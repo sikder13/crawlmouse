@@ -257,51 +257,52 @@ From `apps/web/lib/v2/view`, read through the TypeScript compiler. The screens r
 
 #### `SettingsView`
 
-| Field               | Type                                                             | Note                                                                                    |
-| ------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| `shell`             | `object`                                                         |                                                                                         |
-| `shell.nav`         | `NavItemView[]`                                                  |                                                                                         |
-| `shell.trial`       | `TrialCardView \| null`                                          |                                                                                         |
-| `shell.theme`       | `"system" \| "light" \| "dark"`                                  | The signed-in seat's theme.                                                             |
-| `shell.themeAction` | `ActionView`                                                     | Where a new theme is saved (PATCH /api/me {theme}).                                     |
-| `header`            | `object`                                                         |                                                                                         |
-| `header.title`      | `string`                                                         |                                                                                         |
-| `header.line`       | `string`                                                         |                                                                                         |
-| `account`           | `object`                                                         |                                                                                         |
-| `account.title`     | `string`                                                         |                                                                                         |
-| `account.email`     | `FieldView`                                                      |                                                                                         |
-| `account.name`      | `FieldView`                                                      |                                                                                         |
-| `account.signIn`    | `{ title: string; text: string; }`                               |                                                                                         |
-| `account.save`      | `ActionView`                                                     | The account form's submit: name and address together (CC27B_ROUTES.account).            |
-| `email`             | `object`                                                         |                                                                                         |
-| `email.title`       | `string`                                                         |                                                                                         |
-| `email.tableLabel`  | `string`                                                         |                                                                                         |
-| `email.rows`        | `EmailKindRowView[]`                                             |                                                                                         |
-| `email.foot`        | `string`                                                         |                                                                                         |
-| `danger`            | `object`                                                         | `action` is null for anyone but the owner: deleting is the owner's alone.               |
-| `danger.title`      | `string`                                                         |                                                                                         |
-| `danger.tableLabel` | `string`                                                         |                                                                                         |
-| `danger.label`      | `string`                                                         |                                                                                         |
-| `danger.text`       | `string`                                                         |                                                                                         |
-| `danger.action`     | `ActionView \| null`                                             |                                                                                         |
-| `plan`              | `object`                                                         |                                                                                         |
-| `plan.title`        | `string`                                                         |                                                                                         |
-| `plan.name`         | `string`                                                         |                                                                                         |
-| `plan.left`         | `string \| null`                                                 |                                                                                         |
-| `plan.note`         | `string \| null`                                                 | The trial's end and what the card on file means, or Free's limits; null on a paid plan. |
-| `plan.usageLabel`   | `string`                                                         |                                                                                         |
-| `plan.usage`        | `[string, string][]`                                             |                                                                                         |
-| `plan.keep`         | `ActionView \| null`                                             |                                                                                         |
-| `plan.other`        | `string`                                                         |                                                                                         |
-| `plan.compare`      | `ActionView`                                                     |                                                                                         |
-| `plan.termsLabel`   | `string`                                                         |                                                                                         |
-| `plan.terms`        | `{ label: string; text: string; action: ActionView \| null; }[]` | Cancel and Receipts, each with its control where the account has one to use.            |
-| `columns`           | `object`                                                         |                                                                                         |
-| `columns.kind`      | `string`                                                         |                                                                                         |
-| `columns.detail`    | `string`                                                         |                                                                                         |
-| `columns.control`   | `string`                                                         |                                                                                         |
-| `columns.item`      | `string`                                                         |                                                                                         |
-| `columns.value`     | `string`                                                         |                                                                                         |
+| Field                 | Type                                                             | Note                                                                                      |
+| --------------------- | ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `shell`               | `object`                                                         |                                                                                           |
+| `shell.nav`           | `NavItemView[]`                                                  |                                                                                           |
+| `shell.trial`         | `TrialCardView \| null`                                          |                                                                                           |
+| `shell.theme`         | `"system" \| "light" \| "dark"`                                  | The signed-in seat's theme.                                                               |
+| `shell.themeAction`   | `ActionView`                                                     | Where a new theme is saved (PATCH /api/me {theme}).                                       |
+| `header`              | `object`                                                         |                                                                                           |
+| `header.title`        | `string`                                                         |                                                                                           |
+| `header.line`         | `string`                                                         |                                                                                           |
+| `account`             | `object`                                                         |                                                                                           |
+| `account.title`       | `string`                                                         |                                                                                           |
+| `account.email`       | `FieldView`                                                      |                                                                                           |
+| `account.name`        | `FieldView`                                                      |                                                                                           |
+| `account.signIn`      | `{ title: string; text: string; }`                               |                                                                                           |
+| `account.save`        | `ActionView`                                                     | The account form's submit: name and address together (CC27B_ROUTES.account).              |
+| `email`               | `object`                                                         |                                                                                           |
+| `email.title`         | `string`                                                         |                                                                                           |
+| `email.tableLabel`    | `string`                                                         |                                                                                           |
+| `email.rows`          | `EmailKindRowView[]`                                             |                                                                                           |
+| `email.foot`          | `string`                                                         |                                                                                           |
+| `email.undeliverable` | `string \| null`                                                 | The reader's own address is suppressed (CC-28 D7): what still reaches it. Null otherwise. |
+| `danger`              | `object`                                                         | `action` is null for anyone but the owner: deleting is the owner's alone.                 |
+| `danger.title`        | `string`                                                         |                                                                                           |
+| `danger.tableLabel`   | `string`                                                         |                                                                                           |
+| `danger.label`        | `string`                                                         |                                                                                           |
+| `danger.text`         | `string`                                                         |                                                                                           |
+| `danger.action`       | `ActionView \| null`                                             |                                                                                           |
+| `plan`                | `object`                                                         |                                                                                           |
+| `plan.title`          | `string`                                                         |                                                                                           |
+| `plan.name`           | `string`                                                         |                                                                                           |
+| `plan.left`           | `string \| null`                                                 |                                                                                           |
+| `plan.note`           | `string \| null`                                                 | The trial's end and what the card on file means, or Free's limits; null on a paid plan.   |
+| `plan.usageLabel`     | `string`                                                         |                                                                                           |
+| `plan.usage`          | `[string, string][]`                                             |                                                                                           |
+| `plan.keep`           | `ActionView \| null`                                             |                                                                                           |
+| `plan.other`          | `string`                                                         |                                                                                           |
+| `plan.compare`        | `ActionView`                                                     |                                                                                           |
+| `plan.termsLabel`     | `string`                                                         |                                                                                           |
+| `plan.terms`          | `{ label: string; text: string; action: ActionView \| null; }[]` | Cancel and Receipts, each with its control where the account has one to use.              |
+| `columns`             | `object`                                                         |                                                                                           |
+| `columns.kind`        | `string`                                                         |                                                                                           |
+| `columns.detail`      | `string`                                                         |                                                                                           |
+| `columns.control`     | `string`                                                         |                                                                                           |
+| `columns.item`        | `string`                                                         |                                                                                           |
+| `columns.value`       | `string`                                                         |                                                                                           |
 
 #### `FieldView`
 
@@ -490,9 +491,10 @@ From `apps/web/lib/v2/copy/{alerts,reports,settings,trial-end}.ts`, listed in `c
 
 What this step adds that no locked screen has, marked `data-v2-addition` where it renders:
 
-| Screen  | Addition                                                                                                                           | Source                                                    |
-| ------- | ---------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
-| reports | A Show button beside the site picker: the picker reloads the card for another site without changing the page on input (WCAG 3.2.2) | CC-27 plan, approved; the artboard draws the picker alone |
+| Screen   | Addition                                                                                                                                                              | Source                                                                   |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| reports  | A Show button beside the site picker: the picker reloads the card for another site without changing the page on input (WCAG 3.2.2)                                    | CC-27 plan, approved; the artboard draws the picker alone                |
+| settings | A line under the email kinds when mail to the reader’s own address hard-bounced or was reported as spam, saying that only sign-in links and account mail go to it now | CC-28 D7 (Resend’s bounces and complaints suppress all but account mail) |
 
 ## Changes to earlier steps’ code
 

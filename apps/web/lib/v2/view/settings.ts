@@ -232,7 +232,14 @@ export interface SettingsView {
     /** The account form's submit: name and address together (CC27B_ROUTES.account). */
     save: ActionView;
   };
-  email: { title: string; tableLabel: string; rows: EmailKindRowView[]; foot: string };
+  email: {
+    title: string;
+    tableLabel: string;
+    rows: EmailKindRowView[];
+    foot: string;
+    /** The reader's own address is suppressed (CC-28 D7): what still reaches it. Null otherwise. */
+    undeliverable: string | null;
+  };
   /** `action` is null for anyone but the owner: deleting is the owner's alone. */
   danger: {
     title: string;
@@ -266,6 +273,12 @@ export interface SettingsView {
  * page). Its forms post to CC27B_ROUTES paths, and Keep to the checkout route ACCOUNT_ACTIONS names;
  * the preview stops each submit.
  */
+/** The reader's own address, as the suppression record holds it (`email_address_suppressed`). */
+export interface Undeliverable {
+  address: string;
+  reason: 'hard_bounce' | 'complaint';
+}
+
 export function settingsView(
   d: FixtureDataset,
   viewer: Viewer,
@@ -273,7 +286,13 @@ export function settingsView(
     billingEnd = null,
     role = 'owner',
     subscriptionStatus,
+    undeliverable = null,
   }: {
+    /**
+     * The reader's own address when mail to it is suppressed, read by the live page; null or left out
+     * when it is not, or cannot be read (no pepper), and in a preview.
+     */
+    undeliverable?: Undeliverable | null;
     /** The subscription mirror's `status`, or null for none; left out in a preview (`deleteText`). */
     subscriptionStatus?: string | null;
     /** When a paid plan set to cancel at its period's end ends (the subscription mirror's
@@ -405,6 +424,10 @@ export function settingsView(
       tableLabel: COPY.tables.email,
       rows: EMAIL_KINDS.map((k) => rowOf[k]()),
       foot: COPY.emailFoot(EMAIL_KINDS.length),
+      undeliverable:
+        undeliverable === null
+          ? null
+          : COPY.undeliverable(undeliverable.address, undeliverable.reason),
     },
     danger: {
       title: COPY.dangerTitle,

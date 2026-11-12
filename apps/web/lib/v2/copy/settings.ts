@@ -46,6 +46,16 @@ export const SETTINGS_COPY = {
   /** FACTS A9: Stripe sends the receipts. */
   emailFoot: (kinds: number) =>
     `Those are the ${numberWord(kinds)} kinds from us. If you pay, Stripe sends the receipts. There is no newsletter and no product-update mail to unsubscribe from.`,
+  /**
+   * The member's own address, once a hard bounce or a spam report suppressed it (CC-28 D7): every kind
+   * of mail but account mail stops (`email_kind_suppressible`), so what still goes is named.
+   */
+  undeliverable: (address: string, reason: 'hard_bounce' | 'complaint') =>
+    `${
+      reason === 'hard_bounce'
+        ? `We could not deliver to ${address}`
+        : `Mail to ${address} was reported as spam`
+    }, so only sign-in links and mail about the account are sent to it now.`,
   dangerTitle: 'Danger',
   deleteLabel: 'Delete this account',
   /** FACTS E6: the seven-day undo, by the restore link (owner ruling, CC-27b Q16). */
@@ -288,4 +298,10 @@ export const SETTINGS_CHANGES: CopyChange[] = [
   },
 ];
 
-export const SETTINGS_ADDITIONS: Addition[] = [];
+export const SETTINGS_ADDITIONS: Addition[] = [
+  {
+    screen: 'settings',
+    what: 'A line under the email kinds when mail to the reader’s own address hard-bounced or was reported as spam, saying that only sign-in links and account mail go to it now',
+    source: 'CC-28 D7 (Resend’s bounces and complaints suppress all but account mail)',
+  },
+];

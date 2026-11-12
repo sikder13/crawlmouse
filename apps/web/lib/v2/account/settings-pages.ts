@@ -6,8 +6,10 @@
 import 'server-only';
 import { supabaseAdmin } from '../../supabase/admin';
 import { supabaseServer } from '../../supabase/server';
+import { hashMailAddress, mailPepper } from '../mail/address-hash';
 import { supabaseCheckReader } from '../pipeline/load';
 import type { Viewer } from '../view/account';
+import type { Undeliverable } from '../view/settings';
 import type { SeatRole } from './profile';
 import { loadSettingsDataset, viewInput } from './settings-dataset';
 import { readViewer } from './viewer';
@@ -25,6 +27,8 @@ export type SettingsPageRead =
       viewer: Viewer;
       billingEnd: string | null;
       subscriptionStatus: string | null;
+      /** The reader's own address when mail to it is suppressed (CC-28 D7), else null. */
+      undeliverable: Undeliverable | null;
     };
 
 export async function readSettingsPage(now = new Date()): Promise<SettingsPageRead> {
@@ -57,5 +61,24 @@ export async function readSettingsPage(now = new Date()): Promise<SettingsPageRe
     viewer: { accountId, now: now.toISOString() },
     billingEnd,
     subscriptionStatus,
+    undeliverable: await suppressionOf(admin, user.email ?? null),
   };
+}
+
+/**
+ * Whether mail to `address` is suppressed, and why (`email_address_suppressed`, by the mailer's
+ * peppered hash). Null for no address, and with no pepper: the hash cannot be made, so nothing can be
+ * said either way.
+ */
+async function suppressionOf(
+  admin: ReturnType<typeof supabaseAdmin>,
+  address: string | null,
+): Promise<Undeliverable | null> {
+  const pepper = mailPepper();
+  if (address === null || pepper === null) return null;
+  const { data, error } = await admin.rpc('email_address_suppressed', {
+    p_hash: hashMailAddress(pepper, address),
+  });
+  if (error) throw new Error(`settings page: email_address_suppressed failed: ${error.message}`);
+  return data === 'hard_bounce' || data === 'complaint' ? { address, reason: data } : null;
 }

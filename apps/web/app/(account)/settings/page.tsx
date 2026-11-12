@@ -34,6 +34,7 @@ export default async function SettingsPage({
           billingEnd: page.billingEnd,
           role: page.role,
           subscriptionStatus: page.subscriptionStatus,
+          undeliverable: page.undeliverable,
         })}
       />
     </LiveActions>
