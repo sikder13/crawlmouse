@@ -109,7 +109,26 @@ before it changes anything. Both take the same signed token (`lib/v2/mail/links.
 kind and lasts 90 days. The POST route accepts a cross-site request (a mail client sends it), with the
 webhook policy class. The page's form is sent back to `/unsubscribe` with a two-minute cookie naming the kind it
 turned off, and the page says "Done" only with that cookie, so a crafted link cannot show it. Account mail carries
-neither.
+neither. That a sent alert's and summary's two links carry one token, and that both routes accept it:
+`pnpm --filter @crawlmouse/web exec vitest run lib/v2/monitor/unsubscribe-send.test.ts`, over the deps
+`monitor/functions.ts` builds. (The preview pages show a stand-in footer link, signed by nothing.)
+
+What the alert says (`templates/alert.ts`), rendered from the changes it lists:
+
+- The opening line: when the check ran and what it found, `The check on Fri 30 Oct at 06:02 EDT found 3 problems
+and 1 other change.` A problem is an opened change or a falling grade (`isProblem`); a count of one is singular.
+- When the listed changes moved a grade's letter, one line above the rows: `AI readability D → F`, from the first
+  delta's letter to the last's, Technical SEO first. A grade whose letter held is left out; its row shows the scores.
+- Each row's second line gives where and how many as one phrase (`wherePhrase`): the engine's `all pages` reads
+  `across the site`, `robots.txt` reads `in robots.txt`, `stack` reads `in the site’s stack`, and any other `where`
+  reads `on <where>`; then `· 3 pages` (`1 page` at one) and any grade move.
+- An opened change with a `fix_id` adds `Open the fix`, the fix's page under the alert's check
+  (`auditHrefs(checkId).fix(fixId)`); a resolved one does not. `Open the check` stays the closing link.
+
+The weekly summary's rows use the same where phrase. A time in the alert, the trial reminder and the Slack message
+reads the account's clock with the zone's short name when Intl gives one (`21:41 EST`, `03:41 CET`: `en-US` is
+asked first, then `en-GB`), and `your time` when Intl gives only an offset (`GMT+9`); the IANA name is not shown
+(`templates/when.ts`; `when.test.ts` holds both outcomes).
 
 Alert and summary recipients honour a seat's client scope as `is_member_for_site` reads it (`client_scope_all`, or
 a `seat_sites` row for the site or the production site it stages): `alert_email_recipients(account, site)` answers

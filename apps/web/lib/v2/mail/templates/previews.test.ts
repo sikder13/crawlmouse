@@ -27,3 +27,25 @@ describe('the mail preview registry (D2)', () => {
     },
   );
 });
+
+describe('the alert and summary previews show the lines rulings-3 added', () => {
+  it('the alert: counts in the opening line, a grade line, a fix link and where phrases', () => {
+    const m = mailPreview('alert')!.render();
+    expect(m.text).toMatch(
+      /^The check on \w{3} \d+ \w{3} at \d\d:\d\d [A-Z]{3,4} found \d+ problems? /m,
+    );
+    expect(m.text).toMatch(/^(Technical SEO|AI readability) [A-F][+-]? → [A-F][+-]?/m);
+    expect(m.text).toMatch(
+      /^ {2}Open the fix: https:\/\/crawlmouse\.com\/audit\/[0-9a-f-]+\/fix\/[0-9a-f-]+$/m,
+    );
+    expect(m.text).toContain('  in robots.txt · ');
+    expect(m.text).toContain('  across the site · ');
+    expect(m.text).not.toContain('America/');
+  });
+
+  it('the summary: the same where phrases, over the site’s week', () => {
+    const m = mailPreview('weekly-summary')!.render();
+    expect(m.text).toContain('  across the site · ');
+    expect(m.text).toContain('  in robots.txt · ');
+  });
+});

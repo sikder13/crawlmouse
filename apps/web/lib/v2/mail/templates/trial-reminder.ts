@@ -1,13 +1,14 @@
 /**
  * The trial reminder (CC-03's `email.requested` `trial_reminder`): once, before a trial ends, in the
- * account's time zone. Account mail (Q8): no unsubscribe; the person turns it off in Settings
+ * account's time zone, named by its short name or as "your time" (when.ts). Account mail (Q8): no unsubscribe; the person turns it off in Settings
  * (`accounts.email_trial_reminder`), which the sender honours before claiming.
  */
-import { dayDate, hourMinute } from '../../format';
+import { dayDate } from '../../format';
 import { layout } from '../layout';
 import { mailUrl } from '../links';
 import type { Template } from '../types';
 import { linkPara, para, small } from './parts';
+import { clockTime } from './when';
 
 export interface TrialReminderInput {
   plan: 'pro' | 'agency';
@@ -40,7 +41,7 @@ export const trialReminder: Template<TrialReminderInput> = ({
   const name = PLAN[plan];
   const day = dayDate(endsAt, zone);
   const subject = `Your Crawlmouse ${name} trial ends ${day}`;
-  const lead = `Your ${name} trial ends on ${day} at ${hourMinute(endsAt, zone)} (${zone}).`;
+  const lead = `Your ${name} trial ends on ${day} at ${clockTime(endsAt, zone)}.`;
   const money =
     variant === 'no_card'
       ? 'No card is on file, so nothing is charged. Unless you choose a plan, the account goes back to Free then, and nothing you can see is deleted.'
