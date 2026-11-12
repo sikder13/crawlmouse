@@ -2,8 +2,9 @@
  * The functions the Inngest serve route registers (D3): v1's four, in today's order; and checkFn, its
  * cancel handler, the reaper and the daily expiry (CC-22b D8) only when V2_PIPELINE=1 in the
  * environment the route module loads with. CC-03's two billing functions follow, only when
- * V2_BILLING=1, and CC-27b's three deletion functions last, only when V2_CHECKS_PUBLIC=1. With the
- * flags unset the list is v1's four objects, unchanged (functions.test.ts).
+ * V2_BILLING=1, then CC-27b's three deletion functions and CC-28's four mail functions, only when
+ * V2_CHECKS_PUBLIC=1. With the flags unset the list is v1's four objects, unchanged
+ * (functions.test.ts).
  *
  * What each function is built from (correctness 1): the reaper, the cancel handler and checkFn's
  * onFailure take the pipeline store and nothing else; the expiry takes its own stores and the
@@ -37,6 +38,7 @@ import { createCheckReaperFn } from '../../../../../inngest/check-reaper';
 import { checksPublicEnabled, pipelineEnabled } from '../../auth/flags';
 import { billingFunctions } from '../../billing/inngest-functions';
 import { deletionFunctions } from '../account/deletion-ports';
+import { mailFunctions } from '../mail/functions';
 import { workerClientFromEnv } from '../../worker-client/client';
 import { CRAWL_USER_AGENT } from './discover';
 import { supabaseEvidenceStore } from './evidence';
@@ -111,7 +113,10 @@ export function inngestFunctions(
   const billing = billingFunctions(env);
   // CC-27b's deletion functions, with V2_CHECKS_PUBLIC=1 only (lib/v2/account/deletion-ports.ts).
   const deletion = checksPublicEnabled(env) ? deletionFunctions(env) : [];
-  if (!pipelineEnabled(env)) return [...v1, ...billing, ...deletion];
+  // CC-28's mail handlers and the check_finished listener, with V2_CHECKS_PUBLIC=1 only
+  // (lib/v2/mail/functions.ts).
+  const mail = checksPublicEnabled(env) ? mailFunctions(env) : [];
+  if (!pipelineEnabled(env)) return [...v1, ...billing, ...deletion, ...mail];
   // Built when a function runs, not when the route loads, so a missing variable cannot keep the
   // route from registering v1's functions.
   return [
@@ -129,6 +134,7 @@ export function inngestFunctions(
     }),
     ...billing,
     ...deletion,
+    ...mail,
   ];
 }
 

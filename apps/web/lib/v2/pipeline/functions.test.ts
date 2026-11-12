@@ -297,6 +297,13 @@ const limitsOf = (configs: readonly Config[]): number[] =>
     return (Array.isArray(k) ? k : [k]).map((o) => o.limit);
   });
 
+/** CC-28's mail functions, registered with V2_CHECKS_PUBLIC=1 only (lib/v2/mail/functions.ts). */
+const MAIL_IDS = [
+  'crawlmouse-crawlmouse.mail.account',
+  'crawlmouse-crawlmouse.mail.check-notify',
+  'crawlmouse-crawlmouse.mail.fix-to-developer',
+  'crawlmouse-crawlmouse.events.check-finished',
+];
 const SWEEP = [undefined, '', '0', '-1', '2', '5', '6', '50', '1000', 'abc', '5.5'] as const;
 
 describe('no registered function can declare a concurrency limit above the plan cap (D4)', () => {
@@ -323,7 +330,9 @@ describe('no registered function can declare a concurrency limit above the plan 
               vi.stubEnv('INNGEST_CHECK_CONCURRENCY', check);
               const configs = configsOf(fresh.inngestFunctions(process.env));
               expect(configs.length).toBe(
-                (flag === '1' ? 10 : 5) + (billing === '1' ? 2 : 0) + (pub === '1' ? 3 : 0),
+                (flag === '1' ? 10 : 5) +
+                  (billing === '1' ? 2 : 0) +
+                  (pub === '1' ? 3 + MAIL_IDS.length : 0),
               );
               const deletionIds = [
                 'crawlmouse-crawlmouse.account.deletion-cancel',
@@ -331,7 +340,9 @@ describe('no registered function can declare a concurrency limit above the plan 
                 'crawlmouse-crawlmouse.account.purge-deleted',
               ];
               const ids = configs.map((c) => c.id);
-              for (const id of deletionIds) expect(ids.includes(id), id).toBe(pub === '1');
+              for (const id of [...deletionIds, ...MAIL_IDS]) {
+                expect(ids.includes(id), id).toBe(pub === '1');
+              }
               if (billing === '1') {
                 expect(configs.map((c) => c.id)).toEqual(
                   expect.arrayContaining([
