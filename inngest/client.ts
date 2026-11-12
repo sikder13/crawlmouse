@@ -52,7 +52,9 @@ type Events = {
           accountId: string;
           template: 'email_change_confirm' | 'email_change_notice' | 'account_delete';
           tokenId: string;
-        };
+        }
+      // CC-29: the Agency Plus contact form names its contact_requests row, never the address.
+      | { template: 'agency_plus_contact'; contactId: string };
   };
   // CC-27b: a deletion was confirmed, one event per account it marked. deletionCancelFn ends the
   // account's subscription through CC-03's cancel, and the account's trialLifecycleFn stops (cancelOn,
