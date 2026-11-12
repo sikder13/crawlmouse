@@ -21,7 +21,7 @@ import { namesOnePage, templateNoun } from '../build/template-noun.js';
 import { subjectOfKey } from '../detectors/fingerprint.js';
 import type { RenderedDetection } from '../detectors/rendered.js';
 import type { Detection } from '../detectors/types.js';
-import { clean } from '../packets/text.js';
+import { clean } from '../clean-text.js';
 import { PAGES_PER_FIX_TEMPLATE } from '../render/sample.js';
 import { effectsOf, type FixRecord } from './effects.js';
 
@@ -93,7 +93,7 @@ export const NOTHING_WRITTEN: WriteFix = () => ({ packet: null, effort: null, be
 export const MAX_TITLE_CHARS = 300;
 
 /**
- * A fix's title on one line, with nothing invisible in it (packets/text.ts `clean`): its subject is
+ * A fix's title on one line, with nothing invisible in it (clean-text.ts `clean`): its subject is
  * crawled text, and the title is the first line of the packet's prompt. A title past
  * MAX_TITLE_CHARS is cut and ends in an ellipsis.
  */

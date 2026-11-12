@@ -98,16 +98,15 @@ describe('beforeAfterOf: an edge rule that blocks a crawler', () => {
     expect(row).toMatchObject({ today: 3, after: 4 });
   });
 
-  it('adds nothing, exactly, when the crawler already reads the text on most pages', () => {
-    // A rule on half its pages is detected while the site verdict stays allowed.
-    const [row] = beforeAfterOf(edge('GPTBot', { matching: 2, of: 4 }), factsWith());
-    expect(row).toEqual({
-      measure: 'crawlers_reading_text',
-      today: 6,
-      after: 6,
-      after_bound: 'exact',
-      after_is_estimate: true,
-    });
+  it('writes no row for a crawler already counted: a rule on half its pages leaves the site verdict allowed', () => {
+    expect(beforeAfterOf(edge('GPTBot', { matching: 2, of: 4 }), factsWith())).toEqual([]);
+  });
+
+  it('writes no row for a crawler something else keeps out of the count', () => {
+    for (const verdict of ['allowed_thin', 'disallowed_by_robots', 'challenged_ua'] as const) {
+      const facts = factsWith({ GPTBot: verdict });
+      expect(beforeAfterOf(edge('GPTBot', { matching: 1, of: 4 }), facts), verdict).toEqual([]);
+    }
   });
 
   it('takes `after` from the counterfactual the effect is computed with (servedAll), not a second rule', () => {

@@ -5,7 +5,7 @@
  * chose (a URL, a path, a template key, anchor text, a heading) could carry an instruction for that
  * assistant, so it enters a packet through `code` and no other way:
  *
- *   - format and control characters are removed (`INVISIBLE`, `BREAKS`), so it cannot start a line,
+ *   - format and control characters are removed (clean-text.ts), so it cannot start a line,
  *     reorder what is shown, or hide text;
  *   - a backtick becomes an apostrophe, so it cannot end the code span it is shown in;
  *   - it is cut at a stated number of code points, and a cut says how long the text was;
@@ -16,16 +16,9 @@
  * not type-check. The parts of a line the template itself holds are this repository's own text, and
  * `line` refuses a line break in them.
  */
+import { clean } from '../clean-text.js';
 
-/**
- * Code points that draw nothing or change how text is shown: removed. The Unicode categories, and
- * the letters and marks that render blank though their category says otherwise (the Hangul fillers,
- * the braille blank, the combining grapheme joiner, two Khmer inherent vowels).
- */
-const INVISIBLE =
-  /[\p{Cf}\p{Co}\p{Cs}\p{Cn}\p{Variation_Selector}\u034F\u115F\u1160\u17B4\u17B5\u2800\u3164\uFFA0]/gu;
-/** Control characters, line and paragraph separators, and every other space: each run becomes one space. */
-const BREAKS = /[\p{Cc}\p{Zl}\p{Zp}\p{Zs}]+/gu;
+export { clean };
 
 /** The longest crawled text a packet shows, in code points, unless a caller asks for less. */
 export const MAX_CRAWLED_CHARS = 200;
@@ -46,11 +39,6 @@ function safe(text: string): Safe {
   const value = Object.freeze({ text });
   made.add(value);
   return value;
-}
-
-/** Crawled text without the code points `INVISIBLE` lists, with no line break and no backtick. */
-export function clean(crawled: string): string {
-  return crawled.replace(INVISIBLE, '').replace(BREAKS, ' ').replaceAll('`', "'").trim();
 }
 
 /** Crawled text, cleaned, cut to `max` code points and shown in a code span. */

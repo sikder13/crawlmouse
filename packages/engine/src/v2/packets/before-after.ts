@@ -39,11 +39,11 @@ export const BEFORE_AFTER_RULES: { readonly [T in FixType]: BeforeAfterRule } = 
   robots_txt_blocks_crawler: NO_FIX,
   edge_rule_blocks_crawler: {
     measures: ['crawlers_reading_text'],
-    rule: 'Today: the AI crawlers (the registry’s `ai_search` and `ai_training` groups) whose verdict for the site is `allowed`, which is the count the fix page prints against the AI crawlers tested. After: the counterfactual serves the crawler, `allowed`, on the pages the rule blocked it on (`servedAll`), so the crawler is added when it is not counted today, and the bound is `approx`: whether it then reads the text depends on what those pages serve, which the blocked requests could not show. A crawler counted today stays counted and the bound is `exact`.',
+    rule: 'A row only for an AI crawler (the registry’s `ai_search` and `ai_training` groups) whose verdict for the site is `blocked_by_ua_rule`: one already counted has no before and after, and one kept out by something else is not let in by this fix alone. Today: the AI crawlers whose verdict for the site is `allowed`, the count the fix page prints against the AI crawlers tested. After: one more, because the counterfactual serves the crawler, `allowed`, on the pages the rule blocked it on (`servedAll`); `approx`, because what those pages serve the crawler is what the blocked requests could not show.',
   },
   client_rendered_template: {
     measures: ['words_without_js', 'text_share'],
-    rule: 'From the template’s rendered pages (`evidence.pages`). Words without JavaScript: today the median `raw_words`, after the median `rendered_words`, `approx` because a server render need not hold the same words a browser shows. Text share: today the record’s `measured` (the median share), after 1, `approx` for the same reason. No row for crawlers reading the text: the fix’s counterfactual changes the text share and no crawler’s verdict.',
+    rule: 'From the template’s rendered pages (`evidence.pages`). Words without JavaScript: today the median `raw_words`, after the median `rendered_words`, each rounded to a whole word, `approx` because a server render need not hold the same words a browser shows. Text share: today the record’s `measured` (the median share), after 1, `approx` for the same reason. No row for crawlers reading the text: the fix’s counterfactual changes the text share and no crawler’s verdict.',
   },
   orphan_pages: NO_MEASURE('the links to a page'),
   quotable_opening: {
@@ -96,11 +96,11 @@ function crawlersReadingText(
   const ai = new Set(registry.filter((e) => e.group !== 'search_engine').map((e) => e.token));
   const reading = facts.crawlers.filter((c) => ai.has(c.ua) && c.verdict === 'allowed');
   const today = reading.length;
-  // A crawler outside those groups is not one the row counts.
-  if (!ai.has(record.crawler)) return [];
-  if (reading.some((c) => c.ua === record.crawler)) {
-    return [row('crawlers_reading_text', today, today, 'exact')];
-  }
+  // The row moves only for a crawler the rule itself keeps out of the count: an AI crawler whose
+  // verdict for the site is the user-agent block. One already counted has no before and after, and
+  // one kept out by something else (robots.txt, a thin answer) is not let in by this fix alone.
+  const own = facts.crawlers.find((c) => c.ua === record.crawler);
+  if (!ai.has(record.crawler) || own?.verdict !== 'blocked_by_ua_rule') return [];
   // The pages the rule holds on, through the counterfactual the effect applies to the crawler's tally.
   const served = servedAll({
     ua: record.crawler,
@@ -111,8 +111,8 @@ function crawlersReadingText(
       edge: { blocked: record.extent.matching, served: 0, answered: record.extent.of },
     },
   });
-  const reads = (served.counts.allowed ?? 0) > 0 && (served.counts.blocked_by_ua_rule ?? 0) === 0;
-  return [row('crawlers_reading_text', today, today + (reads ? 1 : 0), reads ? 'approx' : 'exact')];
+  if ((served.counts.allowed ?? 0) === 0 || (served.counts.blocked_by_ua_rule ?? 0) > 0) return [];
+  return [row('crawlers_reading_text', today, today + 1, 'approx')];
 }
 
 function quotableOpening(record: ContentRecord): Row[] {
@@ -133,8 +133,8 @@ export function renderedBeforeAfter(record: RenderedDetection): Row[] {
   return [
     row(
       'words_without_js',
-      median(pages.map((p) => p.raw_words)),
-      median(pages.map((p) => p.rendered_words)),
+      Math.round(median(pages.map((p) => p.raw_words))),
+      Math.round(median(pages.map((p) => p.rendered_words))),
       'approx',
     ),
     row('text_share', record.measured, SERVER_RENDERED_SHARE, 'approx'),

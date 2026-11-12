@@ -30,16 +30,8 @@ const facts: PacketFacts = {
 };
 
 describe('with counterfactuals that change nothing', () => {
-  it('the edge fix adds no crawler: the blocked pages stay blocked', () => {
-    expect(beforeAfterOf({ family: 'access', record: accessRecord('GPTBot') }, facts)).toEqual([
-      {
-        measure: 'crawlers_reading_text',
-        today: 5,
-        after: 5,
-        after_bound: 'exact',
-        after_is_estimate: true,
-      },
-    ]);
+  it('the edge fix writes no row: the blocked pages stay blocked, so no crawler is added', () => {
+    expect(beforeAfterOf({ family: 'access', record: accessRecord('GPTBot') }, facts)).toEqual([]);
   });
 
   it('the opening is still not quotable: the failing pages stay failing', () => {
