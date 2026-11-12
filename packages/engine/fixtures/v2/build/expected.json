@@ -31110,7 +31110,29 @@
       },
       "effort": null,
       "before_after": [],
-      "packet": null,
+      "packet": {
+        "framework": "generic",
+        "frameworks": [
+          "generic"
+        ],
+        "context": [
+          "No path of links from the homepage `https://built-site.test` reaches `https://built-site.test/products/forgotten-lantern`; the audit counts more than 3 clicks as deep."
+        ],
+        "change": [
+          "Add a link to `https://built-site.test/products/forgotten-lantern` on a page at most 2 clicks from the homepage, so that it lands within 3.",
+          "On the links as crawled, the estimate for this fix puts the link on `https://built-site.test/blog/choosing-tent-pegs`, a page that close. Another page as close does as well: pick the one a visitor would look on.",
+          "Write the link as an <a> element with an href, in the HTML the server sends. A link that only JavaScript adds is not there for a crawler that does not run scripts."
+        ],
+        "keep": [
+          "Keep the page at `https://built-site.test/products/forgotten-lantern` and the links it has: the fix adds a shorter path, it moves nothing."
+        ],
+        "verify": {
+          "command": "curl -sS -A 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36; compatible; OAI-SearchBot/1.4; +https://openai.com/searchbot' 'https://built-site.test/blog/choosing-tent-pegs' | tr '\\n\\r\\t\\047' '   \"' | grep -oiE '<a[[:space:]][^>]*>' | grep -oiE '[[:space:]]href=\"[^\"]*\"' | sed -e 's/^.[Hh][Rr][Ee][Ff]=\"//' -e 's/\"$//' -e 's/&amp;/\\&/g' -e 's/#.*$//' -e 's:\\(.\\)/$:\\1:' | grep -qxF -e 'https://built-site.test/products/forgotten-lantern' -e '/products/forgotten-lantern'",
+          "expect": "Exit status 0 once `https://built-site.test/blog/choosing-tent-pegs` holds an <a> whose href is `https://built-site.test/products/forgotten-lantern`, in full or from the root, in quotes; today it holds none. If you put the link on another page, request that page instead. The command proves the link; the click depth is measured again on the next check.",
+          "ua": "OAI-SearchBot"
+        },
+        "packets": []
+      },
       "gone": null
     },
     {
@@ -31144,7 +31166,57 @@
       },
       "effort": null,
       "before_after": [],
-      "packet": null,
+      "packet": {
+        "framework": "generic",
+        "frameworks": [
+          "generic",
+          "nextjs"
+        ],
+        "context": [
+          "The hreflang annotations join `https://built-site.test/blog/tent-care-guide` and 1 other crawled page into one cluster. 1 of the 2 carries a defect: `https://built-site.test/blog/tent-care-guide-fr`.",
+          "It is named as an alternate by another page of the cluster and does not name that page back. Google ignores annotations that do not point both ways.",
+          "It has no x-default annotation. Google recommends one and does not require it.",
+          "Google's rules for hreflang: https://developers.google.com/search/docs/specialty/international/localized-versions"
+        ],
+        "change": [
+          "Give every page of the cluster the same full set of annotations: one <link rel=\"alternate\" hreflang=\"…\" href=\"…\"> in the <head> for each language version, the page itself included, each with an absolute URL.",
+          "Where one page names another, make the other name it back.",
+          "Add an x-default annotation to each page, naming the page for visitors whose language none of the others matches."
+        ],
+        "keep": [
+          "Keep each page at its URL, and keep the annotations of the pages that carry no defect in step with the ones you change: every page lists the same set."
+        ],
+        "verify": {
+          "command": "curl -sS -A 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36; compatible; OAI-SearchBot/1.4; +https://openai.com/searchbot' 'https://built-site.test/blog/tent-care-guide-fr' | tr '\\n\\r\\t\\047' '   \"' | grep -oiE '<link[^>]*[[:space:]]hreflang=\"[^\"]*\"[^>]*>' | sed -e 's/.*[[:space:]]hreflang=\"\\([^\"]*\\)\".*[[:space:]]href=\"\\([^\"]*\\)\".*/\\1 \\2/' -e 's/.*[[:space:]]href=\"\\([^\"]*\\)\".*[[:space:]]hreflang=\"\\([^\"]*\\)\".*/\\2 \\1/' -e 's/&amp;/\\&/g' -e 's/#.*$//' -e 's:\\(.\\)/$:\\1:' | awk 'BEGIN { self = ARGV[1]; n = ARGV[2]; for (i = 3; i < 3 + n; i++) must[ARGV[i]] = 1; for (; i < ARGC; i++) gone[ARGV[i]] = 1; ARGC = 1 } { if (tolower($1) == \"x-default\") fallback = 1; else if ($2 == self) own = 1; delete must[$2]; if ($1 in gone || $2 in gone) bad = 1 } END { for (m in must) bad = 1; exit !(own && fallback && !bad) }' 'https://built-site.test/blog/tent-care-guide-fr' '1' 'https://built-site.test/blog/tent-care-guide'",
+          "expect": "Exit status 0 once `https://built-site.test/blog/tent-care-guide-fr` lists itself under a language code and holds an x-default. It must also name `https://built-site.test/blog/tent-care-guide`. Annotations are read from <link> elements with quoted, absolute URLs.",
+          "ua": "OAI-SearchBot"
+        },
+        "packets": [
+          {
+            "framework": "nextjs",
+            "context": [
+              "The hreflang annotations join `https://built-site.test/blog/tent-care-guide` and 1 other crawled page into one cluster. 1 of the 2 carries a defect: `https://built-site.test/blog/tent-care-guide-fr`.",
+              "It is named as an alternate by another page of the cluster and does not name that page back. Google ignores annotations that do not point both ways.",
+              "It has no x-default annotation. Google recommends one and does not require it.",
+              "Google's rules for hreflang: https://developers.google.com/search/docs/specialty/international/localized-versions"
+            ],
+            "change": [
+              "In the App Router the annotations come from alternates.languages (a map from hreflang value to URL) in the metadata export, or in generateMetadata, of the page.js of the route or of a layout.js above it. Make the changes below there.",
+              "Give every page of the cluster the same full set of annotations: one <link rel=\"alternate\" hreflang=\"…\" href=\"…\"> in the <head> for each language version, the page itself included, each with an absolute URL.",
+              "Where one page names another, make the other name it back.",
+              "Add an x-default annotation to each page, naming the page for visitors whose language none of the others matches."
+            ],
+            "keep": [
+              "Keep each page at its URL, and keep the annotations of the pages that carry no defect in step with the ones you change: every page lists the same set."
+            ],
+            "verify": {
+              "command": "curl -sS -A 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36; compatible; OAI-SearchBot/1.4; +https://openai.com/searchbot' 'https://built-site.test/blog/tent-care-guide-fr' | tr '\\n\\r\\t\\047' '   \"' | grep -oiE '<link[^>]*[[:space:]]hreflang=\"[^\"]*\"[^>]*>' | sed -e 's/.*[[:space:]]hreflang=\"\\([^\"]*\\)\".*[[:space:]]href=\"\\([^\"]*\\)\".*/\\1 \\2/' -e 's/.*[[:space:]]href=\"\\([^\"]*\\)\".*[[:space:]]hreflang=\"\\([^\"]*\\)\".*/\\2 \\1/' -e 's/&amp;/\\&/g' -e 's/#.*$//' -e 's:\\(.\\)/$:\\1:' | awk 'BEGIN { self = ARGV[1]; n = ARGV[2]; for (i = 3; i < 3 + n; i++) must[ARGV[i]] = 1; for (; i < ARGC; i++) gone[ARGV[i]] = 1; ARGC = 1 } { if (tolower($1) == \"x-default\") fallback = 1; else if ($2 == self) own = 1; delete must[$2]; if ($1 in gone || $2 in gone) bad = 1 } END { for (m in must) bad = 1; exit !(own && fallback && !bad) }' 'https://built-site.test/blog/tent-care-guide-fr' '1' 'https://built-site.test/blog/tent-care-guide'",
+              "expect": "Exit status 0 once `https://built-site.test/blog/tent-care-guide-fr` lists itself under a language code and holds an x-default. It must also name `https://built-site.test/blog/tent-care-guide`. Annotations are read from <link> elements with quoted, absolute URLs.",
+              "ua": "OAI-SearchBot"
+            }
+          }
+        ]
+      },
       "gone": null
     },
     {
@@ -31178,7 +31250,30 @@
       },
       "effort": null,
       "before_after": [],
-      "packet": null,
+      "packet": {
+        "framework": "generic",
+        "frameworks": [
+          "generic"
+        ],
+        "context": [
+          "`https://built-site.test/journal/forged-steel-pegs` is 4 clicks from the homepage `https://built-site.test`; the audit counts more than 3 as deep.",
+          "The shortest path the crawl found passes through, in URL order: `https://built-site.test/blog/choosing-tent-pegs`, `https://built-site.test/blog/how-to-pitch-a-tent`, `https://built-site.test/journal/peg-materials-compared`."
+        ],
+        "change": [
+          "Add a link to `https://built-site.test/journal/forged-steel-pegs` on a page at most 2 clicks from the homepage, so that it lands within 3.",
+          "On the links as crawled, the estimate for this fix puts the link on `https://built-site.test/blog/choosing-tent-pegs`, a page that close. Another page as close does as well: pick the one a visitor would look on.",
+          "Write the link as an <a> element with an href, in the HTML the server sends. A link that only JavaScript adds is not there for a crawler that does not run scripts."
+        ],
+        "keep": [
+          "Keep the page at `https://built-site.test/journal/forged-steel-pegs` and the links it has: the fix adds a shorter path, it moves nothing."
+        ],
+        "verify": {
+          "command": "curl -sS -A 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36; compatible; OAI-SearchBot/1.4; +https://openai.com/searchbot' 'https://built-site.test/blog/choosing-tent-pegs' | tr '\\n\\r\\t\\047' '   \"' | grep -oiE '<a[[:space:]][^>]*>' | grep -oiE '[[:space:]]href=\"[^\"]*\"' | sed -e 's/^.[Hh][Rr][Ee][Ff]=\"//' -e 's/\"$//' -e 's/&amp;/\\&/g' -e 's/#.*$//' -e 's:\\(.\\)/$:\\1:' | grep -qxF -e 'https://built-site.test/journal/forged-steel-pegs' -e '/journal/forged-steel-pegs'",
+          "expect": "Exit status 0 once `https://built-site.test/blog/choosing-tent-pegs` holds an <a> whose href is `https://built-site.test/journal/forged-steel-pegs`, in full or from the root, in quotes; today it holds none. If you put the link on another page, request that page instead. The command proves the link; the click depth is measured again on the next check.",
+          "ua": "OAI-SearchBot"
+        },
+        "packets": []
+      },
       "gone": null
     },
     {
@@ -31283,7 +31378,29 @@
       },
       "effort": null,
       "before_after": [],
-      "packet": null,
+      "packet": {
+        "framework": "generic",
+        "frameworks": [
+          "generic"
+        ],
+        "context": [
+          "Template `/collections/{slug}`: 1 later page of a paginated list repeats its first page: `https://built-site.test/collections/camping-tents?page=2`.",
+          "Main content nearly identical to the first page's (64-bit content hashes within 3 bits): `https://built-site.test/collections/camping-tents?page=2`."
+        ],
+        "change": [
+          "Make each later page list its own items. A later page that serves the first page again usually means the page number in the URL does not reach the query that builds the list.",
+          "If a list has no items for a later page, stop linking to that page and let it answer 404."
+        ],
+        "keep": [
+          "Keep each later page at its own URL, and keep the <a href> links from one page of the list to the next: Google reads the pages of a sequence as separate pages."
+        ],
+        "verify": {
+          "command": "curl -sS -A 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36; compatible; OAI-SearchBot/1.4; +https://openai.com/searchbot' -w '<a href=\"crawlmouse:end\">' 'https://built-site.test/collections/camping-tents' 'https://built-site.test/collections/camping-tents?page=2' | tr '\\n\\r\\t\\047' '   \"' | grep -oiE '<a[[:space:]][^>]*>' | grep -oiE '[[:space:]]href=\"[^\"]*\"' | sed -e 's/^.[Hh][Rr][Ee][Ff]=\"//' -e 's/\"$//' -e 's/&amp;/\\&/g' -e 's/#.*$//' -e 's:\\(.\\)/$:\\1:' | awk 'BEGIN { mark = ARGV[1]; for (i = 2; i < ARGC; i++) first[ARGV[i]] = 1; ARGC = 1 } $0 == \"crawlmouse:end\" { page++; next } page == 0 { first[$0] = 1; next } !($0 in first) && index($0, mark) == 0 { fresh++ } END { exit !(page == 2 && fresh) }' 'page=' 'https://built-site.test/collections/camping-tents' '/collections/camping-tents'",
+          "expect": "Exit status 0 once `https://built-site.test/collections/camping-tents?page=2` links to a page that `https://built-site.test/collections/camping-tents` does not link to and that is not another page of the list: items of its own. The content hash is measured again on the next check.",
+          "ua": "OAI-SearchBot"
+        },
+        "packets": []
+      },
       "gone": null
     },
     {
@@ -31352,7 +31469,29 @@
       },
       "effort": null,
       "before_after": [],
-      "packet": null,
+      "packet": {
+        "framework": "generic",
+        "frameworks": [
+          "generic"
+        ],
+        "context": [
+          "`https://built-site.test/products/forgotten-lantern` has no link from another page: the crawl read 58 other pages that answered 200, and none links to it."
+        ],
+        "change": [
+          "Add a link to `https://built-site.test/products/forgotten-lantern` on `https://built-site.test/products/camp-kitchen-item-1`. The audit suggests that page: of the pages that do not link here yet, its title, link text and URL are the closest match.",
+          "Write the link as an <a> element with an href, in the HTML the server sends. A link that only JavaScript adds is not there for a crawler that does not run scripts.",
+          "Give it link text that names the page. Its title, as a starting point: `forgotten lantern`."
+        ],
+        "keep": [
+          "Keep the page at `https://built-site.test/products/forgotten-lantern`: the fix is a link to it, not a move or a redirect."
+        ],
+        "verify": {
+          "command": "curl -sS -A 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36; compatible; OAI-SearchBot/1.4; +https://openai.com/searchbot' 'https://built-site.test/products/camp-kitchen-item-1' | tr '\\n\\r\\t\\047' '   \"' | grep -oiE '<a[[:space:]][^>]*>' | grep -oiE '[[:space:]]href=\"[^\"]*\"' | sed -e 's/^.[Hh][Rr][Ee][Ff]=\"//' -e 's/\"$//' -e 's/&amp;/\\&/g' -e 's/#.*$//' -e 's:\\(.\\)/$:\\1:' | grep -qxF -e 'https://built-site.test/products/forgotten-lantern' -e '/products/forgotten-lantern'",
+          "expect": "Exit status 0 once `https://built-site.test/products/camp-kitchen-item-1` holds an <a> whose href is `https://built-site.test/products/forgotten-lantern`, in full or from the root, in quotes. Today no crawled page holds such a link.",
+          "ua": "OAI-SearchBot"
+        },
+        "packets": []
+      },
       "gone": null
     },
     {
@@ -31386,7 +31525,59 @@
       },
       "effort": null,
       "before_after": [],
-      "packet": null,
+      "packet": {
+        "framework": "generic",
+        "frameworks": [
+          "generic",
+          "nextjs"
+        ],
+        "context": [
+          "`https://built-site.test/products/camping-tents-item-2` declares `https://built-site.test/products/retired-tent` as its canonical.",
+          "`https://built-site.test/products/retired-tent` answers 404: the page the canonical names is gone.",
+          "2 pages link to `https://built-site.test/products/camping-tents-item-2`, a URL that names another as its canonical: `https://built-site.test/collections/camping-tents`, `https://built-site.test/collections/camping-tents?page=2`.",
+          "Google's rules for canonical URLs: https://developers.google.com/search/docs/crawling-indexing/consolidate-duplicate-urls"
+        ],
+        "change": [
+          "Set the rel=\"canonical\" of `https://built-site.test/products/camping-tents-item-2` to its own URL.",
+          "If another live URL of this site is the one meant to be indexed for this content, name that one instead; the command below checks for the page's own URL.",
+          "Write it as one <link rel=\"canonical\"> in the <head>, with an absolute URL."
+        ],
+        "keep": [
+          "Keep `https://built-site.test/products/camping-tents-item-2` answering 200 with its content: no redirect is asked for.",
+          "Keep the links to `https://built-site.test/products/camping-tents-item-2`: once it is its own canonical they point at the canonical URL."
+        ],
+        "verify": {
+          "command": "curl -sS -A 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36; compatible; OAI-SearchBot/1.4; +https://openai.com/searchbot' 'https://built-site.test/products/camping-tents-item-2' | tr '\\n\\r\\t\\047' '   \"' | grep -oiE '<link[^>]*[[:space:]]rel=\"canonical\"[^>]*>' | head -n 1 | grep -oiE '[[:space:]]href=\"[^\"]*\"' | sed -e 's/^.[Hh][Rr][Ee][Ff]=\"//' -e 's/\"$//' -e 's/&amp;/\\&/g' -e 's/#.*$//' -e 's:\\(.\\)/$:\\1:' | grep -qxF -e 'https://built-site.test/products/camping-tents-item-2' -e '/products/camping-tents-item-2'",
+          "expect": "Exit status 0 once the first <link rel=\"canonical\"> of `https://built-site.test/products/camping-tents-item-2` names `https://built-site.test/products/camping-tents-item-2`, in full or from the root, in quotes. Today it names `https://built-site.test/products/retired-tent`.",
+          "ua": "OAI-SearchBot"
+        },
+        "packets": [
+          {
+            "framework": "nextjs",
+            "context": [
+              "`https://built-site.test/products/camping-tents-item-2` declares `https://built-site.test/products/retired-tent` as its canonical.",
+              "`https://built-site.test/products/retired-tent` answers 404: the page the canonical names is gone.",
+              "2 pages link to `https://built-site.test/products/camping-tents-item-2`, a URL that names another as its canonical: `https://built-site.test/collections/camping-tents`, `https://built-site.test/collections/camping-tents?page=2`.",
+              "Google's rules for canonical URLs: https://developers.google.com/search/docs/crawling-indexing/consolidate-duplicate-urls"
+            ],
+            "change": [
+              "In the App Router the tag comes from alternates.canonical in the metadata export, or in generateMetadata, of the page.js of the route or of a layout.js above it. Set it there so that `https://built-site.test/products/camping-tents-item-2` declares its own URL.",
+              "A route that sets no alternates of its own takes the alternates of the layout above it. If the wrong canonical comes from a layout, set alternates.canonical in the page's own metadata.",
+              "Give an absolute URL, or a path with metadataBase set in the root layout: Next.js joins the two.",
+              "If another live URL of this site is the one meant to be indexed for this content, name that one instead; the command below checks for the page's own URL."
+            ],
+            "keep": [
+              "Keep `https://built-site.test/products/camping-tents-item-2` answering 200 with its content: no redirect is asked for.",
+              "Keep the links to `https://built-site.test/products/camping-tents-item-2`: once it is its own canonical they point at the canonical URL."
+            ],
+            "verify": {
+              "command": "curl -sS -A 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36; compatible; OAI-SearchBot/1.4; +https://openai.com/searchbot' 'https://built-site.test/products/camping-tents-item-2' | tr '\\n\\r\\t\\047' '   \"' | grep -oiE '<link[^>]*[[:space:]]rel=\"canonical\"[^>]*>' | head -n 1 | grep -oiE '[[:space:]]href=\"[^\"]*\"' | sed -e 's/^.[Hh][Rr][Ee][Ff]=\"//' -e 's/\"$//' -e 's/&amp;/\\&/g' -e 's/#.*$//' -e 's:\\(.\\)/$:\\1:' | grep -qxF -e 'https://built-site.test/products/camping-tents-item-2' -e '/products/camping-tents-item-2'",
+              "expect": "Exit status 0 once the first <link rel=\"canonical\"> of `https://built-site.test/products/camping-tents-item-2` names `https://built-site.test/products/camping-tents-item-2`, in full or from the root, in quotes. Today it names `https://built-site.test/products/retired-tent`.",
+              "ua": "OAI-SearchBot"
+            }
+          }
+        ]
+      },
       "gone": null
     },
     {
@@ -31420,7 +31611,32 @@
       },
       "effort": null,
       "before_after": [],
-      "packet": null,
+      "packet": {
+        "framework": "generic",
+        "frameworks": [
+          "generic"
+        ],
+        "context": [
+          "2 pages link to `https://built-site.test/products/old-dome-tent`, which answers only after 2 redirects.",
+          "Redirect 1: `https://built-site.test/products/old-dome-tent` answers 301 with Location `https://built-site.test/products/older-dome-tent`.",
+          "Redirect 2: `https://built-site.test/products/older-dome-tent` answers 301 with Location `https://built-site.test/products/dome-tent-classic`.",
+          "The chain ends at `https://built-site.test/products/dome-tent-classic`, which answers 200."
+        ],
+        "change": [
+          "On `https://built-site.test/collections/camping-tents`, `https://built-site.test/collections/camping-tents?page=2`, change the href of each link to `https://built-site.test/products/old-dome-tent` so that it reads `https://built-site.test/products/dome-tent-classic`.",
+          "A link in a shared header, footer or template is one edit for every page it appears on.",
+          "Separately, if you control the redirect rules, send `https://built-site.test/products/old-dome-tent` to `https://built-site.test/products/dome-tent-classic` in one response. The links are what this fix measures."
+        ],
+        "keep": [
+          "Keep the redirect from `https://built-site.test/products/old-dome-tent`: links on other sites and bookmarks still arrive there."
+        ],
+        "verify": {
+          "command": "curl -sS -A 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36; compatible; OAI-SearchBot/1.4; +https://openai.com/searchbot' 'https://built-site.test/collections/camping-tents' | tr '\\n\\r\\t\\047' '   \"' | grep -oiE '<a[[:space:]][^>]*>' | grep -oiE '[[:space:]]href=\"[^\"]*\"' | sed -e 's/^.[Hh][Rr][Ee][Ff]=\"//' -e 's/\"$//' -e 's/&amp;/\\&/g' -e 's/#.*$//' -e 's:\\(.\\)/$:\\1:' | awk 'BEGIN { n = ARGV[1]; for (i = 2; i < 2 + n; i++) stale[ARGV[i]] = 1; for (; i < ARGC; i++) kept[ARGV[i]] = 1; ARGC = 1 } $0 in stale { old = 1 } $0 in kept { found = 1 } END { exit !(found && !old) }' '2' 'https://built-site.test/products/old-dome-tent' '/products/old-dome-tent' 'https://built-site.test/products/dome-tent-classic' '/products/dome-tent-classic'",
+          "expect": "Exit status 0 once `https://built-site.test/collections/camping-tents` links to `https://built-site.test/products/dome-tent-classic` and no longer to `https://built-site.test/products/old-dome-tent` (an <a> href in full or from the root, in quotes). Today it links to `https://built-site.test/products/old-dome-tent`. The command reads the first of the 2 linking pages: run it for each.",
+          "ua": "OAI-SearchBot"
+        },
+        "packets": []
+      },
       "gone": null
     },
     {
