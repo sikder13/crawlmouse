@@ -149,6 +149,29 @@ describe('GET /api/fixes/[id]/packet', () => {
     }
   });
 
+  it('402, not no_packet, for a fix Free does not open that has no packet; on Pro the same fix answers no_packet', async () => {
+    const hidden = fw.ranked[3]!;
+    const copy = (await fw.db.clone()) as PGlite;
+    h.db = copy;
+    try {
+      await copy.query(`update public.site_fixes set packet = null where id = $1`, [hidden]);
+      // Whether a fix the tier does not open has a packet is not answered: with or without a
+      // framework asked for, the answer is the paywall's.
+      for (const query of ['', '?framework=generic', '?framework=nuxt']) {
+        expect(await answer(await get(hidden, query)), query).toEqual([
+          402,
+          { code: 'upgrade_required', gate: 'packets' },
+        ]);
+      }
+      // The control: the fix has no packet, which the tier that opens it is told.
+      await makePro(copy, fw.w.accountId);
+      expect(await answer(await get(hidden))).toEqual([404, { code: 'no_packet' }]);
+    } finally {
+      h.db = fw.db;
+      await copy.close();
+    }
+  });
+
   describe('?framework=', () => {
     /** The packet (written for any stack) with a WordPress and a Next.js body beside its own. */
     const SEVERAL = withBodies(PACKET, ['wordpress', 'nextjs']);
