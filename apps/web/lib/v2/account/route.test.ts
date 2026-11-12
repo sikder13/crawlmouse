@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isId, meantMethod, paywall, refuse, serviceRefusal } from './route';
+import { backFrom, isId, meantMethod, noticeTo, paywall, refuse, serviceRefusal } from './route';
 
 const post = new Request('https://crawlmouse.com/api/sites/x', { method: 'POST' });
 
@@ -58,5 +58,55 @@ describe('refusals', () => {
     const r = serviceRefusal(code);
     expect(r.status).toBe(503);
     expect(await r.json()).toEqual({ code });
+  });
+});
+
+describe('the pages a form goes back to', () => {
+  const ID = '50000000-0000-4000-8000-0000000000c9';
+  const from = (referer: string | null) =>
+    backFrom(
+      new Request('https://crawlmouse.com/api/sites', {
+        method: 'POST',
+        headers: referer === null ? {} : { referer },
+      }),
+      '/fallback',
+    );
+
+  it('are the dashboard, a site page, the client matrix and a client page, on our own origin', () => {
+    for (const path of ['/dashboard', `/sites/${ID}`, '/agency', `/agency/clients/${ID}`]) {
+      expect(from(`https://crawlmouse.com${path}`)).toBe(path);
+      expect(from(`https://crawlmouse.com${path}?notice=capped#x`)).toBe(path);
+    }
+  });
+
+  it('are no other page: any other path, another origin, or no Referer, is the fallback', () => {
+    for (const referer of [
+      'https://crawlmouse.com/agency/reports',
+      'https://crawlmouse.com/agency/',
+      'https://crawlmouse.com/agency/clients',
+      'https://crawlmouse.com/agency/clients/not-an-id',
+      `https://crawlmouse.com/agency/clients/${ID}/x`,
+      'https://crawlmouse.com/agencyx',
+      `https://crawlmouse.com/x/agency`,
+      'https://crawlmouse.com/settings',
+      'https://evil.example/agency',
+      'not a url',
+      null,
+    ]) {
+      expect(from(referer), String(referer)).toBe('/fallback');
+    }
+  });
+
+  it('noticeTo sends a form back to one of them with its notice, and to no other page', () => {
+    const res = noticeTo('/agency', 'site_exists');
+    expect(res.status).toBe(303);
+    expect(res.headers.get('location')).toBe('/agency?notice=site_exists');
+    expect(
+      noticeTo(`/agency/clients/${ID}`, 'capped', '2026-11-03T10:00:00.000Z').headers.get(
+        'location',
+      ),
+    ).toBe(`/agency/clients/${ID}?notice=capped&next=2026-11-03T10%3A00%3A00.000Z`);
+    expect(() => noticeTo('/agency/reports', 'capped')).toThrow(/not a page to go back to/);
+    expect(() => noticeTo('https://evil.example/agency', 'capped')).toThrow();
   });
 });
