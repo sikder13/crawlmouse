@@ -11,18 +11,31 @@
  * with. Every page of a sound cluster lists itself under a language code, so the command asks that
  * of the page; what else it asks (`needsOf`) is read from the check's rows for the page and for the
  * members the record names: the pages it must name back, and the values and targets it must stop
- * carrying. Google recommends an x-default and does not require one, so the command asks for it only
- * when its absence is the one condition the record proves. The command requests no alternate, reads
+ * carrying. Google recommends an x-default and does not require one, and the audit keeps the fix open
+ * until the marked pages have one (detectors/hreflang-gaps.ts `judge`), so the command asks for it
+ * whenever the record proves one missing, and its `expect` says why. The command requests no alternate, reads
  * no HTTP `Link` header and no sitemap, and checks a value's form, not the registry of codes: its
  * `expect` says so.
  */
 import { isValidHreflang } from '../../detectors/hreflang-gaps.js';
 import { isRedirect, isUnread } from '../../detectors/scope.js';
 import type { Condition } from '../../detectors/types.js';
-import { command, fetchOf, hreflangHolds, listed, spelled } from '../html-checks.js';
+import { command, fetchOf, holds, hreflangHolds, listed, spelled } from '../html-checks.js';
 import { servedAt } from '../served-at.js';
 import { crawledWord, url } from '../shell.js';
-import { DOCS_READ, GOOGLE_DOCS, pagesShown, plural, subjectOf } from '../structure.js';
+import {
+  DOCS_READ,
+  GOOGLE_DOCS,
+  NEXT_LIMITED_BOTS_SOURCE,
+  NEXT_METADATA,
+  NEXT_STREAMING,
+  pagesShown,
+  phrase,
+  plural,
+  seeTags,
+  subjectOf,
+  TAGS,
+} from '../structure.js';
 import { code, count, line, list, ours, type Line, type Safe } from '../text.js';
 import type { Change, PacketEntry, PacketFacts, RecordOf } from '../types.js';
 
@@ -30,6 +43,8 @@ type Fix = RecordOf<'hreflang_gap'>;
 
 /** The values and pages a line or a command names before it counts the rest. */
 const MAX_NAMED = 12;
+/** The annotations the readable layer's lines name before they count the rest. */
+const MAX_SEEN = 6;
 /** The longest hreflang value the worker keeps is 64 characters. */
 const MAX_VALUE_CHARS = 64;
 
@@ -151,7 +166,7 @@ const STEPS: Readonly<Partial<Record<Condition, Line>>> = {
   hreflang_missing_return: line`Where one page names another, make the other name it back.`,
   hreflang_alternate_redirects: line`Point each annotation at the URL that answers 200 itself, not at one that redirects there.`,
   hreflang_alternate_gone: line`Remove each annotation that names a page answering 404 or 410, or restore the page.`,
-  hreflang_missing_x_default: line`Add an x-default annotation to each page, naming the page for visitors whose language none of the others matches. Google recommends it and does not require it.`,
+  hreflang_missing_x_default: line`Add an x-default annotation to each page, naming the page for visitors whose language none of the others matches. Google recommends it and does not require it; the audit's fix stays open until each page has one.`,
   hreflang_invalid_code: line`Write each hreflang value as an ISO 639-1 language code, optionally followed by an ISO 15924 script and an ISO 3166-1 alpha-2 region: en, en-GB, zh-Hant-TW. A region alone is not valid.`,
 };
 
@@ -165,8 +180,6 @@ const generic = (fix: Fix): Change => ({
     line`Keep each page at its URL, and keep the annotations of the pages that carry no defect in step with the ones you change: every page lists the same set.`,
   ],
 });
-
-const NEXT_METADATA = 'https://nextjs.org/docs/app/api-reference/functions/generate-metadata';
 
 /**
  * The Next.js body. The page cited shows language codes as the keys of alternates.languages and no
@@ -182,7 +195,7 @@ function nextjs(fix: Fix): Change | null {
       SAME_SET,
       ...steps,
       line`Metadata objects are merged shallowly: a segment that sets alternates replaces the whole alternates object of the layouts above it. Where a page sets alternates.languages, carry the layout's alternates.canonical, media and types into the same object (share them from one module, or read the parent's resolved metadata from the second argument of generateMetadata), or the page loses its canonical.`,
-      line`Next.js can send the tags of a generateMetadata that waits on data after the first HTML, in the <body>, to user agents outside its list of HTML-limited bots. The command below reads the <head>: use the static metadata export where the values do not depend on the request, or add the crawler to htmlLimitedBots in the Next.js config.`,
+      NEXT_STREAMING,
       ...(fix.conditions.includes(X_DEFAULT)
         ? [
             line`The Next.js page cited shows no x-default among the keys of alternates.languages: for that annotation, follow the generic rewrite and confirm the tag in the HTML served.`,
@@ -218,8 +231,9 @@ export const hreflangGap: PacketEntry<'hreflang_gap'> = {
           url: NEXT_METADATA,
           read: DOCS_READ,
           supports:
-            'metadata and generateMetadata are exported from layout.js and page.js, in Server Components; alternates.languages and its <link rel="alternate" hreflang> output; Merging: objects are shallowly merged and nested fields are overwritten by the last segment to define them, shared through a separate variable or the parent argument; Streaming metadata: tags appended to the <body> except for HTML-limited bots, htmlLimitedBots',
+            'metadata and generateMetadata are exported from layout.js and page.js, in Server Components; alternates.languages and its <link rel="alternate" hreflang> output; Merging: objects are shallowly merged and nested fields are overwritten by the last segment to define them, shared through a separate variable or the parent argument; "If the page can be prerendered and generateMetadata doesn\'t introduce dynamic behavior, the resulting metadata is included in the page\'s initial HTML. Otherwise the metadata resolved from generateMetadata can be streamed"; Streaming metadata: tags appended to the <body>, and in the <head> for HTML-limited bots',
         },
+        NEXT_LIMITED_BOTS_SOURCE,
       ],
     },
   },
@@ -227,7 +241,9 @@ export const hreflangGap: PacketEntry<'hreflang_gap'> = {
     const needs = needsOf(fix, facts);
     const own = servedAt(facts, needs.page);
     const fetch = fetchOf(facts, [needs.page]);
-    const fallback = fix.conditions.length === 1 && fix.conditions[0] === X_DEFAULT;
+    // the audit keeps the fix open while a marked page has no x-default (detectors/hreflang-gaps.ts
+    // `judge`), so the command asks for one whenever the record proves one missing
+    const fallback = fix.conditions.includes(X_DEFAULT);
     const back = listed(needs.back, MAX_NAMED, url);
     const goneValues = listed(needs.invalid, MAX_NAMED, (v) => crawledWord(v, MAX_VALUE_CHARS));
     const goneUrls = listed(needs.dead, MAX_NAMED - goneValues.length, url);
@@ -242,24 +258,39 @@ export const hreflangGap: PacketEntry<'hreflang_gap'> = {
         ? ''
         : ' The command reads the first of the pages marked; the others are measured again on the next check.',
     );
+    const today = annotationsOf(facts, needs.page) ?? [];
     return {
       command: command(
         fetch.fragment,
-        hreflangHolds({
-          self: own,
-          fallback,
-          must: back,
-          goneValues: goneValues.map((v) => crawledWord(v, MAX_VALUE_CHARS)),
-          goneUrls,
-        }),
+        holds(
+          hreflangHolds({
+            self: own,
+            fallback,
+            must: back,
+            goneValues: goneValues.map((v) => crawledWord(v, MAX_VALUE_CHARS)),
+            goneUrls,
+          }),
+        ),
       ),
       // what the command leaves out is said before the lists, which a long line is cut in
-      expect: line`Exit status 0 once ${code(own)} lists itself under a value with the form of a language code${ours(fallback ? ' and holds an x-default' : '')}, and carries no value of another form.${ours(left === 0 ? '' : ` Of the ${needs.back.length + stale.length} URLs and values that follow, the command leaves ${left} out: it names what fits its length.`)}${ours(needs.back.length === 0 ? '' : ' It must also name ')}${pagesShown(needs.back, MAX_NAMED)}${ours(needs.back.length === 0 ? '' : '.')}${ours(stale.length === 0 ? '' : ' It must no longer hold ')}${list(
+      expect: line`Exit status 0 once ${code(own)} lists itself under a value with the form of a language code${ours(fallback ? ' and holds an x-default' : '')}, and carries no value of another form.${ours(fallback ? " Google recommends an x-default and does not require one; the audit's fix stays open until an x-default is present, so the command asks for it." : '')}${ours(left === 0 ? '' : ` Of the ${needs.back.length + stale.length} URLs and values that follow, the command leaves ${left} out: it names what fits its length.`)}${ours(needs.back.length === 0 ? '' : ' It must also name ')}${pagesShown(needs.back, MAX_NAMED)}${ours(needs.back.length === 0 ? '' : '.')}${ours(stale.length === 0 ? '' : ' It must no longer hold ')}${list(
         stale,
         MAX_NAMED,
         'annotation',
-      )}${ours(stale.length === 0 ? '' : '.')} It reads <link> elements in the <head> of the HTML, with absolute URLs; annotations in an HTTP Link header or a sitemap are not read, no alternate is requested, and a value is checked for its form, not against the registry of codes.${ours(fallback ? '' : ' An x-default is recommended and not required: the command does not ask for one.')}${others}`,
+      )}${ours(stale.length === 0 ? '' : '.')} It reads <link> elements in the <head> of the HTML; annotations in an HTTP Link header or a sitemap are not read, no alternate is requested, and a value is checked for its form, not against the registry of codes.${ours(fallback ? '' : ' An x-default is recommended and not required: the command does not ask for one.')}${others}`,
       ua: fetch.ua,
+      see: {
+        command: seeTags(facts, [needs.page], TAGS.hreflang),
+        today:
+          today.length === 0
+            ? line`Nothing: the crawl read no hreflang annotation on this page.`
+            : line`The page's ${count(today.length)} hreflang ${plural(today.length, 'tag', 'tags')}, as the crawl read ${plural(today.length, 'it', 'them')}: ${list(
+                today.map((l) => phrase`${code(l.lang, MAX_VALUE_CHARS)} for ${code(l.href)}`),
+                MAX_SEEN,
+                'tag',
+              )}.`,
+        after: line`A tag that names ${code(own)} under its own language code${ours(fallback ? ', an x-default tag' : '')}${ours(needs.back.length === 0 ? '' : ', a tag for each of ')}${pagesShown(needs.back, MAX_SEEN)}${ours(stale.length === 0 ? '' : ', and no tag that holds ')}${list(stale, MAX_SEEN, 'annotation')}.`,
+      },
     };
   },
 };

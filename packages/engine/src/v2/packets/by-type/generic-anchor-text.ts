@@ -11,15 +11,16 @@
  * changed to another stock phrase passes the command and is judged on the next check.
  */
 import { TOP_HUB_FRACTION } from '../../detectors/thresholds.js';
-import { command, fetchOf, listed, noLinkSays } from '../html-checks.js';
-import { servedAt } from '../served-at.js';
+import { command, fetchOf, holds, listed, noLinkSays } from '../html-checks.js';
 import { crawledWord } from '../shell.js';
-import { filedLinks, plural, subjectOf, titleOf } from '../structure.js';
+import { filedLinks, plural, readShown, seeTags, subjectOf, TAGS, titleOf } from '../structure.js';
 import { clean, code, count, line, list, ours, type Line } from '../text.js';
 import type { PacketEntry, PacketFacts, RecordOf } from '../types.js';
 
 /** The generic links a packet lists one by one, and the distinct texts its command names. */
 const MAX_LINKS = 8;
+/** The texts the readable command looks for: the first few, so that it stays short. */
+const MAX_SEEN = 3;
 const MAX_TEXTS = 20;
 const MAX_TEXT_CHARS = 80;
 
@@ -62,8 +63,8 @@ export const genericAnchorText: PacketEntry<'generic_anchor_text'> = {
     const recorded = fix.measured === null ? null : Math.round(generic / fix.measured);
     return [
       recorded === null
-        ? line`${code(hub)} is a hub, one of the top ${share}% of crawled pages by internal PageRank, and ${count(generic)} of its recorded links have generic text.`
-        : line`${code(hub)} is a hub, one of the top ${share}% of crawled pages by internal PageRank, and ${count(generic)} of its ${count(recorded)} recorded links have generic text.`,
+        ? line`${code(hub)} is a hub, one of the top ${share}% of crawled pages by internal PageRank, and ${count(generic)} of its recorded links ${plural(generic, 'has', 'have')} generic text.`
+        : line`${code(hub)} is a hub, one of the top ${share}% of crawled pages by internal PageRank, and ${count(generic)} of its ${count(recorded)} recorded ${plural(recorded, 'link', 'links')} ${plural(generic, 'has', 'have')} generic text.`,
       line`The crawl records one link for each target, with the first link text it found.`,
     ];
   },
@@ -102,17 +103,28 @@ export const genericAnchorText: PacketEntry<'generic_anchor_text'> = {
     const named = listed(texts, MAX_TEXTS, wordOf);
     const left = texts.length - named.length;
     const fetch = fetchOf(facts, [hub]);
-    const on = servedAt(facts, hub);
+    const on = readShown(facts, hub);
     const generic = fix.evidence.edges.length;
+    const seen = named.slice(0, MAX_SEEN);
+    const unseen = texts.length - seen.length;
     return {
-      command: command(fetch.fragment, noLinkSays(on, named.map(wordOf))),
+      command: command(fetch.fragment, holds(noLinkSays(named.map(wordOf)))),
       // what the command leaves out is said before the list, which a long line is cut in
-      expect: line`Exit status 0 once ${code(on)} has links and the first link to each target says none of the recorded generic texts${ours(left === 0 ? '' : ` the command names (it leaves ${left} of the ${texts.length} out, for length)`)}: ${list(
+      expect: line`Exit status 0 once ${on} has links and the first link to each target says none of the recorded generic texts${ours(left === 0 ? '' : ` the command names (it leaves ${left} of the ${texts.length} out, for length)`)}: ${list(
         named.map((t) => code(t, MAX_TEXT_CHARS)),
         MAX_TEXTS,
         'text',
       )}, compared without case, with spaces collapsed and the tags inside a link removed. The crawl keeps one text for a target, the first, so a later link to the same target is not read. The command knows these recorded phrases only: another stock phrase in their place passes it, and is judged on the next check. Today the crawl recorded ${count(generic)} such ${plural(generic, 'link', 'links')}.`,
       ua: fetch.ua,
+      see: {
+        command: seeTags(facts, [hub], TAGS.aWithText, seen.map(wordOf), true),
+        today: line`The links that say ${list(
+          seen.map((t) => code(t, MAX_TEXT_CHARS)),
+          MAX_SEEN,
+          'text',
+        )}: the crawl recorded ${count(generic)} generic ${plural(generic, 'link', 'links')} on this page${ours(unseen === 0 ? '' : `, under ${texts.length} texts, of which the command looks for the first ${seen.length}`)}. A link with a tag inside its text is not printed; the exact check reads it.`,
+        after: line`Nothing, once no link says one of them.`,
+      },
     };
   },
 };

@@ -14,7 +14,7 @@ import type { Detection } from '../../detectors/types.js';
 import { writePacket } from '../registry.js';
 import type { FixPacket, PacketFacts } from '../types.js';
 import { hostileText, outsideCodeSpans, UNSHOWN } from './hostile.js';
-import { twoStateSite, type TwoStateSite } from './verify.js';
+import { runCommand, twoStateSite, type SiteState, type TwoStateSite } from './verify.js';
 
 type StructureType = Extract<
   FixType,
@@ -36,7 +36,62 @@ export const SERVED: readonly Pick<CrawlerAccess, 'ua' | 'verdict'>[] = [
 export function packetOf(type: StructureType, record: Detection, facts: PacketFacts): FixPacket {
   const packet = writePacket(type, record, facts);
   if (packet === null) throw new Error(`${type} has no packet builder`);
+  expectOwnWords(packet);
   return packet;
+}
+
+/** Every string of a packet that is prose: its lines, in every body, and the readable layer's two. */
+export function proseOf(packet: FixPacket): string[] {
+  return [packet, ...packet.packets].flatMap((body) => [
+    ...body.context,
+    ...body.change,
+    ...body.keep,
+    body.verify.expect,
+    ...(body.verify.see === null ? [] : [body.verify.see.today, body.verify.see.after]),
+  ]);
+}
+
+/** A count of one before a plural: "1 redirects". */
+export const ONE_OF_MANY = /\b1 (?!carries\b)[a-z]+s\b/;
+/** An identifier of this repository's: an enum value or a key, in snake case. */
+export const IDENTIFIER = /[a-z]+_[a-z_]+/;
+
+/**
+ * What every packet these tests build is held to, in the words this repository wrote (a crawled value
+ * is in a code span, and a command holds what it needs): no count of one before a plural (owner
+ * ruling 2), and no internal identifier (owner ruling 3). Every structure packet a test builds comes
+ * through `packetOf`, so the two rules are checked on each of them.
+ */
+export function expectOwnWords(packet: FixPacket): void {
+  for (const text of proseOf(packet)) {
+    const ours = outsideCodeSpans(text);
+    expect(ours, text).not.toMatch(ONE_OF_MANY);
+    expect(ours, text).not.toMatch(IDENTIFIER);
+  }
+}
+
+/**
+ * The readable command's output on the broken site and on the fixed one. The packet must carry the
+ * readable layer, the two outputs must differ, and no line of the proof may have been cut.
+ */
+export async function seen(
+  site: TwoStateSite,
+  packet: FixPacket,
+): Promise<Record<SiteState, string>> {
+  const { see, expect: expected } = packet.verify;
+  if (see === null) throw new Error('the packet has no readable command');
+  for (const text of [expected, see.today, see.after]) expect(text).not.toContain('(line cut');
+  expect(see.command.startsWith('curl -sS '), see.command).toBe(true);
+  // read in ten seconds: short besides the URLs, the user agent and the texts it looks for
+  expect(outsideQuotes(see.command).length, see.command).toBeLessThan(120);
+  expect(see.command).not.toMatch(/awk|ARGV/);
+  site.use('broken');
+  const broken = await runCommand(see.command);
+  site.use('fixed');
+  const fixed = await runCommand(see.command);
+  site.use('broken');
+  expect(fixed.stdout).not.toBe(broken.stdout);
+  return { broken: broken.stdout, fixed: fixed.stdout };
 }
 
 /** The one record in `state` about `subject` among a detector's records. */
@@ -52,8 +107,21 @@ export function detected(
   return found[0]!;
 }
 
-/** A page's HTML by path (with its query), per state; a path not listed answers 404. */
+/**
+ * A page's HTML by path (with its query), per state; a path not listed answers 404, and one whose
+ * entry is `movedTo(path)` answers 301 to that path.
+ */
 export type Served = Record<string, string>;
+
+const MOVED = '301 to ';
+export const movedTo = (path: string): string => `${MOVED}${path}`;
+
+/**
+ * The round 2 SEO review's input: a homepage whose request ends at /en/ (as a bare host's ends at
+ * www). The crawl files what it read there under the homepage's URL, and a command that reads the
+ * homepage must request /en/, since it follows no redirect.
+ */
+export const HOME_AT_EN = { '/': movedTo('/en/') } as const;
 
 /** `url` with a slash at the end of its path. */
 const slashed = (url: string): string => url.replace(/^([^?]*[^/?])(\?.*)?$/, '$1/$2');
@@ -66,6 +134,10 @@ function serve(pages: Served) {
   return (req: IncomingMessage, res: ServerResponse) => {
     const url = req.url ?? '';
     const body = pages[url];
+    if (body?.startsWith(MOVED)) {
+      res.writeHead(301, { location: body.slice(MOVED.length) }).end('moved');
+      return;
+    }
     if (body === undefined && pages[slashed(url)] !== undefined) {
       res.writeHead(301, { location: slashed(url) }).end('moved');
       return;
@@ -164,7 +236,8 @@ const outsideQuotes = (command: string): string =>
 /**
  * What a packet written from a hostile record is held to: the contract accepts it; no string in it
  * holds a line break or a character that draws nothing; nothing crawled stands outside a code span
- * in a line, or outside a quoted word in the command.
+ * in a line, or outside a quoted word in a command. The readable layer (`verify.see`) is held to the
+ * same: its command, and its two lines.
  */
 export function expectHostileSafe(packet: FixPacket): void {
   expect(FixPacketSchema.safeParse(packet).success).toBe(true);
@@ -174,11 +247,20 @@ export function expectHostileSafe(packet: FixPacket): void {
       expect((text.match(/`/g) ?? []).length % 2, text).toBe(0);
       expect(outsideCodeSpans(text), text).not.toContain(MARK);
     }
-    const { command } = body.verify;
-    expect(UNSHOWN.test(command), command).toBe(false);
-    expect(command.startsWith('curl '), command).toBe(true);
-    expect(outsideQuotes(command), command).not.toContain(MARK);
-    expect(outsideQuotes(command), command).not.toMatch(/\$\(|`/);
+    const { see } = body.verify;
+    if (see === null) throw new Error('the packet has no readable command');
+    for (const text of [see.today, see.after]) {
+      expect(UNSHOWN.test(text), text).toBe(false);
+      expect((text.match(/`/g) ?? []).length % 2, text).toBe(0);
+      expect(outsideCodeSpans(text), text).not.toContain(MARK);
+    }
+    for (const command of [body.verify.command, see.command]) {
+      expect(command).not.toMatch(/[\r\n]/);
+      expect(UNSHOWN.test(command), command).toBe(false);
+      expect(command.startsWith('curl '), command).toBe(true);
+      expect(outsideQuotes(command), command).not.toContain(MARK);
+      expect(outsideQuotes(command), command).not.toMatch(/\$\(|`/);
+    }
   }
 }
 

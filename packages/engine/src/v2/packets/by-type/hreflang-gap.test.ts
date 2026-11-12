@@ -14,6 +14,7 @@ import {
   packetOf,
   pageAsRead,
   pageAt,
+  seen,
   SERVED,
   servedSite,
 } from '../test-support/structure.js';
@@ -236,7 +237,7 @@ describe('the hreflang_gap packet', () => {
     const only = packetFor(cluster(base, 'hreflang_missing_x_default'), base);
     expect(only.frameworks).toEqual(['generic']);
     expect(only.change.at(-1)).toBe(
-      'Add an x-default annotation to each page, naming the page for visitors whose language none of the others matches. Google recommends it and does not require it.',
+      "Add an x-default annotation to each page, naming the page for visitors whose language none of the others matches. Google recommends it and does not require it; the audit's fix stays open until each page has one.",
     );
     const withSelf = packetFor(
       cluster(base, 'hreflang_missing_self', {
@@ -256,41 +257,87 @@ describe('the hreflang_gap packet', () => {
 
   it('asks the command for what the first marked page lacks, read from its own annotations', () => {
     const invalid = packetFor(cluster(base, 'hreflang_invalid_code'), base).verify;
-    expect(invalid.command).toMatch(/^curl -sS -A '[^']*' 'https:\/\/a\.test\/en' \| /);
-    expect(invalid.command.endsWith("' 'https://a.test' '0' 'https://a.test/en' '0' 'en-UK'")).toBe(
+    expect(invalid.command).toMatch(
+      /^curl -sS -f --compressed -A '[^']*' -w '[^']*' 'https:\/\/a\.test\/en' \| /,
+    );
+    expect(invalid.command.endsWith("}' '0' 'https://a.test/en' '0' '1' 'en-UK'")).toBe(true);
+    const back = packetFor(cluster(base, 'hreflang_missing_return'), base).verify;
+    expect(back.command.endsWith("}' '0' 'https://a.test/en' '1' 'https://a.test/de' '0'")).toBe(
       true,
     );
-    const back = packetFor(cluster(base, 'hreflang_missing_return'), base).verify;
-    expect(
-      back.command.endsWith("' 'https://a.test' '0' 'https://a.test/en' '1' 'https://a.test/de'"),
-    ).toBe(true);
     expect(back.expect).toBe(
-      'Exit status 0 once `https://a.test/en` lists itself under a value with the form of a language code, and carries no value of another form. It must also name `https://a.test/de`. It reads <link> elements in the <head> of the HTML, with absolute URLs; annotations in an HTTP Link header or a sitemap are not read, no alternate is requested, and a value is checked for its form, not against the registry of codes. An x-default is recommended and not required: the command does not ask for one.',
+      'Exit status 0 once `https://a.test/en` lists itself under a value with the form of a language code, and carries no value of another form. It must also name `https://a.test/de`. It reads <link> elements in the <head> of the HTML; annotations in an HTTP Link header or a sitemap are not read, no alternate is requested, and a value is checked for its form, not against the registry of codes. An x-default is recommended and not required: the command does not ask for one.',
     );
     const gone = packetFor(cluster(base, 'hreflang_alternate_gone'), base).verify;
-    expect(
-      gone.command.endsWith("' 'https://a.test' '0' 'https://a.test/en' '0' 'https://a.test/fr'"),
-    ).toBe(true);
+    expect(gone.command.endsWith("}' '0' 'https://a.test/en' '0' '1' 'https://a.test/fr'")).toBe(
+      true,
+    );
     expect(gone.expect).toContain(' It must no longer hold `https://a.test/fr`. ');
   });
 
-  it('asks the command for an x-default only when its absence is all the record proves', () => {
+  // round 2, SEO finding 3
+  it('says in the Next.js body when metadata is sent after the first HTML, and that a value replaces the default list', () => {
+    const next = packetFor(cluster(base, 'hreflang_missing_return'), base).packets[0]!;
+    expect(next.framework).toBe('nextjs');
+    const step = next.change.find((line) => line.includes('htmlLimitedBots'))!;
+    expect(step).toContain(
+      'When a page cannot be prerendered, or its generateMetadata introduces dynamic behavior, Next.js can send the metadata tags after the first HTML',
+    );
+    expect(step).toContain(
+      'extend the default list: a value for htmlLimitedBots in the Next.js config overrides the default list',
+    );
+    expect(step).not.toMatch(/waits on data|add the crawler to htmlLimitedBots/);
+  });
+
+  it('asks the command for an x-default whenever the record proves one missing, and says why', () => {
     const only = packetFor(cluster(base, 'hreflang_missing_x_default'), base).verify;
-    expect(only.command.endsWith("' 'https://a.test' '1' 'https://a.test/en' '0'")).toBe(true);
+    expect(only.command.endsWith("}' '1' 'https://a.test/en' '0' '0'")).toBe(true);
     expect(only.expect).toContain(
-      'under a value with the form of a language code and holds an x-default,',
+      "under a value with the form of a language code and holds an x-default, and carries no value of another form. Google recommends an x-default and does not require one; the audit's fix stays open until an x-default is present, so the command asks for it.",
     );
     expect(only.expect).not.toContain('does not ask for one');
-    const more = packetFor(
-      cluster(base, 'hreflang_missing_self', {
-        de: [
-          ['en', '/en'],
-          ['de', '/de'],
-        ],
-      }),
-      base,
-    ).verify;
-    expect(more.command).toContain("' 'https://a.test' '0' 'https://a.test/de' '0'");
+    // with another condition beside it, the x-default is still asked for
+    const input = cluster(base, 'hreflang_missing_self', {
+      de: [
+        ['en', '/en'],
+        ['de', '/de'],
+      ],
+    });
+    const more = packetFor(input, base);
+    expect(detected(detectHreflangGaps(input), `${base}/de`).conditions).toEqual(
+      expect.arrayContaining(['hreflang_missing_self', 'hreflang_missing_x_default']),
+    );
+    expect(more.verify.command).toContain("}' '1' 'https://a.test/de' '0' '0'");
+    // without the condition, it is not
+    const none = packetFor(cluster(base, 'hreflang_missing_return'), base).verify;
+    expect(none.command).toContain("}' '0' 'https://a.test/en' '1' 'https://a.test/de' '0'");
+    expect(none.expect).toContain('the command does not ask for one');
+  });
+
+  it('marks no page whose request ended at another address, so the page read answers where it is named', () => {
+    // round 2, SEO finding 1: this packet reads a page too, and the detector reads the annotations
+    // of a page answering at its own URL only (hreflang-gaps.ts `annotationsOf` here), so the
+    // address requested is the page's own
+    const input = site(
+      [
+        {
+          path: base,
+          links: [`${base}/de`],
+          facts: {
+            final_url: `${base}/en/`,
+            hreflang: [{ lang: 'de', href: `${base}/de` }],
+          },
+        },
+        { path: `${base}/de`, facts: { hreflang: [{ lang: 'en', href: base }] } },
+      ],
+      { homepage: base },
+    );
+    const record = detected(detectHreflangGaps(input), base);
+    expect(record.affected_urls).toEqual([`${base}/de`]);
+    const p = packetOf('hreflang_gap', record, factsFor(input, SERVED));
+    expect(p.verify.command).toMatch(
+      /^curl -sS -f --compressed -A '[^']*' -w '[^']*' 'https:\/\/a\.test\/de' \| /,
+    );
   });
 
   const head = (ls: Links, origin: string) =>
@@ -320,6 +367,75 @@ describe('the hreflang_gap packet', () => {
       expect(broken.status).not.toBe(0);
       expect(fixed.status).toBe(0);
     });
+  });
+
+  // round 2, SEO finding 5: the audit keeps the fix open until the x-default is there
+  it('verify, when a return and an x-default are both missing, does not pass on the return alone', async () => {
+    const crawled: Links = [['en', '/en']];
+    const returned: Links = [
+      ['en', '/en'],
+      ['de', '/de'],
+    ];
+    let origin = '';
+    let fixedWith = returned;
+    served = await servedSite({
+      broken: {
+        get '/en'() {
+          return head(crawled, origin);
+        },
+      },
+      fixed: {
+        get '/en'() {
+          return head(fixedWith, origin);
+        },
+      },
+    });
+    origin = served.base;
+    const input = cluster(origin, 'hreflang_missing_return', { en: crawled });
+    const record = detected(detectHreflangGaps(input), `${origin}/de`);
+    expect(record.conditions).toEqual(
+      expect.arrayContaining(['hreflang_missing_return', 'hreflang_missing_x_default']),
+    );
+    const p = packetFor(input, origin);
+    const half = await inBothStates(served, p.verify.command);
+    expect(half.broken.status).not.toBe(0);
+    expect(half.fixed.status).not.toBe(0);
+    // and the detector still flags that state
+    const still = cluster(origin, 'hreflang_missing_return', { en: returned });
+    expect(detected(detectHreflangGaps(still), `${origin}/de`).conditions).toContain(
+      'hreflang_missing_x_default',
+    );
+    fixedWith = FIXED;
+    expect((await inBothStates(served, p.verify.command)).fixed.status).toBe(0);
+  });
+
+  it('shows the tags with a command to read, and what it prints today and after', async () => {
+    let origin = '';
+    served = await servedSite({
+      broken: {
+        get '/en'() {
+          return head(BROKEN.hreflang_missing_return.en, origin);
+        },
+      },
+      fixed: {
+        get '/en'() {
+          return head(FIXED, origin);
+        },
+      },
+    });
+    origin = served.base;
+    const p = packetFor(cluster(origin, 'hreflang_missing_return'), origin);
+    expect(p.verify.see).toEqual({
+      command: expect.stringMatching(
+        /^curl -sS -A '[^']*' '[^']*\/en' \| grep -io '<link\[\^>\]\*hreflang\[\^>\]\*>'$/,
+      ),
+      today: `The page's 2 hreflang tags, as the crawl read them: \`en\` for \`${origin}/en\`, \`x-default\` for \`${origin}/en\`.`,
+      after: `A tag that names \`${origin}/en\` under its own language code, a tag for each of \`${origin}/de\`.`,
+    });
+    const printed = await seen(served, p);
+    expect(printed.broken.trim().split('\n')).toHaveLength(2);
+    expect(printed.broken).not.toContain(`${origin}/de`);
+    expect(printed.fixed).toContain(`hreflang="de" href="${origin}/de"`);
   });
 
   // the round 1 SEO review's inputs, on a record whose page must name /de back

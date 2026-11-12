@@ -14,7 +14,9 @@ import {
   hostileUrl,
   packetOf,
   pageAsRead,
+  HOME_AT_EN,
   pageAt,
+  seen,
   SERVED,
   servedSite,
 } from '../test-support/structure.js';
@@ -64,7 +66,9 @@ describe('the deep_pages packet', () => {
       'On the links as crawled, the estimate for this fix puts the link on `https://a.test/b`, a page that close. Another page as close does as well: pick the one a visitor would look on.',
       'Write the link as an <a> element with an href, in the HTML the server sends. A link that only JavaScript adds is not there for a crawler that does not run scripts.',
     ]);
-    expect(p.verify.command).toMatch(/^curl -sS -A '[^']*' 'https:\/\/a\.test\/b' \| /);
+    expect(p.verify.command).toMatch(
+      /^curl -sS -f --compressed -A '[^']*' -w '[^']*' 'https:\/\/a\.test\/b' \| /,
+    );
     expect(p.frameworks).toEqual(['generic']);
   });
 
@@ -84,13 +88,147 @@ describe('the deep_pages packet', () => {
     ]);
   });
 
-  it('writes no command that passes today: a parent that already links to the page is refused', () => {
+  it('writes no command that passes today: when the estimate’s page already links to the page, it names the next', () => {
     const linked: PacketFacts = {
       ...facts,
       edges: [...facts.edges, edge(`${base}/b`, `${base}/deep`)],
     };
     expect(packetOf('deep_pages', record, facts).verify.expect).toContain('today it holds none');
-    expect(() => packetOf('deep_pages', record, linked)).toThrow(/already links to the page/);
+    const p = packetOf('deep_pages', record, linked);
+    expect(p.change[1]).toBe(
+      "`https://a.test/c` is that close and holds no link to this page in the crawl's record. Another page as close does as well: pick the one a visitor would look on.",
+    );
+    expect(p.verify.command).toContain(" 'https://a.test/c' | ");
+    expect(p.verify.expect).toContain('once `https://a.test/c` holds an <a>');
+  });
+
+  // round 2, security finding 2: the grade files a link recorded from a page that did not answer
+  // 200, and the detector's graph leaves it out, so the estimate's page can link to the deep page
+  describe('when the estimate’s page is reached through a page that did not answer 200', () => {
+    /** home → /moved (a 301 the record holds links from) → /mid → /deep. */
+    const through = (b: string): DetectorInput =>
+      site(
+        [
+          { path: b, links: [`${b}/moved`] },
+          { path: `${b}/moved`, status: 301, links: [`${b}/mid`] },
+          { path: `${b}/mid`, links: [`${b}/deep`] },
+          { path: `${b}/deep`, links: [b] },
+        ],
+        { homepage: b },
+      );
+
+    it('names a page the detector counts as close, where the builder used to throw', () => {
+      const live = through(base);
+      const held = factsFor(live, SERVED);
+      const deep = detected(detectDeepPages(live), `${base}/deep`);
+      expect(deep.measured).toBeNull();
+      // the estimate's page links to the deep page already
+      expect(shallowParent({ ...live, edges: live.edges })).toBe(`${base}/mid`);
+      const p = packetOf('deep_pages', deep, held);
+      expect(p.change[1]).toBe(
+        "`https://a.test` is that close and holds no link to this page in the crawl's record. Another page as close does as well: pick the one a visitor would look on.",
+      );
+      expect(p.verify.expect).toContain('today it holds none');
+    });
+
+    it('verify fails on the site as crawled and passes once the page named links to the deep one', async () => {
+      served = await servedSite({
+        broken: { '/': anchors(['/moved']), '/mid': anchors(['/deep']) },
+        fixed: { '/': anchors(['/moved', '/deep']), '/mid': anchors(['/deep']) },
+      });
+      const live = through(served.base);
+      const p = packetOf(
+        'deep_pages',
+        detected(detectDeepPages(live), `${served.base}/deep`),
+        factsFor(live, SERVED),
+      );
+      const { broken, fixed } = await inBothStates(served, p.verify.command);
+      expect(broken.status).not.toBe(0);
+      expect(fixed.status).toBe(0);
+    });
+  });
+
+  it('names no page it cannot vouch for: a homepage read at another crawled page that holds the link', () => {
+    // the homepage's request ended on /en, which the crawl also holds as a page of its own, with
+    // the link: a command that read the homepage would find the link there before any fix
+    const live = site(
+      [
+        { path: base, facts: { final_url: `${base}/en` } },
+        { path: `${base}/en`, links: [`${base}/deep`] },
+        { path: `${base}/deep`, links: [base] },
+      ],
+      { homepage: base },
+    );
+    const p = packetOf(
+      'deep_pages',
+      detected(detectDeepPages(live), `${base}/deep`),
+      factsFor(live, SERVED),
+    );
+    expect(p.change[1]).toBe(
+      "The crawl's record names no page that close without a link here already: `https://a.test` was read at an address the crawl also holds as another page, and the links found there include this one. Put the link on a page a visitor reaches within 2 clicks of the homepage.",
+    );
+    expect(p.verify.expect).toBe(
+      'Exit status 0 when the page requested holds an <a> whose href is `https://a.test/deep`, however the URL is written. The record names no page to request that is close to the homepage and without the link, so the command requests `https://a.test/en` (where `https://a.test` answers), and can pass before the fix: put the URL of the page you added the link to in its place. The click depth is measured again on the next check.',
+    );
+    expect(p.verify.see?.today).toBe(
+      'The record does not say: the crawl holds links to `https://a.test/deep` at the address requested, under another page.',
+    );
+  });
+
+  // round 2, SEO finding 1: the page read answers at another address than the one the crawl names it by
+  it('when the homepage answers at /en/ and is the page to link from, verify requests /en/ in both states', async () => {
+    served = await servedSite({
+      broken: { ...HOME_AT_EN, '/en/': anchors(['/a']) },
+      fixed: { ...HOME_AT_EN, '/en/': anchors(['/a', '/deep']) },
+    });
+    const b = served.base;
+    const live = site(
+      [
+        { path: b, links: [`${b}/a`], facts: { final_url: `${b}/en/` } },
+        { path: `${b}/a`, links: [b] },
+        { path: `${b}/deep`, links: [b] },
+      ],
+      { homepage: b },
+    );
+    const held = factsFor(live, SERVED);
+    const pages = new Map(held.pages);
+    pages.set(`${b}/deep`, { ...pages.get(`${b}/deep`)!, suggested_parent_url: b });
+    const p = packetOf('deep_pages', detected(detectDeepPages(live), `${b}/deep`), {
+      ...held,
+      pages,
+    });
+    expect(p.verify.command).toContain(` '${b}/en/' | `);
+    expect(p.verify.expect).toContain(`once \`${b}/en/\` (where \`${b}\` answers) holds`);
+    const { broken, fixed } = await inBothStates(served, p.verify.command);
+    expect(broken.status).not.toBe(0);
+    expect(fixed.status).toBe(0);
+    const printed = await seen(served, p);
+    expect(printed.broken).toBe('');
+    expect(printed.fixed).toBe('<a href="/deep">\n');
+  });
+
+  it('shows the link with a command to read, and what it prints today and after', async () => {
+    served = await servedSite({
+      broken: { '/b': anchors(['/']) },
+      fixed: { '/b': anchors(['/', '/deep']) },
+    });
+    const live = chain(served.base);
+    const p = packetOf(
+      'deep_pages',
+      detected(detectDeepPages(live), `${served.base}/deep`),
+      factsFor(live, SERVED),
+    );
+    expect(p.verify.see).toEqual({
+      command: expect.stringMatching(
+        /^curl -sS -A '[^']*GPTBot[^']*' '[^']*\/b' \| grep -io '<a \[\^>\]\*>' \| grep -F -e '\/deep'$/,
+      ),
+      today: `Nothing: the crawl found no link to \`${served.base}/deep\` on that page.`,
+      after:
+        'The <a> tag you added: a line that holds `/deep`. A link that spells the path another way is not printed; the exact check reads it.',
+    });
+    const printed = await seen(served, p);
+    expect(printed.broken).toBe('');
+    expect(printed.fixed).toBe('<a href="/deep">\n');
   });
 
   describe('a page that is also an orphan', () => {

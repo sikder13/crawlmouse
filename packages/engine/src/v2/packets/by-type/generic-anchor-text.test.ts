@@ -14,6 +14,8 @@ import {
   packetOf,
   pageAsRead,
   pageAt,
+  HOME_AT_EN,
+  seen,
   SERVED,
   servedSite,
 } from '../test-support/structure.js';
@@ -115,7 +117,7 @@ describe('the generic_anchor_text packet', () => {
 
   it('checks for the recorded texts, each once whatever its case', () => {
     const p = packetOf('generic_anchor_text', record, facts);
-    expect(p.verify.command).toMatch(/' 'https:\/\/a\.test' 'Click here' 'Read more' 'here'$/);
+    expect(p.verify.command).toMatch(/\}' '3' 'Click here' 'Read more' 'here'$/);
     expect(p.verify.expect).toBe(
       'Exit status 0 once `https://a.test/hub` has links and the first link to each target says none of the recorded generic texts: `Click here`, `Read more`, `here`, compared without case, with spaces collapsed and the tags inside a link removed. The crawl keeps one text for a target, the first, so a later link to the same target is not read. The command knows these recorded phrases only: another stock phrase in their place passes it, and is judged on the next check. Today the crawl recorded 4 such links.',
     );
@@ -129,6 +131,157 @@ describe('the generic_anchor_text packet', () => {
       broken: hub(['Click here', 'Read more', 'click here', 'here', 'Ridge tent']),
       fixed: hub(['Ridge footprint', 'Tent care guide', 'Alpine stove', 'Trail mug', 'Ridge tent']),
     });
+    const live = hubSite(served.base);
+    const p = packetOf(
+      'generic_anchor_text',
+      detected(detectGenericAnchors(live), `${served.base}/hub`),
+      factsFor(live, SERVED),
+    );
+    const { broken, fixed } = await inBothStates(served, p.verify.command);
+    expect(broken.status).not.toBe(0);
+    expect(fixed.status).toBe(0);
+  });
+
+  it('takes the singular at one link', () => {
+    const one = {
+      ...record,
+      measured: 1,
+      evidence: { ...record.evidence, edges: record.evidence.edges.slice(0, 1) },
+    };
+    const p = packetOf('generic_anchor_text', one, facts);
+    expect(p.context[0]).toContain('and 1 of its 1 recorded link has generic text.');
+    expect(p.verify.expect).toContain('Today the crawl recorded 1 such link.');
+    expect(p.verify.see?.today).toContain('the crawl recorded 1 generic link on this page.');
+    const two = {
+      ...record,
+      measured: 1,
+      evidence: { ...record.evidence, edges: record.evidence.edges.slice(0, 2) },
+    };
+    expect(packetOf('generic_anchor_text', two, facts).context[0]).toContain(
+      'and 2 of its 2 recorded links have generic text.',
+    );
+  });
+
+  it('shows the links with a command to read, and what it prints today and after', async () => {
+    const hub = (texts: string[]) => ({
+      '/hub': anchors(texts.map((t, i): [string, string] => [`/p/${i + 1}`, t])),
+    });
+    served = await servedSite({
+      broken: hub(['Click here', 'Read more', 'click here', 'here', 'Ridge tent']),
+      fixed: hub(['Ridge footprint', 'Tent care guide', 'Alpine stove', 'Trail mug', 'Ridge tent']),
+    });
+    const live = hubSite(served.base);
+    const p = packetOf(
+      'generic_anchor_text',
+      detected(detectGenericAnchors(live), `${served.base}/hub`),
+      factsFor(live, SERVED),
+    );
+    expect(p.verify.see).toEqual({
+      command: expect.stringMatching(
+        /^curl -sS -A '[^']*' '[^']*\/hub' \| grep -io '<a \[\^>\]\*>\[\^<\]\*<\/a>' \| grep -iF -e 'Click here' -e 'Read more' -e 'here'$/,
+      ),
+      today:
+        'The links that say `Click here`, `Read more`, `here`: the crawl recorded 4 generic links on this page. A link with a tag inside its text is not printed; the exact check reads it.',
+      after: 'Nothing, once no link says one of them.',
+    });
+    const printed = await seen(served, p);
+    expect(printed.broken.trim().split('\n')).toEqual([
+      '<a href="/p/1">Click here</a>',
+      '<a href="/p/2">Read more</a>',
+      '<a href="/p/3">click here</a>',
+      '<a href="/p/4">here</a>',
+    ]);
+    expect(printed.fixed).toBe('');
+  });
+
+  // round 2, SEO finding 1: the hub answers at another address than the one the crawl names it by
+  it('when the hub is a homepage that answers at /en/, verify requests /en/ in both states', async () => {
+    const home = (texts: string[]) => ({
+      ...HOME_AT_EN,
+      '/en/': anchors(texts.map((t, i): [string, string] => [`/p/${i + 1}`, t])),
+    });
+    served = await servedSite({
+      broken: home(['Click here', 'Read more', 'Ridge tent']),
+      fixed: home(['Ridge footprint', 'Tent care guide', 'Ridge tent']),
+    });
+    const b = served.base;
+    const live = site(
+      [
+        {
+          path: b,
+          pr: 0.9,
+          facts: { final_url: `${b}/en/` },
+          links: [
+            { to: `${b}/p/1`, anchor: 'Click here', generic: true },
+            { to: `${b}/p/2`, anchor: 'Read more', generic: true },
+            { to: `${b}/p/3`, anchor: 'Ridge tent' },
+            { to: `${b}/p/4`, anchor: 'click here', generic: true },
+            { to: `${b}/p/5`, anchor: 'Alpine stove' },
+          ],
+        },
+        ...[1, 2, 3, 4, 5].map((n) => ({ path: `${b}/p/${n}`, pr: 0.01, links: [b] })),
+      ],
+      { homepage: b },
+    );
+    const p = packetOf(
+      'generic_anchor_text',
+      detected(detectGenericAnchors(live), b),
+      factsFor(live, SERVED),
+    );
+    expect(p.verify.command).toContain(` '${b}/en/' | `);
+    expect(p.verify.expect).toContain(`once \`${b}/en/\` (where \`${b}\` answers) has links`);
+    const { broken, fixed } = await inBothStates(served, p.verify.command);
+    expect(broken.status).not.toBe(0);
+    expect(fixed.status).toBe(0);
+    const printed = await seen(served, p);
+    expect(printed.broken).toContain('>Click here</a>');
+    expect(printed.fixed).toBe('');
+  });
+
+  // round 2: a generic text the page writes another way than the record holds it
+  it.each([
+    ['a numeric character reference', 'Click here', '&#99;lick here'],
+    ['a hex character reference', 'Click here', 'Click&#x20;here'],
+    ['a backtick, which a packet shows as an apostrophe', 'tap `here`', 'tap `here`'],
+    ['an em space, which the crawl reads as a space', 'Click\u2003here', 'Click\u2003here'],
+    ['a comment inside the text', 'Click here', 'Cli<!-- x -->ck here'],
+  ])('verify is not passed by a generic text written with %s', async (_name, recorded, written) => {
+    const hub = (text: string) => ({
+      '/hub': `<a href="/p/1">${text}</a><a href="/p/2">Ridge tent</a>`,
+    });
+    served = await servedSite({ broken: hub(written), fixed: hub('Ridge footprint') });
+    const b = served.base;
+    const live = site(
+      [
+        {
+          path: `${b}/hub`,
+          pr: 0.9,
+          links: [
+            ...[1, 3, 4].map((n) => ({ to: `${b}/p/${n}`, anchor: recorded, generic: true })),
+            { to: `${b}/p/2`, anchor: 'Ridge tent' },
+            { to: `${b}/p/5`, anchor: 'Alpine stove' },
+          ],
+        },
+        { path: b, pr: 0.01, links: [`${b}/hub`] },
+        ...[1, 2, 3, 4, 5].map((n) => ({ path: `${b}/p/${n}`, pr: 0.01, links: [`${b}/hub`] })),
+      ],
+      { homepage: b },
+    );
+    const p = packetOf(
+      'generic_anchor_text',
+      detected(detectGenericAnchors(live), `${b}/hub`),
+      factsFor(live, SERVED),
+    );
+    const { broken, fixed } = await inBothStates(served, p.verify.command);
+    expect(broken.status).not.toBe(0);
+    expect(fixed.status).toBe(0);
+  });
+
+  it('leaves out the links the crawl leaves out: a fragment alone, and another site', async () => {
+    const hub = (first: string) => ({
+      '/hub': `<a href="/p/1">${first}</a><a href="#">Click here</a><a href="https://other.test/x">Read more</a>`,
+    });
+    served = await servedSite({ broken: hub('Click here'), fixed: hub('Ridge footprint') });
     const live = hubSite(served.base);
     const p = packetOf(
       'generic_anchor_text',

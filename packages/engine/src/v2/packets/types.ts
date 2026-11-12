@@ -57,7 +57,7 @@ export interface Verify {
   /** The registry token of the crawler the command requests as; null when it requests as none. */
   ua: string | null;
   /** The readable layer above the strict command. */
-  see?: See;
+  see: See;
 }
 
 /**

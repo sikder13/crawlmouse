@@ -60,6 +60,11 @@ const builder: PacketBuilder<Rec> = {
     command: sh`curl -sS ${url(r.url)} | grep -q ${word('<a')}`,
     expect: line`Exit status 0.`,
     ua: null,
+    see: {
+      command: sh`curl -sS ${url(r.url)} | grep -io ${word('<a[^>]*>')}`,
+      today: line`A link on ${code(r.url)}.`,
+      after: line`The same link.`,
+    },
   }),
 };
 
@@ -209,13 +214,23 @@ describe('compose over hostile records (properties)', () => {
         'Edit the Link in .',
         'x',
         'Exit status 0.',
+        'A link on .',
+        'The same link.',
       ].map((s) => s.trim()),
     );
     fc.assert(
       fc.property(hostileRec, framework, (r, f) => {
         const p = compose(builder, r, facts(f));
         for (const body of [p, ...p.packets]) {
-          for (const text of [...body.context, ...body.change, ...body.keep, body.verify.expect]) {
+          const shown = [
+            ...body.context,
+            ...body.change,
+            ...body.keep,
+            body.verify.expect,
+            body.verify.see!.today,
+            body.verify.see!.after,
+          ];
+          for (const text of shown) {
             expect(UNSHOWN.test(text)).toBe(false);
             const written = outsideCodeSpans(text)
               .replace(/ \((line )?cut from \d+ characters\)/g, '')
@@ -225,6 +240,7 @@ describe('compose over hostile records (properties)', () => {
             expect(ours.has(written), written).toBe(true);
           }
           expect(UNSHOWN.test(body.verify.command)).toBe(false);
+          expect(UNSHOWN.test(body.verify.see!.command)).toBe(false);
         }
       }),
     );
