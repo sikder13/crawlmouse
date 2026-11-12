@@ -33,7 +33,9 @@ webhook has caught up.
 ## 3. Dry run
 
 From a checkout of `main`, with the production database URL in an environment variable (never on
-the command line):
+the command line), and `TRIAL_LEDGER_PEPPER` set to production's value: the mail ledger names a
+person by a hash of their address under it (CC-28), and without it the plan refuses with
+`mail_pepper` rather than leave those rows behind:
 
 ```bash
 pnpm --filter @crawlmouse/scripts exec tsx ops/erase-account.ts --db-url-env DB_URL --email person@example.com --yes-production

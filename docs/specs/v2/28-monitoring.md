@@ -74,6 +74,41 @@ When a site's request step fails every retry, `scheduleTickFn` catches it per si
 back while its 24-hour window is open. It acts only while `next_check_at` is still past the claimed time, so
 a second call, or a schedule saved since, gives nothing back twice. Sentry is told the site id and the slot.
 
+## The mail the product sends (D2, D3, D7, D11)
+
+| Event                                                      | Function                      | Template                                                        | Idempotency key                                     | Who it goes to                                                                                |
+| ---------------------------------------------------------- | ----------------------------- | --------------------------------------------------------------- | --------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `email.requested` `trial_reminder`                         | `lib/v2/mail/functions.ts`    | `trial-reminder`                                                | `trial_reminder:<account>:<trial end>`              | the owner, while `email_trial_reminder` is on and the account is unmarked and on a live trial |
+| `email.requested` with `tokenId`                           | same                          | `email-change-confirm`, `email-change-notice`, `account-delete` | `account_link:<tokenId>`                            | `account_link_recipient`; the link is minted after the claim (Q10)                            |
+| `check.notify_requested`, `check.finished`, `check.failed` | same                          | `check-notify`                                                  | `check_notify:<check>`                              | `checks.notify_email`, once the check has ended; a cancelled check is told as failed          |
+| `fix.email_developer_requested`                            | same                          | `fix-to-developer`                                              | `fix_to_developer:<request>`                        | the request row's address; `sent_at` set after the send; the body is the packet as text       |
+| `check.finished`                                           | `lib/v2/monitor/functions.ts` | `alert`                                                         | `alert:<check>:email:<seat>`, `alert:<check>:slack` | `alert_email_recipients`; Slack through the account's URL at send time                        |
+| `summary.requested` (from the hourly summary tick)         | same                          | `weekly-summary`                                                | `summary:<account>:<ISO week>:<seat>`               | `summary_recipients`, never for an empty week                                                 |
+
+`check_finished` is sent once per check from the `check.finished` listener, with the owner read from the
+database and `source: 'pipeline'`; Inngest's idempotency on the check id holds it to one for 24 hours.
+
+Alert and summary mail carry `List-Unsubscribe: <https://crawlmouse.com/api/unsubscribe?t=…>` and
+`List-Unsubscribe-Post: List-Unsubscribe=One-Click`; the footer links the page `/unsubscribe?t=…`, which asks
+before it changes anything. Both take the same signed token (`lib/v2/mail/links.ts`), which names one seat and one
+kind and lasts 90 days. The POST route accepts a cross-site request (a mail client sends it), with the
+webhook policy class. Account mail carries neither.
+
+Slack is posted with `fetch` after the engine's `validateUrlOrThrow`, only to a `https://hooks.slack.com/services/…`
+URL, with no redirect followed and a timeout: the engine's `safeFetch` makes GET requests only. The message is
+plain text with Slack's `& < >` escapes and link previews off. `alert_events.destination_hash` is an HMAC under the
+mail pepper of the sorted recipient hashes (email) or of the URL (Slack).
+
+Every account has the six default rules (Q13): seeded by the migration's backfill, and again, for any kind missing,
+before alertFn evaluates and before the Alerts page reads.
+
+## Erasure (D9)
+
+`erase.ts` adds the mail step to the sequence: the plan gains `erase_mail_records(hashes, false)`'s counts, the
+apply is followed by `erase_mail_records(hashes, true)`, and the recount reads them again. The hashes are the plan's
+addresses under the mail pepper; with no pepper the plan refuses (`mail_pepper`) rather than skip the step. Both
+port sets implement it: `deletion-ports.ts` (the purge) and `scripts/ops/erase-account.ts`.
+
 ## Owner rulings
 
 Q1–Q8, Q10 and Q11 approved as acted on (`questions.md` in the step's notes); Q9 changed to the release
@@ -96,3 +131,15 @@ link is minted only after the claim (Q10); unsubscribe and recipients are per se
   step's retry claims the next due sites, and the first set waits for its next due time (one cadence lost,
   one slot spent). Making the claim idempotent needs a claim keyed on the run (questions Q12).
 - A site removed between its claim and its request step still gets its queued `scheduled` check.
+- The unsubscribe page and route answer 404 while `V2_CHECKS_PUBLIC` is off, so turning the flag off after mail
+  has gone out breaks those links until it is on again.
+- Slack turns a bare URL in message text into a link (a fix title naming a page on the member's site); we build no
+  link and previews are off.
+- The weekly summary reads at most 5,000 changes per account-week; past that it logs `summary.read_capped` and its
+  counts are of the rows read.
+- `check_finished` replayed after Inngest's 24-hour idempotency window is counted again.
+- A fix with no packet is answered `queued` and nothing is sent.
+- The Alerts page shows what `changes.notified` records; a failed or suppressed channel (`alert_events`) is not
+  shown.
+- The Supabase ports for alerts and the summary (`alerts-store.ts`, `summary-store.ts`) are typechecked and their
+  SQL is tested on PGlite; the PostgREST reads themselves have not run against a real PostgREST.
