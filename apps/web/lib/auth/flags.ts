@@ -35,3 +35,12 @@ export function pipelineEnabled(env: Env = process.env): boolean {
 export function checksPublicEnabled(env: Env = process.env): boolean {
   return env.V2_CHECKS_PUBLIC?.trim() === '1';
 }
+
+/**
+ * Whether any CC-29 public page is served: V2_CHECKS_PUBLIC (the /check pages) or V2_BILLING (Pricing,
+ * Developers, For agencies). The social-card route answers 404 while it is false; each card then asks
+ * its own page's flag (lib/v2/social-card.tsx).
+ */
+export function v2PublicPagesEnabled(env: Env = process.env): boolean {
+  return checksPublicEnabled(env) || env.V2_BILLING?.trim() === '1';
+}

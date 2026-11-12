@@ -215,6 +215,7 @@ describe('the finders see what they claim to see', () => {
       'app/api/sites/[id]/route.ts',
       'app/api/sites/route.ts',
       'app/api/webhooks/stripe-account/route.ts',
+      'app/og/[card]/route.ts',
     ]);
   });
 
