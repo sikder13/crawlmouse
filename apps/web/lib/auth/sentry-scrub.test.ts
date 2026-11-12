@@ -95,3 +95,21 @@ describe('the SDK options that run the scrubber', () => {
     expect(inits[0]).not.toMatch(/beforeSend/);
   });
 });
+
+describe('scrubDoorSecrets, a Slack webhook in any shape the stored URL may take (CC-28)', () => {
+  it.each([
+    ['today’s shape', 'https://hooks.slack.com/services/T0001/B0002/SLACKSECRETabc123'],
+    [
+      'underscore and dash in the secret',
+      'https://hooks.slack.com/services/T0001/B0002/SLACK_SECRET-x',
+    ],
+    ['a team id not starting with T', 'https://hooks.slack.com/services/E0001/B0002/SLACKSECRET'],
+    ['no team or bot segments', 'https://hooks.slack.com/services/SLACKSECRET'],
+    ['more segments', 'https://hooks.slack.com/services/T1/B2/C3/SLACKSECRET'],
+    ['encoded slashes', 'https%3A%2F%2Fhooks.slack.com%2Fservices%2FT1%2FB2%2FSLACKSECRET'],
+  ])('%s', (_, url) => {
+    const out = JSON.stringify(scrubDoorSecrets({ url, breadcrumbs: [{ data: { url } }] }));
+    expect(out).not.toMatch(/SLACK_?SECRET/);
+    expect(out).toContain('services');
+  });
+});

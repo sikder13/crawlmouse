@@ -72,10 +72,11 @@ const ACCOUNT_LINK_PATH = new RegExp(
 /**
  * A Slack incoming-webhook URL's path (`/services/T…/B…/<secret>`, CC-28 D5): anyone holding it posts
  * into the member's Slack. alertFn POSTs to it with `fetch`, which the SDK records as a span and a
- * breadcrumb; the secret part goes, with the slashes as CHECK_PATH reads them.
+ * breadcrumb. Everything after `/services/` goes, in the characters the stored URL may hold
+ * (`SLACK_WEBHOOK`, lib/v2/monitor/slack.ts), with the slashes as CHECK_PATH reads them.
  */
 const SLACK_WEBHOOK_PATH = new RegExp(
-  `(${SLASH}services${SLASH}T[A-Z0-9]+${SLASH}B[A-Z0-9]+${SLASH})[A-Za-z0-9]+`,
+  `(${SLASH}services${SLASH})[A-Za-z0-9_-]+(?:${SLASH}[A-Za-z0-9_-]+)*`,
   'gi',
 );
 /**
