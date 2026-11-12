@@ -144,6 +144,7 @@ function pages(env: Env): [string, string][] {
     trialEndsAt: new Date('2026-11-20T00:00:00Z'),
     trialUsedAt: NOW,
     subscriptionId: 'sub_1',
+    billingEnd: null,
     firstSite: null,
   };
   const used = { accountId: AGENCY, trialUsedAt: NOW, deleted: false };

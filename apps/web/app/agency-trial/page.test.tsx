@@ -54,6 +54,7 @@ const agencyRow = (over: Partial<AgencyAccountRow>): AgencyAccountRow => ({
   trialEndsAt: null,
   trialUsedAt: null,
   subscriptionId: null,
+  billingEnd: null,
   firstSite: 'clientsite.com',
   ...over,
 });
@@ -169,5 +170,33 @@ describe('/agency-trial', () => {
       { method: 'post', action: '/api/billing/portal', fields: { accountId: id } },
       { method: 'post', action: '/api/billing/cancel', fields: { accountId: id, confirm: 'true' } },
     ]);
+  });
+
+  // Correctness B-r2-1: after "Yes, cancel" the account stays on the trial with cancel_at_period_end
+  // set; back on this page it says the card is not charged and offers no Cancel, asked or not.
+  it('an agency trial set to cancel: not charged, and no Cancel, even with ?cancel=<id>', async () => {
+    h.viewer = signedIn;
+    const id = 'a0000000-0000-4000-8000-00000000000b';
+    h.rows = [
+      agencyRow({
+        state: 'agency_trial',
+        tier: 'agency',
+        trialVariant: 'card_required',
+        trialEndsAt: new Date('2099-01-01T00:00:00Z'),
+        trialUsedAt: new Date('2026-10-01T10:00:00Z'),
+        subscriptionId: 'sub_1',
+        billingEnd: new Date('2099-01-01T00:00:00Z'),
+      }),
+    ];
+    h.used = { accountId: id, trialUsedAt: new Date('2026-10-01T10:00:00Z'), deleted: false };
+    for (const params of [{}, { cancel: id }] as Record<string, string>[]) {
+      const html = renderToStaticMarkup(await render(params));
+      expect(html).toContain('Cancelled; the trial ends Thu 1 Jan and the card is not charged.');
+      expect(html).not.toContain('charged when it ends');
+      const actions = [...new JSDOM(html).window.document.querySelectorAll('form')].map((f) =>
+        f.getAttribute('action'),
+      );
+      expect(actions).toEqual(['/api/billing/portal']);
+    }
   });
 });

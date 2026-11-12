@@ -17,9 +17,11 @@ import { effectiveTier, type Tier } from '../../entitlement-v2';
 import type { AccountState } from '@crawlmouse/types/v2';
 import { AGENCIES_COPY } from '../copy/agencies';
 import { AGENCY_TRIAL_COPY as COPY } from '../copy/agency-trial';
+import { SETTINGS_COPY } from '../copy/settings';
 import { tagged, type TaggedView } from './agencies';
 import { portalRefusal } from '../../billing/portal-v2';
 import { dayDate } from '../format';
+import { PLAN_NAMES } from './account';
 import type { UsedTrial } from '../pricing/used-trial';
 
 export interface AgencyAccountRow {
@@ -35,6 +37,12 @@ export interface AgencyAccountRow {
   trialEndsAt: Date | null;
   trialUsedAt: Date | null;
   subscriptionId: string | null;
+  /**
+   * When the subscription it follows is set to cancel at its period's end (the cancel route sets
+   * `cancel_at_period_end`), that end: the mirror's `current_period_end`, as Settings reads it
+   * (`loadSettingsDataset`'s `billingEnd`). Null when it is not set to cancel, or follows none.
+   */
+  billingEnd: Date | null;
   /** The account's first site, when it holds one. */
   firstSite: string | null;
 }
@@ -98,7 +106,7 @@ export interface ManageView {
   /**
    * CC-03 D8's two clicks: `ask` reloads this page with the confirmation; `confirm` posts to the
    * cancel route with `confirm=true`. Null when the account follows no subscription, which the
-   * cancel route refuses (`no_subscription`).
+   * cancel route refuses (`no_subscription`), and when it is already set to cancel (`billingEnd`).
    */
   cancel: { ask: PageForm; confirm: (PageForm & { text: string }) | null } | null;
 }
@@ -136,20 +144,29 @@ const CANCEL = '/api/billing/cancel';
 
 function manageView(row: AgencyAccountRow, input: AgencyTrialInput): ManageView {
   const m = COPY.manage;
-  const ends =
-    row.trialEndsAt === null ? null : dayDate(row.trialEndsAt.toISOString(), input.timeZone);
+  const date = (d: Date | null) => (d === null ? null : dayDate(d.toISOString(), input.timeZone));
+  const ends = date(row.trialEndsAt);
   const state = row.state as 'agency_trial' | 'agency' | 'past_due';
   const askFields: Record<string, string> = { cancel: row.id };
   if (input.interval === 'year') askFields.interval = 'year';
+  // Set to cancel (correctness B-r2-1): Settings' words for a plan set to end, and no second Cancel.
+  // A past-due account says first that its payment failed, as Settings' plan card does.
+  const ending = date(row.billingEnd);
+  const text =
+    ending === null || state === 'past_due'
+      ? m.state(state, ends)
+      : state === 'agency_trial'
+        ? SETTINGS_COPY.trialCancelled(ending)
+        : SETTINGS_COPY.cancelling(PLAN_NAMES.agency, ending);
   return {
     accountId: row.id,
     title: row.name ?? m.unnamed,
-    text: m.state(state, ends),
+    text,
     portal: portalRefusal(input.customers.get(row.id) ?? null)
       ? null
       : { method: 'post', action: PORTAL, fields: { accountId: row.id }, label: m.portal },
     cancel:
-      row.subscriptionId === null
+      row.subscriptionId === null || ending !== null
         ? null
         : {
             ask: {

@@ -25,6 +25,7 @@ const row = (over: Partial<AgencyAccountRow> = {}): AgencyAccountRow => ({
   trialEndsAt: null,
   trialUsedAt: null,
   subscriptionId: null,
+  billingEnd: null,
   firstSite: 'clientsite.com',
   ...over,
 });
@@ -266,6 +267,60 @@ describe('an owned agency account’s billing', () => {
       view(agencyStanding([trialing], USED, NOW), 'month', { cancelAsked: 'other' }).manage[0]!
         .cancel!.confirm,
     ).toBeNull();
+  });
+
+  // Correctness B-r2-1: the cancel route sets cancel_at_period_end and the account stays on the
+  // trial until it ends; the page reads that from the mirror (billingEnd) and says so, in Settings'
+  // words (SETTINGS_COPY.trialCancelled, .cancelling), with no Cancel to click again.
+  it('a trial set to cancel: not charged, in Settings’ words, and no Cancel, even when asked', () => {
+    const cancelled = { ...trialing, billingEnd: new Date('2026-11-03T15:00:00Z') };
+    const v = view(agencyStanding([cancelled], USED, NOW), 'month', {
+      customers: new Map([[cancelled.id, 'cus_1']]),
+      cancelAsked: cancelled.id,
+    });
+    expect(v.manage).toEqual([
+      {
+        accountId: cancelled.id,
+        title: 'Summit Digital',
+        text: 'Cancelled; the trial ends Tue 3 Nov and the card is not charged.',
+        portal: {
+          method: 'post',
+          action: '/api/billing/portal',
+          fields: { accountId: cancelled.id },
+          label: 'Manage billing',
+        },
+        cancel: null,
+      },
+    ]);
+    expect(JSON.stringify(v.manage)).not.toMatch(/charged when it ends|unless you cancel/);
+  });
+
+  it('Agency set to cancel: runs to the period’s end, nothing more charged, no Cancel', () => {
+    const r = row({
+      ...SUB,
+      state: 'agency',
+      tier: 'agency',
+      billingEnd: new Date('2026-12-01T00:00:00Z'),
+    });
+    expect(view(agencyStanding([r], USED, NOW)).manage[0]).toMatchObject({
+      text: 'Agency until Tue 1 Dec, then Free. Nothing more is charged.',
+      cancel: null,
+    });
+  });
+
+  it('past due and set to cancel: the payment that failed, and no Cancel', () => {
+    const r = row({
+      ...SUB,
+      state: 'past_due',
+      tier: 'agency',
+      pastDueTier: 'agency',
+      pastDueSince: NOW,
+      billingEnd: new Date('2026-12-01T00:00:00Z'),
+    });
+    expect(view(agencyStanding([r], USED, NOW)).manage[0]).toMatchObject({
+      text: 'The last payment failed. Update the card from Manage billing to keep Agency.',
+      cancel: null,
+    });
   });
 
   it('no Stripe customer: no Manage billing (portalRefusal); no subscription: no Cancel', () => {

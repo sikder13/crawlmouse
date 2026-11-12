@@ -22,6 +22,7 @@ const row: AgencyAccountRow = {
   trialEndsAt: null,
   trialUsedAt: null,
   subscriptionId: null,
+  billingEnd: null,
   firstSite: 'clientsite.com',
 };
 
