@@ -4,8 +4,9 @@
  * in a non-preview send, and both routes accept that token.
  *
  * The deps are production's (`alertDeps`, `summaryDeps` in functions.ts, so their `unsubscribeLinks`
- * wiring is the one under test) with the store, the mail ledger and transport, and the event capture
- * replaced by in-memory ones: nothing here reaches a database, a mail provider or Slack.
+ * wiring is the one under test) with the store, the mail ledger and transport replaced by in-memory
+ * ones, and the event capture a no-op, except in the S1 block, which keeps production's `capture` over
+ * a mocked `captureServerEvent`: nothing here reaches a database, a mail provider, PostHog or Slack.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -15,6 +16,7 @@ import { htmlTargets } from '../mail/templates/inspect';
 import type { OutgoingMail, UnsubscribeKind } from '../mail/types';
 import { UNSUBSCRIBE_COPY } from '../mail/unsubscribe';
 import { verifyUnsubscribe } from '../mail/unsubscribe-token';
+import { captureServerEvent } from '@/lib/analytics-server';
 import { deliverAlert, type AlertDeps, type StoredChange } from './alerts';
 import { alertDeps, summaryDeps } from './functions';
 import { sendSummary, type SummaryDeps } from './summary';
@@ -67,7 +69,12 @@ function mail(): { deps: MailDeps; sent: OutgoingMail[] } {
   };
 }
 
-async function alertSent(): Promise<OutgoingMail> {
+/** `productionCapture` keeps `alertDeps`' and `summaryDeps`' own `capture` (S1); otherwise it is a no-op. */
+interface SentOptions {
+  productionCapture?: boolean;
+}
+
+async function alertSent(opts: SentOptions = {}): Promise<OutgoingMail> {
   const m = mail();
   const deps: AlertDeps = {
     ...alertDeps(ENV),
@@ -110,7 +117,7 @@ async function alertSent(): Promise<OutgoingMail> {
       finishSlack: async () => {},
       record: async () => {},
     },
-    capture: async () => {},
+    ...(opts.productionCapture ? {} : { capture: async () => {} }),
     now: () => NOW,
   };
   expect(await deliverAlert(deps, CHECK, 'email')).toEqual({ status: 'sent', reason: null });
@@ -118,7 +125,7 @@ async function alertSent(): Promise<OutgoingMail> {
   return m.sent[0]!;
 }
 
-async function summarySent(): Promise<OutgoingMail> {
+async function summarySent(opts: SentOptions = {}): Promise<OutgoingMail> {
   const m = mail();
   const deps: SummaryDeps = {
     ...summaryDeps(ENV),
@@ -131,7 +138,7 @@ async function summarySent(): Promise<OutgoingMail> {
       ],
       recipients: async () => [{ seatId: SEAT, email: 'owner@agency.example', sites: null }],
     },
-    capture: async () => {},
+    ...(opts.productionCapture ? {} : { capture: async () => {} }),
     now: () => NOW,
   };
   const weekStart = new Date(Date.UTC(2026, 10, 16)).toISOString();
@@ -215,4 +222,26 @@ describe.each<[string, () => Promise<OutgoingMail>, UnsubscribeKind]>([
     );
     expect(rpc).toHaveBeenCalledWith('unsubscribe_seat', { p_seat: SEAT, p_kind: kind });
   });
+});
+
+describe('the product events as production wires them (S1, D11)', () => {
+  it.each<[string, () => Promise<OutgoingMail>, Record<string, unknown>]>([
+    ['alert_sent', () => alertSent({ productionCapture: true }), { channel: 'email', changes: 1 }],
+    ['summary_sent', () => summarySent({ productionCapture: true }), { sites: 1, changes: 1 }],
+  ])(
+    '%s: the event’s name, keyed by the account, with no address or token in it',
+    async (event, sent, properties) => {
+      const capture = vi.mocked(captureServerEvent);
+      capture.mockClear();
+      const m = await sent();
+      expect(capture.mock.calls).toEqual([
+        [null, { event, distinctId: `account:${ACCOUNT}`, properties }],
+      ]);
+      const token = links(m).header.searchParams.get('t')!;
+      const json = JSON.stringify(capture.mock.calls);
+      expect(json).not.toContain('@');
+      expect(json).not.toContain(token);
+      expect(json).not.toContain(SEAT);
+    },
+  );
 });
