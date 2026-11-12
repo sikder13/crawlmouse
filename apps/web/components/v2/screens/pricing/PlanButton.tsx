@@ -3,9 +3,9 @@ import { Button } from '../../Button';
 import styles from './Pricing.module.css';
 
 /**
- * A plan's button, as `pricingView` decided it: a link, a form that posts to a billing route (a
- * form is answered with a redirect to Checkout, the trial or the dashboard), the plan the account is
- * on, or a sentence where a button would be.
+ * A plan's button, as `pricingView` decided it: a link, a form that posts to a billing route (which
+ * answers a form with a redirect when it succeeds), the plan the account is on, or a sentence where a
+ * button would be.
  */
 export function PlanButton({ action }: { action: PlanAction }) {
   if (action.kind === 'note') {

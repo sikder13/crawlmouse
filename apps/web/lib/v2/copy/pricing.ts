@@ -1,8 +1,9 @@
 /**
  * Pricing's written sentences (Final-Pricing, with FACTS-proposed Part 2's revisions A2, A3, A6, A8,
- * A9, B2, D5, K9, K10 and L6). Every price comes from `prices.ts`, every limit from `GATES`, the
- * trial's length from `TRIAL_DAYS`; the Agency Plus row's figures are the one set declared here
- * (owner ruling Q7), because nothing is built behind that row.
+ * A9, B2, D5, K9, K10 and L6). Prices come from `prices.ts`, limits from `GATES`, the trial's length
+ * from `TRIAL_DAYS`. Three figures are declared here: the Agency Plus row's (owner ruling Q7: nothing
+ * is built behind that row), Free's price, and the annual renewal reminder days (L6).
+ * components/v2/screens/pricing/pricing-numbers.test.tsx holds the rendered page to these sources.
  */
 import { TRIAL_REMINDER_DAYS_BEFORE_END, EMAIL_KINDS } from '../../auth/constants';
 import type { Interval } from '../../billing/catalog';
@@ -158,7 +159,6 @@ export const PRICING_COPY = {
   title: 'Every audit is free. Pay when you want it watched.',
   lead: () =>
     `The first audit of any site is free and complete: every crawler, every page up to ${count(GATES.free.pagesPerCheck)}, the ${numberWord(freeFixes())} fixes with the largest effect. Pro and Agency add what one audit cannot do: checking again, telling you what changed, and every fix the audit finds.`,
-  intervalLabel: 'Billing',
   intervals: { month: 'Monthly', year: 'Yearly' } as Record<Interval, string>,
   /** FACTS B2 (the crawlers, rewritten to I6) and L6 (the annual reminders). */
   crawlers:
@@ -190,7 +190,7 @@ export const PRICING_COPY = {
     },
     current: { label: 'Your plan', note: 'The plan your account is on now' },
     included: { label: 'Included in your plan', note: 'Agency includes all of Pro' },
-    freeBelow: { label: 'Your account returns to Free', note: 'If you cancel, from Settings' },
+    freeBelow: { note: 'If you cancel, from Settings, the account returns to Free' },
     notOwner: { note: 'Only the account owner changes its plan' },
   },
   agencyPlus: {
