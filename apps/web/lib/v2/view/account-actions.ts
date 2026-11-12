@@ -135,6 +135,12 @@ export const ACCOUNT_ACTIONS = {
     owner: 'built',
     guard: 'None (a minted public report).',
   },
+  switchAccount: {
+    verb: 'POST',
+    route: '/api/seats/switch',
+    owner: 'built',
+    guard: 'Signed-in holder of an active seat on the named account (`is_member`).',
+  },
 } as const satisfies Record<string, RouteSpec>;
 
 export type ActionKey = keyof typeof ACCOUNT_ACTIONS;
@@ -238,3 +244,21 @@ export const ACCOUNT_NAV = [
   { label: 'Integrations', href: '/settings/integrations' },
   { label: 'Settings', href: '/settings' },
 ] as const;
+
+/**
+ * The rail of an account on the Agency tier (Final-Ag-Matrix), without the locked rail's Branding,
+ * which docs/specs/v2/31-agency.md D11 leaves out of the step.
+ */
+export const AGENCY_NAV = [
+  { label: 'Clients', href: '/agency' },
+  { label: 'Changes', href: '/changes' },
+  { label: 'Alerts', href: '/alerts' },
+  { label: 'Reports', href: '/reports' },
+  { label: 'Seats', href: '/seats' },
+  { label: 'Settings', href: '/settings' },
+] as const;
+
+/** A rail link's label, on either rail. */
+export type RailLabel =
+  | (typeof ACCOUNT_NAV)[number]['label']
+  | (typeof AGENCY_NAV)[number]['label'];

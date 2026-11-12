@@ -28,6 +28,22 @@ export const PREVIEWS: PreviewEntry[] = [
   { path: '/v2-preview/switch', name: 'Switch', kind: 'primitive' },
   { path: '/v2-preview/page-shell', name: 'PageShell', kind: 'primitive' },
   { path: '/v2-preview/account-shell', name: 'AccountShell', kind: 'primitive' },
+  // CC-31: the rail of a person with seats on several accounts.
+  {
+    path: '/v2-preview/account-shell/switcher',
+    name: 'AccountSwitcher, two accounts',
+    kind: 'primitive',
+  },
+  {
+    path: '/v2-preview/account-shell/switcher/open',
+    name: 'AccountSwitcher, three accounts, open',
+    kind: 'primitive',
+  },
+  {
+    path: '/v2-preview/account-shell/switcher/long',
+    name: 'AccountSwitcher, a long name on the agency rail',
+    kind: 'primitive',
+  },
   { path: '/v2-preview/trial-card', name: 'TrialCard', kind: 'primitive' },
   { path: '/v2-preview/theme-control', name: 'ThemeControl', kind: 'primitive' },
   { path: '/v2-preview/grade-history', name: 'GradeHistory', kind: 'primitive' },
