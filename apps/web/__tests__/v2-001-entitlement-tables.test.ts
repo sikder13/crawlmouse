@@ -50,7 +50,10 @@ const POSTURE: Record<
   },
   seats: {
     policies: ['seats_member_read'],
-    authenticatedSelect: { columnsWithout: ['invite_token_hash'] },
+    // 031 adds the invitation's expiry and number, which no client reads either.
+    authenticatedSelect: {
+      columnsWithout: ['invite_token_hash', 'invite_expires_at', 'invite_seq'],
+    },
   },
   agency_brands: {
     policies: ['agency_brands_member_read'],
@@ -275,7 +278,11 @@ async function buildWorld(): Promise<World> {
     [agency],
   );
   await db.query(`update public.accounts set stripe_customer_id = 'cus_' || left(id::text, 8)`);
-  await db.query(`update public.seats set invite_token_hash = repeat('a', 64)`);
+  // 031's seats_invite_token: a hash is held by an invited seat, with an expiry.
+  await db.query(
+    `update public.seats set invite_token_hash = repeat('a', 64), invite_expires_at = now()
+      where status = 'invited'`,
+  );
   return { db, alice, bob, dave, aliceAccount, bobAccount, agency };
 }
 
