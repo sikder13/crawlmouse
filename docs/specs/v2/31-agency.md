@@ -267,6 +267,11 @@ the seat stayed held; and the invite routes bound how many are sent (above). The
 written invitation says it will be emailed from `alerts@crawlmouse.com` (`seat_invited`,
 `lib/v2/copy/notices.ts`).
 
+Known gap, the one spec 28 states for an account link (its Known gaps, first item): after Resend
+has accepted an invitation, a failure before the ledger records it as sent makes the retry mint a new
+link, which replaces the delivered one, and Resend refuses the second send; that mail's link then
+does not work and the owner sends the invitation again.
+
 The mail over the migrated schema, with the real `issue_seat_invite`, `read_seat_invite` and
 `claim_email_send`, and the handler and template alone:
 `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-031-m-invite-mail.test.ts lib/v2/mail/handlers.test.ts lib/v2/mail/store.test.ts lib/v2/mail/recipient-not-in-copy.test.ts lib/v2/mail/templates/seat-invite.test.ts`.
@@ -440,9 +445,10 @@ neither function:
 `pnpm --filter @crawlmouse/web exec vitest run lib/v2/mail/handlers.test.ts lib/v2/mail/recipient-not-in-copy.test.ts lib/v2/mail/templates/report-confirm.test.ts lib/v2/mail/templates/client-report.test.ts`
 and `pnpm --filter @crawlmouse/inngest exec vitest run mail.test.ts`.
 
-Known gap: a contact whose address is under a suppression (a hard bounce or a complaint) is still
+Known gaps. A contact whose address is under a suppression (a hard bounce or a complaint) is still
 sent the confirmation, and a report to that address is then answered `suppressed` and not sent; no
-screen says so.
+screen says so. And the gap §6 states for an invitation's link holds for these links: a failure
+between Resend's acceptance and the ledger's record makes the retry mint again.
 
 ## 11. Erasure, gate messages and events
 

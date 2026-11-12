@@ -76,7 +76,7 @@ type Events = {
   'fix.email_developer_requested': { data: { requestId: string } };
   // CC-31: an invitation to a seat was written or re-sent (apps/web/lib/v2/agency/seats.ts). The
   // event names the seat and the invitation's number, never an address or a token: the handler
-  // reads both through issue_seat_invite.
+  // reads the address from the seat and mints the token through issue_seat_invite.
   'seat.invite.requested': { data: { seat_id: string; seq: number } };
   // CC-31: the two mails of a client report schedule (inngest/mail.ts). Each names a row and holds
   // no address and no token: the confirmation asked of a site's client contact, and a report to send.

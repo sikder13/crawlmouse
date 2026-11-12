@@ -121,9 +121,10 @@ export interface InviteMailEvent {
 
 /**
  * The event that asks for an invitation's mail. It names the seat and the invitation's number and
- * holds no address and no token: the handler reads both through `issue_seat_invite`. The event's id
- * is the invitation's, so the same invitation asked for twice is one event to Inngest, and a resend,
- * which is the next number, is another.
+ * holds no address and no token: the handler reads the address from the seat and mints the token
+ * through `issue_seat_invite` (lib/v2/mail/handlers.ts). The event's id is the invitation's, so the
+ * same invitation asked for twice is one event to Inngest, and a resend, which is the next number,
+ * is another.
  */
 export function inviteMailEvent({ seatId, seq }: Invitation): InviteMailEvent {
   return {
