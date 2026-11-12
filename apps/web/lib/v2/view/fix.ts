@@ -122,6 +122,12 @@ export interface PacketBodyView extends FrameworkOption {
   stack: string;
   /** The body as the page's block shows it, under its four headings. */
   block: string;
+  /**
+   * Which line of `block` (from 0) is the strict command, for a body with both verify layers: the
+   * page shows that line unwrapped in a strip that scrolls sideways, since it can run to thousands
+   * of characters. Null for a body with the strict command alone, whose block is shown whole.
+   */
+  exactLine: number | null;
   /** The body as plain text, for "Copy as a prompt" (the segment copies the same text). */
   prompt: string;
 }
@@ -350,16 +356,39 @@ function writtenFor(
     : `Written for any stack: the audit detected ${stack}, not which front end the site runs.${choose}`;
 }
 
-/** One body under its four headings, with the check's crawler and what we run afterwards. */
-function packetBlock(check: Check, f: Pick<Fix, 'affected_pages'>, b: PacketBody): string {
+/** One body's block, and which of its lines is the strict command when it has both layers. */
+interface Block {
+  block: string;
+  exactLine: number | null;
+}
+
+/**
+ * One body under its four headings, with the check's crawler and what we run afterwards. A body
+ * with a readable command (`verify.see`) has two layers under Verify: "See it", that command with
+ * what it prints today and after the fix, then "Exact check", the strict command.
+ */
+function packetBlock(check: Check, f: Pick<Fix, 'affected_pages'>, b: PacketBody): Block {
   const indent = (lines: readonly string[]) => lines.map((l) => `  ${l}`);
   // `verify.ua` is set when the command requests as a crawler (the contract's field); the command's
   // own first word is not read, since a command can start with `test "$(curl …`.
   const asCrawler = b.verify.ua !== null;
   const crawler = asCrawler ? check.crawlers.find((c) => c.ua === b.verify.ua) : undefined;
   const got = crawler ? (crawler.status === null ? 'robots.txt' : String(crawler.status)) : null;
+  const see = b.verify.see;
+  const run = see ? 'the exact check' : 'this';
+  const layers = see
+    ? [
+        'See it',
+        `  ${see.command}`,
+        `  Today: ${see.today}`,
+        `  After the fix: ${see.after}`,
+        'Exact check',
+      ]
+    : [];
+  const strict = see ? `  ${b.verify.command}` : b.verify.command;
   const verify = [
-    b.verify.command,
+    ...layers,
+    strict,
     `  → expect ${b.verify.expect}`,
     // FACTS D1: a request as a crawler is our tagged request's twin, not the same request.
     ...(asCrawler
@@ -369,10 +398,10 @@ function packetBlock(check: Check, f: Pick<Fix, 'affected_pages'>, b: PacketBody
       : []),
     ...(crawler ? [`Requests as ${crawler.ua}, which gets ${got} today.`] : []),
     f.affected_pages > 1
-      ? `We run this on all ${count(f.affected_pages)} pages when you mark the fix done.`
-      : 'We run this when you mark the fix done.',
+      ? `We run ${run} on all ${count(f.affected_pages)} pages when you mark the fix done.`
+      : `We run ${run} when you mark the fix done.`,
   ];
-  return [
+  const above = [
     'Context',
     ...indent(b.context),
     '',
@@ -381,8 +410,12 @@ function packetBlock(check: Check, f: Pick<Fix, 'affected_pages'>, b: PacketBody
     ...(b.keep.length ? ['', 'Keep', ...indent(b.keep)] : []),
     '',
     'Verify',
-    ...indent(verify),
-  ].join('\n');
+  ];
+  return {
+    block: [...above, ...indent(verify)].join('\n'),
+    // Each string of a body is one line (`packetBodies`), so a line's place is its index here.
+    exactLine: see ? above.length + layers.length : null,
+  };
 }
 
 const slug = (s: string) =>
@@ -537,7 +570,7 @@ export function fixView(
     key: b.framework,
     label: FRAMEWORK_LABELS[b.framework],
     stack: `${writtenFor(check, b.framework, { own: i === 0, switchable })} Copy it as a prompt or hand it to a developer.`,
-    block: packetBlock(check, bare, b),
+    ...packetBlock(check, bare, b),
     prompt: packetPrompt(bare, b),
   }));
   const own = written[0]!;

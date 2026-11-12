@@ -7,7 +7,14 @@ import { noPacketLine } from './no-packet';
 import { noPacketReason } from './packet-reason';
 import { packetBodies, packetPrompt, sectionFixes, type PacketFramework } from './segment/fixes';
 import { edited, FIRST_AUDIT } from './segment/test-helpers';
-import { bodyFor, everyPacketString, parsed, withBodies } from './test-support/multi-body';
+import {
+  bodyFor,
+  everyPacketString,
+  parsed,
+  seeFor,
+  withBodies,
+  withSee,
+} from './test-support/multi-body';
 import { holds } from '../../../__tests__/v2/_lib/holds';
 
 const BAD = FIRST_AUDIT['bad-site'];
@@ -28,11 +35,19 @@ const open = (v: FixView) => {
 /** Every string of every body a packet holds, so a test can say none of them reached a view. */
 const packetStrings = (f: Fix) => (f.packet ? everyPacketString(f.packet) : []);
 
-/** The bad site with fix `n` given a body for each of `others`, and that fix's view. */
-function withBodiesOn(n: number, others: readonly PacketFramework[], opts = {}) {
+/**
+ * The bad site with fix `n` given a body for each of `others`, and that fix's view; with `see`,
+ * each body has a readable command too.
+ */
+function withBodiesOn(
+  n: number,
+  others: readonly PacketFramework[],
+  { see = false, ...opts }: { see?: boolean; plan?: 'free' | 'pro' } = {},
+) {
   const { d } = edited('bad-site');
   const f = d.fixes.find((x) => x.id === fixOf(n).id)!;
-  f.packet = parsed({ ...f, packet: withBodies(f.packet!, others) }).packet;
+  const packet = withBodies(f.packet!, others);
+  f.packet = parsed({ ...f, packet: see ? withSee(packet) : packet }).packet;
   return { f, v: fixView(d, BAD, f.id, { asFirstSeen: true, ...opts }) };
 }
 
@@ -192,6 +207,27 @@ describe('fixView: the Pro wall', () => {
     for (const s of lines) expect(holds(json, s), s).toBe(false);
     // The control: on Pro the same fix opens, and its view holds each body, found the same way.
     const opened = JSON.stringify(withBodiesOn(5, others, { plan: 'pro' }).v);
+    for (const s of lines) expect(holds(opened, s), s).toBe(true);
+  });
+
+  it('carries none of a locked fix’s readable command: not it, nor what it prints today or after', () => {
+    const others = ['wordpress', 'generic'] as const;
+    const { f, v } = withBodiesOn(5, others, { see: true });
+    expect(v.kind).toBe('locked');
+    const json = JSON.stringify(v);
+    const lines = packetStrings(f);
+    // Three more strings for each of the three bodies: the command, today, after the fix.
+    expect(lines).toHaveLength(packetStrings(fixOf(5)).length + others.length * 6 + 3 * 3);
+    for (const framework of ['nextjs', ...others] as const) {
+      const see = seeFor(framework);
+      for (const s of [see.command, see.today, see.after]) {
+        expect(lines, s).toContain(s);
+        expect(holds(json, s), s).toBe(false);
+      }
+    }
+    for (const s of lines) expect(holds(json, s), s).toBe(false);
+    // The control: on Pro the same fix opens, and its view holds each of them, found the same way.
+    const opened = JSON.stringify(withBodiesOn(5, others, { see: true, plan: 'pro' }).v);
     for (const s of lines) expect(holds(opened, s), s).toBe(true);
   });
 
@@ -451,6 +487,114 @@ describe('fixView: the verify block', () => {
     const block = blockOf('curl -sA "NoSuchBot" https://example-outfitter.com/', 'NoSuchBot');
     expect(block).toContain(COMMENT);
     expect(block).not.toContain('Requests as');
+  });
+});
+
+describe('fixView: the two verify layers of a body with a readable command', () => {
+  const others = ['wordpress', 'generic'] as const;
+  const { f, v: layered } = withBodiesOn(2, others, { see: true });
+  const v = open(layered);
+  const verifyOf = (block: string) => {
+    const lines = block.split('\n');
+    return lines.filter((_, i) => i > lines.indexOf('Verify'));
+  };
+
+  it('shows “See it” above “Exact check” in each body’s block, from that body', () => {
+    expect(v.packet.bodies.map((b) => b.key)).toEqual(['nextjs', ...others]);
+    for (const body of v.packet.bodies) {
+      const see = seeFor(body.key);
+      const own = packetBodies(f.packet!).find((b) => b.framework === body.key)!;
+      const head = [
+        '  See it',
+        `    ${see.command}`,
+        `    Today: ${see.today}`,
+        `    After the fix: ${see.after}`,
+        '  Exact check',
+        `    ${own.verify.command}`,
+        `    → expect ${own.verify.expect}`,
+      ];
+      const verify = verifyOf(body.block);
+      expect(
+        verify.filter((_, i) => i < head.length),
+        body.key,
+      ).toEqual(head);
+      expect(verify.at(-1), body.key).toBe(
+        '  We run the exact check on all 158 pages when you mark the fix done.',
+      );
+      // No other body's readable command is in this one's block or prompt.
+      for (const other of ['nextjs', ...others].filter((k) => k !== body.key)) {
+        const theirs = seeFor(other as PacketFramework);
+        for (const s of [theirs.command, theirs.today, theirs.after]) {
+          expect(body.block, `${body.key} block`).not.toContain(s);
+          expect(body.prompt, `${body.key} prompt`).not.toContain(s);
+        }
+      }
+    }
+  });
+
+  it('says which line of the block is the strict command, for the page to show on one line', () => {
+    for (const body of v.packet.bodies) {
+      const own = packetBodies(f.packet!).find((b) => b.framework === body.key)!;
+      expect(body.exactLine, body.key).not.toBeNull();
+      expect(body.block.split('\n')[body.exactLine!], body.key).toBe(`    ${own.verify.command}`);
+    }
+  });
+
+  it('keeps the crawler lines under the exact check, for a command that requests as a crawler', () => {
+    // Fix 2's own body requests as OAI-SearchBot (the fixture's `verify.ua`).
+    expect(verifyOf(v.own.block).filter((_, i) => i >= 7)).toEqual([
+      '  # we run the same request with a tagged user agent; your result and ours can differ only if a rule matches the exact string',
+      '  Requests as OAI-SearchBot, which gets 200 today.',
+      '  We run the exact check on all 158 pages when you mark the fix done.',
+    ]);
+  });
+
+  it('carries both commands in the prompt, labelled, and says the exact check decides', () => {
+    const body = v.packet.bodies[1]!;
+    const lines = body.prompt.split('\n');
+    expect(lines.filter((_, i) => i >= lines.indexOf('Keep:') + 3)).toEqual([
+      'Verify (we run the exact check after you mark done):',
+      'See it (a short command that prints the evidence; it decides nothing):',
+      `  ${seeFor('wordpress').command}`,
+      `  Today: ${seeFor('wordpress').today}`,
+      `  After the fix: ${seeFor('wordpress').after}`,
+      'Exact check (this command decides whether the fix has landed):',
+      `  ${bodyFor('wordpress').verify.command}`,
+      `  → expect ${bodyFor('wordpress').verify.expect}`,
+    ]);
+  });
+
+  it('a body without a readable command is shown as before: one command, no layer named', () => {
+    const plain = open(view(2));
+    expect(plain.own.exactLine).toBeNull();
+    const p = fixOf(2).packet!;
+    expect(p.verify.see).toBeNull();
+    // Written out by hand: the verify section of the bad site's fix 2, as the locked screen has it.
+    expect(verifyOf(plain.own.block)).toEqual([
+      `  ${p.verify.command}`,
+      `    → expect ${p.verify.expect}`,
+      '  # we run the same request with a tagged user agent; your result and ours can differ only if a rule matches the exact string',
+      '  Requests as OAI-SearchBot, which gets 200 today.',
+      '  We run this on all 158 pages when you mark the fix done.',
+    ]);
+    for (const text of [plain.own.block, plain.own.prompt]) {
+      expect(text).not.toMatch(/See it|Exact check|exact check|After the fix:/);
+    }
+    expect(plain.own.prompt.split('\n').filter((l) => l.startsWith('Verify'))).toEqual([
+      'Verify (we run this after you mark done):',
+    ]);
+  });
+
+  it('one body with a readable command beside one without: each is shown in its own way', () => {
+    const { d } = edited('bad-site');
+    const p = fix2(d).packet!;
+    p.packets = [
+      { ...bodyFor('webflow'), verify: { ...bodyFor('webflow').verify, see: seeFor('webflow') } },
+    ];
+    const w = open(fixView(d, BAD, fixOf(2).id, { asFirstSeen: true }));
+    expect(w.packet.bodies.map((b) => b.exactLine === null)).toEqual([true, false]);
+    expect(w.packet.bodies[0]!.block).not.toContain('See it');
+    expect(w.packet.bodies[1]!.block).toContain(`    ${seeFor('webflow').command}`);
   });
 });
 

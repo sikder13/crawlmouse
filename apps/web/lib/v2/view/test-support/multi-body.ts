@@ -22,6 +22,23 @@ export const bodyFor = (framework: PacketFramework): PacketBody => ({
   },
 });
 
+/** A readable command for `framework`, with what it prints; each string names the framework. */
+export const seeFor = (framework: PacketFramework): NonNullable<PacketBody['verify']['see']> => ({
+  command: `curl -s https://example.test/${framework}/page | grep -io "${framework}-evidence"`,
+  today: `nothing: the ${framework} page holds no such marker today, as the audit recorded`,
+  after: `one ${framework}-evidence line for each marker the fix adds to the page`,
+});
+
+/** `packet` with a readable command (`verify.see`) on each of its bodies, its own among them. */
+export const withSee = (packet: FixPacket): FixPacket => ({
+  ...packet,
+  verify: { ...packet.verify, see: seeFor(packet.framework) },
+  packets: packet.packets.map((b) => ({
+    ...b,
+    verify: { ...b.verify, see: seeFor(b.framework) },
+  })),
+});
+
 /** `packet` with a body added for each of `others`, listed as the contract requires. */
 export function withBodies(packet: FixPacket, others: readonly PacketFramework[]): FixPacket {
   if (others.includes(packet.framework)) {
@@ -34,7 +51,10 @@ export function withBodies(packet: FixPacket, others: readonly PacketFramework[]
   };
 }
 
-/** Each string of each body of a packet: its own framework's, and those in `packets`. */
+/**
+ * Each string of each body of a packet: its own framework's, and those in `packets`, with the three
+ * strings of a body's readable command where it has one.
+ */
 export const everyPacketString = (p: FixPacket): string[] =>
   [p, ...p.packets].flatMap((b) => [
     ...b.context,
@@ -42,6 +62,7 @@ export const everyPacketString = (p: FixPacket): string[] =>
     ...b.keep,
     b.verify.command,
     b.verify.expect,
+    ...(b.verify.see ? [b.verify.see.command, b.verify.see.today, b.verify.see.after] : []),
   ]);
 
 /** `fix` as the contract parses it, so a hand-made packet is one the contract accepts. */

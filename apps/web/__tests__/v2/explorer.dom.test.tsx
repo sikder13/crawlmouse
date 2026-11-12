@@ -10,7 +10,7 @@ import { FIX_SOURCES, fixIdOf } from '../../app/(v2-preview)/v2-preview/_preview
 import { EXPLORER_KEYS } from '../../components/v2/screens/map/keys';
 import { fixture } from '../../lib/v2/fixtures';
 import { fixView } from '../../lib/v2/view/fix';
-import { withBodies } from '../../lib/v2/view/test-support/multi-body';
+import { seeFor, withBodies, withSee } from '../../lib/v2/view/test-support/multi-body';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -290,6 +290,46 @@ describe('the framework switch, operated', () => {
     expect(next!.prompt).not.toBe(wordpress!.prompt);
   });
 
+  it('downloads the prompt of the body shown: choosing another framework changes the file’s text', () => {
+    const saved: { text: string; name: string }[] = [];
+    let last = '';
+    vi.stubGlobal(
+      'Blob',
+      class {
+        constructor(parts: string[]) {
+          last = parts.join('');
+        }
+      },
+    );
+    // jsdom has neither function.
+    const urls = URL as unknown as Record<string, unknown>;
+    urls.createObjectURL = () => 'blob:packet';
+    urls.revokeObjectURL = () => {};
+    const anchor = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
+      this: HTMLAnchorElement,
+    ) {
+      saved.push({ text: last, name: this.download });
+    });
+    try {
+      const host = page();
+      const download = () =>
+        [...host.querySelectorAll('button')].find((b) => b.textContent === 'Download as .md')!;
+      click(download());
+      click(toggles(host)[1]!);
+      click(download());
+      click(toggles(host)[2]!);
+      click(download());
+      expect(saved.map((f) => f.text)).toEqual([next!.prompt, wordpress!.prompt, generic!.prompt]);
+      expect(new Set(saved.map((f) => f.text)).size).toBe(3);
+      expect(saved.map((f) => f.name)).toEqual(Array(3).fill(view.packet.download));
+    } finally {
+      vi.unstubAllGlobals();
+      delete urls.createObjectURL;
+      delete urls.revokeObjectURL;
+      anchor.mockRestore();
+    }
+  });
+
   it('keeps the focus on the toggle chosen, by click and by keyboard', () => {
     const host = page();
     const [, second] = toggles(host);
@@ -302,6 +342,85 @@ describe('the framework switch, operated', () => {
       expect(b.tabIndex).toBe(0);
       expect(b.disabled).toBe(false);
     }
+  });
+
+  describe('with a readable command on each body', () => {
+    const layered = (() => {
+      const d = structuredClone(fixture('bad-site'));
+      const f = d.fixes.find((x) => x.id === fixIdOf('bad-site'))!;
+      f.packet = withSee(withBodies(f.packet!, ['wordpress', 'generic']));
+      const v = fixView(d, FIX_SOURCES['bad-site'].check, f.id, { asFirstSeen: true });
+      if (v.kind !== 'open' || !v.packet || !v.switcher)
+        throw new Error('fix 2 opens with a switch');
+      return { packet: v.packet, switcher: v.switcher };
+    })();
+    const layeredPage = () =>
+      mount(
+        <PacketChoice>
+          <ChosenPacket
+            bodies={layered.packet.bodies}
+            download={layered.packet.download}
+            ask={null}
+          />
+          <FrameworkSwitch options={layered.switcher.options} />
+        </PacketChoice>,
+      );
+    /** The block as the page holds it: the text above the strict command, the command, the rest. */
+    const parts = (host: HTMLElement) =>
+      [...host.querySelectorAll('[data-v2-packet-layers] pre')].map((p) => p.textContent!);
+    const strip = (host: HTMLElement) =>
+      host.querySelector<HTMLElement>('[data-v2-scroll-region]')!;
+
+    it('shows both layers of the body chosen, and the switch changes both', () => {
+      const host = layeredPage();
+      layered.packet.bodies.forEach((body, i) => {
+        if (i > 0) click(toggles(host)[i]!);
+        const see = seeFor(body.key);
+        const [above, command, below] = parts(host);
+        expect(parts(host)).toHaveLength(3);
+        expect([above, command, below].join('\n')).toBe(body.block);
+        // “See it”, its command and what it prints stand above the strict command, in this order.
+        const at = [
+          'See it',
+          see.command,
+          `Today: ${see.today}`,
+          `After the fix: ${see.after}`,
+        ].map((s) => above!.indexOf(s));
+        expect(at.every((n) => n >= 0)).toBe(true);
+        expect([...at].sort((a, b) => a - b)).toEqual(at);
+        expect(above!.endsWith('  Exact check')).toBe(true);
+        // The strict command is the one line of the strip that scrolls, whole.
+        expect(strip(host).textContent).toBe(command);
+        expect(command).toBe(body.block.split('\n')[body.exactLine!]);
+        expect(below).toContain('→ expect');
+        // No other body's readable command is left in the page.
+        for (const other of layered.packet.bodies.filter((b) => b !== body)) {
+          expect(host.textContent).not.toContain(seeFor(other.key).command);
+          expect(host.textContent).not.toContain(seeFor(other.key).today);
+        }
+      });
+    });
+
+    it('names the strip that scrolls and puts it in the tab order while the command overflows it', async () => {
+      const host = layeredPage();
+      const el = strip(host);
+      expect(el.getAttribute('tabindex')).toBeNull();
+      // jsdom lays nothing out: the widths of a command wider than its strip, set by hand.
+      Object.defineProperty(el, 'scrollWidth', { value: 4000, configurable: true });
+      Object.defineProperty(el, 'clientWidth', { value: 320, configurable: true });
+      // The region checks again at the next frame after its content changes, as a choice makes it.
+      await act(async () => {
+        toggles(host)[1]!.click();
+        await Promise.resolve();
+      });
+      act(() => {
+        vi.advanceTimersToNextFrame();
+      });
+      expect(strip(host)).toBe(el);
+      expect(strip(host).getAttribute('tabindex')).toBe('0');
+      expect(strip(host).getAttribute('role')).toBe('region');
+      expect(strip(host).getAttribute('aria-label')).toBe('Exact check command');
+    });
   });
 
   it('a switch outside the choice it sets is a programming error, not a dead control', () => {

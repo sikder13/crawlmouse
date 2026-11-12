@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, type ReactNode } from 'react';
 import { Heading } from '../../Heading';
+import { ScrollRegion } from '../../ScrollRegion';
 import type { PacketBodyView, PacketFramework } from '../../../../lib/v2/view/fix';
 import { PacketActions } from '../segment/PacketActions';
 import { DownloadText } from './DownloadText';
@@ -33,6 +34,28 @@ export function usePacketChoice(): Choice {
 }
 
 /**
+ * A body's block. Where it has both verify layers, its strict command (`exactLine`) is one line in
+ * a strip that scrolls sideways (`ScrollRegion`: a tab stop while it overflows), between the text
+ * above and below it: the command is whole in the page, for find-in-page and for selecting, and
+ * takes one line of it however long it is.
+ */
+function PacketBlock({ body }: { body: PacketBodyView }) {
+  const at = body.exactLine;
+  if (at === null) return <pre className={styles.packet}>{body.block}</pre>;
+  const lines = body.block.split('\n');
+  const part = (from: number, to: number) => lines.filter((_, i) => i >= from && i < to).join('\n');
+  return (
+    <div className={styles.packet} data-v2-packet-layers="">
+      <pre className={styles.packetPart}>{part(0, at)}</pre>
+      <ScrollRegion label="Exact check command" className={styles.exact}>
+        <pre className={styles.exactLine}>{lines[at]}</pre>
+      </ScrollRegion>
+      <pre className={styles.packetPart}>{part(at + 1, lines.length)}</pre>
+    </div>
+  );
+}
+
+/**
  * The packet as written for the chosen framework: which stack it is for, the block, and the copy
  * and download buttons, which hand over that body's prompt. Before a choice, and outside
  * `PacketChoice`, it is the first body, the packet's own.
@@ -57,7 +80,7 @@ export function ChosenPacket({
         </Heading>
         <div className={styles.hdSub}>{body.stack}</div>
       </div>
-      <pre className={styles.packet}>{body.block}</pre>
+      <PacketBlock body={body} />
       <PacketActions prompt={body.prompt} primary ask={ask} className={styles.actions}>
         <DownloadText text={body.prompt} filename={download}>
           Download as .md

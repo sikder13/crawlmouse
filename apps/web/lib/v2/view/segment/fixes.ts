@@ -215,12 +215,32 @@ const cleanBody = (b: PacketBody): PacketBody => ({
 export const packetParagraph = (b: Pick<PacketBody, 'context'>) =>
   b.context.filter((l) => !SITE_LINE.test(l));
 
-/** The verify lines of the segment's packet block and of the prompt. */
-const verifyLines = (b: Pick<PacketBody, 'verify'>) => [
-  'Verify (we run this after you mark done):',
-  `  ${b.verify.command}`,
-  `  → expect ${b.verify.expect}`,
-];
+/** What heads the short command of a packet that has both layers, in a block and in a prompt. */
+export const SEE_IT = 'See it (a short command that prints the evidence; it decides nothing):';
+/** What heads the strict command of such a packet. */
+export const EXACT_CHECK = 'Exact check (this command decides whether the fix has landed):';
+
+/**
+ * The verify lines of the segment's packet block and of the prompt. A body with a readable command
+ * (`verify.see`) gets two labelled layers, that command first with what it prints today and after
+ * the fix, then the strict command; a body without one gets the strict command alone.
+ */
+function verifyLines(b: Pick<PacketBody, 'verify'>): string[] {
+  const { command, expect, see } = b.verify;
+  if (see === null) {
+    return ['Verify (we run this after you mark done):', `  ${command}`, `  → expect ${expect}`];
+  }
+  return [
+    'Verify (we run the exact check after you mark done):',
+    SEE_IT,
+    `  ${see.command}`,
+    `  Today: ${see.today}`,
+    `  After the fix: ${see.after}`,
+    EXACT_CHECK,
+    `  ${command}`,
+    `  → expect ${expect}`,
+  ];
+}
 
 /** The label a prompt's first line gives the fix's title under. */
 export const PROMPT_TITLE_LABEL = 'The audit’s title for this fix:';
