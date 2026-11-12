@@ -4,7 +4,7 @@ import { NOT_WRITTEN } from './by-type/pending.js';
 import { PACKETS } from './registry.js';
 
 /** The fix types the engine writes no packet for, each with its reason in its entry. */
-const NO_PACKET: readonly FixType[] = ['robots_txt_blocks_crawler'];
+const NO_PACKET: readonly FixType[] = ['robots_txt_blocks_crawler', 'js_only_navigation'];
 
 describe('the packet registry', () => {
   it('has an entry for each fix type of the contract and no other', () => {
