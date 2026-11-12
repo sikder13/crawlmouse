@@ -1,7 +1,10 @@
 /**
- * Every link a v2 email carries is built here, from values this code checked (D3): our origin, a path
- * we serve, and an id or token of a shape we know. No template puts a string it was given into an
- * href. `unsubscribeUrl` is the one C's alert and weekly-summary templates and their senders call.
+ * The links of the check-notify, account-link and unsubscribe mail are built here, from values this
+ * code checked (D3): our origin, a path we serve, and an id or token of a shape we know. The alert and
+ * weekly-summary templates build their page links in templates/alert.ts (`pageUrl`, `SITE_ORIGIN`, the
+ * same origin and the same id check); their senders pass in the unsubscribe link `unsubscribeLinks`
+ * builds here (lib/v2/monitor/functions.ts).
+ * Which targets each template's HTML holds is what its tests assert, with templates/inspect.ts.
  */
 import { auditHref } from '../view/audit-hrefs';
 import { LINK_FLOWS, type LinkFlow } from '../account/link-cookie';

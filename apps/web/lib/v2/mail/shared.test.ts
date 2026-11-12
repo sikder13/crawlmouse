@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { bounded, html, oneLine } from './escape';
 import { layout } from './layout';
+import { checkUrl, MAIL_ORIGIN } from './links';
+import { pageUrl, SITE_ORIGIN } from './templates/alert';
 import { linkSecret, signUnsubscribe, verifyUnsubscribe } from './unsubscribe-token';
 
 const SECRET = 's'.repeat(40);
@@ -76,5 +78,17 @@ describe('the unsubscribe token (D7)', () => {
     expect(linkSecret({})).toBeNull();
     expect(linkSecret({ EMAIL_LINK_SECRET: 'short' })).toBeNull();
     expect(linkSecret({ EMAIL_LINK_SECRET: SECRET })).toBe(SECRET);
+  });
+});
+
+describe('the page links (links.ts and templates/alert.ts)', () => {
+  it('share one origin and refuse the same ids', () => {
+    expect(SITE_ORIGIN).toBe(MAIL_ORIGIN);
+    const id = 'c0000000-0000-4000-8000-0000000000aa';
+    expect(pageUrl('/audit/', id)).toBe(checkUrl(id));
+    for (const bad of ['', 'x', `${id}/../alerts`, id.toUpperCase(), `${id} `]) {
+      expect(() => pageUrl('/audit/', bad)).toThrow(RangeError);
+      expect(() => checkUrl(bad)).toThrow(RangeError);
+    }
   });
 });
