@@ -373,8 +373,10 @@ function fakeSchedule(now: string) {
   return { site, deps, count: () => count };
 }
 
-describe('owner ruling Q9: a request that fails every retry gives back what its claim took', () => {
-  it('the site is due again on the next tick, and the slot count is back where it was', async () => {
+describe('owner ruling Q9 over a fake of the SQL: a request that fails every retry gives back what its claim took', () => {
+  // The count here is the fake's. The same case over the real functions is
+  // apps/web/__tests__/v2-028-schedule.test.ts "scheduleTickFn over claim_due_sites and release_scheduled_claim".
+  it('the site is due again on the next tick, and the fake’s slot count is back where it was', async () => {
     const f = fakeSchedule('2026-11-13T10:00:00.000Z');
     expect(f.count()).toBe(0);
     await inngestLike().execute(handlerOf(f.deps(true)));

@@ -1,8 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import type { PGlite } from '@electric-sql/pglite';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { createScheduleTickFn } from '../../../inngest/schedule';
+import { scheduleDeps, type SchedulePorts } from '../lib/v2/monitor/schedule';
 import { applyAllMigrations, asRole, freshDb } from './helpers/pglite-migrations';
 import { personalAccount, signUp } from './helpers/v2-check-tables';
+
+vi.mock('server-only', () => ({}));
 
 /**
  * Migration 028, section B (docs/specs/v2/28-monitoring.md, D4): when a site falls due, the triggers
@@ -486,6 +490,22 @@ describe('claim_due_sites', () => {
     expect((await siteRow(second)).next_check_at!.toISOString()).toBe('2026-11-09T06:00:00.000Z');
   });
 
+  it('reads the first site as the transition does: a staging site made before the primary is not it', async () => {
+    await settle();
+    const acc = await account('free');
+    const primary = await site(acc, { created: '2026-10-02T00:00:00Z' });
+    const staging = randomUUID();
+    await db.query(
+      `insert into public.sites (id, account_id, host, schedule_cadence, schedule_iso_weekday,
+                                 schedule_hour_local, staging_of_site_id, created_at)
+       values ($1, $2, $3, 'weekly', 1, 6, $4, '2026-10-01T00:00:00Z')`,
+      [staging, acc, `${staging.slice(0, 8)}.example`, primary],
+    );
+    await makeDue(primary);
+    await makeDue(staging);
+    expect((await claim(NOW, 50, slot())).map((r) => r.site_id)).toEqual([primary]);
+  });
+
   it('reads the first site as the transition does: a removed first site makes the next one first', async () => {
     await settle();
     const acc = await account('free');
@@ -688,5 +708,95 @@ describe('release_scheduled_claim (owner ruling Q9)', () => {
         ]),
       ),
     ).rejects.toThrow(/claimed next time/);
+  });
+});
+
+// ─── the tick over this SQL ─────────────────────────────────────────────────────────────────────
+
+/**
+ * Owner ruling Q9 once end to end: inngest/schedule.ts's handler, through apps/web/lib/v2/monitor/
+ * schedule.ts's ports, against the functions above (inngest/schedule.test.ts runs the handler over a
+ * fake of them). The rpc port answers as PostgREST does, times as ISO strings. Steps run in order and
+ * are retried in place, three attempts, which is all this case needs of Inngest.
+ */
+describe('scheduleTickFn over claim_due_sites and release_scheduled_claim (owner ruling Q9)', () => {
+  const GLOBAL = {
+    bucket: 'global:audits:day',
+    window_start: '2026-11-13T00:00:00.000Z',
+    limit: 5000,
+  };
+
+  async function rpc(fn: string, args: Record<string, unknown>): Promise<unknown> {
+    const names = Object.keys(args);
+    const call = `public.${fn}(${names.map((n, i) => `${n} => $${i + 1}`).join(', ')})`;
+    const values = names.map((n) =>
+      typeof args[n] === 'object' ? JSON.stringify(args[n]) : args[n],
+    );
+    return asRole(db, 'service_role', null, async (tx) => {
+      if (fn === 'claim_due_sites') {
+        return JSON.parse(JSON.stringify((await tx.query(`select * from ${call}`, values)).rows));
+      }
+      return (await tx.query<{ r: unknown }>(`select ${call} as r`, values)).rows[0]!.r;
+    });
+  }
+
+  const steps = {
+    run: async (_id: string, fn: () => unknown) => {
+      for (let attempt = 1; ; attempt += 1) {
+        try {
+          return JSON.parse(JSON.stringify((await fn()) ?? null)) as unknown;
+        } catch (err) {
+          if (attempt === 3) throw err;
+        }
+      }
+    },
+  };
+
+  it('a request that fails every retry: the site is due again on the next tick, and the slot count is back', async () => {
+    await settle();
+    const id = await site(await account(), { weekday: 1, hour: 6, offset: 0 });
+    await makeDue(id, '2026-11-09T06:00:00Z');
+    const before = await countOf(GLOBAL);
+    const captured: [string, Record<string, string>][] = [];
+    const ports: SchedulePorts = {
+      rpc,
+      pipeline: {
+        requestSite: async () => {
+          throw new Error('database unavailable');
+        },
+        insertQueued: async () => {
+          throw new Error('not reached');
+        },
+      },
+      send: async () => {
+        throw new Error('not reached');
+      },
+      now: () => Date.parse(NOW),
+      newId: () => randomUUID(),
+      capture: (message, extra) => captured.push([message, extra]),
+      env: {},
+    };
+    const handler = (
+      createScheduleTickFn(() => scheduleDeps(ports)) as unknown as {
+        fn: (ctx: { step: typeof steps }) => Promise<unknown>;
+      }
+    ).fn;
+
+    expect(await handler({ step: steps })).toEqual({
+      claimed: 1,
+      requested: 0,
+      released: 1,
+      unreleased: 0,
+    });
+    expect((await siteRow(id)).next_check_at!.toISOString()).toBe('2026-11-09T06:00:00.000Z');
+    expect(await countOf(GLOBAL)).toBe(before);
+    expect(captured).toEqual([
+      ['schedule.claim_released', { siteId: id, slot: '2026-11-09T06:00:00.000Z' }],
+    ]);
+    // The next tick claims it again, at the same slot.
+    expect((await claim(NOW, 50, GLOBAL)).map((r) => [r.site_id, r.slot.toISOString()])).toEqual([
+      [id, '2026-11-09T06:00:00.000Z'],
+    ]);
+    expect(await countOf(GLOBAL)).toBe(before + 1);
   });
 });
