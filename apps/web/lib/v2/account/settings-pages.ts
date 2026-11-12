@@ -3,11 +3,11 @@
  * D8): the caller, the account they act in, their role on it, and that account's records. The role
  * is the session's own `member_role`, read before any service-role read of the account's records.
  */
-import { seedDefaultAlertRules } from '../monitor/alert-defaults';
 import 'server-only';
 import { supabaseAdmin } from '../../supabase/admin';
 import { supabaseServer } from '../../supabase/server';
 import { hashMailAddress, mailPepper } from '../mail/address-hash';
+import { seedDefaultAlertRules } from '../monitor/alert-defaults';
 import { supabaseCheckReader } from '../pipeline/load';
 import type { Viewer } from '../view/account';
 import type { Undeliverable } from '../view/settings';

@@ -29,8 +29,9 @@ Both constants: `grep -n "SENDER" apps/web/lib/auth/constants.ts`.
    carries no `Reply-To` (`buildOutgoing` in `apps/web/lib/v2/mail/headers.ts` refuses any header outside `EXTRA_HEADERS`), so a reply
    goes to `alerts@crawlmouse.com`. Cloudflare Email Routing receives for the zone, and
    `scripts/configure-cloudflare.sh` creates no rule for `alerts@`:
-   `grep -n "FORWARDED_PREFIXES=" scripts/configure-cloudflare.sh`. Without a rule, a reply to an alert,
-   a summary, a check note or an account email bounces. Before switch-on, add one of:
+   `grep -n "FORWARDED_PREFIXES=" scripts/configure-cloudflare.sh`. Without a rule for it (and unless the
+   zone has a catch-all rule, which the script does not create and this repository cannot read), a reply to
+   an alert, a summary, a check note or an account email bounces. Before switch-on, add one of:
    - Cloudflare → `crawlmouse.com` → Email → Email Routing → Routing rules → _Create address_
      `alerts@crawlmouse.com`, action _Send to an email_, destination the verified inbox the other
      addresses forward to; or
