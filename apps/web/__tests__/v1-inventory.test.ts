@@ -183,6 +183,7 @@ describe('the finders see what they claim to see', () => {
       'app/dashboard/v2/page.tsx',
       'app/sites/[id]/page.tsx',
       'app/v2-home/page.tsx',
+      'app/v2-report/[slug]/page.tsx',
       'app/api/account/delete/confirm/route.ts',
       'app/api/account/email/confirm/route.ts',
       'app/api/account/email/route.ts',

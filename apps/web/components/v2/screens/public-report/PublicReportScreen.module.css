@@ -1,0 +1,125 @@
+/* Final-Public: sizes and spacing from the locked screen's inline styles. */
+
+.main {
+  padding-top: 36px;
+  padding-bottom: 96px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.crumbs {
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.crumb {
+  gap: 8px;
+  font-size: var(--v2-text-small);
+  flex-wrap: wrap;
+}
+
+.small {
+  font-size: var(--v2-text-small);
+}
+
+.overview {
+  padding: 26px 28px;
+}
+
+.headline {
+  max-width: 820px;
+}
+
+.figures {
+  align-items: flex-start;
+  gap: 36px;
+  margin-top: 20px;
+  flex-wrap: wrap;
+}
+
+.figures > * {
+  max-width: 320px;
+}
+
+.figure {
+  font-family: var(--v2-font-mono);
+  font-size: 22px;
+  padding-top: 8px;
+  font-variant-numeric: tabular-nums;
+}
+
+.flush {
+  padding: 0;
+  overflow: hidden;
+}
+
+.head {
+  padding: 18px 24px;
+  border-bottom: 1px solid var(--v2-line);
+}
+
+.fixesHead {
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.fixesFoot {
+  padding: 12px 24px;
+  font-size: var(--v2-text-small);
+  border-top: 1px solid var(--v2-line2);
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.tableNote {
+  margin: 12px 0 0;
+  font-size: var(--v2-text-micro);
+}
+
+.tableNote a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.own {
+  padding: 24px 28px;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.ownQuestion {
+  font-weight: 500;
+  font-size: var(--v2-text-body);
+}
+
+.ownForm {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  flex-wrap: wrap;
+  flex: 1 1 420px;
+  max-width: 520px;
+}
+
+.ownInput {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+
+.ownButton {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+@media (max-width: 760px) {
+  .ownButton {
+    flex: 1 1 100%;
+  }
+}

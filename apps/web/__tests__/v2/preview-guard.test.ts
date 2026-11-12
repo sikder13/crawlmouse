@@ -184,7 +184,9 @@ describe('v2 stays out of live pages', () => {
    * off, checked below with the v1 inventory's own reader of that shape.
    */
   const V2_PAGE_DIRS = [
-    ...V2_REWRITES.map((r) => join(WEB_ROOT, 'app', ...r.to.split('/').filter(Boolean))),
+    ...V2_REWRITES.map((r) =>
+      join(WEB_ROOT, 'app', ...r.to.split('/:')[0]!.split('/').filter(Boolean)),
+    ),
     join(WEB_ROOT, 'app', 'sites'),
   ];
   const inV2PageDir = (file: string) => V2_PAGE_DIRS.some((d) => file.startsWith(d + '/'));
@@ -221,6 +223,7 @@ describe('v2 stays out of live pages', () => {
       'app/dashboard/v2/page.tsx',
       'app/sites/[id]/page.tsx',
       'app/v2-home/page.tsx',
+      'app/v2-report/[slug]/page.tsx',
     ]);
     for (const page of pages) expect(isFlagGated(page), relative(WEB_ROOT, page)).toBe(true);
   });

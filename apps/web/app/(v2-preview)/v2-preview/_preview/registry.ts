@@ -255,4 +255,11 @@ export const PREVIEWS: PreviewEntry[] = [
   },
   { path: '/v2-preview/screens/continue', name: 'Continue', kind: 'screen' },
   { path: '/v2-preview/screens/continue/expired', name: 'Continue, link expired', kind: 'screen' },
+  // CC-29 workstream B: the shared report. Its orange element is the audit form's "Start the audit".
+  { path: '/v2-preview/screens/public-report', name: 'Final-Public', kind: 'screen' },
+  {
+    path: '/v2-preview/screens/public-report/withheld',
+    name: 'Public report, withheld',
+    kind: 'screen',
+  },
 ];
