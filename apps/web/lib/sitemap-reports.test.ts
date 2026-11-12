@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 import { fetchIndexableReportSlugs } from './sitemap-reports';
 
 // SPEC 04 §8 (V13) — the /r/ sitemap section lists ONLY claimed+indexable, non-hidden, non-taken-down
@@ -11,15 +11,38 @@ function makeSb(result: { data: unknown; error: unknown }) {
   const record: { table?: string; filters: Filter[] } = { filters: [] };
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const chain: any = {
-    select: (...a: unknown[]) => { record.filters.push(['select', ...a]); return chain; },
-    eq: (...a: unknown[]) => { record.filters.push(['eq', ...a]); return chain; },
-    not: (...a: unknown[]) => { record.filters.push(['not', ...a]); return chain; },
-    is: (...a: unknown[]) => { record.filters.push(['is', ...a]); return chain; },
-    order: (...a: unknown[]) => { record.filters.push(['order', ...a]); return chain; },
-    limit: (...a: unknown[]) => { record.filters.push(['limit', ...a]); return Promise.resolve(result); },
+    select: (...a: unknown[]) => {
+      record.filters.push(['select', ...a]);
+      return chain;
+    },
+    eq: (...a: unknown[]) => {
+      record.filters.push(['eq', ...a]);
+      return chain;
+    },
+    not: (...a: unknown[]) => {
+      record.filters.push(['not', ...a]);
+      return chain;
+    },
+    is: (...a: unknown[]) => {
+      record.filters.push(['is', ...a]);
+      return chain;
+    },
+    order: (...a: unknown[]) => {
+      record.filters.push(['order', ...a]);
+      return chain;
+    },
+    limit: (...a: unknown[]) => {
+      record.filters.push(['limit', ...a]);
+      return Promise.resolve(result);
+    },
   };
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const sb: any = { from: (t: string) => { record.table = t; return chain; } };
+  const sb: any = {
+    from: (t: string) => {
+      record.table = t;
+      return chain;
+    },
+  };
   return { sb, record };
 }
 
@@ -57,17 +80,42 @@ describe('fetchIndexableReportSlugs', () => {
 
   it('returns [] and never throws when the client itself throws (e.g. missing env at build)', async () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const sb: any = { from: () => { throw new Error('no service-role key'); } };
+    const sb: any = {
+      from: () => {
+        throw new Error('no service-role key');
+      },
+    };
     expect(await fetchIndexableReportSlugs(sb, 100)).toEqual([]);
   });
 
   it('caps at the limit and warns — no silent truncation', async () => {
-    const rows = Array.from({ length: 3 }, (_, i) => ({ slug: `s${i}`, created_at: '2026-01-01T00:00:00Z' }));
+    const rows = Array.from({ length: 3 }, (_, i) => ({
+      slug: `s${i}`,
+      created_at: '2026-01-01T00:00:00Z',
+    }));
     const { sb } = makeSb({ data: rows, error: null });
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const out = await fetchIndexableReportSlugs(sb, 3);
     expect(out).toHaveLength(3);
     expect(warn).toHaveBeenCalled();
     warn.mockRestore();
+  });
+
+  describe('v2 reports and V2_CHECKS_PUBLIC (CC-29; rows in sitemap-reports.db.test.ts)', () => {
+    afterEach(() => vi.unstubAllEnvs());
+    const filtersWith = async (flag: string) => {
+      vi.stubEnv('V2_CHECKS_PUBLIC', flag);
+      const { sb, record } = makeSb({ data: [], error: null });
+      await fetchIndexableReportSlugs(sb, 100);
+      return record.filters;
+    };
+
+    it('with the flag off reads graded (v1) reports only', async () => {
+      expect(await filtersWith('')).toContainEqual(['not', 'grade', 'is', null]);
+    });
+
+    it('with the flag on reads every claimed, indexable report', async () => {
+      expect(await filtersWith('1')).not.toContainEqual(['not', 'grade', 'is', null]);
+    });
   });
 });

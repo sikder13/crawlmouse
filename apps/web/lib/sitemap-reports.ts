@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { checksPublicEnabled } from './auth/flags';
 
 export interface SitemapReportEntry {
   slug: string;
@@ -18,7 +19,7 @@ export async function fetchIndexableReportSlugs(
   limit: number,
 ): Promise<SitemapReportEntry[]> {
   try {
-    const { data, error } = await sb
+    const query = sb
       .from('public_reports')
       .select('slug, created_at')
       .eq('indexable', true)
@@ -26,13 +27,19 @@ export async function fetchIndexableReportSlugs(
       // silently advertise an unclaimed page — the "unclaimed → unlisted" guardrail lives in the query.
       .not('claimed_at', 'is', null)
       .is('hidden_at', null)
-      .is('takedown_requested_at', null)
+      .is('takedown_requested_at', null);
+    // A v2 report (CC-29) is a 404 while V2_CHECKS_PUBLIC is off (`isReportGoneEitherKind`), so it is
+    // listed only while the flag is on. It is told apart by its grade, which a v2 row never has (the
+    // insert trigger copies it from `audits`); a v1 row without one is a 404 on v1's page as well.
+    const { data, error } = await (checksPublicEnabled() ? query : query.not('grade', 'is', null))
       .order('created_at', { ascending: false })
       .limit(limit);
     if (error) return [];
     const rows = (data as Array<{ slug: string; created_at: string }> | null) ?? [];
     if (rows.length >= limit) {
-      console.warn(`[sitemap] /r/ report section hit the ${limit}-row cap; some claimed reports are omitted`);
+      console.warn(
+        `[sitemap] /r/ report section hit the ${limit}-row cap; some claimed reports are omitted`,
+      );
     }
     return rows.map((r) => ({ slug: r.slug, lastModified: r.created_at }));
   } catch {
