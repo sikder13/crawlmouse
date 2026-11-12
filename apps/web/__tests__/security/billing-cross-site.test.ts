@@ -67,24 +67,28 @@ vi.mock('@/lib/supabase/server', () => ({
   },
 }));
 
-const ROUTES = [
-  ['checkout', () => import('../../app/api/billing/checkout/route')],
-  ['portal', () => import('../../app/api/billing/portal/route')],
-  ['cancel', () => import('../../app/api/billing/cancel/route')],
-  ['agency-trial', () => import('../../app/api/billing/agency-trial/route')],
-] as const;
-
 const BODY = new URLSearchParams({ plan: 'pro', interval: 'month' }).toString();
+/** The seat purchase's own form (CC-31 D4): its body is the two quantities. */
+const SEATS_BODY = new URLSearchParams({ seats: '1', sites: '0' }).toString();
+
+const ROUTES = [
+  ['checkout', () => import('../../app/api/billing/checkout/route'), BODY],
+  ['portal', () => import('../../app/api/billing/portal/route'), BODY],
+  ['cancel', () => import('../../app/api/billing/cancel/route'), BODY],
+  ['agency-trial', () => import('../../app/api/billing/agency-trial/route'), BODY],
+  ['seats', () => import('../../app/api/billing/seats/route'), SEATS_BODY],
+] as const;
 
 async function send(
   path: string,
   headers: Record<string, string>,
   load: () => Promise<{ POST: (r: Request) => Promise<Response> }>,
+  body: string,
 ) {
   const init = {
     method: 'POST',
     headers: { 'content-type': 'application/x-www-form-urlencoded', ...headers },
-    body: BODY,
+    body,
   };
   const url = `https://crawlmouse.com/api/billing/${path}`;
   const edge = await handleEdge(
@@ -100,31 +104,33 @@ async function send(
 beforeEach(() => {
   h.calls.length = 0;
   vi.stubEnv('V2_BILLING', '1');
+  // The seat purchase is behind this flag too.
+  vi.stubEnv('V2_CHECKS_PUBLIC', '1');
 });
 
-describe.each(ROUTES)('POST /api/billing/%s (D11)', (path, load) => {
+describe.each(ROUTES)('POST /api/billing/%s (D11)', (path, load, body) => {
   it('refuses another site’s Origin with 403 before the route runs', async () => {
-    const res = await send(path, { origin: 'https://evil.example' }, load);
+    const res = await send(path, { origin: 'https://evil.example' }, load, body);
     expect(res.status).toBe(403);
     expect(await res.json()).toEqual({ error: 'Cross-site request refused', code: 'cross_site' });
     expect(h.calls).toEqual([]);
   });
 
   it('refuses a request with no Origin and no Sec-Fetch-Site with 403', async () => {
-    const res = await send(path, {}, load);
+    const res = await send(path, {}, load, body);
     expect(res.status).toBe(403);
     expect(h.calls).toEqual([]);
   });
 
   it('lets our own page’s form through to the route (the control)', async () => {
-    const res = await send(path, { origin: 'https://crawlmouse.com' }, load);
+    const res = await send(path, { origin: 'https://crawlmouse.com' }, load, body);
     expect(h.calls).toContain('getUser()');
     // The route answered, not the middleware (whose 403 is `cross_site`).
     expect(await res.json()).not.toMatchObject({ code: 'cross_site' });
   });
 
   it('lets a no-JS form post that says it is same-origin through (the control)', async () => {
-    await send(path, { 'sec-fetch-site': 'same-origin' }, load);
+    await send(path, { 'sec-fetch-site': 'same-origin' }, load, body);
     expect(h.calls).toContain('getUser()');
   });
 });

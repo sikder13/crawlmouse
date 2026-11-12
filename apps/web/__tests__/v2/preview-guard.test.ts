@@ -180,12 +180,15 @@ describe('v2 stays out of live pages', () => {
         : '';
   /**
    * The signed-in v2 pages outside the groups (CC-26b): the targets of `V2_REWRITES`, which the
-   * middleware alone serves, and the site page. Each page in them is a 404 with V2_CHECKS_PUBLIC
-   * off, checked below with the v1 inventory's own reader of that shape.
+   * middleware alone serves, and the site page; and CC-31's Seats page and the page an invitation's
+   * link lands on. Each page in them is a 404 with V2_CHECKS_PUBLIC off, checked below with the v1
+   * inventory's own reader of that shape.
    */
   const V2_PAGE_DIRS = [
     ...V2_REWRITES.map((r) => join(WEB_ROOT, 'app', ...r.to.split('/').filter(Boolean))),
     join(WEB_ROOT, 'app', 'sites'),
+    join(WEB_ROOT, 'app', 'seats'),
+    join(WEB_ROOT, 'app', 'invite'),
   ];
   const inV2PageDir = (file: string) => V2_PAGE_DIRS.some((d) => file.startsWith(d + '/'));
   const allowed = (file: string) =>
@@ -219,6 +222,8 @@ describe('v2 stays out of live pages', () => {
     const pages = sources.filter((f) => inV2PageDir(f) && PAGE.test(f));
     expect(pages.map((f) => relative(WEB_ROOT, f)).sort()).toEqual([
       'app/dashboard/v2/page.tsx',
+      'app/invite/page.tsx',
+      'app/seats/page.tsx',
       'app/sites/[id]/page.tsx',
       'app/v2-home/page.tsx',
     ]);

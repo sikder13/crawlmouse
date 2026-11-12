@@ -5,6 +5,22 @@
 -- ─── B ────────────────────────────────────────────────────────────────────────────────────────────
 
 -- ─── A ────────────────────────────────────────────────────────────────────────────────────────────
+-- The seat functions go, then the invitation's columns. A seat invited meanwhile stays, as a row of
+-- status 'invited'. Its link's hash is cleared: no function is left to accept the link, and a hash
+-- without an expiry would stop the migration's CHECK from being added again.
+drop function if exists public.remove_seat(uuid, uuid, timestamptz);
+drop function if exists public.change_seat(uuid, uuid, text, uuid[]);
+drop function if exists public.accept_seat_invite(text, uuid, timestamptz);
+drop function if exists public.read_seat_invite(text, timestamptz);
+drop function if exists public.resend_seat_invite(uuid, uuid);
+drop function if exists public.issue_seat_invite(uuid, integer, timestamptz);
+drop function if exists public.invite_seat(uuid, text, text, uuid[], integer, timestamptz);
+drop function if exists public.seat_scope_valid(uuid, uuid[]);
+drop index if exists public.seats_invite_token_hash_uq;
+alter table public.seats drop constraint if exists seats_invite_token;
+update public.seats set invite_token_hash = null where invite_token_hash is not null;
+alter table public.seats drop column if exists invite_seq;
+alter table public.seats drop column if exists invite_expires_at;
 
 -- ─── S ────────────────────────────────────────────────────────────────────────────────────────────
 -- seats returns to 001's policy: every member of the account reads every seat.

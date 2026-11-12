@@ -347,6 +347,28 @@ export const ROUTE_POLICIES: readonly RoutePolicy[] = [
     reason: "the restore link's token, from its HttpOnly cookie, is the credential (D4)",
     origin: 'strict',
   },
+  // CC-31 workstream A: extra seats and sites on the Agency subscription (D4).
+  { route: 'api/billing/seats', methods: ['POST'], class: 'member', origin: 'strict' },
+  // CC-31 workstream A: seats and invitations (D3). A seat's own routes sit under `id/`, so no path
+  // here matches two rows (`api/seats/accept` would also match a seat id directly under `seats`).
+  { route: 'api/seats', methods: ['POST'], class: 'member', origin: 'strict' },
+  {
+    route: 'api/seats/id/[id]',
+    methods: ['DELETE', 'PATCH', 'POST'],
+    class: 'member',
+    origin: 'strict',
+  },
+  { route: 'api/seats/id/[id]/resend', methods: ['POST'], class: 'member', origin: 'strict' },
+  // The caller is signed in and holds no seat yet: the invitation's token, read from its cookie,
+  // names the seat, and accept_seat_invite accepts it only for the user whose address was invited.
+  { route: 'api/seats/accept', methods: ['POST'], class: 'user', origin: 'strict' },
+  {
+    route: 'invite/[token]',
+    methods: ['GET'],
+    class: 'public',
+    reason: 'an emailed link: moves its token into a cookie and redirects; changes nothing',
+    origin: 'any',
+  },
 ];
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);

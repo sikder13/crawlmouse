@@ -140,7 +140,99 @@ An account has one owner seat, and it cannot be removed or demoted. No transfer 
 CC-29's rule of one Agency trial a person is kept by the owner's seat staying active, so a future
 transfer of ownership must move that rule from the seat to the person.
 
+**The rules are SQL's** (migration section A): `invite_seat`, `issue_seat_invite`,
+`resend_seat_invite`, `read_seat_invite`, `accept_seat_invite`, `change_seat` and `remove_seat`, each
+granted to `service_role` alone. A route asks `seat_may` through the caller's own session first.
+`pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-031-a-seats.test.ts` runs each outcome
+below, the grants, and the migration applied twice and reverted.
+
+| Rule | Where it holds |
+|---|---|
+| An invitation is a `seats` row of status `invited`. Its link's token is minted when the mail is sent, lives 7 days, and is stored as its sha256 (`seats.invite_token_hash`, `invite_expires_at`); the row holds no raw token. | `issue_seat_invite`; the CHECK `seats_invite_token` |
+| A role is `account_manager` or `developer`. A scope is every client, or at least one live client site of the account that is not a staging copy. | `invite_seat`, `change_seat`, `seat_scope_valid` |
+| An address that holds an invited seat, or is the current address of an active member, is not invited again (`exists`). Addresses are compared in lower case and otherwise as written, so a plus-address is another address. | `invite_seat` |
+| The seat limit is the lower of `accounts.seat_limit` and the viewer's limit at that moment (the trial and past-due clocks read). Active seats and invited seats count toward it, an invited seat whose link has expired included, until it is removed. The count is made in the statement that writes the seat, under the account's row lock. | `invite_seat` |
+| A removed seat of the same address is written back to `invited` (its next invitation) rather than a second row added. | `invite_seat` |
+| An invitation is accepted by the signed-in user whose current address is the invited one, once. Another address is refused and the invitation stays usable. | `accept_seat_invite` |
+| An acceptance is refused while the account's active seats are not below `accounts.seat_limit`. | `accept_seat_invite` |
+| An account marked for deletion neither invites nor gains a member (spec 27b). | each function answers `marked` |
+| A resend is the row's next invitation (`invite_seq + 1`): the link sent before stops working at once. | `resend_seat_invite` |
+| Removing a seat sets `removed`, deletes its `seat_sites` rows and gives the sites it owned to the owner's seat. `is_member`, `is_member_for_site` and `seat_may` read `status = 'active'`, so the person's next request is refused. | `remove_seat` |
+| A seat id is looked up with the account the caller acts in, so another account's seat is `not_found`. | `change_seat`, `remove_seat`, `resend_seat_invite` |
+
+Two invitations, or two acceptances, for the last seat: one passes and the other is `full`. That is
+run on a real Postgres with two connections, and again on a database built without the function's
+account lock, where both pass:
+`cd scripts && TRIAL_RACE_DB_URL=… TRIAL_RACE_REQUIRED=1 pnpm exec vitest run db/seats-race.test.ts`.
+
+**What `apply_entitlement_transition` does to seats** (migration `20261102000001`). On a transition
+it removes the active seats that are not the owner's beyond the new seat limit, keeping those accepted
+earliest. It does not count invited seats and does not change them: an invitation written before the
+limit fell stays, with its link, and is refused at acceptance (`full`) while the active seats fill
+the limit. It leaves the `seat_sites` rows and `sites.owner_seat_id` of a seat it removes, which
+`remove_seat` clears and moves. The test file above runs a transition to a lower limit over an
+account with members and an invitation.
+
+**Routes** (each a 404 with `V2_CHECKS_PUBLIC` unset):
+
+| Route | Who | Answers |
+|---|---|---|
+| `POST /api/seats` `{email, role, scope}` | `seat_may('invite_seat')`, in the account the caller acts in | 201; 402 `upgrade_required` with gate `seats` and `canBuySeats` (Free, or no seat free); 409 `seat_exists`; 400 `invalid_scope`; 429 `rate_limited` |
+| `PATCH /api/seats/id/[id]` `{role, scope}` | `seat_may('change_seat')` | 200; 404; 409 `seat_owner` |
+| `DELETE /api/seats/id/[id]` | `seat_may('remove_seat')` | 200; 404; 409 `seat_owner` |
+| `POST /api/seats/id/[id]/resend` | `seat_may('invite_seat')` | 200; 404; 409 `not_invited`; 429 |
+| `POST /api/seats/accept` | a signed-in user; the token is read from the `cm_link_invite` cookie | 200 or a 303 to `/dashboard`, with the switcher cookie set to the joined account; 410 `invite_gone`; 403 `email_mismatch`; 409 `invite_full`, `already_member` |
+| `GET /invite/[token]` | anyone holding the link | moves the token into the cookie and answers 303 to `/invite`; changes nothing |
+
+A seat's own routes are under `/api/seats/id/`: a seat id directly under `/api/seats` would also match
+`/api/seats/accept` and `/api/seats/switch`, and the route registry holds each path to one row
+(`__tests__/security/route-policy.test.ts`, "no two rows overlap").
+
+Invitation mail is bounded at 20 a day for an account and 10 an hour for a client address, an invite
+and a resend counted together (`app/api/seats/route.ts`).
+
+**The invitation's mail.** An invitation written or re-sent asks for its mail with the Inngest event
+`seat.invite.requested {seat_id, seq}`, whose id is `seat_invite:<seat>:<seq>`
+(`inviteMailEvent`, `lib/v2/agency/seats.ts`): the same invitation asked for twice is one event, and
+a resend is another. The event holds no address and no token.
+`pnpm --filter @crawlmouse/web exec vitest run lib/v2/agency/seats.test.ts app/api/seats/route.test.ts`.
+
 ## 7. Buying seats and sites
+
+`POST /api/billing/seats` `{seats, sites}` sets the Agency plan's extra seats and extra sites to the
+quantities given (absolute, not a difference). It answers 404 unless `V2_CHECKS_PUBLIC` and
+`V2_BILLING` are both on, asks `seat_may('buy_seats')`, and answers 402 with gate `agencyBranding`
+below Agency.
+
+It makes one `subscriptions.update` on the account's subscription (`changeExtras`,
+`lib/v2/agency/extras.ts`), through CC-03's Stripe client and catalog: an item the subscription holds
+is changed by its id (deleted at quantity 0), and a new one is added at
+`catalog.priceFor('agency', <the base item's interval>, kind)`. The route writes no limit:
+`accounts.seat_limit` and `site_limit` change when the webhook applies the subscription Stripe
+confirms.
+
+| Case | Answer |
+|---|---|
+| Quantities the plan does not sell (`limitsFor`), or more than 100 extra seats in one request | 400 `invalid`, before any Stripe call |
+| A seat limit below the seats in use (active, and invited with a link not yet expired), or a site limit below the live client sites | 409 `in_use`, before any Stripe call |
+| No subscription; one set to end; one not `active` or `trialing`; one whose items are not the catalog's Agency plan | 409 |
+| The card is declined on a raise | 402 `payment_failed`; the subscription is as it was |
+| The quantities the subscription already holds | 200 `changed: false`; no Stripe write |
+
+**Proration** (owner ruling, questions.md Q4). When either quantity rises the update is sent with
+`proration_behavior: 'always_invoice'` and `payment_behavior: 'error_if_incomplete'` (`RAISE`): the
+rest of the period is charged at once, and a charge that fails leaves the subscription unchanged.
+When quantities only fall it is sent with `proration_behavior: 'none'` (`LOWER`): no credit, and the
+lower quantity bills from the next invoice. A request that raises one quantity and lowers the other
+is sent as a raise, so Stripe prorates the lowered item too.
+
+The idempotency key names the subscription, its latest invoice, the last event the mirror applied,
+and the quantities the change starts from and ends at, so a retry of one request repeats it and the
+same quantities bought, lowered and bought again do not.
+
+`pnpm --filter @crawlmouse/web exec vitest run lib/v2/agency/extras.test.ts app/api/billing/seats/route.test.ts`
+runs these against a Stripe subscription in memory and CC-03's fake catalog, and reads each
+subscription the update leaves through `mirrorOf`, the webhook's reading.
 
 ## 8. The client matrix and the client page
 

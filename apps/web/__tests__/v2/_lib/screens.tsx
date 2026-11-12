@@ -45,6 +45,15 @@ import { SettingsScreen } from '../../../components/v2/screens/settings/Settings
 import { DeleteScreen } from '../../../components/v2/screens/settings/DeleteScreen';
 import { TrialEndScreen } from '../../../components/v2/screens/trial-end/TrialEndScreen';
 import { ChangesLogScreen } from '../../../components/v2/screens/changes-log/ChangesLogScreen';
+import { InviteScreen } from '../../../components/v2/screens/invite/InviteScreen';
+import { SeatsScreen } from '../../../components/v2/screens/seats/SeatsScreen';
+import {
+  INVITE_PREVIEWS,
+  SEATS_PREVIEWS,
+  seatsPreview,
+  type InvitePreview,
+  type SeatsPreview,
+} from '../../../app/(v2-preview)/v2-preview/_preview/seats';
 
 export const homeData = homePreview;
 
@@ -109,4 +118,20 @@ export const CC27_ELEMENTS: Record<string, () => React.ReactElement> = {
   '/v2-preview/screens/settings/free': () => <SettingsScreen data={settingsPreview('clean')} />,
   '/v2-preview/screens/settings/delete': () => <DeleteScreen data={deletePreview()} />,
   '/v2-preview/screens/trial-end': () => <TrialEndScreen data={trialEndPreview()} />,
+};
+
+/** CC-31 workstream A: the Seats screen and the invitation page, by registry path. */
+export const CC31_SEAT_ELEMENTS: Record<string, () => React.ReactElement> = {
+  ...Object.fromEntries(
+    (Object.keys(SEATS_PREVIEWS) as SeatsPreview[]).map((path) => [
+      path,
+      () => <SeatsScreen data={seatsPreview(path)} />,
+    ]),
+  ),
+  ...Object.fromEntries(
+    (Object.keys(INVITE_PREVIEWS) as InvitePreview[]).map((path) => [
+      path,
+      () => <InviteScreen data={INVITE_PREVIEWS[path]()} />,
+    ]),
+  ),
 };

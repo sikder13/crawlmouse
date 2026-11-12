@@ -79,6 +79,7 @@ const ANONYMOUS: Record<
   'api/billing/checkout': { status: 401, body: { error: 'auth_required' } },
   'api/billing/portal': { status: 401, body: { error: 'auth_required' } },
   'api/billing/pro-trial/start': { status: 401, body: { code: 'auth_required' } },
+  'api/billing/seats': { status: 401, body: { code: 'auth_required' } },
   'api/billing/status': { status: 401, body: { pro: false } },
   'api/checks/[id]/claim': { status: 401, body: { code: 'auth_required' } },
   'api/fixes/[id]/done': { status: 401, body: { code: 'auth_required' } },
@@ -91,6 +92,10 @@ const ANONYMOUS: Record<
   'api/reports/[slug]/mine': { status: 200, body: { owned: false } },
   'api/reports/[slug]/visibility': { status: 401, body: { error: 'auth_required' } },
   'api/reports/[slug]/white-label': { status: 401, body: { error: 'auth_required' } },
+  'api/seats': { status: 401, body: { code: 'auth_required' } },
+  'api/seats/accept': { status: 401, body: { code: 'auth_required' } },
+  'api/seats/id/[id]': { status: 401, body: { code: 'auth_required' } },
+  'api/seats/id/[id]/resend': { status: 401, body: { code: 'auth_required' } },
   'api/sites': { status: 401, body: { code: 'auth_required' } },
   'api/sites/[id]': { status: 401, body: { code: 'auth_required' } },
   'api/sites/[id]/checks': { status: 401, body: { code: 'auth_required' } },
@@ -110,6 +115,8 @@ beforeEach(() => {
   vi.stubEnv('V2_CHECKS_PUBLIC', '1');
   vi.stubEnv('V2_PIPELINE', '1');
   vi.stubEnv('CRAWL_PAUSED', '');
+  // The seat purchase answers 404 with V2_BILLING unset, before it reads the session.
+  vi.stubEnv('V2_BILLING', '1');
 });
 afterEach(() => vi.unstubAllEnvs());
 

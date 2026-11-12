@@ -284,8 +284,9 @@ describe('seatFromRow', () => {
   it('an invited seat has no accepted_at', async () => {
     const id = randomUUID();
     await db.query(
-      `insert into public.seats (id, account_id, invited_email, role, status, invite_token_hash)
-       values ($1, $2, 'new@example.com', 'developer', 'invited', $3)`,
+      `insert into public.seats (id, account_id, invited_email, role, status, invite_token_hash,
+                                 invite_expires_at)
+       values ($1, $2, 'new@example.com', 'developer', 'invited', $3, now() + interval '7 days')`,
       [id, world.accountId, SHA(77)],
     );
     const s = seatFromRow(await one('seats', 'id', id), []);

@@ -64,6 +64,35 @@ export const NOTICE_LINES: Record<NoticeCode, (at: string | null) => string> = {
   invalid_email: () => 'That is not an email address, so nothing was recorded.',
   rate_limited: (at) =>
     `Too many emails were asked for in a short time, so nothing was recorded.${at ? ` Ask again from ${at}.` : ''}`,
+  seat_invited: () =>
+    'Invited. The seat is held for that address until the invitation is accepted or removed.',
+  seat_resent: () =>
+    'A new invitation replaces the one sent before; the earlier link no longer works.',
+  seat_changed: () => 'The seat was changed.',
+  seat_removed: () => 'Removed. That person no longer sees this account.',
+  seat_exists: () => 'That address already has a seat or an invitation on this account.',
+  seats_full: () => 'Every seat on this account is taken, so nobody was invited.',
+  invalid_scope: () =>
+    'Choose every client, or at least one client site of this account that is not a staging copy.',
+  seat_owner: () => 'The owner’s seat cannot be changed or removed.',
+  not_invited: () => 'That invitation was already accepted, so nothing was sent.',
+  invite_gone: () =>
+    'This invitation cannot be used: it was accepted, replaced, removed or has expired.',
+  email_mismatch: () =>
+    'This invitation was sent to another address. Sign in with the address it was sent to.',
+  invite_full: () =>
+    'The account has no seat free, so the invitation was not accepted. Its owner can free one.',
+  already_member: () => 'You already have a seat on this account.',
+  extras_changed: () =>
+    'The change was sent to billing. The new limits show here once the payment is confirmed.',
+  extras_unchanged: () => 'The plan already has those quantities, so nothing was changed.',
+  in_use: () =>
+    'More seats or sites are in use than that would leave. Remove a seat or a site first, then lower the quantity.',
+  payment_failed: () => 'The card was declined, so nothing was changed.',
+  subscription_unchangeable: () =>
+    'This plan cannot be changed here: it is set to end, or its last payment has not gone through. Settings › Plan has the details.',
+  billing_unavailable: () =>
+    'Billing cannot be reached right now, so nothing was changed. Try again later.',
   invalid: () => 'That request was not understood, so nothing was changed.',
 };
 

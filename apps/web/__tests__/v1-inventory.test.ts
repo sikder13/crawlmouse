@@ -181,6 +181,8 @@ describe('the finders see what they claim to see', () => {
       'app/audit/[id]/signals/page.tsx',
       'app/audit/[id]/structure/page.tsx',
       'app/dashboard/v2/page.tsx',
+      'app/invite/page.tsx',
+      'app/seats/page.tsx',
       'app/sites/[id]/page.tsx',
       'app/v2-home/page.tsx',
       'app/api/account/delete/confirm/route.ts',
@@ -193,6 +195,7 @@ describe('the finders see what they claim to see', () => {
       'app/api/billing/agency-trial/route.ts',
       'app/api/billing/cancel/route.ts',
       'app/api/billing/pro-trial/start/route.ts',
+      'app/api/billing/seats/route.ts',
       'app/api/checks/[id]/cancel/route.ts',
       'app/api/checks/[id]/claim/route.ts',
       'app/api/checks/[id]/notify/route.ts',
@@ -202,10 +205,15 @@ describe('the finders see what they claim to see', () => {
       'app/api/fixes/[id]/email-developer/route.ts',
       'app/api/fixes/[id]/packet/route.ts',
       'app/api/me/route.ts',
+      'app/api/seats/accept/route.ts',
+      'app/api/seats/id/[id]/resend/route.ts',
+      'app/api/seats/id/[id]/route.ts',
+      'app/api/seats/route.ts',
       'app/api/sites/[id]/checks/route.ts',
       'app/api/sites/[id]/route.ts',
       'app/api/sites/route.ts',
       'app/api/webhooks/stripe-account/route.ts',
+      'app/invite/[token]/route.ts',
     ]);
   });
 

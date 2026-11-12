@@ -74,6 +74,10 @@ type Events = {
   // fix_email_requests row; the event names only that row, so no address sits in Inngest's event
   // history. CC-28's mailer reads the row and sends; nothing in CC-26b does.
   'fix.email_developer_requested': { data: { requestId: string } };
+  // CC-31: an invitation to a seat was written or re-sent (apps/web/lib/v2/agency/seats.ts). The
+  // event names the seat and the invitation's number, never an address or a token: the handler
+  // reads both through issue_seat_invite.
+  'seat.invite.requested': { data: { seat_id: string; seq: number } };
 };
 
 export const inngest = new Inngest({

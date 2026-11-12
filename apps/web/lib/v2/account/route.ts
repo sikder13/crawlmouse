@@ -115,6 +115,27 @@ export const NOTICE_CODES = [
   'email_requested',
   'invalid_email',
   'rate_limited',
+  // seats and invitations (CC-31)
+  'seat_invited',
+  'seat_resent',
+  'seat_changed',
+  'seat_removed',
+  'seat_exists',
+  'seats_full',
+  'invalid_scope',
+  'seat_owner',
+  'not_invited',
+  'invite_gone',
+  'email_mismatch',
+  'invite_full',
+  'already_member',
+  // buying seats and sites (CC-31)
+  'extras_changed',
+  'extras_unchanged',
+  'in_use',
+  'payment_failed',
+  'subscription_unchangeable',
+  'billing_unavailable',
   // any body the route could not read
   'invalid',
 ] as const;
@@ -123,9 +144,9 @@ export type NoticeCode = (typeof NOTICE_CODES)[number];
 
 const NOTICE_SET: ReadonlySet<string> = new Set(NOTICE_CODES);
 
-/** The pages a form posts from: the dashboard, or one site's page. */
+/** The pages a form posts from: the dashboard, Seats, an invitation's page, or one site's page. */
 const BACK =
-  /^\/(?:dashboard|sites\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/;
+  /^\/(?:dashboard|seats|invite|sites\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/;
 
 /**
  * The page a form was posted from, when it is one a form can go back to (the dashboard or a site
