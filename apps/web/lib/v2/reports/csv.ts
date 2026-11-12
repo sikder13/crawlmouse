@@ -41,7 +41,8 @@ const PAGE_CELLS = {
   meta_description: (p) => p.meta_description?.text ?? null,
   depth: (p) => p.depth,
   links_in: (p) => p.links_in,
-  links_out: (p) => p.links_out,
+  /** Empty where the page's links were not read in full: the number is then not its count. */
+  links_out: (p) => (p.links_read ? p.links_out : null),
   pagerank_share: (p) => p.pagerank_share,
   is_orphan: (p) => p.is_orphan,
   js_only: (p) => p.js_only,

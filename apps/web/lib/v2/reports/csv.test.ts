@@ -226,6 +226,17 @@ describe('the pages file', () => {
     ]);
   });
 
+  it('leaves links_out empty where the page’s links were not read in full, and says so in links_read', () => {
+    const cells = (page: typeof PAGE) => {
+      const [header, row] = parseCsv(pagesCsv({ page_results: [page] }, CHECK.id));
+      const at = (column: string) => row![header!.indexOf(column)];
+      return [at('links_out'), at('links_read')];
+    };
+    expect(cells({ ...PAGE, links_read: true, links_out: 7 })).toEqual(['7', 'true']);
+    // The number a cut-short read left behind is not the page's count of links.
+    expect(cells({ ...PAGE, links_read: false, links_out: 7 })).toEqual(['', 'false']);
+  });
+
   it('property: no cell of a page built from arbitrary strings reads back starting as a formula', () => {
     fc.assert(
       fc.property(

@@ -467,7 +467,7 @@ producer.
 `is_orphan`, `js_only`, `found_via`, `sitemap_lastmod`, `suggested_parent_url`, `sampled`,
 `raw_words`, `rendered_words`, `text_share`, `text_state`, `crawlers_reached`,
 `crawlers_reading_text`, `content_failures`, `is_html`, `links_read`. What was not read is an empty
-cell. A page's redirects, declared canonical, hreflang and robots.txt verdicts are in the JSON file.
+cell, `links_out` included where `links_read` is false. A page's redirects, declared canonical, hreflang and robots.txt verdicts are in the JSON file.
 
 In both CSV files a value that starts with `=`, `+`, `-`, `@`, tab or carriage return has an
 apostrophe put before it, and each cell is written in double quotes with its quotes doubled (RFC
