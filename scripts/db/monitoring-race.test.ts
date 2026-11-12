@@ -149,12 +149,6 @@ async function raceSeen<T>(sql: Sql, a: Call<T>, b: Call<T>) {
   }
 }
 
-/** raceSeen, answering the two outcomes only. */
-async function race<T>(sql: Sql, a: Call<T>, b: Call<T>) {
-  const { a: ra, b: rb } = await raceSeen(sql, a, b);
-  return { a: ra, b: rb };
-}
-
 const claimMail =
   (key: string): Call<string> =>
   async (t) => {
@@ -250,7 +244,11 @@ describe.skipIf(!URL_ENV)('migration 028 under two real transactions', () => {
     'mutation: without the unique key, both workers go (the race this file exists to catch)',
     async () => {
       const key = `race:${randomUUID()}`;
-      expect(await race(unkeyed, claimMail(key), claimMail(key))).toEqual({ a: 'go', b: 'go' });
+      expect(await raceSeen(unkeyed, claimMail(key), claimMail(key))).toEqual({
+        a: 'go',
+        b: 'go',
+        seen: 'settled',
+      });
     },
     TEST_TIMEOUT_MS,
   );
@@ -292,54 +290,23 @@ describe.skipIf(!URL_ENV)('migration 028 under two real transactions', () => {
  * written, and one built with the claim's guard taken out (the unique key replaced by a check-then-
  * insert), where both workers must go.
  *
- * Each race also records whether B's call was still waiting when A committed. In the real database it
- * must be (B waits on A's uncommitted key, then reads it); in the mutation database it must not be (no
- * key to wait on). So a pass shows the window was hit, not only that B ran after A.
+ * Each race runs through `raceSeen`, which commits A only once B is seen blocked on a lock in
+ * `pg_stat_activity` or returned. In the real database B must be seen waiting (on A's uncommitted key);
+ * in the mutation database it must return without waiting (no key to wait on). So a pass shows B's
+ * call met A's open transaction, not only that B ran after A (review r2, test quality S1).
  */
 const SLACK_UNIQUE_KEY =
   'idempotency_key text not null unique check (length(idempotency_key) between 1 and 200),\n  account_id uuid references public.accounts (id) on delete set null,\n  status text not null check (status in';
 const SLACK_SENDING_INSERT =
   "  values (p_key, p_account, 'sending', 1, p_now, p_now)\n  on conflict (idempotency_key) do nothing;\n";
 
-/** A's call is made and A stays open while B's runs; then A commits, then B. */
-async function slackRace(sql: Sql, key: string) {
-  const claim = async (t: postgres.ReservedSql) => {
+/** One worker's claim of the Slack message `key`. */
+const claimSlack =
+  (key: string): Call<string> =>
+  async (t) => {
     const [x] = await t`select public.claim_slack_send(${key}, null, now()) as r`;
     return (x!.r as { outcome: string }).outcome;
   };
-  const ta = await sql.reserve();
-  const tb = await sql.reserve();
-  try {
-    await ta`begin`;
-    await ta`set local role service_role`;
-    const a = await claim(ta);
-    await tb`begin`;
-    await tb`set local role service_role`;
-    let settled = false;
-    const pending = claim(tb).then(
-      (outcome) => {
-        settled = true;
-        return { outcome };
-      },
-      (error: unknown) => {
-        settled = true;
-        return { error };
-      },
-    );
-    await new Promise((r) => setTimeout(r, 500));
-    const waitingAtCommit = !settled;
-    await ta`commit`;
-    const b = await pending;
-    if ('error' in b) throw b.error;
-    await tb`commit`;
-    return { a, b: b.outcome, waitingAtCommit };
-  } finally {
-    for (const t of [ta, tb]) {
-      await t`rollback`.catch(() => {});
-      t.release();
-    }
-  }
-}
 
 describe.skipIf(!URL_ENV)('migration 028: the Slack ledger under two real transactions', () => {
   const suffix = `${process.pid}_${Date.now()}`;
@@ -379,7 +346,11 @@ describe.skipIf(!URL_ENV)('migration 028: the Slack ledger under two real transa
     'two workers claiming one Slack message: B waits for A, then is told busy, and one row is written',
     async () => {
       const key = `alert:${randomUUID()}:slack`;
-      expect(await slackRace(real, key)).toEqual({ a: 'go', b: 'busy', waitingAtCommit: true });
+      expect(await raceSeen(real, claimSlack(key), claimSlack(key))).toEqual({
+        a: 'go',
+        b: 'busy',
+        seen: 'waiting',
+      });
       const [n] =
         await real`select count(*)::int as n from public.slack_sends where idempotency_key = ${key}`;
       expect(n!.n).toBe(1);
@@ -391,7 +362,11 @@ describe.skipIf(!URL_ENV)('migration 028: the Slack ledger under two real transa
     'mutation: without the unique key, B does not wait and both workers go (two posts)',
     async () => {
       const key = `alert:${randomUUID()}:slack`;
-      expect(await slackRace(unkeyed, key)).toEqual({ a: 'go', b: 'go', waitingAtCommit: false });
+      expect(await raceSeen(unkeyed, claimSlack(key), claimSlack(key))).toEqual({
+        a: 'go',
+        b: 'go',
+        seen: 'settled',
+      });
     },
     TEST_TIMEOUT_MS,
   );
