@@ -4,9 +4,11 @@
  * whose notified rows were written by hand from the screens (bad-site's weekly check of
  * example-outfitter.com, challenged-site's text drop), and with the Alerts view's crawler verdicts.
  */
+import { readdirSync, readFileSync } from 'node:fs';
 import fc from 'fast-check';
 import type { Change, Verdict } from '@crawlmouse/types/v2';
 import { describe, expect, it } from 'vitest';
+import { FIX_SUBJECT } from '../../../../../packages/engine/src/v2/diff/subjects';
 import { fixture } from '../fixtures';
 import { alertsView } from '../view/alerts';
 import {
@@ -151,6 +153,28 @@ describe('text_drop: the site’s share of text without JavaScript fell by more 
       changes: [resolved, other],
     });
     expect(fired(i)).toEqual([]);
+  });
+
+  // Review r1 (correctness S4) asked for a `changed` row of this subject to fire on a further drop.
+  // The engine writes no such row: the subject comes only from a client-rendered-template fix's own
+  // row (opened or resolved), so a further drop while that fix stays open writes no change at all,
+  // and an alert has no change to name (spec 28, known gaps). This pins that premise: when the
+  // engine gains another writer of the subject, this fails and the rule is to be read again.
+  it('the engine writes the subject only as a client-rendered-template fix’s row (review r1 S4)', () => {
+    expect(
+      Object.entries(FIX_SUBJECT)
+        .filter(([, subject]) => subject === 'text_without_js')
+        .map(([type]) => type),
+    ).toEqual(['client_rendered_template']);
+    // Every source file of the diff but subjects.ts, the mapping read above.
+    const engineDiff = new URL('../../../../../packages/engine/src/v2/diff/', import.meta.url);
+    const files = readdirSync(engineDiff).filter(
+      (f) => f.endsWith('.ts') && !f.endsWith('.test.ts') && f !== 'subjects.ts',
+    );
+    expect(files).toContain('changes.ts');
+    for (const file of files) {
+      expect(readFileSync(new URL(file, engineDiff), 'utf8'), file).not.toMatch(/text_without_js/);
+    }
   });
 
   it('reads points as percentage points, rounded so float error cannot cross the threshold', () => {

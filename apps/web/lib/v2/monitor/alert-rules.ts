@@ -13,7 +13,9 @@
  *   blocked (challenged, rate limited) is `any_change`'s.
  * - `text_drop`, "Text without JavaScript drops more than N points": an `opened` text-without-JavaScript
  *   row, when the site's share of text without JavaScript fell by more than `threshold_points`
- *   percentage points from the check before (`textDropPoints`).
+ *   percentage points from the check before (`textDropPoints`). The engine writes that subject only
+ *   as a client-rendered-template fix's row, so a further drop while the fix stays open has no row to
+ *   name and alerts nothing (spec 28, known gaps; alert-rules.test.ts pins the engine's side).
  * - `grade_letter_moved`, "A grade moves a full letter": a row with a grade delta whose letter moved:
  *   B to C does, B to B+ does not.
  * - `new_orphans`: an `opened` orphan-pages row.

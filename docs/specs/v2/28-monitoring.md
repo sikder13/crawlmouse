@@ -149,6 +149,10 @@ link is minted only after the claim (Q10); unsubscribe and recipients are per se
   included, so a send whose record failed is still counted; an event replayed after Inngest's 24-hour
   idempotency window is counted again.
 - A fix with no packet is answered `queued` and nothing is sent.
+- `text_drop` fires on the `opened` text-without-JavaScript row a client-rendered-template fix writes. The engine
+  writes no other row of that subject, so a further drop while that fix stays open has no change to name and alerts
+  nothing, against the rule's label "drops more than N points". Closing it needs a change row for the share itself
+  (the engine's diff).
 - The Alerts page shows what `changes.notified` records; a failed or suppressed channel (`alert_events`) is not
   shown.
 - The Supabase ports for alerts and the summary (`alerts-store.ts`, `summary-store.ts`) run in
