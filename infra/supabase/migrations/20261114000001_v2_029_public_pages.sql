@@ -17,6 +17,8 @@
 alter table public.accounts add column if not exists agency_checkout_url text
   constraint accounts_agency_checkout_url_check check (agency_checkout_url ~ '^https://checkout\.stripe\.com/');
 alter table public.accounts add column if not exists agency_checkout_at timestamptz;
+-- When the owner last ticked the Agency trial's consent (renewal, EU withdrawal, Terms; FACTS J15/L6).
+alter table public.accounts add column if not exists agency_trial_consent_at timestamptz;
 
 -- ─── start_agency_trial_account ──────────────────────────────────────────────────────────────────
 -- ARCH-2 §2.4: an agency trial is a second account, whose owner is the person starting it. The call
@@ -31,6 +33,8 @@ alter table public.accounts add column if not exists agency_checkout_at timestam
 -- that no check has read yet (a resubmit after a Checkout that did not finish), and left alone once a
 -- check has read it. It is stored without a check: its first audit is started from the agency
 -- workspace.
+-- The route calls it only once the consent box was ticked, so each call stamps the account's
+-- agency_trial_consent_at.
 -- p_host is the host the route admitted (lib/v2/account/sites.ts admittedHost); the function checks
 -- only its shape. p_name is the agency name shown on client reports.
 
@@ -96,6 +100,8 @@ begin
     returning id into v_seat;
     v_outcome := 'created';
   end if;
+
+  update public.accounts set agency_trial_consent_at = pg_catalog.now() where id = v_account;
 
   select s.id into v_site
     from public.sites s

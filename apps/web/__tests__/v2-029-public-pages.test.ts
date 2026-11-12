@@ -78,6 +78,11 @@ describe('start_agency_trial_account', () => {
     );
     expect(rows).toEqual([{ role: 'owner', status: 'active' }]);
     expect(await sitesOf(answer.account_id!)).toEqual(['client.example']);
+    const { rows: consent } = await db.query<{ at: Date | null }>(
+      'select agency_trial_consent_at as at from public.accounts where id = $1',
+      [answer.account_id],
+    );
+    expect(consent[0]!.at).toBeInstanceOf(Date);
     const { rows: users } = await db.query<{ default_account_id: string }>(
       'select default_account_id from public.users where id = $1',
       [userId],
@@ -130,7 +135,7 @@ describe('start_agency_trial_account', () => {
     const userId = await person();
     await expect(
       asRole(db, 'authenticated', userId, (tx) =>
-        tx.query('select agency_checkout_url from public.accounts'),
+        tx.query('select agency_checkout_url, agency_trial_consent_at from public.accounts'),
       ),
     ).rejects.toThrow(/permission denied/);
   });
@@ -172,16 +177,18 @@ describe('the rollback', () => {
                   + (select count(*) from pg_tables where tablename = 'contact_requests')
                   + (select count(*) from pg_indexes where indexname = 'public_reports_check_uq')
                   + (select count(*) from information_schema.columns
-                      where table_name = 'accounts' and column_name like 'agency_checkout_%') as n`,
+                      where table_name = 'accounts'
+                        and column_name in ('agency_checkout_url', 'agency_checkout_at',
+                                            'agency_trial_consent_at')) as n`,
           )
         ).rows[0]!.n;
-      expect(Number(await present())).toBe(5);
+      expect(Number(await present())).toBe(6);
       await own.exec(readRollback(ROLLBACK));
       await own.exec(readRollback(ROLLBACK));
       expect(Number(await present())).toBe(0);
       await own.exec(readMigration(MIGRATION));
       await own.exec(readMigration(MIGRATION));
-      expect(Number(await present())).toBe(5);
+      expect(Number(await present())).toBe(6);
     } finally {
       await own.close();
     }
