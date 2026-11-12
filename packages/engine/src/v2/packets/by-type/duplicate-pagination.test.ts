@@ -83,6 +83,43 @@ describe('the duplicate_pagination packet', () => {
     );
   });
 
+  it('says of each page what its own row shows, when two lists of a template differ', () => {
+    const u = (path: string) => `${base}${path}`;
+    const input = site(
+      [
+        { path: base, links: [u('/collections/tents'), u('/collections/stoves')] },
+        ...['tents', 'stoves'].map((name) => ({
+          path: u(`/collections/${name}`),
+          links: [u(`/collections/${name}?page=2`)],
+          facts: { simhash: HASH, canonical: { href: u(`/collections/${name}`) } },
+        })),
+        {
+          path: u('/collections/tents?page=2'),
+          template: TEMPLATE,
+          facts: { simhash: simhashAway(HASH, 30), canonical: { href: u('/collections/tents') } },
+        },
+        {
+          path: u('/collections/stoves?page=2'),
+          template: TEMPLATE,
+          facts: {
+            simhash: simhashAway(HASH, 2),
+            canonical: { href: u('/collections/stoves?page=2') },
+          },
+        },
+      ],
+      { homepage: base },
+    );
+    const p = packetFor(input);
+    expect(p.context.slice(1)).toEqual([
+      'Canonical set to the first page of the list: `https://a.test/collections/tents?page=2`.',
+      'Google asks that each page of a sequence have its own canonical, and that the first page not be the canonical of the others: https://developers.google.com/search/docs/specialty/ecommerce/pagination-and-incremental-page-loading',
+      "Main content nearly identical to the first page's (64-bit content hashes within 3 bits): `https://a.test/collections/stoves?page=2`.",
+    ]);
+    // the first page marked is the stoves list's, which keeps its own canonical: the command leaves the canonical out
+    expect(p.verify.command).not.toContain('rel="canonical"');
+    expect(p.verify.expect).toContain('The command reads the first of the later pages');
+  });
+
   it('writes a step for each condition, and none for a condition not proved', () => {
     const canonical = packetFor(listSite(base, 'canonical')).change;
     const content = packetFor(listSite(base, 'content')).change;
