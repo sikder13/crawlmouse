@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import V1ReportPage, { generateMetadata as v1Metadata } from '../../r/[slug]/page';
 import { LivePublicReport } from '@/components/v2/screens/public-report/LivePublicReport';
+import { ReportViewBeacon } from '@/components/v2/screens/public-report/ReportViewBeacon';
 import { checksPublicEnabled } from '@/lib/auth/flags';
 import { getPublicReport } from '@/lib/reports';
 import { publicReportTitle, reportPageOf } from '@/lib/v2/view/public-report';
@@ -13,8 +14,8 @@ import { publicReportTitle, reportPageOf } from '@/lib/v2/view/public-report';
  * row, a missing one included, is v1's page, rendered by v1's own module with the same params.
  * With the flag off it is a 404 (the rewrite is not applied then, and `/r/<slug>` is v1's files).
  *
- * Cached as v1's page is, so it reads no request header; the view is counted by a beacon from the
- * page (`ReportViewBeacon`). `purgePublicReport` revalidates this path beside `/r/<slug>`.
+ * Cached as v1's page is, so it reads no request header; a view of either kind is counted by a
+ * beacon from the page (`ReportViewBeacon`). `purgePublicReport` revalidates this path beside `/r/<slug>`.
  */
 export const revalidate = 300;
 
@@ -36,7 +37,14 @@ export default async function V2ReportPage({ params }: Props) {
   if (!checksPublicEnabled()) return notFound();
   const { slug } = await params;
   const page = reportPageOf(await getPublicReport(slug));
-  if (page.kind === 'v1') return V1ReportPage({ params });
+  // v1's page answers 404 itself for a row that is gone; the beacon renders only beside a report.
+  if (page.kind === 'v1')
+    return (
+      <>
+        <ReportViewBeacon slug={slug} />
+        {await V1ReportPage({ params })}
+      </>
+    );
   if (page.kind === 'gone') notFound();
   return <LivePublicReport slug={slug} view={page.view} />;
 }

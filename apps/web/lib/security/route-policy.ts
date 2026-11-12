@@ -217,6 +217,14 @@ export const ROUTE_POLICIES: readonly RoutePolicy[] = [
   { route: 'api/reports/[slug]/mine', methods: ['GET'], class: 'user', origin: 'any' },
   { route: 'api/reports/[slug]/visibility', methods: ['POST'], class: 'user', origin: 'strict' },
   { route: 'api/reports/[slug]/white-label', methods: ['POST'], class: 'user', origin: 'strict' },
+  {
+    route: 'api/reports/[slug]/view',
+    methods: ['POST'],
+    class: 'public',
+    reason:
+      "counts one view of a public report for the funnel (CC-29 Q14); it reads the report and writes only the caller's per-IP bucket",
+    origin: 'strict',
+  },
   { route: 'api/sites', methods: ['POST'], class: 'member', origin: 'strict' },
   {
     route: 'api/sites/[id]',
