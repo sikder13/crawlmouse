@@ -10,35 +10,35 @@ Migration: `infra/supabase/migrations/20261114000002_v2_031_agency.sql`, revert 
 
 ## 1. Decisions
 
-| # | Decision |
-|---|---|
-| D1 | `V2_CHECKS_PUBLIC` gates the pages and routes of this step; unset, each answers 404. An Agency-only route answers 402 with the gate's name (`agencyBranding`) for a lower tier; an Agency-only page shows the gate (§12). |
-| D2 | `is_member_for_site` is the one rule for seeing a site. A service-role read is keyed by ids the caller's own session returned (§4). What a role may do is `seat_may` (§3), which the routes of this step and the site and alert routes ask. Out of scope is 404. |
-| D2b | A person with several seats chooses the account they act in; the choice is a cookie that is followed only when it names one of their own active seats (§5). `users.default_account_id` is not written. |
-| D3 | Seats and invitations: a single-use token, 7 days, stored as its hash; accepted only by the signed-in user whose email matches; the limit is checked in the statement that writes the seat. |
-| D4 | Seats and sites beyond the plan are bought through CC-03's catalog and Stripe client; limits follow the subscription the webhook confirms. |
-| D5 | `/agency` is the client matrix; `/agency/clients/[siteId]` the client page. |
-| D6 | `POST /api/reports` makes `audit_pdf`, `compare`, `raw_export` and `prospect_one_pager`, server-side from stored data, into the private `reports` bucket. |
-| D6b | A `compare` report is a before-and-after page (`format: html`), with a baseline version for a site with nothing wrong. |
-| D7 | Download is a 10-minute signed URL. A share link is a 22-character token stored as its sha256, good for 30 days, revocable, 410 once gone. |
-| D8 | Client report schedules are stored and edited here; an external recipient confirms their address before any report is sent to it. |
-| D9 | Invited addresses, report recipients, share links and report files join CC-27b's erasure. |
-| D10 | A gate message is written once from `GATES` and `prices.ts`; the events of §11 are sent server-side. |
-| D11 | Not in this step: custom domains and the agency's sender (Branding), the read-only API, competitors, `/r/**` and minting, hiding a v2 public report, the mailer's own code beyond new kinds, switching flags. |
+| #   | Decision                                                                                                                                                                                                                                                         |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| D1  | `V2_CHECKS_PUBLIC` gates the pages and routes of this step; unset, each answers 404. An Agency-only route answers 402 with the gate's name (`agencyBranding`) for a lower tier; an Agency-only page shows the gate (§12).                                        |
+| D2  | `is_member_for_site` is the one rule for seeing a site. A service-role read is keyed by ids the caller's own session returned (§4). What a role may do is `seat_may` (§3), which the routes of this step and the site and alert routes ask. Out of scope is 404. |
+| D2b | A person with several seats chooses the account they act in; the choice is a cookie that is followed only when it names one of their own active seats (§5). `users.default_account_id` is not written.                                                           |
+| D3  | Seats and invitations: a single-use token, 7 days, stored as its hash; accepted only by the signed-in user whose email matches; the limit is checked in the statement that writes the seat.                                                                      |
+| D4  | Seats and sites beyond the plan are bought through CC-03's catalog and Stripe client; limits follow the subscription the webhook confirms.                                                                                                                       |
+| D5  | `/agency` is the client matrix; `/agency/clients/[siteId]` the client page.                                                                                                                                                                                      |
+| D6  | `POST /api/reports` makes `audit_pdf`, `compare`, `raw_export` and `prospect_one_pager`, server-side from stored data, into the private `reports` bucket.                                                                                                        |
+| D6b | A `compare` report is a before-and-after page (`format: html`), with a baseline version for a site with nothing wrong.                                                                                                                                           |
+| D7  | Download is a 10-minute signed URL. A share link is a 22-character token stored as its sha256, good for 30 days, revocable, 410 once gone.                                                                                                                       |
+| D8  | Client report schedules are stored and edited here; an external recipient confirms their address before any report is sent to it.                                                                                                                                |
+| D9  | Invited addresses, report recipients, share links and report files join CC-27b's erasure.                                                                                                                                                                        |
+| D10 | A gate message is written once from `GATES` and `prices.ts`; the events of §11 are sent server-side.                                                                                                                                                             |
+| D11 | Not in this step: custom domains and the agency's sender (Branding), the read-only API, competitors, `/r/**` and minting, hiding a v2 public report, the mailer's own code beyond new kinds, switching flags.                                                    |
 
 How the tree changed the form of a decision is in §12.
 
 ## 2. Pages and routes
 
-| Path | Who | What |
-|---|---|---|
-| `/agency` | Agency | the client matrix (`Final-Ag-Matrix`) |
-| `/agency/clients/[siteId]` | Agency, a seat that covers the site | the client page (`Final-Ag-Client`) |
-| `/agency/reports` | Agency | client report schedules and what was sent (`Final-Ag-Reports`) |
-| `/reports`, `/reports/[id]` | a signed-in member; making a report needs `exports` | `Final-Reports`; a proof page |
-| `/seats` | a signed-in member; Free sees the gate | `Final-Ag-Seats` |
-| `/invite/[token]`, `/invite` | the invited address, signed in | the link lands its token in a cookie; the page shows the invitation; accepting is a POST |
-| `/s/[token]`, `/s/view/[reportId]` | anyone holding the link | a shared report: 410 once gone, a file as a redirect, a proof page rendered |
+| Path                               | Who                                                 | What                                                                                     |
+| ---------------------------------- | --------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `/agency`                          | Agency                                              | the client matrix (`Final-Ag-Matrix`)                                                    |
+| `/agency/clients/[siteId]`         | Agency, a seat that covers the site                 | the client page (`Final-Ag-Client`)                                                      |
+| `/agency/reports`                  | Agency                                              | client report schedules and what was sent (`Final-Ag-Reports`)                           |
+| `/reports`, `/reports/[id]`        | a signed-in member; making a report needs `exports` | `Final-Reports`; a proof page                                                            |
+| `/seats`                           | a signed-in member; Free sees the gate              | `Final-Ag-Seats`                                                                         |
+| `/invite/[token]`, `/invite`       | the invited address, signed in                      | the link lands its token in a cookie; the page shows the invitation; accepting is a POST |
+| `/s/[token]`, `/s/view/[reportId]` | anyone holding the link                             | a shared report: 410 once gone, a file as a redirect, a proof page rendered              |
 
 ## 3. The Guard column
 
@@ -48,15 +48,15 @@ same table from `SEAT_GUARD` (`apps/web/lib/v2/agency/guard.ts`) to decide which
 `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-031-seam.test.ts` asks SQL each role and
 action and compares the answers with `SEAT_GUARD` and with the table below written out in the test.
 
-| Action | Owner | Account manager | Developer | Asked with |
-|---|---|---|---|---|
-| see audits and packets, mark a fix done, run a check | yes | yes | yes | `is_member_for_site` alone |
-| `export_report` | yes | yes | yes | + `is_member_for_site` |
-| `share_report`, `schedule_report`, `prospect_report` | yes | yes | no | + `is_member_for_site` |
-| `add_site` (an unscoped seat), `edit_site`, `remove_site` | yes | yes | no | + `is_member_for_site` |
-| `edit_account_alerts` (the account-wide rules and the Slack webhook) | yes | yes | no | the account |
-| `invite_seat`, `change_seat`, `remove_seat` | yes | no | no | the account |
-| `buy_seats` | yes | no | no | the account |
+| Action                                                               | Owner | Account manager | Developer | Asked with                 |
+| -------------------------------------------------------------------- | ----- | --------------- | --------- | -------------------------- |
+| see audits and packets, mark a fix done, run a check                 | yes   | yes             | yes       | `is_member_for_site` alone |
+| `export_report`                                                      | yes   | yes             | yes       | + `is_member_for_site`     |
+| `share_report`, `schedule_report`, `prospect_report`                 | yes   | yes             | no        | + `is_member_for_site`     |
+| `add_site` (an unscoped seat), `edit_site`, `remove_site`            | yes   | yes             | no        | + `is_member_for_site`     |
+| `edit_account_alerts` (the account-wide rules and the Slack webhook) | yes   | yes             | no        | the account                |
+| `invite_seat`, `change_seat`, `remove_seat`                          | yes   | no              | no        | the account                |
+| `buy_seats`                                                          | yes   | no              | no        | the account                |
 
 The rows are the locked Seats artboard's "What each role can do": see audits and packets; mark fixes
 done, run checks; edit and send client reports; add or remove client sites; branding, seats, billing.
@@ -78,19 +78,19 @@ table refuses gets 403 `role_refused`.
 
 Which client makes each read of a site, check, fix, packet, alert, change or report, and what bounds it.
 
-| Read | Where | Client | Bound by |
-|---|---|---|---|
-| The account, its seats, subscription, keys, brand, account-wide alert rules | `lib/v2/account/dataset.ts`, `settings-dataset.ts` | caller | row security, `is_member` |
-| The ids of the account's live sites | `sitesInScope` (`lib/v2/agency/guard.ts`) | caller | `sites`' policy, `is_member_for_site` |
-| `seat_sites` | both datasets | caller | a row is visible when its site is (section S) |
-| Site rows, schedules, checks, fixes, fix events, changes | both datasets | service role | the ids `sitesInScope` returned |
-| Site alert rules, reports | both datasets | caller | row security, `is_member_for_site` |
-| A site page's site | `siteOfCaller` (`lib/v2/account/pages.ts`) | caller | `is_member_for_site` |
-| Edit, remove a site | `app/api/sites/[id]/route.ts` | caller, then service role by site id | `is_member_for_site`, `seat_may` |
-| Add a site | `app/api/sites/route.ts` | caller, then service role | `seat_may`, an unscoped seat |
-| Re-check | `app/api/sites/[id]/checks/route.ts` | caller, then service role by site id | `is_member_for_site` |
-| Mark done, packet, email a developer | `app/api/fixes/[id]/*/route.ts`, `lib/v2/account/fixes.ts` | caller, then service role by fix id | `is_member_for_fix` |
-| A check's pages, stream, cancel, notify | `readableCheck` (`lib/v2/pipeline/public.ts`) | service role, then caller | the caller's `sites` read for a kept site |
+| Read                                                                        | Where                                                      | Client                               | Bound by                                      |
+| --------------------------------------------------------------------------- | ---------------------------------------------------------- | ------------------------------------ | --------------------------------------------- |
+| The account, its seats, subscription, keys, brand, account-wide alert rules | `lib/v2/account/dataset.ts`, `settings-dataset.ts`         | caller                               | row security, `is_member`                     |
+| The ids of the account's live sites                                         | `sitesInScope` (`lib/v2/agency/guard.ts`)                  | caller                               | `sites`' policy, `is_member_for_site`         |
+| `seat_sites`                                                                | both datasets                                              | caller                               | a row is visible when its site is (section S) |
+| Site rows, schedules, checks, fixes, fix events, changes                    | both datasets                                              | service role                         | the ids `sitesInScope` returned               |
+| Site alert rules, reports                                                   | both datasets                                              | caller                               | row security, `is_member_for_site`            |
+| A site page's site                                                          | `siteOfCaller` (`lib/v2/account/pages.ts`)                 | caller                               | `is_member_for_site`                          |
+| Edit, remove a site                                                         | `app/api/sites/[id]/route.ts`                              | caller, then service role by site id | `is_member_for_site`, `seat_may`              |
+| Add a site                                                                  | `app/api/sites/route.ts`                                   | caller, then service role            | `seat_may`, an unscoped seat                  |
+| Re-check                                                                    | `app/api/sites/[id]/checks/route.ts`                       | caller, then service role by site id | `is_member_for_site`                          |
+| Mark done, packet, email a developer                                        | `app/api/fixes/[id]/*/route.ts`, `lib/v2/account/fixes.ts` | caller, then service role by fix id  | `is_member_for_fix`                           |
+| A check's pages, stream, cancel, notify                                     | `readableCheck` (`lib/v2/pipeline/public.ts`)              | service role, then caller            | the caller's `sites` read for a kept site     |
 
 Each row is run as owner, account manager, developer in scope, developer out of scope, removed seat
 and stranger: `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-031-scope.test.ts __tests__/v2-031-scope-routes.test.ts`.
@@ -124,15 +124,15 @@ The switch is `POST /api/seats/switch`. No GET sets the cookie.
 
 Which account each resolver uses for a person with several seats:
 
-| Resolver | Used by | Account |
-|---|---|---|
-| `loadViewer` | the dashboard, add a site, the account's alert rules, `PATCH /api/account` (name, timezone) | the chosen one |
-| `readSettingsPage` | Settings, Settings › Plan, Trial ending | the chosen one |
-| `requestedAccountId` (`lib/billing/owner.ts`) | billing checkout, portal and cancel, when the request names no account | the chosen one when the caller owns it, else their one owned account, else 409 |
-| `ownPersonalAccountId` | `POST /api/account/email` | the caller's own personal account |
-| `PATCH /api/account` (a changed address), `DELETE /api/account` | Settings | refused with 409 `personal_account_only` outside the caller's personal account |
-| `siteOfCaller` | the site page | the site's own account |
-| the door's keep (`lib/auth/stores.ts`), `prepare_email_undo` | keep this audit; undo an email change | `users.default_account_id` |
+| Resolver                                                        | Used by                                                                                     | Account                                                                        |
+| --------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `loadViewer`                                                    | the dashboard, add a site, the account's alert rules, `PATCH /api/account` (name, timezone) | the chosen one                                                                 |
+| `readSettingsPage`                                              | Settings, Settings › Plan, Trial ending                                                     | the chosen one                                                                 |
+| `requestedAccountId` (`lib/billing/owner.ts`)                   | billing checkout, portal and cancel, when the request names no account                      | the chosen one when the caller owns it, else their one owned account, else 409 |
+| `ownPersonalAccountId`                                          | `POST /api/account/email`                                                                   | the caller's own personal account                                              |
+| `PATCH /api/account` (a changed address), `DELETE /api/account` | Settings                                                                                    | refused with 409 `personal_account_only` outside the caller's personal account |
+| `siteOfCaller`                                                  | the site page                                                                               | the site's own account                                                         |
+| the door's keep (`lib/auth/stores.ts`), `prepare_email_undo`    | keep this audit; undo an email change                                                       | `users.default_account_id`                                                     |
 
 ## 6. Seats and invitations
 
