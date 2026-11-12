@@ -31213,7 +31213,65 @@
       },
       "effort": null,
       "before_after": [],
-      "packet": null,
+      "packet": {
+        "framework": "generic",
+        "frameworks": [
+          "generic",
+          "nextjs"
+        ],
+        "context": [
+          "The check `schema_with_description` fails on 13 of the 13 pages of the template `/blog/{slug}` it was decided on.",
+          "The check passes a page when a JSON-LD node about the page itself has a `description` that is not empty. Such a node has an `@type` like `WebPage`, `Article`, `BlogPosting`, `Product`, `Service`, `Event`, or another type whose name ends in `Page` or `Article`.",
+          "A page with no JSON-LD fails. A description on a node about the site or the business (`WebSite`, `Organization`) does not count, and neither does the meta description.",
+          "Failing pages: `https://built-site.test/blog/camp-cooking-ideas`, `https://built-site.test/blog/campfire-safety-basics`, `https://built-site.test/blog/choosing-tent-pegs` and 10 more pages not shown.",
+          "The check does not count towards a grade yet, so this fix moves no grade today."
+        ],
+        "change": [
+          "In the template `/blog/{slug}`, find the `<script type=\"application/ld+json\">` block the server sends. If it has a node whose `@type` describes the page itself (`Product` on a product page, `Article` or `BlogPosting` on an article, `WebPage` otherwise), add a `description` property to that node.",
+          "If the template sends no such node, add one in a `<script type=\"application/ld+json\">` element, with `@context`, `@type`, `name` and `description`.",
+          "Fill `description` from the page's own summary field (the one its meta description or excerpt comes from), as plain text. An empty string or one of only spaces does not pass.",
+          "Write the value with the platform's JSON encoder, so a quote or a line break in the text cannot break the block; a block that does not parse declares nothing.",
+          "Send the block in the HTML response. The check does not run scripts, so markup a script adds in the browser is not read."
+        ],
+        "keep": [
+          "Keep each page's URL and its H1.",
+          "Keep the node's other properties and the page's other JSON-LD nodes as they are.",
+          "Keep the visible content unchanged: the description summarises what the page already says and adds no claim of its own."
+        ],
+        "verify": {
+          "command": "curl -sS -A 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36; compatible; OAI-SearchBot/1.4; +https://openai.com/searchbot' 'https://built-site.test/blog/camp-cooking-ideas' | tr '\\r\\n<' '  \\n' | awk 'tolower($0)~/^script[^>]*application\\/ld\\+json/&&$0~/\"@type\"[ \\t]*:[ \\t]*(\\[[^]]*)?\"(https?:\\/\\/schema\\.org\\/)?([A-Za-z]*(Page|Article|BlogPosting|SocialMediaPosting)|Product|ProductModel|IndividualProduct|Service|Event|Recipe|HowTo|Course|TouristTrip|Car|Vehicle)\"/&&$0~/\"description\"[ \\t]*:[ \\t]*\"[ \\t]*[^\" \\t]/{f=1}END{exit !f}'",
+          "expect": "Exit status 0 when one JSON-LD block of the first failing page holds a type about the page itself and a `description` that is not empty; the audit's check failed that page. It requests as OAI-SearchBot, which the site serves today. The command does not tell which node of the block the description is on. The audit's next check applies the full rule to every page of the template.",
+          "ua": "OAI-SearchBot"
+        },
+        "packets": [
+          {
+            "framework": "nextjs",
+            "context": [
+              "The check `schema_with_description` fails on 13 of the 13 pages of the template `/blog/{slug}` it was decided on.",
+              "The check passes a page when a JSON-LD node about the page itself has a `description` that is not empty. Such a node has an `@type` like `WebPage`, `Article`, `BlogPosting`, `Product`, `Service`, `Event`, or another type whose name ends in `Page` or `Article`.",
+              "A page with no JSON-LD fails. A description on a node about the site or the business (`WebSite`, `Organization`) does not count, and neither does the meta description.",
+              "Failing pages: `https://built-site.test/blog/camp-cooking-ideas`, `https://built-site.test/blog/campfire-safety-basics`, `https://built-site.test/blog/choosing-tent-pegs` and 10 more pages not shown.",
+              "The check does not count towards a grade yet, so this fix moves no grade today."
+            ],
+            "change": [
+              "In the `page.js` (or `layout.js`) that renders `/blog/{slug}`, build the object for the page's own node: `{ '@context': 'https://schema.org', '@type': …, name: …, description: … }`, with `description` from the same data the page renders its summary from.",
+              "Render it in the component's output as a native script element: `<script type=\"application/ld+json\" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, '\\\\u003c') }} />`. Do not use `next/script` for it.",
+              "If the page already renders such an object without `description`, add the property there instead of a second node.",
+              "Confirm the block is in the HTML response, which is what the check and the verify command read. An empty `description` does not pass."
+            ],
+            "keep": [
+              "Keep each page's URL and its H1.",
+              "Keep the node's other properties and the page's other JSON-LD nodes as they are.",
+              "Keep the visible content unchanged: the description summarises what the page already says and adds no claim of its own."
+            ],
+            "verify": {
+              "command": "curl -sS -A 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36; compatible; OAI-SearchBot/1.4; +https://openai.com/searchbot' 'https://built-site.test/blog/camp-cooking-ideas' | tr '\\r\\n<' '  \\n' | awk 'tolower($0)~/^script[^>]*application\\/ld\\+json/&&$0~/\"@type\"[ \\t]*:[ \\t]*(\\[[^]]*)?\"(https?:\\/\\/schema\\.org\\/)?([A-Za-z]*(Page|Article|BlogPosting|SocialMediaPosting)|Product|ProductModel|IndividualProduct|Service|Event|Recipe|HowTo|Course|TouristTrip|Car|Vehicle)\"/&&$0~/\"description\"[ \\t]*:[ \\t]*\"[ \\t]*[^\" \\t]/{f=1}END{exit !f}'",
+              "expect": "Exit status 0 when one JSON-LD block of the first failing page holds a type about the page itself and a `description` that is not empty; the audit's check failed that page. It requests as OAI-SearchBot, which the site serves today. The command does not tell which node of the block the description is on. The audit's next check applies the full rule to every page of the template.",
+              "ua": "OAI-SearchBot"
+            }
+          }
+        ]
+      },
       "gone": null
     },
     {
@@ -31318,7 +31376,65 @@
       },
       "effort": null,
       "before_after": [],
-      "packet": null,
+      "packet": {
+        "framework": "generic",
+        "frameworks": [
+          "generic",
+          "nextjs"
+        ],
+        "context": [
+          "The check `schema_with_description` fails on 6 of the 6 pages of the template `/collections/{slug}` it was decided on.",
+          "The check passes a page when a JSON-LD node about the page itself has a `description` that is not empty. Such a node has an `@type` like `WebPage`, `Article`, `BlogPosting`, `Product`, `Service`, `Event`, or another type whose name ends in `Page` or `Article`.",
+          "A page with no JSON-LD fails. A description on a node about the site or the business (`WebSite`, `Organization`) does not count, and neither does the meta description.",
+          "Failing pages: `https://built-site.test/collections/camp-kitchen`, `https://built-site.test/collections/camp-lighting`, `https://built-site.test/collections/camping-tents` and 3 more pages not shown.",
+          "The check does not count towards a grade yet, so this fix moves no grade today."
+        ],
+        "change": [
+          "In the template `/collections/{slug}`, find the `<script type=\"application/ld+json\">` block the server sends. If it has a node whose `@type` describes the page itself (`Product` on a product page, `Article` or `BlogPosting` on an article, `WebPage` otherwise), add a `description` property to that node.",
+          "If the template sends no such node, add one in a `<script type=\"application/ld+json\">` element, with `@context`, `@type`, `name` and `description`.",
+          "Fill `description` from the page's own summary field (the one its meta description or excerpt comes from), as plain text. An empty string or one of only spaces does not pass.",
+          "Write the value with the platform's JSON encoder, so a quote or a line break in the text cannot break the block; a block that does not parse declares nothing.",
+          "Send the block in the HTML response. The check does not run scripts, so markup a script adds in the browser is not read."
+        ],
+        "keep": [
+          "Keep each page's URL and its H1.",
+          "Keep the node's other properties and the page's other JSON-LD nodes as they are.",
+          "Keep the visible content unchanged: the description summarises what the page already says and adds no claim of its own."
+        ],
+        "verify": {
+          "command": "curl -sS -A 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36; compatible; OAI-SearchBot/1.4; +https://openai.com/searchbot' 'https://built-site.test/collections/camp-kitchen' | tr '\\r\\n<' '  \\n' | awk 'tolower($0)~/^script[^>]*application\\/ld\\+json/&&$0~/\"@type\"[ \\t]*:[ \\t]*(\\[[^]]*)?\"(https?:\\/\\/schema\\.org\\/)?([A-Za-z]*(Page|Article|BlogPosting|SocialMediaPosting)|Product|ProductModel|IndividualProduct|Service|Event|Recipe|HowTo|Course|TouristTrip|Car|Vehicle)\"/&&$0~/\"description\"[ \\t]*:[ \\t]*\"[ \\t]*[^\" \\t]/{f=1}END{exit !f}'",
+          "expect": "Exit status 0 when one JSON-LD block of the first failing page holds a type about the page itself and a `description` that is not empty; the audit's check failed that page. It requests as OAI-SearchBot, which the site serves today. The command does not tell which node of the block the description is on. The audit's next check applies the full rule to every page of the template.",
+          "ua": "OAI-SearchBot"
+        },
+        "packets": [
+          {
+            "framework": "nextjs",
+            "context": [
+              "The check `schema_with_description` fails on 6 of the 6 pages of the template `/collections/{slug}` it was decided on.",
+              "The check passes a page when a JSON-LD node about the page itself has a `description` that is not empty. Such a node has an `@type` like `WebPage`, `Article`, `BlogPosting`, `Product`, `Service`, `Event`, or another type whose name ends in `Page` or `Article`.",
+              "A page with no JSON-LD fails. A description on a node about the site or the business (`WebSite`, `Organization`) does not count, and neither does the meta description.",
+              "Failing pages: `https://built-site.test/collections/camp-kitchen`, `https://built-site.test/collections/camp-lighting`, `https://built-site.test/collections/camping-tents` and 3 more pages not shown.",
+              "The check does not count towards a grade yet, so this fix moves no grade today."
+            ],
+            "change": [
+              "In the `page.js` (or `layout.js`) that renders `/collections/{slug}`, build the object for the page's own node: `{ '@context': 'https://schema.org', '@type': …, name: …, description: … }`, with `description` from the same data the page renders its summary from.",
+              "Render it in the component's output as a native script element: `<script type=\"application/ld+json\" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, '\\\\u003c') }} />`. Do not use `next/script` for it.",
+              "If the page already renders such an object without `description`, add the property there instead of a second node.",
+              "Confirm the block is in the HTML response, which is what the check and the verify command read. An empty `description` does not pass."
+            ],
+            "keep": [
+              "Keep each page's URL and its H1.",
+              "Keep the node's other properties and the page's other JSON-LD nodes as they are.",
+              "Keep the visible content unchanged: the description summarises what the page already says and adds no claim of its own."
+            ],
+            "verify": {
+              "command": "curl -sS -A 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36; compatible; OAI-SearchBot/1.4; +https://openai.com/searchbot' 'https://built-site.test/collections/camp-kitchen' | tr '\\r\\n<' '  \\n' | awk 'tolower($0)~/^script[^>]*application\\/ld\\+json/&&$0~/\"@type\"[ \\t]*:[ \\t]*(\\[[^]]*)?\"(https?:\\/\\/schema\\.org\\/)?([A-Za-z]*(Page|Article|BlogPosting|SocialMediaPosting)|Product|ProductModel|IndividualProduct|Service|Event|Recipe|HowTo|Course|TouristTrip|Car|Vehicle)\"/&&$0~/\"description\"[ \\t]*:[ \\t]*\"[ \\t]*[^\" \\t]/{f=1}END{exit !f}'",
+              "expect": "Exit status 0 when one JSON-LD block of the first failing page holds a type about the page itself and a `description` that is not empty; the audit's check failed that page. It requests as OAI-SearchBot, which the site serves today. The command does not tell which node of the block the description is on. The audit's next check applies the full rule to every page of the template.",
+              "ua": "OAI-SearchBot"
+            }
+          }
+        ]
+      },
       "gone": null
     },
     {
@@ -31455,7 +31571,65 @@
       },
       "effort": null,
       "before_after": [],
-      "packet": null,
+      "packet": {
+        "framework": "generic",
+        "frameworks": [
+          "generic",
+          "nextjs"
+        ],
+        "context": [
+          "The check `schema_with_description` fails on 2 of the 2 pages of the template `/journal/{slug}` it was decided on.",
+          "The check passes a page when a JSON-LD node about the page itself has a `description` that is not empty. Such a node has an `@type` like `WebPage`, `Article`, `BlogPosting`, `Product`, `Service`, `Event`, or another type whose name ends in `Page` or `Article`.",
+          "A page with no JSON-LD fails. A description on a node about the site or the business (`WebSite`, `Organization`) does not count, and neither does the meta description.",
+          "Failing pages: `https://built-site.test/journal/forged-steel-pegs`, `https://built-site.test/journal/peg-materials-compared`.",
+          "The check does not count towards a grade yet, so this fix moves no grade today."
+        ],
+        "change": [
+          "In the template `/journal/{slug}`, find the `<script type=\"application/ld+json\">` block the server sends. If it has a node whose `@type` describes the page itself (`Product` on a product page, `Article` or `BlogPosting` on an article, `WebPage` otherwise), add a `description` property to that node.",
+          "If the template sends no such node, add one in a `<script type=\"application/ld+json\">` element, with `@context`, `@type`, `name` and `description`.",
+          "Fill `description` from the page's own summary field (the one its meta description or excerpt comes from), as plain text. An empty string or one of only spaces does not pass.",
+          "Write the value with the platform's JSON encoder, so a quote or a line break in the text cannot break the block; a block that does not parse declares nothing.",
+          "Send the block in the HTML response. The check does not run scripts, so markup a script adds in the browser is not read."
+        ],
+        "keep": [
+          "Keep each page's URL and its H1.",
+          "Keep the node's other properties and the page's other JSON-LD nodes as they are.",
+          "Keep the visible content unchanged: the description summarises what the page already says and adds no claim of its own."
+        ],
+        "verify": {
+          "command": "curl -sS -A 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36; compatible; OAI-SearchBot/1.4; +https://openai.com/searchbot' 'https://built-site.test/journal/forged-steel-pegs' | tr '\\r\\n<' '  \\n' | awk 'tolower($0)~/^script[^>]*application\\/ld\\+json/&&$0~/\"@type\"[ \\t]*:[ \\t]*(\\[[^]]*)?\"(https?:\\/\\/schema\\.org\\/)?([A-Za-z]*(Page|Article|BlogPosting|SocialMediaPosting)|Product|ProductModel|IndividualProduct|Service|Event|Recipe|HowTo|Course|TouristTrip|Car|Vehicle)\"/&&$0~/\"description\"[ \\t]*:[ \\t]*\"[ \\t]*[^\" \\t]/{f=1}END{exit !f}'",
+          "expect": "Exit status 0 when one JSON-LD block of the first failing page holds a type about the page itself and a `description` that is not empty; the audit's check failed that page. It requests as OAI-SearchBot, which the site serves today. The command does not tell which node of the block the description is on. The audit's next check applies the full rule to every page of the template.",
+          "ua": "OAI-SearchBot"
+        },
+        "packets": [
+          {
+            "framework": "nextjs",
+            "context": [
+              "The check `schema_with_description` fails on 2 of the 2 pages of the template `/journal/{slug}` it was decided on.",
+              "The check passes a page when a JSON-LD node about the page itself has a `description` that is not empty. Such a node has an `@type` like `WebPage`, `Article`, `BlogPosting`, `Product`, `Service`, `Event`, or another type whose name ends in `Page` or `Article`.",
+              "A page with no JSON-LD fails. A description on a node about the site or the business (`WebSite`, `Organization`) does not count, and neither does the meta description.",
+              "Failing pages: `https://built-site.test/journal/forged-steel-pegs`, `https://built-site.test/journal/peg-materials-compared`.",
+              "The check does not count towards a grade yet, so this fix moves no grade today."
+            ],
+            "change": [
+              "In the `page.js` (or `layout.js`) that renders `/journal/{slug}`, build the object for the page's own node: `{ '@context': 'https://schema.org', '@type': …, name: …, description: … }`, with `description` from the same data the page renders its summary from.",
+              "Render it in the component's output as a native script element: `<script type=\"application/ld+json\" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, '\\\\u003c') }} />`. Do not use `next/script` for it.",
+              "If the page already renders such an object without `description`, add the property there instead of a second node.",
+              "Confirm the block is in the HTML response, which is what the check and the verify command read. An empty `description` does not pass."
+            ],
+            "keep": [
+              "Keep each page's URL and its H1.",
+              "Keep the node's other properties and the page's other JSON-LD nodes as they are.",
+              "Keep the visible content unchanged: the description summarises what the page already says and adds no claim of its own."
+            ],
+            "verify": {
+              "command": "curl -sS -A 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36; compatible; OAI-SearchBot/1.4; +https://openai.com/searchbot' 'https://built-site.test/journal/forged-steel-pegs' | tr '\\r\\n<' '  \\n' | awk 'tolower($0)~/^script[^>]*application\\/ld\\+json/&&$0~/\"@type\"[ \\t]*:[ \\t]*(\\[[^]]*)?\"(https?:\\/\\/schema\\.org\\/)?([A-Za-z]*(Page|Article|BlogPosting|SocialMediaPosting)|Product|ProductModel|IndividualProduct|Service|Event|Recipe|HowTo|Course|TouristTrip|Car|Vehicle)\"/&&$0~/\"description\"[ \\t]*:[ \\t]*\"[ \\t]*[^\" \\t]/{f=1}END{exit !f}'",
+              "expect": "Exit status 0 when one JSON-LD block of the first failing page holds a type about the page itself and a `description` that is not empty; the audit's check failed that page. It requests as OAI-SearchBot, which the site serves today. The command does not tell which node of the block the description is on. The audit's next check applies the full rule to every page of the template.",
+              "ua": "OAI-SearchBot"
+            }
+          }
+        ]
+      },
       "gone": null
     }
   ],
