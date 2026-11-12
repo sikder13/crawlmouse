@@ -24,7 +24,12 @@ interface Body {
   context: string[];
   change: string[];
   keep: string[];
-  verify: { command: string; expect: string };
+  verify: {
+    command: string;
+    expect: string;
+    /** The readable command with what it prints today and after the fix; null on a packet without one. */
+    see: { command: string; today: string; after: string } | null;
+  };
 }
 /** A packet: the body for its own framework, and in `packets` the bodies for the others. */
 interface Packet extends Body {
@@ -37,7 +42,10 @@ const FIXTURE = JSON.parse(
   ),
 ) as { fixes: { title: string; packet: Packet | null }[] };
 
-/** The lines of each body of the packet of the fix whose title the page heads with. */
+/**
+ * The lines of each body of the packet of the fix whose title the page heads with, the three of a
+ * body's readable command among them where it has one.
+ */
 function packetOf(title: string): string[] {
   const fix = FIXTURE.fixes.find((f) => `${f.title}.` === title || f.title === title);
   if (!fix?.packet) throw new Error(`No fix with a packet is titled "${title}"`);
@@ -47,6 +55,7 @@ function packetOf(title: string): string[] {
     ...b.keep,
     b.verify.command,
     b.verify.expect,
+    ...(b.verify.see ? [b.verify.see.command, b.verify.see.today, b.verify.see.after] : []),
   ]);
 }
 

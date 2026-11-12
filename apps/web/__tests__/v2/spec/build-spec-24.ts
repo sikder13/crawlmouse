@@ -5,11 +5,12 @@ import { FixTypeSchema } from '@crawlmouse/types/v2';
 import { FIXTURE_NAMES, findCheck, fixesAsOf, fixture } from '../../../lib/v2/fixtures';
 import { ADDITIONS, COPY_CHANGES } from '../../../lib/v2/copy-registry';
 import { FIX_MAP_INVENTORY } from '../../../lib/v2/view/fix-map-inventory';
-import { FRAMEWORK_LABELS } from '../../../lib/v2/view/fix';
+import { fixView, FRAMEWORK_LABELS } from '../../../lib/v2/view/fix';
 import { FREE_FIXES, freeFixes } from '../../../lib/v2/view/free-fixes';
 import { noPacketLine } from '../../../lib/v2/view/no-packet';
 import { noPacketReason } from '../../../lib/v2/view/packet-reason';
-import { packetBodies } from '../../../lib/v2/view/segment/fixes';
+import { packetBodies, PROMPT_TITLE_LABEL } from '../../../lib/v2/view/segment/fixes';
+import { withSee } from '../../../lib/v2/view/test-support/multi-body';
 import { EXPLORER_SVG_MAX } from '../../../lib/v2/view/link-map';
 import { EXPLORER_KEYS } from '../../../components/v2/screens/map/keys';
 import { previewAllowed } from '../../../app/(v2-preview)/v2-preview/_preview/guard';
@@ -195,7 +196,7 @@ function frameworkSection(): string {
     '',
     '### The packet route',
     '',
-    '`GET /api/fixes/[id]/packet` (`packet` in `apps/web/lib/v2/account/fixes.ts`) answers `{packet, prompt}`: the stored packet and the prompt of its own framework’s body. With `?framework=` it answers `{body, prompt}` for the body written for that framework, and 404 `no_packet_for_framework` for a value the packet holds no body for. The tier’s 402 and the 404 `no_packet` are decided before the framework is looked at. Verify: `pnpm --filter @crawlmouse/web exec vitest run "app/api/fixes/[id]/packet/route.test.ts"`.',
+    '`GET /api/fixes/[id]/packet` (`packet` in `apps/web/lib/v2/account/fixes.ts`) answers `{packet, prompt}`: the stored packet and the prompt of its own framework’s body. With `?framework=` it answers `{body, prompt}` for the body written for that framework, and 404 `no_packet_for_framework` for a value the packet holds no body for. The tier’s 402 is decided first, so a fix the tier does not open answers 402 whether or not it has a packet; then the 404 `no_packet`; both before the framework is looked at. Verify: `pnpm --filter @crawlmouse/web exec vitest run "app/api/fixes/[id]/packet/route.test.ts"`.',
   ].join('\n');
 }
 
@@ -226,6 +227,45 @@ function noPacketSection(): string {
       : []),
     '',
     'The prompt and the blocks put each packet string and the fix’s title on one line (`oneLine` in `apps/web/lib/v2/packet-text.ts`), so a packet stored with a line break or a control character in a string adds no line to what is copied. Verify: `pnpm --filter @crawlmouse/web exec vitest run lib/v2/view/segment/fixes.property.test.ts lib/v2/packet-text.test.ts`.',
+  ].join('\n');
+}
+
+function verifyLayersSection(): string {
+  // No contract fixture's packet has a readable command, so the example gives one a hand-made one.
+  const withOne = FIXTURE_NAMES.flatMap((name) => fixture(name).fixes).filter(
+    (f) => f.packet !== null && f.packet.verify.see !== null,
+  ).length;
+  const source = FIX_SOURCES['bad-site'];
+  const d = structuredClone(fixture(source.fixture));
+  const f = d.fixes.find((x) => x.id === fixIdOf('bad-site'))!;
+  f.packet = withSee(f.packet!);
+  const view = fixView(d, source.check, f.id, { asFirstSeen: source.asFirstSeen });
+  if (view.kind !== 'open' || !view.packet) throw new Error('the bad site’s fix opens');
+  const body = view.packet.bodies[0]!;
+  const after = (lines: string[], from: (l: string) => boolean) =>
+    lines.filter((_, i) => i >= lines.findIndex(from));
+  const block = after(body.block.split('\n'), (l) => l === 'Verify');
+  const prompt = after(body.prompt.split('\n'), (l) => l.startsWith('Verify'));
+  return [
+    '## The two verify layers',
+    '',
+    'A packet body’s `verify.see` is a short command that prints the evidence, with what it prints today and after the fix (`{ command, today, after }`), or null (owner rulings 1 and Q8). Where it is not null, the block (`packetBlock` in `apps/web/lib/v2/view/fix.ts`), the segment’s open fix and the prompt (`verifyLines` in `apps/web/lib/v2/view/segment/fixes.ts`) show two layers: “See it”, then “Exact check” with the strict command. “Download as .md” saves the prompt. Where it is null, the verify section is the strict command and what to expect, as before.',
+    '',
+    `Of the packets in the contract fixtures, ${withOne} ${withOne === 1 ? 'has' : 'have'} a readable command. The example below is the bad site’s fix ${f.number} with a hand-made one (\`withSee\` in \`apps/web/lib/v2/view/test-support/multi-body.ts\`): first the block’s Verify section, then the prompt’s.`,
+    '',
+    '```text',
+    ...block,
+    '```',
+    '',
+    '```text',
+    ...prompt,
+    '```',
+    '',
+    'On the fix page the strict command (the view’s `exactLine`) is one unwrapped line in a strip that scrolls sideways (`ScrollRegion`, a named tab stop while the command overflows it); the rest of the block wraps. The command is in the HTML once and whole. `PacketBlock` in `apps/web/components/v2/screens/fix/PacketChoice.tsx`; the rules are `.exact` and `.exactLine` in `FixScreen.module.css`.',
+    '',
+    `A prompt’s first line is \`${PROMPT_TITLE_LABEL} "…"\`: the fix’s title on one line in straight double quotes, with each quotation mark in it (\`" “ ” „ ‟ « »\`) written as an apostrophe and backslashes at its end dropped (\`promptTitle\`).`,
+    '',
+    'Verify: `pnpm --filter @crawlmouse/web exec vitest run lib/v2/view/fix.test.ts lib/v2/view/segment/fixes.test.ts lib/v2/view/segment/fixes.property.test.ts __tests__/v2/fix.test.tsx __tests__/v2/explorer.dom.test.tsx __tests__/v2/fix-words.test.tsx`. The last of these also scans the fix page’s own text, on each live fix of the bad, built and challenged fixtures, for a count of one before a plural and for a word shaped like an enum value or key (owner rulings 2 and 3); it leaves the packet’s strings, which are the engine’s, to the engine’s tests.',
   ].join('\n');
 }
 
@@ -447,6 +487,8 @@ export async function buildSpec24(): Promise<string> {
     freeSection(),
     '',
     frameworkSection(),
+    '',
+    verifyLayersSection(),
     '',
     noPacketSection(),
     '',
