@@ -19,6 +19,7 @@ import {
   type Person,
   type ScopeWorld,
 } from '../../lib/v2/account/sites-test-support';
+import { sitesFullMessage } from '../../lib/v2/agency/gates';
 import { agencyAccount } from '../../lib/v2/agency/test-support';
 import type { AgencyHomeView } from '../../lib/v2/view/agency-matrix';
 
@@ -60,7 +61,10 @@ afterEach(() => {
   h.chosen = null;
 });
 
-type Screen = ReactElement<{ data: AgencyHomeView; notice?: { code: string } | null }>;
+type Screen = ReactElement<{
+  data: AgencyHomeView;
+  notice?: { code: string; text: string } | null;
+}>;
 
 /** The page as `p` gets it, acting in `chosen` (their default account when null). */
 async function open(p: Person | null, chosen: string | null = null, search = {}) {
@@ -138,6 +142,11 @@ describe('/agency', () => {
     const screen = await open(w.owner, null, { notice: 'site_exists' });
     expect(screen.props.notice).toMatchObject({ code: 'site_exists' });
     expect((await open(w.owner)).props.notice).toBeNull();
+  });
+
+  it('a client refused because the plan’s sites are all in use is told so from the gate messages', async () => {
+    const screen = await open(w.owner, null, { notice: 'upgrade_required' });
+    expect(screen.props.notice?.text).toBe(sitesFullMessage('agency'));
   });
 });
 

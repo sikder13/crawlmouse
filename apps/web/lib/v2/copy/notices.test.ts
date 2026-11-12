@@ -1,6 +1,7 @@
 /** The line a page shows when a form posted from it was refused (CC-26b follow-up). */
 import { describe, expect, it } from 'vitest';
 import { NOTICE_CODES } from '../account/route';
+import { gateMessage, sitesFullMessage } from '../agency/gates';
 import { NOTICE_LINES, noticeLine } from './notices';
 
 const NEXT = '2026-11-10T13:30:00.000Z';
@@ -120,7 +121,32 @@ describe('noticeLine', () => {
     ).toMatch(/run Tue 08:30\.$/);
   });
 
+  it('on a page that names the account’s tier, a refused add is told the sites its plan keeps and the plan that lifts it', () => {
+    const line = (tier: 'free' | 'pro' | 'agency') =>
+      noticeLine({ notice: 'upgrade_required' }, ZONE, tier)!.text;
+    expect(line('free')).toBe(gateMessage('sites', 'free'));
+    expect(line('pro')).toBe(gateMessage('sites', 'pro'));
+    expect(line('agency')).toBe(sitesFullMessage('agency'));
+    // The sentences today, written out once: the second site on Free, the sixth on Pro.
+    expect(line('free')).toBe('Free keeps 1 site. Pro keeps 5 sites: Pro is $19 a month.');
+    expect(line('pro')).toBe('Pro keeps 5 sites. Agency keeps 25 sites: Agency is $99 a month.');
+  });
+
+  it('the tier changes no other line, and a page that names none keeps the general one', () => {
+    for (const code of NOTICE_CODES.filter((c) => c !== 'upgrade_required')) {
+      expect(noticeLine({ notice: code, next: NEXT }, ZONE, 'free')).toEqual(
+        noticeLine({ notice: code, next: NEXT }, ZONE),
+      );
+    }
+    expect(noticeLine({ notice: 'upgrade_required' }, ZONE)!.text).toBe('That needs a paid plan.');
+  });
+
+  it('the general line for a refused upgrade holds no price and no limit', () => {
+    expect(NOTICE_LINES.upgrade_required(null)).not.toMatch(/\d/);
+  });
+
   it('an unknown notice, or none, shows nothing', () => {
+    expect(noticeLine({ notice: '<script>' }, ZONE, 'free')).toBeNull();
     expect(noticeLine({ notice: '<script>' }, ZONE)).toBeNull();
     expect(noticeLine({ notice: 'toString' }, ZONE)).toBeNull();
     expect(noticeLine({}, ZONE)).toBeNull();

@@ -35,13 +35,14 @@ export default async function AgencyPage({
   const r = await loadViewer();
   if (r.kind === 'signed_out') redirect('/login');
   if (r.kind !== 'viewer') return <AccountStateScreen state={r.kind} />;
-  const { account, seat, accounts } = r.viewer;
+  const { account, seat, accounts, tier } = r.viewer;
   const { d, viewer } = await readAccount(await supabaseServer(), account.id, seat.id, new Date());
   return (
     <LiveActions>
       <MatrixScreen
         data={agencyHomeView(d, viewer, { accounts })}
-        notice={noticeLine(await searchParams, account.timezone)}
+        // The form a plan's limit refuses here is the add-client form: its notice names the limit.
+        notice={noticeLine(await searchParams, account.timezone, tier)}
       />
     </LiveActions>
   );

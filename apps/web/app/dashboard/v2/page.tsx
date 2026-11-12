@@ -38,13 +38,14 @@ export default async function V2Dashboard({
   const r = await loadViewer();
   if (r.kind === 'signed_out') redirect('/login');
   if (r.kind !== 'viewer') return <AccountStateScreen state={r.kind} />;
-  const { account, seat, accounts } = r.viewer;
+  const { account, seat, accounts, tier } = r.viewer;
   const { d, viewer } = await readAccount(await supabaseServer(), account.id, seat.id, new Date());
   return (
     <LiveActions>
       <DashboardScreen
         data={withSwitcher(dashboardView(d, viewer), accounts, account.id)}
-        notice={noticeLine(await searchParams, account.timezone)}
+        // The form a plan's limit refuses here is the add-site form: its notice names the limit.
+        notice={noticeLine(await searchParams, account.timezone, tier)}
       />
     </LiveActions>
   );

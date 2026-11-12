@@ -3,6 +3,8 @@
  * (`NOTICE_CODES` in lib/v2/account/route.ts, which sends the form back with `?notice=`). The
  * compiler holds the two lists to one set. A code outside it shows nothing.
  */
+import type { Tier } from '../../entitlement-v2';
+import { sitesFullMessage } from '../agency/gates';
 import type { Addition } from '../copy-registry';
 import { weekdayTime } from '../format';
 import { noticeOf, type NoticeCode } from '../account/route';
@@ -67,13 +69,24 @@ export const NOTICE_LINES: Record<NoticeCode, (at: string | null) => string> = {
   invalid: () => 'That request was not understood, so nothing was changed.',
 };
 
-/** The line for a page's search params, or null when they carry no notice of ours. */
+/**
+ * The line for a page's search params, or null when they carry no notice of ours.
+ *
+ * `sitesOn` is the account's tier, given by a page where the add-site form is the form a plan's
+ * limit refuses (the dashboard, the client matrix). There `upgrade_required` is said as the gate
+ * message for sites (`sitesFullMessage`, whose numbers are GATES' and prices.ts's). A page that
+ * gives none keeps the code's general line: the address carries the code, not which gate refused.
+ */
 export function noticeLine(
   params: Readonly<Record<string, string | string[] | undefined>>,
   zone: string,
+  sitesOn?: Tier,
 ): { code: NoticeCode; text: string } | null {
   const n = noticeOf(params);
   if (n === null) return null;
+  if (n.code === 'upgrade_required' && sitesOn !== undefined) {
+    return { code: n.code, text: sitesFullMessage(sitesOn) };
+  }
   return { code: n.code, text: NOTICE_LINES[n.code](n.next ? weekdayTime(n.next, zone) : null) };
 }
 
