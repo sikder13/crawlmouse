@@ -5,9 +5,15 @@
  * sizes come from `byte_count`. Making a report needs `GATES[tier].exports`; without it the card
  * offers the plans instead. The site the card makes reports for is the page's `?site=`, by default
  * the primary site.
+ *
+ * A live page hands the view what the records do not hold (`ReportsSide`): each report's file state,
+ * whether the reader's role may share, and a link just made. With the file states given, a report is
+ * offered for download, opening or sharing only when its file is stored; a pending one and a failed
+ * one say so and offer nothing. A proof page (`html`) opens at `/reports/<id>`.
  */
 import { instant, type Check, type Report } from '@crawlmouse/types/v2';
 import { GATES, type Tier } from '../../entitlement-v2';
+import { gateMessage } from '../agency/gates';
 import {
   RAW_FORMATS,
   RAW_TYPES,
@@ -32,13 +38,38 @@ import { routeAction } from './settings';
 
 export { SHARE_LINK_DAYS } from '../copy/reports';
 
+/** Where a proof page is read by a member: `app/reports/[id]/page.tsx`. */
+const PROOF_ROUTE = '/reports/[id]';
+
+/** Whether a report's file is in the bucket yet (`reports.file_state`). */
+export type FileState = 'pending' | 'stored' | 'failed';
+
+/** What a live page knows that the account's records do not hold. */
+export interface ReportsSide {
+  /**
+   * Each report's file state, by report id. Given, a report that is not `stored` in it has no
+   * download, no Open and no share link. Left out (a preview), a row's own columns decide.
+   */
+  fileStates?: ReadonlyMap<string, FileState>;
+  /** Whether the reader's role may make and withdraw a share link; a preview reads as the owner. */
+  mayShare?: boolean;
+  /** A share link made a moment ago, shown once on its report's row. */
+  madeLink?: { reportId: string; url: string } | null;
+}
+
 export interface MadeRowView {
   key: string;
   made: string;
   site: string;
   type: string;
   covers: string;
+  /** "Being made" or "Could not be made", for a report whose file is not stored. */
+  state: string | null;
   actions: ActionView[];
+  /** A share link that works, where the reader is not offered a new one: "Link · until <date>". */
+  linkUntil: string | null;
+  /** The address of a share link just made for this report. */
+  madeLink: { label: string; url: string } | null;
 }
 
 export interface ScheduledRowView {
@@ -57,6 +88,8 @@ export interface ReportsView {
   make: {
     title: string;
     sub: string;
+    /** The plan that makes reports, where the account's does not. */
+    gate: string | null;
     /** The site picker: a GET form to `base` that reloads the card for another site. */
     sites: { value: string; label: string }[];
     selected: string;
@@ -103,6 +136,7 @@ export function reportsView(
   query: { site?: string },
   /** The page the site picker reloads: `/reports`, or a preview's path. */
   base: string,
+  side: ReportsSide = {},
 ): ReportsView {
   const v = viewAt(d, viewer);
   const zone = v.account.timezone;
@@ -183,29 +217,51 @@ export function reportsView(
           : null;
     return [what, by].filter(Boolean).join(' · ');
   };
+  const stateOf = (r: Report): FileState | null => side.fileStates?.get(r.id) ?? null;
+  /** Whether the report has a file to hand over: the page's word for it, else the row's own. */
+  const hasFile = (r: Report): boolean =>
+    side.fileStates ? stateOf(r) === 'stored' : r.byte_count !== null || r.format === 'html';
+  const mayShare = side.mayShare ?? true;
+  /** A new link needs the plan's exports as well as the role; withdrawing one needs the role. */
+  const mayLink = mayShare && v.gates.exports;
+  const sharedUntil = (r: Report): string | null =>
+    hasFile(r) && r.share_expires_at !== null && at(r.share_expires_at) > at(v.now)
+      ? COPY.link(dayDate(r.share_expires_at, zone))
+      : null;
   const rowActions = (r: Report): ActionView[] => {
+    if (!hasFile(r)) return [];
     const ctx = `${REPORT_TYPES[r.kind as keyof typeof REPORT_TYPES] ?? RAW_TYPES[r.format]}, ${when(r.created_at)}`;
-    const get =
-      r.byte_count !== null
-        ? routeAction(
+    const get: ActionView =
+      r.format === 'html'
+        ? {
+            label: COPY.open,
+            route: PROOF_ROUTE,
+            href: PROOF_ROUTE.replace('[id]', r.id),
+            method: 'get',
+            fields: {},
+            primary: false,
+            context: ctx,
+          }
+        : routeAction(
             'reportDownload',
-            COPY.download(fileSize(r.byte_count)),
+            r.byte_count === null ? COPY.downloadFile : COPY.download(fileSize(r.byte_count)),
             { id: r.id },
             { context: ctx },
-          )
-        : r.format === 'html'
-          ? routeAction('reportDownload', COPY.open, { id: r.id }, { context: ctx })
-          : null;
-    const share =
-      r.share_expires_at && at(r.share_expires_at) > at(v.now)
+          );
+    const until = sharedUntil(r);
+    const link = mayLink
+      ? routeAction('reportShare', until ?? COPY.makeLink, { id: r.id }, { context: ctx })
+      : null;
+    const withdraw =
+      mayShare && until !== null
         ? routeAction(
             'reportShare',
-            COPY.link(dayDate(r.share_expires_at, zone)),
+            COPY.withdrawLink,
             { id: r.id },
-            { context: ctx },
+            { fields: { _method: 'DELETE' }, context: ctx },
           )
         : null;
-    return [get, share].filter((a): a is ActionView => a !== null);
+    return [get, link, withdraw].filter((a): a is ActionView => a !== null);
   };
   const typeOf = (r: Report) =>
     r.kind === 'raw_export' ? RAW_TYPES[r.format] : REPORT_TYPES[r.kind];
@@ -224,6 +280,7 @@ export function reportsView(
           ? COPY.makeSub(chosen.host, when(latest.finished_at!))
           : COPY.makeNoCheck(chosen.host)
         : COPY.noSites,
+      gate: v.tier === 'agency' ? null : gateMessage('exports', v.tier),
       sites: sites.map((s) => ({ value: s.id, label: s.host })),
       selected: chosen?.id ?? '',
       pick: { href: base, label: COPY.siteLabel, show: COPY.show },
@@ -242,7 +299,7 @@ export function reportsView(
         action:
           canMake && pair.length === 2
             ? {
-                ...make('compare', COPY.makeCompare, { previousCheckId: pair[0]!.id }),
+                ...make('compare', COPY.makeCompare, { beforeCheckId: pair[0]!.id }),
                 context: twoDates(pair).replace(/\.$/, ''),
               }
             : null,
@@ -264,7 +321,13 @@ export function reportsView(
         site: host.get(r.site_id) ?? '',
         type: typeOf(r),
         covers: coversOf(r),
+        state: COPY.fileStates[stateOf(r) ?? 'stored'],
         actions: rowActions(r),
+        linkUntil: mayLink ? null : sharedUntil(r),
+        madeLink:
+          side.madeLink?.reportId === r.id && hasFile(r)
+            ? { label: COPY.madeLink, url: side.madeLink.url }
+            : null,
       })),
       foot: COPY.madeFoot(SHARE_LINK_DAYS, exportsPlan),
       empty: made.length ? null : COPY.madeEmpty,
@@ -280,7 +343,11 @@ export function reportsView(
         to: r.recipient_email ?? '',
         status: COPY.statusWords[r.status as 'scheduled' | 'held'],
       })),
-      foot: branding?.sender_email ? COPY.sentFrom(branding.sender_email) : COPY.scheduledFoot,
+      foot: branding?.sender_email
+        ? COPY.sentFrom(branding.sender_email)
+        : v.tier === 'agency'
+          ? COPY.scheduledAgency
+          : gateMessage('clientReports', 'pro')!,
       compare: v.gates.agencyBranding ? null : pricing,
     },
   };
