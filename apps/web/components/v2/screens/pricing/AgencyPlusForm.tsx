@@ -19,6 +19,9 @@ export type ContactState = 'idle' | 'sending' | 'sent' | { error: string };
  * Turnstile token when a site key is configured; a token works once, so the widget is reset after
  * each answer. Not the orange element: the row it belongs to carries none.
  */
+/** Where the form posts its JSON; marked on the form as `data-endpoint` so a test can resolve it. */
+export const AGENCY_PLUS_ENDPOINT = '/api/contact/agency-plus';
+
 export function AgencyPlusForm({ initial = 'idle' }: { initial?: ContactState }) {
   const ids = useId();
   const widget = useRef<TurnstileInstance | undefined>(undefined);
@@ -35,7 +38,7 @@ export function AgencyPlusForm({ initial = 'idle' }: { initial?: ContactState })
     const note = value('note');
     setState('sending');
     try {
-      const res = await fetch('/api/contact/agency-plus', {
+      const res = await fetch(AGENCY_PLUS_ENDPOINT, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
@@ -68,7 +71,12 @@ export function AgencyPlusForm({ initial = 'idle' }: { initial?: ContactState })
   }
   const error = typeof state === 'object' ? (COPY.errors[state.error] ?? COPY.errors.failed) : null;
   return (
-    <form className={styles.form} aria-label={COPY.formTitle} onSubmit={submit}>
+    <form
+      className={styles.form}
+      aria-label={COPY.formTitle}
+      data-endpoint={AGENCY_PLUS_ENDPOINT}
+      onSubmit={submit}
+    >
       <Field
         id={`${ids}-email`}
         name="email"

@@ -110,6 +110,12 @@ export interface PricingView {
     link: string;
     formTitle: string;
     reply: TaggedView;
+    /**
+     * Whether the contact form is offered: its route answers 404 unless V2_CHECKS_PUBLIC is on as well
+     * as V2_BILLING (the mailer runs under the former). Without it the card gives the inbox to write to.
+     */
+    form: boolean;
+    inbox: string;
   };
   after: {
     title: string;
@@ -304,6 +310,8 @@ export function pricingView(
       link: COPY.agencyPlus.link,
       formTitle: COPY.agencyPlus.formTitle,
       reply: tagged(COPY.agencyPlus.reply),
+      form: flags.checksPublic,
+      inbox: COPY.agencyPlus.inbox,
     },
     after: {
       title: COPY.after.title(pro.trial),

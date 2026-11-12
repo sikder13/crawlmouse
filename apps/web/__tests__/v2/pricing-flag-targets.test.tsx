@@ -78,6 +78,10 @@ function targets(html: string): string[] {
   const raw = [
     ...[...doc.querySelectorAll('a[href]')].map((a) => a.getAttribute('href')!),
     ...[...doc.querySelectorAll('form[action]')].map((f) => f.getAttribute('action')!),
+    // A form that posts with fetch names its route in data-endpoint (AgencyPlusForm).
+    ...[...doc.querySelectorAll('form[data-endpoint]')].map(
+      (f) => f.getAttribute('data-endpoint')!,
+    ),
   ];
   return raw
     .filter((t) => !t.startsWith('#') && !t.startsWith('mailto:'))

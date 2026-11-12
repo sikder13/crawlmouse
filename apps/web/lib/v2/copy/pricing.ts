@@ -309,6 +309,8 @@ export const PRICING_COPY = {
     price: () => `from ${usd(AGENCY_PLUS.fromMonthly)} a month`,
     link: 'Send a request',
     formTitle: 'Tell us about your agency',
+    /** Offered in place of the form while its route is not served. */
+    inbox: 'support@crawlmouse.com',
     /** The request is mailed to this inbox (`agency_plus_contact`, AGENCY_PLUS_INBOX). */
     reply: {
       text: 'We reply from support@crawlmouse.com.',

@@ -141,8 +141,17 @@ export function PricingScreen({ view, contact }: { view: PricingView; contact?: 
             <Heading level={2} size="s">
               {view.agencyPlus.formTitle}
             </Heading>
-            <Capability as="p" item={view.agencyPlus.reply} comingLabel={view.comingLabel} />
-            <AgencyPlusForm initial={contact} />
+            {view.agencyPlus.form ? (
+              <>
+                <Capability as="p" item={view.agencyPlus.reply} comingLabel={view.comingLabel} />
+                <AgencyPlusForm initial={contact} />
+              </>
+            ) : (
+              <p>
+                Write to <a href={`mailto:${view.agencyPlus.inbox}`}>{view.agencyPlus.inbox}</a>{' '}
+                with your agency’s name and how many client sites you run.
+              </p>
+            )}
           </Card>
         </section>
 
