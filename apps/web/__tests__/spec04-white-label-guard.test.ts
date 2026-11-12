@@ -21,20 +21,23 @@ describe('white-label brand swap is wired on every branded surface (§5)', () =>
   });
 
   it('the OG card swaps its eyebrow to the white-label brand when set', () => {
-// SPEC 5.1a Stage 4 moved the OG card's DECISION (gone-gating, white-label eyebrow, and the
-// refusal to draw a grade slot without both a letter and a score) into lib/og-report-model.ts,
-// so it could be unit-tested against a payload rather than grepped. A PNG route has no payload a
-// test can read, which is why that extraction happened. These guards therefore read the route AND
-// the model it delegates to: together they are the OG card's implementation, and the contract each
-// asserts is unchanged.
+    // SPEC 5.1a Stage 4 moved the OG card's DECISION (gone-gating, white-label eyebrow, and the
+    // refusal to draw a grade slot without both a letter and a score) into lib/og-report-model.ts,
+    // so it could be unit-tested against a payload rather than grepped. A PNG route has no payload a
+    // test can read, which is why that extraction happened. These guards therefore read the route AND
+    // the model it delegates to: together they are the OG card's implementation, and the contract each
+    // asserts is unchanged.
     const og = read('app/r/[slug]/opengraph-image.tsx') + read('lib/og-report-model.ts');
     expect(og).toContain('whiteLabelBrandName');
     expect(og).toContain('report.white_label');
   });
 
   it('the deploy-order-safe read path carries white_label to the branded surfaces', () => {
-    const reports = read('lib/reports.ts');
-    expect(reports).toMatch(/EXTENDED_REPORT_COLS\s*=[^\n]*white_label/);
+    // The column sets are defined in lib/report-row.ts and read by lib/reports.ts (CC-29).
+    expect(read('lib/report-row.ts')).toMatch(/EXTENDED_REPORT_COLS\s*=[^\n]*white_label/);
+    expect(read('lib/reports.ts')).toMatch(
+      /import \{[^}]*EXTENDED_REPORT_COLS[^}]*\} from '\.\/report-row'/,
+    );
   });
 
   // SPEC 04.2 FIX 1 — the LEGACY (null-snapshot) branch was the surface 04.1 missed: ReportBrandHeader lived
