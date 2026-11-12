@@ -195,3 +195,15 @@ describe('the read-only API the page calls coming', () => {
     expect(`${view.h1} ${view.intro}`).not.toMatch(/\btoday\b|available now/i);
   });
 });
+
+// Owner ruling, rulings-3 Q37: the page says only what is true, and MCP is after v1
+// (OPERATING-RULES §8), so neither the write API nor the MCP server reads as being built.
+describe('the roadmap', () => {
+  it('reads the write API and the MCP server as planned, with no date', () => {
+    const rows = developersView().roadmap.rows;
+    const status = (start: string) => rows.find((r) => r.item.startsWith(start))?.status;
+    expect(status('Write API')).toBe('planned');
+    expect(status('MCP server')).toBe('planned');
+    for (const r of rows) expect(`${r.item} ${r.status}`).not.toMatch(/\b20\d\d\b|\bQ[1-4]\b/);
+  });
+});
