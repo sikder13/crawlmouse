@@ -39,6 +39,7 @@ vi.mock('@/lib/v2/pipeline/load', () => ({
 import { FirstCheckScreen } from '@/components/v2/screens/site/FirstCheckScreen';
 import { SiteScreen } from '@/components/v2/screens/site/SiteScreen';
 import { siteOfCaller } from '@/lib/v2/account/pages';
+import { dayDate, hourMinute } from '@/lib/v2/format';
 import SitePage from './page';
 
 let db: PGlite;
@@ -121,6 +122,29 @@ describe('/sites/[id] with V2_CHECKS_PUBLIC=1', () => {
     vi.stubEnv('V2_CHECKS_PUBLIC', '1');
     const page = children(await open(kept));
     expect(page.type).toBe(SiteScreen);
+  });
+
+  it('names the next check at the time sites.next_check_at holds (CC-28 D8)', async () => {
+    vi.stubEnv('V2_CHECKS_PUBLIC', '1');
+    await db.query(
+      `update public.sites set schedule_cadence = 'monthly', schedule_iso_weekday = 2,
+              schedule_hour_local = 7, schedule_offset_min = 41 where id = $1`,
+      [kept],
+    );
+    const { rows } = await db.query<{ at: Date; tz: string }>(
+      `select s.next_check_at as at, a.timezone as tz
+         from public.sites s join public.accounts a on a.id = s.account_id where s.id = $1`,
+      [kept],
+    );
+    const at = rows[0]!.at.toISOString();
+    const page = children(await open(kept)) as unknown as ReactElement<{
+      data: { header: { line: string } };
+    }>;
+    expect(page.props.data.header.line).toContain(
+      `next ${dayDate(at, rows[0]!.tz)} around ${hourMinute(at, rows[0]!.tz)}`,
+    );
+    // The monthly time the column holds: minute 41, which no weekly stand-in reads.
+    expect(hourMinute(at, rows[0]!.tz)).toMatch(/:41$/);
   });
 
   it('renders a site with no check yet as the first-check screen', async () => {

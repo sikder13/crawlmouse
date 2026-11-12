@@ -471,3 +471,29 @@ export async function setSiteAlertRule(
     rule: { kind: plan.kind, enabled: written.enabled, channels: written.channels },
   };
 }
+
+/**
+ * Each site's `next_check_at`, the time the scheduler's trigger set (CC-28 D4), by site id; null for a
+ * site with none. Over the service role, for site ids the page has already read through the caller's
+ * session.
+ */
+export async function readNextChecks(
+  admin: SupabaseClient,
+  siteIds: readonly string[],
+): Promise<Map<string, string | null>> {
+  if (siteIds.length === 0) return new Map();
+  const { data, error } = await admin
+    .from('sites')
+    .select('id, next_check_at')
+    .in('id', [...siteIds]);
+  if (error) throw new Error(`sites read failed: ${error.message}`);
+  const rows = z
+    .array(z.object({ id: z.string(), next_check_at: z.string().nullable() }))
+    .parse(data);
+  return new Map(
+    rows.map((r) => [
+      r.id,
+      r.next_check_at === null ? null : new Date(r.next_check_at).toISOString(),
+    ]),
+  );
+}

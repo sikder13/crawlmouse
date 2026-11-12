@@ -17,6 +17,7 @@ import {
   domainSlot,
   editSite,
   globalSlot,
+  readNextChecks,
   removeSite,
   supabaseAddSite,
   supabaseRequestRecheck,
@@ -518,5 +519,36 @@ describe('the daily ceiling and the per-domain bucket', () => {
     });
     expect((await add(false)).outcome).toBe('created');
     expect(await countIn(d.bucket, d.window_start)).toBe(5);
+  });
+});
+
+describe('readNextChecks (CC-28 D8)', () => {
+  it('answers each site’s next_check_at as the scheduler’s trigger set it, null for an unscheduled one', async () => {
+    const { accountId } = await account();
+    const timed = await site(accountId);
+    const untimed = await site(accountId);
+    await db.query(
+      `update public.sites set schedule_cadence = 'weekly', schedule_iso_weekday = 3,
+              schedule_hour_local = 6 where id = $1`,
+      [timed.id],
+    );
+    await db.query(
+      `update public.sites set schedule_cadence = null, schedule_iso_weekday = null,
+              schedule_hour_local = null where id = $1`,
+      [untimed.id],
+    );
+    const { rows } = await db.query<{ at: Date }>(
+      `select next_check_at as at from public.sites where id = $1`,
+      [timed.id],
+    );
+    expect(rows[0]!.at).toBeInstanceOf(Date);
+    const next = await readNextChecks(adminOver(db), [timed.id, untimed.id]);
+    expect(next).toEqual(
+      new Map([
+        [timed.id, rows[0]!.at.toISOString()],
+        [untimed.id, null],
+      ]),
+    );
+    expect(await readNextChecks(adminOver(db), [])).toEqual(new Map());
   });
 });

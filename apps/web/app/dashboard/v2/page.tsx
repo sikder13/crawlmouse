@@ -4,8 +4,10 @@ import { checksPublicEnabled } from '@/lib/auth/flags';
 import { AccountStateScreen } from '@/components/v2/screens/account/AccountStateScreen';
 import { LiveActions } from '@/components/v2/screens/account/LiveActions';
 import { DashboardScreen } from '@/components/v2/screens/dashboard/DashboardScreen';
+import { supabaseAdmin } from '@/lib/supabase/admin';
 import { supabaseServer } from '@/lib/supabase/server';
 import { readAccount } from '@/lib/v2/account/pages';
+import { readNextChecks } from '@/lib/v2/account/sites-store';
 import { loadViewer } from '@/lib/v2/account/viewer';
 import { reachedByRewrite } from '@/lib/v2/rewrite-target';
 import { dashboardView } from '@/lib/v2/view/dashboard';
@@ -38,10 +40,15 @@ export default async function V2Dashboard({
   if (r.kind !== 'viewer') return <AccountStateScreen state={r.kind} />;
   const { account, seat } = r.viewer;
   const { d, viewer } = await readAccount(await supabaseServer(), account.id, seat.id, new Date());
+  // The scheduler's own column (CC-28 D8), for the sites the caller's session read.
+  const next = await readNextChecks(
+    supabaseAdmin(),
+    d.sites.map((s) => s.id),
+  );
   return (
     <LiveActions>
       <DashboardScreen
-        data={dashboardView(d, viewer)}
+        data={dashboardView(d, viewer, next)}
         notice={noticeLine(await searchParams, account.timezone)}
       />
     </LiveActions>

@@ -5,9 +5,11 @@ import { LiveActions } from '@/components/v2/screens/account/LiveActions';
 import { FirstCheckScreen } from '@/components/v2/screens/site/FirstCheckScreen';
 import { SiteScreen } from '@/components/v2/screens/site/SiteScreen';
 import { checksPublicEnabled } from '@/lib/auth/flags';
+import { supabaseAdmin } from '@/lib/supabase/admin';
 import { supabaseServer } from '@/lib/supabase/server';
 import { isId } from '@/lib/v2/account/route';
 import { readAccount, siteOfCaller } from '@/lib/v2/account/pages';
+import { readNextChecks } from '@/lib/v2/account/sites-store';
 import { viewAt } from '@/lib/v2/view/account';
 import { accountShellView } from '@/lib/v2/view/account-shell';
 import { sitePage } from '@/lib/v2/view/site';
@@ -45,7 +47,8 @@ export default async function SitePage({
   const site = await siteOfCaller(session, user.id, id, now);
   if (site === null) notFound();
   const { d, viewer } = await readAccount(session, site.accountId, site.seatId, now);
-  const page = sitePage(d, viewer, id);
+  // The scheduler's own column (CC-28 D8), read once the caller's seat is established.
+  const page = sitePage(d, viewer, id, await readNextChecks(supabaseAdmin(), [id]));
   const notice = noticeLine(await searchParams, d.accounts[0]!.timezone);
   return (
     <LiveActions>
