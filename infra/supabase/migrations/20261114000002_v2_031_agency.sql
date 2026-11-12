@@ -173,8 +173,9 @@ $$;
 -- Writes one report a person asked for, waiting for its file: status 'ready', made_by 'user',
 -- file_state 'pending'. p holds account_id, site_id, kind, format and covers_check_ids, and may hold
 -- owner_seat_id and subject_fix_id; any other key, a kind this function does not make (audit_pdf as
--- pdf, compare as html, raw_export as csv, json or edge_list), more than two checks or a repeated
--- one raises 22023. The row is written only when, in the insert's own statement, the site is the
+-- pdf, compare as html, raw_export as csv, json or edge_list), more than two checks, two for a
+-- kind other than compare, a repeated one, or a fix without two checks of a compare raises 22023.
+-- The row is written only when, in the insert's own statement, the site is the
 -- account's, each id of covers_check_ids is a finished or partial check of that site, and
 -- subject_fix_id, when given, is a fix of that site; otherwise P0002. Returns the report's id.
 create or replace function public.create_report(p jsonb)
@@ -217,7 +218,7 @@ begin
                      or (v_kind = 'raw_export' and v_format in ('csv', 'json', 'edge_list')), false)
      or pg_catalog.cardinality(v_checks) not between 1 and 2
      or (pg_catalog.cardinality(v_checks) = 2 and (v_kind <> 'compare' or v_checks[1] = v_checks[2]))
-     or (v_fix is not null and v_kind <> 'compare') then
+     or (v_fix is not null and (v_kind <> 'compare' or pg_catalog.cardinality(v_checks) <> 2)) then
     raise exception 'create_report: not a report this function makes' using errcode = '22023';
   end if;
 

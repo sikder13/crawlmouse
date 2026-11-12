@@ -242,9 +242,10 @@ describe('create_report', () => {
   });
 
   it('writes nothing for a fix of another site', async () => {
+    const two = [w.site1.check, await checkIn(w.site1.id, 'partial')];
     await refusedAsMissing([
-      { kind: 'compare', format: 'html', subject_fix_id: w.site2.fix },
-      { kind: 'compare', format: 'html', subject_fix_id: randomUUID() },
+      { kind: 'compare', format: 'html', covers_check_ids: two, subject_fix_id: w.site2.fix },
+      { kind: 'compare', format: 'html', covers_check_ids: two, subject_fix_id: randomUUID() },
     ]);
   });
 
@@ -266,6 +267,7 @@ describe('create_report', () => {
         covers_check_ids: [w.site1.check, second, w.site1.check],
       },
       { subject_fix_id: w.site1.fix },
+      { kind: 'compare', format: 'html', subject_fix_id: w.site1.fix },
       { status: 'sent' },
       { storage_path: 'a/b.pdf' },
       { covers_check_ids: 'not-an-array' },
