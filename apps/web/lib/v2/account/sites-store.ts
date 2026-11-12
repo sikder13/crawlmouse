@@ -89,7 +89,9 @@ class NotQueued extends Error {
  * `request_capped_check` as its insert. Its bucketed check id makes a repeat inside the 2-minute
  * bucket find the row it wrote: while that check is queued the event is sent again with the same id
  * (Inngest drops the duplicate, and a send that failed the first time gets its retry); once it has
- * started the request is answered `check_running` and nothing is sent.
+ * started or ended, the request moves to the next 2-minute bucket (CC-28 D11) and is capped there like
+ * any other. `check_running` and `recently_checked` remain for a next bucket whose check has also left
+ * `queued`.
  */
 export function supabaseRequestRecheck(
   admin: SupabaseClient,
@@ -100,6 +102,8 @@ export function supabaseRequestRecheck(
     const deps: RequestDeps = {
       store: {
         requestSite: (siteId) => pipeline.requestSite(siteId),
+        // CC-28 D11: a bucket whose check has started gives way to the next bucket (request.ts).
+        checkStatus: (checkId) => pipeline.checkStatus!(checkId),
         insertQueued: async (row: QueuedCheck) => {
           const a = await call(
             admin,
