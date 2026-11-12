@@ -5,6 +5,8 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { applyAllMigrations, freshDb } from '../../../__tests__/helpers/pglite-migrations';
 import { personalAccount, signUp } from '../../../__tests__/helpers/v2-check-tables';
 import type { CancelAccounts, CancelStripe } from '../../billing/cancel';
+import { hashMailAddress } from '../mail/address-hash';
+import { MAIL_PEPPER_REFUSAL, MAIL_SENDS_KEY } from './erase';
 import { hashToken } from './tokens';
 import { purgePorts } from './deletion-ports';
 import { deletionBilling, purge } from './deletion-purge';
@@ -180,9 +182,16 @@ async function deleted({ due = true } = {}) {
 const queued = (userId: string) =>
   n(`select count(*) from public.pending_erasures where user_id = $1`, [userId]);
 
-function purgeOver(log: string[], stripe = stripeRecorder({}), over = {}) {
+const PEPPER = 'a-purge-test-pepper-of-32-characters';
+
+function purgeOver(
+  log: string[],
+  stripe = stripeRecorder({}),
+  over = {},
+  pepper: string | null = PEPPER,
+) {
   const captured: unknown[] = [];
-  const p = purgePorts(serviceClient(log, over), stripe.subscriptions, async (...a) => {
+  const p = purgePorts(serviceClient(log, over), stripe.subscriptions, pepper, async (...a) => {
     captured.push(a);
   });
   return { steps: purge(p), captured, stripe };
@@ -477,5 +486,42 @@ describe('the deletion’s billing steps', () => {
     expect(stripe.calls.filter((c) => c[0] === 'update')).toEqual([
       ['update', 'sub_r', { cancel_at_period_end: false }],
     ]);
+  });
+});
+
+describe('the purge and the mail rows found by address hash (CC-28 D9)', () => {
+  it('deletes the sends to the person’s address by its hash, and leaves another address’s', async () => {
+    const d = await deleted();
+    const send = (key: string, hash: string) =>
+      db.query(
+        `insert into public.email_sends (idempotency_key, kind, address_hash, account_id, status,
+                                         attempts, claimed_at, updated_at)
+         values ($1, 'check_notify', $2, null, 'failed', 1, now(), now())`,
+        [key, hash],
+      );
+    const theirs = hashMailAddress(PEPPER, d.email);
+    const others = hashMailAddress(PEPPER, `stranger-${serial}@example.com`);
+    await send(`purge-mail-${serial}-a`, theirs);
+    await send(`purge-mail-${serial}-b`, others);
+    const { steps } = purgeOver([]);
+    const out = await steps.purgeOne({ userId: d.userId, accounts: [d.accountId] });
+    expect(out.outcome).toBe('purged');
+    expect(out.counts![MAIL_SENDS_KEY]).toBe(1);
+    expect(
+      await n(`select count(*) from public.email_sends where address_hash = $1`, [theirs]),
+    ).toBe(0);
+    expect(
+      await n(`select count(*) from public.email_sends where address_hash = $1`, [others]),
+    ).toBe(1);
+  });
+
+  it('with no mail pepper the purge refuses and erases nothing', async () => {
+    const d = await deleted();
+    const { steps } = purgeOver([], stripeRecorder({}), {}, null);
+    const out = await steps.purgeOne({ userId: d.userId, accounts: [d.accountId] });
+    expect(out.outcome).toBe('refused');
+    expect(out.refusals).toContain(MAIL_PEPPER_REFUSAL);
+    expect(await n(`select count(*) from public.accounts where id = $1`, [d.accountId])).toBe(1);
+    expect(await queued(d.userId)).toBe(1);
   });
 });

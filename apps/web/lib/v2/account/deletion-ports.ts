@@ -15,10 +15,11 @@ import {
 import { supabaseCancelAccounts, type CancelStripe } from '../../billing/cancel';
 import { stripeAccount } from '../../billing/stripe-account';
 import { checkRateLimit } from '../../rate-limit';
+import { mailPepper } from '../mail/address-hash';
 import { accountCapture, type CaptureAccountEvent } from './account-events';
 import type { DeletionPorts, Rpc } from './deletion';
 import { deletionBilling, purge, type PurgePorts } from './deletion-purge';
-import type { ErasurePlan, ErasurePorts, StorageObject } from './erase';
+import type { ErasurePlan, ErasurePorts, MailRecordCounts, StorageObject } from './erase';
 
 type Env = Readonly<Record<string, string | undefined>>;
 
@@ -57,8 +58,15 @@ function authAdmin(sb: SupabaseClient) {
   };
 }
 
-/** The erasure over the service-role client; `requireDue` is the purge's, so its apply waits for the window. */
-export function serviceErasurePorts(sb: SupabaseClient, requireDue: boolean): ErasurePorts {
+/**
+ * The erasure over the service-role client; `requireDue` is the purge's, so its apply waits for the
+ * window. `pepper` is the mailer's (`mailPepper`); null makes the plan refuse.
+ */
+export function serviceErasurePorts(
+  sb: SupabaseClient,
+  requireDue: boolean,
+  pepper: string | null,
+): ErasurePorts {
   const rpc = serviceRpc(sb);
   return {
     plan: (target) =>
@@ -95,6 +103,9 @@ export function serviceErasurePorts(sb: SupabaseClient, requireDue: boolean): Er
       );
       return { counts: after.counts, storage: after.storage };
     },
+    mailPepper: pepper,
+    mailRecords: (hashes, apply) =>
+      rpc<MailRecordCounts>('erase_mail_records', { p_hashes: [...hashes], p_apply: apply }),
   };
 }
 
@@ -141,10 +152,14 @@ const lazyStripe = (env: Env): CancelStripe => ({
   },
 });
 
-/** The purge's ports over the service-role client and the v2 Stripe client's subscription calls. */
+/**
+ * The purge's ports over the service-role client and the v2 Stripe client's subscription calls;
+ * `pepper` is the mailer's, for the erasure's rows found by address hash.
+ */
 export function purgePorts(
   sb: SupabaseClient,
   stripe: CancelStripe['subscriptions'],
+  pepper: string | null,
   capture: CaptureAccountEvent = accountCapture(null),
 ): PurgePorts {
   return {
@@ -160,7 +175,7 @@ export function purgePorts(
       return (data as { id: string }[]).map((r) => r.id);
     },
     stripe,
-    erasure: serviceErasurePorts(sb, true),
+    erasure: serviceErasurePorts(sb, true, pepper),
     capture,
     report,
     now: Date.now,
@@ -181,7 +196,8 @@ export function deletionFunctions(env: Env = process.env): InngestFunction.Like[
     });
   };
   // The purge has no request, so its event goes with no cookie header: no person profile.
-  const purgeSteps = () => purge(purgePorts(serviceClient(env), lazyStripe(env).subscriptions));
+  const purgeSteps = () =>
+    purge(purgePorts(serviceClient(env), lazyStripe(env).subscriptions, mailPepper(env)));
   return [
     createDeletionCancelFn(billing),
     createDeletionResumeFn(billing),

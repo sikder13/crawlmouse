@@ -5,12 +5,15 @@ import { assertAllowed, refOfUrl } from '../db/target';
 import {
   REDACTED_EMAIL,
   erasePerson,
+  planWithMail,
   type AfterCounts,
   type ErasurePlan,
   type ErasurePorts,
   type ErasureTarget,
+  type MailRecordCounts,
   type StorageObject,
 } from '../../apps/web/lib/v2/account/erase';
+import { mailPepper } from '../../apps/web/lib/v2/mail/address-hash';
 
 /**
  * B-F2: erase one person's data on request. The runbook is docs/ops/erasure.md.
@@ -31,6 +34,10 @@ import {
  * reference is set null), takedown requests (the address is redacted only on a closed one), and
  * public reports the person minted (minted_by is set null; a report is about a domain, and its
  * removal is the takedown flow's).
+ *
+ * The mail the product sent names its recipient by a peppered hash only (CC-28), so the script needs
+ * the app's `TRIAL_LEDGER_PEPPER` in its environment to find it; without it the plan refuses. The
+ * suppressions on those hashes are kept (CC-28 Q2).
  */
 
 export type { AfterCounts, ErasurePlan, ErasureTarget, StorageObject };
@@ -58,7 +65,11 @@ export type DeleteAuthUser = (userId: string) => Promise<void>;
  * The erasure's ports over a direct connection. The script has no Storage API client, so it removes
  * no objects: while the plan lists any, it refuses, and the runbook deletes them by hand (§4).
  */
-export function scriptPorts(db: Db, deleteAuthUser: DeleteAuthUser): ErasurePorts {
+export function scriptPorts(
+  db: Db,
+  deleteAuthUser: DeleteAuthUser,
+  pepper: string | null,
+): ErasurePorts {
   return {
     plan: (target) => planErasure(db, target),
     async apply(target, expected) {
@@ -87,6 +98,14 @@ export function scriptPorts(db: Db, deleteAuthUser: DeleteAuthUser): ErasurePort
       );
       return { counts: row!.after.counts, storage: row!.after.storage };
     },
+    mailPepper: pepper,
+    async mailRecords(hashes, apply) {
+      const [row] = await db.query<{ r: MailRecordCounts }>(
+        `select public.erase_mail_records($1::text[], $2) as r`,
+        [[...hashes], apply],
+      );
+      return row!.r;
+    },
   };
 }
 
@@ -101,8 +120,9 @@ export async function executeErasure(
   db: Db,
   target: ErasureTarget,
   deleteAuthUser: DeleteAuthUser,
+  pepper: string | null,
 ): Promise<{ before: ErasurePlan; after: AfterCounts }> {
-  const result = await erasePerson(scriptPorts(db, deleteAuthUser), target);
+  const result = await erasePerson(scriptPorts(db, deleteAuthUser, pepper), target);
   if (!result.ok) throw new Error(`refusing to erase:\n- ${result.refusals.join('\n- ')}`);
   return { before: result.before, after: result.after };
 }
@@ -182,10 +202,18 @@ async function main(): Promise<void> {
   const ref = refOfUrl(url);
   assertAllowed(ref, values['yes-production']);
   const target = { email: values.email, userId: values['user-id'] };
+  const pepper = mailPepper(process.env);
   const db = connect(url);
   try {
     if (!values.yes) {
-      console.log(render(await planErasure(db, target)));
+      const dryRun = scriptPorts(
+        db,
+        async () => {
+          throw new Error('a dry run deletes no Auth user');
+        },
+        pepper,
+      );
+      console.log(render(await planWithMail(dryRun, target)));
       console.log('\nDry run: nothing was changed. Run again with --yes to erase.');
       return;
     }
@@ -197,7 +225,7 @@ async function main(): Promise<void> {
     if (!sameProject(url, apiUrl)) {
       throw new Error('NEXT_PUBLIC_SUPABASE_URL names a different project than the database URL');
     }
-    const { before, after } = await executeErasure(db, target, adminApiDelete(apiUrl, key));
+    const { before, after } = await executeErasure(db, target, adminApiDelete(apiUrl, key), pepper);
     console.log(render(before));
     console.log('\nErased. Counts read again afterwards (each should be 0):\n');
     for (const [k, n] of Object.entries(after.counts))
