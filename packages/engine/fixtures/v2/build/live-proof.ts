@@ -10,9 +10,10 @@
  * the guides' filled-in side. Nothing is written to disk and no recorded batch is read.
  *
  * The check is built under the fixture's own name (recorded.ts HOST), as the recorded fixture is, so
- * the output does not change with the server's port. Each packet's verify command is then run against
+ * the output does not change with the server's port. Each packet's two commands are then run against
  * the server, which still serves the site as audited, with HOST in the command replaced by the
- * server's address: the status printed is the command's own, on the site before any fix.
+ * server's address: what the readable command printed and the exact check's exit status are their
+ * own, on the site before any fix.
  */
 import { startServer } from '../../../../worker/src/test-support/http.js';
 import { buildCheck, type BuiltCheck } from '../../../src/v2/build/index.js';
@@ -29,6 +30,21 @@ const VARIANT: SiteVariant = { linkRedirectTarget: false, guidesWithIntro: true 
 
 type Fix = BuiltCheck['fixes'][number];
 type Body = NonNullable<Fix['packet']>['packets'][number];
+
+/** Each framework a body is written for, in words: the labels the fix page shows, and the generic body by what it is. */
+const FRAMEWORK: Readonly<Record<Body['framework'], string>> = {
+  nextjs: 'Next.js',
+  shopify_liquid: 'Shopify (Liquid)',
+  shopify_hydrogen: 'Shopify (Hydrogen)',
+  wordpress: 'WordPress',
+  webflow: 'Webflow',
+  generic: 'any stack',
+};
+
+/** The lines of a readable command's output this file prints before it counts the rest. */
+const OUTPUT_LINES = 12;
+/** The characters of one such line it prints before it says the line was cut. */
+const OUTPUT_CHARS = 300;
 
 const numbered = (lines: readonly string[]) => lines.map((l, i) => `${i + 1}. ${l}`);
 const bullets = (lines: readonly string[]) => lines.map((l) => `- ${l}`);
@@ -64,13 +80,55 @@ function effectOf(fix: Fix): string {
 
 function bodyOf(body: Body): string[] {
   return [
-    `#### Change (${body.framework})`,
+    `#### Change: ${FRAMEWORK[body.framework]}`,
     '',
     ...numbered(body.change),
     '',
     '#### Keep',
     '',
     ...bullets(body.keep),
+  ];
+}
+
+/** What a command printed, with the server's address put back as HOST, bounded, and saying what it left out. */
+function printed(stdout: string, base: string): string[] {
+  const lines = stdout.replaceAll(base, HOST).split('\n');
+  while (lines.at(-1) === '') lines.pop();
+  if (lines.length === 0) return ['Run against the local server, before any fix, it printed nothing.'];
+  const rest = lines.length - OUTPUT_LINES;
+  const shown = lines.slice(0, OUTPUT_LINES).map((l) => {
+    const points = [...l];
+    return points.length <= OUTPUT_CHARS
+      ? l
+      : `${points.slice(0, OUTPUT_CHARS).join('')} [line cut from ${points.length} characters]`;
+  });
+  return [
+    'Run against the local server, before any fix, it printed:',
+    '',
+    '```',
+    ...shown,
+    '```',
+    ...(rest > 0 ? ['', `${rest} more ${rest === 1 ? 'line is' : 'lines are'} not shown.`] : []),
+  ];
+}
+
+/** The readable layer of the verify block: the command, what the packet says of it, and what it printed. */
+async function seeOf(see: Body['verify']['see'], base: string): Promise<string[]> {
+  if (see === null) return [];
+  const ran = await runCommand(see.command.replaceAll(HOST, base));
+  return [
+    '#### See it',
+    '',
+    '```sh',
+    see.command,
+    '```',
+    '',
+    `Today: ${see.today}`,
+    '',
+    `After the fix: ${see.after}`,
+    '',
+    ...printed(ran.stdout, base),
+    '',
   ];
 }
 
@@ -95,6 +153,9 @@ async function fixOf(fix: Fix, base: string): Promise<string[]> {
     ...bodyOf(p),
     '',
     '### Verify',
+    '',
+    ...(await seeOf(p.verify.see, base)),
+    '#### Exact check',
     '',
     '```sh',
     p.verify.command,

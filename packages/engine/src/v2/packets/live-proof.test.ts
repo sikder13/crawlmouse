@@ -8,6 +8,8 @@ import { describe, expect, it } from 'vitest';
 import type { AccessTest, BatchResult } from '@crawlmouse/types/v2';
 import { record, renamed } from '../../../fixtures/v2/build/generate.js';
 import { liveProof } from '../../../fixtures/v2/build/live-proof.js';
+import { identifiersIn } from './test-support/content.js';
+import { outsideCodeSpans } from './test-support/hostile.js';
 
 const FIXTURE = new URL('../../../fixtures/v2/build/', import.meta.url);
 const json = (v: unknown) => `${JSON.stringify(v, null, 2)}\n`;
@@ -54,5 +56,29 @@ describe('the lab site, crawled over HTTP', () => {
     for (const s of statuses) expect(s).not.toBe('0');
     // the output does not name the server's port
     expect(proof).not.toMatch(/127\.0\.0\.1/);
+
+    // each stack is named in words, and no identifier of ours is printed outside a command
+    expect(proof).toContain('#### Change: any stack');
+    expect(proof).toContain('#### Change: Next.js');
+    expect(proof).not.toMatch(/^#### Change \(/m);
+    const prose = proof
+      .replace(/^```[^]*?^```$/gm, '')
+      .split('\n')
+      .map(outsideCodeSpans);
+    for (const text of prose) expect(identifiersIn(text), text).toEqual([]);
+
+    // the readable command comes first, with what it printed on the site as audited
+    const edge = proof.slice(proof.indexOf('Let ClaudeBot through the user-agent rule'));
+    const section = edge.slice(0, edge.indexOf('\n## '));
+    expect(section.indexOf('#### See it')).toBeGreaterThan(section.indexOf('### Verify'));
+    expect(section.indexOf('#### Exact check')).toBeGreaterThan(section.indexOf('#### See it'));
+    expect(section).toMatch(
+      /#### See it\n\n```sh\ncurl -sS -o \/dev\/null -w '%\{http_code\}\\n' -A 'ClaudeBot' '[^']+'\n```\n\nToday: `403`: [^\n]+\n\nAfter the fix: `200`\. [^\n]+\n\nRun against the local server, before any fix, it printed:\n\n```\n403\n```\n/,
+    );
+    expect(section).toMatch(/#### Exact check\n\n```sh\ncurl -sS -o \/dev\/null -D - /);
+    const guides = proof.slice(proof.indexOf('Serve the text of guides without JavaScript'));
+    expect(guides.slice(0, guides.indexOf('\n## '))).toMatch(
+      /Today: The audit counted \d+ words in this page’s HTML response\.[^\n]+\n\nAfter the fix: [^\n]+\n\nRun against the local server, before any fix, it printed:\n\n```\n\d+\n```\n/,
+    );
   }, 60_000);
 });
