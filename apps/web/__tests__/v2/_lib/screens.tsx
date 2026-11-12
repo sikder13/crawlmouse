@@ -54,6 +54,16 @@ import {
   type InvitePreview,
   type SeatsPreview,
 } from '../../../app/(v2-preview)/v2-preview/_preview/seats';
+import { ClientScreen } from '../../../components/v2/screens/agency/ClientScreen';
+import { MatrixScreen } from '../../../components/v2/screens/agency/MatrixScreen';
+import {
+  AGENCY_PREVIEWS,
+  CLIENT_PREVIEWS,
+  agencyPreview,
+  clientPreview,
+  type AgencyPreview,
+  type ClientPreview,
+} from '../../../app/(v2-preview)/v2-preview/_preview/agency';
 
 export const homeData = homePreview;
 
@@ -132,6 +142,26 @@ export const CC31_SEAT_ELEMENTS: Record<string, () => React.ReactElement> = {
     (Object.keys(INVITE_PREVIEWS) as InvitePreview[]).map((path) => [
       path,
       () => <InviteScreen data={INVITE_PREVIEWS[path]()} />,
+    ]),
+  ),
+};
+
+/** CC-31's agency screens: each state of the client matrix, and the client page. */
+export const CC31_ELEMENTS: Record<string, () => React.ReactElement> = {
+  ...Object.fromEntries(
+    (Object.keys(AGENCY_PREVIEWS) as AgencyPreview[]).map((path) => [
+      path,
+      () => <MatrixScreen data={agencyPreview(path)} />,
+    ]),
+  ),
+  ...Object.fromEntries(
+    (Object.keys(CLIENT_PREVIEWS) as ClientPreview[]).map((path) => [
+      path,
+      () => {
+        const data = clientPreview(path);
+        if (data?.kind !== 'client') throw new Error(`${path} has no client page to render`);
+        return <ClientScreen data={data} />;
+      },
     ]),
   ),
 };

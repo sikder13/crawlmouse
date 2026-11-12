@@ -308,6 +308,7 @@ describe('cross-site refusal covers every state change a session or a visitor ca
       'api/seats/accept',
       'api/seats/id/[id]',
       'api/seats/id/[id]/resend',
+      'api/seats/switch',
       'api/sites',
       'api/sites/[id]',
       'api/sites/[id]/checks',

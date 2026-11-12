@@ -23,6 +23,7 @@ const h = vi.hoisted(() => ({
   user: null as { id: string; email: string } | null,
   send: vi.fn(async (_e: unknown) => undefined),
   capture: vi.fn(async (..._a: unknown[]) => undefined),
+  agencyCapture: vi.fn(async (..._a: unknown[]) => undefined),
   refused: new Set<string>(),
   /** The switcher cookie's value on this request, or null for none. */
   chosen: null as string | null,
@@ -66,7 +67,13 @@ vi.mock('@/lib/v2/account/events', async (original) => ({
   captureFor: () => h.capture,
 }));
 
+vi.mock('@/lib/v2/agency/events', async (original) => ({
+  ...(await original<typeof import('@/lib/v2/agency/events')>()),
+  agencyCaptureFor: () => h.agencyCapture,
+}));
+
 import { checkStarted } from '@/lib/v2/account/events';
+import { agencyAccount } from '@/lib/v2/agency/test-support';
 import { POST } from './route';
 
 beforeAll(async () => {
@@ -83,6 +90,7 @@ beforeEach(() => {
   h.chosen = null;
   h.send.mockClear();
   h.capture.mockClear();
+  h.agencyCapture.mockClear();
   h.refused = new Set(['private.example']);
   vi.stubEnv('V2_CHECKS_PUBLIC', '1');
   vi.stubEnv('V2_PIPELINE', '1');
@@ -94,13 +102,21 @@ const as = (p: Person | null) => {
   h.user = p && { id: p.id, email: p.email };
 };
 
-function post(body: string, type = 'application/json'): Request {
+function post(body: string, type = 'application/json', referer?: string): Request {
   return new Request('https://crawlmouse.com/api/sites', {
     method: 'POST',
-    headers: { origin: 'https://crawlmouse.com', 'content-type': type },
+    headers: {
+      origin: 'https://crawlmouse.com',
+      'content-type': type,
+      ...(referer ? { referer } : {}),
+    },
     body,
   });
 }
+
+/** A form's post of `url`, as the page at `from` sends it. */
+const form = (url: string, from: string) =>
+  post(`url=${url}`, 'application/x-www-form-urlencoded', `https://crawlmouse.com${from}`);
 
 const json = (v: unknown) => post(JSON.stringify(v));
 
@@ -204,6 +220,58 @@ describe('POST /api/sites', () => {
     const res = await POST(post('url=form.example', 'application/x-www-form-urlencoded'));
     expect(res.status).toBe(303);
     expect(res.headers.get('location')).toMatch(/^\/sites\/[0-9a-f-]{36}$/);
+  });
+
+  it('a form from the client matrix goes back to it: with the new client on success, with its notice when refused', async () => {
+    const p = await person(h.db, 'agency-form');
+    const agency = await agencyAccount(h.db, p);
+    as(p);
+    h.chosen = agency.accountId;
+    const added = await POST(form('client-one.example', '/agency'));
+    expect(added.status).toBe(303);
+    expect(added.headers.get('location')).toBe('/agency');
+    expect((await sitesOf(agency.accountId)).map((s) => s.host)).toEqual(['client-one.example']);
+    const again = await POST(form('client-one.example', '/agency'));
+    expect(again.status).toBe(303);
+    expect(again.headers.get('location')).toBe('/agency?notice=site_exists');
+    const refused = await POST(form('private.example', '/agency'));
+    expect(refused.headers.get('location')).toBe('/agency?notice=host_refused');
+  });
+
+  it('a form from any other page, or from another origin, goes back to the dashboard as before', async () => {
+    as(await person(h.db, 'elsewhere'));
+    for (const referer of [
+      'https://crawlmouse.com/agency/reports',
+      'https://crawlmouse.com/agency/clients/50000000-0000-4000-8000-0000000000c9',
+      'https://crawlmouse.com/sites/50000000-0000-4000-8000-0000000000c9',
+      'https://crawlmouse.com/settings',
+      'https://evil.example/agency',
+    ]) {
+      const res = await POST(
+        post('url=private.example', 'application/x-www-form-urlencoded', referer),
+      );
+      expect(res.headers.get('location'), referer).toBe('/dashboard?notice=host_refused');
+    }
+  });
+
+  it('the first client an agency adds sends first_client_added beside site_added; its second does not', async () => {
+    const p = await person(h.db, 'first-client');
+    const agency = await agencyAccount(h.db, p);
+    as(p);
+    h.chosen = agency.accountId;
+    expect((await POST(json({ url: 'first-client.example' }))).status).toBe(201);
+    expect(h.capture.mock.calls[0]).toEqual(['site_added', agency.accountId, { n: 1 }]);
+    expect(h.agencyCapture.mock.calls).toEqual([['first_client_added', agency.accountId, {}]]);
+    h.agencyCapture.mockClear();
+    expect((await POST(json({ url: 'second-client.example' }))).status).toBe(201);
+    expect(h.agencyCapture).not.toHaveBeenCalled();
+  });
+
+  it('a personal account’s first site is not a client: no first_client_added', async () => {
+    as(await person(h.db, 'not-agency'));
+    expect((await POST(json({ url: 'personal-first.example' }))).status).toBe(201);
+    expect(h.capture.mock.calls[0]![2]).toEqual({ n: 1 });
+    expect(h.agencyCapture).not.toHaveBeenCalled();
   });
 
   it('a host the engine does not admit (a private address) is 422, with nothing written or sent', async () => {

@@ -36,7 +36,11 @@ import { action, type ActionView, type RouteSpec } from './account-actions';
 import { FREE_SCHEDULE, accountShellView, type ShellView } from './account-shell';
 import { FREE_FIXES } from './free-fixes';
 import { DELETE_COPY, deletionMoney } from '../copy/deletion';
-import { REFUSAL_SENTENCES, SETTINGS_NOTICES as NOTICES } from '../copy/settings-notices';
+import {
+  OWN_ACCOUNT_COPY as OWN,
+  REFUSAL_SENTENCES,
+  SETTINGS_NOTICES as NOTICES,
+} from '../copy/settings-notices';
 import type { SeatRole } from '../account/profile';
 
 export const CC27B_ROUTES = {
@@ -273,7 +277,15 @@ export function settingsView(
     billingEnd = null,
     role = 'owner',
     subscriptionStatus,
+    notOwnAccount,
   }: {
+    /**
+     * Set where the account shown is not the reader's own personal account (an agency's, or one
+     * they hold a seat on): their sign-in address and their deletion belong to their own account
+     * (`PATCH` and `DELETE /api/account` answer 409 `personal_account_only` here), so neither is
+     * offered. `personalAccountId` is that account, to switch to, or null where it is not known.
+     */
+    notOwnAccount?: { personalAccountId: string | null };
     /** The subscription mirror's `status`, or null for none; left out in a preview (`deleteText`). */
     subscriptionStatus?: string | null;
     /** When a paid plan set to cancel at its period's end ends (the subscription mirror's
@@ -385,8 +397,8 @@ export function settingsView(
         name: 'newEmail',
         value: a.email,
         placeholder: null,
-        hint: owner ? COPY.emailHint : COPY.emailOwnerOnly,
-        readOnly: !owner,
+        hint: !owner ? COPY.emailOwnerOnly : notOwnAccount ? OWN.address : COPY.emailHint,
+        readOnly: !owner || notOwnAccount !== undefined,
       },
       name: {
         id: 'account-name',
@@ -410,8 +422,19 @@ export function settingsView(
       title: COPY.dangerTitle,
       tableLabel: COPY.tables.danger,
       label: COPY.deleteLabel,
-      text: deleteText(v, subscriptionStatus),
-      action: owner ? routeAction('deleteConfirm', COPY.deleteAction) : null,
+      text: owner && notOwnAccount ? OWN.deletion : deleteText(v, subscriptionStatus),
+      action: !owner
+        ? null
+        : !notOwnAccount
+          ? routeAction('deleteConfirm', COPY.deleteAction)
+          : notOwnAccount.personalAccountId === null
+            ? null
+            : action(
+                'switchAccount',
+                OWN.switchTo,
+                {},
+                { fields: { accountId: notOwnAccount.personalAccountId } },
+              ),
     },
     plan: {
       title: COPY.planTitle,

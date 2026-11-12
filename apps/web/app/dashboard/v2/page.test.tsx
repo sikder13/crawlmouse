@@ -35,16 +35,28 @@ vi.mock('@/lib/v2/account/pages', () => ({
 import type { ReactElement } from 'react';
 import { AccountStateScreen } from '@/components/v2/screens/account/AccountStateScreen';
 import { DashboardScreen } from '@/components/v2/screens/dashboard/DashboardScreen';
+import { gateMessage } from '@/lib/v2/agency/gates';
 import { fixture } from '@/lib/v2/fixtures';
 import { noSiteDataset } from '../../(v2-preview)/v2-preview/_preview/accounts';
 import V2Dashboard from './page';
 
 type El = ReactElement<{ state?: string; data?: { firstRun: boolean; header: { title: string } } }>;
-const render = () => V2Dashboard({ searchParams: Promise.resolve({}) }) as Promise<El>;
+const render = (search: Record<string, string> = {}) =>
+  V2Dashboard({ searchParams: Promise.resolve(search) }) as Promise<El>;
 const BAD = 'a0000000-0000-4000-8000-000000000001';
-const viewerOn = (accountId: string, seatId: string, timezone = 'UTC') => ({
+const SUMMIT = { id: 'a0000000-0000-4000-8000-0000000000aa', kind: 'agency', name: 'Summit' };
+const viewerOn = (
+  accountId: string,
+  seatId: string,
+  timezone = 'UTC',
+  others: (typeof SUMMIT)[] = [],
+) => ({
   kind: 'viewer',
-  viewer: { account: { id: accountId, timezone }, seat: { id: seatId } },
+  viewer: {
+    account: { id: accountId, timezone },
+    seat: { id: seatId },
+    accounts: [{ id: accountId, kind: 'personal', name: null }, ...others],
+  },
 });
 
 const HERE = join(process.cwd(), 'app', 'dashboard');
@@ -104,6 +116,38 @@ describe('/dashboard/v2', () => {
     h.dataset = fixture('bad-site');
     const home = (await render()).props as unknown as { children: El };
     expect(home.children.props.data!.firstRun).toBe(false);
+  });
+
+  it('a person with one seat has no switcher; with a second seat the rail offers the other account', async () => {
+    vi.stubEnv('V2_CHECKS_PUBLIC', '1');
+    const owner = fixture('bad-site').seats[0]!.id;
+    h.dataset = fixture('bad-site');
+    type Framed = { children: ReactElement<{ data: { shell: { switcher: unknown } } }> };
+    const switcher = async () =>
+      ((await render()).props as unknown as Framed).children.props.data.shell.switcher;
+    h.viewer = viewerOn(BAD, owner);
+    expect(await switcher()).toBeNull();
+    h.viewer = viewerOn(BAD, owner, 'UTC', [SUMMIT]);
+    expect(await switcher()).toMatchObject({
+      current: 'Personal account',
+      visiting: null,
+      others: [{ label: 'Summit', href: '/api/seats/switch', fields: { accountId: SUMMIT.id } }],
+    });
+  });
+
+  it('a refused add is told the sites the plan keeps and the plan that lifts it, from the gate messages', async () => {
+    vi.stubEnv('V2_CHECKS_PUBLIC', '1');
+    const owner = fixture('bad-site').seats[0]!.id;
+    h.dataset = fixture('bad-site');
+    type Noticed = { children: ReactElement<{ notice: { code: string; text: string } | null }> };
+    const notice = async (tier: string) => {
+      const v = viewerOn(BAD, owner);
+      h.viewer = { ...v, viewer: { ...v.viewer, tier } };
+      const el = await render({ notice: 'upgrade_required' });
+      return (el.props as unknown as Noticed).children.props.notice?.text;
+    };
+    expect(await notice('free')).toBe(gateMessage('sites', 'free'));
+    expect(await notice('pro')).toBe(gateMessage('sites', 'pro'));
   });
 
   it('with the flag on, reads the viewer: signed out goes to /login', async () => {

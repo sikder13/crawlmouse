@@ -145,14 +145,17 @@ export type NoticeCode = (typeof NOTICE_CODES)[number];
 
 const NOTICE_SET: ReadonlySet<string> = new Set(NOTICE_CODES);
 
-/** The pages a form posts from: the dashboard, Seats, an invitation's page, or one site's page. */
+/**
+ * The pages a form posts from: the dashboard, Seats, an invitation's page, one site's page, and for
+ * an agency the client matrix and one client's page.
+ */
 const BACK =
-  /^\/(?:dashboard|seats|invite|sites\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/;
+  /^\/(?:dashboard|seats|invite|agency|(?:sites|agency\/clients)\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/;
 
 /**
- * The page a form was posted from, when it is one a form can go back to (the dashboard or a site
- * page, on this request's own origin, read from `Referer`); otherwise `fallback`. Only the path is
- * kept, so nothing else the header carries reaches the answer.
+ * The page a form was posted from, when it is one a form can go back to (one of `BACK`'s pages, on
+ * this request's own origin, read from `Referer`); otherwise `fallback`. Only the path is kept, so
+ * nothing else the header carries reaches the answer.
  */
 export function backFrom(req: Request, fallback: string): string {
   const referer = req.headers.get('referer');

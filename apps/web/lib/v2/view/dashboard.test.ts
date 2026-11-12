@@ -216,7 +216,12 @@ describe('Dashboard, withheld: challenged-site as Northwind Digital (past_due, A
   it('means harborlight’s two grades, (91 + 89) / 2 = 90, and names the site it left out', () => {
     expect(v.strip!.health.value).toBe('90');
     expect(v.strip!.health.excluded).toBe('1 site excluded: AI readability withheld');
-    expect(v.shell.nav.find((n) => n.label === 'Sites')!.count).toBe('2');
+    // An Agency account's rail is the agency rail (CC-31): its sites are counted under Clients.
+    expect(v.shell.nav.find((n) => n.label === 'Sites')).toBeUndefined();
+    expect(v.shell.nav.find((n) => n.label === 'Clients')).toMatchObject({
+      count: '2',
+      current: true,
+    });
     expect(v.shell.trial).toBeNull();
     expect(v.sites.note).toBe('2 of 25 on Agency');
     reconciles(v);

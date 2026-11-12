@@ -217,6 +217,7 @@ export const ROUTE_POLICIES: readonly RoutePolicy[] = [
   { route: 'api/reports/[slug]/mine', methods: ['GET'], class: 'user', origin: 'any' },
   { route: 'api/reports/[slug]/visibility', methods: ['POST'], class: 'user', origin: 'strict' },
   { route: 'api/reports/[slug]/white-label', methods: ['POST'], class: 'user', origin: 'strict' },
+  { route: 'api/seats/switch', methods: ['POST'], class: 'member', origin: 'strict' },
   { route: 'api/sites', methods: ['POST'], class: 'member', origin: 'strict' },
   {
     route: 'api/sites/[id]',

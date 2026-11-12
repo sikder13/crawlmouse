@@ -4,13 +4,26 @@ import { isCrawlPaused } from '@/lib/crawl-pause';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { supabaseServer } from '@/lib/supabase/server';
 import { captureFor, checkStarted } from '@/lib/v2/account/events';
-import { notFound, readBody, refuse, refuseTo, respond, tooSoonTo } from '@/lib/v2/account/route';
+import {
+  backFrom,
+  notFound,
+  readBody,
+  refuse,
+  refuseTo,
+  respond,
+  tooSoonTo,
+} from '@/lib/v2/account/route';
 import { admittedHost, parseAddBody } from '@/lib/v2/account/sites';
 import { supabaseAddSite } from '@/lib/v2/account/sites-store';
 import { loadViewer } from '@/lib/v2/account/viewer';
+import { agencyCaptureFor } from '@/lib/v2/agency/events';
 
-/** The page a form posts this from, and is sent back to when it is refused. */
-const BACK = '/dashboard';
+/**
+ * The pages a form posts this from, and is sent back to when it is refused: the dashboard, and for
+ * an agency the client matrix. A form from any other page goes back to the dashboard.
+ */
+const DASHBOARD = '/dashboard';
+const MATRIX = '/agency';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -25,12 +38,16 @@ export const dynamic = 'force-dynamic';
  * (questions.md Q12). The host is canonicalised and
  * admitted by the engine's SSRF guard. The slot count, the per-day bound on first audits, the
  * ceiling, v1's per-domain hourly bucket (Free only, as v1 counts it) and the insert are one SQL
- * transaction (`add_site`). A form is answered with a 303 to the new site's page, JSON with its ids.
+ * transaction (`add_site`). A form is answered with a 303 to the new site's page, or back to the
+ * client matrix when it was posted from there; JSON with its ids. A refused form goes back to the
+ * page it came from, the dashboard or the matrix, with its notice. The first site an agency account
+ * adds also sends `first_client_added` (CC-31 D10).
  */
 export async function POST(req: Request) {
   if (!checksPublicEnabled()) return notFound();
-  if (isCrawlPaused()) return refuseTo(req, BACK, 503, 'paused');
-  if (!pipelineEnabled()) return refuseTo(req, BACK, 503, 'unavailable');
+  const back = backFrom(req, DASHBOARD) === MATRIX ? MATRIX : DASHBOARD;
+  if (isCrawlPaused()) return refuseTo(req, back, 503, 'paused');
+  if (!pipelineEnabled()) return refuseTo(req, back, 503, 'unavailable');
 
   const sb = await supabaseServer();
   const {
@@ -40,8 +57,8 @@ export async function POST(req: Request) {
 
   const viewer = await loadViewer();
   if (viewer.kind === 'signed_out') return refuse(401, 'auth_required');
-  if (viewer.kind === 'no_account') return refuseTo(req, BACK, 409, 'no_account');
-  if (viewer.kind === 'ambiguous') return refuseTo(req, BACK, 409, 'account_ambiguous');
+  if (viewer.kind === 'no_account') return refuseTo(req, back, 409, 'no_account');
+  if (viewer.kind === 'ambiguous') return refuseTo(req, back, 409, 'account_ambiguous');
   const { account, seat, tier, limits } = viewer.viewer;
 
   const { data: allowed, error: guardError } = await sb.rpc('seat_may', {
@@ -49,19 +66,19 @@ export async function POST(req: Request) {
     p_action: 'add_site',
   });
   if (guardError) throw new Error(`seat_may failed: ${guardError.message}`);
-  if (allowed !== true) return refuseTo(req, BACK, 403, 'role_refused');
+  if (allowed !== true) return refuseTo(req, back, 403, 'role_refused');
   const scope = await sb.from('seats').select('client_scope_all').eq('id', seat.id).maybeSingle();
   if (scope.error) throw new Error(`seats read failed: ${scope.error.message}`);
   if ((scope.data as { client_scope_all?: unknown } | null)?.client_scope_all !== true) {
-    return refuseTo(req, BACK, 403, 'scoped_seat');
+    return refuseTo(req, back, 403, 'scoped_seat');
   }
 
   const body = await readBody(req);
   const input = body && parseAddBody(body.fields);
-  if (!body || !input) return refuseTo(req, BACK, 400, 'invalid');
+  if (!body || !input) return refuseTo(req, back, 400, 'invalid');
   const admitted = await admittedHost(input.url);
   if (!admitted.ok)
-    return refuseTo(req, BACK, admitted.code === 'invalid_host' ? 400 : 422, admitted.code);
+    return refuseTo(req, back, admitted.code === 'invalid_host' ? 400 : 422, admitted.code);
 
   // The schedule is the door's rule (lib/auth/schedule.ts): a Free account's first site is checked
   // monthly. Whether this is the first is read here; add_site counts the slots under its lock.
@@ -88,20 +105,24 @@ export async function POST(req: Request) {
     case 'created': {
       const capture = captureFor(req);
       await capture('site_added', account.id, { n: added.n });
+      if (added.n === 1 && account.kind === 'agency') {
+        await agencyCaptureFor(req)('first_client_added', account.id, {});
+      }
       await capture('check_started', account.id, checkStarted('first_audit', added.checkId));
+      // From the matrix, back to it, where the new client is a row; else to the new site's page.
       return body.kind === 'form'
-        ? respond('form', `/sites/${added.siteId}`)
+        ? respond('form', back === MATRIX ? MATRIX : `/sites/${added.siteId}`)
         : Response.json({ siteId: added.siteId, checkId: added.checkId }, { status: 201 });
     }
     case 'exists':
-      return refuseTo(req, BACK, 409, 'site_exists', { siteId: added.siteId });
+      return refuseTo(req, back, 409, 'site_exists', { siteId: added.siteId });
     case 'full':
-      return refuseTo(req, BACK, 402, 'upgrade_required', { gate: 'sites' });
+      return refuseTo(req, back, 402, 'upgrade_required', { gate: 'sites' });
     case 'adds_capped':
-      return tooSoonTo(req, BACK, 'adds_capped', added.nextAllowedAt);
+      return tooSoonTo(req, back, 'adds_capped', added.nextAllowedAt);
     case 'domain_capped':
-      return tooSoonTo(req, BACK, 'domain_capped', added.nextAllowedAt);
+      return tooSoonTo(req, back, 'domain_capped', added.nextAllowedAt);
     case 'capacity':
-      return refuseTo(req, BACK, 503, 'capacity');
+      return refuseTo(req, back, 503, 'capacity');
   }
 }

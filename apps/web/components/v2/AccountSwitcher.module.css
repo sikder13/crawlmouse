@@ -1,0 +1,125 @@
+/*
+ * The rail's account switcher: the account acted in on a button the width of the rail's links,
+ * and the other accounts in a hairline panel under it, in the rail's own column (rule 2: no
+ * shadow; nothing is covered). It opens and closes on state alone (rules 10 and 13). No orange.
+ */
+
+.switcher {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: var(--v2-control-h-sm);
+  padding: 0 10px;
+  border: 1px solid var(--v2-line);
+  border-radius: var(--v2-radius-control);
+  background: var(--v2-s1);
+  color: var(--v2-fg);
+  font: inherit;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}
+
+.trigger:hover {
+  border-color: var(--v2-fg);
+}
+
+.trigger:focus-visible,
+.item:focus-visible {
+  outline: 2px solid var(--v2-fg);
+  outline-offset: 2px;
+}
+
+/* A long account name is cut with an ellipsis; the whole name is the button's accessible name. */
+.name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The account a page shows while the reader acts in another: its name, as the button reads. */
+.shown {
+  margin: 0;
+  padding: 0 10px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chevron {
+  display: block;
+  flex: none;
+  width: 10px;
+  height: 6px;
+}
+
+.trigger[aria-expanded='true'] .chevron {
+  transform: rotate(180deg);
+}
+
+.panel {
+  padding: 6px;
+  border: 1px solid var(--v2-line);
+  border-radius: var(--v2-radius-surface);
+  background: var(--v2-s1);
+}
+
+.caption {
+  margin: 0;
+  padding: 2px 10px 4px;
+  color: var(--v2-mut);
+  font-size: 12px;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.list form {
+  margin: 0;
+}
+
+.item {
+  display: block;
+  width: 100%;
+  min-height: var(--v2-control-h-sm);
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--v2-radius-control);
+  background: none;
+  color: var(--v2-fg2);
+  font: inherit;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.item:hover {
+  background: var(--v2-s2);
+  color: var(--v2-fg);
+}
+
+/* Forced colours repaint backgrounds, so the button keeps an outline of its own. */
+@media (forced-colors: active) {
+  .trigger {
+    border: 1px solid ButtonText;
+  }
+}

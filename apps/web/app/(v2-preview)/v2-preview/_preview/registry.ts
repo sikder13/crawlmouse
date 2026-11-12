@@ -28,6 +28,22 @@ export const PREVIEWS: PreviewEntry[] = [
   { path: '/v2-preview/switch', name: 'Switch', kind: 'primitive' },
   { path: '/v2-preview/page-shell', name: 'PageShell', kind: 'primitive' },
   { path: '/v2-preview/account-shell', name: 'AccountShell', kind: 'primitive' },
+  // CC-31: the rail of a person with seats on several accounts.
+  {
+    path: '/v2-preview/account-shell/switcher',
+    name: 'AccountSwitcher, two accounts',
+    kind: 'primitive',
+  },
+  {
+    path: '/v2-preview/account-shell/switcher/open',
+    name: 'AccountSwitcher, three accounts, open',
+    kind: 'primitive',
+  },
+  {
+    path: '/v2-preview/account-shell/switcher/long',
+    name: 'AccountSwitcher, a long name on the agency rail',
+    kind: 'primitive',
+  },
   { path: '/v2-preview/trial-card', name: 'TrialCard', kind: 'primitive' },
   { path: '/v2-preview/theme-control', name: 'ThemeControl', kind: 'primitive' },
   { path: '/v2-preview/grade-history', name: 'GradeHistory', kind: 'primitive' },
@@ -217,6 +233,41 @@ export const PREVIEWS: PreviewEntry[] = [
       { name: 'all', query: '', orange: 0 },
       { name: 'opened', query: '?kind=opened', orange: 0 },
     ],
+  },
+  // CC-31, the agency's workspace. The matrix's orange element is setup's next step while there is
+  // one, and "Add a client site" after it.
+  { path: '/v2-preview/screens/agency', name: 'Final-Ag-Matrix', kind: 'screen' },
+  { path: '/v2-preview/screens/agency/no-client', name: 'Clients, none yet', kind: 'screen' },
+  {
+    path: '/v2-preview/screens/agency/not-checked',
+    name: 'Clients, one not checked yet',
+    kind: 'screen',
+  },
+  {
+    path: '/v2-preview/screens/agency/first-check',
+    name: 'Clients, a first check queued',
+    kind: 'screen',
+  },
+  { path: '/v2-preview/screens/agency/invite', name: 'Clients, one seat', kind: 'screen' },
+  { path: '/v2-preview/screens/agency/report', name: 'Clients, no report sent', kind: 'screen' },
+  // A seat that covers one client adds none, and setup is done: nothing here is its next action.
+  {
+    path: '/v2-preview/screens/agency/scoped',
+    name: 'Clients, a seat that covers one',
+    kind: 'screen',
+    orange: 0,
+  },
+  { path: '/v2-preview/screens/agency/gate', name: 'Clients, below Agency', kind: 'screen' },
+  {
+    path: '/v2-preview/screens/agency/open',
+    name: 'Clients, acting in another account',
+    kind: 'screen',
+  },
+  { path: '/v2-preview/screens/agency/client', name: 'Final-Ag-Client', kind: 'screen' },
+  {
+    path: '/v2-preview/screens/agency/client/clean',
+    name: 'Client, nothing open',
+    kind: 'screen',
   },
   { path: '/v2-preview/screens/map', name: 'Final-LinkMap', kind: 'screen' },
   { path: '/v2-preview/screens/map/all', name: 'Link map, every page', kind: 'screen' },

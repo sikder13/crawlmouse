@@ -3,7 +3,7 @@
  * Every number here is read from `GATES` or `prices.ts`; this file writes none
  * (`gates.test.ts` reads its source for a digit).
  */
-import { AGENCY_MONTHLY, PRO_MONTHLY, usd } from '../../billing/prices';
+import { AGENCY_MONTHLY, EXTRA_SITE, PRO_MONTHLY, usd } from '../../billing/prices';
 import { GATES, type Tier } from '../../entitlement-v2';
 import { count, plural } from '../words';
 
@@ -22,6 +22,27 @@ export const nextTier = (tier: Tier): PaidTier | null => (tier === 'agency' ? nu
 
 const sites = (n: number) => `${count(n)} ${plural(n, 'site', 'sites')}`;
 const seats = (n: number) => `${count(n)} ${plural(n, 'seat', 'seats')}`;
+
+/**
+ * What an account that keeps as many sites as its plan allows is told when it adds one more: the
+ * sites gate below Agency, and on Agency what a site beyond the plan's costs.
+ */
+export function sitesFullMessage(tier: Tier): string {
+  if (tier === 'agency') {
+    return `${NAME.agency} keeps ${sites(GATES.agency.sites)}. A site beyond them is ${usd(EXTRA_SITE)} a month.`;
+  }
+  const to = NEXT[tier];
+  return `${NAME[tier]} keeps ${sites(GATES[tier].sites)}. ${NAME[to]} keeps ${sites(GATES[to].sites)}: ${NAME[to]} is ${usd(MONTHLY[to])} a month.`;
+}
+
+/**
+ * What an account below Agency is told on an Agency-only page (the client matrix, a client page):
+ * what Agency keeps, and its price.
+ */
+export function agencyGateMessage(): string {
+  const g = GATES.agency;
+  return `Clients, their matrix and their pages are on ${NAME.agency}, which keeps ${sites(g.sites)} and ${seats(g.seats)}: ${NAME.agency} is ${usd(MONTHLY.agency)} a month.`;
+}
 
 /**
  * The line for `gate` on `tier`, or null when the next plan does not lift it (a Pro account sees

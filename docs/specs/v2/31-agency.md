@@ -124,15 +124,62 @@ The switch is `POST /api/seats/switch`. No GET sets the cookie.
 
 Which account each resolver uses for a person with several seats:
 
-| Resolver                                                        | Used by                                                                                     | Account                                                                        |
-| --------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| `loadViewer`                                                    | the dashboard, add a site, the account's alert rules, `PATCH /api/account` (name, timezone) | the chosen one                                                                 |
-| `readSettingsPage`                                              | Settings, Settings › Plan, Trial ending                                                     | the chosen one                                                                 |
-| `requestedAccountId` (`lib/billing/owner.ts`)                   | billing checkout, portal and cancel, when the request names no account                      | the chosen one when the caller owns it, else their one owned account, else 409 |
-| `ownPersonalAccountId`                                          | `POST /api/account/email`                                                                   | the caller's own personal account                                              |
-| `PATCH /api/account` (a changed address), `DELETE /api/account` | Settings                                                                                    | refused with 409 `personal_account_only` outside the caller's personal account |
-| `siteOfCaller`                                                  | the site page                                                                               | the site's own account                                                         |
-| the door's keep (`lib/auth/stores.ts`), `prepare_email_undo`    | keep this audit; undo an email change                                                       | `users.default_account_id`                                                     |
+| Resolver                                                        | Used by                                                                                                                    | Account                                                                        |
+| --------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `loadViewer`                                                    | the dashboard, the client matrix (`/agency`), add a site, the account's alert rules, `PATCH /api/account` (name, timezone) | the chosen one                                                                 |
+| `readSettingsPage`                                              | Settings, Settings › Plan, Settings › Delete, Trial ending                                                                 | the chosen one                                                                 |
+| `requestedAccountId` (`lib/billing/owner.ts`)                   | billing checkout, portal and cancel, when the request names no account                                                     | the chosen one when the caller owns it, else their one owned account, else 409 |
+| `ownPersonalAccountId`                                          | `POST /api/account/email`                                                                                                  | the caller's own personal account                                              |
+| `PATCH /api/account` (a changed address), `DELETE /api/account` | Settings                                                                                                                   | refused with 409 `personal_account_only` outside the caller's personal account |
+| `siteOfCaller`                                                  | the site page, the client page (`/agency/clients/[siteId]`)                                                                | the site's own account                                                         |
+| the door's keep (`lib/auth/stores.ts`), `prepare_email_undo`    | keep this audit; undo an email change                                                                                      | `users.default_account_id`                                                     |
+
+**The switch route.** `POST /api/seats/switch` `{accountId}` (`app/api/seats/switch/route.ts`, class
+`member`, strict origin). It asks `is_member` as the caller, which is false for a removed seat, an
+invitation not accepted and an account marked for deletion; refused, it answers 404, sets no cookie
+and reads nothing more. It reads the account's kind with the caller's client and sets the cookie
+(`Secure` when the request is HTTPS). A form is answered with a 303 to `/agency` for an agency account
+and to `/dashboard` for a personal one; JSON with `{accountId}`. The route file exports `POST` and no
+other method. `pnpm --filter @crawlmouse/web exec vitest run app/api/seats/switch/route.test.ts`
+
+**The control.** `AccountSwitcher` (`components/v2/AccountSwitcher.tsx`) sits in the rail under the
+brand, in `AccountShell`'s `account` slot. `switcherView` (`lib/v2/view/account-shell.ts`) builds it
+from the viewer's `accounts` and is null for a person with one seat, whose rail then has no switcher.
+It is a disclosure, as `NavMenu` is: a button that names the account acted in and says whether the
+list is shown (`aria-expanded`), and a list of the person's other accounts, each a form that posts
+its id to the switch. The list opens under the button, in the rail's own column. Escape, a press
+outside it and focus moving outside it close it. A `<noscript>` copy of the list, not hidden, is what
+a browser that runs no script shows. No element of it is orange. An account with no name reads
+"Personal account" or "Agency account", by its kind.
+`pnpm --filter @crawlmouse/web exec vitest run __tests__/v2/account-switcher.test.tsx lib/v2/view/account-shell.agency.test.ts`
+
+The pages that pass the viewer's accounts to the frame: the dashboard, the site page, Settings and
+Settings › Plan, `/agency` and `/agency/clients/[siteId]`. A page that does not has no switcher in its
+rail (`ShellView.switcher` is null unless `accounts` is given):
+`grep -rlE "withSwitcher|accounts \}|accounts:" apps/web/app --include=page.tsx`.
+
+**A page of an account that is not the one acted in.** The site page and the client page show the
+site's own account, whatever the cookie says. When that is not the account the caller acts in, the
+frame's switcher is not a list: it names the page's account and the one acted in, and offers one
+switch, to the page's account. The frame then leaves out Keep and the links to billing
+(`withSwitcher`), whose routes act on the account acted in.
+
+**Settings on an account that is not the person's own.** Settings shows the account acted in. Where
+that is not the caller's own personal account (`readSettingsPage`'s `ownPersonalId`), the sign-in
+address is read-only and Delete… is replaced by "Switch to your own account"; each says the control
+belongs to their own account (`OWN_ACCOUNT_COPY`, `lib/v2/copy/settings-notices.ts`). Settings › Delete
+redirects such a caller to Settings.
+`pnpm --filter @crawlmouse/web exec vitest run "app/(account)/settings/pages.test.tsx"`
+
+**The agency rail.** An account on the Agency tier gets `AGENCY_NAV`
+(`lib/v2/view/account-actions.ts`): Clients (`/agency`, with the number of client sites in the
+reader's records), Changes, Alerts, Reports, Seats, Settings. The locked rail's Branding is left out
+(D11). An account on another tier keeps `ACCOUNT_NAV`. On the agency rail the brand carries the word
+"Agency", and outside a trial the rail's card gives the plan's list price for the account's billing
+period (`AGENCY_MONTHLY` or `AGENCY_YEARLY`, `prices.ts`) and the sites and seats of the account's
+limits; to the owner of an account that is not past due and holds both, it also gives the renewal
+date and the card's last four digits. A page under Sites (the dashboard, a site page) marks Clients
+on the agency rail.
 
 ## 6. Seats and invitations
 
@@ -236,6 +283,84 @@ subscription the update leaves through `mirrorOf`, the webhook's reading.
 
 ## 8. The client matrix and the client page
 
+### `/agency`
+
+`app/agency/page.tsx` renders `agencyHomeView` (`lib/v2/view/agency-matrix.ts`) for the account the
+caller acts in, in `MatrixScreen`:
+
+| The account acted in                                                            | The page                                                           |
+| ------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| on the Agency tier                                                              | the client matrix                                                  |
+| below Agency, not an agency's, and the caller holds a seat on an agency account | "Open" and the agency's name: a form that posts to the switch (§5) |
+| below Agency otherwise, an agency account with no plan among them               | the gate: `agencyGateMessage()` and a link to `/pricing`           |
+
+**The matrix** (`Final-Ag-Matrix`). One row per client site in the records read for the caller's seat
+(`readAccount`, whose site ids are the caller's own read: §4), so a seat that covers some clients
+lists those. A staging copy has no row. A row's grades, pills, last check and schedule are the
+dashboard's own site row (`dashboardView`), so a withheld grade reads "withheld" as it does there.
+Rows with a problem opened since the site's previous check come first, then by host. The columns are
+Site, Client, Technical SEO, AI readability, Since last check, Next check, Last check, and Schedule ·
+report; Next check is an addition to the artboard.
+
+The header counts the clients against the account's site limit; for a seat that covers some clients
+it says how many are in the seat. The strip is absent until a client has two results. It then gives
+"Clients needing a call" (clients with a problem opened since their previous check, of those with
+two results), and Opened and Resolved when their count is not zero.
+
+Adding a client is the dashboard's add-site form, posted to `POST /api/sites` for the account acted
+in, offered to a seat that may add a site while the account has a site unused. Posted from `/agency`,
+the route answers a form with a 303 back to `/agency`: with the new client as a row, or with a
+refusal's notice. The pages a form may be sent back to are `BACK`'s four shapes
+(`lib/v2/account/route.ts`): `/dashboard`, `/sites/<id>`, `/agency`, `/agency/clients/<id>`.
+
+**First run.** `next` is setup's next step: the first of these that is not done and that the caller's
+role may do. Its action is the page's orange element; with no step, "Add a client site" is.
+
+| State                                                | The step                                    | Who                           |
+| ---------------------------------------------------- | ------------------------------------------- | ----------------------------- |
+| no client                                            | the header's form: add one                  | a seat that may add a site    |
+| a client with no check, and none under way           | "Run it now": `POST /api/sites/[id]/checks` | a seat that covers the client |
+| a client has a result, and the records hold one seat | "Open Seats" (`/seats`)                     | the owner                     |
+| more than one seat, and no client report sent        | "Open client reports" (`/agency/reports`)   | the owner, an account manager |
+
+A client with no result yet says in its row what its site page's first-check line says ("Not checked
+yet", "First check queued"), with one button: start the check, or watch it. The first check of such a
+client goes through the re-check route as it stands. That route queues it with the trigger `manual`
+(`__tests__/v2-031-c-first-check.test.ts`), so it counts toward the site's `manualChecksPerSiteDay`.
+
+Left out, each a `ruling` row in `lib/v2/copy/agency.ts`: "Audit a prospect", "Filter", "Export
+matrix", and "Reports going out Mon · Preview".
+
+### `/agency/clients/[siteId]`
+
+`app/agency/clients/[siteId]/page.tsx` renders `agencyClientView` (`lib/v2/view/agency-client.ts`) in
+`ClientScreen` (`Final-Ag-Client`), from the site page's view (`siteView`): the client's name over the
+host and the site page's own line and actions; the two grades with their moves, without the parts
+under each; the fixes still to do (open, open again, or not verified) as the site page's rows, with
+their effects and packet links; and "This client": the contact, the report schedule and the owning
+seat. Each of those rows links to where it is changed, `/agency/reports` for the owner and an account
+manager and `/seats` for the owner.
+
+It is a 404 for a malformed id, a site that does not exist, a removed one, a staging copy, and a site
+the caller's seat does not cover. A client with no result yet is shown as the site page's first-check
+screen, on the agency rail. On an account below Agency the page is the gate.
+
+Left out, each a `ruling` row: the "What to tell … this week" paragraph (no view renders its
+sentences from the data) with its two buttons, "Client portal", the line under the fixes about whose
+name a packet carries, the report row's sender, and the seat row's alert channels.
+
+### Both pages
+
+`noindex`, `force-dynamic`, a 404 while `V2_CHECKS_PUBLIC` is off, and the sign-in page for a caller
+who is not signed in. Neither has a `loading.tsx`: `find apps/web/app -name loading.tsx` prints no
+file in this tree.
+
+Previews, in `app/(v2-preview)/v2-preview/_preview/agency.ts`: the matrix; no client; a client not
+checked; a first check queued; one seat; no report sent; a seat that covers one client; the gate;
+the switch to an agency; the client page with a fix to raise, and with none.
+
+`pnpm --filter @crawlmouse/web exec vitest run lib/v2/view/agency-matrix.test.ts lib/v2/view/agency-client.test.ts __tests__/v2/agency.test.tsx app/agency`
+
 ## 9. Reports, exports and the proof page
 
 A report's content is a `ReportDoc` (`lib/v2/reports/generate.ts`): titles, tables and
@@ -244,6 +369,74 @@ before-and-after pairs, as strings.
 ## 10. Download, share and schedules
 
 ## 11. Erasure, gate messages and events
+
+### Erasure
+
+Workstream C adds no SQL. `erase_rules()` (migration 20261112000002, section B) is not restated.
+`apps/web/__tests__/v2-031-c-erasure.test.ts` runs CC-27b's plan and apply on PGlite, through
+`erasePerson` (`lib/v2/account/erase.ts`), for four people; for each, the plan's counts name the rows,
+the erasure removes or blanks them, and a plan read again by address counts none.
+
+| The person                                                                                            | What goes, and by which rule                                                                                                                                                                                           |
+| ----------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| invited to another account's agency, not yet accepted                                                 | the invitation, by rule 28 (`seats deleted (invitations in other accounts)`); its `seat_sites` rows by their foreign key                                                                                               |
+| holding an active seat on another account's agency                                                    | the seat, with the Auth user (rule 7); `sites.owner_seat_id` and `reports.owner_seat_id` are set null by their foreign keys; `share_links.created_by` is set null (rule 9). The agency's sites, reports and links stay |
+| owning an agency with invited seats, stored reports, share links and a client contact                 | both of the person's accounts (rule 32) with their seats, sites, reports, schedules and share links; each stored report's file is in the plan's storage list and is removed before `apply`                             |
+| the client contact and report recipient of another account, with an account of their own or with none | `sites.client_contact_email` (rule 30) and `reports.recipient_email` (rule 29) are set null; the rows stay                                                                                                             |
+
+**Known gap, reported and not fixed here.** `sites.client_contact_name` is left beside the blanked
+address: rule 30 sets `client_contact_email` and no rule names the name. The test
+`known gap, reported: the contact’s name stays beside the blanked address` pins this, so a rule that
+covers the name turns it red. The fix is one more column in rule 30's action, which restates
+`erase_rules()`.
+
+The storage list (`erase_person_counts`) names a report's file as bucket `reports` and object name
+`reports.storage_path`. A file stored under another name or bucket is not listed.
+
+`pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-031-c-erasure.test.ts`
+
+### Gate messages
+
+`lib/v2/agency/gates.ts` writes what a reader is told at a limit, from `GATES` and `prices.ts`:
+`gateMessage(gate, tier)`, `agencyGateMessage()` and `sitesFullMessage(tier)`. Its code holds no
+digit (`gates.test.ts`, "has no digit in its code").
+
+| Where                                                                                                                  | The sentence                                                                                                            |
+| ---------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `/agency` and `/agency/clients/[siteId]` on an account below Agency                                                    | `agencyGateMessage()`                                                                                                   |
+| the dashboard and `/agency`, after an add was refused because the plan's sites are in use (`?notice=upgrade_required`) | `sitesFullMessage(tier)`: the sites gate below Agency, and on Agency what a site beyond the plan's costs (`EXTRA_SITE`) |
+
+`gates.test.ts` also reads three copy files for a price or a limit written as a digit: the matrix and
+client copy (`lib/v2/copy/agency.ts`), `NOTICE_LINES` (`lib/v2/copy/notices.ts`) and
+`OWN_ACCOUNT_COPY` (`lib/v2/copy/settings-notices.ts`).
+
+Not moved to `gateMessage` by workstream C, each outside its paths: the dashboard's "Need more?" line
+and its add-site label (`lib/v2/view/dashboard.ts`, which take their numbers from `GATES` and
+`prices.ts`), the fix list's "on Pro" counts (`lib/v2/view/segment/fixes.ts`, `result.ts`) and the
+fix page's Pro wall (`lib/v2/view/fix.ts`), which are locked copy on the public audit screens.
+
+`pnpm --filter @crawlmouse/web exec vitest run lib/v2/agency/gates.test.ts lib/v2/copy/notices.test.ts`
+
+### Events
+
+The events of `AGENCY_EVENTS` (`lib/v2/agency/events.ts`), the workstream that sends each, and where.
+On workstream C's branch one of them has a caller, `first_client_added`; the others are sent by the
+workstreams named, on their branches.
+
+| Event                      | Workstream | Sent by                                                                                                |
+| -------------------------- | ---------- | ------------------------------------------------------------------------------------------------------ |
+| `first_client_added`       | C          | `POST /api/sites`, when `add_site` reports the account's first site and the account's kind is `agency` |
+| `seat_invited`             | A          | the invite route (`POST /api/seats`)                                                                   |
+| `seat_accepted`            | A          | the accept route (`POST /api/seats/accept`)                                                            |
+| `seats_bought`             | A          | `POST /api/billing/seats`                                                                              |
+| `report_generated`         | B          | `POST /api/reports`                                                                                    |
+| `report_downloaded`        | B          | `GET /api/report-files/[id]/download`                                                                  |
+| `report_shared`            | B2         | `POST /api/report-files/[id]/share`                                                                    |
+| `share_link_opened`        | B2         | the share link's handler (`/s/[token]`)                                                                |
+| `proof_viewed`             | B2         | the proof page, opened through a share link or signed in                                               |
+| `first_client_report_sent` | B2         | the function that sends a client report                                                                |
+
+The callers on a tree: `grep -rnE "'(seat_invited|seat_accepted|report_generated|report_downloaded|report_shared|share_link_opened|proof_viewed|first_client_added|first_client_report_sent|seats_bought)'" apps/web/app apps/web/lib inngest --include=*.ts --include=*.tsx | grep -v "\.test\.\|agency/events.ts\|analytics-events.ts"`.
 
 ## 12. Where the tree changed a decision's form
 

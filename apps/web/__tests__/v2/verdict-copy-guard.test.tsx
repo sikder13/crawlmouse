@@ -14,6 +14,7 @@ import type { SegmentKey } from '../../lib/v2/view/segment/frame';
 import {
   ACCOUNT_ELEMENTS,
   CC27_ELEMENTS,
+  CC31_ELEMENTS,
   SEGMENT_VARIANTS,
   changesHistoryElement,
   segmentElement,
@@ -166,14 +167,20 @@ describe('verdict copy guard', () => {
 
   it('covers every account screen in the preview registry, counted apart from the segments', () => {
     const paths = PREVIEWS.map((p) => p.path).filter((p) =>
-      /\/screens\/(dashboard|site|changes-log|alerts|reports|settings|trial-end)(\/|$)/.test(p),
+      /\/screens\/(dashboard|site|changes-log|alerts|reports|settings|trial-end|agency)(\/|$)/.test(
+        p,
+      ),
     );
     expect(paths.sort()).toEqual(
-      [...Object.keys(ACCOUNT_ELEMENTS), ...Object.keys(CC27_ELEMENTS)].sort(),
+      [
+        ...Object.keys(ACCOUNT_ELEMENTS),
+        ...Object.keys(CC27_ELEMENTS),
+        ...Object.keys(CC31_ELEMENTS),
+      ].sort(),
     );
   });
 
-  const accountElements = { ...ACCOUNT_ELEMENTS, ...CC27_ELEMENTS };
+  const accountElements = { ...ACCOUNT_ELEMENTS, ...CC27_ELEMENTS, ...CC31_ELEMENTS };
   it.each(Object.keys(accountElements))(
     '%s: "blocked" only beside a blocking verdict, in what is seen and what is heard',
     (path) => {
