@@ -146,7 +146,7 @@ export const duplicatePagination: PacketEntry<'duplicate_pagination'> = {
     const content = fix.conditions.includes('pagination_near_duplicate')
       ? joined(
           fetchOf(facts, [first, later]).fragment,
-          listsDiffer(firstAt, crawledWord(listMark(later))),
+          listsDiffer(firstAt, own, crawledWord(listMark(later))),
         )
       : null;
     const others = ours(

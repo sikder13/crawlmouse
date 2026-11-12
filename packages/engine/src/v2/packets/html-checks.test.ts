@@ -1,6 +1,9 @@
+import { execFile } from 'node:child_process';
 import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import type { RequestListener } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { gzipSync } from 'node:zlib';
 import fc from 'fast-check';
 import { afterAll, afterEach, describe, expect, it } from 'vitest';
 import { commandOf, crawledWord } from './shell.js';
@@ -9,6 +12,7 @@ import {
   canonicalIs,
   command,
   COMMAND_BOUNDS,
+  compared,
   fetchOf,
   hreflangHolds,
   httpUrl,
@@ -17,8 +21,10 @@ import {
   listed,
   listsDiffer,
   noLinkSays,
+  normsOf,
   PAGE_END,
   part,
+  sameInCommand,
   spelled,
   type Fragment,
   type HreflangNeeds,
@@ -81,7 +87,7 @@ describe('fetchOf', () => {
     ]);
     expect(fetch.ua).toBe('GPTBot');
     expect(commandOf(command(fetch.fragment))).toMatch(
-      /^curl -sS -A '[^']*GPTBot[^']*' 'https:\/\/a\.test\/x'$/,
+      /^curl -sS -f --compressed -A '[^']*GPTBot[^']*' 'https:\/\/a\.test\/x'$/,
     );
   });
 
@@ -91,7 +97,7 @@ describe('fetchOf', () => {
       ['https://a.test/x'],
     );
     expect(fetch.ua).toBeNull();
-    expect(commandOf(command(fetch.fragment))).toBe("curl -sS 'https://a.test/x'");
+    expect(commandOf(command(fetch.fragment))).toBe("curl -sS -f --compressed 'https://a.test/x'");
   });
 
   it('requests each page at the address it is served at, and marks the end of each when it fetches two', () => {
@@ -101,7 +107,7 @@ describe('fetchOf', () => {
     ]);
     const fetch = fetchOf({ crawlers: [], pages }, ['https://a.test/p', 'https://a.test/q']);
     expect(commandOf(command(fetch.fragment))).toBe(
-      `curl -sS -w '\\n${PAGE_END}\\n' 'https://a.test/p/' 'https://a.test/q'`,
+      `curl -sS -f --compressed -w '\\n${PAGE_END}\\n' 'https://a.test/p/' 'https://a.test/elsewhere'`,
     );
   });
 });
@@ -168,11 +174,17 @@ describe('linksTo', () => {
       query: '<a href="/t?a=1&amp;b=2">x</a>',
       otherHost: '<a href="https://other.test/t?a=1&b=2">x</a>',
       otherOrder: '<a href="/t?b=2&a=1">x</a>',
+      otherValue: '<a href="/t?a=1&b=3">x</a>',
+      oneMore: '<a href="/t?a=1&b=2&c=3">x</a>',
+      emptyPairs: '<a href="/t?&a=1&&b=2&">x</a>',
     };
     expect(await passes(pages, to('/t?a=1&b=2'))).toEqual({
       query: true,
       otherHost: false,
-      otherOrder: false,
+      otherOrder: true,
+      otherValue: false,
+      oneMore: false,
+      emptyPairs: true,
     });
   });
 
@@ -277,6 +289,279 @@ describe('linksTo', () => {
       }
     },
   );
+});
+
+describe('linksTo, against the ways a page can spell a URL', () => {
+  /**
+   * Each href is a link to /old on a page at /dir/page, as the engine's reader records it (round 2,
+   * correctness finding 3, and SEO finding 6): `{base}` is the site's origin, `{host}` its host.
+   */
+  const OLD: [name: string, anchor: string][] = [
+    ['root-relative', '<a href="/old">x</a>'],
+    ['document-relative', '<a href="../old">x</a>'],
+    ['document-relative with a dot', '<a href="./../old">x</a>'],
+    ['protocol-relative', '<a href="//{host}/old">x</a>'],
+    ['an upper-case scheme and host', '<a href="HTTP://{HOST}/old">x</a>'],
+    ['a dot segment', '<a href="/./old">x</a>'],
+    ['two dots', '<a href="/a/../old">x</a>'],
+    ['an escaped dot segment', '<a href="/a/%2E%2e/old">x</a>'],
+    ['an empty query', '<a href="/old?">x</a>'],
+    ['a numeric character reference', '<a href="/ol&#100;">x</a>'],
+    ['a hex character reference', '<a href="/ol&#x64;">x</a>'],
+    ['a backslash', '<a href="\\old">x</a>'],
+    ['a > inside another attribute', '<a title="a>b" href="/old">x</a>'],
+    ['an href inside another attribute first', `<a title=' href="/new" ' href="/old">x</a>`],
+    ['the scheme alone before a path', '<a href="http:/old">x</a>'],
+    ['a doubled slash', '<a href="//{host}//old">x</a>'],
+    ['a tab in the tag', '<a\thref="/old">x</a>'],
+  ];
+  const at = (base: string, html: string) => {
+    const { host } = new URL(base);
+    return html.replaceAll('{HOST}', host.toUpperCase()).replaceAll('{host}', host);
+  };
+
+  it.each(OLD)('finds the stale link written with %s', async (_name, anchor) => {
+    const kept = '<a href="/new">y</a>';
+    const s = await serving({
+      '/dir/page': (base) => at(base, `${anchor}${kept}`),
+      '/dir/fixed': kept,
+    });
+    const check = (path: string) =>
+      status(s, [path], linksTo(`${s.base}${path}`, [`${s.base}/new`], [`${s.base}/old`]));
+    expect(await check('/dir/page')).not.toBe(0);
+    expect(await check('/dir/fixed')).toBe(0);
+  });
+
+  it.each(OLD)('finds the link it asks for written with %s', async (_name, anchor) => {
+    const s = await serving({
+      '/dir/page': (base) => at(base, anchor),
+      '/dir/other': '<a href="/older">x</a>',
+    });
+    const check = (path: string) =>
+      status(s, [path], linksTo(`${s.base}${path}`, [`${s.base}/old`]));
+    expect(await check('/dir/page')).toBe(0);
+    expect(await check('/dir/other')).not.toBe(0);
+  });
+
+  it('counts an href it cannot read as the stale link, and only when a stale link is asked about', async () => {
+    const s = await serving({ '/p': '<a href="/ol&dscr;">x</a><a href="/new">y</a>' });
+    const page = `${s.base}/p`;
+    expect(await status(s, ['/p'], linksTo(page, [`${s.base}/new`], [`${s.base}/old`]))).not.toBe(
+      0,
+    );
+    expect(await status(s, ['/p'], linksTo(page, [`${s.base}/new`]))).toBe(0);
+  });
+
+  // round 2, security finding 4: an escaped delimiter is not the delimiter
+  it('keeps apart two URLs that differ by an escaped slash, question mark, hash or percent', async () => {
+    const pages = {
+      slash: '<a href="/a%2Fb">x</a>',
+      question: '<a href="/a%3Fb">x</a>',
+      hash: '<a href="/a%23b">x</a>',
+      percent: '<a href="/a%2541">x</a>',
+      ampersand: '<a href="/q?a=1%26b=2">x</a>',
+    };
+    const links = (target: string) => async (name: keyof typeof pages) =>
+      (
+        await passes({ [name]: pages[name] }, (base, path) =>
+          linksTo(`${base}${path}`, [`${base}${target}`]),
+        )
+      )[name];
+    expect(await links('/a/b')('slash')).toBe(false);
+    expect(await links('/a%2Fb')('slash')).toBe(true);
+    expect(await links('/a%2fb')('slash')).toBe(true);
+    expect(await links('/a?b')('question')).toBe(false);
+    expect(await links('/a%3Fb')('question')).toBe(true);
+    expect(await links('/a')('hash')).toBe(false);
+    expect(await links('/aA')('percent')).toBe(false);
+    expect(await links('/q?a=1&b=2')('ampersand')).toBe(false);
+  });
+
+  it('resolves a relative link against the first <base href>, as a browser does', async () => {
+    const pages = {
+      otherSite: '<base href="https://other.test/"><a href="/t">x</a>',
+      otherSiteRelative: '<head><base href="https://other.test/"></head><a href="t">x</a>',
+      otherSiteFull: (base: string) => `<base href="https://other.test/"><a href="${base}/t">x</a>`,
+      toRoot: '<base href="/"><a href="t">x</a>',
+      toDirectory: '<base href="/shop/"><a href="../t">x</a>',
+      secondIgnored: '<base href="/"><base href="/shop/"><a href="t">x</a>',
+      none: '<a href="t">x</a>',
+    };
+    const s = await serving(
+      Object.fromEntries(Object.entries(pages).map(([name, html]) => [`/dir/${name}`, html])),
+    );
+    const out: Record<string, boolean> = {};
+    for (const name of Object.keys(pages)) {
+      const path = `/dir/${name}`;
+      out[name] = (await status(s, [path], linksTo(`${s.base}${path}`, [`${s.base}/t`]))) === 0;
+    }
+    expect(out).toEqual({
+      otherSite: false,
+      otherSiteRelative: false,
+      otherSiteFull: true,
+      toRoot: true,
+      toDirectory: true,
+      secondIgnored: true,
+      none: false,
+    });
+  });
+
+  it('reads past a script that ends with a space in its end tag, and stops at a tag that never ends', async () => {
+    expect(
+      await passes(
+        {
+          spacedEnd: '<script>var a = "<a href=/u>";</script ><a href="/t">x</a>',
+          upperEnd: '<script>1</SCRIPT\n><a href="/t">x</a>',
+          inScript: '<script>var a = \'<a href="/t">x</a>\';</script >',
+          openQuote: `<a href="/t">x</a><p title="${'<i>x</i>'.repeat(12)}`,
+          declaration: '<!DOCTYPE html><?xml version="1.0"?><a href="/t">x</a>',
+          emptyComment: '<!--><a href="/t">x</a><!--->',
+          lessThan: '<p>1 < 2 and a<b</p><a href="/t">x</a>',
+        },
+        (base, path) => linksTo(`${base}${path}`, [`${base}/t`]),
+      ),
+    ).toEqual({
+      spacedEnd: true,
+      upperEnd: true,
+      inScript: false,
+      openQuote: false,
+      declaration: true,
+      emptyComment: true,
+      lessThan: true,
+    });
+  });
+});
+
+describe('sameInCommand', () => {
+  it('says when the programs cannot tell two URLs of a record apart', () => {
+    // round 2, security finding 4: the engine keeps these apart, and `norm` decodes both to one
+    expect(sameInCommand('https://a.test/x%7Ey', 'https://a.test/x~y')).toBe(true);
+    expect(sameInCommand('https://a.test/a?x=1&y=2', 'https://a.test/a?y=2&x=1')).toBe(true);
+    expect(sameInCommand('https://a.test/a//b/', 'https://a.test/a/b')).toBe(true);
+    expect(sameInCommand('https://a.test/a/b', 'https://a.test/a%2Fb')).toBe(false);
+    expect(sameInCommand('https://a.test/a?b', 'https://a.test/a%3Fb')).toBe(false);
+    expect(sameInCommand('https://a.test/old', 'https://a.test/new')).toBe(false);
+    expect(sameInCommand('http://a.test:80/x', 'http://A.TEST/x/')).toBe(true);
+    expect(sameInCommand('not a url', 'not a url')).toBe(false);
+  });
+
+  it('compares as the awk programs do (property)', async () => {
+    const piece = fc.constantFrom(
+      'a',
+      'b',
+      'A',
+      '/',
+      '//',
+      '.',
+      '%2F',
+      '%2f',
+      '%7E',
+      '~',
+      '%41',
+      '%25',
+      '%C3%A9',
+      'é',
+      '+',
+      '%2B',
+      '%20',
+      ' ',
+      '&',
+      '=',
+      '?',
+      '%3F',
+      '%26',
+      '%3D',
+      '%00',
+      '%',
+      '%zz',
+      "'",
+      '[1]',
+      '{x}',
+    );
+    const urlArb = fc
+      .tuple(
+        fc.constantFrom('https://a.test', 'http://A.test:80', 'https://a.test:8443'),
+        fc.array(piece, { maxLength: 6 }),
+        fc.option(fc.array(piece, { maxLength: 6 }), { nil: null }),
+      )
+      .map(([origin, path, query]) =>
+        `${origin}/${path.join('')}${query === null ? '' : `?${query.join('')}`}`.replaceAll(
+          '#',
+          '',
+        ),
+      )
+      .filter((u) => URL.canParse(u));
+    await fc.assert(
+      fc.asyncProperty(fc.array(urlArb, { minLength: 2, maxLength: 12 }), async (urls) => {
+        const byAwk = (
+          await new Promise<Buffer>((resolve, reject) =>
+            execFile(
+              'sh',
+              ['-c', commandOf(normsOf(urls))],
+              { encoding: 'buffer' },
+              (error, out) => (error ? reject(error) : resolve(out)),
+            ),
+          )
+        )
+          .toString('latin1')
+          .split('\n')
+          .slice(0, -1);
+        expect(byAwk).toEqual(urls.map((u) => compared(new URL(u).href)));
+      }),
+      { numRuns: 60, seed: 30 },
+    );
+  });
+});
+
+describe('what the request asks of the server', () => {
+  it('does not pass on an error page that carries the tag', async () => {
+    const html = '<html><head><link rel="canonical" href="/gone"></head><a href="/t">x</a></html>';
+    site = await twoStateSite({
+      broken: (_req, res) => void res.writeHead(404, { 'content-type': 'text/html' }).end(html),
+      fixed: (_req, res) => void res.writeHead(200, { 'content-type': 'text/html' }).end(html),
+    });
+    const page = `${site.base}/gone`;
+    for (const check of [canonicalIs(page, page), linksTo(page, [`${site.base}/t`])]) {
+      const run = commandOf(command(fetchOf(NO_CRAWLER, [page]).fragment, check));
+      site.use('broken');
+      expect((await runCommand(run)).status).not.toBe(0);
+      site.use('fixed');
+      expect((await runCommand(run)).status).toBe(0);
+    }
+  });
+
+  it('reads a page from a server that compresses every response', async () => {
+    const body = gzipSync('<a href="/t">x</a>');
+    const zipped: RequestListener = (_req, res) =>
+      void res
+        .writeHead(200, { 'content-type': 'text/html', 'content-encoding': 'gzip' })
+        .end(body);
+    site = await twoStateSite({ broken: zipped, fixed: zipped });
+    const page = `${site.base}/p`;
+    const run = commandOf(
+      command(fetchOf(NO_CRAWLER, [page]).fragment, linksTo(page, [`${site.base}/t`])),
+    );
+    expect((await runCommand(run)).status).toBe(0);
+  });
+
+  it('reads a page of two megabytes within the time a command is given', async () => {
+    const big =
+      '<html><head><link rel="canonical" href="/big"></head><body>' +
+      Array.from(
+        { length: 6000 },
+        (_, i) =>
+          `<!-- c${i} --><div class="row"><a href="/item/${i}" title="a>b">Item ${i} ${'x'.repeat(250)}</a>\n</div><script>var a${i} = "<a href=/no>";</script>`,
+      ).join('') +
+      '<a href="/t">read more</a></body></html>';
+    expect(big.length).toBeGreaterThan(2_000_000);
+    const s = await serving({ '/big': big });
+    const page = `${s.base}/big`;
+    const started = Date.now();
+    expect(await status(s, ['/big'], linksTo(page, [`${s.base}/t`], [`${s.base}/no`]))).toBe(0);
+    expect(await status(s, ['/big'], canonicalIs(page, page))).toBe(0);
+    expect(await status(s, ['/big'], noLinkSays(page, [crawledWord('read more')]))).not.toBe(0);
+    expect(Date.now() - started).toBeLessThan(10_000);
+  });
 });
 
 describe('canonicalIs', () => {
@@ -505,7 +790,11 @@ describe('listsDiffer', () => {
       '/own-last': `${nav}${items(5)}`,
     });
     const run = (later: string) =>
-      status(s, ['/list', later], listsDiffer(`${s.base}/list`, crawledWord('page=')));
+      status(
+        s,
+        ['/list', later],
+        listsDiffer(`${s.base}/list`, `${s.base}${later}`, crawledWord('page=')),
+      );
     expect(await run('/repeat')).not.toBe(0);
     expect(await run('/repeat-and-sort')).not.toBe(0);
     expect(await run('/repeat-and-unrelated')).not.toBe(0);
@@ -571,7 +860,7 @@ describe('a command over hostile values', () => {
             }),
             part` ; `,
             page,
-            listsDiffer(target, crawledWord(text)),
+            listsDiffer(target, target, crawledWord(text)),
           ),
         );
         expect(built).not.toMatch(/[\r\n]/);
