@@ -146,6 +146,12 @@ describe('the changes job and the jobs it gates', () => {
     },
   );
 
+  // Run 43280365648: shard 6 reached a 60-minute limit (45.4 min of checks, then "Propose
+  // baselines" cancelled at 13.8 min) and shard 1 took 55.7 min, so a failing run left no artifact.
+  it('gives each visual shard 90 minutes, so a failing shard can still propose its baselines', () => {
+    expect((job('visual-shard') as { 'timeout-minutes'?: number })['timeout-minutes']).toBe(90);
+  });
+
   it('security-browser and zap-baseline still need the build', () => {
     expect(needs('security-browser')).toEqual(['build', 'changes']);
     expect(needs('zap-baseline')).toEqual(['build', 'changes']);
