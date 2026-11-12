@@ -138,6 +138,9 @@ link is minted only after the claim (Q10); unsubscribe and recipients are per se
 - The weekly summary reads at most 5,000 changes per account-week; past that it logs `summary.read_capped` and its
   counts are of the rows read.
 - `check_finished` replayed after Inngest's 24-hour idempotency window is counted again.
+- `alert_sent` and `summary_sent` are counted by each run that completes with the mail delivered, `done`
+  included, so a send whose record failed is still counted; an event replayed after Inngest's 24-hour
+  idempotency window is counted again.
 - A fix with no packet is answered `queued` and nothing is sent.
 - The Alerts page shows what `changes.notified` records; a failed or suppressed channel (`alert_events`) is not
   shown.

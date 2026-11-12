@@ -18,7 +18,11 @@ export const SUMMARY_TICK_FN_ID = 'crawlmouse.summary.tick';
 export const SUMMARY_SEND_FN_ID = 'crawlmouse.summary.send';
 /** Accounts per page of the due list: each page's step answer stays under the step output bound. */
 export const SUMMARY_PAGE = 20;
-/** The ledger's three attempts, and one for a claim left busy by a dead worker. */
+/**
+ * Five runs of the send step, as alertFn's email step: a seat's three ledger attempts, the run whose
+ * claim answers `exhausted`, and one for a claim left busy. Every seat advances one attempt per run
+ * (`sendEach`), so the count does not depend on the number of seats.
+ */
 export const SUMMARY_RETRIES = 4;
 
 type Env = Readonly<Record<string, string | undefined>>;

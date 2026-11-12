@@ -1,3 +1,4 @@
+import { NonRetriableError } from 'inngest';
 import { describe, expect, it } from 'vitest';
 import { ALERT_FN_ID, ALERT_RETRIES, createAlertFn, type AlertWork } from './alerts';
 import { inngest } from './client';
@@ -69,5 +70,34 @@ describe('createAlertFn (D5)', () => {
     });
     expect(ids).toEqual(['plan']);
     expect(out).toEqual({ skip: 'first_check' });
+  });
+
+  it('runs the Slack step when the email step failed every retry, then ends the run failed, not retried', async () => {
+    const delivered: string[] = [];
+    const err = await run({
+      plan: async () => ({ fired: 2, channels: ['email', 'slack'] }),
+      deliver: async (_checkId, channel) => {
+        if (channel === 'email') throw new Error('mail send to be retried: provider_503');
+        delivered.push(channel);
+        return { status: 'sent', reason: null };
+      },
+    }).catch((e: unknown) => e);
+    expect(delivered).toEqual(['slack']);
+    expect(err).toBeInstanceOf(NonRetriableError);
+    expect((err as Error).message).toBe('alert channels failed: email');
+  });
+
+  it('runs the email step when the Slack step failed, in the order the plan names them', async () => {
+    const delivered: string[] = [];
+    const err = await run({
+      plan: async () => ({ fired: 1, channels: ['slack', 'email'] }),
+      deliver: async (_checkId, channel) => {
+        if (channel === 'slack') throw new Error('slack send to be retried: slack_503');
+        delivered.push(channel);
+        return { status: 'sent', reason: null };
+      },
+    }).catch((e: unknown) => e);
+    expect(delivered).toEqual(['email']);
+    expect((err as Error).message).toBe('alert channels failed: slack');
   });
 });

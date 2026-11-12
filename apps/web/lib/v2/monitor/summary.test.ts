@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Claim, MailLedger } from '../mail/ledger';
+import { MailRetry } from '../mail/send';
+import type { MailTransport } from '../mail/transport';
 import type { OutgoingMail } from '../mail/types';
 import type { SummaryChange, SummarySite } from '../mail/templates/weekly-summary';
 import { duePage, sendSummary, weekBefore, type SummaryDeps, type SummaryDue } from './summary';
@@ -27,12 +29,23 @@ const change: SummaryChange = {
   detected_at: '2026-11-13T10:00:00.000Z',
 };
 
-function harness(o: { marked?: boolean; sites?: SummarySite[]; linkSecret?: string | null } = {}) {
+function harness(
+  o: {
+    marked?: boolean;
+    sites?: SummarySite[];
+    linkSecret?: string | null;
+    /** Answers for the transport, by address; an address not named is sent. */
+    refuse?: Readonly<Record<string, { code: string; retryable: boolean }>>;
+    /** How many of the first counts throw. */
+    captureFailures?: number;
+  } = {},
+) {
   const sent: OutgoingMail[] = [];
   const captures: unknown[] = [];
   const logs: unknown[] = [];
   const asked: [string, string][] = [];
   const rows = new Map<string, string>();
+  let captureFailures = o.captureFailures ?? 0;
   const ledger: MailLedger = {
     async claim(c): Promise<Claim> {
       if (rows.get(c.key) === 'sent') return { outcome: 'done' };
@@ -60,10 +73,12 @@ function harness(o: { marked?: boolean; sites?: SummarySite[]; linkSecret?: stri
       ledger,
       transport: {
         async send(m) {
+          const refused = o.refuse?.[m.to];
+          if (refused) return { ok: false, ...refused };
           sent.push(m);
           return { ok: true, providerId: 'p' };
         },
-      },
+      } satisfies MailTransport,
       pepper: 'p'.repeat(40),
       now: () => NOW,
       log: (event, fields) => logs.push({ event, fields }),
@@ -74,12 +89,16 @@ function harness(o: { marked?: boolean; sites?: SummarySite[]; linkSecret?: stri
       oneClick: `https://crawlmouse.com/api/unsubscribe?t=${seat}`,
     }),
     capture: async (accountId, properties) => {
+      if (captureFailures > 0) {
+        captureFailures--;
+        throw new Error('capture failed');
+      }
       captures.push({ accountId, properties });
     },
     log: (event, fields) => logs.push({ event, fields }),
     now: () => NOW,
   };
-  return { deps, sent, captures, logs, asked };
+  return { deps, sent, captures, logs, asked, rows };
 }
 
 describe('the week a summary covers', () => {
@@ -124,12 +143,33 @@ describe('sendSummary (D6)', () => {
     expect(JSON.stringify([h.captures, h.logs])).not.toContain('@agency.example');
   });
 
-  it('a retried step sends nobody twice and counts once', async () => {
+  it('a step run again after it completed (a replayed event) sends nobody twice', async () => {
     const h = harness();
     await sendSummary(h.deps, DUE);
     expect(await sendSummary(h.deps, DUE)).toEqual({ sent: 0, outcomes: ['done', 'done'] });
     expect(h.sent).toHaveLength(2);
-    expect(h.captures).toHaveLength(1);
+    // Counted on each run that completes with the mail delivered (spec 28, known gaps).
+    expect(h.captures).toHaveLength(2);
+  });
+
+  it('sends to the next seat when one seat’s send is retried, then retries, and counts once (review r1 B2, N4)', async () => {
+    const refuse = { 'one@agency.example': { code: 'provider_503', retryable: true } };
+    const h = harness({ refuse });
+    await expect(sendSummary(h.deps, DUE)).rejects.toBeInstanceOf(MailRetry);
+    expect(h.sent.map((m) => m.to)).toEqual(['two@agency.example']);
+    expect(h.captures).toEqual([]);
+    delete (refuse as Record<string, unknown>)['one@agency.example'];
+    expect(await sendSummary(h.deps, DUE)).toEqual({ sent: 1, outcomes: ['sent', 'done'] });
+    expect(h.sent.map((m) => m.to)).toEqual(['two@agency.example', 'one@agency.example']);
+    expect(h.captures).toEqual([{ accountId: ACCOUNT, properties: { sites: 1, changes: 1 } }]);
+  });
+
+  it('a summary sent by a run that then failed counts on the retry that finds it done (review r1 N4)', async () => {
+    const h = harness({ captureFailures: 1 });
+    await expect(sendSummary(h.deps, DUE)).rejects.toThrow(/capture failed/);
+    expect(await sendSummary(h.deps, DUE)).toEqual({ sent: 0, outcomes: ['done', 'done'] });
+    expect(h.sent).toHaveLength(2);
+    expect(h.captures).toEqual([{ accountId: ACCOUNT, properties: { sites: 1, changes: 1 } }]);
   });
 
   it('is never sent empty', async () => {

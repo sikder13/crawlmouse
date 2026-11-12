@@ -11,7 +11,8 @@
  */
 import { unsubscribeHeaders } from '../mail/headers';
 import type { UnsubscribeLinks } from '../mail/links';
-import { send, type MailDeps, type SendOutcome } from '../mail/send';
+import { send, type MailDeps } from '../mail/send';
+import { sendEach, type SeatOutcome } from './alerts';
 import { weeklySummaryTemplate, type SummarySite } from '../mail/templates/weekly-summary';
 
 export interface SummaryDue {
@@ -44,7 +45,7 @@ export interface SummaryDeps {
 
 export type SummaryAnswer =
   | { skip: 'no_account' | 'marked' | 'empty' | 'no_link_secret' | 'no_recipients' }
-  | { sent: number; outcomes: SendOutcome[] };
+  | { sent: number; outcomes: SeatOutcome[] };
 
 /** The offset of `zone` from UTC at `ms`, in milliseconds. */
 function offsetMs(zone: string, ms: number): number {
@@ -103,29 +104,29 @@ export async function sendSummary(deps: SummaryDeps, due: SummaryDue): Promise<S
   const recipients = await deps.store.recipients(due.accountId);
   if (recipients.length === 0) return { skip: 'no_recipients' };
   const now = deps.now();
-  const outcomes: SendOutcome[] = [];
-  for (const r of recipients) {
+  const { outcomes, retry } = await sendEach(recipients, (r) => {
     const links = deps.unsubscribeLinks(secret, r.seatId, now);
-    outcomes.push(
-      await send(deps.mail, {
-        kind: 'weekly_summary',
-        to: r.email,
-        idempotencyKey: `summary:${due.accountId}:${due.weekKey}:${r.seatId}`,
-        accountId: due.accountId,
-        render: async () =>
-          weeklySummaryTemplate({
-            since,
-            until: due.weekStart,
-            zone: account.zone,
-            sites,
-            unsubscribeUrl: links.page,
-          }),
-        headers: () => unsubscribeHeaders({ url: links.oneClick }),
-      }),
-    );
-  }
+    return send(deps.mail, {
+      kind: 'weekly_summary',
+      to: r.email,
+      idempotencyKey: `summary:${due.accountId}:${due.weekKey}:${r.seatId}`,
+      accountId: due.accountId,
+      render: async () =>
+        weeklySummaryTemplate({
+          since,
+          until: due.weekStart,
+          zone: account.zone,
+          sites,
+          unsubscribeUrl: links.page,
+        }),
+      headers: () => unsubscribeHeaders({ url: links.oneClick }),
+    });
+  });
+  // Every seat had its attempt this run; a retry now moves only the seats not yet sent.
+  if (retry !== null) throw retry;
   const sent = outcomes.filter((o) => o === 'sent').length;
-  if (sent > 0) {
+  // Counted on the run that completes, so a summary first sent by a run that then failed counts.
+  if (outcomes.some((o) => o === 'sent' || o === 'done')) {
     await deps.capture(due.accountId, {
       sites: sites.length,
       changes: sites.reduce((n, s) => n + s.changes.length, 0),
