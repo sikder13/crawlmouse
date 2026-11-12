@@ -72,8 +72,9 @@ export const FUNNEL_EVENTS = [
   'account_restored',
   'account_purged',
   // CC-29 — the public pages that sell, sent from the server through captureServerEvent and gated by
-  // serverCaptureAllowed: `pricing_viewed` at the pricing page's per-request render, `plan_chosen
-  // {plan, interval}` when a plan button starts its flow, and `report_viewed {kind}` from the shared
+  // serverCaptureAllowed: `pricing_viewed` at the pricing page's per-request render; `plan_chosen
+  // {plan, interval}` from POST /api/agency-trial only, since Free's and Pro's buttons start on pages
+  // and routes CC-29 does not change and send none; and `report_viewed {kind}` from the shared
   // report's view beacon (the page is cached). The Agency trial sends CC-25's `trial_started` with
   // `{kind: 'agency', variant: 'card_required', stage: 'checkout_opened'}`; a v2 mint sends SPEC 04's
   // `report_minted` with `{kind: 'v2'}`.
