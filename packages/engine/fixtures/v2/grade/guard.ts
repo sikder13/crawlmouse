@@ -143,7 +143,7 @@ export const readerDigest = (): string => digestOf(closureOf(['v2/content/read.t
 
 function outcomeOf(input: GradeInput, access: AccessDetection[] = []) {
   const g = gradeCheck(input);
-  const { outcomes, overview } = detectorOutcomes(g, access, input.structure, NOTHING_WRITTEN);
+  const { outcomes, overview } = detectorOutcomes(g, access, input.structure, [], NOTHING_WRITTEN);
   return {
     technical_seo: g.technical_seo,
     ai_readability: g.ai_readability,

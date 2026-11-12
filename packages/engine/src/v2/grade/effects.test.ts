@@ -27,7 +27,7 @@ function blog(n: number, unanswered: number, cells: Cells = {}, extra: PageSpec[
   const grades = gradeCheck(input);
   return {
     grades,
-    ...detectorOutcomes(grades, access, input.structure, writtenFrom(factsFor(input))),
+    ...detectorOutcomes(grades, access, input.structure, [], writtenFrom(factsFor(input))),
   };
 }
 
@@ -42,7 +42,7 @@ function scored(n: number, unanswered: number, cells: Cells = {}, extra: PageSpe
   const grades: Grades = { ...g, inputs, ai_readability: aiFrom(inputs.ai) };
   return {
     grades,
-    ...detectorOutcomes(grades, access, input.structure, writtenFrom(factsFor(input))),
+    ...detectorOutcomes(grades, access, input.structure, [], writtenFrom(factsFor(input))),
   };
 }
 
@@ -153,6 +153,7 @@ describe('the author and date fix, end to end', () => {
       grades,
       access,
       input.structure,
+      [],
       writtenFrom(factsFor(input)),
     );
     const [fix] = fixes(outcomes).filter((f) => f.type === 'missing_author_date');
@@ -610,6 +611,7 @@ describe('the structure counterfactuals, by hand', () => {
       grades,
       access,
       input.structure,
+      [],
       writtenFrom(factsFor(input)),
     );
     expect(overview.technical_seo).toBe(round(fixed.score! - grades.technical_seo.score!));
@@ -966,6 +968,7 @@ describe('the outcomes', () => {
       grades,
       access,
       input.structure,
+      [],
       writtenFrom(factsFor(input)),
     );
     const respected = access.filter((r) => r.state === 'detected' && !r.opens_fix);

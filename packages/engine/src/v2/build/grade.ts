@@ -16,6 +16,7 @@ import { enumerateFixes } from '../../projection/ledger.js';
 import { detectAccess } from '../access/index.js';
 import type { AccessResult } from '../access/types.js';
 import { subjectOfKey } from '../detectors/fingerprint.js';
+import { detectRendered } from '../detectors/rendered.js';
 import { detectStructure } from '../detectors/index.js';
 import type { Detection } from '../detectors/types.js';
 import type { DetectorOutcome } from '../diff/types.js';
@@ -88,7 +89,13 @@ export function gradeAssembled(
     edges: assembled.edges,
     access_tests: assembled.access_tests,
   };
-  const { outcomes } = detectorOutcomes(grades, access.detections, structure, writtenFrom(facts));
+  const { outcomes } = detectorOutcomes(
+    grades,
+    access.detections,
+    structure,
+    detectRendered(withOrphans),
+    writtenFrom(facts),
+  );
   const pages = withOrphans.map((p) => ({
     ...p,
     content_failures: grades.content_failures.get(p.url) ?? null,

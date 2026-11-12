@@ -1,6 +1,7 @@
 /**
- * The diff's input (`DetectorOutcome`, diff/types.ts) from the three detector families' records: the
- * structure detectors (CC-16), the access detectors (CC-15) and the content checks. A detected record
+ * The diff's input (`DetectorOutcome`, diff/types.ts) from the four detector families' records: the
+ * structure detectors (CC-16), the access detectors (CC-15), the content checks and the rendered-page
+ * detector (detectors/rendered.ts). A detected record
  * that opens a fix carries a draft with its computed effect and rank (effects.ts); a record not
  * detected, or that could not decide, carries its state.
  *
@@ -18,8 +19,10 @@ import { FIX_SECTION } from '../diff/subjects.js';
 import type { DetectorOutcome, FixDraft } from '../diff/types.js';
 import { namesOnePage, templateNoun } from '../build/template-noun.js';
 import { subjectOfKey } from '../detectors/fingerprint.js';
+import type { RenderedDetection } from '../detectors/rendered.js';
 import type { Detection } from '../detectors/types.js';
 import { clean } from '../packets/text.js';
+import { PAGES_PER_FIX_TEMPLATE } from '../render/sample.js';
 import { effectsOf, type FixRecord } from './effects.js';
 
 import type { Grades } from './index.js';
@@ -40,6 +43,21 @@ export const STRUCTURE_CLASS: Readonly<Partial<Record<FixType, RecommendationCla
 /** The structure detectors read our own crawl, so a finding is likely, not confirmed. */
 const CRAWL_CONFIDENCE: Confidence = 'likely';
 
+/**
+ * A client-rendered template is a documented requirement: Google's "Understand the JavaScript SEO
+ * basics" says server-side rendering or pre-rendering is still a good idea because not all bots can
+ * run JavaScript (read 2026-11-12). The same class as the structure rules a search engine documents.
+ */
+export const RENDERED_CLASS: RecommendationClass = 'documented_requirement';
+
+/**
+ * A browser measured the template's pages: confirmed once PAGES_PER_FIX_TEMPLATE of them were rendered
+ * (the detector opens a fix only when its rendered pages agree), likely on fewer. One page shows a
+ * page; the render planner renders PAGES_PER_FIX_TEMPLATE of an open fix's template on the next check.
+ */
+export const renderedConfidence = (r: Pick<RenderedDetection, 'extent'>): Confidence =>
+  r.extent.rendered >= PAGES_PER_FIX_TEMPLATE ? 'confirmed' : 'likely';
+
 /** "its" or "their", for the pages a template key names. */
 const possessive = (key: string) => (namesOnePage(key) ? 'its' : 'their');
 
@@ -56,6 +74,7 @@ export const TITLES: Readonly<Partial<Record<FixType, (subject: string) => strin
   canonical_mismatch: (s) => `Correct the canonical of ${s}`,
   hreflang_gap: (s) => `Complete the hreflang annotations of ${s}`,
   edge_rule_blocks_crawler: (s) => `Let ${s} through the user-agent rule`,
+  client_rendered_template: (k) => `Serve the text of ${templateNoun(k)} without JavaScript`,
   quotable_opening: (k) => `Open ${templateNoun(k)} with a direct answer`,
   missing_author_date: (k) => `Show an author and a date on ${templateNoun(k)}`,
   specs_as_images: (k) => `Give the specifications on ${templateNoun(k)} as text`,
@@ -128,6 +147,21 @@ function draft(
       crawler_uas: [],
     };
   }
+  if (f.family === 'rendered') {
+    const r = f.record;
+    return {
+      ...base,
+      type: r.type,
+      section: FIX_SECTION[r.type],
+      title: titleOf(r.type, r.template_key),
+      recommendation_class: RENDERED_CLASS,
+      confidence: renderedConfidence(r),
+      affected_pages: r.affected_urls.length,
+      // the render planner renders more pages of an open fix's template (build/plan.ts)
+      template_key: r.template_key,
+      crawler_uas: [],
+    };
+  }
   const r = f.record;
   const type: StructureType = r.type;
   return {
@@ -153,6 +187,7 @@ export function detectorOutcomes(
   grades: Grades,
   access: readonly AccessDetection[],
   structure: readonly Detection[],
+  rendered: readonly RenderedDetection[],
   written: WriteFix,
 ): Outcomes {
   const records: FixRecord[] = [
@@ -161,6 +196,7 @@ export function detectorOutcomes(
       .filter((r) => r.state !== 'detected' || r.opens_fix)
       .map((record) => ({ family: 'access' as const, record })),
     ...grades.content_detections.map((record) => ({ family: 'content' as const, record })),
+    ...rendered.map((record) => ({ family: 'rendered' as const, record })),
   ];
   const fixes = records.filter((f) => f.record.state === 'detected');
   const { byFix, overview } = effectsOf(grades.inputs, fixes);
