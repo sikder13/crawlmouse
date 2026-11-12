@@ -91,7 +91,7 @@ describe('the orphan_pages packet', () => {
     const p = packetOf('orphan_pages', record, withParent(input, orphan, `${base}/hub`));
     expect(p.verify.ua).toBe('GPTBot');
     expect(p.verify.command).toMatch(
-      /^curl -sS -f --compressed -A '[^']*GPTBot[^']*' -w '[^']*' 'https:\/\/a\.test\/hub' \| /,
+      /^curl -sS -f --compressed --max-time 20 -A '[^']*GPTBot[^']*' -w '[^']*' 'https:\/\/a\.test\/hub' \| /,
     );
     expect(p.verify.command).toMatch(
       / \| LC_ALL=C awk '.*' '0' '1' 'https:\/\/a\.test\/products\/lantern'$/,
@@ -102,7 +102,7 @@ describe('the orphan_pages packet', () => {
     });
     expect(none.verify.ua).toBeNull();
     expect(none.verify.command).toMatch(
-      /^curl -sS -f --compressed -w '[^']*' 'https:\/\/a\.test\/hub' \| /,
+      /^curl -sS -f --compressed --max-time 20 -w '[^']*' 'https:\/\/a\.test\/hub' \| /,
     );
   });
 
@@ -185,7 +185,7 @@ describe('the orphan_pages packet', () => {
     );
     expect(p.verify.see).toEqual({
       command: expect.stringMatching(
-        /^curl -sS -A '[^']*GPTBot[^']*' '[^']*\/hub' \| grep -io '<a \[\^>\]\*>' \| grep -F -e '\/products\/lantern'$/,
+        /^curl -sS --compressed --max-time 20 -A '[^']*GPTBot[^']*' '[^']*\/hub' \| tr '[^']*' ' {3}' \| grep -aioE '<a \[\^>\]\*>' \| grep -F -e '\/products\/lantern"' .* -e '\/products\/lantern>'$/,
       ),
       today: `Nothing: the crawl found no link to \`${url}\` on any page.`,
       after:
@@ -208,6 +208,85 @@ describe('the orphan_pages packet', () => {
       withParent(live, url, `${served.base}/hub`),
     );
     expect((await inBothStates(served, p.verify.command)).fixed.status).not.toBe(0);
+  });
+
+  // round 3, correctness finding 1: the readable command kept a tag by the path alone, so it printed
+  // a link to /products/lantern-oil while `today` read "Nothing"
+  it('the readable command prints no link to another page whose path starts the same', async () => {
+    const other = ['/products/lantern-oil', '/products/lantern-2?x=1', '/products'];
+    served = await servedSite({
+      broken: { '/hub': anchors(other) },
+      fixed: { '/hub': anchors([...other, '/products/lantern?ref=hub']) },
+    });
+    const live = orphanSite(served.base);
+    const url = `${served.base}/products/lantern`;
+    const p = packetOf(
+      'orphan_pages',
+      detected(detectOrphans(live), url),
+      withParent(live, url, `${served.base}/hub`),
+    );
+    expect(p.verify.see?.today).toMatch(/^Nothing: /);
+    const printed = await seen(served, p);
+    expect(printed.broken).toBe('');
+    expect(printed.fixed).toBe('<a href="/products/lantern?ref=hub">\n');
+  });
+
+  // round 3, correctness finding 3: "1 other pages" survived the plural property, which could not
+  // see a count behind an adjective and built no record with one other page
+  it('takes the singular at one other page', () => {
+    const two = site([{ path: base }, { path: orphan }], { homepage: base });
+    const p = packetOf(
+      'orphan_pages',
+      detected(detectOrphans(two), orphan),
+      withParent(two, orphan, null),
+    );
+    expect(p.context[0]).toBe(
+      '`https://a.test/products/lantern` has no link from another page: the crawl read 1 other page that answered 200, and none links to it.',
+    );
+  });
+
+  // round 3, security finding 2 (wording): the command requested the homepage and did not name the
+  // address, which is another one when the homepage's request ends elsewhere
+  it('with no suggested parent, names the address the command requests for the homepage', () => {
+    const live = site(
+      [
+        { path: base, links: [`${base}/hub`], facts: { final_url: `${base}/en/` } },
+        { path: `${base}/hub`, links: [base] },
+        { path: orphan },
+      ],
+      { homepage: base },
+    );
+    const p = packetOf(
+      'orphan_pages',
+      detected(detectOrphans(live), orphan),
+      withParent(live, orphan, null),
+    );
+    expect(p.verify.command).toContain(" 'https://a.test/en/' | ");
+    expect(p.verify.expect).toContain(
+      'so the command requests the homepage, `https://a.test/en/` (where `https://a.test` answers): put the URL of the page you added the link to in its place.',
+    );
+  });
+
+  // round 3, SEO note 3: the step named /hub/ and the line after it /hub, in one packet
+  it('names the suggested parent at one address throughout', () => {
+    const live = site(
+      [
+        { path: base, links: [`${base}/hub`] },
+        { path: `${base}/hub`, links: [base], facts: { final_url: `${base}/hub/` } },
+        { path: orphan },
+      ],
+      { homepage: base },
+    );
+    const p = packetOf(
+      'orphan_pages',
+      detected(detectOrphans(live), orphan),
+      withParent(live, orphan, `${base}/hub`),
+    );
+    expect(p.change[0]).toContain(' on `https://a.test/hub/`. ');
+    expect(p.change[1]).toBe(
+      '`https://a.test/hub/` is 1 click from the homepage, so this link also puts the page within 3.',
+    );
+    expect(p.change.join(' ')).not.toContain('`https://a.test/hub`');
   });
 
   it('says when a link on the suggested parent leaves the page deep', () => {

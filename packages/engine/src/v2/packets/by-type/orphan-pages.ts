@@ -5,8 +5,8 @@
  * Verify fetches the page the link goes on, at the address its content was read at (served-at.ts
  * `readAt`: a homepage that answers at `/en/` is requested there), and looks for an `<a>` to the
  * orphan. With no suggested parent there is no such page to name: the command then requests the
- * homepage, which holds no link to the orphan today, and its `expect` tells the developer to put
- * their own page in its place.
+ * homepage, which holds no link to the orphan today, and its `expect` names the address requested
+ * and tells the developer to put their own page in its place.
  *
  * A page no link reaches is also a deep page, so the same URL can carry a deep_pages fix. The two
  * packets name one page when they can (deep-pages.ts `linkFrom`): this one says how far the suggested
@@ -18,9 +18,12 @@ import { servedAt } from '../served-at.js';
 import {
   addressesOf,
   clicksFromHome,
+  code,
   CRAWLABLE_LINK,
+  fitting,
+  MARKER_LIMIT,
   pathOf,
-  pathWord,
+  pathWords,
   plural,
   readShown,
   rowOf,
@@ -29,21 +32,25 @@ import {
   TAGS,
   titleOf,
 } from '../structure.js';
-import { code, count, line, type Line } from '../text.js';
+import { count, line, type Line } from '../text.js';
 import type { PacketEntry, PacketFacts } from '../types.js';
 
-/** Whether a link on the suggested parent also brings the page within the depth the audit counts as healthy. */
+/**
+ * Whether a link on the suggested parent also brings the page within the depth the audit counts as
+ * healthy. The parent is named at the address it is served at, as the step before this one names it.
+ */
 function depthLine(facts: PacketFacts, parent: string): Line {
   const clicks = clicksFromHome(facts).get(parent);
+  const shown = code(servedAt(facts, parent));
   if (clicks === undefined) {
-    return line`No path of links from the homepage reaches ${code(parent)} either, so with this link alone the page stays out of reach of the homepage: where the audit lists a deep-page fix for this URL, it names a page close enough for both.`;
+    return line`No path of links from the homepage reaches ${shown} either, so with this link alone the page stays out of reach of the homepage: where the audit lists a deep-page fix for this URL, it names a page close enough for both.`;
   }
   return clicks < MAX_HEALTHY_DEPTH
-    ? line`${code(parent)} is ${count(clicks)} ${plural(clicks, 'click', 'clicks')} from the homepage, so this link also puts the page within ${count(MAX_HEALTHY_DEPTH)}.`
-    : line`${code(parent)} is ${count(clicks)} clicks from the homepage, so with this link alone the page is more than ${count(MAX_HEALTHY_DEPTH)} clicks deep: where the audit lists a deep-page fix for this URL, it names a page close enough for both.`;
+    ? line`${shown} is ${count(clicks)} ${plural(clicks, 'click', 'clicks')} from the homepage, so this link also puts the page within ${count(MAX_HEALTHY_DEPTH)}.`
+    : line`${shown} is ${count(clicks)} clicks from the homepage, so with this link alone the page is more than ${count(MAX_HEALTHY_DEPTH)} clicks deep: where the audit lists a deep-page fix for this URL, it names a page close enough for both.`;
 }
 
-export const orphanPages: PacketEntry<'orphan_pages'> = {
+export const orphanPages: PacketEntry<'orphan_pages'> = fitting({
   kind: 'builder',
   context: (fix, facts) => {
     const url = subjectOf(fix);
@@ -86,17 +93,17 @@ export const orphanPages: PacketEntry<'orphan_pages'> = {
     const on = parent ?? facts.homepage_url;
     const fetch = fetchOf(facts, [on]);
     return {
-      command: command(fetch.fragment, holds(linksTo(addressesOf(facts, url)))),
+      command: command(holds(fetch, linksTo(addressesOf(facts, url)))),
       expect:
         parent === null
-          ? line`Exit status 0 once the page requested holds an <a> whose href is ${shown}, however the URL is written. The audit suggests no parent, so the command requests the homepage: put the URL of the page you added the link to in its place. Today no crawled page holds such a link.`
-          : line`Exit status 0 once ${readShown(facts, parent)} holds an <a> whose href is ${shown}, however the URL is written. Today no crawled page holds such a link.`,
+          ? line`Exit status 0 once the page requested holds an <a> whose href is ${shown}, however the URL is written. The audit suggests no parent, so the command requests the homepage, ${readShown(facts, on)}: put the URL of the page you added the link to in its place. Today no crawled page holds such a link. ${MARKER_LIMIT}`
+          : line`Exit status 0 once ${readShown(facts, parent)} holds an <a> whose href is ${shown}, however the URL is written. Today no crawled page holds such a link. ${MARKER_LIMIT}`,
       ua: fetch.ua,
       see: {
-        command: seeTags(facts, [on], TAGS.a, [pathWord(url)]),
+        command: seeTags(facts, [on], TAGS.a, pathWords(url)),
         today: line`Nothing: the crawl found no link to ${shown} on any page.`,
         after: line`The <a> tag you added: a line that holds ${code(pathOf(url))}. A link that spells the path another way is not printed; the exact check reads it.`,
       },
     };
   },
-};
+});

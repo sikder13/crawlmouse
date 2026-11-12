@@ -8,13 +8,26 @@
  * without case, with runs of spaces collapsed and the tags inside a link removed, which is how the
  * crawl reads link text. It also needs the page to have a link at all, so a page that was not served,
  * or whose links were removed, does not pass. It knows the recorded phrases and no others: a link
- * changed to another stock phrase passes the command and is judged on the next check.
+ * changed to another stock phrase passes the command and is judged on the next check. A link text
+ * longer than the program reads (html-checks.ts `CAP`) counts as a recorded one.
  */
 import { TOP_HUB_FRACTION } from '../../detectors/thresholds.js';
-import { command, fetchOf, holds, listed, noLinkSays } from '../html-checks.js';
+import { CAP, command, fetchOf, holds, listed, noLinkSays } from '../html-checks.js';
 import { crawledWord } from '../shell.js';
-import { filedLinks, plural, readShown, seeTags, subjectOf, TAGS, titleOf } from '../structure.js';
-import { clean, code, count, line, list, ours, type Line } from '../text.js';
+import {
+  code,
+  filedLinks,
+  fitting,
+  list,
+  MARKER_LIMIT,
+  plural,
+  readShown,
+  seeTags,
+  subjectOf,
+  TAGS,
+  titleOf,
+} from '../structure.js';
+import { clean, count, line, ours, type Line } from '../text.js';
 import type { PacketEntry, PacketFacts, RecordOf } from '../types.js';
 
 /** The generic links a packet lists one by one, and the distinct texts its command names. */
@@ -53,7 +66,7 @@ function distinctTexts(links: readonly GenericLink[]): string[] {
   return out;
 }
 
-export const genericAnchorText: PacketEntry<'generic_anchor_text'> = {
+export const genericAnchorText: PacketEntry<'generic_anchor_text'> = fitting({
   kind: 'builder',
   context: (fix) => {
     const hub = subjectOf(fix);
@@ -108,13 +121,13 @@ export const genericAnchorText: PacketEntry<'generic_anchor_text'> = {
     const seen = named.slice(0, MAX_SEEN);
     const unseen = texts.length - seen.length;
     return {
-      command: command(fetch.fragment, holds(noLinkSays(named.map(wordOf)))),
-      // what the command leaves out is said before the list, which a long line is cut in
-      expect: line`Exit status 0 once ${on} has links and the first link to each target says none of the recorded generic texts${ours(left === 0 ? '' : ` the command names (it leaves ${left} of the ${texts.length} out, for length)`)}: ${list(
+      command: command(holds(fetch, noLinkSays(named.map(wordOf)))),
+      // what the command leaves out is said before the list, which a long line is shortened in
+      expect: line`Exit status 0 once ${on} has links and the first link to each target says none of these recorded generic texts${ours(left === 0 ? '' : ` (${left} of the ${texts.length} are left out, for length)`)}: ${list(
         named.map((t) => code(t, MAX_TEXT_CHARS)),
         MAX_TEXTS,
         'text',
-      )}, compared without case, with spaces collapsed and the tags inside a link removed. The crawl keeps one text for a target, the first, so a later link to the same target is not read. The command knows these recorded phrases only: another stock phrase in their place passes it, and is judged on the next check. Today the crawl recorded ${count(generic)} such ${plural(generic, 'link', 'links')}.`,
+      )}. Case, runs of spaces and tags inside a link are ignored; a text over ${count(CAP)} bytes counts as generic. A later link to the same target is not read, as in the crawl, and another stock phrase passes: it is judged on the next check. ${MARKER_LIMIT}`,
       ua: fetch.ua,
       see: {
         command: seeTags(facts, [hub], TAGS.aWithText, seen.map(wordOf), true),
@@ -127,4 +140,4 @@ export const genericAnchorText: PacketEntry<'generic_anchor_text'> = {
       },
     };
   },
-};
+});

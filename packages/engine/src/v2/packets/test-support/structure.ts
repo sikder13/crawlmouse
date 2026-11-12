@@ -6,11 +6,16 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import fc from 'fast-check';
 import { expect } from 'vitest';
 import { FixPacketSchema, type FixType, type PageResult } from '@crawlmouse/types/v2';
-import { page, type PageSpec } from '../../../../fixtures/v2/detectors/builders.js';
+import {
+  page,
+  simhashAway,
+  site,
+  type PageSpec,
+} from '../../../../fixtures/v2/detectors/builders.js';
 import { canonicalizeUrl } from '../../../url-canonical.js';
 import { readPage } from '../../../../../worker/src/reader/read.js';
 import type { CrawlerAccess } from '../../access/types.js';
-import type { Detection } from '../../detectors/types.js';
+import type { Detection, DetectorInput } from '../../detectors/types.js';
 import { writePacket } from '../registry.js';
 import type { FixPacket, PacketFacts } from '../types.js';
 import { hostileText, outsideCodeSpans, UNSHOWN } from './hostile.js';
@@ -51,8 +56,23 @@ export function proseOf(packet: FixPacket): string[] {
   ]);
 }
 
-/** A count of one before a plural: "1 redirects". */
-export const ONE_OF_MANY = /\b1 (?!carries\b)[a-z]+s\b/;
+/** The nouns the structure packets count. */
+const COUNTED =
+  'pages|links|redirects|clicks|texts|tags|values|annotations|hops|lines|items|crawlers|characters|bits|bytes';
+
+/**
+ * Each place `text` says 1 of something in the plural, outside its code spans: "1 redirects", and
+ * with a word or two between, "1 other pages", "1 more generic links". "1 page links to" is a page
+ * that links, and "1 of the 3 carries" one of several: they stay.
+ */
+export function pluralsAtOne(text: string): string[] {
+  const ours = outsideCodeSpans(text).replace(/\b1 page links to\b/g, '');
+  return [
+    ...(ours.match(/\b1 (?!carries\b)[a-z]+s\b/g) ?? []),
+    ...(ours.match(new RegExp(`\\b1 (?:[a-z]+ ){1,2}(?:${COUNTED})\\b`, 'g')) ?? []),
+  ];
+}
+
 /** An identifier of this repository's: an enum value or a key, in snake case. */
 export const IDENTIFIER = /[a-z]+_[a-z_]+/;
 
@@ -65,7 +85,7 @@ export const IDENTIFIER = /[a-z]+_[a-z_]+/;
 export function expectOwnWords(packet: FixPacket): void {
   for (const text of proseOf(packet)) {
     const ours = outsideCodeSpans(text);
-    expect(ours, text).not.toMatch(ONE_OF_MANY);
+    expect(pluralsAtOne(text), text).toEqual([]);
     expect(ours, text).not.toMatch(IDENTIFIER);
   }
 }
@@ -83,7 +103,7 @@ export async function seen(
   for (const text of [expected, see.today, see.after]) expect(text).not.toContain('(line cut');
   expect(see.command.startsWith('curl -sS '), see.command).toBe(true);
   // read in ten seconds: short besides the URLs, the user agent and the texts it looks for
-  expect(outsideQuotes(see.command).length, see.command).toBeLessThan(120);
+  expect(outsideQuotes(see.command).length, see.command).toBeLessThan(200);
   expect(see.command).not.toMatch(/awk|ARGV/);
   site.use('broken');
   const broken = await runCommand(see.command);
@@ -302,4 +322,99 @@ export const SPELLINGS: [name: string, recorded: string, written: string[]][] = 
   ],
   ['a space', '/my%20page', ['<a href="/my page">x</a>', '<a href="/my%20page">x</a>']],
   ['a quote', '/say%22hi%22', [`<a href='/say"hi"'>x</a>`, '<a href="/say&quot;hi&quot;">x</a>']],
+];
+
+/**
+ * Sites whose detected records are as large as a crawl can make them, with URLs made by `u` on
+ * `origin`: an orphan and a deep page; a hub of thirty generic links with long texts; a redirect
+ * chain and a canonical on a redirect, each linked from ten pages; a list whose second page names
+ * the first as canonical and repeats it; an hreflang cluster of fourteen pages whose first names
+ * none of the others back, under twelve invalid values, and names twelve alternates that are gone.
+ */
+export function largestSites(origin: string, u: (name: string) => string): DetectorInput[] {
+  const home = { homepage: origin };
+  const hash = '0123456789abcdef';
+  const members = Array.from({ length: 14 }, (_, i) => u(`m${i}`));
+  const gone = Array.from({ length: 12 }, (_, i) => u(`gone${i}`));
+  const linkers = Array.from({ length: 10 }, (_, i) => u(`l${i}`));
+  const list = u('list').slice(0, -8);
+  /** `site`, with a short text on each link: the fixture's own names the target, which is long here. */
+  const siteOf = (pages: PageSpec[]): DetectorInput =>
+    site(
+      pages.map((p) => ({
+        ...p,
+        links: p.links?.map((l) => (typeof l === 'string' ? { to: l, anchor: 'a link' } : l)),
+      })),
+      home,
+    );
+  return [
+    siteOf([
+      { path: origin, links: [u('a')] },
+      { path: u('a'), links: [u('b')] },
+      { path: u('b'), links: [u('c')] },
+      { path: u('c'), links: [u('d')] },
+      { path: u('d'), links: [origin] },
+      { path: u('orphan') },
+    ]),
+    siteOf([
+      {
+        path: u('hub'),
+        pr: 0.9,
+        links: Array.from({ length: 30 }, (_, i) => ({
+          to: u(`t${i}`),
+          anchor: `${"click 'here' ".repeat(15)}${i}`,
+          generic: true,
+        })),
+      },
+      { path: origin, pr: 0.01, links: [u('hub')] },
+      ...Array.from({ length: 30 }, (_, i): PageSpec => ({ path: u(`t${i}`), pr: 0.01 })),
+    ]),
+    siteOf([
+      { path: origin, links: linkers },
+      ...linkers.map((l): PageSpec => ({ path: l, links: [u('old'), u('p')] })),
+      { path: u('old'), facts: { final_url: u('new'), redirect: { hops: 4, loop: false } } },
+      { path: u('p'), facts: { canonical: { href: u('t') } } },
+      { path: u('t'), facts: { final_url: u('t2'), canonical: { href: u('t2') } } },
+      { path: u('t2'), facts: { canonical: { href: u('t2') } } },
+    ]),
+    siteOf([
+      { path: origin, links: [list] },
+      {
+        path: list,
+        links: [`${list}?page=2`],
+        facts: { simhash: hash, canonical: { href: list } },
+      },
+      {
+        path: `${list}?page=2`,
+        template: '/list/{slug}',
+        kind: 'pagination',
+        facts: { simhash: simhashAway(hash, 1), canonical: { href: list } },
+      },
+    ]),
+    siteOf([
+      { path: origin, links: members },
+      ...members.map(
+        (m, i): PageSpec => ({
+          path: m,
+          facts: {
+            hreflang:
+              i === 0
+                ? [
+                    ...gone.map((href, j) => ({ lang: `not-a-code-${j}`, href })),
+                    { lang: 'en', href: u('elsewhere') },
+                  ]
+                : members.map((href, j) => ({ lang: `l${j}`, href })),
+          },
+        }),
+      ),
+      ...gone.map((g): PageSpec => ({ path: g, status: 404 })),
+    ]),
+  ];
+}
+
+/** Every string of a packet: its prose in every body, and its two commands. */
+export const stringsOf = (packet: FixPacket): string[] => [
+  ...proseOf(packet),
+  packet.verify.command,
+  ...(packet.verify.see === null ? [] : [packet.verify.see.command]),
 ];

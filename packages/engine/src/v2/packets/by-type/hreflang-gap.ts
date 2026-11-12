@@ -13,7 +13,7 @@
  * members the record names: the pages it must name back, and the values and targets it must stop
  * carrying. Google recommends an x-default and does not require one, and the audit keeps the fix open
  * until the marked pages have one (detectors/hreflang-gaps.ts `judge`), so the command asks for it
- * whenever the record proves one missing, and its `expect` says why. The command requests no alternate, reads
+ * whenever the record proves one missing; the step for it says why. The command requests no alternate, reads
  * no HTTP `Link` header and no sitemap, and checks a value's form, not the registry of codes: its
  * `expect` says so.
  */
@@ -24,8 +24,12 @@ import { command, fetchOf, holds, hreflangHolds, listed, spelled } from '../html
 import { servedAt } from '../served-at.js';
 import { crawledWord, url } from '../shell.js';
 import {
+  code,
   DOCS_READ,
+  fitting,
   GOOGLE_DOCS,
+  list,
+  MARKER_LIMIT,
   NEXT_LIMITED_BOTS_SOURCE,
   NEXT_METADATA,
   NEXT_STREAMING,
@@ -36,7 +40,7 @@ import {
   subjectOf,
   TAGS,
 } from '../structure.js';
-import { code, count, line, list, ours, type Line, type Safe } from '../text.js';
+import { count, line, ours, type Line, type Safe } from '../text.js';
 import type { Change, PacketEntry, PacketFacts, RecordOf } from '../types.js';
 
 type Fix = RecordOf<'hreflang_gap'>;
@@ -209,7 +213,7 @@ function nextjs(fix: Fix): Change | null {
   };
 }
 
-export const hreflangGap: PacketEntry<'hreflang_gap'> = {
+export const hreflangGap: PacketEntry<'hreflang_gap'> = fitting({
   kind: 'builder',
   context: (fix, facts) => {
     const marked = fix.affected_urls.length;
@@ -254,15 +258,14 @@ export const hreflangGap: PacketEntry<'hreflang_gap'> = {
     const left =
       needs.back.length - back.length + stale.length - goneValues.length - goneUrls.length;
     const others = ours(
-      fix.affected_urls.length === 1
-        ? ''
-        : ' The command reads the first of the pages marked; the others are measured again on the next check.',
+      fix.affected_urls.length === 1 ? '' : ' Only the first marked page is read.',
     );
     const today = annotationsOf(facts, needs.page) ?? [];
+    const asked = needs.back.length + stale.length;
     return {
       command: command(
-        fetch.fragment,
         holds(
+          fetch,
           hreflangHolds({
             self: own,
             fallback,
@@ -272,12 +275,13 @@ export const hreflangGap: PacketEntry<'hreflang_gap'> = {
           }),
         ),
       ),
-      // what the command leaves out is said before the lists, which a long line is cut in
-      expect: line`Exit status 0 once ${code(own)} lists itself under a value with the form of a language code${ours(fallback ? ' and holds an x-default' : '')}, and carries no value of another form.${ours(fallback ? " Google recommends an x-default and does not require one; the audit's fix stays open until an x-default is present, so the command asks for it." : '')}${ours(left === 0 ? '' : ` Of the ${needs.back.length + stale.length} URLs and values that follow, the command leaves ${left} out: it names what fits its length.`)}${ours(needs.back.length === 0 ? '' : ' It must also name ')}${pagesShown(needs.back, MAX_NAMED)}${ours(needs.back.length === 0 ? '' : '.')}${ours(stale.length === 0 ? '' : ' It must no longer hold ')}${list(
+      // what the command leaves out and does not read comes before the lists: a list is what a
+      // long line is shortened in (structure.ts `fitting`)
+      expect: line`Exit status 0 once ${code(own)} lists itself under a value with the form of a language code${ours(fallback ? ' and holds an x-default' : '')}, and carries no value of another form. Only <link> elements in the <head> are read, no Link header or sitemap; no alternate is requested; a value's form is checked, not the registry of codes.${others} ${MARKER_LIMIT}${ours(left === 0 ? '' : ` Of the ${asked} URLs and values that follow, the command leaves ${left} out: too long.`)}${ours(needs.back.length === 0 ? '' : ' It must name ')}${pagesShown(needs.back, MAX_NAMED)}${ours(needs.back.length === 0 ? '' : '.')}${ours(stale.length === 0 ? '' : ' It must drop ')}${list(
         stale,
         MAX_NAMED,
         'annotation',
-      )}${ours(stale.length === 0 ? '' : '.')} It reads <link> elements in the <head> of the HTML; annotations in an HTTP Link header or a sitemap are not read, no alternate is requested, and a value is checked for its form, not against the registry of codes.${ours(fallback ? '' : ' An x-default is recommended and not required: the command does not ask for one.')}${others}`,
+      )}${ours(stale.length === 0 ? '' : '.')}`,
       ua: fetch.ua,
       see: {
         command: seeTags(facts, [needs.page], TAGS.hreflang),
@@ -289,8 +293,8 @@ export const hreflangGap: PacketEntry<'hreflang_gap'> = {
                 MAX_SEEN,
                 'tag',
               )}.`,
-        after: line`A tag that names ${code(own)} under its own language code${ours(fallback ? ', an x-default tag' : '')}${ours(needs.back.length === 0 ? '' : ', a tag for each of ')}${pagesShown(needs.back, MAX_SEEN)}${ours(stale.length === 0 ? '' : ', and no tag that holds ')}${list(stale, MAX_SEEN, 'annotation')}.`,
+        after: line`A tag that names ${code(own)} under its own language code${ours(fallback ? ', an x-default tag' : '')}${ours(needs.back.length === 0 ? '' : needs.back.length === 1 ? ', a tag for ' : ', a tag for each of ')}${pagesShown(needs.back, MAX_SEEN)}${ours(stale.length === 0 ? '' : ', and no tag that holds ')}${list(stale, MAX_SEEN, 'annotation')}.`,
       },
     };
   },
-};
+});

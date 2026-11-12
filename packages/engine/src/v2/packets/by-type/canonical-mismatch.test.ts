@@ -21,7 +21,7 @@ import {
   servedSite,
   SPELLINGS,
 } from '../test-support/structure.js';
-import { inBothStates, type TwoStateSite } from '../test-support/verify.js';
+import { inBothStates, twoStateSite, type TwoStateSite } from '../test-support/verify.js';
 import { canonicalMismatch } from './canonical-mismatch.js';
 import type { PacketFacts } from '../types.js';
 
@@ -168,9 +168,9 @@ describe('the canonical_mismatch packet', () => {
   ])('when the canonical %s, expects %s', (shape, expected) => {
     const p = packetFor(canonicalSite(base, shape), base);
     expect(p.verify.command).toMatch(
-      /^curl -sS -f --compressed -A '[^']*' -w '[^']*' 'https:\/\/a\.test\/p' \| tr '[^']*' ' {4}' \| LC_ALL=C awk '/,
+      /^curl -sS -f --compressed --max-time 20 -A '[^']*' -w '[^']*' 'https:\/\/a\.test\/p' \| tr '[^']*' '[^']*' \| LC_ALL=C awk '/,
     );
-    expect(p.verify.command.endsWith(`}' '${expected}'`)).toBe(true);
+    expect(p.verify.command.endsWith(`}' '1' '${expected}' '0'`)).toBe(true);
     expect(p.change.join(' ')).toContain(
       expected === 'https://a.test/p'
         ? 'et the rel="canonical" of `https://a.test/p` to its own URL.'
@@ -187,7 +187,7 @@ describe('the canonical_mismatch packet', () => {
     expect(moved.verify.command.match(/curl|awk/g)).toEqual(['curl', 'awk']);
     expect(
       moved.verify.command.endsWith(
-        "}' 'https://a.test/t2' '1' 'https://a.test/p' '1' 'https://a.test/t2'",
+        "}' '2' 'https://a.test/t2' '0' '1' 'https://a.test/p' '1' 'https://a.test/t2'",
       ),
     ).toBe(true);
     const kept = packetFor(canonicalSite(base, 'gone_and_linked'), base);
@@ -333,7 +333,7 @@ describe('the canonical_mismatch packet', () => {
     const p = packetFor(canonicalSite(b, 'gone'), b);
     expect(p.verify.see).toEqual({
       command: expect.stringMatching(
-        /^curl -sS -A '[^']*' '[^']*\/p' \| grep -io '<link\[\^>\]\*rel="canonical"\[\^>\]\*>'$/,
+        /^curl -sS --compressed --max-time 20 -A '[^']*' '[^']*\/p' \| tr '[^']*' ' {3}' \| grep -aioE '<link \[\^>\]\*rel=\.\?canonical\[\^>\]\*>'$/,
       ),
       today: `The page's canonical tag, which names \`${b}/t\`.`,
       after: `The page's canonical tag, naming \`${b}/p\`.`,
@@ -462,7 +462,7 @@ describe('a canonical no fault is proven of, on a page the site links to', () =>
         /^Set the rel="canonical" of `https:\/\/a\.test\/p` to its own URL, or check /,
       );
       expect(p.change.join(' ')).not.toContain('Change the links');
-      expect(p.verify.command.endsWith(`}' 'https://a.test/p'`)).toBe(true);
+      expect(p.verify.command.endsWith(`}' '1' 'https://a.test/p' '0'`)).toBe(true);
     });
 
     it('verify fails on the declared canonical and passes on the page’s own', async () => {
@@ -711,5 +711,160 @@ describe('the canonical_mismatch packet over hostile records (properties)', () =
         expectDeterministic('canonical_mismatch', record, facts);
       }),
     );
+  });
+});
+
+// Round 3. Each input is a reviewer's, and each test was red before the change it names.
+describe('the canonical_mismatch packet, round 3', () => {
+  const tag = (href: string) => `<link rel="canonical" href="${href}">`;
+  const html = (head: string, body = '') =>
+    `<html><head><title>p</title>${head}</head><body>${body}<a href="/">home</a></body></html>`;
+  // the Meta Pixel snippet, as its vendor has it pasted into the head
+  const PIXEL =
+    '<noscript><img height="1" width="1" style="display:none" src="https://www.facebook.com/tr?id=1&ev=PageView&noscript=1"/></noscript>';
+
+  // SEO finding 4: the reader ended the head at the <img>, so the command never exited 0
+  it('verify reads a canonical after the Meta Pixel’s <noscript><img> in the head, as the engine’s reader does', async () => {
+    const states = {
+      broken: {
+        '/': anchors(['/t2']),
+        '/p': html(`${PIXEL}${tag('/t')}`),
+        '/t2': html(tag('/t2')),
+      },
+      fixed: { '/': anchors(['/t2']), '/p': html(`${PIXEL}${tag('/p')}`), '/t2': html(tag('/t2')) },
+    };
+    served = await servedSite(states);
+    const b = served.base;
+    const read = (state: 'broken' | 'fixed') =>
+      site(
+        [
+          ...Object.entries(states[state]).map(([path, body]) =>
+            pageAsRead(path === '/' ? b : `${b}${path}`, body),
+          ),
+          { path: `${b}/t`, status: 404 },
+        ],
+        { homepage: b },
+      );
+    // the engine's reader reads the canonical after the snippet: the record is made from its reading
+    const p = packetFor(read('broken'), b);
+    expect(p.context[0]).toBe(`\`${b}/p\` declares \`${b}/t\` as its canonical.`);
+    const { broken, fixed } = await inBothStates(served, p.verify.command);
+    expect(broken.status).not.toBe(0);
+    expect(fixed.status).toBe(0);
+    expect(detectCanonicalMismatch(read('fixed')).filter((r) => r.state === 'detected')).toEqual(
+      [],
+    );
+  });
+
+  // SEO finding 6 (D3): the stale URL and the kept one are one URL to the programs, and the command
+  // checked the canonical, which stands, so it passed before the fix and said so
+  describe('links to a URL the programs read as one with the canonical (/x%7Ey and /x~y)', () => {
+    const input = (b: string) =>
+      linkedSite(
+        b,
+        `${b}/x~y`,
+        [{ path: `${b}/x~y`, links: [b], facts: { canonical: { href: `${b}/x~y` } } }],
+        '/x%7Ey',
+      );
+    const packet = (b: string) =>
+      packetOf(
+        'canonical_mismatch',
+        detected(detectCanonicalMismatch(input(b)), `${b}/x%7Ey`),
+        factsFor(input(b), SERVED),
+      );
+
+    it('compares the links’ hrefs as they are spelled, and says so; today differs from after', () => {
+      const p = packet(base);
+      expect(p.verify.expect).toBe(
+        'Exit status 0 once `https://a.test` links to `https://a.test/x~y` spelled so, character for character once the href is resolved, and to no other spelling of that URL. Today it links to `https://a.test/x%7Ey`, which most readers take for the same URL. An href the command cannot read counts as another spelling. A page that itself prints "crawlmouse:end" does not pass.',
+      );
+      expect(p.verify.command).toContain('function spelled(');
+      expect(p.verify.see?.today).toBe(
+        'The <a> tags that link to `https://a.test/x%7Ey`: lines that hold `/x%7Ey`.',
+      );
+      expect(p.verify.see?.after).toBe(
+        'The <a> tags that link to `https://a.test/x~y`, lines that hold `/x~y`, and none that links to `https://a.test/x%7Ey`.',
+      );
+      expect(p.verify.see?.today).not.toBe(p.verify.see?.after);
+    });
+
+    it('verify fails before the fix and passes after it', async () => {
+      const page = html(tag('/x~y'));
+      served = await servedSite({
+        broken: { '/': anchors(['/x%7Ey', '/t2']), '/x%7Ey': page, '/x~y': page },
+        fixed: { '/': anchors(['/x~y', '/t2']), '/x%7Ey': page, '/x~y': page },
+      });
+      const p = packet(served.base);
+      const { broken, fixed } = await inBothStates(served, p.verify.command);
+      expect(broken.status).not.toBe(0);
+      expect(fixed.status).toBe(0);
+      const printed = await seen(served, p);
+      expect(printed.broken).toBe('<a href="/x%7Ey">\n');
+      expect(printed.fixed).toBe('<a href="/x~y">\n');
+    });
+  });
+
+  it('compares the canonical’s href as it is spelled when the one declared and the one expected are one URL to the programs', async () => {
+    // /p declares /t%7E, which redirects to /t~: the expected canonical is /t~, and a command that
+    // compared the two as the programs do would pass on the canonical the page has today
+    const page = (href: string) => html(tag(href));
+    served = await servedSite({
+      broken: { '/p': page('/t%7E') },
+      fixed: { '/p': page('/t~') },
+    });
+    const b = served.base;
+    const live = site(
+      [
+        { path: b, links: [`${b}/t~`], facts: { canonical: { href: null } } },
+        { path: `${b}/p`, links: [b], facts: { canonical: { href: `${b}/t%7E` } } },
+        { path: `${b}/t%7E`, facts: { final_url: `${b}/t~`, canonical: { href: `${b}/t~` } } },
+        { path: `${b}/t~`, links: [b], facts: { canonical: { href: `${b}/t~` } } },
+      ],
+      { homepage: b },
+    );
+    const p = packetFor(live, b);
+    expect(p.verify.expect).toContain(`naming \`${b}/t~\`, spelled so character for character.`);
+    const { broken, fixed } = await inBothStates(served, p.verify.command);
+    expect(broken.status).not.toBe(0);
+    expect(fixed.status).toBe(0);
+  });
+
+  // SEO note 5: /p and /p/ are one URL to the command, so a canonical naming the spelling that
+  // redirects passed
+  it('on a site known to redirect /p to /p/, does not pass a canonical that names /p', async () => {
+    served = await servedSite({
+      broken: { '/p/': html(tag('/p')) },
+      fixed: { '/p/': html(tag('/p/')) },
+    });
+    const u = (path: string) => `${served!.base}${path}`;
+    const input = site(
+      [
+        { path: served.base, links: [u('/t2')], facts: { canonical: { href: null } } },
+        { path: u('/p'), facts: { final_url: u('/p/'), canonical: { href: u('/t') } } },
+        { path: u('/t'), status: 404 },
+      ],
+      { homepage: served.base },
+    );
+    const p = packetFor(input, served.base);
+    expect(p.verify.expect).toContain(
+      `naming \`${u('/p/')}\`, however the URL is written but for the slash that ends its path, which counts.`,
+    );
+    const { broken, fixed } = await inBothStates(served, p.verify.command);
+    expect(broken.status).not.toBe(0);
+    expect(fixed.status).toBe(0);
+  });
+
+  // SEO note 4: `curl -f` stops at 400 and more, so a redirect whose body carries the tag passed
+  it('verify is not passed by a redirect whose body carries the expected canonical', async () => {
+    const body = html(tag('/p'));
+    served = await twoStateSite({
+      broken: (_req, res) =>
+        void res.writeHead(301, { location: '/elsewhere', 'content-type': 'text/html' }).end(body),
+      fixed: (_req, res) => void res.writeHead(200, { 'content-type': 'text/html' }).end(body),
+    });
+    const p = packetFor(canonicalSite(served.base, 'gone'), served.base);
+    const { broken, fixed } = await inBothStates(served, p.verify.command);
+    expect(broken.status).not.toBe(0);
+    expect(fixed.status).toBe(0);
   });
 });

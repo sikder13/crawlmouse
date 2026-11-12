@@ -84,13 +84,13 @@ describe('the redirect_chain packet', () => {
 
     it('checks the first linking page, and says there are more', () => {
       expect(p.verify.command).toMatch(
-        /^curl -sS -f --compressed -A '[^']*' -w '[^']*' 'https:\/\/a\.test\/' \| /,
+        /^curl -sS -f --compressed --max-time 20 -A '[^']*' -w '[^']*' 'https:\/\/a\.test\/' \| /,
       );
       expect(p.verify.command).toMatch(
-        /\}' '1' 'https:\/\/a\.test\/old' '1' 'https:\/\/a\.test\/new'$/,
+        /\}' '1' '1' 'https:\/\/a\.test\/old' '1' 'https:\/\/a\.test\/new'$/,
       );
       expect(p.verify.expect).toBe(
-        'Exit status 0 once `https://a.test` links to `https://a.test/new/` and no longer to `https://a.test/old` (an <a> href, however the URL is written). Today it links to `https://a.test/old`. An href with a named character reference the command does not know counts as the old link. The command reads the first of the 2 linking pages: run it for each.',
+        'Exit status 0 once `https://a.test` links to `https://a.test/new/` and no longer to `https://a.test/old` (an <a> href, however the URL is written). Today it links to `https://a.test/old`. An href the command cannot read counts as the old link. The command reads the first of the 2 linking pages: run it for each. A page that itself prints "crawlmouse:end" does not pass.',
       );
     });
   });
@@ -114,7 +114,7 @@ describe('the redirect_chain packet', () => {
         'Or, where the page the links should lead to is known, point the links on `https://a.test` straight at it.',
       ]);
       expect(p.verify.command).toMatch(
-        /^curl -sS -f -o \/dev\/null -L --max-redirs 1 -A '[^']*' 'https:\/\/a\.test\/loop'$/,
+        /^curl -sS -f -o \/dev\/null -L --max-redirs 1 --max-time 20 -A '[^']*' 'https:\/\/a\.test\/loop'$/,
       );
     });
   });
@@ -327,7 +327,7 @@ describe('the redirect_chain packet', () => {
     );
     expect(p.verify.see).toEqual({
       command: expect.stringMatching(
-        /^curl -sS -A '[^']*' '[^']*\/' \| grep -io '<a \[\^>\]\*>' \| grep -F -e '\/old' -e '\/new\/'$/,
+        /^curl -sS --compressed --max-time 20 -A '[^']*' '[^']*\/' \| tr '[^']*' ' {3}' \| grep -aioE '<a \[\^>\]\*>' \| grep -F -e '\/old"' .* -e '\/old>' -e '\/new\/"' .* -e '\/new\/>'$/,
       ),
       today: `The <a> tags that link to \`${b}/old\`: lines that hold \`/old\`.`,
       after: `The <a> tags that link to \`${b}/new/\`, lines that hold \`/new/\`, and none that links to \`${b}/old\`.`,
@@ -350,7 +350,7 @@ describe('the redirect_chain packet', () => {
     );
     expect(p.verify.see).toEqual({
       command: expect.stringMatching(
-        /^curl -sS -o \/dev\/null -L --max-redirs 10 -w '%\{num_redirects\} %\{http_code\}\\n' -A '[^']*' '[^']*\/loop'$/,
+        /^curl -sS -o \/dev\/null -L --max-redirs 10 --max-time 20 -w '%\{num_redirects\} %\{http_code\}\\n' -A '[^']*' '[^']*\/loop'$/,
       ),
       today:
         "curl's error for too many redirects, and the number 10 with the status of a redirect: the crawl recorded redirects that loop.",
@@ -379,7 +379,7 @@ describe('the redirect_chain packet', () => {
       '1 page links to `https://a.test/loop`, whose redirects loop: after 1 redirect a Location names a URL the chain had already requested.',
     );
     expect(p.verify.expect).toContain(
-      'Today the crawl recorded 1 redirect and no page at the end of them.',
+      'Today the crawl recorded 1 redirect and no page at the end of it.',
     );
     const two = packetOf(
       'redirect_chain',

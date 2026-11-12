@@ -1,5 +1,5 @@
-import { execFile } from 'node:child_process';
-import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { execFile, spawn } from 'node:child_process';
+import { existsSync, mkdtempSync, rmSync, symlinkSync } from 'node:fs';
 import type { RequestListener } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -9,6 +9,7 @@ import { afterAll, afterEach, describe, expect, it } from 'vitest';
 import { commandOf, crawledWord } from './shell.js';
 import {
   canonicalIs,
+  CAP,
   command,
   COMMAND_BOUNDS,
   compared,
@@ -16,8 +17,11 @@ import {
   holds,
   hreflangHolds,
   httpUrl,
+  linksSpelled,
   linksTo,
   listed,
+  MAX_ATTRS,
+  MAX_PARAMS,
   listsDiffer,
   noLinkSays,
   normsOf,
@@ -29,7 +33,7 @@ import {
   type HreflangNeeds,
 } from './html-checks.js';
 import { hostileText, UNSHOWN } from './test-support/hostile.js';
-import { pageAt, SPELLINGS } from './test-support/structure.js';
+import { pageAsRead, pageAt, SPELLINGS } from './test-support/structure.js';
 import { runCommand, twoStateSite, type TwoStateSite } from './test-support/verify.js';
 
 let site: TwoStateSite | null = null;
@@ -61,16 +65,18 @@ async function status(s: TwoStateSite, paths: string[], ...checks: Check[]): Pro
     NO_CRAWLER,
     paths.map((p) => `${s.base}${p}`),
   );
-  return (await runCommand(commandOf(command(fetch.fragment, holds(...checks))))).status;
+  return (await runCommand(commandOf(command(holds(fetch, ...checks))))).status;
 }
 
 const holdsCommand = (s: TwoStateSite, paths: string[], ...checks: Check[]) =>
   command(
-    fetchOf(
-      NO_CRAWLER,
-      paths.map((p) => `${s.base}${p}`),
-    ).fragment,
-    holds(...checks),
+    holds(
+      fetchOf(
+        NO_CRAWLER,
+        paths.map((p) => `${s.base}${p}`),
+      ),
+      ...checks,
+    ),
   );
 
 /** Whether `check` passes on each of `pages`, served under its name. */
@@ -95,7 +101,7 @@ describe('fetchOf', () => {
     ]);
     expect(fetch.ua).toBe('GPTBot');
     expect(commandOf(command(fetch.fragment))).toMatch(
-      /^curl -sS -f --compressed -A '[^']*GPTBot[^']*' -w '\\ncrawlmouse:end %\{url_effective\}\\n' 'https:\/\/a\.test\/x'$/,
+      /^curl -sS -f --compressed --max-time 20 -A '[^']*GPTBot[^']*' -w '\\ncrawlmouse:end %\{http_code\} %\{url_effective\}\\n' 'https:\/\/a\.test\/x'$/,
     );
   });
 
@@ -106,7 +112,7 @@ describe('fetchOf', () => {
     );
     expect(fetch.ua).toBeNull();
     expect(commandOf(command(fetch.fragment))).toBe(
-      `curl -sS -f --compressed -w '\\n${PAGE_END} %{url_effective}\\n' 'https://a.test/x'`,
+      `curl -sS -f --compressed --max-time 20 -w '\\n${PAGE_END} %{http_code} %{url_effective}\\n' 'https://a.test/x'`,
     );
   });
 
@@ -117,7 +123,7 @@ describe('fetchOf', () => {
     ]);
     const fetch = fetchOf({ crawlers: [], pages }, ['https://a.test/p', 'https://a.test/q']);
     expect(commandOf(command(fetch.fragment))).toBe(
-      `curl -sS -f --compressed -w '\\n${PAGE_END} %{url_effective}\\n' 'https://a.test/p/' 'https://a.test/elsewhere'`,
+      `curl -sS -f --compressed --max-time 20 -w '\\n${PAGE_END} %{http_code} %{url_effective}\\n' 'https://a.test/p/' 'https://a.test/elsewhere'`,
     );
   });
 });
@@ -515,7 +521,7 @@ describe('what the request asks of the server', () => {
     });
     const page = `${site.base}/gone`;
     for (const check of [canonicalIs(page), linksTo([`${site.base}/t`])]) {
-      const run = commandOf(command(fetchOf(NO_CRAWLER, [page]).fragment, holds(check)));
+      const run = commandOf(command(holds(fetchOf(NO_CRAWLER, [page]), check)));
       site.use('broken');
       expect((await runCommand(run)).status).not.toBe(0);
       site.use('fixed');
@@ -531,9 +537,7 @@ describe('what the request asks of the server', () => {
         .end(body);
     site = await twoStateSite({ broken: zipped, fixed: zipped });
     const page = `${site.base}/p`;
-    const run = commandOf(
-      command(fetchOf(NO_CRAWLER, [page]).fragment, holds(linksTo([`${site.base}/t`]))),
-    );
+    const run = commandOf(command(holds(fetchOf(NO_CRAWLER, [page]), linksTo([`${site.base}/t`]))));
     expect((await runCommand(run)).status).toBe(0);
   });
 
@@ -769,7 +773,7 @@ describe('listsDiffer', () => {
   const nav = '<a href="/list">1</a><a href="/list?page=2">2</a><a href="/list?page=3">3</a>';
   const items = (...ids: number[]) => ids.map((i) => `<a href="/item/${i}">item ${i}</a>`).join('');
 
-  it('passes when each page has a link of its own that is not the list itself', async () => {
+  it('passes when each page has two links of its own to the site that are not the list itself', async () => {
     const s = await serving({
       '/list': `${nav}${items(1, 2)}`,
       '/repeat': `${nav}${items(1, 2)}`,
@@ -779,6 +783,12 @@ describe('listsDiffer', () => {
       '/subset': `${nav}${items(1)}`,
       '/own': `${nav}${items(3, 4)}`,
       '/own-last': `${nav}${items(5)}`,
+      // round 3, SEO finding 3: the same items on both pages, and one link of its own on each
+      '/list-promo': `${nav}${items(1, 2, 3)}<a href="/promo">promo</a>`,
+      '/repeat-and-all': `${nav}${items(1, 2, 3)}<a href="/list/all">all</a>`,
+      // links that are no page of the site are not items
+      '/repeat-and-others': `${nav}${items(1, 2)}<a href="mailto:a@b.test">m</a><a href="tel:1">t</a><a href="https://ads.test/1">ad</a><a href="https://ads.test/2">ad</a>`,
+      '/list-and-others': `${nav}${items(1, 2)}<a href="https://ads.test/3">ad</a><a href="https://ads.test/4">ad</a>`,
     });
     const run = (later: string) => status(s, ['/list', later], listsDiffer(crawledWord('page=')));
     expect(await run('/repeat')).not.toBe(0);
@@ -788,7 +798,18 @@ describe('listsDiffer', () => {
     expect(await run('/subset')).not.toBe(0);
     expect(await run('/missing')).not.toBe(0);
     expect(await run('/own')).toBe(0);
-    expect(await run('/own-last')).toBe(0);
+    // a stated limit: one item of its own is not told from one incidental link
+    expect(await run('/own-last')).not.toBe(0);
+    expect(
+      await status(s, ['/list-promo', '/repeat-and-all'], listsDiffer(crawledWord('page='))),
+    ).not.toBe(0);
+    expect(
+      await status(
+        s,
+        ['/list-and-others', '/repeat-and-others'],
+        listsDiffer(crawledWord('page=')),
+      ),
+    ).not.toBe(0);
   });
 });
 
@@ -842,11 +863,15 @@ describe('a command over hostile values', () => {
         const target = new URL(
           `http://127.0.0.1:9/${encodeURIComponent(path)}?q=${encodeURIComponent(text)}`,
         ).href;
-        const page = part`printf '<a href="/x">y</a> crawlmouse:end http://127.0.0.1:9/p '`;
+        const page = {
+          fragment: part`printf '<a href="/x">y</a>\\ncrawlmouse:end 200 http://127.0.0.1:9/p\\n'`,
+          ua: null,
+          pages: 1,
+        };
         const built = commandOf(
           command(
-            page,
             holds(
+              page,
               linksTo([target], [target]),
               canonicalIs(target),
               noLinkSays([crawledWord(text), crawledWord(path)]),
@@ -867,6 +892,371 @@ describe('a command over hostile values', () => {
         expect(existsSync(marker)).toBe(false);
       }),
       { numRuns: 40 },
+    );
+  });
+});
+
+// Round 3. Each input below is a reviewer's, and each test was red before the change it names.
+
+describe('the line curl writes after each page (round 3, security finding 1)', () => {
+  it('does not pass a page that prints the line itself: the count of lines is not the count of pages', async () => {
+    const s = await serving({
+      // a link to the kept URL, the line with the page's own address, then the stale link
+      '/own': (base) =>
+        `<a href="/new">k</a>\ncrawlmouse:end 200 ${base}/own\n<a href="/old">o</a>`,
+      // the same with the line as round 3 wrote it, and with another site's address
+      '/other': '<a href="/new">k</a>\ncrawlmouse:end http://x.test/\n<a href="/old">o</a>',
+      '/other-200': '<a href="/new">k</a>\ncrawlmouse:end 200 http://x.test/\n<a href="/old">o</a>',
+      // a fixed page that prints the words before its kept link: a stated limit, it never passes
+      '/quoted': '<p>comment:\ncrawlmouse:end x </p><a href="/new">k</a>',
+      // the words inside a line are text, and the page is read as any other
+      '/inline': '<p>the marker is crawlmouse:end 200 x </p><a href="/new">k</a>',
+      '/fixed': '<a href="/new">k</a>',
+      '/broken': '<a href="/new">k</a><a href="/old">o</a>',
+    });
+    const run = (path: string) => status(s, [path], linksTo([`${s.base}/new`], [`${s.base}/old`]));
+    expect(await run('/fixed')).toBe(0);
+    expect(await run('/broken')).not.toBe(0);
+    expect(await run('/own')).not.toBe(0);
+    expect(await run('/other')).not.toBe(0);
+    expect(await run('/other-200')).not.toBe(0);
+    expect(await run('/quoted')).not.toBe(0);
+    expect(await run('/inline')).toBe(0);
+  });
+
+  it('does not let the first page of two stand in for the second', async () => {
+    const a = (hrefs: string[]) => hrefs.map((h) => `<a href="${h}">t</a>`).join('\n');
+    const s = await serving({
+      // page 1 holds its own items, the line, and a page of other items; page 2 repeats page 1
+      '/l1': (base) =>
+        `${a(['/i1', '/i2', '/i7', '/i8'])}\ncrawlmouse:end 200 ${base}/l2\n${a(['/i1', '/i2', '/i5', '/i6'])}`,
+      '/l2': a(['/i1', '/i2', '/i7', '/i8']),
+      '/f1': a(['/i1', '/i2']),
+      '/f2': a(['/i3', '/i4']),
+    });
+    const differ = listsDiffer(crawledWord('page='));
+    expect(await status(s, ['/f1', '/f2'], differ)).toBe(0);
+    expect(await status(s, ['/l1', '/l2'], differ)).not.toBe(0);
+  });
+
+  it('does not pass a redirect whose body carries the tag, nor a page it was not given', async () => {
+    const html = '<html><head><link rel="canonical" href="/p"></head><a href="/t">x</a></html>';
+    site = await twoStateSite({
+      broken: (_req, res) =>
+        void res.writeHead(301, { location: '/p/', 'content-type': 'text/html' }).end(html),
+      fixed: (_req, res) => void res.writeHead(200, { 'content-type': 'text/html' }).end(html),
+    });
+    const page = `${site.base}/p`;
+    for (const check of [canonicalIs(page), linksTo([`${site.base}/t`])]) {
+      const run = commandOf(command(holds(fetchOf(NO_CRAWLER, [page]), check)));
+      site.use('broken');
+      expect((await runCommand(run)).status).not.toBe(0);
+      site.use('fixed');
+      expect((await runCommand(run)).status).toBe(0);
+    }
+    // the program is told one page and given two: it does not pass
+    const two = fetchOf(NO_CRAWLER, [page, page]);
+    const one = { ...two, pages: 1 };
+    expect((await runCommand(commandOf(command(holds(two, canonicalIs(page)))))).status).toBe(0);
+    expect((await runCommand(commandOf(command(holds(one, canonicalIs(page)))))).status).not.toBe(
+      0,
+    );
+  });
+
+  it('reads past a NUL in the page, where an awk that ends a string at one would read less than curl wrote', async () => {
+    const s = await serving({ '/nul': '<a href="/z\0z">n</a>\0<a href="/t">x</a>' });
+    expect(await status(s, ['/nul'], linksTo([`${s.base}/t`]))).toBe(0);
+    expect(commandOf(holdsCommand(s, ['/nul'], linksTo([`${s.base}/t`])))).toContain(
+      String.raw` | tr '\n\t\r\f\000' '\001\001\001  ' | `,
+    );
+  });
+});
+
+describe('the head, with a <noscript> in it (round 3, SEO finding 4)', () => {
+  // the Meta Pixel snippet, and Google Tag Manager's, as their vendors have them pasted into the head
+  const PIXEL =
+    '<noscript><img height="1" width="1" style="display:none" src="https://www.facebook.com/tr?id=1&ev=PageView&noscript=1"/></noscript>';
+  const GTM =
+    '<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-X" height="0" width="0"></iframe></noscript>';
+  const head = (inner: string, body = '') =>
+    `<html><head>${inner}</head><body>${body}</body></html>`;
+  const canonical = '<link rel="canonical" href="/c">';
+  const lang = '<link rel="alternate" hreflang="en" href="/c">';
+
+  it('reads a canonical and an hreflang annotation after it, as the engine’s reader does', async () => {
+    const pages = {
+      pixel: head(`${PIXEL}${canonical}${lang}`),
+      gtm: head(`${GTM}${canonical}${lang}`),
+      words: head(`<noscript>Turn JavaScript on.</noscript>${canonical}${lang}`),
+      // what ends the head still ends it once the <noscript> is closed
+      thenDiv: head(`${PIXEL}<div>x</div>${canonical}${lang}`),
+      thenText: head(`${PIXEL}x${canonical}${lang}`),
+      inBody: head(PIXEL, `${canonical}${lang}`),
+    };
+    expect(await passes(pages, (base) => canonicalIs(`${base}/c`))).toEqual({
+      pixel: true,
+      gtm: true,
+      words: true,
+      thenDiv: false,
+      thenText: false,
+      inBody: false,
+    });
+    expect(
+      await passes(pages, (base) =>
+        hreflangHolds({
+          self: `${base}/c`,
+          fallback: false,
+          must: [],
+          goneValues: [],
+          goneUrls: [],
+        }),
+      ),
+    ).toEqual({
+      pixel: true,
+      gtm: true,
+      words: true,
+      thenDiv: false,
+      thenText: false,
+      inBody: false,
+    });
+    // the engine's own reader reads the canonical and the annotation after the snippet
+    for (const name of ['pixel', 'gtm'] as const) {
+      const read = pageAsRead('https://a.test/c', pages[name]);
+      expect(read.facts?.canonical, name).toEqual({ href: 'https://a.test/c' });
+      expect(read.facts?.hreflang, name).toEqual([{ lang: 'en', href: 'https://a.test/c' }]);
+    }
+  });
+});
+
+describe('what a browser removes from a URL, and reads in a text (round 3 notes)', () => {
+  it('reads an href with a tab or a line break in it as a browser does, typed or as a reference', async () => {
+    expect(
+      await passes(
+        {
+          tab: '<a href="/o\tld">x</a>',
+          lineBreak: '<a href="/o\nld">x</a>',
+          carriage: '<a href="/o\r\nld">x</a>',
+          reference: '<a href="/o&#10;ld">x</a>',
+          hexReference: '<a href="/o&#x9;ld">x</a>',
+          named: '<a href="/o&Tab;l&NewLine;d">x</a>',
+          // a space is not removed: it is another URL
+          space: '<a href="/o ld">x</a>',
+          // and a tag written over several lines is read as one
+          spread: '<a\n\tclass="card"\n\thref="/old"\n>x</a>',
+        },
+        (base) => linksTo([`${base}/old`]),
+      ),
+    ).toEqual({
+      tab: true,
+      lineBreak: true,
+      carriage: true,
+      reference: true,
+      hexReference: true,
+      named: true,
+      space: false,
+      spread: true,
+    });
+  });
+
+  it('reads a line break in a link’s text as a space, typed or as a reference', async () => {
+    expect(
+      await passes(
+        {
+          named: '<a href="/t">Click&NewLine;here</a>',
+          tab: '<a href="/t">Click&Tab;here</a>',
+          typed: '<a href="/t">\n  Click\n\there\n</a>',
+          other: '<a href="/t">Tents</a>',
+        },
+        () => noLinkSays([crawledWord('click here')]),
+      ),
+    ).toEqual({ named: false, tab: false, typed: false, other: true });
+  });
+});
+
+describe('two URLs the programs read as one (round 3, SEO finding 6)', () => {
+  it('linksSpelled passes only on the spelling asked for, and on no other spelling beside it', async () => {
+    expect(
+      await passes(
+        {
+          old: '<a href="/x%7Ey">x</a>',
+          oldLower: '<a href="/x%7ey">x</a>',
+          kept: '<a href="/x~y">x</a>',
+          keptFull: (base) => `<a href="${base.toUpperCase().replace('HTTP', 'http')}/x~y">x</a>`,
+          keptDotted: '<a href="/a/../x~y">x</a>',
+          both: '<a href="/x~y">x</a><a href="/x%7Ey">x</a>',
+          unreadable: '<a href="/x~y">x</a><a href="/x&zzz;">x</a>',
+          none: '<a href="/other">x</a>',
+        },
+        (base) => linksSpelled([`${base}/x~y`]),
+      ),
+    ).toEqual({
+      old: false,
+      oldLower: false,
+      kept: true,
+      keptFull: true,
+      keptDotted: true,
+      both: false,
+      unreadable: false,
+      none: false,
+    });
+    // `linksTo` cannot tell them apart: it passes on the old spelling, which is why it is not used
+    const s = await serving({ '/old': '<a href="/x%7Ey">x</a>' });
+    expect(await status(s, ['/old'], linksTo([`${s.base}/x~y`]))).toBe(0);
+  });
+
+  it('canonicalIs compares the spelling, or the slash that ends the path, when it is asked to', async () => {
+    const head = (href: string) =>
+      `<html><head><link rel="canonical" href="${href}"></head></html>`;
+    const pages = {
+      escaped: head('/x%7Ey'),
+      plain: head('/x~y'),
+      slashed: head('/x~y/'),
+    };
+    const run = (expected: string, match: 'alike' | 'slashed' | 'spelled') =>
+      passes(pages, (base) => canonicalIs(`${base}${expected}`, 1, match));
+    expect(await run('/x~y', 'alike')).toEqual({ escaped: true, plain: true, slashed: true });
+    expect(await run('/x~y', 'slashed')).toEqual({ escaped: true, plain: true, slashed: false });
+    expect(await run('/x~y/', 'slashed')).toEqual({ escaped: false, plain: false, slashed: true });
+    expect(await run('/x~y', 'spelled')).toEqual({ escaped: false, plain: true, slashed: false });
+  });
+});
+
+describe('a page made to keep the program busy (round 3, security finding 3)', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'packets-busybox-'));
+  afterAll(() => rmSync(dir, { recursive: true, force: true }));
+  /** `PATH` with BusyBox's awk first, when this machine has BusyBox; null when it has none. */
+  const busyboxPath = ((): string | null => {
+    const busybox = ['/usr/bin/busybox', '/bin/busybox'].find((p) => existsSync(p));
+    if (busybox === undefined) return null;
+    symlinkSync(busybox, join(dir, 'awk'));
+    return `${dir}:${process.env.PATH ?? ''}`;
+  })();
+  const rep = (text: string, bytes: number) => text.repeat(Math.ceil(bytes / text.length));
+  const MB2 = 2_000_000;
+  const params = (n: number) =>
+    Array.from({ length: n }, (_, i) => `z${String(99999 - i)}=1`).join('&');
+
+  /**
+   * The command's status and the milliseconds it took, with the awk first on `path`. A command that
+   * has not ended in ten seconds is killed with every process of its pipeline, and fails the test.
+   */
+  const timed = (run: string, path: string | undefined) =>
+    new Promise<{ status: number; ms: number }>((resolve, reject) => {
+      const started = Date.now();
+      const child = spawn('sh', ['-c', run], {
+        env: { ...process.env, PATH: path },
+        detached: true,
+        stdio: 'ignore',
+      });
+      const timer = setTimeout(() => {
+        try {
+          process.kill(-child.pid!, 'SIGKILL');
+        } catch {
+          // it ended as the timer fired
+        }
+        reject(new Error('the command did not end in ten seconds'));
+      }, 10_000);
+      child.on('close', (code) => {
+        clearTimeout(timer);
+        resolve({ status: code ?? 1, ms: Date.now() - started });
+      });
+    });
+
+  // name, the page, the check, and whether the command passes: every shape has a link to /k, and
+  // what is too long to read is not read as a link to it, nor as a text that is not generic
+  const kept = '<a href="/k">k</a>';
+  const SHAPES: [string, string, (base: string) => Check, boolean][] = [
+    [
+      '8,000 query parameters in descending order',
+      `${kept}<a href="/q?${params(8000)}">x</a>`,
+      (b) => linksTo([`${b}/k`]),
+      true,
+    ],
+    [
+      'the same, where a stale link is asked about',
+      `${kept}<a href="/q?${params(8000)}">x</a>`,
+      (b) => linksTo([`${b}/k`], [`${b}/old`]),
+      false,
+    ],
+    [
+      `${MAX_PARAMS + 1} query parameters, where a stale link is asked about`,
+      `${kept}<a href="/q?${params(MAX_PARAMS + 1)}">x</a>`,
+      (b) => linksTo([`${b}/k`], [`${b}/old`]),
+      false,
+    ],
+    ['"< " for 400 KB', `${kept}${rep('< ', 400_000)}`, (b) => linksTo([`${b}/k`]), true],
+    ['"a < b " for 2 MB', `${kept}${rep('a < b ', MB2)}`, (b) => linksTo([`${b}/k`]), true],
+    [
+      'one href of 2 MB of &amp;',
+      `${kept}<a href="/${rep('&amp;', MB2)}">x</a>`,
+      (b) => linksTo([`${b}/k`], [`${b}/old`]),
+      false,
+    ],
+    [
+      'one href of 2 MB of %41',
+      `${kept}<a href="/${rep('%41', MB2)}">x</a>`,
+      (b) => linksTo([`${b}/k`], [`${b}/old`]),
+      false,
+    ],
+    [
+      'a link text of 2 MB of &amp;',
+      `<a href="/k">${rep('&amp;', MB2)}</a>`,
+      () => noLinkSays([crawledWord('click here')]),
+      false,
+    ],
+    [
+      'a link never closed, before 2 MB of tags',
+      `<a href="/k">${rep('<b>x</b>', MB2)}`,
+      () => noLinkSays([crawledWord('click here')]),
+      false,
+    ],
+    [
+      'one tag of 2 MB of quoted attributes',
+      `${kept}<p ${rep('a="1" ', MB2)}>`,
+      (b) => linksTo([`${b}/k`]),
+      false,
+    ],
+    [
+      `an <a> with ${MAX_ATTRS + 1} attributes`,
+      `${kept}<a ${rep('a="1" ', 6 * (MAX_ATTRS + 1))}href="/old">x</a>`,
+      (b) => linksTo([`${b}/k`], [`${b}/old`]),
+      false,
+    ],
+    [
+      'hrefs of 8 KB of &amp;, for 2 MB',
+      `${kept}${rep(`<a href="/${rep('&amp;', CAP - 8)}">x</a>`, MB2)}`,
+      (b) => linksTo([`${b}/k`]),
+      true,
+    ],
+    [
+      'comments with text between them, for 2 MB',
+      `${kept}${rep('a<!--x-->', MB2)}`,
+      (b) => linksTo([`${b}/k`]),
+      true,
+    ],
+  ];
+
+  it.each(SHAPES)(
+    '%s: ends well inside the time a command is given, and fails closed',
+    async (_name, html, check, pass) => {
+      const s = await serving({ '/t': html });
+      const run = commandOf(holdsCommand(s, ['/t'], check(s.base)));
+      const mawk = await timed(run, process.env.PATH);
+      expect(mawk.status === 0, `status ${mawk.status}`).toBe(pass);
+      expect(mawk.ms).toBeLessThan(5_000);
+      if (busyboxPath === null) return;
+      const busybox = await timed(run, busyboxPath);
+      expect(busybox.status === 0, `busybox status ${busybox.status}`).toBe(pass);
+      expect(busybox.ms).toBeLessThan(8_000);
+      console.log(`TIME ${_name}: awk ${mawk.ms} ms, BusyBox awk ${busybox.ms} ms`);
+    },
+    30_000,
+  );
+
+  it('gives curl a time to end a transfer in', () => {
+    const s = { base: 'http://127.0.0.1:9' } as TwoStateSite;
+    expect(commandOf(holdsCommand(s, ['/t'], linksTo([`${s.base}/k`])))).toMatch(
+      /^curl -sS -f --compressed --max-time 20 /,
     );
   });
 });

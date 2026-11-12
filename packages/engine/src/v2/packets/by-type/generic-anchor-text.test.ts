@@ -117,9 +117,9 @@ describe('the generic_anchor_text packet', () => {
 
   it('checks for the recorded texts, each once whatever its case', () => {
     const p = packetOf('generic_anchor_text', record, facts);
-    expect(p.verify.command).toMatch(/\}' '3' 'Click here' 'Read more' 'here'$/);
+    expect(p.verify.command).toMatch(/\}' '1' '3' 'Click here' 'Read more' 'here'$/);
     expect(p.verify.expect).toBe(
-      'Exit status 0 once `https://a.test/hub` has links and the first link to each target says none of the recorded generic texts: `Click here`, `Read more`, `here`, compared without case, with spaces collapsed and the tags inside a link removed. The crawl keeps one text for a target, the first, so a later link to the same target is not read. The command knows these recorded phrases only: another stock phrase in their place passes it, and is judged on the next check. Today the crawl recorded 4 such links.',
+      'Exit status 0 once `https://a.test/hub` has links and the first link to each target says none of these recorded generic texts: `Click here`, `Read more`, `here`. Case, runs of spaces and tags inside a link are ignored; a text over 8192 bytes counts as generic. A later link to the same target is not read, as in the crawl, and another stock phrase passes: it is judged on the next check. A page that itself prints "crawlmouse:end" does not pass.',
     );
   });
 
@@ -150,7 +150,6 @@ describe('the generic_anchor_text packet', () => {
     };
     const p = packetOf('generic_anchor_text', one, facts);
     expect(p.context[0]).toContain('and 1 of its 1 recorded link has generic text.');
-    expect(p.verify.expect).toContain('Today the crawl recorded 1 such link.');
     expect(p.verify.see?.today).toContain('the crawl recorded 1 generic link on this page.');
     const two = {
       ...record,
@@ -178,7 +177,7 @@ describe('the generic_anchor_text packet', () => {
     );
     expect(p.verify.see).toEqual({
       command: expect.stringMatching(
-        /^curl -sS -A '[^']*' '[^']*\/hub' \| grep -io '<a \[\^>\]\*>\[\^<\]\*<\/a>' \| grep -iF -e 'Click here' -e 'Read more' -e 'here'$/,
+        /^curl -sS --compressed --max-time 20 -A '[^']*' '[^']*\/hub' \| tr '[^']*' ' {3}' \| grep -aioE '<a \[\^>\]\*>\[\^<\]\*<\/a>' \| grep -iF -e 'Click here' -e 'Read more' -e 'here'$/,
       ),
       today:
         'The links that say `Click here`, `Read more`, `here`: the crawl recorded 4 generic links on this page. A link with a tag inside its text is not printed; the exact check reads it.',
@@ -192,6 +191,64 @@ describe('the generic_anchor_text packet', () => {
       '<a href="/p/4">here</a>',
     ]);
     expect(printed.fixed).toBe('');
+  });
+
+  // round 3, SEO finding 1: the readable command printed nothing for a link whose text is on the
+  // line after its tag, or whose tag is written over several lines
+  it('the readable command prints a link whose tag or text is written over several lines', async () => {
+    const hub = (texts: string[]) => ({
+      '/hub': `<html><body>${texts
+        .map((t, i) => `<a class="card"\n href='/p/${i + 1}'>\n  ${t}\n</a>`)
+        .join('\n')}</body></html>`,
+    });
+    served = await servedSite({
+      broken: hub(['Click here', 'Read more', 'click here', 'here', 'Ridge tent']),
+      fixed: hub(['Ridge footprint', 'Tent care guide', 'Alpine stove', 'Trail mug', 'Ridge tent']),
+    });
+    const live = hubSite(served.base);
+    const p = packetOf(
+      'generic_anchor_text',
+      detected(detectGenericAnchors(live), `${served.base}/hub`),
+      factsFor(live, SERVED),
+    );
+    const printed = await seen(served, p);
+    expect(
+      printed.broken
+        .trim()
+        .split('\n')
+        .map((l) => l.replace(/\s+/g, ' ')),
+    ).toEqual([
+      `<a class="card" href='/p/1'> Click here </a>`,
+      `<a class="card" href='/p/2'> Read more </a>`,
+      `<a class="card" href='/p/3'> click here </a>`,
+      `<a class="card" href='/p/4'> here </a>`,
+    ]);
+    expect(printed.fixed).toBe('');
+    const { broken, fixed } = await inBothStates(served, p.verify.command);
+    expect(broken.status).not.toBe(0);
+    expect(fixed.status).toBe(0);
+  });
+
+  // round 3, correctness note (b): a line break written as a reference inside a generic text
+  it('verify is not passed by a generic text with its space written as &NewLine; or a tab in its href', async () => {
+    const hub = (first: string) => ({
+      '/hub': `<html><body>${first}${[2, 3, 4, 5]
+        .map((n) => `<a href="/p/${n}">Page ${n}</a>`)
+        .join('')}</body></html>`,
+    });
+    served = await servedSite({
+      broken: hub('<a href="/p/\t1">Click&NewLine;here</a>'),
+      fixed: hub('<a href="/p/\t1">Ridge footprint</a>'),
+    });
+    const live = hubSite(served.base);
+    const p = packetOf(
+      'generic_anchor_text',
+      detected(detectGenericAnchors(live), `${served.base}/hub`),
+      factsFor(live, SERVED),
+    );
+    const { broken, fixed } = await inBothStates(served, p.verify.command);
+    expect(broken.status).not.toBe(0);
+    expect(fixed.status).toBe(0);
   });
 
   // round 2, SEO finding 1: the hub answers at another address than the one the crawl names it by
