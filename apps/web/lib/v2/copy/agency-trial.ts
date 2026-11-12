@@ -57,13 +57,13 @@ export const AGENCY_TRIAL_COPY = {
   notSure: `Not sure yet? Your own account can start ${TRIAL_DAYS} days of Pro with no card, from`,
   pricing: 'Pricing',
   seePlans: 'See the plans',
+  /** A `trial_refused` shows `trialRefusal`'s reason instead (AgencyTrialForm). */
   errors: {
     invalid: 'Tick the box, and give the agency a name and one client site.',
     invalid_host: 'That is not a site address. Type a domain such as clientsite.com.',
     host_refused:
       'That address is private or reserved, so it cannot be audited. Use the client’s public site.',
     trial_used: 'Your agency trial was used, so it cannot start again.',
-    trial_refused: 'This account cannot start a trial now.',
     rate_limited: 'That is too many tries for now. Wait a few minutes and try again.',
     billing_unavailable: 'The card page is not available right now. Try again in a few minutes.',
     failed: 'It did not go through. Try again in a moment.',

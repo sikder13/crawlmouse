@@ -7,12 +7,23 @@ import { Button } from '../../Button';
 import fieldStyles from '../../Field.module.css';
 import styles from './AgencyTrial.module.css';
 
-export type TrialFormState = 'idle' | 'sending' | { error: string };
+/** A refusal is its code, and for `trial_refused` the reason `trialRefusal` gave (CC-03). */
+export type TrialFormState = 'idle' | 'sending' | { error: string; reason?: string };
+
+/**
+ * The line a refusal shows: for `trial_refused`, the state machine's reason itself (D3); for any
+ * other code its sentence, and the generic one for a code with none.
+ */
+function refusalText(state: TrialFormState): string | null {
+  if (typeof state !== 'object') return null;
+  if (state.error === 'trial_refused' && state.reason) return state.reason;
+  return COPY.errors[state.error] ?? COPY.errors.failed!;
+}
 
 /**
  * The step before Checkout (FACTS J15 as overruled): the agency name, the first client site and the
  * consent checkbox. It posts JSON to /api/agency-trial and follows the `{url}` it answers to Stripe's
- * page; a refusal is shown here by its code. Without script the same form posts itself, with
+ * page; a refusal is shown here (`refusalText`). Without script the same form posts itself, with
  * `consent=true`, and the route answers with a redirect.
  */
 export function AgencyTrialForm({
@@ -41,18 +52,25 @@ export function AgencyTrialForm({
           interval: view.interval,
         }),
       });
-      const body = (await res.json().catch(() => ({}))) as { url?: unknown; error?: unknown };
+      const body = (await res.json().catch(() => ({}))) as {
+        url?: unknown;
+        error?: unknown;
+        reason?: unknown;
+      };
       if (res.ok && typeof body.url === 'string') {
         window.location.assign(body.url);
         return;
       }
-      setState({ error: typeof body.error === 'string' ? body.error : 'failed' });
+      setState({
+        error: typeof body.error === 'string' ? body.error : 'failed',
+        ...(typeof body.reason === 'string' ? { reason: body.reason } : {}),
+      });
     } catch {
       setState({ error: 'failed' });
     }
   }
 
-  const error = typeof state === 'object' ? (COPY.errors[state.error] ?? COPY.errors.failed) : null;
+  const error = refusalText(state);
   return (
     <form
       className={styles.form}
