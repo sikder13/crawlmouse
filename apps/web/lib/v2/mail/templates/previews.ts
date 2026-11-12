@@ -91,6 +91,13 @@ const RENDERS: Record<MailPreviewSlug, (opts?: PreviewOptions) => RenderedMail> 
       endsAt: '2026-11-08T02:41:00.000Z',
       timezone: 'America/Indiana/Indianapolis',
     }),
+  'trial-reminder-card': () =>
+    trialReminder({
+      plan: 'agency',
+      variant: 'card_required',
+      endsAt: '2026-11-08T02:41:00.000Z',
+      timezone: 'America/Indiana/Indianapolis',
+    }),
   'email-change-confirm': () => emailChangeConfirm({ token: TOKEN }),
   'email-change-notice': () => emailChangeNotice({ token: TOKEN }),
   'account-delete': () => accountDelete({ confirmToken: TOKEN, restoreToken: RESTORE }),

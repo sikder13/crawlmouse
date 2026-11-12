@@ -11,6 +11,11 @@ export const MAIL_PREVIEW_INDEX = [
   { slug: 'check-notify-failed', name: 'Check notify, failed', kind: 'check_notify' },
   { slug: 'fix-to-developer', name: 'Fix to a developer', kind: 'fix_to_developer' },
   { slug: 'trial-reminder', name: 'Trial reminder, no card', kind: 'trial_reminder' },
+  {
+    slug: 'trial-reminder-card',
+    name: 'Trial reminder, card on file, Agency',
+    kind: 'trial_reminder',
+  },
   { slug: 'email-change-confirm', name: 'Email change, confirm', kind: 'email_change_confirm' },
   {
     slug: 'email-change-notice',

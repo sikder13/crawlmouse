@@ -69,3 +69,17 @@ describe('the previews a sample is built from', () => {
     expect(m.text).toContain('What your checks found from 24 Oct to 30 Oct.');
   });
 });
+
+describe('the trial reminder’s previews (N6)', () => {
+  it('show both variants: no card on Pro, and a card on file on Agency', () => {
+    const noCard = mailPreview('trial-reminder')!.render();
+    expect(noCard.subject).toMatch(/^Your Crawlmouse Pro trial ends /);
+    expect(noCard.text).toContain('No card is on file, so nothing is charged.');
+    const card = mailPreview('trial-reminder-card')!;
+    expect(card.kind).toBe('trial_reminder');
+    const m = card.render();
+    expect(m.subject).toMatch(/^Your Crawlmouse Agency trial ends /);
+    expect(m.text).toContain('Then the card on file is charged for Agency');
+    expect(m.text).not.toContain('No card is on file');
+  });
+});
