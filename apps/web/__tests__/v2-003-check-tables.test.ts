@@ -289,7 +289,8 @@ const HIDDEN: Record<NewTable, string[] | null> = {
   evidence_blobs: [],
   alert_rules: [],
   alert_events: [],
-  reports: ['storage_path'],
+  // 031's failed_reason is an internal code and subject_fix_id a row id no screen reads.
+  reports: ['storage_path', 'failed_reason', 'subject_fix_id'],
   report_schedules: [],
   share_links: null,
   api_keys: ['key_hash'],
@@ -1009,6 +1010,14 @@ const RULE_CASES: Record<
     table: 'reports',
     row: async () => ({ ...(await freshRow('reports')), covers_check_ids: [] }),
   },
+  reports_stored_path: {
+    table: 'reports',
+    row: async () => ({ ...(await freshRow('reports')), storage_path: 'a/b.pdf' }),
+  },
+  reports_failed_reason: {
+    table: 'reports',
+    row: async () => ({ ...(await freshRow('reports')), failed_reason: 'abandoned' }),
+  },
   report_schedules_client_report_cadence: {
     table: 'report_schedules',
     row: async () => ({ ...(await freshRow('report_schedules')), cadence: 'on_deploy' }),
@@ -1310,6 +1319,18 @@ const OTHER_WAY: {
     table: 'reports',
     label: 'a public slug on a report that is not a public link',
     row: async () => ({ ...(await freshRow('reports')), public_slug: `r-${randomUUID()}` }),
+  },
+  {
+    constraint: 'reports_stored_path',
+    table: 'reports',
+    label: 'a stored file with no path',
+    row: async () => ({ ...(await freshRow('reports')), file_state: 'stored' }),
+  },
+  {
+    constraint: 'reports_failed_reason',
+    table: 'reports',
+    label: 'a failed file with no reason',
+    row: async () => ({ ...(await freshRow('reports')), file_state: 'failed' }),
   },
   {
     constraint: 'fix_events_kind_fields',
