@@ -69,10 +69,10 @@ A claimed site's `next_check_at` moves to the first due time after `now` in the 
 claim returns the time it was due, which keys the request (`check:<site>:scheduled:<iso>`), so a retried
 request step makes the same check.
 
-When the request step fails every retry, its `onFailure` calls `release_scheduled_claim` (owner ruling Q9):
+When a site's request step fails every retry, `scheduleTickFn` catches it per site and runs a `release` step that calls `release_scheduled_claim` (owner ruling Q9):
 `next_check_at` goes back to the claimed time, so the next tick claims the site again, and the slot is given
 back while its 24-hour window is open. It acts only while `next_check_at` is still past the claimed time, so
-a second call, or a schedule saved since, gives nothing back twice.
+a second call, or a schedule saved since, gives nothing back twice. Sentry is told the site id and the slot.
 
 ## Owner rulings
 
@@ -92,3 +92,7 @@ link is minted only after the claim (Q10); unsubscribe and recipients are per se
 - Slack's incoming webhooks take no idempotency key: a worker that dies between the POST and
   `finish_slack_send` can repeat one Slack message when the claim is taken back.
 - The tick runs hourly at minute 0, so a site due at 06:37 starts at the 07:00 tick.
+- A claim whose database call committed but whose step result never reached Inngest is not released: the
+  step's retry claims the next due sites, and the first set waits for its next due time (one cadence lost,
+  one slot spent). Making the claim idempotent needs a claim keyed on the run (questions Q12).
+- A site removed between its claim and its request step still gets its queued `scheduled` check.
