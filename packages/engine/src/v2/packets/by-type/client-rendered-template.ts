@@ -7,8 +7,8 @@
  *
  * Verify. The record holds word counts and no phrase of the page, so the command counts words: it
  * requests the first rendered page of the record and counts the words of the HTML response outside
- * the elements in SKIPPED (the element names of the audit's own structural strip,
- * analysis/ai-readiness/constants.ts AI_STRUCTURAL_STRIP, and `head`). It exits 0 when the count
+ * the elements in SKIPPED (the element names of the audit's own structural strip, the constant
+ * AI_STRUCTURAL_STRIP that main-content.ts reads, and `head`). It exits 0 when the count
  * reaches `wordsNeeded`: the count at which the page's share of its measured rendered words is
  * READABLE_FROM (render/state.ts). Text inside a script, an inline JSON state included, is not counted.
  *

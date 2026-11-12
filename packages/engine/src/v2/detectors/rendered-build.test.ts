@@ -88,8 +88,9 @@ describe('detected: every rendered page of the template is an empty shell', () =
   });
 
   it('has an effect on AI readability: Readable, recomputed with the template read in full', () => {
-    // AI readability is withheld on every real check until a content check counts (SPEC 17), so the
-    // stored effect waits on the grade's reasons; with Quotable scored it is the Readable recompute.
+    // AI readability is withheld on this check (no content check counts in Quotable yet, SPEC 17),
+    // so the stored effect waits on the grade's reasons; with Quotable scored it is the Readable
+    // recompute.
     expect(built.grades.ai_readability.withheld).toBe(true);
     expect(fix!.effect.ai_readability).toBe(null);
     expect(fix!.effect.ai_readability_pending_on).toEqual(
@@ -120,6 +121,7 @@ describe('not detected: a rendered page of the template, and no shell among them
   it('opens no fix on a first check', () => {
     const built = buildCheck(recordedBuild());
     expect(recordOf(built).state).toBe('not_detected');
+    expect(detectRendered(built.page_results).filter((r) => r.state === 'detected')).toEqual([]);
     expect(shellFix(built)).toEqual([]);
     expect(built.diff_inputs.indeterminate).not.toContain(FINGERPRINT);
   });

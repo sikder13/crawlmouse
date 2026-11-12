@@ -1,7 +1,7 @@
 /**
  * The recorded built-site check with one template's render outcome edited, for the three states of
- * the client-rendered template detector (detectors/rendered.ts). The recorded render has every
- * rendered page `readable`; nothing here is recorded from a browser.
+ * the client-rendered template detector (detectors/rendered.ts). As recorded, no template is detected
+ * (rendered-build.test.ts); nothing here is recorded from a browser.
  */
 import type { BuildInput } from '../../../src/v2/build/types.js';
 import type { RenderOutcome } from '../../../src/v2/render/run.js';
