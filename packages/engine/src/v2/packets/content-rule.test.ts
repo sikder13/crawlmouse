@@ -23,7 +23,7 @@ import {
   servedRow,
 } from './test-support/content.js';
 import { outsideCodeSpans, UNSHOWN } from './test-support/hostile.js';
-import { runCommand, twoStateSite } from './test-support/verify.js';
+import { inBothStates, runCommand, twoStateSite } from './test-support/verify.js';
 import { line, textOf } from './text.js';
 
 describe('the lines every content packet opens with', () => {
@@ -108,7 +108,7 @@ describe('tagProbe', () => {
     const probe = tagProbe(contentFacts(), 'https://shop.test/a', PROGRAM);
     expect(probe.ua).toBe(FIRST_TESTABLE.token);
     expect(commandOf(probe.command)).toBe(
-      `curl -sS -A '${FIRST_TESTABLE.ua_string}' 'https://shop.test/a' | tr '\\r\\n<' '  \\n' | awk '${PROGRAM}'`,
+      `curl -sSf --compressed -A '${FIRST_TESTABLE.ua_string}' 'https://shop.test/a' | tr '\\r\\n<' '  \\n' | awk '${PROGRAM}'`,
     );
     expect(probe.sender.text).toBe(
       `It requests as ${FIRST_TESTABLE.token}, which the site serves today.`,
@@ -127,7 +127,7 @@ describe('tagProbe', () => {
     const probe = tagProbe(contentFacts('no_crawler'), 'https://shop.test/a', PROGRAM);
     expect(probe.ua).toBe(null);
     expect(commandOf(probe.command)).toBe(
-      `curl -sS 'https://shop.test/a' | tr '\\r\\n<' '  \\n' | awk '${PROGRAM}'`,
+      `curl -sSf --compressed 'https://shop.test/a' | tr '\\r\\n<' '  \\n' | awk '${PROGRAM}'`,
     );
   });
 });
@@ -142,6 +142,25 @@ describe('what a command sets aside', () => {
       'The command sets aside `nav, footer, aside, form` elements as the check does, but not `[role="navigation"], [aria-hidden="true"]`.',
     );
     expect(selectors).toHaveLength(elements.length + 2);
+  });
+});
+
+describe('a closing tag with a space before its `>`', () => {
+  it('ends a set-aside element, so what follows it is read', async () => {
+    const html = '<nav>menu</nav ><FOOTER>f</FOOTER\t><h1>Title</h1>';
+    const site = await twoStateSite({
+      broken: (_req, res) => void res.end(html.replace('<h1>Title</h1>', '')),
+      fixed: (_req, res) => void res.end(html),
+    });
+    try {
+      const program = `${AWK_VISIBLE}!c&&l~/^h1[ \\t>]/{f=1}END{exit !f}`;
+      const { command } = tagProbe(contentFacts(), `${site.base}/a`, program);
+      const { broken, fixed } = await inBothStates(site, commandOf(command));
+      expect(broken.status).not.toBe(0);
+      expect(fixed.status).toBe(0);
+    } finally {
+      await site.close();
+    }
   });
 });
 
@@ -220,7 +239,7 @@ describe('content-rule over hostile records (properties)', () => {
         );
         expect(UNSHOWN.test(command)).toBe(false);
         expect(command).toMatch(
-          /^curl -sS '[^']*' \| tr '\\r\\n<' ' {2}\\n' \| awk 'END\{exit 1\}'$/,
+          /^curl -sSf --compressed '[^']*' \| tr '\\r\\n<' ' {2}\\n' \| awk 'END\{exit 1\}'$/,
         );
       }),
     );

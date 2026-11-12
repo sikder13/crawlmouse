@@ -40,7 +40,7 @@ const MARKS_PATTERN = QUESTION_MARKS.map((m) => (m === '?' ? '\\?' : m)).join('|
  */
 const PROGRAM =
   `${AWK_VISIBLE}!c&&l~/^h1[ \\t>]/{s=1}` +
-  `l~/^\\/h[23]>/{if(h&&t~/(${MARKS_PATTERN})([ \\t]|$)/)f=1;h=0}` +
+  `l~/^\\/h[23][ \\t>]/{if(h&&t~/(${MARKS_PATTERN})([ \\t]|$)/)f=1;h=0}` +
   `h{${AWK_TEXT};t=t x}` +
   `l~/^h[23][ \\t>]/{h=s&&!c;${AWK_TEXT};t=x}` +
   `END{exit !f}`;

@@ -86,7 +86,7 @@ describe('missing_schema_description: what the packet says', () => {
 
   it('requests the first failing page as a crawler the site serves', () => {
     expect(packet.verify.ua).toBe(FIRST_TESTABLE.token);
-    expect(packet.verify.command.startsWith('curl -sS -A ')).toBe(true);
+    expect(packet.verify.command.startsWith('curl -sSf --compressed -A ')).toBe(true);
     expect(packet.verify.command).toContain("'https://shop.test/blog/a'");
     expect(packet.verify.command).not.toContain('/blog/b');
   });
@@ -110,7 +110,7 @@ describe('missing_schema_description: the command and the engine’s check agree
 
   it('requests as no crawler when the audit recorded none that is served, and says so', async () => {
     const run = await commandOn(TYPE, { broken: BROKEN, fixed: FIXED }, 'no_crawler');
-    expect(run.command.startsWith("curl -sS 'http://127.0.0.1")).toBe(true);
+    expect(run.command.startsWith("curl -sSf --compressed 'http://127.0.0.1")).toBe(true);
     expect(run.broken.status).not.toBe(0);
     expect(run.fixed.status).toBe(0);
     expect(run.userAgents.every((ua) => ua.startsWith('curl/'))).toBe(true);

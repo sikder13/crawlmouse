@@ -10,7 +10,9 @@
  * rendered page of the record at the address the crawl read it at (served-at.ts `readAt`) and counts the words of
  * the HTML response outside the elements in SKIPPED. It exits 0 when the count reaches `wordsNeeded`:
  * the count at which the page's share of its measured rendered words is READABLE_FROM
- * (render/state.ts). Text inside a script, an inline JSON state included, is not counted.
+ * (render/state.ts). Text inside a script, an inline JSON state included, is not counted. curl is
+ * given `-f`, so a response with an error status gives the count no input, and `--compressed`, so a
+ * server that compresses whatever the request accepts is still read.
  *
  * What the count is not: the audit's count. The audit also drops `header` elements, link-dense menus
  * and elements by ARIA role (main-content.ts), which this command does not: a `header` inside an
@@ -58,12 +60,13 @@ export const SKIPPED = [
  * The awk program of the verify command. Its input has one line per `<` of the response, so a line
  * starts with a tag's name. From an opening tag of SKIPPED (not self-closed) to that element's
  * closing tag, lines are dropped; of every other line the tag is removed and the words are counted.
- * It prints the count and exits 0 when the count is `need` or more.
+ * It prints the count and exits 0 when the count is `need` or more. A closing tag ends its element
+ * with or without a space before its `>`.
  */
 const COUNT_WORDS = [
   '{ t = tolower($0) }',
-  `skip == "" && t !~ "^[^>]*/>" && match(t, "^(${SKIPPED.join('|')})[ >]") { skip = substr(t, 1, RLENGTH - 1) }`,
-  'skip != "" { if (index(t, "/" skip ">") != 1) next; skip = "" }',
+  `skip == "" && t !~ "^[^>]*/>" && match(t, "^(${SKIPPED.join('|')})[ \\t>]") { skip = substr(t, 1, RLENGTH - 1) }`,
+  'skip != "" { if (t !~ ("^/" skip "[ \\t/>]")) next; skip = "" }',
   '{ sub(/^[^>]*>/, ""); n += split($0, w) }',
   'END { print n + 0; exit !(n >= need + 0) }',
 ].join(' ');
@@ -258,9 +261,9 @@ export const clientRenderedTemplate: PacketEntry<'client_rendered_template'> = {
     return {
       command:
         entry === null
-          ? sh`curl -sS ${address} | tr ${word('\\r\\n')} ${word('  ')} | tr ${word('<')} ${word('\\n')} | awk -v need=${int(need)} ${word(COUNT_WORDS)}`
-          : sh`curl -sS -A ${word(userAgentOf(entry))} ${address} | tr ${word('\\r\\n')} ${word('  ')} | tr ${word('<')} ${word('\\n')} | awk -v need=${int(need)} ${word(COUNT_WORDS)}`,
-      expect: line`Prints its count of the words in the HTML response and exits 0 at ${count(need)} or more: ${percent(READABLE_FROM)}% of the ${count(page.rendered_words)} the audit counted once rendered (it counted ${count(page.raw_words)} without JavaScript). The command counts all text outside ${skipped} elements: its count differs a little from the audit’s, and a page with that much text outside its main content passes unfixed. The audit’s next check closes the fix sooner: once every rendered page of the template has more than ${percent(EMPTY_SHELL_LEAVES_ABOVE)}% of its rendered words in the HTML response.`,
+          ? sh`curl -sSf --compressed ${address} | tr ${word('\\r\\n')} ${word('  ')} | tr ${word('<')} ${word('\\n')} | awk -v need=${int(need)} ${word(COUNT_WORDS)}`
+          : sh`curl -sSf --compressed -A ${word(userAgentOf(entry))} ${address} | tr ${word('\\r\\n')} ${word('  ')} | tr ${word('<')} ${word('\\n')} | awk -v need=${int(need)} ${word(COUNT_WORDS)}`,
+      expect: line`Prints its count of the words in the HTML response and exits 0 at ${count(need)} or more: ${percent(READABLE_FROM)}% of the ${count(page.rendered_words)} the audit counted once rendered (it counted ${count(page.raw_words)} without JavaScript). An error status does not pass. The command counts all text outside ${skipped} elements: its count differs a little from the audit’s, and a page with that much text outside its main content passes unfixed. The audit’s next check closes the fix sooner: once every rendered page of the template has more than ${percent(EMPTY_SHELL_LEAVES_ABOVE)}% of its rendered words in the HTML response.`,
       ua: entry?.token ?? null,
     };
   },

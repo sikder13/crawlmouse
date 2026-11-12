@@ -26,7 +26,7 @@ import type { PacketEntry, PacketFacts } from '../types.js';
  */
 const PROGRAM =
   `${AWK_VISIBLE}!c&&l~/^(table|dl)[ \\t>]/{s=1}` +
-  `l~/^\\/(td|dd)>/{k=0}` +
+  `l~/^\\/(td|dd)[ \\t>]/{k=0}` +
   `!c&&l~/^(td|dd)[ \\t>]/{k=s}` +
   `k{${AWK_TEXT};if(x~/[^ \\t]/)f=1}` +
   `END{exit !f}`;

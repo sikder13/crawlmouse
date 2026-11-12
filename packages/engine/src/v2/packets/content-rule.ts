@@ -114,16 +114,16 @@ const CHROME_ATTRIBUTES = SELECTORS.filter((s) => !CHROME_ELEMENTS.includes(s));
  * line in lower case, and `c` counts the set-aside elements open at it, so a rule guarded by `!c`
  * skips what is inside one.
  */
-export const AWK_VISIBLE = `{l=tolower($0)}l~/^(${CHROME_ELEMENTS.join('|')})[ \\t>]/{c++}l~/^\\/(${CHROME_ELEMENTS.join('|')})>/{if(c)c--}`;
+export const AWK_VISIBLE = `{l=tolower($0)}l~/^(${CHROME_ELEMENTS.join('|')})[ \\t>]/{c++}l~/^\\/(${CHROME_ELEMENTS.join('|')})[ \\t>]/{if(c)c--}`;
 
 /** For `expect`: how far a command built on AWK_VISIBLE follows the check's set-aside list. */
 export const CHROME_GAP = ours(
   `The command sets aside \`${CHROME_ELEMENTS.join(', ')}\` elements as the check does, but not \`${CHROME_ATTRIBUTES.join(', ')}\`.`,
 );
 
-/** For `expect`: the command reads one page; the audit's next check is the full proof. */
+/** For `expect`: an error status fails; the command reads one page, and the audit's next check is the full proof. */
 export const RECHECK = ours(
-  "The audit's next check applies the full rule to every page of the template.",
+  "A page answered with an error status does not pass. The audit's next check applies the full rule to every page of the template.",
 );
 
 /**
@@ -132,7 +132,9 @@ export const RECHECK = ours(
  * breaks into spaces and each `<` into a line break, so a line starts with a tag's name and holds the
  * text up to the next tag), and let `program`, an awk program of ours, exit 0 when what it looks for
  * is there. Requested as a crawler the site serves today (crawler.ts), or as none when the audit
- * recorded none.
+ * recorded none. curl is given `-f`, so a response with an error status gives the program no input
+ * and the command fails, and `--compressed`, so a server that compresses whatever the request
+ * accepts is still read.
  */
 export function tagProbe(facts: PacketFacts, page: string, program: string): TagProbe {
   const from = word('\\r\\n<');
@@ -141,7 +143,7 @@ export function tagProbe(facts: PacketFacts, page: string, program: string): Tag
   const address = url(readAt(facts, page));
   if (entry === null) {
     return {
-      command: sh`curl -sS ${address} | tr ${from} ${to} | awk ${word(program)}`,
+      command: sh`curl -sSf --compressed ${address} | tr ${from} ${to} | awk ${word(program)}`,
       ua: null,
       sender: ours(
         "It requests with curl's own user agent: the audit recorded no crawler the site serves.",
@@ -149,7 +151,7 @@ export function tagProbe(facts: PacketFacts, page: string, program: string): Tag
     };
   }
   return {
-    command: sh`curl -sS -A ${word(userAgentOf(entry))} ${address} | tr ${from} ${to} | awk ${word(program)}`,
+    command: sh`curl -sSf --compressed -A ${word(userAgentOf(entry))} ${address} | tr ${from} ${to} | awk ${word(program)}`,
     ua: entry.token,
     sender: ours(`It requests as ${entry.token}, which the site serves today.`),
   };

@@ -5,6 +5,7 @@
  */
 import { existsSync } from 'node:fs';
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import { gzipSync } from 'node:zlib';
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import {
@@ -244,6 +245,34 @@ export function contentCommandOnSites(
       // requested at its own address the command reads the redirect's body, fixed or not
       const own = writePacket(type, contentRecord(type, { affected_urls: [page] }), contentFacts())!;
       expect((await runCommand(own.verify.command)).status).not.toBe(0);
+    });
+  });
+
+  describe(`${type}: the command and how the page is answered`, () => {
+    const run = async (serve: (html: string) => (req: IncomingMessage, res: ServerResponse) => void) => {
+      const site = await twoStateSite({ broken: serve(pages.broken), fixed: serve(pages.fixed) });
+      open.push(site);
+      const record = contentRecord(type, { affected_urls: [`${site.base}/blog/a`] });
+      return inBothStates(site, writePacket(type, record, contentFacts())!.verify.command);
+    };
+
+    it('reads a page from a server that gzips whatever the request accepts', async () => {
+      const { broken, fixed } = await run((html) => (_req, res) => {
+        res.setHeader('content-encoding', 'gzip');
+        res.end(gzipSync(html));
+      });
+      expect(broken.status).not.toBe(0);
+      expect(fixed.status).toBe(0);
+    });
+
+    it('does not pass on an error page that carries the fixed markup', async () => {
+      const { broken, fixed } = await run((html) => (_req, res) => {
+        res.statusCode = 404;
+        res.end(html);
+      });
+      expect(broken.status).not.toBe(0);
+      expect(fixed.status).not.toBe(0);
+      expect(fixed.stderr).toMatch(/404/);
     });
   });
 

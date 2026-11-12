@@ -1,3 +1,4 @@
+import { gzipSync } from 'node:zlib';
 import fc from 'fast-check';
 import { afterEach, describe, expect, it } from 'vitest';
 import { FixPacketSchema, type PageResult } from '@crawlmouse/types/v2';
@@ -254,7 +255,7 @@ describe('the client-rendered template packet, from its record', () => {
     const record = detected('https://a.test', [[41, 312]]);
     const served = compose(builder, record, factsOf());
     expect(served.verify.ua).toBe('OAI-SearchBot');
-    expect(served.verify.command).toMatch(/^curl -sS -A '[^']*OAI-SearchBot/);
+    expect(served.verify.command).toMatch(/^curl -sSf --compressed -A '[^']*OAI-SearchBot/);
     expect(served.context.join('\n')).not.toMatch(/No tested AI crawler/);
     const none = compose(
       builder,
@@ -262,7 +263,7 @@ describe('the client-rendered template packet, from its record', () => {
       factsOf([{ ua: 'OAI-SearchBot', verdict: 'blocked_by_ua_rule' }]),
     );
     expect(none.verify.ua).toBe(null);
-    expect(none.verify.command).toMatch(/^curl -sS 'https:\/\/a\.test\/guides\/g-0' \|/);
+    expect(none.verify.command).toMatch(/^curl -sSf --compressed 'https:\/\/a\.test\/guides\/g-0' \|/);
     expect(none.context.at(-1)).toBe(
       'No tested AI crawler is served by the site today, so the check below requests the page with no crawler’s user agent.',
     );
@@ -274,7 +275,7 @@ describe('the client-rendered template packet, from its record', () => {
     const { verify } = compose(builder, record, factsOf());
     expect(verify.command).toContain("need='250'");
     expect(verify.expect).toBe(
-      'Prints its count of the words in the HTML response and exits 0 at 250 or more: 80% of the 312 the audit counted once rendered (it counted 41 without JavaScript). The command counts all text outside `script`, `style`, `noscript`, `template`, `svg`, `title`, `nav`, `footer`, `aside` elements: its count differs a little from the audit’s, and a page with that much text outside its main content passes unfixed. The audit’s next check closes the fix sooner: once every rendered page of the template has more than 45% of its rendered words in the HTML response.',
+      'Prints its count of the words in the HTML response and exits 0 at 250 or more: 80% of the 312 the audit counted once rendered (it counted 41 without JavaScript). An error status does not pass. The command counts all text outside `script`, `style`, `noscript`, `template`, `svg`, `title`, `nav`, `footer`, `aside` elements: its count differs a little from the audit’s, and a page with that much text outside its main content passes unfixed. The audit’s next check closes the fix sooner: once every rendered page of the template has more than 45% of its rendered words in the HTML response.',
     );
     expect(Math.round(EMPTY_SHELL_LEAVES_ABOVE * 100)).toBe(45);
     // the largest counts a page can have leave the line under the packet's bound
@@ -462,6 +463,59 @@ describe('the client-rendered template verify command', () => {
     // requested at its own address the command counts the redirect's body, fixed or not
     const own = compose(builder, record, factsOf()).verify.command;
     expect((await runCommand(own)).status).not.toBe(0);
+  });
+
+  it('reads a page from a server that gzips whatever the request accepts', async () => {
+    const gzipped =
+      (body: string) =>
+      (_req: unknown, res: { setHeader(n: string, v: string): void; end(b: Buffer): void }) => {
+        res.setHeader('content-encoding', 'gzip');
+        res.end(gzipSync(body));
+      };
+    site = await twoStateSite({ broken: gzipped(SHELL), fixed: gzipped(SERVER_RENDERED) });
+    const record = measured(site.base);
+    const { broken, fixed } = await inBothStates(
+      site,
+      compose(builder, record, factsOf()).verify.command,
+    );
+    expect(broken.status).not.toBe(0);
+    expect(fixed.status).toBe(0);
+    expect(Number(fixed.stdout)).toBeGreaterThanOrEqual(wordsNeeded(record.evidence.pages[0]!));
+  });
+
+  it('does not pass on an error page that holds the text', async () => {
+    site = await twoStateSite({
+      broken: html(SHELL),
+      fixed: (_req, res) => {
+        res.statusCode = 404;
+        res.end(SERVER_RENDERED);
+      },
+    });
+    const { verify } = compose(builder, measured(site.base), factsOf());
+    site.use('fixed');
+    const ran = await runCommand(verify.command);
+    expect(ran.status).not.toBe(0);
+    expect(ran.stderr).toMatch(/404/);
+    expect(verify.expect).toContain('An error status does not pass.');
+  });
+
+  it('passes on a server-rendered page with a script closed by `</script >`', async () => {
+    const spaced = (page: string) => {
+      const out = page.replace('</script>', '</script >').replace('</script>', '</SCRIPT\t>');
+      expect(out).not.toBe(page);
+      return out;
+    };
+    site = await twoStateSite({ broken: html(spaced(SHELL)), fixed: html(spaced(SERVER_RENDERED)) });
+    const record = measured(site.base);
+    const { broken, fixed } = await inBothStates(
+      site,
+      compose(builder, record, factsOf()).verify.command,
+    );
+    expect(broken.status).not.toBe(0);
+    expect(fixed.status).toBe(0);
+    // the same counts as with the tags closed plainly
+    site.use('broken');
+    expect(Math.abs(Number(broken.stdout) - record.evidence.pages[0]!.raw_words)).toBeLessThanOrEqual(5);
   });
 
   it('passes on a server-rendered page whose head is not closed', async () => {
