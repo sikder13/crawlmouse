@@ -116,10 +116,10 @@ export function PublicReportScreen({
               })}
             />
           </Card>
-          {/* FACTS D1: one line under every crawler table. */}
+          {/* FACTS D1: one line under every crawler table, without its sentence on our source IPs, which
+              /bot does not list (CC-29 Q28; __tests__/v2/no-published-ips.test.ts). */}
           <p className={`${layout.mut} ${styles.tableNote}`}>
-            Tested with tagged user agents from published IPs —{' '}
-            <a href="/bot">crawlmouse.com/bot</a>.
+            Tested with tagged user agents — <a href="/bot">crawlmouse.com/bot</a>.
           </p>
         </div>
 

@@ -132,9 +132,7 @@ describe('app/v2-report/[slug]', () => {
     expect(text).toContain('· 10 more in the full audit');
     expect(text).toContain('allowed by robots.txt');
     expect(text).toContain('verified bot, not fetched');
-    expect(text).toContain(
-      'Tested with tagged user agents from published IPs — crawlmouse.com/bot.',
-    );
+    expect(text).toContain('Tested with tagged user agents — crawlmouse.com/bot.');
     expect(text).not.toContain('this link works until');
     expect(markup.match(/data-v2-primary=""/g)).toHaveLength(1);
     expect(markup.match(/<h1/g)).toHaveLength(1);

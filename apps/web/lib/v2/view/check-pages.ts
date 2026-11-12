@@ -1,9 +1,9 @@
 /**
  * The three `/check` pages as data (CC-29 D8): the copy of `lib/v2/copy/check-pages.ts`, with the
- * sentences that state what the example audit measured built from the bad-site fixture's first audit,
- * the one the home replays. The crawler names in a sentence come from that check's crawler rows, and
- * what each OpenAI crawler does from the engine's crawler list (`AI_BOT_REGISTRY`), so neither is
- * typed here.
+ * sentences that state what the sample audit measured built from the bad-site fixture's first audit,
+ * the one the home replays. The crawlers the grade counts come from that check's crawler rows, what
+ * each OpenAI crawler does from the engine's crawler list (`AI_BOT_REGISTRY`), and the crawlers the
+ * JavaScript guide names from `JS_GUIDE_CRAWLERS`, so none is typed here.
  */
 import { AI_BOT_REGISTRY } from '@crawlmouse/engine';
 import { GATES } from '../../entitlement-v2';
@@ -11,6 +11,7 @@ import {
   CHECK_COPY,
   CHECK_DATA_COPY,
   FUNNEL,
+  JS_GUIDE_CRAWLERS,
   checkPath,
   type CheckQuestion,
   type Paragraph,
@@ -45,7 +46,7 @@ export interface CheckPageView {
   formLabel: string;
 }
 
-/** OpenAI's three crawlers, in the order the gptbot page discusses them. */
+/** The OpenAI crawlers the audit tests, in the order the gptbot page discusses them. */
 const OPENAI = ['GPTBot', 'OAI-SearchBot', 'ChatGPT-User'] as const;
 
 const paragraph = (p: Paragraph): CheckPageBlock => ({ kind: 'paragraph', ...p });
@@ -87,15 +88,17 @@ function gptbotBlocks(): CheckPageBlock[] {
 }
 
 function javascriptBlocks(): CheckPageBlock[] {
-  const { d, check } = exampleCheck();
-  const ai = check.crawlers.filter((c) => c.group !== 'search_engine').map((c) => c.ua);
+  const { d } = exampleCheck();
   const { withoutJs: w } = homeView(d, CHECKS.badFirstAudit, {
     map: mapDrawing('bad-site'),
     end: stateAt(recording('bad-site').events, Infinity),
   });
   const [p1, p2, p3] = CHECK_COPY.javascript.paragraphs;
   return [
-    paragraph({ text: CHECK_DATA_COPY.noJs(listOf(ai)), sources: CHECK_DATA_COPY.noJsSources }),
+    paragraph({
+      text: CHECK_DATA_COPY.noJs(listOf(JS_GUIDE_CRAWLERS)),
+      sources: CHECK_DATA_COPY.noJsSources,
+    }),
     paragraph(p1!),
     paragraph(p2!),
     paragraph({
