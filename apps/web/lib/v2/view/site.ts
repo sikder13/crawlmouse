@@ -31,6 +31,7 @@ const BLOCKING_VERDICTS: Verdict[] = ['disallowed_by_robots', 'blocked_by_ua_rul
 import { capitalise, count, numberWord, plural } from '../words';
 import {
   PLAN_NAMES,
+  readerRole,
   resultChecks,
   runsSites,
   viewAt,
@@ -756,7 +757,7 @@ export function sitePage(d: AccountDataset, viewer: Viewer, siteId: string): Sit
   return {
     kind: 'first_check',
     first: {
-      shell: accountShellView(v, 'Sites'),
+      shell: accountShellView(v, 'Sites', { role: readerRole(v) ?? 'developer' }),
       title: site.host,
       line,
       state,

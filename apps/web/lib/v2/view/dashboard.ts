@@ -787,7 +787,7 @@ function noSiteView(v: AccountView): DashboardView {
   const adds = addsSites(v);
   const trial = v.account.state === 'pro_trial' || v.account.state === 'agency_trial';
   return {
-    shell: accountShellView(v, 'Sites'),
+    shell: accountShellView(v, 'Sites', { role: readerRole(v) ?? 'developer' }),
     firstRun: true,
     header: {
       title: adds ? COPY.noSiteTitle : COPY.noSiteSeatTitle,
@@ -949,7 +949,7 @@ export function dashboardView(d: AccountDataset, viewer: Viewer): DashboardView 
   const daysLeft = trial ? calendarDays(v.now, v.account.trial_ends_at!, zone) : null;
 
   return {
-    shell: accountShellView(v, 'Sites'),
+    shell: accountShellView(v, 'Sites', { role: readerRole(v) ?? 'developer' }),
     firstRun,
     header,
     strip,
