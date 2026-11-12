@@ -467,103 +467,104 @@ Learn opens as a disclosure (NavMenu). Log in is the header's action, at `/login
 
 From `apps/web/app/(v2-preview)/v2-preview/_preview/registry.ts`. They are served by `next dev` only: when `NODE_ENV` is `production` the group layout and each page call `previewOnly()`, which returns a 404, and `apps/web/__tests__/v2/preview-guard.test.ts` calls every page under that setting. The visual harness in `tests/visual` captures each one at 1280 and 390 pixels, light and dark, and a screen that plays a recording once at each moment listed, opened paused there; `tests/visual/README.md` says how to run it and how to update a baseline.
 
-| Page                                         | Path                                                     | Kind      | Opened at                            |
-| -------------------------------------------- | -------------------------------------------------------- | --------- | ------------------------------------ |
-| Button                                       | `/v2-preview/button`                                     | primitive |                                      |
-| StatusPill                                   | `/v2-preview/status-pill`                                | primitive |                                      |
-| Grade                                        | `/v2-preview/grade`                                      | primitive |                                      |
-| VerdictCell                                  | `/v2-preview/verdict-cell`                               | primitive |                                      |
-| CoverageLine                                 | `/v2-preview/coverage-line`                              | primitive |                                      |
-| Card                                         | `/v2-preview/card`                                       | primitive |                                      |
-| Table                                        | `/v2-preview/table`                                      | primitive |                                      |
-| Field                                        | `/v2-preview/field`                                      | primitive |                                      |
-| Select                                       | `/v2-preview/select`                                     | primitive |                                      |
-| Switch                                       | `/v2-preview/switch`                                     | primitive |                                      |
-| PageShell                                    | `/v2-preview/page-shell`                                 | primitive |                                      |
-| AccountShell                                 | `/v2-preview/account-shell`                              | primitive |                                      |
-| TrialCard                                    | `/v2-preview/trial-card`                                 | primitive |                                      |
-| ThemeControl                                 | `/v2-preview/theme-control`                              | primitive |                                      |
-| GradeHistory                                 | `/v2-preview/grade-history`                              | primitive |                                      |
-| CheckGlyphRow                                | `/v2-preview/check-glyph-row`                            | primitive |                                      |
-| Final-Home                                   | `/v2-preview/screens/home`                               | screen    |                                      |
-| Final-Crawl                                  | `/v2-preview/screens/crawl`                              | screen    | `?at=47000`, `?at=128000`, `?at=end` |
-| Crawl, clean re-run                          | `/v2-preview/screens/crawl/clean`                        | screen    | `?at=end`                            |
-| Crawl, challenged                            | `/v2-preview/screens/crawl/challenged`                   | screen    | `?at=end`                            |
-| Final-Result                                 | `/v2-preview/screens/result`                             | screen    |                                      |
-| Result, clean bill                           | `/v2-preview/screens/result/clean`                       | screen    |                                      |
-| Result, withheld                             | `/v2-preview/screens/result/challenged`                  | screen    |                                      |
-| Result, loading                              | `/v2-preview/screens/result/loading`                     | screen    |                                      |
-| Result, not started                          | `/v2-preview/screens/result/empty`                       | screen    |                                      |
-| Result, failed                               | `/v2-preview/screens/result/error`                       | screen    |                                      |
-| Result, expired                              | `/v2-preview/screens/result/expired`                     | screen    |                                      |
-| Final-Segment                                | `/v2-preview/screens/segment/access`                     | screen    |                                      |
-| Crawler access, clean bill                   | `/v2-preview/screens/segment/access/clean`               | screen    |                                      |
-| Crawler access, withheld                     | `/v2-preview/screens/segment/access/challenged`          | screen    |                                      |
-| Final-Seg-JS                                 | `/v2-preview/screens/segment/nojs`                       | screen    |                                      |
-| Without JavaScript, clean bill               | `/v2-preview/screens/segment/nojs/clean`                 | screen    |                                      |
-| Without JavaScript, withheld                 | `/v2-preview/screens/segment/nojs/challenged`            | screen    |                                      |
-| Final-Seg-Structure                          | `/v2-preview/screens/segment/structure`                  | screen    |                                      |
-| Structure, clean bill                        | `/v2-preview/screens/segment/structure/clean`            | screen    |                                      |
-| Structure, withheld                          | `/v2-preview/screens/segment/structure/challenged`       | screen    |                                      |
-| Final-Seg-Content                            | `/v2-preview/screens/segment/content`                    | screen    |                                      |
-| Content, clean bill                          | `/v2-preview/screens/segment/content/clean`              | screen    |                                      |
-| Content, withheld                            | `/v2-preview/screens/segment/content/challenged`         | screen    |                                      |
-| Final-Seg-Signals                            | `/v2-preview/screens/segment/signals`                    | screen    |                                      |
-| Signals, clean bill                          | `/v2-preview/screens/segment/signals/clean`              | screen    |                                      |
-| Signals, withheld                            | `/v2-preview/screens/segment/signals/challenged`         | screen    |                                      |
-| Final-Seg-Changes                            | `/v2-preview/screens/segment/changes`                    | screen    |                                      |
-| Changes, clean bill                          | `/v2-preview/screens/segment/changes/clean`              | screen    |                                      |
-| Changes, withheld                            | `/v2-preview/screens/segment/changes/challenged`         | screen    |                                      |
-| Changes, after a re-check                    | `/v2-preview/screens/segment/changes/history`            | screen    |                                      |
-| Changes, withheld, after a re-check          | `/v2-preview/screens/segment/changes/challenged-history` | screen    |                                      |
-| Final-Fix                                    | `/v2-preview/screens/fix`                                | screen    |                                      |
-| Fix 1, bad site                              | `/v2-preview/screens/fix/first`                          | screen    |                                      |
-| Fix 3, bad site                              | `/v2-preview/screens/fix/third`                          | screen    |                                      |
-| Fix, challenged site                         | `/v2-preview/screens/fix/challenged`                     | screen    |                                      |
-| Fix, on Pro                                  | `/v2-preview/screens/fix/locked`                         | screen    |                                      |
-| Fix, resolved                                | `/v2-preview/screens/fix/resolved`                       | screen    |                                      |
-| Final-Dashboard-Day0                         | `/v2-preview/screens/dashboard/day0`                     | screen    |                                      |
-| Final-Dashboard                              | `/v2-preview/screens/dashboard`                          | screen    |                                      |
-| Dashboard, clean (stand-in Free account, H5) | `/v2-preview/screens/dashboard/clean`                    | screen    |                                      |
-| Dashboard, withheld                          | `/v2-preview/screens/dashboard/withheld`                 | screen    |                                      |
-| Final-Site                                   | `/v2-preview/screens/site`                               | screen    |                                      |
-| Site, clean (stand-in Free account)          | `/v2-preview/screens/site/clean`                         | screen    |                                      |
-| Site, withheld                               | `/v2-preview/screens/site/withheld`                      | screen    |                                      |
-| Dashboard, no site                           | `/v2-preview/screens/dashboard/no-site`                  | screen    |                                      |
-| Site, first check running                    | `/v2-preview/screens/site/first-check`                   | screen    |                                      |
-| Dashboard, no account                        | `/v2-preview/screens/dashboard/no-account`               | screen    |                                      |
-| Dashboard, more than one account             | `/v2-preview/screens/dashboard/ambiguous`                | screen    |                                      |
-| Final-Alerts                                 | `/v2-preview/screens/alerts`                             | screen    |                                      |
-| Alerts, free                                 | `/v2-preview/screens/alerts/free`                        | screen    |                                      |
-| Final-Reports                                | `/v2-preview/screens/reports`                            | screen    |                                      |
-| Reports, Agency (Northwind, owner ruling 8)  | `/v2-preview/screens/reports/agency`                     | screen    |                                      |
-| Final-Settings                               | `/v2-preview/screens/settings`                           | screen    |                                      |
-| Settings, free                               | `/v2-preview/screens/settings/free`                      | screen    |                                      |
-| Settings, delete (owner ruling 12)           | `/v2-preview/screens/settings/delete`                    | screen    |                                      |
-| Final-TrialEnd                               | `/v2-preview/screens/trial-end`                          | screen    |                                      |
-| Changes log                                  | `/v2-preview/screens/changes-log`                        | screen    | ``, `?kind=opened`                   |
-| Final-LinkMap                                | `/v2-preview/screens/map`                                | screen    |                                      |
-| Link map, every page                         | `/v2-preview/screens/map/all`                            | screen    |                                      |
-| Link map, clean bill                         | `/v2-preview/screens/map/clean`                          | screen    |                                      |
-| Link map, withheld                           | `/v2-preview/screens/map/challenged`                     | screen    |                                      |
-| Link map, 2,000 pages                        | `/v2-preview/screens/map/large`                          | screen    |                                      |
-| Final-Signup                                 | `/v2-preview/screens/signup`                             | screen    |                                      |
-| Sign-up, sending                             | `/v2-preview/screens/signup/submitting`                  | screen    |                                      |
-| Sign-up, rate limited                        | `/v2-preview/screens/signup/rate-limited`                | screen    |                                      |
-| Final-CheckEmail                             | `/v2-preview/screens/check-email/from-audit`             | screen    |                                      |
-| Final-CheckEmail-NoAudit                     | `/v2-preview/screens/check-email/named-site`             | screen    |                                      |
-| Check-email, sign-in                         | `/v2-preview/screens/check-email/signin`                 | screen    |                                      |
-| Continue                                     | `/v2-preview/screens/continue`                           | screen    |                                      |
-| Continue, link expired                       | `/v2-preview/screens/continue/expired`                   | screen    |                                      |
-| Final-Pricing                                | `/v2-preview/screens/pricing`                            | screen    |                                      |
-| Pricing, signed in                           | `/v2-preview/screens/pricing/signed-in`                  | screen    |                                      |
-| Final-AgencyTrial                            | `/v2-preview/screens/agency-trial`                       | screen    |                                      |
-| Agency trial, Checkout did not finish        | `/v2-preview/screens/agency-trial/returning`             | screen    |                                      |
-| Agency trial, used                           | `/v2-preview/screens/agency-trial/used`                  | screen    |                                      |
-| Final-Agencies                               | `/v2-preview/screens/agencies`                           | screen    |                                      |
-| Final-Developers                             | `/v2-preview/screens/developers`                         | screen    |                                      |
-| Check: is GPTBot blocked?                    | `/v2-preview/screens/check/gptbot`                       | screen    |                                      |
-| Check: readable without JavaScript?          | `/v2-preview/screens/check/javascript`                   | screen    |                                      |
-| Check: robots.txt for AI                     | `/v2-preview/screens/check/robots-ai`                    | screen    |                                      |
-| Final-Public                                 | `/v2-preview/screens/public-report`                      | screen    |                                      |
-| Public report, withheld                      | `/v2-preview/screens/public-report/withheld`             | screen    |                                      |
+| Page                                               | Path                                                     | Kind      | Opened at                            |
+| -------------------------------------------------- | -------------------------------------------------------- | --------- | ------------------------------------ |
+| Button                                             | `/v2-preview/button`                                     | primitive |                                      |
+| StatusPill                                         | `/v2-preview/status-pill`                                | primitive |                                      |
+| Grade                                              | `/v2-preview/grade`                                      | primitive |                                      |
+| VerdictCell                                        | `/v2-preview/verdict-cell`                               | primitive |                                      |
+| CoverageLine                                       | `/v2-preview/coverage-line`                              | primitive |                                      |
+| Card                                               | `/v2-preview/card`                                       | primitive |                                      |
+| Table                                              | `/v2-preview/table`                                      | primitive |                                      |
+| Field                                              | `/v2-preview/field`                                      | primitive |                                      |
+| Select                                             | `/v2-preview/select`                                     | primitive |                                      |
+| Switch                                             | `/v2-preview/switch`                                     | primitive |                                      |
+| PageShell                                          | `/v2-preview/page-shell`                                 | primitive |                                      |
+| AccountShell                                       | `/v2-preview/account-shell`                              | primitive |                                      |
+| TrialCard                                          | `/v2-preview/trial-card`                                 | primitive |                                      |
+| ThemeControl                                       | `/v2-preview/theme-control`                              | primitive |                                      |
+| GradeHistory                                       | `/v2-preview/grade-history`                              | primitive |                                      |
+| CheckGlyphRow                                      | `/v2-preview/check-glyph-row`                            | primitive |                                      |
+| Final-Home                                         | `/v2-preview/screens/home`                               | screen    |                                      |
+| Final-Crawl                                        | `/v2-preview/screens/crawl`                              | screen    | `?at=47000`, `?at=128000`, `?at=end` |
+| Crawl, clean re-run                                | `/v2-preview/screens/crawl/clean`                        | screen    | `?at=end`                            |
+| Crawl, challenged                                  | `/v2-preview/screens/crawl/challenged`                   | screen    | `?at=end`                            |
+| Final-Result                                       | `/v2-preview/screens/result`                             | screen    |                                      |
+| Result, clean bill                                 | `/v2-preview/screens/result/clean`                       | screen    |                                      |
+| Result, withheld                                   | `/v2-preview/screens/result/challenged`                  | screen    |                                      |
+| Result, loading                                    | `/v2-preview/screens/result/loading`                     | screen    |                                      |
+| Result, not started                                | `/v2-preview/screens/result/empty`                       | screen    |                                      |
+| Result, failed                                     | `/v2-preview/screens/result/error`                       | screen    |                                      |
+| Result, expired                                    | `/v2-preview/screens/result/expired`                     | screen    |                                      |
+| Final-Segment                                      | `/v2-preview/screens/segment/access`                     | screen    |                                      |
+| Crawler access, clean bill                         | `/v2-preview/screens/segment/access/clean`               | screen    |                                      |
+| Crawler access, withheld                           | `/v2-preview/screens/segment/access/challenged`          | screen    |                                      |
+| Final-Seg-JS                                       | `/v2-preview/screens/segment/nojs`                       | screen    |                                      |
+| Without JavaScript, clean bill                     | `/v2-preview/screens/segment/nojs/clean`                 | screen    |                                      |
+| Without JavaScript, withheld                       | `/v2-preview/screens/segment/nojs/challenged`            | screen    |                                      |
+| Final-Seg-Structure                                | `/v2-preview/screens/segment/structure`                  | screen    |                                      |
+| Structure, clean bill                              | `/v2-preview/screens/segment/structure/clean`            | screen    |                                      |
+| Structure, withheld                                | `/v2-preview/screens/segment/structure/challenged`       | screen    |                                      |
+| Final-Seg-Content                                  | `/v2-preview/screens/segment/content`                    | screen    |                                      |
+| Content, clean bill                                | `/v2-preview/screens/segment/content/clean`              | screen    |                                      |
+| Content, withheld                                  | `/v2-preview/screens/segment/content/challenged`         | screen    |                                      |
+| Final-Seg-Signals                                  | `/v2-preview/screens/segment/signals`                    | screen    |                                      |
+| Signals, clean bill                                | `/v2-preview/screens/segment/signals/clean`              | screen    |                                      |
+| Signals, withheld                                  | `/v2-preview/screens/segment/signals/challenged`         | screen    |                                      |
+| Final-Seg-Changes                                  | `/v2-preview/screens/segment/changes`                    | screen    |                                      |
+| Changes, clean bill                                | `/v2-preview/screens/segment/changes/clean`              | screen    |                                      |
+| Changes, withheld                                  | `/v2-preview/screens/segment/changes/challenged`         | screen    |                                      |
+| Changes, after a re-check                          | `/v2-preview/screens/segment/changes/history`            | screen    |                                      |
+| Changes, withheld, after a re-check                | `/v2-preview/screens/segment/changes/challenged-history` | screen    |                                      |
+| Final-Fix                                          | `/v2-preview/screens/fix`                                | screen    |                                      |
+| Fix 1, bad site                                    | `/v2-preview/screens/fix/first`                          | screen    |                                      |
+| Fix 3, bad site                                    | `/v2-preview/screens/fix/third`                          | screen    |                                      |
+| Fix, challenged site                               | `/v2-preview/screens/fix/challenged`                     | screen    |                                      |
+| Fix, on Pro                                        | `/v2-preview/screens/fix/locked`                         | screen    |                                      |
+| Fix, resolved                                      | `/v2-preview/screens/fix/resolved`                       | screen    |                                      |
+| Final-Dashboard-Day0                               | `/v2-preview/screens/dashboard/day0`                     | screen    |                                      |
+| Final-Dashboard                                    | `/v2-preview/screens/dashboard`                          | screen    |                                      |
+| Dashboard, clean (stand-in Free account, H5)       | `/v2-preview/screens/dashboard/clean`                    | screen    |                                      |
+| Dashboard, withheld                                | `/v2-preview/screens/dashboard/withheld`                 | screen    |                                      |
+| Final-Site                                         | `/v2-preview/screens/site`                               | screen    |                                      |
+| Site, clean (stand-in Free account)                | `/v2-preview/screens/site/clean`                         | screen    |                                      |
+| Site, withheld                                     | `/v2-preview/screens/site/withheld`                      | screen    |                                      |
+| Dashboard, no site                                 | `/v2-preview/screens/dashboard/no-site`                  | screen    |                                      |
+| Site, first check running                          | `/v2-preview/screens/site/first-check`                   | screen    |                                      |
+| Dashboard, no account                              | `/v2-preview/screens/dashboard/no-account`               | screen    |                                      |
+| Dashboard, more than one account                   | `/v2-preview/screens/dashboard/ambiguous`                | screen    |                                      |
+| Final-Alerts                                       | `/v2-preview/screens/alerts`                             | screen    |                                      |
+| Alerts, free                                       | `/v2-preview/screens/alerts/free`                        | screen    |                                      |
+| Final-Reports                                      | `/v2-preview/screens/reports`                            | screen    |                                      |
+| Reports, Agency (Northwind, owner ruling 8)        | `/v2-preview/screens/reports/agency`                     | screen    |                                      |
+| Final-Settings                                     | `/v2-preview/screens/settings`                           | screen    |                                      |
+| Settings, free                                     | `/v2-preview/screens/settings/free`                      | screen    |                                      |
+| Settings, delete (owner ruling 12)                 | `/v2-preview/screens/settings/delete`                    | screen    |                                      |
+| Final-TrialEnd                                     | `/v2-preview/screens/trial-end`                          | screen    |                                      |
+| Changes log                                        | `/v2-preview/screens/changes-log`                        | screen    | ``, `?kind=opened`                   |
+| Final-LinkMap                                      | `/v2-preview/screens/map`                                | screen    |                                      |
+| Link map, every page                               | `/v2-preview/screens/map/all`                            | screen    |                                      |
+| Link map, clean bill                               | `/v2-preview/screens/map/clean`                          | screen    |                                      |
+| Link map, withheld                                 | `/v2-preview/screens/map/challenged`                     | screen    |                                      |
+| Link map, 2,000 pages                              | `/v2-preview/screens/map/large`                          | screen    |                                      |
+| Final-Signup                                       | `/v2-preview/screens/signup`                             | screen    |                                      |
+| Sign-up, sending                                   | `/v2-preview/screens/signup/submitting`                  | screen    |                                      |
+| Sign-up, rate limited                              | `/v2-preview/screens/signup/rate-limited`                | screen    |                                      |
+| Final-CheckEmail                                   | `/v2-preview/screens/check-email/from-audit`             | screen    |                                      |
+| Final-CheckEmail-NoAudit                           | `/v2-preview/screens/check-email/named-site`             | screen    |                                      |
+| Check-email, sign-in                               | `/v2-preview/screens/check-email/signin`                 | screen    |                                      |
+| Continue                                           | `/v2-preview/screens/continue`                           | screen    |                                      |
+| Continue, link expired                             | `/v2-preview/screens/continue/expired`                   | screen    |                                      |
+| Final-Pricing                                      | `/v2-preview/screens/pricing`                            | screen    |                                      |
+| Pricing, signed in                                 | `/v2-preview/screens/pricing/signed-in`                  | screen    |                                      |
+| Final-AgencyTrial                                  | `/v2-preview/screens/agency-trial`                       | screen    |                                      |
+| Agency trial, Checkout did not finish              | `/v2-preview/screens/agency-trial/returning`             | screen    |                                      |
+| Agency trial, used                                 | `/v2-preview/screens/agency-trial/used`                  | screen    |                                      |
+| Agency trial, on the trial: its billing and Cancel | `/v2-preview/screens/agency-trial/held`                  | screen    |                                      |
+| Final-Agencies                                     | `/v2-preview/screens/agencies`                           | screen    |                                      |
+| Final-Developers                                   | `/v2-preview/screens/developers`                         | screen    |                                      |
+| Check: is GPTBot blocked?                          | `/v2-preview/screens/check/gptbot`                       | screen    |                                      |
+| Check: readable without JavaScript?                | `/v2-preview/screens/check/javascript`                   | screen    |                                      |
+| Check: robots.txt for AI                           | `/v2-preview/screens/check/robots-ai`                    | screen    |                                      |
+| Final-Public                                       | `/v2-preview/screens/public-report`                      | screen    |                                      |
+| Public report, withheld                            | `/v2-preview/screens/public-report/withheld`             | screen    |                                      |
