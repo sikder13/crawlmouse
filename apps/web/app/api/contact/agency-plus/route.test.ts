@@ -4,18 +4,13 @@
  * it calls replaced.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-  CONTACT_PER_IP_PER_DAY,
-  DAY_MS,
-  contactAgencyPlus,
-  type ContactDeps,
-} from './_lib/contact';
+import { contactAgencyPlus, type ContactDeps } from './_lib/contact';
 
 const ID = 'c0000000-0000-4000-8000-000000000001';
 
 function deps(over: Partial<ContactDeps> = {}) {
   const calls = {
-    rateLimit: [] as [string, number, number][],
+    rateLimit: [] as [string][],
     verify: [] as [string, string | undefined][],
     insert: [] as unknown[],
     send: [] as unknown[],
@@ -112,9 +107,7 @@ describe('contactAgencyPlus', () => {
 
     const ok = deps();
     await contactAgencyPlus(GOOD, ok.d);
-    expect(ok.calls.rateLimit).toEqual([
-      ['contact:ip:203.0.113.7', CONTACT_PER_IP_PER_DAY, DAY_MS],
-    ]);
+    expect(ok.calls.rateLimit).toEqual([['contact:ip:203.0.113.7']]);
   });
 
   it('with no client address, no per-IP bucket is counted', async () => {

@@ -17,11 +17,9 @@
  * (`public_reports_check_uq`, a concurrent mint) answers the first report's slug; one on the slug is
  * retried with a fresh slug. A new report sends `report_minted {kind: 'v2'}`.
  */
-import { MINT_REPORTS_PER_DAY } from '../../limits';
 import { isUndefinedColumnError } from '../../pg-errors';
 import type { PublicSnapshotV2 } from './snapshot';
 
-const DAY_MS = 24 * 60 * 60 * 1000;
 const MAX_SLUG_ATTEMPTS = 3;
 const UNIQUE_VIOLATION = '23505';
 
@@ -42,7 +40,8 @@ export interface MintV2Deps {
   checkAsCaller(checkId: string): Promise<{ siteId: string; status: string } | null>;
   /** `is_member_for_site` through the caller's own session. */
   isMemberForSite(siteId: string): Promise<boolean>;
-  checkRateLimit(key: string, limit: number, windowMs: number): Promise<{ allowed: boolean }>;
+  /** Counts one mint against `key`'s bucket: MINT_REPORTS_PER_DAY a day, as v1's mint. */
+  rateLimit(key: string): Promise<{ allowed: boolean }>;
   verifyTurnstile(token: string, ip?: string): Promise<boolean>;
   /** The slug of the report already minted for this check, or null. Service role. */
   slugForCheck(checkId: string): Promise<string | null>;
@@ -86,7 +85,7 @@ export async function mintV2(
   const user = await deps.user();
   if (!user) return refuse(401, 'auth_required');
 
-  const cap = await deps.checkRateLimit(`mint:${user.id}`, MINT_REPORTS_PER_DAY, DAY_MS);
+  const cap = await deps.rateLimit(`mint:${user.id}`);
   if (!cap.allowed) {
     if (!turnstileToken) return refuse(429, 'captcha_required');
     const ok = await deps.verifyTurnstile(turnstileToken, ip === 'unknown' ? undefined : ip);

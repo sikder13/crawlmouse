@@ -9,9 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { BillingResult } from '@/lib/billing/checkout-v2';
 import { admittedHost } from '@/lib/v2/account/sites';
 import {
-  AGENCY_TRIAL_PER_USER_PER_HOUR,
   CHECKOUT_REUSE_MS,
-  HOUR_MS,
   startAgencyTrial,
   type AgencyTrialDeps,
   type StartedAccount,
@@ -252,9 +250,7 @@ describe('startAgencyTrial', () => {
   it('counts each person in an hourly bucket and refuses past it with 429', async () => {
     const ok = harness();
     await startAgencyTrial(json(GOOD), USER, ok.deps);
-    expect(ok.calls.rateLimit).toEqual([
-      [`agency-trial:user:${USER.id}`, AGENCY_TRIAL_PER_USER_PER_HOUR, HOUR_MS],
-    ]);
+    expect(ok.calls.rateLimit).toEqual([[`agency-trial:user:${USER.id}`]]);
     const { deps, calls } = harness({ rateLimit: async () => ({ allowed: false }) });
     const res = await startAgencyTrial(json(GOOD), USER, deps);
     expect(res.status).toBe(429);

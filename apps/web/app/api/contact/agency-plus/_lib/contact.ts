@@ -10,7 +10,6 @@ import { z } from 'zod';
 
 /** Contact requests one address may send a day. */
 export const CONTACT_PER_IP_PER_DAY = 5;
-export const DAY_MS = 24 * 60 * 60 * 1000;
 
 const Body = z.strictObject({
   email: z.email().max(320),
@@ -29,7 +28,8 @@ export interface AgencyPlusEvent {
 export interface ContactDeps {
   /** `getClientIp`'s value; 'unknown' when there is none, which no per-IP bucket counts. */
   ip: string;
-  rateLimit(key: string, limit: number, windowMs: number): Promise<{ allowed: boolean }>;
+  /** Counts one request against `key`'s bucket: CONTACT_PER_IP_PER_DAY a day. */
+  rateLimit(key: string): Promise<{ allowed: boolean }>;
   turnstileEnforced: boolean;
   verifyTurnstile(token: string, ip: string | undefined): Promise<boolean>;
   /** Stores the request; returns its id. */
@@ -55,7 +55,7 @@ export async function contactAgencyPlus(body: unknown, deps: ContactDeps): Promi
   const { email, sites, note, turnstileToken } = parsed.data;
 
   if (deps.ip !== 'unknown') {
-    const rl = await deps.rateLimit(`contact:ip:${deps.ip}`, CONTACT_PER_IP_PER_DAY, DAY_MS);
+    const rl = await deps.rateLimit(`contact:ip:${deps.ip}`);
     if (!rl.allowed) return answer(429, { error: 'rate_limited' });
   }
   if (deps.turnstileEnforced) {

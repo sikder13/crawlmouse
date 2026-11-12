@@ -145,3 +145,22 @@ describe('supabaseMintDeps', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });
+
+describe('the cap', () => {
+  it("counts the caller's bucket at v1's per-user cap and window", async () => {
+    const { checkRateLimit } = await import('@/lib/rate-limit');
+    const { MINT_REPORTS_PER_DAY } = await import('@/lib/limits');
+    vi.mocked(checkRateLimit).mockResolvedValue({ allowed: true } as never);
+    const deps = supabaseMintDeps(
+      client('session', { data: null, error: null }),
+      client('admin', { data: null, error: null }),
+      null,
+    );
+    await deps.rateLimit('mint:u-1');
+    expect(checkRateLimit).toHaveBeenCalledWith(
+      'mint:u-1',
+      MINT_REPORTS_PER_DAY,
+      24 * 60 * 60 * 1000,
+    );
+  });
+});

@@ -12,7 +12,13 @@ import { supabaseAdmin } from '@/lib/supabase/admin';
 import { supabaseServer } from '@/lib/supabase/server';
 import { admittedHost } from '@/lib/v2/account/sites';
 import { pricingCapture } from '@/lib/v2/pricing/events';
-import { startAgencyTrial, type StartedAccount } from './_lib/start';
+import {
+  AGENCY_TRIAL_PER_USER_PER_HOUR,
+  startAgencyTrial,
+  type StartedAccount,
+} from './_lib/start';
+
+const HOUR_MS = 60 * 60 * 1000;
 
 export const runtime = 'nodejs';
 
@@ -39,7 +45,7 @@ export async function POST(req: Request) {
     req,
     { id: user.id, email: user.email ?? null },
     {
-      rateLimit: checkRateLimit,
+      rateLimit: (key) => checkRateLimit(key, AGENCY_TRIAL_PER_USER_PER_HOUR, HOUR_MS),
       admit: (site) => admittedHost(site),
       async startAccount(userId, name, host) {
         const { data, error } = await admin.rpc('start_agency_trial_account', {

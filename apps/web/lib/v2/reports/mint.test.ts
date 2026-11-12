@@ -25,7 +25,7 @@ let state: {
 let slugs: string[];
 let inserted: Record<string, unknown>[];
 let verified: [string, string | undefined][];
-let limits: [string, number, number][];
+let limits: [string][];
 
 function deps(): MintV2Deps {
   const log =
@@ -38,8 +38,8 @@ function deps(): MintV2Deps {
     user: log('user', async () => state.user),
     checkAsCaller: log('checkAsCaller', async () => state.check),
     isMemberForSite: log('isMemberForSite', async () => state.member),
-    checkRateLimit: log('checkRateLimit', async (key: string, limit: number, windowMs: number) => {
-      limits.push([key, limit, windowMs]);
+    rateLimit: log('rateLimit', async (key: string) => {
+      limits.push([key]);
       return { allowed: state.capAllowed };
     }),
     verifyTurnstile: log('verifyTurnstile', async (token: string, ip?: string) => {
@@ -184,13 +184,13 @@ describe('mintV2', () => {
 describe('mintV2’s cap and Turnstile: v1’s authed path', () => {
   it('counts the caller’s own bucket at v1’s per-user cap', async () => {
     await mint();
-    expect(limits).toEqual([['mint:u-1', 20, 24 * 60 * 60 * 1000]]);
+    expect(limits).toEqual([['mint:u-1']]);
   });
 
   it('cap spent and no token: 429 captcha_required, before the check is read', async () => {
     state.capAllowed = false;
     expect(await mint()).toEqual({ status: 429, body: { error: 'captcha_required' } });
-    expect(calls).toEqual(['user', 'checkRateLimit']);
+    expect(calls).toEqual(['user', 'rateLimit']);
   });
 
   it('cap spent and a bad token: 429 captcha_failed; a good one passes', async () => {

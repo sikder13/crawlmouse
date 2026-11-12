@@ -20,7 +20,6 @@ import type { CapturePricingEvent } from '@/lib/v2/pricing/events';
 
 /** Submits one person may make in an hour. */
 export const AGENCY_TRIAL_PER_USER_PER_HOUR = 10;
-export const HOUR_MS = 60 * 60 * 1000;
 
 /**
  * How long a stored Checkout is handed back. CC-03 opens each session to expire SESSION_LIFETIME_S
@@ -34,7 +33,8 @@ export type StartedAccount =
   | { outcome: 'created' | 'existing'; accountId: string; siteId: string };
 
 export interface AgencyTrialDeps {
-  rateLimit(key: string, limit: number, windowMs: number): Promise<{ allowed: boolean }>;
+  /** Counts one request against `key`'s bucket: AGENCY_TRIAL_PER_USER_PER_HOUR an hour. */
+  rateLimit(key: string): Promise<{ allowed: boolean }>;
   admit(site: string): Promise<Admitted>;
   /** `start_agency_trial_account` through the service role. */
   startAccount(userId: string, name: string, host: string): Promise<StartedAccount>;
@@ -76,11 +76,7 @@ export async function startAgencyTrial(
   if (!body || !parsed?.success) return refuse(400, 'invalid');
   const { agencyName, site, interval } = parsed.data;
 
-  const rl = await deps.rateLimit(
-    `agency-trial:user:${person.id}`,
-    AGENCY_TRIAL_PER_USER_PER_HOUR,
-    HOUR_MS,
-  );
+  const rl = await deps.rateLimit(`agency-trial:user:${person.id}`);
   if (!rl.allowed) return refuse(429, 'rate_limited');
 
   const admitted = await deps.admit(site);

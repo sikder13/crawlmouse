@@ -5,7 +5,10 @@
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { captureServerEvent } from '../../analytics-server';
+import { MINT_REPORTS_PER_DAY } from '../../limits';
 import { checkRateLimit } from '../../rate-limit';
+
+const DAY_MS = 24 * 60 * 60 * 1000;
 import { newReportSlug } from '../../slug';
 import { verifyTurnstileToken } from '../../turnstile';
 import { findCheck, siteOf } from '../fixtures';
@@ -37,7 +40,7 @@ export function supabaseMintDeps(
       if (error) throw new Error(`is_member_for_site failed: ${error.message}`);
       return data === true;
     },
-    checkRateLimit,
+    rateLimit: (key) => checkRateLimit(key, MINT_REPORTS_PER_DAY, DAY_MS),
     verifyTurnstile: verifyTurnstileToken,
     async slugForCheck(checkId) {
       const { data, error } = await admin

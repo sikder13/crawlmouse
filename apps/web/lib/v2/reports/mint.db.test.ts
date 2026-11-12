@@ -57,7 +57,7 @@ function deps(caller: string, w: World, edit: Partial<MintV2Deps> = {}): MintV2D
         );
         return rows[0]!.ok === true;
       }),
-    checkRateLimit: async () => ({ allowed: true }),
+    rateLimit: async () => ({ allowed: true }),
     verifyTurnstile: async () => true,
     slugForCheck: (checkId) =>
       asRole(db, 'service_role', null, async (tx) => {

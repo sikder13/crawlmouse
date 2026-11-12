@@ -5,7 +5,9 @@ import { checkRateLimit } from '@/lib/rate-limit';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { verifyTurnstileToken } from '@/lib/turnstile';
 import { turnstileEnforced } from '@/lib/turnstile-policy';
-import { answer, contactAgencyPlus } from './_lib/contact';
+import { answer, contactAgencyPlus, CONTACT_PER_IP_PER_DAY } from './_lib/contact';
+
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 export const runtime = 'nodejs';
 
@@ -18,7 +20,7 @@ export async function POST(req: Request) {
   const body: unknown = await req.json().catch(() => null);
   return contactAgencyPlus(body, {
     ip: getClientIp(req),
-    rateLimit: checkRateLimit,
+    rateLimit: (key) => checkRateLimit(key, CONTACT_PER_IP_PER_DAY, DAY_MS),
     turnstileEnforced: turnstileEnforced(process.env),
     verifyTurnstile: verifyTurnstileToken,
     async insert(row) {
