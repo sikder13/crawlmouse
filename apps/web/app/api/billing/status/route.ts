@@ -10,9 +10,7 @@ export const dynamic = 'force-dynamic';
 // while it waits for the webhook to land.
 export async function GET() {
   const sb = await supabaseServer();
-  const {
-    data: { user },
-  } = await sb.auth.getUser();
+  const { data: { user } } = await sb.auth.getUser();
   if (!user) return NextResponse.json({ pro: false }, { status: 401 });
   return NextResponse.json({ pro: await userIsPro(sb, user.id) });
 }

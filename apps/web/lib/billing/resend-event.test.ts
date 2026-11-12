@@ -3,10 +3,7 @@ import { parseResendEvent } from './resend-event';
 
 describe('parseResendEvent', () => {
   it('maps a hard bounce', () => {
-    const e = parseResendEvent({
-      type: 'email.bounced',
-      data: { email: 'x@y.com', bounce: { type: 'Permanent' } },
-    });
+    const e = parseResendEvent({ type: 'email.bounced', data: { email: 'x@y.com', bounce: { type: 'Permanent' } } });
     expect(e).toEqual({ eventType: 'bounced', email: 'x@y.com', bounceType: 'permanent' });
   });
   it('maps a delivery with no bounce', () => {

@@ -4,8 +4,8 @@ export type PlanVariant = 'pro' | 'free';
 
 export interface PlanCardModel {
   variant: PlanVariant;
-  statusLabel: string; // 'Pro' | 'Free plan'
-  ctaLabel: string; // 'Manage subscription' | 'Upgrade'
+  statusLabel: string;        // 'Pro' | 'Free plan'
+  ctaLabel: string;           // 'Manage subscription' | 'Upgrade'
   ctaHref: '/billing' | '/pricing';
   /** ISO date to render (via LocalTime) when Pro & active; null otherwise. Kept raw so the
    *  view formats it in the viewer's locale — a pre-formatted string here would be both
