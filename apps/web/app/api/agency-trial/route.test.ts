@@ -90,7 +90,7 @@ describe('startAgencyTrial', () => {
     expect(await res.json()).toEqual({ url: URL_NEW });
     expect(calls.startAccount).toEqual([[USER.id, 'Summit Digital', 'clientsite.com']]);
     expect(calls.checkout).toEqual([{ accountId: ACCOUNT, email: USER.email, interval: 'month' }]);
-    expect(calls.stored).toEqual([[ACCOUNT, URL_NEW, NOW]]);
+    expect(calls.stored).toEqual([[ACCOUNT, { url: URL_NEW, at: NOW, interval: 'month' }]]);
     expect(calls.events).toEqual([
       ['plan_chosen', ACCOUNT, { plan: 'agency', interval: 'month' }],
       [
@@ -118,6 +118,7 @@ describe('startAgencyTrial', () => {
         openCheckout: async () => ({
           url: URL_OPEN,
           at: new Date(NOW.getTime() - CHECKOUT_REUSE_MS + 1000),
+          interval: 'month',
         }),
       },
       { outcome: 'existing', accountId: ACCOUNT, siteId: SITE },
@@ -135,6 +136,7 @@ describe('startAgencyTrial', () => {
         openCheckout: async () => ({
           url: URL_OPEN,
           at: new Date(NOW.getTime() - CHECKOUT_REUSE_MS),
+          interval: 'month',
         }),
       },
       { outcome: 'existing', accountId: ACCOUNT, siteId: SITE },
@@ -142,6 +144,31 @@ describe('startAgencyTrial', () => {
     expect(await (await startAgencyTrial(json(GOOD), USER, deps)).json()).toEqual({ url: URL_NEW });
     expect(calls.checkout).toHaveLength(1);
   });
+
+  // Correctness B3 / security N3: the consent names the interval, so a Checkout opened for the other
+  // interval is never handed back; a new one is opened, which expires the old (CC-03's startCheckout).
+  it.each([
+    ['month', 'year'],
+    ['year', 'month'],
+  ] as const)(
+    'a Checkout still open for %s is not reused for a %s submit: a new one, stored with its interval',
+    async (stored, asked) => {
+      const { deps, calls } = harness(
+        {
+          openCheckout: async () => ({
+            url: URL_OPEN,
+            at: new Date(NOW.getTime() - 1000),
+            interval: stored,
+          }),
+        },
+        { outcome: 'existing', accountId: ACCOUNT, siteId: SITE },
+      );
+      const res = await startAgencyTrial(json({ ...GOOD, interval: asked }), USER, deps);
+      expect(await res.json()).toEqual({ url: URL_NEW });
+      expect(calls.checkout).toEqual([{ accountId: ACCOUNT, email: USER.email, interval: asked }]);
+      expect(calls.stored).toEqual([[ACCOUNT, { url: URL_NEW, at: NOW, interval: asked }]]);
+    },
+  );
 
   it('a stored Checkout is reused only while CC-03’s session can still be open', () => {
     // CC-03 sets each session to expire SESSION_LIFETIME_S (31 min) after it is created.
@@ -260,26 +287,95 @@ describe('startAgencyTrial', () => {
 
 // ─── the route ───────────────────────────────────────────────────────────────────────────────────
 
-const r = vi.hoisted(() => ({ user: null as { id: string; email: string } | null, admin: 0 }));
+const r = vi.hoisted(() => ({
+  user: null as { id: string; email: string } | null,
+  admin: 0,
+  after: [] as (() => unknown)[],
+}));
 
 vi.mock('@/lib/supabase/server', () => ({
   supabaseServer: async () => ({ auth: { getUser: async () => ({ data: { user: r.user } }) } }),
 }));
+// The service role's one call this route makes before Checkout: the account is created.
 vi.mock('@/lib/supabase/admin', () => ({
   supabaseAdmin: () => {
     r.admin += 1;
-    return {};
+    return {
+      rpc: async () => ({
+        data: { outcome: 'created', account_id: ACCOUNT, site_id: SITE },
+        error: null,
+      }),
+    };
   },
 }));
-vi.mock('next/server', () => ({ after: () => undefined }));
+vi.mock('next/server', () => ({ after: (fn: () => unknown) => r.after.push(fn) }));
 vi.mock('server-only', () => ({}));
+// Everything between the route and its events is replaced except the consent gate: pricingCapture
+// and captureServerEvent run for real, to a stubbed fetch.
+vi.mock('@/lib/rate-limit', () => ({ checkRateLimit: async () => ({ allowed: true }) }));
+vi.mock('./_lib/checkouts', () => ({
+  agencyCheckouts: () => ({ open: async () => null, store: async () => undefined }),
+}));
+vi.mock('@/lib/billing/checkout-v2', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/billing/checkout-v2')>()),
+  supabaseCheckoutAccounts: () => ({}),
+}));
+vi.mock('@/lib/billing/stripe-account', () => ({ stripeAccount: () => ({}) }));
+vi.mock('@/lib/billing/stripe-catalog', () => ({ accountCatalog: () => ({}) }));
+vi.mock('@/lib/billing/agency-trial', () => ({
+  agencyTrial: async () => ({ ok: true, url: URL_NEW }),
+}));
 
 describe('POST /api/agency-trial', () => {
+  const fetchMock = vi.fn(async () => new Response(null, { status: 200 }));
+  /** The events posted to PostHog. */
+  const sent = () =>
+    (fetchMock.mock.calls as unknown as [string, RequestInit][]).map(
+      ([, init]) => JSON.parse(String(init.body)).event,
+    );
+
   beforeEach(() => {
     r.user = null;
     r.admin = 0;
+    r.after = [];
+    fetchMock.mockClear();
+    vi.stubGlobal('fetch', fetchMock);
+    vi.stubEnv('NEXT_PUBLIC_POSTHOG_KEY', 'phc_test');
   });
-  afterEach(() => vi.unstubAllEnvs());
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
+
+  // Tier B TB-B1: the route hands the request's Cookie header to the consent gate. A null header
+  // reads as "allowed" (lib/consent.ts), so a route that dropped it would send these for a visitor
+  // who declined.
+  it.each([
+    ['cm_consent=denied', []],
+    ['cm_consent_required=1', []],
+    ['cm_consent=granted', ['plan_chosen', 'trial_started']],
+  ])('cookie %s: sends %j through the real consent gate', async (cookie, events) => {
+    vi.stubEnv('V2_BILLING', '1');
+    r.user = USER;
+    // The host's DNS check is replaced here only; the handler's tests above use the real guard.
+    vi.resetModules();
+    vi.doMock('@/lib/v2/account/sites', () => ({
+      admittedHost: async () => ({ ok: true, host: 'clientsite.com' }),
+    }));
+    const { POST } = await import('./route');
+    vi.doUnmock('@/lib/v2/account/sites');
+    const res = await POST(
+      new Request('https://crawlmouse.com/api/agency-trial', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', cookie },
+        body: JSON.stringify(GOOD),
+      }),
+    );
+    expect(await res.json()).toEqual({ url: URL_NEW });
+    expect(r.after).toHaveLength(2);
+    for (const work of r.after) await work();
+    expect(sent()).toEqual(events);
+  });
 
   it('401 without a session, whatever the flag', async () => {
     vi.stubEnv('V2_BILLING', '1');

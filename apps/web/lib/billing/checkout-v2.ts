@@ -22,6 +22,7 @@ import type { Catalog, Interval } from './catalog';
 import type { RequestBody } from './request-body';
 import type { EntitlementSnapshot } from './state-machine';
 import { snapshotFromRow, type AccountRow } from './state-machine-apply';
+import { checkoutRefusal } from './checkout-refusal';
 import { CatalogError } from './stripe-catalog';
 
 /**
@@ -100,18 +101,7 @@ export function parseCheckout(body: RequestBody): CheckoutInput | null {
   return parsed.success ? parsed.data : null;
 }
 
-const RANK: Readonly<Record<PaidTier, number>> = { pro: 1, agency: 2 };
-
-/** Why the account may not buy `plan` now, or null when it may. */
-export function checkoutRefusal(s: EntitlementSnapshot, plan: PaidTier): BillingRefusal | null {
-  if ((s.state === 'pro' || s.state === 'agency') && RANK[s.state] >= RANK[plan]) {
-    return { ok: false, status: 409, error: 'plan_held' };
-  }
-  if (s.subscriptionId !== null) {
-    return { ok: false, status: 409, error: 'subscription_open', detail: { next: 'portal' } };
-  }
-  return null;
-}
+export { checkoutRefusal };
 
 function isIdempotencyError(err: unknown): boolean {
   return (err as { type?: unknown } | null)?.type === 'StripeIdempotencyError';

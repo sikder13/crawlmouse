@@ -4,6 +4,10 @@
  * from `TRIAL_DAYS`. Three figures are declared here: the Agency Plus row's (owner ruling Q7: nothing
  * is built behind that row), Free's price, and the annual renewal reminder days (L6).
  * components/v2/screens/pricing/pricing-numbers.test.tsx holds the rendered page to these sources.
+ *
+ * Every sentence that names a capability carries it (`capabilities`, keys of For agencies'
+ * `CAPABILITIES`), and the page marks "coming" each one that is not built (SEO review 1–3, Q27);
+ * components/v2/screens/pricing/pricing-capabilities.test.tsx sweeps the rendered page for it.
  */
 import { TRIAL_REMINDER_DAYS_BEFORE_END, EMAIL_KINDS } from '../../auth/constants';
 import type { Interval } from '../../billing/catalog';
@@ -20,6 +24,7 @@ import {
 } from '../../billing/prices';
 import { TRIAL_DAYS } from '../../billing/state-machine';
 import { GATES, type Tier } from '../../entitlement-v2';
+import type { Tagged } from './agencies';
 import { CANCEL_CLICKS, EVIDENCE_CONDENSED_AFTER_DAYS } from './settings';
 import { capitalise, count, numberWord, plural } from '../words';
 
@@ -62,16 +67,15 @@ function freeFixes(): number {
 }
 const pages = (tier: Tier) => `${count(GATES[tier].pagesPerCheck)} pages`;
 
-export interface PlanRow {
+export interface PlanRow extends Tagged {
   /** The short left-hand label: "5 sites", "weekly". */
   label: string;
-  text: string;
 }
 
 export interface PlanCopy {
   name: string;
   tag: string;
-  description: string;
+  description: Tagged;
   rows: PlanRow[];
 }
 
@@ -89,6 +93,7 @@ function seatAndSitePrices(interval: Interval): string {
 const renders = (tier: Tier): PlanRow => ({
   label: `${count(GATES[tier].fullRendersPerMonth)} renders`,
   text: 'Full JavaScript renders a month',
+  capabilities: ['renders'],
 });
 
 /** The three plan columns (A2: Pro has two seats; K9: renders; K10: the seat and site prices). */
@@ -98,55 +103,105 @@ export function planCopy(interval: Interval): Record<Tier, PlanCopy> {
     free: {
       name: 'Free',
       tag: 'no card, ever',
-      description: 'One site you care about, re-checked monthly.',
+      description: {
+        text: 'One site you care about, re-checked monthly.',
+        capabilities: ['sites', 'weekly_checks'],
+      },
       rows: [
         {
           label: `${free.sites} ${plural(free.sites, 'site', 'sites')}`,
           text: `Up to ${pages('free')} per audit`,
+          capabilities: ['sites'],
         },
-        { label: 'monthly', text: 'Re-checked monthly; an email only if something changed' },
+        {
+          label: 'monthly',
+          text: 'Re-checked monthly; an email only if something changed',
+          capabilities: ['weekly_checks', 'change_emails'],
+        },
         {
           label: `${free.fixesVisible} fixes`,
           text: `The ${numberWord(freeFixes())} largest fixes per audit, with copy-paste packets`,
+          capabilities: ['fix_packets'],
         },
-        { label: 'kept', text: 'Every audit, its evidence and link map, kept' },
+        {
+          label: 'kept',
+          text: 'Every audit, its evidence and link map, kept',
+          capabilities: ['free_audit'],
+        },
       ],
     },
     pro: {
       name: 'Pro',
       tag: `free for ${trialDays}, no card`,
-      description: `Freelancers and in-house developers watching up to ${pro.sites} sites. ${capitalise(numberWord(pro.seats))} ${plural(pro.seats, 'seat', 'seats')}.`,
+      description: {
+        text: `Freelancers and in-house developers watching up to ${pro.sites} sites. ${capitalise(numberWord(pro.seats))} ${plural(pro.seats, 'seat', 'seats')}.`,
+        capabilities: ['sites', 'weekly_checks', 'seats'],
+      },
       rows: [
-        { label: `${pro.sites} sites`, text: `Up to ${pages('pro')} per audit` },
-        { label: 'weekly', text: 'Re-checked weekly; alerts by email and Slack' },
+        {
+          label: `${pro.sites} sites`,
+          text: `Up to ${pages('pro')} per audit`,
+          capabilities: ['sites'],
+        },
+        {
+          label: 'weekly',
+          text: 'Re-checked weekly; alerts by email and Slack',
+          capabilities: ['weekly_checks', 'change_emails', 'slack_alerts'],
+        },
         {
           label: 'all fixes',
           text: 'Every fix the audit finds, with packets for your coding tool',
+          capabilities: ['fix_packets'],
         },
         {
           label: `${pro.competitorsPerSite} ${plural(pro.competitorsPerSite, 'competitor', 'competitors')}`,
           text: 'Per site, audited the same way',
+          capabilities: ['competitors'],
         },
-        { label: 'export', text: 'PDF, CSV and JSON' },
-        { label: 'staging', text: 'Audit preview and staging URLs before you deploy' },
+        { label: 'export', text: 'PDF, CSV and JSON', capabilities: ['exports'] },
+        {
+          label: 'staging',
+          text: 'Audit preview and staging URLs before you deploy',
+          capabilities: ['staging'],
+        },
         renders('pro'),
       ],
     },
     agency: {
       name: 'Agency',
       tag: `${TRIAL_DAYS}-day trial, card required`,
-      description: 'Agencies reporting to clients under their own name.',
+      description: {
+        text: 'Agencies reporting to clients under their own name.',
+        capabilities: ['client_reports'],
+      },
       rows: [
-        { label: `${agency.sites} sites`, text: seatAndSitePrices(interval) },
+        {
+          label: `${agency.sites} sites`,
+          text: seatAndSitePrices(interval),
+          capabilities: ['sites', 'seats'],
+        },
         {
           label: 'your brand',
           text: 'Reports on your domain with your logo; emails from your address',
+          capabilities: ['client_report_page', 'sender_address'],
         },
-        { label: 'one-pagers', text: 'Client prospect one-pagers from any public audit' },
-        { label: `${agency.competitorsPerSite} competitors`, text: 'Per site' },
-        { label: 'scheduled', text: 'Weekly or monthly client reports, sent for you' },
+        {
+          label: 'one-pagers',
+          text: 'Client prospect one-pagers from any public audit',
+          capabilities: ['one_pagers'],
+        },
+        {
+          label: `${agency.competitorsPerSite} competitors`,
+          text: 'Per site',
+          capabilities: ['competitors'],
+        },
+        {
+          label: 'scheduled',
+          text: 'Weekly or monthly client reports, sent for you',
+          capabilities: ['client_reports', 'weekly_checks'],
+        },
         renders('agency'),
-        { label: 'everything', text: 'All of Pro, on every site' },
+        { label: 'everything', text: 'All of Pro, on every site', capabilities: ['sites'] },
       ],
     },
   };
@@ -154,21 +209,54 @@ export function planCopy(interval: Interval): Record<Tier, PlanCopy> {
 
 export const PRICING_COPY = {
   /** The page's meta description. */
+  /** The meta description: built capabilities only, since a search result carries no "coming" mark. */
   description: () =>
-    `Every audit is free and complete. Pro is ${usd(PRO_MONTHLY)} a month for every fix and weekly checks on up to ${GATES.pro.sites} sites; Agency is ${usd(AGENCY_MONTHLY)} a month for ${GATES.agency.sites} client sites reported under your name.`,
+    `Every audit is free and complete. Pro is ${usd(PRO_MONTHLY)} a month for every fix the audit finds, on up to ${GATES.pro.sites} sites; Agency is ${usd(AGENCY_MONTHLY)} a month for ${GATES.agency.sites} client sites.`,
   title: 'Every audit is free. Pay when you want it watched.',
-  lead: () =>
-    `The first audit of any site is free and complete: every crawler, every page up to ${count(GATES.free.pagesPerCheck)}, the ${numberWord(freeFixes())} fixes with the largest effect. Pro and Agency add what one audit cannot do: checking again, telling you what changed, and every fix the audit finds.`,
+  lead: (): Tagged[] => [
+    {
+      text: `The first audit of any site is free and complete: every crawler, every page up to ${count(GATES.free.pagesPerCheck)}, the ${numberWord(freeFixes())} fixes with the largest effect.`,
+      capabilities: ['free_audit'],
+    },
+    {
+      text: 'Pro and Agency add what one audit cannot do: checking again, telling you what changed, and every fix the audit finds.',
+      capabilities: ['weekly_checks', 'change_emails', 'fix_packets'],
+    },
+  ],
   intervals: { month: 'Monthly', year: 'Yearly' } as Record<Interval, string>,
   /** FACTS B2 (the crawlers, rewritten to I6) and L6 (the annual reminders). */
-  crawlers:
-    'Every plan tests the same AI crawlers on a sample of your pages: OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot count towards your grade; GPTBot and ClaudeBot are shown, and blocking them is your choice. Googlebot and Bingbot are shown by robots.txt. Pro also lists the crawlers it has seen on your site (observed activity).',
-  annual: () => {
+  crawlers: (): Tagged[] => [
+    {
+      text: 'Every plan tests the same AI crawlers on a sample of your pages: OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot count towards your grade; GPTBot and ClaudeBot are shown, and blocking them is your choice. Googlebot and Bingbot are shown by robots.txt.',
+      capabilities: ['free_audit'],
+    },
+    {
+      text: 'Pro also lists the crawlers it has seen on your site (observed activity).',
+      capabilities: ['observed_crawlers'],
+    },
+  ],
+  annual: (): Tagged[] => {
     const [first, second] = ANNUAL_RENEWAL_REMINDER_DAYS;
-    return `Annual: Pro ${usd(PRO_YEARLY)}, Agency ${usd(AGENCY_YEARLY)} — ${numberWord(monthsFree())} months free, from Settings. We email you ${first} and ${second} days before an annual renewal.`;
+    return [
+      {
+        text: `Annual: Pro ${usd(PRO_YEARLY)}, Agency ${usd(AGENCY_YEARLY)} — ${numberWord(monthsFree())} months free, from Settings.`,
+        capabilities: [],
+      },
+      {
+        text: `We email you ${first} and ${second} days before an annual renewal.`,
+        capabilities: ['renewal_reminders'],
+      },
+    ];
   },
   buttons: {
     free: { label: 'Create a free account', note: `Includes ${trialDays} of Pro` },
+    /** V2_ACCOUNT_DOOR off: v1's sign-in creates the account, and starts no trial. */
+    freeSignIn: { label: 'Create a free account', note: 'One email, no card' },
+    proSignIn: {
+      label: 'Choose Pro',
+      note: (interval: Interval) =>
+        `Sign in first; ${usd(priceOf('pro', interval))} ${per(interval)}, the card taken by Stripe`,
+    },
     proTrial: {
       label: `Start with ${trialDays} of Pro`,
       note: (interval: Interval) =>
@@ -188,6 +276,13 @@ export const PRICING_COPY = {
       note: (interval: Interval) =>
         `${usd(priceOf('agency', interval))} ${per(interval)}; your agency has used its trial`,
     },
+    /** CC-03 answers `subscription_open`: the account's subscription is changed in the portal. */
+    portal: {
+      label: 'Manage billing',
+      note: 'This account still has a subscription; change it from the billing page',
+    },
+    unavailable: { note: 'This account cannot choose this plan now' },
+    agencyUsed: { note: 'Your agency trial was used, on an agency account since deleted' },
     current: { label: 'Your plan', note: 'The plan your account is on now' },
     included: { label: 'Included in your plan', note: 'Agency includes all of Pro' },
     freeBelow: { note: 'If you cancel, from Settings, the account returns to Free' },
@@ -197,14 +292,20 @@ export const PRICING_COPY = {
     name: 'Agency Plus',
     limits: () => `${AGENCY_PLUS.sites} sites, ${AGENCY_PLUS.seats} seats`,
     price: () => `from ${usd(AGENCY_PLUS.fromMonthly)} a month`,
-    link: 'Talk to us',
+    link: 'Send a request',
     formTitle: 'Tell us about your agency',
+    /** Nothing tells anyone of a request until CC-28's mailer (Q27). */
+    reply: {
+      text: 'We reply from support@crawlmouse.com.',
+      capabilities: ['agency_plus_reply'],
+    } as Tagged,
     email: 'Work email',
     sites: 'How many client sites',
     note: 'Anything we should know',
     noteHint: 'optional',
     submit: 'Send',
-    sent: 'Sent. We reply from support@crawlmouse.com.',
+    /** What is true once the route answers: the request is stored. */
+    sent: 'Sent. Your request is recorded.',
     errors: {
       invalid: 'Check the address and the number of sites, then send it again.',
       rate_limited:
@@ -216,44 +317,89 @@ export const PRICING_COPY = {
   after: {
     title: `What happens when the ${trialDays} end`,
     /** FACTS A6 (long form) and A8. */
-    lead: () =>
-      `Nothing you can see is deleted. Evidence older than ${EVIDENCE_CONDENSED_AFTER_DAYS} days is condensed to headers and the parts of pages that changed. We email you ${numberWord(TRIAL_REMINDER_DAYS_BEFORE_END)} days before.`,
+    lead: (): Tagged[] => [
+      {
+        text: `Nothing you can see is deleted. Evidence older than ${EVIDENCE_CONDENSED_AFTER_DAYS} days is condensed to headers and the parts of pages that changed.`,
+        capabilities: [],
+      },
+      {
+        text: `We email you ${numberWord(TRIAL_REMINDER_DAYS_BEFORE_END)} days before.`,
+        capabilities: ['trial_reminder'],
+      },
+    ],
     columns: ['What', 'What happens'] as const,
-    rows: (interval: Interval): [string, string][] => [
+    rows: (interval: Interval): [string, Tagged][] => [
       [
         'Your first site',
-        `Keeps monthly checks, ${numberWord(freeFixes())} fixes per audit, and its full history on Free`,
+        {
+          text: `Keeps monthly checks, ${numberWord(freeFixes())} fixes per audit, and its full history on Free`,
+          capabilities: ['weekly_checks', 'fix_packets'],
+        },
       ],
-      ['Other sites', 'Pause until you choose Pro or remove them; their history stays'],
+      [
+        'Other sites',
+        {
+          text: 'Pause until you choose Pro or remove them; their history stays',
+          capabilities: ['sites'],
+        },
+      ],
       [
         `Fixes beyond the first ${numberWord(freeFixes())}`,
-        'Stay listed with their estimated effect; the packets reopen with Pro',
+        {
+          text: 'Stay listed with their estimated effect; the packets reopen with Pro',
+          capabilities: ['fix_packets'],
+        },
       ],
       [
         'Agency trial',
-        `Card on file is charged ${usd(priceOf('agency', interval))} on day ${TRIAL_DAYS + 1} unless you cancel; from Settings, any day, ${numberWord(CANCEL_CLICKS)} clicks, no call`,
+        {
+          text: `Card on file is charged ${usd(priceOf('agency', interval))} on day ${TRIAL_DAYS + 1} unless you cancel; from the Agency trial page, any day, ${numberWord(CANCEL_CLICKS)} clicks, no call`,
+          capabilities: ['agency_trial', 'cancel'],
+        },
       ],
     ],
   },
   why: {
     title: 'Why the first audit is free and complete',
-    text: `A sample that hides the verdict is a sales pitch, not an audit. You see what each crawler got back and the ${numberWord(freeFixes())} fixes that matter most, without an account. If the audit is useful, you will want it kept and checked again; that is what you pay for.`,
+    text: (): Tagged[] => [
+      {
+        text: `A sample that hides the verdict is a sales pitch, not an audit. You see what each crawler got back and the ${numberWord(freeFixes())} fixes that matter most, without an account.`,
+        capabilities: ['free_audit'],
+      },
+      {
+        text: 'If the audit is useful, you will want it kept and checked again; that is what you pay for.',
+        capabilities: ['weekly_checks'],
+      },
+    ],
   },
   faq: {
     title: 'Questions people ask before paying',
-    items: (): { q: string; a: string }[] => [
-      {
-        q: 'Do I need a card for Pro?',
-        a: `No. The ${trialDays} start with your email. Agency needs a card because it sends email from your domain.`,
-      },
-      {
-        q: 'Which emails will I get?',
-        a: `${capitalise(numberWord(EMAIL_KINDS.length))} kinds and no others: a sign-in link, a note when a check finds a change, and one reminder ${numberWord(TRIAL_REMINDER_DAYS_BEFORE_END)} days before the ${trialDays} end. If you pay, Stripe sends the receipts.`,
-      },
-      {
-        q: 'Can I cancel?',
-        a: 'Any day, from Settings, with no call. The account goes back to Free; nothing you can see is deleted.',
-      },
-    ],
+    items: (): { q: string; a: Tagged }[] => {
+      const [first, second] = ANNUAL_RENEWAL_REMINDER_DAYS;
+      return [
+        {
+          q: 'Do I need a card for Pro?',
+          a: {
+            text: `No. The ${trialDays} start with your email. Agency’s trial takes a card at the start, and the plan is charged when the trial ends unless you cancel.`,
+            capabilities: ['agency_trial', 'cancel'],
+          },
+        },
+        {
+          q: 'Which emails will I get?',
+          // FACTS: three kinds, with renewal reminders the annual subscriber's exception (L6).
+          a: {
+            text: `${capitalise(numberWord(EMAIL_KINDS.length))} kinds and no others: a sign-in link, a note when a check finds a change, and one reminder ${numberWord(TRIAL_REMINDER_DAYS_BEFORE_END)} days before the ${trialDays} end; on an annual plan, also renewal reminders ${first} and ${second} days before it renews. If you pay, Stripe sends the receipts.`,
+            capabilities: ['change_emails', 'trial_reminder', 'renewal_reminders'],
+          },
+        },
+        {
+          q: 'Can I cancel?',
+          a: {
+            text: 'Any day, with no call: from Settings, or for an agency account from the Agency trial page. The account goes back to Free; nothing you can see is deleted.',
+            capabilities: ['cancel'],
+          },
+        },
+      ];
+    },
   },
 } as const;

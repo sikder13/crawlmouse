@@ -8,7 +8,10 @@ import {
   readMigration,
   readRollback,
 } from './helpers/pglite-migrations';
+import { postgrestOver } from './helpers/postgrest-pglite';
 import { personalAccount, signUp } from './helpers/v2-check-tables';
+import { agencyCheckouts } from '../app/api/agency-trial/_lib/checkouts';
+import { readUsedAgencyTrial } from '../lib/v2/pricing/used-trial';
 
 /**
  * Migration 20261114000001 (CC-29): start_agency_trial_account, contact_requests and one public report
@@ -131,13 +134,102 @@ describe('start_agency_trial_account', () => {
     ).rejects.toThrow(/permission denied/);
   });
 
-  it('authenticated cannot read the open Checkout columns', async () => {
+  it.each(['agency_checkout_url', 'agency_checkout_interval', 'agency_trial_consent_at'])(
+    'authenticated cannot read accounts.%s',
+    async (column) => {
+      const userId = await person();
+      await expect(
+        asRole(db, 'authenticated', userId, (tx) =>
+          tx.query(`select ${column} from public.accounts`),
+        ),
+      ).rejects.toThrow(/permission denied/);
+    },
+  );
+});
+
+// Correctness B3 / security N3: the stored Checkout carries its interval, so the route reuses it only
+// for a submit on the same interval.
+describe('the stored agency Checkout', () => {
+  const URL = 'https://checkout.stripe.com/c/pay/cs_test_1';
+
+  it('the route’s port stores the URL, the time and the interval, and reads them back', async () => {
     const userId = await person();
+    const { account_id } = await start(userId);
+    const port = agencyCheckouts(postgrestOver(db) as never);
+    expect(await port.open(account_id!)).toBeNull();
+    const at = new Date('2026-11-12T12:00:00.000Z');
+    for (const interval of ['year', 'month'] as const) {
+      await port.store(account_id!, { url: URL, at, interval });
+      expect(await port.open(account_id!)).toEqual({ url: URL, at, interval });
+    }
+  });
+
+  it('accounts.agency_checkout_interval holds month, year or nothing', async () => {
+    const userId = await person();
+    const { account_id } = await start(userId);
+    for (const ok of ['month', 'year', null]) {
+      await db.query('update public.accounts set agency_checkout_interval = $2 where id = $1', [
+        account_id,
+        ok,
+      ]);
+    }
     await expect(
-      asRole(db, 'authenticated', userId, (tx) =>
-        tx.query('select agency_checkout_url, agency_trial_consent_at from public.accounts'),
-      ),
-    ).rejects.toThrow(/permission denied/);
+      db.query(`update public.accounts set agency_checkout_interval = 'week' where id = $1`, [
+        account_id,
+      ]),
+    ).rejects.toThrow(/accounts_agency_checkout_interval_check/);
+  });
+});
+
+// Correctness N5: the Agency trial page and Pricing read a used trial by the function's own rule,
+// a deleted account included. Each attribute the rule keys on is varied, alone and together, and
+// the read must say "used" exactly when the function answers trial_used.
+describe('readUsedAgencyTrial agrees with start_agency_trial_account', () => {
+  const cases: {
+    kind: 'agency' | 'personal';
+    used: boolean;
+    deleted: boolean;
+    role: 'owner' | 'account_manager';
+    removed: boolean;
+  }[] = [];
+  for (const kind of ['agency', 'personal'] as const)
+    for (const used of [false, true])
+      for (const deleted of [false, true])
+        for (const role of ['owner', 'account_manager'] as const)
+          for (const removed of [false, true]) cases.push({ kind, used, deleted, role, removed });
+
+  it.each(cases)('%j', async (c) => {
+    const userId = await person();
+    const account =
+      c.kind === 'agency'
+        ? (await start(userId)).account_id!
+        : (await personalAccount(db, userId)).accountId;
+    await db.query(
+      `update public.accounts
+          set trial_used_at = case when $2 then now() - interval '3 days' end,
+              deleted_at = case when $3 then now() end
+        where id = $1`,
+      [account, c.used, c.deleted],
+    );
+    await db.query(
+      `update public.seats
+          set role = $3,
+              status = case when $4 then 'removed' else 'active' end,
+              removed_at = case when $4 then now() end
+        where account_id = $1 and user_id = $2`,
+      [account, userId, c.role, c.removed],
+    );
+    const read = await readUsedAgencyTrial(postgrestOver(db) as never, userId);
+    const answer = await start(userId, 'other.example');
+    expect(read !== null).toBe(answer.outcome === 'trial_used');
+    if (read !== null) expect(read).toMatchObject({ accountId: account, deleted: c.deleted });
+  });
+
+  it('the sweep reaches both answers, a deleted account among the used', () => {
+    const counted = cases.filter(
+      (c) => c.kind === 'agency' && c.used && c.role === 'owner' && !c.removed,
+    );
+    expect(counted.map((c) => c.deleted)).toEqual([false, true]);
   });
 });
 
@@ -179,16 +271,17 @@ describe('the rollback', () => {
                   + (select count(*) from information_schema.columns
                       where table_name = 'accounts'
                         and column_name in ('agency_checkout_url', 'agency_checkout_at',
+                                            'agency_checkout_interval',
                                             'agency_trial_consent_at')) as n`,
           )
         ).rows[0]!.n;
-      expect(Number(await present())).toBe(6);
+      expect(Number(await present())).toBe(7);
       await own.exec(readRollback(ROLLBACK));
       await own.exec(readRollback(ROLLBACK));
       expect(Number(await present())).toBe(0);
       await own.exec(readMigration(MIGRATION));
       await own.exec(readMigration(MIGRATION));
-      expect(Number(await present())).toBe(6);
+      expect(Number(await present())).toBe(7);
     } finally {
       await own.close();
     }

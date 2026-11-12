@@ -12,6 +12,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin';
 import { supabaseServer } from '@/lib/supabase/server';
 import { admittedHost } from '@/lib/v2/account/sites';
 import { pricingCapture } from '@/lib/v2/pricing/events';
+import { agencyCheckouts } from './_lib/checkouts';
 import {
   AGENCY_TRIAL_PER_USER_PER_HOUR,
   startAgencyTrial,
@@ -40,6 +41,7 @@ export async function POST(req: Request) {
   if (!billingV2Enabled()) return refuse(404, 'not_found');
 
   const admin = supabaseAdmin();
+  const checkouts = agencyCheckouts(admin);
   const now = () => new Date();
   return startAgencyTrial(
     req,
@@ -61,30 +63,15 @@ export async function POST(req: Request) {
             : { outcome: r.outcome, accountId: r.account_id, siteId: r.site_id }
         ) as StartedAccount;
       },
-      async openCheckout(accountId) {
-        const { data, error } = await admin
-          .from('accounts')
-          .select('agency_checkout_url, agency_checkout_at')
-          .eq('id', accountId)
-          .maybeSingle();
-        if (error) throw new Error(`accounts checkout read failed: ${error.message}`);
-        const row = data as {
-          agency_checkout_url: string | null;
-          agency_checkout_at: string | null;
-        } | null;
-        return row?.agency_checkout_url && row.agency_checkout_at
-          ? { url: row.agency_checkout_url, at: new Date(row.agency_checkout_at) }
-          : null;
-      },
-      async storeCheckout(accountId, url, at) {
-        const { error } = await admin
-          .from('accounts')
-          .update({ agency_checkout_url: url, agency_checkout_at: at.toISOString() })
-          .eq('id', accountId);
+      openCheckout: (accountId) => checkouts.open(accountId),
+      async storeCheckout(accountId, checkout) {
         // The session is open either way; without the stored URL a second submit opens another,
         // which expires this one (CC-03's startCheckout).
-        if (error)
-          report('agency-trial.checkout-store-failed', { accountId, reason: error.message });
+        await checkouts
+          .store(accountId, checkout)
+          .catch((err: Error) =>
+            report('agency-trial.checkout-store-failed', { accountId, reason: err.message }),
+          );
       },
       checkout: (input) =>
         agencyTrial(

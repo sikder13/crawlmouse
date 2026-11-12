@@ -3,12 +3,14 @@
  * from `GATES`, and its one-pager preview from the bad-site fixture's first audit through
  * `buildPublicSnapshot`, the builder the public report uses.
  *
- * `CAPABILITIES` is the table of every capability the page names, with whether it is on main and
- * the proof of it. A built capability's proof is the file that does it; a coming one's proof is
- * something `agencies.test.ts` can check is still true: the file its step will add is absent, or the
- * code that would do it says it does not yet. When that step lands, the proof fails, and the page's
- * "coming" mark is taken off with it. Every piece of copy names its capabilities, and a piece that
- * names one that is coming is marked (`coming`).
+ * `CAPABILITIES` is the table of every capability the pages that sell name (For agencies, Pricing and
+ * the Agency trial page), with whether it is on main and the proof of it. A built capability's proof
+ * is the file that does it. A coming one's proof is something `agencies.test.ts` checks against the
+ * tree: the file its step will add is absent, a pattern the code that would do it has to contain is
+ * nowhere in the source, or the code that would do it says it does not yet. Each proof fails when
+ * its step adds that file or that text; a step that ships the capability some other way leaves the
+ * proof true, and the "coming" mark stays until the row is changed. Every piece of copy names its
+ * capabilities, and a piece that names one that is coming is marked (`coming`).
  */
 import { TRIAL_DAYS } from '../../billing/state-machine';
 import { AGENCY_MONTHLY, PRO_MONTHLY, usd } from '../../billing/prices';
@@ -34,7 +36,17 @@ export type CapabilityKey =
   | 'sender_address'
   | 'one_pagers'
   | 'client_reports'
-  | 'client_matrix';
+  | 'client_matrix'
+  | 'fix_packets'
+  | 'slack_alerts'
+  | 'exports'
+  | 'staging'
+  | 'renders'
+  | 'trial_reminder'
+  | 'renewal_reminders'
+  | 'agency_plus_reply'
+  | 'agency_workspace'
+  | 'observed_crawlers';
 
 /** Paths are from the repository root. */
 export type Proof =
@@ -44,8 +56,11 @@ export type Proof =
   | { kind: 'absent'; path: string }
   /** Coming: a file whose text says it is not done. */
   | { kind: 'holds'; path: string; text: string }
-  /** Coming: no source file under `dirs` (tests, test support and this file aside) holds `text`. */
-  | { kind: 'nowhere'; dirs: readonly string[]; text: string };
+  /**
+   * Coming: no source file under `dirs` (tests, test support and this file aside) holds `text`, a
+   * string or a pattern.
+   */
+  | { kind: 'nowhere'; dirs: readonly string[]; text: string | RegExp };
 
 export interface Capability {
   status: 'built' | 'coming';
@@ -58,6 +73,9 @@ export interface Capability {
    */
   named?: RegExp;
 }
+
+/** Where a coming capability's code would be: the app, its jobs and the crawl worker. */
+const SOURCE_DIRS = ['apps/web/lib', 'apps/web/app', 'inngest', 'packages/worker/src'] as const;
 
 export const CAPABILITIES: Readonly<Record<CapabilityKey, Capability>> = {
   free_audit: {
@@ -98,19 +116,21 @@ export const CAPABILITIES: Readonly<Record<CapabilityKey, Capability>> = {
   },
   weekly_checks: {
     status: 'coming',
-    what: 'Checks on a schedule: nothing requests a scheduled check yet (CC-28).',
+    what: 'Checks on a schedule, weekly or monthly: nothing requests a scheduled check yet (CC-28).',
     proof: {
       kind: 'nowhere',
-      dirs: ['apps/web/lib', 'apps/web/app', 'inngest'],
-      text: "trigger: 'scheduled'",
+      dirs: SOURCE_DIRS,
+      text: /trigger:\s*(?:['"]scheduled['"]|[A-Z_]*SCHEDULED\b)/,
     },
-    named: /checked weekly|re-checks/i,
+    named:
+      /\bweekly\b|re-?check|checked (?:again|monthly)|checking again|scheduled checks?|every week|monthly checks/i,
   },
   change_emails: {
     status: 'coming',
     what: 'The email when a check finds a change: the mailer is CC-28’s.',
     proof: { kind: 'absent', path: 'apps/web/lib/v2/mail' },
-    named: /finds a change|hear first/i,
+    named:
+      /finds a change|hear first|email only if something changed|alerts by email|telling you what changed|note when a (?:re-)?check/i,
   },
   client_report_page: {
     status: 'coming',
@@ -134,13 +154,81 @@ export const CAPABILITIES: Readonly<Record<CapabilityKey, Capability>> = {
     status: 'coming',
     what: 'Client reports sent on a schedule: CC-31.',
     proof: { kind: 'absent', path: 'apps/web/app/api/report-files' },
-    named: /client reports?\b(?! page)|report to them|report from you/i,
+    named:
+      /client reports?\b(?! page)|report to them|report from you|under (?:your|their) (?:own )?name/i,
   },
   client_matrix: {
     status: 'coming',
     what: 'The client matrix, every client site on one screen: CC-31.',
     proof: { kind: 'absent', path: 'apps/web/app/agency' },
     named: /client matrix|every client on one screen/i,
+  },
+  fix_packets: {
+    status: 'built',
+    what: 'Each fix with its copy-paste packet (GET /api/fixes/[id]/packet).',
+    proof: { kind: 'exists', path: 'apps/web/app/api/fixes/[id]/packet/route.ts' },
+  },
+  slack_alerts: {
+    status: 'coming',
+    what: 'Alerts sent to Slack: a seat can choose Slack, but nothing posts to it.',
+    proof: {
+      kind: 'nowhere',
+      dirs: SOURCE_DIRS,
+      text: /hooks\.slack\.com|slack\.com\/api|chat\.postMessage/,
+    },
+    named: /\bslack\b/i,
+  },
+  exports: {
+    status: 'coming',
+    what: 'Exporting an audit as PDF or JSON: v1’s CSV of an audit is the only export.',
+    proof: { kind: 'nowhere', dirs: SOURCE_DIRS, text: 'application/pdf' },
+    named: /\b[Ee]xport|\bPDF\b|\bJSON\b/,
+  },
+  staging: {
+    status: 'coming',
+    what: 'Auditing a staging or preview URL before a deploy: a staging host is stored, but no check is requested for a deploy.',
+    proof: { kind: 'nowhere', dirs: SOURCE_DIRS, text: /trigger:\s*['"]deploy['"]/ },
+    named: /staging|preview URLs?|before you deploy/i,
+  },
+  renders: {
+    status: 'coming',
+    what: 'Full JavaScript renders counted against the plan’s monthly allowance: the pipeline runs with no render budget.',
+    proof: {
+      kind: 'holds',
+      path: 'apps/web/lib/v2/pipeline/functions.ts',
+      text: 'daily: NO_DAILY_BUDGET,',
+    },
+    named: /\brenders\b|JavaScript renders?|full renders?/i,
+  },
+  trial_reminder: {
+    status: 'coming',
+    what: 'The email three days before a trial ends: the mailer is CC-28’s.',
+    proof: { kind: 'absent', path: 'apps/web/lib/v2/mail' },
+    named: /email you (?:three|\d+) days before|reminder (?:three|\d+) days before/i,
+  },
+  renewal_reminders: {
+    status: 'coming',
+    what: 'The emails 45 and 20 days before an annual renewal: the mailer is CC-28’s.',
+    proof: { kind: 'absent', path: 'apps/web/lib/v2/mail' },
+    named: /renewal reminders?|before an annual renewal/i,
+  },
+  agency_plus_reply: {
+    status: 'coming',
+    what: 'A reply to an Agency Plus request: it is stored, and nothing tells anyone yet (CC-28).',
+    proof: { kind: 'absent', path: 'apps/web/lib/v2/mail' },
+    named: /we reply|talk to us/i,
+  },
+  observed_crawlers: {
+    status: 'coming',
+    what: 'The crawlers seen visiting your own site (observed activity): nothing reads a site’s visits yet.',
+    proof: { kind: 'nowhere', dirs: SOURCE_DIRS, text: 'observed_activity' },
+    named: /observed activity|crawlers it has seen|seen on your site/i,
+  },
+  agency_workspace: {
+    status: 'coming',
+    what: 'The agency workspace, where an agency account’s sites are audited: CC-31.',
+    proof: { kind: 'absent', path: 'apps/web/app/agency' },
+    named: /agency workspace|under Branding/i,
   },
 };
 

@@ -10,12 +10,18 @@ const h = vi.hoisted(() => {
     user: { id: 'u1' } as unknown,
     seats: [{ account_id: ACCOUNT }] as unknown[],
     role: 'owner' as unknown,
+    personal: [] as unknown[],
     followed: null as unknown,
   };
   const seatsChain: Record<string, unknown> = {
     then: (resolve: (v: unknown) => unknown) => resolve({ data: state.seats, error: null }),
   };
   seatsChain.select = seatsChain.eq = () => seatsChain;
+  // The caller's owned accounts that are personal (ownedAccountId, for several owner seats).
+  const accountsChain: Record<string, unknown> = {
+    then: (resolve: (v: unknown) => unknown) => resolve({ data: state.personal, error: null }),
+  };
+  accountsChain.select = accountsChain.eq = accountsChain.in = () => accountsChain;
   const session = {
     auth: {
       getUser: async () => {
@@ -25,7 +31,7 @@ const h = vi.hoisted(() => {
     },
     from: (table: string) => {
       log.push(`session.from ${table}`);
-      return seatsChain;
+      return table === 'accounts' ? accountsChain : seatsChain;
     },
     rpc: async (fn: string, args: unknown) => {
       log.push(`rpc ${fn} ${JSON.stringify(args)}`);
@@ -99,6 +105,7 @@ beforeEach(() => {
   h.state.user = { id: 'u1' };
   h.state.seats = [{ account_id: ACCOUNT }];
   h.state.role = 'owner';
+  h.state.personal = [];
   h.state.followed = {
     id: SUB,
     mirror: {
@@ -203,10 +210,30 @@ describe('POST /api/billing/cancel', () => {
     expect(h.log).toEqual(['getUser', `rpc member_role {"p_account":"${OTHER}"}`]);
   });
 
-  it('409 account_ambiguous for an owner of two accounts naming neither', async () => {
+  // Q26: the Agency trial is a second owner seat. Settings' Cancel names no account, so it acts on
+  // the caller's personal (default) account, found with the caller's own client before the role.
+  it('an owner of two accounts naming neither cancels the personal one', async () => {
+    h.state.seats = [{ account_id: ACCOUNT }, { account_id: OTHER }];
+    h.state.personal = [{ id: OTHER }];
+    const res = await post('confirm=true');
+    expect([res.status, res.headers.get('location')]).toEqual([
+      303,
+      `${SITE}/settings/plan?cancel=done`,
+    ]);
+    expect(h.log.slice(0, 5)).toEqual([
+      'getUser',
+      'session.from seats',
+      'session.from accounts',
+      `rpc member_role {"p_account":"${OTHER}"}`,
+      'supabaseAdmin',
+    ]);
+  });
+
+  it('409 account_ambiguous for an owner of two accounts naming neither, neither personal', async () => {
     h.state.seats = [{ account_id: ACCOUNT }, { account_id: OTHER }];
     const res = await post('confirm=true');
     expect([res.status, await res.json()]).toEqual([409, { error: 'account_ambiguous' }]);
     expect(stripeCalls()).toEqual([]);
+    expect(h.log).not.toContain('supabaseAdmin');
   });
 });

@@ -36,6 +36,7 @@ describe('docs/specs/v2/01-accounts.md', () => {
       'purge_after',
       'agency_checkout_url',
       'agency_checkout_at',
+      'agency_checkout_interval',
       'agency_trial_consent_at',
     ]);
     expect(byTable.seats!.hiddenColumns).toEqual(['invite_token_hash']);

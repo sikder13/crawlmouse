@@ -7,13 +7,14 @@
  * and every run of digits in its text is read (thousands separators joined: "2,000" is 2000).
  */
 import { renderToStaticMarkup } from 'react-dom/server';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { TRIAL_DAYS, FREE_START } from '@/lib/billing/state-machine';
 import * as PRICES from '@/lib/billing/prices';
 import { GATES } from '@/lib/entitlement-v2';
 import { AGENCY_PLUS, ANNUAL_RENEWAL_REMINDER_DAYS, FREE_PRICE } from '@/lib/v2/copy/pricing';
 import { EVIDENCE_CONDENSED_AFTER_DAYS } from '@/lib/v2/copy/settings';
 import { pricingView, type PricingViewer } from '@/lib/v2/view/pricing';
+import { numberWord } from '@/lib/v2/words';
 import { PricingScreen } from './PricingScreen';
 
 /** Numbers on the page that are not a price or a limit, each with what it is. */
@@ -68,8 +69,9 @@ const VIEWERS: [string, PricingViewer][] = [
         owner: true,
         tier: 'free',
         snapshot: FREE_START,
+        customer: null,
       },
-      agency: { held: false, trialUsedAccountId: null },
+      agency: { held: false, used: null },
     },
   ],
   [
@@ -81,8 +83,18 @@ const VIEWERS: [string, PricingViewer][] = [
         owner: true,
         tier: 'free',
         snapshot: { ...FREE_START, trialUsedAt: NOW },
+        customer: null,
       },
-      agency: { held: false, trialUsedAccountId: 'a0000000-0000-4000-8000-00000000000b' },
+      agency: {
+        held: false,
+        used: {
+          account: {
+            id: 'a0000000-0000-4000-8000-00000000000b',
+            snapshot: { ...FREE_START, trialUsedAt: NOW },
+            customer: null,
+          },
+        },
+      },
     },
   ],
 ];
@@ -92,7 +104,11 @@ const pages = VIEWERS.flatMap(([name, viewer]) =>
     (interval) =>
       [
         `${name}, ${interval}`,
-        renderToStaticMarkup(<PricingScreen view={pricingView(viewer, interval, NOW)} />),
+        renderToStaticMarkup(
+          <PricingScreen
+            view={pricingView(viewer, interval, NOW, { accountDoor: true, checksPublic: true })}
+          />,
+        ),
       ] as const,
   ),
 );
@@ -121,4 +137,90 @@ describe('the numbers on the Pricing page', () => {
     ]);
     expect(renderedNumbers('<p data-x="777">a <b>5</b> b</p><!-- 31 -->')).toEqual([5]);
   });
+});
+
+// Tier B TB-N3, on Pricing: built again against GATES and prices no copy could contain, the page
+// must lose today's values, as numerals and as words. A figure typed equal to today's would stay.
+describe('the figures follow GATES and prices.ts, not the values typed today', () => {
+  const ALTERED = {
+    pro: { sites: 11, seats: 3, competitorsPerSite: 2 },
+    agency: { sites: 37, seats: 13, competitorsPerSite: 6 },
+    prices: { PRO_MONTHLY: 23, PRO_YEARLY: 230, AGENCY_MONTHLY: 123, AGENCY_YEARLY: 1230 },
+  };
+
+  async function alteredPage(interval: 'month' | 'year') {
+    vi.resetModules();
+    vi.doMock('@/lib/entitlement-v2', async (importOriginal) => {
+      const real = await importOriginal<typeof import('@/lib/entitlement-v2')>();
+      return {
+        ...real,
+        GATES: {
+          ...real.GATES,
+          pro: { ...real.GATES.pro, ...ALTERED.pro },
+          agency: { ...real.GATES.agency, ...ALTERED.agency },
+        },
+      };
+    });
+    vi.doMock('@/lib/billing/prices', async (importOriginal) => ({
+      ...(await importOriginal<typeof import('@/lib/billing/prices')>()),
+      ...ALTERED.prices,
+    }));
+    try {
+      const { pricingView: view } = await import('@/lib/v2/view/pricing');
+      const { PricingScreen: Screen } = await import('./PricingScreen');
+      return textOf(
+        renderToStaticMarkup(
+          <Screen
+            view={view({ kind: 'signed_out' }, interval, new Date('2026-11-12T12:00:00Z'), {
+              accountDoor: true,
+              checksPublic: true,
+            })}
+          />,
+        ),
+      );
+    } finally {
+      vi.doUnmock('@/lib/entitlement-v2');
+      vi.doUnmock('@/lib/billing/prices');
+      vi.resetModules();
+    }
+  }
+
+  const altered = new Set<number>([
+    ...Object.values(ALTERED.pro),
+    ...Object.values(ALTERED.agency),
+    ...Object.values(ALTERED.prices),
+    TRIAL_DAYS,
+    ...Object.values(NOT_PRICES),
+  ]);
+  /** Today's moved values; one and two are left out, as other things on the page use those words. */
+  const moved = [
+    GATES.pro.sites,
+    GATES.pro.seats,
+    GATES.pro.competitorsPerSite,
+    GATES.agency.sites,
+    GATES.agency.seats,
+    GATES.agency.competitorsPerSite,
+    PRICES.PRO_MONTHLY,
+    PRICES.PRO_YEARLY,
+    PRICES.AGENCY_MONTHLY,
+    PRICES.AGENCY_YEARLY,
+  ].filter((n) => n > 2 && !altered.has(n));
+
+  it.each(['month', 'year'] as const)(
+    '%s: the altered values in, today’s out',
+    async (interval) => {
+      const text = await alteredPage(interval);
+      const price =
+        interval === 'month' ? ALTERED.prices.AGENCY_MONTHLY : ALTERED.prices.AGENCY_YEARLY;
+      expect(text).toContain(PRICES.usd(price));
+      expect(text).toContain(`${ALTERED.agency.sites} sites`);
+      expect(moved.length).toBeGreaterThan(5);
+      const left = moved.filter(
+        (n) =>
+          new RegExp(`(?<![\\d,.])${n}(?![\\d,])`).test(text) ||
+          (numberWord(n) !== String(n) && new RegExp(`\\b${numberWord(n)}\\b`, 'i').test(text)),
+      );
+      expect(left).toEqual([]);
+    },
+  );
 });

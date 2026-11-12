@@ -7,8 +7,11 @@
  * 3. the first client site admitted by `admittedHost`, so a private or reserved host is refused;
  * 4. `start_agency_trial_account` creates the second account with this person as owner and stores the
  *    site, or returns the one an earlier submit made, or answers `trial_used`, which is a 409;
- * 5. a Checkout this account opened within CHECKOUT_REUSE_MS is returned again, not opened twice;
- * 6. otherwise CC-03's `agencyTrial` opens one, and its URL and the time are stored on the account.
+ * 5. a Checkout this account opened within CHECKOUT_REUSE_MS, for the interval this submit asks, is
+ *    returned again, not opened twice; one opened for the other interval is not, since the consent
+ *    names the interval;
+ * 6. otherwise CC-03's `agencyTrial` opens one, and its URL, the time and the interval are stored on
+ *    the account.
  * The answer is CC-03's: a 303 to Checkout for a form, `{url}` for JSON, a JSON refusal otherwise.
  */
 import { z } from 'zod';
@@ -16,6 +19,7 @@ import type { Interval } from '@/lib/billing/catalog';
 import { SESSION_LIFETIME_S, type BillingResult } from '@/lib/billing/checkout-v2';
 import { readBody, refuse, respond } from '@/lib/billing/request-body';
 import type { Admitted } from '@/lib/v2/account/sites';
+import type { StoredCheckout } from './checkouts';
 import type { CapturePricingEvent } from '@/lib/v2/pricing/events';
 
 /** Submits one person may make in an hour. */
@@ -39,8 +43,8 @@ export interface AgencyTrialDeps {
   /** `start_agency_trial_account` through the service role. */
   startAccount(userId: string, name: string, host: string): Promise<StartedAccount>;
   /** The Checkout stored on the account, or null. */
-  openCheckout(accountId: string): Promise<{ url: string; at: Date } | null>;
-  storeCheckout(accountId: string, url: string, at: Date): Promise<void>;
+  openCheckout(accountId: string): Promise<StoredCheckout | null>;
+  storeCheckout(accountId: string, checkout: StoredCheckout): Promise<void>;
   /** CC-03's `agencyTrial` with the deps its own route builds. */
   checkout(input: {
     accountId: string;
@@ -91,13 +95,17 @@ export async function startAgencyTrial(
 
   const open = await deps.openCheckout(accountId);
   const at = deps.now();
-  if (open !== null && at.getTime() - open.at.getTime() < CHECKOUT_REUSE_MS) {
+  if (
+    open !== null &&
+    open.interval === interval &&
+    at.getTime() - open.at.getTime() < CHECKOUT_REUSE_MS
+  ) {
     return respond(body.kind, open.url);
   }
 
   const result = await deps.checkout({ accountId, email: person.email, interval });
   if (!result.ok) return refuse(result.status, result.error, result.detail);
-  await deps.storeCheckout(accountId, result.url, at);
+  await deps.storeCheckout(accountId, { url: result.url, at, interval });
   deps.defer(() =>
     deps.capture('trial_started', accountId, {
       kind: 'agency',

@@ -43,7 +43,7 @@ export const AGENCIES_COPY = {
     capabilities: ['agency_trial'],
   }),
   trialNote: (p: { days: number; price: string; sites: number }): Tagged => ({
-    text: `Card required; nothing charged for ${p.days} days, then ${p.price} a month · ${p.sites} client sites · cancel from Settings any day, two clicks`,
+    text: `Card required; nothing charged for ${p.days} days, then ${p.price} a month · ${p.sites} client sites · cancel any day, two clicks`,
     capabilities: ['agency_trial', 'sites', 'cancel'],
   }),
   prospect: {
@@ -101,7 +101,7 @@ export const AGENCIES_COPY = {
       reports: {
         text: 'Scheduled client reports, sent for you',
         capabilities: ['client_reports'],
-        agency: 'weekly or monthly, PDF',
+        agency: 'on a schedule you set',
       },
       matrix: {
         text: 'Client matrix',

@@ -7,13 +7,14 @@
  */
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { TRIAL_DAYS } from '../../billing/state-machine';
 import { AGENCY_MONTHLY, PRO_MONTHLY, usd } from '../../billing/prices';
 import { GATES } from '../../entitlement-v2';
 import { findCheck, fixture } from '../fixtures';
 import { CHECKS } from '../recordings';
 import { buildPublicSnapshot } from '../reports/build-snapshot';
+import { numberWord } from '../words';
 import {
   CAPABILITIES,
   agenciesView,
@@ -45,10 +46,13 @@ function holds(proof: Proof): boolean {
       return !existsSync(join(REPO, proof.path));
     case 'holds':
       return readFileSync(join(REPO, proof.path), 'utf8').includes(proof.text);
-    case 'nowhere':
+    case 'nowhere': {
+      const has = (text: string) =>
+        typeof proof.text === 'string' ? text.includes(proof.text) : proof.text.test(text);
       return proof.dirs
         .flatMap((d) => sources(join(REPO, d)))
-        .every((f) => !readFileSync(f, 'utf8').includes(proof.text));
+        .every((f) => !has(readFileSync(f, 'utf8')));
+    }
   }
 }
 
@@ -86,6 +90,100 @@ describe('the capability table', () => {
     expect(holds({ kind: 'nowhere', dirs: ['apps/web/lib'], text: 'export function usd' })).toBe(
       false,
     );
+  });
+});
+
+// Tier B TB-N1: each coming capability's pattern, varied over the ways the pages and FACTS name it.
+// Pricing's plan rows and FACTS's tier line are in this list, not only the copy written to pass it.
+const PARAPHRASES: Partial<Record<CapabilityKey, readonly string[]>> = {
+  weekly_checks: [
+    'weekly checks on up to 5 sites',
+    'Re-checked weekly',
+    'Re-checked monthly',
+    'checked weekly',
+    're-checks every client site',
+    'recheck',
+    'scheduled checks',
+    'every week',
+    'checking again',
+    'checked again',
+    'Keeps monthly checks',
+  ],
+  change_emails: [
+    'an email only if something changed',
+    'alerts by email and Slack',
+    'a note when a check finds a change',
+    'a note when a re-check finds a change',
+    'telling you what changed',
+    'you hear first',
+  ],
+  slack_alerts: ['alerts by email and Slack', 'Slack alerts'],
+  exports: ['PDF, CSV and JSON', 'PDF/CSV/JSON export', 'export', 'Exports'],
+  staging: [
+    'Audit preview and staging URLs before you deploy',
+    'staging/preview audits',
+    'a staging URL',
+  ],
+  renders: ['10 full renders a month', '30 renders', 'Full JavaScript renders a month'],
+  seats: ['5 seats', 'Two seats', '$12 a seat beyond', 'one seat'],
+  competitors: ['1 competitor per site', '3 competitors', 'Competitors per site'],
+  trial_reminder: [
+    'We email you three days before',
+    'one reminder three days before the 14 days end',
+    'We email you 3 days before',
+  ],
+  renewal_reminders: [
+    'We email you 45 and 20 days before an annual renewal',
+    'renewal reminders at 45 and 20 days',
+  ],
+  agency_plus_reply: ['We reply from support@crawlmouse.com', 'Talk to us'],
+  client_report_page: ['reports on your domain with your logo', 'client report page'],
+  sender_address: ['emails from your address', 'Emails to clients from your address'],
+  client_matrix: ['Client matrix', 'every client on one screen'],
+  observed_crawlers: [
+    'Pro also lists the crawlers it has seen on your site (observed activity).',
+    'observed activity',
+  ],
+  one_pagers: ['client one-pagers', 'Prospect one-pagers', 'one-page summary'],
+  client_reports: [
+    'reports under your name',
+    'Agencies reporting to clients under their own name.',
+    'Weekly or monthly client reports, sent for you',
+    'client reports',
+    'shown on client reports',
+  ],
+  agency_workspace: [
+    'its first audit runs from the agency workspace',
+    'set your domain and logo under Branding',
+  ],
+};
+
+/** Text naming only built things, which no coming pattern may match. */
+const BUILT_ONLY = [
+  'Server-render the product template, 158 pages',
+  'Monthly',
+  'Yearly',
+  'Up to 2,000 pages per audit',
+  'Every fix the audit finds, with packets for your coding tool',
+  'Any day, with no call. The account goes back to Free.',
+  'Sent. Your request is recorded.',
+];
+
+describe('what names a coming capability', () => {
+  it.each(Object.entries(PARAPHRASES))('%s: each paraphrase is named', (key, phrases) => {
+    const cap = CAPABILITIES[key as CapabilityKey];
+    expect(cap.status).toBe('coming');
+    expect(phrases!.filter((p) => !cap.named!.test(p))).toEqual([]);
+  });
+
+  it('every coming capability has paraphrases here', () => {
+    const coming = ENTRIES.filter(([, c]) => c.status === 'coming').map(([k]) => k);
+    expect(coming.filter((k) => !(k in PARAPHRASES))).toEqual([]);
+  });
+
+  it.each(BUILT_ONLY)('"%s" names no coming capability', (text) => {
+    const named = ENTRIES.filter(([, c]) => c.named?.test(text)).map(([k]) => k);
+    expect(named).toEqual([]);
   });
 });
 
@@ -178,5 +276,86 @@ describe('perSitePhrase', () => {
         else expect(price / sites).toBe(n);
       }
     }
+  });
+});
+
+// Tier B TB-N3: a figure typed into the copy that equals today's value, as a numeral or a word,
+// passes a membership check. The view is built again against GATES and prices no copy could
+// contain, and today's values must be gone from it.
+describe('the figures follow GATES and prices.ts, not the values typed today', () => {
+  const ALTERED = {
+    pro: { sites: 11, seats: 3, competitorsPerSite: 2 },
+    agency: { sites: 37, seats: 13, competitorsPerSite: 6 },
+    PRO_MONTHLY: 23,
+    AGENCY_MONTHLY: 123,
+  };
+
+  async function alteredView() {
+    vi.resetModules();
+    vi.doMock('../../entitlement-v2', async (importOriginal) => {
+      const real = await importOriginal<typeof import('../../entitlement-v2')>();
+      return {
+        ...real,
+        GATES: {
+          ...real.GATES,
+          pro: { ...real.GATES.pro, ...ALTERED.pro },
+          agency: { ...real.GATES.agency, ...ALTERED.agency },
+        },
+      };
+    });
+    vi.doMock('../../billing/prices', async (importOriginal) => ({
+      ...(await importOriginal<typeof import('../../billing/prices')>()),
+      PRO_MONTHLY: ALTERED.PRO_MONTHLY,
+      AGENCY_MONTHLY: ALTERED.AGENCY_MONTHLY,
+    }));
+    try {
+      return (await import('./agencies')).agenciesView();
+    } finally {
+      vi.doUnmock('../../entitlement-v2');
+      vi.doUnmock('../../billing/prices');
+      vi.resetModules();
+    }
+  }
+
+  /**
+   * Today's figures the alteration moves, each with its word. One and two are left out: "one click"
+   * and "two clicks" are the page's words for other things.
+   */
+  const moved = [
+    GATES.pro.sites,
+    GATES.pro.seats,
+    GATES.pro.competitorsPerSite,
+    GATES.agency.sites,
+    GATES.agency.seats,
+    GATES.agency.competitorsPerSite,
+    PRO_MONTHLY,
+    AGENCY_MONTHLY,
+  ].filter(
+    (n) =>
+      ![
+        ...Object.values(ALTERED.pro),
+        ...Object.values(ALTERED.agency),
+        ALTERED.PRO_MONTHLY,
+        ALTERED.AGENCY_MONTHLY,
+        TRIAL_DAYS,
+      ].includes(n) && n > 2,
+  );
+
+  it('the altered values reach the page', async () => {
+    const text = JSON.stringify({ ...(await alteredView()), onePager: null });
+    for (const n of [ALTERED.agency.sites, ALTERED.agency.seats, ALTERED.AGENCY_MONTHLY])
+      expect(text, String(n)).toContain(String(n));
+    expect(text).toContain(numberWord(ALTERED.agency.seats));
+  });
+
+  it('none of today’s moved values is left, as a numeral or as a word', async () => {
+    const text = JSON.stringify({ ...(await alteredView()), onePager: null });
+    expect(moved.length).toBeGreaterThan(4);
+    const left = moved.filter(
+      (n) =>
+        new RegExp(`(?<![\\d,.])${n}(?![\\d,])`).test(text) ||
+        (numberWord(n) !== String(n) && new RegExp(`\\b${numberWord(n)}\\b`, 'i').test(text)),
+    );
+    expect(left).toEqual([]);
   });
 });

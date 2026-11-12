@@ -3,6 +3,7 @@
  * sign in that returns here; never indexed; the form for a new trialist, the reason and no form for
  * a used trial, and the "did not finish" note for an agency account a Checkout left (Q16).
  */
+import { JSDOM } from 'jsdom';
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -12,6 +13,7 @@ const h = vi.hoisted(() => ({
   reads: 0,
   viewer: { kind: 'signed_out' } as Record<string, unknown>,
   rows: [] as unknown[],
+  used: null as unknown,
 }));
 
 vi.mock('server-only', () => ({}));
@@ -22,7 +24,13 @@ vi.mock('@/lib/v2/account/viewer', () => ({
     return h.viewer;
   },
 }));
+vi.mock('@/lib/supabase/admin', () => ({ supabaseAdmin: () => ({}) }));
 vi.mock('@/lib/v2/pricing/read', () => ({ readAgencyAccounts: async () => h.rows }));
+vi.mock('@/lib/billing/portal-v2', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/billing/portal-v2')>()),
+  supabasePortalAccounts: () => ({ customerOf: async () => 'cus_1' }),
+}));
+vi.mock('@/lib/v2/pricing/used-trial', () => ({ readUsedAgencyTrial: async () => h.used }));
 
 import AgencyTrialPage, { dynamic, metadata } from './page';
 
@@ -54,6 +62,7 @@ beforeEach(() => {
   h.reads = 0;
   h.viewer = { kind: 'signed_out' };
   h.rows = [];
+  h.used = null;
   vi.stubEnv('V2_BILLING', '1');
 });
 afterEach(() => vi.unstubAllEnvs());
@@ -106,11 +115,59 @@ describe('/agency-trial', () => {
     expect(html).toContain('value="clientsite.com"');
   });
 
-  it('a used trial: the reason and no form', async () => {
+  it.each([
+    ['a live account', [agencyRow({ trialUsedAt: new Date('2026-10-01T10:00:00Z') })], false],
+    // N5: the function counts a deleted account's used trial, which no live row shows.
+    ['a deleted account', [], true],
+  ] as const)('a used trial on %s: the reason and no form', async (_, rows, deleted) => {
     h.viewer = signedIn;
-    h.rows = [agencyRow({ trialUsedAt: new Date('2026-10-01T10:00:00Z') })];
+    h.rows = [...rows];
+    h.used = {
+      accountId: 'a0000000-0000-4000-8000-00000000000b',
+      trialUsedAt: new Date('2026-10-01T10:00:00Z'),
+      deleted,
+    };
     const html = renderToStaticMarkup(await render());
     expect(html).toContain('Your Agency trial was used.');
     expect(html).not.toContain('<form');
+  });
+
+  // Q26: the trialist cancels the agency account here, before day 15, without CC-31's switcher.
+  it('an agency trial owned: Manage billing and Cancel name that account, in two clicks', async () => {
+    h.viewer = signedIn;
+    const id = 'a0000000-0000-4000-8000-00000000000b';
+    h.rows = [
+      agencyRow({
+        state: 'agency_trial',
+        tier: 'agency',
+        trialVariant: 'card_required',
+        trialEndsAt: new Date('2099-01-01T00:00:00Z'),
+        trialUsedAt: new Date('2026-10-01T10:00:00Z'),
+        subscriptionId: 'sub_1',
+      }),
+    ];
+    h.used = { accountId: id, trialUsedAt: new Date('2026-10-01T10:00:00Z'), deleted: false };
+    const forms = (html: string) =>
+      [...new JSDOM(html).window.document.querySelectorAll('form')].map((f) => ({
+        method: f.getAttribute('method'),
+        action: f.getAttribute('action'),
+        fields: Object.fromEntries(
+          [...f.querySelectorAll('input[type="hidden"]')].map((i) => [
+            i.getAttribute('name'),
+            i.getAttribute('value'),
+          ]),
+        ),
+      }));
+    const first = renderToStaticMarkup(await render());
+    expect(first).toContain('You already have Agency.');
+    expect(forms(first)).toEqual([
+      { method: 'post', action: '/api/billing/portal', fields: { accountId: id } },
+      { method: 'get', action: '/agency-trial', fields: { cancel: id } },
+    ]);
+    const second = renderToStaticMarkup(await render({ cancel: id }));
+    expect(forms(second)).toEqual([
+      { method: 'post', action: '/api/billing/portal', fields: { accountId: id } },
+      { method: 'post', action: '/api/billing/cancel', fields: { accountId: id, confirm: 'true' } },
+    ]);
   });
 });

@@ -16,6 +16,7 @@ const h = vi.hoisted(() => ({
   role: 'owner' as string | null,
   sessionId: null as string | null,
   log: [] as string[],
+  rpcArgs: [] as unknown[],
   emails: [] as AccountEmailEvent[],
 }));
 
@@ -32,17 +33,41 @@ vi.mock('@/lib/supabase/server', () => ({
         error: null,
       }),
     },
+    // ownedAccountId's two reads, answered from the database: the caller's active owner seats,
+    // and which of the accounts it names (`in`) are personal.
     from: (table: string) => {
       h.log.push(`session.from ${table}`);
-      const rows = h.user ? [{ account_id: accountOf.get(h.user.id) }] : [];
+      let ids: string[] = [];
+      const read = (): Promise<unknown[]> => {
+        if (!h.user) return Promise.resolve([]);
+        return table === 'seats'
+          ? h.db
+              .query(
+                `select account_id from public.seats
+                  where user_id = $1 and role = 'owner' and status = 'active'`,
+                [h.user.id],
+              )
+              .then((r) => r.rows)
+          : h.db
+              .query(`select id from public.accounts where id = any($1) and kind = 'personal'`, [
+                ids,
+              ])
+              .then((r) => r.rows);
+      };
       const chain: Record<string, unknown> = {
-        then: (resolve: (v: unknown) => unknown) => resolve({ data: rows, error: null }),
+        then: (resolve: (v: unknown) => unknown) =>
+          read().then((rows) => resolve({ data: rows, error: null })),
       };
       chain.select = chain.eq = () => chain;
+      chain.in = (_: string, values: string[]) => {
+        ids = values;
+        return chain;
+      };
       return chain;
     },
-    rpc: async (fn: string) => {
+    rpc: async (fn: string, args: unknown) => {
       h.log.push(`session.rpc ${fn}`);
+      h.rpcArgs.push(args);
       return { data: h.role, error: null };
     },
   }),
@@ -92,6 +117,7 @@ beforeEach(() => {
   h.role = 'owner';
   h.sessionId = null;
   h.log.length = 0;
+  h.rpcArgs.length = 0;
   h.emails.length = 0;
 });
 afterEach(() => vi.unstubAllEnvs());
@@ -185,6 +211,31 @@ describe('POST /api/account/email', () => {
     expect(h.emails.map((e) => e.data.template)).toEqual([
       'email_change_confirm',
       'email_change_notice',
+    ]);
+  });
+
+  // Q26: the Agency trial gives its person a second owner seat; this form names no account, so it
+  // acts on their personal (default) one, found with the caller's own client before the role.
+  it('with the agency trial’s second owner seat, acts on the default account', async () => {
+    const p = await person();
+    const { rows } = await h.db.query<{ r: { account_id: string } }>(
+      `select public.start_agency_trial_account($1, 'Agency', 'client.example') r`,
+      [p.id],
+    );
+    expect(rows[0]!.r.account_id).not.toBe(p.accountId);
+    const { rows: users } = await h.db.query<{ id: string }>(
+      `select default_account_id as id from public.users where id = $1`,
+      [p.id],
+    );
+    expect(users[0]!.id).toBe(p.accountId);
+    await asked(p, 'two-seats@example.org');
+    expect(h.rpcArgs).toEqual([{ p_account: p.accountId }]);
+    expect(h.log).toEqual([
+      'getUser',
+      'session.from seats',
+      'session.from accounts',
+      'session.rpc member_role',
+      'supabaseAdmin',
     ]);
   });
 
