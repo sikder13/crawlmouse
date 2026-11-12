@@ -14,6 +14,13 @@ import {
   resultElement,
 } from './_lib/screens';
 import { WEB_ROOT } from './_lib/tokens-css';
+import { AgenciesScreen } from '../../components/v2/screens/agencies/AgenciesScreen';
+import { DevelopersScreen } from '../../components/v2/screens/developers/DevelopersScreen';
+import { CheckPageScreen } from '../../components/v2/screens/check/CheckPageScreen';
+import { agenciesView } from '../../lib/v2/view/agencies';
+import { developersView } from '../../lib/v2/view/developers';
+import { checkPageView } from '../../lib/v2/view/check-pages';
+import { CHECK_QUESTIONS } from '../../lib/v2/copy/check-pages';
 
 /**
  * No v2 component decides whether a page is indexed, or what it is called or canonical to. Those
@@ -134,6 +141,13 @@ describe('no v2 component sets a robots directive or a head element', () => {
       ),
     ],
     ['the footer alone', () => <SiteFooter status="ok" />],
+    // CC-29: the public pages' screens, as their routes render them.
+    ['For agencies', () => <AgenciesScreen data={agenciesView()} audit="live" />],
+    ['Developers', () => <DevelopersScreen data={developersView()} audit="live" />],
+    ...CHECK_QUESTIONS.map((q): [string, () => React.ReactElement] => [
+      `the /check/${q} page`,
+      () => <CheckPageScreen data={checkPageView(q)} start />,
+    ]),
   ];
   it.each(RENDERED)('renders no head element in %s', (_, el) => {
     const markup = renderToStaticMarkup(el());

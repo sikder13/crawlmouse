@@ -14,11 +14,18 @@ const GROUP = join(WEB_ROOT, 'app', '(v2-preview)');
 const ACCOUNT_GROUP = join(WEB_ROOT, 'app', '(account)');
 const PREVIEW = join(GROUP, 'v2-preview');
 /**
- * The public check flow's live pages (CC-22b), each a 404 while V2_CHECKS_PUBLIC is off: a v2
- * check's pages, which sit under v1's audit route with no layout of their own, and the page `/` is
- * rewritten to. `__tests__/v1-inventory.test.ts` holds the list of flag-gated page files.
+ * The live v2 pages outside the groups, each a 404 while its flag is off: the public check flow's
+ * (CC-22b), a v2 check's pages, which sit under v1's audit route with no layout of their own, and the
+ * page `/` is rewritten to; and CC-29's new addresses. `__tests__/v1-inventory.test.ts` holds the
+ * list of flag-gated page files.
  */
-const V2_LIVE = [join(WEB_ROOT, 'app', 'audit', '[id]'), join(WEB_ROOT, 'app', 'v2-home')];
+const V2_LIVE = [
+  join(WEB_ROOT, 'app', 'audit', '[id]'),
+  join(WEB_ROOT, 'app', 'v2-home'),
+  // CC-29: For agencies (V2_BILLING) and the three /check pages (V2_CHECKS_PUBLIC), new addresses.
+  join(WEB_ROOT, 'app', 'agencies'),
+  join(WEB_ROOT, 'app', 'check'),
+];
 
 function walk(dir: string, out: string[] = []): string[] {
   if (!existsSync(dir)) return out;
@@ -220,6 +227,7 @@ describe('v2 stays out of live pages', () => {
     expect(pages.map((f) => relative(WEB_ROOT, f)).sort()).toEqual([
       'app/dashboard/v2/page.tsx',
       'app/sites/[id]/page.tsx',
+      'app/v2-developers/page.tsx',
       'app/v2-home/page.tsx',
     ]);
     for (const page of pages) expect(isFlagGated(page), relative(WEB_ROOT, page)).toBe(true);
