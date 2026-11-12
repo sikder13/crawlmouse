@@ -243,16 +243,25 @@ describe('what the clients can reach', () => {
       ...readMigration(MIGRATION).matchAll(/create or replace function (public\.\w+)\(/g),
     ].map((m) => m[1]!);
     expect(fns.length).toBeGreaterThan(0);
+    // The name match finds every function the file adds: a match that finds none could not fail below.
+    const found = await db.query<{ n: number }>(
+      `select count(distinct n.nspname || '.' || p.proname)::int n
+         from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+        where n.nspname || '.' || p.proname = any($1)`,
+      [fns],
+    );
+    expect(found.rows[0]!.n).toBe(new Set(fns).size);
     const { rows } = await db.query<{ fn: string; role: string }>(
       `select p.oid::regprocedure::text fn, r role
          from pg_proc p cross join unnest(array['anon', 'authenticated']) r
-        where p.oid::regproc::text = any($1) and has_function_privilege(r, p.oid, 'execute')`,
+         join pg_namespace n on n.oid = p.pronamespace
+        where n.nspname || '.' || p.proname = any($1) and has_function_privilege(r, p.oid, 'execute')`,
       [fns],
     );
     expect(rows).toEqual([]);
   });
 
-  it('keeps the address out of the ledger: no column holds text that is not a hash, key or code', async () => {
+  it('names no column of the three ledgers after an address, a recipient, a subject or a body', async () => {
     const { rows } = await db.query<{ column_name: string }>(
       `select column_name from information_schema.columns
         where table_schema = 'public' and table_name in ('email_sends', 'email_suppressions', 'slack_sends')
