@@ -25,6 +25,7 @@ import { detectorOutcomes } from '../grade/outcomes.js';
 import type { PacketFacts } from '../packets/types.js';
 import { writtenFrom } from '../packets/written.js';
 import type { Assembled } from './assemble.js';
+import { awaitingShellTemplates, emptyRootUrls } from './plan.js';
 import { stackOf } from './record.js';
 import type { BuildInput } from './types.js';
 
@@ -41,7 +42,7 @@ export interface Graded {
 }
 
 export function gradeAssembled(
-  input: Pick<BuildInput, 'check' | 'previous'>,
+  input: Pick<BuildInput, 'check' | 'previous' | 'fixes'>,
   assembled: Assembled,
   robots_txt: string | null,
 ): Graded {
@@ -98,7 +99,10 @@ export function gradeAssembled(
     grades,
     access.detections,
     structure,
-    detectRendered(withOrphans),
+    detectRendered(withOrphans, {
+      emptyRoots: emptyRootUrls(assembled),
+      openTemplates: awaitingShellTemplates(input.fixes),
+    }),
     writtenFrom(facts, ({ type, fingerprint }) => packet_faults.push({ type, fingerprint })),
   );
   const pages = withOrphans.map((p) => ({

@@ -82,7 +82,7 @@ export function renderedRecord(pages: RenderedPage[], measured: number | null): 
     state: 'detected',
     reason: null,
     measured,
-    extent: { pages: 40, rendered: pages.length },
+    extent: { pages: 40, graded: 40, rendered: pages.length },
     affected_urls: pages.map((p) => p.url),
     evidence: { pages },
   };

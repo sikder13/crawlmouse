@@ -99,7 +99,7 @@ describe('the client-rendered template packet, from its record', () => {
       '`https://a.test/guides/g-1`: 38 words in the HTML response, 290 once rendered in a browser.',
       'Across the rendered pages, a median of 13% of the rendered words is in the HTML response. A crawler that does not run JavaScript reads the smaller number.',
       'Measured by rendering 2 pages. The other 29 graded pages of the template were not rendered: the finding is for the template by this sample.',
-      'The audit renders only pages it grades. A route whose HTML response holds too little text to be graded is not rendered, so another template of the site can have the same fault unmeasured.',
+      'The audit renders pages it grades, and at most 5 pages whose HTML response holds too little text to be graded and reads as a page the browser fills in. Any other page with too little text to be graded is not rendered, so another template of the site can have the same fault unmeasured.',
     ]);
   });
 
@@ -118,6 +118,42 @@ describe('the client-rendered template packet, from its record', () => {
       const p = compose(builder, detected('https://a.test', [[41, 312]], 3), factsOf(crawlers));
       for (const text of allText(p)) expect(identifiersIn(text), text).toEqual([]);
     }
+  });
+
+  it('says the pages are too thin to grade, for a template of empty-root pages alone (CC-32 D2)', () => {
+    const thin = (path: string, render: boolean): RenderedInputPage => ({
+      url: `https://a.test${path}`,
+      template_key: T,
+      kind: 'thin',
+      status_code: 200,
+      is_html: true,
+      without_js: render
+        ? { raw_words: 0, rendered_words: 300, text_share: 0, state: 'empty_shell' }
+        : null,
+    });
+    const recordOf = (pages: RenderedInputPage[]) => {
+      const [r] = detectRendered(pages, { emptyRoots: new Set(pages.map((p) => p.url)) });
+      if (r?.state !== 'detected') throw new Error('the test record is not detected');
+      return r;
+    };
+    const one = compose(builder, recordOf([thin('/guides/a', true)]), factsOf()).context;
+    expect(one[0]).toMatch(
+      /The audit rendered its 1 page in a browser; its HTML response held too little text to be graded\.$/,
+    );
+    expect(one).toContain('Measured by rendering 1 page: every page of the template.');
+    const three = recordOf([
+      thin('/guides/a', true),
+      thin('/guides/b', true),
+      thin('/guides/c', false),
+    ]);
+    const ctx = compose(builder, three, factsOf()).context;
+    expect(ctx[0]).toMatch(
+      /The audit rendered 2 of its 3 pages in a browser; their HTML responses held too little text to be graded\.$/,
+    );
+    expect(ctx).toContain(
+      'Measured by rendering 2 pages. The other 1 page of the template was not rendered: the finding is for the template by this sample.',
+    );
+    expect(ctx.join('\n')).not.toMatch(/graded page/);
   });
 
   it('says one page in the singular, and two in the plural', () => {

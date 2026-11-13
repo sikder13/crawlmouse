@@ -144,7 +144,9 @@ describe('the client-rendered template fix', () => {
   });
 
   it('is confirmed when every graded page of the template was rendered, however few', () => {
-    const extent = (pages: number, rendered: number) => ({ extent: { pages, rendered } });
+    const extent = (pages: number, rendered: number) => ({
+      extent: { pages, graded: pages, rendered },
+    });
     expect(PAGES_PER_FIX_TEMPLATE).toBe(2);
     expect(renderedConfidence(extent(1, 1))).toBe('confirmed');
     expect(renderedConfidence(extent(2, 1))).toBe('likely');
@@ -239,5 +241,65 @@ describe('the client-rendered template fix (properties)', () => {
         expect(fixes.map((f) => f.rank).sort((a, b) => a - b)).toEqual(fixes.map((_, i) => i + 1));
       }),
     );
+  });
+});
+
+describe('a shell-only template fix (owner ruling on CC-32 Q8)', () => {
+  /** A template of three empty-root pages, two rendered as shells: no graded page. */
+  const shell = () => {
+    const urls = ['https://a.test/app/a', 'https://a.test/app/b', 'https://a.test/app/c'];
+    const [record] = detectRendered(
+      urls.map((url, i) => ({
+        url,
+        template_key: '/app/{slug}',
+        kind: 'thin' as const,
+        status_code: 200,
+        is_html: true,
+        without_js:
+          i < 2 ? { raw_words: 0, rendered_words: 400, text_share: 0, state: SHELL } : null,
+      })),
+      { emptyRoots: new Set(urls) },
+    );
+    expect(record).toMatchObject({ state: 'detected', extent: { pages: 3, graded: 0 } });
+    return record!;
+  };
+
+  it('ranks first, beside a fix with a large grade effect, and moves no effect, rank order or overview of the others', () => {
+    const s = site([[0.1, SHELL], [0.2, SHELL], null, null, null]);
+    const shellRecord = shell();
+    const { access } = s;
+    const structure = s.input.structure;
+    const without = detectorOutcomes(s.grades, access, structure, s.rendered, NOTHING_WRITTEN);
+    const withShell = detectorOutcomes(
+      s.grades,
+      access,
+      structure,
+      [...s.rendered, shellRecord],
+      NOTHING_WRITTEN,
+    );
+    const before = fixesOf(without.outcomes);
+    const after = fixesOf(withShell.outcomes);
+    const blog = after.find((f) => f.template_key === '/blog/{slug}')!;
+    expect(blog.effect.ai_readability).toBe(21.25);
+    const shellFix = after.find((f) => f.fingerprint === shellRecord.fingerprint)!;
+    expect(shellFix.rank).toBe(1);
+    expect(shellFix.effect).toMatchObject({ technical_seo: 0, ai_readability: 0 });
+    for (const f of before) {
+      const same = after.find((g) => g.fingerprint === f.fingerprint)!;
+      expect(same.effect, f.type).toEqual(f.effect);
+      expect(same.rank, f.type).toBe(f.rank + 1);
+      expect(same.absorbed_by_fingerprint, f.type).toBe(f.absorbed_by_fingerprint);
+    }
+    expect(withShell.overview).toEqual(without.overview);
+  });
+
+  it('is first only when its template has no graded page: a template with one ranks by its effect', () => {
+    const s = site([[0.1, SHELL], [0.2, SHELL], null, null, null]);
+    const graded = { ...shell(), extent: { pages: 3, graded: 1, rendered: 2 } };
+    const fixes = effectsOf(s.grades.inputs, [
+      { family: 'rendered', record: s.rendered.find((r) => r.state === 'detected')! },
+      { family: 'rendered', record: graded },
+    ]);
+    expect(fixes.byFix.get(graded.fingerprint)!.rank).toBe(2);
   });
 });

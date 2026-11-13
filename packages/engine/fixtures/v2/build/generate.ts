@@ -11,7 +11,9 @@
  * plans until it plans none, then the stage-1 access batch `sample` plans, then stage 2 when stage 1
  * calls for it. Rendering is CC-14's renderCheck over `renderCandidates`, against a fake Browser Run
  * client that answers with the site's own HTML (the guides' rendered side is their text filled in): a
- * recording, not a measurement of a browser. The worker is only read here.
+ * recording, not a measurement of a browser. The empty-root phase is left off (no empty-root render),
+ * so the recording, and the web fixture built from it, stay as recorded before that phase existed;
+ * empty-shell-site.ts carries that phase's fixture. The worker is only read here.
  *
  * The server's loopback address is renamed https://built-site.test, as the access fixtures rename
  * theirs; access test ids are renumbered in row order, so a regeneration changes only what changed.
@@ -140,6 +142,7 @@ export async function record(
     });
     const render = await renderCheck({
       ...plan,
+      maxEmptyRootRenders: 0,
       client: fakeClient(replies),
       admit: async () => undefined,
       caps: { perCheckMs: 600_000, perDayMs: 3_600_000 },

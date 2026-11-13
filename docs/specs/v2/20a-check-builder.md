@@ -6,19 +6,19 @@
 
 ## Input
 
-| Field          | What it is                                                                                                                            |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| `check`        | The check as CC-20b created it: ids, trigger, timestamps, `expires_at`, `page_cap`, and `grade_version`, which must be this engine's. |
-| `site`         | The `Site` row. Its `account_id` decides whether a usage event is written.                                                            |
-| `homepage_url` | Where the crawl started, in the engine's canonical spelling (the root has no trailing slash).                                         |
-| `seeds`        | The crawl's seeds from discovery: the homepage and the sitemap's URLs with their `lastmod`.                                           |
-| `batches`      | Every crawl and access batch result, parsed with `BatchResultSchema`.                                                                 |
-| `render`       | CC-14's `RenderOutcome` over `renderCandidates`; null when nothing rendered.                                                          |
-| `previous`     | The site's last graded check as `diffCheck` reads it: its `Check` and its `diff_inputs`.                                              |
-| `fixes`        | The site's fixes before this check.                                                                                                   |
-| `events`       | Every event of those fixes.                                                                                                           |
-| `lineage`      | `engine_sha`, and `worker_release`: a batch row that names a worker release must name this one.                                       |
-| `now`          | When the lineage row is minted (its `created_at`).                                                                                    |
+| Field          | What it is                                                                                                                                                                             |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `check`        | The check as CC-20b created it: ids, trigger, timestamps, `expires_at`, `page_cap`, and `grade_version`, which must be this engine's.                                                  |
+| `site`         | The `Site` row. Its `account_id` decides whether a usage event is written.                                                                                                             |
+| `homepage_url` | Where the crawl started, in the engine's canonical spelling (the root has no trailing slash).                                                                                          |
+| `seeds`        | The crawl's seeds from discovery: the homepage and the sitemap's URLs with their `lastmod`.                                                                                            |
+| `batches`      | Every crawl and access batch result, parsed with `BatchResultSchema`.                                                                                                                  |
+| `render`       | CC-14's `RenderOutcome` over `renderCandidates`; null when nothing rendered.                                                                                                           |
+| `previous`     | The site's last graded check as `diffCheck` reads it: its `Check` and its `diff_inputs`.                                                                                               |
+| `fixes`        | The site's fixes before this check. The diff reads them, and the `client_rendered_template` detector gives a record to each template an awaiting one names (`awaitingShellTemplates`). |
+| `events`       | Every event of those fixes.                                                                                                                                                            |
+| `lineage`      | `engine_sha`, and `worker_release`: a batch row that names a worker release must name this one.                                                                                        |
+| `now`          | When the lineage row is minted (its `created_at`).                                                                                                                                     |
 
 ## Output
 
@@ -43,7 +43,7 @@ Each contract row is parsed with its schema before it is returned; a row that do
 
 1. `readBatches`: parse each batch; keep a batch that arrived twice once, refuse two different results for one batch id, a URL crawled in two batches, a non-canonical URL, and a row from another worker build than `lineage.worker_release`.
 2. `assemble`: crawl rows to pages by `outcome`, links, classification, depth, PageRank, coverage and the refusal evidence.
-3. Refuse an access test or a render of a page the planners would not have sampled.
+3. Refuse an access test of a page outside the sample, and a render of a page that is neither a sampled page the graded phase may render (`renderable`) nor one of the empty-root picks (`plannedEmptyRoots`).
 4. `detectAccess`, then `detectStructure`, then orphans and their parents onto the pages, then `gradeCheck`, then `detectorOutcomes` (which runs `effectsOf`).
 5. The `Check` record, then `diffCheck` with this check's side.
 6. Lineage and usage, then validation.
@@ -78,6 +78,7 @@ A check is `partial` when a batch carries a reason marked partial below, when th
 | Stage 2                              | when a scored crawler's verdict on a stage-1 page differs from the homepage's, or a browser control was not served: top 5 hubs, 4 deepest, 4 newest by lastmod, then templates round-robin, to 50 pages |
 | Coverage `sample_strategy.max_pages` | 50                                                                                                                                                                                                      |
 | Render candidates                    | the sampled pages; `maxRenders` 25; open fix templates from client-rendered fixes in `open`, `reopened`, `marked_done`                                                                                  |
+| Empty-root candidates                | every crawled page, with its row's `content_features.client_rendered`; `maxEmptyRootRenders` 5                                                                                                          |
 
 ## Where the fields come from
 
@@ -156,7 +157,7 @@ A check is `partial` when a batch carries a reason marked partial below, when th
 | `id`                       | derived from the five values the table keeps unique                                                                                         |
 | usage `result`             | `delivered` when either grade has a score, else `withheld`                                                                                  |
 | usage `billable`           | `result` is `delivered` (owner ruling)                                                                                                      |
-| usage `compute_seconds`    | the batches' durations and the render's browser time                                                                                        |
+| usage `compute_seconds`    | the batches' durations and the render's browser time, both render phases                                                                    |
 | usage `request_count`      | the batches' requests                                                                                                                       |
 | usage `occurred_at`        | the check's `finished_at`                                                                                                                   |
 
@@ -211,4 +212,4 @@ Two corrections to what the builder feeds the grade, signed off by the owner (20
 
 - **A redirect that lands on a crawled page hides absences.** `detectors/scope.ts` files a redirected row's links under the requested URL only when no other row has the final URL; `grade/effects.ts` `linkedStraight` describes them as filed there anyway. On the fixture's variant (one more link, to `/products/dome-tent-classic`, so it is crawled as its own page): without it, `/products/forgotten-lantern` detected, `/journal/forged-steel-pegs` detected; with it, `/products/forgotten-lantern` indeterminate (`links_not_fully_recorded`), `/journal/forged-steel-pegs` indeterminate (`links_not_fully_recorded`). Technical SEO 81.77 without, 81.79 with. In the variant both URLs answer 200 with the same content, so v1's duplicate rule keeps the one that sorts first: `/products/old-dome-tent` is `duplicate`, `/products/dome-tent-classic` is `content`. Not settled here.
 
-- **A client-rendered template leaves the graded population before it can be rendered.** v1's thin-content rule classifies the app-shell pages `/guides/getting-started-camping` as `thin`, `/guides/winter-camping-basics` as `thin`, `/guides/packing-checklist` as `thin`; CC-14's `renderable` (`packages/engine/src/v2/render/sample.ts:62`) bars a render candidate that is not a content page, and the thin rule is v1's (`packages/engine/src/analysis/classify-pages.ts:98`), so none of them is rendered; the builder's planner offers them (build.test.ts). For CC-20b. The `client_rendered_template` detector (`packages/engine/src/v2/detectors/rendered.ts`, CC-30) reads the graded pages that were rendered, so these pages give it no record: the golden check holds 0 fixes of that type.
+- **A client-rendered template leaves the graded population before it can be rendered.** v1's thin-content rule classifies the app-shell pages `/guides/getting-started-camping` as `thin`, `/guides/winter-camping-basics` as `thin`, `/guides/packing-checklist` as `thin`, and the thin rule is v1's (`packages/engine/src/analysis/classify-pages.ts:98`), so the graded phase's `renderable` (`packages/engine/src/v2/render/sample.ts`) bars them. Since CC-32 they are empty-root pages: the empty-root phase (`render/empty-root.ts`) renders up to two of them, and the `client_rendered_template` detector (`packages/engine/src/v2/detectors/rendered.ts`) counts their template as present. The recording leaves that phase off (`generate.ts`), so here 0 of them are rendered, the template's fingerprint is among the check's indeterminate ones, and the golden check holds 0 fixes of that type; `fixtures/v2/build/empty-shell-site.ts` carries the phase.
