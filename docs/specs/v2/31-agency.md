@@ -499,6 +499,13 @@ site's account, which need not be the one the caller acts in: the gate's switch 
 is of <that account>", and the rail says which account the caller acts in
 (`agencyGate`'s `actingIn`).
 
+The document title is "Client" whichever client it is, so two client tabs read alike in the tab
+bar. It is the page's static `metadata`: a title that named the host would come from
+`generateMetadata`, which Next runs apart from the page, and it would read the site a second time
+for a caller the page reads once. The page's header gives the client's host, under its name where
+it has one.
+`pnpm --filter @crawlmouse/web exec vitest run 'app/agency/clients/[siteId]/page.test.tsx' -t 'document title'`.
+
 Left out, each a `ruling` row: the "What to tell … this week" paragraph (no view renders its
 sentences from the data) with its two buttons, "Client portal", the line under the fixes about whose
 name a packet carries, the report row's sender, and the seat row's alert channels.
