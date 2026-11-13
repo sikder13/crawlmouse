@@ -755,12 +755,19 @@ no confirmation, pause or link hash of the erased contact on the schedule.
 
 **When a contact is asked to confirm, and what the answer says.** A contact that changed on a client
 that has a schedule is asked when it is saved; a contact saved before its schedule is asked when the
-schedule is saved, so the first run sends a report and not the confirmation; "Ask again" asks
-whenever the contact has not confirmed. Each of the three routes answers what became of it
+schedule is saved, so a contact that confirms before the first run is sent a report at it; "Ask
+again" asks whenever the contact has not confirmed; a resume asks the recipient who paused. A
+schedule its recipient has paused is asked nothing by a save or by "Ask again" (409
+`nothing_to_confirm`): `issue_recipient_confirmation` issues none for it, and a pause withdraws a
+link that was waiting. The client, schedule and resume routes answer what became of the request
 (`confirmation` in JSON, the notice for a form): `asked`; `waits`, for an account in its Agency
 trial whose contact is not its owner's own address, where nothing is mailed until the trial has
-become the plan and no bound is counted; `later`, past the account's 20 a day, where the save
-stands and the schedule's next run asks; `none`. The bound is also on the mail itself (below).
+become the plan and no bound is counted; `later`, past the account's bound for the day
+(`CONFIRM_MAILS_PER_DAY.account`), where the save stands and the schedule's next run asks; `none`.
+The confirm route answers `{ requested: true }`, or 409 or 429. `asked` and the notices that follow
+it state a request, not a delivery: the bound is also on the mail itself (below), and a request
+past the address's own bound sends nothing.
+`pnpm --filter @crawlmouse/web exec vitest run "app/api/report-files/schedules/site/[siteId]/route.test.ts" __tests__/v2-031-b2-schedules.test.ts`
 
 **The recipient's links.** Each link's GET moves its token into an HttpOnly cookie and redirects
 to a page with no token in its address (`/s/confirm`, `/s/pause`); the page says what the button
@@ -818,22 +825,25 @@ acting in another account. It is `noindex` and `force-dynamic`.
   not scheduled"); a count of nothing is left out.
 - **Clients** has one row a client site the caller's records hold, and none for a staging copy: the
   client and its host; the contact and where it stands (`no contact`, `not asked to confirm yet`,
-  `asked to confirm <date>`, `confirmed`, `paused by the recipient`); the schedule in the client
+  `asked to confirm <date>`, `asked to confirm once the trial has become the plan`, `confirmed`,
+  `paused by the recipient`); the schedule in the client
   page's words; the next run on the schedule's own clock, with its zone; and the owning seat.
 - **The forms** are for a seat `roleMay(role, 'schedule_report')` allows, the owner and an account
   manager. A row has "Change"; "Ask to confirm", or "Ask again" once a link was sent, while a
-  scheduled contact has not confirmed; and "Resume" while its recipient has paused.
+  scheduled contact has not confirmed; and "Ask to confirm again" while its recipient has paused.
+  In the Agency trial a contact that is not the owner's own address is offered neither ask, and its
+  row reads "asked to confirm once the trial has become the plan".
   `?client=<site id>` opens that client's card: its name, contact address and owning seat; its
   schedule (how often, weekday, time, time zone, whether to send when nothing changed); and "Stop
   the schedule". A form posts to a route of the table above with its verb in `_method`, and the
   route answers a 303 to `/agency/reports?notice=<code>`. The owning seat's field is left out when
-  the reader's records do not hold the seat that owns the client, so a save leaves that seat as it
-  is. A developer gets the rows and no form.
+  the reader's records do not hold the seat that owns the client, or that seat no longer covers
+  the client, so a save leaves that seat as it is. A developer gets the rows and no form.
 - **Sent** lists the client reports whose status is `sent`, the newest `SENT_SHOWN` (20) under a
   line that says how many there are: when, the client, who it went to, and "Open" (`/reports/<id>`)
   for a report that is a document whose file is stored. A `scheduled` or `held` report is not
   listed.
-- **In the Agency trial** one line says where a report is sent while the trial runs (rule 4 of
+- **In the Agency trial** one line says where a report is sent while the trial runs (rule 3 of
   "Sending").
 
 `readAccount` gives the page the records the caller's own session reads. `readClientReports`
@@ -853,10 +863,10 @@ The schedule's time zone is chosen from the names the account's own zone is chos
 `lib/v2/view/agency-reports.test.ts` parses each of `ZONES` with the contract's `TimeZoneSchema` and
 with the schedule route's body.
 
-Known gaps. Saving a schedule does not ask its contact to confirm: a contact saved before its
-schedule reads "not asked to confirm yet" until "Ask to confirm" is pressed or the schedule's first
-run asks (rule 3 of "Sending"). The client page's two "Change" links open `/agency/reports`, not
-that client's card.
+Known gaps. A request past the day's bound, the account's or the address's, leaves the row reading
+"not asked to confirm yet" until "Ask to confirm" is pressed or the schedule's next run asks (rule 4
+of "Sending"). For a seat that covers some clients the header's line ends ", of the client sites in
+your seat".
 
 Previews, in `app/(v2-preview)/v2-preview/_preview/agency-reports.ts`: the page; a client in each
 state; one client's forms open; a developer; the Agency trial; the gate.
@@ -880,10 +890,16 @@ in SQL") with a template in `lib/v2/mail/templates/` and a handler in `reportMai
   `/s/confirm/<token>`, and says that no report is sent unless the reader confirms and that they need
   no account. Its subject and first words are fixed and name the site; the agency's name, which its
   owner typed, follows in quotation marks (an invitation's mail does the same with the account's
-  name). At most 20 confirmations are mailed for an account in any 24 hours and 3 to one address
-  (`CONFIRM_MAILS_PER_DAY`, `lib/v2/mail/handlers.ts`), counted from the ledger before another is
-  claimed (`report_confirm_mail_counts`), so the bound holds for the hourly run as for a route; past
-  it the handler answers `bounded` and claims nothing. `request_id` names one request: the same value again is answered `done`, and the next
+  name); a name that holds what a mail client would link (a scheme, `www.`, an address, a dotted
+  name) is not shown, and the mail is the one of an account with no name (`accountNameText`). The
+  day's bounds (`CONFIRM_MAILS_PER_DAY`, `lib/v2/agency/confirm-bounds.ts`: for one account, and to
+  one address whichever account asks) are counted from the ledger and then the mail is claimed
+  (`report_confirm_mail_counts`), so they hold for the hourly run as for a route; past one the
+  handler answers `bounded` and claims nothing. The count and the claim are two calls, so the
+  function runs one confirmation at a time (`REPORT_CONFIRM_CONCURRENCY`, `inngest/mail.ts`): a
+  count then sees each earlier claim. The address's bound is across accounts: an account whose
+  request is refused by it learns that others asked that address that day, and frequent requests
+  to an address keep another account's from it until the day has passed. `request_id` names one request: the same value again is answered `done`, and the next
   request is another mail. An empty one, or one longer than 100 characters, is `invalid_request`.
 - **The report** shows the report document's own title, lines and closing line
   (`ReportDoc.title`, `.lines`, `.footer.text`) as given, and links the report (`/s/<token>`) and the
@@ -928,8 +944,10 @@ A recipient's pause is final from the sender's side (owner ruling, 2026-11-12).
 the confirmation mail again from the bucket of the client and confirm routes
 (`report-confirm:account:`); reports start again when the recipient confirms. Past the day's bound
 the pause is still lifted and no mail is asked for (`confirmation: 'later'`); the next run asks. The
-pause page tells the recipient so. The account has no pause of its own in this step: it removes a
-schedule (`DELETE`) and saves one again.
+pause page tells the recipient so. Each resume is one more request to a recipient who paused, within
+the address's bound for the day; the confirmation mail has no link that stops further requests
+(questions.md Q42). The account has no pause of its own in this step: it removes a schedule
+(`DELETE`) and saves one again, and the new schedule's contact is asked to confirm again.
 `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-031-b2-schedules.test.ts __tests__/v2-031-report-mails.test.ts "app/api/report-files/schedules/site/[siteId]/route.test.ts"`
 
 Known gaps. The recipient's two link cookies are set for the whole site (`Path=/`, the convention of
