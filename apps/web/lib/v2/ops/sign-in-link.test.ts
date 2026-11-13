@@ -55,7 +55,7 @@ describe('who may import it', () => {
   const ALLOWED = [/^apps\/web\/app\/api\/internal\//, /^apps\/web\/lib\/v2\/ops\/functions\.ts$/];
   // Any specifier whose last segment is sign-in-link, so a sibling's './sign-in-link' counts too.
   const SPEC =
-    /(?:from\s+|import\s*\(\s*|require\(\s*)['"]((?:[^'"]*\/)?sign-in-link(?:\.tsx?)?)['"]/g;
+    /(?:from\s+|import\s*\(\s*|require\(\s*)['"]((?:[^'"]*\/)?sign-in-link(?:\.[cm]?[jt]sx?)?)['"]/g;
 
   function walk(dir: string, out: string[] = []): string[] {
     for (const entry of readdirSync(dir)) {
@@ -86,6 +86,9 @@ describe('who may import it', () => {
       "const m = await import('../apps/web/lib/v2/ops/sign-in-link');",
       "import { requestSignInLink } from './sign-in-link';",
       "import { requestSignInLink } from './sign-in-link.ts';",
+      // next.config.mjs resolves a .js specifier to the .ts file, the convention inngest/ uses.
+      "import { requestSignInLink } from './sign-in-link.js';",
+      "const m = await import('../lib/v2/ops/sign-in-link.mjs');",
     ])
       expect([...src.matchAll(SPEC)].length, src).toBe(1);
   });
