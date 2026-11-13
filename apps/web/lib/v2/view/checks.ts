@@ -52,9 +52,13 @@ export const aiOf = (c: Check): GradeCell | null => {
 /** Both grades, the condition for a site to count in "Health, all sites" (D5). */
 export const bothGrades = (c: Check) => seoOf(c) !== null && aiOf(c) !== null;
 
-/** "−1", "+3", "no change": a score's move, with the minus sign the locked screens print. */
+/**
+ * "−1", "+3", "+0.47", "no change": a score's move, with the minus sign the locked screens print.
+ * A score has at most two decimals (the engine's), so the move is given to two: the difference of
+ * two such numbers as a float is not (82.24 − 81.77 is 0.46999999999999886).
+ */
 export function move(from: number, to: number): string {
-  const n = to - from;
+  const n = Math.round((to - from) * 100) / 100;
   return n === 0 ? 'no change' : n > 0 ? `+${n}` : `−${-n}`;
 }
 

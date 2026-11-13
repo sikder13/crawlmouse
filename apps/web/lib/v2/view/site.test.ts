@@ -1,7 +1,7 @@
 /** The site page's view model against values worked out by hand from the fixtures. */
 import { describe, expect, it } from 'vitest';
 import { fixture } from '../fixtures';
-import { axisLabels } from './checks';
+import { axisLabels, move } from './checks';
 import { siteView } from './site';
 
 const BAD_ACCOUNT = 'a0000000-0000-4000-8000-000000000001';
@@ -9,6 +9,17 @@ const OUTFITTER = '50000000-0000-4000-8000-000000000001';
 const C9 = 'a0000000-0000-4000-8000-0000000000c9';
 const GRANITEPEAK = '50000000-0000-4000-8000-0000000000c9';
 const bad = fixture('bad-site');
+
+describe('a score’s move', () => {
+  it('is given to the two decimals a score has, with the locked minus sign, and says no change', () => {
+    expect([move(80, 79), move(22, 25), move(79, 79)]).toEqual(['−1', '+3', 'no change']);
+    // The engine's scores have decimals: their difference as a float is not a number to print.
+    expect(82.24 - 81.77).not.toBe(0.47);
+    expect(move(81.77, 82.24)).toBe('+0.47');
+    expect(move(82.24, 81.77)).toBe('−0.47');
+    expect(move(70.1, 70.1 + 0.001)).toBe('no change');
+  });
+});
 
 describe('Site page, example-outfitter.com at as_of', () => {
   const v = siteView(bad, { accountId: BAD_ACCOUNT, now: bad.as_of }, OUTFITTER);
