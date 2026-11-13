@@ -281,6 +281,46 @@ describe('take_founder_overflow', () => {
     expect(t.rows.map((r) => r.account_id)).toEqual([byMinute['01'], byMinute['02']]);
   });
 
+  it('re-takes the rows of a notice whose mail gave up, and no other key’s (review C6)', async () => {
+    await take(`overflow:clear-${randomUUID()}`);
+    const now = '2027-11-01T10:00:00.000Z';
+    for (const k of keys('ovx-fill', LIMIT)) await claim({ key: k, now });
+    // The ledger row of a notice's mail; the rule reads its key, status and attempts, not its kind.
+    const ledger = (overflowKey: string, status: string, attempts: number) =>
+      db.query(
+        `insert into public.email_sends (idempotency_key, kind, address_hash, status, attempts,
+                                         claimed_at, sent_at, updated_at)
+         values ($1, 'alert', $2, $3, $4, $5, case when $3 = 'sent' then $5::timestamptz end, $5)`,
+        [
+          `founder_event:${overflowKey}`,
+          randomUUID().replace(/-/g, '').padEnd(64, '0'),
+          status,
+          attempts,
+          now,
+        ],
+      );
+    // Three notices take their rows first; then their mails' ledger rows say how each ended.
+    const heldUnder = async (tag: string, n: number) => {
+      const account = randomUUID();
+      for (const k of keys(tag, n)) expect(await claim({ key: k, account, now })).toBe('held');
+      const key = `overflow:${randomUUID()}`;
+      expect((await take(key)).total).toBe(n);
+      return { account, key };
+    };
+    const gaveUp = await heldUnder('ovx-gave-up', 2);
+    const retrying = await heldUnder('ovx-retrying', 1);
+    const sent = await heldUnder('ovx-sent', 1);
+    await ledger(gaveUp.key, 'failed', 3);
+    await ledger(retrying.key, 'failed', 1);
+    await ledger(sent.key, 'sent', 1);
+    const exhausted = gaveUp.account;
+    const fresh = randomUUID();
+    expect(await claim({ key: keys('ovx-new', 1)[0]!, account: fresh, now })).toBe('held');
+    const next = await take(`overflow:${randomUUID()}`);
+    expect(next.total).toBe(3);
+    expect(next.rows.map((r) => r.account_id).sort()).toEqual([exhausted, exhausted, fresh].sort());
+  });
+
   it('refuses a key that is not an overflow key', async () => {
     await expect(take('signup:x')).rejects.toThrow(/an overflow key/);
   });

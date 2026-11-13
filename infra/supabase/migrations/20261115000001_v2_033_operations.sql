@@ -331,9 +331,13 @@ end;
 $$;
 
 -- The held rows one "N more" notice reports, under its key p_key ('overflow:<hour>'). The first call
--- for a key writes the key onto every held row no notice has taken; a later call for the same key
--- takes nothing new and answers the rows already carrying it, so a retried notice reports the same
--- rows. Answers {"total": n, "rows": [...]}, rows oldest first, at most p_rows of them.
+-- for a key writes the key onto every held row no notice has taken, and onto every row taken by a
+-- notice whose mail gave up: its ledger row (email_sends, key 'founder_event:<its key>') is `failed`
+-- with 3 attempts, claim_email_send's bound, so that notice is never sent and its rows are reported in
+-- this one (review C6). A later call for the same key takes nothing new and answers the rows already
+-- carrying it, so a retried notice reports the same rows. Rows taken by a notice whose run ended
+-- before its mail was claimed keep that notice's key and are not reported again. Answers
+-- {"total": n, "rows": [...]}, rows oldest first, at most p_rows of them.
 create or replace function public.take_founder_overflow(p_key text, p_rows integer)
 returns jsonb
 language plpgsql
@@ -349,7 +353,11 @@ begin
   perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended('founder_notices', 0));
   if not exists (select 1 from public.founder_notices n where n.overflow_key = p_key) then
     update public.founder_notices n set overflow_key = p_key
-     where n.state = 'held' and n.overflow_key is null;
+     where n.state = 'held'
+       and (n.overflow_key is null
+            or exists (select 1 from public.email_sends e
+                        where e.idempotency_key = 'founder_event:' || n.overflow_key
+                          and e.status = 'failed' and e.attempts >= 3));
   end if;
   return (
     select pg_catalog.jsonb_build_object(

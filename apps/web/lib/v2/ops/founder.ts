@@ -289,12 +289,15 @@ export interface DigestOutcome {
   overflow: SendOutcome | 'none' | 'unconfigured';
 }
 
-/** The digests that are due, and the "N more" notice when notices are held. */
-export async function digest(d: FounderDeps): Promise<DigestOutcome> {
+/**
+ * The digests due at `at`, the tick's time, and the "N more" notice when notices are held. Every key
+ * is built from `at`, so a retry of the tick keeps them (review C6).
+ */
+export async function digest(d: FounderDeps, at: Date): Promise<DigestOutcome> {
   const to = recipient(d);
   if (to === null)
     return { daily: 'unconfigured', weekly: 'unconfigured', overflow: 'unconfigured' };
-  const due = digestDue(d.now());
+  const due = digestDue(at);
   const mail = (key: string, render: () => Promise<ReturnType<typeof founderDigest>>) =>
     send(d.mail, { kind: 'founder_digest', to, idempotencyKey: key, accountId: null, render });
 

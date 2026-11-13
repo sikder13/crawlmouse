@@ -250,7 +250,8 @@ async function sweep() {
       occurredAt: NOW.toISOString(),
     }),
   );
-  answers.push(JSON.stringify(await digest(founder(new Date('2026-11-16T13:07:00.000Z')))));
+  const tick = new Date('2026-11-16T13:07:00.000Z');
+  answers.push(JSON.stringify(await digest(founder(tick), tick)));
   return { answers, sent: transport.sent, kinds: new Set(ledger.claims.map((c) => c.kind)) };
 }
 

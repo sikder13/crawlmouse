@@ -110,7 +110,7 @@ export function opsFunctions(
     return {
       entitlement: (ev) => entitlementNotice(d, ev),
       sweep: () => sweep(d),
-      digest: () => digest(d),
+      digest: (at) => digest(d, new Date(at)),
     };
   };
   const fns: InngestFunction.Like[] = [

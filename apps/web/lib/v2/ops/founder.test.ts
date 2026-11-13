@@ -359,13 +359,13 @@ describe('entitlementNotice', () => {
     for (let i = 0; i < FOUNDER_LIMIT + 5; i++)
       await entitlementNotice(d, change('free', 'pro_trial', { id: id(ACCOUNT, `evt_${i}`) }));
     expect(transport.sent).toHaveLength(FOUNDER_LIMIT);
-    expect((await digest(d)).overflow).toBe('sent');
+    expect((await digest(d, d.now())).overflow).toBe('sent');
     const notices = transport.sent.filter((m) => m.idempotencyKey.includes(':overflow:'));
     expect(notices.map((m) => [m.idempotencyKey, m.subject])).toEqual([
       ['founder_event:overflow:2026-11-13T15', '5 more notices in the last hour'],
     ]);
     // A second tick in the same hour sends nothing more.
-    expect((await digest(d)).overflow).toBe('done');
+    expect((await digest(d, d.now())).overflow).toBe('done');
     expect(transport.sent.filter((m) => m.subject.includes('more notice'))).toHaveLength(1);
   });
 
@@ -397,10 +397,10 @@ describe('entitlementNotice', () => {
         change('free', 'pro_trial', { id: id(ACCOUNT, `evt_${i}`) }),
       );
     const d2: FounderDeps = { ...d, store: filled.store };
-    await expect(digest(d2)).rejects.toThrow(MailRetry);
+    await expect(digest(d2, d2.now())).rejects.toThrow(MailRetry);
     // A held notice arriving between the attempts goes to the next hour's notice.
     await entitlementNotice(filled.d, change('free', 'pro_trial', { id: id(ACCOUNT, 'evt_late') }));
-    expect((await digest(d2)).overflow).toBe('sent');
+    expect((await digest(d2, d2.now())).overflow).toBe('sent');
     expect(transport.sent.map((m) => m.subject)).toEqual(['3 more notices in the last hour']);
   });
 });
@@ -495,7 +495,7 @@ describe('digest', () => {
   it('on a Monday from 08:00 New York sends the daily and the weekly, each once', async () => {
     // 2026-11-02 08:07 EST, a Monday.
     const { d, transport, windows } = setup({ now: new Date('2026-11-02T13:07:00.000Z') });
-    expect(await digest(d)).toEqual({ daily: 'sent', weekly: 'sent', overflow: 'none' });
+    expect(await digest(d, d.now())).toEqual({ daily: 'sent', weekly: 'sent', overflow: 'none' });
     expect(transport.sent.map((m) => [m.idempotencyKey, m.subject, m.to])).toEqual([
       ['founder_digest:daily:2026-11-01', 'Crawlmouse daily: 2026-11-01', FOUNDER],
       ['founder_digest:weekly:2026-10-26', 'Crawlmouse weekly: week of 2026-10-26', FOUNDER],
@@ -506,19 +506,34 @@ describe('digest', () => {
       ['2026-10-19T04:00:00.000Z', '2026-10-26T04:00:00.000Z'],
     ]);
     // The next hour's tick finds both sent and reads no counts.
-    expect(await digest(d)).toEqual({ daily: 'done', weekly: 'done', overflow: 'none' });
+    expect(await digest(d, d.now())).toEqual({ daily: 'done', weekly: 'done', overflow: 'none' });
     expect(windows).toHaveLength(3);
+  });
+
+  it('keys the overflow notice by the tick’s time, not by the time of the attempt (review C6)', async () => {
+    // The attempt runs at 16:01, a retry of the 15:07 tick: the notice is still 15:00's.
+    const { d, transport } = setup({ now: new Date('2026-11-13T16:01:00.000Z') });
+    const tick = new Date('2026-11-13T15:07:00.000Z');
+    for (let i = 0; i < 22; i++)
+      await entitlementNotice(
+        { ...d, now: () => tick },
+        change('free', 'pro_trial', { id: id(ACCOUNT, `evt_${i}`) }),
+      );
+    expect((await digest(d, tick)).overflow).toBe('sent');
+    expect(
+      transport.sent.filter((m) => m.subject.includes('more notice')).map((m) => m.idempotencyKey),
+    ).toEqual(['founder_event:overflow:2026-11-13T15']);
   });
 
   it('sends nothing before 08:00 New York, and nothing at all unconfigured', async () => {
     const early = setup({ now: new Date('2026-11-02T12:59:00.000Z') });
-    expect(await digest(early.d)).toEqual({
+    expect(await digest(early.d, early.d.now())).toEqual({
       daily: 'not_due',
       weekly: 'not_due',
       overflow: 'none',
     });
     const off = setup({ to: null, now: new Date('2026-11-02T13:07:00.000Z') });
-    expect(await digest(off.d)).toEqual({
+    expect(await digest(off.d, off.d.now())).toEqual({
       daily: 'unconfigured',
       weekly: 'unconfigured',
       overflow: 'unconfigured',
