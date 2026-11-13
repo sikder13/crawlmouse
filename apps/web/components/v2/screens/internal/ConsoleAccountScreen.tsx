@@ -215,9 +215,7 @@ export function ConsoleAccountScreen({ view: v, notice }: ConsoleAccountProps) {
               <span key="f" className={styles.nowrap}>
                 {c.finished}
               </span>,
-              <span key="i" className={styles.nowrap}>
-                {c.id}
-              </span>,
+              c.id,
               c.rerun ? (
                 <ActionForm
                   action={`/api/internal/checks/${c.id}/rerun`}

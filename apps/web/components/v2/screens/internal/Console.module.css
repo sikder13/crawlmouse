@@ -75,7 +75,7 @@
   min-width: 180px;
 }
 
-/* A time or an id in a table cell stays on one line. */
+/* A time in a table cell stays on one line; an id may break at its hyphens. */
 .nowrap {
   white-space: nowrap;
 }
