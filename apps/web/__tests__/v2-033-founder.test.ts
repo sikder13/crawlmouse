@@ -8,30 +8,19 @@ import {
   readMigration,
   readRollback,
 } from './helpers/pglite-migrations';
+import { withInternal } from './helpers/accounts-internal';
 import { personalAccount, signUp } from './helpers/v2-check-tables';
 
 /**
- * Migration 20261115000001 section C (CC-33 D3): founder_notices, claim_founder_notice,
- * take_founder_overflow and founder_digest_counts, on PGlite with every migration applied. PGlite has
+ * Migration 20261115000001 section C (CC-33 D3, D6): founder_notices, claim_founder_notice,
+ * take_founder_overflow, founder_digest_counts and signin_delivery_seen, on PGlite with every migration
+ * applied; founder_signups_unannounced is v2-033-founder-store.test.ts's, through the store that calls it. PGlite has
  * one backend, so claims here run one after the other; concurrent claims are
  * scripts/db/founder-notice-race.test.ts.
  */
 
 const MIGRATION = '20261115000001_v2_033_operations.sql';
 const ROLLBACK = '20261115000001_v2_033_operations.revert.sql';
-
-/**
- * `accounts.internal` is section A's (workstream A). Until that section is written, the file is
- * applied with the column added at its place, as section A adds it; with section A present the edit
- * changes nothing.
- */
-const withInternal = (sql: string): string =>
-  sql.includes('-- ═══ end §A') && !/add column if not exists internal\b/.test(sql)
-    ? sql.replace(
-        '-- ═══ end §A',
-        'alter table public.accounts add column if not exists internal boolean not null default false;\n-- ═══ end §A',
-      )
-    : sql;
 
 let db: PGlite;
 beforeAll(async () => {
@@ -495,7 +484,7 @@ describe('the migration and its revert', () => {
         `select to_regclass('public.founder_notices')::text as t,
                 (select count(*)::int from pg_proc where proname in
                   ('claim_founder_notice', 'take_founder_overflow', 'founder_digest_counts',
-                   'signin_delivery_seen')) as f`,
+                   'signin_delivery_seen', 'founder_signups_unannounced')) as f`,
       );
       expect(gone.rows[0]).toEqual({ t: null, f: 0 });
       await d.exec(withInternal(readMigration(MIGRATION)));

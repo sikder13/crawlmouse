@@ -201,6 +201,31 @@ begin
 end;
 $$;
 
+-- The founder sweep's sign-ups (plan-review M8): users created at or after p_since with no signup
+-- notice yet, oldest first, at most p_limit, with their default account. The sweep announces each
+-- once Supabase Auth shows its address confirmed; one still unconfirmed when it falls out of the
+-- window is never announced.
+create or replace function public.founder_signups_unannounced(p_since timestamptz, p_limit integer)
+returns table (user_id uuid, account_id uuid, created_at timestamptz)
+language plpgsql
+stable
+security invoker
+set search_path = pg_catalog, pg_temp
+as $$
+begin
+  if p_since is null or p_limit is null or p_limit < 1 then
+    raise exception 'founder_signups_unannounced: a time and a positive limit are required'
+      using errcode = '22023';
+  end if;
+  return query
+    select u.id, u.default_account_id, u.created_at from public.users u
+     where u.created_at >= p_since
+       and not exists (select 1 from public.founder_notices n where n.event_key = 'signup:' || u.id::text)
+     order by u.created_at, u.id
+     limit p_limit;
+end;
+$$;
+
 -- The sign-in canary's look (D6, inngest/signin-canary.ts): whether Resend's webhook recorded a
 -- delivery to p_address, compared lower-cased, at or after p_since.
 create or replace function public.signin_delivery_seen(p_address text, p_since timestamptz)
@@ -230,11 +255,14 @@ revoke all on function public.founder_digest_counts(timestamptz, timestamptz)
   from public, anon, authenticated, service_role;
 revoke all on function public.signin_delivery_seen(text, timestamptz)
   from public, anon, authenticated, service_role;
+revoke all on function public.founder_signups_unannounced(timestamptz, integer)
+  from public, anon, authenticated, service_role;
 grant execute on function public.claim_founder_notice(text, text, uuid, boolean, timestamptz, jsonb,
                                                       timestamptz, integer, boolean) to service_role;
 grant execute on function public.take_founder_overflow(text, integer) to service_role;
 grant execute on function public.founder_digest_counts(timestamptz, timestamptz) to service_role;
 grant execute on function public.signin_delivery_seen(text, timestamptz) to service_role;
+grant execute on function public.founder_signups_unannounced(timestamptz, integer) to service_role;
 -- ═══ end §C ══════════════════════════════════════════════════════════════════════════════════════
 
 
