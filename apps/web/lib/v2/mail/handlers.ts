@@ -208,8 +208,10 @@ export function mailHandlers(d: MailHandlerDeps): MailHandlers {
         to: invitation.recipient,
         idempotencyKey: `seat_invite:${seatId}:${seq}`,
         accountId: invitation.accountId,
-        // Minted only now, after the claim answered go: a retry of this key mints nothing, and a
-        // resend is another key. The token goes into the link and nowhere else.
+        // Minted only now, after the claim answered go: an event replayed once its mail is
+        // recorded as sent claims nothing and mints nothing, and a resend is another key. An attempt
+        // retried after its claim mints again (spec 31 §6). The token goes into the link and
+        // nowhere else.
         render: async () => {
           const issued = await store.issueSeatInvite(seatId, seq, mail.now());
           // No row: accepted, removed, re-sent or its account marked since the read above. The

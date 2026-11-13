@@ -8,9 +8,12 @@
  *    sent, the confirmation mail included;
  * 4. the contact has not confirmed: the confirmation mail is asked for, once, and no report is sent;
  * 5. the site has no finished check: nothing is sent;
- * 6. nothing changed since the last report sent and the schedule does not send unchanged: nothing is sent;
- * 7. otherwise the report's row is written for the slot and its mail is asked for; the row becomes
- *    `sent` when the mail port answers that it has gone.
+ * 6. no check queued after the one the last sent report ended on found a change, and the schedule
+ *    does not send unchanged: nothing is sent;
+ * 7. otherwise the report's row is written for the slot and its mail is asked for. Production's mail
+ *    port hands the report on and answers `queued` (`inngestClientReportMail`): the mailer's handler
+ *    marks the row `sent` when the mail has gone. A port that sends inside the run answers `sent`,
+ *    and the run then marks the row itself; the tests' port is the one that does.
  *
  * Whatever was decided, the schedule moves to its next run, so a client that cannot be sent to this
  * week is looked at again next week and no schedule is run twice for one slot. The due list holds
@@ -44,7 +47,7 @@ export interface DueSchedule {
   };
   /** The site's latest finished or partial check, or null. */
   checkId: string | null;
-  /** Whether a change was detected after the last client report sent for the site. */
+  /** Whether a check queued after the one the last sent client report ended on found a change. */
   changed: boolean;
 }
 

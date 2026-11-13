@@ -1522,8 +1522,8 @@ $$;
 --   the account's state, tier, past_due_tier, past_due_since, trial_variant and trial_ends_at, from
 --   which the runner reads the plan and whether the account is in its Agency trial;
 --   check_id, the site's latest finished or partial check, or null;
---   changed, whether a change other than a baseline was detected at the site after the last client
---   report sent for it (true when none was sent).
+--   changed, whether a check of the site queued after the one the last sent client report ended on
+--   found a change other than a baseline (true when none was sent).
 create or replace function public.due_report_schedules(p_now timestamptz, p_limit integer)
 returns jsonb
 language sql

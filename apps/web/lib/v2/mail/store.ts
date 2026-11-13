@@ -130,7 +130,10 @@ export interface IssuedClientReport {
 /**
  * What the two mails of a client report schedule read and mint (handlers.ts `reportMailHandlers`).
  * Each mail has a read made before its ledger claim, which mints nothing, and an issue made after
- * it, so a retried or replayed event mints nothing and replaces no link already delivered. An
+ * it: an event replayed once its mail is recorded as sent claims nothing and mints nothing. An
+ * attempt that is retried after its claim (a send that failed, or one Resend accepted and the
+ * ledger did not record) renders again, and so issues again: the link of the attempt before stops
+ * working, which matters only where that mail was in fact delivered (spec 31 §6 and §10). An
  * issue answers null when there is nothing to send any more. No method logs an address or a token.
  */
 export interface ReportMailStore {
