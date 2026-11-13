@@ -221,6 +221,55 @@ describe('presence: a template with an empty-root page and no graded page (CC-32
   });
 });
 
+describe('a template an awaiting fix names, with no present page (CC-32 D3)', () => {
+  const gone = '/gone/{slug}';
+
+  it('gets an indeterminate record, template_absent, with no page', () => {
+    expect(detectRendered([], { openTemplates: [gone] })).toEqual([
+      {
+        type: 'client_rendered_template',
+        key: `shell:${gone}`,
+        fingerprint: fingerprintOf(`shell:${gone}`),
+        template_key: gone,
+        state: 'indeterminate',
+        reason: 'template_absent',
+        measured: null,
+        extent: { pages: 0, graded: 0, rendered: 0 },
+        affected_urls: [],
+        evidence: { pages: [] },
+      },
+    ]);
+  });
+
+  it('is absent when its only pages are neither graded nor empty-root pages', () => {
+    const [r] = detectRendered(
+      [page('https://a.test/gone/a', gone, [0, 200, 'empty_shell'], { kind: 'thin' })],
+      { openTemplates: [gone] },
+    );
+    expect(r).toMatchObject({ state: 'indeterminate', reason: 'template_absent' });
+  });
+
+  it('takes the usual verdict when the template is present, once', () => {
+    const records = detectRendered([page('https://a.test/gone/a', gone, [0, 200, 'empty_shell'])], {
+      openTemplates: [gone, gone],
+    });
+    expect(records.map((r) => [r.template_key, r.state, r.reason])).toEqual([
+      [gone, 'detected', null],
+    ]);
+  });
+
+  it('sits in template-key order among the present templates', () => {
+    const records = detectRendered([page('https://a.test/a/1', '/a/{slug}', null)], {
+      openTemplates: ['/z/{slug}', '/0/{slug}'],
+    });
+    expect(records.map((r) => [r.template_key, r.reason])).toEqual([
+      ['/0/{slug}', 'template_absent'],
+      ['/a/{slug}', 'not_rendered'],
+      ['/z/{slug}', 'template_absent'],
+    ]);
+  });
+});
+
 describe('the client-rendered template detector (properties)', () => {
   const state = fc.constantFrom<JsTextState>('empty_shell', 'partial', 'readable');
   const pages = fc.uniqueArray(

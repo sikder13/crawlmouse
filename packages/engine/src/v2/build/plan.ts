@@ -300,6 +300,25 @@ export const emptyRootUrls = (assembled: Pick<Assembled, 'pages' | 'content'>): 
   );
 
 /**
+ * The template keys the site's client-rendered fixes still waiting on rendering name
+ * (AWAITING_FIX_STATUSES), once each, sorted: what the graded phase renders first and what the
+ * detector gives a record to whether or not the template is present.
+ */
+export function awaitingShellTemplates(
+  fixes: readonly Pick<Fix, 'type' | 'status' | 'template_key'>[],
+): string[] {
+  return [
+    ...new Set(
+      fixes
+        .filter(
+          (f) => f.type === 'client_rendered_template' && AWAITING_FIX_STATUSES.includes(f.status),
+        )
+        .flatMap((f) => (f.template_key === null ? [] : [f.template_key])),
+    ),
+  ].sort();
+}
+
+/**
  * The render step's input: the sampled pages (so every graded-phase candidate is a sampled page), the
  * templates of the site's client-rendered fixes still waiting on rendering, FREE_MAX_RENDERS, the
  * pages' states in the previous check, which CC-20b reads from that check's PageResults, and, for the
@@ -324,15 +343,7 @@ export function renderCandidates(
       // A page is a PageResult only when our crawler fetched it under our robots.txt group.
       fetched_under_our_robots: true,
     }));
-  const openFixTemplates = [
-    ...new Set(
-      fixes
-        .filter(
-          (f) => f.type === 'client_rendered_template' && AWAITING_FIX_STATUSES.includes(f.status),
-        )
-        .flatMap((f) => (f.template_key === null ? [] : [f.template_key])),
-    ),
-  ].sort();
+  const openFixTemplates = awaitingShellTemplates(fixes);
   return {
     candidates,
     openFixTemplates,

@@ -31,12 +31,14 @@ import { DETECTORS_RUN } from '../build/diff.js';
 import type { ContentDetection } from '../content/aggregate.js';
 import { CONTENT_CHECKS } from '../content/checks.js';
 import * as T from '../content/thresholds.js';
+import { AWAITING_FIX_STATUSES } from '../build/plan.js';
 import { CRAWLER_REGISTRY_V2 } from '../crawler-registry.js';
 import { firstPageOf } from '../detectors/duplicate-pagination.js';
 import {
   detectRendered,
   RENDERED_INDETERMINATE_REASONS,
   SHELL_KEY_PREFIX,
+  type RenderedDetection,
   type RenderedIndeterminateReason,
   type RenderedInputPage,
 } from '../detectors/rendered.js';
@@ -974,6 +976,8 @@ const TABLE_PAGES = 4;
 const REASON_MEANING: Readonly<Record<RenderedIndeterminateReason, string>> = {
   not_rendered: 'no page of the template was rendered',
   pages_disagree: 'some rendered pages are empty shells and some are not',
+  template_absent:
+    'an awaiting fix names the template, and the check has no graded or empty-root page of it',
 };
 
 /** The detector's verdict on a template of TABLE_PAGES graded pages, the first of which were rendered as `states`. */
@@ -1011,7 +1015,10 @@ function detectorTable(): string {
     ['empty_shell', 'readable'],
     [],
   ];
-  const records = cases.map((states) => ({ states, record: verdictOn(states) }));
+  const records: { states: readonly State[] | 'absent'; record: RenderedDetection }[] = [
+    ...cases.map((states) => ({ states, record: verdictOn(states) })),
+    { states: 'absent', record: detectRendered([], { openTemplates: ['/t/{slug}'] })[0]! },
+  ];
   for (const reason of RENDERED_INDETERMINATE_REASONS) {
     if (!records.some((r) => r.record.reason === reason)) {
       throw new Error(`packets spec: no case of the state table gives ${reason}`);
@@ -1020,7 +1027,11 @@ function detectorTable(): string {
   return table(
     ['Rendered pages, by `state`', 'Record', 'Reason', 'Fix opens', 'Confidence'],
     records.map(({ states, record }) => [
-      states.length === 0 ? 'none rendered' : codes(states),
+      states === 'absent'
+        ? 'no page present; an awaiting fix names the template'
+        : states.length === 0
+          ? 'none rendered'
+          : codes(states),
       code(record.state),
       record.reason === null ? '' : `${code(record.reason)}: ${REASON_MEANING[record.reason]}`,
       record.state === 'detected' ? 'yes' : 'no',
@@ -1632,10 +1643,11 @@ export function renderPacketSpec(): string {
     bullets([
       `Key: \`${SHELL_KEY_PREFIX}:<template_key>\`. \`measured\` is the median \`text_share\` of the rendered pages.`,
       `Scope (Q5, CC-32 D2): a route that serves an empty root is classed \`thin\` and is not graded; it is an empty-root page, so its template is present and gets a record, and the empty-root phase renders up to two of its pages (${file('render/empty-root.ts')}). A template whose graded pages render with text and whose empty-root pages render as shells is \`pages_disagree\`, so an open fix for it stays open and is measured again. A template of empty-root pages alone has no graded page, so its fix moves no grade: its effect is 0.`,
+      `Every crawled template of empty-root pages now gets a record, \`not_rendered\` while production renders nothing. So the check that first detects it writes no \`opened\` change row: the diff writes one for a new fix only when the previous check measured the fingerprint, and a fingerprint the previous check reported indeterminate was not measured (\`diff/diff.ts\` \`measuredBefore\`). Graded templates follow the same rule.`,
       `Listed in \`DETECTORS_RUN\` (build/diff.ts): ${(['client_rendered_template', 'js_only_navigation'] as const).map((t) => `${code(t)} ${DETECTORS_RUN.includes(t) ? 'yes' : 'no'}`).join(', ')}.`,
       `Effect (grade/effects.ts \`applyFix\`): ${COUNTERFACTUALS.client_rendered_template}. The share it sets is \`SERVER_RENDERED_SHARE\`, ${SERVER_RENDERED_SHARE}.`,
       `Outcome (grade/outcomes.ts): section ${code(FIX_SECTION.client_rendered_template)}; recommendation class ${code(RENDERED_CLASS)} (\`RENDERED_CLASS\`); confidence \`confirmed\` when ${PAGES_PER_FIX_TEMPLATE} (\`PAGES_PER_FIX_TEMPLATE\`) or more of the template’s present pages were rendered, or each of them was, and \`likely\` otherwise (\`renderedConfidence\`); \`template_key\` set, which the graded phase reads to render up to that many graded pages of an open fix’s template on the next check. Title for \`/guides/{slug}\`: “${exampleTitle}”.`,
-      `Open (Q10): a template that loses its graded pages gets no record, so an open fix for it is not measured again.`,
+      `A template an awaiting fix names (${AWAITING_FIX_STATUSES.map(code).join(', ')}) with no graded and no empty-root page in the check gets an \`indeterminate\` record, reason \`template_absent\` (Q10, CC-32 D3), so the fix is measured again and the lifecycle's rule for an indeterminate record applies: it does not close by itself.`,
     ]),
     '',
     '## 7. Effort and before/after',

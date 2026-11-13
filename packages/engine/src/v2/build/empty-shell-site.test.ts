@@ -3,7 +3,9 @@
  * pipeline's own order: sample → renderCandidates → renderCheck → buildCheck. The records below are
  * written by hand from the fixture's description, not read back from a run.
  */
+import type { Fix } from '@crawlmouse/types/v2';
 import { describe, expect, it } from 'vitest';
+import { fixWithHistory } from '../../../fixtures/v2/diff/builders.js';
 import {
   EMPTY_SHELL_HOST,
   EMPTY_SHELL_REPLIES,
@@ -20,11 +22,11 @@ import { readBatches } from './batches.js';
 import { buildCheck } from './build.js';
 import { emptyRootUrls, renderCandidates, sample } from './plan.js';
 
-async function pipeline(maxEmptyRootRenders = EMPTY_ROOT_MAX_RENDERS) {
-  const input = emptyShellBuild();
+async function pipeline(maxEmptyRootRenders = EMPTY_ROOT_MAX_RENDERS, fixes: Fix[] = []) {
+  const input = { ...emptyShellBuild(), fixes };
   const a = assemble(input, readBatches(input.batches, input.check, input.lineage.worker_release));
   const s = sample(a);
-  const plan = renderCandidates(a, [...s.stage1, ...s.stage2], [], new Map());
+  const plan = renderCandidates(a, [...s.stage1, ...s.stage2], fixes, new Map());
   const render = await renderCheck({
     ...plan,
     maxEmptyRootRenders,
@@ -158,5 +160,27 @@ describe('an empty shell on most routes, sample → renderCandidates → renderC
     for (const t of ['/about-us', '/app/{slug}', '/docs/{slug}', '/pricing-plans']) {
       expect(built.diff_inputs.indeterminate).toContain(fingerprintOf(`shell:${t}`));
     }
+  });
+
+  it('measures an open fix whose template the check no longer holds: template_absent, remeasured (CC-32 D3)', async () => {
+    const input = emptyShellBuild();
+    const gone = '/gone/{slug}';
+    const { fix, events } = fixWithHistory(1, 'open', { type: 'client_rendered_template' });
+    expect(events).toEqual([]);
+    const open: Fix = {
+      ...fix,
+      site_id: input.check.site_id,
+      fingerprint: fingerprintOf(`shell:${gone}`),
+      template_key: gone,
+      last_measured_check_id: 'c0000000-0000-4000-8000-0000000000aa',
+      first_seen_check_id: 'c0000000-0000-4000-8000-0000000000aa',
+    };
+    const { built } = await pipeline(EMPTY_ROOT_MAX_RENDERS, [open]);
+    expect(built.diff_inputs.indeterminate).toContain(open.fingerprint);
+    expect(built.fixes.find((f) => f.id === open.id)).toMatchObject({
+      status: 'open',
+      last_state: 'indeterminate',
+      last_measured_check_id: input.check.id,
+    });
   });
 });

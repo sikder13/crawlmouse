@@ -17,6 +17,11 @@
  * A template whose graded pages render with text and whose empty-root pages render as shells is
  * `pages_disagree`.
  *
+ * A template an awaiting client-rendered fix names (the caller passes them) and that has no present
+ * page gets a record too: `indeterminate`, reason `template_absent`, with no page. So the fix is
+ * measured again on every check rather than left with no outcome; the lifecycle's rule for an
+ * indeterminate record decides what that does to it (diff/lifecycle.ts).
+ *
  * `js_only_navigation` has no detector: the render step keeps word counts and no link.
  */
 import type { DetectionState, PageResult } from '@crawlmouse/types/v2';
@@ -27,7 +32,11 @@ import { fingerprintOf } from './fingerprint.js';
 export type RenderedFixType = 'client_rendered_template' | 'js_only_navigation';
 
 /** Why a rendered-page detector could not decide. */
-export const RENDERED_INDETERMINATE_REASONS = ['not_rendered', 'pages_disagree'] as const;
+export const RENDERED_INDETERMINATE_REASONS = [
+  'not_rendered',
+  'pages_disagree',
+  'template_absent',
+] as const;
 export type RenderedIndeterminateReason = (typeof RENDERED_INDETERMINATE_REASONS)[number];
 
 /** One rendered page of the template, as the render step measured it. */
@@ -81,17 +90,26 @@ function verdict(rendered: number, shells: number): Pick<RenderedDetection, 'sta
 export interface RenderedContext {
   /** The URLs of the crawled empty-root pages (build/plan.ts `emptyRootUrls`); none when left out. */
   emptyRoots?: ReadonlySet<string>;
+  /**
+   * The templates the site's awaiting client-rendered fixes name (build/plan.ts
+   * `awaitingShellTemplates`); none when left out.
+   */
+  openTemplates?: readonly string[];
 }
 
-/** One `client_rendered_template` record per template present in the check, in template-key order. */
+/**
+ * One `client_rendered_template` record per template present in the check, and per template an open
+ * fix names, in template-key order.
+ */
 export function detectRendered(
   pages: readonly RenderedInputPage[],
-  { emptyRoots = new Set() }: RenderedContext = {},
+  { emptyRoots = new Set(), openTemplates = [] }: RenderedContext = {},
 ): RenderedDetection[] {
   const templates = new Map<string, RenderedInputPage[]>();
   for (const p of pages.filter((p) => isGraded(p) || emptyRoots.has(p.url))) {
     templates.set(p.template_key, [...(templates.get(p.template_key) ?? []), p]);
   }
+  for (const t of openTemplates) if (!templates.has(t)) templates.set(t, []);
   return [...templates]
     .sort(([a], [b]) => byText(a, b))
     .map(([template_key, present]): RenderedDetection => {
@@ -99,7 +117,10 @@ export function detectRendered(
         .flatMap((p) => (p.without_js ? [{ url: p.url, ...p.without_js }] : []))
         .sort((a, b) => byText(a.url, b.url));
       const shells = rendered.filter((p) => p.state === 'empty_shell').length;
-      const { state, reason } = verdict(rendered.length, shells);
+      const { state, reason } =
+        present.length === 0
+          ? { state: 'indeterminate' as const, reason: 'template_absent' as const }
+          : verdict(rendered.length, shells);
       const key = `${SHELL_KEY_PREFIX}:${template_key}`;
       return {
         type: 'client_rendered_template',

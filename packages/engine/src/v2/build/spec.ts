@@ -57,7 +57,8 @@ const INPUT: Record<keyof BuildInput, string> = {
   render: "CC-14's `RenderOutcome` over `renderCandidates`; null when nothing rendered.",
   previous:
     "The site's last graded check as `diffCheck` reads it: its `Check` and its `diff_inputs`.",
-  fixes: "The site's fixes before this check.",
+  fixes:
+    "The site's fixes before this check. The diff reads them, and the `client_rendered_template` detector gives a record to each template an awaiting one names (`awaitingShellTemplates`).",
   events: 'Every event of those fixes.',
   lineage:
     '`engine_sha`, and `worker_release`: a batch row that names a worker release must name this one.',

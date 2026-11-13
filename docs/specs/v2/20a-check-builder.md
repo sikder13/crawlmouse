@@ -6,19 +6,19 @@
 
 ## Input
 
-| Field          | What it is                                                                                                                            |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| `check`        | The check as CC-20b created it: ids, trigger, timestamps, `expires_at`, `page_cap`, and `grade_version`, which must be this engine's. |
-| `site`         | The `Site` row. Its `account_id` decides whether a usage event is written.                                                            |
-| `homepage_url` | Where the crawl started, in the engine's canonical spelling (the root has no trailing slash).                                         |
-| `seeds`        | The crawl's seeds from discovery: the homepage and the sitemap's URLs with their `lastmod`.                                           |
-| `batches`      | Every crawl and access batch result, parsed with `BatchResultSchema`.                                                                 |
-| `render`       | CC-14's `RenderOutcome` over `renderCandidates`; null when nothing rendered.                                                          |
-| `previous`     | The site's last graded check as `diffCheck` reads it: its `Check` and its `diff_inputs`.                                              |
-| `fixes`        | The site's fixes before this check.                                                                                                   |
-| `events`       | Every event of those fixes.                                                                                                           |
-| `lineage`      | `engine_sha`, and `worker_release`: a batch row that names a worker release must name this one.                                       |
-| `now`          | When the lineage row is minted (its `created_at`).                                                                                    |
+| Field          | What it is                                                                                                                                                                             |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `check`        | The check as CC-20b created it: ids, trigger, timestamps, `expires_at`, `page_cap`, and `grade_version`, which must be this engine's.                                                  |
+| `site`         | The `Site` row. Its `account_id` decides whether a usage event is written.                                                                                                             |
+| `homepage_url` | Where the crawl started, in the engine's canonical spelling (the root has no trailing slash).                                                                                          |
+| `seeds`        | The crawl's seeds from discovery: the homepage and the sitemap's URLs with their `lastmod`.                                                                                            |
+| `batches`      | Every crawl and access batch result, parsed with `BatchResultSchema`.                                                                                                                  |
+| `render`       | CC-14's `RenderOutcome` over `renderCandidates`; null when nothing rendered.                                                                                                           |
+| `previous`     | The site's last graded check as `diffCheck` reads it: its `Check` and its `diff_inputs`.                                                                                               |
+| `fixes`        | The site's fixes before this check. The diff reads them, and the `client_rendered_template` detector gives a record to each template an awaiting one names (`awaitingShellTemplates`). |
+| `events`       | Every event of those fixes.                                                                                                                                                            |
+| `lineage`      | `engine_sha`, and `worker_release`: a batch row that names a worker release must name this one.                                                                                        |
+| `now`          | When the lineage row is minted (its `created_at`).                                                                                                                                     |
 
 ## Output
 
