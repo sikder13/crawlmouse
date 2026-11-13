@@ -108,6 +108,41 @@ describe('the cutover table covers the inventory', () => {
     },
   );
 
+  /**
+   * Where each redirect lands, and why it is served while the row's flags are on: a rewrite row whose
+   * flag the row names, or a page file that answers without a flag or gates itself on one the row names.
+   */
+  const TARGETS: Record<string, { rewrite: string } | { page: string; gate: string | null }> = {
+    '/': { rewrite: '/' },
+    '/audit/:a': { page: 'app/audit/[id]/page.tsx', gate: null },
+    '/settings/plan': { page: 'app/(account)/settings/plan/page.tsx', gate: 'checksPublicEnabled' },
+  };
+  const FLAG_READER: Record<string, string> = {
+    checksPublicEnabled: 'checksPublic',
+    billingV2Enabled: 'billing',
+  };
+
+  it.each(V1_CUTOVER.filter((r) => r.answer.kind === 'redirect').map((r) => [r.from, r] as const))(
+    "%s lands on an address served under the row's flags",
+    (_, row) => {
+      const to = (row.answer as { to: string }).to;
+      const target = TARGETS[to];
+      expect(target, to).toBeDefined();
+      if ('rewrite' in target!) {
+        const rewrite = V2_REWRITES.find((r) => r.from === target.rewrite);
+        expect(rewrite && row.flags.includes(rewrite.flag)).toBe(true);
+        return;
+      }
+      const source = readFileSync(join(WEB, target.page), 'utf8');
+      if (target.gate === null) {
+        expect(source).not.toMatch(/if \(!\w+Enabled\(\)\) return notFound\(\)/);
+      } else {
+        expect(source).toContain(`if (!${target.gate}()) return notFound();`);
+        expect(row.flags).toContain(FLAG_READER[target.gate]);
+      }
+    },
+  );
+
   it.each(Object.entries(SERVED_AT_SAME_ADDRESS))(
     '%s, served at its own address, is a rewrite row or the page that branches',
     (path, address) => {
