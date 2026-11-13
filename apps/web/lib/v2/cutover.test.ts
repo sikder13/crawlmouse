@@ -126,9 +126,9 @@ describe('the cutover table covers the inventory', () => {
     "%s lands on an address served under the row's flags",
     (_, row) => {
       const to = (row.answer as { to: string }).to;
-      const target = TARGETS[to];
-      expect(target, to).toBeDefined();
-      if ('rewrite' in target!) {
+      expect(TARGETS[to], to).toBeDefined();
+      const target = TARGETS[to]!;
+      if ('rewrite' in target) {
         const rewrite = V2_REWRITES.find((r) => r.from === target.rewrite);
         expect(rewrite && row.flags.includes(rewrite.flag)).toBe(true);
         return;
