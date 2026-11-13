@@ -7,24 +7,9 @@
  * which CC-29 creates. It is refused up front with `trialRefusal`'s reason, the same check the
  * webhook's `agency_trial_started` makes, on the account as this request reads it.
  */
-import { z } from 'zod';
 import type { Interval } from './catalog';
 import { startCheckout, type BillingResult, type Buyer, type CheckoutDeps } from './checkout-v2';
-import type { RequestBody } from './request-body';
 import { TRIAL_DAYS, trialRefusal } from './state-machine';
-
-const AgencyTrialBody = z.strictObject({
-  interval: z.enum(['month', 'year']),
-  accountId: z.uuid(),
-});
-
-export type AgencyTrialInput = z.infer<typeof AgencyTrialBody>;
-
-/** An agency trial body: the interval and the account, both required; null for anything else. */
-export function parseAgencyTrial(body: RequestBody): AgencyTrialInput | null {
-  const parsed = AgencyTrialBody.safeParse(body.fields);
-  return parsed.success ? parsed.data : null;
-}
 
 export async function agencyTrial(
   deps: CheckoutDeps,
