@@ -32,11 +32,17 @@ const page = (
   ...over,
 });
 
-const links = (statics: string[], rendered: string[], truncated = false): RenderLinks => ({
-  static: statics.map(at).sort(),
-  rendered: rendered.map(at).sort(),
-  truncated,
-});
+/**
+ * A page's links as the render step keeps them (render/links.ts): the rendered side's targets less the
+ * static side's, sorted, here unbounded. The render step's own subtraction is tested in links.test.ts.
+ */
+const links = (statics: string[], rendered: string[]): RenderLinks => {
+  const js_only = rendered
+    .filter((t) => !statics.includes(t))
+    .map(at)
+    .sort();
+  return { js_only, js_only_count: js_only.length, truncated: false };
+};
 
 const only = (
   pages: RenderedInputPage[],
@@ -98,25 +104,31 @@ describe('the JS-only navigation detector', () => {
     expect(r.affected_urls).toEqual([]);
   });
 
-  it('takes no evidence from a page with a truncated side, or with no links, and is then not_rendered', () => {
+  it('takes no evidence from a page with no links, and is then not_rendered', () => {
     const pages = [page('/products/a'), page('/products/b')];
-    const r = only(pages, {
-      [at('/products/a')]: links(['/'], ['/', '/guides/x'], true),
-      // /products/b was rendered on an outcome stored before links were kept: none in the map.
-    });
-    expect(r).toMatchObject({
+    // Both rendered on an outcome stored before links were kept: none in the map.
+    expect(only(pages, {})).toMatchObject({
       state: 'indeterminate',
       reason: 'not_rendered',
       extent: { pages: 2, graded: 2, rendered: 0 },
       evidence: { pages: [] },
     });
-    // The page with whole lists decides alone.
-    const decided = only(pages, {
-      [at('/products/a')]: links(['/'], ['/', '/guides/x'], true),
-      [at('/products/b')]: links(['/'], ['/', '/guides/z']),
-    });
+    // The page that carries links decides alone.
+    const decided = only(pages, { [at('/products/b')]: links(['/'], ['/', '/guides/z']) });
     expect(decided).toMatchObject({ state: 'detected', extent: { rendered: 1 } });
     expect(decided.evidence.pages.map((p) => p.url)).toEqual([at('/products/b')]);
+  });
+
+  it('counts a page whose kept list the bound cut as evidence, with its whole count', () => {
+    const cut: RenderLinks = { js_only: [at('/guides/x')], js_only_count: 250, truncated: true };
+    const r = only([page('/products/a')], { [at('/products/a')]: cut });
+    expect(r).toMatchObject({ state: 'detected', extent: { rendered: 1 } });
+    expect(r.evidence.pages).toEqual([
+      { url: at('/products/a'), js_only_count: 250, js_only_targets: [at('/guides/x')] },
+    ]);
+    // and an empty difference, which the render step took over both whole sides, is not detected
+    const none: RenderLinks = { js_only: [], js_only_count: 0, truncated: false };
+    expect(only([page('/products/a')], { [at('/products/a')]: none }).state).toBe('not_detected');
   });
 
   it('reads no links for a page the render did not measure', () => {
@@ -172,22 +184,25 @@ describe('the JS-only navigation detector', () => {
     ]);
   });
 
-  it('never calls a target JS-only when the static side links to it too (property)', () => {
-    const path = fc.constantFrom('/', '/a', '/b', '/c', '/d', '/e');
+  it('detects exactly when every evidence page has a JS-only target, and none when no page has (property)', () => {
     fc.assert(
-      fc.property(fc.array(path), fc.array(path), (statics, rendered) => {
-        const s = [...new Set(statics)];
-        const r = [...new Set(rendered)];
-        const record = only([page('/products/a')], { [at('/products/a')]: links(s, r) });
-        const found = record.evidence.pages[0]!.js_only_targets;
-        for (const t of found) expect(s.map(at)).not.toContain(t);
-        // and every rendered target the static side lacks is found
-        expect(found).toEqual(
-          r
-            .filter((x) => !s.includes(x))
-            .map(at)
-            .sort(),
+      fc.property(fc.array(fc.nat(3), { minLength: 1, maxLength: 5 }), (counts) => {
+        const pages = counts.map((_, i) => page(`/products/p${i}`));
+        const byUrl = Object.fromEntries(
+          counts.map((n, i) => [
+            at(`/products/p${i}`),
+            links(
+              [],
+              Array.from({ length: n }, (_, k) => `/g/${k}`),
+            ),
+          ]),
         );
+        const r = only(pages, byUrl);
+        const found = counts.filter((n) => n > 0).length;
+        const expected =
+          found === counts.length ? 'detected' : found === 0 ? 'not_detected' : 'indeterminate';
+        expect(r.state).toBe(expected);
+        expect(r.evidence.pages.map((p) => p.js_only_count)).toEqual(counts);
       }),
     );
   });

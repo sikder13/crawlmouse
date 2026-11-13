@@ -68,8 +68,9 @@ const DISALLOW = ['/embed/', '/audit/', '/dashboard', '/verify/'];
  * and repeating the disallows would invite a crawler to enumerate them.
  *
  * ⚠ Cloudflare's robots.txt setting (Bot Preference Sync) prepends its own directives to this file
- * at the edge when it is on and at least one of the zone's Search, Agent or Training policies blocks.
- * With every policy on Allow it serves this file unchanged. The zone's settings are in
+ * at the edge when it is on and at least one of the zone's Search, Agent or Training policies is set
+ * to Block or Block on pages with ads, or Training is set to Disallow. With every policy on Allow it
+ * serves this file unchanged. The zone's settings are in
  * docs/OPERATING-RULES.md §12.
  */
 export function robotsTxt(): string {

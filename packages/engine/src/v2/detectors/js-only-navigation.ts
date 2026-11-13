@@ -1,14 +1,14 @@
 /**
- * The JS-only navigation detector: one record per template present in the check, from the links the
- * render step read on both sides of each page it measured (render/links.ts, kept on the render
- * outcome, never on `PageResult`).
+ * The JS-only navigation detector: one record per template present in the check, from what the render
+ * step found a page's script adds to its same-site links (render/links.ts `RenderLinks`, kept on the
+ * render outcome, never on `PageResult`).
  *
  * The population, the presence rule, the deciding pages and the record for a template an awaiting fix
  * names with no present page are client_rendered_template's (detectors/rendered.ts). A deciding page
- * is evidence when it was measured (`without_js`) and its render outcome carries `links` with no side
- * truncated: a truncated side, or an outcome stored before links were kept, cannot show that a link is
- * absent from the static HTML. A page's JS-only targets are its rendered side's targets less its static
- * side's. The verdict (`verdict`, shared):
+ * is evidence when it was measured (`without_js`) and its render outcome carries `links`: the render
+ * step took the difference over both sides read whole, so an empty one shows the script adds no
+ * same-site link, and a bounded one still counts every target. An outcome stored before links were
+ * kept carries none, and its pages are not evidence. The verdict (`verdict`, shared):
  *
  *   detected       an evidence page exists, and each has a JS-only target
  *   not_detected   an evidence page exists, and none has
@@ -16,8 +16,8 @@
  *                  `not_rendered`: no deciding page is evidence
  *                  `template_absent`: an awaiting fix names the template and it has no present page
  *
- * The evidence keeps each evidence page's JS-only target count and its first MAX_JS_ONLY_TARGETS
- * targets in sorted order.
+ * The evidence keeps each evidence page's JS-only target count (`js_only_count`, before any bound) and
+ * its first MAX_JS_ONLY_TARGETS targets in sorted order.
  */
 import type { DetectionState } from '@crawlmouse/types/v2';
 import type { RenderLinks } from '../render/links.js';
@@ -68,12 +68,6 @@ export interface JsOnlyDetection {
 /** A record of either rendered-page detector: what the fix records of the `rendered` family hold. */
 export type RenderedRecord = RenderedDetection | JsOnlyDetection;
 
-/** The rendered side's targets less the static side's, sorted (both sides are sorted already). */
-function jsOnlyTargets(links: RenderLinks): string[] {
-  const served = new Set(links.static);
-  return links.rendered.filter((t) => !served.has(t)).sort(byText);
-}
-
 export function detectJsOnlyNavigation(
   pages: readonly RenderedInputPage[],
   links: ReadonlyMap<string, RenderLinks>,
@@ -83,12 +77,12 @@ export function detectJsOnlyNavigation(
     const evidence = decidingPages(present)
       .flatMap((p): JsOnlyPage[] => {
         const l = links.get(p.url);
-        if (p.without_js === null || l === undefined || l.truncated) return [];
-        const targets = jsOnlyTargets(l);
+        if (p.without_js === null || l === undefined) return [];
+        const targets = [...l.js_only].sort(byText);
         return [
           {
             url: p.url,
-            js_only_count: targets.length,
+            js_only_count: l.js_only_count,
             js_only_targets: targets.slice(0, MAX_JS_ONLY_TARGETS),
           },
         ];

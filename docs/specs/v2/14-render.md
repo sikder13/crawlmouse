@@ -205,27 +205,33 @@ neither the site estimate nor Readable, which read graded pages only.
 
 ## The links of a rendered page
 
-A measured page's outcome also carries `links`: the same-site link targets of its static side and of
-its rendered side (`links.ts`, CC-32 D6). One extractor reads both sides, the crawl's own (extract.ts
-`extractPage`, share actions and media files left out), so each target is in `canonicalizeUrl`'s
-spelling. A target is kept when it is on the page's own site by the crawl planner's rule
-(`inSiteScope`: the page's host or its `www.` twin, on the default port), is not the page itself, and
-is at most 2048 characters. Each side keeps, once each, the longest prefix of its sorted
-targets that holds at most 200 targets (`MAX_RENDER_LINKS`) and 32 KiB of URL
-characters (`MAX_RENDER_LINK_CHARS`). `truncated` is set when either side left a target out, or had a
-target past the URL bound.
+A measured page's outcome also carries `links`: what its script adds to its same-site links
+(`links.ts`, CC-32 D6). One extractor reads both sides, the crawl's own (extract.ts `extractPage`,
+share actions and media files left out), so each target is in `canonicalizeUrl`'s spelling with no
+options, the spelling the worker's edges carry. A `www.` twin is a target of its own, as it is a page
+of its own in the v2 crawl. A target is read when it is on the page's own site by the crawl planner's
+rule (`inSiteScope`: the page's host or its `www.` twin, on the default port), is not the page itself,
+and is at most 2048 characters; a longer one is left out on both sides alike, as the worker
+leaves it out of its edges, so it is never JS-only.
 
-So a rendered page adds at most 64 KiB of URL characters to the stored outcome, its two sides
-together; a canonical URL is ASCII, so that is also its bytes, before JSON quoting. On the Free cap, 25 graded
-and 5 empty-root renders, a check adds at most 1920 KiB. The graded cap is the caller's
-(`maxRenders`), so a larger cap raises the second figure by 64 KiB a render.
+Both sides are read whole, in memory, and the difference, the rendered side's targets less the static
+side's, is taken over the whole sets. Only the difference is kept: `js_only`, sorted, the longest
+prefix that holds at most 200 targets (`MAX_RENDER_LINKS`) and 32 KiB of URL characters
+(`MAX_RENDER_LINK_CHARS`); `js_only_count`, the whole difference's size; and `truncated`, set when the
+bound left some out. An empty difference is evidence that the script adds no same-site link, however
+many links the page has.
+
+So a rendered page adds at most 32 KiB of URL characters to the stored outcome; a canonical URL is
+ASCII, so that is also its bytes, before JSON quoting. On the Free cap, 25 graded and 5 empty-root
+renders, a check adds at most 960 KiB. The graded cap is the caller's (`maxRenders`), so a larger cap
+raises the second figure by 32 KiB a render.
 
 The lists stay on the render outcome, which the pipeline keeps as evidence; they are never written to
 `PageResult.without_js`, whose stored shape holds the four keys above. A page whose links cannot be read
 keeps its measurement and carries no `links`, and so does every page of an outcome stored before this.
-The `js_only_navigation` detector (detectors/js-only-navigation.ts) reads them: a page's JS-only targets
-are its rendered side's less its static side's, and a page with a truncated side, or with no `links`, is
-not evidence. A record keeps at most 20 of a page's targets.
+The `js_only_navigation` detector (detectors/js-only-navigation.ts) reads them: a measured page with
+`links` is evidence, whether or not its kept list was cut, and a page with no `links` is not. A record
+keeps at most 20 of a page's targets, with its whole count.
 
 ## The site estimate
 
