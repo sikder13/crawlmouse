@@ -911,11 +911,13 @@ as $$
        set view_count = l.view_count + 1
       from public.reports r
       join public.accounts a on a.id = r.account_id
+      join public.sites st on st.id = r.site_id
      where l.token_hash = p_token_hash
        and r.id = l.report_id
        and l.revoked_at is null
        and l.expires_at > p_now
        and public.report_file_stored(r)
+       and st.removed_at is null
        and a.deleted_at is null
        and a.deletion_confirmed_at is null
     returning r.id, r.account_id, r.site_id, r.kind, r.format, r.storage_path
@@ -948,10 +950,12 @@ as $$
        from public.share_links l
        join public.reports r on r.id = l.report_id
        join public.accounts a on a.id = r.account_id
+       join public.sites st on st.id = r.site_id
       where l.token_hash = p_token_hash
         and l.revoked_at is null
         and l.expires_at > p_now
         and public.report_file_stored(r)
+        and st.removed_at is null
         and a.deleted_at is null
         and a.deletion_confirmed_at is null),
     (select pg_catalog.jsonb_build_object('outcome', 'gone')
@@ -1134,7 +1138,7 @@ begin
       return pg_catalog.jsonb_build_object('outcome', 'invalid_owner');
     end if;
   end if;
-  v_changed := v_new is distinct from pg_catalog.lower(v_old);
+  v_changed := pg_catalog.lower(v_new) is distinct from pg_catalog.lower(v_old);
 
   update public.sites st
      set client_name = case when p ? 'client_name'
@@ -1570,7 +1574,7 @@ as $$
                             from public.reports r
                            where r.site_id = rs.site_id and r.kind = 'client_report'
                              and r.status = 'sent'
-                           order by r.sent_at desc, r.id desc
+                           order by r.sent_at desc, r.scheduled_for desc nulls last, r.id desc
                            limit 1) last
                     join public.checks lc on lc.id = last.check_id),
                  true)) as o
@@ -1673,7 +1677,7 @@ begin
     from (select r.covers_check_ids[pg_catalog.array_upper(r.covers_check_ids, 1)] as check_id
             from public.reports r
            where r.site_id = p_site and r.kind = 'client_report' and r.status = 'sent'
-           order by r.sent_at desc, r.id desc
+           order by r.sent_at desc, r.scheduled_for desc nulls last, r.id desc
            limit 1) last
     join public.checks c on c.id = last.check_id
    where c.site_id = p_site and c.status in ('finished', 'partial') and c.id <> p_check;
