@@ -38,10 +38,30 @@ const read = async (): Promise<Sections> =>
 const differing = (a: Sections, b: Sections) =>
   [...new Set([...Object.keys(a), ...Object.keys(b)])].filter((s) => a[s] !== b[s]).sort();
 
+/** The kinds `email_sends.kind` allows, in the constraint's order. */
+const kinds = async () =>
+  [
+    ...(
+      await db.query<{ def: string }>(
+        `select pg_get_constraintdef(oid) def from pg_constraint where conname = 'email_sends_kind_check'`,
+      )
+    ).rows[0]!.def.matchAll(/'([a-z_]+)'::text/g),
+  ].map((m) => m[1]);
+
 describe('the revert of 20261114000002', () => {
   it('leaves each section of the fingerprint as the migration found it, and the migration applied again gives its own back', async () => {
     const before = await read();
+    // The state it is applied to is production's order: CC-29's 20261114000001 is in it, with the
+    // kind that migration added to the mail ledger.
+    const kindsBefore = await kinds();
+    expect(kindsBefore).toContain('agency_plus_contact');
     await db.exec(readMigration(MIGRATION));
+    expect(await kinds()).toEqual([
+      ...kindsBefore,
+      'seat_invite',
+      'report_confirm',
+      'client_report',
+    ]);
     const applied = await read();
     // The comparison is of something: the fingerprint has sections, and the migration moves some.
     expect(Object.keys(before).length).toBeGreaterThan(0);
@@ -49,6 +69,7 @@ describe('the revert of 20261114000002', () => {
 
     await db.exec(readRollback(ROLLBACK));
     expect(differing(before, await read())).toEqual([]);
+    expect(await kinds()).toEqual(kindsBefore);
 
     await db.exec(readMigration(MIGRATION));
     expect(differing(applied, await read())).toEqual([]);
