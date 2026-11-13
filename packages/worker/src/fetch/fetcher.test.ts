@@ -99,6 +99,17 @@ describe('SSRF: refused through the production fetch path, guard not bypassed', 
   });
 });
 
+describe('SSRF: an address the earlier text rule allowed is refused through the fetch path', () => {
+  it('refuses a name that resolves to 64:ff9b::5, the NAT64 spelling of 0.0.0.5', async () => {
+    const connect = vi.spyOn(net.Socket.prototype, 'connect');
+    const nat64 = createFetcher(systemClock, { resolver: async () => ['64:ff9b::5'] });
+    const r = await nat64('http://nat64.test/', CRAWL, limits);
+    expect(r.error).toBe('ssrf_refused');
+    expect(r.status).toBeNull();
+    expect(connect).not.toHaveBeenCalled();
+  });
+});
+
 describe('size caps (the guard is bypassed only so the loopback fixture is reachable)', () => {
   // The worker keeps MAX_KEPT_BYTES and stops reading there, so a body past it is cut, not refused.
   // MAX_BODY_BYTES refuses a body only for a request that keeps more, as robots.txt's does not.
