@@ -1,8 +1,10 @@
 /**
  * The front-end markers the reader records on a batch's first page (CC-30 Q2). Each marker is one
- * fixed test over where the framework writes it: an attribute, an element's id or class, an inline
- * script, a response header. The page's text is not read, so a marker's literal in an article or a
- * code sample does not match, and a row stores marker names only, never what the page held.
+ * fixed test over where its framework writes it (frontend-markers.ts says each): a script's `src` or a
+ * link's `href`, a script's id, an assignment in a script the browser runs as JavaScript, an element's
+ * class, the root element's attribute, a response header. Page text, other attributes, comments,
+ * strings, data scripts and what `textarea`, `template` and `noscript` hold are not read, and a row
+ * stores marker names only, never what the page held. Every case goes through `readPage`.
  */
 import { FrontendMarkerSchema, type FrontendMarker } from '@crawlmouse/types/v2';
 import { describe, expect, it } from 'vitest';
@@ -140,5 +142,91 @@ describe('front-end markers', () => {
   it('records no markers when the stack was not asked for (a URL after the batch’s first)', () => {
     const { body } = CARRIES.next_static_path;
     expect(readPage({ body, bodyCut: false, finalUrl: URL_ }).read!.stack).toBeNull();
+  });
+});
+
+describe('where the markers are not read (review B2)', () => {
+  const none = (name: string, body: string) => expect(markersOf(page('', body)), name).toEqual([]);
+
+  it('reads the Shopify.theme object only as an assignment in a script run as JavaScript', () => {
+    none(
+      'JSON-LD',
+      '<script type="application/ld+json">{"@type":"Article","articleBody":"Set Shopify.theme = {} in theme.liquid"}</script>',
+    );
+    none('text/plain', '<script type="text/plain">Shopify.theme = {}</script>');
+    none('a template type', '<script type="text/x-template">Shopify.theme = {}</script>');
+    none(
+      'a line comment',
+      '<script>// we migrated off Shopify.theme = {} last year\nvar a = 1;</script>',
+    );
+    none('a block comment', '<script>/* Shopify.theme = {} */ var a = 1;</script>');
+    none(
+      'a string',
+      '<script>var s = "Shopify.theme = {}"; var t = \'Shopify.theme = 1\';</script>',
+    );
+    none('a template literal', '<script>var s = `Shopify.theme = ${1}`;</script>');
+    none(
+      'a read, not an assignment',
+      '<script>if (Shopify.theme == null) go(Shopify.theme);</script>',
+    );
+    none('an arrow', '<script>const f = (Shopify.theme) => 1;</script>');
+    none('a script file', '<script src="/x.js">Shopify.theme = {}</script>');
+  });
+
+  it('reads the Shopify.theme object from the scripts a Liquid layout writes', () => {
+    const at = (script: string) => markersOf(page(script));
+    expect(
+      at(
+        '<script>var Shopify = Shopify || {};\nShopify.shop = "a.myshopify.com";\nShopify.theme = {"name":"Dawn","id":1};</script>',
+      ),
+    ).toEqual(['shopify_theme_object']);
+    expect(
+      at('<script type="text/javascript">window.Shopify.theme={"name":"x"};</script>'),
+    ).toEqual(['shopify_theme_object']);
+    expect(at('<script type=" Text/JavaScript ">Shopify.theme = {};</script>')).toEqual([
+      'shopify_theme_object',
+    ]);
+    // A comment or a string before the assignment does not hide it.
+    expect(
+      at('<script>var u = "https://a.test/x"; /* note */ // done\nShopify.theme = {};</script>'),
+    ).toEqual(['shopify_theme_object']);
+  });
+
+  it('reads the Next.js asset path only from a script’s src or a link’s href', () => {
+    const asset = 'https://cdn.example/_next/static/chunks/x.js';
+    none('an anchor', `<article><a href="${asset}">a file</a></article>`);
+    none('an image', '<img src="https://other.example/_next/static/media/a.png">');
+    none(
+      'other attributes',
+      `<div data-src="${asset}" title="${asset}"><img alt="${asset}"></div>`,
+    );
+    none('a script’s other attribute', `<script data-href="${asset}"></script>`);
+    none('a link’s other attribute', `<link rel="preload" data-src="${asset}" href="/a.css">`);
+    expect(markersOf(page(`<link rel="preload" as="script" href="${asset}">`))).toEqual([
+      'next_static_path',
+    ]);
+    expect(markersOf(page('<link rel="stylesheet" href="/_next/static/css/a.css">'))).toEqual([
+      'next_static_path',
+    ]);
+    expect(markersOf(page(`<script src="${asset}" async></script>`))).toEqual(['next_static_path']);
+  });
+
+  it.each(['textarea', 'template', 'noscript'])('reads nothing %s holds', (tag) => {
+    const held =
+      '<div class="shopify-section"></div><script id="__NEXT_DATA__">{}</script>' +
+      '<script>Shopify.theme = {};</script><script src="/_next/static/a.js"></script>' +
+      '<link href="/wp-content/a.css">';
+    none(tag, `<${tag}>${held}</${tag}>`);
+    // and what follows it is read
+    expect(markersOf(page('', `<${tag}>x</${tag}><div class="shopify-section"></div>`))).toEqual([
+      'shopify_section_class',
+    ]);
+  });
+
+  it('reads nothing an HTML comment holds', () => {
+    none(
+      'comment',
+      '<!-- <div class="shopify-section"></div> <script id="__NEXT_DATA__"></script> -->',
+    );
   });
 });
