@@ -30,17 +30,32 @@ status-page vendor, switching any flag.
 - **The bound.** 20 instant notices an hour for customers' accounts and 20 for internal ones, counted
   apart. The rest are held, and the hourly tick at :07 mails them as one "N more" notice, keyed
   `founder_event:overflow:<UTC hour>` from the tick's time, taken once in a `clock` step so a retry in
-  the next hour keeps the key. Rows taken by a notice whose mail gave up (its ledger row failed after 3
-  attempts) are listed again in the next notice (`apps/web/__tests__/v2-033-founder.test.ts`, "re-takes
-  the rows of a notice whose mail gave up").
+  the next hour keeps the key. Rows taken by a notice whose mail's ledger row is `failed` are listed
+  again by a later hour's notice, whether `send` gave up after 3 attempts or recorded, after one, a
+  provider answer it does not retry (`apps/web/__tests__/v2-033-founder.test.ts`, "re-takes the rows
+  of a notice whose mail gave up").
 - **Payments.** Whether a payment is the first is Stripe's record, not the account's state history:
   the customer's paid invoices (`invoices.list` with `status: 'paid'`), leaving out the latest invoice
   and zero-amount ones (Stripe pays a zero invoice when a trial starts). With none, "First payment";
   with one or more, "Payment (returning)"; with Stripe unread, "Payment". A change from `past_due` to
   a paid state is announced when it is a first payment (a trial whose first charge failed), and not
-  otherwise. The amount is the invoice's `amount_paid` when its status is `paid`, and otherwise its
+  otherwise. A Stripe read that fails is logged as `founder.stripe_unread` (kind and whether it is such
+  a recovery, nothing else). For a recovery the notice then throws `FounderStripeUnread` before
+  claiming anything, and Inngest retries the step (FOUNDER_RETRIES, 4). When the retries are spent
+  the run is marked failed in Inngest's dashboard under `crawlmouse.founder.entitlement`, with that
+  error's message; no notice was mailed or claimed, and the function's log holds one
+  `founder.stripe_unread` line an attempt. Any other notice is sent with Stripe unread
+  (`apps/web/lib/v2/ops/founder.test.ts`, "review N3"). The amount is the invoice's `amount_paid` when its status is `paid`, and otherwise its
   `amount_due`, said to be unpaid, with Stripe's status (`apps/web/lib/v2/ops/founder.test.ts`,
-  "review C2" and "review C3").
+  "review C2" and "review C3"). A payment notice is headed as a payment only when Stripe shows its
+  invoice `paid`; otherwise it is a plan start, "Plan started: Pro — first invoice not yet paid" (or
+  "invoice not yet paid", or "invoice not read from Stripe"), and the "N more" notice lists it the
+  same way. Its stored facts record the invoice as `invoice`: Stripe's status, `not_given` or
+  `not_read` ("review N4"). A card trial's end is commonly announced this way: at a trial's end
+  Stripe creates the invoice with a one-hour draft period before charging it
+  (docs.stripe.com/billing/invoices/subscription, "Update the first invoice of a subscription"), and
+  the charge that follows has no notice, since billing records `invoice.paid` without an entitlement change
+  (`apps/web/lib/billing/state-machine.ts`, `'invoice.paid': 'recorded_only'`).
 - **Sign-ups** are announced once Supabase Auth shows the address confirmed. The sweep reads users
   created in the 7 days before it runs (`apps/web/lib/v2/ops/founder.test.ts` asserts the window), so
   a user still unconfirmed 7 days after signing up is not announced. A sign-up whose notice was
@@ -50,8 +65,11 @@ status-page vendor, switching any flag.
   and "review C8").
 - **The digest** is mailed at the first hourly tick at or after 08:00 New York time, keyed
   `founder_digest:daily:<date>` and, on Mondays, `founder_digest:weekly:<Monday>`. Its figures are
-  `founder_digest_counts`'s, each labelled as it is computed; renewals are not recorded, so payments
-  read "first and returning payments". The two bounce figures count addresses and include internal
+  `founder_digest_counts`'s, each labelled as it is computed. Payments count payment notices whose
+  invoice was recorded `paid`, first and returning; renewals have no notice and are not counted, and a
+  recovery from `past_due` is counted only when it is a first payment, the one case it has a notice.
+  The other payment notices are counted as plans started with the invoice not yet paid or not read
+  (`apps/web/__tests__/v2-033-founder.test.ts`, "counts each figure"). The two bounce figures count addresses and include internal
   accounts' mail; send failures leave out internal accounts and the founder notices' own mail
   (questions Q14).
 - **The canary's look** (`signin_delivery_seen`, questions Q17) counts a delivery to its address of a

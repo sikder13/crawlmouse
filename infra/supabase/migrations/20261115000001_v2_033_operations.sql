@@ -430,14 +430,21 @@ begin
 end;
 $$;
 
--- The held rows one "N more" notice reports, under its key p_key ('overflow:<hour>'). The first call
--- for a key writes the key onto every held row no notice has taken, and onto the rows taken by a
--- notice whose mail gave up: its ledger row (email_sends, key 'founder_event:<its key>') is `failed`
--- with 3 attempts, claim_email_send's bound, so that notice is not sent again and its rows are
--- reported in this one (review C6). A later call for the same key takes nothing new and answers the rows already
+-- The held rows one "N more" notice reports, under its key p_key ('overflow:<hour>', the hour as
+-- 'YYYY-MM-DDTHH' in UTC). The first call for a key writes the key onto every held row no notice has
+-- taken, and onto the rows taken by an earlier notice whose mail's ledger row (email_sends, key
+-- 'founder_event:<its key>') is `failed` and either
+--   has 3 attempts, claim_email_send's bound, so that notice is not sent again (review C6), or
+--   is under an earlier hour's key than p_key, whatever its attempts: `send` records `failed` after
+--   one attempt for a provider answer it does not retry (review N1).
+-- Both keys must be hour keys for the second; they compare as text in the "C" collation, which for
+-- that fixed-width shape is the hours' order. A retry of the earlier notice's run, if one is left,
+-- finds no rows under its key, and takes a later hour's rows back only when that later mail has 3
+-- failed attempts (apps/web/__tests__/v2-033-founder.test.ts, "review C6, N1"). A later call for the same key takes nothing new and answers the rows already
 -- carrying it, so a retried notice reports the same rows. Rows taken by a notice whose run ended
 -- before its mail was claimed keep that notice's key and are not reported again. Answers
--- {"total": n, "rows": [...]}, rows oldest first, at most p_rows of them.
+-- {"total": n, "rows": [...]}, rows oldest first, at most p_rows of them; a row's `invoice` is its
+-- facts' (null when it has none), so the notice can tell a paid payment from a plan start.
 create or replace function public.take_founder_overflow(p_key text, p_rows integer)
 returns jsonb
 language plpgsql
@@ -457,7 +464,11 @@ begin
        and (n.overflow_key is null
             or exists (select 1 from public.email_sends e
                         where e.idempotency_key = 'founder_event:' || n.overflow_key
-                          and e.status = 'failed' and e.attempts >= 3));
+                          and e.status = 'failed'
+                          and (e.attempts >= 3
+                               or (n.overflow_key ~ '^overflow:[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}$'
+                                   and p_key ~ '^overflow:[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}$'
+                                   and n.overflow_key collate "C" < p_key collate "C"))));
   end if;
   return (
     select pg_catalog.jsonb_build_object(
@@ -465,8 +476,10 @@ begin
       'rows', coalesce((
         select pg_catalog.jsonb_agg(pg_catalog.jsonb_build_object(
                  'kind', r.kind, 'account_id', r.account_id, 'internal', r.internal,
-                 'occurred_at', r.occurred_at) order by r.occurred_at, r.event_key)
-          from (select n.kind, n.account_id, n.internal, n.occurred_at, n.event_key
+                 'occurred_at', r.occurred_at, 'invoice', r.invoice)
+                 order by r.occurred_at, r.event_key)
+          from (select n.kind, n.account_id, n.internal, n.occurred_at, n.event_key,
+                       n.facts ->> 'invoice' as invoice
                   from public.founder_notices n
                  where n.overflow_key = p_key
                  order by n.occurred_at, n.event_key
@@ -481,7 +494,11 @@ $$;
 --   trials_started               trial_started notices recorded
 --   trials_ended                 accounts.state_history entries whose previous entry is a trial
 --                                state, by the entry's `since`
---   payments_first_or_returning  payment notices recorded
+--   payments_paid                payment notices whose facts record Stripe's invoice as `paid`
+--                                (first and returning; a recovery from past_due has a notice only
+--                                when it is a first payment, founder.ts)
+--   plans_started_unpaid         payment notices whose facts record anything else: an invoice not
+--                                yet paid, not given or not read (review N4)
 --   payments_failed              payment_failed notices recorded
 --   cancellations                cancellation notices recorded
 --   checks_run_all               checks queued; a check of a site no account keeps is counted
@@ -507,9 +524,11 @@ begin
       using errcode = '22023';
   end if;
   with notices as (
-    select n.kind, pg_catalog.count(*) as c from public.founder_notices n
+    select n.kind, (n.kind = 'payment' and n.facts ->> 'invoice' is not distinct from 'paid') as paid,
+           pg_catalog.count(*) as c
+      from public.founder_notices n
      where not n.internal and n.created_at >= p_from and n.created_at < p_to
-     group by n.kind
+     group by 1, 2
   ),
   run as (
     select c.status, c.queued_at, c.finished_at from public.checks c
@@ -526,7 +545,8 @@ begin
        where not a.internal and h.i > 1
          and a.state_history -> (h.i::int - 2) ->> 'state' in ('pro_trial', 'agency_trial')
          and (h.e ->> 'since')::timestamptz >= p_from and (h.e ->> 'since')::timestamptz < p_to),
-    'payments_first_or_returning', coalesce((select c from notices where kind = 'payment'), 0),
+    'payments_paid', coalesce((select c from notices where kind = 'payment' and paid), 0),
+    'plans_started_unpaid', coalesce((select c from notices where kind = 'payment' and not paid), 0),
     'payments_failed', coalesce((select c from notices where kind = 'payment_failed'), 0),
     'cancellations', coalesce((select c from notices where kind = 'cancellation'), 0),
     'checks_run_all', (select pg_catalog.count(*) from run

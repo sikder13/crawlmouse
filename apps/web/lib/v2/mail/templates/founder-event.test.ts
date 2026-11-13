@@ -6,7 +6,9 @@ import {
   founderEvent,
   founderOverflow,
   internalAccountUrl,
+  invoiceFact,
   type FounderEventInput,
+  type InvoiceFact,
 } from './founder-event';
 import { foreignTargets, htmlTargets } from './inspect';
 
@@ -76,6 +78,38 @@ describe('founderEvent', () => {
     expect(
       founderEvent(event({ amount: { minor: 1900, currency: 'usd', status: null } })).text,
     ).toContain('Amount: $19.00 due, not yet paid (Stripe invoice status: not given)');
+  });
+
+  it('heads a payment whose invoice is not paid as a plan start, saying which (review N4)', () => {
+    const at = (status: 'open' | 'draft' | null, payment: FounderEventInput['payment']) =>
+      founderEvent(event({ payment, amount: { minor: 1900, currency: 'usd', status } }));
+    expect(at('open', 'first').subject).toBe('Plan started: Pro — first invoice not yet paid');
+    expect(at('draft', 'returning').subject).toBe('Plan started: Pro — invoice not yet paid');
+    expect(at(null, 'unknown').subject).toBe('Plan started: Pro — invoice not yet paid');
+    for (const amount of [null, undefined])
+      expect(founderEvent(event({ amount })).subject).toBe(
+        'Plan started: Pro — invoice not read from Stripe',
+      );
+    expect(founderEvent(event({ internal: true, amount: null, plan: null })).subject).toBe(
+      '[TEST] Plan started — invoice not read from Stripe',
+    );
+    const m = at('open', 'first');
+    expect(m.text.split('\n')[0]).toBe('Plan started: Pro — first invoice not yet paid');
+    expect(`${m.subject}\n${m.text}`).not.toMatch(/payment/i);
+    // A paid one is a payment; a failed one is headed as before.
+    expect(at(null, 'first').subject).not.toContain('First payment');
+    expect(founderEvent(event()).subject).toBe('First payment: Pro');
+    expect(founderEvent(event({ kind: 'payment_failed', amount: null })).subject).toBe(
+      'Payment failed: Pro',
+    );
+  });
+
+  it('records what Stripe said of the invoice: its status, not_given, or not_read (review N4)', () => {
+    expect(invoiceFact({ minor: 1, currency: 'usd', status: 'paid' })).toBe('paid');
+    expect(invoiceFact({ minor: 1, currency: 'usd', status: 'open' })).toBe('open');
+    expect(invoiceFact({ minor: 1, currency: 'usd', status: null })).toBe('not_given');
+    expect(invoiceFact(null)).toBe('not_read');
+    expect(invoiceFact(undefined)).toBe('not_read');
   });
 
   it('shows an amount only for payments, and says when Stripe’s was not read', () => {
@@ -158,6 +192,30 @@ describe('founderOverflow', () => {
     expect(founderOverflow({ total: 3, rows: [row(1), row(2)] }).text).toContain(
       '1 more is not listed here',
     );
+  });
+
+  it('lists a held payment as a payment only when its invoice was paid (review N4)', () => {
+    const pay = (invoice?: InvoiceFact | null) => ({
+      ...row(1),
+      kind: 'payment' as const,
+      invoice,
+    });
+    const m = founderOverflow({
+      total: 5,
+      rows: [pay('paid'), pay('open'), pay('not_given'), pay('not_read'), pay(undefined)],
+    });
+    expect(
+      m.text
+        .split('\n')
+        .filter((l) => l.startsWith('- '))
+        .map((l) => l.split(': ')[0]),
+    ).toEqual([
+      '- Payment',
+      '- Plan started, invoice not yet paid',
+      '- Plan started, invoice not yet paid',
+      '- Plan started, invoice not read from Stripe',
+      '- Plan started, invoice not read from Stripe',
+    ]);
   });
 
   it('is [TEST] only when every held notice is an internal account’s', () => {

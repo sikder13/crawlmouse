@@ -12,6 +12,7 @@ import {
 } from '../mail/templates/founder-digest';
 import {
   FOUNDER_EVENT_KINDS,
+  STRIPE_INVOICE_STATUSES,
   type FounderEventKind,
   type FounderOverflowRow,
 } from '../mail/templates/founder-event';
@@ -84,6 +85,7 @@ const OverflowSchema = z.strictObject({
       account_id: z.string().nullable(),
       internal: z.boolean(),
       occurred_at: z.string(),
+      invoice: z.enum([...STRIPE_INVOICE_STATUSES, 'not_given', 'not_read']).nullable(),
     }),
   ),
 });
@@ -121,7 +123,12 @@ export function supabaseFounderStore(sb: SupabaseClient): FounderStore {
       const t = OverflowSchema.parse(data);
       return {
         total: t.total,
-        rows: t.rows.map((r) => ({ kind: r.kind, accountId: r.account_id, internal: r.internal })),
+        rows: t.rows.map((r) => ({
+          kind: r.kind,
+          accountId: r.account_id,
+          internal: r.internal,
+          invoice: r.invoice,
+        })),
       };
     },
     async digestCounts(from, to) {

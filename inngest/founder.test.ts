@@ -81,6 +81,24 @@ describe('the founder functions (D3)', () => {
     expect(out).toBe('sent');
   });
 
+  it('lets the notice’s throw out of its step, so Inngest retries the step and then fails the run (review N3)', async () => {
+    const w = work();
+    w.entitlement.mockRejectedValueOnce(new Error('stripe unread'));
+    await expect(
+      run(
+        createFounderEntitlementFn(() => w as unknown as FounderWork),
+        {
+          event: {
+            id: `entitlement.changed:${ACCOUNT}:evt_1`,
+            name: 'entitlement.changed',
+            ts: 0,
+            data: { accountId: ACCOUNT, from: 'past_due', to: 'pro' },
+          },
+        },
+      ),
+    ).rejects.toThrow('stripe unread');
+  });
+
   it('passes a missing id on as missing, for the notice to refuse', async () => {
     const w = work();
     await run(
