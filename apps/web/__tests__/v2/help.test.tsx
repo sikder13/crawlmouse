@@ -1,9 +1,10 @@
 /**
  * The help centre (CC-33 D4). Each page is rendered whole, shell and footer included:
  * - every run of digits it shows is a price, a limit or a figure the code that owns it holds;
- * - built again with each of those owners given another value, the pages show the new values and
- *   none of today's (the describe block "the figures follow the modules that own them" names each
- *   owner, the two quoted modules whose sentences it rewrites, and what it leaves unaltered);
+ * - built again with each of those owners given another value, the pages show each new value as
+ *   many times as the articles read its owner, and today's values only where the describe block
+ *   "the figures follow the modules that own them" says (it names each owner, the two quoted
+ *   modules whose sentences it rewrites, and what it leaves unaltered);
  * - each plan's feature lines follow its GATES, today's and with the switches set apart;
  * - the delete article says what `deletionMoney` says for each subscription state;
  * - every capability it names carries its `CAPABILITIES` key, a coming one with its mark, and its
@@ -163,11 +164,16 @@ const shows = (text: string, n: number) =>
   new Set(numbersIn(text)).has(n) ||
   (numberWord(n) !== count(n) && new RegExp(`\\b${numberWord(n)}\\b`, 'i').test(text));
 
-// Every figure the pages render is read from a module that owns it. The build below gives each of
-// those modules another value, one the pages do not show today, and then:
-// - each altered value is on the pages (as a numeral, or as the word the page spells it with);
-// - no value of today's is left, as a numeral, nor as a word, but for the words in `PROSE_WORDS`.
-// A figure typed into an article instead of read keeps today's value, and fails one or the other.
+// The build below gives each module that owns a figure on the pages another value, one the pages
+// do not show today (`PAIRS`), and then checks:
+// - each altered value is on the pages, as a numeral or as the word the page spells it with, as
+//   many times as `READS` states for its owner (the places the articles read it);
+// - no value of today's is left as a numeral, but for the grade weights' (`STAYS`), nor as a word,
+//   but for "one" and "two", which are on the pages as many times as `PROSE_USES` states.
+// A figure typed, in any form, where an article reads an owner leaves that owner's count in `READS`
+// one short. A figure typed in a new place keeps today's value: as a numeral it is left over unless
+// it equals a grade weight (Pro's and Agency's 10 re-checks do), as "one" or "two" it changes a
+// count in `PROSE_USES`, and as another word it is left over.
 // Owners altered: prices.ts; each GATES number the pages show; TRIAL_DAYS; the sign-in constants;
 // MAGIC_LINK_PER_EMAIL_PER_HOUR; ANONYMOUS_EXPIRY_HOURS; CANCEL_CLICKS; MIN_GRADEABLE_PAGES; the
 // re-check window (pinned.ts). Two modules' sentences are quoted whole, and are built when their
@@ -177,6 +183,12 @@ const shows = (text: string, n: number) =>
 // which pinned.test.ts holds to the engine.
 describe('the figures follow the modules that own them, not the values typed today', () => {
   const TODAY_RESTORE = RESTORE_DAYS;
+  /**
+   * The re-check sentence names Pro and Agency together when their re-checks are equal. The altered
+   * build keeps them equal when today's are, so it renders the branch today's pages render, and
+   * counts them as one owner (Pro's) in `PAIRS`.
+   */
+  const PAID_SAME = GATES.pro.manualChecksPerSiteDay === GATES.agency.manualChecksPerSiteDay;
   const ALTERED = {
     gates: {
       free: { sites: 6, fixesVisible: 8, pagesPerCheck: 450, manualChecksPerSiteDay: 43 },
@@ -192,7 +204,7 @@ describe('the figures follow the modules that own them, not the values typed tod
         seats: 31,
         competitorsPerSite: 29,
         pagesPerCheck: 2700,
-        manualChecksPerSiteDay: 23,
+        manualChecksPerSiteDay: PAID_SAME ? 27 : 23,
       },
     },
     prices: { PRO_MONTHLY: 21, PRO_YEARLY: 210, AGENCY_MONTHLY: 123, AGENCY_YEARLY: 1230 },
@@ -210,11 +222,13 @@ describe('the figures follow the modules that own them, not the values typed tod
   /** Today's value of each owner the build alters, beside its altered value. */
   const PAIRS: [string, number, number][] = [
     ...(['free', 'pro', 'agency'] as const).flatMap((tier) =>
-      Object.entries(ALTERED.gates[tier]).map(([k, v]): [string, number, number] => [
-        `GATES.${tier}.${k}`,
-        GATES[tier][k as keyof (typeof ALTERED.gates)[typeof tier]] as number,
-        v,
-      ]),
+      Object.entries(ALTERED.gates[tier])
+        .filter(([k]) => !(PAID_SAME && tier === 'agency' && k === 'manualChecksPerSiteDay'))
+        .map(([k, v]): [string, number, number] => [
+          `GATES.${tier}.${k}`,
+          GATES[tier][k as keyof (typeof ALTERED.gates)[typeof tier]] as number,
+          v,
+        ]),
     ),
     ...Object.entries(ALTERED.prices).map(([k, v]): [string, number, number] => [
       k,
@@ -239,12 +253,52 @@ describe('the figures follow the modules that own them, not the values typed tod
   ];
 
   /**
-   * Words of today's values the pages also use for other things, so their presence proves nothing:
-   * "one" and "two" in prose ("for one email", "two grades"), and "two" and "four" counting the
-   * grades' parts, which stay.
+   * Words of today's values the pages also use for other things ("for one email", "two grades"),
+   * with the number of times the altered pages show each. A figure typed as one of these words
+   * adds one.
    */
-  const PROSE_WORDS = new Set(['one', 'two', 'four']);
-  /** Numerals that stay: the grade weights, the parts' counts, and the footer's year. */
+  const PROSE_USES: Record<string, number> = { one: 13, two: 5 };
+  /**
+   * How many times the altered pages show each owner's altered value, as a numeral or as its word:
+   * the number of places the pages read that owner. A figure typed in one of those places shows
+   * today's value there, so its owner's altered value is one short.
+   */
+  const READS: Record<string, number> = {
+    'GATES.free.sites': 1,
+    'GATES.free.fixesVisible': 4,
+    'GATES.free.pagesPerCheck': 1,
+    'GATES.free.manualChecksPerSiteDay': 2,
+    'GATES.pro.sites': 1,
+    'GATES.pro.seats': 1,
+    'GATES.pro.competitorsPerSite': 1,
+    'GATES.pro.pagesPerCheck': 1,
+    'GATES.pro.manualChecksPerSiteDay': 3,
+    'GATES.agency.sites': 1,
+    'GATES.agency.seats': 1,
+    'GATES.agency.competitorsPerSite': 1,
+    'GATES.agency.pagesPerCheck': 1,
+    PRO_MONTHLY: 1,
+    PRO_YEARLY: 1,
+    AGENCY_MONTHLY: 1,
+    AGENCY_YEARLY: 1,
+    TRIAL_DAYS: 4,
+    AUTH_LINK_MINUTES: 1,
+    RESEND_HINT_MINUTES: 1,
+    TRIAL_REMINDER_DAYS_BEFORE_END: 1,
+    MAGIC_LINK_PER_EMAIL_PER_HOUR: 1,
+    ANONYMOUS_EXPIRY_HOURS: 1,
+    CANCEL_CLICKS: 1,
+    MIN_GRADEABLE_PAGES: 1,
+    RECHECK_WINDOW_HOURS: 4,
+    'the restore window (copy/deletion.ts)': 3,
+    'the scored crawlers AI_WAITING names': 1,
+  };
+  const wordTimes = (text: string, word: string) =>
+    (text.match(new RegExp(`\\b${word}\\b`, 'gi')) ?? []).length;
+  const timesShown = (text: string, n: number) =>
+    numbersIn(text).filter((x) => x === n).length +
+    (numberWord(n) === count(n) ? 0 : wordTimes(text, numberWord(n)));
+  /** Numerals that stay: the grade weights, which the build does not alter. */
   const STAYS = new Set<number>([...numeric(AI_WEIGHTS), ...numeric(SEO_WEIGHTS)]);
 
   const alterDays = (t: string) =>
@@ -372,11 +426,20 @@ describe('the figures follow the modules that own them, not the values typed tod
     const left = PAIRS.filter(([, now]) => {
       if (!STAYS.has(now) && numerals.has(now)) return true;
       const word = numberWord(now);
-      return (
-        word !== count(now) && !PROSE_WORDS.has(word) && new RegExp(`\\b${word}\\b`, 'i').test(text)
-      );
+      return word !== count(now) && !Object.hasOwn(PROSE_USES, word) && wordTimes(text, word) > 0;
     }).map(([name, now]) => `${name} (${now})`);
     expect(left).toEqual([]);
+    const prose = Object.fromEntries(Object.keys(PROSE_USES).map((w) => [w, wordTimes(text, w)]));
+    expect(prose).toEqual(PROSE_USES);
+  });
+
+  it('each owner’s altered value is on the altered pages as many times as the pages read it', async () => {
+    const text = await alteredText();
+    expect(Object.keys(READS).sort()).toEqual(PAIRS.map(([name]) => name).sort());
+    const shown = Object.fromEntries(
+      PAIRS.map(([name, , altered]) => [name, timesShown(text, altered)]),
+    );
+    expect(shown).toEqual(READS);
   });
 });
 
