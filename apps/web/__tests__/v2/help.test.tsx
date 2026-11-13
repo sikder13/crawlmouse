@@ -4,7 +4,7 @@
  * - built again with each of those owners given another value, the pages show the new values and
  *   none of today's (the describe block "the figures follow the modules that own them" names each
  *   owner, the two quoted modules whose sentences it rewrites, and what it leaves unaltered);
- * - each plan's feature lines follow its GATES, today's and with each switch turned the other way;
+ * - each plan's feature lines follow its GATES, today's and with the switches set apart;
  * - the delete article says what `deletionMoney` says for each subscription state;
  * - every capability it names carries its `CAPABILITIES` key, a coming one with its mark, and its
  *   title and description, which a search result shows with no mark, name no coming capability;
@@ -402,18 +402,12 @@ function expectedFeatures(g: TierGates): string[][] {
 
 describe('each plan’s feature lines follow its GATES', () => {
   const HEADINGS = { free: 'Free', pro: 'Pro', agency: 'Agency' } as const;
-  // Each switch the lines read, turned the other way on Free and on Agency.
-  const FLIPPED = {
-    free: { slack: true, seats: 3, competitorsPerSite: 2, exports: true, agencyBranding: true },
-    agency: {
-      slack: false,
-      seats: 1,
-      competitorsPerSite: 0,
-      exports: false,
-      agencyBranding: false,
-    },
+  // The switches set so that no two of them agree on all three tiers (Pro is today's: each switch
+  // on but agencyBranding), so a line keyed on the wrong switch shows on a tier it should not.
+  const SET = {
+    free: { slack: true, seats: 1, competitorsPerSite: 2, exports: false, agencyBranding: true },
+    agency: { slack: true, seats: 5, competitorsPerSite: 0, exports: false, agencyBranding: false },
   };
-
   const check = (
     articles: { slug: string; blocks: HelpBlock[] }[],
     gates: Record<Tier, TierGates>,
@@ -431,24 +425,31 @@ describe('each plan’s feature lines follow its GATES', () => {
     expect(expectedFeatures(GATES.agency).length).toBeGreaterThan(3);
   });
 
-  it('GATES with each switch turned the other way', async () => {
+  it('GATES with the switches set apart', async () => {
     vi.resetModules();
     vi.doMock('@/lib/entitlement-v2', async (importOriginal) => {
       const real = await importOriginal<typeof import('@/lib/entitlement-v2')>();
       return {
         ...real,
         GATES: {
-          free: { ...real.GATES.free, ...FLIPPED.free },
+          free: { ...real.GATES.free, ...SET.free },
           pro: real.GATES.pro,
-          agency: { ...real.GATES.agency, ...FLIPPED.agency },
+          agency: { ...real.GATES.agency, ...SET.agency },
         },
       };
     });
     try {
       const { helpArticles: altered } = await import('@/lib/v2/help/articles');
-      const { GATES: flipped } = await import('@/lib/entitlement-v2');
-      expect(flipped.free.exports).toBe(true);
-      check(altered(), flipped);
+      const { GATES: set } = await import('@/lib/entitlement-v2');
+      const switches = (
+        ['slack', 'seats', 'competitorsPerSite', 'exports', 'agencyBranding'] as const
+      ).map((k) =>
+        (['free', 'pro', 'agency'] as const)
+          .map((t) => (k === 'seats' ? set[t].seats > 1 : Boolean(set[t][k])))
+          .join(),
+      );
+      expect(new Set(switches).size).toBe(switches.length);
+      check(altered(), set);
     } finally {
       vi.doUnmock('@/lib/entitlement-v2');
       vi.resetModules();
