@@ -8,9 +8,14 @@
  * which answers a decrypted value) matches no route. http.test.ts sends each probe's real URL and
  * these refusals through `refusal`.
  *
- * A token is tied to its host (`TOKEN_HOST`): a request whose URL or a header carries a token is
- * refused unless it goes to that token's host, and an `authorization` header is refused unless it
- * carries the token of the host it goes to.
+ * A token is tied to its host (`TOKEN_HOST`). A request is refused when a token is found in its URL
+ * and the request goes to another host, or in any of its headers except the `authorization` header
+ * of a request to that token's own host. Found means `tokenFound`: a run of `TOKEN_RUN` characters
+ * of the token (the whole token when it is shorter), or of its base64 or base64url form with the four
+ * characters at each end left out (they depend on the bytes around the token), at each of the three
+ * byte alignments so a prefix such as `user:` does not hide it, appears in the string as sent, in the string with up to three rounds of percent-decoding, or in
+ * either with `+` read as a space. An `authorization` header is refused unless it carries the token
+ * of the host it goes to.
  *
  * Every string value in a JSON response body (not its keys) is handed to `onValue` (the CLI registers them with its
  * redactor); a body that is not JSON is handed over whole.
@@ -88,6 +93,69 @@ export class RefusedRequest extends Error {
   }
 }
 
+/** The shortest run of a token's characters that counts as the token being present. */
+export const TOKEN_RUN = 16;
+
+/** The runs of `token` and of its base64 and base64url forms that `tokenFound` looks for. */
+function runsOf(token: string): string[] {
+  const forms: string[] = [];
+  for (const pad of ['', 'x', 'xx']) {
+    const bytes = Buffer.from(pad + token);
+    for (const enc of ['base64', 'base64url'] as const) {
+      const e = bytes.toString(enc);
+      // The first 4 characters mix in the pad's bytes, the last 4 whatever follows the token.
+      forms.push(e.slice(pad ? 4 : 0, e.length - 4));
+    }
+  }
+  const runs = new Set<string>();
+  const add = (f: string) => {
+    for (let i = 0; i + TOKEN_RUN <= f.length; i += 1) runs.add(f.slice(i, i + TOKEN_RUN));
+  };
+  if (token.length < TOKEN_RUN) runs.add(token);
+  else add(token);
+  for (const f of forms) add(f);
+  return [...runs];
+}
+
+const runCache = new Map<string, string[]>();
+const cachedRuns = (token: string): string[] => {
+  let r = runCache.get(token);
+  if (!r) {
+    r = runsOf(token);
+    runCache.set(token, r);
+  }
+  return r;
+};
+
+/** Each `%XX` sequence decoded where it is valid UTF-8, left as it is where it is not. */
+const percentDecoded = (s: string): string =>
+  s.replace(/(?:%[0-9a-fA-F]{2})+/g, (m) => {
+    try {
+      return decodeURIComponent(m);
+    } catch {
+      return m;
+    }
+  });
+
+/** `s`, up to three rounds of percent-decoding of it, and each of those with `+` read as a space. */
+function readings(s: string): string[] {
+  const out = [s];
+  let cur = s;
+  for (let i = 0; i < 3; i += 1) {
+    const next = percentDecoded(cur);
+    if (next === cur) break;
+    out.push(next);
+    cur = next;
+  }
+  return [...out, ...out.map((r) => r.replace(/\+/g, ' '))];
+}
+
+/** Whether `haystack` carries `token`, as `TOKEN_RUN` describes in the header comment. */
+export function tokenFound(token: string, haystack: string): boolean {
+  const runs = cachedRuns(token);
+  return readings(haystack).some((h) => runs.some((r) => h.includes(r)));
+}
+
 /** Why the request is refused, or null when it is allowed. */
 export function refusal(
   input: string,
@@ -112,18 +180,24 @@ export function refusal(
   for (const name of url.searchParams.keys()) {
     if (!route.params.includes(name)) return `query parameter ${name} is not allowed there`;
   }
+  const own = tokenEntries.find(([, host]) => host === url.hostname)?.[0];
   for (const [name, host] of tokenEntries) {
     const token = tokens[name];
     if (!token || host === url.hostname) continue;
-    if (url.href.includes(token)) return `${name} in a URL to ${url.hostname}`;
-    for (const [, v] of headers) {
-      if (v.includes(token)) return `${name} in a header to ${url.hostname}`;
+    if (tokenFound(token, url.href)) return `${name} in a URL to ${url.hostname}`;
+  }
+  for (const [header, value] of headers) {
+    for (const [name] of tokenEntries) {
+      const token = tokens[name];
+      if (!token || name === own) continue;
+      if (tokenFound(token, value)) return `${name} in a header to ${url.hostname}`;
     }
+    if (header !== 'authorization' && own && tokens[own] && tokenFound(tokens[own]!, value))
+      return `${own} in the ${header} header`;
   }
   const auth = headers.get('authorization');
   if (auth !== null) {
-    const own = tokenEntries.find(([, host]) => host === url.hostname);
-    const token = own ? tokens[own[0]] : undefined;
+    const token = own ? tokens[own] : undefined;
     if (!token || !auth.includes(token))
       return `an authorization header to ${url.hostname} that does not carry its token`;
   }
