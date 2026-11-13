@@ -10,6 +10,7 @@ import {
   person,
   sessionOver,
   type Person,
+  NEXT_SINCE,
 } from '@/lib/v2/account/sites-test-support';
 import { agencyAccount } from '@/lib/v2/agency/test-support';
 
@@ -398,7 +399,7 @@ describe('POST /api/seats', () => {
                 past_due_since = case when $2 = 'past_due' then now() end,
                 past_due_tier = case when $2 = 'past_due' then 'agency' end,
                 state_history = state_history || jsonb_build_array(
-                  jsonb_build_object('state', $2::text, 'since', now()::text))
+                  jsonb_build_object('state', $2::text, 'since', ${NEXT_SINCE}))
           where id = $1`,
         [agency.accountId, state],
       );
@@ -483,7 +484,7 @@ describe('POST /api/seats', () => {
                 trial_variant = 'card_required',
                 trial_ends_at = now() + interval '5 days', trial_used_at = now(),
                 state_history = state_history || jsonb_build_array(
-                  jsonb_build_object('state', $2::text, 'since', now()::text))
+                  jsonb_build_object('state', $2::text, 'since', ${NEXT_SINCE}))
           where id = $1`,
         [owner.accountId, state],
       );

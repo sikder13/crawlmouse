@@ -10,6 +10,7 @@ import {
   person,
   sessionOver,
   type Person,
+  NEXT_SINCE,
 } from '@/lib/v2/account/sites-test-support';
 
 // The client report schedule routes and the recipient's two links (CC-31 D8). The session and
@@ -270,7 +271,7 @@ describe('what each answer says became of the confirmation', () => {
           set state = 'agency_trial', trial_variant = 'card_required', trial_used_at = now(),
               trial_ends_at = now() + interval '5 days',
               state_history = state_history || jsonb_build_array(
-                jsonb_build_object('state', 'agency_trial', 'since', now()::text))
+                jsonb_build_object('state', 'agency_trial', 'since', ${NEXT_SINCE}))
         where id = $1`,
       [accountId],
     );
@@ -414,7 +415,7 @@ describe('the notice a form is answered with says what became of the confirmatio
           set state = 'agency_trial', trial_variant = 'card_required', trial_used_at = now(),
               trial_ends_at = now() + interval '5 days',
               state_history = state_history || jsonb_build_array(
-                jsonb_build_object('state', 'agency_trial', 'since', now()::text))
+                jsonb_build_object('state', 'agency_trial', 'since', ${NEXT_SINCE}))
         where id = $1`,
       [accountId],
     );

@@ -128,6 +128,14 @@ export async function addSeat(
   return id;
 }
 
+/**
+ * The time of the next entry of an account's `state_history`, as SQL over the row being updated:
+ * now, or a millisecond after the last entry when the clock has not moved since it was written
+ * (two statements in one millisecond, or in one transaction). The account schema refuses a history
+ * that does not move forward.
+ */
+export const NEXT_SINCE = `greatest(now(), (state_history -> -1 ->> 'since')::timestamptz + interval '1 millisecond')::text`;
+
 /** Moves an account onto a paid plan, with the plan's limits stored as billing writes them. */
 export async function makePaid(
   db: PGlite,
@@ -138,7 +146,7 @@ export async function makePaid(
   await db.query(
     `update public.accounts set state = $2, tier = $2, site_limit = $3, seat_limit = $4,
        competitor_limit = $5, current_subscription_id = $6,
-       state_history = state_history || jsonb_build_array(jsonb_build_object('state', $2::text, 'since', now()::text))
+       state_history = state_history || jsonb_build_array(jsonb_build_object('state', $2::text, 'since', ${NEXT_SINCE}))
      where id = $1`,
     [accountId, tier, g.sites, g.seats, g.competitorsPerSite, `sub_${randomUUID().slice(0, 8)}`],
   );

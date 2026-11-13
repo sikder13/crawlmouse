@@ -10,6 +10,7 @@ import {
   person,
   removeSeat,
   type Person,
+  NEXT_SINCE,
 } from '../lib/v2/account/sites-test-support';
 import {
   applyAllMigrations,
@@ -851,7 +852,7 @@ describe('the confirmation in an Agency trial (D8)', () => {
           set state = 'agency_trial', trial_variant = 'card_required', trial_used_at = now(),
               trial_ends_at = now() + interval '5 days',
               state_history = state_history || jsonb_build_array(
-                jsonb_build_object('state', 'agency_trial', 'since', now()::text))
+                jsonb_build_object('state', 'agency_trial', 'since', ${NEXT_SINCE}))
         where id = $1`,
       [accountId],
     );
@@ -1124,7 +1125,7 @@ describe('due_report_schedules', () => {
     await db.query(
       `update public.accounts
           set state = 'agency_trial', trial_variant = 'no_card', trial_ends_at = $2, trial_used_at = now(),
-              state_history = state_history || jsonb_build_array(jsonb_build_object('state', 'agency_trial', 'since', now()::text))
+              state_history = state_history || jsonb_build_array(jsonb_build_object('state', 'agency_trial', 'since', ${NEXT_SINCE}))
         where id = $1`,
       [own.accountId, at(10)],
     );

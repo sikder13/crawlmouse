@@ -16,6 +16,7 @@ import {
   adminOver,
   keptSite,
   makePaid,
+  NEXT_SINCE,
   person,
   scopeWorld,
   sessionOver,
@@ -186,22 +187,31 @@ describe('/agency for an agency account born from the trial form (CC-29), in its
   /** The account as `start_agency_trial_account` makes it, then on its trial as Checkout leaves it. */
   async function trialist(tag: string) {
     const p = await person(h.db, tag);
-    const { rows } = await h.db.query<{ r: { account_id: string; site_id: string } }>(
-      `select public.start_agency_trial_account($1, 'Trial Agency', $2) r`,
-      [p.id, `${tag}-first-client.example`],
-    );
-    const { account_id: accountId, site_id: siteId } = rows[0]!.r;
-    await makePaid(h.db, accountId, 'agency');
-    await h.db.query(
-      `update public.accounts
-          set state = 'agency_trial', trial_variant = 'card_required', trial_used_at = now(),
-              trial_ends_at = now() + interval '5 days',
-              state_history = state_history || jsonb_build_array(
-                jsonb_build_object('state', 'agency_trial', 'since', now()::text))
-        where id = $1`,
-      [accountId],
-    );
-    return { p, accountId, siteId };
+    // In one transaction, where `now()` is one instant for every statement: the three entries of
+    // the account's history are written at the same time by the clock, and must still move forward.
+    await h.db.query('begin');
+    try {
+      const { rows } = await h.db.query<{ r: { account_id: string; site_id: string } }>(
+        `select public.start_agency_trial_account($1, 'Trial Agency', $2) r`,
+        [p.id, `${tag}-first-client.example`],
+      );
+      const { account_id: accountId, site_id: siteId } = rows[0]!.r;
+      await makePaid(h.db, accountId, 'agency');
+      await h.db.query(
+        `update public.accounts
+            set state = 'agency_trial', trial_variant = 'card_required', trial_used_at = now(),
+                trial_ends_at = now() + interval '5 days',
+                state_history = state_history || jsonb_build_array(
+                  jsonb_build_object('state', 'agency_trial', 'since', ${NEXT_SINCE}))
+          where id = $1`,
+        [accountId],
+      );
+      await h.db.query('commit');
+      return { p, accountId, siteId };
+    } catch (e) {
+      await h.db.query('rollback');
+      throw e;
+    }
   }
 
   it('loads: the matrix lists the first client the form stored, and the record holds the consent the form recorded', async () => {
