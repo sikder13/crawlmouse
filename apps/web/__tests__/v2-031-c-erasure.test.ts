@@ -480,6 +480,40 @@ describe('(d) the client contact and report recipient of another account', () =>
     await nothingLeftOf(contact.email);
   });
 
+  it('a contact who confirmed and paused: the schedule keeps no record of them once they are erased', async () => {
+    const email = `confirmed-${randomUUID().slice(0, 8)}@client.example`;
+    await asContact(email);
+    // The schedule as the product leaves it for a contact who confirmed, was mailed a report (the
+    // pause link's hash is derived from their address) and then pressed the pause link.
+    await db.query(`delete from public.report_schedules where site_id = $1`, [world.site2.id]);
+    await insertRow(db, 'report_schedules', {
+      ...ROWS.report_schedules(world.site2.id, world.accountId),
+      page_slug: `erased-${world.site2.id.slice(0, 8)}`,
+      recipient_confirm_hash: sha(`confirm-${email}`),
+      recipient_confirm_sent_at: '2026-11-01T10:00:00.000Z',
+      recipient_confirmed_at: '2026-11-01T10:05:00.000Z',
+      pause_token_hash: sha(`pause-${email}`),
+      paused_by_recipient_at: '2026-11-08T10:00:00.000Z',
+    });
+    await erase({ email });
+    const {
+      rows: [left],
+    } = await db.query(
+      `select recipient_confirm_hash, recipient_confirm_sent_at, recipient_confirmed_at,
+              pause_token_hash, paused_by_recipient_at
+         from public.report_schedules where site_id = $1`,
+      [world.site2.id],
+    );
+    expect(left).toEqual({
+      recipient_confirm_hash: null,
+      recipient_confirm_sent_at: null,
+      recipient_confirmed_at: null,
+      pause_token_hash: null,
+      paused_by_recipient_at: null,
+    });
+    await nothingLeftOf(email);
+  });
+
   it('a contact with no account, erased by address: the same two rules', async () => {
     const email = `no-account-${randomUUID().slice(0, 8)}@client.example`;
     await asContact(email);
