@@ -232,6 +232,8 @@ describe('dossier', () => {
     expect(d.fixes).toEqual([
       { id: open, site_id: s1.id, number: 7, type: 'orphan_pages', status: 'open' },
     ]);
+    // The resolved fix is neither listed nor counted, so the page reports nothing withheld.
+    expect(d.totals.fixes).toBe(1);
     expect(d.rules.map((r) => r.id)).toEqual([rule]);
     expect(d.alerts.map((a) => a.id)).toEqual([event]);
   });
