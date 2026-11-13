@@ -3,6 +3,7 @@ import { checkRateLimit } from '@/lib/rate-limit';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { supabaseServer } from '@/lib/supabase/server';
 import { isId, notFound, readBody, refuse, refuseTo } from '@/lib/v2/account/route';
+import { CONFIRM_MAILS_PER_DAY } from '@/lib/v2/agency/confirm-bounds';
 import { CLIENT_REPORTS_PAGE, resumeSchedule } from '@/lib/v2/agency/schedules';
 import { clientReportsGate, clientSiteOf } from '@/lib/v2/agency/schedules-caller';
 import { inngestClientReportMail, supabaseSchedulesStore } from '@/lib/v2/agency/schedules-store';
@@ -13,7 +14,7 @@ export const dynamic = 'force-dynamic';
 type Context = { params: Promise<{ siteId: string }> };
 
 /** Confirmation mails an account may ask for in a day; it fails closed. */
-const PER_ACCOUNT_DAY = 20;
+const PER_ACCOUNT_DAY = CONFIRM_MAILS_PER_DAY.account;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /**

@@ -4,6 +4,7 @@
  * compiler holds the two lists to one set. A code outside it shows nothing.
  */
 import type { Tier } from '../../entitlement-v2';
+import { CONFIRM_MAILS_PER_DAY } from '../agency/confirm-bounds';
 import { sitesFullMessage } from '../agency/gates';
 import { ALERTS_SENDER } from '../../auth/constants';
 import type { Addition } from '../copy-registry';
@@ -16,6 +17,12 @@ const capitalised = (t: string) => t[0]!.toUpperCase() + t.slice(1);
 /** In an Agency trial: why a client's contact was not mailed, and when it will be. */
 const WAITS_FOR_PLAN =
   'During the trial, reports go to your own address only: this contact is asked to confirm once the trial has become the plan.';
+
+/**
+ * What a sender is told once the confirmation was asked for. It states a request and not a
+ * delivery: the mailer keeps the address's own bound, across senders, and past it sends nothing.
+ */
+const ASKED_TO_CONFIRM = `The contact is being asked to confirm, and reports are sent once it does. An address is sent at most ${CONFIRM_MAILS_PER_DAY.address} of these requests in a day, from any sender; past that, the schedule’s next run asks.`;
 
 /** `at` is the next-allowed time in the account's zone ("Tue 13:30"), or null when none was sent. */
 export const NOTICE_LINES: Record<NoticeCode, (at: string | null) => string> = {
@@ -111,13 +118,11 @@ export const NOTICE_LINES: Record<NoticeCode, (at: string | null) => string> = {
   share_revoked: () => 'The link was withdrawn and no longer opens.',
   not_ready: () => 'That report’s file is not stored yet, so no link was made.',
   schedule_saved: () => 'The schedule was saved.',
-  schedule_saved_asked: () =>
-    'The schedule was saved, and the contact was sent a link to confirm. Reports are sent once the contact confirms.',
+  schedule_saved_asked: () => `The schedule was saved. ${ASKED_TO_CONFIRM}`,
   schedule_saved_waits: () => `The schedule was saved. ${WAITS_FOR_PLAN}`,
   schedule_cleared: () => 'The schedule was removed. No more reports are sent for this client.',
   client_saved: () => 'Saved.',
-  client_saved_asked: () =>
-    'Saved. The contact was sent a link to confirm. Reports are sent once the contact confirms.',
+  client_saved_asked: () => `Saved. ${ASKED_TO_CONFIRM}`,
   client_saved_waits: () => `Saved. ${WAITS_FOR_PLAN}`,
   client_saved_later: () =>
     'Saved. No more confirmations can be sent today: the contact is asked at the schedule’s next run.',
@@ -126,9 +131,8 @@ export const NOTICE_LINES: Record<NoticeCode, (at: string | null) => string> = {
     'A confirmation was asked for. Reports are sent once the contact confirms.',
   confirmation_waits: () => WAITS_FOR_PLAN,
   nothing_to_confirm: () =>
-    'There is nothing to confirm: the client has no schedule or no contact, or the contact has confirmed.',
-  schedule_resumed: () =>
-    'The contact was sent a link to confirm again. Reports start again once the contact confirms.',
+    'There is nothing to confirm: the client has no schedule or no contact, the contact has confirmed, or the recipient has paused the reports.',
+  schedule_resumed: () => `The pause was lifted. ${ASKED_TO_CONFIRM}`,
   schedule_resumed_later: () =>
     'The pause was lifted. The contact is asked to confirm again at the schedule’s next run; reports start once it confirms.',
   not_paused: () => 'That schedule is not paused.',

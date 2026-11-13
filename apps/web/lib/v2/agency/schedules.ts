@@ -196,23 +196,38 @@ export interface ClientDeps {
  * What became of asking a site's contact to confirm: `asked` (the mail was asked for); `waits`
  * (the account is in its Agency trial and the contact is not its owner's own address: nothing is
  * mailed until the trial has become the plan); `later` (the account's daily bound is spent: the
- * schedule's next run asks); `none` (nothing to ask: no schedule, no contact, a contact that has
- * confirmed, or one the caller's `when` does not ask again).
+ * schedule's next run asks); `none` (nothing to ask: no schedule, no contact, a schedule its
+ * recipient has paused, a contact that has confirmed, or one the caller's `when` does not ask again).
+ *
+ * `asked` says the request was made, not that a mail was delivered: the mailer keeps a bound of its
+ * own for each address, across accounts, and answers a request past it by sending nothing.
  */
 export type Confirmation = 'asked' | 'waits' | 'later' | 'none';
 
-async function askToConfirm(
+/** The outcome, and with `later` the verdict that refused it (it holds when the bound resets). */
+type Asked =
+  | { confirmation: Exclude<Confirmation, 'later'> }
+  | { confirmation: 'later'; verdict: LimitVerdict };
+
+async function ask(
   deps: ClientDeps,
   site: ClientSite,
   when: readonly ConfirmationState[],
-): Promise<Confirmation> {
+): Promise<Asked> {
   const state = await deps.store.confirmationState(site);
-  if (state === 'trial') return 'waits';
-  if (!when.includes(state)) return 'none';
-  if (!(await deps.confirmations()).allowed) return 'later';
+  if (state === 'trial') return { confirmation: 'waits' };
+  if (!when.includes(state)) return { confirmation: 'none' };
+  const verdict = await deps.confirmations();
+  if (!verdict.allowed) return { confirmation: 'later', verdict };
   await deps.mail.confirmation({ siteId: site.siteId, key: deps.now().toISOString() });
-  return 'asked';
+  return { confirmation: 'asked' };
 }
+
+const askToConfirm = async (
+  deps: ClientDeps,
+  site: ClientSite,
+  when: readonly ConfirmationState[],
+): Promise<Confirmation> => (await ask(deps, site, when)).confirmation;
 
 const SAVED_SCHEDULE: Record<Confirmation, NoticeCode> = {
   asked: 'schedule_saved_asked',
@@ -269,7 +284,8 @@ export async function saveClient(
 
 /**
  * POST …/confirm: the confirmation mail again, for a schedule whose contact has not confirmed.
- * 409 `nothing_to_confirm` with no schedule, no contact or a contact that has confirmed; 409
+ * 409 `nothing_to_confirm` with no schedule, no contact, a contact that has confirmed or a schedule
+ * its recipient has paused (resume is the one way to ask then); 409
  * `confirmation_waits` in an Agency trial for a contact that is not the owner's own address; 429
  * past the account's daily bound.
  */
@@ -278,8 +294,8 @@ export async function resendConfirmation(
   site: ClientSite,
   kind: Kind,
 ): Promise<Response> {
-  const confirmation = await askToConfirm(deps, site, ['pending', 'asked']);
-  switch (confirmation) {
+  const asked = await ask(deps, site, ['pending', 'asked']);
+  switch (asked.confirmation) {
     case 'asked':
       return done(kind, 'confirmation_requested', { requested: true });
     case 'waits':
@@ -287,8 +303,7 @@ export async function resendConfirmation(
     case 'none':
       return refuseTo(kind, CLIENT_REPORTS_PAGE, 409, 'nothing_to_confirm');
     case 'later': {
-      // The bound was asked a moment ago and refused: asked again, it gives the time it resets.
-      const verdict = await deps.confirmations();
+      const { verdict } = asked;
       const seconds = Math.max(
         1,
         Math.ceil((verdict.resetAt.getTime() - deps.now().getTime()) / 1000),

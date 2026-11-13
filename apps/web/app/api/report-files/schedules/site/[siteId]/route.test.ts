@@ -53,6 +53,7 @@ vi.mock('@/lib/rate-limit', () => ({
   },
 }));
 
+import { CONFIRM_MAILS_PER_DAY } from '@/lib/v2/agency/confirm-bounds';
 import { POST as USE_CONFIRM } from '../../../confirm/route';
 import { POST as USE_PAUSE } from '../../../pause/route';
 import { GET as LAND_CONFIRM } from '../../../../../s/confirm/[token]/route';
@@ -245,6 +246,14 @@ async function confirmedWorld(): Promise<World> {
   return w;
 }
 
+/** The account's bound on confirmation mail, as each route that asks for the mail must ask it. */
+const confirmBound = (accountId: string) => ({
+  key: `report-confirm:account:${accountId}`,
+  limit: CONFIRM_MAILS_PER_DAY.account,
+  windowMs: 86_400_000,
+  failClosed: true,
+});
+
 describe('what each answer says became of the confirmation', () => {
   const events = () => h.send.mock.calls.map((c) => (c[0] as { name: string }).name);
   const said = async (res: Response) =>
@@ -266,8 +275,11 @@ describe('what each answer says became of the confirmation', () => {
     as(w.owner);
     expect(await said(await patch(w.siteId, { contactEmail: 'c@client.example' }))).toBe('none');
     expect(events()).toEqual([]);
+    h.limits.length = 0;
     expect(await said(await put(w.siteId))).toBe('asked');
     expect(events()).toEqual(['report.confirmation.requested']);
+    // The save asks within the account's bound on confirmation mail, which fails closed.
+    expect(h.limits).toEqual([confirmBound(w.accountId)]);
     // Saved again, with the link sent and not used: nothing more is asked.
     await h.db.query(
       `update public.report_schedules set recipient_confirm_sent_at = now() where site_id = $1`,
@@ -322,6 +334,140 @@ describe('what each answer says became of the confirmation', () => {
     const saved = await patch(w.siteId, { contactEmail: 'c@client.example' });
     expect([saved.status, await said(saved)]).toEqual([200, 'later']);
     expect(events()).toEqual([]);
+  });
+
+  it('past the day’s bound a saved schedule stands and asks for nothing', async () => {
+    const w = await world();
+    as(w.owner);
+    await patch(w.siteId, { contactEmail: 'c@client.example' });
+    h.over.add('report-confirm');
+    const saved = await put(w.siteId);
+    expect([saved.status, await said(saved)]).toEqual([200, 'later']);
+    expect(events()).toEqual([]);
+    expect(await schedule(w.siteId)).toBeDefined();
+  });
+
+  it('while its recipient has paused a schedule, no save and no “ask again” asks them anything: resume is the one way', async () => {
+    const w = await confirmedWorld();
+    const t = await token('issue_report_pause', w.siteId);
+    await h.db.query(`select public.pause_report_schedule($1, now())`, [sha256(t)]);
+    as(w.owner);
+    h.limits.length = 0;
+    const again = await resend(w.siteId);
+    expect([again.status, await again.json()]).toEqual([409, { code: 'nothing_to_confirm' }]);
+    expect(await said(await put(w.siteId))).toBe('none');
+    expect(events()).toEqual([]);
+    expect(h.limits).toEqual([]);
+    expect((await schedule(w.siteId))!.paused_by_recipient_at).not.toBeNull();
+
+    // The same once the confirmation is gone: resumed, asked, and paused again with the old link,
+    // the schedule is one whose contact has not confirmed, and still nothing but resume asks.
+    expect(await said(await resume(w.siteId))).toBe('asked');
+    await h.db.query(`select public.pause_report_schedule($1, now())`, [sha256(t)]);
+    expect((await schedule(w.siteId))!.recipient_confirmed_at).toBeNull();
+    h.send.mockClear();
+    h.limits.length = 0;
+    const unconfirmed = await resend(w.siteId);
+    expect([unconfirmed.status, await unconfirmed.json()]).toEqual([
+      409,
+      { code: 'nothing_to_confirm' },
+    ]);
+    expect(await said(await put(w.siteId))).toBe('none');
+    expect(events()).toEqual([]);
+    expect(h.limits).toEqual([]);
+  });
+});
+
+describe('the notice a form is answered with says what became of the confirmation', () => {
+  const location = (res: Response) => [res.status, res.headers.get('location')];
+  const to = (code: string) => [303, `/agency/reports?notice=${code}`];
+  const scheduleForm = (siteId: string) =>
+    SCHEDULE_FORM(
+      request(
+        base(siteId),
+        'POST',
+        '_method=PUT&cadence=weekly&isoWeekday=1&timeLocal=09%3A00&timezone=UTC',
+        FORM,
+      ),
+      ctx(siteId),
+    );
+  const clientForm = (siteId: string, contact: string) =>
+    CLIENT_FORM(
+      request(
+        `${base(siteId)}/client`,
+        'POST',
+        `_method=PATCH&contactEmail=${encodeURIComponent(contact)}`,
+        FORM,
+      ),
+      ctx(siteId),
+    );
+  const resumeForm = (siteId: string) =>
+    RESUME(request(`${base(siteId)}/resume`, 'POST', '', FORM), ctx(siteId));
+  const inTrial = (accountId: string) =>
+    h.db.query(
+      `update public.accounts
+          set state = 'agency_trial', trial_variant = 'card_required', trial_used_at = now(),
+              trial_ends_at = now() + interval '5 days',
+              state_history = state_history || jsonb_build_array(
+                jsonb_build_object('state', 'agency_trial', 'since', now()::text))
+        where id = $1`,
+      [accountId],
+    );
+  const pausedWorld = async () => {
+    const w = await confirmedWorld();
+    const t = await token('issue_report_pause', w.siteId);
+    await h.db.query(`select public.pause_report_schedule($1, now())`, [sha256(t)]);
+    return w;
+  };
+
+  it('a saved schedule: asked, waiting for the plan, and nothing to ask', async () => {
+    const asked = await world();
+    as(asked.owner);
+    await patch(asked.siteId, { contactEmail: 'c@client.example' });
+    expect(location(await scheduleForm(asked.siteId))).toEqual(to('schedule_saved_asked'));
+
+    const waits = await world();
+    await inTrial(waits.accountId);
+    as(waits.owner);
+    await patch(waits.siteId, { contactEmail: 'outside@client.example' });
+    expect(location(await scheduleForm(waits.siteId))).toEqual(to('schedule_saved_waits'));
+
+    const none = await world();
+    as(none.owner);
+    expect(location(await scheduleForm(none.siteId))).toEqual(to('schedule_saved'));
+  });
+
+  it('a saved contact: asked, asked at the next run, and nothing to ask', async () => {
+    const w = await world();
+    as(w.owner);
+    await put(w.siteId);
+    expect(location(await clientForm(w.siteId, 'c@client.example'))).toEqual(
+      to('client_saved_asked'),
+    );
+    h.over.add('report-confirm');
+    expect(location(await clientForm(w.siteId, 'd@client.example'))).toEqual(
+      to('client_saved_later'),
+    );
+    h.over.clear();
+    // The same address again: the contact did not change.
+    expect(location(await clientForm(w.siteId, 'd@client.example'))).toEqual(to('client_saved'));
+  });
+
+  it('a resume: asked, asked at the next run, and waiting for the plan', async () => {
+    const asked = await pausedWorld();
+    as(asked.owner);
+    expect(location(await resumeForm(asked.siteId))).toEqual(to('schedule_resumed'));
+
+    const later = await pausedWorld();
+    as(later.owner);
+    h.over.add('report-confirm');
+    expect(location(await resumeForm(later.siteId))).toEqual(to('schedule_resumed_later'));
+    h.over.clear();
+
+    const waits = await pausedWorld();
+    await inTrial(waits.accountId);
+    as(waits.owner);
+    expect(location(await resumeForm(waits.siteId))).toEqual(to('confirmation_waits'));
   });
 });
 
@@ -544,14 +690,7 @@ describe('PATCH …/client', () => {
       `report_confirm:${w.siteId}:${(event.data as { request_id: string }).request_id}`,
     );
     expect(JSON.stringify(event)).not.toContain('harborlight');
-    expect(h.limits).toEqual([
-      {
-        key: `report-confirm:account:${w.accountId}`,
-        limit: 20,
-        windowMs: 86_400_000,
-        failClosed: true,
-      },
-    ]);
+    expect(h.limits).toEqual([confirmBound(w.accountId)]);
   });
 
   it('asks for no confirmation when the contact did not change, or was taken away', async () => {
@@ -800,7 +939,7 @@ describe('the recipient’s pause link, and POST …/resume', () => {
     expect(h.send.mock.calls.map((c) => (c[0] as { name: string }).name)).toEqual([
       'report.confirmation.requested',
     ]);
-    expect(h.limits.map((l) => l.key)).toEqual([`report-confirm:account:${w.accountId}`]);
+    expect(h.limits).toEqual([confirmBound(w.accountId)]);
     const again = await resume(w.siteId);
     expect(again.status).toBe(409);
     expect(await again.json()).toEqual({ code: 'not_paused' });

@@ -23,6 +23,7 @@
  * record is `send()`'s, which answers a failure there with `MailRetry` too; a fix email's `sent_at`
  * write that fails after the send is retried the same way.
  */
+import { CONFIRM_MAILS_PER_DAY } from '../agency/confirm-bounds';
 import type {
   EmailRequestedData,
   MailHandlers,
@@ -228,11 +229,8 @@ export function mailHandlers(d: MailHandlerDeps): MailHandlers {
   };
 }
 
-/**
- * Confirmation mails in any 24 hours: for one account (the bound its two routes also keep), and to
- * one address, whichever account or site asks.
- */
-export const CONFIRM_MAILS_PER_DAY = { account: 20, address: 3 } as const;
+/** The day's bounds on confirmation mail, kept here from the ledger (`../agency/confirm-bounds`). */
+export { CONFIRM_MAILS_PER_DAY };
 
 /** The longest `request_id` a confirmation's ledger key takes; the key itself holds 200 characters. */
 export const REQUEST_ID_MAX = 100;

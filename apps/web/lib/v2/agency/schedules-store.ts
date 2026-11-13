@@ -54,6 +54,7 @@ export type ConfirmationState =
   | 'pending'
   | 'asked'
   | 'trial'
+  | 'paused'
   | 'confirmed'
   | 'no_contact'
   | 'no_schedule';
@@ -153,7 +154,7 @@ export function supabaseSchedulesStore(admin: SupabaseClient): SchedulesStore {
     async confirmationState(site) {
       const schedule = await admin
         .from('report_schedules')
-        .select('recipient_confirmed_at, recipient_confirm_sent_at')
+        .select('recipient_confirmed_at, recipient_confirm_sent_at, paused_by_recipient_at')
         .eq('site_id', site.siteId)
         .eq('account_id', site.accountId)
         .maybeSingle();
@@ -172,7 +173,10 @@ export function supabaseSchedulesStore(admin: SupabaseClient): SchedulesStore {
       const held = schedule.data as {
         recipient_confirmed_at: string | null;
         recipient_confirm_sent_at: string | null;
+        paused_by_recipient_at: string | null;
       };
+      // A recipient's pause is final from the sender's side: resume is the one way to ask.
+      if (held.paused_by_recipient_at) return 'paused';
       if (held.recipient_confirmed_at) return 'confirmed';
 
       // In its Agency trial an account mails its owner's own address and no other.

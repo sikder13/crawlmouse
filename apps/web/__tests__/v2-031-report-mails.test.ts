@@ -8,7 +8,8 @@ import { createHash } from 'node:crypto';
 import type { PGlite } from '@electric-sql/pglite';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { adminOver } from '../lib/v2/account/sites-test-support';
-import { reportMailHandlers } from '../lib/v2/mail/handlers';
+import { hashMailAddress } from '../lib/v2/mail/address-hash';
+import { CONFIRM_MAILS_PER_DAY, reportMailHandlers } from '../lib/v2/mail/handlers';
 import { supabaseMailLedger } from '../lib/v2/mail/ledger';
 import { memoryLedger, memoryTransport } from '../lib/v2/mail/memory';
 import { supabaseReportMailStore } from '../lib/v2/mail/report-mail-store';
@@ -364,5 +365,70 @@ describe('the confirmation’s daily bound over the real ledger', () => {
     // Twenty-four hours after the first, the first has left the window.
     const next = new Date(day.getTime() + 24 * 60 * 60 * 1000 + 1000);
     expect(await handlersAt(next).reportConfirm(site, 'run-next-day')).toBe('sent');
+  });
+
+  it('the account’s twenty-first confirmation in a day is not sent, to whichever address; mail of another kind is not counted, nor another account’s; a day on, it is sent', async () => {
+    const site = w.other.id;
+    const address = 'twentieth@client.example';
+    await db.query(`select public.set_client($1, $2, $3::jsonb)`, [
+      site,
+      w.accountId,
+      JSON.stringify({ client_contact_email: address }),
+    ]);
+    const day = new Date('2027-01-11T09:00:00.000Z');
+    const claim = (key: string, kind: string, hash: string) =>
+      db.query(`select public.claim_email_send($1, $2, $3, $4, $5)`, [
+        key,
+        kind,
+        hash,
+        w.accountId,
+        day,
+      ]);
+    // One short of the account's bound, each to an address of its own: other clients' contacts.
+    const short = CONFIRM_MAILS_PER_DAY.account - 1;
+    for (let i = 0; i < short; i++) {
+      await claim(`report_confirm:other-client-${i}:run`, 'report_confirm', sha256(`client-${i}`));
+    }
+    // Mail of another kind, for the account and to this very address: neither count is of it.
+    const own = hashMailAddress(PEPPER, address);
+    for (let i = 0; i < CONFIRM_MAILS_PER_DAY.address; i++) {
+      await claim(`seat_invite:bound-${i}`, 'seat_invite', own);
+    }
+    const counts = async (account: string) =>
+      (
+        await db.query<{ c: { account: number; address: number } }>(
+          `select public.report_confirm_mail_counts($1, $2, $3) c`,
+          [account, own, new Date(day.getTime() - 60_000)],
+        )
+      ).rows[0]!.c;
+    expect(await counts(w.accountId)).toEqual({ account: short, address: 0 });
+
+    const transport = memoryTransport();
+    const handlersAt = (at: Date) =>
+      reportMailHandlers({
+        mail: {
+          ledger: supabaseMailLedger(adminOver(db)),
+          transport,
+          pepper: PEPPER,
+          now: () => at,
+          log: () => {},
+        },
+        store: store(),
+        capture: async () => undefined,
+        pauseLinks: true,
+      });
+    const hour = (n: number) => new Date(day.getTime() + n * 60 * 60 * 1000);
+    // The twentieth goes; the twenty-first does not, though its address has had one.
+    expect(await handlersAt(hour(1)).reportConfirm(site, 'account-20')).toBe('sent');
+    expect(await handlersAt(hour(2)).reportConfirm(site, 'account-21')).toBe('bounded');
+    expect(transport.sent).toHaveLength(1);
+    expect(await counts(w.accountId)).toEqual({
+      account: CONFIRM_MAILS_PER_DAY.account,
+      address: 1,
+    });
+    // Another account's count holds none of these: the address's one is the address's, not its own.
+    expect(await counts(w.stranger.accountId)).toEqual({ account: 0, address: 1 });
+    // A day after the nineteen, they have left the window.
+    expect(await handlersAt(hour(24.5)).reportConfirm(site, 'account-next-day')).toBe('sent');
   });
 });
