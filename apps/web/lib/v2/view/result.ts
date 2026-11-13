@@ -20,6 +20,7 @@ import {
   formatPoints,
   groupSum,
   NO_EFFECT,
+  makesReadable,
   NO_EFFECT_SHORT,
   pagesReadable,
 } from './effect-headline';
@@ -811,12 +812,7 @@ function fixRows(
       key: 'rest',
       title: `${capitalise(numberWord(rest.length))} more, grouped by type`,
       scope: null,
-      points: withPages(
-        rest.some((f) => f.effect.technical_seo === null)
-          ? 'SEO not estimated'
-          : restPoints(rest.map((f) => f.effect.technical_seo!)),
-        pagesReadable(rest),
-      ),
+      points: restPoints(rest),
       open: false,
       count: rest.length,
       href: '#pro',
@@ -825,16 +821,28 @@ function fixRows(
   return rows;
 }
 
-/** A grouped row's points with the pages its `pages_readable` fixes make readable, when it has any. */
-function withPages(seo: string, pages: string | null): string {
-  if (pages === null) return seo;
-  return seo === NO_EFFECT_SHORT ? pages : `${seo}; ${pages}`;
-}
-
-/** The grouped row's Technical SEO points, summed as `groupSum` sums them. */
-export function restPoints(seo: readonly number[]): string {
-  const signed = formatPoints(groupSum(seo));
-  return signed === null ? NO_EFFECT_SHORT : `${signed} SEO`;
+/**
+ * The grouped row's points, in the table's short words and by `groupPoints`' rule
+ * (segment/fixes.ts): each grade's points summed with every member taken at 0 when below it
+ * (`groupSum`), "SEO not estimated" when a member's Technical SEO effect is, the pages the
+ * `pages_readable` members make readable, and how many members' AI effect still waits. "No measurable
+ * effect" only when none of that has anything to say.
+ */
+export function restPoints(
+  fixes: readonly Pick<Fix, 'type' | 'effect' | 'affected_pages' | 'last_state'>[],
+): string {
+  const seoUnknown = fixes.some((f) => f.effect.technical_seo === null);
+  const seo = seoUnknown ? null : formatPoints(groupSum(fixes.map((f) => f.effect.technical_seo!)));
+  const ai = formatPoints(groupSum(fixes.map((f) => f.effect.ai_readability ?? 0)));
+  const figures = [seo && `${seo} SEO`, ai && `${ai} AI`].filter(Boolean).join(', ');
+  const waiting = fixes.filter((f) => f.effect.ai_readability === null && !makesReadable(f)).length;
+  const parts = [
+    figures || null,
+    seoUnknown ? 'SEO not estimated' : null,
+    pagesReadable(fixes),
+    waiting ? `AI not yet estimated for ${waiting}` : null,
+  ].filter(Boolean);
+  return parts.length ? parts.join('; ') : NO_EFFECT_SHORT;
 }
 
 const GROUP_NAMES: Record<CrawlerResult['group'], string> = {

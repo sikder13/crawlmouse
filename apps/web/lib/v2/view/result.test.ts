@@ -380,11 +380,19 @@ describe('the tables’ labels', () => {
     // pages it makes readable (CC-32 Q8), the others by their waiting AI effect
     const pages = pagesReadableText(shell!.affected_pages, shell!.last_state === 'detected');
     const named = new Set(rows.map((r) => r.key));
+    // the grouped row: the shell fix's pages when it is a member, and the other members' waiting AI
+    const restCount = rows.find((r) => r.key === 'rest')?.count ?? 0;
+    const shellInRest = !named.has(shell!.id);
+    const restWaiting = restCount - (shellInRest ? 1 : 0);
     const want = (key: string) =>
       key === 'rest'
-        ? named.has(shell!.id)
-          ? 'SEO not estimated'
-          : `SEO not estimated; ${pages}`
+        ? [
+            'SEO not estimated',
+            shellInRest ? pages : null,
+            restWaiting ? `AI not yet estimated for ${restWaiting}` : null,
+          ]
+            .filter(Boolean)
+            .join('; ')
         : key === shell!.id
           ? pages
           : section[key] === 'structure'
