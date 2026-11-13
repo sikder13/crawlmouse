@@ -22,6 +22,7 @@ import { AGENCY_MONTHLY } from '../../billing/prices';
 import { GATES } from '../../entitlement-v2';
 import { fixture } from '../fixtures';
 import type { Viewer } from './account';
+import { agencyClientView } from './agency-client';
 import { agencyGate, agencyHomeView, type MatrixView } from './agency-matrix';
 import { dashboardView } from './dashboard';
 
@@ -128,6 +129,43 @@ describe('the client matrix', () => {
       nextCheck: 'none scheduled',
       schedule: 'not scheduled · no report',
     });
+  });
+
+  it('says of a schedule what holds it: paused by its recipient, or no contact to send to', () => {
+    const cell = (data: FixtureDataset, siteId: string) =>
+      matrix(data, northwind).clients.rows.find((r) => r.key === siteId)!.schedule;
+    const granite = d.sites.find((s) => s.id === GRANITEPEAK_SITE)!;
+    const paused = edit((x) => ({
+      sites: x.sites.map((s) =>
+        s.id === GRANITEPEAK_SITE
+          ? {
+              ...s,
+              client_report: {
+                ...granite.client_report!,
+                paused_by_recipient_at: '2026-11-01T09:00:00Z',
+              },
+            }
+          : s,
+      ),
+    }));
+    expect(cell(paused, GRANITEPEAK_SITE)).toBe(
+      'weekly, Fri · report weekly, Mon (paused by the recipient)',
+    );
+    const uncontacted = edit((x) => ({
+      sites: x.sites.map((s) =>
+        s.id === HARBORLIGHT_SITE ? { ...s, client_contact_email: null } : s,
+      ),
+    }));
+    expect(cell(uncontacted, HARBORLIGHT_SITE)).toBe(
+      'weekly, Fri · report monthly, first Mon (no contact)',
+    );
+    // A schedule with a contact that is not paused says neither, and no schedule says "no report".
+    expect(cell(d, GRANITEPEAK_SITE)).toBe('weekly, Fri · report weekly, Mon');
+    expect(cell(paused, HARBORLIGHT_SITE)).toBe('weekly, Fri · report monthly, first Mon');
+    // The words are the client page's for the same schedule.
+    const page = agencyClientView(paused, northwind, GRANITEPEAK_SITE);
+    if (page?.kind !== 'client') throw new Error('expected the client page');
+    expect(page.client.rows[1]!.value).toContain('paused by the recipient');
   });
 
   it('leaves a staging copy out: it is not a client', () => {
@@ -312,6 +350,38 @@ describe('the matrix, first run: the next step is the first not done', () => {
     expect(v.header.actions[0]!.primary).toBe(false);
   });
 
+  it('a first check that failed: the step says so, and not that the site was never checked', () => {
+    const failed = edit((x) => ({
+      checks: x.checks.map((c) =>
+        c.site_id === PINECREST
+          ? ({
+              ...c,
+              status: 'failed',
+              started_at: c.queued_at,
+              finished_at: c.queued_at,
+              failure_reason: 'unreachable',
+            } as typeof c)
+          : c,
+      ),
+    }));
+    const v = matrix(failed, kestrel);
+    expect(v.clients.rows[0]!.first).toMatchObject({
+      label: 'First check failed',
+      action: { label: 'Run the first check', method: 'post' },
+    });
+    expect(v.next).toMatchObject({
+      step: 'check',
+      title: 'Run the first check of pinecrest.example',
+      body: 'The first check ended without a result. Run it again to grade the site.',
+      action: { label: 'Run it now', method: 'post', primary: true },
+    });
+    expect(v.next!.body).not.toContain('not been checked');
+    // A client that was never checked keeps its own sentence.
+    expect(matrix(notChecked, kestrel).next!.body).toBe(
+      'It has not been checked yet. The first check grades the site and lists its fixes.',
+    );
+  });
+
   it('a first check under way: the row links to it, and there is no step to take', () => {
     const v = matrix(d, kestrel);
     expect(v.clients.rows[0]!.first).toMatchObject({
@@ -418,6 +488,33 @@ describe('/agency for an account that is not on Agency', () => {
         },
       ],
     });
+  });
+
+  it('a reader acting in the agency, on a page of their personal account, is not told they act in the personal one', () => {
+    // `/agency/clients/<a site of the personal account>`, opened while acting in Northwind.
+    const visiting = agencyGate(bad, home, {
+      accounts: [PERSONAL, AGENCY],
+      actingIn: NORTHWIND_ACCOUNT_ID,
+    });
+    if (visiting?.kind !== 'open') throw new Error(`expected the switch, got ${visiting?.kind}`);
+    expect(visiting.body).toBe(
+      'This page is of Personal account, which has no client workspace. Open the agency to see its clients.',
+    );
+    expect(visiting.body).not.toContain('You are acting in');
+    // The rail says which account they act in, and offers the switch to the one shown.
+    expect(visiting.shell.switcher?.visiting?.acting).toBe('Northwind Digital');
+    // Acting in the personal account, the sentence is theirs.
+    const acting = agencyGate(bad, home, { accounts: [PERSONAL, AGENCY] });
+    if (acting?.kind !== 'open') throw new Error('expected the switch');
+    expect(acting.body).toBe(
+      'You are acting in Personal account, which has no client workspace. Open the agency to see its clients.',
+    );
+    expect(acting.shell.switcher?.visiting).toBeNull();
+    const named = agencyGate(bad, home, {
+      accounts: [PERSONAL, AGENCY],
+      actingIn: BAD_ACCOUNT_ID,
+    });
+    expect(named).toMatchObject({ kind: 'open', body: acting.body });
   });
 
   it('an agency account with no plan is told the same as any account below Agency', () => {

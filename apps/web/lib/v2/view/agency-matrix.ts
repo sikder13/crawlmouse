@@ -16,7 +16,7 @@ import { GATES } from '../../entitlement-v2';
 import { extrasSold } from '../agency/extras-bounds';
 import { roleMay } from '../agency/guard';
 import { agencyGateMessage } from '../agency/gates';
-import { MATRIX_COPY as COPY } from '../copy/agency';
+import { CLIENT_COPY, MATRIX_COPY as COPY } from '../copy/agency';
 import { dayDate, hourMinute, listOf, nextWeekly } from '../format';
 import {
   addsSites,
@@ -61,11 +61,16 @@ export interface ClientRowView {
    * A client with no result yet: what its first check is doing ("Not checked yet", "First check
    * running · 42 pages read so far"), and the one thing to do about it: start it, or watch it.
    */
-  first: { label: string; action: ActionView } | null;
+  first: {
+    label: string;
+    action: ActionView;
+    /** The site page's sentence for a first check that ended without a result; else null. */
+    failed: string | null;
+  } | null;
   /** "Fri 6 Nov around 06:00", or "none scheduled". */
   nextCheck: string;
   lastCheck: string;
-  /** "weekly, Fri · report weekly, Mon". */
+  /** "weekly, Fri · report weekly, Mon", with what holds the report where something does. */
   schedule: string;
 }
 
@@ -140,6 +145,11 @@ export interface AgencyReader {
   /** The accounts of the reader's active seats (`AccountViewer.accounts`). */
   accounts?: readonly SwitcherAccount[];
   /**
+   * The account the reader acts in, where the page may be of another one (a client page opened by
+   * its address). Left out, it is the page's account.
+   */
+  actingIn?: string;
+  /**
    * Whether the plan's extra seats and sites can be bought here (`V2_BILLING`): `/seats` draws its
    * buy form only then, so only then does the matrix link to it. Left out, it is not linked.
    */
@@ -153,9 +163,21 @@ export interface AgencyReader {
   reportSent?: boolean;
 }
 
+/**
+ * The report's schedule, and after it what keeps a report from going: its recipient paused it (the
+ * client page's words), or the client has no contact to send to.
+ */
 function reportCell(s: Site): string {
   const r = s.client_report;
-  return r ? COPY.report(r.cadence, WEEKDAYS[r.iso_weekday]!) : COPY.noReport;
+  if (!r) return COPY.noReport;
+  const when = COPY.report(r.cadence, WEEKDAYS[r.iso_weekday]!);
+  const held =
+    r.paused_by_recipient_at !== null
+      ? CLIENT_COPY.pausedByRecipient
+      : s.client_contact_email === null
+        ? COPY.noContact
+        : null;
+  return held === null ? when : COPY.reportHeld(when, held);
 }
 
 /** The earliest weekly check ahead of any client, as the dashboard writes one: "Fri 6 Nov around 06:00". */
@@ -191,6 +213,7 @@ function firstOf(d: AccountDataset, viewer: Viewer, site: Site): ClientRowView['
       act.method === 'post'
         ? action('runCheck', COPY.runFirst, { id: site.id }, { context: site.host })
         : { ...act, primary: false, context: site.host },
+    failed: page.first.state === 'failed' ? page.first.body : null,
   };
 }
 
@@ -253,7 +276,8 @@ function nextStep(
     return {
       step: 'check',
       title: S.checkTitle(unchecked.host),
-      body: S.checkBody,
+      // A check that ended without a result was a check: the site page's sentence for it.
+      body: unchecked.first!.failed ?? S.checkBody,
       // Named apart from the row's own button, which the row's site names.
       action: { ...unchecked.first!.action, label: S.checkAction, primary: true },
     };
@@ -388,17 +412,23 @@ function matrixView(
 
 /**
  * What an Agency-only page shows in place of itself: null on the Agency tier. Below it, the switch
- * when the account is not an agency's and the reader holds a seat on one; else the gate.
+ * when the account is not an agency's and the reader holds a seat on one; else the gate. The
+ * account is the page's; a reader acting in another one (`actingIn`) is not told they act in it.
  */
 export function agencyGate(
   d: AccountDataset,
   viewer: Viewer,
-  { accounts = [] }: AgencyReader = {},
+  { accounts = [], actingIn }: AgencyReader = {},
 ): AgencyGateView | AgencyOpenView | null {
   const v = viewAt(d, viewer);
   if (v.tier === 'agency') return null;
   // Not a page of this account's rail: nothing in it is marked.
-  const shell = accountShellView(v, null, { role: readerRole(v) ?? 'developer', accounts });
+  const shell = accountShellView(v, null, {
+    role: readerRole(v) ?? 'developer',
+    accounts,
+    ...(actingIn ? { actingIn } : {}),
+  });
+  const visiting = actingIn !== undefined && actingIn !== v.account.id;
   const here = accounts.find((a) => a.id === v.account.id);
   const agencies = accounts.filter((a) => a.kind === 'agency' && a.id !== v.account.id);
   if (here && here.kind !== 'agency' && agencies.length > 0) {
@@ -406,7 +436,9 @@ export function agencyGate(
       kind: 'open',
       shell,
       title: COPY.openTitle,
-      body: COPY.openBody(accountLabel(here)),
+      body: visiting
+        ? COPY.openBodyVisiting(accountLabel(here))
+        : COPY.openBody(accountLabel(here)),
       agencies: agencies
         .map((a) => ({ id: a.id, label: accountLabel(a) }))
         .sort((x, y) => x.label.localeCompare(y.label, 'en') || x.id.localeCompare(y.id))

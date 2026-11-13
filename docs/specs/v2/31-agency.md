@@ -402,7 +402,9 @@ lists those. A staging copy has no row. A row's grades, pills, last check and sc
 dashboard's own site row (`dashboardView`), so a withheld grade reads "withheld" as it does there.
 Rows with a problem opened since the site's previous check come first, then by host. The columns are
 Site, Client, Technical SEO, AI readability, Since last check, Next check, Last check, and Schedule ·
-report; Next check is an addition to the artboard.
+report; Next check is an addition to the artboard. The report's part of the last column says what
+holds a schedule's reports where something does: "(paused by the recipient)", the client page's
+words, or "(no contact)".
 
 The header counts the clients against the account's site limit; for a seat that covers some clients
 it says how many are in the seat. The strip is absent until a client has two results. It then gives
@@ -431,7 +433,9 @@ about the account:
 `pnpm --filter @crawlmouse/web exec vitest run lib/v2/view/agency-matrix.test.ts -t 'a seat that covers some clients is not asked'`.
 
 A client with no result yet says in its row what its site page's first-check line says ("Not checked
-yet", "First check queued"), with one button: start the check, or watch it. The first check of such a
+yet", "First check queued"), with one button: start the check, or watch it. Where the first check
+ended without a result the step's sentence is the site page's for that state, not "It has not been
+checked yet". The first check of such a
 client goes through the re-check route as it stands. That route queues it with the trigger `manual`
 (`__tests__/v2-031-c-first-check.test.ts`), so it counts toward the site's `manualChecksPerSiteDay`.
 
@@ -460,7 +464,10 @@ owns a client, so no row links there.
 
 It is a 404 for a malformed id, a site that does not exist, a removed one, a staging copy, and a site
 the caller's seat does not cover. A client with no result yet is shown as the site page's first-check
-screen, on the agency rail. On an account below Agency the page is the gate.
+screen, on the agency rail. On an account below Agency the page is the gate. The page is of the
+site's account, which need not be the one the caller acts in: the gate's switch then says "This page
+is of <that account>", and the rail says which account the caller acts in
+(`agencyGate`'s `actingIn`).
 
 Left out, each a `ruling` row: the "What to tell … this week" paragraph (no view renders its
 sentences from the data) with its two buttons, "Client portal", the line under the fixes about whose
