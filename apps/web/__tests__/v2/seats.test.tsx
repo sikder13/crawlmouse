@@ -209,6 +209,13 @@ describe('seatsView: an Agency account read by its owner (Northwind)', () => {
       );
     }
     expect(usd(EXTRA_SEAT_YEARLY)).toBe('$120');
+    // And where the price waits: past due, the year's price still.
+    const due = SEATS_PREVIEWS[OWNER];
+    const pastDue = structuredClone(due.data());
+    pastDue.accounts.find((a) => a.id === due.viewer().accountId)!.billing_period_months = 12;
+    expect(seatsView(pastDue, due.viewer(), { seatLimit: 5, billing: true }).people.foot).toBe(
+      'One seat free. Beyond five, $120 a seat a year, once the plan’s last payment has gone through.',
+    );
   });
 
   it('takes the seat limit it is given over the account’s own', () => {
