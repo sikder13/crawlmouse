@@ -79,6 +79,18 @@ describe('the pages a shell-only template fix makes readable', () => {
     for (const text of Object.values(p)) expect(text).not.toMatch(GRADE_OR_NONE);
   });
 
+  it('in a group, a fix headed by its pages is not counted as waiting; another fix still is', () => {
+    const waiting: Fix = {
+      ...shellFix(2, null),
+      type: 'quotable_opening',
+      section: 'content',
+    };
+    expect(groupPoints([shellFix(7, null)])).toBe('Makes 7 pages readable without JavaScript');
+    expect(groupPoints([shellFix(7, null), waiting])).toBe(
+      'Makes 7 pages readable without JavaScript; AI effect not yet estimated for 1',
+    );
+  });
+
   it('on a template with graded pages whose AI effect is 0 by rounding, the line still reads (CC-32 D4/Q8 note)', () => {
     // a graded-template fix: its counterfactual sets every graded page's share to 1, so its pages are
     // made readable; its AI effect rounded to 0 (grade/effects.ts DECIMALS)
@@ -92,14 +104,14 @@ describe('the pages a shell-only template fix makes readable', () => {
     );
     for (const state of ['indeterminate', 'not_detected'] as const) {
       expect(points(shellFix(12, 0, 0, state), [])).toBe(
-        'Made 12 pages readable without JavaScript when last detected',
+        'Would make 12 pages readable without JavaScript, as of the last check that detected it',
       );
       expect(points(shellFix(1, null, 0, state), [])).toBe(
-        'Made 1 page readable without JavaScript when last detected',
+        'Would make 1 page readable without JavaScript, as of the last check that detected it',
       );
     }
     expect(groupPoints([shellFix(4), shellFix(3, 0, 0, 'indeterminate')])).toBe(
-      'Makes 4 pages readable without JavaScript; Made 3 pages readable without JavaScript when last detected',
+      'Makes 4 pages readable without JavaScript; Would make 3 pages readable without JavaScript, as of the last check that detected it',
     );
   });
 
