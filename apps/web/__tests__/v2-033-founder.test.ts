@@ -550,10 +550,6 @@ describe('founder_digest_counts', () => {
 
 describe('founder_digest_counts, send failures (review C5)', () => {
   it('leaves out an internal account’s failed send and the founder notices’ own', async () => {
-    // §K adds the founder kinds to email_sends' kind check; until then this database widens it.
-    await db.query(
-      'alter table public.email_sends drop constraint if exists email_sends_kind_check',
-    );
     const at = '2031-02-05T12:00:00.000Z';
     const account = async (internal: boolean) => {
       const { accountId } = await personalAccount(
