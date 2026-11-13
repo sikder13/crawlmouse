@@ -53,8 +53,8 @@ Then, in this order:
    (or Inngest → Apps → crawlmouse → Resync). Inngest keeps the function list from its last sync. If it
    calls `crawlmouse.com`, the step's functions fail against a deployment that no longer serves them; if
    it calls the rolled-forward deployment's own URL, that deployment keeps running them, mail and alerts
-   included. Either way they run until the resync. Then check the function count matches the one
-   `golive:check` lists for the step before.
+   included. Either way they run until the resync. Then check the function count matches the
+   `functionCountsByStep()` line (under _On_) for the step before: after a step-5 rollback, "after step 4".
 
 2. **Unset the variable** in Vercel, so the next deployment agrees with the one now serving.
 3. **Undo the rollback once the fix is deployed.** After an Instant Rollback, Vercel stops assigning
@@ -66,7 +66,9 @@ What a v2 user sees after a rollback is in [After a rollback](#after-a-rollback)
 
 ## Step 0 — the check passes for step 1
 
-`pnpm golive:check -- --step 1` exits 0, with every manual box for step 1 ticked. Step 1's rows are
+`pnpm golive:check -- --step 1` exits 0, with every manual box for step 1 ticked. Do the runbook's
+_Production_ steps up to the dispatch first (`docs/ops/worker-runbook.md`: the environment, the app, its
+secrets staged); two of step 1's boxes are true only after them. Step 1's rows are
 what must hold before the worker is deployed; what step 1 makes true (the worker answering, its
 release, its egress record, the app's worker variables) is checked before step 2.
 
@@ -79,12 +81,12 @@ release, its egress record, the app's worker variables) is checked before step 2
 
 **Smoke** (no flag is on, so a visitor sees v1 throughout):
 
-| #   | Do                                               | Right looks like                            |
-| --- | ------------------------------------------------ | ------------------------------------------- |
-| 1   | Open `https://crawlmouse-worker.fly.dev/healthz` | `{"ok":true}`                               |
-| 2   | `pnpm golive:check -- --step 2`                  | the worker, release and egress lines `pass` |
-| 3   | Open `https://crawlmouse.com/`                   | the v1 home, unchanged                      |
-| 4   | Run a v1 audit of a small site                   | it completes, as before                     |
+| #   | Do                                               | Right looks like                                                                                      |
+| --- | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------- |
+| 1   | Open `https://crawlmouse-worker.fly.dev/healthz` | `{"ok":true}`                                                                                         |
+| 2   | `pnpm golive:check -- --step 2`                  | the worker and release lines `pass`; tick `worker-egress-recorded` once the runbook's table is filled |
+| 3   | Open `https://crawlmouse.com/`                   | the v1 home, unchanged                                                                                |
+| 4   | Run a v1 audit of a small site                   | it completes, as before                                                                               |
 
 **Watch for 30 minutes.** Fly → `crawlmouse-worker` → Monitoring (no restarts), and
 `flyctl logs --app crawlmouse-worker`. The worker reports to no Sentry project.
@@ -112,12 +114,12 @@ budget is over its line).
 
 **Smoke.**
 
-| #   | Do                                              | Right looks like                                                              |
-| --- | ----------------------------------------------- | ----------------------------------------------------------------------------- |
-| 1   | Inngest → Apps → crawlmouse                     | synced after the redeploy; the function count `golive:check` lists for step 2 |
-| 2   | Inngest → Functions → `crawlmouse.check.reaper` | a run every ten minutes, each completed                                       |
-| 3   | Open `https://crawlmouse.com/`                  | the v1 home                                                                   |
-| 4   | Run a v1 audit                                  | it completes                                                                  |
+| #   | Do                                              | Right looks like                                                                   |
+| --- | ----------------------------------------------- | ---------------------------------------------------------------------------------- |
+| 1   | Inngest → Apps → crawlmouse                     | synced after the redeploy; the count `functionCountsByStep()` gives "after step 2" |
+| 2   | Inngest → Functions → `crawlmouse.check.reaper` | a run every ten minutes, each completed                                            |
+| 3   | Open `https://crawlmouse.com/`                  | the v1 home                                                                        |
+| 4   | Run a v1 audit                                  | it completes                                                                       |
 
 **Watch for 30 minutes.** Inngest → Runs, failed only. Inngest → Usage (executions against the plan).
 Sentry → Issues with `signal:audit-failed`.
@@ -240,15 +242,15 @@ The boxes are not ticked in this file. When one is true, pass its id to the chec
 
 #### Before step 1: deploy the production worker, record its egress, set the worker variables
 
-- [ ] `worker-github-environment` (owner): GitHub environment `worker-production` holds FLY_API_TOKEN (secret) and FLY_ORG (variable), deployments restricted to main. Why: worker-production.yml takes its Fly credentials from it and nowhere else (CC-35 D1). Source: `docs/ops/worker-runbook.md:11`.
-- [ ] `worker-fly-secrets` (owner): Fly app `crawlmouse-worker` has WORKER_SIGNING_SECRET and WORKER_JWT_PUBLIC_KEY set from standard input, pairing the app variables. Why: the worker refuses every batch it cannot verify. Source: `docs/ops/worker-runbook.md:45`.
-- [ ] `fly-tokens-scoped` (owner): no GitHub environment other than `worker-production` holds a Fly token that reaches `crawlmouse-worker`: the `staging` environment's FLY_API_TOKEN is an app-scoped deploy token for `crawlmouse-worker-staging` (`fly tokens create deploy -a crawlmouse-worker-staging`), and the `spike` environment is deleted or holds no Fly token. Why: an organisation token in an environment a push to main runs could deploy or destroy the production worker with no owner dispatch (review r1 D-B2). Source: `docs/ops/worker-runbook.md:14`.
+- [ ] `worker-github-environment` (owner): GitHub environment `worker-production` holds FLY_API_TOKEN (secret) and FLY_ORG (variable), deployments restricted to main. Why: worker-production.yml takes its Fly credentials from it and nowhere else (CC-35 D1). Source: `docs/ops/worker-runbook.md:337`.
+- [ ] `worker-fly-secrets` (owner): Fly app `crawlmouse-worker` has WORKER_SIGNING_SECRET and WORKER_JWT_PUBLIC_KEY set from standard input, pairing the app variables. Why: the worker refuses every batch it cannot verify. Source: `docs/ops/worker-runbook.md:368`.
+- [ ] `fly-tokens-scoped` (owner): no Fly token outside the `worker-production` environment reaches `crawlmouse-worker`: no repository- or organisation-level Actions secret holds one; the `spike` environment is deleted or holds none; and the `staging` environment's FLY_API_TOKEN is a deploy token for `crawlmouse-worker-staging` alone (`fly tokens create deploy -a crawlmouse-worker-staging`), or, if such a token cannot open the SSH console staging's egress check uses, production is in a Fly organisation of its own. Why: an organisation token in an environment a push to main runs could deploy or destroy the production worker with no owner dispatch (review r1 D-B2). Source: `docs/ops/worker-runbook.md:14`.
 
 #### Before step 2: V2_PIPELINE=1
 
 Step 1's exit check is part of this list: the rows that only the worker deploy makes true gate step 2.
 
-- [ ] `worker-egress-recorded` (owner): the production worker's egress IPv4 and IPv6 are recorded in the runbook's egress table. Why: sites allow-list the crawler by that address; the table says "not recorded". Source: `docs/ops/worker-runbook.md:304`.
+- [ ] `worker-egress-recorded` (owner): the production worker's egress IPv4 and IPv6 are recorded in the runbook's egress table. Why: sites allow-list the crawler by that address; the table says "not recorded". Source: `docs/ops/worker-runbook.md:392`.
 - [ ] `worker-uptime-monitor` (CC-33): a Sentry uptime monitor watches the production worker's /healthz. Why: a worker that stops answering stops every check; nobody is told otherwise. Source: `notes/cc-33/PR.md:121`.
 - [ ] `pipeline-rehearsal` (CTO): the check pipeline has run once end to end against a Supabase branch and an Inngest branch environment, the cancel event carrying checkId. Why: CC-20b's flag-on rehearsal; unit tests do not exercise the deployed function (OPERATING-RULES §6). Source: `notes/cc-20b/PR.md:344`.
 - [ ] `sentry-v2-alerts` (CTO): Sentry alert rules exist for the v2 signals each step's 30-minute watch reads. Why: a failing step must be seen within the watch, not reported by a user. Source: `docs/ops/security-baseline.md:39`.

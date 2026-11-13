@@ -54,7 +54,7 @@ export const PRECONDITIONS: readonly Precondition[] = [
     mustBeTrue:
       'GitHub environment `worker-production` holds FLY_API_TOKEN (secret) and FLY_ORG (variable), deployments restricted to main',
     why: 'worker-production.yml takes its Fly credentials from it and nowhere else (CC-35 D1)',
-    source: 'docs/ops/worker-runbook.md:11',
+    source: 'docs/ops/worker-runbook.md:337',
     gates: 1,
     owner: 'owner',
     check: manual,
@@ -64,7 +64,7 @@ export const PRECONDITIONS: readonly Precondition[] = [
     mustBeTrue:
       'Fly app `crawlmouse-worker` has WORKER_SIGNING_SECRET and WORKER_JWT_PUBLIC_KEY set from standard input, pairing the app variables',
     why: 'the worker refuses every batch it cannot verify',
-    source: 'docs/ops/worker-runbook.md:45',
+    source: 'docs/ops/worker-runbook.md:368',
     gates: 1,
     owner: 'owner',
     check: manual,
@@ -72,7 +72,7 @@ export const PRECONDITIONS: readonly Precondition[] = [
   {
     id: 'fly-tokens-scoped',
     mustBeTrue:
-      "no GitHub environment other than `worker-production` holds a Fly token that reaches `crawlmouse-worker`: the `staging` environment's FLY_API_TOKEN is an app-scoped deploy token for `crawlmouse-worker-staging` (`fly tokens create deploy -a crawlmouse-worker-staging`), and the `spike` environment is deleted or holds no Fly token",
+      "no Fly token outside the `worker-production` environment reaches `crawlmouse-worker`: no repository- or organisation-level Actions secret holds one; the `spike` environment is deleted or holds none; and the `staging` environment's FLY_API_TOKEN is a deploy token for `crawlmouse-worker-staging` alone (`fly tokens create deploy -a crawlmouse-worker-staging`), or, if such a token cannot open the SSH console staging's egress check uses, production is in a Fly organisation of its own",
     why: 'an organisation token in an environment a push to main runs could deploy or destroy the production worker with no owner dispatch (review r1 D-B2)',
     source: 'docs/ops/worker-runbook.md:14',
     gates: 1,
@@ -104,7 +104,7 @@ export const PRECONDITIONS: readonly Precondition[] = [
     mustBeTrue:
       "the production worker's egress IPv4 and IPv6 are recorded in the runbook's egress table",
     why: 'sites allow-list the crawler by that address; the table says "not recorded"',
-    source: 'docs/ops/worker-runbook.md:304',
+    source: 'docs/ops/worker-runbook.md:392',
     gates: 2,
     owner: 'owner',
     check: manual,
