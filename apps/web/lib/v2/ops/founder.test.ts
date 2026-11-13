@@ -341,6 +341,36 @@ describe('sweep', () => {
     expect(transport.sent).toHaveLength(3);
   });
 
+  it('keeps an internal account’s mark in each loop: [TEST] subjects, and stored internal so no digest counts them', async () => {
+    const { d, store, transport, rows } = setup();
+    const user = 'b0000000-0000-4000-8000-0000000000ff';
+    vi.mocked(store.unannouncedUsers).mockResolvedValue([
+      { userId: user, accountId: INTERNAL, createdAt: '2026-11-13T10:00:00.000Z' },
+    ]);
+    vi.mocked(store.agencyAccounts).mockResolvedValue([
+      { accountId: INTERNAL, createdAt: '2026-11-13T14:00:00.000Z' },
+    ]);
+    vi.mocked(store.cancellations).mockResolvedValue([
+      {
+        subscriptionId: 'sub_int',
+        accountId: INTERNAL,
+        plan: 'pro',
+        canceledAt: '2026-11-13T14:30:00.000Z',
+      },
+    ]);
+    await sweep(d);
+    expect(transport.sent.map((m) => m.subject)).toEqual([
+      '[TEST] New sign-up',
+      '[TEST] Agency account created',
+      '[TEST] Cancellation: Pro',
+    ]);
+    expect([...rows.values()].map((r) => [r.claim.kind, r.claim.internal])).toEqual([
+      ['signup', true],
+      ['agency_created', true],
+      ['cancellation', true],
+    ]);
+  });
+
   it('logs unconfigured once for the whole run', async () => {
     const { d, store, log } = setup({ to: null });
     vi.mocked(store.agencyAccounts).mockResolvedValue([
