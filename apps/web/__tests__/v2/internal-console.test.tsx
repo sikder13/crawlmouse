@@ -119,6 +119,16 @@ describe('the account screen', () => {
     expect(html).toMatch(/<p class="[^"]*" role="status">Re-run queued\.<\/p>/);
     expect(count(html, 'role="status"')).toBe(1);
   });
+
+  it('writes the checks list times as UTC minutes under headers that say UTC, and names UTC on the re-run', () => {
+    const html = renderToStaticMarkup(
+      <ConsoleAccountScreen view={accountView(dossier(null))} notice={null} />,
+    );
+    expect(html).toContain('Queued (UTC)');
+    expect(html).toContain('Finished (UTC)');
+    expect(html).toContain('2026-11-12 08:00<');
+    expect(html).toContain('aria-label="Re-run the check queued 2026-11-12 08:00 UTC"');
+  });
 });
 
 describe('client analytics on the console', () => {
