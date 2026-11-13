@@ -17,8 +17,20 @@ const AXE = createRequire(
 const WORDMARK_ACCENT = '[data-v2-wordmark] > span';
 const BRAND_LINK = 'a[aria-label="Crawlmouse home"]';
 
+/**
+ * The proof page is the one page drawn without Crawlmouse's header: an agency shows it to its client
+ * (docs/specs/v2/31-agency.md, "The proof page"), and its root carries `data-v2-proof`. It has no
+ * brand link and no wordmark, so the scan has nothing to leave out; that is checked, not assumed.
+ */
+const PROOF_PAGE = '[data-v2-proof]';
+
 async function expectWordmarkExclusionIsTheWordmarkOnly(page: Page) {
   const brands = await page.locator(BRAND_LINK).count();
+  if ((await page.locator(PROOF_PAGE).count()) > 0) {
+    expect(brands, 'the proof page shows no brand link').toBe(0);
+    expect(await page.locator(WORDMARK_ACCENT).count(), 'nor a wordmark').toBe(0);
+    return;
+  }
   expect(brands, 'a page shows the brand link').toBeGreaterThan(0);
   expect(
     await page.locator(WORDMARK_ACCENT).count(),
