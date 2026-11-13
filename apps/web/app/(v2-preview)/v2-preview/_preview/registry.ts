@@ -269,6 +269,41 @@ export const PREVIEWS: PreviewEntry[] = [
     name: 'Client, nothing open',
     kind: 'screen',
   },
+  // CC-31, the agency's client reports. With each client scheduled, and for a developer, the page
+  // asks nothing of the reader; else its orange element is the header's "Schedule a report for …",
+  // or the open form's "Save the schedule".
+  {
+    path: '/v2-preview/screens/agency/reports',
+    name: 'Final-Ag-Reports',
+    kind: 'screen',
+    orange: 0,
+  },
+  {
+    path: '/v2-preview/screens/agency/reports/states',
+    name: 'Client reports, a client in each state',
+    kind: 'screen',
+  },
+  {
+    path: '/v2-preview/screens/agency/reports/change',
+    name: 'Client reports, one client’s forms open',
+    kind: 'screen',
+  },
+  {
+    path: '/v2-preview/screens/agency/reports/developer',
+    name: 'Client reports, a developer',
+    kind: 'screen',
+    orange: 0,
+  },
+  {
+    path: '/v2-preview/screens/agency/reports/trial',
+    name: 'Client reports, the Agency trial',
+    kind: 'screen',
+  },
+  {
+    path: '/v2-preview/screens/agency/reports/gate',
+    name: 'Client reports, below Agency',
+    kind: 'screen',
+  },
   { path: '/v2-preview/screens/map', name: 'Final-LinkMap', kind: 'screen' },
   { path: '/v2-preview/screens/map/all', name: 'Link map, every page', kind: 'screen' },
   // No fix to open from any page: the keep bar's button is the orange element.

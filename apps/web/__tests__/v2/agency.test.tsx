@@ -1,16 +1,22 @@
 /**
- * The agency screens (CC-31 D5). The client matrix against Final-Ag-Matrix and the client page
- * against Final-Ag-Client: the visible text equals the locked HTML with the registered changes
- * applied (lib/v2/copy/agency.ts) and nothing else. Then each state of `/agency` as its preview
- * renders it: the orange element the registry says it has, the routes its forms post to, and what
- * a reader of that state is and is not offered.
+ * The agency screens (CC-31 D5, D8). The client matrix against Final-Ag-Matrix, the client page
+ * against Final-Ag-Client and client reports against Final-Ag-Reports: the visible text equals the
+ * locked HTML with the registered changes applied (lib/v2/copy/agency.ts,
+ * lib/v2/copy/client-reports.ts) and nothing else. Then each state of `/agency` and of
+ * `/agency/reports` as its preview renders it: the orange element the registry says it has, the
+ * routes its forms post to, and what a reader of that state is and is not offered.
  */
+import { JSDOM } from 'jsdom';
 import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { GRANITEPEAK_SITE } from '../../app/(v2-preview)/v2-preview/_preview/agency';
 import { PREVIEWS } from '../../app/(v2-preview)/v2-preview/_preview/registry';
 import { AGENCY_MONTHLY } from '../../lib/billing/prices';
 import { GATES } from '../../lib/entitlement-v2';
+import { gateMessage } from '../../lib/v2/agency/gates';
+import { parseClientBody, parseScheduleBody } from '../../lib/v2/agency/schedules';
 import { ACCOUNT_ACTIONS } from '../../lib/v2/view/account-actions';
+import { CLIENT_REPORT_ROUTES } from '../../lib/v2/view/agency-reports';
 import { CC31_ELEMENTS } from './_lib/screens';
 import { expected, firstDifference, locked, renderedText, withoutShell } from './_lib/lock';
 
@@ -21,7 +27,10 @@ const MATRIX = '/v2-preview/screens/agency';
 const CLIENT = '/v2-preview/screens/agency/client';
 const state = (name: string) => `${MATRIX}/${name}`;
 
-const ROUTES = Object.values(ACCOUNT_ACTIONS).map(
+const REPORTS = '/v2-preview/screens/agency/reports';
+const reports = (name: string) => `${REPORTS}/${name}`;
+
+const ROUTES = [...Object.values(ACCOUNT_ACTIONS), ...Object.values(CLIENT_REPORT_ROUTES)].map(
   (a) => new RegExp(`^${a.route.replace(/\[\w+\]/g, '[^/]+')}$`),
 );
 
@@ -244,5 +253,253 @@ describe('/agency for a reader who is not offered the matrix', () => {
       },
     ]);
     expect(main(html)).toMatch(/data-v2-primary=""[^>]*>Open Northwind Digital</);
+  });
+});
+
+describe('client reports against Final-Ag-Reports', () => {
+  const html = render(REPORTS);
+
+  it('reads as the locked HTML outside the rail’s links, with each registered change and nothing else', () => {
+    expect(
+      firstDifference(
+        expected(withoutShell(locked('Final-Ag-Reports.dc.html')).rest, 'agency-reports'),
+        renderedText(withoutShell(html).rest),
+      ),
+    ).toBeNull();
+  });
+
+  it('sits under Reports in the agency rail, and asks nothing while each client is scheduled', () => {
+    expect(html).toMatch(/aria-current="location"[^>]*>Reports/);
+    expect(primaries(html)).toHaveLength(0);
+  });
+
+  it('links each client to its page, and offers its Change on this page', () => {
+    const hrefs = [...main(html).matchAll(/<a [^>]*href="([^"]+)"/g)].map((m) => m[1]);
+    expect(hrefs).toEqual([
+      '/agency/clients/50000000-0000-4000-8000-0000000000c9',
+      `${REPORTS}?client=50000000-0000-4000-8000-0000000000c9#change`,
+      '/agency/clients/50000000-0000-4000-8000-0000000000ca',
+      `${REPORTS}?client=50000000-0000-4000-8000-0000000000ca#change`,
+    ]);
+    // Nothing is open, so the page has no form: both contacts have confirmed.
+    expect(forms(html)).toEqual([]);
+  });
+
+  it('draws nothing the step has no route for', () => {
+    const text = renderedText(main(html));
+    for (const gone of [
+      'Hold',
+      'headline',
+      'Preview',
+      'Opened',
+      'markeddoneafter',
+      'reports@',
+      'trackingpixel',
+    ]) {
+      expect(text, gone).not.toContain(gone);
+    }
+    expect(html).not.toContain('$69');
+  });
+});
+
+describe('client reports, a client in each state', () => {
+  const html = render(reports('states'));
+  const doc = new JSDOM(main(html)).window.document;
+  const rowOf = (host: string) =>
+    [...doc.querySelectorAll('tbody tr')].find((tr) => tr.textContent!.includes(host))!;
+
+  it('says where each contact stands in words and as a status: colour and shape', () => {
+    const state = (host: string) => {
+      const row = rowOf(host);
+      return [
+        row.querySelector('[data-v2-contact]')?.getAttribute('data-v2-contact') ?? null,
+        row.querySelector('[data-v2-pill]')?.getAttribute('data-v2-pill') ?? null,
+      ];
+    };
+    expect(state('granitepeak.example')).toEqual(['confirmed', 'ok']);
+    expect(state('harborlight.example')).toEqual(['asked', 'unverified']);
+    expect(state('redbird.example')).toEqual(['not_asked', 'unverified']);
+    expect(state('cedarpoint.example')).toEqual(['paused', 'warn']);
+    // No contact is not a status: it is said in words alone.
+    expect(state('northfield.example')).toEqual([null, null]);
+    expect(rowOf('northfield.example').textContent).toContain('no contact');
+    // A status pill draws its shape.
+    for (const pill of doc.querySelectorAll('tbody [data-v2-pill]')) {
+      expect(pill.querySelector('svg[data-v2-glyph]')).not.toBeNull();
+    }
+  });
+
+  it('counts the clients by schedule in the header, from the rows under it', () => {
+    const scheduled = [...doc.querySelectorAll('tbody tr')].filter(
+      (tr) => tr.querySelector('th[scope="row"]') !== null,
+    );
+    const cells = scheduled.map((tr) => tr.children[2]!.textContent!);
+    const n = (start: string) => cells.filter((c) => c.startsWith(start)).length;
+    expect(cells).toHaveLength(6);
+    expect(main(html)).toContain(
+      `>${n('weekly')} weekly, ${n('monthly')} monthly, ${n('not scheduled')} not scheduled<`,
+    );
+  });
+
+  it('has one orange element, in the header: the first client with no schedule', () => {
+    expect(primaries(html)).toHaveLength(1);
+    const orange = doc.querySelector('[data-v2-primary]')!;
+    expect(orange.textContent).toBe('Schedule a report for maplerow.example');
+    expect(orange.getAttribute('href')).toBe(
+      `${reports('states')}?client=50000000-0000-4000-8000-0000000000f2#change`,
+    );
+    expect(orange.closest('header')).not.toBeNull();
+    for (const table of main(html).match(/<table[\s\S]*?<\/table>/g)!) {
+      expect(table).not.toContain('data-v2-primary');
+    }
+  });
+
+  it('posts the ask and the resume of a row to that client’s routes', () => {
+    const site = (n: string) =>
+      `/api/report-files/schedules/site/50000000-0000-4000-8000-0000000000${n}`;
+    expect(forms(html)).toEqual([
+      { method: 'post', action: `${site('f1')}/resume`, fields: {} },
+      { method: 'post', action: `${site('ca')}/confirm`, fields: {} },
+      { method: 'post', action: `${site('f4')}/confirm`, fields: {} },
+    ]);
+    expect(rowOf('cedarpoint.example').textContent).toContain('Resume');
+    expect(rowOf('harborlight.example').textContent).toContain('Ask again');
+    expect(rowOf('redbird.example').textContent).toContain('Ask to confirm');
+  });
+
+  it('opens a sent report that is a document at its page', () => {
+    expect(main(html)).toContain('href="/reports/60000000-0000-4000-8000-0000000000c9"');
+  });
+});
+
+describe('client reports, one client’s forms open', () => {
+  const html = render(reports('change'));
+  const doc = new JSDOM(main(html)).window.document;
+  const card = doc.querySelector('[data-v2-client-change]')!;
+  const api = `/api/report-files/schedules/site/${GRANITEPEAK_SITE}`;
+  /** A form's fields as a browser posts them, without the verb. */
+  const posted = (form: Element) => {
+    const fields: Record<string, string> = {};
+    for (const el of form.querySelectorAll('input, select')) {
+      const input = el as HTMLInputElement;
+      if (input.name === '_method') continue;
+      if (input.type === 'checkbox') {
+        if (input.checked) fields[input.name] = 'on';
+      } else fields[input.name] = input.value;
+    }
+    return fields;
+  };
+  const formAt = (action: string, verb: string) =>
+    [...card.querySelectorAll('form')].find(
+      (f) =>
+        f.getAttribute('action') === action &&
+        f.querySelector('input[name="_method"]')?.getAttribute('value') === verb,
+    )!;
+
+  it('is one card for the chosen client, with its three forms and the verb each route takes', () => {
+    expect(card.querySelector('h2')!.textContent).toBe('Change Granite Peak Supply');
+    expect(
+      [...card.querySelectorAll('form')].map((f) => [
+        f.getAttribute('method'),
+        f.getAttribute('action'),
+        f.querySelector('input[name="_method"]')?.getAttribute('value'),
+      ]),
+    ).toEqual([
+      ['post', api, 'DELETE'],
+      ['post', `${api}/client`, 'PATCH'],
+      ['post', api, 'PUT'],
+    ]);
+  });
+
+  it('posts a client the client route reads, holding what the client holds', () => {
+    const fields = posted(formAt(`${api}/client`, 'PATCH'));
+    expect(fields).toEqual({
+      clientName: 'Granite Peak Supply',
+      contactEmail: 'ops@granitepeak.example',
+      ownerSeatId: 'e0000000-0000-4000-8000-0000000000ca',
+    });
+    expect(parseClientBody({ kind: 'form', fields })).toEqual(fields);
+  });
+
+  it('posts a schedule the schedule route reads, holding the schedule the client has', () => {
+    const fields = posted(formAt(api, 'PUT'));
+    expect(fields).toEqual({
+      cadence: 'weekly',
+      isoWeekday: '1',
+      timeLocal: '08:00',
+      timezone: 'America/Denver',
+      sendWhenUnchanged: 'on',
+    });
+    expect(parseScheduleBody({ kind: 'form', fields })).toEqual({
+      cadence: 'weekly',
+      isoWeekday: 1,
+      timeLocal: '08:00',
+      timezone: 'America/Denver',
+      sendWhenUnchanged: true,
+    });
+  });
+
+  it('gives each field a label of its own', () => {
+    const controls = [...card.querySelectorAll('input:not([type="hidden"]), select')];
+    expect(controls).toHaveLength(8);
+    const names = controls.map((el) => {
+      const label = el.id
+        ? card.querySelector(`label[for="${el.id}"]`)
+        : (el.closest('label') ?? null);
+      return label?.textContent?.trim() ?? '';
+    });
+    expect(names).toEqual([
+      'Client name',
+      'Contact address',
+      'Owning seat',
+      'How often',
+      'Weekday',
+      'Time',
+      'Time zone',
+      'Send a report when nothing changed',
+    ]);
+  });
+
+  it('has one orange element, the schedule’s submit, outside any table', () => {
+    expect(primaries(html)).toHaveLength(1);
+    expect(card.querySelector('[data-v2-primary]')!.textContent).toBe('Save the schedule');
+    expect(card.querySelector('table')).toBeNull();
+    // The header's own action steps aside while a client's forms are open.
+    expect(main(html)).not.toContain('Schedule a report for');
+  });
+});
+
+describe('client reports for a reader who is not offered the forms', () => {
+  it('a developer: the rows, with no form, no Change and no column for one', () => {
+    const html = render(reports('developer'));
+    expect(main(html)).toContain('granitepeak.example');
+    expect(main(html)).toContain('harborlight.example');
+    expect(forms(html)).toEqual([]);
+    expect(main(html)).not.toContain('<form');
+    expect(main(html)).not.toContain('?client=');
+    expect(main(html)).not.toContain('>Change');
+    expect(main(html)).not.toContain('data-v2-client-change');
+    const head = main(html).match(/<thead[\s\S]*?<\/thead>/)![0];
+    expect(head).not.toContain('Actions');
+    expect(primaries(html)).toHaveLength(0);
+  });
+
+  it('an account in its Agency trial is told once where a report is sent meanwhile', () => {
+    const html = render(reports('trial'));
+    expect(html.match(/data-v2-trial-note=""/g)).toHaveLength(1);
+    expect(main(html)).toContain('While the trial runs, a report is sent where');
+    expect(render(REPORTS)).not.toContain('data-v2-trial-note');
+  });
+
+  it('an account below Agency: the gate for client reports, with Agency’s price from prices.ts', () => {
+    const html = render(reports('gate'));
+    expect(html).toContain('data-v2-agency-state="gate"');
+    expect(main(html)).toContain('>Client reports<');
+    expect(main(html)).toContain(gateMessage('clientReports', 'pro')!);
+    expect(main(html)).toContain(`Agency is $${AGENCY_MONTHLY} a month.`);
+    expect(main(html)).not.toContain('<table');
+    expect(forms(html)).toEqual([]);
+    // The rail is the account's own, not the agency rail.
+    expect(html).toMatch(/href="\/dashboard"[^>]*>Sites /);
   });
 });
