@@ -376,6 +376,21 @@ describe('grants', () => {
 });
 
 describe('the migration', () => {
+  it('reverted and applied again, a withdrawn link stays shut and a live one still opens', async () => {
+    const [withdrawn, live] = [await report(), await report()];
+    const [gone, kept] = [randomUUID(), randomUUID()];
+    await create(withdrawn.reportId, gone, withdrawn.owner.id);
+    await revoke(withdrawn.reportId);
+    await create(live.reportId, kept, live.owner.id);
+    expect((await open(gone)).outcome).toBe('gone');
+
+    await db.exec(readRollback(ROLLBACK));
+    await db.exec(readMigration(MIGRATION));
+    // The revert drops revoked_at, so it deletes the links that were withdrawn first.
+    expect((await open(gone)).outcome).toBe('unknown');
+    expect((await open(kept)).outcome).toBe('open');
+  });
+
   it('applies twice, reverts to no share function and no revoked_at, reverts twice, and applies again', async () => {
     const state = async () => ({
       functions: (
