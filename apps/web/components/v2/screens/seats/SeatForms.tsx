@@ -1,45 +1,15 @@
 'use client';
 
-import type { FormEvent, ReactNode } from 'react';
 import { Button } from '../../Button';
 import { Field } from '../../Field';
 import { Select } from '../../Select';
 import { SEATS_COPY } from '../../../../lib/v2/copy/seats';
 import type { SeatChangeView, SeatFields, SeatsView } from '../../../../lib/v2/view/seats';
 import { useLive } from '../account/LiveActions';
+import { PostForm } from '../account/PostForm';
 import styles from './SeatsScreen.module.css';
 
 const F = SEATS_COPY.form;
-const URLENCODED = 'application/x-www-form-urlencoded';
-
-/** A POST form that submits on a live page and is inert on a preview, as `ActionControl`'s are. */
-function PostForm({
-  action,
-  method,
-  className,
-  children,
-}: {
-  action: string;
-  /** The verb an HTML form lacks, sent as `_method`. */
-  method?: 'PATCH' | 'DELETE';
-  className?: string;
-  children: ReactNode;
-}) {
-  const live = useLive();
-  const stop = (e: FormEvent) => e.preventDefault();
-  return (
-    <form
-      method="post"
-      action={action}
-      encType={URLENCODED}
-      className={className}
-      onSubmit={live ? undefined : stop}
-    >
-      {method ? <input type="hidden" name="_method" value={method} /> : null}
-      {children}
-    </form>
-  );
-}
 
 /** A seat's role, and which clients it covers: every one, or the boxes ticked. */
 function RoleAndScope({ id, fields }: { id: string; fields: SeatFields }) {
