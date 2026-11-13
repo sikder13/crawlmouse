@@ -677,10 +677,6 @@ const INVENTORY: [entry: string, why: string][] = [
     'ARRAY slice of a page’s JS-only link targets (`string[]`), to bound how many a record keeps; `js_only_count` keeps the whole count. No string is cut (CC-32 D6).',
   ],
   [
-    'packages/engine/src/v2/render/links.ts :: return { targets: sorted.slice(0, MAX_RENDER_LINKS), truncated };',
-    'ARRAY slice of one render side’s sorted link targets (`string[]`), to bound how many the render outcome keeps; `truncated` says when it cut. No string is cut (CC-32 D6).',
-  ],
-  [
     'packages/engine/src/v2/packets/by-type/generic-anchor-text.ts :: const shown = links.slice(0, MAX_LINKS).map(({ to, text }): Line => {',
     'ARRAY slice of the hub’s generic links, to bound how many steps the packet lists; the packet counts the rest. No string is cut (CC-30).',
   ],

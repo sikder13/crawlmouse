@@ -210,9 +210,15 @@ its rendered side (`links.ts`, CC-32 D6). One extractor reads both sides, the cr
 `extractPage`, share actions and media files left out), so each target is in `canonicalizeUrl`'s
 spelling. A target is kept when it is on the page's own site by the crawl planner's rule
 (`inSiteScope`: the page's host or its `www.` twin, on the default port), is not the page itself, and
-is at most 2048 characters. Each side keeps at most 200 targets
-(`MAX_RENDER_LINKS`), the first in sorted order, once each. `truncated` is set when either side had
-more, or had a target past the URL bound.
+is at most 2048 characters. Each side keeps, once each, the longest prefix of its sorted
+targets that holds at most 200 targets (`MAX_RENDER_LINKS`) and 32 KiB of URL
+characters (`MAX_RENDER_LINK_CHARS`). `truncated` is set when either side left a target out, or had a
+target past the URL bound.
+
+So a rendered page adds at most 64 KiB of URL characters to the stored outcome, its two sides
+together; a canonical URL is ASCII, so that is also its bytes, before JSON quoting. On the Free cap, 25 graded
+and 5 empty-root renders, a check adds at most 1920 KiB. The graded cap is the caller's
+(`maxRenders`), so a larger cap raises the second figure by 64 KiB a render.
 
 The lists stay on the render outcome, which the pipeline keeps as evidence; they are never written to
 `PageResult.without_js`, whose stored shape holds the four keys above. A page whose links cannot be read

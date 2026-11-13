@@ -1,13 +1,13 @@
 /**
  * The same-site link targets of a page's two renders (links.ts): one extractor for both sides, the
  * crawl's own rules (extract.ts `extractPage` with non-content links left out, then canonicalizeUrl),
- * the page's own site only, at most MAX_RENDER_LINKS a side, sorted, and `truncated` when a side had
- * more, or a target past the URL bound.
+ * the page's own site only, at most MAX_RENDER_LINKS targets and MAX_RENDER_LINK_CHARS characters a
+ * side, sorted, and `truncated` when a side had more, or a target past the URL bound.
  */
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { MAX_URL_LENGTH } from '../batch-bounds.js';
-import { MAX_RENDER_LINKS, renderLinks, sameSiteTargets } from './links.js';
+import { MAX_RENDER_LINK_CHARS, MAX_RENDER_LINKS, renderLinks, sameSiteTargets } from './links.js';
 
 const PAGE = 'https://shop.test/products/tent';
 const body = (anchors: string) => `<html><body><nav>${anchors}</nav><p>Words.</p></body></html>`;
@@ -103,6 +103,59 @@ describe('sameSiteTargets', () => {
       targets: ['https://shop.test/ok'],
       truncated: true,
     });
+  });
+});
+
+describe('the character budget', () => {
+  /** A same-site URL of exactly `length` characters, sorting by `i`. */
+  const urlOf = (i: number, length: number) => {
+    const head = `https://shop.test/p${String(i).padStart(2, '0')}-`;
+    return head + 'x'.repeat(length - head.length);
+  };
+  const longs = (n: number) => Array.from({ length: n }, (_, i) => urlOf(i, MAX_URL_LENGTH));
+  // Each target is MAX_URL_LENGTH characters, so this many fill the budget exactly.
+  const fill = MAX_RENDER_LINK_CHARS / MAX_URL_LENGTH;
+
+  it('is a whole number of the longest targets, below the count bound', () => {
+    expect(Number.isInteger(fill)).toBe(true);
+    expect(fill).toBeLessThan(MAX_RENDER_LINKS);
+  });
+
+  it('keeps a side exactly at the budget whole, and does not call it truncated', () => {
+    const got = sameSiteTargets(
+      body(
+        longs(fill)
+          .map((u) => a(u))
+          .join(''),
+      ),
+      PAGE,
+    );
+    expect(got.truncated).toBe(false);
+    expect(got.targets).toEqual(longs(fill));
+    expect(got.targets.reduce((n, t) => n + t.length, 0)).toBe(MAX_RENDER_LINK_CHARS);
+  });
+
+  it(`truncates a side past the budget before ${MAX_RENDER_LINKS} targets, keeping the sorted prefix that fits`, () => {
+    // One more long target, and a short one sorting last that would fit on its own: a prefix stops
+    // at the first target that does not fit, so neither is kept.
+    const short = 'https://shop.test/zz';
+    const hrefs = [short, ...longs(fill + 1).reverse()];
+    const got = sameSiteTargets(body(hrefs.map((u) => a(u)).join('')), PAGE);
+    expect(got.truncated).toBe(true);
+    expect(got.targets).toEqual(longs(fill));
+    expect(got.targets.reduce((n, t) => n + t.length, 0)).toBeLessThanOrEqual(
+      MAX_RENDER_LINK_CHARS,
+    );
+  });
+
+  it('marks the page truncated in renderLinks when either side passes the budget', () => {
+    const over = body(
+      longs(fill + 1)
+        .map((u) => a(u))
+        .join(''),
+    );
+    expect(renderLinks(body(a('/a')), over, PAGE).truncated).toBe(true);
+    expect(renderLinks(over, body(a('/a')), PAGE).truncated).toBe(true);
   });
 });
 
