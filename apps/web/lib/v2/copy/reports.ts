@@ -48,8 +48,6 @@ export const REPORTS_COPY = {
   show: 'Show',
   pdfTitle: 'PDF audit report',
   pdfBody: 'Grades, crawler table, every open fix, the link map’s figures.',
-  brandedOnAgency: 'Under your own name and domain on Agency.',
-  branded: 'Under your own name and domain.',
   makePdf: 'Make the PDF',
   compareTitle: 'Compare two checks',
   comparePair: (a: string, b: string) => `${a} vs ${b}.`,
@@ -135,6 +133,14 @@ export const REPORTS_CHANGES: CopyChange[] = [
     locked: ' 6–9 pages.',
     rendered: '',
     source: 'The fixture records no PDF’s page count: the length is not in fixture (D2)',
+  },
+  {
+    screen: 'reports',
+    kind: 'ruling',
+    locked: ' Under your own name and domain on Agency.',
+    rendered: '',
+    source:
+      'CC-31 brief, D11: Branding (the agency’s name, domain and sender) is not in this step, and the PDF the step makes carries none of them',
   },
   {
     screen: 'reports',

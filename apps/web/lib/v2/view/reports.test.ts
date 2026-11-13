@@ -38,9 +38,7 @@ describe('Reports, the header and Make a report', () => {
     expect(m.compare.text).toBe(
       'Thu 29 vs Fri 30 Oct. What moved and why, with the evidence for each change.',
     );
-    expect(m.pdf.text).toBe(
-      'Grades, crawler table, every open fix, the link map’s figures. Under your own name and domain on Agency.',
-    );
+    expect(m.pdf.text).toBe('Grades, crawler table, every open fix, the link map’s figures.');
     expect(m.pdf.action).toMatchObject({
       label: 'Make the PDF',
       href: '/api/reports',
@@ -164,9 +162,7 @@ describe('Reports, on Northwind’s Agency account (challenged-site)', () => {
     const v = northwind();
     expect(v.header.line).toBe('2 sites · exports and PDF on Agency');
     expect(v.make.sub).toBe('For harborlight.example, latest check Fri 30 Oct 06:01');
-    expect(v.make.pdf.text).toBe(
-      'Grades, crawler table, every open fix, the link map’s figures. Under your own name and domain.',
-    );
+    expect(v.make.pdf.text).toBe('Grades, crawler table, every open fix, the link map’s figures.');
     expect(v.made.rows.map((r) => [r.made, r.site, r.type, r.covers])).toEqual([
       ['Sat 31 Oct 11:01', 'harborlight.example', 'Link map, edge list', 'check of Fri 30 Oct'],
       ['Sat 31 Oct 11:00', 'harborlight.example', 'JSON, all responses', 'check of Fri 30 Oct'],

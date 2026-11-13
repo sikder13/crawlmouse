@@ -298,7 +298,9 @@ export function reportsView(
       pick: { href: base, label: COPY.siteLabel, show: COPY.show },
       pdf: {
         title: COPY.pdfTitle,
-        text: `${COPY.pdfBody} ${v.gates.agencyBranding ? COPY.branded : COPY.brandedOnAgency}`,
+        // The PDF carries no agency's name or domain (branding is not built), so the card says
+        // what the file holds and promises neither.
+        text: COPY.pdfBody,
         action: canMake
           ? make('audit_pdf', COPY.makePdf, {}, true)
           : v.gates.exports
