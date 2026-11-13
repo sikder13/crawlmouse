@@ -183,4 +183,18 @@ describe('an empty shell on most routes, sample → renderCandidates → renderC
       last_measured_check_id: input.check.id,
     });
   });
+
+  it('a shell-only fix counts the template’s crawled empty-root pages, not the rendered ones, and ranks first', async () => {
+    const { render, built } = await pipeline();
+    const app = built.fixes.find(
+      (f) => f.type === 'client_rendered_template' && f.template_key === '/app/{slug}',
+    )!;
+    const rendered = render.pages.filter((p) => p.rendered && p.template_key === '/app/{slug}');
+    expect([app.affected_pages, rendered.length]).toEqual([3, 2]);
+    const shellOnly = built.fixes
+      .filter((f) => f.type === 'client_rendered_template' && f.template_key !== '/')
+      .map((f) => f.rank!)
+      .sort((a, b) => a - b);
+    expect(shellOnly).toEqual([1, 2, 3]);
+  });
 });

@@ -21,6 +21,7 @@ import {
   groupSum,
   NO_EFFECT,
   NO_EFFECT_SHORT,
+  pagesReadable,
 } from '../effect-headline';
 import { openFixes, type FixPlan } from '../free-fixes';
 import { noPacketLine } from '../no-packet';
@@ -120,6 +121,8 @@ export function effortText(f: Pick<Fix, 'effort'>): string | null {
 
 /** "+1 Technical SEO; AI effect estimated after fixes 1 and 2", from the fix's own numbers. */
 export function proPoints(f: Fix, all: readonly Fix[]): string {
+  const h = effectHeadline(f, all);
+  if (h.kind === 'pages_readable') return h.text;
   const parts: string[] = [];
   const { ai_readability: ai, technical_seo: seo } = f.effect;
   const aiSigned = ai === null ? null : formatPoints(ai);
@@ -127,8 +130,7 @@ export function proPoints(f: Fix, all: readonly Fix[]): string {
   if (aiSigned) parts.push(`${aiSigned} AI readability`);
   if (seoSigned) parts.push(`${seoSigned} Technical SEO`);
   const head =
-    parts.join(', ') ||
-    (effectHeadline(f, all).kind === 'no_effect' ? NO_EFFECT_SHORT : 'no estimated effect');
+    parts.join(', ') || (h.kind === 'no_effect' ? NO_EFFECT_SHORT : 'no estimated effect');
   const waits = f.effect.ai_readability_pending_on
     .map((fp) => all.find((x) => x.fingerprint === fp)?.number)
     .filter((n): n is number => n !== undefined);
@@ -170,12 +172,15 @@ export function groupPoints(fixes: readonly Fix[]): string {
     seoPending ? `Technical SEO effect not estimated for ${seoPending}` : null,
     pending ? `AI effect not yet estimated for ${pending}` : null,
   ].filter(Boolean);
+  const pages = pagesReadable(fixes);
   const head = parts.length
     ? `${parts.join(', ')} together`
-    : estimated
-      ? NO_EFFECT_SHORT
-      : 'no estimated effect';
-  return `${head}${waits.length ? `; ${waits.join('; ')}` : ''}`;
+    : pages !== null
+      ? null
+      : estimated
+        ? NO_EFFECT_SHORT
+        : 'no estimated effect';
+  return [head, pages, ...waits].filter(Boolean).join('; ');
 }
 
 /**
@@ -183,13 +188,14 @@ export function groupPoints(fixes: readonly Fix[]): string {
  * points with "estimated" in the unit (FACTS A5), or a dash and why its AI effect waits.
  */
 export function effectOf(
-  f: Pick<Fix, 'effect' | 'section'>,
+  f: Pick<Fix, 'type' | 'effect' | 'section' | 'affected_pages'>,
   siteFixes: readonly Pick<Fix, 'fingerprint' | 'number'>[],
 ): { points: string; unit: string } {
   const h = effectHeadline(f, siteFixes);
   if (h.kind === 'ai') return { points: h.signed, unit: 'AI readability, estimated' };
   if (h.kind === 'seo') return { points: h.signed, unit: 'Technical SEO, estimated' };
   if (h.kind === 'no_effect') return { points: '—', unit: NO_EFFECT };
+  if (h.kind === 'pages_readable') return { points: '—', unit: h.text };
   return h.kind === 'waiting'
     ? { points: '—', unit: h.sentence }
     : { points: '—', unit: 'Technical SEO, not estimated' };
