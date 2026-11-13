@@ -1,19 +1,25 @@
 import { checksPublicEnabled } from '@/lib/auth/flags';
+import { checkRateLimit } from '@/lib/rate-limit';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { supabaseServer } from '@/lib/supabase/server';
 import { isId, notFound, readBody, refuse, refuseTo } from '@/lib/v2/account/route';
 import { CLIENT_REPORTS_PAGE, resumeSchedule } from '@/lib/v2/agency/schedules';
 import { clientReportsGate, clientSiteOf } from '@/lib/v2/agency/schedules-caller';
-import { supabaseSchedulesStore } from '@/lib/v2/agency/schedules-store';
+import { inngestClientReportMail, supabaseSchedulesStore } from '@/lib/v2/agency/schedules-store';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 type Context = { params: Promise<{ siteId: string }> };
 
+/** Confirmation mails an account may ask for in a day; it fails closed. */
+const PER_ACCOUNT_DAY = 20;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
 /**
- * Resume a client's schedule that its recipient paused (CC-31 D8): reports are sent again from the
- * next run.
+ * Ask to start again a client's schedule that its recipient paused (CC-31 D8). A recipient's pause
+ * is final from the sender's side: the pause is lifted and the contact is sent a new confirmation
+ * request, and reports start again only when the recipient confirms.
  *
  * For a seat that covers the site (`is_member_for_site`: any other site is a 404) and whose role
  * `seat_may` lets schedule reports (the owner or an account manager: docs/specs/v2/31-agency.md §3;
@@ -50,7 +56,16 @@ export async function POST(req: Request, { params }: Context) {
   if (gated) return gated;
 
   return resumeSchedule(
-    { store: supabaseSchedulesStore(supabaseAdmin()), now: () => new Date() },
+    {
+      store: supabaseSchedulesStore(supabaseAdmin()),
+      mail: inngestClientReportMail(),
+      // The bucket of the client and confirm routes: this asks for the same mail.
+      confirmations: () =>
+        checkRateLimit(`report-confirm:account:${site.accountId}`, PER_ACCOUNT_DAY, DAY_MS, {
+          failClosed: true,
+        }),
+      now: () => new Date(),
+    },
     site,
     kind,
   );

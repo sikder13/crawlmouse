@@ -1476,8 +1476,12 @@ begin
 end;
 $$;
 
--- The account resumes a schedule its recipient paused: the pause is cleared and next_run_at is the
--- first run after p_now, so a schedule paused for a month does not send at once for the weeks missed.
+-- The account asks to start again a schedule its recipient paused. A recipient's pause is final from
+-- the sender's side (owner ruling, 2026-11-12): this does not restart the mail. It lifts the pause
+-- and clears the confirmation with it, so the schedule is one whose contact has not confirmed: the
+-- mailer sends a new confirmation request, and reports start again only when the recipient
+-- confirms. next_run_at is the first run after p_now, so a schedule paused for a month does not
+-- send at once for the weeks missed.
 -- Answers {outcome}: 'resumed' with next_run_at; 'not_paused'; 'not_found' (no schedule for p_site on
 -- p_account).
 create or replace function public.resume_report_schedule(
@@ -1507,7 +1511,12 @@ begin
   end if;
   v_next := public.report_schedule_next(v.cadence, v.iso_weekday, v.time_local, v.timezone, p_now);
   update public.report_schedules rs
-     set paused_by_recipient_at = null, next_run_at = v_next, updated_at = pg_catalog.now()
+     set paused_by_recipient_at = null,
+         recipient_confirmed_at = null,
+         recipient_confirm_hash = null,
+         recipient_confirm_sent_at = null,
+         next_run_at = v_next,
+         updated_at = pg_catalog.now()
    where rs.site_id = p_site;
   return pg_catalog.jsonb_build_object('outcome', 'resumed', 'next_run_at', v_next);
 end;

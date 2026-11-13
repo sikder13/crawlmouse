@@ -778,7 +778,7 @@ describe('the recipient’s pause link, and POST …/resume', () => {
     expect(h.log).toEqual([]);
   });
 
-  it('the page’s POST pauses with the cookie’s token, and the owner resumes', async () => {
+  it('the page’s POST pauses with the cookie’s token; the owner’s resume asks the recipient to confirm again', async () => {
     const w = await confirmedWorld();
     const t = await token('issue_report_pause', w.siteId);
     as(null);
@@ -787,13 +787,41 @@ describe('the recipient’s pause link, and POST …/resume', () => {
     expect(await res.json()).toEqual({ paused: true });
     expect(await paused(w)).not.toBeNull();
 
+    // The sender's "resume" restarts nothing: it lifts the pause and asks the recipient to confirm
+    // again (owner ruling), with the confirmation's own event and bound.
     as(w.owner);
+    h.send.mockClear();
+    h.limits.length = 0;
     const back = await resume(w.siteId);
     expect(back.status).toBe(200);
+    expect(await back.json()).toMatchObject({ confirmation: 'asked' });
     expect(await paused(w)).toBeNull();
+    expect((await schedule(w.siteId))!.recipient_confirmed_at).toBeNull();
+    expect(h.send.mock.calls.map((c) => (c[0] as { name: string }).name)).toEqual([
+      'report.confirmation.requested',
+    ]);
+    expect(h.limits.map((l) => l.key)).toEqual([`report-confirm:account:${w.accountId}`]);
     const again = await resume(w.siteId);
     expect(again.status).toBe(409);
     expect(await again.json()).toEqual({ code: 'not_paused' });
+  });
+
+  it('past the day’s bound a resume still lifts the pause and restarts no mail: the contact is asked at the next run', async () => {
+    const w = await confirmedWorld();
+    const t = await token('issue_report_pause', w.siteId);
+    as(null);
+    await use(`cm_link_report_pause=${t}`);
+    expect(await paused(w)).not.toBeNull();
+    as(w.owner);
+    h.over.add('report-confirm');
+    h.send.mockClear();
+    const back = await resume(w.siteId);
+    expect([back.status, ((await back.json()) as { confirmation: string }).confirmation]).toEqual([
+      200,
+      'later',
+    ]);
+    expect(h.send).not.toHaveBeenCalled();
+    expect((await schedule(w.siteId))!.recipient_confirmed_at).toBeNull();
   });
 
   it('a mail client’s one-click POST pauses with the token in the path and no cookie', async () => {

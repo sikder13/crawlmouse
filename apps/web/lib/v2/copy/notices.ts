@@ -127,10 +127,14 @@ export const NOTICE_LINES: Record<NoticeCode, (at: string | null) => string> = {
   confirmation_waits: () => WAITS_FOR_PLAN,
   nothing_to_confirm: () =>
     'There is nothing to confirm: the client has no schedule or no contact, or the contact has confirmed.',
-  schedule_resumed: () => 'Resumed. Reports are sent again from the next run.',
+  schedule_resumed: () =>
+    'The contact was sent a link to confirm again. Reports start again once the contact confirms.',
+  schedule_resumed_later: () =>
+    'The pause was lifted. The contact is asked to confirm again at the schedule’s next run; reports start once it confirms.',
   not_paused: () => 'That schedule is not paused.',
   report_confirmed: () => 'Confirmed. The reports will be sent to this address.',
-  report_paused: () => 'Paused. No more reports are sent until the sender resumes them.',
+  report_paused: () =>
+    'Paused. No more reports are sent. They start again only if you are asked to confirm again and do.',
   report_link_gone: () => 'This link can no longer be used: it was replaced or has expired.',
   invalid: () => 'That request was not understood, so nothing was changed.',
   method_not_allowed: () => 'That form could not be sent that way. Reload the page and try again.',

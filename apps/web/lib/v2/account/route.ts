@@ -156,6 +156,7 @@ export const NOTICE_CODES = [
   'confirmation_waits',
   'nothing_to_confirm',
   'schedule_resumed',
+  'schedule_resumed_later',
   'not_paused',
   'report_confirmed',
   'report_paused',

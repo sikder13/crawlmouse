@@ -976,6 +976,30 @@ describe('the pause link', () => {
     expect(row.next_run_at!.toISOString()).toBe('2026-12-28T09:00:00.000Z');
     expect(await resume(c.siteId, c.accountId, at(41))).toEqual({ outcome: 'not_paused' });
   });
+
+  it('a recipient’s pause is final from the sender’s side: resuming restarts no mail, and reports start again only when the recipient confirms again', async () => {
+    const c = await confirmed('reader@client.example');
+    const token = pauseToken();
+    await issuePause(c.siteId, NOW, token);
+    await pause(token, at(1));
+    expect((await resume(c.siteId, c.accountId, at(2))).outcome).toBe('resumed');
+    // The confirmation went with the pause: the schedule is one whose contact has not confirmed.
+    expect(await schedule(c.siteId)).toMatchObject({
+      paused_by_recipient_at: null,
+      recipient_confirmed_at: null,
+      recipient_confirm_hash: null,
+      recipient_confirm_sent_at: null,
+    });
+    // No report can be mailed for it, by the due list or by the mailer's own check.
+    const dueRow = (await due(at(60))).find((r) => r.site_id === c.siteId)!;
+    expect(dueRow.confirmed).toBe(false);
+    expect(await issuePause(c.siteId, at(2), token)).toEqual({ outcome: 'none' });
+    // The recipient is asked again, and once they confirm the reports go.
+    const asked = await issueConfirmation(c.siteId, at(2));
+    expect(asked.outcome).toBe('issued');
+    expect((await confirm(asked.token as string, at(3))).outcome).toBe('confirmed');
+    expect((await issuePause(c.siteId, at(3), token)).outcome).toBe('issued');
+  });
 });
 
 describe('due_report_schedules', () => {

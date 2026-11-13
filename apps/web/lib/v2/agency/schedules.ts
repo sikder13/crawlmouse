@@ -220,6 +220,12 @@ const SAVED_SCHEDULE: Record<Confirmation, NoticeCode> = {
   later: 'schedule_saved',
   none: 'schedule_saved',
 };
+const RESUMED: Record<Confirmation, NoticeCode> = {
+  asked: 'schedule_resumed',
+  waits: 'confirmation_waits',
+  later: 'schedule_resumed_later',
+  none: 'schedule_resumed_later',
+};
 const SAVED_CLIENT: Record<Confirmation, NoticeCode> = {
   asked: 'client_saved_asked',
   waits: 'client_saved_waits',
@@ -294,16 +300,23 @@ export async function resendConfirmation(
   }
 }
 
-/** POST …/resume: a schedule its recipient paused sends again from its next run. */
+/**
+ * POST …/resume, for a schedule its recipient paused. A recipient's pause is final from the
+ * sender's side (owner ruling): this restarts no mail. The pause is lifted and the contact is
+ * asked to confirm again, under the bounds of any confirmation; reports start again only when the
+ * recipient confirms. The answer says what became of the request (`confirmation`).
+ */
 export async function resumeSchedule(
-  deps: { store: SchedulesStore; now(): Date },
+  deps: ClientDeps,
   site: ClientSite,
   kind: Kind,
 ): Promise<Response> {
   const r = await deps.store.resume(site, deps.now());
   switch (r.outcome) {
-    case 'resumed':
-      return done(kind, 'schedule_resumed', { nextRunAt: r.nextRunAt });
+    case 'resumed': {
+      const confirmation = await askToConfirm(deps, site, ['pending']);
+      return done(kind, RESUMED[confirmation], { nextRunAt: r.nextRunAt, confirmation });
+    }
     case 'not_paused':
       return refuseTo(kind, CLIENT_REPORTS_PAGE, 409, 'not_paused');
     case 'not_found':

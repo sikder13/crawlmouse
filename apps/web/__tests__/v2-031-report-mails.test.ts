@@ -263,6 +263,37 @@ describe('a client report schedule’s mails, from the confirmation to a paused 
   });
 });
 
+describe('after the recipient paused, the sender’s resume', () => {
+  it('mails the recipient a confirmation and no report; the report goes once they confirm again', async () => {
+    const at = new Date('2026-12-01T10:00:00.000Z');
+    expect(
+      (
+        await answer(`select public.resume_report_schedule($1, $2, $3) r`, [
+          w.site.id,
+          w.accountId,
+          at,
+        ])
+      ).outcome,
+    ).toBe('resumed');
+    // The report that waited through the pause is still not mailed.
+    const report = await writeReport('2026-12-07T09:00:00.000Z', w.site.second);
+    const first = mailer(at);
+    expect(await first.h.clientReport(report)).toBe('nothing_to_send');
+    expect(first.transport.sent).toEqual([]);
+    // What is mailed is the request to confirm again.
+    expect(await first.h.reportConfirm(w.site.id, 'resume-1')).toBe('sent');
+    const token = tokenIn(first.transport.sent[0]!.text, '/s/confirm/', 43);
+    await answer(`select public.confirm_report_recipient($1, $2) r`, [sha256(token), at]);
+    // Confirmed again: the next report is mailed, with the pause link it always had.
+    const next = await writeReport('2026-12-14T09:00:00.000Z', w.site.second);
+    const second = mailer(new Date('2026-12-14T09:05:00.000Z'));
+    expect(await second.h.clientReport(next)).toBe('sent');
+    expect(tokenIn(second.transport.sent[0]!.text, '/s/pause/', 43)).toBe(
+      reportPauseToken(SECRET, w.site.id, CONTACT),
+    );
+  });
+});
+
 describe('the pause link’s token', () => {
   const SITE = '50000000-0000-4000-8000-000000000001';
   const OTHER = '50000000-0000-4000-8000-000000000002';

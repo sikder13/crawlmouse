@@ -174,7 +174,9 @@ describe('/s/pause', () => {
 
   it('after the form’s answer says the reports are stopped', async () => {
     const html = await pausePage({ notice: 'report_paused' });
-    expect(html).toContain('Paused. No more reports are sent until the sender resumes them.');
+    expect(html).toContain(
+      'Paused. No more reports are sent. They start again only if you are asked to confirm again and do.',
+    );
     expect(html).not.toMatch(/<form/);
   });
 

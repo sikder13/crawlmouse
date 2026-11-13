@@ -19,7 +19,7 @@ export const RECIPIENT_COPY = {
     title: 'Stop these reports',
     lines: (sender: string, host: string) => [
       `${sender} sends reports about ${host} to this address.`,
-      'The button stops them. They start again only if the sender turns them back on.',
+      'The button stops them. The sender cannot start them again: they start only if you are asked to confirm again and do.',
     ],
     button: 'Stop the reports',
     done: 'Stopped',
