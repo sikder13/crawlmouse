@@ -47,7 +47,7 @@ export default async function SharedProofPage({
   if (!isId(reportId)) return notFound();
   const raw = (await cookies()).get(SHARE_COOKIE)?.value;
   // No token, no read. With one, the page is bounded for an address as the link itself is, before
-  // the database is asked; past the bound it is a 404 like any other miss.
+  // the link is read; past the bound it is a 404 like any other miss.
   if (!isShareToken(raw)) return notFound();
   const limit = await checkRateLimit(
     `share-view:ip:${ipHash(getClientIp(new Request(siteUrl('/'), { headers: new Headers(await headers()) })))}`,
