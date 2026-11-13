@@ -267,7 +267,7 @@ export function seatsView(
           : null,
     },
     people: {
-      title: partial ? COPY.people : `${COPY.people} · ${count(used)} of ${count(limit)} seats`,
+      title: partial ? COPY.people : COPY.peopleOf(used, limit),
       sub: COPY.peopleSub,
       rows,
       foot: partial ? null : foot,

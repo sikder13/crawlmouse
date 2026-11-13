@@ -714,6 +714,10 @@ hour for the account. The link is answered once: JSON gets `{url, expiresAt}`; a
 `/reports`, which the page shows on the report's row. That cookie lasts 120 seconds and is not
 cleared sooner: a page cannot clear a cookie.
 
+The Reports screen says how long a link works from `SHARE_LINK_DAYS` (`lib/v2/copy/reports.ts`),
+which a test holds to the interval `create_share_link` adds, read from the migration's text:
+`pnpm --filter @crawlmouse/web exec vitest run lib/v2/view/reports.test.ts -t 'how long a share link works'`.
+
 A client report's link is the one its mail carries, and a new link revokes the one before, so none
 is made for one here: the `POST` answers 409 `mailed_link`, and the Reports screen offers such a row
 Open and "Withdraw link" and no link form (`shareReport`, `lib/v2/reports/share.ts`; `mayMake`,
@@ -1032,7 +1036,7 @@ where it is sent.
 | `first_client_added`       | C          | `POST /api/sites`, when `add_site` reports the account's first site and the account's kind is `agency` |
 | `seat_invited`             | A          | the invite route (`POST /api/seats`)                                                                   |
 | `seat_accepted`            | A          | the accept route (`POST /api/seats/accept`)                                                            |
-| `seats_bought`             | A          | `POST /api/billing/seats`                                                                              |
+| `seats_bought`             | A          | `POST /api/billing/seats`, when a quantity rose; a lowering alone sends none                           |
 | `report_generated`         | B          | `POST /api/reports`                                                                                    |
 | `report_downloaded`        | B          | `GET /api/report-files/[id]/download`                                                                  |
 | `report_shared`            | B2         | `POST /api/report-files/[id]/share`                                                                    |

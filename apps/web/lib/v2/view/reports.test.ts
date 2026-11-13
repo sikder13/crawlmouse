@@ -3,6 +3,8 @@
  * (Fri 30 Oct 10:05Z, EDT), Northwind's Agency account at challenged-site's (Mon 2 Nov 12:00Z,
  * EST after the 1 Nov change), and the stand-in Free account.
  */
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   ACCOUNT_VIEWERS,
@@ -154,6 +156,29 @@ describe('Reports made', () => {
       `Reports sent to a client are made on Agency. Agency is ${usd(AGENCY_MONTHLY)} a month.`,
     );
     expect(s.compare).toMatchObject({ label: 'Compare plans', href: '/pricing' });
+  });
+});
+
+describe('how long a share link works', () => {
+  it('is the interval create_share_link adds to the moment it is made, in days', () => {
+    const sql = readFileSync(
+      resolve(
+        __dirname,
+        '../../../../../infra/supabase/migrations/20261114000002_v2_031_agency.sql',
+      ),
+      'utf8',
+    );
+    const create = /create or replace function public\.create_share_link[\s\S]*?\n\$\$;/.exec(
+      sql,
+    )![0];
+    // The one interval of the function: the link's expiry, which the row and the report both get.
+    expect([...create.matchAll(/interval '([^']+)'/g)].map((m) => m[1])).toEqual([
+      `${SHARE_LINK_DAYS} days`,
+    ]);
+    expect(create).toMatch(/v_expires := p_now \+ interval '\d+ days';/);
+    // The screen's two sentences state that number and no other.
+    const said = [home().made.sub, home().made.foot].join(' ');
+    expect(said.match(/\d+ days/g)).toEqual([`${SHARE_LINK_DAYS} days`, `${SHARE_LINK_DAYS} days`]);
   });
 });
 

@@ -114,8 +114,11 @@ export type ExtrasRefusal =
   | { ok: false; status: 503; code: 'billing_unavailable' };
 
 export type ExtrasResult =
-  /** `changed` is false when the subscription already held these quantities: no Stripe write. */
-  { ok: true; extras: Extras; changed: boolean } | ExtrasRefusal;
+  /**
+   * `changed` is false when the subscription already held these quantities: no Stripe write.
+   * `raised` says a quantity rose, which is a purchase; a change that is not one is a lowering.
+   */
+  { ok: true; extras: Extras; changed: boolean; raised: boolean } | ExtrasRefusal;
 
 const UNAVAILABLE: ExtrasRefusal = { ok: false, status: 503, code: 'billing_unavailable' };
 
@@ -245,7 +248,7 @@ export async function changeExtras(
     }
     const from = held.extras;
     if (from.seats === want.seats && from.sites === want.sites) {
-      return { ok: true, extras: from, changed: false };
+      return { ok: true, extras: from, changed: false, raised: false };
     }
 
     const existing: Partial<Record<'seat' | 'site', string>> = {};
@@ -275,7 +278,7 @@ export async function changeExtras(
     );
     const now = await mirrorOf(updated, deps.catalog);
     if ('refused' in now) throw new Error(`extras: Stripe answered a subscription ${now.refused}`);
-    return { ok: true, extras: now.extras, changed: true };
+    return { ok: true, extras: now.extras, changed: true, raised: rises };
   } catch (err) {
     if (err instanceof CatalogError) return UNAVAILABLE;
     if (isCardError(err)) return { ok: false, status: 402, code: 'payment_failed' };

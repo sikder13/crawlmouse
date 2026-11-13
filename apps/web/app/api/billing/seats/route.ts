@@ -71,7 +71,8 @@ export async function POST(req: Request) {
     },
     { accountId: target.accountId, want },
   );
-  if (result.ok && result.changed) {
+  // A purchase: a quantity rose. Lowering one buys nothing, and sends no event.
+  if (result.ok && result.raised) {
     await agencyCaptureFor(req)('seats_bought', target.accountId, want);
   }
   return extrasResponse(body.kind, result);

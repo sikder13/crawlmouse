@@ -240,6 +240,9 @@ describe('seatsView: the other readers', () => {
   it('a Free account: the gate message and no form', () => {
     const v = seatsPreview(FREE);
     expect(v.header.line).toBe('1 of 1 used · owner');
+    // One seat is "seat": the title's noun follows the limit.
+    expect(v.people.title).toBe('People · 1 of 1 seat');
+    expect(seatsPreview(PRO_FULL).people.title).toBe('People · 2 of 2 seats');
     expect(v.people.foot).toBe(gateMessage('seats', 'free'));
     expect([v.header.invite, v.invite, v.buy]).toEqual([null, null, null]);
   });

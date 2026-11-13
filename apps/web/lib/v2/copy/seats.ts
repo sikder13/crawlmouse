@@ -6,13 +6,16 @@ import type { SeatRole } from '@crawlmouse/types/v2';
 import { EXTRA_SEAT, usd } from '../../billing/prices';
 import type { SeatAction } from '../agency/guard';
 import type { Addition, CopyChange } from '../copy-registry';
-import { count } from '../words';
+import { count, plural } from '../words';
 import { agencyRailChanges } from './agency';
 
 export const SEATS_COPY = {
   title: 'Seats',
   invite: 'Invite someone',
   people: 'People',
+  /** The People card's title for a reader shown every seat: "People · 4 of 5 seats". */
+  peopleOf: (used: number, limit: number) =>
+    `People · ${count(used)} of ${count(limit)} ${plural(limit, 'seat', 'seats')}`,
   peopleSub: 'Who sees which clients and who gets which alerts',
   tables: { seats: 'Seats', roles: 'Roles' },
   columns: {
