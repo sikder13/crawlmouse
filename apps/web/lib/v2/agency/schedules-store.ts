@@ -50,6 +50,14 @@ export interface RecipientLinkView {
   accountName: string | null;
 }
 
+export type ConfirmationState =
+  | 'pending'
+  | 'asked'
+  | 'trial'
+  | 'confirmed'
+  | 'no_contact'
+  | 'no_schedule';
+
 export interface SchedulesStore {
   setSchedule(
     site: ClientSite,
@@ -63,10 +71,13 @@ export interface SchedulesStore {
   ): Promise<
     { outcome: 'saved'; contactChanged: boolean } | { outcome: 'not_found' | 'invalid_owner' }
   >;
-  /** Whether the site's schedule waits on its contact: `pending`, else why there is nothing to ask. */
-  confirmationState(
-    site: ClientSite,
-  ): Promise<'pending' | 'confirmed' | 'no_contact' | 'no_schedule'>;
+  /**
+   * Where the site's schedule stands with its contact. `pending`: not confirmed, and no link sent
+   * yet; `asked`: a link was sent and not used; `trial`: not confirmed, and the account is in its
+   * Agency trial with a contact that is not its owner's own address, so no confirmation is mailed
+   * (`issue_recipient_confirmation` holds the same rule); else why there is nothing to ask.
+   */
+  confirmationState(site: ClientSite): Promise<ConfirmationState>;
   resume(
     site: ClientSite,
     now: Date,
@@ -142,7 +153,7 @@ export function supabaseSchedulesStore(admin: SupabaseClient): SchedulesStore {
     async confirmationState(site) {
       const schedule = await admin
         .from('report_schedules')
-        .select('recipient_confirmed_at')
+        .select('recipient_confirmed_at, recipient_confirm_sent_at')
         .eq('site_id', site.siteId)
         .eq('account_id', site.accountId)
         .maybeSingle();
@@ -155,12 +166,41 @@ export function supabaseSchedulesStore(admin: SupabaseClient): SchedulesStore {
         .eq('id', site.siteId)
         .maybeSingle();
       if (contact.error) throw new Error(`sites read failed: ${contact.error.message}`);
-      if (!(contact.data as { client_contact_email: string | null } | null)?.client_contact_email) {
-        return 'no_contact';
+      const address = (contact.data as { client_contact_email: string | null } | null)
+        ?.client_contact_email;
+      if (!address) return 'no_contact';
+      const held = schedule.data as {
+        recipient_confirmed_at: string | null;
+        recipient_confirm_sent_at: string | null;
+      };
+      if (held.recipient_confirmed_at) return 'confirmed';
+
+      // In its Agency trial an account mails its owner's own address and no other.
+      const account = await admin
+        .from('accounts')
+        .select('state')
+        .eq('id', site.accountId)
+        .maybeSingle();
+      if (account.error) throw new Error(`accounts read failed: ${account.error.message}`);
+      if ((account.data as { state: string } | null)?.state === 'agency_trial') {
+        const owner = await admin
+          .from('seats')
+          .select('user_id')
+          .eq('account_id', site.accountId)
+          .eq('role', 'owner')
+          .eq('status', 'active')
+          .maybeSingle();
+        if (owner.error) throw new Error(`seats read failed: ${owner.error.message}`);
+        const ownerId = (owner.data as { user_id: string | null } | null)?.user_id ?? null;
+        const user =
+          ownerId === null
+            ? { data: null, error: null }
+            : await admin.from('users').select('email').eq('id', ownerId).maybeSingle();
+        if (user.error) throw new Error(`users read failed: ${user.error.message}`);
+        const own = (user.data as { email: string | null } | null)?.email ?? null;
+        if (own === null || own.toLowerCase() !== address.toLowerCase()) return 'trial';
       }
-      return (schedule.data as { recipient_confirmed_at: string | null }).recipient_confirmed_at
-        ? 'confirmed'
-        : 'pending';
+      return held.recipient_confirm_sent_at ? 'asked' : 'pending';
     },
     async resume(site, now) {
       const a = await call(

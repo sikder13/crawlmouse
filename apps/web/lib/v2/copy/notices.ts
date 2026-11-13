@@ -13,6 +13,10 @@ import { noticeOf, type NoticeCode } from '../account/route';
 const NEXT_CHECK = 'the next check confirms the fix or reopens it.';
 const capitalised = (t: string) => t[0]!.toUpperCase() + t.slice(1);
 
+/** In an Agency trial: why a client's contact was not mailed, and when it will be. */
+const WAITS_FOR_PLAN =
+  'During the trial, reports go to your own address only: this contact is asked to confirm once the trial has become the plan.';
+
 /** `at` is the next-allowed time in the account's zone ("Tue 13:30"), or null when none was sent. */
 export const NOTICE_LINES: Record<NoticeCode, (at: string | null) => string> = {
   capped: (at) =>
@@ -107,12 +111,20 @@ export const NOTICE_LINES: Record<NoticeCode, (at: string | null) => string> = {
   share_revoked: () => 'The link was withdrawn and no longer opens.',
   not_ready: () => 'That report’s file is not stored yet, so no link was made.',
   schedule_saved: () => 'The schedule was saved.',
+  schedule_saved_asked: () =>
+    'The schedule was saved, and the contact was sent a link to confirm. Reports are sent once the contact confirms.',
+  schedule_saved_waits: () => `The schedule was saved. ${WAITS_FOR_PLAN}`,
   schedule_cleared: () => 'The schedule was removed. No more reports are sent for this client.',
-  client_saved: () =>
-    'Saved. A contact that changed is asked to confirm before any report is sent to it.',
+  client_saved: () => 'Saved.',
+  client_saved_asked: () =>
+    'Saved. The contact was sent a link to confirm. Reports are sent once the contact confirms.',
+  client_saved_waits: () => `Saved. ${WAITS_FOR_PLAN}`,
+  client_saved_later: () =>
+    'Saved. No more confirmations can be sent today: the contact is asked at the schedule’s next run.',
   invalid_owner: () => 'That seat cannot own this client: it is not active, or does not cover it.',
   confirmation_requested: () =>
     'A confirmation was asked for. Reports are sent once the contact confirms.',
+  confirmation_waits: () => WAITS_FOR_PLAN,
   nothing_to_confirm: () =>
     'There is nothing to confirm: the client has no schedule or no contact, or the contact has confirmed.',
   schedule_resumed: () => 'Resumed. Reports are sent again from the next run.',

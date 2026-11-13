@@ -19,7 +19,7 @@ import {
   type NoticeCode,
   type RequestBody,
 } from '../account/route';
-import type { SchedulesStore } from './schedules-store';
+import type { ConfirmationState, SchedulesStore } from './schedules-store';
 
 /** The page the schedule forms are on. */
 export const CLIENT_REPORTS_PAGE = '/agency/reports';
@@ -146,7 +146,7 @@ const done = (kind: Kind, notice: NoticeCode, json: Record<string, unknown>) =>
 
 /** PUT …/schedules/site/[siteId]: 400 `invalid` for a body or a zone that is not a schedule's. */
 export async function saveSchedule(
-  deps: { store: SchedulesStore; now(): Date },
+  deps: ClientDeps,
   site: ClientSite,
   body: RequestBody | null,
 ): Promise<Response> {
@@ -155,8 +155,12 @@ export async function saveSchedule(
   if (!input) return refuseTo(kind, CLIENT_REPORTS_PAGE, 400, 'invalid');
   const r = await deps.store.setSchedule(site, input, deps.now());
   switch (r.outcome) {
-    case 'saved':
-      return done(kind, 'schedule_saved', { nextRunAt: r.nextRunAt });
+    case 'saved': {
+      // A contact saved before its schedule has not been asked yet: it is asked now, so the first
+      // run sends a report and not the confirmation.
+      const confirmation = await askToConfirm(deps, site, ['pending']);
+      return done(kind, SAVED_SCHEDULE[confirmation], { nextRunAt: r.nextRunAt, confirmation });
+    }
     case 'invalid':
       return refuseTo(kind, CLIENT_REPORTS_PAGE, 400, 'invalid');
     case 'not_found':
@@ -188,10 +192,46 @@ export interface ClientDeps {
 }
 
 /**
- * PATCH …/client: the client's name, contact address and owning seat. A contact that changed to an
- * address is asked to confirm at once, within the account's daily bound; past it the save stands
- * and the schedule's next run asks. 400 `invalid_owner` for a seat that is not an active seat of the
- * account covering the site.
+ * What became of asking a site's contact to confirm: `asked` (the mail was asked for); `waits`
+ * (the account is in its Agency trial and the contact is not its owner's own address: nothing is
+ * mailed until the trial has become the plan); `later` (the account's daily bound is spent: the
+ * schedule's next run asks); `none` (nothing to ask: no schedule, no contact, a contact that has
+ * confirmed, or one the caller's `when` does not ask again).
+ */
+export type Confirmation = 'asked' | 'waits' | 'later' | 'none';
+
+async function askToConfirm(
+  deps: ClientDeps,
+  site: ClientSite,
+  when: readonly ConfirmationState[],
+): Promise<Confirmation> {
+  const state = await deps.store.confirmationState(site);
+  if (state === 'trial') return 'waits';
+  if (!when.includes(state)) return 'none';
+  if (!(await deps.confirmations()).allowed) return 'later';
+  await deps.mail.confirmation({ siteId: site.siteId, key: deps.now().toISOString() });
+  return 'asked';
+}
+
+const SAVED_SCHEDULE: Record<Confirmation, NoticeCode> = {
+  asked: 'schedule_saved_asked',
+  waits: 'schedule_saved_waits',
+  later: 'schedule_saved',
+  none: 'schedule_saved',
+};
+const SAVED_CLIENT: Record<Confirmation, NoticeCode> = {
+  asked: 'client_saved_asked',
+  waits: 'client_saved_waits',
+  later: 'client_saved_later',
+  none: 'client_saved',
+};
+
+/**
+ * PATCH …/client: the client's name, contact address and owning seat. A contact that changed, on a
+ * client that has a schedule, is asked to confirm at once, within the account's daily bound; past
+ * the bound the save stands and the schedule's next run asks; with no schedule yet, saving the
+ * schedule asks. The answer says which (`confirmation`). 400 `invalid_owner` for a seat that is not
+ * an active seat of the account covering the site.
  */
 export async function saveClient(
   deps: ClientDeps,
@@ -204,10 +244,14 @@ export async function saveClient(
   const r = await deps.store.setClient(site, input);
   switch (r.outcome) {
     case 'saved': {
-      if (r.contactChanged && input.contactEmail && (await deps.confirmations()).allowed) {
-        await deps.mail.confirmation({ siteId: site.siteId, key: deps.now().toISOString() });
-      }
-      return done(kind, 'client_saved', { contactChanged: r.contactChanged });
+      const confirmation =
+        r.contactChanged && input.contactEmail
+          ? await askToConfirm(deps, site, ['pending'])
+          : 'none';
+      return done(kind, SAVED_CLIENT[confirmation], {
+        contactChanged: r.contactChanged,
+        confirmation,
+      });
     }
     case 'invalid_owner':
       return refuseTo(kind, CLIENT_REPORTS_PAGE, 400, 'invalid_owner');
@@ -218,29 +262,35 @@ export async function saveClient(
 
 /**
  * POST …/confirm: the confirmation mail again, for a schedule whose contact has not confirmed.
- * 409 `nothing_to_confirm` with no schedule, no contact or a contact that has confirmed; 429 past
- * the account's daily bound.
+ * 409 `nothing_to_confirm` with no schedule, no contact or a contact that has confirmed; 409
+ * `confirmation_waits` in an Agency trial for a contact that is not the owner's own address; 429
+ * past the account's daily bound.
  */
 export async function resendConfirmation(
   deps: ClientDeps,
   site: ClientSite,
   kind: Kind,
 ): Promise<Response> {
-  if ((await deps.store.confirmationState(site)) !== 'pending') {
-    return refuseTo(kind, CLIENT_REPORTS_PAGE, 409, 'nothing_to_confirm');
+  const confirmation = await askToConfirm(deps, site, ['pending', 'asked']);
+  switch (confirmation) {
+    case 'asked':
+      return done(kind, 'confirmation_requested', { requested: true });
+    case 'waits':
+      return refuseTo(kind, CLIENT_REPORTS_PAGE, 409, 'confirmation_waits');
+    case 'none':
+      return refuseTo(kind, CLIENT_REPORTS_PAGE, 409, 'nothing_to_confirm');
+    case 'later': {
+      // The bound was asked a moment ago and refused: asked again, it gives the time it resets.
+      const verdict = await deps.confirmations();
+      const seconds = Math.max(
+        1,
+        Math.ceil((verdict.resetAt.getTime() - deps.now().getTime()) / 1000),
+      );
+      return kind === 'form'
+        ? noticeTo(CLIENT_REPORTS_PAGE, 'rate_limited', verdict.resetAt.toISOString())
+        : refuse(429, 'rate_limited', {}, { 'retry-after': String(seconds) });
+    }
   }
-  const verdict = await deps.confirmations();
-  if (!verdict.allowed) {
-    const seconds = Math.max(
-      1,
-      Math.ceil((verdict.resetAt.getTime() - deps.now().getTime()) / 1000),
-    );
-    return kind === 'form'
-      ? noticeTo(CLIENT_REPORTS_PAGE, 'rate_limited', verdict.resetAt.toISOString())
-      : refuse(429, 'rate_limited', {}, { 'retry-after': String(seconds) });
-  }
-  await deps.mail.confirmation({ siteId: site.siteId, key: deps.now().toISOString() });
-  return done(kind, 'confirmation_requested', { requested: true });
 }
 
 /** POST …/resume: a schedule its recipient paused sends again from its next run. */

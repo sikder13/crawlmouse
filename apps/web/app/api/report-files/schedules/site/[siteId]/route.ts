@@ -1,15 +1,20 @@
 import { checksPublicEnabled } from '@/lib/auth/flags';
+import { checkRateLimit } from '@/lib/rate-limit';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { supabaseServer } from '@/lib/supabase/server';
 import { isId, meantMethod, notFound, readBody, refuse, refuseTo } from '@/lib/v2/account/route';
 import { CLIENT_REPORTS_PAGE, clearSchedule, saveSchedule } from '@/lib/v2/agency/schedules';
 import { clientReportsGate, clientSiteOf } from '@/lib/v2/agency/schedules-caller';
-import { supabaseSchedulesStore } from '@/lib/v2/agency/schedules-store';
+import { inngestClientReportMail, supabaseSchedulesStore } from '@/lib/v2/agency/schedules-store';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 type Context = { params: Promise<{ siteId: string }> };
+
+/** Confirmation mails an account may ask for in a day; it fails closed. */
+const PER_ACCOUNT_DAY = 20;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** Save a client site's report schedule: `{cadence, isoWeekday, timeLocal, timezone, sendWhenUnchanged}` (CC-31 D8). */
 export async function PUT(req: Request, ctx: Context) {
@@ -72,7 +77,16 @@ async function act(req: Request, { params }: Context, method: 'PUT' | 'DELETE' |
   if (verb === 'DELETE') return clearSchedule({ store }, site, kind);
   if (verb !== 'PUT') return refuse(405, 'method_not_allowed');
   return saveSchedule(
-    { store, now: () => new Date() },
+    {
+      store,
+      mail: inngestClientReportMail(),
+      // The bucket of the client and confirm routes: a confirmation asked for here counts with theirs.
+      confirmations: () =>
+        checkRateLimit(`report-confirm:account:${site.accountId}`, PER_ACCOUNT_DAY, DAY_MS, {
+          failClosed: true,
+        }),
+      now: () => new Date(),
+    },
     site,
     body && meant ? { kind: body.kind, fields: meant.fields } : null,
   );

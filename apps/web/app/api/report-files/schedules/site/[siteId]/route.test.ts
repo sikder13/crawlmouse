@@ -245,6 +245,86 @@ async function confirmedWorld(): Promise<World> {
   return w;
 }
 
+describe('what each answer says became of the confirmation', () => {
+  const events = () => h.send.mock.calls.map((c) => (c[0] as { name: string }).name);
+  const said = async (res: Response) =>
+    ((await res.json()) as { confirmation?: string }).confirmation;
+  /** The account as an Agency trial with a card, as the entitlement step writes one. */
+  const inTrial = (accountId: string) =>
+    h.db.query(
+      `update public.accounts
+          set state = 'agency_trial', trial_variant = 'card_required', trial_used_at = now(),
+              trial_ends_at = now() + interval '5 days',
+              state_history = state_history || jsonb_build_array(
+                jsonb_build_object('state', 'agency_trial', 'since', now()::text))
+        where id = $1`,
+      [accountId],
+    );
+
+  it('a contact saved before its schedule is asked when the schedule is saved, once: the first run then sends a report', async () => {
+    const w = await world();
+    as(w.owner);
+    expect(await said(await patch(w.siteId, { contactEmail: 'c@client.example' }))).toBe('none');
+    expect(events()).toEqual([]);
+    expect(await said(await put(w.siteId))).toBe('asked');
+    expect(events()).toEqual(['report.confirmation.requested']);
+    // Saved again, with the link sent and not used: nothing more is asked.
+    await h.db.query(
+      `update public.report_schedules set recipient_confirm_sent_at = now() where site_id = $1`,
+      [w.siteId],
+    );
+    expect(await said(await put(w.siteId))).toBe('none');
+    expect(events()).toHaveLength(1);
+  });
+
+  it('in an Agency trial a contact that is not the owner’s own address is asked nothing, is told so, and no bound is counted', async () => {
+    const w = await world();
+    await inTrial(w.accountId);
+    as(w.owner);
+    await put(w.siteId);
+    h.limits.length = 0;
+    const saved = await patch(w.siteId, { contactEmail: 'outside@client.example' });
+    expect([saved.status, await said(saved)]).toEqual([200, 'waits']);
+    const again = await resend(w.siteId);
+    expect([again.status, await again.json()]).toEqual([409, { code: 'confirmation_waits' }]);
+    expect(await said(await put(w.siteId))).toBe('waits');
+    expect(events()).toEqual([]);
+    expect(h.limits).toEqual([]);
+    // A form is sent back with the notice that says why.
+    const form = await CLIENT_FORM(
+      request(
+        `${base(w.siteId)}/client`,
+        'POST',
+        '_method=PATCH&contactEmail=other%40client.example',
+        FORM,
+      ),
+      ctx(w.siteId),
+    );
+    expect(form.headers.get('location')).toBe('/agency/reports?notice=client_saved_waits');
+  });
+
+  it('in an Agency trial the owner’s own address is asked as any contact is', async () => {
+    const w = await world();
+    await inTrial(w.accountId);
+    as(w.owner);
+    await put(w.siteId);
+    expect(await said(await patch(w.siteId, { contactEmail: w.owner.email.toUpperCase() }))).toBe(
+      'asked',
+    );
+    expect(events()).toEqual(['report.confirmation.requested']);
+  });
+
+  it('past the day’s bound a saved contact is told it is asked at the next run', async () => {
+    const w = await world();
+    as(w.owner);
+    await put(w.siteId);
+    h.over.add('report-confirm');
+    const saved = await patch(w.siteId, { contactEmail: 'c@client.example' });
+    expect([saved.status, await said(saved)]).toEqual([200, 'later']);
+    expect(events()).toEqual([]);
+  });
+});
+
 describe('who may use the schedule routes', () => {
   const calls = (w: World) =>
     [
@@ -445,7 +525,7 @@ describe('PATCH …/client', () => {
       ownerSeatId: w.owner.seatId,
     });
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ contactChanged: true });
+    expect(await res.json()).toEqual({ contactChanged: true, confirmation: 'asked' });
     expect(await siteRow(w.siteId)).toEqual({
       client_name: 'Harborlight Dental',
       client_contact_name: null,
