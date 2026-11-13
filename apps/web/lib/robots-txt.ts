@@ -73,7 +73,9 @@ const DISALLOW = ['/embed/', '/audit/', '/dashboard', '/verify/'];
  * docs/OPERATING-RULES.md §12.
  */
 export function robotsTxt(): string {
-  const wildcard = ['User-Agent: *', 'Allow: /', ...DISALLOW.map((p) => `Disallow: ${p}`)].join('\n');
+  const wildcard = ['User-Agent: *', 'Allow: /', ...DISALLOW.map((p) => `Disallow: ${p}`)].join(
+    '\n',
+  );
   const named = AI_CRAWLERS.map((agent) => `User-Agent: ${agent}\nAllow: /`);
 
   return [
