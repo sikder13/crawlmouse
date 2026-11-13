@@ -1148,22 +1148,45 @@ fix page's Pro wall (`lib/v2/view/fix.ts`), which are locked copy on the public 
 The events of `AGENCY_EVENTS` (`lib/v2/agency/events.ts`), the workstream that built each sender, and
 where it is sent.
 
-| Event                      | Workstream | Sent by                                                                                                |
-| -------------------------- | ---------- | ------------------------------------------------------------------------------------------------------ |
-| `first_client_added`       | C          | `POST /api/sites`, when `add_site` reports the account's first site and the account's kind is `agency` |
-| `seat_invited`             | A          | the invite route (`POST /api/seats`)                                                                   |
-| `seat_accepted`            | A          | the accept route (`POST /api/seats/accept`)                                                            |
-| `seats_bought`             | A          | `POST /api/billing/seats`, when a quantity rose; a lowering alone sends none                           |
-| `report_generated`         | B          | `POST /api/reports`                                                                                    |
-| `report_downloaded`        | B          | `GET /api/report-files/[id]/download`                                                                  |
-| `report_shared`            | B2         | `POST /api/report-files/[id]/share`                                                                    |
-| `share_link_opened`        | B2         | the share link's handler (`/s/[token]`)                                                                |
-| `proof_viewed`             | B2         | the proof page, opened through a share link or signed in                                               |
-| `first_client_report_sent` | B2         | the function that sends a client report                                                                |
+| Event                      | Workstream | Sent by                                                                                                                                                                                      |
+| -------------------------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `first_client_added`       | C          | The first site added to an agency account, by either path (ruling Q41): `POST /api/sites` when `add_site` reports the account's first site, and CC-29's trial form when it makes the account |
+| `seat_invited`             | A          | the invite route (`POST /api/seats`)                                                                                                                                                         |
+| `seat_accepted`            | A          | the accept route (`POST /api/seats/accept`)                                                                                                                                                  |
+| `seats_bought`             | A          | `POST /api/billing/seats`, when a quantity rose; a lowering alone sends none                                                                                                                 |
+| `report_generated`         | B          | `POST /api/reports`                                                                                                                                                                          |
+| `report_downloaded`        | B          | `GET /api/report-files/[id]/download`                                                                                                                                                        |
+| `report_shared`            | B2         | `POST /api/report-files/[id]/share`                                                                                                                                                          |
+| `share_link_opened`        | B2         | the share link's handler (`/s/[token]`)                                                                                                                                                      |
+| `proof_viewed`             | B2         | the proof page, opened through a share link or signed in                                                                                                                                     |
+| `first_client_report_sent` | B2         | the function that sends a client report                                                                                                                                                      |
 
 The callers on a tree: `grep -rnE "'(seat_invited|seat_accepted|report_generated|report_downloaded|report_shared|share_link_opened|proof_viewed|first_client_added|first_client_report_sent|seats_bought)'" apps/web/app apps/web/lib inngest --include=*.ts --include=*.tsx | grep -v "\.test\.\|agency/events.ts\|analytics-events.ts"`.
 
 ## 12. Where the tree changed a decision's form
+
+**With CC-29 merged** (`origin/main` `5ce70ee2`), what this step held for it:
+
+- **An agency account born from the trial loads.** The account's record holds the consent CC-29's
+  form recorded (`accounts.agency_trial_consent_at`, a column no client role reads): the two loaders
+  read it with the service role for the account the caller's session returned, and only when its
+  history holds an Agency trial (`lib/v2/account/trial-consent.ts`). A trial with no consent
+  recorded is refused by name (`accountFromRow`).
+  `pnpm --filter @crawlmouse/web exec vitest run app/agency/page.test.tsx lib/v2/account/rows.test.ts`
+- **Which account a billing request with no account acts on.** The account the caller acts in (the
+  switcher's, §5), when it is one of their seats; otherwise the account of their one owner seat, or,
+  with several, their personal account (CC-29 Q26): `ownedAccountId`, `lib/billing/owner.ts`.
+- **The Agency trial's Checkout lands on `/agency`** (questions.md Q8), where a person acting in
+  their personal account is offered "Open <agency>", the switch.
+- **The capability table** (`CAPABILITIES`, `lib/v2/view/agencies.ts`) reads built for seats, client
+  reports, the client matrix, exports and the agency workspace. The report page on the agency's
+  domain, the agency's own sender address and the one-pager stay "coming", each with a proof that
+  holds beside this step's routes.
+  `pnpm --filter @crawlmouse/web exec vitest run lib/v2/view/agencies.test.ts`
+- **The migrations' order.** This step's `20261114000002` is applied after CC-29's
+  `20261114000001` and keeps the mail kind that one added; its revert gives back the schema with
+  that kind (`__tests__/v2-031-revert-fingerprint.test.ts`). Applied in the other order, CC-29's
+  rewrite of the kinds drops this step's three (questions.md Q44).
 
 - **Pages for Pro.** Seats and reports are sold on Pro, so `/seats` and `/reports` are not under
   `/agency` (questions.md Q1).
