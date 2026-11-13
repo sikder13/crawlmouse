@@ -1102,16 +1102,20 @@ digit (`gates.test.ts`, "has no digit in its code").
 | `/agency` and `/agency/clients/[siteId]` on an account below Agency                                                    | `agencyGateMessage()`                                                                                                   |
 | the dashboard and `/agency`, after an add was refused because the plan's sites are in use (`?notice=upgrade_required`) | `sitesFullMessage(tier)`: the sites gate below Agency, and on Agency what a site beyond the plan's costs (`EXTRA_SITE`) |
 
-`gates.test.ts` also reads other files for a price or a limit written by hand: a `$` before a digit,
-or a digit before "site", "seat", "client" or "fix". It reads the matrix and client copy
+`gates.test.ts` also reads other files for a price, a limit or a length in days written by hand: a
+`$` before a digit, or a digit before "site", "seat", "client", "fix" or "day". It reads the matrix
+and client copy
 (`lib/v2/copy/agency.ts`), `NOTICE_LINES` (`lib/v2/copy/notices.ts`), `OWN_ACCOUNT_COPY`
 (`lib/v2/copy/settings-notices.ts`), the words of Seats, client reports and Reports
 (`lib/v2/copy/seats.ts`, `client-reports.ts`, `reports.ts`, each up to its lock corrections), and
 the views that compose a sentence from numbers: `lib/v2/view/seats.ts` (the foot and the buy line),
 `agency-matrix.ts`, `agency-client.ts`, `agency-reports.ts` and `reports.ts`. In those, apart from
-the two Reports files (whose copy says "two checks"), it also fails on a number from two to twelve,
+the two Reports files (whose copy says "two checks"), it also fails on a number from two to fifteen,
 twenty or thirty spelled out. It does not see a bare digit with neither a `$` nor one of those nouns
-beside it.
+beside it, a length in another unit (`NOTICE_LINES` writes "the last 24 hours"), or what follows the
+slice it reads from a copy module: the lock corrections and the additions, where `SEATS_ADDITIONS`
+quotes the Seats note with "seven days" written out.
+`pnpm --filter @crawlmouse/web exec vitest run lib/v2/agency/gates.test.ts -t 'other files say'`.
 
 `gateMessage('fixes', …)` has no caller: the fix list's and the fix page's Pro lines are locked copy
 (next paragraph), so D10's line for the fix limit is on no screen.
@@ -1181,15 +1185,20 @@ on a link minted again on a retry, §9 on the prospect's one-pager, §10 on a cl
 - **Invitation mail is bounded by the day, lower in a trial** (`INVITE_MAIL_PER_DAY`,
   `lib/v2/agency/seats.ts`): an invitation names the account, a string its owner chose, to an address
   the owner chose. An invitation and a resend count into one bucket.
-- **Text inside a `data-v2-addition` marker is compared with no artboard.** The lock comparison
-  leaves a marked element out (`__tests__/v2/_lib/lock.ts`), on every screen of the product. For
-  Seats, the matrix, the client page and client reports a test holds each text node inside a marker,
-  on each preview and as a live page draws it, to a string of the screen's view or of the step's
-  copy modules, so a sentence typed into a component there fails:
-  `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2/agency-additions.test.tsx`. It does
-  not see a sentence added to a copy module or composed in a view, an attribute, a state no preview
-  renders, or a marker on another screen (Reports among them). Tying each marker to a registry row
-  by a key is a change to the harness every screen uses, and is not made here.
+- **Text inside a `data-v2-addition` marker is compared with no artboard, and so is a preview that
+  is not an artboard's.** The lock comparison reads the preview that draws a locked artboard and
+  leaves a marked element out (`__tests__/v2/_lib/lock.ts`). For Seats, the matrix, the client page
+  and client reports a test reads the text nodes inside a marker and those of the page's `<main>`,
+  on the previews of those screens and again as a live page draws them, and fails on one that is not
+  a string of the screen's view, of the step's copy modules or of a shared component (a status
+  pill's spoken word, a withheld grade), or such strings joined by " · ". A sentence typed into a
+  component there fails:
+  `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2/agency-additions.test.tsx`.
+  What it does not see: a sentence added to a copy module or composed in a view; a string of the
+  copy drawn where the data does not hold it (one case is held: `seats.test.tsx` counts the
+  "Invited" pill against the view's rows, `-t 'Invited'`); an attribute; a state no preview
+  renders; the rail outside a marker; and any other screen, Reports among them. Tying each marker
+  to a registry row by a key is a change to the harness every screen uses, and is not made here.
 - **The PDF's not-measured list has no heading.** The proof page titles the list "Not measured"
   (`lib/v2/copy/proof.ts`); the PDF draws the same sentences after a rule with no title
   (`drawDoc`, `lib/v2/reports/pdf-layout.ts`). A title would be a string the document does not hold,

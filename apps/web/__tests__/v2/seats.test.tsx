@@ -391,6 +391,23 @@ describe('the screens, as their previews render them', () => {
     expect(pastDue).not.toMatch(/<section[^>]* id="buy"/);
   });
 
+  it('Seats: the “Invited” pill is on the rows the view marks as invitations, and on no other', () => {
+    const drawn = (path: keyof typeof SEATS_PREVIEWS) => {
+      const html = renderToStaticMarkup(CC31_SEAT_ELEMENTS[path]!());
+      const table = /<table[^>]*aria-label="Seats"[\s\S]*?<\/table>/.exec(html)![0];
+      return [...table.matchAll(/<tr[^>]*>[\s\S]*?<\/tr>/g)]
+        .slice(1)
+        .map(([row]) => row.includes('Invited, not yet accepted'));
+    };
+    const paths = Object.keys(SEATS_PREVIEWS) as (keyof typeof SEATS_PREVIEWS)[];
+    for (const path of paths) {
+      expect(drawn(path), path).toEqual(seatsPreview(path).people.rows.map((r) => r.invited));
+    }
+    // Both kinds of row are among them: an invitation, and seats that were accepted.
+    expect(drawn(PRO_FULL)).toEqual([false, true]);
+    expect(drawn(PAID)).toEqual([false, false, false, false]);
+  });
+
   it('Seats, live: a change, a removal and, for an invitation, a resend, for each seat but the owner’s', () => {
     const live = (path: keyof typeof SEATS_PREVIEWS) =>
       renderToStaticMarkup(
