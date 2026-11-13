@@ -60,6 +60,14 @@
   gap: 8px;
 }
 
+/* The field's focus ring (Field.module.css) on the inputs that are not a Field: the scope's
+   checkboxes and the plan's quantities. Without it each showed the browser's own, at 1.1:1. */
+.site input:focus-visible,
+.quantity input:focus-visible {
+  outline: 2px solid var(--v2-fg);
+  outline-offset: 2px;
+}
+
 .change {
   text-align: left;
 }
