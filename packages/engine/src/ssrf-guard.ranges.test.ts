@@ -4,7 +4,8 @@ import { createSafeLookup, isPrivateOrReservedIp, validateUrlOrThrow } from './s
 
 // One named test per row of ADDRESS_RANGES (address-ranges.ts). A row that refuses is tested inside
 // its prefix and just outside it; a row that reads an embedded IPv4 address is tested with a private
-// and a public one. mutations.md records which of these turns red when each row is removed.
+// and a public one, and, where it lies outside 2000::/3, just outside its prefix too: there a prefix
+// read too wide would allow what the last row refuses.
 
 const refuses = (...ips: string[]) => {
   for (const ip of ips) expect(isPrivateOrReservedIp(ip), `${ip} should be refused`).toBe(true);
@@ -78,18 +79,22 @@ describe('IPv6 rows that read an embedded IPv4 address', () => {
   it('::ffff:0:0/96 (IPv4-mapped)', () => {
     refuses('::ffff:10.0.0.1', '::ffff:a00:1', '::ffff:7f00:1', '::FFFF:169.254.169.254');
     allows('::ffff:8.8.8.8', '::ffff:808:808');
+    refuses('::fffe:808:808');
   });
   it('::ffff:0:0:0/96 (IPv4-translated)', () => {
     refuses('::ffff:0:a00:1', '::ffff:0:127.0.0.1', '0:0:0:0:ffff:0:a9fe:a9fe');
     allows('::ffff:0:808:808', '::ffff:0:8.8.8.8');
+    refuses('::ffff:1:808:808');
   });
   it('64:ff9b::/96 (NAT64)', () => {
     refuses('64:ff9b::5', '64:ff9b::a00:1', '64:ff9b::a9fe:a9fe', '64:ff9b::127.0.0.1');
-    allows('64:ff9b::808:808', '64:ff9b::8.8.8.8');
+    allows('64:ff9b::808:808', '64:ff9b::8.8.8.8', '64:ff9b::8080:8080');
+    refuses('64:ff9b::1:808:808', '64:ff9b::1:0:808:808');
   });
   it('::/96 (IPv4-compatible), where :: and ::1 embed 0.0.0.0 and 0.0.0.1', () => {
     refuses('::', '::1', '::a00:1', '::10.0.0.1', '0:0:0:0:0:0:0:1');
     allows('::808:808', '::8.8.8.8');
+    refuses('::1:808:808');
   });
   it('2002::/16 (6to4), the IPv4 address in bytes 2 to 5', () => {
     refuses('2002:7f00::1', '2002:a9fe:a9fe::', '2002:a00:1::');
@@ -102,6 +107,9 @@ describe('IPv6 rows that read an embedded IPv4 address', () => {
     refuses('2001:0:4136:e378:8000:63bf:80ff:fffe');
     // Client 10.0.0.1, stored as f5ff:fffe.
     refuses('2001:0:4136:e378:8000:63bf:f5ff:fffe');
+    // Client 127.0.0.1 behind server 192.0.0.1: the server's first bit is set, so a prefix read
+    // longer than /32 would miss this one.
+    refuses('2001:0:c000:1:8000:63bf:80ff:fffe');
     // Client 8.8.8.8, stored as f7f7:f7f7.
     allows('2001:0:4136:e378:8000:63bf:f7f7:f7f7');
   });
