@@ -14,6 +14,8 @@ import { agencyPlusContact } from './agency-plus-contact';
 import { alertTemplate } from './alert';
 import { checkNotify } from './check-notify';
 import { fixToDeveloper } from './fix-to-developer';
+import { DIGEST_FIGURES, founderDigest, type DigestCounts } from './founder-digest';
+import { founderEvent, founderOverflow } from './founder-event';
 import { trialReminder } from './trial-reminder';
 import { weeklySummaryTemplate } from './weekly-summary';
 
@@ -70,6 +72,12 @@ const summaryWeek = () => {
     until: new Date((Math.floor(Math.max(...days) / day) + 1) * day).toISOString(),
   };
 };
+/** A digest's figures: stand-in numbers, each figure's own. */
+const digestCounts = (base: number): DigestCounts =>
+  Object.fromEntries(DIGEST_FIGURES.map(([k], i) => [k, base + i])) as DigestCounts;
+/** Stand-in account ids: the shape the console links, naming no account. */
+const ACCOUNT_ID = (n: number) => `a0000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
+
 /** What one alert lists: that check's changes. */
 const alertChanges = () => siteChanges().filter((c) => c.check_id === alertCheck().id);
 
@@ -123,6 +131,36 @@ const RENDERS: Record<MailPreviewSlug, (opts?: PreviewOptions) => RenderedMail> 
       email: 'ops@summit-digital.example',
       sites: 40,
       note: 'We look after 40 client sites, most on WordPress.\nWe would want SSO for our team.',
+    }),
+  'founder-event': () =>
+    founderEvent({
+      kind: 'payment',
+      internal: false,
+      accountId: ACCOUNT_ID(1),
+      plan: 'pro',
+      payment: 'first',
+      amount: { minor: 1900, currency: 'usd' },
+      host: badHost(),
+      ownerEmail: ['owner', 'shop.example'].join('@'),
+      occurredAt: '2026-11-13T14:59:00.000Z',
+    }),
+  'founder-overflow': () =>
+    founderOverflow({
+      total: 4,
+      rows: [
+        { kind: 'signup', accountId: ACCOUNT_ID(2), internal: false },
+        { kind: 'trial_started', accountId: ACCOUNT_ID(3), internal: false },
+        { kind: 'signup', accountId: ACCOUNT_ID(4), internal: true },
+      ],
+    }),
+  'founder-digest-daily': () =>
+    founderDigest({ variant: 'daily', date: '2026-11-12', counts: digestCounts(1) }),
+  'founder-digest-weekly': () =>
+    founderDigest({
+      variant: 'weekly',
+      monday: '2026-11-02',
+      week: digestCounts(7),
+      previous: digestCounts(5),
     }),
 };
 
