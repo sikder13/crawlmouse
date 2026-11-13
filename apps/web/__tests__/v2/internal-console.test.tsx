@@ -102,6 +102,19 @@ describe('the account screen', () => {
   });
 });
 
+describe('client analytics on the console', () => {
+  it('each screen opts its content out of autocapture and masks it in a replay', () => {
+    for (const html of [
+      renderToStaticMarkup(<ConsoleSearchScreen results={null} nothingFound={false} />),
+      renderToStaticMarkup(
+        <ConsoleAccountScreen view={accountView(dossier(null))} notice={null} />,
+      ),
+    ]) {
+      expect(html).toMatch(/<main class="[^"]*\bph-no-capture\b[^"]*" data-ph-mask="">/);
+    }
+  });
+});
+
 describe('the search screen', () => {
   it('posts the query, and has one orange element', () => {
     const html = renderToStaticMarkup(<ConsoleSearchScreen results={null} nothingFound={false} />);

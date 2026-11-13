@@ -24,7 +24,9 @@ export interface ConsoleSearchProps {
 export function ConsoleSearchScreen({ results, nothingFound }: ConsoleSearchProps) {
   return (
     <PageShell header="app" footer={false}>
-      <main className={`${layout.wrap} ${styles.main}`}>
+      {/* PostHog is set up for every page (instrumentation-client.ts): `ph-no-capture` keeps its
+          autocapture off this staff page, and `data-ph-mask` masks its text in an error replay. */}
+      <main className={`${layout.wrap} ${styles.main} ph-no-capture`} data-ph-mask="">
         <div className={styles.header}>
           <Heading level={1} size="l">
             Support console
