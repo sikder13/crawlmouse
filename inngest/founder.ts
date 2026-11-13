@@ -13,7 +13,12 @@
  *
  * The work is one step, retried as a whole. The notices and mails in it are keyed by their
  * event, so a retry claims the same rows and the mail ledger answers `done` for a mail already sent.
- * This package imports nothing from the app.
+ * A run that fails past its retries is reported through the injected `FounderFailureReport` (Sentry's
+ * `signal: founder-notice-failed`, wired in apps/web/lib/v2/ops/functions.ts), as inngest/audit.ts
+ * reports a failed audit: Inngest 3.54.2 registers an `onFailure` as a function of its own,
+ * `<id>-failure`, triggered by `inngest/function.failed` for this function's id and retried once
+ * (components/InngestFunction.js, `getConfig`). The report is handed the function's id and Inngest's
+ * run id, and not the run's error. This package imports nothing from the app.
  */
 import type { AccountState } from '@crawlmouse/types/v2';
 import { inngest } from './client';
@@ -36,6 +41,15 @@ export interface FounderEntitlementEvent {
   occurredAt: string;
 }
 
+/** A founder function's run that failed past its retries: the function's id and Inngest's run id. */
+export interface FounderFailure {
+  fnId: string;
+  runId: string;
+}
+
+/** Raises the founder signal for a failed run. */
+export type FounderFailureReport = (failure: FounderFailure) => Promise<void>;
+
 export interface FounderWork {
   entitlement(event: FounderEntitlementEvent): Promise<unknown>;
   sweep(): Promise<unknown>;
@@ -43,9 +57,15 @@ export interface FounderWork {
   digest(at: string): Promise<unknown>;
 }
 
-export function createFounderEntitlementFn(work: () => FounderWork) {
+export function createFounderEntitlementFn(work: () => FounderWork, report: FounderFailureReport) {
   return inngest.createFunction(
-    { id: FOUNDER_ENTITLEMENT_FN_ID, retries: FOUNDER_RETRIES, concurrency: { limit: 1 } },
+    {
+      id: FOUNDER_ENTITLEMENT_FN_ID,
+      retries: FOUNDER_RETRIES,
+      concurrency: { limit: 1 },
+      onFailure: ({ event }) =>
+        report({ fnId: FOUNDER_ENTITLEMENT_FN_ID, runId: event.data.run_id }),
+    },
     { event: 'entitlement.changed' },
     async ({ event, step }) =>
       step.run('notify', async () =>
@@ -63,17 +83,27 @@ export function createFounderEntitlementFn(work: () => FounderWork) {
   );
 }
 
-export function createFounderSweepFn(work: () => FounderWork) {
+export function createFounderSweepFn(work: () => FounderWork, report: FounderFailureReport) {
   return inngest.createFunction(
-    { id: FOUNDER_SWEEP_FN_ID, retries: FOUNDER_RETRIES, concurrency: { limit: 1 } },
+    {
+      id: FOUNDER_SWEEP_FN_ID,
+      retries: FOUNDER_RETRIES,
+      concurrency: { limit: 1 },
+      onFailure: ({ event }) => report({ fnId: FOUNDER_SWEEP_FN_ID, runId: event.data.run_id }),
+    },
     { cron: '*/5 * * * *' },
     async ({ step }) => step.run('sweep', async () => sized('sweep', await work().sweep())),
   );
 }
 
-export function createFounderDigestFn(work: () => FounderWork) {
+export function createFounderDigestFn(work: () => FounderWork, report: FounderFailureReport) {
   return inngest.createFunction(
-    { id: FOUNDER_DIGEST_FN_ID, retries: FOUNDER_RETRIES, concurrency: { limit: 1 } },
+    {
+      id: FOUNDER_DIGEST_FN_ID,
+      retries: FOUNDER_RETRIES,
+      concurrency: { limit: 1 },
+      onFailure: ({ event }) => report({ fnId: FOUNDER_DIGEST_FN_ID, runId: event.data.run_id }),
+    },
     { cron: '7 * * * *' },
     async ({ step }) => {
       const at = await step.run('clock', () => new Date().toISOString());

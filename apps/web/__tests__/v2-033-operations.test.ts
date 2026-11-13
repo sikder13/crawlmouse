@@ -617,6 +617,20 @@ describe('operator_request_check', () => {
     expect((await actionsOf(op)).map((a) => a.outcome)).toEqual(['site_paused']);
   });
 
+  it('a site removed after the route read it writes one row with the outcome site_removed (review T1)', async () => {
+    const op = await operator();
+    const { accountId } = await personalAccount(db, await person());
+    const s = await site(accountId);
+    const failed = await failedCheck(s);
+    // The route refuses a removed site before the call; this is the removal landing between the two.
+    await db.query('update public.sites set removed_at = now() where id = $1', [s]);
+    const r = row(s);
+    expect((await request(op, failed, r)).outcome).toBe('removed');
+    const { rows } = await db.query('select 1 from public.checks where id = $1', [r.id]);
+    expect(rows).toEqual([]);
+    expect((await actionsOf(op)).map((a) => a.outcome)).toEqual(['site_removed']);
+  });
+
   it('refuses a target that did not fail, or is another site’s, and writes nothing', async () => {
     const op = await operator();
     const { accountId } = await personalAccount(db, await person());

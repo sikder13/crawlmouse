@@ -20,6 +20,12 @@ const sb = vi.hoisted(() => ({
 vi.mock('@supabase/supabase-js', () => ({ createClient: vi.fn(() => sb) }));
 vi.mock('./sign-in-link', () => ({ requestSignInLink: vi.fn(async () => 'sent') }));
 vi.mock('../../billing/stripe-account', () => ({ stripeAccount: vi.fn() }));
+const sentry = vi.hoisted(() => ({
+  captureMessage: vi.fn(),
+  getClient: vi.fn((): unknown => ({})),
+  flush: vi.fn(async () => true),
+}));
+vi.mock('@sentry/nextjs', () => sentry);
 
 const ENV = {
   NEXT_PUBLIC_SUPABASE_URL: 'https://project.supabase.example',
@@ -33,9 +39,9 @@ const ids = (fns: readonly unknown[]) =>
       .map((c) => c.id),
   );
 
-const FOUNDER = [FOUNDER_ENTITLEMENT_FN_ID, FOUNDER_SWEEP_FN_ID, FOUNDER_DIGEST_FN_ID].map(
-  (id) => `crawlmouse-${id}`,
-);
+const FOUNDER_FNS = [FOUNDER_ENTITLEMENT_FN_ID, FOUNDER_SWEEP_FN_ID, FOUNDER_DIGEST_FN_ID];
+/** Each founder function, followed by its failure handler (review M3). */
+const FOUNDER = FOUNDER_FNS.flatMap((id) => [`crawlmouse-${id}`, `crawlmouse-${id}-failure`]);
 const CANARY = `crawlmouse-${SIGNIN_CANARY_FN_ID}`;
 const TO = ['canary', 'example.test'].join('@');
 const signIn = async () => 'sent' as const;
@@ -63,6 +69,34 @@ describe('opsFunctions', () => {
       expect(ids(opsFunctions({ V2_BILLING: '1', SIGNIN_CANARY_TO: to }, signIn))).not.toContain(
         CANARY,
       );
+  });
+
+  it('reports a founder function’s failed run to Sentry as founder-notice-failed, with its id (review M3)', async () => {
+    const fns = opsFunctions({ ...ENV, V2_BILLING: '1' });
+    for (const id of FOUNDER_FNS) {
+      sentry.captureMessage.mockClear();
+      const fn = fns.find((f) => ids([f])[0] === `crawlmouse-${id}`) as unknown as {
+        onFailureFn: (c: unknown) => Promise<unknown>;
+      };
+      await fn.onFailureFn({
+        event: {
+          name: 'inngest/function.failed',
+          data: { function_id: `crawlmouse-${id}`, run_id: 'run-1', error: { message: 'x' } },
+        },
+        error: new Error('x'),
+        step: { run: async (_id: string, f: () => unknown) => f() },
+      });
+      expect(sentry.captureMessage.mock.calls).toEqual([
+        [
+          'founder-notice-failed',
+          {
+            level: 'error',
+            tags: { signal: 'founder-notice-failed', function: id },
+            extra: { runId: 'run-1' },
+          },
+        ],
+      ]);
+    }
   });
 
   it("asks for the canary's link through requestSignInLink unless another is given (review T5)", async () => {

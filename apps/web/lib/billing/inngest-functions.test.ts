@@ -175,8 +175,11 @@ describe('the Inngest serve route’s function list', { timeout: 60_000 }, () =>
       'crawlmouse-crawlmouse.trial.lifecycle',
       'crawlmouse-crawlmouse.billing.past-due-sweep',
       'crawlmouse-crawlmouse.founder.entitlement',
+      'crawlmouse-crawlmouse.founder.entitlement-failure',
       'crawlmouse-crawlmouse.founder.sweep',
+      'crawlmouse-crawlmouse.founder.sweep-failure',
       'crawlmouse-crawlmouse.founder.digest',
+      'crawlmouse-crawlmouse.founder.digest-failure',
     ]);
   });
 });

@@ -229,6 +229,23 @@ describe('claim_founder_notice', () => {
 });
 
 describe('take_founder_overflow', () => {
+  /** The ledger row of a notice's mail; the rule reads its key, status and attempts, not its kind. */
+  const ledger = (overflowKey: string, status: string, attempts: number, at: string) =>
+    db.query(
+      `insert into public.email_sends (idempotency_key, kind, address_hash, status, attempts,
+                                       claimed_at, sent_at, updated_at)
+       values ($1, 'alert', $2, $3, $4, $5, case when $3 = 'sent' then $5::timestamptz end, $5)`,
+      [
+        `founder_event:${overflowKey}`,
+        randomUUID().replace(/-/g, '').padEnd(64, '0'),
+        status,
+        attempts,
+        at,
+      ],
+    );
+  const accounts = (t: { rows: { account_id: string | null }[] }) =>
+    t.rows.map((r) => r.account_id);
+
   it('takes the held rows under its key once, and answers the same rows for that key again', async () => {
     // Clear the held rows earlier tests left, under a key of their own.
     await take(`overflow:clear-${randomUUID()}`);
@@ -285,20 +302,6 @@ describe('take_founder_overflow', () => {
     await take(`overflow:clear-${randomUUID()}`);
     const now = '2027-11-01T10:00:00.000Z';
     for (const k of keys('ovx-fill', LIMIT)) await claim({ key: k, now });
-    // The ledger row of a notice's mail; the rule reads its key, status and attempts, not its kind.
-    const ledger = (overflowKey: string, status: string, attempts: number) =>
-      db.query(
-        `insert into public.email_sends (idempotency_key, kind, address_hash, status, attempts,
-                                         claimed_at, sent_at, updated_at)
-         values ($1, 'alert', $2, $3, $4, $5, case when $3 = 'sent' then $5::timestamptz end, $5)`,
-        [
-          `founder_event:${overflowKey}`,
-          randomUUID().replace(/-/g, '').padEnd(64, '0'),
-          status,
-          attempts,
-          now,
-        ],
-      );
     // Notices take their rows under their hour's key first; then their mails' ledger rows say how
     // each ended.
     const heldUnder = async (tag: string, n: number, key: string) => {
@@ -316,11 +319,11 @@ describe('take_founder_overflow', () => {
     // 1 attempt under a key that is not an hour's: not compared.
     const notAnHour = await heldUnder('ovx-not-an-hour', 1, `overflow:0-${randomUUID()}`);
     const sent = await heldUnder('ovx-sent', 1, 'overflow:2027-11-01T07');
-    await ledger(gaveUp.key, 'failed', 3);
-    await ledger(failedOnce.key, 'failed', 1);
-    await ledger(later.key, 'failed', 1);
-    await ledger(notAnHour.key, 'failed', 1);
-    await ledger(sent.key, 'sent', 1);
+    await ledger(gaveUp.key, 'failed', 3, now);
+    await ledger(failedOnce.key, 'failed', 1, now);
+    await ledger(later.key, 'failed', 1, now);
+    await ledger(notAnHour.key, 'failed', 1, now);
+    await ledger(sent.key, 'sent', 1, now);
     const fresh = randomUUID();
     expect(await claim({ key: keys('ovx-new', 1)[0]!, account: fresh, now })).toBe('held');
     const next = await take('overflow:2027-11-01T10');
@@ -328,6 +331,40 @@ describe('take_founder_overflow', () => {
     expect(next.rows.map((r) => r.account_id).sort()).toEqual(
       [gaveUp.account, gaveUp.account, failedOnce.account, fresh].sort(),
     );
+  });
+
+  it('a retry of an earlier hour’s notice, after a later hour re-took its rows, takes nothing new (review M2)', async () => {
+    // An hour key before this test's takes the rows earlier tests left held, `later`'s among them.
+    await take('overflow:2028-03-01T09');
+    const now = '2028-03-01T11:00:00.000Z';
+    for (const k of keys('ovm-fill', LIMIT)) await claim({ key: k, now });
+    const r = randomUUID();
+    expect(await claim({ key: keys('ovm-r', 1)[0]!, account: r, now })).toBe('held');
+    expect(accounts(await take('overflow:2028-03-01T10'))).toEqual([r]);
+    // The 10:00 notice's mail failed once: a provider answer `send` does not retry, or a throw while
+    // its run still has retries. The 11:00 notice re-takes its rows.
+    await ledger('overflow:2028-03-01T10', 'failed', 1, now);
+    expect(accounts(await take('overflow:2028-03-01T11'))).toEqual([r]);
+    const s = randomUUID();
+    expect(await claim({ key: keys('ovm-s', 1)[0]!, account: s, now })).toBe('held');
+    // The 10:00 run's retry: a mail was claimed under its key, so it takes no new row.
+    expect(await take('overflow:2028-03-01T10')).toEqual({ total: 0, rows: [] });
+    expect(accounts(await take('overflow:2028-03-01T12'))).toEqual([s]);
+  });
+
+  it('re-takes an earlier hour’s rows only under an hour key (review T2)', async () => {
+    // An hour key before this test's takes the rows earlier tests left held.
+    await take('overflow:2028-04-01T09');
+    const now = '2028-04-01T10:00:00.000Z';
+    for (const k of keys('ovt-fill', LIMIT)) await claim({ key: k, now });
+    const a = randomUUID();
+    expect(await claim({ key: keys('ovt', 1)[0]!, account: a, now })).toBe('held');
+    expect(accounts(await take('overflow:2028-04-01T05'))).toEqual([a]);
+    await ledger('overflow:2028-04-01T05', 'failed', 1, now);
+    // A key that is not an hour's is not compared with the row's hour key (as text it would sort
+    // after it, 'z' > '2'), so it takes no row of an earlier hour.
+    expect((await take(`overflow:z-${randomUUID()}`)).total).toBe(0);
+    expect(accounts(await take('overflow:2028-04-01T10'))).toEqual([a]);
   });
 
   it('refuses a key that is not an overflow key', async () => {

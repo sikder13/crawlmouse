@@ -408,6 +408,16 @@ const WITHDRAWN: readonly WithdrawnClaim[] = [
       'the file is served unchanged.',
     allowedIn: [],
   },
+  {
+    // Withdrawn in SQL, which this guard cannot read; registered so no document repeats it.
+    text: 'so a retried notice reports the same rows',
+    withdrawnIn:
+      'infra/supabase/migrations/20261115000001_v2_033_operations.sql (take_founder_overflow), CC-33 review round 3 M2',
+    truth:
+      'A retried "N more" notice reports the rows carrying its key: the ones it took, or none once a ' +
+      'later hour re-took them; it takes no new row once a mail was claimed under its key.',
+    allowedIn: [],
+  },
 ];
 
 /**

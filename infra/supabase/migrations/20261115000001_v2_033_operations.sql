@@ -431,20 +431,25 @@ end;
 $$;
 
 -- The held rows one "N more" notice reports, under its key p_key ('overflow:<hour>', the hour as
--- 'YYYY-MM-DDTHH' in UTC). The first call for a key writes the key onto every held row no notice has
--- taken, and onto the rows taken by an earlier notice whose mail's ledger row (email_sends, key
--- 'founder_event:<its key>') is `failed` and either
+-- 'YYYY-MM-DDTHH' in UTC). A first call for a key is one where no row carries the key and no mail was
+-- claimed under it (no email_sends row keyed 'founder_event:<p_key>'). It writes the key onto every
+-- held row no notice has taken, and onto the rows taken by an earlier notice whose mail's ledger row
+-- (key 'founder_event:<its key>') is `failed` and either
 --   has 3 attempts, claim_email_send's bound, so that notice is not sent again (review C6), or
---   is under an earlier hour's key than p_key, whatever its attempts: `send` records `failed` after
---   one attempt for a provider answer it does not retry (review N1).
+--   is under an earlier hour's key than p_key, whatever its attempts (review N1). `send` records
+--   `failed` after one attempt both for a provider answer it does not retry and for an attempt that
+--   threw while its run has retries left.
 -- Both keys must be hour keys for the second; they compare as text in the "C" collation, which for
--- that fixed-width shape is the hours' order. A retry of the earlier notice's run, if one is left,
--- finds no rows under its key, and takes a later hour's rows back only when that later mail has 3
--- failed attempts (apps/web/__tests__/v2-033-founder.test.ts, "review C6, N1"). A later call for the same key takes nothing new and answers the rows already
--- carrying it, so a retried notice reports the same rows. Rows taken by a notice whose run ended
--- before its mail was claimed keep that notice's key and are not reported again. Answers
--- {"total": n, "rows": [...]}, rows oldest first, at most p_rows of them; a row's `invoice` is its
--- facts' (null when it has none), so the notice can tell a paid payment from a plan start.
+-- that fixed-width shape is the hours' order. Any other call takes nothing new and answers the rows
+-- carrying p_key: a retried notice reports the rows it took, or none when a later hour's notice has
+-- re-taken them, so a retry does not mail rows held since under the key its mail was claimed with
+-- (review M2). Rows taken by a notice whose run ended before its mail was claimed keep that notice's
+-- key and are not reported again. apps/web/__tests__/v2-033-founder.test.ts: "review C6, N1" holds
+-- rows under keys whose mails ended each way and takes an hour key after them; "review M2" retries an
+-- earlier hour's take after a later hour re-took its rows; "review T2" takes under a key that is not an
+-- hour's. Answers {"total": n, "rows": [...]}, rows oldest first, at most p_rows of them; a row's
+-- `invoice` is its facts' (null when it has none), so the notice can tell a paid payment from a plan
+-- start.
 create or replace function public.take_founder_overflow(p_key text, p_rows integer)
 returns jsonb
 language plpgsql
@@ -458,7 +463,9 @@ begin
       using errcode = '22023';
   end if;
   perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended('founder_notices', 0));
-  if not exists (select 1 from public.founder_notices n where n.overflow_key = p_key) then
+  if not exists (select 1 from public.founder_notices n where n.overflow_key = p_key)
+     and not exists (select 1 from public.email_sends e
+                      where e.idempotency_key = 'founder_event:' || p_key) then
     update public.founder_notices n set overflow_key = p_key
      where n.state = 'held'
        and (n.overflow_key is null
@@ -494,9 +501,11 @@ $$;
 --   trials_started               trial_started notices recorded
 --   trials_ended                 accounts.state_history entries whose previous entry is a trial
 --                                state, by the entry's `since`
---   payments_paid                payment notices whose facts record Stripe's invoice as `paid`
---                                (first and returning; a recovery from past_due has a notice only
---                                when it is a first payment, founder.ts)
+--   payments_paid                payment notices whose facts record Stripe's invoice as `paid`, as
+--                                read when the plan changed (first and returning; a recovery from
+--                                past_due has a notice only when it is a first payment, founder.ts;
+--                                a card trial's conversion, charged about an hour after the change,
+--                                is recorded unpaid and counted in plans_started_unpaid)
 --   plans_started_unpaid         payment notices whose facts record anything else: an invoice not
 --                                yet paid, not given or not read (review N4)
 --   payments_failed              payment_failed notices recorded
