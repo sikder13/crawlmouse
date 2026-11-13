@@ -14,6 +14,7 @@ import { idsInPath, supportMailto, type SupportRequest, type SupportTopic } from
 const UUID = '0b0e7a52-5f0b-4b53-9c0e-0d4a3a1f2c11';
 const OTHER = 'a0000000-0000-4000-8000-00000000000a';
 const EVENT = '4f0b6c1d2e3a4b5c6d7e8f9a0b1c2d3e';
+const DIGEST = '2384917703';
 const TOPICS: readonly SupportTopic[] = ['general', 'error', 'fix'];
 
 /** The link's parts, read the way a mail client reads them. */
@@ -40,6 +41,7 @@ const LINES: Record<string, RegExp> = {
   Fix: ID,
   'Fix type': new RegExp(`^(?:${FixTypeSchema.options.join('|')})$`),
   Reference: /^[0-9a-f]{32}$/i,
+  'Server reference': /^[0-9A-Za-z]{1,32}$/,
 };
 
 /** Each line of the body is a fixed line, a blank, or `Label: value` with a value its field accepts. */
@@ -63,6 +65,7 @@ describe('supportMailto', () => {
       fixId: OTHER,
       fixType: 'orphan_pages',
       eventId: EVENT,
+      digest: DIGEST,
     });
     const p = parts(href);
     expect(p.url.pathname).toBe(SUPPORT_EMAIL);
@@ -76,6 +79,7 @@ describe('supportMailto', () => {
       `Fix: ${OTHER}`,
       'Fix type: orphan_pages',
       `Reference: ${EVENT}`,
+      `Server reference: ${DIGEST}`,
       '',
       SUPPORT_COPY.mail.prompt.fix,
       '',
@@ -105,6 +109,9 @@ describe('supportMailto', () => {
     ['fixType', { fixType: 'orphan_pages\r\nTo: x' }],
     ['fixType', { fixType: 'toString' }],
     ['eventId', { eventId: `${EVENT}0` }],
+    ['digest', { digest: `${DIGEST}\r\nCc: x` }],
+    ['digest', { digest: 'a'.repeat(33) }],
+    ['digest', { digest: 'NEXT_HTTP_ERROR_FALLBACK;404' }],
   ] as const)('drops a %s that is not of its shape, rather than escaping it', (_field, bad) => {
     const input = { topic: 'error', path: '/alerts', ...bad } as SupportRequest;
     const { body } = parts(supportMailto(input));
@@ -139,11 +146,11 @@ describe('supportMailto', () => {
     fc.string({ unit: 'binary' }),
     INJECTIONS,
     fc
-      .tuple(fc.constantFrom(UUID, EVENT, '/settings', 'orphan_pages'), INJECTIONS)
+      .tuple(fc.constantFrom(UUID, EVENT, DIGEST, '/settings', 'orphan_pages'), INJECTIONS)
       .map(([a, b]) => a + b),
-    fc.tuple(INJECTIONS, fc.constantFrom(UUID, EVENT, '/settings')).map(([a, b]) => a + b),
+    fc.tuple(INJECTIONS, fc.constantFrom(UUID, EVENT, DIGEST, '/settings')).map(([a, b]) => a + b),
   );
-  const field = fc.option(fc.oneof(anyString, fc.constantFrom(UUID, EVENT, '/sites')), {
+  const field = fc.option(fc.oneof(anyString, fc.constantFrom(UUID, EVENT, DIGEST, '/sites')), {
     nil: undefined,
   });
   const request = fc.record({
@@ -155,6 +162,7 @@ describe('supportMailto', () => {
     fixId: field,
     fixType: field,
     eventId: field,
+    digest: field,
   });
 
   it('for any input: one recipient, a subject and a body, and no line, header or address added', () => {

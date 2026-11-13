@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 /**
  * The signed-in segments' error boundaries (CC-33 D5): each reports the error to Sentry, shows the
- * error screen with the event's id, retries through `reset`, and links support with the mailto the
- * builder makes from the page's path, the ids in it and the event id.
+ * error screen with the event's id, retries by refreshing the route from the server and then
+ * resetting the boundary, and links support with the mailto the builder makes from the page's path,
+ * the ids in it, the event id and the error's digest.
  */
 import { act, type ComponentType } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -14,13 +15,16 @@ import type { SegmentErrorProps } from '../../components/v2/screens/support/Segm
 const sentry = vi.hoisted(() => ({ id: '' }));
 const nav = vi.hoisted(() => ({ path: '/' }));
 const captureException = vi.hoisted(() => vi.fn(() => sentry.id));
+const calls = vi.hoisted(() => [] as string[]);
+const refresh = vi.hoisted(() => vi.fn(() => void calls.push('refresh')));
 vi.mock('@sentry/nextjs', () => ({ captureException }));
-vi.mock('next/navigation', () => ({ usePathname: () => nav.path }));
+vi.mock('next/navigation', () => ({ usePathname: () => nav.path, useRouter: () => ({ refresh }) }));
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const SITE = '0b0e7a52-5f0b-4b53-9c0e-0d4a3a1f2c11';
 const EVENT = '4f0b6c1d2e3a4b5c6d7e8f9a0b1c2d3e';
+const DIGEST = '2384917703';
 
 let root: Root | null = null;
 afterEach(() => {
@@ -28,6 +32,8 @@ afterEach(() => {
   root = null;
   document.body.innerHTML = '';
   captureException.mockClear();
+  refresh.mockClear();
+  calls.length = 0;
 });
 
 function mount(Boundary: ComponentType<SegmentErrorProps>, props: SegmentErrorProps) {
@@ -52,7 +58,7 @@ describe.each(BOUNDARIES)('app/%s/error.tsx', (_segment, path, load) => {
     const { default: Boundary } = await load();
     sentry.id = EVENT;
     nav.path = path;
-    const error = new Error('boom');
+    const error = Object.assign(new Error('boom'), { digest: DIGEST });
     const host = mount(Boundary, { error, reset: vi.fn() });
     expect(captureException).toHaveBeenCalledWith(error);
     expect(host.querySelectorAll('h1')).toHaveLength(1);
@@ -67,22 +73,30 @@ describe.each(BOUNDARIES)('app/%s/error.tsx', (_segment, path, load) => {
       path,
       ...(path.startsWith('/sites/') ? { siteId: SITE } : {}),
       eventId: EVENT,
+      digest: DIGEST,
     });
     expect(link.getAttribute('href')).toBe(expected);
     expect(decodeURIComponent(expected)).toContain(`Reference: ${EVENT}`);
+    expect(decodeURIComponent(expected)).toContain(`Server reference: ${DIGEST}`);
   });
 
-  it('retries through reset', async () => {
+  // Next 15's `reset` only clears the boundary's state (next/dist/client/components/
+  // error-boundary.js, `this.reset`), so a server component that threw would throw again from the
+  // payload the client holds; `router.refresh()` asks the server for the route again first.
+  it('retries by refreshing the route from the server, then resetting the boundary', async () => {
     const { default: Boundary } = await load();
     sentry.id = EVENT;
     nav.path = path;
-    const reset = vi.fn();
+    const reset = vi.fn(() => void calls.push('reset'));
     const host = mount(Boundary, { error: new Error('boom'), reset });
     const retry = [...host.querySelectorAll('button')].find(
       (b) => b.textContent === SUPPORT_COPY.error.retry,
     )!;
+    expect(calls).toEqual([]);
     act(() => retry.click());
+    expect(refresh).toHaveBeenCalledTimes(1);
     expect(reset).toHaveBeenCalledTimes(1);
+    expect(calls).toEqual(['refresh', 'reset']);
   });
 
   it('shows no reference while Sentry has given none', async () => {

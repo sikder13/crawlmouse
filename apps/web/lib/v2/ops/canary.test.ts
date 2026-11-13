@@ -62,6 +62,17 @@ describe('reportCanary', () => {
     expect(sentry.flush).toHaveBeenCalled();
   });
 
+  it.each(['request_error', 'look_error'] as const)(
+    'raises the canary’s own failure under its stage, %s',
+    async (stage) => {
+      await reportCanary(stage);
+      expect(sentry.captureMessage).toHaveBeenCalledWith('signin-canary', {
+        level: 'error',
+        tags: { signal: 'signin-canary', stage },
+      });
+    },
+  );
+
   it('throws when the signal is not flushed, so the step runs again', async () => {
     sentry.flush.mockResolvedValue(false);
     await expect(reportCanary('request')).rejects.toThrow(/not flushed/);

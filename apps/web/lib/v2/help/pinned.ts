@@ -2,8 +2,9 @@
  * Facts the help articles state that live where this module cannot import them: the grade formulas'
  * weights (packages/engine/src/v2/grade/weights.ts, which the engine's published surfaces do not
  * export), the crawl worker's identity (packages/worker/src/identities.ts; the worker is not a
- * dependency of the app) and the verdicts' labels (components/v2/verdicts.ts, which lib may not
- * import: preview-guard.test.ts). `pinned.test.ts` holds each value equal to its source.
+ * dependency of the app), the verdicts' labels (components/v2/verdicts.ts, which lib may not
+ * import: preview-guard.test.ts) and the re-check cap's window (SQL, `request_capped_check`).
+ * `pinned.test.ts` holds each value equal to its source.
  */
 import type { Verdict } from '@crawlmouse/types/v2';
 
@@ -23,6 +24,9 @@ export const CRAWL_USER_AGENT =
 /** What is appended to each crawler's user agent when the audit requests as that crawler. */
 export const CRAWLER_TAG = 'Crawlmouse/2.0 (+https://crawlmouse.com/bot)';
 
+/** The header naming us that a request sent as a crawler carries; the browser control sends none. */
+export const FROM_HEADER = 'From';
+
 /** What the result calls a verdict the help articles explain. */
 export const VERDICT_LABELS: Readonly<
   Record<
@@ -37,3 +41,6 @@ export const VERDICT_LABELS: Readonly<
 
 /** The robots.txt groups that bind the worker's requests. */
 export const OUR_ROBOTS_TOKENS = ['Crawlmouse', 'CrawlmouseBot'] as const;
+
+/** The hours over which a site's re-checks (`manual` and `fix_recheck`) are counted against its cap. */
+export const RECHECK_WINDOW_HOURS = 24;
