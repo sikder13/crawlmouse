@@ -8,7 +8,13 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { MAX_URL_LENGTH } from '../batch-bounds.js';
-import { MAX_RENDER_LINK_CHARS, MAX_RENDER_LINKS, renderLinks, sameSiteTargets } from './links.js';
+import {
+  MAX_RENDER_LINK_CHARS,
+  MAX_RENDER_LINKS,
+  readRenderLinks,
+  renderLinks,
+  sameSiteTargets,
+} from './links.js';
 
 const PAGE = 'https://shop.test/products/tent';
 const body = (anchors: string) => `<html><body><nav>${anchors}</nav><p>Words.</p></body></html>`;
@@ -33,7 +39,7 @@ describe('sameSiteTargets', () => {
     ]);
   });
 
-  it('keeps the www twin as a target of its own, as the v2 crawl keeps it a page of its own', () => {
+  it('keeps the www twin as a target of its own, as the worker’s crawl keeps it a page of its own', () => {
     expect(sorted(sameSiteTargets(page(['https://www.shop.test/x', '/']), PAGE))).toEqual([
       'https://shop.test',
       'https://www.shop.test/x',
@@ -203,5 +209,39 @@ describe('the character budget', () => {
     expect(got.js_only.reduce((n, t) => n + t.length, 0)).toBeLessThanOrEqual(
       MAX_RENDER_LINK_CHARS,
     );
+  });
+});
+
+describe('readRenderLinks: links as a stored render outcome holds them', () => {
+  const current = { js_only: ['https://shop.test/a'], js_only_count: 3, truncated: true };
+
+  it('reads the current shape as it is', () => {
+    expect(readRenderLinks(current)).toEqual(current);
+    const empty = { js_only: [], js_only_count: 0, truncated: false };
+    expect(readRenderLinks(empty)).toEqual(empty);
+  });
+
+  it('reads any other shape as no links, without throwing', () => {
+    const round1 = {
+      static: ['https://shop.test/a'],
+      rendered: ['https://shop.test/a', 'https://shop.test/b'],
+      truncated: false,
+    };
+    for (const value of [
+      round1,
+      undefined,
+      null,
+      'links',
+      [],
+      { ...current, js_only: 'https://shop.test/a' },
+      { ...current, js_only: [1] },
+      { ...current, js_only_count: 1.5 },
+      { ...current, js_only_count: -1 },
+      { ...current, js_only_count: '3' },
+      { ...current, js_only_count: Number.NaN },
+      { ...current, truncated: 'no' },
+    ]) {
+      expect(readRenderLinks(value), JSON.stringify(value)).toBeNull();
+    }
   });
 });

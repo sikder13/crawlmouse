@@ -192,6 +192,15 @@ describe('where the markers are not read (review B2)', () => {
     ).toEqual(['shopify_theme_object']);
   });
 
+  it('reads an assignment after a string that holds an escaped quote', () => {
+    // The string ends at its last quote: an escaped one inside it does not end it, so the code after
+    // it is read as code.
+    const script = String.raw`<script>var s = "say \"hi\" to Shopify.theme"; Shopify.theme = {};</script>`;
+    expect(markersOf(page(script))).toEqual(['shopify_theme_object']);
+    const single = String.raw`<script>var s = 'it\'s'; Shopify.theme = {};</script>`;
+    expect(markersOf(page(single))).toEqual(['shopify_theme_object']);
+  });
+
   it('reads the Next.js asset path only from a script’s src or a link’s href', () => {
     const asset = 'https://cdn.example/_next/static/chunks/x.js';
     none('an anchor', `<article><a href="${asset}">a file</a></article>`);

@@ -209,7 +209,8 @@ A measured page's outcome also carries `links`: what its script adds to its same
 (`links.ts`, CC-32 D6). One extractor reads both sides, the crawl's own (extract.ts `extractPage`,
 share actions and media files left out), so each target is in `canonicalizeUrl`'s spelling with no
 options, the spelling the worker's edges carry. A `www.` twin is a target of its own, as it is a page
-of its own in the v2 crawl. A target is read when it is on the page's own site by the crawl planner's
+of its own in the worker's crawl (the older single-function engine path, `audit.ts` under its ENGINE_V2
+flag, unifies `www.`; its pages never reach this detector). A target is read when it is on the page's own site by the crawl planner's
 rule (`inSiteScope`: the page's host or its `www.` twin, on the default port), is not the page itself,
 and is at most 2048 characters; a longer one is left out on both sides alike, as the worker
 leaves it out of its edges, so it is never JS-only.
@@ -229,6 +230,8 @@ raises the second figure by 32 KiB a render.
 The lists stay on the render outcome, which the pipeline keeps as evidence; they are never written to
 `PageResult.without_js`, whose stored shape holds the four keys above. A page whose links cannot be read
 keeps its measurement and carries no `links`, and so does every page of an outcome stored before this.
+The build reads `links` back from evidence JSON through `readRenderLinks`: an entry in any other shape
+(an earlier one, or a count that is not a whole number) is read as no `links`.
 The `js_only_navigation` detector (detectors/js-only-navigation.ts) reads them: a measured page with
 `links` is evidence, whether or not its kept list was cut, and a page with no `links` is not. A record
 keeps at most 20 of a page's targets, with its whole count.

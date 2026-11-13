@@ -210,10 +210,12 @@ whole difference's size; `truncated` when the bound left some out. An empty diff
 however many links the page has; a cut one still detects, with its whole count. `links` sits on the engine's
 `RenderOutcome` page, which the pipeline stores as evidence. It is not written to `PageResult.without_js`: the
 `page_results_without_js` CHECK allows four keys, and a test pins them. No contract field and no migration was
-needed; production has stored no render outcome, so the shape changed in place during review.
+needed; production has stored no render outcome, so the shape changed in place during review. The build reads
+`links` back through `readRenderLinks`: an entry in any other shape, the round-1 one included, is no `links`.
 
-**www twins.** The v2 crawl keeps a `www.` twin a page of its own: the worker's edges carry `canonicalizeUrl`
-with no options, and the planner crawls the twin as its own URL (`inSiteScope`). The extractor does the same, so a
+**www twins.** The worker's crawl keeps a `www.` twin a page of its own: the worker's edges carry
+`canonicalizeUrl` with no options, and the planner crawls the twin as its own URL (`inSiteScope`). (The older
+single-function engine path, `audit.ts` under its ENGINE_V2 flag, unifies `www.`; it never feeds `buildCheck`.) The extractor does the same, so a
 static `/x` and a rendered `https://www.<host>/x` on a page at `<host>` are two targets, and the second is JS-only,
 as the crawl would count it. Held by `render/links.test.ts`.
 
@@ -268,6 +270,9 @@ grade guard's `expected.json` changed its source digest only; its cases are unch
 - Extraction adds CPU to the render path: both sides go through `extractPage`, in memory, with no read cap. The
   D6 review measured 5.1 s for a 10 MiB side with 2,000 nested links, where `measurePage` took 10.9 s for its two
   sides; `renderCheck` has no deadline yet (`apps/web/lib/v2/pipeline/steps/finish.ts`).
+- A script that fails during the render (a CDN that times out, say) adds no link, so the page's difference is
+  empty and reads `not_detected`. The rule is unchanged: one evidence page with an empty difference, on a
+  one-page sample, can verify an open fix as resolved, although the fix was not made.
 - The readings stay with the crawl's link rules: a link that is not an `<a href>` (a click handler on a `div`) is
   not a link on either side.
 

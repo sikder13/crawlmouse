@@ -189,4 +189,21 @@ describe('a site whose product pages add their navigation in the browser', () =>
       expect(built.fix_events.map((e) => e.kind)).toContain('unable_to_verify');
     });
   });
+
+  it('reads a stored entry whose links are not the current shape as no links: not evidence, and no throw', async () => {
+    const { input, render, built } = await pipeline();
+    // The shape round 1 of the D6 review stored, and a count that is not a whole number.
+    const round1 = { static: [], rendered: [at('/guides/camp-cooking')], truncated: false };
+    const fractional = {
+      js_only: [at('/guides/camp-cooking')],
+      js_only_count: 1.5,
+      truncated: false,
+    };
+    const stored = JSON.parse(JSON.stringify(render)) as { pages: Array<Record<string, unknown>> };
+    stored.pages = stored.pages.map((p, i) => ({ ...p, links: i % 2 === 0 ? round1 : fractional }));
+    const odd = buildCheck({ ...input, render: stored as unknown as RenderOutcome });
+    expect(odd.fixes.filter((f) => f.type === 'js_only_navigation')).toEqual([]);
+    for (const r of EXPECTED) expect(odd.diff_inputs.indeterminate).toContain(r.fingerprint);
+    expect(odd.check.technical_seo).toEqual(built.check.technical_seo);
+  });
 });
