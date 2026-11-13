@@ -25,6 +25,9 @@ const ALLOWED_SCHEMES = new Set(['http:', 'https:']);
  * IPv6 prefixes that carry an IPv4 address, which are judged by the address they carry). The text is
  * refused when Node's `net.isIP` does not read it as an address or when `parseAddress` does not, and
  * an IPv6 address with a zone (`fe80::1%eth0`) is refused whatever its bytes.
+ *
+ * The two readers accept the same text (ssrf-guard.property.test.ts checks that they agree), so
+ * either check alone decides the same; both are kept so that a defect in one is not the guard's.
  */
 export function isPrivateOrReservedIp(ip: string): boolean {
   if (net.isIP(ip) === 0) return true;
