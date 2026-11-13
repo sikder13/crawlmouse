@@ -85,11 +85,11 @@ describe('unannouncedUsers', () => {
       configured: true,
     });
     await ledgerRow(`founder_event:signup:${c.userId}`, 'sent', 1);
-    expect(await store.unannouncedUsers('2030-01-01T00:00:00.000Z', 10)).toEqual([
+    expect(await store.unannouncedUsers('2030-01-01T00:00:00.000Z', 10, 0)).toEqual([
       { userId: b.userId, accountId: b.accountId, createdAt: '2030-01-01T00:00:01.000Z' },
       { userId: a.userId, accountId: a.accountId, createdAt: '2030-01-01T00:00:03.000Z' },
     ]);
-    expect(await store.unannouncedUsers('2030-01-01T00:00:00.000Z', 1)).toHaveLength(1);
+    expect(await store.unannouncedUsers('2030-01-01T00:00:00.000Z', 1, 0)).toHaveLength(1);
   });
 });
 
@@ -251,9 +251,48 @@ describe('a sign-up whose mail failed (review C1)', () => {
     await ledgerRow(`founder_event:signup:${users.sent}`, 'sent', 1);
     await ledgerRow(`founder_event:signup:${users.exhausted}`, 'failed', 3);
     await ledgerRow(`founder_event:signup:${users.suppressed}`, 'suppressed', 0);
-    expect((await store.unannouncedUsers(since, 50)).map((u) => u.userId)).toEqual([
+    expect((await store.unannouncedUsers(since, 50, 0)).map((u) => u.userId)).toEqual([
       users.noLedger,
       users.failedOnce,
     ]);
   });
+});
+
+describe('the sign-up rotation (review C8)', () => {
+  it('takes p_limit users a run from position (turn × limit) mod n, oldest first, wrapping', async () => {
+    const since = '2035-01-01T00:00:00.000Z';
+    const ids: string[] = [];
+    for (let i = 0; i < 5; i++) ids.push((await person(`2035-01-01T00:00:0${i}Z`)).userId);
+    const at = async (turn: number) =>
+      (await store.unannouncedUsers(since, 2, turn)).map((u) => ids.indexOf(u.userId));
+    expect(await at(0)).toEqual([0, 1]);
+    expect(await at(1)).toEqual([2, 3]);
+    expect(await at(2)).toEqual([4, 0]);
+    expect(await at(3)).toEqual([1, 2]);
+    // n = 5 and 2 × 5 = 10 ≡ 0: turn 5 starts where turn 0 did.
+    expect(await at(5)).toEqual([0, 1]);
+    await expect(store.unannouncedUsers(since, 2, -1)).rejects.toThrow(/founder_signups_unannounced/);
+  });
+
+  it('a confirmed user behind more than a run’s worth of unconfirmed ones is announced on the next run', async () => {
+    // 201 unconfirmed users created before one confirmed one: oldest first, a run of 200 never
+    // reached it. The run whose turn × 200 ≡ 0 (mod 202) starts at the oldest; the next one starts
+    // at position 200, where the confirmed user is.
+    const turn = 6_880_928; // ≡ 0 (mod 202): 2035-06-01T02:40:00Z
+    const now = new Date(turn * 300_000);
+    for (let i = 0; i < 201; i++)
+      await person(new Date(now.getTime() - 86_400_000 + i * 1000).toISOString());
+    const { userId: confirmedUser } = await person(
+      new Date(now.getTime() - 3_600_000).toISOString(),
+    );
+    const transport = memoryTransport();
+    let clock = now;
+    const d = sweepDeps(() => clock, transport, (u) => u === confirmedUser);
+    expect((await sweep(d)).signups).toEqual({ unconfirmed: 200 });
+    clock = new Date(now.getTime() + 300_000);
+    expect((await sweep(d)).signups).toEqual({ unconfirmed: 199, sent: 1 });
+    expect(transport.sent.map((m) => m.idempotencyKey)).toEqual([
+      `founder_event:signup:${confirmedUser}`,
+    ]);
+  }, 120_000);
 });

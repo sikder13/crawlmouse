@@ -331,8 +331,9 @@ describe('sweep', () => {
       [`founder_event:agency:${ACCOUNT}`, 'Agency account created'],
       ['founder_event:cancel:sub_9:2026-11-13T14:30:00.000Z', 'Cancellation: Agency'],
     ]);
-    // Seven days back for sign-ups, at most 200; two hours back for the rest.
-    expect(store.unannouncedUsers).toHaveBeenCalledWith('2026-11-06T15:00:00.000Z', 200);
+    // Seven days back for sign-ups, at most 200 in the run's turn; two hours back for the rest.
+    // The rotation's turn is the run's five-minute tick: 2026-11-13T15:00Z / 5 min.
+    expect(store.unannouncedUsers).toHaveBeenCalledWith('2026-11-06T15:00:00.000Z', 200, 5_981_940);
     expect(store.agencyAccounts).toHaveBeenCalledWith('2026-11-13T13:00:00.000Z');
     expect(store.cancellations).toHaveBeenCalledWith('2026-11-13T13:00:00.000Z');
     // A second sweep over the same rows sends nothing more.

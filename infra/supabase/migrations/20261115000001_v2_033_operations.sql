@@ -437,14 +437,19 @@ end;
 $$;
 
 -- The founder sweep's sign-ups (plan-review M8): users created at or after p_since whose sign-up is
--- not yet announced, oldest first, at most p_limit, with their default account. Not yet announced:
+-- not yet announced, at most p_limit, with their default account, taken in a rotation: of the n such
+-- users ordered oldest first, the p_limit from position (p_turn * p_limit) mod n on, wrapping to the
+-- oldest. The sweep passes its five-minute tick as p_turn, so while the set holds still, consecutive
+-- runs look at every user once in ceil(n / p_limit) runs, and users found unconfirmed cannot hold the
+-- first p_limit places every run (review C8). Not yet announced:
 -- no signup notice, or a signup notice decided `send` whose mail (the ledger key
 -- `founder_event:signup:<user>`) has no email_sends row, or one that is neither sent nor suppressed
 -- and has fewer than 3 attempts (claim_email_send's bound). So a notice whose send failed is offered
 -- again on the next run and the ledger's key stops a second mail; a `held` or `skipped` notice is not
 -- offered again. The sweep announces each once Supabase Auth shows its address confirmed; one still
 -- unconfirmed when it falls out of the window is never announced.
-create or replace function public.founder_signups_unannounced(p_since timestamptz, p_limit integer)
+create or replace function public.founder_signups_unannounced(p_since timestamptz, p_limit integer,
+                                                              p_turn bigint)
 returns table (user_id uuid, account_id uuid, created_at timestamptz)
 language plpgsql
 stable
@@ -452,19 +457,25 @@ security invoker
 set search_path = pg_catalog, pg_temp
 as $$
 begin
-  if p_since is null or p_limit is null or p_limit < 1 then
-    raise exception 'founder_signups_unannounced: a time and a positive limit are required'
+  if p_since is null or p_limit is null or p_limit < 1 or p_turn is null or p_turn < 0 then
+    raise exception 'founder_signups_unannounced: a time, a positive limit and a turn of 0 or more are required'
       using errcode = '22023';
   end if;
   return query
-    select u.id, u.default_account_id, u.created_at from public.users u
-      left join public.founder_notices n on n.event_key = 'signup:' || u.id::text
-      left join public.email_sends e on e.idempotency_key = 'founder_event:signup:' || u.id::text
-     where u.created_at >= p_since
-       and (n.event_key is null
-            or (n.state = 'send'
-                and (e.id is null or (e.status not in ('sent', 'suppressed') and e.attempts < 3))))
-     order by u.created_at, u.id
+    with w as (
+      select u.id, u.default_account_id, u.created_at,
+             pg_catalog.row_number() over (order by u.created_at, u.id) - 1 as pos,
+             pg_catalog.count(*) over () as total
+        from public.users u
+        left join public.founder_notices n on n.event_key = 'signup:' || u.id::text
+        left join public.email_sends e on e.idempotency_key = 'founder_event:signup:' || u.id::text
+       where u.created_at >= p_since
+         and (n.event_key is null
+              or (n.state = 'send'
+                  and (e.id is null or (e.status not in ('sent', 'suppressed') and e.attempts < 3))))
+    )
+    select w.id, w.default_account_id, w.created_at from w
+     order by (w.pos - ((p_turn % w.total) * p_limit) % w.total + w.total) % w.total
      limit p_limit;
 end;
 $$;
@@ -498,14 +509,14 @@ revoke all on function public.founder_digest_counts(timestamptz, timestamptz)
   from public, anon, authenticated, service_role;
 revoke all on function public.signin_delivery_seen(text, timestamptz)
   from public, anon, authenticated, service_role;
-revoke all on function public.founder_signups_unannounced(timestamptz, integer)
+revoke all on function public.founder_signups_unannounced(timestamptz, integer, bigint)
   from public, anon, authenticated, service_role;
 grant execute on function public.claim_founder_notice(text, text, uuid, boolean, timestamptz, jsonb,
                                                       timestamptz, integer, boolean) to service_role;
 grant execute on function public.take_founder_overflow(text, integer) to service_role;
 grant execute on function public.founder_digest_counts(timestamptz, timestamptz) to service_role;
 grant execute on function public.signin_delivery_seen(text, timestamptz) to service_role;
-grant execute on function public.founder_signups_unannounced(timestamptz, integer) to service_role;
+grant execute on function public.founder_signups_unannounced(timestamptz, integer, bigint) to service_role;
 -- ═══ end §C ══════════════════════════════════════════════════════════════════════════════════════
 
 

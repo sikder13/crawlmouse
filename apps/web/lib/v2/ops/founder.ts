@@ -4,9 +4,9 @@
  *   entitlementNotice  one `entitlement.changed` event: a trial started, a payment or a failed one
  *                      (founder-classify.ts); key `entitlement:<event id>`
  *   sweep              sign-ups confirmed (users of the last 7 days not yet announced, at most 200 a
- *                      run, oldest first), agency accounts created and subscriptions canceled in the
- *                      last 2 hours; keys `signup:<user>`, `agency:<account>`,
- *                      `cancel:<subscription>:<canceled_at>`
+ *                      run, in a rotation whose turn is the run's five-minute tick), agency accounts
+ *                      created and subscriptions canceled in the last 2 hours; keys `signup:<user>`,
+ *                      `agency:<account>`, `cancel:<subscription>:<canceled_at>`
  *   digest             the daily and weekly digests when due (digest-clock.ts), and the "N more"
  *                      notice for the notices held over the hour's bound
  *
@@ -42,6 +42,8 @@ export const OVERFLOW_ROWS = 50;
 /** Sign-ups the sweep reads a run, and how far back. */
 export const SIGNUP_BATCH = 200;
 export const SIGNUP_LOOKBACK_MS = 7 * 24 * 3_600_000;
+/** The sweep's cron period (inngest/founder.ts, every five minutes): the sign-up rotation's turn. */
+export const SWEEP_EVERY_MS = 5 * 60_000;
 /** How far back the sweep reads agency accounts and cancellations. */
 export const SWEEP_LOOKBACK_MS = 2 * 3_600_000;
 /** The longest notice key: the mail ledger's 200 less `founder_event:`. */
@@ -201,7 +203,7 @@ const tally = (into: Record<string, number>, outcome: string) => {
 };
 
 /**
- * Sign-ups confirmed since the sign-up look-back (at most SIGNUP_BATCH a run), then agency accounts
+ * Sign-ups confirmed since the sign-up look-back (SIGNUP_BATCH a run, in the rotation), then agency accounts
  * created and subscriptions canceled since the sweep look-back, at the period's end or at once.
  */
 export async function sweep(d: FounderDeps): Promise<SweepOutcome> {
@@ -212,6 +214,7 @@ export async function sweep(d: FounderDeps): Promise<SweepOutcome> {
   const users = await d.store.unannouncedUsers(
     new Date(now - SIGNUP_LOOKBACK_MS).toISOString(),
     SIGNUP_BATCH,
+    Math.floor(now / SWEEP_EVERY_MS),
   );
   for (const u of users) {
     let confirmed: boolean;

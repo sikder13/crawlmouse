@@ -49,10 +49,14 @@ export interface FounderStore {
   takeOverflow(key: string, rows: number): Promise<{ total: number; rows: FounderOverflowRow[] }>;
   digestCounts(from: string, to: string): Promise<DigestCounts>;
   account(accountId: string): Promise<NoticeAccount | null>;
-  /** Users created at or after `since` whose sign-up is not announced (founder_signups_unannounced). */
+  /**
+   * Users created at or after `since` whose sign-up is not announced, `limit` of them in the
+   * rotation's `turn` (founder_signups_unannounced).
+   */
   unannouncedUsers(
     since: string,
     limit: number,
+    turn: number,
   ): Promise<{ userId: string; accountId: string | null; createdAt: string }[]>;
   /** Agency accounts created at or after `since`. */
   agencyAccounts(since: string): Promise<{ accountId: string; createdAt: string }[]>;
@@ -178,10 +182,11 @@ export function supabaseFounderStore(sb: SupabaseClient): FounderStore {
         host: (sites?.[0]?.host as string | undefined) ?? null,
       };
     },
-    async unannouncedUsers(since, limit) {
+    async unannouncedUsers(since, limit, turn) {
       const { data, error } = await sb.rpc('founder_signups_unannounced', {
         p_since: since,
         p_limit: limit,
+        p_turn: turn,
       });
       if (error) fail('founder_signups_unannounced', error);
       return z
