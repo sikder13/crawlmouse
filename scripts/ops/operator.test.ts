@@ -118,12 +118,60 @@ describe('ops:operator', () => {
     for (const call of f.calls) expect(call.path).not.toMatch(/@|%40/i);
   });
 
-  it('list prints user ids and when each was added', async () => {
-    const f = fakeFetch(() => [200, [{ user_id: USER, added_at: '2026-11-13T12:00:00+00:00' }]]);
+  it('remove takes a user id as well, without looking an address up, for a user since deleted', async () => {
+    const f = fakeFetch(() => [200, [{ user_id: USER }]]);
+    const o = out();
+    await runOperator(
+      ['remove', USER],
+      restClient({ url: URL_, key: KEY, fetch: f.fetch }),
+      o.print,
+    );
+    expect(f.calls.map((c) => [c.method, c.path])).toEqual([
+      ['DELETE', `/rest/v1/operators?user_id=eq.${USER}`],
+    ]);
+    expect(o.lines).toEqual([`operator removed: user ${USER}`]);
+  });
+
+  it('add still takes an address only', async () => {
+    const f = fakeFetch(() => [200, null]);
+    const c = restClient({ url: URL_, key: KEY, fetch: f.fetch });
+    await expect(runOperator(['add', USER], c, () => undefined)).rejects.toThrow(
+      /no user has that address/,
+    );
+    expect(f.calls.map((x) => x.path)).toEqual(['/rest/v1/rpc/user_id_by_email']);
+  });
+
+  it('list prints user ids and when each was added, and marks a row whose user no longer exists', async () => {
+    const GONE = 'b0000000-0000-4000-8000-000000000002';
+    const f = fakeFetch((_, path) =>
+      path.startsWith('/rest/v1/operators')
+        ? [
+            200,
+            [
+              { user_id: USER, added_at: '2026-11-13T12:00:00+00:00' },
+              { user_id: GONE, added_at: '2026-11-13T13:00:00+00:00' },
+            ],
+          ]
+        : [200, [{ id: USER }]],
+    );
     const o = out();
     await runOperator(['list'], restClient({ url: URL_, key: KEY, fetch: f.fetch }), o.print);
-    expect(f.calls[0]!.path).toBe('/rest/v1/operators?select=user_id,added_at&order=added_at.asc');
-    expect(o.lines).toEqual([`${USER}  added 2026-11-13T12:00:00+00:00`]);
+    expect(f.calls.map((c) => [c.method, c.path])).toEqual([
+      ['GET', '/rest/v1/operators?select=user_id,added_at&order=added_at.asc'],
+      ['GET', `/rest/v1/users?select=id&id=in.(${USER},${GONE})`],
+    ]);
+    expect(o.lines).toEqual([
+      `${USER}  added 2026-11-13T12:00:00+00:00`,
+      `${GONE}  added 2026-11-13T13:00:00+00:00  (no such user: remove it with ops:operator remove ${GONE})`,
+    ]);
+  });
+
+  it('list with no operators reads no users', async () => {
+    const f = fakeFetch(() => [200, []]);
+    const o = out();
+    await runOperator(['list'], restClient({ url: URL_, key: KEY, fetch: f.fetch }), o.print);
+    expect(f.calls).toHaveLength(1);
+    expect(o.lines).toEqual(['no operators']);
   });
 
   it('refuses anything else, and a database refusal is an error', async () => {
