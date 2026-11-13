@@ -151,7 +151,8 @@ export const SEATS_CHANGES: CopyChange[] = [
     kind: 'ruling',
     locked: '$9 a seat a month',
     rendered: `${usd(EXTRA_SEAT)} a seat a month`,
-    source: 'The price of a seat beyond the plan’s is lib/billing/prices.ts EXTRA_SEAT',
+    source:
+      'CC-31 brief, D10: a price is read from prices.ts, where a seat beyond the plan’s is EXTRA_SEAT',
   },
 ];
 

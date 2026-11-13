@@ -138,11 +138,11 @@ export const REPORTS_CHANGES: CopyChange[] = [
   },
   {
     screen: 'reports',
-    kind: 'facts',
+    kind: 'ruling',
     locked: 'every open fix, link map.',
     rendered: 'every open fix, the link map’s figures.',
     source:
-      'What the PDF holds (auditDoc, lib/v2/reports/generate-doc.ts): the structure page’s figures and no drawing of the map',
+      'CC-31 brief, D6: the PDF is made from the audit’s own views (auditDoc, lib/v2/reports/generate-doc.ts), which hold the structure page’s figures and no drawing of the map',
   },
   {
     screen: 'reports',
