@@ -148,6 +148,18 @@ describe('/reports', () => {
     await expect(page()).rejects.toBeInstanceOf(NotFound);
   });
 
+  it('carries the account switcher for a person with a seat on two accounts: the way back to their own', async () => {
+    // The manager holds a seat on the agency and owns a personal account; here they act in the agency.
+    as(w.manager);
+    const html = await page();
+    expect(html).toMatch(/<form[^>]* action="\/api\/seats\/switch"/);
+    expect(html).toContain(`name="accountId" value="${w.manager.accountId}"`);
+    // A person with one account is shown no switch.
+    as(w.stranger);
+    h.cookies.delete('cm_account');
+    expect(await page()).not.toContain('/api/seats/switch');
+  });
+
   it('the owner sees both clients’ reports: a stored file to download and share, a proof page to open, a pending one with neither', async () => {
     as(w.owner);
     const html = await page();

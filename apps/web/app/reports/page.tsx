@@ -11,6 +11,7 @@ import { readSettingsPage } from '@/lib/v2/account/settings-pages';
 import { noticeLine } from '@/lib/v2/copy/notices';
 import { madeLinkIn, SHARE_FLASH_COOKIE, shareUrl } from '@/lib/v2/reports/share';
 import { reportFileStates } from '@/lib/v2/reports/share-proof';
+import { withSwitcher } from '@/lib/v2/view/account-shell';
 import { reportsView } from '@/lib/v2/view/reports';
 
 // Read per request: a build with the flag off would otherwise prerender this page as its 404.
@@ -47,19 +48,23 @@ export default async function ReportsPage({
     <LiveActions>
       <ReportsScreen
         notice={noticeLine(query, zone)}
-        data={reportsView(
-          page.d,
-          page.viewer,
-          { site: typeof query.site === 'string' ? query.site : undefined },
-          '/reports',
-          {
-            fileStates: await reportFileStates(supabaseAdmin(), page.d.reports),
-            role: page.role,
-            madeLink: made && {
-              reportId: made.reportId,
-              url: shareUrl(siteOrigin(), made.token),
+        data={withSwitcher(
+          reportsView(
+            page.d,
+            page.viewer,
+            { site: typeof query.site === 'string' ? query.site : undefined },
+            '/reports',
+            {
+              fileStates: await reportFileStates(supabaseAdmin(), page.d.reports),
+              role: page.role,
+              madeLink: made && {
+                reportId: made.reportId,
+                url: shareUrl(siteOrigin(), made.token),
+              },
             },
-          },
+          ),
+          page.accounts,
+          page.viewer.accountId,
         )}
       />
     </LiveActions>

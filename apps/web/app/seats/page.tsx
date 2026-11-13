@@ -10,6 +10,7 @@ import { supabaseServer } from '@/lib/supabase/server';
 import { readAccount } from '@/lib/v2/account/pages';
 import { loadViewer } from '@/lib/v2/account/viewer';
 import { noticeLine } from '@/lib/v2/copy/notices';
+import { withSwitcher } from '@/lib/v2/view/account-shell';
 import { seatsView } from '@/lib/v2/view/seats';
 
 // Read per request: a build with the flag off would otherwise prerender this page as its 404.
@@ -35,12 +36,16 @@ export default async function SeatsPage({
   const r = await loadViewer();
   if (r.kind === 'signed_out') redirect('/login');
   if (r.kind !== 'viewer') return <AccountStateScreen state={r.kind} />;
-  const { account, seat, limits } = r.viewer;
+  const { account, seat, limits, accounts } = r.viewer;
   const { d, viewer } = await readAccount(await supabaseServer(), account.id, seat.id, new Date());
   return (
     <LiveActions>
       <SeatsScreen
-        data={seatsView(d, viewer, { seatLimit: limits.seats, billing: billingV2Enabled() })}
+        data={withSwitcher(
+          seatsView(d, viewer, { seatLimit: limits.seats, billing: billingV2Enabled() }),
+          accounts,
+          account.id,
+        )}
         notice={noticeLine(await searchParams, account.timezone)}
       />
     </LiveActions>
