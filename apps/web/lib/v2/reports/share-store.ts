@@ -102,7 +102,8 @@ export function supabaseShareFiles(admin: SupabaseClient): ShareFiles {
   const bucket = () => admin.storage.from(REPORTS_BUCKET);
   return {
     async signedUrl(path, seconds) {
-      const { data, error } = await bucket().createSignedUrl(path, seconds);
+      // A download, as the member's own is (generate-run.ts): the object is not opened in place.
+      const { data, error } = await bucket().createSignedUrl(path, seconds, { download: true });
       if (error || !data) throw new Error(`reports: sign failed: ${error?.message ?? 'no data'}`);
       return data.signedUrl;
     },
