@@ -52,7 +52,8 @@ two did not (`docs/ops/security-baseline.md`); list what exists before creating 
 ## The sign-in canary
 
 `crawlmouse.ops.signin-canary` (`inngest/signin-canary.ts`), on the cron `*/10 * * * *`, registered when
-`SIGNIN_CANARY_TO` is one plain address and `V2_BILLING` or `V2_CHECKS_PUBLIC` is `1`:
+`SIGNIN_CANARY_TO` is one plain address, whatever the v2 flags (`apps/web/lib/v2/ops/functions.ts`;
+`pnpm --filter @crawlmouse/web exec vitest run lib/v2/ops/functions.test.ts`):
 
 1. asks Supabase Auth for a sign-in link to that address (`requestSignInLink`, with
    `shouldCreateUser: false`, so the address must be an existing user);
@@ -106,25 +107,31 @@ Before setting `SIGNIN_CANARY_TO` (questions Q4):
   (`pnpm ops:internal <account-id>`) so the digests leave it out.
 - **Resend's webhook** stays subscribed to `email.delivered`. If it is not, the canary raises its
   signal on its runs: it fails loud.
-- **The stored events carry the mail's time.** Step 3 counts a delivery only by its
-  `data.created_at`. Count, read-only, the delivered rows from the sign-in sender and those of them
-  carrying a time-shaped `data.created_at` (set `sender` to `SIGNIN_SENDER`'s value):
-
-  ```sql
-  with sender as (select 'magic@crawlmouse.com'::text as address)
-  select count(*) as delivered_from_sender,
-         count(*) filter (
-           where e.payload -> 'data' ->> 'created_at'
-                 ~ '^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}(:?\d{2})?)$'
-         ) as with_mail_time
-    from public.email_events e, sender
-   where e.event_type = 'delivered'
-     and lower(btrim(coalesce(substring(e.payload -> 'data' ->> 'from', '<([^<>]*)>\s*$'),
-                              e.payload -> 'data' ->> 'from'))) = lower(sender.address);
-  ```
-
-  Equal counts mean the stored deliveries of sign-in mail carry the time. If
-  `with_mail_time` is lower, do not set `SIGNIN_CANARY_TO`: those runs would raise `delivery`. A
-  `delivered_from_sender` of 0 proves nothing; sign in once and run it again.
 
 Then add a Sentry issue alert on the `signin-canary` message, as for the other signals.
+
+### The stored events carry the mail's time (checked)
+
+Step 3 counts a delivery only by its `data.created_at`. A read-only count on production on
+2026-11-13 (CC-33 owner ruling 4) found 55 delivered rows, 55 of them with a time-shaped
+`data.created_at` and a `data.from`. Two spellings of the sender occurred, `"Crawlmouse"
+<magic@crawlmouse.com>` and `Crawlmouse <magic@crawlmouse.com>`; step 3 reads both as
+`SIGNIN_SENDER` (`pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-033-founder.test.ts -t
+"sender spelling"`). Those figures are that day's reading. To re-read them, count the delivered rows
+from the sign-in sender and those of them carrying a time-shaped `data.created_at`:
+
+```sql
+with sender as (select 'magic@crawlmouse.com'::text as address)
+select count(*) as delivered_from_sender,
+       count(*) filter (
+         where e.payload -> 'data' ->> 'created_at'
+               ~ '^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}(:?\d{2})?)$'
+       ) as with_mail_time
+  from public.email_events e, sender
+ where e.event_type = 'delivered'
+   and lower(btrim(coalesce(substring(e.payload -> 'data' ->> 'from', '<([^<>]*)>\s*$'),
+                            e.payload -> 'data' ->> 'from'))) = lower(sender.address);
+```
+
+A `with_mail_time` lower than `delivered_from_sender` means some stored deliveries carry no mail
+time, and the canary raises `delivery` on runs whose mail is one of them.

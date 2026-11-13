@@ -41,13 +41,17 @@ export function canaryWork(d: CanaryDeps): CanaryWork {
 
 const FLUSH_MS = 2000;
 
-/** The signal, with its stage; flushed before the step ends, since the function's process may not outlive it. */
+/**
+ * The signal, with its stage; flushed before the step ends, since the function's process may not
+ * outlive it. With no client, or a client with no DSN (`Sentry.init` without SENTRY_DSN builds one
+ * that sends nothing), it is logged instead.
+ */
 export async function reportCanary(stage: CanaryStage): Promise<void> {
   Sentry.captureMessage('signin-canary', {
     level: 'error',
     tags: { signal: 'signin-canary', stage },
   });
-  if (Sentry.getClient() === undefined) {
+  if (!Sentry.getClient()?.getDsn()) {
     console.error(JSON.stringify({ event: 'ops.signin_canary', stage, sentry: 0 }));
     return;
   }

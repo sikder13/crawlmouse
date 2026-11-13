@@ -3,8 +3,8 @@
  * - every run of digits it shows is a price, a limit or a figure the code that owns it holds;
  * - built again with each of those owners given another value, the pages show each new value as
  *   many times as the articles read its owner, and today's values only where the describe block
- *   "the figures follow the modules that own them" says (it names each owner, the two quoted
- *   modules whose sentences it rewrites, and what it leaves unaltered);
+ *   "the figures follow the modules that own them" says (it names each owner, the quoted module
+ *   whose sentences it rewrites, and what it leaves unaltered);
  * - each plan's feature lines follow its GATES, today's and with the switches set apart;
  * - the delete article says what `deletionMoney` says for each subscription state;
  * - every capability it names carries its `CAPABILITIES` key, a coming one with its mark, and its
@@ -176,9 +176,9 @@ const shows = (text: string, n: number) =>
 // count in `PROSE_USES`, and as another word it is left over.
 // Owners altered: prices.ts; each GATES number the pages show; TRIAL_DAYS; the sign-in constants;
 // MAGIC_LINK_PER_EMAIL_PER_HOUR; ANONYMOUS_EXPIRY_HOURS; CANCEL_CLICKS; MIN_GRADEABLE_PAGES; the
-// re-check window (pinned.ts). Two modules' sentences are quoted whole, and are built when their
-// module loads, so the build rewrites their figure as that module would print it: the deletion
-// pages' restore window (copy/deletion.ts prints RESTORE_DAYS and spells it "seven") and the
+// re-check window (pinned.ts); the restore window (copy/restore-window.ts, which the deletion pages'
+// sentences print as a numeral and as a word). One module's sentences are quoted whole, and are
+// built when it loads, so the build rewrites their figure as that module would print it: the
 // crawlers AI_WAITING names ("two"). Not altered: the grade weights and the number of their parts,
 // which pinned.test.ts holds to the engine.
 describe('the figures follow the modules that own them, not the values typed today', () => {
@@ -248,7 +248,7 @@ describe('the figures follow the modules that own them, not the values typed tod
     ['CANCEL_CLICKS', CANCEL_CLICKS, ALTERED.cancelClicks],
     ['MIN_GRADEABLE_PAGES', MIN_GRADEABLE_PAGES, ALTERED.minGradeablePages],
     ['RECHECK_WINDOW_HOURS', RECHECK_WINDOW_HOURS, ALTERED.recheckWindowHours],
-    ['the restore window (copy/deletion.ts)', TODAY_RESTORE, ALTERED.restoreDays],
+    ['the restore window (copy/restore-window.ts)', TODAY_RESTORE, ALTERED.restoreDays],
     ['the scored crawlers AI_WAITING names', 2, ALTERED.scoredCrawlers],
   ];
 
@@ -290,7 +290,7 @@ describe('the figures follow the modules that own them, not the values typed tod
     CANCEL_CLICKS: 1,
     MIN_GRADEABLE_PAGES: 1,
     RECHECK_WINDOW_HOURS: 4,
-    'the restore window (copy/deletion.ts)': 3,
+    'the restore window (copy/restore-window.ts)': 3,
     'the scored crawlers AI_WAITING names': 1,
   };
   const wordTimes = (text: string, word: string) =>
@@ -300,14 +300,6 @@ describe('the figures follow the modules that own them, not the values typed tod
     (numberWord(n) === count(n) ? 0 : wordTimes(text, numberWord(n)));
   /** Numerals that stay: the grade weights, which the build does not alter. */
   const STAYS = new Set<number>([...numeric(AI_WEIGHTS), ...numeric(SEO_WEIGHTS)]);
-
-  const alterDays = (t: string) =>
-    t
-      .replaceAll(`${TODAY_RESTORE} days`, `${ALTERED.restoreDays} days`)
-      .replace(
-        new RegExp(`\\b${numberWord(TODAY_RESTORE)}\\b`, 'g'),
-        numberWord(ALTERED.restoreDays),
-      );
 
   async function alteredText(): Promise<string> {
     vi.resetModules();
@@ -354,21 +346,7 @@ describe('the figures follow the modules that own them, not the values typed tod
       ...(await importOriginal<typeof import('@/lib/v2/help/pinned')>()),
       RECHECK_WINDOW_HOURS: ALTERED.recheckWindowHours,
     }));
-    vi.doMock('@/lib/v2/copy/deletion', async (importOriginal) => {
-      const real = await importOriginal<typeof import('@/lib/v2/copy/deletion')>();
-      return {
-        ...real,
-        DELETE_COPY: {
-          ...real.DELETE_COPY,
-          what: real.DELETE_COPY.what.map(alterDays),
-          moneyEnds: alterDays(real.DELETE_COPY.moneyEnds),
-          moneyNotCollected: alterDays(real.DELETE_COPY.moneyNotCollected),
-          money: real.DELETE_COPY.money.map(alterDays),
-        },
-        deletionMoney: (status: string | null) =>
-          real.deletionMoney(status)?.map(alterDays) ?? null,
-      };
-    });
+    vi.doMock('@/lib/v2/copy/restore-window', () => ({ RESTORE_DAYS: ALTERED.restoreDays }));
     vi.doMock('@/lib/v2/view/effect-headline', async (importOriginal) => {
       const real = await importOriginal<typeof import('@/lib/v2/view/effect-headline')>();
       return {
@@ -394,7 +372,7 @@ describe('the figures follow the modules that own them, not the values typed tod
       '@/lib/v2/copy/settings',
       '@crawlmouse/types',
       '@/lib/v2/help/pinned',
-      '@/lib/v2/copy/deletion',
+      '@/lib/v2/copy/restore-window',
       '@/lib/v2/view/effect-headline',
     ];
     try {

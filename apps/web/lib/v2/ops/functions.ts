@@ -2,8 +2,10 @@
  * CC-33's Inngest functions as production wires them, for the serve route's list
  * (lib/v2/pipeline/functions.ts): the founder's notices (D3) with V2_BILLING or V2_CHECKS_PUBLIC set
  * to `1`, each reporting a run failed past its retries through `reportFounderFailure`
- * (founder-signal.ts), and the sign-in canary (D6) as well when SIGNIN_CANARY_TO is one plain address; its link is
- * asked for through `requestSignInLink` unless a test passes another `SignInLink`. Everything is built when a function runs, not when the route loads.
+ * (founder-signal.ts); and the sign-in canary (D6) when SIGNIN_CANARY_TO is one plain address,
+ * whatever the v2 flags (owner ruling on Q16), after the founder's when both are registered. The
+ * canary's link is asked for through `requestSignInLink` unless a test passes another `SignInLink`.
+ * The functions' dependencies are built when a function runs, not when the route loads.
  */
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { InngestFunction } from 'inngest';
@@ -106,7 +108,22 @@ export function opsFunctions(
   env: Env = process.env,
   signIn: SignInLink = requestSignInLink,
 ): InngestFunction.Like[] {
-  if (!billingV2Enabled(env) && !checksPublicEnabled(env)) return [];
+  const canaryTo = env.SIGNIN_CANARY_TO?.trim() ?? '';
+  const canary: InngestFunction.Like[] =
+    canaryTo !== '' && isPlainAddress(canaryTo)
+      ? [
+          createSigninCanaryFn(() =>
+            canaryWork({
+              to: canaryTo,
+              signIn,
+              sb: serviceClient(env),
+              now: () => new Date(),
+              report: reportCanary,
+            }),
+          ),
+        ]
+      : [];
+  if (!billingV2Enabled(env) && !checksPublicEnabled(env)) return canary;
   const work = (): FounderWork => {
     const d = founderDeps(env);
     return {
@@ -115,24 +132,10 @@ export function opsFunctions(
       digest: (at) => digest(d, new Date(at)),
     };
   };
-  const fns: InngestFunction.Like[] = [
+  return [
     createFounderEntitlementFn(work, reportFounderFailure),
     createFounderSweepFn(work, reportFounderFailure),
     createFounderDigestFn(work, reportFounderFailure),
+    ...canary,
   ];
-  const canaryTo = env.SIGNIN_CANARY_TO?.trim() ?? '';
-  if (canaryTo !== '' && isPlainAddress(canaryTo)) {
-    fns.push(
-      createSigninCanaryFn(() =>
-        canaryWork({
-          to: canaryTo,
-          signIn,
-          sb: serviceClient(env),
-          now: () => new Date(),
-          report: reportCanary,
-        }),
-      ),
-    );
-  }
-  return fns;
 }

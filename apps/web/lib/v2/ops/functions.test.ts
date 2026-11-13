@@ -22,7 +22,8 @@ vi.mock('./sign-in-link', () => ({ requestSignInLink: vi.fn(async () => 'sent') 
 vi.mock('../../billing/stripe-account', () => ({ stripeAccount: vi.fn() }));
 const sentry = vi.hoisted(() => ({
   captureMessage: vi.fn(),
-  getClient: vi.fn((): unknown => ({})),
+  // A client built with a DSN, so the signal is flushed rather than logged (founder-signal.ts).
+  getClient: vi.fn((): unknown => ({ getDsn: () => ({ host: 'o0.ingest.example.test' }) })),
   flush: vi.fn(async () => true),
 }));
 vi.mock('@sentry/nextjs', () => sentry);
@@ -47,9 +48,25 @@ const TO = ['canary', 'example.test'].join('@');
 const signIn = async () => 'sent' as const;
 
 describe('opsFunctions', () => {
-  it('registers nothing unless V2_BILLING or V2_CHECKS_PUBLIC is 1', () => {
-    for (const env of [{}, { V2_BILLING: '0' }, { V2_CHECKS_PUBLIC: 'true' }, { V2_PIPELINE: '1' }])
-      expect(opsFunctions({ ...env, SIGNIN_CANARY_TO: TO }, signIn)).toEqual([]);
+  /** Environments with neither V2_BILLING nor V2_CHECKS_PUBLIC on, the other v2 flags varied. */
+  const FOUNDER_OFF = [
+    {},
+    { V2_BILLING: '0', V2_CHECKS_PUBLIC: '0' },
+    { V2_BILLING: 'true', V2_CHECKS_PUBLIC: 'yes' },
+    { V2_PIPELINE: '1', V2_ACCOUNT_DOOR: '1' },
+  ];
+
+  it('registers nothing with SIGNIN_CANARY_TO unset unless V2_BILLING or V2_CHECKS_PUBLIC is 1', () => {
+    for (const env of FOUNDER_OFF) expect(opsFunctions(env, signIn)).toEqual([]);
+  });
+
+  it('registers the canary, and nothing else, with SIGNIN_CANARY_TO and every v2 flag off (ruling 4, Q16)', () => {
+    expect(ids(opsFunctions({ SIGNIN_CANARY_TO: TO }, signIn))).toEqual([CANARY]);
+    for (const env of FOUNDER_OFF)
+      expect(
+        ids(opsFunctions({ ...env, SIGNIN_CANARY_TO: TO }, signIn)),
+        JSON.stringify(env),
+      ).toEqual([CANARY]);
   });
 
   it('registers the founder functions with either flag', () => {
@@ -65,10 +82,12 @@ describe('opsFunctions', () => {
     expect(ids(opsFunctions({ V2_BILLING: '1', SIGNIN_CANARY_TO: ` ${TO} ` }, signIn))).toContain(
       CANARY,
     );
-    for (const to of [undefined, '', '  ', 'not-an-address', `${TO}, other@example.test`])
+    for (const to of [undefined, '', '  ', 'not-an-address', `${TO}, other@example.test`]) {
       expect(ids(opsFunctions({ V2_BILLING: '1', SIGNIN_CANARY_TO: to }, signIn))).not.toContain(
         CANARY,
       );
+      expect(opsFunctions({ SIGNIN_CANARY_TO: to }, signIn)).toEqual([]);
+    }
   });
 
   it('reports a founder function’s failed run to Sentry as founder-notice-failed, with its id (review M3)', async () => {

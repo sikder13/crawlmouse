@@ -4,9 +4,10 @@
  * environment the route module loads with. CC-03's two billing functions follow, only when
  * V2_BILLING=1, then CC-27b's three deletion functions, CC-28's four mail functions and CC-29's
  * deletion of Agency Plus requests, only when V2_CHECKS_PUBLIC=1, then CC-33's three founder functions
- * (and its sign-in canary) when either V2_BILLING=1 or V2_CHECKS_PUBLIC=1. CC-28's scheduler tick, alert and summary functions follow, only when both
- * V2_PIPELINE=1 and V2_CHECKS_PUBLIC=1. With the flags unset the list is v1's four objects, unchanged
- * (functions.test.ts).
+ * when either V2_BILLING=1 or V2_CHECKS_PUBLIC=1, and its sign-in canary when SIGNIN_CANARY_TO is one
+ * plain address, whatever the flags. CC-28's scheduler tick, alert and summary functions follow, only
+ * when both V2_PIPELINE=1 and V2_CHECKS_PUBLIC=1. With the flags and SIGNIN_CANARY_TO unset the list is
+ * v1's four objects, unchanged (functions.test.ts).
  *
  * What each function is built from (correctness 1): the reaper, the cancel handler and checkFn's
  * onFailure take the pipeline store and nothing else; the expiry takes its own stores and the

@@ -644,6 +644,17 @@ describe('signin_delivery_seen', () => {
     expect(await seen(address.toUpperCase(), AT)).toBe(true);
   });
 
+  it('answers true for each sender spelling production’s delivered rows carry (ruling 4, Q17)', async () => {
+    // Read on production's email_events: the display name quoted, and bare; each with an ISO
+    // `data.created_at` to the millisecond.
+    for (const from of [`"Crawlmouse" <${SENDER}>`, `Crawlmouse <${SENDER}>`]) {
+      const address = canary();
+      expect(await seen(address, AT), from).toBe(false);
+      await event(address, 'delivered', mailAt(5000), { from, created_at: mailAt(1000) });
+      expect(await seen(address, AT), from).toBe(true);
+    }
+  });
+
   it('does not count another sender’s delivery to the address (review Q17)', async () => {
     const address = canary();
     await event(address, 'delivered', mailAt(5000), {

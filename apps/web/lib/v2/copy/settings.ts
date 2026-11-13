@@ -11,8 +11,11 @@ import { capitalise, count, numberWord, plural } from '../words';
 export const EVIDENCE_CONDENSED_AFTER_DAYS = 90;
 /** Cancelling a plan takes this many clicks, with no retention offer in the path (FACTS D5, L6). */
 export const CANCEL_CLICKS = 2;
-/** A deleted account can be restored by a sign-in link for this long (FACTS E6, ARCH-2 §3.2). */
-export const DELETE_GRACE_DAYS = 7;
+/**
+ * A deleted account can be restored by its restore link for this long (FACTS E6, ARCH-2 §3.2): the
+ * deletion copy's RESTORE_DAYS, so the window has one owner.
+ */
+export { RESTORE_DAYS as DELETE_GRACE_DAYS } from './deletion';
 
 export const SETTINGS_COPY = {
   title: 'Settings',
@@ -59,7 +62,7 @@ export const SETTINGS_COPY = {
     }, so only sign-in links and mail about the account are sent to it now.`,
   dangerTitle: 'Danger',
   deleteLabel: 'Delete this account',
-  /** FACTS E6: the seven-day undo, by the restore link (owner ruling, CC-27b Q16). */
+  /** FACTS E6: the undo within the restore window, by the restore link (owner ruling, CC-27b Q16). */
   deleteText: (sites: number, grace: number) =>
     `${
       sites === 0
