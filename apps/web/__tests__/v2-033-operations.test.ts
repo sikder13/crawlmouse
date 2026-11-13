@@ -246,7 +246,7 @@ describe('operator_actions', () => {
 
   it('the service role reads and adds rows, and cannot change or delete one', async () => {
     const op = await operator();
-    const id = await call<number>('operator_log', [op, 'search', null, 'email', null]);
+    const id = await call<number>('operator_log', [op, 'search', null, 'email', null, '2']);
     for (const sql of [
       `update public.operator_actions set reason = 'x' where id = ${Number(id)}`,
       `update public.operator_actions set outcome = 'x' where id = ${Number(id)}`,
@@ -285,7 +285,14 @@ describe('operator_log', () => {
   it('writes one row, as given, and answers its id', async () => {
     const op = await operator();
     const { accountId } = await personalAccount(db, await person());
-    const id = await call<number>('operator_log', [op, 'view_account', accountId, accountId, null]);
+    const id = await call<number>('operator_log', [
+      op,
+      'view_account',
+      accountId,
+      accountId,
+      null,
+      null,
+    ]);
     expect(await actionsOf(op)).toEqual([
       {
         id: Number(id),
@@ -301,16 +308,16 @@ describe('operator_log', () => {
 
   it('refuses a caller who is not an operator, and writes nothing', async () => {
     const someone = await person();
-    await expect(call('operator_log', [someone, 'search', null, 'email', null])).rejects.toThrow(
-      /not an operator/,
-    );
+    await expect(
+      call('operator_log', [someone, 'search', null, 'email', null, '0']),
+    ).rejects.toThrow(/not an operator/);
     expect(await actionsOf(someone)).toEqual([]);
   });
 
   it('refuses rerun_check, which only operator_request_check records', async () => {
     const op = await operator();
     await expect(
-      call('operator_log', [op, 'rerun_check', null, randomUUID(), 'x']),
+      call('operator_log', [op, 'rerun_check', null, randomUUID(), 'x', null]),
     ).rejects.toThrow(/operator_request_check/);
     expect(await actionsOf(op)).toEqual([]);
   });
@@ -319,7 +326,7 @@ describe('operator_log', () => {
     const op = await operator();
     await expect(
       asRole(db, role, op, (tx) =>
-        tx.query(`select public.operator_log($1, 'search', null, 'email', null)`, [op]),
+        tx.query(`select public.operator_log($1, 'search', null, 'email', null, '0')`, [op]),
       ),
     ).rejects.toThrow(/permission denied/);
   });
@@ -434,6 +441,7 @@ describe('operator_finish', () => {
       accountId,
       randomUUID(),
       'locked out',
+      null,
     ]);
     expect(await call<boolean>('operator_finish', [id, 'sent'])).toBe(true);
     expect(await call<boolean>('operator_finish', [id, 'refused'])).toBe(false);
@@ -442,7 +450,7 @@ describe('operator_finish', () => {
 
   it('leaves any other action alone, and refuses an outcome it does not know', async () => {
     const op = await operator();
-    const id = await call<number>('operator_log', [op, 'search', null, 'email', null]);
+    const id = await call<number>('operator_log', [op, 'search', null, 'email', null, '2']);
     expect(await call<boolean>('operator_finish', [id, 'sent'])).toBe(false);
     const resend = await call<number>('operator_log', [
       op,
@@ -450,9 +458,10 @@ describe('operator_finish', () => {
       null,
       randomUUID(),
       'x',
+      null,
     ]);
     await expect(call('operator_finish', [resend, 'whatever'])).rejects.toThrow(/outcome/);
-    expect((await actionsOf(op)).map((a) => a.outcome)).toEqual([null, null]);
+    expect((await actionsOf(op)).map((a) => a.outcome)).toEqual(['2', null]);
   });
 
   it.each(['anon', 'authenticated'] as const)('%s may not execute it', async (role) => {

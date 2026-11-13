@@ -83,17 +83,19 @@ revoke all on table public.operator_actions from public, anon, authenticated, se
 grant select, insert on table public.operator_actions to service_role;
 
 -- ─── operator_log ────────────────────────────────────────────────────────────────────────────────
--- Writes one search, view_account or resend_sign_in row and answers its id. p_operator must be in
--- operators (42501 otherwise). A re-run is recorded by operator_request_check, in the call that
--- queues it, so rerun_check is refused here (22023). Security invoker: service_role holds the
--- insert.
+-- Writes one search, view_account or resend_sign_in row and answers its id. p_outcome is known when
+-- the row is written for a search (how many accounts it found) and null otherwise; a re-send's is set
+-- afterwards by operator_finish. p_operator must be in operators (42501 otherwise). A re-run is
+-- recorded by operator_request_check, in the call that queues it, so rerun_check is refused here
+-- (22023). Security invoker: service_role holds the insert.
 
 create or replace function public.operator_log(
   p_operator uuid,
   p_action text,
   p_account uuid,
   p_target text,
-  p_reason text
+  p_reason text,
+  p_outcome text
 )
 returns bigint
 language plpgsql
@@ -112,16 +114,16 @@ begin
   if not found then
     raise exception 'operator_log: % is not an operator', p_operator using errcode = '42501';
   end if;
-  insert into public.operator_actions (operator_id, action, account_id, target, reason)
-  values (p_operator, p_action, p_account, p_target, p_reason)
+  insert into public.operator_actions (operator_id, action, account_id, target, reason, outcome)
+  values (p_operator, p_action, p_account, p_target, p_reason, p_outcome)
   returning id into v_id;
   return v_id;
 end;
 $$;
 
-revoke all on function public.operator_log(uuid, text, uuid, text, text)
+revoke all on function public.operator_log(uuid, text, uuid, text, text, text)
   from public, anon, authenticated, service_role;
-grant execute on function public.operator_log(uuid, text, uuid, text, text) to service_role;
+grant execute on function public.operator_log(uuid, text, uuid, text, text, text) to service_role;
 
 -- ─── operator_request_check ──────────────────────────────────────────────────────────────────────
 -- An operator's re-run of a failed check: in one call, request_capped_check(p_row, p_cap, p_global)
