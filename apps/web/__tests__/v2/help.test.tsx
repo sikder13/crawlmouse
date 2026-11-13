@@ -78,18 +78,21 @@ const ALLOWED = new Set<number>([
   ...Object.values(NAMED),
 ]);
 
-function pages(): [string, string][] {
-  return [
-    ['/help', renderToStaticMarkup(<HelpIndexScreen data={helpIndexView()} />)],
-    ...HELP_SLUGS.map(
-      (slug) =>
-        [
-          helpPath(slug),
-          renderToStaticMarkup(<HelpArticleScreen data={helpArticleView(slug)} />),
-        ] as [string, string],
+/** The help pages' addresses; each is rendered inside the test that reads it. */
+const PATHS = ['/help', ...HELP_SLUGS.map(helpPath)];
+
+function render(path: string): string {
+  const slug = HELP_SLUGS.find((s) => helpPath(s) === path);
+  return renderToStaticMarkup(
+    slug ? (
+      <HelpArticleScreen data={helpArticleView(slug)} />
+    ) : (
+      <HelpIndexScreen data={helpIndexView()} />
     ),
-  ];
+  );
 }
+
+const pages = (): [string, string][] => PATHS.map((p) => [p, render(p)]);
 
 describe('the help articles', () => {
   it('are twelve, in the index’s order, each titled as its question', () => {
@@ -111,15 +114,15 @@ describe('the help articles', () => {
 });
 
 describe('the numbers on the help pages', () => {
-  it.each(pages())('%s: each one is a price, a limit or a named figure', (_path, html) => {
-    const found = numbersIn(textOf(html));
+  it.each(PATHS)('%s: each one is a price, a limit or a named figure', (path) => {
+    const found = numbersIn(textOf(render(path)));
     expect(found.filter((n) => !ALLOWED.has(n))).toEqual([]);
   });
 
   it('the pages render numbers (anti-vacuity), the plans’ prices among them', () => {
     const all = pages().flatMap(([, html]) => numbersIn(textOf(html)));
     expect(all.length).toBeGreaterThan(40);
-    const plans = textOf(pages().find(([p]) => p === helpPath('plans'))![1]);
+    const plans = textOf(render(helpPath('plans')));
     for (const price of [PRICES.PRO_MONTHLY, PRICES.PRO_YEARLY, PRICES.AGENCY_MONTHLY])
       expect(plans).toContain(PRICES.usd(price));
   });
@@ -243,9 +246,8 @@ describe('the figures follow GATES and prices.ts, not the values typed today', (
 });
 
 describe('the capabilities the help pages name', () => {
-  const swept = pages().map(([path, html]) => [path, capabilitySweep(html)] as const);
-
-  it.each(swept)('%s: tagged, a coming one marked, none loose', (_path, sweep) => {
+  it.each(PATHS)('%s: tagged, a coming one marked, none loose', (path) => {
+    const sweep = capabilitySweep(render(path));
     expect(sweep.unknown).toEqual([]);
     expect(sweep.unmarked).toEqual([]);
     expect(sweep.overMarked).toEqual([]);
@@ -253,8 +255,9 @@ describe('the capabilities the help pages name', () => {
   });
 
   it('the sweep sees coming capabilities named, and the plans mark them (anti-vacuity)', () => {
-    expect(swept.reduce((n, [, s]) => n + s.seen, 0)).toBeGreaterThan(3);
-    const plans = pages().find(([p]) => p === helpPath('plans'))![1];
+    const seen = pages().reduce((n, [, html]) => n + capabilitySweep(html).seen, 0);
+    expect(seen).toBeGreaterThan(3);
+    const plans = render(helpPath('plans'));
     expect(plans.match(/data-v2-coming=""/g)!.length).toBeGreaterThan(2);
   });
 
