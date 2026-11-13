@@ -275,10 +275,17 @@ describe('runReconcile', () => {
 // `selectError` makes the first audits select reject (to prove the loop surfaces a read fault).
 function makeTtlSb(
   expiredIds: string[],
-  opts: { selectError?: Error; reported?: string[]; reportsError?: Error } = {},
+  opts: {
+    selectError?: Error;
+    reported?: string[];
+    /** Named by a report that was taken down or hidden: reported only to a read without the filters. */
+    removed?: string[];
+    reportsError?: Error;
+  } = {},
 ) {
   const store = new Set(expiredIds);
   const reported = new Set(opts.reported ?? []);
+  const removed = new Set(opts.removed ?? []);
   const deleted: string[] = [];
   const reads: { after: string | null; limit: number }[] = [];
   const auditsRead = () => {
@@ -312,19 +319,30 @@ function makeTtlSb(
     from: (table: string) =>
       table === 'public_reports'
         ? {
-            select: (cols: string) => ({
-              in: (col: string, ids: string[]) => {
-                expect([cols, col]).toEqual(['audit_id', 'audit_id']);
-                return Promise.resolve(
-                  opts.reportsError
-                    ? { data: null, error: opts.reportsError }
-                    : {
-                        data: ids.filter((id) => reported.has(id)).map((id) => ({ audit_id: id })),
-                        error: null,
-                      },
-                );
-              },
-            }),
+            select: (cols: string) => {
+              const nulls = new Set<string>();
+              const chain = {
+                is: (col: string, value: null) => {
+                  expect(value).toBeNull();
+                  nulls.add(col);
+                  return chain;
+                },
+                in: (col: string, ids: string[]) => {
+                  expect([cols, col]).toEqual(['audit_id', 'audit_id']);
+                  const published = nulls.has('takedown_requested_at') && nulls.has('hidden_at');
+                  const named = (id: string) => reported.has(id) || (!published && removed.has(id));
+                  return Promise.resolve(
+                    opts.reportsError
+                      ? { data: null, error: opts.reportsError }
+                      : {
+                          data: ids.filter(named).map((id) => ({ audit_id: id })),
+                          error: null,
+                        },
+                  );
+                },
+              };
+              return chain;
+            },
           }
         : {
             select: () => auditsRead(),
@@ -426,6 +444,17 @@ describe('deleteExpiredAudits', () => {
     });
     expect(res).toEqual({ deleted: 5, kept: 2, drained: true, iterations: 3 });
     expect(sb.deleted.sort()).toEqual(['a00', 'a01', 'a03', 'a04', 'a06']);
+  });
+
+  it('deletes an expired audit whose report was taken down or hidden: only a published report keeps it', async () => {
+    const ids = idsOf(5);
+    const sb = makeTtlSb(ids, { reported: ['a01'], removed: ['a02', 'a03'] });
+    const res = await deleteExpiredAudits(sb, '2026-06-03T00:00:00Z', {
+      batchSize: 10,
+      maxIterations: 10,
+    });
+    expect(res).toEqual({ deleted: 4, kept: 1, drained: true, iterations: 1 });
+    expect(sb.deleted.sort()).toEqual(['a00', 'a02', 'a03', 'a04']);
   });
 
   it('kept audits that fill whole batches do not block the batches after them', async () => {

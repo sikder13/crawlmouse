@@ -5,7 +5,7 @@
  *
  * The client below translates the builder calls `deleteExpiredAudits` makes, and only those, into
  * SQL run as `service_role`: `select(cols).lte().gt().order().limit()` and `delete().in()` on
- * `audits`, `select(cols).in()` on `public_reports`. Any other call is undefined and throws. The
+ * `audits`, `select(cols).is(col, null).in()` on `public_reports`. Any other call is undefined and throws. The
  * shared PostgREST stand-in (`apps/web/__tests__/helpers/postgrest-pglite.ts`) does not model `lte`,
  * `gt` or `delete`. What this cannot show is PostgREST's own translation of those calls.
  */
@@ -48,6 +48,11 @@ function sqlClient(db: PGlite): SupabaseClient {
         const chain = {
           lte: (c: string, v: unknown) => (add((p) => `${ident(c)} <= ${p}`, v), chain),
           gt: (c: string, v: unknown) => (add((p) => `${ident(c)} > ${p}`, v), chain),
+          is: (c: string, v: null) => {
+            if (v !== null) throw new Error('is() is translated for null only');
+            where.push(`${ident(c)} is null`);
+            return chain;
+          },
           order: (c: string, o: { ascending: boolean }) => {
             order = ` order by ${ident(c)} ${o.ascending ? 'asc' : 'desc'}`;
             return chain;
@@ -91,12 +96,18 @@ async function audit(n: number, expiresAt: string | null) {
   );
 }
 
-async function report(n: number) {
-  await db.query(`insert into public.public_reports (slug, audit_id, domain) values ($1, $2, $3)`, [
-    `report-${n}`,
-    id(n),
-    `site-${n}.example`,
-  ]);
+async function report(n: number, state: 'published' | 'taken_down' | 'hidden' = 'published') {
+  await db.query(
+    `insert into public.public_reports (slug, audit_id, domain, takedown_requested_at, hidden_at)
+     values ($1, $2, $3, $4, $5)`,
+    [
+      `report-${n}`,
+      id(n),
+      `site-${n}.example`,
+      state === 'taken_down' ? PAST : null,
+      state === 'hidden' ? PAST : null,
+    ],
+  );
 }
 
 const remaining = async () =>
@@ -137,5 +148,19 @@ describe('deleteExpiredAudits on the migrated schema (C-4)', () => {
       drained: true,
       iterations: 2,
     });
+  });
+
+  it('lets an audit expire once its report is taken down or hidden', async () => {
+    await db.query(`delete from public.public_reports`);
+    await db.query(`delete from public.audits`);
+    for (const n of [21, 22, 23]) await audit(n, PAST);
+    await report(21);
+    await report(22, 'taken_down');
+    await report(23, 'hidden');
+
+    const res = await deleteExpiredAudits(sqlClient(db), NOW, { batchSize: 10, maxIterations: 10 });
+
+    expect(res).toEqual({ deleted: 2, kept: 1, drained: true, iterations: 1 });
+    expect(await remaining()).toEqual([id(21)]);
   });
 });

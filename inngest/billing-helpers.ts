@@ -241,7 +241,7 @@ export interface DeleteExpiredResult {
 
 /**
  * Delete expired audits in bounded id-chunks instead of one unscoped statement, keeping every
- * expired audit that a `public_reports` row names (C-4: deleting it would set the report's
+ * expired audit that a published report names, one neither taken down nor hidden (C-4: deleting it would set the report's
  * `audit_id` null, through the FK's `on delete set null`, and cut the report's link to it).
  *
  * Each batch reads up to `batchSize` expired ids after the last id the batch before it read, in id
@@ -261,7 +261,9 @@ export async function deleteExpiredAudits(
   nowIso: string,
   opts: DeleteExpiredOpts = {},
 ): Promise<DeleteExpiredResult> {
-  const batchSize = opts.batchSize ?? 500;
+  // Each batch sends its ids twice, as `in` filters in a request URL (the report read and the
+  // delete); 150 uuids keep each URL near 5.5 KB.
+  const batchSize = opts.batchSize ?? 150;
   const maxIterations = opts.maxIterations ?? 50;
   let deleted = 0;
   let kept = 0;
@@ -289,9 +291,17 @@ export async function deleteExpiredAudits(
   return { deleted, kept, drained: false, iterations };
 }
 
-/** The ids among `ids` that a public report names. */
+/**
+ * The ids among `ids` that a published report names: one neither taken down nor hidden. A report that
+ * was removed no longer needs its audit, which then expires as /privacy says audits do.
+ */
 async function reportedAmong(sb: SupabaseClient, ids: readonly string[]): Promise<Set<string>> {
-  const { data, error } = await sb.from('public_reports').select('audit_id').in('audit_id', ids);
+  const { data, error } = await sb
+    .from('public_reports')
+    .select('audit_id')
+    .is('takedown_requested_at', null)
+    .is('hidden_at', null)
+    .in('audit_id', ids);
   if (error) throw error;
   return new Set((data ?? []).map((r: { audit_id: string }) => r.audit_id));
 }
