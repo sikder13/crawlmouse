@@ -74,7 +74,7 @@ no rate-limit bucket is spent; Turnstile and the limits of `/api/checks` are unc
 
 - `auditFn` and `cleanupExpiredAuditsFn` stay registered, with their ids and crons. `auditFn` gets no
   work once step 4 is on: `audit.requested` is sent by `/api/audits/start` and `/reaudit`
-  (`git grep -n "name: 'audit.requested'" apps/web -- ':!*.test.ts'`), and
+  (`git grep -n "name: 'audit.requested'" -- apps/web ':!*.test.ts'`), and
   both answer 410. A rollback finds both as it left them. The cleanup keeps calling
   `prune_rate_limits` (B-F1).
 - **C-4.** `deleteExpiredAudits` (`inngest/billing-helpers.ts`) no longer deletes an expired audit
