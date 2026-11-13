@@ -197,4 +197,27 @@ describe('an empty shell on most routes, sample → renderCandidates → renderC
       .sort((a, b) => a - b);
     expect(shellOnly).toEqual([1, 2, 3]);
   });
+
+  it('r3: refuses a render of an empty-root page the empty-root phase did not pick', async () => {
+    const { render } = await pipeline();
+    const input = emptyShellBuild();
+    const extra = {
+      url: at('/pricing-plans'),
+      template_key: '/pricing-plans',
+      picked_for: 'empty_root' as const,
+      rendered: true as const,
+      without_js: {
+        raw_words: 0,
+        rendered_words: 40,
+        text_share: 0,
+        state: 'empty_shell' as const,
+      },
+    };
+    expect(render.pages.some((p) => p.url === extra.url)).toBe(false);
+    expect(() =>
+      buildCheck({ ...input, render: { ...render, pages: [...render.pages, extra] } }),
+    ).toThrow(
+      /a render of .*pricing-plans, which neither the sample nor the empty-root picks hold/,
+    );
+  });
 });

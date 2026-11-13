@@ -6,8 +6,10 @@
  *   stage 2 when the stage-1 rows show a difference.
  * - renderCandidates: what CC-14's renderCheck needs besides its client, caps and budget.
  *
- * `buildCheck` recomputes the sample and the empty-root pages from the same rows and refuses an access
- * test or a render the planners would not have asked for.
+ * `buildCheck` recomputes the sample and the empty-root picks from the same rows. It refuses an access
+ * test of a page outside the sample, and a render of a page that is neither a sampled page the
+ * graded phase may render (`renderable`) nor one of the empty-root picks (`plannedEmptyRoots`). It does
+ * not recompute which of those sampled pages the graded phase picked under its cap.
  */
 import type { AccessTest, CrawlBatchResult, Fix, PageResult } from '@crawlmouse/types/v2';
 import { inSiteScope } from '../../extract.js';
@@ -17,6 +19,7 @@ import { CRAWLER_REGISTRY_V2 } from '../crawler-registry.js';
 import {
   EMPTY_ROOT_MAX_RENDERS,
   emptyRoot,
+  selectEmptyRoots,
   type EmptyRootCandidate,
 } from '../render/empty-root.js';
 import { FREE_MAX_RENDERS, type RenderCandidate } from '../render/sample.js';
@@ -291,7 +294,14 @@ export function emptyRootPool(
   }));
 }
 
-/** The URLs of the crawled pages `emptyRoot` holds for, the one rule the render, guard and detector read. */
+/**
+ * The URLs of the empty-root pages the empty-root phase can render: `selectEmptyRoots` over this
+ * crawl, at EMPTY_ROOT_MAX_RENDERS. What `buildCheck` admits a render of besides the sample.
+ */
+export const plannedEmptyRoots = (assembled: Pick<Assembled, 'pages' | 'content'>): Set<string> =>
+  new Set(selectEmptyRoots(emptyRootPool(assembled), EMPTY_ROOT_MAX_RENDERS).map((p) => p.url));
+
+/** The URLs of the crawled pages `emptyRoot` holds for: the pages that make a template present. */
 export const emptyRootUrls = (assembled: Pick<Assembled, 'pages' | 'content'>): Set<string> =>
   new Set(
     emptyRootPool(assembled)

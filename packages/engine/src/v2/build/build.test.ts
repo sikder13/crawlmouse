@@ -308,7 +308,7 @@ describe('what buildCheck refuses', () => {
   it('a render of a page the sample does not hold', () => {
     const unsampled = built.page_results.find((p) => !p.sampled)!;
     expect(() => buildCheck(edited((i) => (i.render!.pages[0]!.url = unsampled.url)))).toThrow(
-      /a render of .* which neither the sample nor the empty-root pages hold/,
+      /a render of .* which neither the sample nor the empty-root picks hold/,
     );
   });
 
