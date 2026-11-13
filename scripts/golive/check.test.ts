@@ -454,7 +454,9 @@ describe('the header names the live commit and whether this checkout matches it 
 
 describe('a checkout that does not match the live commit blocks every step (review r3 R3-N1)', () => {
   const LIVE = 'c'.repeat(40);
-  const ticked = PRECONDITIONS.filter((p) => p.gates === 1 && p.check.kind === 'manual').map((p) => p.id);
+  const ticked = PRECONDITIONS.filter((p) => p.gates === 1 && p.check.kind === 'manual').map(
+    (p) => p.id,
+  );
   async function exitAt(diff: { code: number; stdout: string }, file: string | null) {
     const out: string[] = [];
     const code = await main(['--step', '1', '--ticked', ticked.join(',')], {
