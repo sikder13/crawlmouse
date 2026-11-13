@@ -204,7 +204,7 @@ describe('footer-links.ts: the one map of header and footer links', () => {
 
   it('says what the checker reads, and the checker page still says it', () => {
     expect(noteOf('Is GPTBot blocked?')).toMatch(/access matrix/);
-    const checker = appSource('ai-readiness-checker', 'page.tsx');
+    const checker = appSource('ai-readiness-checker', 'AiReadinessChecker.tsx');
     expect(checker).toMatch(/per-crawler access matrix/);
     expect(checker).toMatch(/GPTBot/);
   });
