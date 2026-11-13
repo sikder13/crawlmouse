@@ -489,6 +489,13 @@ in `apps/web/app/api/reports/route.ts`, and `route.test.ts` beside it has a test
 the 403 `role_refused`, which no request reaches today, since `seat_may` lets each role
 `export_report` (§3).
 
+The Reports screen's forms post to this route. A form refused with 400, 402, 409 or 429 is answered
+with a 303 to `/reports?notice=<code>` and the page says the code's line (`NOTICE_LINES`,
+`lib/v2/copy/notices.ts`): `invalid`, `upgrade_required`, `fix_not_verified`, and `reports_capped`
+with the time the bound that refused it ends. JSON gets the status and code as before
+(429 `rate_limited`). A form's 401 and 404 are JSON too.
+`pnpm --filter @crawlmouse/web exec vitest run app/api/reports/route.test.ts -t 'a refused form'`.
+
 The file is made inside the request and the row is written first: `create_report` writes it
 `pending`, `finish_report` marks it `stored` with its path and size, `fail_report` marks it `failed`
 with `build_failed`, `store_failed` or `object_left`. What was thrown is not stored or returned
