@@ -109,17 +109,6 @@ describe('the client-rendered template fix', () => {
     expect({ ...after.ai, readable: null }).toEqual({ ...s.grades.inputs.ai, readable: null });
   });
 
-  it('has no counterfactual for js_only_navigation: the fix type is not opened', () => {
-    const s = site([[0.1, SHELL]]);
-    const record = {
-      ...s.rendered.find((r) => r.state === 'detected')!,
-      type: 'js_only_navigation' as const,
-    };
-    expect(() => applyFix(s.grades.inputs, { family: 'rendered', record })).toThrow(
-      /no counterfactual for js_only_navigation/,
-    );
-  });
-
   it('opens with its template, its section and no crawler; confirmed once two pages were rendered', () => {
     const two = fixesOf(site([[0.1, SHELL], [0.2, SHELL], null]).outcomes).find(
       (f) => f.type === 'client_rendered_template',

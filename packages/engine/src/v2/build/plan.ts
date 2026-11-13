@@ -310,23 +310,31 @@ export const emptyRootUrls = (assembled: Pick<Assembled, 'pages' | 'content'>): 
   );
 
 /**
- * The template keys the site's client-rendered fixes still waiting on rendering name
- * (AWAITING_FIX_STATUSES), once each, sorted: what the graded phase renders first and what the
- * detector gives a record to whether or not the template is present.
+ * The template keys the site's fixes of `type` still waiting on rendering name (AWAITING_FIX_STATUSES),
+ * once each, sorted: what that type's rendered-page detector gives a record to whether or not the
+ * template is present.
  */
-export function awaitingShellTemplates(
+export function awaitingTemplates(
   fixes: readonly Pick<Fix, 'type' | 'status' | 'template_key'>[],
+  type: 'client_rendered_template' | 'js_only_navigation',
 ): string[] {
   return [
     ...new Set(
       fixes
-        .filter(
-          (f) => f.type === 'client_rendered_template' && AWAITING_FIX_STATUSES.includes(f.status),
-        )
+        .filter((f) => f.type === type && AWAITING_FIX_STATUSES.includes(f.status))
         .flatMap((f) => (f.template_key === null ? [] : [f.template_key])),
     ),
   ].sort();
 }
+
+/**
+ * The template keys the site's client-rendered fixes still waiting on rendering name: what the graded
+ * phase renders first, and what the client-rendered detector gives a record to whether or not the
+ * template is present.
+ */
+export const awaitingShellTemplates = (
+  fixes: readonly Pick<Fix, 'type' | 'status' | 'template_key'>[],
+): string[] => awaitingTemplates(fixes, 'client_rendered_template');
 
 /**
  * The render step's input: the sampled pages (so every graded-phase candidate is a sampled page), the

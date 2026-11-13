@@ -29,6 +29,7 @@ import { gradeSources } from '../../../fixtures/v2/grade/guard.js';
 import { SIGNATURES } from '../../cms-detection/index.js';
 import type { AccessDetection } from '../access/types.js';
 import { DETECTORS_RUN } from '../build/diff.js';
+import { JS_ONLY_KEY_PREFIX, MAX_JS_ONLY_TARGETS } from '../detectors/js-only-navigation.js';
 import { FRONTENDS } from '../build/record.js';
 import type { ContentDetection } from '../content/aggregate.js';
 import { CONTENT_CHECKS } from '../content/checks.js';
@@ -297,7 +298,7 @@ const DECISIONS: readonly Decision[] = [
     id: 'D5',
     decision: 'The front end is detected.',
     built:
-      'Narrowed (Q2). The worker records a CMS name and no marker, so `stack.frontend` stays null. The first body is chosen by `frameworkOf`: the detected front end when a later step records one, else the framework the CMS is (§8).',
+      'Narrowed (Q2), then built in CC-32 D5: the worker records front-end markers, and `stackOf` sets `stack.frontend` from them (§8). The first body is chosen by `frameworkOf`: the detected front end, else the framework the CMS is.',
     where: ['packets/stack.ts', 'build/record.ts'],
     tests: ['packets/stack.test.ts', 'packets/compose.test.ts'],
   },
@@ -305,13 +306,22 @@ const DECISIONS: readonly Decision[] = [
     id: 'D6',
     decision: 'The two rendered-page fix types open.',
     built:
-      'Narrowed. `client_rendered_template` opens, from the render step’s own `state` per page (§6). `js_only_navigation` is not opened: the render step keeps no link (Q3). A route that serves an empty root is classed thin and is not rendered, so it gets no record (Q5).',
-    where: ['detectors/rendered.ts', 'grade/effects.ts', 'grade/outcomes.ts', 'build/diff.ts'],
+      'Narrowed, then completed in CC-32. `client_rendered_template` opens, from the render step’s own `state` per page (§6). `js_only_navigation` opens since CC-32 D6, from the links the render step reads on both sides of a page (§6); it has no packet (CC-32 Q7). A route that serves an empty root is an empty-root page since CC-32 D2, so its template gets a record (§6).',
+    where: [
+      'detectors/rendered.ts',
+      'detectors/js-only-navigation.ts',
+      'grade/effects.ts',
+      'grade/outcomes.ts',
+      'build/diff.ts',
+    ],
     tests: [
       'detectors/rendered.test.ts',
       'detectors/rendered-build.test.ts',
       'grade/effects.rendered.test.ts',
       'build/client-rendered.test.ts',
+      'detectors/js-only-navigation.test.ts',
+      'grade/effects.js-only.test.ts',
+      'build/js-nav-site.test.ts',
     ],
   },
   {
@@ -1650,6 +1660,7 @@ export function renderPacketSpec(): string {
       `Effect (grade/effects.ts \`applyFix\`): ${COUNTERFACTUALS.client_rendered_template}. The share it sets is \`SERVER_RENDERED_SHARE\`, ${SERVER_RENDERED_SHARE}.`,
       `Outcome (grade/outcomes.ts): section ${code(FIX_SECTION.client_rendered_template)}; recommendation class ${code(RENDERED_CLASS)} (\`RENDERED_CLASS\`); confidence \`confirmed\` when ${PAGES_PER_FIX_TEMPLATE} (\`PAGES_PER_FIX_TEMPLATE\`) or more of the template’s present pages were rendered, or each of them was, and \`likely\` otherwise (\`renderedConfidence\`); \`template_key\` set, which the graded phase reads to render up to that many graded pages of an open fix’s template on the next check. Title for \`/guides/{slug}\`: “${exampleTitle}”.`,
       `A template an awaiting fix names (${AWAITING_FIX_STATUSES.map(code).join(', ')}) with no graded and no empty-root page in the check gets an \`indeterminate\` record, reason \`template_absent\` (Q10, CC-32 D3), so the fix is measured again and the lifecycle's rule for an indeterminate record applies: it does not close by itself. The record is not stored as such: a fix keeps \`last_state\` \`indeterminate\`, and \`gone\` holds a page's 404 or 410 only, so the dashboard cannot tell a gone template from one not rendered. An awaiting fix whose \`template_key\` is null cannot be named by template: it gets no record and the diff leaves it as it was. The detector opens every fix with its record's template key.`,
+      `\`js_only_navigation\` (${file('detectors/js-only-navigation.ts')}, CC-32 D6) has the same population, deciding pages and \`template_absent\` rule (the templates its own awaiting fixes name). A deciding page is evidence when it was measured and its render outcome carries \`links\` with neither side truncated (${file('render/links.ts')}); its JS-only targets are its rendered side's same-site targets less its static side's. Detected when every evidence page has one, not detected when none has, \`pages_disagree\` otherwise, and \`not_rendered\` when no deciding page is evidence. Key: \`${JS_ONLY_KEY_PREFIX}:<template_key>\`; the evidence keeps each page's count and its first ${MAX_JS_ONLY_TARGETS} targets. Effect: ${COUNTERFACTUALS.js_only_navigation}. Section ${code(FIX_SECTION.js_only_navigation)}, class and confidence as above. Title for \`/guides/{slug}\`: “${titleOf('js_only_navigation', '/guides/{slug}')}”. No packet (CC-32 Q7).`,
     ]),
     '',
     '## 7. Effort and before/after',
@@ -1731,8 +1742,8 @@ export function renderPacketSpec(): string {
     'Open, each with the recommendation that was acted on:',
     '',
     bullets([
-      '**Q2.** The worker records a CMS name and no front-end marker, so Next.js, Liquid and Hydrogen are not told apart. Acted on: `stack.frontend` stays null and the first body follows the CMS (§8). Proposed: the additive worker field of §8.',
-      '**Q3.** `js_only_navigation` needs the rendered side’s links, which the render step does not keep. Acted on: the type stays unopened with its reason in the registry. Proposed: a CC-14 follow-up that keeps the rendered same-site link targets.',
+      '**Q2.** The worker recorded a CMS name and no front-end marker, so Next.js, Liquid and Hydrogen were not told apart. Acted on: `stack.frontend` stayed null and the first body followed the CMS. Done in CC-32 D5: the additive worker field of §8.',
+      '**Q3.** `js_only_navigation` needed the rendered side’s links, which the render step did not keep. Acted on: the type stayed unopened with its reason in the registry. Done in CC-32 D6: the render step keeps the same-site link targets of both sides, and the type opens (§6).',
       '**Q4.** `effort` is a label field, so a fix first found before this step keeps `effort: null` until it resolves and reopens. Acted on: the diff is left alone. Proposed, if such fixes exist in production: take `effort` in the diff when the stored one is null.',
       '**Q5.** A route that serves an empty root is thin, not graded and not rendered, so a pure-shell site gets no `client_rendered_template` fix, and rendering thin pages alone would give one an effect of 0. Acted on: the fix opens on what the render step measured (§6). For the owner: whether the graded population should change is an OPERATING-RULES §5 question.',
       '**Pagination and D3.** The near-duplicate half of the `duplicate_pagination` exact check can exit 0 on an unfixed site (§5, its open limit). Acted on: kept, disclosed in `expect`, here and in the PR text. For the owner: accept it as an exception to D3, or have the packet carry no exact check for that condition.',

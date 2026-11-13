@@ -26,12 +26,12 @@ Before this step a fix carried `packet: null`, `effort: null` and `before_after:
 - **D4. A stack body where the platform’s documentation supports its steps; `frameworks` lists bodies that exist.** A stack body carries `sources` (title, URL, read date, what it supports), rendered in §5. `compose` computes `frameworks` from the bodies written.
   - Where: `packets/compose.ts`, `packets/types.ts`.
   - Held by: `packets/compose.test.ts`, `packets/registry.test.ts`.
-- **D5. The front end is detected.** Narrowed (Q2). The worker records a CMS name and no marker, so `stack.frontend` stays null. The first body is chosen by `frameworkOf`: the detected front end when a later step records one, else the framework the CMS is (§8).
+- **D5. The front end is detected.** Narrowed (Q2), then built in CC-32 D5: the worker records front-end markers, and `stackOf` sets `stack.frontend` from them (§8). The first body is chosen by `frameworkOf`: the detected front end, else the framework the CMS is.
   - Where: `packets/stack.ts`, `build/record.ts`.
   - Held by: `packets/stack.test.ts`, `packets/compose.test.ts`.
-- **D6. The two rendered-page fix types open.** Narrowed. `client_rendered_template` opens, from the render step’s own `state` per page (§6). `js_only_navigation` is not opened: the render step keeps no link (Q3). A route that serves an empty root is classed thin and is not rendered, so it gets no record (Q5).
-  - Where: `detectors/rendered.ts`, `grade/effects.ts`, `grade/outcomes.ts`, `build/diff.ts`.
-  - Held by: `detectors/rendered.test.ts`, `detectors/rendered-build.test.ts`, `grade/effects.rendered.test.ts`, `build/client-rendered.test.ts`.
+- **D6. The two rendered-page fix types open.** Narrowed, then completed in CC-32. `client_rendered_template` opens, from the render step’s own `state` per page (§6). `js_only_navigation` opens since CC-32 D6, from the links the render step reads on both sides of a page (§6); it has no packet (CC-32 Q7). A route that serves an empty root is an empty-root page since CC-32 D2, so its template gets a record (§6).
+  - Where: `detectors/rendered.ts`, `detectors/js-only-navigation.ts`, `grade/effects.ts`, `grade/outcomes.ts`, `build/diff.ts`.
+  - Held by: `detectors/rendered.test.ts`, `detectors/rendered-build.test.ts`, `grade/effects.rendered.test.ts`, `build/client-rendered.test.ts`, `detectors/js-only-navigation.test.ts`, `grade/effects.js-only.test.ts`, `build/js-nav-site.test.ts`.
 - **D7. Before/after and effort from what was measured.** A rule per fix type for both, as data (§7). `after` comes from `servedAll`, `allPassing` and `SERVER_RENDERED_SHARE` of grade/effects.ts. Narrowed: no rule states `minutes`, because no record holds a measure of time; those fixes carry no effort.
   - Where: `packets/effort.ts`, `packets/before-after.ts`, `grade/effects.ts`.
   - Held by: `packets/effort.test.ts`, `packets/before-after.test.ts`, `packets/before-after.same-code.test.ts`.
@@ -72,7 +72,7 @@ The registry (`packets/registry.ts`), one row per fix type of the contract:
 The reason each entry without a builder carries:
 
 - `robots_txt_blocks_crawler`: robots.txt disallows the crawler, which is the site’s stated intent: the engine opens no fix for it.
-- `js_only_navigation`: Not measured: the audit’s rendering records word counts only. It keeps no link from the rendered page, so it cannot tell which links exist only once JavaScript has run, and the engine opens no fix of this type.
+- `js_only_navigation`: No packet yet: the audit finds these links by reading each sampled page before and after its JavaScript runs, and the steps to put them in the HTML are not written for any stack yet.
 
 A builder (`packets/types.ts`) has these fields, functions of one record and the check’s `PacketFacts` (the homepage URL, the stack, the crawlers’ site verdicts, the pages, the links and the access tests):
 
@@ -717,7 +717,7 @@ Lab fixture: no fix of this type.
 
 ### `js_only_navigation`
 
-Registry reason: Not measured: the audit’s rendering records word counts only. It keeps no link from the rendered page, so it cannot tell which links exist only once JavaScript has run, and the engine opens no fix of this type.
+Registry reason: No packet yet: the audit finds these links by reading each sampled page before and after its JavaScript runs, and the steps to put them in the HTML are not written for any stack yet.
 
 Lab fixture: no fix of this type.
 
@@ -981,10 +981,11 @@ The detector’s verdict on a template of 4 graded pages, computed when this doc
 - Key: `shell:<template_key>`. `measured` is the median `text_share` of the rendered pages.
 - Scope (Q5, CC-32 D2): a route that serves an empty root is classed `thin` and is not graded; it is an empty-root page, so its template is present and gets a record, and the empty-root phase renders up to two of its pages (`render/empty-root.ts`). A template with a graded page is judged on its graded renders alone, so its verdict and confidence are what they were before CC-32: with no graded page rendered it reads `not_rendered`, whatever its empty-root pages show. A template of empty-root pages alone has no graded page, so its fix moves no grade: its effect is 0.
 - Every crawled template of empty-root pages now gets a record, `not_rendered` while production renders nothing. So the check that first detects it writes no `opened` change row: the diff writes one for a new fix only when the previous check measured the fingerprint, and a fingerprint the previous check reported indeterminate was not measured (`diff/diff.ts` `measuredBefore`). Graded templates follow the same rule.
-- Listed in `DETECTORS_RUN` (build/diff.ts): `client_rendered_template` yes, `js_only_navigation` no.
+- Listed in `DETECTORS_RUN` (build/diff.ts): `client_rendered_template` yes, `js_only_navigation` yes.
 - Effect (grade/effects.ts `applyFix`): the `text_share` of every graded page of the template becomes 1, rendered this check or not; only Readable moves. The share it sets is `SERVER_RENDERED_SHARE`, 1.
 - Outcome (grade/outcomes.ts): section `without_js`; recommendation class `best_practice` (`RENDERED_CLASS`); confidence `confirmed` when 2 (`PAGES_PER_FIX_TEMPLATE`) or more of the template’s present pages were rendered, or each of them was, and `likely` otherwise (`renderedConfidence`); `template_key` set, which the graded phase reads to render up to that many graded pages of an open fix’s template on the next check. Title for `/guides/{slug}`: “Serve the text of guides without JavaScript”.
 - A template an awaiting fix names (`open`, `reopened`, `marked_done`) with no graded and no empty-root page in the check gets an `indeterminate` record, reason `template_absent` (Q10, CC-32 D3), so the fix is measured again and the lifecycle's rule for an indeterminate record applies: it does not close by itself. The record is not stored as such: a fix keeps `last_state` `indeterminate`, and `gone` holds a page's 404 or 410 only, so the dashboard cannot tell a gone template from one not rendered. An awaiting fix whose `template_key` is null cannot be named by template: it gets no record and the diff leaves it as it was. The detector opens every fix with its record's template key.
+- `js_only_navigation` (`detectors/js-only-navigation.ts`, CC-32 D6) has the same population, deciding pages and `template_absent` rule (the templates its own awaiting fixes name). A deciding page is evidence when it was measured and its render outcome carries `links` with neither side truncated (`render/links.ts`); its JS-only targets are its rendered side's same-site targets less its static side's. Detected when every evidence page has one, not detected when none has, `pages_disagree` otherwise, and `not_rendered` when no deciding page is evidence. Key: `jsnav:<template_key>`; the evidence keeps each page's count and its first 20 targets. Effect: each evidence page links in its HTML to the JS-only targets its record keeps that the crawl holds as pages, through `addEdge`, so anchor diversity leaves those links out; a target the crawl never fetched adds no page. `js_only` stays false on every page and edge. Section `structure`, class and confidence as above. Title for `/guides/{slug}`: “Put the links of guides in the HTML”. No packet (CC-32 Q7).
 
 ## 7. Effort and before/after
 
@@ -1162,8 +1163,8 @@ The 8 mutations the brief requires, as round 2’s correctness review ran them a
 
 Open, each with the recommendation that was acted on:
 
-- **Q2.** The worker records a CMS name and no front-end marker, so Next.js, Liquid and Hydrogen are not told apart. Acted on: `stack.frontend` stays null and the first body follows the CMS (§8). Proposed: the additive worker field of §8.
-- **Q3.** `js_only_navigation` needs the rendered side’s links, which the render step does not keep. Acted on: the type stays unopened with its reason in the registry. Proposed: a CC-14 follow-up that keeps the rendered same-site link targets.
+- **Q2.** The worker recorded a CMS name and no front-end marker, so Next.js, Liquid and Hydrogen were not told apart. Acted on: `stack.frontend` stayed null and the first body followed the CMS. Done in CC-32 D5: the additive worker field of §8.
+- **Q3.** `js_only_navigation` needed the rendered side’s links, which the render step did not keep. Acted on: the type stayed unopened with its reason in the registry. Done in CC-32 D6: the render step keeps the same-site link targets of both sides, and the type opens (§6).
 - **Q4.** `effort` is a label field, so a fix first found before this step keeps `effort: null` until it resolves and reopens. Acted on: the diff is left alone. Proposed, if such fixes exist in production: take `effort` in the diff when the stored one is null.
 - **Q5.** A route that serves an empty root is thin, not graded and not rendered, so a pure-shell site gets no `client_rendered_template` fix, and rendering thin pages alone would give one an effect of 0. Acted on: the fix opens on what the render step measured (§6). For the owner: whether the graded population should change is an OPERATING-RULES §5 question.
 - **Pagination and D3.** The near-duplicate half of the `duplicate_pagination` exact check can exit 0 on an unfixed site (§5, its open limit). Acted on: kept, disclosed in `expect`, here and in the PR text. For the owner: accept it as an exception to D3, or have the packet carry no exact check for that condition.

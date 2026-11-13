@@ -16,7 +16,9 @@ import { enumerateFixes } from '../../projection/ledger.js';
 import { detectAccess } from '../access/index.js';
 import type { AccessResult } from '../access/types.js';
 import { subjectOfKey } from '../detectors/fingerprint.js';
+import { detectJsOnlyNavigation } from '../detectors/js-only-navigation.js';
 import { detectRendered } from '../detectors/rendered.js';
+import type { RenderLinks } from '../render/links.js';
 import { detectStructure } from '../detectors/index.js';
 import type { Detection } from '../detectors/types.js';
 import type { DetectorOutcome } from '../diff/types.js';
@@ -25,7 +27,7 @@ import { detectorOutcomes } from '../grade/outcomes.js';
 import type { PacketFacts } from '../packets/types.js';
 import { writtenFrom } from '../packets/written.js';
 import type { Assembled } from './assemble.js';
-import { awaitingShellTemplates, emptyRootUrls } from './plan.js';
+import { awaitingShellTemplates, awaitingTemplates, emptyRootUrls } from './plan.js';
 import { stackOf } from './record.js';
 import type { BuildInput } from './types.js';
 
@@ -42,7 +44,7 @@ export interface Graded {
 }
 
 export function gradeAssembled(
-  input: Pick<BuildInput, 'check' | 'previous' | 'fixes'>,
+  input: Pick<BuildInput, 'check' | 'previous' | 'fixes' | 'render'>,
   assembled: Assembled,
   robots_txt: string | null,
 ): Graded {
@@ -95,14 +97,21 @@ export function gradeAssembled(
   // A builder that throws leaves its fix without a packet (packets/written.ts); the grading summary
   // counts them, so a fault is seen where the check's steps are logged.
   const packet_faults: Graded['packet_faults'] = [];
+  const emptyRoots = emptyRootUrls(assembled);
   const { outcomes } = detectorOutcomes(
     grades,
     access.detections,
     structure,
-    detectRendered(withOrphans, {
-      emptyRoots: emptyRootUrls(assembled),
-      openTemplates: awaitingShellTemplates(input.fixes),
-    }),
+    [
+      ...detectRendered(withOrphans, {
+        emptyRoots,
+        openTemplates: awaitingShellTemplates(input.fixes),
+      }),
+      ...detectJsOnlyNavigation(withOrphans, renderLinksOf(input.render), {
+        emptyRoots,
+        openTemplates: awaitingTemplates(input.fixes, 'js_only_navigation'),
+      }),
+    ],
     writtenFrom(facts, ({ type, fingerprint }) => packet_faults.push({ type, fingerprint })),
   );
   const pages = withOrphans.map((p) => ({
@@ -110,6 +119,18 @@ export function gradeAssembled(
     content_failures: grades.content_failures.get(p.url) ?? null,
   }));
   return { pages, robots_txt, access, structure, grades, outcomes, packet_faults };
+}
+
+/**
+ * The links the render step read on each rendered page, by URL (render/links.ts); none for an outcome
+ * stored before it kept them. They reach the JS-only navigation detector only, never a PageResult.
+ */
+function renderLinksOf(render: BuildInput['render']): Map<string, RenderLinks> {
+  return new Map(
+    (render?.pages ?? []).flatMap((p) =>
+      p.rendered && p.links ? [[p.url, p.links] as const] : [],
+    ),
+  );
 }
 
 /**

@@ -27,14 +27,13 @@
  * measured again on every check rather than left with no outcome; the lifecycle's rule for an
  * indeterminate record decides what that does to it (diff/lifecycle.ts).
  *
- * `js_only_navigation` has no detector: the render step keeps word counts and no link.
+ * `js_only_navigation` has its own detector, over the same population and deciding pages
+ * (detectors/js-only-navigation.ts).
  */
 import type { DetectionState, PageResult } from '@crawlmouse/types/v2';
 import { median } from '../grade/numbers.js';
 import { isGraded } from '../grade/technical-seo.js';
 import { fingerprintOf } from './fingerprint.js';
-
-export type RenderedFixType = 'client_rendered_template' | 'js_only_navigation';
 
 /** Why a rendered-page detector could not decide. */
 export const RENDERED_INDETERMINATE_REASONS = [
@@ -54,7 +53,7 @@ export interface RenderedPage {
 
 /** One rendered-page detector's verdict on one template. */
 export interface RenderedDetection {
-  type: RenderedFixType;
+  type: 'client_rendered_template';
   /** `FingerprintSchema`: the hash of `key`. */
   fingerprint: string;
   /** The readable key the fingerprint hashes. */
@@ -85,12 +84,19 @@ export type RenderedInputPage = Pick<
 /** The key prefix of a client-rendered template's fingerprint; the subject is the template key. */
 export const SHELL_KEY_PREFIX = 'shell';
 
-const byText = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
+export const byText = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
 
-function verdict(rendered: number, shells: number): Pick<RenderedDetection, 'state' | 'reason'> {
-  if (rendered === 0) return { state: 'indeterminate', reason: 'not_rendered' };
-  if (shells === rendered) return { state: 'detected', reason: null };
-  if (shells === 0) return { state: 'not_detected', reason: null };
+/**
+ * The verdict over a template's deciding pages: `found` of the `deciding` pages carry the finding.
+ * Shared with detectors/js-only-navigation.ts.
+ */
+export function verdict(
+  deciding: number,
+  found: number,
+): Pick<RenderedDetection, 'state' | 'reason'> {
+  if (deciding === 0) return { state: 'indeterminate', reason: 'not_rendered' };
+  if (found === deciding) return { state: 'detected', reason: null };
+  if (found === 0) return { state: 'not_detected', reason: null };
   return { state: 'indeterminate', reason: 'pages_disagree' };
 }
 
@@ -106,53 +112,71 @@ export interface RenderedContext {
 }
 
 /**
+ * Each template present in the check, with its present pages (graded or empty-root), and each template
+ * an open fix names with none, in template-key order. Shared with detectors/js-only-navigation.ts.
+ */
+export function presentTemplates<P extends RenderedInputPage>(
+  pages: readonly P[],
+  { emptyRoots = new Set(), openTemplates = [] }: RenderedContext = {},
+): Array<[string, P[]]> {
+  const templates = new Map<string, P[]>();
+  for (const p of pages.filter((p) => isGraded(p) || emptyRoots.has(p.url))) {
+    templates.set(p.template_key, [...(templates.get(p.template_key) ?? []), p]);
+  }
+  for (const t of openTemplates) if (!templates.has(t)) templates.set(t, []);
+  return [...templates].sort(([a], [b]) => byText(a, b));
+}
+
+/**
+ * The pages whose renders decide a present template's verdict: its graded pages when it has any, its
+ * empty-root pages otherwise. Shared with detectors/js-only-navigation.ts.
+ */
+export const decidingPages = <P extends RenderedInputPage>(present: readonly P[]): readonly P[] => {
+  const graded = present.filter(isGraded);
+  return graded.length > 0 ? graded : present;
+};
+
+/**
  * One `client_rendered_template` record per template present in the check, and per template an open
  * fix names, in template-key order.
  */
 export function detectRendered(
   pages: readonly RenderedInputPage[],
-  { emptyRoots = new Set(), openTemplates = [] }: RenderedContext = {},
+  context: RenderedContext = {},
 ): RenderedDetection[] {
-  const templates = new Map<string, RenderedInputPage[]>();
-  for (const p of pages.filter((p) => isGraded(p) || emptyRoots.has(p.url))) {
-    templates.set(p.template_key, [...(templates.get(p.template_key) ?? []), p]);
-  }
-  for (const t of openTemplates) if (!templates.has(t)) templates.set(t, []);
-  return [...templates]
-    .sort(([a], [b]) => byText(a, b))
-    .map(([template_key, present]): RenderedDetection => {
-      const graded = present.filter(isGraded);
-      const rendered = (graded.length > 0 ? graded : present)
-        .flatMap((p) => (p.without_js ? [{ url: p.url, ...p.without_js }] : []))
-        .sort((a, b) => byText(a.url, b.url));
-      const shells = rendered.filter((p) => p.state === 'empty_shell').length;
-      const { state, reason } =
-        present.length === 0
-          ? { state: 'indeterminate' as const, reason: 'template_absent' as const }
-          : verdict(rendered.length, shells);
-      const key = `${SHELL_KEY_PREFIX}:${template_key}`;
-      return {
-        type: 'client_rendered_template',
-        fingerprint: fingerprintOf(key),
-        key,
-        template_key,
-        state,
-        reason,
-        measured: rendered.length === 0 ? null : median(rendered.map((p) => p.text_share)),
-        extent: {
-          pages: present.length,
-          graded: graded.length,
-          rendered: rendered.length,
-        },
-        affected_urls: state === 'detected' ? present.map((p) => p.url).sort(byText) : [],
-        evidence: {
-          pages: rendered.map(({ url, raw_words, rendered_words, text_share }) => ({
-            url,
-            raw_words,
-            rendered_words,
-            text_share,
-          })),
-        },
-      };
-    });
+  return presentTemplates(pages, context).map(([template_key, present]): RenderedDetection => {
+    const graded = present.filter(isGraded);
+    const rendered = decidingPages(present)
+      .flatMap((p) => (p.without_js ? [{ url: p.url, ...p.without_js }] : []))
+      .sort((a, b) => byText(a.url, b.url));
+    const shells = rendered.filter((p) => p.state === 'empty_shell').length;
+    const { state, reason } =
+      present.length === 0
+        ? { state: 'indeterminate' as const, reason: 'template_absent' as const }
+        : verdict(rendered.length, shells);
+    const key = `${SHELL_KEY_PREFIX}:${template_key}`;
+    return {
+      type: 'client_rendered_template',
+      fingerprint: fingerprintOf(key),
+      key,
+      template_key,
+      state,
+      reason,
+      measured: rendered.length === 0 ? null : median(rendered.map((p) => p.text_share)),
+      extent: {
+        pages: present.length,
+        graded: graded.length,
+        rendered: rendered.length,
+      },
+      affected_urls: state === 'detected' ? present.map((p) => p.url).sort(byText) : [],
+      evidence: {
+        pages: rendered.map(({ url, raw_words, rendered_words, text_share }) => ({
+          url,
+          raw_words,
+          rendered_words,
+          text_share,
+        })),
+      },
+    };
+  });
 }

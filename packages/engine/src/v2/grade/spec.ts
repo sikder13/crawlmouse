@@ -73,7 +73,7 @@ export const COUNTERFACTUALS: Readonly<Record<FixType, string>> = {
   client_rendered_template:
     'the `text_share` of every graded page of the template becomes 1, rendered this check or not; only Readable moves',
   js_only_navigation:
-    'none: the fix type is not opened. The render step records word counts and no link of the rendered side, and `js_only` is written false on every page and edge',
+    'each evidence page links in its HTML to the JS-only targets its record keeps that the crawl holds as pages, through `addEdge`, so anchor diversity leaves those links out; a target the crawl never fetched adds no page. `js_only` stays false on every page and edge',
 };
 
 /** The URL each crawlability detector's record marks (technical-seo.ts defectUrls). */

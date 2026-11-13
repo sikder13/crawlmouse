@@ -42,6 +42,7 @@ import {
   type RenderSide,
 } from './client.js';
 import { siteEstimate, type SiteEstimate } from './estimate.js';
+import { renderLinks, type RenderLinks } from './links.js';
 import { measurePage, type WithoutJs } from './page.js';
 import { selectEmptyRoots, type EmptyRootCandidate } from './empty-root.js';
 import { oncePerUrl, selectRenders, type PickedFor, type RenderCandidate } from './sample.js';
@@ -106,7 +107,16 @@ interface Picked {
 }
 
 export type RenderedPage =
-  | (Picked & { rendered: true; without_js: WithoutJs })
+  | (Picked & {
+      rendered: true;
+      without_js: WithoutJs;
+      /**
+       * The same-site link targets of the two sides (links.ts), for `js_only_navigation`. Absent on an
+       * outcome stored before the render step kept them, and on a page whose links could not be read.
+       * Never copied into `without_js`.
+       */
+      links?: RenderLinks;
+    })
   | (Picked & { rendered: false; reason: NotRenderedReason; detail?: string });
 
 export interface RenderOutcome {
@@ -321,9 +331,16 @@ async function renderPhase(
     } catch {
       return notRendered(p, 'measure_failed');
     }
-    return m.measured
-      ? { ...p, rendered: true, without_js: m.without_js }
-      : notRendered(p, m.reason);
+    if (!m.measured) return notRendered(p, m.reason);
+    // A page whose links cannot be read keeps its measurement and carries no links: it is not
+    // evidence for js_only_navigation, and nothing else reads them.
+    let links: RenderLinks;
+    try {
+      links = renderLinks(staticSide.html, renderedSide.html, p.url);
+    } catch {
+      return { ...p, rendered: true, without_js: m.without_js };
+    }
+    return { ...p, rendered: true, without_js: m.without_js, links };
   }
 
   /**
