@@ -797,8 +797,9 @@ describe('the client report (CC-31 D8)', () => {
       .mockRejectedValueOnce(new Error('x'))
       .mockResolvedValue({ accountId: ACCOUNT, first: true });
     const { h, capture, transport } = reportSetup(reportStore({ markClientReportSent: mark }));
-    await expect(h.clientReport(REPORT)).rejects.toThrow();
-    expect(await h.clientReport(REPORT)).toBe('done');
+    // A MailRetry, which the function's step retries (inngest/mail.ts `guarded` throws it on).
+    await expect(h.clientReport(REPORT)).rejects.toBeInstanceOf(MailRetry);
+    await expect(guarded('test', () => h.clientReport(REPORT))).resolves.toBe('done');
     expect(transport.sent).toHaveLength(1);
     expect(capture.mock.calls).toEqual([['first_client_report_sent', ACCOUNT, {}]]);
   });

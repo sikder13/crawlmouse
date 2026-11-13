@@ -298,7 +298,11 @@ export function reportMailHandlers(d: ReportMailHandlerDeps): ReportMailHandlers
       // The row becomes `sent` once its mail has gone. `done` is a mail an earlier run sent and
       // stopped before it marked: the mark is made now, and a report already marked answers null.
       if (outcome === 'sent' || outcome === 'done') {
-        const marked = await store.markClientReportSent(reportId, mail.now());
+        // A mark that fails is retried with the step: the retry claims `done`, sends nothing, and
+        // marks. Thrown plainly it would end the step, and the mailed report would stay `scheduled`.
+        const marked = await store.markClientReportSent(reportId, mail.now()).catch(() => {
+          throw new MailRetry('mark_sent_failed');
+        });
         if (marked?.first) await capture('first_client_report_sent', marked.accountId, {});
       }
       return outcome;
