@@ -20,8 +20,10 @@ passed to it as `--ticked <id>,<id>` once ticked here.
 ## How a step is switched on, and off
 
 **On.** Vercel → `crawlmouse-001` → Settings → Environment Variables → Production: add the variable
-with the value `1`. Then redeploy production (Deployments → the current production deployment → ⋯ →
-Redeploy, without the build cache option changed). A variable reaches only a deployment built after
+with the value `1`. Then redeploy the deployment already serving production (Deployments → the
+current production deployment → ⋯ → Redeploy, without the build cache option changed), not a newer
+commit: the step then changes the flag and nothing else, and its rollback returns to the same code
+(`docs/specs/v2/26b-dashboard-wiring.md:88`). A variable reaches only a deployment built after
 it is set; the running deployment keeps the environment it was built with. Then resync Inngest (the
 command below) and check that Inngest → Apps → crawlmouse lists the function count `golive:check`
 prints for the step after this one; after step 5 it is the count the step-5 sync row names.
