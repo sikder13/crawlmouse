@@ -58,7 +58,20 @@ export type FounderLogEvent =
   | 'founder.unconfigured'
   | 'founder.event_id_refused'
   | 'founder.key_refused'
-  | 'founder.confirmation_unread';
+  | 'founder.confirmation_unread'
+  | 'founder.stripe_unread';
+
+/**
+ * Stripe could not be read for a change from past_due to a paid state (review N3): whether it is a
+ * first payment is Stripe's to say, so the notice waits for a read. inngest/founder.ts runs the work in
+ * one step, and a step that throws is retried, up to FOUNDER_RETRIES times, before the run fails.
+ */
+export class FounderStripeUnread extends Error {
+  constructor() {
+    super('founder: Stripe was not read for a change from past_due; the notice waits for a read');
+    this.name = 'FounderStripeUnread';
+  }
+}
 
 export type { PaymentRecord };
 type InvoiceFacts = NonNullable<PaymentRecord['invoice']>;
@@ -161,8 +174,10 @@ export interface EntitlementEvent {
 
 /**
  * A payment's notice reads Stripe before its claim: the label (first, returning or neither) and the
- * amount are Stripe's. A recovery from past_due is noticed when it is a first payment; when it is not,
- * or Stripe cannot be read, it answers `no_notice` and claims nothing.
+ * amount are Stripe's. A read that fails is logged (`founder.stripe_unread`). A recovery from
+ * past_due is noticed when it is a first payment, and answers `no_notice`, claiming nothing, when it
+ * is not; with Stripe unread it throws FounderStripeUnread, claiming nothing, for the step to retry.
+ * Any other notice is sent with what was read.
  */
 export async function entitlementNotice(
   d: FounderDeps,
@@ -185,7 +200,9 @@ export async function entitlementNotice(
     try {
       record = await d.payment(subscriptionId);
     } catch {
-      record = null;
+      const recovery = c.kind === 'payment' && c.recovery;
+      d.log('founder.stripe_unread', { kind: c.kind, recovery: recovery ? 1 : 0 });
+      if (recovery) throw new FounderStripeUnread();
     }
   }
   const payment = c.kind === 'payment' ? paymentLabel(record) : undefined;

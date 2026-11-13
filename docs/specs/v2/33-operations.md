@@ -39,7 +39,13 @@ status-page vendor, switching any flag.
   and zero-amount ones (Stripe pays a zero invoice when a trial starts). With none, "First payment";
   with one or more, "Payment (returning)"; with Stripe unread, "Payment". A change from `past_due` to
   a paid state is announced when it is a first payment (a trial whose first charge failed), and not
-  otherwise. The amount is the invoice's `amount_paid` when its status is `paid`, and otherwise its
+  otherwise. A Stripe read that fails is logged as `founder.stripe_unread` (kind and whether it is such
+  a recovery, nothing else). For a recovery the notice then throws `FounderStripeUnread` before
+  claiming anything, and Inngest retries the step (FOUNDER_RETRIES, 4). When the retries are spent
+  the run is marked failed in Inngest's dashboard under `crawlmouse.founder.entitlement`, with that
+  error's message; no notice was mailed or claimed, and the function's log holds one
+  `founder.stripe_unread` line an attempt. Any other notice is sent with Stripe unread
+  (`apps/web/lib/v2/ops/founder.test.ts`, "review N3"). The amount is the invoice's `amount_paid` when its status is `paid`, and otherwise its
   `amount_due`, said to be unpaid, with Stripe's status (`apps/web/lib/v2/ops/founder.test.ts`,
   "review C2" and "review C3").
 - **Sign-ups** are announced once Supabase Auth shows the address confirmed. The sweep reads users
