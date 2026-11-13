@@ -59,6 +59,21 @@ describe('account', () => {
     expect(a!.history.map((h) => h.state)).toEqual(['free']);
   });
 
+  it('names the active owner alone: not an active developer seat, not a removed owner seat', async () => {
+    const owner = `owner-${randomUUID()}@example.com`;
+    const ownerId = await signUp(db, owner);
+    const { accountId } = await personalAccount(db, ownerId);
+    const developer = await signUp(db, `dev-${randomUUID()}@example.com`);
+    const former = await signUp(db, `former-${randomUUID()}@example.com`);
+    await db.query(
+      `insert into public.seats (account_id, user_id, invited_email, role, status, accepted_at, removed_at)
+       values ($1, $2, 'dev@example.com', 'developer', 'active', now(), null),
+              ($1, $3, 'former@example.com', 'owner', 'removed', now(), now())`,
+      [accountId, developer, former],
+    );
+    expect((await store.account(accountId))!.ownerEmail).toBe(owner);
+  });
+
   it('answers null for an account that does not exist, and no host for one with no site', async () => {
     expect(await store.account(randomUUID())).toBeNull();
     const { accountId } = await person('2026-05-01T00:00:00Z');
