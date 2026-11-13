@@ -56,6 +56,10 @@ export function workerInputPaths(root = REPO_ROOT): string[] {
 
 const SHA = /^[0-9a-f]{40}$/;
 
+/** `flyctl tokens create` prints `FlyV1 fm2_…`, which is sent as it is; any other token as Bearer. */
+export const flyAuthorization = (token: string): string =>
+  token.startsWith('FlyV1 ') ? token : `Bearer ${token}`;
+
 interface Machine {
   state?: unknown;
   image_ref?: { tag?: unknown };
@@ -67,7 +71,7 @@ export const releaseProbe =
     const token = deps.env.FLY_READ_TOKEN;
     if (!token) return noToken('FLY_READ_TOKEN');
     const res = await deps.fetch(`${MACHINES_API}/apps/${WORKER_APP}/machines`, {
-      headers: { authorization: `Bearer ${token}` },
+      headers: { authorization: flyAuthorization(token) },
     });
     if (!res.ok) return httpFailed('Fly Machines API', res.status);
     const machines = (await res.json()) as Machine[];

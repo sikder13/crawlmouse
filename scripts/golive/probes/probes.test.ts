@@ -270,6 +270,18 @@ describe('worker', () => {
       (await releaseProbe(() => [])(deps({ fetch: machines([sha]), git: g, env: token }))).status,
     ).toBe('unknown');
   });
+  it('sends a FlyV1 token as given and any other token as a Bearer token', async () => {
+    const flyV1 = ['FlyV1', fakeToken(['fm2'])].join(' ');
+    const plain = fakeToken(['fo1']);
+    for (const [t, header] of [
+      [flyV1, flyV1],
+      [plain, `Bearer ${plain}`],
+    ] as const) {
+      const { fetch, calls } = scriptedFetch(() => json([]));
+      await releaseProbe(() => [])(deps({ fetch, env: { FLY_READ_TOKEN: t } }));
+      expect(calls[0]!.headers.authorization).toBe(header);
+    }
+  });
   it("takes the paths from worker-staging.yml's push trigger", () => {
     expect(workerInputPaths()).toContain('packages/**');
     expect(workerInputPaths()).toContain('pnpm-lock.yaml');
