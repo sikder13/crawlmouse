@@ -34,7 +34,7 @@ import type { AgencyCapture } from '../agency/events';
 import { checkRef } from '../pipeline/public';
 import { hashMailAddress } from './address-hash';
 import { unsubscribeHeaders } from './headers';
-import { reportPauseUrl } from './links';
+import { reportDeclineUrl, reportPauseUrl } from './links';
 import { MailRetry, send, type MailDeps } from './send';
 import type { MailStore, ReportMailStore } from './store';
 import { accountDelete, emailChangeConfirm, emailChangeNotice } from './templates/account-links';
@@ -254,6 +254,7 @@ export function reportMailHandlers(d: ReportMailHandlerDeps): ReportMailHandlers
       if (requestId.length === 0 || requestId.length > REQUEST_ID_MAX) return 'invalid_request';
       const contact = await read(store.confirmationRecipient(siteId));
       if (contact === null) return 'not_found';
+      const key = `report_confirm:${siteId}:${requestId}`;
       // The day's bound, on the mail itself: the hourly run asks with no bound of its own, and a
       // confirmation is account mail, which a complaint does not stop. With no pepper there is no
       // hash to count by, and `send` below answers `unconfigured`.
@@ -264,6 +265,7 @@ export function reportMailHandlers(d: ReportMailHandlerDeps): ReportMailHandlers
             contact.accountId,
             hashMailAddress(mail.pepper, contact.recipient),
             since,
+            key,
           ),
         );
         if (
@@ -274,14 +276,20 @@ export function reportMailHandlers(d: ReportMailHandlerDeps): ReportMailHandlers
           return 'bounded';
         }
       }
+      // Set by `render`, which `send` calls before it asks for the headers.
+      let unsubscribe: Readonly<Record<string, string>> = {};
       return send(mail, {
         kind: 'report_confirm',
         to: contact.recipient,
-        idempotencyKey: `report_confirm:${siteId}:${requestId}`,
+        idempotencyKey: key,
         accountId: contact.accountId,
+        headers: () => unsubscribe,
         render: async () => {
-          const issued = await store.issueConfirmation(siteId, mail.now());
+          const issued = await store.issueConfirmation(siteId, mail.now(), requestId);
           if (issued === null || issued.recipient !== contact.recipient) return null;
+          // "Don't ask me again" is the message's one-click List-Unsubscribe target: a mail
+          // client's unsubscribe stops these requests for good.
+          unsubscribe = unsubscribeHeaders({ url: reportDeclineUrl(issued.token) });
           return reportConfirm({
             token: issued.token,
             agencyName: issued.agencyName,

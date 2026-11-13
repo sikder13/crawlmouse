@@ -295,6 +295,58 @@ describe('after the recipient paused, the sender’s resume', () => {
   });
 });
 
+describe('“Don’t ask me again”, from the mail that asks to confirm', () => {
+  it('the mail carries the link as its one-click unsubscribe; once used, no request for that address and site is mailed again, and the same request retried inside a pause’s window is', async () => {
+    // Another client of the agency, asked for the first time.
+    const site = w.other.id;
+    await db.query(`select public.set_client($1, $2, $3::jsonb)`, [
+      site,
+      w.accountId,
+      JSON.stringify({ client_contact_email: 'declines@client.example' }),
+    ]);
+    await db.query(`select public.set_report_schedule($1, $2, $3::jsonb, $4)`, [
+      site,
+      w.accountId,
+      JSON.stringify({
+        cadence: 'weekly',
+        iso_weekday: 1,
+        time_local: '09:00',
+        timezone: 'UTC',
+        send_when_unchanged: true,
+      }),
+      SAVED,
+    ]);
+    const at = new Date('2026-11-20T10:00:00.000Z');
+    const first = mailer(at);
+    expect(await first.h.reportConfirm(site, 'ask-1')).toBe('sent');
+    const mail = first.transport.sent[0]!;
+    const token = tokenIn(mail.text, '/s/confirm/', 43);
+    // The same token under the decline path, in the body and as the List-Unsubscribe target.
+    expect(tokenIn(mail.text, '/s/decline/', 43)).toBe(token);
+    expect(mail.text).toContain('You can stop these requests for good with one click.');
+    expect(mail.headers).toEqual({
+      'List-Unsubscribe': `<https://crawlmouse.com/s/decline/${token}>`,
+      'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+    });
+
+    expect(
+      (await answer(`select public.decline_report_requests($1, $2) r`, [sha256(token), at]))
+        .outcome,
+    ).toBe('declined');
+    // Nothing asks that address for that site again: the next request, a year on, sends nothing.
+    for (const when of [at, new Date('2027-11-20T10:00:00.000Z')]) {
+      const next = mailer(when);
+      expect(await next.h.reportConfirm(site, `ask-${when.getTime()}`)).toBe('nothing_to_send');
+      expect(next.transport.sent).toEqual([]);
+    }
+    // The confirmation link of the declined mail confirms nothing.
+    expect(
+      (await answer(`select public.confirm_report_recipient($1, $2) r`, [sha256(token), at]))
+        .outcome,
+    ).toBe('gone');
+  });
+});
+
 describe('the pause link’s token', () => {
   const SITE = '50000000-0000-4000-8000-000000000001';
   const OTHER = '50000000-0000-4000-8000-000000000002';
@@ -430,5 +482,39 @@ describe('the confirmation’s daily bound over the real ledger', () => {
     expect(await counts(w.stranger.accountId)).toEqual({ account: 0, address: 1 });
     // A day after the nineteen, they have left the window.
     expect(await handlersAt(hour(24.5)).reportConfirm(site, 'account-next-day')).toBe('sent');
+  });
+
+  it('a message left `sending` counts for another request and not against its own retry', async () => {
+    const site = w.other.id;
+    const address = 'retried@client.example';
+    await db.query(`select public.set_client($1, $2, $3::jsonb)`, [
+      site,
+      w.accountId,
+      JSON.stringify({ client_contact_email: address }),
+    ]);
+    const day = new Date('2027-03-01T09:00:00.000Z');
+    const own = hashMailAddress(PEPPER, address);
+    const claim = (key: string) =>
+      db.query(`select public.claim_email_send($1, 'report_confirm', $2, $3, $4)`, [
+        key,
+        own,
+        w.accountId,
+        day,
+      ]);
+    // One short of the address's bound, each claimed and left `sending`, as a transport that
+    // has not answered leaves it. The last of them is the request retried below.
+    const short = CONFIRM_MAILS_PER_DAY.address - 1;
+    for (let i = 0; i < short; i++) await claim(`report_confirm:${site}:held-${i}`);
+    const counts = async (key: string | null) =>
+      (
+        await db.query<{ c: { address: number } }>(
+          `select public.report_confirm_mail_counts($1, $2, $3, $4) c`,
+          [w.accountId, own, new Date(day.getTime() - 60_000), key],
+        )
+      ).rows[0]!.c.address;
+    // A message being sent is counted; the message asking is not counted against itself.
+    expect(await counts(null)).toBe(short);
+    expect(await counts(`report_confirm:${site}:held-0`)).toBe(short - 1);
+    expect(await counts(`report_confirm:${site}:another`)).toBe(short);
   });
 });

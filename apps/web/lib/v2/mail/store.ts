@@ -140,14 +140,21 @@ export interface ReportMailStore {
   confirmationRecipient(siteId: string): Promise<ReportRecipient | null>;
   /**
    * The confirmation mails the ledger holds as sent or being sent, claimed after `since`: for the
-   * account, and for the address of `addressHash`. Read before another is claimed.
+   * account, and for the address of `addressHash`. Read before another is claimed. `key` is the
+   * message about to be claimed: its own row, left by an attempt being retried, is not counted.
    */
   confirmationsSince(
     accountId: string,
     addressHash: string,
     since: Date,
+    key: string,
   ): Promise<{ account: number; address: number }>;
-  issueConfirmation(siteId: string, now: Date): Promise<IssuedConfirmation | null>;
+  /** `requestId` names the ask: a retry of it is issued again inside a pause's window. */
+  issueConfirmation(
+    siteId: string,
+    now: Date,
+    requestId: string,
+  ): Promise<IssuedConfirmation | null>;
   clientReportRecipient(reportId: string): Promise<ReportRecipient | null>;
   issueClientReport(reportId: string, now: Date): Promise<IssuedClientReport | null>;
   /**

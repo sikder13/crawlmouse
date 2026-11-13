@@ -645,12 +645,17 @@ describe('the confirmation asked of a client’s contact (CC-31 D8)', () => {
     });
     const m = transport.sent[0]!;
     expect(m.to).toBe(CONTACT);
-    expect(m.headers).toEqual({});
+    // A mail client's one-click unsubscribe is "Don't ask me again": the confirmation's own token
+    // under the decline path.
+    expect(m.headers).toEqual({
+      'List-Unsubscribe': `<https://crawlmouse.com/s/decline/${RAW}>`,
+      'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+    });
     expect(m.text).toContain(`https://crawlmouse.com/s/confirm/${RAW}`);
     expect(m.subject).toBe('An agency asks to send you reports about client.example');
     expect(m.text).toContain('The agency’s account is called “Summit Digital”.');
     for (const part of [m.subject, m.text, m.html]) expect(part).not.toContain('contact@');
-    expect(s.issueConfirmation).toHaveBeenCalledWith(SITE, NOW);
+    expect(s.issueConfirmation).toHaveBeenCalledWith(SITE, NOW, 'req-1');
   });
 
   it('the same request twice sends once and mints once; the next request is another mail', async () => {
@@ -718,6 +723,8 @@ describe('the confirmation’s daily bound, on the mail itself (security review 
       ACCOUNT,
       hashMailAddress(PEPPER, CONTACT),
       new Date(NOW.getTime() - 24 * 60 * 60 * 1000),
+      // The message about to be claimed: its own earlier attempt is not counted against it.
+      `report_confirm:${SITE}:req-1`,
     );
   });
 

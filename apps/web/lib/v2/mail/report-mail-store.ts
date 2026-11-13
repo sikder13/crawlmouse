@@ -110,18 +110,25 @@ export function supabaseReportMailStore(deps: ReportMailStoreDeps): ReportMailSt
       return { recipient: site.client_contact_email, accountId: site.account_id };
     },
 
-    async confirmationsSince(accountId, addressHash, since) {
+    async confirmationsSince(accountId, addressHash, since, key) {
       return rpc(
         'report_confirm_mail_counts',
-        { p_account: accountId, p_address_hash: addressHash, p_since: since.toISOString() },
+        {
+          p_account: accountId,
+          p_address_hash: addressHash,
+          p_since: since.toISOString(),
+          p_key: key,
+        },
         z.object({ account: z.number().int(), address: z.number().int() }),
       );
     },
 
-    async issueConfirmation(siteId, now) {
+    async issueConfirmation(siteId, now, requestId) {
+      // The request's id names one ask: a retry of it is issued a link again, where another
+      // request to a recipient who paused is refused within the window.
       const a = await rpc(
         'issue_recipient_confirmation',
-        { p_site: siteId, p_now: now.toISOString() },
+        { p_site: siteId, p_now: now.toISOString(), p_request: requestId },
         Confirmation,
       );
       if (a.outcome !== 'issued') return null;
