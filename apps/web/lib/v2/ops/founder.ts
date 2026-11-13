@@ -15,9 +15,10 @@
  * A claim answers the decision already stored for its key, so a retried event sends what the first
  * claim decided, and the mail ledger's key, `founder_event:<key>`, stops a second send.
  *
- * Every mail goes to FOUNDER_NOTIFY_TO and nowhere else, with no account on its ledger row, so it is
- * not in any customer's mail. Unset or not one plain address: nothing is mailed and the run logs
- * `founder.unconfigured` once. No log line carries an address.
+ * The mail goes to the address `recipient()` answers, FOUNDER_NOTIFY_TO, with a null account on its
+ * ledger row, so it is not in a customer's mail list (founder.test.ts, "mails a first payment …").
+ * Unset or not one plain address: nothing is mailed and the run logs `founder.unconfigured` once. The
+ * log lines written here carry counts, kinds and lengths.
  */
 import type { AccountState } from '@crawlmouse/types/v2';
 import { isPlainAddress } from '../mail/headers';

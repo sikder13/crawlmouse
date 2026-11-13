@@ -1,12 +1,13 @@
 /**
- * The founder's instant notices (CC-33 D3), mailed to FOUNDER_NOTIFY_TO only (lib/v2/ops/founder.ts):
+ * The founder's instant notices (CC-33 D3), mailed to FOUNDER_NOTIFY_TO (lib/v2/ops/founder.ts):
  * one event (`founderEvent`), or the "N more" notice that reports the events held over the hour's bound
  * (`founderOverflow`). A notice names the event in words, the plan, Stripe's amount, the account as its
  * support-console link, the account's first site's host and the owner's address. It holds no card
  * detail: nothing in its input can carry one. An internal account's notice has a `[TEST] ` subject.
  *
  * The host and the owner's address come from outside our code: each is one bounded line, escaped in
- * the HTML and never a link. The only link is the console's, built here from a checked account id.
+ * the HTML and never a link. The link targets are the console's, built here from a checked account
+ * id (founder-event.test.ts reads them with `htmlTargets`).
  */
 import { count, plural } from '../../words';
 import { html, oneLine } from '../escape';

@@ -1,7 +1,7 @@
 /**
  * What the founder notices read and write (CC-33 D3), over the service-role client: the claim, the
  * overflow take and the digest counts (migration 20261115000001 section C), and the reads a notice is
- * built from. Every answer is parsed; a database error throws, so the caller's step is retried.
+ * built from. Answers are parsed with zod; a database error throws, so the caller's step is retried.
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { z } from 'zod';

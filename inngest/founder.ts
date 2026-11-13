@@ -10,7 +10,8 @@
  * - `crawlmouse.founder.digest`, hourly at :07: the daily and weekly digests when due, and the
  *   "N more" notice.
  *
- * Each is one step, retried as a whole: everything in it is keyed, so a retry sends nothing twice.
+ * Each is one step, retried as a whole. The notices and mails in it are keyed by their event, so a
+ * retry claims the same rows and the mail ledger answers `done` for a mail already sent.
  * This package imports nothing from the app.
  */
 import type { AccountState } from '@crawlmouse/types/v2';

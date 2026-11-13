@@ -8,7 +8,7 @@
  *                                                     `unknown` when the history holds no such change
  *   any other state → past_due                        payment failed (the plan of the state left)
  *
- * Every other change reaches the founder in the digest only.
+ * Any other change answers null: the digest reports it.
  */
 import type { AccountState } from '@crawlmouse/types/v2';
 

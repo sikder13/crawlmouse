@@ -9,8 +9,8 @@ export const metadata = {
   alternates: { canonical: '/status' },
 };
 
-// Rendered on each request by the deployment serving it, so the page answering is the one state it
-// reports. Nothing else here is measured, and the page says so.
+// Rendered on each request by the deployment serving it, so the page answering is the state it
+// reports; page.test.tsx fails on any other state word. The page says what it does not measure.
 export const dynamic = 'force-dynamic';
 
 export default function StatusPage() {
