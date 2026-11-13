@@ -59,6 +59,21 @@ describe('the arguments', () => {
 });
 
 describe('step gating', () => {
+  it('passes step 1 before the worker exists: every automatic probe failing does not block it', async () => {
+    const failing: Answers = {};
+    for (const id of Object.keys(PROBES) as ProbeId[])
+      failing[id] = { status: 'fail', reason: 'x' };
+    const r = await run(
+      ['--step', '1', '--ticked', manualThrough(1).join(',')],
+      probesWith(failing),
+    );
+    expect(r.code).toBe(0);
+    expect(
+      (await run(['--step', '2', '--ticked', manualThrough(2).join(',')], probesWith(failing)))
+        .code,
+    ).toBe(1);
+  });
+
   it('passes a step when every row gating it and every earlier step passes', async () => {
     const r = await run(['--step', '2', '--ticked', manualThrough(2).join(',')], allPass());
     expect(r.code).toBe(0);
@@ -88,8 +103,9 @@ describe('step gating', () => {
     expect(r.code).toBe(1);
   });
 
-  it('never counts unknown as pass, at any step', async () => {
-    for (const step of [1, 2, 3, 4, 5]) {
+  it('never counts unknown as pass, at any step it gates', async () => {
+    // vercel-env-step-1 is step 1's exit check, so it gates step 2 and every later one.
+    for (const step of [2, 3, 4, 5]) {
       const r = await run(
         ['--step', String(step), '--ticked', manualThrough(step).join(',')],
         probesWith({
@@ -108,7 +124,7 @@ describe('step gating', () => {
     probes['worker-healthz'] = async () => {
       throw new Error('secret detail from a library');
     };
-    const r = await run(['--ticked', manualThrough(1).join(',')], probes);
+    const r = await run(['--step', '2', '--ticked', manualThrough(2).join(',')], probes);
     expect(r.code).toBe(1);
     expect(r.all).toContain('worker-healthz: unknown (the probe failed (Error))');
     expect(r.all).not.toContain('secret detail');

@@ -48,17 +48,27 @@ describe('the registry', () => {
     expect([...used].sort()).toEqual(Object.keys(PROBES).sort());
   });
 
-  it('has a Vercel variables row and an Inngest sync row for each step', () => {
+  it("has a Vercel variables row for each step's names, step 1's gating step 2", () => {
     for (const s of STEPS) {
       expect(
         PRECONDITIONS.some(
-          (p) => p.check.kind === 'auto' && p.check.probe === `vercel-env-${s}` && p.gates === s,
+          (p) =>
+            p.check.kind === 'auto' &&
+            p.check.probe === `vercel-env-${s}` &&
+            p.gates === (s === 1 ? 2 : s),
         ),
+        String(s),
       ).toBe(true);
+    }
+  });
+
+  it('has an Inngest sync row gating each flag step, and none gating step 1', () => {
+    for (const s of [2, 3, 4, 5]) {
       expect(
         PRECONDITIONS.some((p) => p.id === `inngest-synced-before-step-${s}` && p.gates === s),
       ).toBe(true);
     }
+    expect(PRECONDITIONS.some((p) => p.id === 'inngest-synced-before-step-1')).toBe(false);
   });
 
   it('holds the rows the brief names, at their steps and owners', () => {
@@ -79,6 +89,68 @@ describe('the registry', () => {
     ]) {
       expect(at(id)?.owner, id).toBe('CC-36');
     }
+  });
+});
+
+describe('step 1 can be checked before the worker deploy (review r1 D-B1)', () => {
+  const at = (id: string) => PRECONDITIONS.find((p) => p.id === id);
+
+  it('gates step 1 only on what the owner makes true before deploying, all manual', () => {
+    expect(
+      PRECONDITIONS.filter((p) => p.gates === 1)
+        .map((p) => p.id)
+        .sort(),
+    ).toEqual(['fly-tokens-scoped', 'worker-fly-secrets', 'worker-github-environment']);
+    for (const p of PRECONDITIONS.filter((x) => x.gates === 1)) expect(p.check.kind).toBe('manual');
+  });
+
+  it("moves step 1's exit check to step 2's entry", () => {
+    for (const id of [
+      'worker-healthz',
+      'worker-release',
+      'vercel-env-step-1',
+      'worker-egress-recorded',
+      'worker-uptime-monitor',
+    ]) {
+      expect(at(id)?.gates, id).toBe(2);
+    }
+  });
+
+  it('asks that no other environment holds a Fly token that reaches the production worker (D-B2)', () => {
+    expect(at('fly-tokens-scoped')).toMatchObject({ gates: 1, owner: 'owner' });
+    expect(at('fly-tokens-scoped')?.mustBeTrue).toMatch(
+      /tokens create deploy -a crawlmouse-worker-staging/,
+    );
+    expect(at('fly-tokens-scoped')?.mustBeTrue).toMatch(/`spike`/);
+  });
+});
+
+describe('rows added in review round 1', () => {
+  const at = (id: string) => PRECONDITIONS.find((p) => p.id === id);
+
+  it('pairs the app worker variables with the production worker before step 4', () => {
+    expect(at('worker-variables-paired')).toMatchObject({ gates: 4, owner: 'owner' });
+    expect(at('worker-variables-paired')?.mustBeTrue).toContain(
+      'https://crawlmouse-worker.fly.dev',
+    );
+  });
+
+  it('records Search Console before step 5, and runs IndexNow only after the watch', () => {
+    expect(at('search-console-step-5')).toMatchObject({ gates: 5, owner: 'owner' });
+    for (const id of ['search-console-baseline', 'search-console-step-5']) {
+      expect(at(id)?.mustBeTrue, id).toMatch(
+        /IndexNow is run only after the step's 30-minute watch/,
+      );
+      expect(at(id)?.mustBeTrue, id).not.toMatch(/after the deploy/);
+    }
+  });
+
+  it("says the Stripe probe cannot see the key's account", () => {
+    expect(at('stripe-live-prices')?.why).toMatch(/cannot see which Stripe account/);
+  });
+
+  it('does not require the optional sign-in canary, only its prerequisites when it is set', () => {
+    expect(at('signin-canary')?.mustBeTrue).toMatch(/^SIGNIN_CANARY_TO is unset, or/);
   });
 });
 

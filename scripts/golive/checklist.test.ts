@@ -29,6 +29,11 @@ describe('the render', () => {
     }
   });
 
+  it("says under step 2 that step 1's exit check gates it", () => {
+    const at = block.indexOf('#### Before step 2');
+    expect(block.slice(at, block.indexOf('- [ ]', at))).toContain("Step 1's exit check");
+  });
+
   it('keeps what the document holds outside the markers', async () => {
     const doc = `# Go live\n\nIntro.\n\n${START}\nold\n${END}\n\n## After\n`;
     const out = await renderFile(doc);
