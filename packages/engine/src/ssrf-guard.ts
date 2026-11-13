@@ -2,6 +2,7 @@ import { promises as dns } from 'node:dns';
 import type { LookupAddress, LookupOptions } from 'node:dns';
 import net from 'node:net';
 import type { LookupFunction } from 'node:net';
+import { isReservedAddress, parseAddress } from './address-ranges.js';
 
 export type DnsResolver = (hostname: string) => Promise<string[]>;
 
@@ -17,111 +18,20 @@ const defaultResolver: DnsResolver = async (hostname) => {
 const ALLOWED_SCHEMES = new Set(['http:', 'https:']);
 
 /**
- * Normalize an IPv6 string to its canonical compressed form (e.g., '0:0:0:0:0:0:0:1' -> '::1').
- * Returns the normalized form, or the original string if normalization fails.
- * Uses Node's URL parser which performs RFC 5952 normalization.
- */
-function normalizeIPv6(ip: string): string {
-  try {
-    return new URL(`http://[${ip}]/`).hostname.replace(/^\[|\]$/g, '').toLowerCase();
-  } catch {
-    return ip.toLowerCase();
-  }
-}
-
-/**
- * Returns true for IPs that must not be reached from server-side fetches:
- * - RFC 1918 private (10/8, 172.16/12, 192.168/16)
- * - Loopback (127/8, ::1)
- * - Link-local (169.254/16, fe80::/10) - includes cloud metadata 169.254.169.254
- * - Unspecified (0.0.0.0, ::)
- * - IPv6 ULA (fc00::/7)
- * - CGNAT (100.64.0.0/10) - includes Alibaba Cloud metadata 100.100.100.200
- * - IPv4-mapped IPv6 (::ffff:a.b.c.d) and IPv4-compatible IPv6 (::a.b.c.d) - recursively checked
+ * True for an address a server-side fetch must not reach, and for text that is not an address.
+ *
+ * The text is read into its 4 or 16 bytes once, and the verdict comes from the bytes and the table
+ * in address-ranges.ts (private, loopback, link local, documentation, multicast, reserved, and the
+ * IPv6 prefixes that carry an IPv4 address, which are judged by the address they carry). The text is
+ * refused when Node's `net.isIP` does not read it as an address or when `parseAddress` does not, and
+ * an IPv6 address with a zone (`fe80::1%eth0`) is refused whatever its bytes.
  */
 export function isPrivateOrReservedIp(ip: string): boolean {
-  const family = net.isIP(ip);
-  if (family === 0) return true; // not a valid IP - treat as reserved
-
-  if (family === 4) {
-    const octets = ip.split('.').map(Number);
-    const [a, b] = octets as [number, number, number, number];
-    if (a === 0) return true;                       // 0.0.0.0/8
-    if (a === 10) return true;                      // 10/8
-    if (a === 127) return true;                     // loopback 127/8
-    if (a === 169 && b === 254) return true;        // link-local + cloud metadata
-    if (a === 172 && b >= 16 && b <= 31) return true; // 172.16/12
-    if (a === 192 && b === 168) return true;        // 192.168/16
-    if (a === 100 && b >= 64 && b <= 127) return true; // 100.64/10 CGNAT (Alibaba metadata)
-    return false;
-  }
-
-  // IPv6 - normalize first so non-canonical forms collapse
-  const lower = normalizeIPv6(ip);
-
-  // Loopback (::1) and unspecified (::) after canonical normalization
-  if (lower === '::1' || lower === '::') return true;
-
-  // IPv4-mapped IPv6: ::ffff:0:0/96 (dotted-decimal embedded form after normalization)
-  // After URL normalization, ::ffff:169.254.169.254 becomes ::ffff:a9fe:a9fe (hex pairs).
-  // Match the hex-pair form and extract the embedded v4 address.
-  const ipv4MappedHex = lower.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
-  if (ipv4MappedHex) {
-    const hi = parseInt(ipv4MappedHex[1]!, 16);
-    const lo = parseInt(ipv4MappedHex[2]!, 16);
-    const embedded = `${(hi >> 8) & 0xff}.${hi & 0xff}.${(lo >> 8) & 0xff}.${lo & 0xff}`;
-    return isPrivateOrReservedIp(embedded);
-  }
-  // Also handle the dotted-decimal form in case normalization preserves it (it usually doesn't, but defensive).
-  const ipv4MappedDecimal = lower.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
-  if (ipv4MappedDecimal) {
-    return isPrivateOrReservedIp(ipv4MappedDecimal[1]!);
-  }
-  // IPv4-compatible (deprecated): ::a.b.c.d or ::aabb:ccdd
-  const ipv4CompatDecimal = lower.match(/^::(\d+\.\d+\.\d+\.\d+)$/);
-  if (ipv4CompatDecimal) {
-    return isPrivateOrReservedIp(ipv4CompatDecimal[1]!);
-  }
-  const ipv4CompatHex = lower.match(/^::([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
-  if (ipv4CompatHex) {
-    const hi = parseInt(ipv4CompatHex[1]!, 16);
-    const lo = parseInt(ipv4CompatHex[2]!, 16);
-    // Only treat as v4-compat if the value looks like a real v4 (avoid false positives on real v6).
-    // ::aabb:ccdd as v4-compat would be 0.171.205.221 - we conservatively check.
-    const embedded = `${(hi >> 8) & 0xff}.${hi & 0xff}.${(lo >> 8) & 0xff}.${lo & 0xff}`;
-    if (isPrivateOrReservedIp(embedded)) return true;
-    // Fall through to other checks if not flagged - this is conservative.
-  }
-
-  // NAT64 (64:ff9b::/96) embeds an IPv4 in the low 32 bits, e.g.
-  // 64:ff9b::a9fe:a9fe == 169.254.169.254. Reachable on NAT64-enabled (often
-  // IPv6-only cloud) networks, so check the embedded v4.
-  const nat64 = lower.match(/^64:ff9b::([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
-  if (nat64) {
-    const hi = parseInt(nat64[1]!, 16);
-    const lo = parseInt(nat64[2]!, 16);
-    const embedded = `${(hi >> 8) & 0xff}.${hi & 0xff}.${(lo >> 8) & 0xff}.${lo & 0xff}`;
-    if (isPrivateOrReservedIp(embedded)) return true;
-  }
-  // 6to4 (2002::/16) embeds an IPv4 in the first 32 bits after the prefix, e.g.
-  // 2002:a9fe:a9fe:: == 169.254.169.254. Block when the embedded v4 is private.
-  const sixToFour = lower.match(/^2002:([0-9a-f]{1,4}):([0-9a-f]{1,4})(?::|$)/);
-  if (sixToFour) {
-    const hi = parseInt(sixToFour[1]!, 16);
-    const lo = parseInt(sixToFour[2]!, 16);
-    const embedded = `${(hi >> 8) & 0xff}.${hi & 0xff}.${(lo >> 8) & 0xff}.${lo & 0xff}`;
-    if (isPrivateOrReservedIp(embedded)) return true;
-  }
-
-  // Link-local fe80::/10 - first byte is 0xfe AND second byte is 0x80-0xbf
-  const firstByte = parseInt(lower.slice(0, 2), 16);
-  const secondByte = parseInt(lower.slice(2, 4), 16);
-  if (firstByte === 0xfe && secondByte >= 0x80 && secondByte <= 0xbf) return true;
-
-  // ULA fc00::/7 - first byte 0xfc or 0xfd
-  if (firstByte === 0xfc || firstByte === 0xfd) return true;
-
-  return false;
+  if (net.isIP(ip) === 0) return true;
+  const address = parseAddress(ip);
+  if (address === null) return true;
+  if (address.zone !== null) return true;
+  return isReservedAddress(address.family, address.bytes);
 }
 
 export interface ValidateUrlOptions {
@@ -196,7 +106,7 @@ export function createSafeLookup(resolver: DnsResolver = defaultResolver): Looku
       family?: number,
     ) => void,
   ): void => {
-    const opts: LookupOptions = typeof options === 'number' ? { family: options } : options ?? {};
+    const opts: LookupOptions = typeof options === 'number' ? { family: options } : (options ?? {});
     const host = hostname.replace(/\.$/, '').toLowerCase();
     resolver(host)
       .then((addresses) => {
@@ -207,7 +117,9 @@ export function createSafeLookup(resolver: DnsResolver = defaultResolver): Looku
         for (const addr of addresses) {
           if (isPrivateOrReservedIp(addr)) {
             callback(
-              new Error(`Blocked connection to private or reserved IP (${addr}) for ${host}`) as NodeJS.ErrnoException,
+              new Error(
+                `Blocked connection to private or reserved IP (${addr}) for ${host}`,
+              ) as NodeJS.ErrnoException,
               '',
             );
             return;
@@ -217,7 +129,10 @@ export function createSafeLookup(resolver: DnsResolver = defaultResolver): Looku
         const pool = requested ? addresses.filter((a) => net.isIP(a) === requested) : addresses;
         const chosen = pool.length ? pool : addresses;
         if (opts.all) {
-          callback(null, chosen.map((address) => ({ address, family: net.isIP(address) })));
+          callback(
+            null,
+            chosen.map((address) => ({ address, family: net.isIP(address) })),
+          );
         } else {
           const address = chosen[0]!;
           callback(null, address, net.isIP(address));
