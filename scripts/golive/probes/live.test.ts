@@ -205,6 +205,17 @@ describe('migrations-applied lists the files at the live commit', () => {
     }
   });
 
+  it('is unknown, not pass, when two files at the live commit share a version (review r2 N2)', async () => {
+    const g = git(lsTree(tree('20260101000001_one.sql', '20260101000001_two.sql')));
+    const r = await migrationsProbe()(
+      deps({ fetch: production(LIVE, recorded('20260101000001')).fetch, git: g.run, env: tokens }),
+    );
+    expect(r).toEqual({
+      status: 'unknown',
+      reason: `two files at the live commit ${LIVE.slice(0, 12)} share version 20260101000001`,
+    });
+  });
+
   it('answers unknown without the Supabase token, and sends nothing', async () => {
     const { fetch, calls } = production();
     const r = await migrationsProbe()(deps({ fetch, git: git().run, env: {} }));
