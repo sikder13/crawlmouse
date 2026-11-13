@@ -82,7 +82,7 @@ const withoutSlash = (path: string): string =>
  * `/dashboard/v2` there), and with `withRsc` each also without the `.rsc` suffix of a React Server
  * Components request. Null when the path does not decode.
  */
-function spellings(pathname: string, withRsc: boolean): string[] | null {
+export function spellings(pathname: string, withRsc: boolean): string[] | null {
   let decoded: string;
   try {
     decoded = decodeURIComponent(pathname);
