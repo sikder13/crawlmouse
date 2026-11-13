@@ -3,7 +3,8 @@
  * cancel handler, the reaper and the daily expiry (CC-22b D8) only when V2_PIPELINE=1 in the
  * environment the route module loads with. CC-03's two billing functions follow, only when
  * V2_BILLING=1, then CC-27b's three deletion functions, CC-28's four mail functions and CC-29's
- * deletion of Agency Plus requests, only when V2_CHECKS_PUBLIC=1. CC-28's scheduler tick, alert and summary functions follow, only when both
+ * deletion of Agency Plus requests, only when V2_CHECKS_PUBLIC=1, then CC-33's three founder functions
+ * (and its sign-in canary) when either V2_BILLING=1 or V2_CHECKS_PUBLIC=1. CC-28's scheduler tick, alert and summary functions follow, only when both
  * V2_PIPELINE=1 and V2_CHECKS_PUBLIC=1. With the flags unset the list is v1's four objects, unchanged
  * (functions.test.ts).
  *
@@ -43,6 +44,7 @@ import { scheduleFunctions } from '../monitor/schedule';
 import { mailFunctions } from '../mail/functions';
 import { workerClientFromEnv } from '../../worker-client/client';
 import { monitorFunctions } from '../monitor/functions';
+import { opsFunctions } from '../ops/functions';
 import { CRAWL_USER_AGENT } from './discover';
 import { supabaseEvidenceStore } from './evidence';
 import { expireUnkept, settleKept, type ExpireDeps } from './expire';
@@ -119,7 +121,10 @@ export function inngestFunctions(
   // CC-28's mail handlers and the check_finished listener, and CC-29's contact purge, with
   // V2_CHECKS_PUBLIC=1 only (lib/v2/mail/functions.ts).
   const mail = checksPublicEnabled(env) ? mailFunctions(env) : [];
-  if (!pipelineEnabled(env)) return [...v1, ...billing, ...deletion, ...mail];
+  // CC-33's founder notices, and its sign-in canary, with V2_BILLING=1 or V2_CHECKS_PUBLIC=1
+  // (lib/v2/ops/functions.ts).
+  const ops = opsFunctions(env);
+  if (!pipelineEnabled(env)) return [...v1, ...billing, ...deletion, ...mail, ...ops];
   // Built when a function runs, not when the route loads, so a missing variable cannot keep the
   // route from registering v1's functions.
   return [
@@ -138,6 +143,7 @@ export function inngestFunctions(
     ...billing,
     ...deletion,
     ...mail,
+    ...ops,
     // CC-28's scheduler tick, with V2_CHECKS_PUBLIC=1 as well (lib/v2/monitor/schedule.ts).
     ...(checksPublicEnabled(env) ? scheduleFunctions(env) : []),
     // CC-28's alerts and weekly summary, with V2_CHECKS_PUBLIC=1 as well (lib/v2/monitor/functions.ts).

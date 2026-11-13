@@ -329,6 +329,16 @@ const MAIL_IDS = [
 ];
 const SWEEP = [undefined, '', '0', '-1', '2', '5', '6', '50', '1000', 'abc', '5.5'] as const;
 
+/**
+ * CC-33's founder functions: registered with V2_BILLING=1 or V2_CHECKS_PUBLIC=1. The sign-in canary
+ * is registered only with a sign-in link given, which this list does not pass (lib/v2/ops/functions.ts).
+ */
+const FOUNDER_IDS = [
+  'crawlmouse-crawlmouse.founder.entitlement',
+  'crawlmouse-crawlmouse.founder.sweep',
+  'crawlmouse-crawlmouse.founder.digest',
+];
+
 /** CC-28's alert and summary functions: registered with V2_PIPELINE and V2_CHECKS_PUBLIC both set. */
 const MONITOR_IDS = [
   'crawlmouse-crawlmouse.alert.dispatch',
@@ -381,6 +391,8 @@ describe('no registered function can declare a concurrency limit above the plan 
                 (flag === '1' ? 10 : 5) +
                   (billing === '1' ? 2 : 0) +
                   (pub === '1' ? 3 + MAIL_IDS.length : 0) +
+                  // CC-33's founder functions, with either flag.
+                  (pub === '1' || billing === '1' ? FOUNDER_IDS.length : 0) +
                   // CC-28's scheduler tick, and its alert and summary functions.
                   (pub === '1' && flag === '1' ? 1 + MONITOR_IDS.length : 0),
               );
@@ -394,6 +406,9 @@ describe('no registered function can declare a concurrency limit above the plan 
               const ids = configs.map((c) => c.id);
               for (const id of [...deletionIds, ...MAIL_IDS]) {
                 expect(ids.includes(id), id).toBe(pub === '1');
+              }
+              for (const id of FOUNDER_IDS) {
+                expect(ids.includes(id), id).toBe(pub === '1' || billing === '1');
               }
               if (billing === '1') {
                 expect(configs.map((c) => c.id)).toEqual(
