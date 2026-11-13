@@ -12,8 +12,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
  * A client is an account's host, whichever row holds it. The first two groups bring a client back
  * by each route and ask what a pause and a pause link then do. The third holds two of the
  * migration's calls open at once: PGlite has one backend and cannot. The same interleavings also run
- * against a database built from the migration with one line of each rule taken out, where the
- * fault each rule prevents must show: those are the mutation checks, run whenever the file runs.
+ * against a database built from the migration with each of three rules undone (`unruled`), where
+ * the fault that rule prevents must show: those are the mutation checks, run whenever the file runs.
  */
 
 const URL_ENV = process.env.TRIAL_RACE_DB_URL;
@@ -66,12 +66,19 @@ async function migrated(admin: Sql, name: string, edit: (sql: string) => string 
     (_m, role: string, opts: string) =>
       `do $r$ begin if not exists (select 1 from pg_roles where rolname = '${role}') then create role ${role}${opts}; end if; end $r$;`,
   );
-  await sql.unsafe(shim).simple();
-  for (const f of migrationFiles()) {
-    const text = readMigration(f);
-    await sql.unsafe(f === MIGRATION ? edit(text) : text).simple();
+  try {
+    await sql.unsafe(shim).simple();
+    for (const f of migrationFiles()) {
+      const text = readMigration(f);
+      await sql.unsafe(f === MIGRATION ? edit(text) : text).simple();
+    }
+    return sql;
+  } catch (e) {
+    // A migration that does not apply leaves no database behind on the developer's Postgres.
+    await sql.end();
+    await admin.unsafe(`drop database if exists ${name}`);
+    throw e;
   }
-  return sql;
 }
 
 /** `text` with `from` replaced by `to`, refusing unless `from` is there exactly once. */

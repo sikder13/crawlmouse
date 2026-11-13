@@ -1600,12 +1600,46 @@ describe('what a recipient refused (owner ruling on Q42)', () => {
         const live = { ...c, siteId: again };
         expect(mine(await due(at(60)), live)).toHaveLength(1);
 
+        // Followed to its page, the old link reads as a pause link of that client still.
+        expect(await readLink(oldLink, at(7))).toMatchObject({ outcome: 'pause', host: c.host });
         expect(await pause(oldLink, at(7))).toEqual({ outcome: 'paused' });
         expect(iso((await schedule(again))!.paused_by_recipient_at)).toBe(at(7));
         expect(mine(await due(at(60)), live)).toEqual([]);
         expect((await issuePause(again, at(8))).outcome).toBe('none');
         expect((await schedule(sibling.id))!.paused_by_recipient_at).toBeNull();
       }
+    });
+
+    it('the old report’s pause link leaves a live row whose contact is another address sending, and its page reads gone', async () => {
+      const c = await confirmed('reader@client.example');
+      const oldLink = pauseToken();
+      expect((await issuePause(c.siteId, NOW, oldLink)).outcome).toBe('issued');
+      await db.query(`update public.sites set removed_at = $2 where id = $1`, [c.siteId, at(5)]);
+      const again = randomUUID();
+      await insertRow(db, 'sites', ROWS.sites(again, c.accountId, c.host));
+      await setClient(again, c.accountId, { client_contact_email: 'successor@client.example' });
+      await setSchedule(again, c.accountId, WEEKLY, at(5));
+      const asked = await issueConfirmation(again, at(6), 'successor');
+      expect((await confirm(asked.token as string, at(6))).outcome).toBe('confirmed');
+
+      expect(await readLink(oldLink, at(7))).toEqual({ outcome: 'gone' });
+      expect(await pause(oldLink, at(7))).toEqual({ outcome: 'paused' });
+      expect((await schedule(again))!.paused_by_recipient_at).toBeNull();
+      expect((await issuePause(again, at(8))).outcome).toBe('issued');
+    });
+
+    it('a pause’s window is counted from the latest request to the address on any row of the client', async () => {
+      const c = await pausedClient();
+      expect((await resume(c.siteId, c.accountId, at(2))).outcome).toBe('resumed');
+      expect((await issueConfirmation(c.siteId, at(2), 'on-the-first-row')).outcome).toBe('issued');
+      const again = await readded(c);
+      const day = 2 + WINDOW_DAYS + 1;
+      // The first row's window has passed: one request on the row added again, and it opens another.
+      expect((await issueConfirmation(again, at(day), 'a-month-on')).outcome).toBe('issued');
+      expect(await issueConfirmation(again, at(day, 60_000), 'a-minute-after')).toEqual({
+        outcome: 'none',
+      });
+      expect(await askRefusal(again, at(day, 60_000))).toMatchObject({ refused: 'asked_recently' });
     });
 
     it('the recipient’s confirmation on the row the client came back as ends the pause on each row', async () => {
@@ -1663,26 +1697,51 @@ describe('what a recipient refused (owner ruling on Q42)', () => {
       expect(await refusals(sending)).toEqual([]);
     });
 
-    it('the erasure on one account leaves what that address refused on another account’s row of the host', async () => {
+    it('the erasure on one account, by a report’s recipient (rule 29) and by a contact (rule 30), leaves what that address refused on another account’s row of the host', async () => {
       const email = 'reader@client.example';
-      const c = await confirmed(email);
-      const report = await writeReport(c.siteId, '2026-11-16T09:00:00.000Z', await check(c.siteId));
-      const other = await client();
-      const theirs = randomUUID();
-      await insertRow(db, 'sites', ROWS.sites(theirs, other.accountId, c.host));
-      await setClient(theirs, other.accountId, { client_contact_email: email });
-      await setSchedule(theirs, other.accountId);
-      await decline((await issueConfirmation(theirs, NOW, 'theirs')).token as string, at(1));
+      const otherAccountsRow = async (host: string) => {
+        const other = await client();
+        const theirs = randomUUID();
+        await insertRow(db, 'sites', ROWS.sites(theirs, other.accountId, host));
+        await setClient(theirs, other.accountId, { client_contact_email: email });
+        await setSchedule(theirs, other.accountId);
+        await decline((await issueConfirmation(theirs, NOW, 'theirs')).token as string, at(1));
+        return theirs;
+      };
+      /** A client whose contact paused, so the first account's row holds an entry of its own. */
+      const paused = async () => {
+        const c = await confirmed(email);
+        const report = await writeReport(
+          c.siteId,
+          '2026-11-16T09:00:00.000Z',
+          await check(c.siteId),
+        );
+        const link = pauseToken();
+        await issuePause(c.siteId, NOW, link);
+        await pause(link, at(1));
+        expect(await refusals(c.siteId)).toHaveLength(1);
+        return { ...c, reportId: report.report_id };
+      };
+      // Rule 29: the report's recipient is blanked.
+      const first = await paused();
+      const theirs = await otherAccountsRow(first.host);
       const held = await refusals(theirs);
       expect(held).toHaveLength(1);
-      // Rule 29 and rule 30, on the first account's rows.
       await db.query(`update public.reports set recipient_email = null where id = $1`, [
-        report.report_id,
+        first.reportId,
       ]);
-      await db.query(`update public.sites set client_contact_email = null where id = $1`, [
-        c.siteId,
-      ]);
+      expect(await refusals(first.siteId)).toEqual([]);
       expect(await refusals(theirs)).toEqual(held);
+      // Rule 30: the contact is blanked.
+      const second = await paused();
+      const others = await otherAccountsRow(second.host);
+      const kept = await refusals(others);
+      await db.query(`update public.sites set client_contact_email = null where id = $1`, [
+        second.siteId,
+      ]);
+      expect(await refusals(second.siteId)).toEqual([]);
+      expect(await refusals(others)).toEqual(kept);
+      expect(kept).toHaveLength(1);
     });
 
     it('the erasure takes the address’s entry from each row of the client', async () => {
@@ -1952,8 +2011,10 @@ describe('what a recipient refused (owner ruling on Q42)', () => {
         ]),
       pick.map((n): Step[] => [
         { op: 'pause_link', pick: n },
+        { op: 'report' },
         { op: 'resume' },
         { op: 'ask' },
+        { op: 'pause_link', pick: n },
         { op: 'resume' },
         { op: 'ask' },
       ]),
@@ -1976,7 +2037,9 @@ describe('what a recipient refused (owner ruling on Q42)', () => {
      * refused it: a request to one that declined, a second request inside the window to one that
      * paused, a report to either, and a resume the sender was let do. Beside it, another account
      * holds the same host with the same contact; the last entries say whether anything reached it.
-     * `held` counts the times a refusal was met and kept, so a run that met none is told apart.
+     * `held` counts the times a function refused for the recipient's reason (the request's own
+     * answer to report_ask_refusals, a report to a schedule the recipient paused, a resume answered
+     * `declined` or `asked_recently`), so runs that met none of a kind are told apart.
      */
     async function wrongs(steps: Step[]): Promise<{ wrong: string[]; held: Held }> {
       const out: string[] = [];
@@ -2041,8 +2104,11 @@ describe('what a recipient refused (owner ruling on Q42)', () => {
             if (state[contact].paused) state[contact].askedAt = ms;
             waiting = { token: r.token as string, who: contact };
             mailLinks.push({ token: own, who: contact });
-          } else if (state[contact].declined) held.declined++;
-          else if (inWindow(contact)) held.window++;
+          } else {
+            const refused = (await askRefusal(row, now()))?.refused;
+            if (refused === 'declined') held.declined++;
+            if (refused === 'asked_recently') held.window++;
+          }
         } else if (s.op === 'confirm' && waiting) {
           const r = await confirm(waiting.token, now());
           if (r.outcome === 'confirmed') {
@@ -2059,7 +2125,7 @@ describe('what a recipient refused (owner ruling on Q42)', () => {
             if (state[contact].declined) out.push(`${at_}: a report to an address that declined`);
             if (state[contact].paused) out.push(`${at_}: a report to an address that paused`);
             pauseLinks.push({ token, who: contact });
-          } else if (state[contact].declined || state[contact].paused) held.report++;
+          } else if ((await schedule(row))?.paused_by_recipient_at) held.report++;
         } else if (s.op === 'pause_link' && pauseLinks.length) {
           const l = pauseLinks[s.pick % pauseLinks.length]!;
           if ((await pause(l.token, now())).outcome === 'paused') state[l.who].paused = true;
@@ -2076,7 +2142,7 @@ describe('what a recipient refused (owner ruling on Q42)', () => {
           if (r.outcome === 'resumed') {
             if (state[contact].declined) out.push(`${at_}: a resume for an address that declined`);
             if (inWindow(contact)) out.push(`${at_}: a resume inside the window`);
-          } else if (state[contact].declined || inWindow(contact)) held.resume++;
+          } else if (r.outcome === 'declined' || r.outcome === 'asked_recently') held.resume++;
         }
       }
       const theirs = (await schedule(bystander))!;
@@ -2100,14 +2166,14 @@ describe('what a recipient refused (owner ruling on Q42)', () => {
           for (const k of Object.keys(met) as (keyof Held)[]) met[k] += r.held[k];
           expect(r.wrong).toEqual([]);
         }),
-        { numRuns: 60 },
+        { numRuns: 300 },
       );
       // The runs met each kind of refusal: a property that judged nothing would not pass here.
       for (const k of Object.keys(met) as (keyof Held)[])
         expect([k, met[k] > 0]).toEqual([k, true]);
     }, 300_000);
 
-    it('one walk through each refusal the property judges: a pause’s window on a row that came by an update, a report to a paused address, a decline carried to a row added again', async () => {
+    it('one walk through each refusal the property judges: a report to a paused schedule, a resume inside the window, the window on a row that came by an update, a decline carried to a row added again', async () => {
       const r = await wrongs([
         { op: 'contact', to: 'X' },
         { op: 'schedule' },
@@ -2115,10 +2181,13 @@ describe('what a recipient refused (owner ruling on Q42)', () => {
         { op: 'confirm' },
         { op: 'report' },
         { op: 'pause_link', pick: 0 },
+        { op: 'report' },
+        { op: 'resume' },
+        { op: 'ask' },
+        { op: 'pause_link', pick: 0 },
+        { op: 'resume' },
         { op: 'bring_back', route: 'update' },
         { op: 'ask' },
-        { op: 'ask' },
-        { op: 'report' },
         { op: 'mail_decline', pick: 0 },
         { op: 'bring_back', route: 'insert' },
         { op: 'ask' },

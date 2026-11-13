@@ -1107,29 +1107,34 @@ was kept from a public check. The read of what an address refused (`report_refus
 confirmation, the pause, the decline and the erasure's two triggers go by it
 (`grep -n 'report_client_sites(' infra/supabase/migrations/20261114000002_v2_031_agency.sql`). So
 removing a client and bringing it back, by either route, clears nothing. An address that declined is
-asked nothing on the row the client came back as. A pause's window is counted from the first request
-on that row. The link of a mail sent before the removal, the request's "Don't ask me again" or a
-report's pause link, stops what the live row was about to send. Another account that adds the same
+asked nothing on the row the client came back as. A pause's window is counted from the latest request
+to that address on any row of the client. The link of a mail sent before the removal, the request's
+"Don't ask me again" or a report's pause link, stops what the live row was about to send, pressed in
+the mail client or followed to its page (`read_report_link` reads a removed row's pause link while
+the client has a live row for that address). Another account that adds the same
 host holds none of it, and its requests and reports are not touched. Past `report_refusals_max()`
 entries on a row, the oldest that hold a link's hash and nothing else go; an entry that records a
 pause, a refusal or a request's time is kept whatever the count.
 
 Two tests hold this beside the function tests. A generated sequence of the account's and the
 recipient's actions, on a client whose rows come and go by both routes, is judged at each request,
-report and resume, and counts the refusals it meets so that a run that met none fails
+report and resume, and counts the times a function refused for the recipient's reason, so that
+runs that met none of a kind fail
 (`pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-031-b2-schedules.test.ts`). And on a
 real Postgres, with the product's own `add_site`, `remove_site` and `keep_check` and with two calls
 held open at once (`scripts/db/report-links-race.test.ts`, a step of CI's `db-cli-files` job).
 
 Left as it is. An address written another way (`name+tag@…`) is another address, and is asked as
 one. The functions that write a refusal or a schedule across a client's rows lock those rows in the
-order of their ids before they write (`lock_report_client`), and the account's own functions lock
-their one row and then its schedule, so two of them on one client wait for each other: the race test
+order of their ids before they write (`lock_report_client`); `set_client` and `set_report_schedule`
+lock their one row and then its schedule, and `clear_report_schedule` locks no site row. So two of
+them on one client wait for each other: the race test
 holds an old mail's link against the confirmation of a new one, in both orders of the two rows, and
 shows Postgres ending one as a deadlock with that lock taken out. The erasure's update of a contact
 is not ordered so: it holds the row it blanks before its trigger reaches the client's other rows. On
-a client with two rows, an erasure and a recipient's press at the same instant can be ended by
-Postgres as a deadlock, and the one ended has written nothing. What a refusal leaves for the erasure
+a client with two rows, the erasure and a call that takes the client's rows at the same instant (a
+request, a resume, a confirmation, a pause, a decline) can be ended by Postgres as a deadlock, and
+the one ended has written nothing. What a refusal leaves for the erasure
 is in §11.
 
 Known gaps. The recipient's two link cookies are set for the whole site (`Path=/`, the convention of

@@ -1226,7 +1226,7 @@ begin
    limit 1;
   v_entry := pg_catalog.jsonb_strip_nulls(
     coalesce(v_old, pg_catalog.jsonb_build_object('a', p_key)) || p_patch);
-  if v_old is not null and v_entry = v_old then
+  if v_entry = coalesce(v_old, pg_catalog.jsonb_build_object('a', p_key)) then
     return;
   end if;
   select coalesce(pg_catalog.jsonb_agg(e.v order by e.n), '[]'::jsonb) into v_rest
@@ -1703,7 +1703,9 @@ $$;
 -- that sends them. It changes nothing and returns no address.
 -- Answers {outcome}: 'confirm' or 'pause' with host and account_name; 'gone' for a hash no schedule
 -- holds, a confirmation link issued more than seven days before p_now, a removed site, and a
--- deleted or marked account.
+-- deleted or marked account. A pause link of a removed row still reads 'pause' while the client
+-- has a live row whose contact is that address: pause_report_schedule stops that row's reports,
+-- so the page offers its button as the mail's one-click does.
 create or replace function public.read_report_link(p_token_hash text, p_now timestamptz)
 returns jsonb
 language sql
@@ -1722,7 +1724,16 @@ as $$
       where (rs.pause_token_hash = p_token_hash
              or (rs.recipient_confirm_hash = p_token_hash
                  and rs.recipient_confirm_sent_at > p_now - interval '7 days'))
-        and st.removed_at is null
+        and (st.removed_at is null
+             or (rs.pause_token_hash = p_token_hash
+                 and exists (
+                   select 1
+                     from public.sites live
+                     join public.report_schedules ls on ls.site_id = live.id
+                    where live.id in (select public.report_client_sites(st.id))
+                      and live.removed_at is null
+                      and public.report_refusal_key(live.client_contact_email)
+                            = public.report_refusal_key(st.client_contact_email))))
         and a.deleted_at is null
         and a.deletion_confirmed_at is null),
     pg_catalog.jsonb_build_object('outcome', 'gone'));
