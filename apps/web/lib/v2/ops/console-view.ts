@@ -11,14 +11,20 @@ export type Pill = 'ok' | 'warn' | 'bad' | 'unverified' | 'neutral';
 
 const NONE = '—';
 
-/** `2026-11-12 08:01 UTC`, or a dash for no time. */
-export function when(iso: string | null): string {
+/** `2026-11-12 08:01`, the UTC minute, or a dash for no time: for a column whose header names UTC. */
+export function minute(iso: string | null): string {
   if (iso === null) return NONE;
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return NONE;
   const two = (n: number) => String(n).padStart(2, '0');
   const day = `${d.getUTCFullYear()}-${two(d.getUTCMonth() + 1)}-${two(d.getUTCDate())}`;
-  return `${day} ${two(d.getUTCHours())}:${two(d.getUTCMinutes())} UTC`;
+  return `${day} ${two(d.getUTCHours())}:${two(d.getUTCMinutes())}`;
+}
+
+/** `2026-11-12 08:01 UTC`, or a dash for no time. */
+export function when(iso: string | null): string {
+  const m = minute(iso);
+  return m === NONE ? NONE : `${m} UTC`;
 }
 
 const CUSTOMER = /^cus_[A-Za-z0-9]+$/;
@@ -174,8 +180,8 @@ export function accountView(d: Dossier): AccountView {
         status: c.status,
         pill: CHECK_PILL[c.status] ?? 'neutral',
         failure: c.failure_reason ?? NONE,
-        queued: when(c.queued_at),
-        finished: when(c.finished_at),
+        queued: minute(c.queued_at),
+        finished: minute(c.finished_at),
         rerun:
           c.status === 'failed' &&
           site !== undefined &&

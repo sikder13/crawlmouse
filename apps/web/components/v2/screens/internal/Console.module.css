@@ -74,3 +74,8 @@
 .reason {
   min-width: 180px;
 }
+
+/* A time or an id in a table cell stays on one line. */
+.nowrap {
+  white-space: nowrap;
+}

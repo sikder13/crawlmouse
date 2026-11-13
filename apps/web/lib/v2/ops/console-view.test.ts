@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Dossier } from './console-store';
-import { accountView, resultsView, stripeLink, when } from './console-view';
+import { accountView, minute, resultsView, stripeLink, when } from './console-view';
 
 const A = 'a0000000-0000-4000-8000-000000000001';
 const U = 'b0000000-0000-4000-8000-000000000001';
@@ -176,6 +176,14 @@ describe('when', () => {
   });
 });
 
+describe('minute', () => {
+  it('writes the UTC minute with no zone, for a column whose header names UTC, and nothing as a dash', () => {
+    expect(minute('2026-11-12T08:01:59.999Z')).toBe('2026-11-12 08:01');
+    expect(minute(null)).toBe('—');
+    expect(minute('not a time')).toBe('—');
+  });
+});
+
 describe('stripeLink', () => {
   it("links a customer id to Stripe's dashboard", () => {
     expect(stripeLink('cus_Abc123')).toEqual({
@@ -236,6 +244,14 @@ describe('accountView', () => {
       ['k1', 'one.example', 'failed', 'reaped', true],
       ['k2', 'two.example', 'failed', 'internal', false],
       ['k3', 'one.example', 'finished', '—', false],
+    ]);
+  });
+
+  it('writes the checks list times as UTC minutes, for its "(UTC)" headers', () => {
+    expect(v.checks.map((c) => c.queued)).toEqual([
+      '2026-11-12 08:00',
+      '2026-11-11 08:00',
+      '2026-11-10 08:00',
     ]);
   });
 

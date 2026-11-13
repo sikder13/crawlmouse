@@ -191,31 +191,37 @@ export function ConsoleAccountScreen({ view: v, notice }: ConsoleAccountProps) {
           withheld={v.withheld.checks}
           empty="No checks."
           columns={[
-            { header: 'Queued', mono: true },
+            { header: 'Queued (UTC)', mono: true },
             { header: 'Site' },
             { header: 'Trigger' },
             { header: 'Status' },
             { header: 'Failure' },
-            { header: 'Finished', mono: true, hideOnPhone: true },
+            { header: 'Finished (UTC)', mono: true, hideOnPhone: true },
             { header: 'Check id', mono: true, hideOnPhone: true },
             { header: 'Re-run' },
           ]}
           rows={v.checks.map((c) => ({
             key: c.key,
             cells: [
-              c.queued,
+              <span key="q" className={styles.nowrap}>
+                {c.queued}
+              </span>,
               c.host,
               c.trigger,
               <StatusPill key="s" state={c.pill}>
                 {c.status}
               </StatusPill>,
               c.failure,
-              c.finished,
-              c.id,
+              <span key="f" className={styles.nowrap}>
+                {c.finished}
+              </span>,
+              <span key="i" className={styles.nowrap}>
+                {c.id}
+              </span>,
               c.rerun ? (
                 <ActionForm
                   action={`/api/internal/checks/${c.id}/rerun`}
-                  label={`Re-run the check queued ${c.queued}`}
+                  label={`Re-run the check queued ${c.queued} UTC`}
                 >
                   Re-run
                 </ActionForm>
