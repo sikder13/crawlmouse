@@ -339,6 +339,21 @@ describe('POST /api/report-files/[id]/share', () => {
     expect(h.capture).not.toHaveBeenCalled();
   });
 
+  it('past the account’s bound a form goes back to Reports with the line about links, and no link is made', async () => {
+    const w = await world();
+    as(w.owner);
+    h.over.add('share-link');
+    const res = await shareForm(w.pdf);
+    expect(res.status).toBe(303);
+    const to = new URL(res.headers.get('location')!, 'https://crawlmouse.com');
+    expect([to.pathname, to.searchParams.get('notice')]).toEqual(['/reports', 'links_capped']);
+    expect(Number.isNaN(Date.parse(to.searchParams.get('next') ?? ''))).toBe(false);
+    const { rows } = await h.db.query(`select 1 from public.share_links where report_id = $1`, [
+      w.pdf,
+    ]);
+    expect(rows).toEqual([]);
+  });
+
   it('answers 429 past the account’s bound, which fails closed and is keyed by the account', async () => {
     const w = await world();
     as(w.owner);

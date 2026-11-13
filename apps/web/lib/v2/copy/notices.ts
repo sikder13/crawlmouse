@@ -116,6 +116,8 @@ export const NOTICE_LINES: Record<NoticeCode, (at: string | null) => string> = {
     'Billing cannot be reached right now, so nothing was changed. Try again later.',
   reports_capped: (at) =>
     `This account has made as many reports as it may for now, so none was made.${at ? ` The next can be made ${at}.` : ''}`,
+  links_capped: (at) =>
+    `This account has made as many links as it may for now, so none was made.${at ? ` The next can be made ${at}.` : ''}`,
   fix_not_verified: () =>
     'That check did not verify the fix, so there is no proof to make. Nothing was made.',
   share_made: () =>

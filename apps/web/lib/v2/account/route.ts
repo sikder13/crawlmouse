@@ -141,6 +141,7 @@ export const NOTICE_CODES = [
   'billing_unavailable',
   // making a report (CC-31)
   'reports_capped',
+  'links_capped',
   'fix_not_verified',
   // share links (CC-31)
   'share_made',

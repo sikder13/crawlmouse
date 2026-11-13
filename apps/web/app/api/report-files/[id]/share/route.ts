@@ -7,6 +7,7 @@ import {
   isId,
   meantMethod,
   notFound,
+  noticeTo,
   paywall,
   readBody,
   refuse,
@@ -95,15 +96,13 @@ async function act(req: Request, { params }: Context, method: 'DELETE' | null) {
     { failClosed: true },
   );
   if (!limit.allowed) {
+    // A form's line says links and when the bound ends; `rate_limited`'s line is the fix mail's.
+    if (kind === 'form') return noticeTo(REPORTS_PAGE, 'links_capped', limit.resetAt.toISOString());
     const seconds = Math.max(1, Math.ceil((limit.resetAt.getTime() - Date.now()) / 1000));
-    return refuseTo(
-      req,
-      REPORTS_PAGE,
+    return refuse(
       429,
       'rate_limited',
-      {
-        nextAllowedAt: limit.resetAt.toISOString(),
-      },
+      { nextAllowedAt: limit.resetAt.toISOString() },
       { 'retry-after': String(seconds) },
     );
   }
