@@ -541,6 +541,16 @@ describe('set_client', () => {
     expect(
       await setClient(c.siteId, c.accountId, { client_contact_email: 'FIRST@client.example' }),
     ).toEqual({ outcome: 'saved', contact_changed: false });
+    // An address stored with a capital by another writer, and a call that names no contact: no
+    // change is answered, as none is made.
+    await db.query(
+      `update public.sites set client_contact_email = 'First@client.example' where id = $1`,
+      [c.siteId],
+    );
+    expect(await setClient(c.siteId, c.accountId, { client_name: 'Renamed' })).toEqual({
+      outcome: 'saved',
+      contact_changed: false,
+    });
     expect((await schedule(c.siteId))!.pause_token_hash).not.toBeNull();
 
     expect(
@@ -1185,6 +1195,25 @@ describe('write_client_report and mark_client_report_sent', () => {
     const nextSlot = await writeReport(c.siteId, '2026-11-23T09:00:00.000Z', checkId);
     expect(nextSlot.outcome).toBe('written');
     expect(nextSlot.report_id).not.toBe(first.report_id);
+  });
+
+  it('of two reports marked sent at one instant, the later slot’s is the last one sent', async () => {
+    const c = await confirmed();
+    const [older, newer] = [await check(c.siteId), await check(c.siteId)];
+    const first = await writeReport(c.siteId, '2026-11-16T09:00:00.000Z', older);
+    const second = await writeReport(c.siteId, '2026-11-23T09:00:00.000Z', newer);
+    // Marked in the other order, at the same instant: an id decides nothing.
+    await markSent(second.report_id, at(12));
+    await markSent(first.report_id, at(12));
+    const third = await check(c.siteId);
+    const next = await writeReport(c.siteId, '2026-11-30T09:00:00.000Z', third);
+    const covers = (
+      await db.query<{ covers_check_ids: string[] }>(
+        `select covers_check_ids from public.reports where id = $1`,
+        [next.report_id],
+      )
+    ).rows[0]!.covers_check_ids;
+    expect(covers).toEqual([newer, third]);
   });
 
   it('covers the check the last sent report ended on, before the new one; a report not sent, and the same check, add nothing', async () => {

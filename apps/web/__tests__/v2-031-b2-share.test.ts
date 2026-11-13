@@ -232,6 +232,24 @@ describe('open_share_link', () => {
     expect(await open(tok)).toEqual({ outcome: 'gone' });
   });
 
+  it('is gone for a client that was removed, by the count and by the plain read, and opens again if the site is kept again', async () => {
+    const r = await report();
+    const tok = randomUUID();
+    await create(r.reportId, tok, r.owner.id);
+    await db.query(`update public.sites set removed_at = now() where id = $1`, [r.siteId]);
+    expect(await open(tok)).toEqual({ outcome: 'gone' });
+    expect(
+      (
+        await db.query<{ r: { outcome: string } }>(`select public.read_share_link($1, $2) r`, [
+          sha256(tok),
+          NOW,
+        ])
+      ).rows[0]!.r,
+    ).toEqual({ outcome: 'gone' });
+    await db.query(`update public.sites set removed_at = null where id = $1`, [r.siteId]);
+    expect((await open(tok)).outcome).toBe('open');
+  });
+
   it('is gone for an account marked for deletion, opens again once the mark is cleared, and is gone for a deleted one', async () => {
     const r = await report();
     const tok = randomUUID();
