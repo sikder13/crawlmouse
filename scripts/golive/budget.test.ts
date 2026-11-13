@@ -10,6 +10,7 @@ import {
   checkExecutions,
   cronPerDay,
   finishedFanOut,
+  floorBySwitchOn,
   hobbyVerdict,
   monthlyFloor,
   type CheckShape,
@@ -145,5 +146,19 @@ describe('the month', () => {
 describe('docs/ops/inngest-budget.md', () => {
   it('is the render of the model, byte for byte', async () => {
     expect(readFileSync(DOC_PATH, 'utf8')).toBe(await renderBudget());
+  });
+});
+
+describe('the floor by switch-on step', () => {
+  it('starts schedule and summary only once V2_CHECKS_PUBLIC joins V2_PIPELINE', () => {
+    const [pipeline, door, checks, billing] = floorBySwitchOn();
+    // V2_PIPELINE: v1's 3+3 a day, the reaper 288, the expiry 3.
+    expect(pipeline!.floor).toBe((3 + 3 + 288 + 3) * 31);
+    expect(door!.floor).toBe(pipeline!.floor);
+    // V2_CHECKS_PUBLIC adds the purge 3, the contact purge 2, the schedule and summary ticks 72 each.
+    expect(checks!.floor).toBe(door!.floor + (3 + 2 + 72 + 72) * 31);
+    // V2_BILLING adds the past-due sweep, 72 a day.
+    expect(billing!.floor).toBe(checks!.floor + 72 * 31);
+    expect(billing!.floor).toBe(monthlyFloor());
   });
 });

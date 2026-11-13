@@ -18,6 +18,7 @@ import {
   checkExecutions,
   cronPerDay,
   finishedFanOut,
+  floorBySwitchOn,
   hobbyVerdict,
   monthlyFloor,
   monthlyTotal,
@@ -65,6 +66,14 @@ export async function renderBudget(): Promise<string> {
     '',
     `**Floor: ${n(monthlyFloor())} executions a month.** v1's own crons are ${n(v1Floor())} of it, counted as`,
     "they run with V2_BILLING on (the reconcile's second step); with every flag off they are one step fewer a day.",
+    '',
+    '### The floor after each switch-on step',
+    '',
+    '| After setting | Floor a month |',
+    '| --- | --- |',
+    ...floorBySwitchOn().map(({ flags, floor }) => `| ${flags.join(', ')} | ${n(floor)} |`),
+    '',
+    'A cron registered under two flags (`V2_PIPELINE+V2_CHECKS_PUBLIC`) starts with the second of them.',
     '',
     '## Event functions, per event',
     '',
@@ -115,6 +124,9 @@ export async function renderBudget(): Promise<string> {
     lines.push(`| ${n(checks)} | ${totals.map(n).join(' | ')} |`);
   }
   lines.push(
+    '',
+    'Every figure is a clean run: a step that fails and is retried is one more execution, and an',
+    "`onFailure` handler's run and steps are more again. The totals are a floor under real traffic.",
     '',
     "v1's audits are left out of the table: each is one run and five steps (`crawlmouse.audit`), and",
     'the brief measured 85 audits in production in the 30 days to 2026-11-13 (F2).',

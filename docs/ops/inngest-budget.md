@@ -30,6 +30,17 @@ when a row disagrees, and fails when this file differs from its render.
 **Floor: 16,058 executions a month.** v1's own crons are 186 of it, counted as
 they run with V2_BILLING on (the reconcile's second step); with every flag off they are one step fewer a day.
 
+### The floor after each switch-on step
+
+| After setting                                              | Floor a month |
+| ---------------------------------------------------------- | ------------- |
+| V2_PIPELINE                                                | 9,207         |
+| V2_PIPELINE, V2_ACCOUNT_DOOR                               | 9,207         |
+| V2_PIPELINE, V2_ACCOUNT_DOOR, V2_CHECKS_PUBLIC             | 13,826        |
+| V2_PIPELINE, V2_ACCOUNT_DOOR, V2_CHECKS_PUBLIC, V2_BILLING | 16,058        |
+
+A cron registered under two flags (`V2_PIPELINE+V2_CHECKS_PUBLIC`) starts with the second of them.
+
 ## Event functions, per event
 
 | Function                             | File                         | Registered with              | Trigger                                              | Steps a run                                                                         |
@@ -80,6 +91,9 @@ production, so the shapes stand in for them until they are.
 | 100            | 18,858  | 23,558  | 35,258  |
 | 1,000          | 44,058  | 91,058  | 208,058 |
 | 5,000          | 156,058 | 391,058 | 976,058 |
+
+Every figure is a clean run: a step that fails and is retried is one more execution, and an
+`onFailure` handler's run and steps are more again. The totals are a floor under real traffic.
 
 v1's audits are left out of the table: each is one run and five steps (`crawlmouse.audit`), and
 the brief measured 85 audits in production in the 30 days to 2026-11-13 (F2).

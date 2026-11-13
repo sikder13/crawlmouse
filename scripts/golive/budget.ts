@@ -294,6 +294,29 @@ export function monthlyFloor(rows: readonly FunctionRow[] = FUNCTIONS): number {
   return rows.reduce((sum, f) => sum + cronPerDay(f), 0) * DAYS_PER_MONTH;
 }
 
+/** The flags in switch-on order (docs/ops/go-live.md steps 2–5). */
+export const SWITCH_ON = [
+  'V2_PIPELINE',
+  'V2_ACCOUNT_DOOR',
+  'V2_CHECKS_PUBLIC',
+  'V2_BILLING',
+] as const;
+export type Flag = (typeof SWITCH_ON)[number];
+
+/** Whether a row is registered when exactly `on` are set. */
+export function registered(f: FunctionRow, on: ReadonlySet<Flag>): boolean {
+  return f.registration === 'v1' || f.registration.split('+').every((flag) => on.has(flag as Flag));
+}
+
+/** The monthly floor after each switch-on step: the flags of that step and every step before it. */
+export function floorBySwitchOn(): { flags: readonly Flag[]; floor: number }[] {
+  return SWITCH_ON.map((_, i) => {
+    const flags = SWITCH_ON.slice(0, i + 1);
+    const on = new Set<Flag>(flags);
+    return { flags, floor: monthlyFloor(FUNCTIONS.filter((f) => registered(f, on))) };
+  });
+}
+
 /** v1's crons alone: what production spends today, before any flag. */
 export const v1Floor = (): number => monthlyFloor(FUNCTIONS.filter((f) => f.registration === 'v1'));
 
