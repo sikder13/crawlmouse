@@ -1054,8 +1054,8 @@ the send with `nothing_to_send` when it has nothing to give:
 When the mail has gone (`sent`, or `done` for a mail an earlier run sent and stopped before
 marking) the handler calls `mark_client_report_sent`, and captures `first_client_report_sent` when
 that answers that the report is the account's first. With no `EMAIL_LINK_SECRET` the pause link
-cannot be made, and no report is read, claimed or sent (`unconfigured`, with a log line); the
-confirmation, which carries no pause link, still goes.
+cannot be made, and no report is read, claimed or sent (`unconfigured`, with a log line); nor is a
+confirmation, whose "Don't ask me again" link is made with the same secret.
 
 `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-031-report-mails.test.ts lib/v2/mail/handlers.test.ts lib/v2/mail/recipient-not-in-copy.test.ts lib/v2/mail/templates/report-confirm.test.ts lib/v2/mail/templates/client-report.test.ts lib/v2/pipeline/functions.test.ts`
 and `pnpm --filter @crawlmouse/inngest exec vitest run mail.test.ts`. The first of those runs both
@@ -1080,21 +1080,34 @@ or changing the contact away and back, clears neither:
   then on no resume, "Ask again", save or hourly run sends that address a request for that site,
   and no report: a request that was waiting is withdrawn, and a schedule that was sending is
   paused. The routes answer `declined` / 409 `contact_declined`, and the client's row reads
-  "declined". No function lifts it. A confirmation link is taken as a refusal whatever its age.
-- **A pause, after which the account may ask once.** A request issued to a recipient who paused
-  opens a window (`report_reask_window()`) in which no other request is issued to that address for
-  that site, whatever asks; the request that opened it is issued again if its own mail is retried
-  (`p_request`). A resume inside the window lifts nothing and answers 409 `asked_recently` with when
+  "declined", with no next run. No function of the migration takes it away but the erasure's two
+  triggers. The link is not refused for its age.
+- **A pause, after which the account may ask once in each window.** A request issued to a
+  recipient who paused opens a window (`report_reask_window()`; `REASK_WINDOW_DAYS` in the pages'
+  words) in which no other request is issued to that address for that site, whatever asks; the
+  request that opened it is issued again if its own mail is retried (`p_request`), and a request
+  that names none is refused. When the window has passed the account may ask once more. A resume inside the window lifts nothing and answers 409 `asked_recently` with when
   it may ask (`nextAllowedAt`; the row says the day). The recipient's own confirmation ends it.
 
 One function answers whether a site's contact may be asked, for the issue, the resume, the due list
 and the screen: `report_ask_refusals`. An entry holds the sha256 of the address and no address.
 `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-031-b2-schedules.test.ts __tests__/v2-031-report-mails.test.ts "app/api/report-files/schedules/site/[siteId]/route.test.ts" app/s lib/v2/view/agency-reports.test.ts`
 
+The mail's "Don't ask me again" link is the address's own (`lib/v2/mail/report-decline-token.ts`,
+derived from the site and the address as the pause link is), and its hash is kept with the site's
+entry for that address. So the link of an earlier mail answers after a later request replaced its
+confirmation link, and with the schedule removed. A request is not mailed without it: with no
+`EMAIL_LINK_SECRET` the confirmation is `unconfigured`, as a report is.
+
+A client site removed and added again is a new row, and starts with the list of the row removed
+before it (`sites_carry_report_refusals`), so removing a client clears nothing. A site keeps at
+most `report_refusals_max()` entries; past it the oldest that record no pause and no refusal go.
+
 Left as it is. An address written another way (`name+tag@…`) is another address, and is asked as
-one. A "Don't ask me again" link stops answering when its request is replaced by a later one (the
-later mail carries its own) or the schedule is removed; the pause link of a report keeps answering.
-What a refusal leaves for the erasure is in §11.
+one. The recipient's functions lock the site's row and then its schedule, the order the account's
+own functions lock in, so a pause beside a save waits and does not deadlock; that is held by the
+order of the statements, and no test runs two connections against it. What a refusal leaves for the
+erasure is in §11.
 
 Known gaps. The recipient's two link cookies are set for the whole site (`Path=/`, the convention of
 `lib/v2/account/link-cookie.ts`), since the page and the route that reads the token are under
@@ -1133,10 +1146,13 @@ goes with the address in two places, by triggers, since `erase_rules()` is not r
 erasure blanks `sites.client_contact_email` (rule 30; `set_client`, the account's own writer, keeps
 the entry so a refusal cannot be cleared by changing the contact away and back), and when it blanks
 a report's `recipient_email` (rule 29), which reaches a recipient who is no longer the site's
-contact. **Known gap:** the entry of a contact that declined, was never sent a report and was then
-replaced as the contact by the account is reached by neither rule: its hash stays on the site's row
+contact; both reach every row of the client, the removed one and the one it was added again as.
+**Known gap:** the entry of a contact that was never sent a report and that the account then
+replaced or took away (through `set_client`, which keeps entries) is reached by neither rule: its
+entry, an unsalted sha256 of the address and the hash of its link's token, stays on the site's row
 until the site or the account goes. Closing it is one rule more in `erase_rules()` (questions.md
-Q43). `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-031-b2-schedules.test.ts -t "the erasure"`
+Q43). The two tests write rules 29 and 30 as the erasure does; the erasure's own function was run
+against them by a reviewer (review-r5-scoped.md), not by a test in the tree. `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-031-b2-schedules.test.ts -t "the erasure"`
 
 An erased contact leaves nothing on the schedule either: blanking the address clears the
 schedule's confirmation, the recipient's pause and both link hashes (the pause link's hash is
