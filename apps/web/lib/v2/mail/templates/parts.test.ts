@@ -29,6 +29,9 @@ describe('accountNameText', () => {
     ['a dotted host', 'evil.example'],
     ['a dotted host in another script', 'пример.рф'],
     ['a bare IPv4 address', '10.0.0.1'],
+    ['a host with a full-width dot', 'evil\uFF0Eexample'],
+    ['a host with an ideographic full stop', 'evil\u3002example'],
+    ['a host with a half-width ideographic stop', 'evil\uFF61example'],
     ['a host split by a zero-width space', 'evil\u200bexample'],
     ['a telephone number', 'Call 555 010 9999'],
     ['a telephone number with separators', '+1 (555) 010-99'],
@@ -36,10 +39,22 @@ describe('accountNameText', () => {
     expect(accountNameText(name)).toBeNull();
   });
 
-  it('also refuses an ordinary name with a dot inside a word, and one with an @: stated, not hidden', () => {
-    for (const name of ['Node.js Experts', 'J.Crew Digital', 'Pixel @ Work', 'Smith & Co.Ltd']) {
+  it('also refuses an ordinary name with a dot inside a word, one with an @, and one with seven digits: stated, not hidden', () => {
+    for (const name of [
+      'Node.js Experts',
+      'J.Crew Digital',
+      'Pixel @ Work',
+      'Smith & Co.Ltd',
+      'Route 66 Digital 2020-2024',
+    ]) {
       expect(accountNameText(name)).toBeNull();
     }
+  });
+
+  it('counts seven digits, with or without separators between them, and not six', () => {
+    expect(accountNameText('Studio 555 010')).toBe('Studio 555 010');
+    expect(accountNameText('Studio 555 0109')).toBeNull();
+    expect(accountNameText('Studio 5550109')).toBeNull();
   });
 
   it('has no name for null, an empty one and spaces, and bounds a long one', () => {
@@ -74,8 +89,18 @@ describe('a name a mail client would link, in the mails that show the name', () 
   const HOSTILE = 'Your site is down. Restore it at https://evil.example/login';
 
   it('the confirmation is the mail of an account with no name', () => {
-    const named = reportConfirm({ token: TOKEN, agencyName: HOSTILE, host: 'example.com' });
-    const bare = reportConfirm({ token: TOKEN, agencyName: null, host: 'example.com' });
+    const named = reportConfirm({
+      token: TOKEN,
+      declineToken: TOKEN,
+      agencyName: HOSTILE,
+      host: 'example.com',
+    });
+    const bare = reportConfirm({
+      token: TOKEN,
+      declineToken: TOKEN,
+      agencyName: null,
+      host: 'example.com',
+    });
     expect(named).toEqual(bare);
     expect(named.text).not.toContain('evil.example');
   });

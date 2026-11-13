@@ -1232,6 +1232,11 @@ describe('“Don’t ask me again”: the link, the one-click POST and the pages
     }
     expect((await oneClick('x'.repeat(43))).status).toBe(404);
     expect(await refusals(w.siteId)).toEqual([]);
+    // A value that is not token-shaped is a 404 before the limiter and before any read.
+    h.limits.length = 0;
+    h.log.length = 0;
+    expect((await oneClick('not-a-token')).status).toBe(404);
+    expect([h.limits, h.log]).toEqual([[], []]);
 
     const res = await oneClick(t);
     expect([res.status, await res.text()]).toEqual([200, '']);
@@ -1251,9 +1256,15 @@ describe('“Don’t ask me again”: the link, the one-click POST and the pages
     );
     expect(confirmed.status).toBe(410);
     expect((await schedule(w.siteId))!.recipient_confirmed_at).toBeNull();
-    expect(h.limits.map((l) => l.key.split(':').slice(0, 2).join(':'))).toContain(
-      'report-decline-click:ip',
-    );
+    // Thirty an hour for an address, on the one-click and on the page's press.
+    const bound = (name: string) =>
+      h.limits
+        .filter((l) => l.key.startsWith(`${name}:ip:`))
+        .map((l) => [l.limit, l.windowMs, l.failClosed]);
+    expect(bound('report-decline-click')[0]).toEqual([30, 3_600_000, false]);
+    h.limits.length = 0;
+    await use(`cm_link_report_decline=${t}`);
+    expect(bound('report-decline-use')).toEqual([[30, 3_600_000, false]]);
   });
 
   it('the page’s POST records it with the decline cookie’s token, clears the cookie, and a form goes to the page with the line', async () => {

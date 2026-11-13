@@ -16,11 +16,12 @@ export const ACCOUNT_NAME_MAX = 80;
 /**
  * What a mail client may turn into a link when it meets it in plain text. The rule refuses more
  * than clients link, and says so: `@`, `:`, `/` and `\\` anywhere (an address, a scheme, a path); a
- * dot with a character straight after it (`example.com`, `1.2.3.4`, and also "Node.js"); an
+ * dot, or one of the three dots a host name's are folded from (U+FF0E, U+3002, U+FF61), with a
+ * character straight after it (`example.com`, `1.2.3.4`, and also "Node.js"); an
  * invisible format character, which can split a host a filter would see; and seven digits or more,
  * with or without separators (a telephone number).
  */
-const LINKABLE = /[@:/\\]|\.(?=\S)|\p{Cf}|(?:\d[\s().+-]*){7,}/u;
+const LINKABLE = /[@:/\\]|[.\uFF0E\u3002\uFF61](?=\S)|\p{Cf}|(?:\d[\s().+-]*){7,}/u;
 
 /**
  * An account's name, which its owner typed, as one bounded line; null when it has none, and null
