@@ -35,6 +35,8 @@ export interface AccountViewer {
   tier: Tier;
   gates: Readonly<TierGates>;
   limits: { sites: number; seats: number; competitorsPerSite: number };
+  /** Every account the caller holds an active seat on, this one included: what the switcher lists. */
+  accounts: { id: string; kind: 'personal' | 'agency'; name: string | null }[];
 }
 
 export type ViewerResult =
@@ -82,9 +84,15 @@ function failed(what: string, error: { message: string }): never {
   throw new Error(`viewer: ${what} failed: ${error.message}`);
 }
 
+/**
+ * `chosen` is the account the caller picked in the switcher (viewer-cookie.ts), or null. It is
+ * followed only when it is the account of one of the caller's own active seats; otherwise the caller
+ * acts in their default account, as before the switcher existed.
+ */
 export async function readViewer(
   deps: ViewerDeps,
   user: { id: string; email: string | null },
+  chosen: string | null = null,
 ): Promise<ViewerResult> {
   const seats = await deps.session
     .from('seats')
@@ -93,7 +101,8 @@ export async function readViewer(
     .eq('status', 'active');
   if (seats.error) failed('seats read', seats.error);
   const mine = z.array(SeatRow).parse(seats.data);
-  const seat = mine.length <= 1 ? mine[0] : await defaultSeat(deps, user.id, mine);
+  const picked = chosen === null ? undefined : mine.find((s) => s.account_id === chosen);
+  const seat = picked ?? (mine.length <= 1 ? mine[0] : await defaultSeat(deps, user.id, mine));
   if (seat === null) return { kind: 'ambiguous', userId: user.id };
   if (seat === undefined) return { kind: 'no_account', userId: user.id };
 
@@ -106,8 +115,32 @@ export async function readViewer(
       email: user.email,
       seat: { id: seat.id, role: seat.role, theme: seat.theme },
       ...entitlement,
+      accounts: await seatAccounts(
+        deps.session,
+        mine.map((s) => s.account_id),
+      ),
     },
   };
+}
+
+const SwitcherRow = z.object({
+  id: z.string(),
+  kind: z.enum(['personal', 'agency']),
+  name: z.string().nullable(),
+});
+
+/** The accounts of the caller's active seats, read with the caller's own client. */
+async function seatAccounts(
+  session: SupabaseClient,
+  accountIds: string[],
+): Promise<AccountViewer['accounts']> {
+  const accounts = await session
+    .from('accounts')
+    .select('id, kind, name')
+    .in('id', accountIds)
+    .is('deleted_at', null);
+  if (accounts.error) failed('accounts list', accounts.error);
+  return z.array(SwitcherRow).parse(accounts.data);
 }
 
 export type Entitlement = Pick<AccountViewer, 'account' | 'tier' | 'gates' | 'limits'>;

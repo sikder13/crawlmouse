@@ -45,6 +45,42 @@ import { SettingsScreen } from '../../../components/v2/screens/settings/Settings
 import { DeleteScreen } from '../../../components/v2/screens/settings/DeleteScreen';
 import { TrialEndScreen } from '../../../components/v2/screens/trial-end/TrialEndScreen';
 import { ChangesLogScreen } from '../../../components/v2/screens/changes-log/ChangesLogScreen';
+import { InviteScreen } from '../../../components/v2/screens/invite/InviteScreen';
+import { SeatsScreen } from '../../../components/v2/screens/seats/SeatsScreen';
+import { ProofScreen } from '../../../components/v2/screens/proof/ProofScreen';
+import { RecipientLinkScreen } from '../../../components/v2/screens/share/RecipientLinkScreen';
+import {
+  REPORT_LINK_PREVIEWS,
+  type ReportLinkPreview,
+} from '../../../app/(v2-preview)/v2-preview/_preview/report-link';
+import {
+  PROOF_PREVIEWS,
+  proofPreview,
+  type ProofPreview,
+} from '../../../app/(v2-preview)/v2-preview/_preview/proof';
+import {
+  INVITE_PREVIEWS,
+  SEATS_PREVIEWS,
+  seatsPreview,
+  type InvitePreview,
+  type SeatsPreview,
+} from '../../../app/(v2-preview)/v2-preview/_preview/seats';
+import { ClientScreen } from '../../../components/v2/screens/agency/ClientScreen';
+import { MatrixScreen } from '../../../components/v2/screens/agency/MatrixScreen';
+import { ClientReportsScreen } from '../../../components/v2/screens/agency/ReportsScreen';
+import {
+  AGENCY_PREVIEWS,
+  CLIENT_PREVIEWS,
+  agencyPreview,
+  clientPreview,
+  type AgencyPreview,
+  type ClientPreview,
+} from '../../../app/(v2-preview)/v2-preview/_preview/agency';
+import {
+  CLIENT_REPORTS_PREVIEWS,
+  clientReportsPreview,
+  type ClientReportsPreview,
+} from '../../../app/(v2-preview)/v2-preview/_preview/agency-reports';
 
 export const homeData = homePreview;
 
@@ -109,4 +145,63 @@ export const CC27_ELEMENTS: Record<string, () => React.ReactElement> = {
   '/v2-preview/screens/settings/free': () => <SettingsScreen data={settingsPreview('clean')} />,
   '/v2-preview/screens/settings/delete': () => <DeleteScreen data={deletePreview()} />,
   '/v2-preview/screens/trial-end': () => <TrialEndScreen data={trialEndPreview()} />,
+};
+
+/** CC-31 workstream B2: the proof page, by registry path. */
+export const CC31_PROOF_ELEMENTS: Record<string, () => React.ReactElement> = Object.fromEntries(
+  (Object.keys(PROOF_PREVIEWS) as ProofPreview[]).map((path) => [
+    path,
+    () => <ProofScreen data={proofPreview(path)} />,
+  ]),
+);
+
+/** CC-31 workstream B2: the page a client report's recipient lands on, by registry path. */
+export const CC31_REPORT_LINK_ELEMENTS: Record<string, () => React.ReactElement> =
+  Object.fromEntries(
+    (Object.keys(REPORT_LINK_PREVIEWS) as ReportLinkPreview[]).map((path) => [
+      path,
+      () => <RecipientLinkScreen data={REPORT_LINK_PREVIEWS[path]()} />,
+    ]),
+  );
+
+/** CC-31 workstream A: the Seats screen and the invitation page, by registry path. */
+export const CC31_SEAT_ELEMENTS: Record<string, () => React.ReactElement> = {
+  ...Object.fromEntries(
+    (Object.keys(SEATS_PREVIEWS) as SeatsPreview[]).map((path) => [
+      path,
+      () => <SeatsScreen data={seatsPreview(path)} />,
+    ]),
+  ),
+  ...Object.fromEntries(
+    (Object.keys(INVITE_PREVIEWS) as InvitePreview[]).map((path) => [
+      path,
+      () => <InviteScreen data={INVITE_PREVIEWS[path]()} />,
+    ]),
+  ),
+};
+
+/** CC-31's agency screens: each state of the client matrix, the client page, and client reports. */
+export const CC31_ELEMENTS: Record<string, () => React.ReactElement> = {
+  ...Object.fromEntries(
+    (Object.keys(AGENCY_PREVIEWS) as AgencyPreview[]).map((path) => [
+      path,
+      () => <MatrixScreen data={agencyPreview(path)} />,
+    ]),
+  ),
+  ...Object.fromEntries(
+    (Object.keys(CLIENT_PREVIEWS) as ClientPreview[]).map((path) => [
+      path,
+      () => {
+        const data = clientPreview(path);
+        if (data?.kind !== 'client') throw new Error(`${path} has no client page to render`);
+        return <ClientScreen data={data} />;
+      },
+    ]),
+  ),
+  ...Object.fromEntries(
+    (Object.keys(CLIENT_REPORTS_PREVIEWS) as ClientReportsPreview[]).map((path) => [
+      path,
+      () => <ClientReportsScreen data={clientReportsPreview(path)} />,
+    ]),
+  ),
 };

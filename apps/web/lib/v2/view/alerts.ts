@@ -21,6 +21,7 @@ import {
   type AccountDataset,
   type Viewer,
 } from './account';
+import { roleMay } from '../agency/guard';
 import { action, type ActionView } from './account-actions';
 import { accountShellView, type ShellView } from './account-shell';
 import { accountChanges } from './changes-log';
@@ -80,7 +81,10 @@ export interface RuleRowView {
   /** The verdicts the rule fires on, for the crawler rule; none otherwise. */
   verdicts: Verdict[];
   on: boolean;
-  toggle: ActionView;
+  /** The switch, for a reader whose role may edit the account's alerts; null for one who reads them. */
+  toggle: ActionView | null;
+  /** The rule's state in words, shown where there is no switch. */
+  state: string;
 }
 
 export interface AlertsView {
@@ -274,6 +278,9 @@ export function alertsView(d: AccountDataset, viewer: Viewer): AlertsView {
       );
     });
 
+  // The account's rules are edited by the roles `seat_may('edit_account_alerts')` allows.
+  const canEdit = roleMay(readerRole(v) ?? 'developer', 'edit_account_alerts');
+
   // ── where alerts go ──
   const slack = v.account.integrations.find((i) => i.kind === 'slack');
   const trial = v.account.state === 'pro_trial' || v.account.state === 'agency_trial';
@@ -359,7 +366,10 @@ export function alertsView(d: AccountDataset, viewer: Viewer): AlertsView {
         label: label(r),
         verdicts: r.kind === 'crawler_blocked' ? BLOCKING_VERDICTS : [],
         on: r.enabled,
-        toggle: routeAction('accountAlertRules', label(r), {}, { fields: { rule: r.id } }),
+        toggle: canEdit
+          ? routeAction('accountAlertRules', label(r), {}, { fields: { rule: r.id } })
+          : null,
+        state: r.enabled ? COPY.on : COPY.off,
       })),
       foot: rules.length ? [COPY.override, ...quiet].join(' ') : null,
       empty: rules.length ? null : COPY.rulesEmpty,

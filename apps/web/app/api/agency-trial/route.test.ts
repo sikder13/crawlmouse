@@ -54,6 +54,9 @@ function harness(over: Partial<AgencyTrialDeps> = {}, started?: StartedAccount) 
     capture: async (...args) => {
       calls.events.push(args);
     },
+    firstClient: async (accountId) => {
+      calls.events.push(['first_client_added', accountId, {}]);
+    },
     defer: (work) => void work(),
     now: () => NOW,
     ...over,
@@ -93,6 +96,8 @@ describe('startAgencyTrial', () => {
     expect(calls.stored).toEqual([[ACCOUNT, { url: URL_NEW, at: NOW, interval: 'month' }]]);
     expect(calls.events).toEqual([
       ['plan_chosen', ACCOUNT, { plan: 'agency', interval: 'month' }],
+      // CC-31 Q41: the account was made now, with this site its first client.
+      ['first_client_added', ACCOUNT, {}],
       [
         'trial_started',
         ACCOUNT,
@@ -127,6 +132,7 @@ describe('startAgencyTrial', () => {
     expect(await res.json()).toEqual({ url: URL_OPEN });
     expect(calls.checkout).toEqual([]);
     expect(calls.stored).toEqual([]);
+    // An account an earlier submit made: its first site was that submit's, so no first client now.
     expect(calls.events.map((e) => e[0])).toEqual(['plan_chosen']);
   });
 
@@ -195,7 +201,8 @@ describe('startAgencyTrial', () => {
     expect(res.status).toBe(503);
     expect(await res.json()).toEqual({ error: 'billing_unavailable' });
     expect(calls.stored).toEqual([]);
-    expect(calls.events.map((e) => e[0])).toEqual(['plan_chosen']);
+    // The account and its first site were stored before Checkout was asked for.
+    expect(calls.events.map((e) => e[0])).toEqual(['plan_chosen', 'first_client_added']);
   });
 
   it.each([
@@ -353,7 +360,7 @@ describe('POST /api/agency-trial', () => {
   it.each([
     ['cm_consent=denied', []],
     ['cm_consent_required=1', []],
-    ['cm_consent=granted', ['plan_chosen', 'trial_started']],
+    ['cm_consent=granted', ['plan_chosen', 'first_client_added', 'trial_started']],
   ])('cookie %s: sends %j through the real consent gate', async (cookie, events) => {
     vi.stubEnv('V2_BILLING', '1');
     r.user = USER;
@@ -372,7 +379,7 @@ describe('POST /api/agency-trial', () => {
       }),
     );
     expect(await res.json()).toEqual({ url: URL_NEW });
-    expect(r.after).toHaveLength(2);
+    expect(r.after).toHaveLength(3);
     for (const work of r.after) await work();
     expect(sent()).toEqual(events);
   });

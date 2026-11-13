@@ -142,7 +142,7 @@ describe('Final-Result, the bad site', () => {
           : c.kind === 'a11y'
             ? /^axe /
             : c.kind === 'ruling'
-              ? /^(Owner ruling|CC-26 brief)/
+              ? /^(Owner ruling|CC-26 brief|CC-31 brief)/
               : /^(The fixture|As on Home|The contract)/,
       );
     }

@@ -16,11 +16,12 @@ export const dynamic = 'force-dynamic';
 const BACK = '/alerts';
 
 /**
- * The account's alert rules and Slack destination (CC-27b D7, spec 27 `accountAlertRules`), for any
- * signed-in member of the account the caller acts in: one account-level rule's switch, and setting,
- * replacing or clearing the Slack webhook URL (a paid tier to set one: 402). The membership is read
- * through the caller's own session (`member_role`) before the service-role client is made, and the
- * writes name that account only, so another account's rule is a 404. The answer carries whether a
+ * The account's alert rules and Slack destination (CC-27b D7, spec 27 `accountAlertRules`), for a
+ * member of the account the caller acts in whose role `seat_may` lets edit them (spec 31 §3): one
+ * account-level rule's switch, and setting, replacing or clearing the Slack webhook URL (a paid tier
+ * to set one: 402). Membership and role are read through the caller's own session (`member_role`,
+ * `seat_may`) before the service-role client is made, and the writes name that account only, so
+ * another account's rule is a 404. The answer carries whether a
  * URL is set and its last four characters, never the URL. A form is sent back to Alerts, a refused
  * one with `?error=<code>`.
  */
@@ -48,6 +49,12 @@ async function update(req: Request, method: 'PUT' | null): Promise<Response> {
   const { data: role, error: roleError } = await sb.rpc('member_role', { p_account: account.id });
   if (roleError) throw new Error(`member_role failed: ${roleError.message}`);
   if (typeof role !== 'string') return no(404, 'not_found');
+  const { data: allowed, error: guardError } = await sb.rpc('seat_may', {
+    p_account: account.id,
+    p_action: 'edit_account_alerts',
+  });
+  if (guardError) throw new Error(`seat_may failed: ${guardError.message}`);
+  if (allowed !== true) return no(403, 'role_refused');
 
   const meant = meantMethod(req, body);
   if ((method ?? meant.method) !== 'PUT') return no(405, 'method_not_allowed');

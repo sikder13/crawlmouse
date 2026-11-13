@@ -41,7 +41,8 @@ export async function POST(req: Request, ctx: Context) {
 }
 
 /**
- * Both changes, for the owner or an account manager whose seat covers the site (questions.md Q12).
+ * Both changes, for a seat that covers the site and whose role `seat_may` allows the change (the owner
+ * or an account manager: docs/specs/v2/31-agency.md §3).
  * A site of another account, a malformed id and a removed site are the same 404, decided through the
  * caller's own session before the service-role client is made. What an edit may set is decided with
  * the gates and limits of the site's own account. A form is answered with a 303 (to the site after an
@@ -62,18 +63,18 @@ async function change(req: Request, { params }: Context, method: 'PATCH' | 'DELE
   if (member !== true) return notFound();
   const site = await readSite(sb, id);
   if (site === null || site.removed_at !== null) return notFound();
-  const { data: role, error: roleError } = await sb.rpc('member_role', {
-    p_account: site.account_id,
-  });
-  if (roleError) throw new Error(`member_role failed: ${roleError.message}`);
-  if (role !== 'owner' && role !== 'account_manager')
-    return refuseTo(req, back, 403, 'role_refused');
-  const entitlement = await readEntitlement(sb, site.account_id, new Date());
-  if (entitlement === null) return notFound();
-
   const body = await readBody(req);
   const meant = body === null ? null : meantMethod(req, body);
   const verb = method ?? meant?.method;
+  const { data: allowed, error: guardError } = await sb.rpc('seat_may', {
+    p_account: site.account_id,
+    p_action: verb === 'DELETE' ? 'remove_site' : 'edit_site',
+  });
+  if (guardError) throw new Error(`seat_may failed: ${guardError.message}`);
+  if (allowed !== true) return refuseTo(req, back, 403, 'role_refused');
+  const entitlement = await readEntitlement(sb, site.account_id, new Date());
+  if (entitlement === null) return notFound();
+
   if (verb === 'DELETE') {
     if (!isRemoveConfirmed(meant?.fields ?? {})) {
       return refuseTo(req, back, 400, 'confirm_required');

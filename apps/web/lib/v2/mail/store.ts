@@ -7,6 +7,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Fix } from '@crawlmouse/types/v2';
 import { z } from 'zod';
 import { supabaseFixesStore } from '../account/fixes-store';
+import { INVITED_ROLES, type InvitedRole } from '../agency/seats';
 
 export interface AccountLinkRow {
   kind: string;
@@ -59,6 +60,24 @@ export interface FinishedCheck {
   accountId: string | null;
 }
 
+/** One invitation of an invited seat, read before its mail is claimed. */
+export interface SeatInvitation {
+  /** The invited address: the mail's recipient. */
+  recipient: string;
+  accountId: string;
+  /** `deleted_at` or `deletion_confirmed_at` set on the seat's account. */
+  marked: boolean;
+}
+
+/** What `issue_seat_invite` returns: the link's token, once, and what the mail says. */
+export interface IssuedSeatInvite {
+  token: string;
+  /** The address the link was issued for. */
+  recipient: string;
+  accountName: string | null;
+  role: InvitedRole;
+}
+
 export interface MailStore {
   /** `account_link_recipient`: who a link's email goes to, without minting it; null when it cannot be used. */
   accountLinkRecipient(tokenId: string): Promise<AccountLinkRow | null>;
@@ -71,6 +90,16 @@ export interface MailStore {
   markFixEmailSent(requestId: string, at: Date): Promise<void>;
   /** A check's trigger, status and owner, read from the database (the event's account can be null). */
   finishedCheck(checkId: string): Promise<FinishedCheck | null>;
+  /**
+   * Invitation `seq` of the seat `seatId`, without minting its link; null when the seat is not
+   * invited or `seq` is not its current invitation (accepted, removed, or re-sent since).
+   */
+  seatInvitation(seatId: string, seq: number): Promise<SeatInvitation | null>;
+  /**
+   * `issue_seat_invite`: mints the invitation's link, replacing the one issued before for the seat.
+   * Null when the function returns no row. The token is never logged or stored.
+   */
+  issueSeatInvite(seatId: string, seq: number, now: Date): Promise<IssuedSeatInvite | null>;
   /** An Agency Plus request by id; null when there is no such row. */
   contactRequest(contactId: string): Promise<ContactRequest | null>;
   /** Sets `contact_requests.sent_at` when it is not set. */
@@ -80,6 +109,85 @@ export interface MailStore {
    * ones made more than 30 days before it; the count.
    */
   purgeContacts(now: Date): Promise<number>;
+}
+
+/** Who one of a client report schedule's mails goes to, read before the mail is claimed. */
+export interface ReportRecipient {
+  /** The client's contact address: the mail's recipient. */
+  recipient: string;
+  /** The agency's account. */
+  accountId: string;
+}
+
+/** A confirmation link minted for a site's client contact, and what its mail says. */
+export interface IssuedConfirmation {
+  token: string;
+  /** The token of the address's "Don't ask me again" link: the same in each request mailed to it. */
+  declineToken: string;
+  /** The address the link was minted for. */
+  recipient: string;
+  agencyName: string | null;
+  host: string;
+}
+
+/** A report ready to mail: its two links' tokens, minted now, and the report document's own strings. */
+export interface IssuedClientReport {
+  /** The address the report is for. */
+  recipient: string;
+  agencyName: string | null;
+  host: string;
+  /** The report document's title, the lines under it and its closing line (`ReportDoc`). */
+  headline: string;
+  lines: readonly string[];
+  footer: string;
+  /** The token of the report's share link. */
+  shareToken: string;
+  /** The token of the schedule's pause link. */
+  pauseToken: string;
+}
+
+/**
+ * What the two mails of a client report schedule read and mint (handlers.ts `reportMailHandlers`).
+ * Each mail has a read made before its ledger claim, which mints nothing, and an issue made after
+ * it: an event replayed once its mail is recorded as sent claims nothing and mints nothing. An
+ * attempt that is retried after its claim (a send that failed, or one Resend accepted and the
+ * ledger did not record) renders again, and so issues again: the link of the attempt before stops
+ * working, which matters only where that mail was in fact delivered (spec 31 §6 and §10). An
+ * issue answers null when there is nothing to send any more. No method logs an address or a token.
+ */
+export interface ReportMailStore {
+  confirmationRecipient(siteId: string): Promise<ReportRecipient | null>;
+  /**
+   * The confirmation mails the ledger holds as sent or being sent, claimed after `since`: for the
+   * account, and for the address of `addressHash`. Read before another is claimed. `key` is the
+   * message about to be claimed: its own row, left by an attempt being retried, is not counted.
+   */
+  confirmationsSince(
+    accountId: string,
+    addressHash: string,
+    since: Date,
+    key: string,
+  ): Promise<{ account: number; address: number }>;
+  /**
+   * `requestId` names the ask: a retry of it is issued again inside a pause's window. `recipient`
+   * is the address the mail was claimed for: nothing is issued when it is no longer the contact.
+   */
+  issueConfirmation(
+    siteId: string,
+    now: Date,
+    requestId: string,
+    recipient: string,
+  ): Promise<IssuedConfirmation | null>;
+  clientReportRecipient(reportId: string): Promise<ReportRecipient | null>;
+  issueClientReport(reportId: string, now: Date): Promise<IssuedClientReport | null>;
+  /**
+   * The report's mail has gone: its row becomes `sent`. Answers the account, and whether this is
+   * the first client report it has sent; null for a report already marked, or none.
+   */
+  markClientReportSent(
+    reportId: string,
+    now: Date,
+  ): Promise<{ accountId: string; first: boolean } | null>;
 }
 
 const fail = (what: string, error: { code?: string } | null): never => {
@@ -116,6 +224,19 @@ const RequestRow = z.object({
   account_id: z.string(),
   fix_id: z.string(),
 });
+const InvitedSeatRow = z.object({ invited_email: z.string(), account_id: z.string() });
+const MarkRow = z.object({
+  deleted_at: z.string().nullable(),
+  deletion_confirmed_at: z.string().nullable(),
+});
+const IssuedInvite = z.array(
+  z.object({
+    token: z.string(),
+    email: z.string(),
+    account_name: z.string().nullable(),
+    role: z.enum(INVITED_ROLES),
+  }),
+);
 
 export function supabaseMailStore(sb: SupabaseClient): MailStore {
   const site = async (siteId: string) => {
@@ -232,6 +353,49 @@ export function supabaseMailStore(sb: SupabaseClient): MailStore {
       if (c === null) return null;
       const s = await site(c.site_id);
       return { trigger: c.trigger, status: c.status, accountId: s?.account_id ?? null };
+    },
+
+    async seatInvitation(seatId, seq) {
+      const r = await sb
+        .from('seats')
+        .select('invited_email, account_id')
+        .eq('id', seatId)
+        .eq('status', 'invited')
+        .eq('invite_seq', seq)
+        .maybeSingle();
+      if (r.error) fail('seats', r.error);
+      if (r.data === null) return null;
+      const seat = InvitedSeatRow.parse(r.data);
+      const a = await sb
+        .from('accounts')
+        .select('deleted_at, deletion_confirmed_at')
+        .eq('id', seat.account_id)
+        .maybeSingle();
+      if (a.error) fail('accounts', a.error);
+      if (a.data === null) return null;
+      const account = MarkRow.parse(a.data);
+      return {
+        recipient: seat.invited_email,
+        accountId: seat.account_id,
+        marked: account.deleted_at !== null || account.deletion_confirmed_at !== null,
+      };
+    },
+
+    async issueSeatInvite(seatId, seq, now) {
+      const r = await sb.rpc('issue_seat_invite', {
+        p_seat: seatId,
+        p_seq: seq,
+        p_now: now.toISOString(),
+      });
+      if (r.error) fail('issue_seat_invite', r.error);
+      const row = IssuedInvite.parse(r.data ?? [])[0];
+      if (row === undefined) return null;
+      return {
+        token: row.token,
+        recipient: row.email,
+        accountName: row.account_name,
+        role: row.role,
+      };
     },
 
     async contactRequest(contactId) {

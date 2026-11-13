@@ -52,6 +52,11 @@ export interface AgencyTrialDeps {
     interval: Interval;
   }): Promise<BillingResult>;
   capture: CapturePricingEvent;
+  /**
+   * `first_client_added` for the account (CC-31 D10, ruling Q41): the first site added to an agency
+   * account by any path, and this form stores an agency account's first site.
+   */
+  firstClient(accountId: string): Promise<void>;
   /** Runs work after the response (Next's `after` in the route). */
   defer(work: () => Promise<void>): void;
   now(): Date;
@@ -92,6 +97,9 @@ export async function startAgencyTrial(
   }
   const { accountId } = started;
   deps.defer(() => deps.capture('plan_chosen', accountId, { plan: 'agency', interval }));
+  // `created`: the account was made now, with this site its first. `existing` is the account of an
+  // earlier submit, whose first site that submit stored and reported.
+  if (started.outcome === 'created') deps.defer(() => deps.firstClient(accountId));
 
   const open = await deps.openCheckout(accountId);
   const at = deps.now();

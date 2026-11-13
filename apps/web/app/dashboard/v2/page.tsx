@@ -10,6 +10,7 @@ import { readAccount } from '@/lib/v2/account/pages';
 import { readNextChecks } from '@/lib/v2/account/sites-store';
 import { loadViewer } from '@/lib/v2/account/viewer';
 import { reachedByRewrite } from '@/lib/v2/rewrite-target';
+import { withSwitcher } from '@/lib/v2/view/account-shell';
 import { dashboardView } from '@/lib/v2/view/dashboard';
 import { noticeLine } from '@/lib/v2/copy/notices';
 
@@ -25,7 +26,8 @@ export const metadata = {
 /**
  * The v2 dashboard (CC-26b D8). With V2_CHECKS_PUBLIC on, the middleware rewrites `/dashboard` here;
  * v1's `app/dashboard/page.tsx` imports nothing of it, so neither this page nor its stylesheets are
- * in v1's graph. With the flag off it is a 404, reached or not.
+ * in v1's graph. With the flag off it is a 404, reached or not. It shows the account the caller
+ * acts in, and for a caller with seats on several accounts its rail has the switcher (CC-31 D2b).
  */
 export default async function V2Dashboard({
   searchParams,
@@ -38,7 +40,7 @@ export default async function V2Dashboard({
   const r = await loadViewer();
   if (r.kind === 'signed_out') redirect('/login');
   if (r.kind !== 'viewer') return <AccountStateScreen state={r.kind} />;
-  const { account, seat } = r.viewer;
+  const { account, seat, accounts, tier } = r.viewer;
   const { d, viewer } = await readAccount(await supabaseServer(), account.id, seat.id, new Date());
   // The scheduler's own column (CC-28 D8), for the sites the caller's session read.
   const next = await readNextChecks(
@@ -48,8 +50,9 @@ export default async function V2Dashboard({
   return (
     <LiveActions>
       <DashboardScreen
-        data={dashboardView(d, viewer, next)}
-        notice={noticeLine(await searchParams, account.timezone)}
+        data={withSwitcher(dashboardView(d, viewer, next), accounts, account.id)}
+        // The form a plan's limit refuses here is the add-site form: its notice names the limit.
+        notice={noticeLine(await searchParams, account.timezone, tier)}
       />
     </LiveActions>
   );

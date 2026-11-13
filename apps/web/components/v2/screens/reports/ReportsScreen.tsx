@@ -17,8 +17,15 @@ const T = REPORTS_COPY.table;
 /**
  * Final-Reports: make a report for one site (its picker reloads the card for another), the reports
  * the account has made, and the client reports scheduled. The one orange element is "Make the PDF".
+ * `notice` is the line of a form the routes sent back.
  */
-export function ReportsScreen({ data }: { data: ReportsView }) {
+export function ReportsScreen({
+  data,
+  notice = null,
+}: {
+  data: ReportsView;
+  notice?: { text: string } | null;
+}) {
   const { header, make, made, scheduled } = data;
   return (
     <AccountFrame shell={data.shell}>
@@ -28,6 +35,12 @@ export function ReportsScreen({ data }: { data: ReportsView }) {
           <div className={shared.line}>{header.line}</div>
         </div>
       </header>
+
+      {notice ? (
+        <p className={shared.note} role="status" data-v2-addition="">
+          {notice.text}
+        </p>
+      ) : null}
 
       <Card as="section" className={shared.panel}>
         <CardHead title={make.title} sub={make.sub}>
@@ -49,6 +62,7 @@ export function ReportsScreen({ data }: { data: ReportsView }) {
             </form>
           ) : null}
         </CardHead>
+        {make.gate ? <p className={styles.gate}>{make.gate}</p> : null}
         <div className={styles.options}>
           <div className={styles.option}>
             <div>
@@ -87,6 +101,8 @@ export function ReportsScreen({ data }: { data: ReportsView }) {
         {made.rows.length ? (
           <Table
             label={T.made}
+            rowHeader
+            className={shared.rowHeaded}
             columns={[
               { header: C.made },
               { header: C.site, mono: true },
@@ -105,10 +121,28 @@ export function ReportsScreen({ data }: { data: ReportsView }) {
                 <span key="c" className={styles.muted}>
                   {r.covers}
                 </span>,
-                <div key="a" className={styles.rowActions}>
-                  {r.actions.map((a) => (
-                    <ActionControl key={a.label} action={a} variant="quiet" />
-                  ))}
+                <div key="a" className={styles.rowEnd}>
+                  {r.state ? <span className={styles.muted}>{r.state}</span> : null}
+                  {r.linkUntil ? <span className={styles.muted}>{r.linkUntil}</span> : null}
+                  {r.actions.length ? (
+                    <div className={styles.rowActions}>
+                      {r.actions.map((a) => (
+                        <ActionControl key={a.label} action={a} variant="quiet" />
+                      ))}
+                    </div>
+                  ) : null}
+                  {r.madeLink ? (
+                    <p className={styles.madeLink} data-v2-addition="">
+                      <span>{r.madeLink.label}</span>{' '}
+                      {/* A share link opens the report for whoever holds it. `ph-no-capture` is
+                          the recorder's class for an element it leaves out of a session recording
+                          and of autocapture; `data-ph-mask` is the selector this project's
+                          recorder masks (instrumentation-client.ts). */}
+                      <code className="ph-no-capture" data-ph-mask="">
+                        {r.madeLink.url}
+                      </code>
+                    </p>
+                  ) : null}
                 </div>,
               ],
             }))}
@@ -124,6 +158,8 @@ export function ReportsScreen({ data }: { data: ReportsView }) {
         {scheduled.rows.length ? (
           <Table
             label={T.scheduled}
+            rowHeader
+            className={shared.rowHeaded}
             columns={[
               { header: C.when },
               { header: C.site, mono: true },

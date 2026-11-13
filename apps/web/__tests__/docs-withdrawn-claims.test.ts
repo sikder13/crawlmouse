@@ -69,6 +69,23 @@ interface WithdrawnClaim {
 
 const WITHDRAWN: readonly WithdrawnClaim[] = [
   {
+    text: 'A site keeps at most `report_refusals_max()` entries',
+    withdrawnIn: 'docs/specs/v2/31-agency.md §10, CC-31 review rounds 6 and 7',
+    truth:
+      'An entry that records a pause, a refusal or a request’s time is kept whatever the count, so a ' +
+      'row can hold more; past the bound the oldest entries that hold a link’s hash alone go.',
+    allowedIn: [],
+  },
+  {
+    text: 'The records the screen reads do not say which the account pays',
+    withdrawnIn:
+      'docs/specs/v2/22-audit-flow.md (the Seats foot’s registry entry), CC-31 review round 7',
+    truth:
+      'account.billing_period_months is read from the account’s subscription, and the Seats foot ' +
+      'gives the year’s price of a seat to an account charged by the year.',
+    allowedIn: [],
+  },
+  {
     text: 'the changed and cascaded rows read 0',
     withdrawnIn: 'docs/ops/erasure.md §5, CC-V1FIX review round 1',
     truth:
@@ -387,6 +404,24 @@ const WITHDRAWN: readonly WithdrawnClaim[] = [
     text: 'there is no second click',
     withdrawnIn: 'docs/ops/db-migrations.md §1 step 5, CC-COST (owner ruling Q3)',
     truth: 'While the repository is public, apply waits for the owner to approve production.',
+    allowedIn: [],
+  },
+  // The two below were corrected in d0c2b506 and e6238b12 and registered in the commit after them.
+  {
+    text: 'A form refused with 400, 402, 409 or 429',
+    withdrawnIn: 'docs/specs/v2/31-agency.md §9, CC-31 Tier B review round 2 (n7)',
+    truth:
+      'POST /api/reports sends a form back to /reports for either of its two 400s, its 402, its ' +
+      '403, its 409 and its 429; no request reaches the 403 while each role may export_report.',
+    allowedIn: [],
+  },
+  {
+    text: "says what holds a schedule's reports where something does",
+    withdrawnIn: 'docs/specs/v2/31-agency.md §8, CC-31 Tier B review round 2 (n6)',
+    truth:
+      'The matrix’s schedule cell says three holds its records show: no contact, the Agency trial ' +
+      'for a contact that is not the owner’s address, and a pause by the recipient. A contact ' +
+      'that has not confirmed is not in those records, and the cell says nothing of it.',
     allowedIn: [],
   },
   {

@@ -18,7 +18,7 @@ import shared from '../account/AccountScreen.module.css';
 import styles from './SiteScreen.module.css';
 
 /** One grade, as the locked page draws it: the letter, "79 · −1 since Thu", and its parts. */
-function GradeHalf({ g }: { g: GradeCardView }) {
+export function GradeHalf({ g }: { g: GradeCardView }) {
   return (
     <div className={styles.half}>
       <div className={styles.label}>{g.label}</div>

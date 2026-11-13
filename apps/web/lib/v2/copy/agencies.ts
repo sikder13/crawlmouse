@@ -9,8 +9,8 @@
  * is named. Changes from the artboard, and why:
  * - The h1 no longer promises "an audit with your name on it": branded audits are not built, and a
  *   heading is the one place a "coming" mark cannot sit. It says what Agency does today.
- * - The hero note drops "5 seats": inviting a seat is not built, and the comparison table, where
- *   seats are marked, says it.
+ * - The hero note drops "5 seats": it was dropped while inviting a seat was not built. CC-31 built
+ *   it; the note was left as it is, and the comparison table gives the seats.
  * - The one-pager preview drops the competitor's grade: competitors are stored but not measured.
  */
 import type { CapabilityKey } from '../view/agencies';

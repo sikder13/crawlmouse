@@ -168,7 +168,8 @@ describe("agencyTrial's session", () => {
             trial_period_days: 14,
             trial_settings: { end_behavior: { missing_payment_method: 'cancel' } },
           },
-          success_url: `${ORIGIN}/settings/plan?checkout=done`,
+          // The agency's workspace, where the new account is one press away (CC-31 Q8).
+          success_url: `${ORIGIN}/agency`,
           cancel_url: `${ORIGIN}/agency-trial`,
         },
       ],

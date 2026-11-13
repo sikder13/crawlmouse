@@ -11,6 +11,8 @@ const OWNER_EMAIL = 'owner@example.com';
 const h = vi.hoisted(() => ({
   user: null as { id: string; email: string } | null,
   role: 'owner' as string | null,
+  /** The kind of the account the viewer acts in. */
+  kind: 'personal' as 'personal' | 'agency',
   log: [] as string[],
   saved: [] as { accountId: string; columns: Record<string, unknown> }[],
   deletions: [] as unknown[],
@@ -46,7 +48,9 @@ vi.mock('@/lib/supabase/admin', () => ({
 }));
 vi.mock('@/lib/v2/account/viewer', () => ({
   loadViewer: async () =>
-    h.user ? { kind: 'viewer', viewer: { account: { id: ACCOUNT } } } : { kind: 'signed_out' },
+    h.user
+      ? { kind: 'viewer', viewer: { account: { id: ACCOUNT, kind: h.kind } } }
+      : { kind: 'signed_out' },
 }));
 vi.mock('@/lib/v2/account/profile', async (orig) => ({
   ...(await orig<typeof import('@/lib/v2/account/profile')>()),
@@ -93,6 +97,7 @@ beforeEach(() => {
   vi.stubEnv('V2_CHECKS_PUBLIC', '1');
   h.user = { id: '00000000-0000-4000-8000-0000000000b1', email: OWNER_EMAIL };
   h.role = 'owner';
+  h.kind = 'personal';
   h.log = [];
   h.saved = [];
   h.deletions = [];
@@ -180,6 +185,24 @@ describe('PATCH: the profile', () => {
     ]);
   });
 
+  it('acting in an agency account: a changed address is 409 personal_account_only and nothing is saved', async () => {
+    h.kind = 'agency';
+    const res = await (
+      await route()
+    ).PATCH(json('PATCH', { name: 'Studio', newEmail: 'new@example.com' }));
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ code: 'personal_account_only' });
+    expect(h.changes).toEqual([]);
+    expect(h.saved).toEqual([]);
+  });
+
+  it('acting in an agency account: its name is saved on that account', async () => {
+    h.kind = 'agency';
+    const res = await (await route()).PATCH(json('PATCH', { name: 'Summit Digital' }));
+    expect(res.status).toBe(200);
+    expect(h.saved).toEqual([{ accountId: ACCOUNT, columns: { name: 'Summit Digital' } }]);
+  });
+
   it('saves nothing when the owner’s email change is refused', async () => {
     h.changeAnswer = { ok: false, status: 429, code: 'rate_limited' };
     const res = await (
@@ -222,6 +245,14 @@ describe('DELETE: the deletion request', () => {
     expect(h.deletions).toEqual([
       { userId: h.user!.id, accountId: ACCOUNT, hostname: 'shop.example', ip: '203.0.113.9' },
     ]);
+  });
+
+  it('acting in an agency account: deletion is 409 personal_account_only, with nothing handed on', async () => {
+    h.kind = 'agency';
+    const res = await (await route()).DELETE(json('DELETE', { hostname: 'shop.example' }));
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ code: 'personal_account_only' });
+    expect(h.deletions).toEqual([]);
   });
 
   it.each(['account_manager', 'developer'])('refuses a %s with 403', async (role) => {

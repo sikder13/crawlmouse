@@ -26,7 +26,9 @@ import {
   siteFromRow,
 } from '../pipeline/rows';
 import type { CheckReader } from '../pipeline/types';
-import { accountFromRow, alertRuleFromRow, reportFromRow, seatFromRow } from './rows';
+import { sitesInScope } from '../agency/guard';
+import { agencyTrialConsentAt } from './trial-consent';
+import { accountFromRow, alertRuleFromRow, reportFromRow, seatsFromRows } from './rows';
 
 export interface DatasetDeps {
   /** The caller's own client: row security applies. */
@@ -88,7 +90,7 @@ export async function loadAccountDataset(
   );
   if (accountRow === null) throw new Error(`loadAccountDataset: no account ${accountId}`);
 
-  const [seatRows, scopeRows, keyRows, brand, liveSites, accountRules] = await Promise.all([
+  const [seatRows, scopeRows, keyRows, brand, siteIds, accountRules] = await Promise.all([
     rows(
       'seats read',
       session
@@ -106,10 +108,7 @@ export async function loadAccountDataset(
       'agency_brands read',
       session.from('agency_brands').select(BRAND_COLUMNS).eq('account_id', accountId).maybeSingle(),
     ),
-    rows(
-      'sites read',
-      session.from('sites').select('id').eq('account_id', accountId).is('removed_at', null),
-    ),
+    sitesInScope(session, accountId),
     rows(
       'alert_rules read',
       session
@@ -142,8 +141,8 @@ export async function loadAccountDataset(
       .maybeSingle(),
   );
   if (ownerUser === null) throw new Error(`loadAccountDataset: no user for ${accountId}'s owner`);
+  const trialConsentAt = await agencyTrialConsentAt(admin, accountRow);
 
-  const siteIds = liveSites.map((s) => s.id as string);
   const some = siteIds.length > 0;
   const [siteRows, schedules, checkRows, fixRows, changeRows, siteRules, links] = some
     ? await Promise.all([
@@ -175,8 +174,6 @@ export async function loadAccountDataset(
     : [];
 
   const scheduleOf = new Map(schedules.map((r) => [r.site_id, r]));
-  const sitesOf = (seatId: unknown) =>
-    scopeRows.filter((r) => r.seat_id === seatId).map((r) => r.site_id as string);
   const asOf = now.toISOString();
   return {
     provenance: 'measured',
@@ -188,11 +185,12 @@ export async function loadAccountDataset(
         account: accountRow,
         email: ownerUser.email as string,
         subscription,
+        trialConsentAt,
         apiKeys: keyRows,
         brand,
       }),
     ],
-    seats: seatRows.map((s) => seatFromRow(s, sitesOf(s.id))),
+    seats: seatsFromRows(seatRows, scopeRows),
     sites: siteRows.map((s) =>
       siteFromRow({ ...s, report_schedules: scheduleOf.get(s.id) ?? null }),
     ),

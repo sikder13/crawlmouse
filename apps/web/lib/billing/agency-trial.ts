@@ -13,6 +13,9 @@ import { startCheckout, type BillingResult, type Buyer, type CheckoutDeps } from
 import type { RequestBody } from './request-body';
 import { TRIAL_DAYS, trialRefusal } from './state-machine';
 
+/** Where the Agency trial's Checkout lands: the agency's workspace. */
+export const AGENCY_HOME = '/agency';
+
 const AgencyTrialBody = z.strictObject({
   interval: z.enum(['month', 'year']),
   accountId: z.uuid(),
@@ -39,6 +42,10 @@ export async function agencyTrial(
     plan: 'agency',
     interval: input.interval,
     cancelPath: '/agency-trial',
+    // The trial's account is a second one (CC-29), and Settings shows the account the person acts
+    // in, which is still their personal one. `/agency` is the workspace: it offers "Open <agency>",
+    // the switch, to a person who holds a seat on an agency and is acting elsewhere (CC-31 Q8).
+    successPath: AGENCY_HOME,
     trialDays: TRIAL_DAYS,
   });
 }

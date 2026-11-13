@@ -1,5 +1,5 @@
 import { test, expect, type Page } from './pw';
-import { HEIGHT, LAYOUT_WIDTHS, ORANGES, PREVIEWS, openPreview } from './pages';
+import { HEIGHT, LAYOUT_WIDTHS, ORANGES, PREVIEWS, openPreview, ownsPath } from './pages';
 import { PANELS } from '../../apps/web/lib/v2/map-layout';
 
 /**
@@ -499,7 +499,7 @@ const RUNNING = [
 for (const width of [960, 1024, 1200, 1280]) {
   test.describe(`the map at ${width}px`, () => {
     test.use({ viewport: { width, height: 900 } });
-    for (const p of [...PREVIEWS, ...RUNNING]) {
+    for (const p of [...PREVIEWS, ...RUNNING.filter((r) => ownsPath(r.path))]) {
       test(`${p.name}: no panel covers a key page on the map`, async ({ page }) => {
         await openPreview(page, p.path);
         const map = page.locator('svg[data-v2-map][role="img"]');

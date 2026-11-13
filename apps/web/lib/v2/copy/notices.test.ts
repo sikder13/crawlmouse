@@ -1,6 +1,7 @@
 /** The line a page shows when a form posted from it was refused (CC-26b follow-up). */
 import { describe, expect, it } from 'vitest';
 import { NOTICE_CODES } from '../account/route';
+import { gateMessage, sitesFullMessage } from '../agency/gates';
 import { NOTICE_LINES, noticeLine } from './notices';
 
 const NEXT = '2026-11-10T13:30:00.000Z';
@@ -86,6 +87,15 @@ describe('noticeLine', () => {
       'rate_limited',
       'Too many emails were asked for in a short time, so nothing was recorded. Ask again from Tue 13:30.',
     ],
+    [
+      'reports_capped',
+      'This account has made as many reports as it may for now, so none was made. The next can be made Tue 13:30.',
+    ],
+    [
+      'fix_not_verified',
+      'That check did not verify the fix, so there is no proof to make. Nothing was made.',
+    ],
+    ['extras_in_trial', 'Seats and sites are bought once the trial has become the plan.'],
     ['invalid', 'That request was not understood, so nothing was changed.'],
     ['method_not_allowed', 'That form could not be sent that way. Reload the page and try again.'],
   ] as const)('%s', (code, line) => {
@@ -94,6 +104,17 @@ describe('noticeLine', () => {
 
   it('a line is written for every notice code, and only for those', () => {
     expect(Object.keys(NOTICE_LINES).sort()).toEqual([...NOTICE_CODES].sort());
+  });
+
+  it('a contact asked since its pause: the day it can be asked again is a date in the account’s zone, not a weekday and a time', () => {
+    // 03:00 UTC on Mon 14 Dec is Sunday evening in Indianapolis.
+    const next = '2026-12-14T03:00:00.000Z';
+    const line = (zone: string) => noticeLine({ notice: 'asked_recently', next }, zone)!.text;
+    expect(line('America/Indiana/Indianapolis')).toBe(
+      'This contact paused the reports and has been asked to confirm again since. A contact that paused is asked at most once in 30 days. It can be asked again from Sun 13 Dec.',
+    );
+    expect(line('UTC')).toContain('from Mon 14 Dec.');
+    expect(noticeLine({ notice: 'asked_recently' }, 'UTC')!.text).not.toContain('from');
   });
 
   it('a cap with no readable time leaves the time out rather than guess', () => {
@@ -121,7 +142,32 @@ describe('noticeLine', () => {
     ).toMatch(/run Tue 08:30\.$/);
   });
 
+  it('on a page that names the account’s tier, a refused add is told the sites its plan keeps and the plan that lifts it', () => {
+    const line = (tier: 'free' | 'pro' | 'agency') =>
+      noticeLine({ notice: 'upgrade_required' }, ZONE, tier)!.text;
+    expect(line('free')).toBe(gateMessage('sites', 'free'));
+    expect(line('pro')).toBe(gateMessage('sites', 'pro'));
+    expect(line('agency')).toBe(sitesFullMessage('agency'));
+    // The sentences today, written out once: the second site on Free, the sixth on Pro.
+    expect(line('free')).toBe('Free keeps 1 site. Pro keeps 5 sites: Pro is $19 a month.');
+    expect(line('pro')).toBe('Pro keeps 5 sites. Agency keeps 25 sites: Agency is $99 a month.');
+  });
+
+  it('the tier changes no other line, and a page that names none keeps the general one', () => {
+    for (const code of NOTICE_CODES.filter((c) => c !== 'upgrade_required')) {
+      expect(noticeLine({ notice: code, next: NEXT }, ZONE, 'free')).toEqual(
+        noticeLine({ notice: code, next: NEXT }, ZONE),
+      );
+    }
+    expect(noticeLine({ notice: 'upgrade_required' }, ZONE)!.text).toBe('That needs a paid plan.');
+  });
+
+  it('the general line for a refused upgrade holds no price and no limit', () => {
+    expect(NOTICE_LINES.upgrade_required(null)).not.toMatch(/\d/);
+  });
+
   it('an unknown notice, or none, shows nothing', () => {
+    expect(noticeLine({ notice: '<script>' }, ZONE, 'free')).toBeNull();
     expect(noticeLine({ notice: '<script>' }, ZONE)).toBeNull();
     expect(noticeLine({ notice: 'toString' }, ZONE)).toBeNull();
     expect(noticeLine({}, ZONE)).toBeNull();

@@ -176,7 +176,9 @@ export function planCopy(interval: Interval, proTrial: boolean): Record<Tier, Pl
       tag: `${TRIAL_DAYS}-day trial, card required`,
       description: {
         text: 'Agencies reporting to clients under their own name.',
-        capabilities: ['client_reports'],
+        // A client report names the agency in its mail; the page it opens, the sender and the
+        // domain are ours (`client_report_page`), so the sentence is marked until that is built.
+        capabilities: ['client_reports', 'client_report_page'],
       },
       rows: [
         {

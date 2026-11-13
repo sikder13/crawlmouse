@@ -8,6 +8,7 @@ import { checksPublicEnabled } from '@/lib/auth/flags';
 import { supabaseServer } from '@/lib/supabase/server';
 import { readAccount } from '@/lib/v2/account/pages';
 import { loadViewer } from '@/lib/v2/account/viewer';
+import { withSwitcher } from '@/lib/v2/view/account-shell';
 import { changesLogView } from '@/lib/v2/view/changes-log';
 
 export const dynamic = 'force-dynamic';
@@ -37,17 +38,21 @@ export default async function ChangesPage({
   const r = await loadViewer();
   if (r.kind === 'signed_out') redirect('/login');
   if (r.kind !== 'viewer') return <AccountStateScreen state={r.kind} />;
-  const { account, seat } = r.viewer;
+  const { account, seat, accounts } = r.viewer;
   const { d, viewer } = await readAccount(await supabaseServer(), account.id, seat.id, new Date());
   const q = await searchParams;
   return (
     <LiveActions>
       <ChangesLogScreen
-        data={changesLogView(
-          d,
-          viewer,
-          { site: one(q.site), kind: one(q.kind), since: one(q.since) },
-          '/changes',
+        data={withSwitcher(
+          changesLogView(
+            d,
+            viewer,
+            { site: one(q.site), kind: one(q.kind), since: one(q.since) },
+            '/changes',
+          ),
+          accounts,
+          account.id,
         )}
       />
     </LiveActions>
