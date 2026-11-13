@@ -138,9 +138,9 @@ describe('supportMailto', () => {
   const anyString = fc.oneof(
     fc.string({ unit: 'binary' }),
     INJECTIONS,
-    fc.tuple(fc.constantFrom(UUID, EVENT, '/settings', 'orphan_pages'), INJECTIONS).map(
-      ([a, b]) => a + b,
-    ),
+    fc
+      .tuple(fc.constantFrom(UUID, EVENT, '/settings', 'orphan_pages'), INJECTIONS)
+      .map(([a, b]) => a + b),
     fc.tuple(INJECTIONS, fc.constantFrom(UUID, EVENT, '/settings')).map(([a, b]) => a + b),
   );
   const field = fc.option(fc.oneof(anyString, fc.constantFrom(UUID, EVENT, '/sites')), {
