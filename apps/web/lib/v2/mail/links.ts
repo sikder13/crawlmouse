@@ -61,11 +61,11 @@ export function reportConfirmUrl(token: string): string {
 }
 
 /**
- * "Don't ask me again", in the mail that asks to confirm: the confirmation link's own token under
- * another path, which records a refusal where the first confirms.
+ * "Don't ask me again", in the mail that asks to confirm: the address's own token
+ * (`report-decline-token.ts`), which records a refusal.
  */
 export function reportDeclineUrl(token: string): string {
-  if (!isToken(token)) throw new RangeError('not a confirmation token');
+  if (!isToken(token)) throw new RangeError('not a decline token');
   return mailUrl(`/s/decline/${token}`);
 }
 

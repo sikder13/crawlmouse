@@ -108,6 +108,7 @@ const reportStore: ReportMailStore = {
   confirmationsSince: async () => ({ account: 0, address: 0 }),
   issueConfirmation: async () => ({
     token: 'R'.repeat(43),
+    declineToken: 'N'.repeat(43),
     recipient: TO.confirming,
     agencyName: 'Summit Digital',
     host: 'shop.example',

@@ -195,12 +195,13 @@ const CASES: readonly Case<unknown>[] = [
     name: 'report-confirm',
     input: {
       token: TOKEN,
+      declineToken: TOKEN,
       agencyName: 'Summit Digital',
       host: 'example.com',
     } satisfies ReportConfirmInput,
     render: reportConfirm,
     outside: ['agencyName', 'host'],
-    ours: ['token'],
+    ours: ['token', 'declineToken'],
   }),
   kase({
     name: 'client-report',

@@ -13,6 +13,7 @@ import { CONFIRM_MAILS_PER_DAY, reportMailHandlers } from '../lib/v2/mail/handle
 import { supabaseMailLedger } from '../lib/v2/mail/ledger';
 import { memoryLedger, memoryTransport } from '../lib/v2/mail/memory';
 import { supabaseReportMailStore } from '../lib/v2/mail/report-mail-store';
+import { reportDeclineToken } from '../lib/v2/mail/report-decline-token';
 import { reportPauseToken } from '../lib/v2/mail/report-pause-token';
 import type { MailDeps } from '../lib/v2/mail/send';
 import { pgliteCheckReader } from '../lib/v2/pipeline/test-support/pglite';
@@ -296,7 +297,7 @@ describe('after the recipient paused, the sender’s resume', () => {
 });
 
 describe('“Don’t ask me again”, from the mail that asks to confirm', () => {
-  it('the mail carries the link as its one-click unsubscribe; once used, no request for that address and site is mailed again, and the same request retried inside a pause’s window is', async () => {
+  it('the mail carries the address’s own link as its one-click unsubscribe; the link of an earlier mail still answers, and once used no request for that address and site is mailed again', async () => {
     // Another client of the agency, asked for the first time.
     const site = w.other.id;
     await db.query(`select public.set_client($1, $2, $3::jsonb)`, [
@@ -321,16 +322,28 @@ describe('“Don’t ask me again”, from the mail that asks to confirm', () =>
     expect(await first.h.reportConfirm(site, 'ask-1')).toBe('sent');
     const mail = first.transport.sent[0]!;
     const token = tokenIn(mail.text, '/s/confirm/', 43);
-    // The same token under the decline path, in the body and as the List-Unsubscribe target.
-    expect(tokenIn(mail.text, '/s/decline/', 43)).toBe(token);
+    // "Don't ask me again" is the address's own token, in the body and as the List-Unsubscribe
+    // target: derived from the site and the address, and not the confirmation's.
+    const decline = reportDeclineToken(SECRET, site, 'declines@client.example');
+    expect(tokenIn(mail.text, '/s/decline/', 43)).toBe(decline);
+    expect(decline).not.toBe(token);
+    expect(decline).not.toBe(reportPauseToken(SECRET, site, 'declines@client.example'));
     expect(mail.text).toContain('You can stop these requests for good with one click.');
     expect(mail.headers).toEqual({
-      'List-Unsubscribe': `<https://crawlmouse.com/s/decline/${token}>`,
+      'List-Unsubscribe': `<https://crawlmouse.com/s/decline/${decline}>`,
       'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
     });
 
+    // "Ask again" mails a second request: another confirmation token, the same decline link.
+    const second = mailer(new Date(at.getTime() + 60_000));
+    expect(await second.h.reportConfirm(site, 'ask-2')).toBe('sent');
+    const later = second.transport.sent[0]!.text;
+    expect(tokenIn(later, '/s/confirm/', 43)).not.toBe(token);
+    expect(tokenIn(later, '/s/decline/', 43)).toBe(decline);
+
+    // The link of the FIRST mail, pressed after the second replaced its confirmation link.
     expect(
-      (await answer(`select public.decline_report_requests($1, $2) r`, [sha256(token), at]))
+      (await answer(`select public.decline_report_requests($1, $2) r`, [sha256(decline), at]))
         .outcome,
     ).toBe('declined');
     // Nothing asks that address for that site again: the next request, a year on, sends nothing.
@@ -339,11 +352,21 @@ describe('“Don’t ask me again”, from the mail that asks to confirm', () =>
       expect(await next.h.reportConfirm(site, `ask-${when.getTime()}`)).toBe('nothing_to_send');
       expect(next.transport.sent).toEqual([]);
     }
-    // The confirmation link of the declined mail confirms nothing.
+    // The confirmation link that was waiting confirms nothing.
     expect(
-      (await answer(`select public.confirm_report_recipient($1, $2) r`, [sha256(token), at]))
-        .outcome,
+      (
+        await answer(`select public.confirm_report_recipient($1, $2) r`, [
+          sha256(tokenIn(later, '/s/confirm/', 43)),
+          at,
+        ])
+      ).outcome,
     ).toBe('gone');
+    // The schedule removed, the link still answers: the site keeps it.
+    await db.query(`select public.clear_report_schedule($1, $2)`, [site, w.accountId]);
+    expect(
+      (await answer(`select public.decline_report_requests($1, $2) r`, [sha256(decline), at]))
+        .outcome,
+    ).toBe('declined');
   });
 });
 
@@ -516,5 +539,14 @@ describe('the confirmation’s daily bound over the real ledger', () => {
     expect(await counts(null)).toBe(short);
     expect(await counts(`report_confirm:${site}:held-0`)).toBe(short - 1);
     expect(await counts(`report_confirm:${site}:another`)).toBe(short);
+    // The account's count leaves the asking message out as the address's does.
+    const forAccount = async (key: string | null) =>
+      (
+        await db.query<{ c: { account: number } }>(
+          `select public.report_confirm_mail_counts($1, $2, $3, $4) c`,
+          [w.accountId, own, new Date(day.getTime() - 60_000), key],
+        )
+      ).rows[0]!.c.account;
+    expect((await forAccount(null)) - (await forAccount(`report_confirm:${site}:held-0`))).toBe(1);
   });
 });

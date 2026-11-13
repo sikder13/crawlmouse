@@ -15,6 +15,7 @@ import { hashToken } from '../account/tokens';
 import type { Generated } from '../reports/generate-run';
 import { hashShareToken, newShareToken, type ShareFiles } from '../reports/share';
 import { parseStoredDoc } from '../reports/share-doc';
+import { reportDeclineToken } from './report-decline-token';
 import { reportPauseToken } from './report-pause-token';
 import type { ReportMailStore } from './store';
 
@@ -123,16 +124,32 @@ export function supabaseReportMailStore(deps: ReportMailStoreDeps): ReportMailSt
       );
     },
 
-    async issueConfirmation(siteId, now, requestId) {
+    async issueConfirmation(siteId, now, requestId, recipient) {
+      if (deps.linkSecret === null) throw new Error('report mail store: no link secret');
       // The request's id names one ask: a retry of it is issued a link again, where another
-      // request to a recipient who paused is refused within the window.
+      // request to a recipient who paused is refused within the window. The address is the one
+      // the mail was claimed for: SQL issues nothing when the site's contact is no longer it, so
+      // the "Don't ask me again" token, derived for that address, is stored for no other.
+      const declineToken = reportDeclineToken(deps.linkSecret, siteId, recipient);
       const a = await rpc(
         'issue_recipient_confirmation',
-        { p_site: siteId, p_now: now.toISOString(), p_request: requestId },
+        {
+          p_site: siteId,
+          p_now: now.toISOString(),
+          p_request: requestId,
+          p_email: recipient,
+          p_decline_hash: hashToken(declineToken),
+        },
         Confirmation,
       );
       if (a.outcome !== 'issued') return null;
-      return { token: a.token, recipient: a.email, agencyName: a.account_name, host: a.host };
+      return {
+        token: a.token,
+        declineToken,
+        recipient: a.email,
+        agencyName: a.account_name,
+        host: a.host,
+      };
     },
 
     async clientReportRecipient(reportId) {

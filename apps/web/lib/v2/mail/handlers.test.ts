@@ -25,6 +25,8 @@ const ACCOUNT = 'a0000000-0000-4000-8000-000000000001';
 const CHECK = 'c0000000-0000-4000-8000-0000000000aa';
 const TOKEN_ID = 't0000000-0000-4000-8000-000000000001';
 const RAW = 'R'.repeat(43);
+/** The token of the address's "Don't ask me again" link, as the store derives one. */
+const DECLINE_RAW = 'N'.repeat(43);
 const RAW2 = 'S'.repeat(43);
 const SEAT = 'e0000000-0000-4000-8000-0000000000a1';
 const SITE = '50000000-0000-4000-8000-0000000000a1';
@@ -708,6 +710,7 @@ function reportStore(over: Partial<ReportMailStore> = {}): ReportMailStore {
     confirmationsSince: vi.fn(async () => ({ account: 0, address: 0 })),
     issueConfirmation: vi.fn(async () => ({
       token: RAW,
+      declineToken: DECLINE_RAW,
       recipient: CONTACT,
       agencyName: 'Summit Digital',
       host: 'client.example',
@@ -761,17 +764,18 @@ describe('the confirmation asked of a client’s contact (CC-31 D8)', () => {
     });
     const m = transport.sent[0]!;
     expect(m.to).toBe(CONTACT);
-    // A mail client's one-click unsubscribe is "Don't ask me again": the confirmation's own token
-    // under the decline path.
+    // A mail client's one-click unsubscribe is "Don't ask me again": the address's own token,
+    // which is not the confirmation's.
     expect(m.headers).toEqual({
-      'List-Unsubscribe': `<https://crawlmouse.com/s/decline/${RAW}>`,
+      'List-Unsubscribe': `<https://crawlmouse.com/s/decline/${DECLINE_RAW}>`,
       'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
     });
     expect(m.text).toContain(`https://crawlmouse.com/s/confirm/${RAW}`);
     expect(m.subject).toBe('An agency asks to send you reports about client.example');
     expect(m.text).toContain('The agency’s account is called “Summit Digital”.');
     for (const part of [m.subject, m.text, m.html]) expect(part).not.toContain('contact@');
-    expect(s.issueConfirmation).toHaveBeenCalledWith(SITE, NOW, 'req-1');
+    expect(s.issueConfirmation).toHaveBeenCalledWith(SITE, NOW, 'req-1', CONTACT);
+    expect(m.text).toContain(`https://crawlmouse.com/s/decline/${DECLINE_RAW}`);
   });
 
   it('the same request twice sends once and mints once; the next request is another mail', async () => {
@@ -814,6 +818,7 @@ describe('the confirmation asked of a client’s contact (CC-31 D8)', () => {
       reportStore({
         issueConfirmation: vi.fn(async () => ({
           token: RAW,
+          declineToken: DECLINE_RAW,
           recipient: 'new-contact@client.example',
           agencyName: null,
           host: 'client.example',
@@ -990,7 +995,17 @@ describe('the client report (CC-31 D8)', () => {
     expect(log.mock.calls).toEqual([
       ['mail.unconfigured', { kind: 'client_report', link_secret: 0 }],
     ]);
-    // The confirmation carries no pause link, and goes.
-    expect(await h.reportConfirm(SITE, 'req-1')).toBe('sent');
+  });
+
+  it('with no link secret no request to confirm is mailed either: its “Don’t ask me again” link cannot be made', async () => {
+    const { h, s, ledger, transport, log } = reportSetup(reportStore(), [], false);
+    expect(await h.reportConfirm(SITE, 'req-1')).toBe('unconfigured');
+    expect(s.confirmationRecipient).not.toHaveBeenCalled();
+    expect(s.issueConfirmation).not.toHaveBeenCalled();
+    expect(ledger.claims).toEqual([]);
+    expect(transport.sent).toEqual([]);
+    expect(log.mock.calls).toEqual([
+      ['mail.unconfigured', { kind: 'report_confirm', link_secret: 0 }],
+    ]);
   });
 });

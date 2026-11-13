@@ -148,7 +148,8 @@ const RENDERS: Record<MailPreviewSlug, (opts?: PreviewOptions) => RenderedMail> 
     }),
   'seat-invite': () => seatInvite({ token: TOKEN, accountName: AGENCY, role: 'account_manager' }),
   'seat-invite-unnamed': () => seatInvite({ token: TOKEN, accountName: null, role: 'developer' }),
-  'report-confirm': () => reportConfirm({ token: TOKEN, agencyName: AGENCY, host: badHost() }),
+  'report-confirm': () =>
+    reportConfirm({ token: TOKEN, declineToken: PAUSE, agencyName: AGENCY, host: badHost() }),
   'client-report': () =>
     clientReport({
       agencyName: AGENCY,

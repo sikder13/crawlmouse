@@ -122,6 +122,8 @@ export interface ReportRecipient {
 /** A confirmation link minted for a site's client contact, and what its mail says. */
 export interface IssuedConfirmation {
   token: string;
+  /** The token of the address's "Don't ask me again" link: the same in each request mailed to it. */
+  declineToken: string;
   /** The address the link was minted for. */
   recipient: string;
   agencyName: string | null;
@@ -166,11 +168,15 @@ export interface ReportMailStore {
     since: Date,
     key: string,
   ): Promise<{ account: number; address: number }>;
-  /** `requestId` names the ask: a retry of it is issued again inside a pause's window. */
+  /**
+   * `requestId` names the ask: a retry of it is issued again inside a pause's window. `recipient`
+   * is the address the mail was claimed for: nothing is issued when it is no longer the contact.
+   */
   issueConfirmation(
     siteId: string,
     now: Date,
     requestId: string,
+    recipient: string,
   ): Promise<IssuedConfirmation | null>;
   clientReportRecipient(reportId: string): Promise<ReportRecipient | null>;
   issueClientReport(reportId: string, now: Date): Promise<IssuedClientReport | null>;

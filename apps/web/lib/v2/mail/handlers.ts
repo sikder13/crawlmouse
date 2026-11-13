@@ -283,6 +283,12 @@ export function reportMailHandlers(d: ReportMailHandlerDeps): ReportMailHandlers
   return {
     async reportConfirm(siteId, requestId) {
       if (requestId.length === 0 || requestId.length > REQUEST_ID_MAX) return 'invalid_request';
+      // A request to confirm is not mailed without its "Don't ask me again" link, which is made
+      // with the link secret, as a report is not mailed without its pause link.
+      if (!d.pauseLinks) {
+        mail.log('mail.unconfigured', { kind: 'report_confirm', link_secret: 0 });
+        return 'unconfigured';
+      }
       const contact = await read(store.confirmationRecipient(siteId));
       if (contact === null) return 'not_found';
       const key = `report_confirm:${siteId}:${requestId}`;
@@ -316,13 +322,20 @@ export function reportMailHandlers(d: ReportMailHandlerDeps): ReportMailHandlers
         accountId: contact.accountId,
         headers: () => unsubscribe,
         render: async () => {
-          const issued = await store.issueConfirmation(siteId, mail.now(), requestId);
+          const issued = await store.issueConfirmation(
+            siteId,
+            mail.now(),
+            requestId,
+            contact.recipient,
+          );
           if (issued === null || issued.recipient !== contact.recipient) return null;
           // "Don't ask me again" is the message's one-click List-Unsubscribe target: a mail
-          // client's unsubscribe stops these requests for good.
-          unsubscribe = unsubscribeHeaders({ url: reportDeclineUrl(issued.token) });
+          // client's unsubscribe stops these requests for good. Its token is the address's own,
+          // the same in each request, so the link of an earlier mail answers as this one does.
+          unsubscribe = unsubscribeHeaders({ url: reportDeclineUrl(issued.declineToken) });
           return reportConfirm({
             token: issued.token,
+            declineToken: issued.declineToken,
             agencyName: issued.agencyName,
             host: issued.host,
           });

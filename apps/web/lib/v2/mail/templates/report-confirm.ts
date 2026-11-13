@@ -16,13 +16,20 @@ import { accountNameText, hostText, linkPara, para, small, smallLink } from './p
 
 export interface ReportConfirmInput {
   token: string;
+  /** The token of the address's "Don't ask me again" link (`report-decline-token.ts`). */
+  declineToken: string;
   /** The agency's name as its owner wrote it, or null. */
   agencyName: string | null;
   /** The client site's host, as stored. */
   host: string;
 }
 
-export const reportConfirm: Template<ReportConfirmInput> = ({ token, agencyName, host }) => {
+export const reportConfirm: Template<ReportConfirmInput> = ({
+  token,
+  declineToken,
+  agencyName,
+  host,
+}) => {
   const link = reportConfirmUrl(token);
   // The subject and the first words are ours, and within the mailer's 200 characters whatever
   // the host (`hostText` bounds it): a longer subject is refused after the link was issued. The
@@ -34,9 +41,9 @@ export const reportConfirm: Template<ReportConfirmInput> = ({ token, agencyName,
   const lead = `${subject}.${named} Open the link and confirm on that page if you want them.`;
   const rule = 'No report is sent unless you confirm. You need no account.';
   const ignore = "If you weren't expecting this, you can safely ignore this email.";
-  // "Don't ask me again": the same token under the decline path. It is also the message's
-  // one-click List-Unsubscribe target (the handler's headers).
-  const decline = reportDeclineUrl(token);
+  // "Don't ask me again": the address's own token, the same in each request mailed to it. It is
+  // also the message's one-click List-Unsubscribe target (the handler's headers).
+  const decline = reportDeclineUrl(declineToken);
   const { forGood, declineButton } = RECIPIENT_COPY;
   return {
     subject,
