@@ -78,10 +78,13 @@ status-page vendor, switching any flag.
 - **The digest** is mailed at the first hourly tick at or after 08:00 New York time, keyed
   `founder_digest:daily:<date>` and, on Mondays, `founder_digest:weekly:<Monday>`. Its figures are
   `founder_digest_counts`'s, each labelled as it is computed. Payments count payment notices whose
-  invoice was recorded `paid`, first and returning; renewals have no notice and are not counted, and a
-  recovery from `past_due` is counted only when it is a first payment, the one case it has a notice.
-  The other payment notices are counted as plans started with the invoice not yet paid or not read
-  (`apps/web/__tests__/v2-033-founder.test.ts`, "counts each figure"). The two bounce figures count addresses and include internal
+  invoice Stripe showed `paid` when the plan changed, first and returning; renewals have no notice and
+  are not counted, and a recovery from `past_due` is counted only when it is a first payment, the one
+  case it has a notice. The other payment notices are counted as plans started with the invoice not
+  yet paid or not read (`apps/web/__tests__/v2-033-founder.test.ts`, "counts each figure"). A card
+  trial's conversion is among them: its charge clears about an hour after the plan changes and has
+  no notice of its own, so it is not counted as a payment (questions Q19). The digest's label for
+  payments says so (`apps/web/lib/v2/mail/templates/founder-digest.test.ts`, "names the figures"). The two bounce figures count addresses and include internal
   accounts' mail; send failures leave out internal accounts and the founder notices' own mail
   (questions Q14).
 - **The canary's look** (`signin_delivery_seen`, questions Q17) counts a delivery to its address of a

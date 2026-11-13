@@ -501,9 +501,11 @@ $$;
 --   trials_started               trial_started notices recorded
 --   trials_ended                 accounts.state_history entries whose previous entry is a trial
 --                                state, by the entry's `since`
---   payments_paid                payment notices whose facts record Stripe's invoice as `paid`
---                                (first and returning; a recovery from past_due has a notice only
---                                when it is a first payment, founder.ts)
+--   payments_paid                payment notices whose facts record Stripe's invoice as `paid`, as
+--                                read when the plan changed (first and returning; a recovery from
+--                                past_due has a notice only when it is a first payment, founder.ts;
+--                                a card trial's conversion, charged about an hour after the change,
+--                                is recorded unpaid and counted in plans_started_unpaid)
 --   plans_started_unpaid         payment notices whose facts record anything else: an invoice not
 --                                yet paid, not given or not read (review N4)
 --   payments_failed              payment_failed notices recorded

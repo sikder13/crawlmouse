@@ -22,9 +22,10 @@ describe('founderDigest', () => {
     ]);
     const labels = Object.fromEntries(DIGEST_FIGURES);
     expect(labels.checks_run_all).toBe('Checks run (all, incl. anonymous)');
-    // review N4: a payment is counted when Stripe's invoice was paid; the rest of the plan starts apart.
+    // review N4, M1: a payment is counted when Stripe's invoice was paid at the plan change; a card
+    // trial's conversion, charged about an hour later, is a plan start with the invoice unpaid.
     expect(labels.payments_paid).toBe(
-      'Payments, first and returning, with the Stripe invoice paid (a failed charge settled later is counted only when it was the first payment)',
+      'Payments: payment notices whose Stripe invoice was already paid when the plan changed (a card trial’s first charge clears about an hour after its plan starts, so it is not counted here but under plans started unpaid; a failed charge settled later is counted only when it was the first payment)',
     );
     expect(labels.plans_started_unpaid).toBe(
       'Plans started with the invoice not yet paid or not read from Stripe',

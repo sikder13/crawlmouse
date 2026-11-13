@@ -16,7 +16,7 @@ export const DIGEST_FIGURES = [
   ['trials_ended', 'Trials ended (an account left a trial state)'],
   [
     'payments_paid',
-    'Payments, first and returning, with the Stripe invoice paid (a failed charge settled later is counted only when it was the first payment)',
+    'Payments: payment notices whose Stripe invoice was already paid when the plan changed (a card trial’s first charge clears about an hour after its plan starts, so it is not counted here but under plans started unpaid; a failed charge settled later is counted only when it was the first payment)',
   ],
   ['plans_started_unpaid', 'Plans started with the invoice not yet paid or not read from Stripe'],
   ['payments_failed', 'Payments failed'],
