@@ -2,8 +2,8 @@
  * The mailer's shared types (CC-28 D1, D2). Every v2 email is one of `MAIL_KINDS`; the list is the
  * `email_sends.kind` check as migration 20261115000001's section K sets it last: CC-28's kinds, CC-29's
  * `agency_plus_contact`, CC-31's three (20261114000002) and CC-33's two founder kinds. send.test.ts
- * ("the kinds") reads the migrations, and __tests__/v2-031-m-mail-kinds.test.ts reads the list from a
- * migrated database.
+ * ("the kinds") reads the migrations, and __tests__/v2-033-mail-kinds.test.ts reads the list from a
+ * database with every migration applied.
  */
 
 export const MAIL_KINDS = [
