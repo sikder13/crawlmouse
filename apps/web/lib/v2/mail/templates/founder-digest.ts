@@ -14,10 +14,7 @@ export const DIGEST_FIGURES = [
   ['signups_confirmed', 'Sign-ups (counted when the address is confirmed)'],
   ['trials_started', 'Trials started'],
   ['trials_ended', 'Trials ended (an account left a trial state)'],
-  [
-    'payments_paid',
-    'Payments: payment notices whose Stripe invoice was already paid when the plan changed (a card trial’s first charge clears about an hour after its plan starts, so it is not counted here but under plans started unpaid; a failed charge settled later is counted only when it was the first payment)',
-  ],
+  ['payments_paid', 'Payments (the Stripe invoice was paid when the plan changed)'],
   ['plans_started_unpaid', 'Plans started with the invoice not yet paid or not read from Stripe'],
   ['payments_failed', 'Payments failed'],
   ['cancellations', 'Cancellations'],
@@ -35,6 +32,8 @@ export type FounderDigestInput =
   | { variant: 'daily'; date: string; counts: DigestCounts }
   | { variant: 'weekly'; monday: string; week: DigestCounts; previous: DigestCounts };
 
+const PAYMENTS =
+  'A card trial’s first charge clears about an hour after its plan starts, so it is counted under plans started unpaid, not under payments; a failed charge settled later is counted as a payment only when it was the first.';
 const SCOPE =
   'Internal accounts are left out of the sign-up, trial, payment, cancellation, check and send-failure figures; the send failures also leave out these notices’ own mail. The two bounce figures count addresses, not accounts, so they include internal accounts’ mail.';
 const WHY =
@@ -53,10 +52,10 @@ export const founderDigest: Template<FounderDigestInput> = (input) => {
     const lead = `${input.date}, New York time.`;
     return {
       subject: title,
-      text: [lead, '', ...lines, '', SCOPE].join('\n'),
+      text: [lead, '', ...lines, '', PAYMENTS, SCOPE].join('\n'),
       html: layout({
         title,
-        body: [para(lead), ...lines.map(para), small(SCOPE)].join(''),
+        body: [para(lead), ...lines.map(para), small(PAYMENTS), small(SCOPE)].join(''),
         why: WHY,
       }),
     };
@@ -69,10 +68,10 @@ export const founderDigest: Template<FounderDigestInput> = (input) => {
   );
   return {
     subject: title,
-    text: [lead, '', ...lines, '', SCOPE].join('\n'),
+    text: [lead, '', ...lines, '', PAYMENTS, SCOPE].join('\n'),
     html: layout({
       title,
-      body: [para(lead), ...lines.map(para), small(SCOPE)].join(''),
+      body: [para(lead), ...lines.map(para), small(PAYMENTS), small(SCOPE)].join(''),
       why: 'Sent to the founder address set in FOUNDER_NOTIFY_TO on Mondays, from 08:00 New York time.',
     }),
   };

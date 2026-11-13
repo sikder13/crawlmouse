@@ -25,7 +25,7 @@ describe('founderDigest', () => {
     // review N4, M1: a payment is counted when Stripe's invoice was paid at the plan change; a card
     // trial's conversion, charged about an hour later, is a plan start with the invoice unpaid.
     expect(labels.payments_paid).toBe(
-      'Payments: payment notices whose Stripe invoice was already paid when the plan changed (a card trial’s first charge clears about an hour after its plan starts, so it is not counted here but under plans started unpaid; a failed charge settled later is counted only when it was the first payment)',
+      'Payments (the Stripe invoice was paid when the plan changed)',
     );
     expect(labels.plans_started_unpaid).toBe(
       'Plans started with the invoice not yet paid or not read from Stripe',
@@ -35,6 +35,11 @@ describe('founderDigest', () => {
   it('daily: the day, each figure with its count, and what is left out', () => {
     const m = founderDigest({ variant: 'daily', date: '2026-11-01', counts: counts(1) });
     expect(m.subject).toBe('Crawlmouse daily: 2026-11-01');
+    // review M1: what the payments figure leaves out is said beside it, in the text and the html.
+    for (const body of [m.text, m.html])
+      expect(body).toContain(
+        'A card trial’s first charge clears about an hour after its plan starts, so it is counted under plans started unpaid, not under payments',
+      );
     DIGEST_FIGURES.forEach(([, label], i) => {
       expect(m.text).toContain(`${label}: ${i + 1}`);
       expect(m.html).toContain(label);
@@ -50,6 +55,7 @@ describe('founderDigest', () => {
     const previous = { ...counts(10), payments_failed: 5, cancellations: 4, trials_started: 1 };
     const m = founderDigest({ variant: 'weekly', monday: '2026-10-26', week, previous });
     expect(m.subject).toBe('Crawlmouse weekly: week of 2026-10-26');
+    expect(m.text).toContain('counted under plans started unpaid, not under payments');
     expect(m.text).toContain('Payments failed: 2 (week before 5, change −3)');
     expect(m.text).toContain('Cancellations: 4 (week before 4, change 0)');
     expect(m.text).toContain('Trials started: 11 (week before 1, change +10)');
