@@ -97,6 +97,7 @@ describe('every printer, over AI and Technical SEO in {null, −1, 0, 0.01, 3}, 
             else expect(pro).not.toContain(unit);
           }
           if (pro.startsWith(NME)) expect(table).toBe(NME);
+          if (table === NME) expect(pro).toBe(NME);
         });
       }),
     );
@@ -111,6 +112,7 @@ describe('a group with a negative member', () => {
     expect(groupPoints([fix(2, -2), fix(1, 3)])).toBe(
       '+3 Technical SEO, +3 AI readability together',
     );
+    expect(groupPoints([fix(-5, 0), fix(3, 0)])).toBe('+3 AI readability together');
   });
 
   it('prints a sum of 0 as no measurable effect', () => {
@@ -156,11 +158,41 @@ describe('the Result, built from a fixture whose fixes are edited', () => {
   });
 
   it('the grouped "N more" row: a negative member lowers no sum', () => {
-    expect(restPoints([2, -50, 2])).toBe('+4 SEO');
-    expect(restPoints([0, -1])).toBe(NME);
+    const seo = (n: number) => fixWith(0, n, 'structure');
+    expect(restPoints([seo(2), seo(-50), seo(2)])).toBe('+4 SEO');
+    expect(restPoints([seo(0), seo(-1)])).toBe(NME);
+    const ai = (n: number) => fixWith(n, 0, 'crawler_access');
+    expect(restPoints([ai(3), ai(-5), ai(2)])).toBe('+5 AI');
     const v = resultOf((fixes) => setAll(fixes, 0, 2));
     const rest = v.fixes!.rows.find((r) => r.key === 'rest')!;
     expect(rest.points).toBe(`+${2 * rest.count} SEO`);
+  });
+
+  it('the grouped "N more" row: counts AI effects, the pages line and waiting effects, as groupPoints does', () => {
+    const v = resultOf((fixes) => setAll(fixes, 5, 0));
+    const rest = v.fixes!.rows.find((r) => r.key === 'rest')!;
+    expect(rest.points).toBe(`+${5 * rest.count} AI`);
+    expect(restPoints([fixWith(5, 0, 'crawler_access'), fixWith(0, 2, 'structure')])).toBe(
+      '+2 SEO, +5 AI',
+    );
+    expect(restPoints([fixWith(null, 0, 'crawler_access'), fixWith(0, 0, 'structure')])).toBe(
+      'AI not yet estimated for 1',
+    );
+    const shell: Fix = {
+      ...fixWith(0, 0, 'without_js'),
+      type: 'client_rendered_template',
+      affected_pages: 4,
+      last_state: 'detected',
+    };
+    expect(restPoints([shell, fixWith(0, 0, 'structure')])).toBe(
+      'Makes 4 pages readable without JavaScript',
+    );
+    expect(restPoints([shell, fixWith(0, 3, 'structure')])).toBe(
+      '+3 SEO; Makes 4 pages readable without JavaScript',
+    );
+    expect(restPoints([fixWith(2, null, 'crawler_access'), fixWith(0, 0, 'structure')])).toBe(
+      '+2 AI; SEO not estimated',
+    );
   });
 
   it('keeps the fix order: the rows are in the same order with every effect at or below zero', () => {
