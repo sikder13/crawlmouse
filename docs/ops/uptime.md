@@ -58,12 +58,26 @@ two did not (`docs/ops/security-baseline.md`); list what exists before creating 
    `shouldCreateUser: false`, so the address must be an existing user);
 2. waits 5 minutes;
 3. looks for an `email_events` row of type `delivered` for that address (compared lower-cased)
-   recorded since the request. None: Sentry `captureMessage('signin-canary')` at level `error`,
-   tagged `signal: signin-canary`, with no address in it. A request Supabase refused raises the same
-   message, tagged `stage: request`.
+   recorded since the request (`signin_delivery_seen`). None: Sentry `captureMessage('signin-canary')`
+   at level `error`, tagged `signal: signin-canary` and `stage: delivery`, with no address in it.
 
-A failure means sign-in mail did not reach the inbox within 5 minutes: Supabase Auth, its SMTP
-settings, Resend, or Resend's webhook into `/api/webhooks/resend`.
+The same message is raised, under another `stage`, when a request Supabase refused (`request`), or
+when asking for the link (`request_error`) or looking for the delivery (`look_error`) throws after
+Inngest's retries, for example while the migration that adds `signin_delivery_seen` is not applied;
+the run then ends failed.
+
+`delivered` is Resend's `email.delivered`: Resend handed the mail to the receiving mail server and it
+was accepted. A `delivery` signal means no such acceptance was recorded within 5 minutes: Supabase
+Auth, its SMTP settings, Resend, or Resend's webhook into `/api/webhooks/resend` failed.
+
+### What the canary does not see
+
+- **Where the mail landed.** A link filed as spam or held in a quarantine counts as delivered.
+- **The link working.** Nothing opens it, so `/login/verify` and its `token_hash` exchange are not
+  exercised.
+- **The magic-link route and its Turnstile.** The canary asks Supabase Auth directly; a route that
+  answers 5xx, or a Turnstile that refuses everyone, does not fail it (questions Q4). The monitors
+  above do not see the route either.
 
 Before setting `SIGNIN_CANARY_TO` (questions Q4):
 
