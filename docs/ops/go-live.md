@@ -1,7 +1,9 @@
 # Go live — the switch-on order and the one-minute rollback
 
 Crawlmouse v2 goes live for everyone, one flag at a time, with no beta (owner decision, 2026-11-13).
-Each step below is checked before it and can be undone after it. Nothing here is per account.
+Each step below has a check before it and a way back after it: the app's steps (2–5) by Vercel's
+Instant Rollback, the worker (step 1) by returning to its previous Fly release. Nothing here is per
+account.
 
 Before every step:
 
@@ -11,7 +13,8 @@ pnpm golive:check -- --step <N>
 
 It prints one line per precondition, grouped by the step it gates, and exits non-zero while any line
 gating step N or an earlier one is not `pass`. `unknown` is not `pass`: it names the token to add to
-`scripts/.env.local`. The boxes it cannot check are listed under [Manual checks](#manual-checks) and
+`scripts/.env.local`. The gating is pinned by
+`pnpm --filter @crawlmouse/scripts exec vitest run golive/check.test.ts`. The boxes it cannot check are listed under [Manual checks](#manual-checks) and
 passed to it as `--ticked <id>,<id>` once ticked here.
 
 ## How a step is switched on, and off
@@ -78,7 +81,10 @@ release, its egress record, the app's worker variables) is checked before step 2
 **Watch for 30 minutes.** Fly → `crawlmouse-worker` → Monitoring (no restarts), and
 `flyctl logs --app crawlmouse-worker`. The worker reports to no Sentry project.
 
-**Rollback.** Nothing in the app calls the worker until step 2. After the first deploy there is no
+**Rollback.** Nothing in the app calls the worker until step 2: its client is defined in
+`apps/web/lib/worker-client/client.ts` and called only from `apps/web/lib/v2/pipeline/functions.ts`,
+whose check functions are registered with `V2_PIPELINE`
+(`grep -rn workerClientFromEnv apps/web --include=*.ts | grep -v test`). After the first deploy there is no
 earlier release to return to: leave the worker running unused. After a later deploy, roll it back to
 its previous release (runbook, _Production_ → _Roll back_).
 
@@ -89,19 +95,21 @@ lists), dispatch `worker-production`, or make the change work with the running w
 
 ## Step 2 — `V2_PIPELINE=1`
 
-Registers the check pipeline's Inngest functions. Nothing a visitor reads changes. **Precondition:**
+Registers the check pipeline's Inngest functions. No page or route changes for a visitor: each route
+that reads the flag also needs `V2_CHECKS_PUBLIC`
+(`grep -rln pipelineEnabled apps/web/app --include=*.ts | grep -v test`), so no check can be requested
+before step 4, and the app's first call to the worker is step 4's first check. **Precondition:**
 the Inngest plan (`docs/ops/inngest-budget.md`; the check fails while the plan is Hobby and the
 budget is over its line).
 
 **Smoke.**
 
-| #   | Do                                                                                                                               | Right looks like                                                                 |
-| --- | -------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| 1   | Inngest → Apps → crawlmouse                                                                                                      | synced after the redeploy; the function count `golive:check` lists for step 2    |
-| 2   | Inngest → Functions → `crawlmouse.check.reaper`                                                                                  | a run every ten minutes, each completed                                          |
-| 3   | Open `https://crawlmouse.com/`                                                                                                   | the v1 home                                                                      |
-| 4   | Run a v1 audit                                                                                                                   | it completes                                                                     |
-| 5   | As the owner's v2 account, request one check of a site it holds (`POST /api/sites/<id>/checks`, served with `V2_PIPELINE` alone) | the check finishes on `crawlmouse-worker`; its run in Inngest has no failed step |
+| #   | Do                                              | Right looks like                                                              |
+| --- | ----------------------------------------------- | ----------------------------------------------------------------------------- |
+| 1   | Inngest → Apps → crawlmouse                     | synced after the redeploy; the function count `golive:check` lists for step 2 |
+| 2   | Inngest → Functions → `crawlmouse.check.reaper` | a run every ten minutes, each completed                                       |
+| 3   | Open `https://crawlmouse.com/`                  | the v1 home                                                                   |
+| 4   | Run a v1 audit                                  | it completes                                                                  |
 
 **Watch for 30 minutes.** Inngest → Runs, failed only. Inngest → Usage (executions against the plan).
 Sentry → Issues with `signal:audit-failed`.
@@ -173,15 +181,16 @@ with `signal:billing-*` and `signal:reconcile-drift`.
 
 Proven on a production build against the local Postgres stand-in with every migration applied (CC-35,
 2026-11-13): built with the four flags on, a v2 account, its kept site and a finished check seeded beside
-a v1 audit and its public report; then built again with the flags off over the same rows.
+a v1 audit and its public report; then built again with the flags off, the stand-in seeded the same way again (each phase starts from
+an empty database, so the ids differ between the two logs).
 
 - **v1 is unchanged.** The home, a v1 audit page, sign-in, a v1 `/r/` report and `/dashboard` render as
   v1's pages, with the v2 rows in the database. The proof's v1 audit has no page rows, so its audit page
   shows v1's loading card rather than figures: what it proves is the route, not the numbers.
 - **A person with a v2 account** signs in as before and sees v1's dashboard: their v1 audits if they
   have any, otherwise v1's "No audits yet". Their v2 site and check pages (`/sites/<id>`,
-  `/audit/<check id>`) and `/signup` answer 404. Nothing of theirs is deleted: switching the flag on again
-  shows the same sites and checks.
+  `/audit/<check id>`) and `/signup` answer 404. A rollback changes the deployment, not the database: their rows
+  stay as they were. The proof did not switch the flags on again over the same rows.
 - **A link already sent** in v2 mail to a check or a site page answers 404 until the flag is on again
   (the two pages measured above).
 - `POST /api/billing/agency-trial` answers 404 with the flags on and off.
