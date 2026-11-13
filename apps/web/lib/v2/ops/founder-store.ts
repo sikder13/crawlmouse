@@ -49,7 +49,7 @@ export interface FounderStore {
   takeOverflow(key: string, rows: number): Promise<{ total: number; rows: FounderOverflowRow[] }>;
   digestCounts(from: string, to: string): Promise<DigestCounts>;
   account(accountId: string): Promise<NoticeAccount | null>;
-  /** Users created at or after `since` with no signup notice, oldest first. */
+  /** Users created at or after `since` whose sign-up is not announced (founder_signups_unannounced). */
   unannouncedUsers(
     since: string,
     limit: number,

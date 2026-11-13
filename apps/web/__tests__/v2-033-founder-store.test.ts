@@ -1,6 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import type { PGlite } from '@electric-sql/pglite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { memoryLedger, memoryTransport, type MemoryTransport } from '../lib/v2/mail/memory';
+import { MailRetry } from '../lib/v2/mail/send';
+import type { OutgoingMail } from '../lib/v2/mail/types';
+import { sweep, type FounderDeps } from '../lib/v2/ops/founder';
 import { supabaseFounderStore, type FounderStore } from '../lib/v2/ops/founder-store';
 import { applyAllMigrations, freshDb } from './helpers/pglite-migrations';
 import { postgrestOver } from './helpers/postgrest-pglite';
@@ -63,7 +67,7 @@ describe('account', () => {
 });
 
 describe('unannouncedUsers', () => {
-  it('lists users created since the time with no signup notice, oldest first, bounded', async () => {
+  it('lists users created since the time and not announced, oldest first, bounded', async () => {
     // A window of its own, in 2030.
     const a = await person('2030-01-01T00:00:03Z');
     const b = await person('2030-01-01T00:00:01Z');
@@ -80,6 +84,7 @@ describe('unannouncedUsers', () => {
       limit: 20,
       configured: true,
     });
+    await ledgerRow(`founder_event:signup:${c.userId}`, 'sent', 1);
     expect(await store.unannouncedUsers('2030-01-01T00:00:00.000Z', 10)).toEqual([
       { userId: b.userId, accountId: b.accountId, createdAt: '2030-01-01T00:00:01.000Z' },
       { userId: a.userId, accountId: a.accountId, createdAt: '2030-01-01T00:00:03.000Z' },
@@ -147,5 +152,108 @@ describe('the RPCs parse', () => {
     });
     const counts = await store.digestCounts('2032-01-01T00:00:00.000Z', '2032-01-02T00:00:00.000Z');
     expect(counts.payments_first_or_returning).toBe(2);
+  });
+});
+
+const FOUNDER = ['qzx-founder', 'inbox.example'].join('@');
+
+/** A transport that throws on its first send and records the rest. */
+function throwsOnce(): MemoryTransport {
+  const inner = memoryTransport();
+  let thrown = false;
+  return {
+    sent: inner.sent,
+    async send(m: OutgoingMail) {
+      if (!thrown) {
+        thrown = true;
+        throw new Error('network');
+      }
+      return inner.send(m);
+    },
+  };
+}
+
+/** The sweep over this store, the in-memory mail ledger and `transport`, at `now`. */
+function sweepDeps(
+  now: () => Date,
+  transport: MemoryTransport,
+  confirmed: (userId: string) => boolean = () => true,
+): FounderDeps {
+  return {
+    mail: {
+      ledger: memoryLedger(),
+      transport,
+      pepper: 'p'.repeat(40),
+      now,
+      log: () => undefined,
+    },
+    store,
+    latestInvoice: async () => null,
+    confirmed: async (u) => confirmed(u),
+    to: FOUNDER,
+    now,
+    log: () => undefined,
+  };
+}
+
+const ledgerRow = (key: string, status: string, attempts: number) =>
+  db.query(
+    `insert into public.email_sends (idempotency_key, kind, address_hash, status, attempts, claimed_at,
+                                     sent_at, updated_at)
+     values ($1, 'alert', $2, $3, $4, now(), case when $3 = 'sent' then now() end, now())`,
+    [key, randomUUID().replace(/-/g, '').padEnd(64, '0'), status, attempts],
+  );
+
+describe('a sign-up whose mail failed (review C1)', () => {
+  it('is offered again until its ledger key is sent: a send that threw is mailed once on the retry', async () => {
+    // A window of its own, in 2033.
+    const { userId } = await person('2033-03-01T10:00:00Z');
+    const now = () => new Date('2033-03-01T12:00:00.000Z');
+    const transport = throwsOnce();
+    const d = sweepDeps(now, transport);
+    await expect(sweep(d)).rejects.toThrow(MailRetry);
+    expect(await sweep(d)).toMatchObject({ signups: { sent: 1 } });
+    expect(await sweep(d)).toMatchObject({ signups: { done: 1 } });
+    expect(transport.sent.map((m) => m.idempotencyKey)).toEqual([
+      `founder_event:signup:${userId}`,
+    ]);
+  });
+
+  it('reads the mail ledger: re-offers a `send` notice whose key is unsent and can still be tried', async () => {
+    const since = '2034-01-01T00:00:00.000Z';
+    const now = new Date('2034-01-02T00:00:00Z');
+    const users: Record<string, string> = {};
+    for (const [name, at] of [
+      ['noLedger', '2034-01-01T00:00:01Z'],
+      ['failedOnce', '2034-01-01T00:00:02Z'],
+      ['sent', '2034-01-01T00:00:03Z'],
+      ['exhausted', '2034-01-01T00:00:04Z'],
+      ['suppressed', '2034-01-01T00:00:05Z'],
+      ['held', '2034-01-01T00:00:06Z'],
+      ['skipped', '2034-01-01T00:00:07Z'],
+    ] as const) {
+      const { userId, accountId } = await person(at);
+      users[name] = userId;
+      await store.claim({
+        key: `signup:${userId}`,
+        kind: 'signup',
+        accountId,
+        internal: false,
+        occurredAt: at,
+        facts: {},
+        now,
+        // `held`: the hour's bound is already full for it; `skipped`: unconfigured.
+        limit: name === 'held' ? 1 : 1000,
+        configured: name !== 'skipped',
+      });
+    }
+    await ledgerRow(`founder_event:signup:${users.failedOnce}`, 'failed', 1);
+    await ledgerRow(`founder_event:signup:${users.sent}`, 'sent', 1);
+    await ledgerRow(`founder_event:signup:${users.exhausted}`, 'failed', 3);
+    await ledgerRow(`founder_event:signup:${users.suppressed}`, 'suppressed', 0);
+    expect((await store.unannouncedUsers(since, 50)).map((u) => u.userId)).toEqual([
+      users.noLedger,
+      users.failedOnce,
+    ]);
   });
 });

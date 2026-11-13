@@ -436,10 +436,14 @@ begin
 end;
 $$;
 
--- The founder sweep's sign-ups (plan-review M8): users created at or after p_since with no signup
--- notice yet, oldest first, at most p_limit, with their default account. The sweep announces each
--- once Supabase Auth shows its address confirmed; one still unconfirmed when it falls out of the
--- window is never announced.
+-- The founder sweep's sign-ups (plan-review M8): users created at or after p_since whose sign-up is
+-- not yet announced, oldest first, at most p_limit, with their default account. Not yet announced:
+-- no signup notice, or a signup notice decided `send` whose mail (the ledger key
+-- `founder_event:signup:<user>`) has no email_sends row, or one that is neither sent nor suppressed
+-- and has fewer than 3 attempts (claim_email_send's bound). So a notice whose send failed is offered
+-- again on the next run and the ledger's key stops a second mail; a `held` or `skipped` notice is not
+-- offered again. The sweep announces each once Supabase Auth shows its address confirmed; one still
+-- unconfirmed when it falls out of the window is never announced.
 create or replace function public.founder_signups_unannounced(p_since timestamptz, p_limit integer)
 returns table (user_id uuid, account_id uuid, created_at timestamptz)
 language plpgsql
@@ -454,8 +458,12 @@ begin
   end if;
   return query
     select u.id, u.default_account_id, u.created_at from public.users u
+      left join public.founder_notices n on n.event_key = 'signup:' || u.id::text
+      left join public.email_sends e on e.idempotency_key = 'founder_event:signup:' || u.id::text
      where u.created_at >= p_since
-       and not exists (select 1 from public.founder_notices n where n.event_key = 'signup:' || u.id::text)
+       and (n.event_key is null
+            or (n.state = 'send'
+                and (e.id is null or (e.status not in ('sent', 'suppressed') and e.attempts < 3))))
      order by u.created_at, u.id
      limit p_limit;
 end;
