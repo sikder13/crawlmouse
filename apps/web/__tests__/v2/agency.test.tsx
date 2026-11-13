@@ -194,7 +194,8 @@ describe('the client page against Final-Ag-Client', () => {
 });
 
 describe('each agency preview', () => {
-  const ours = PREVIEWS.filter((p) => p.path.startsWith(MATRIX));
+  // The matrix's own page and the pages under it: `/screens/agency-trial` (CC-29) is another screen.
+  const ours = PREVIEWS.filter((p) => p.path === MATRIX || p.path.startsWith(`${MATRIX}/`));
 
   it('is in the registry, and the registry lists no other', () => {
     expect(ours.map((p) => p.path).sort()).toEqual(Object.keys(CC31_ELEMENTS).sort());
