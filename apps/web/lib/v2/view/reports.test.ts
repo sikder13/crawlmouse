@@ -191,7 +191,15 @@ describe('Reports, on Northwind’s Agency account (challenged-site)', () => {
       ],
     ]);
     expect(v.scheduled.sub).toBe('2 reports to send');
-    expect(v.scheduled.foot).toBe('Sent for you from reports@northwind-digital.example.');
+    // The fixture's account records a sender of its own. No mail is sent from it (Branding is not
+    // in this step: D11), so the foot names none.
+    const sender = fixture('challenged-site').accounts.find((a) => a.branding?.sender_email)!
+      .branding!.sender_email!;
+    expect(sender).toBe('reports@northwind-digital.example');
+    expect(v.scheduled.foot).toBe(
+      'Client reports are sent for you weekly or monthly, to each client’s contact.',
+    );
+    expect(JSON.stringify(v.scheduled)).not.toContain(sender);
     expect(v.scheduled.compare).toBeNull();
   });
 });

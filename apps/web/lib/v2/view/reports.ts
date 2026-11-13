@@ -280,8 +280,6 @@ export function reportsView(
   const scheduled = v.d.reports
     .filter((r) => r.status === 'scheduled' || r.status === 'held')
     .sort((a, b) => at(a.scheduled_for!) - at(b.scheduled_for!) || a.id.localeCompare(b.id));
-  const branding = v.gates.agencyBranding ? v.account.branding : null;
-
   return {
     shell: accountShellView(v, 'Reports', { role }),
     header: { title: COPY.title, line },
@@ -357,11 +355,9 @@ export function reportsView(
         to: r.recipient_email ?? '',
         status: COPY.statusWords[r.status as 'scheduled' | 'held'],
       })),
-      foot: branding?.sender_email
-        ? COPY.sentFrom(branding.sender_email)
-        : v.tier === 'agency'
-          ? COPY.scheduledAgency
-          : gateMessage('clientReports', 'pro')!,
+      // No sender of the agency's own is named: Branding is not built, and the mail's sender is
+      // the product's (`ALERTS_SENDER`).
+      foot: v.tier === 'agency' ? COPY.scheduledAgency : gateMessage('clientReports', 'pro')!,
       compare: v.gates.agencyBranding ? null : pricing,
     },
   };

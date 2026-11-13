@@ -88,9 +88,8 @@ export const REPORTS_COPY = {
   scheduledTitle: 'Scheduled',
   none: 'None',
   toSend: (n: number) => `${count(n)} ${plural(n, 'report', 'reports')} to send`,
-  /** On Agency with no sender of its own on record. */
+  /** On Agency. */
   scheduledAgency: 'Client reports are sent for you weekly or monthly, to each client’s contact.',
-  sentFrom: (email: string) => `Sent for you from ${email}.`,
   table: { made: 'Reports', scheduled: 'Scheduled reports' },
   columns: {
     made: 'Made',
