@@ -18,7 +18,7 @@ import type { AccessResult } from '../access/types.js';
 import { subjectOfKey } from '../detectors/fingerprint.js';
 import { detectJsOnlyNavigation } from '../detectors/js-only-navigation.js';
 import { detectRendered } from '../detectors/rendered.js';
-import type { RenderLinks } from '../render/links.js';
+import { readRenderLinks, type RenderLinks } from '../render/links.js';
 import { detectStructure } from '../detectors/index.js';
 import type { Detection } from '../detectors/types.js';
 import type { DetectorOutcome } from '../diff/types.js';
@@ -123,13 +123,16 @@ export function gradeAssembled(
 
 /**
  * The links the render step read on each rendered page, by URL (render/links.ts); none for an outcome
- * stored before it kept them. They reach the JS-only navigation detector only, never a PageResult.
+ * stored before it kept them, or in another shape (`readRenderLinks`). They reach the JS-only
+ * navigation detector only, never a PageResult.
  */
 function renderLinksOf(render: BuildInput['render']): Map<string, RenderLinks> {
   return new Map(
-    (render?.pages ?? []).flatMap((p) =>
-      p.rendered && p.links ? [[p.url, p.links] as const] : [],
-    ),
+    (render?.pages ?? []).flatMap((p) => {
+      // Read back from evidence JSON: an entry in any other shape is read as no links.
+      const links = p.rendered ? readRenderLinks(p.links) : null;
+      return links === null ? [] : [[p.url, links] as const];
+    }),
   );
 }
 

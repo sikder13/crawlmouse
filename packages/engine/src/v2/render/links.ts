@@ -7,8 +7,8 @@
  * The extractor is the crawl's own: extract.ts `extractPage`, with non-content links (share actions,
  * media files) left out as the worker leaves them out (worker rows/links.ts), each target in
  * canonicalizeUrl's spelling with no options, which is the spelling the worker's edges carry. A `www.`
- * twin is therefore a target of its own, as it is a page of its own in the v2 crawl (the worker unifies
- * no host): a static `/x` and a rendered `https://www.<host>/x` on a page at `<host>` are two targets.
+ * twin is therefore a target of its own, as it is a page of its own in the worker's crawl (the worker
+ * unifies no host; the older single-function engine path, audit.ts under its ENGINE_V2 flag, does): a static `/x` and a rendered `https://www.<host>/x` on a page at `<host>` are two targets.
  * Then on the page's own site, by the crawl planner's rule (`inSiteScope`: its host or its `www.` twin,
  * on the default port), and not the page itself. A target longer than MAX_URL_LENGTH is left out on
  * both sides alike, as the worker leaves it out of its edges, so it is never JS-only.
@@ -46,6 +46,23 @@ export interface RenderLinks {
   js_only_count: number;
   /** The bound left some out. */
   truncated: boolean;
+}
+
+/**
+ * `links` as a stored render outcome holds them, when they are the current shape: `js_only` an array of
+ * strings, `js_only_count` a whole number not below 0, `truncated` a boolean. Anything else (an outcome
+ * stored in another shape, or none) is null, which the build reads as no links: the page is not
+ * evidence. The pipeline reads the outcome back from evidence JSON without a schema.
+ */
+export function readRenderLinks(value: unknown): RenderLinks | null {
+  if (typeof value !== 'object' || value === null) return null;
+  const v = value as Record<string, unknown>;
+  const { js_only, js_only_count, truncated } = v;
+  if (!Array.isArray(js_only) || !js_only.every((t) => typeof t === 'string')) return null;
+  if (typeof js_only_count !== 'number' || !Number.isInteger(js_only_count) || js_only_count < 0)
+    return null;
+  if (typeof truncated !== 'boolean') return null;
+  return { js_only: js_only as string[], js_only_count, truncated };
 }
 
 const byText = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
