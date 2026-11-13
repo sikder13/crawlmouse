@@ -1,3 +1,173 @@
+# Go live — the switch-on order and the one-minute rollback
+
+Crawlmouse v2 goes live for everyone, one flag at a time, with no beta (owner decision, 2026-11-13).
+Each step below is checked before it and can be undone after it. Nothing here is per account.
+
+Before every step:
+
+```bash
+pnpm golive:check -- --step <N>
+```
+
+It prints one line per precondition, grouped by the step it gates, and exits non-zero while any line
+gating step N or an earlier one is not `pass`. `unknown` is not `pass`: it names the token to add to
+`scripts/.env.local`. The boxes it cannot check are listed under [Manual checks](#manual-checks) and
+passed to it as `--ticked <id>,<id>` once ticked here.
+
+## How a step is switched on, and off
+
+**On.** Vercel → `crawlmouse-001` → Settings → Environment Variables → Production: add the variable
+with the value `1`. Then redeploy production (Deployments → the current production deployment → ⋯ →
+Redeploy, without the build cache option changed). A variable reaches only a deployment built after
+it is set; the running deployment keeps the environment it was built with.
+
+**Off, in a minute.** Vercel → Deployments → the production deployment from before the step → ⋯ →
+_Instant Rollback_. It serves that deployment with the environment it was built with, so the flag is
+off again at once. From a shell instead (`docs/ops/incident-plan.md`):
+
+```bash
+vercel rollback <the previous production deployment's URL> --scope nahl-technologies-projects
+```
+
+Then, in this order:
+
+1. **Unset the variable** in Vercel, so the next deployment agrees with the one now serving.
+2. **Resync Inngest** (Inngest → Apps → crawlmouse → Resync, or open
+   `https://crawlmouse.com/api/webhooks/inngest` with `PUT`): Inngest keeps the function list from the
+   last sync, so the step's crons keep firing against a deployment that no longer serves them until it
+   is resynced. Check the registered function count matches the one `golive:check` lists for the step
+   before.
+3. **Undo the rollback once the fix is deployed.** After an Instant Rollback, Vercel stops assigning
+   the production domains to new deployments until the rollback is undone (Deployments → the rolled-back
+   banner → _Undo rollback_, or promote the fixed deployment). Until then a push to `main` builds but
+   does not serve.
+
+What a v2 user sees after a rollback is in [After a rollback](#after-a-rollback).
+
+## Step 0 — the check passes for step 1
+
+`pnpm golive:check -- --step 1` exits 0, with every manual box for step 1 ticked.
+
+## Step 1 — the production crawl worker
+
+1. The GitHub environment `worker-production`, the worker's two Fly secrets, the dispatch of
+   `worker-production` from `main`, and the egress record: `docs/ops/worker-runbook.md`, _Production_.
+2. In Vercel production: `CRAWL_WORKER_URL`, `WORKER_SIGNING_SECRET`,
+   `WORKER_JWT_PRIVATE_KEY_PKCS8_B64` (the runbook gives each value's source). Redeploy.
+
+**Smoke** (no flag is on, so a visitor sees v1 throughout):
+
+| #   | Do                                               | Right looks like                                        |
+| --- | ------------------------------------------------ | ------------------------------------------------------- |
+| 1   | Open `https://crawlmouse-worker.fly.dev/healthz` | `{"ok":true}`                                           |
+| 2   | `pnpm golive:check -- --step 1`                  | the worker lines `pass`, the release the head of `main` |
+| 3   | Open `https://crawlmouse.com/`                   | the v1 home, unchanged                                  |
+| 4   | Run a v1 audit of a small site                   | it completes, as before                                 |
+
+**Watch for 30 minutes.** Fly → `crawlmouse-worker` → Monitoring (no restarts). Sentry → Issues,
+filtered to the new release.
+
+**Rollback.** Nothing in the app calls the worker until step 2. Roll the worker back to its previous
+release (runbook, _Production_ → _Rolling back_), or leave it running unused.
+
+## Step 2 — `V2_PIPELINE=1`
+
+Registers the check pipeline's Inngest functions. Nothing a visitor reads changes. **Precondition:**
+the Inngest plan (`docs/ops/inngest-budget.md`; the check fails while the plan is Hobby and the
+budget is over its line).
+
+**Smoke.**
+
+| #   | Do                                              | Right looks like                                                              |
+| --- | ----------------------------------------------- | ----------------------------------------------------------------------------- |
+| 1   | Inngest → Apps → crawlmouse                     | synced after the redeploy; the function count `golive:check` lists for step 2 |
+| 2   | Inngest → Functions → `crawlmouse.check.reaper` | a run every ten minutes, each completed                                       |
+| 3   | Open `https://crawlmouse.com/`                  | the v1 home                                                                   |
+| 4   | Run a v1 audit                                  | it completes                                                                  |
+
+**Watch for 30 minutes.** Inngest → Runs, failed only. Inngest → Usage (executions against the plan).
+Sentry → Issues with `signal:audit-failed`.
+
+**Rollback.** Instant Rollback to the step-1 deployment, unset `V2_PIPELINE`, resync Inngest.
+
+## Step 3 — `V2_ACCOUNT_DOOR=1`
+
+Serves `/signup`, `/check-email` and the claim route, and runs the first-login hook.
+
+**Smoke.**
+
+| #   | Do                                           | Right looks like                                                   |
+| --- | -------------------------------------------- | ------------------------------------------------------------------ |
+| 1   | Open `/signup`                               | the v2 sign-up page (200, not 404)                                 |
+| 2   | Sign up with a new address of the owner's    | the check-email page; the link arrives from `magic@crawlmouse.com` |
+| 3   | Open the link on another device              | signed in                                                          |
+| 4   | Sign in with the owner's existing v1 account | signed in; `/dashboard` is v1's dashboard                          |
+
+**Watch for 30 minutes.** Supabase → Auth → Logs (no rate-limit errors). Sentry → Issues.
+
+**Rollback.** Instant Rollback to the step-2 deployment, unset `V2_ACCOUNT_DOOR`, resync Inngest.
+
+## Step 4 — `V2_CHECKS_PUBLIC=1`
+
+The v2 home at `/`, the v2 dashboard at `/dashboard`, the v2 report at `/r/<slug>` (a report minted
+by v1 still renders as v1's), the check pages, the mail, the scheduler, alerts and the weekly summary.
+
+**Smoke.**
+
+| #   | Do                                          | Right looks like                                                                 |
+| --- | ------------------------------------------- | -------------------------------------------------------------------------------- |
+| 1   | Open `/`                                    | the v2 home                                                                      |
+| 2   | Start a check of a small site from the home | the live check page; it finishes in minutes                                      |
+| 3   | Open a v1 report at `/r/<slug>`             | it renders, as v1's report                                                       |
+| 4   | Signed in, open `/dashboard`                | the v2 dashboard with the site just checked                                      |
+| 5   | Inngest → the check's run                   | finished; its step count near the typical figure in `docs/ops/inngest-budget.md` |
+
+**Watch for 30 minutes.** Sentry → Issues with `signal:crawl-degraded` and `signal:schedule-claim`.
+Inngest → Runs, failed only. Resend → Logs (bounces).
+
+**Rollback.** Instant Rollback to the step-3 deployment, unset `V2_CHECKS_PUBLIC`, resync Inngest.
+
+## Step 5 — `V2_BILLING=1`
+
+Pricing, Developers and For agencies as v2 pages, the v2 checkout, the Agency trial (with its
+recorded consent), cancel and portal, the Stripe account webhook, the trial and past-due functions.
+**Precondition:** the Stripe live prices pass `golive:check`.
+
+**Smoke.**
+
+| #   | Do                                                                 | Right looks like                                                        |
+| --- | ------------------------------------------------------------------ | ----------------------------------------------------------------------- |
+| 1   | Open `/pricing`                                                    | the v2 pricing page with the prices in `apps/web/lib/billing/prices.ts` |
+| 2   | Signed in, start Pro checkout                                      | Stripe Checkout in live mode at the Pro price; close it unpaid          |
+| 3   | Open `/agency-trial`, tick the consent, continue                   | Stripe Checkout for the Agency trial; close it unpaid                   |
+| 4   | `curl -si -X POST https://crawlmouse.com/api/billing/agency-trial` | `404`                                                                   |
+
+**Watch for 30 minutes.** Stripe → Developers → Webhooks (no failed deliveries). Sentry → Issues
+with `signal:billing-*` and `signal:reconcile-drift`.
+
+**Rollback.** Instant Rollback to the step-4 deployment, unset `V2_BILLING`, resync Inngest.
+
+## After a rollback
+
+Proven on a production build against the local Postgres stand-in with every migration applied (CC-35,
+2026-11-13): built with the four flags on, a v2 account, its kept site and a finished check seeded beside
+a v1 audit and its public report; then built again with the flags off over the same rows.
+
+- **v1 is unchanged.** The home, a v1 audit page, sign-in, a v1 `/r/` report and `/dashboard` render as
+  v1's pages, with the v2 rows in the database. The proof's v1 audit has no page rows, so its audit page
+  shows v1's loading card rather than figures: what it proves is the route, not the numbers.
+- **A person with a v2 account** signs in as before and sees v1's dashboard: their v1 audits if they
+  have any, otherwise v1's "No audits yet". Their v2 site and check pages (`/sites/<id>`,
+  `/audit/<check id>`) and `/signup` answer 404. Nothing of theirs is deleted: switching the flag on again
+  shows the same sites and checks.
+- **A link already sent** in v2 mail to a check or a site page answers 404 until the flag is on again
+  (the two pages measured above).
+- `POST /api/billing/agency-trial` answers 404 with the flags on and off.
+
+The screenshots and the log are kept with the step's notes; the harness is not part of the product.
+
+## Manual checks
+
 <!-- golive:manual:start -->
 
 <!-- Rendered by scripts/golive/checklist.ts from scripts/golive/preconditions.ts. Do not edit by hand:
