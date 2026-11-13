@@ -333,6 +333,25 @@ describe('take_founder_overflow', () => {
     );
   });
 
+  it('a retry of an earlier hour’s notice, after a later hour re-took its rows, takes nothing new (review M2)', async () => {
+    // An hour key before this test's takes the rows earlier tests left held, `later`'s among them.
+    await take('overflow:2028-03-01T09');
+    const now = '2028-03-01T11:00:00.000Z';
+    for (const k of keys('ovm-fill', LIMIT)) await claim({ key: k, now });
+    const r = randomUUID();
+    expect(await claim({ key: keys('ovm-r', 1)[0]!, account: r, now })).toBe('held');
+    expect(accounts(await take('overflow:2028-03-01T10'))).toEqual([r]);
+    // The 10:00 notice's mail failed once: a provider answer `send` does not retry, or a throw while
+    // its run still has retries. The 11:00 notice re-takes its rows.
+    await ledger('overflow:2028-03-01T10', 'failed', 1, now);
+    expect(accounts(await take('overflow:2028-03-01T11'))).toEqual([r]);
+    const s = randomUUID();
+    expect(await claim({ key: keys('ovm-s', 1)[0]!, account: s, now })).toBe('held');
+    // The 10:00 run's retry: a mail was claimed under its key, so it takes no new row.
+    expect(await take('overflow:2028-03-01T10')).toEqual({ total: 0, rows: [] });
+    expect(accounts(await take('overflow:2028-03-01T12'))).toEqual([s]);
+  });
+
   it('re-takes an earlier hour’s rows only under an hour key (review T2)', async () => {
     // An hour key before this test's takes the rows earlier tests left held.
     await take('overflow:2028-04-01T09');
