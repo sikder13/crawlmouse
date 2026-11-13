@@ -10,11 +10,8 @@ export interface RouteSpec {
   /** The path, with `[id]`-style parameters, as ARCH-2 §5 names it. */
   route: string;
   /** Who builds the handler. */
-  /**
-   * `wave 2`: moved out of CC-27b to the agency workspace's step (CC-27b D10). `later`: a page of its
-   * own in a step not yet named (owner ruling, CC-27b Q15).
-   */
-  owner: 'CC-26b' | 'CC-27b' | 'wave 2' | 'later' | 'built';
+  /** `later`: a page of its own in a step not yet named (owner ruling, CC-27b Q15). */
+  owner: 'CC-26b' | 'CC-27b' | 'later' | 'built';
   /** What the handler must check before acting (ARCH-2 §5, DECISION-LOG E6). */
   guard: string;
 }
@@ -120,8 +117,9 @@ export const ACCOUNT_ACTIONS = {
   reports: {
     verb: 'POST',
     route: '/api/reports',
-    owner: 'wave 2',
-    guard: 'Signed-in member; exports need a paid tier.',
+    owner: 'built',
+    guard:
+      'Signed-in member whose role may export, for a site their seat covers; exports need a paid tier.',
   },
   alertRules: {
     verb: 'PUT',

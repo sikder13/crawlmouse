@@ -103,15 +103,16 @@ export const CC27B_ROUTES = {
   reportDownload: {
     verb: 'GET',
     route: '/api/report-files/[id]/download',
-    owner: 'wave 2',
+    owner: 'built',
     guard:
-      'Signed-in member of the report’s account; redirects to a 10-minute signed URL. Under `/api/report-files`, not `/api/reports/[id]`, because `/api/reports/[slug]` is a live segment and Next refuses two names at one level.',
+      'Signed-in member whose seat covers the report’s site and whose role may export; redirects to a 10-minute signed URL. Under `/api/report-files`, not `/api/reports/[id]`, because `/api/reports/[slug]` is a live segment and Next refuses two names at one level.',
   },
   reportShare: {
     verb: 'POST',
     route: '/api/report-files/[id]/share',
-    owner: 'wave 2',
-    guard: 'Signed-in member; a share link works for 30 days and needs no account to open.',
+    owner: 'built',
+    guard:
+      'Signed-in owner or account manager whose seat covers the report’s site, on a plan with exports; a share link works for 30 days and needs no account to open.',
   },
   trialEnded: {
     verb: 'GET',
