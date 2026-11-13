@@ -321,6 +321,7 @@ What the brief adds, left out of the comparison:
 | crawl        | An error under the email field                                                                                                                                        | CC-22 brief, scope 5                                                     |
 | reports      | A Show button beside the site picker: the picker reloads the card for another site without changing the page on input (WCAG 3.2.2)                                    | CC-27 plan, approved; the artboard draws the picker alone                |
 | settings     | A line under the email kinds when mail to the reader’s own address hard-bounced or was reported as spam, saying that only sign-in links and account mail go to it now | CC-28 D7 (Resend’s bounces and complaints suppress all but account mail) |
+| settings     | A line under the cards, “A question about this account? Email support”: a mailto to the support address whose body carries the account’s id and the page’s path       | CC-33 D5 (lib/v2/support/mailto.ts)                                      |
 
 Added text inside lines the lock also draws, removed by pattern before the comparison:
 
