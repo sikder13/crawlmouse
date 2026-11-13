@@ -109,9 +109,23 @@ and stranger: `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-031-sc
 - `PUT /api/alert-rules` wrote the account-wide alert rules and the Slack webhook for a caller of any
   role. It now asks `seat_may('edit_account_alerts')`.
 
-**Left as it is.** `subscriptions` and `agency_brands` are readable by every member of the account,
-whatever their scope. The owner checks of the billing and account routes (`member_role` compared with
-`'owner'` in `app/api/billing/**` and `app/api/account/**`) are not moved to `seat_may`.
+**Left as it is.** Rows of the account itself are readable by a member of the account whatever
+clients their seat covers: `subscriptions`; `agency_brands`; the account's own row, with
+`card_last4`, `current_subscription_id` and `state_history` (001's column grant under
+`accounts_member_read`); the account-wide `alert_rules`; and `usage_counts(account)`, the monthly
+event counts across the account's clients, which `is_member` gates (migration `20261103000001`). So
+the rail's owner-only billing (§5) is presentation: a seat of any role can read the card's last four
+with its own token. Moving `card_last4` out of the client grant is a change to 001's grants for a
+later step (questions.md Q25). The test below reads the account's row, its subscription and its
+account-wide alert rules as the owner, an account manager and a developer scoped to one client, and
+as a removed seat and a stranger:
+
+```bash
+pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-031-scope.test.ts -t 'what a seat reads of the account itself'
+```
+
+The owner checks of the billing and account routes (`member_role` compared with `'owner'` in
+`app/api/billing/**` and `app/api/account/**`) are not moved to `seat_may`.
 
 ## 5. The account switcher
 
@@ -906,3 +920,22 @@ The callers on a tree: `grep -rnE "'(seat_invited|seat_accepted|report_generated
   credited (`none`) and bills from the next invoice (owner ruling, Q4).
 
 ## 13. Known gaps
+
+Gaps a section above states where it applies are not repeated here (§4 "Left as it is", §6 and §10
+on a link minted again on a retry, §9 on the prospect's one-pager, §10 on a client report that stays
+`scheduled`).
+
+- **A report's file is kept until its account is erased.** Nothing expires a report or deletes its
+  object, and there is no route that deletes one. What holds how fast an account's files grow is the
+  two bounds of `POST /api/reports`, an hour's and a day's, both failing closed:
+  `grep -n 'PER_ACCOUNT_HOUR =\|PER_ACCOUNT_DAY =' apps/web/app/api/reports/route.ts`. A seat of any
+  role that may export spends the account's bounds. A retention rule is a decision for the owner
+  (questions.md Q26).
+- **A rollback of migration `20261114000002` reopens two reads for scoped seats.** The dry run
+  requires a rollback to restore the earlier schema, so the revert returns `seats_member_read` and
+  `seat_sites_member_read` to `is_member(account_id)` while the seats invited meanwhile stay active.
+  The revert's section S says so, with the query that counts the seats it reaches:
+  `sed -n '/^-- ─── S/,/^drop policy/p' infra/supabase/rollbacks/20261114000002_v2_031_agency.revert.sql`.
+- **Invitation mail is bounded by the day, lower in a trial** (`INVITE_MAIL_PER_DAY`,
+  `lib/v2/agency/seats.ts`): an invitation names the account, a string its owner chose, to an address
+  the owner chose. An invitation and a resend count into one bucket.

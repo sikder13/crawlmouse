@@ -140,6 +140,15 @@ alter table public.seats drop column if exists invite_seq;
 alter table public.seats drop column if exists invite_expires_at;
 
 -- ─── S ────────────────────────────────────────────────────────────────────────────────────────────
+-- BEFORE RUNNING THIS FILE ON A DATABASE THAT HAS SCOPED SEATS: the two policies below go back to
+-- is_member(account_id), and a seat invited while the migration was on stays active (section A's
+-- revert keeps the rows). From then on a seat that covers some clients reads each seat row of its
+-- account (colleagues' and pending invitations' addresses) and each seat_sites row (each client's
+-- site id), and remove_seat is gone. The dry run requires a rollback to restore the earlier schema
+-- (docs/ops/db-migrations.md §2, step 8), so this file cannot keep the narrowed policies. Count the
+-- seats this reaches, and decide what to do with them first:
+--   select account_id, count(*) from public.seats
+--    where status = 'active' and not client_scope_all group by 1;
 -- seats returns to 001's policy: every member of the account reads every seat.
 drop policy if exists seats_member_read on public.seats;
 create policy seats_member_read on public.seats
