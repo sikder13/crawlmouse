@@ -684,4 +684,79 @@ grant execute on function public.founder_signups_unannounced(timestamptz, intege
 
 -- ═══ §K: email_sends.kind, the founder kinds (written by the lead once CC-31 is on main) ══════════
 
+-- 028 lists the kinds in two places: the CHECK on email_sends.kind and email_kind_suppressible. As
+-- 031's section C does, both are rebuilt here from what they hold when this runs, with the two founder
+-- kinds added after them, so a kind any earlier migration added stays with its answer, whatever order
+-- 029 and 031 were applied in (questions Q21). Neither founder kind is suppressible: they are account
+-- mail (lib/v2/mail/types.ts, ACCOUNT_KINDS), sent only to FOUNDER_NOTIFY_TO. The block raises and
+-- changes nothing unless the kind column has one CHECK and it is a plain list; run again, it finds the
+-- two there and writes the same definitions. The function's body is written in 028's own words, as
+-- 031 writes it, so the revert gives back the text it found.
+--
+-- Test: pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-033-mail-kinds.test.ts
+do $$
+declare
+  v_added constant text[] := array['founder_event', 'founder_digest'];
+  v_added_suppressible constant text[] := array[]::text[];
+  v_count integer;
+  v_name name;
+  v_def text;
+  v_kinds text[];
+  v_suppressible text[];
+begin
+  select pg_catalog.count(*), pg_catalog.min(c.conname), pg_catalog.min(pg_catalog.pg_get_constraintdef(c.oid))
+    into v_count, v_name, v_def
+    from pg_catalog.pg_constraint c
+   where c.conrelid = 'public.email_sends'::pg_catalog.regclass
+     and c.contype = 'c'
+     and c.conkey = array[(select a.attnum
+                             from pg_catalog.pg_attribute a
+                            where a.attrelid = 'public.email_sends'::pg_catalog.regclass
+                              and a.attname = 'kind')];
+  if v_count <> 1 then
+    raise exception 'email_sends.kind: % CHECKs on the column, where one is read', v_count;
+  end if;
+  select pg_catalog.array_agg(m.k[1] order by m.n)
+    into v_kinds
+    from pg_catalog.regexp_matches(v_def, '''([a-z0-9_]+)''::text', 'g') with ordinality as m(k, n);
+  if v_kinds is null
+     or v_def <> 'CHECK ((kind = ANY (ARRAY['
+                 || (select pg_catalog.string_agg(pg_catalog.quote_literal(u.k) || '::text', ', ' order by u.n)
+                       from pg_catalog.unnest(v_kinds) with ordinality as u(k, n))
+                 || '])))' then
+    raise exception 'email_sends.kind: the CHECK % is not a plain list of kinds', v_name;
+  end if;
+
+  -- What a suppression stops now, asked of the function for each kind the CHECK lists.
+  select coalesce(pg_catalog.array_agg(u.k order by u.n), '{}')
+    into v_suppressible
+    from pg_catalog.unnest(v_kinds) with ordinality as u(k, n)
+   where u.k <> all (v_added) and public.email_kind_suppressible(u.k);
+  v_kinds := v_kinds || coalesce(
+    (select pg_catalog.array_agg(a.k order by a.n)
+       from pg_catalog.unnest(v_added) with ordinality as a(k, n)
+      where a.k <> all (v_kinds)), '{}');
+  v_suppressible := v_suppressible || v_added_suppressible;
+
+  execute pg_catalog.format('alter table public.email_sends drop constraint %I', v_name);
+  execute pg_catalog.format(
+    'alter table public.email_sends add constraint %I check (kind in (%s))', v_name,
+    (select pg_catalog.string_agg(pg_catalog.quote_literal(u.k), ', ' order by u.n)
+       from pg_catalog.unnest(v_kinds) with ordinality as u(k, n)));
+  execute pg_catalog.format(
+    E'create or replace function public.email_kind_suppressible(p_kind text) returns boolean '
+    'language sql immutable set search_path = pg_catalog, pg_temp '
+    'as $f$\n  select %s;\n$f$',
+    coalesce(
+      'p_kind in ('
+        || (select pg_catalog.string_agg(pg_catalog.quote_literal(u.k), ', ' order by u.n)
+              from pg_catalog.unnest(v_suppressible) with ordinality as u(k, n))
+        || ')',
+      'false'));
+end;
+$$;
+
+revoke all on function public.email_kind_suppressible(text) from public, anon, authenticated;
+grant execute on function public.email_kind_suppressible(text) to service_role;
+
 -- ═══ end §K ══════════════════════════════════════════════════════════════════════════════════════
