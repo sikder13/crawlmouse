@@ -216,6 +216,18 @@ describe('seatsView: an Agency account read by its owner (Northwind)', () => {
     expect(seatsView(pastDue, due.viewer(), { seatLimit: 5, billing: true }).people.foot).toBe(
       'One seat free. Beyond five, $120 a seat a year, once the plan’s last payment has gone through.',
     );
+    // And in its Agency trial, where the trial page offers the yearly interval too.
+    const trial = structuredClone(due.data());
+    const t = trial.accounts.find((a) => a.id === due.viewer().accountId)!;
+    Object.assign(t, {
+      state: 'agency_trial',
+      trial_ends_at: '2026-11-20T00:00:00Z',
+      state_history: [{ state: 'agency_trial', since: t.state_history[0]!.since }],
+      billing_period_months: 12,
+    });
+    expect(seatsView(trial, due.viewer(), { seatLimit: 5, billing: true }).people.foot).toBe(
+      'One seat free. Beyond five, $120 a seat a year, once the trial has become the plan.',
+    );
   });
 
   it('takes the seat limit it is given over the account’s own', () => {
