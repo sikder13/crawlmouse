@@ -14,7 +14,9 @@ import { supabaseFixesStore } from '../lib/v2/account/fixes-store';
 import { siteOfCaller } from '../lib/v2/account/pages';
 import { loadSettingsDataset } from '../lib/v2/account/settings-dataset';
 import {
+  addSeat,
   adminOver,
+  person,
   removeSeat,
   scopeWorld,
   sessionOver,
@@ -299,8 +301,13 @@ describe('direct reads with the person’s own token', () => {
 // What D2 leaves as it is (docs/specs/v2/31-agency.md §4, security review r1 m1): rows of the account
 // itself, which a seat reads whatever clients it covers. Pinned here so the spec's list is this test's.
 describe('what a seat reads of the account itself, whatever its scope', () => {
+  /** The rows a read returned; a read that fails is an error here, not "none". */
+  const rowsOf = <T>(r: { data: T[] | null; error: { message: string } | null }, what: string) => {
+    if (r.error) throw new Error(`${what}: ${r.error.message}`);
+    return r.data ?? [];
+  };
   const reads = async (who: Who) => {
-    const sb = sessionOver(db, { id: w[who].id, email: w[who].email });
+    const sb = sessionOf(w[who]);
     const [account, subscriptions, rules] = await Promise.all([
       sb
         .from('accounts')
@@ -310,30 +317,35 @@ describe('what a seat reads of the account itself, whatever its scope', () => {
       sb.from('alert_rules').select('id').eq('account_id', w.accountId).is('site_id', null),
     ]);
     return {
-      account: (account.data ?? []).length,
-      subscriptions: (subscriptions.data ?? []).length,
-      accountRules: (rules.data ?? []).length,
+      account: rowsOf(account, 'accounts').length,
+      subscriptions: rowsOf(subscriptions, 'subscriptions').length,
+      accountRules: rowsOf(rules, 'alert_rules').length,
     };
   };
 
   beforeAll(async () => {
     await db.query(`select public.seed_default_alert_rules($1)`, [w.accountId]);
+    // The account's subscription, as the billing mirror writes one (`makePaid` writes its id on
+    // the account and no row).
+    await db.query(
+      `insert into public.subscriptions (id, account_id, status, plan, interval)
+       select current_subscription_id, id, 'active', 'agency', 'month'
+         from public.accounts where id = $1`,
+      [w.accountId],
+    );
   });
 
-  it('the developer scoped to one client reads what the owner reads of them', async () => {
+  it('the developer scoped to one client reads what the owner reads of them: the row, the subscription, the rules', async () => {
     const owner = await reads('owner');
     expect(owner.account).toBe(1);
+    expect(owner.subscriptions).toBe(1);
     expect(owner.accountRules).toBeGreaterThan(0);
     expect(await reads('developer')).toEqual(owner);
     expect(await reads('manager')).toEqual(owner);
   });
 
   it.each(['removed', 'stranger'] as const)('%s reads none of them', async (who) => {
-    expect(await reads(who)).toEqual({
-      account: 0,
-      subscriptions: 0,
-      accountRules: 0,
-    });
+    expect(await reads(who)).toEqual({ account: 0, subscriptions: 0, accountRules: 0 });
   });
 });
 
@@ -378,5 +390,41 @@ describe('a seat removed between two reads', () => {
       checkGate: [null, null],
       direct: directIds(NOBODY, []),
     });
+  });
+});
+
+// m1 of the test review: the personas above pair "unscoped" with manager and "scoped" with
+// developer, so a rule that read the role would pass them. These two seats cross the pairing.
+describe('scope, not role, decides which clients a seat reads', () => {
+  let scopedManager: Person;
+  let wideDeveloper: Person;
+  /** The rows keyed by a site that a person reads directly; their own seat's scope rows left out. */
+  const siteRows = async (p: Person) => {
+    const rows = await direct(p);
+    return { ...rows, seat_sites: undefined };
+  };
+  beforeAll(async () => {
+    scopedManager = await person(db, 'scoped-manager');
+    wideDeveloper = await person(db, 'wide-developer');
+    await addSeat(db, w.accountId, scopedManager, 'account_manager', [w.site1.id]);
+    await addSeat(db, w.accountId, wideDeveloper, 'developer');
+  });
+
+  it('an account manager whose seat covers site1 reads site1 and not site2, by each read', async () => {
+    expect([await inScope(scopedManager, 'site1'), await inScope(scopedManager, 'site2')]).toEqual([
+      true,
+      false,
+    ]);
+    expect(await scopedSites(scopedManager)).toEqual([w.site1.id]);
+    expect(await siteRows(scopedManager)).toEqual(await siteRows(w.developer));
+  });
+
+  it('a developer whose seat covers every client reads both', async () => {
+    expect([await inScope(wideDeveloper, 'site1'), await inScope(wideDeveloper, 'site2')]).toEqual([
+      true,
+      true,
+    ]);
+    expect(await scopedSites(wideDeveloper)).toEqual(sorted([w.site1.id, w.site2.id]));
+    expect(await siteRows(wideDeveloper)).toEqual(await siteRows(w.manager));
   });
 });

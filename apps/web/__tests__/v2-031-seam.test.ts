@@ -215,6 +215,18 @@ describe('seats', () => {
       return rows.map((r) => r.invited_email);
     });
 
+  // Scope apart from role: a manager whose seat covers one client and a developer whose seat covers
+  // every client. The rule reads the scope, and with only an unscoped manager and a scoped
+  // developer a rule that read the role would pass the same tests.
+  let scopedManager: Person;
+  let wideDeveloper: Person;
+  beforeAll(async () => {
+    scopedManager = await person(db, 'scoped-manager');
+    wideDeveloper = await person(db, 'wide-developer');
+    await addSeat(db, owner.accountId, scopedManager, 'account_manager', [site1]);
+    await addSeat(db, owner.accountId, wideDeveloper, 'developer');
+  });
+
   it('shows a seat scoped to some clients its own row and the owner’s; an unscoped seat reads them all', async () => {
     await db.query(
       `insert into public.seats (account_id, invited_email, role, status, client_scope_all)
@@ -233,6 +245,9 @@ describe('seats', () => {
     expect(await visible(owner.id)).toEqual(everyone);
     expect(await visible(manager.id)).toEqual(everyone);
     expect(await visible(developer.id)).toEqual([developer.email, owner.email].sort());
+    // By scope, whatever the role.
+    expect(await visible(scopedManager.id)).toEqual([owner.email, scopedManager.email].sort());
+    expect(await visible(wideDeveloper.id)).toEqual(everyone);
     expect(await visible(removed.id)).toEqual([]);
     expect(await visible(stranger.id)).toEqual([]);
   });
@@ -249,9 +264,19 @@ describe('seats', () => {
       owner: await covers(owner.id),
       manager: await covers(manager.id),
       developer: await covers(developer.id),
+      scopedManager: await covers(scopedManager.id),
+      wideDeveloper: await covers(wideDeveloper.id),
       removed: await covers(removed.id),
       stranger: await covers(stranger.id),
-    }).toEqual({ owner: true, manager: true, developer: false, removed: false, stranger: false });
+    }).toEqual({
+      owner: true,
+      manager: true,
+      developer: false,
+      scopedManager: false,
+      wideDeveloper: true,
+      removed: false,
+      stranger: false,
+    });
     const { rows } = await db.query<{ anon: boolean; definer: boolean; config: string[] }>(
       `select has_function_privilege('anon', p.oid, 'EXECUTE') anon, p.prosecdef definer, p.proconfig config
          from pg_proc p where p.oid = 'public.member_covers_all(uuid)'::regprocedure`,
