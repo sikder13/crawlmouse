@@ -244,10 +244,28 @@ describe('the wording at each threshold and form', () => {
     expect(aiWithheldSummary(waiting, 4)).toBe(
       'AI readability is graded once each template has a page read in a browser.',
     );
-    // Fewer measured than scored: the count is the reason, as before.
+    // Three of four measured is enough for Access (the engine scores it from two): the count is
+    // still not why, and the grade's reason is given.
     expect(aiWithheldSummary(waiting, 3)).toBe(
-      'Only three of the four scored crawlers could be measured.',
+      'AI readability is graded once each template has a page read in a browser.',
     );
+    // Of two reasons, the first.
+    waiting.ai_readability!.withheld_reasons = ['quotable_unmeasured', 'readable_unmeasured'];
+    expect(aiWithheldSummary(waiting, 3)).toBe(
+      'AI readability is graded once its content part can be measured.',
+    );
+    // The count is the reason when the engine names it, wherever it stands among the reasons, and
+    // for a grade that names none.
+    for (const reasons of [
+      ['too_few_crawlers_measured'],
+      ['readable_unmeasured', 'too_few_crawlers_measured'],
+      [],
+    ] as const) {
+      waiting.ai_readability!.withheld_reasons = [...reasons];
+      expect(aiWithheldSummary(waiting, 1)).toBe(
+        'Only one of the four scored crawlers could be measured.',
+      );
+    }
   });
 
   it('names each thin template, in the plural for more than one', () => {

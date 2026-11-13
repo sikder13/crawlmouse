@@ -300,14 +300,16 @@ export function aiWithheldSummary(check: Check, measured: number): string {
   const ai = check.ai_readability!;
   if (!ai.withheld) throw new Error('Not withheld');
   const scored = check.crawlers.filter((c) => c.scored).length;
-  // The engine withholds by its own count and for other reasons too (a part of the grade it could
-  // not measure): with each scored crawler measured, the count is not why, and the grade's own
-  // first reason is given (`withheld_reasons`, one sentence each in `AI_WAITING`).
-  const reason = ai.withheld_reasons[0];
+  // The engine names why it withholds (`withheld_reasons`, one sentence each in `AI_WAITING`). The
+  // count of crawlers measured is the reason when the engine says so, and for a grade that names
+  // none; for any other, the grade's first reason is given, since Access is scored from fewer
+  // crawlers than all of them and a count would explain nothing.
+  const reasons = ai.withheld_reasons ?? [];
+  const other = reasons.includes('too_few_crawlers_measured') ? undefined : reasons[0];
   const why = meetsEdge(check)
     ? `${EDGE_SENTENCE}, so only ${numberWord(measured)} of the ${numberWord(scored)} scored crawlers could be measured.`
-    : measured >= scored && reason
-      ? `${AI_WAITING[reason]}.`
+    : other
+      ? `${AI_WAITING[other]}.`
       : `Only ${numberWord(measured)} of the ${numberWord(scored)} scored crawlers could be measured.`;
   const range = ai.access_range;
   return range ? `${why} Access is somewhere between ${range.min} and ${range.max} of 40.` : why;
