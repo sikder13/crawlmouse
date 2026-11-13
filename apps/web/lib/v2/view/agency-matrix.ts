@@ -12,6 +12,7 @@
  * for a reader acting in an account that is not an agency while holding a seat on one, the switch.
  */
 import { instant, type Site } from '@crawlmouse/types/v2';
+import { GATES } from '../../entitlement-v2';
 import { roleMay } from '../agency/guard';
 import { agencyGateMessage } from '../agency/gates';
 import { MATRIX_COPY as COPY } from '../copy/agency';
@@ -36,6 +37,7 @@ import {
 } from './account-shell';
 import { nextCheck, zoneOf, type GradeCell } from './checks';
 import { dashboardView, type SinceCellView, type SiteRowView } from './dashboard';
+import { BUY_ANCHOR } from './seats';
 import { sitePage } from './site';
 
 const WEEKDAYS = ['', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -136,6 +138,11 @@ export type AgencyHomeView = MatrixView | AgencyGateView | AgencyOpenView;
 export interface AgencyReader {
   /** The accounts of the reader's active seats (`AccountViewer.accounts`). */
   accounts?: readonly SwitcherAccount[];
+  /**
+   * Whether the plan's extra seats and sites can be bought here (`V2_BILLING`): `/seats` draws its
+   * buy form only then, so only then does the matrix link to it. Left out, it is not linked.
+   */
+  billing?: boolean;
 }
 
 function reportCell(s: Site): string {
@@ -267,6 +274,7 @@ function matrixView(
   viewer: Viewer,
   v: AccountView,
   shell: ShellView,
+  billing: boolean,
 ): MatrixView {
   const zone = zoneOf(v);
   const clients = primarySites(v);
@@ -299,6 +307,15 @@ function matrixView(
   const limit = v.account.limits.sites;
   const n = rows.length;
   const next = nextStep(v, rows, adds);
+  const role = readerRole(v);
+  /** At the plan's limit, a reader who may buy is shown the way to the buy form (`/seats`). */
+  const buys =
+    billing &&
+    adds &&
+    n >= limit &&
+    limit < GATES.agency.maxSites &&
+    role !== null &&
+    roleMay(role, 'buy_seats');
   const compared = clients.filter((s) => resultChecks(v, s.id).length > 1).length;
   const strip = stripOf(rows, compared);
   const upcoming = nextWeeklyOf(v, clients);
@@ -332,7 +349,9 @@ function matrixView(
                 },
               ),
             ]
-          : [],
+          : buys
+            ? [link(`/seats#${BUY_ANCHOR}`, COPY.buySites)]
+            : [],
     },
     strip,
     next,
@@ -403,5 +422,6 @@ export function agencyHomeView(
     viewer,
     v,
     accountShellView(v, 'Clients', { role, accounts: reader.accounts ?? [] }),
+    reader.billing === true,
   );
 }

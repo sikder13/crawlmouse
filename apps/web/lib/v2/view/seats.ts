@@ -110,6 +110,7 @@ export interface SeatsView {
   invite: { id: string; action: string; fields: SeatFields } | null;
   /** Null unless the reader may buy and the plan sells seats and sites beyond its own. */
   buy: {
+    id: string;
     action: string;
     accountId: string;
     line: string;
@@ -119,6 +120,8 @@ export interface SeatsView {
 }
 
 const INVITE_ANCHOR = 'invite';
+/** The buy form's id on `/seats`, which the client matrix links at the plan's site limit. */
+export const BUY_ANCHOR = 'buy';
 
 const siteField = (id: string) => `site_${id}`;
 
@@ -263,6 +266,7 @@ export function seatsView(
     buy:
       mayBuy && billing && v.gates.agencyBranding
         ? {
+            id: BUY_ANCHOR,
             action: '/api/billing/seats',
             accountId: v.account.id,
             line: `${usd(EXTRA_SEAT)} a month for each seat beyond ${numberWord(GATES.agency.seats)}, ${usd(EXTRA_SITE)} a month for each site beyond ${count(GATES.agency.sites)}, up to ${count(GATES.agency.maxSites)} sites.`,

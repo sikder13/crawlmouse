@@ -207,6 +207,28 @@ describe('the matrix, adding a client', () => {
     expect(matrix(full, northwind).header.line).toContain('2 client sites, 0 of 2 unused');
   });
 
+  it('at the plan’s limit, where seats and sites are sold, the owner is shown the way to buy sites; nobody else is, and nobody below the limit', () => {
+    const full = edit((x) => ({
+      accounts: x.accounts.map((a) =>
+        a.id === NORTHWIND_ACCOUNT_ID ? { ...a, limits: { ...a.limits, sites: 2 } } : a,
+      ),
+    }));
+    const actions = (data: FixtureDataset, viewer: Viewer, billing: boolean) => {
+      const v = agencyHomeView(data, viewer, { billing });
+      if (v.kind !== 'matrix') throw new Error(`not the matrix: ${v.kind}`);
+      return v.header.actions.map((a) => [a.label, a.href, a.method]);
+    };
+    expect(actions(full, northwind, true)).toEqual([
+      ['Add sites to the plan', '/seats#buy', 'get'],
+    ]);
+    // Billing off: /seats draws no buy form, so there is nothing to link.
+    expect(actions(full, northwind, false)).toEqual([]);
+    // A seat that is not the owner's may not buy.
+    expect(actions(full, { ...northwind, seatId: PRIYA_SEAT }, true)).toEqual([]);
+    // Below the limit the header's action is the add form, not the link.
+    expect(actions(d, northwind, true).map((a) => a[1])).not.toContain('/seats#buy');
+  });
+
   it('a seat that covers some clients is told how many are in it, not how many slots are unused', () => {
     const line = matrix(d, { ...northwind, seatId: PRIYA_SEAT }).header.line;
     expect(line).toContain('2 client sites in your seat');

@@ -122,7 +122,7 @@ export function SeatsScreen({
 
       {buy ? (
         <div data-v2-addition="">
-          <Card as="section" className={shared.panel}>
+          <Card as="section" id={buy.id} className={shared.panel}>
             <CardHead title={SEATS_COPY.buy.title} sub={buy.line} />
             <div className={styles.formWrap}>
               <BuyForm buy={buy} />

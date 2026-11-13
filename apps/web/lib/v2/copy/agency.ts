@@ -32,6 +32,8 @@ export const MATRIX_COPY = {
   inYourSeat: 'in your seat',
   nextWeekly: (at: string) => `next weekly check ${at}`,
   add: (n: number, limit: number) => `Add a client site · ${count(n)} of ${count(limit)}`,
+  /** At the plan's site limit, for a reader who may buy: the way to the buy form on Seats. */
+  buySites: 'Add sites to the plan',
   addField: { label: 'Client site address', placeholder: 'example.com' },
   strip: {
     label: 'Since each client’s last check',

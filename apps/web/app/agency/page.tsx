@@ -5,6 +5,7 @@ import { AccountStateScreen } from '@/components/v2/screens/account/AccountState
 import { LiveActions } from '@/components/v2/screens/account/LiveActions';
 import { MatrixScreen } from '@/components/v2/screens/agency/MatrixScreen';
 import { checksPublicEnabled } from '@/lib/auth/flags';
+import { billingV2Enabled } from '@/lib/billing/flags';
 import { supabaseServer } from '@/lib/supabase/server';
 import { readAccount } from '@/lib/v2/account/pages';
 import { loadViewer } from '@/lib/v2/account/viewer';
@@ -40,7 +41,7 @@ export default async function AgencyPage({
   return (
     <LiveActions>
       <MatrixScreen
-        data={agencyHomeView(d, viewer, { accounts })}
+        data={agencyHomeView(d, viewer, { accounts, billing: billingV2Enabled() })}
         // The form a plan's limit refuses here is the add-client form: its notice names the limit.
         notice={noticeLine(await searchParams, account.timezone, tier)}
       />
