@@ -44,6 +44,10 @@ export const CLIENT_REPORTS_COPY = {
     asked: (date: string) => `asked to confirm ${date}`,
     confirmed: 'confirmed',
     paused: 'paused by the recipient',
+    /** The recipient answered "Don't ask me again": nothing asks that address for this client. */
+    declined: 'declined: answered “Don’t ask me again”',
+    /** After a contact that paused was asked again: when the next ask is possible. */
+    askAgainFrom: (date: string) => `; asked again since, and can be asked again from ${date}`,
     /** In the Agency trial, a contact that is not the account owner's own address: nothing is mailed to it. */
     trial: 'asked to confirm once the trial has become the plan',
   },

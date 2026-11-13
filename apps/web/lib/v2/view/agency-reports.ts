@@ -77,18 +77,36 @@ export interface ClientReportsSide {
    * Open. Left out (a preview), a report that is a document has one.
    */
   fileStates?: ReadonlyMap<string, FileState>;
+  /**
+   * By site id, why its contact may not be asked to confirm (`report_ask_refusals`): it answered
+   * "Don't ask me again", or it paused the reports and was asked again since. No entry: it may.
+   */
+  refusals?: ReadonlyMap<string, AskRefusalSide>;
 }
+
+export type AskRefusalSide =
+  | { refused: 'declined' }
+  | { refused: 'asked_recently'; nextAt: string };
 
 export interface ClientReportsReader {
   /** The accounts of the reader's active seats (`AccountViewer.accounts`). */
   accounts?: readonly SwitcherAccount[];
 }
 
-export type ContactState = 'none' | 'not_asked' | 'asked' | 'confirmed' | 'paused' | 'trial';
+export type ContactState =
+  | 'none'
+  | 'not_asked'
+  | 'asked'
+  | 'confirmed'
+  | 'paused'
+  | 'trial'
+  | 'declined';
 
 export interface ContactView {
   address: string | null;
   state: ContactState;
+  /** False where the recipient refused: the row then offers no ask of any kind. */
+  mayAsk: boolean;
   /** "confirmed", "asked to confirm Sat 31 Oct", "no contact"; in the Agency trial, when it is asked. */
   label: string;
 }
@@ -260,10 +278,23 @@ function contactOf(
   side: ScheduleSide | undefined,
   zone: string,
   held: boolean,
+  refusal: AskRefusalSide | undefined,
 ): ContactView {
   const address = s.client_contact_email;
-  const as = (state: ContactState, label: string): ContactView => ({ address, state, label });
+  // A contact asked since its pause is asked once: the row says from when it can be asked again.
+  const again =
+    refusal?.refused === 'asked_recently'
+      ? COPY.contact.askAgainFrom(dayDate(refusal.nextAt, zone))
+      : '';
+  const as = (state: ContactState, label: string): ContactView => ({
+    address,
+    state,
+    mayAsk: refusal === undefined,
+    label: `${label}${again}`,
+  });
   if (address === null) return as('none', COPY.contact.none);
+  // "Don't ask me again" is the recipient's, and stands whatever the schedule holds.
+  if (refusal?.refused === 'declined') return as('declined', COPY.contact.declined);
   const schedule = s.client_report;
   // The confirmation is the schedule's: a client with no schedule has none.
   if (schedule === null) return as('not_asked', COPY.contact.notAsked);
@@ -350,11 +381,15 @@ export function shownSent(reports: readonly Report[]): { shown: Report[]; total:
 
 function rowActions(s: Site, contact: ContactView, base: string): ActionView[] {
   return [
-    ...(contact.state === 'paused' ? [post('resume', COPY.askAfterPause, s)] : []),
+    ...(contact.state === 'paused' && contact.mayAsk
+      ? [post('resume', COPY.askAfterPause, s)]
+      : []),
     // With no schedule, or a contact that has confirmed, the confirm route has nothing to ask
     // (`resendConfirmation`, lib/v2/agency/schedules.ts). A contact the Agency trial keeps mail
     // from (`trial`) is in neither state here, so it is offered no ask.
-    ...(s.client_report !== null && (contact.state === 'asked' || contact.state === 'not_asked')
+    ...(s.client_report !== null &&
+    contact.mayAsk &&
+    (contact.state === 'asked' || contact.state === 'not_asked')
       ? [post('confirm', contact.state === 'asked' ? COPY.askAgain : COPY.askToConfirm, s)]
       : []),
     link(changeHref(base, s), COPY.change, { route: base, context: s.host }),
@@ -449,7 +484,13 @@ function reportsView(
       title: COPY.clientsTitle(clients.length),
       sub: COPY.clientsSub,
       rows: clients.map((s) => {
-        const contact = contactOf(s, side.schedules?.get(s.id), zone, heldByTrial(v, s));
+        const contact = contactOf(
+          s,
+          side.schedules?.get(s.id),
+          zone,
+          heldByTrial(v, s),
+          side.refusals?.get(s.id),
+        );
         return {
           key: s.id,
           client: s.client_name?.trim() || null,

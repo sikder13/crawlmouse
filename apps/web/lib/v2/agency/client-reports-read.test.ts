@@ -36,6 +36,11 @@ function recording(answer: (calls: Call[]) => Answer) {
       }
       return chain;
     },
+    // `report_ask_refusals`: no contact of these records has refused.
+    rpc: async (fn: string, args: unknown) => {
+      requests.push([['rpc', fn, args]]);
+      return { data: {}, error: null };
+    },
   };
   return { client: client as unknown as SupabaseClient, requests };
 }
@@ -90,11 +95,36 @@ describe('readClientReports', () => {
     const admin = nothing();
     await readClientReports({ session: session.client, admin: admin.client }, records(ids));
     const lists = (requests: Call[][]) =>
-      requests.map((calls) => (arg(calls, 'in') as [string, string[]])[1]);
+      requests
+        .filter((calls) => calls[0]![0] === 'from')
+        .map((calls) => (arg(calls, 'in') as [string, string[]])[1]);
     for (const asked of [lists(session.requests), lists(admin.requests)]) {
       expect(asked.map((l) => l.length)).toEqual([100, 100, 50]);
       expect(asked.flat()).toEqual(ids);
     }
+  });
+
+  it('asks the service role which contacts may not be asked, for the records’ sites and at the moment given', async () => {
+    const now = new Date('2026-11-12T12:00:00.000Z');
+    const refused = 'a0000000-0000-4000-8000-000000000001';
+    const admin = recording(() => ({ data: [], error: null }));
+    (admin.client as unknown as { rpc: unknown }).rpc = async (fn: string, args: unknown) => {
+      admin.requests.push([['rpc', fn, args]]);
+      return {
+        data: { [refused]: { refused: 'asked_recently', next_at: '2026-12-01T10:00:00+00:00' } },
+        error: null,
+      };
+    };
+    const read = await readClientReports(
+      { session: nothing().client, admin: admin.client, now: () => now },
+      records([refused, 'site-2']),
+    );
+    expect(admin.requests.filter((calls) => calls[0]![0] === 'rpc')).toEqual([
+      [['rpc', 'report_ask_refusals', { p_sites: [refused, 'site-2'], p_now: now.toISOString() }]],
+    ]);
+    expect([...read.side.refusals!]).toEqual([
+      [refused, { refused: 'asked_recently', nextAt: '2026-12-01T10:00:00.000Z' }],
+    ]);
   });
 
   it('asks the service role for the file states of the reports the session returned', async () => {

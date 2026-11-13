@@ -213,18 +213,21 @@ describe('the clients', () => {
     expect(row(view, GRANITEPEAK_SITE).contact).toEqual({
       address: 'ops@granitepeak.example',
       state: 'confirmed',
+      mayAsk: true,
       label: 'confirmed',
     });
     // Asked on Sat 31 Oct in the account's zone (America/Indiana/Indianapolis), not yet confirmed.
     expect(row(view, HARBORLIGHT_SITE).contact).toEqual({
       address: 'hello@harborlight.example',
       state: 'asked',
+      mayAsk: true,
       label: 'asked to confirm Sat 31 Oct',
     });
 
     const never = reports(d, northwind, {}, sideOf({ [GRANITEPEAK_SITE]: {} }));
     expect(row(never, GRANITEPEAK_SITE).contact).toMatchObject({
       state: 'not_asked',
+      mayAsk: true,
       label: 'not asked to confirm yet',
     });
 
@@ -233,6 +236,7 @@ describe('the clients', () => {
     });
     expect(row(reports(paused, northwind, {}, side), GRANITEPEAK_SITE).contact).toMatchObject({
       state: 'paused',
+      mayAsk: true,
       label: 'paused by the recipient',
     });
 
@@ -243,6 +247,7 @@ describe('the clients', () => {
     expect(row(reports(none, northwind, {}, side), GRANITEPEAK_SITE).contact).toEqual({
       address: null,
       state: 'none',
+      mayAsk: true,
       label: 'no contact',
     });
   });
@@ -371,6 +376,66 @@ describe('what a seat that may schedule reports is offered', () => {
     expect(reports(paused, northwind, {}, side).clients.sub).toBe(
       'A report goes to a client’s contact once the contact has confirmed. The pause link in a report stops them, and they start again only when the contact confirms again.',
     );
+  });
+
+  it('a contact that answered “Don’t ask me again” reads declined and is offered no ask, whatever the schedule holds', () => {
+    const paused = siteAs(GRANITEPEAK_SITE, {
+      client_report: { ...weekly, paused_by_recipient_at: '2026-11-01T09:00:00Z' },
+    });
+    const labels = (
+      data: FixtureDataset,
+      site: string,
+      refusals: ClientReportsSide['refusals'],
+    ) => {
+      const r = row(reports(data, northwind, {}, { ...side, refusals }), site);
+      return { contact: r.contact, actions: r.actions.map((a) => a.label) };
+    };
+    const declined = new Map([[GRANITEPEAK_SITE, { refused: 'declined' as const }]]);
+    // Paused, confirmed and waiting alike: the recipient's answer is what the row says.
+    for (const data of [paused, d]) {
+      expect(labels(data, GRANITEPEAK_SITE, declined)).toEqual({
+        contact: {
+          address: 'ops@granitepeak.example',
+          state: 'declined',
+          mayAsk: false,
+          label: 'declined: answered “Don’t ask me again”',
+        },
+        actions: ['Change'],
+      });
+    }
+    const asked = new Map([[HARBORLIGHT_SITE, { refused: 'declined' as const }]]);
+    expect(labels(d, HARBORLIGHT_SITE, asked).actions).toEqual(['Change']);
+    // Another client's refusal is not this one's.
+    expect(labels(paused, GRANITEPEAK_SITE, asked).actions).toEqual([
+      'Ask to confirm again',
+      'Change',
+    ]);
+  });
+
+  it('a contact asked again since its pause is offered no other ask, and the row says from when it can be', () => {
+    const recent = (site: string) =>
+      new Map([[site, { refused: 'asked_recently' as const, nextAt: '2026-12-01T15:00:00Z' }]]);
+    const paused = siteAs(GRANITEPEAK_SITE, {
+      client_report: { ...weekly, paused_by_recipient_at: '2026-11-01T09:00:00Z' },
+    });
+    const again = row(
+      reports(paused, northwind, {}, { ...side, refusals: recent(GRANITEPEAK_SITE) }),
+      GRANITEPEAK_SITE,
+    );
+    expect(again.contact).toMatchObject({
+      state: 'paused',
+      mayAsk: false,
+      label: 'paused by the recipient; asked again since, and can be asked again from Tue 1 Dec',
+    });
+    expect(again.actions.map((a) => a.label)).toEqual(['Change']);
+    // Asked and waiting (the schedule was removed and saved again): no "Ask again" either.
+    const waiting = row(
+      reports(d, northwind, {}, { ...side, refusals: recent(HARBORLIGHT_SITE) }),
+      HARBORLIGHT_SITE,
+    );
+    expect(waiting.contact).toMatchObject({ state: 'asked', mayAsk: false });
+    expect(waiting.contact.label).toContain('can be asked again from Tue 1 Dec');
+    expect(waiting.actions.map((a) => a.label)).toEqual(['Change']);
   });
 
   it('offers no ask where there is nothing to confirm: no schedule, or no contact', () => {
@@ -622,6 +687,7 @@ describe('an account in its Agency trial', () => {
       expect(row(view, PINECREST).contact).toEqual({
         address: 'client@pinecrest.example',
         state: 'trial',
+        mayAsk: true,
         label: 'asked to confirm once the trial has become the plan',
       });
       expect(labels(view)).toEqual(['Change']);

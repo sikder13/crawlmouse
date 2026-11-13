@@ -364,7 +364,11 @@ describe('readClientReports', () => {
       none,
     );
     expect(read.d).toBe(none);
-    expect(read.side).toEqual({ schedules: new Map(), fileStates: new Map() });
+    expect(read.side).toEqual({
+      schedules: new Map(),
+      fileStates: new Map(),
+      refusals: new Map(),
+    });
     expect(log).toEqual([]);
   });
 });

@@ -6,16 +6,19 @@
  * session: row security decides which of them a seat reads, and a report's `recipient_email`
  * reaches the page from that read.
  *
- * The service role then reads two things by ids the caller's session returned. For the sites: when
+ * The service role then reads three things by ids the caller's session returned. For the sites: when
  * each schedule runs next, and when its contact was asked and confirmed, two columns that
  * `infra/supabase/checks/01-client-table-privileges.sql` does not list among those a client role
- * reads. For the reports the page lists: whether each one's document is stored.
+ * reads; and which contacts may not be asked to confirm, as `report_ask_refusals` answers it (the
+ * answer says why and holds no address). For the reports the page lists: whether each one's
+ * document is stored.
  */
 import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { reportFromRow } from '../account/rows';
 import { instantFromDb } from '../pipeline/rows';
 import { reportFileStates } from '../reports/share-proof';
+import { askRefusals } from './schedules-store';
 import type { AccountDataset } from '../view/account';
 import { shownSent, type ClientReportsSide, type ScheduleSide } from '../view/agency-reports';
 
@@ -112,19 +115,25 @@ export async function readClientReports(
     session: SupabaseClient;
     /** The service role. */
     admin: SupabaseClient;
+    /** The moment the refusals are read at; now, unless a test gives one. */
+    now?: () => Date;
   },
   d: AccountDataset,
 ): Promise<ClientReportsRead> {
   const siteIds = d.sites.map((s) => s.id);
-  if (siteIds.length === 0) return { d, side: { schedules: new Map(), fileStates: new Map() } };
-  const [reports, schedules] = await Promise.all([
+  if (siteIds.length === 0) {
+    return { d, side: { schedules: new Map(), fileStates: new Map(), refusals: new Map() } };
+  }
+  const [reports, schedules, refusals] = await Promise.all([
     sentClientReports(deps.session, siteIds),
     scheduleSides(deps.admin, siteIds),
+    askRefusals(deps.admin, siteIds, deps.now?.() ?? new Date()),
   ]);
   return {
     d: { ...d, reports: [...d.reports, ...reports] },
     side: {
       schedules,
+      refusals,
       fileStates: await reportFileStates(deps.admin, shownSent(reports).shown),
     },
   };
