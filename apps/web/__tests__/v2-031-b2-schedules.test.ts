@@ -1610,6 +1610,61 @@ describe('what a recipient refused (owner ruling on Q42)', () => {
       }
     });
 
+    it('an old link’s page reads gone where its press would stop nothing of this client: another account’s row, a live row with no schedule, a removed confirmation link, a marked account', async () => {
+      const email = 'reader@client.example';
+      /** A confirmed client with a report's pause link, its row then removed. */
+      const removedWithLink = async () => {
+        const c = await confirmed(email);
+        const link = pauseToken();
+        expect((await issuePause(c.siteId, NOW, link)).outcome).toBe('issued');
+        await db.query(`update public.sites set removed_at = $2 where id = $1`, [c.siteId, at(5)]);
+        return { ...c, link };
+      };
+      // Another account keeps the host, with the same contact and a schedule.
+      const a = await removedWithLink();
+      const other = await client();
+      const theirs = randomUUID();
+      await insertRow(db, 'sites', ROWS.sites(theirs, other.accountId, a.host));
+      await setClient(theirs, other.accountId, { client_contact_email: email });
+      await setSchedule(theirs, other.accountId, WEEKLY, at(5));
+      expect(await readLink(a.link, at(6))).toEqual({ outcome: 'gone' });
+      // The client is back with that contact and no schedule.
+      const b = await removedWithLink();
+      const back = randomUUID();
+      await insertRow(db, 'sites', ROWS.sites(back, b.accountId, b.host));
+      await setClient(back, b.accountId, { client_contact_email: email });
+      expect(await readLink(b.link, at(6))).toEqual({ outcome: 'gone' });
+      // With the schedule saved, the same link reads as a pause link of the client.
+      await setSchedule(back, b.accountId, WEEKLY, at(6));
+      expect(await readLink(b.link, at(6))).toMatchObject({ outcome: 'pause' });
+      // And the account marked for deletion: gone again.
+      await mark(b.accountId);
+      expect(await readLink(b.link, at(7))).toEqual({ outcome: 'gone' });
+      // A confirmation link of a row since removed, with the client back and asking again.
+      const c = await client();
+      await setClient(c.siteId, c.accountId, { client_contact_email: email });
+      await setSchedule(c.siteId, c.accountId);
+      const asked = await issueConfirmation(c.siteId, NOW, 'before-removal');
+      expect(await readLink(asked.token as string, NOW)).toMatchObject({ outcome: 'confirm' });
+      await readded(c);
+      expect(await readLink(asked.token as string, at(6))).toEqual({ outcome: 'gone' });
+    });
+
+    it('the recipient’s confirmation leaves a row of the client that holds nothing for the address unwritten', async () => {
+      const c = await client();
+      await setClient(c.siteId, c.accountId, { client_contact_email: 'reader@client.example' });
+      await setSchedule(c.siteId, c.accountId);
+      const again = await readded(c);
+      expect([await refusals(c.siteId), await refusals(again)]).toEqual([[], []]);
+      const version = async (id: string) =>
+        (await db.query<{ v: string }>(`select xmin::text v from public.sites where id = $1`, [id]))
+          .rows[0]!.v;
+      const before = await version(c.siteId);
+      const asked = await issueConfirmation(again, at(6), 'on-the-live-row');
+      expect((await confirm(asked.token as string, at(6))).outcome).toBe('confirmed');
+      expect(await version(c.siteId)).toBe(before);
+    });
+
     it('the old report’s pause link leaves a live row whose contact is another address sending, and its page reads gone', async () => {
       const c = await confirmed('reader@client.example');
       const oldLink = pauseToken();
@@ -2037,9 +2092,10 @@ describe('what a recipient refused (owner ruling on Q42)', () => {
      * refused it: a request to one that declined, a second request inside the window to one that
      * paused, a report to either, and a resume the sender was let do. Beside it, another account
      * holds the same host with the same contact; the last entries say whether anything reached it.
-     * `held` counts the times a function refused for the recipient's reason (the request's own
-     * answer to report_ask_refusals, a report to a schedule the recipient paused, a resume answered
-     * `declined` or `asked_recently`), so runs that met none of a kind are told apart.
+     * `held` counts a request refused while report_ask_refusals names a refusal, a report refused to
+     * a schedule the recipient paused, and a resume answered `declined` or `asked_recently`, so runs
+     * that met none of a kind are told apart. A request or a report may be refused for another
+     * reason first (an unconfirmed or paused schedule) and still be counted: an upper bound.
      */
     async function wrongs(steps: Step[]): Promise<{ wrong: string[]; held: Held }> {
       const out: string[] = [];

@@ -1111,15 +1111,18 @@ asked nothing on the row the client came back as. A pause's window is counted fr
 to that address on any row of the client. The link of a mail sent before the removal, the request's
 "Don't ask me again" or a report's pause link, stops what the live row was about to send, pressed in
 the mail client or followed to its page (`read_report_link` reads a removed row's pause link while
-the client has a live row for that address). Another account that adds the same
+the client has a live row with a schedule for that address; otherwise, and for a removed row's
+confirmation link, it reads gone). Another account that adds the same
 host holds none of it, and its requests and reports are not touched. Past `report_refusals_max()`
 entries on a row, the oldest that hold a link's hash and nothing else go; an entry that records a
 pause, a refusal or a request's time is kept whatever the count.
 
 Two tests hold this beside the function tests. A generated sequence of the account's and the
 recipient's actions, on a client whose rows come and go by both routes, is judged at each request,
-report and resume, and counts the times a function refused for the recipient's reason, so that
-runs that met none of a kind fail
+report and resume, and counts what it met of each kind (a request refused while
+`report_ask_refusals` names a refusal, a report refused to a paused schedule, a resume the recipient
+refused), so that runs that met none of a kind fail. A request or a report can be refused for
+another reason first and still be counted, so the counts are an upper bound
 (`pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-031-b2-schedules.test.ts`). And on a
 real Postgres, with the product's own `add_site`, `remove_site` and `keep_check` and with two calls
 held open at once (`scripts/db/report-links-race.test.ts`, a step of CI's `db-cli-files` job).

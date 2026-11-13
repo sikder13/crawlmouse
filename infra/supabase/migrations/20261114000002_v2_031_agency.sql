@@ -1704,8 +1704,9 @@ $$;
 -- Answers {outcome}: 'confirm' or 'pause' with host and account_name; 'gone' for a hash no schedule
 -- holds, a confirmation link issued more than seven days before p_now, a removed site, and a
 -- deleted or marked account. A pause link of a removed row still reads 'pause' while the client
--- has a live row whose contact is that address: pause_report_schedule stops that row's reports,
--- so the page offers its button as the mail's one-click does.
+-- has a live row with a schedule whose contact is that address: pause_report_schedule stops that
+-- row's reports, so the page offers its button as the mail's one-click does. A removed row's
+-- confirmation link, and a pause link whose client has no such row, read 'gone'.
 create or replace function public.read_report_link(p_token_hash text, p_now timestamptz)
 returns jsonb
 language sql
