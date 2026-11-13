@@ -34,7 +34,7 @@ async function person(createdAt: string) {
 }
 
 describe('account', () => {
-  it('reads the internal mark, the history, the subscription, the owner’s address and the first site', async () => {
+  it('reads the internal mark, the subscription, the owner’s address and the first site', async () => {
     const email = `owner-${randomUUID()}@example.com`;
     const userId = await signUp(db, email);
     const { accountId } = await personalAccount(db, userId);
@@ -56,7 +56,6 @@ describe('account', () => {
       ownerEmail: email,
       host: 'first.example',
     });
-    expect(a!.history.map((h) => h.state)).toEqual(['free']);
   });
 
   it('names the active owner alone: not an active developer seat, not a removed owner seat', async () => {
@@ -203,7 +202,7 @@ function sweepDeps(
       log: () => undefined,
     },
     store,
-    latestInvoice: async () => null,
+    payment: async () => ({ invoice: null, earlier: 'none' }),
     confirmed: async (u) => confirmed(u),
     to: FOUNDER,
     now,

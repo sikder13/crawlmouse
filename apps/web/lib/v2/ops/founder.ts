@@ -34,7 +34,7 @@ import {
   type StripeInvoiceStatus,
 } from '../mail/templates/founder-event';
 import { digestDue } from './digest-clock';
-import { classifyEntitlement } from './founder-classify';
+import { classifyEntitlement, paymentLabel, type PaymentRecord } from './founder-classify';
 import type { FounderStore, NoticeAccount } from './founder-store';
 
 /** Instant notices of one kind of account (internal or not) mailed in an hour before the rest are held. */
@@ -60,19 +60,14 @@ export type FounderLogEvent =
   | 'founder.key_refused'
   | 'founder.confirmation_unread';
 
-export interface LatestInvoice {
-  /** Stripe's status, as given; null when Stripe gives none. */
-  status: string | null;
-  amountPaid: number;
-  amountDue: number;
-  currency: string;
-}
+export type { PaymentRecord };
+type InvoiceFacts = NonNullable<PaymentRecord['invoice']>;
 
 /**
  * The amount a notice shows (review C3): `amount_paid` from a paid invoice, else `amount_due` with
  * the invoice's status, so an invoice Stripe has not charged yet is not shown as a payment of 0.
  */
-export function amountOf(inv: LatestInvoice): FounderAmount {
+export function amountOf(inv: InvoiceFacts): FounderAmount {
   const status = (STRIPE_INVOICE_STATUSES as readonly (string | null)[]).includes(inv.status)
     ? (inv.status as StripeInvoiceStatus)
     : null;
@@ -84,8 +79,8 @@ export function amountOf(inv: LatestInvoice): FounderAmount {
 export interface FounderDeps {
   mail: MailDeps;
   store: FounderStore;
-  /** The followed subscription's latest invoice from Stripe; null when it has none. */
-  latestInvoice(subscriptionId: string): Promise<LatestInvoice | null>;
+  /** Stripe's record of the followed subscription's payment; throws when Stripe cannot be read. */
+  payment(subscriptionId: string): Promise<PaymentRecord>;
   /** Whether Supabase Auth shows the user's address confirmed. */
   confirmed(userId: string): Promise<boolean>;
   /** FOUNDER_NOTIFY_TO as set, unchecked. */
@@ -110,8 +105,7 @@ interface Notice {
   occurredAt: string;
   plan: FounderEventInput['plan'];
   payment?: FounderEventInput['payment'];
-  /** Read when the mail is rendered, after the ledger's claim. */
-  amount?: () => Promise<FounderAmount | null>;
+  amount?: FounderAmount | null;
 }
 
 export type NoticeOutcome = 'held' | 'skipped' | 'key_refused' | SendOutcome;
@@ -148,7 +142,7 @@ async function notify(d: FounderDeps, to: string | null, n: Notice): Promise<Not
         accountId: n.accountId,
         plan: n.plan,
         payment: n.payment,
-        amount: n.amount === undefined ? undefined : await n.amount(),
+        amount: n.amount,
         host: n.account?.host ?? null,
         ownerEmail: n.account?.ownerEmail ?? null,
         occurredAt: n.occurredAt,
@@ -165,10 +159,15 @@ export interface EntitlementEvent {
   occurredAt: string;
 }
 
+/**
+ * A payment's notice reads Stripe before its claim: the label (first, returning or neither) and the
+ * amount are Stripe's. A recovery from past_due is noticed only as a first payment; otherwise, or when
+ * Stripe cannot be read, it answers `no_notice` and claims nothing.
+ */
 export async function entitlementNotice(
   d: FounderDeps,
   ev: EntitlementEvent,
-): Promise<NoticeOutcome | 'event_id_refused' | 'digest_only'> {
+): Promise<NoticeOutcome | 'event_id_refused' | 'no_notice'> {
   if (
     ev.id === undefined ||
     !ENTITLEMENT_ID.test(ev.id) ||
@@ -177,22 +176,20 @@ export async function entitlementNotice(
     d.log('founder.event_id_refused', { length: ev.id?.length ?? 0 });
     return 'event_id_refused';
   }
+  const c = classifyEntitlement(ev.from, ev.to);
+  if (c === null) return 'no_notice';
   const account = await d.store.account(ev.accountId);
-  const c = classifyEntitlement(ev.from, ev.to, account?.history ?? []);
-  if (c === null) return 'digest_only';
   const subscriptionId = account?.subscriptionId ?? null;
-  const amount =
-    c.kind === 'trial_started'
-      ? undefined
-      : async (): Promise<FounderAmount | null> => {
-          if (subscriptionId === null) return null;
-          try {
-            const inv = await d.latestInvoice(subscriptionId);
-            return inv === null ? null : amountOf(inv);
-          } catch {
-            return null;
-          }
-        };
+  let record: PaymentRecord | null = null;
+  if (c.kind !== 'trial_started' && subscriptionId !== null) {
+    try {
+      record = await d.payment(subscriptionId);
+    } catch {
+      record = null;
+    }
+  }
+  const payment = c.kind === 'payment' ? paymentLabel(record) : undefined;
+  if (c.kind === 'payment' && c.recovery && payment !== 'first') return 'no_notice';
   return notify(d, recipient(d), {
     key: `entitlement:${ev.id}`,
     kind: c.kind,
@@ -200,8 +197,9 @@ export async function entitlementNotice(
     account,
     occurredAt: ev.occurredAt,
     plan: c.plan,
-    payment: c.kind === 'payment' ? c.payment : undefined,
-    amount,
+    payment,
+    amount:
+      c.kind === 'trial_started' ? undefined : record?.invoice ? amountOf(record.invoice) : null,
   });
 }
 

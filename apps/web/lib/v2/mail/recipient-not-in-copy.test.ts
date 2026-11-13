@@ -227,10 +227,6 @@ async function sweep() {
     digestCounts: async () => counts,
     account: async () => ({
       internal: false,
-      history: [
-        { state: 'free', since: '2026-11-01T00:00:00.000Z' },
-        { state: 'pro_trial', since: '2026-11-13T09:00:00.000Z' },
-      ],
       subscriptionId: null,
       ownerEmail: 'qzx-owner@inbox.example',
       host: 'shop.example',
@@ -239,7 +235,7 @@ async function sweep() {
   const founder = (now: Date): FounderDeps => ({
     mail: { ...mail, now: () => now },
     store: founderStore,
-    latestInvoice: async () => null,
+    payment: async () => ({ invoice: null, earlier: 'none' }),
     confirmed: async () => true,
     to: TO.founderEvent,
     now: () => now,

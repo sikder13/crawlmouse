@@ -12,7 +12,7 @@ import {
   sweep,
   type EntitlementEvent,
   type FounderDeps,
-  type LatestInvoice,
+  type PaymentRecord,
 } from './founder';
 import type { FounderStore, NoticeAccount, NoticeClaim, NoticeState } from './founder-store';
 
@@ -86,21 +86,29 @@ function memoryNotices(accounts: Record<string, NoticeAccount> = {}) {
 
 const account = (over: Partial<NoticeAccount> = {}): NoticeAccount => ({
   internal: false,
-  history: [
-    { state: 'free', since: '2026-11-01T00:00:00.000Z' },
-    { state: 'pro_trial', since: '2026-11-02T00:00:00.000Z' },
-    { state: 'pro', since: '2026-11-13T14:59:00.000Z' },
-  ],
   subscriptionId: 'sub_123',
   ownerEmail: OWNER,
   host: 'shop.example',
   ...over,
 });
 
+/** Stripe's record: a paid latest invoice of 19.00 (amount_due 25.00, to tell them apart), and no earlier paid one. */
+const record = (over: Partial<PaymentRecord> = {}): PaymentRecord => ({
+  invoice: { status: 'paid', amountPaid: 1900, amountDue: 2500, currency: 'usd' },
+  earlier: 'none',
+  ...over,
+});
+const unpaid = (amountDue: number) => ({
+  status: 'open',
+  amountPaid: 0,
+  amountDue,
+  currency: 'usd',
+});
+
 interface Setup {
   to?: string | null;
   transport?: MailTransport;
-  invoice?: (sub: string) => Promise<LatestInvoice | null>;
+  payment?: (sub: string) => Promise<PaymentRecord>;
   confirmed?: (user: string) => Promise<boolean>;
   accounts?: Record<string, NoticeAccount>;
   now?: Date;
@@ -123,10 +131,7 @@ function setup(s: Setup = {}) {
   const d: FounderDeps = {
     mail,
     store: notices.store,
-    latestInvoice: vi.fn(
-      s.invoice ??
-        (async () => ({ status: 'paid', amountPaid: 1900, amountDue: 2500, currency: 'usd' })),
-    ),
+    payment: vi.fn(s.payment ?? (async () => record())),
     confirmed: vi.fn(s.confirmed ?? (async () => true)),
     to: s.to === undefined ? FOUNDER : s.to,
     now: () => s.now ?? NOW,
@@ -175,7 +180,7 @@ describe('entitlementNotice', () => {
     expect(m.text).toContain('Amount: $19.00');
     expect(m.text).toContain(`Owner: ${OWNER}`);
     expect(m.idempotencyKey).toBe(`founder_event:entitlement:${id()}`);
-    expect(d.latestInvoice).toHaveBeenCalledWith('sub_123');
+    expect(d.payment).toHaveBeenCalledWith('sub_123');
     // The ledger row names no account: the founder's mail is in no customer's list.
     expect(ledger.claims.map((c) => [c.kind, c.accountId])).toEqual([['founder_event', null]]);
   });
@@ -214,26 +219,26 @@ describe('entitlementNotice', () => {
     }
   });
 
-  it('claims nothing for a change the digest alone reports', async () => {
+  it('claims nothing for a change that has no instant notice', async () => {
     const { d, rows } = setup();
-    expect(await entitlementNotice(d, change('pro', 'agency'))).toBe('digest_only');
-    expect(await entitlementNotice(d, change('pro_trial', 'free'))).toBe('digest_only');
+    expect(await entitlementNotice(d, change('pro', 'agency'))).toBe('no_notice');
+    expect(await entitlementNotice(d, change('pro_trial', 'free'))).toBe('no_notice');
     expect(rows.size).toBe(0);
   });
 
   it('says the amount was not read when Stripe throws or has no invoice, and uses amount_due for a failure', async () => {
     const thrown = setup({
-      invoice: async () => {
+      payment: async () => {
         throw new Error('stripe down');
       },
     });
     await entitlementNotice(thrown.d, change('pro_trial', 'pro'));
     expect(thrown.transport.sent[0]!.text).toContain('Amount: not read from Stripe');
-    const none = setup({ invoice: async () => null });
+    const none = setup({ payment: async () => record({ invoice: null }) });
     await entitlementNotice(none.d, change('pro_trial', 'pro'));
     expect(none.transport.sent[0]!.text).toContain('Amount: not read from Stripe');
     const failed = setup({
-      invoice: async () => ({ status: 'open', amountPaid: 0, amountDue: 19000, currency: 'usd' }),
+      payment: async () => record({ invoice: unpaid(19000) }),
     });
     await entitlementNotice(failed.d, change('pro', 'past_due'));
     expect(failed.transport.sent[0]!.subject).toBe('Payment failed: Pro');
@@ -248,13 +253,83 @@ describe('entitlementNotice', () => {
     // amount_paid 1900, amount_due 2500: the paid figure is the one shown.
     expect(paid.transport.sent[0]!.text).toContain('Amount: $19.00 paid');
     // A trial's end: Stripe creates the invoice and charges it about an hour later.
-    const pending = setup({
-      invoice: async () => ({ status: 'open', amountPaid: 0, amountDue: 1900, currency: 'usd' }),
-    });
+    const pending = setup({ payment: async () => record({ invoice: unpaid(1900) }) });
     await entitlementNotice(pending.d, change('pro_trial', 'pro'));
     const text = pending.transport.sent[0]!.text;
     expect(text).toContain('Amount: $19.00 due, not yet paid (Stripe invoice status: open)');
     expect(text).not.toContain('$0.00');
+  });
+
+  it('calls a payment first or returning as Stripe’s paid invoices say, not the account’s history (review C2)', async () => {
+    const first = setup({ payment: async () => record({ earlier: 'none' }) });
+    await entitlementNotice(first.d, change('free', 'pro'));
+    const returning = setup({ payment: async () => record({ earlier: 'some' }) });
+    await entitlementNotice(returning.d, change('free', 'pro'));
+    const unsaid = setup({ payment: async () => record({ earlier: 'unknown' }) });
+    await entitlementNotice(unsaid.d, change('free', 'pro'));
+    const unread = setup({
+      payment: async () => {
+        throw new Error('stripe down');
+      },
+    });
+    await entitlementNotice(unread.d, change('agency_trial', 'agency'));
+    expect(
+      [first, returning, unsaid, unread].map((s) => s.transport.sent.map((m) => m.subject)),
+    ).toEqual([
+      ['First payment: Pro'],
+      ['Payment (returning): Pro'],
+      ['Payment: Pro'],
+      ['Payment: Agency'],
+    ]);
+  });
+
+  it('pro_trial → past_due → pro: the failed charge, then the first payment once Stripe holds no earlier paid invoice (review C2)', async () => {
+    const { d, transport } = setup({ payment: async () => record({ invoice: unpaid(1900) }) });
+    expect(
+      await entitlementNotice(d, change('pro_trial', 'past_due', { id: id(ACCOUNT, 'evt_fail') })),
+    ).toBe('sent');
+    vi.mocked(d.payment).mockResolvedValue(record({ earlier: 'none' }));
+    expect(
+      await entitlementNotice(d, change('past_due', 'pro', { id: id(ACCOUNT, 'evt_paid') })),
+    ).toBe('sent');
+    expect(transport.sent.map((m) => m.subject)).toEqual([
+      'Payment failed: Pro',
+      'First payment: Pro',
+    ]);
+    expect(transport.sent[1]!.text).toContain('Amount: $19.00 paid');
+  });
+
+  it('past_due → pro after an earlier payment is a recovery: no instant notice, nothing claimed (review C2)', async () => {
+    for (const earlier of ['some', 'unknown'] as const) {
+      const { d, transport, rows } = setup({ payment: async () => record({ earlier }) });
+      expect(await entitlementNotice(d, change('past_due', 'pro'))).toBe('no_notice');
+      expect(transport.sent).toEqual([]);
+      expect(rows.size).toBe(0);
+    }
+    const unread = setup({
+      payment: async () => {
+        throw new Error('stripe down');
+      },
+    });
+    expect(await entitlementNotice(unread.d, change('past_due', 'agency'))).toBe('no_notice');
+    expect(unread.rows.size).toBe(0);
+  });
+
+  it('pro_trial → past_due → free → pro: the payment is the first when Stripe holds no earlier paid invoice (review C2)', async () => {
+    const { d, transport } = setup({ payment: async () => record({ earlier: 'none' }) });
+    await entitlementNotice(d, change('free', 'pro'));
+    expect(transport.sent.map((m) => m.subject)).toEqual(['First payment: Pro']);
+  });
+
+  it('the same from → to twice: each labelled by Stripe’s record when it is sent (review C2)', async () => {
+    const { d, transport } = setup({ payment: async () => record({ earlier: 'none' }) });
+    await entitlementNotice(d, change('free', 'pro', { id: id(ACCOUNT, 'evt_a') }));
+    vi.mocked(d.payment).mockResolvedValue(record({ earlier: 'some' }));
+    await entitlementNotice(d, change('free', 'pro', { id: id(ACCOUNT, 'evt_b') }));
+    expect(transport.sent.map((m) => m.subject)).toEqual([
+      'First payment: Pro',
+      'Payment (returning): Pro',
+    ]);
   });
 
   it('marks an internal account’s notice [TEST]', async () => {

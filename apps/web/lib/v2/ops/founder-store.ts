@@ -5,7 +5,6 @@
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { z } from 'zod';
-import { AccountStateSchema } from '@crawlmouse/types/v2';
 import {
   DIGEST_FIGURES,
   type DigestCounts,
@@ -16,7 +15,6 @@ import {
   type FounderEventKind,
   type FounderOverflowRow,
 } from '../mail/templates/founder-event';
-import type { History } from './founder-classify';
 
 export type NoticeState = 'send' | 'held' | 'skipped';
 
@@ -36,7 +34,6 @@ export interface NoticeClaim {
 /** An account as a notice names it. */
 export interface NoticeAccount {
   internal: boolean;
-  history: History;
   subscriptionId: string | null;
   /** The active owner's address, or null when the account has none. */
   ownerEmail: string | null;
@@ -96,7 +93,6 @@ const CountsSchema = z.strictObject(
     z.ZodInt
   >,
 );
-const HistorySchema = z.array(z.object({ state: AccountStateSchema, since: z.string() }));
 
 function fail(what: string, error: { code?: string } | null): never {
   throw new Error(`${what}: ${error?.code ?? 'error'}`);
@@ -136,7 +132,7 @@ export function supabaseFounderStore(sb: SupabaseClient): FounderStore {
     async account(accountId) {
       const { data: a, error } = await sb
         .from('accounts')
-        .select('internal, state_history, current_subscription_id')
+        .select('internal, current_subscription_id')
         .eq('id', accountId)
         .maybeSingle();
       if (error) fail('accounts', error);
@@ -170,13 +166,11 @@ export function supabaseFounderStore(sb: SupabaseClient): FounderStore {
       const row = z
         .object({
           internal: z.boolean(),
-          state_history: HistorySchema,
           current_subscription_id: z.string().nullable(),
         })
         .parse(a);
       return {
         internal: row.internal,
-        history: row.state_history,
         subscriptionId: row.current_subscription_id,
         ownerEmail,
         host: (sites?.[0]?.host as string | undefined) ?? null,
