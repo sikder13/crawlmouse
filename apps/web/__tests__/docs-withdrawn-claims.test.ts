@@ -389,6 +389,24 @@ const WITHDRAWN: readonly WithdrawnClaim[] = [
     truth: 'While the repository is public, apply waits for the owner to approve production.',
     allowedIn: [],
   },
+  // The two below were corrected in d0c2b506 and e6238b12 and registered in the commit after them.
+  {
+    text: 'A form refused with 400, 402, 409 or 429',
+    withdrawnIn: 'docs/specs/v2/31-agency.md §9, CC-31 Tier B review round 2 (n7)',
+    truth:
+      'POST /api/reports sends a form back to /reports for either of its two 400s, its 402, its ' +
+      '403, its 409 and its 429; no request reaches the 403 while each role may export_report.',
+    allowedIn: [],
+  },
+  {
+    text: "says what holds a schedule's reports where something does",
+    withdrawnIn: 'docs/specs/v2/31-agency.md §8, CC-31 Tier B review round 2 (n6)',
+    truth:
+      'The matrix’s schedule cell says three holds its records show: no contact, the Agency trial ' +
+      'for a contact that is not the owner’s address, and a pause by the recipient. A contact ' +
+      'that has not confirmed is not in those records, and the cell says nothing of it.',
+    allowedIn: [],
+  },
 ];
 
 /**
