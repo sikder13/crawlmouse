@@ -296,6 +296,47 @@ describe('direct reads with the person’s own token', () => {
   });
 });
 
+// What D2 leaves as it is (docs/specs/v2/31-agency.md §4, security review r1 m1): rows of the account
+// itself, which a seat reads whatever clients it covers. Pinned here so the spec's list is this test's.
+describe('what a seat reads of the account itself, whatever its scope', () => {
+  const reads = async (who: Who) => {
+    const sb = sessionOver(db, { id: w[who].id, email: w[who].email });
+    const [account, subscriptions, rules] = await Promise.all([
+      sb
+        .from('accounts')
+        .select('card_last4, current_subscription_id, state_history')
+        .eq('id', w.accountId),
+      sb.from('subscriptions').select('id').eq('account_id', w.accountId),
+      sb.from('alert_rules').select('id').eq('account_id', w.accountId).is('site_id', null),
+    ]);
+    return {
+      account: (account.data ?? []).length,
+      subscriptions: (subscriptions.data ?? []).length,
+      accountRules: (rules.data ?? []).length,
+    };
+  };
+
+  beforeAll(async () => {
+    await db.query(`select public.seed_default_alert_rules($1)`, [w.accountId]);
+  });
+
+  it('the developer scoped to one client reads what the owner reads of them', async () => {
+    const owner = await reads('owner');
+    expect(owner.account).toBe(1);
+    expect(owner.accountRules).toBeGreaterThan(0);
+    expect(await reads('developer')).toEqual(owner);
+    expect(await reads('manager')).toEqual(owner);
+  });
+
+  it.each(['removed', 'stranger'] as const)('%s reads none of them', async (who) => {
+    expect(await reads(who)).toEqual({
+      account: 0,
+      subscriptions: 0,
+      accountRules: 0,
+    });
+  });
+});
+
 describe('a seat removed between two reads', () => {
   /** The reads above, for both sites, as one value. */
   const everyRead = async (p: Person) => ({
