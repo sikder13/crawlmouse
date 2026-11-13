@@ -142,7 +142,8 @@ describe('the function rows against the code', () => {
     'inngest/trial-lifecycle.ts': 6, // 87 89 99 102 103 113
     'inngest/past-due-sweep.ts': 4, // 51 52 58 61
     'inngest/deletion.ts': 6, // 73 85 97 98 106 110
-    'inngest/mail.ts': 5, // 88 99 110 126 141
+    'inngest/mail.ts': 8, // 115 126 137 153 164 182 195 210
+    'inngest/report-schedules.ts': 1, // 30
     'inngest/schedule.ts': 5, // 98 104 113 122 139
     'inngest/alerts.ts': 2, // 51 57
     'inngest/summary.ts': 4, // 52 57 61 88
@@ -332,10 +333,12 @@ describe('a check against a worker that answers busy, runs long or loses a batch
 
 describe('the month', () => {
   it('computes the floor from the cron rows: runs a day × (1 + idle steps) × 31', () => {
-    // Independent sum: reaper 144×2, three hourly ticks and the sweep 24×3 each, five dailies.
-    const hand = (144 * 2 + 24 * 3 * 3 + (2 + 1) + (2 + 1) + (1 + 2) + (1 + 2) + (1 + 1)) * 31;
+    // Independent sum: reaper 144×2, three hourly ticks and the sweep 24×3 each, the hourly report
+    // schedules 24×2 (CC-31), five dailies.
+    const hand =
+      (144 * 2 + 24 * 3 * 3 + 24 * 2 + (2 + 1) + (2 + 1) + (1 + 2) + (1 + 2) + (1 + 1)) * 31;
     expect(monthlyFloor()).toBe(hand);
-    expect(FUNCTIONS.filter((f) => f.runsPerDay > 0).map(cronPerDay)).toHaveLength(9);
+    expect(FUNCTIONS.filter((f) => f.runsPerDay > 0).map(cronPerDay)).toHaveLength(10);
   });
 
   it('counts a finished check as starting three functions of two executions each', () => {
@@ -361,8 +364,9 @@ describe('the floor by switch-on step', () => {
     // V2_PIPELINE: v1's 3+3 a day, the reaper 288, the expiry 3.
     expect(pipeline!.floor).toBe((3 + 3 + 288 + 3) * 31);
     expect(door!.floor).toBe(pipeline!.floor);
-    // V2_CHECKS_PUBLIC adds the purge 3, the contact purge 2, the schedule and summary ticks 72 each.
-    expect(checks!.floor).toBe(door!.floor + (3 + 2 + 72 + 72) * 31);
+    // V2_CHECKS_PUBLIC adds the purge 3, the contact purge 2, the schedule and summary ticks 72 each,
+    // and CC-31's report schedules 48.
+    expect(checks!.floor).toBe(door!.floor + (3 + 2 + 72 + 72 + 48) * 31);
     // V2_BILLING adds the past-due sweep, 72 a day.
     expect(billing!.floor).toBe(checks!.floor + 72 * 31);
     expect(billing!.floor).toBe(monthlyFloor());

@@ -475,7 +475,7 @@ const WITHDRAWN: readonly WithdrawnClaim[] = [
     text: 'lists 4 functions',
     withdrawnIn: 'docs/ops/go-live.md (sync boxes), CC-35 review round 1 (Tier B B2)',
     truth:
-      'Inngest syncs an onFailure handler as a function of its own: 5, 10, 10, 22 and 24 (golive-sync-count.test.ts).',
+      'Inngest syncs an onFailure handler as a function of its own: the counts functionCountsByStep() prints, which golive-sync-count.test.ts holds to the serve route.',
     allowedIn: [],
   },
   {
