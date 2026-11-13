@@ -53,7 +53,7 @@ const READ_SCOPE: Record<string, ReadScope> = {
   share_links: 'none',
   api_keys: 'account_managers',
   deploy_hooks: 'site',
-  seat_sites: 'account',
+  seat_sites: 'site',
   check_ledger_links: 'none',
   // Members read counts through usage_counts() (v2-006b-data-foundations.test.ts), never a row.
   usage_events: 'none',

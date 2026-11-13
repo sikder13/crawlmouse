@@ -7,7 +7,11 @@ import type { Account } from '@crawlmouse/types/v2';
 import { NO_EXTRAS, contractLimits } from '../../../../lib/entitlement-v2';
 import { fixture } from '../../../../lib/v2/fixtures';
 import { firstRunNow, viewAt, type Viewer } from '../../../../lib/v2/view/account';
-import { accountShellView } from '../../../../lib/v2/view/account-shell';
+import {
+  accountShellView,
+  type ShellView,
+  type SwitcherAccount,
+} from '../../../../lib/v2/view/account-shell';
 import { dashboardView } from '../../../../lib/v2/view/dashboard';
 import { sitePage, siteView, type FirstCheckView } from '../../../../lib/v2/view/site';
 import type { FixtureDataset } from '@crawlmouse/types/v2';
@@ -77,7 +81,9 @@ export const DATASET = {
 
 /** The account frame each preview renders: the rail, its trial card and theme. */
 export function shellPreview(name: keyof typeof ACCOUNT_VIEWERS) {
-  return accountShellView(viewAt(fixture(DATASET[name]), ACCOUNT_VIEWERS[name]()), 'Sites');
+  return accountShellView(viewAt(fixture(DATASET[name]), ACCOUNT_VIEWERS[name]()), 'Sites', {
+    role: 'owner',
+  });
 }
 
 /** The dashboard each preview renders. */
@@ -151,4 +157,65 @@ export function firstCheckPreview(): FirstCheckView {
   if (p.kind !== 'first_check')
     throw new Error('nahltech.com has a result mid-way through its first check');
   return p.first;
+}
+
+// ── CC-31: the account switcher, for a person with seats on several accounts ───────────────────
+
+const PERSONAL_SEAT: SwitcherAccount = { id: BAD_ACCOUNT_ID, kind: 'personal', name: null };
+const NORTHWIND_SEAT: SwitcherAccount = {
+  id: NORTHWIND_ACCOUNT_ID,
+  kind: 'agency',
+  name: 'Northwind Digital',
+};
+const KESTREL_SEAT: SwitcherAccount = {
+  id: 'a0000000-0000-4000-8000-0000000000ca',
+  kind: 'agency',
+  name: 'Kestrel Creative',
+};
+/** Names longer than the rail is wide: the button and the list wrap them onto more lines. */
+const LONG_NAME = 'Whitcombe, Okonkwo & Featherstonehaugh Digital Marketing Partners';
+const LONG_SEAT: SwitcherAccount = {
+  id: 'a0000000-0000-4000-8000-0000000000f2',
+  kind: 'agency',
+  name: `${LONG_NAME} (Canada)`,
+};
+
+/**
+ * The frame of a person with several seats. The fixtures hold no person on two accounts, so the
+ * seats are stated here: bad-site's owner also on Northwind (`two`) and on Kestrel as well
+ * (`three`); and Northwind's owner acting in the agency under a long name, also on a second
+ * long-named agency and a personal account with a name (`long`).
+ */
+export const SWITCHER_PREVIEWS = {
+  two: { viewer: 'home', current: 'Sites', accounts: [PERSONAL_SEAT, NORTHWIND_SEAT] },
+  three: {
+    viewer: 'home',
+    current: 'Sites',
+    accounts: [PERSONAL_SEAT, NORTHWIND_SEAT, KESTREL_SEAT],
+  },
+  long: {
+    viewer: 'withheld',
+    current: 'Clients',
+    accounts: [
+      { ...PERSONAL_SEAT, name: 'Alex' },
+      { ...NORTHWIND_SEAT, name: LONG_NAME },
+      LONG_SEAT,
+    ],
+  },
+} as const satisfies Record<
+  string,
+  {
+    viewer: keyof typeof ACCOUNT_VIEWERS;
+    current: 'Sites' | 'Clients';
+    accounts: SwitcherAccount[];
+  }
+>;
+
+export function switcherPreview(name: keyof typeof SWITCHER_PREVIEWS): ShellView {
+  const p = SWITCHER_PREVIEWS[name];
+  return accountShellView(
+    viewAt(fixture(DATASET[p.viewer]), ACCOUNT_VIEWERS[p.viewer]()),
+    p.current,
+    { role: 'owner', accounts: p.accounts },
+  );
 }

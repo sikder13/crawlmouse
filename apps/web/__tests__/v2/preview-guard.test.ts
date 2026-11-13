@@ -189,17 +189,25 @@ describe('v2 stays out of live pages', () => {
         : '';
   /**
    * The signed-in v2 pages outside the groups (CC-26b): the targets of `V2_REWRITES`, which the
-   * middleware alone serves, and the site page. Each page in them is a 404 with V2_CHECKS_PUBLIC
-   * off, checked below with the v1 inventory's own reader of that shape.
+   * middleware alone serves, and the site page; and CC-31's Seats page and the page an invitation's
+   * link lands on. Each page in them is a 404 with V2_CHECKS_PUBLIC off, checked below with the v1
+   * inventory's own reader of that shape.
    */
   const V2_PAGE_DIRS = [
     ...V2_REWRITES.map((r) =>
       join(WEB_ROOT, 'app', ...r.to.split('/:')[0]!.split('/').filter(Boolean)),
     ),
     join(WEB_ROOT, 'app', 'sites'),
+    join(WEB_ROOT, 'app', 'seats'),
+    join(WEB_ROOT, 'app', 'invite'),
+    // CC-31: the agency's client matrix, client page and client reports.
+    join(WEB_ROOT, 'app', 'agency'),
     // CC-28: the Alerts page and the changes log.
     join(WEB_ROOT, 'app', 'alerts'),
     join(WEB_ROOT, 'app', 'changes'),
+    // CC-31 workstream B2: the proof page, signed in and through a share link.
+    join(WEB_ROOT, 'app', 'reports'),
+    join(WEB_ROOT, 'app', 's'),
   ];
   const inV2PageDir = (file: string) => V2_PAGE_DIRS.some((d) => file.startsWith(d + '/'));
   const allowed = (file: string) =>
@@ -209,6 +217,9 @@ describe('v2 stays out of live pages', () => {
     inV2PageDir(file) ||
     file.startsWith(join(WEB_ROOT, 'components', 'v2') + '/') ||
     file.startsWith(join(WEB_ROOT, '__tests__', 'v2') + '/') ||
+    // CC-31: a report's document prints a verdict's word as the screens do. It imports
+    // components/v2/verdicts.ts, which is data: a type import and no style.
+    file === join(WEB_ROOT, 'lib', 'v2', 'reports', 'generate-doc.ts') ||
     // A test beside the code it tests; the next case holds that no other module imports one.
     /\.test\.tsx?$/.test(file);
 
@@ -232,9 +243,20 @@ describe('v2 stays out of live pages', () => {
   it('each page in the signed-in v2 page folders is a 404 with its flag off', () => {
     const pages = sources.filter((f) => inV2PageDir(f) && PAGE.test(f));
     expect(pages.map((f) => relative(WEB_ROOT, f)).sort()).toEqual([
+      'app/agency/clients/[siteId]/page.tsx',
+      'app/agency/page.tsx',
+      'app/agency/reports/page.tsx',
       'app/alerts/page.tsx',
       'app/changes/page.tsx',
       'app/dashboard/v2/page.tsx',
+      'app/invite/page.tsx',
+      'app/reports/[id]/page.tsx',
+      'app/reports/page.tsx',
+      'app/s/confirm/page.tsx',
+      'app/s/decline/page.tsx',
+      'app/s/pause/page.tsx',
+      'app/s/view/[reportId]/page.tsx',
+      'app/seats/page.tsx',
       'app/sites/[id]/page.tsx',
       'app/v2-developers/page.tsx',
       'app/v2-home/page.tsx',

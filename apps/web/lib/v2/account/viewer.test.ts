@@ -8,8 +8,9 @@ import type { PGlite } from '@electric-sql/pglite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { GATES } from '../../entitlement-v2';
 import { applyAllMigrations, freshDb } from '../../../__tests__/helpers/pglite-migrations';
-import { postgrestOver } from '../../../__tests__/helpers/postgrest-pglite';
+import { postgrestOver, type Call } from '../../../__tests__/helpers/postgrest-pglite';
 import { personalAccount, signUp } from '../../../__tests__/helpers/v2-check-tables';
+import { ACCOUNT_COOKIE, accountCookie, chosenAccount, chosenInHeader } from './viewer-cookie';
 import { readEntitlement, readViewer, type ViewerResult } from './viewer-read';
 
 let db: PGlite;
@@ -35,14 +36,20 @@ async function person(tag: string): Promise<Person> {
   return { userId: await signUp(db, email), email };
 }
 
-const read = (p: Person, now = NOW): Promise<ViewerResult> =>
+const read = (
+  p: Person,
+  now = NOW,
+  chosen: string | null = null,
+  log?: Call[][],
+): Promise<ViewerResult> =>
   readViewer(
     {
-      session: postgrestOver(db, { as: { userId: p.userId } }),
-      admin: postgrestOver(db),
+      session: postgrestOver(db, { as: { userId: p.userId }, ...(log ? { log } : {}) }),
+      admin: postgrestOver(db, log ? { log } : {}),
       now: () => now,
     },
     { id: p.userId, email: p.email },
+    chosen,
   );
 
 async function addSeat(
@@ -242,5 +249,148 @@ describe('readEntitlement', () => {
     const theirs = await personalAccount(db, o.userId);
     const session = postgrestOver(db, { as: { userId: u.userId } });
     expect(await readEntitlement(session, theirs.accountId, NOW)).toBeNull();
+  });
+});
+
+describe('the account a person chose (CC-31 D2b)', () => {
+  /** A person with their own account and a seat on an agency's. */
+  async function twoSeats() {
+    const owner = await person('agency-owner');
+    const agency = await personalAccount(db, owner.userId);
+    await db.query(
+      `update public.accounts set kind = 'agency', name = 'Summit Digital' where id = $1`,
+      [agency.accountId],
+    );
+    const member = await person('member');
+    const own = await personalAccount(db, member.userId);
+    const seatId = await addSeat(agency.accountId, member, 'account_manager');
+    return { owner, agency, member, own, seatId };
+  }
+
+  const accountOf = (r: ViewerResult) => (r.kind === 'viewer' ? r.viewer.account.id : r.kind);
+
+  it('reads the chosen account when it is one of the caller’s active seats, and the default one without a choice', async () => {
+    const w = await twoSeats();
+    expect(accountOf(await read(w.member))).toBe(w.own.accountId);
+    const r = await read(w.member, NOW, w.agency.accountId);
+    expect(accountOf(r)).toBe(w.agency.accountId);
+    if (r.kind !== 'viewer') return;
+    expect(r.viewer.seat).toEqual({ id: w.seatId, role: 'account_manager', theme: 'system' });
+    expect(accountOf(await read(w.member, NOW, w.own.accountId))).toBe(w.own.accountId);
+  });
+
+  it('lists the accounts the caller may act in, by name, and nothing of any other', async () => {
+    const w = await twoSeats();
+    const r = await read(w.member, NOW, w.agency.accountId);
+    if (r.kind !== 'viewer') throw new Error(`expected a viewer, got ${r.kind}`);
+    expect([...r.viewer.accounts].sort((a, b) => a.id.localeCompare(b.id))).toEqual(
+      [
+        { id: w.agency.accountId, kind: 'agency', name: 'Summit Digital' },
+        { id: w.own.accountId, kind: 'personal', name: null },
+      ].sort((a, b) => a.id.localeCompare(b.id)),
+    );
+    const single = await read(w.owner);
+    if (single.kind !== 'viewer') throw new Error(`expected a viewer, got ${single.kind}`);
+    expect(single.viewer.accounts).toEqual([
+      { id: w.agency.accountId, kind: 'agency', name: 'Summit Digital' },
+    ]);
+  });
+
+  it('a choice naming another person’s account changes nothing', async () => {
+    const w = await twoSeats();
+    const other = await person('other');
+    const theirs = await personalAccount(db, other.userId);
+    const without = await read(w.member);
+    const withForged = await read(w.member, NOW, theirs.accountId);
+    expect(withForged).toEqual(without);
+    expect(strings(withForged)).not.toContain(theirs.accountId);
+    // One seat only: the forged choice is still not followed.
+    expect(accountOf(await read(other, NOW, w.agency.accountId))).toBe(theirs.accountId);
+  });
+
+  it('a removed seat’s choice falls back to the default account', async () => {
+    const w = await twoSeats();
+    expect(accountOf(await read(w.member, NOW, w.agency.accountId))).toBe(w.agency.accountId);
+    await db.query(`update public.seats set status = 'removed', removed_at = now() where id = $1`, [
+      w.seatId,
+    ]);
+    const r = await read(w.member, NOW, w.agency.accountId);
+    expect(accountOf(r)).toBe(w.own.accountId);
+    if (r.kind !== 'viewer') return;
+    expect(r.viewer.accounts.map((a) => a.id)).toEqual([w.own.accountId]);
+  });
+
+  it('a choice naming an account marked for deletion falls back', async () => {
+    const w = await twoSeats();
+    await db.query(
+      `update public.accounts set deletion_confirmed_at = now(), purge_after = now() + interval '7 days' where id = $1`,
+      [w.agency.accountId],
+    );
+    expect(accountOf(await read(w.member, NOW, w.agency.accountId))).toBe(w.own.accountId);
+  });
+
+  it('with two seats and no usable default, the choice decides and no choice stays ambiguous', async () => {
+    const w = await twoSeats();
+    await db.query(`update public.users set default_account_id = null where id = $1`, [
+      w.member.userId,
+    ]);
+    expect((await read(w.member)).kind).toBe('ambiguous');
+    expect(accountOf(await read(w.member, NOW, w.agency.accountId))).toBe(w.agency.accountId);
+  });
+
+  it('writes nothing: users.default_account_id is as it was, and every request is a read', async () => {
+    const w = await twoSeats();
+    const log: Call[][] = [];
+    await read(w.member, NOW, w.agency.accountId, log);
+    const written = log.filter((request) =>
+      request.some(([method]) => ['insert', 'update', 'upsert', 'delete', 'rpc'].includes(method)),
+    );
+    expect(log.length).toBeGreaterThan(0);
+    expect(written).toEqual([]);
+    const { rows } = await db.query<{ default_account_id: string }>(
+      `select default_account_id from public.users where id = $1`,
+      [w.member.userId],
+    );
+    expect(rows[0]!.default_account_id).toBe(w.own.accountId);
+  });
+});
+
+describe('the choice’s cookie', () => {
+  it('is httpOnly, SameSite=Lax, for the whole site, and Secure in production', () => {
+    const id = '0b1f6c1e-5a55-4d6e-9d2c-3f1c1b7a9e10';
+    expect(accountCookie(id, true)).toEqual({
+      name: ACCOUNT_COOKIE,
+      value: id,
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: true,
+      path: '/',
+      maxAge: 60 * 60 * 24 * 365,
+    });
+    expect(accountCookie(id, false).secure).toBe(false);
+  });
+
+  it('reads back an account id and nothing else', () => {
+    const id = '0b1f6c1e-5a55-4d6e-9d2c-3f1c1b7a9e10';
+    expect(chosenAccount(id)).toBe(id);
+    for (const bad of [undefined, '', 'x', id.toUpperCase(), `${id} `, `${id}'--`, id.slice(1)]) {
+      expect(chosenAccount(bad)).toBeNull();
+    }
+    expect(() => accountCookie('not-an-id', true)).toThrow(RangeError);
+  });
+
+  it('is read from a request’s Cookie header among its other cookies, and from no other name', () => {
+    const id = '0b1f6c1e-5a55-4d6e-9d2c-3f1c1b7a9e10';
+    expect(chosenInHeader(`theme=dark; ${ACCOUNT_COOKIE}=${id}; cm_consent=granted`)).toBe(id);
+    expect(chosenInHeader(`${ACCOUNT_COOKIE}=${id}`)).toBe(id);
+    for (const header of [
+      null,
+      '',
+      'theme=dark',
+      `x${ACCOUNT_COOKIE}=${id}`,
+      `${ACCOUNT_COOKIE}=nope`,
+    ]) {
+      expect(chosenInHeader(header)).toBeNull();
+    }
   });
 });

@@ -26,12 +26,41 @@ export const LINK_FLOWS = {
     api: '/api/account/delete/confirm',
   },
   restore: { cookie: 'cm_link_restore', page: '/account/restore', api: '/api/account/restore' },
+  // A seat's invitation (CC-31 D3).
+  invite: { cookie: 'cm_link_invite', page: '/invite', api: '/api/seats/accept' },
+  // A client report's recipient: the confirmation link and the pause link (CC-31 D8).
+  reportConfirm: {
+    cookie: 'cm_link_report_confirm',
+    page: '/s/confirm',
+    api: '/api/report-files/confirm',
+  },
+  reportPause: {
+    cookie: 'cm_link_report_pause',
+    page: '/s/pause',
+    api: '/api/report-files/pause',
+  },
+  // "Don't ask me again", from the mail that asks a recipient to confirm (CC-31 D8).
+  reportDecline: {
+    cookie: 'cm_link_report_decline',
+    page: '/s/decline',
+    api: '/api/report-files/decline',
+  },
 } as const;
 
 export type LinkFlow = keyof typeof LINK_FLOWS;
 
 /** Long enough to read the page and press the button; the token's own expiry is the database's. */
 export const LINK_COOKIE_SECONDS = 600;
+
+/**
+ * A flow whose page is left and come back to before its button is pressed keeps its cookie longer.
+ * The invitation's page sends a reader who is not signed in to sign in by email (`/login?next=/invite`)
+ * and that mail has to arrive and be opened first.
+ */
+const LONGER: Partial<Record<LinkFlow, number>> = { invite: 3600 };
+
+/** How long a flow's cookie lasts, in seconds. */
+export const linkCookieSeconds = (flow: LinkFlow): number => LONGER[flow] ?? LINK_COOKIE_SECONDS;
 
 const NO_STORE = { 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' } as const;
 
@@ -51,7 +80,8 @@ export function landLink(origin: string, flow: LinkFlow, token: string): Respons
     Location: `${origin}${LINK_FLOWS[flow].page}`,
   };
   const res = new Response(null, { status: 303, headers });
-  if (isToken(token)) res.headers.append('Set-Cookie', cookie(flow, token, LINK_COOKIE_SECONDS));
+  if (isToken(token))
+    res.headers.append('Set-Cookie', cookie(flow, token, linkCookieSeconds(flow)));
   return res;
 }
 

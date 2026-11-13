@@ -1,0 +1,156 @@
+/* The proof page: a report's document, one column, with before-and-after pairs side by side. */
+
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  flex: 1;
+  max-width: 880px;
+  padding-top: 48px;
+  padding-bottom: 48px;
+}
+
+.head {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.line {
+  margin: 0;
+  color: var(--v2-fg2);
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.text {
+  margin: 0;
+  color: var(--v2-fg2);
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px;
+}
+
+.tableCard {
+  overflow: hidden;
+}
+
+/* A row's first cell is its header (`th[scope='row']`). It reads as the row's first cell, in the
+   row's colour, weight and size, where Table's `.table th` is the column header's face. */
+.tableCard tbody th {
+  color: inherit;
+  font-weight: 400;
+  font-size: var(--v2-text-ui);
+}
+
+.tableCard tbody tr:last-child th {
+  border-bottom: 0;
+}
+
+.caption {
+  margin: 0;
+  padding: 16px 16px 8px;
+  color: var(--v2-mut);
+  font-size: var(--v2-text-micro);
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  margin: 0;
+}
+
+.fact {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.fact dt {
+  color: var(--v2-mut);
+  font-size: var(--v2-text-micro);
+}
+
+.fact dd {
+  margin: 0;
+  font-weight: 500;
+}
+
+.pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.side {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--v2-line);
+  border-radius: var(--v2-radius-surface);
+  background: var(--v2-bg);
+}
+
+.sideLabel {
+  margin: 0;
+  color: var(--v2-mut);
+  font-size: var(--v2-text-micro);
+  font-weight: 500;
+}
+
+.date {
+  margin: 0;
+  color: var(--v2-mut);
+  font-family: var(--v2-font-mono);
+  font-size: var(--v2-text-micro);
+}
+
+.value {
+  margin: 0;
+  font-size: var(--v2-text-s);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.sentences {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding-left: 18px;
+  color: var(--v2-fg2);
+  font-size: var(--v2-text-small);
+  overflow-wrap: anywhere;
+}
+
+.foot {
+  max-width: 880px;
+  padding-top: 16px;
+  padding-bottom: 32px;
+  border-top: 1px solid var(--v2-line);
+  color: var(--v2-mut);
+  font-size: var(--v2-text-micro);
+}
+
+@media (max-width: 760px) {
+  .main {
+    gap: 24px;
+    padding-top: 24px;
+    padding-bottom: 24px;
+  }
+
+  .pair {
+    grid-template-columns: 1fr;
+  }
+}

@@ -8,22 +8,43 @@
  *   trial reminder  trial_reminder:<accountId>:<trialEndsAt>  (one per trial end)
  *   check notify    check_notify:<checkId>
  *   fix to a dev    fix_to_developer:<requestId>
+ *   seat invite     seat_invite:<seatId>:<seq>                (recipient: the seat's invited address)
  *   Agency Plus     agency_plus_contact:<contactId>           (recipient: the sales inbox, always)
+ *
+ * `reportMailHandlers` holds the two mails of a client report schedule, over their own port:
+ *
+ *   confirmation    report_confirm:<siteId>:<requestId>       (recipient: the site's client contact)
+ *   client report   client_report:<reportId>
+ *
+ * The invitation's link, the confirmation's and a report's two are minted inside `render`, after the
+ * claim, as an account link is (Q10).
  *
  * A database read that fails before anything is claimed throws `MailRetry`: nothing was sent and
  * nothing claimed, so the step can safely try again. What happens from the claim to the ledger's
  * record is `send()`'s, which answers a failure there with `MailRetry` too; a fix email's `sent_at`
  * write that fails after the send is retried the same way.
  */
-import type { EmailRequestedData, MailHandlers } from '../../../../../inngest/mail';
+import { CONFIRM_MAILS_PER_DAY } from '../agency/confirm-bounds';
+import type {
+  EmailRequestedData,
+  MailHandlers,
+  ReportMailHandlers,
+} from '../../../../../inngest/mail';
 import { packetPrompt } from '../view/segment/fixes';
+import type { AgencyCapture } from '../agency/events';
 import { checkRef } from '../pipeline/public';
+import { hashMailAddress } from './address-hash';
+import { unsubscribeHeaders } from './headers';
+import { reportDeclineUrl, reportPauseUrl } from './links';
 import { MailRetry, send, type MailDeps } from './send';
-import type { MailStore } from './store';
+import type { MailStore, ReportMailStore } from './store';
 import { accountDelete, emailChangeConfirm, emailChangeNotice } from './templates/account-links';
 import { AGENCY_PLUS_INBOX, agencyPlusContact } from './templates/agency-plus-contact';
 import { checkNotify } from './templates/check-notify';
+import { clientReport } from './templates/client-report';
 import { fixToDeveloper } from './templates/fix-to-developer';
+import { reportConfirm } from './templates/report-confirm';
+import { seatInvite } from './templates/seat-invite';
 import { trialReminder } from './templates/trial-reminder';
 import type { RenderedMail } from './types';
 
@@ -208,6 +229,162 @@ export function mailHandlers(d: MailHandlerDeps): MailHandlers {
         { trigger: c.trigger, status: c.status, check_ref: ref, source: 'pipeline' },
       );
       return 'captured';
+    },
+
+    async seatInvite(seatId, seq) {
+      const invitation = await read(store.seatInvitation(seatId, seq));
+      if (invitation === null) return 'not_invited';
+      if (invitation.marked) return 'marked';
+      return send(mail, {
+        kind: 'seat_invite',
+        to: invitation.recipient,
+        idempotencyKey: `seat_invite:${seatId}:${seq}`,
+        accountId: invitation.accountId,
+        // Minted only now, after the claim answered go: an event replayed once its mail is
+        // recorded as sent claims nothing and mints nothing, and a resend is another key. An attempt
+        // retried after its claim mints again (spec 31 §6). The token goes into the link and
+        // nowhere else.
+        render: async () => {
+          const issued = await store.issueSeatInvite(seatId, seq, mail.now());
+          // No row: accepted, removed, re-sent or its account marked since the read above. The
+          // link is mailed only to the address it was issued for.
+          if (issued === null || issued.recipient !== invitation.recipient) return null;
+          return seatInvite({
+            token: issued.token,
+            accountName: issued.accountName,
+            role: issued.role,
+          });
+        },
+      });
+    },
+  };
+}
+
+/** The day's bounds on confirmation mail, kept here from the ledger (`../agency/confirm-bounds`). */
+export { CONFIRM_MAILS_PER_DAY };
+
+/** The longest `request_id` a confirmation's ledger key takes; the key itself holds 200 characters. */
+export const REQUEST_ID_MAX = 100;
+
+export interface ReportMailHandlerDeps {
+  mail: MailDeps;
+  store: ReportMailStore;
+  /** `first_client_report_sent`, when the report mailed is the account's first (CC-31 D10). */
+  capture: AgencyCapture;
+  /**
+   * Whether the pause link can be made (`EMAIL_LINK_SECRET` is set). A report is not mailed
+   * without its pause link: with this false, nothing is read, claimed or sent.
+   */
+  pauseLinks: boolean;
+}
+
+export function reportMailHandlers(d: ReportMailHandlerDeps): ReportMailHandlers {
+  const { mail, store, capture } = d;
+  return {
+    async reportConfirm(siteId, requestId) {
+      if (requestId.length === 0 || requestId.length > REQUEST_ID_MAX) return 'invalid_request';
+      // A request to confirm is not mailed without its "Don't ask me again" link, which is made
+      // with the link secret, as a report is not mailed without its pause link.
+      if (!d.pauseLinks) {
+        mail.log('mail.unconfigured', { kind: 'report_confirm', link_secret: 0 });
+        return 'unconfigured';
+      }
+      const contact = await read(store.confirmationRecipient(siteId));
+      if (contact === null) return 'not_found';
+      const key = `report_confirm:${siteId}:${requestId}`;
+      // The day's bound, on the mail itself: the hourly run asks with no bound of its own, and a
+      // confirmation is account mail, which a complaint does not stop. With no pepper there is no
+      // hash to count by, and `send` below answers `unconfigured`.
+      if (mail.pepper !== null) {
+        const since = new Date(mail.now().getTime() - 24 * 60 * 60 * 1000);
+        const held = await read(
+          store.confirmationsSince(
+            contact.accountId,
+            hashMailAddress(mail.pepper, contact.recipient),
+            since,
+            key,
+          ),
+        );
+        if (
+          held.account >= CONFIRM_MAILS_PER_DAY.account ||
+          held.address >= CONFIRM_MAILS_PER_DAY.address
+        ) {
+          mail.log('mail.bounded', { kind: 'report_confirm' });
+          return 'bounded';
+        }
+      }
+      // Set by `render`, which `send` calls before it asks for the headers.
+      let unsubscribe: Readonly<Record<string, string>> = {};
+      return send(mail, {
+        kind: 'report_confirm',
+        to: contact.recipient,
+        idempotencyKey: key,
+        accountId: contact.accountId,
+        headers: () => unsubscribe,
+        render: async () => {
+          const issued = await store.issueConfirmation(
+            siteId,
+            mail.now(),
+            requestId,
+            contact.recipient,
+          );
+          if (issued === null || issued.recipient !== contact.recipient) return null;
+          // "Don't ask me again" is the message's one-click List-Unsubscribe target: a mail
+          // client's unsubscribe stops these requests for good. Its token is the address's own,
+          // the same in each request, so the link of an earlier mail answers as this one does.
+          unsubscribe = unsubscribeHeaders({ url: reportDeclineUrl(issued.declineToken) });
+          return reportConfirm({
+            token: issued.token,
+            declineToken: issued.declineToken,
+            agencyName: issued.agencyName,
+            host: issued.host,
+          });
+        },
+      });
+    },
+
+    async clientReport(reportId) {
+      if (!d.pauseLinks) {
+        mail.log('mail.unconfigured', { kind: 'client_report', link_secret: 0 });
+        return 'unconfigured';
+      }
+      const contact = await read(store.clientReportRecipient(reportId));
+      if (contact === null) return 'not_found';
+      // Set by `render`, which `send` calls before it asks for the headers.
+      let unsubscribe: Readonly<Record<string, string>> = {};
+      const outcome = await send(mail, {
+        kind: 'client_report',
+        to: contact.recipient,
+        idempotencyKey: `client_report:${reportId}`,
+        accountId: contact.accountId,
+        render: async () => {
+          const issued = await store.issueClientReport(reportId, mail.now());
+          if (issued === null || issued.recipient !== contact.recipient) return null;
+          // The pause link is the message's footer link and its one-click List-Unsubscribe target.
+          unsubscribe = unsubscribeHeaders({ url: reportPauseUrl(issued.pauseToken) });
+          return clientReport({
+            agencyName: issued.agencyName,
+            host: issued.host,
+            headline: issued.headline,
+            lines: issued.lines,
+            footer: issued.footer,
+            shareToken: issued.shareToken,
+            pauseToken: issued.pauseToken,
+          });
+        },
+        headers: () => unsubscribe,
+      });
+      // The row becomes `sent` once its mail has gone. `done` is a mail an earlier run sent and
+      // stopped before it marked: the mark is made now, and a report already marked answers null.
+      if (outcome === 'sent' || outcome === 'done') {
+        // A mark that fails is retried with the step: the retry claims `done`, sends nothing, and
+        // marks. Thrown plainly it would end the step, and the mailed report would stay `scheduled`.
+        const marked = await store.markClientReportSent(reportId, mail.now()).catch(() => {
+          throw new MailRetry('mark_sent_failed');
+        });
+        if (marked?.first) await capture('first_client_report_sent', marked.accountId, {});
+      }
+      return outcome;
     },
   };
 }

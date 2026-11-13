@@ -60,7 +60,11 @@ const BAD = 'a0000000-0000-4000-8000-000000000001';
 const OWNER = 'e0000000-0000-4000-8000-000000000001';
 const signedIn = () => ({
   kind: 'viewer',
-  viewer: { account: { id: BAD, timezone: 'America/Indiana/Indianapolis' }, seat: { id: OWNER } },
+  viewer: {
+    account: { id: BAD, timezone: 'America/Indiana/Indianapolis' },
+    seat: { id: OWNER },
+    accounts: [{ id: BAD, kind: 'personal', name: null }],
+  },
 });
 const child = async (el: Promise<El>) => ((await el).props as { children: El }).children;
 

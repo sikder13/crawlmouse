@@ -5,8 +5,11 @@ import { accountDelete, emailChangeConfirm, emailChangeNotice } from './account-
 import { agencyPlusContact, type AgencyPlusContactInput } from './agency-plus-contact';
 import { alertTemplate, type AlertMailInput, type MailChange } from './alert';
 import { checkNotify, type CheckNotifyInput } from './check-notify';
+import { clientReport, type ClientReportInput } from './client-report';
 import { fixToDeveloper, type FixToDeveloperInput } from './fix-to-developer';
 import { foreignTargets } from './inspect';
+import { reportConfirm, type ReportConfirmInput } from './report-confirm';
+import { seatInvite, type SeatInviteInput } from './seat-invite';
 import { trialReminder, type TrialReminderInput } from './trial-reminder';
 import { weeklySummaryTemplate, type WeeklySummaryInput } from './weekly-summary';
 
@@ -178,6 +181,44 @@ const CASES: readonly Case<unknown>[] = [
     ],
   }),
   kase({
+    name: 'seat-invite',
+    input: {
+      token: TOKEN,
+      accountName: 'Summit Digital',
+      role: 'developer',
+    } satisfies SeatInviteInput,
+    render: seatInvite,
+    outside: ['accountName'],
+    ours: ['token', 'role'],
+  }),
+  kase({
+    name: 'report-confirm',
+    input: {
+      token: TOKEN,
+      declineToken: TOKEN,
+      agencyName: 'Summit Digital',
+      host: 'example.com',
+    } satisfies ReportConfirmInput,
+    render: reportConfirm,
+    outside: ['agencyName', 'host'],
+    ours: ['token', 'declineToken'],
+  }),
+  kase({
+    name: 'client-report',
+    input: {
+      agencyName: 'Summit Digital',
+      host: 'example.com',
+      headline: 'Report for example.com',
+      lines: ['example.com', 'Checked Fri 30 Oct'],
+      footer: 'Checked with Crawlmouse · Fri 30 Oct',
+      shareToken: 'S'.repeat(22),
+      pauseToken: TOKEN,
+    } satisfies ClientReportInput,
+    render: clientReport,
+    outside: ['agencyName', 'host', 'headline', 'lines.*', 'footer'],
+    ours: ['shareToken', 'pauseToken'],
+  }),
+  kase({
     name: 'agency-plus-contact',
     input: {
       email: 'ops@summit.example',
@@ -229,6 +270,9 @@ describe('D3: every outside string, set to each hostile value, leaves a sendable
         'fix-to-developer',
         'alert',
         'weekly-summary',
+        'seat-invite',
+        'report-confirm',
+        'client-report',
         'agency-plus-contact',
       ]),
     );

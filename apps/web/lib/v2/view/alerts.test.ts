@@ -147,6 +147,26 @@ describe('Alerts, where they go and the rules', () => {
       'Each site can override these on its own page. Quiet by default: the last rule is off. On Fri, 17 pages changed content; no alert carried it.',
     );
   });
+
+  it('gives a developer’s seat the rules’ states in words and no switch; an account manager’s has them', () => {
+    const owner = bad.seats.find((s) => s.role === 'owner')!;
+    const seated = (role: 'developer' | 'account_manager') => {
+      const seat = { ...owner, id: '50000000-0000-4000-8000-0000000000d1', role };
+      const d = { ...bad, seats: [...bad.seats, seat] };
+      return alertsView(d, { accountId: BAD, seatId: seat.id, now: bad.as_of }).rules.rows;
+    };
+    expect(seated('developer').map((x) => [x.toggle, x.state])).toEqual([
+      [null, 'on'],
+      [null, 'on'],
+      [null, 'on'],
+      [null, 'on'],
+      [null, 'on'],
+      [null, 'off'],
+    ]);
+    expect(seated('account_manager').map((x) => x.toggle?.href)).toEqual(
+      Array.from({ length: 6 }, () => '/api/alert-rules'),
+    );
+  });
 });
 
 describe('Alerts, on the stand-in Free account (clean-site)', () => {

@@ -156,6 +156,37 @@ describe('PUT /api/alert-rules', () => {
     expect(h.log.indexOf('supabaseAdmin')).toBeGreaterThan(h.log.indexOf('rpc:member_role'));
   });
 
+  it('a developer seat is 403 role_refused and nothing is written; an account manager may set it', async () => {
+    const m = await member('team', 'pro');
+    const seated = async (role: 'developer' | 'account_manager') => {
+      const guest = await member(`guest-${role}`, 'free');
+      await h.db.query(
+        `insert into public.seats (account_id, user_id, invited_email, role, status, accepted_at)
+         values ($1, $2, $3, $4, 'active', now())`,
+        [m.accountId, guest.user.id, guest.user.email, role],
+      );
+      // They act in the team's account, as the switcher would have it.
+      await h.db.query(`update public.users set default_account_id = $1 where id = $2`, [
+        m.accountId,
+        guest.user.id,
+      ]);
+      return guest.user;
+    };
+
+    h.user = await seated('developer');
+    const refused = await PUT(put({ slackWebhookUrl: URL_A }));
+    expect([refused.status, await refused.json()]).toEqual([403, { code: 'role_refused' }]);
+    const switched = await PUT(put({ rule: m.ruleId, enabled: false }));
+    expect(switched.status).toBe(403);
+    expect(await secretsOf(m.accountId)).toEqual([]);
+    expect(await enabledOf(m.ruleId)).toBe(true);
+
+    h.user = await seated('account_manager');
+    const allowed = await PUT(put({ slackWebhookUrl: URL_A }));
+    expect(allowed.status).toBe(200);
+    expect(await secretsOf(m.accountId)).toEqual([URL_A]);
+  });
+
   it('stores a Slack URL on a paid account and answers its last four, never the URL', async () => {
     const m = await member('paid', 'pro');
     h.user = m.user;

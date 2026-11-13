@@ -212,7 +212,7 @@ async function person() {
       [accountId, at('logo.png')],
     );
     await pglite.query(
-      `update public.reports set storage_path = $2
+      `update public.reports set file_state = 'stored', storage_path = $2
         where id = (select id from public.reports where account_id = $1 order by id limit 1)`,
       [accountId, at('report.pdf')],
     );

@@ -1,6 +1,7 @@
 /**
  * Tier B review S3: no message names its recipient. Every send path runs once here (each mail handler,
- * `deliverAlert`, `sendSummary`) over the in-memory ledger and transport, and each message's subject,
+ * the two report-schedule handlers, `deliverAlert`, `sendSummary`) over the in-memory ledger and
+ * transport, and each message's subject,
  * text and HTML are read for its `to` address and for that address's local part. The sweep asserts
  * that the ledger was claimed for every kind in `MAIL_KINDS`, so a kind added without a path here
  * fails it rather than passing unswept.
@@ -13,11 +14,11 @@ import type { Fix } from '@crawlmouse/types/v2';
 import { fixture } from '../fixtures';
 import { deliverAlert, type AlertDeps, type StoredChange } from '../monitor/alerts';
 import { sendSummary, type SummaryDeps } from '../monitor/summary';
-import { mailHandlers } from './handlers';
+import { mailHandlers, reportMailHandlers } from './handlers';
 import { unsubscribeLinks } from './links';
 import { memoryLedger, memoryTransport } from './memory';
 import type { MailDeps } from './send';
-import type { MailStore } from './store';
+import type { MailStore, ReportMailStore } from './store';
 import { AGENCY_PLUS_INBOX } from './templates/agency-plus-contact';
 import { MAIL_KINDS, type OutgoingMail } from './types';
 
@@ -41,6 +42,9 @@ const TO = {
   developer: 'qzx-developer@inbox.example',
   alert: 'qzx-alert@inbox.example',
   summary: 'qzx-summary@inbox.example',
+  invitee: 'qzx-invitee@inbox.example',
+  confirming: 'qzx-confirming@inbox.example',
+  reportReader: 'qzx-report@inbox.example',
   // CC-29: an Agency Plus request goes to our own inbox, whatever address the form was given.
   agencyPlus: AGENCY_PLUS_INBOX,
 };
@@ -88,9 +92,40 @@ const store: MailStore = {
   }),
   markFixEmailSent: async () => undefined,
   finishedCheck: async () => null,
+  seatInvitation: async () => ({ recipient: TO.invitee, accountId: ACCOUNT, marked: false }),
+  issueSeatInvite: async () => ({
+    token: 'R'.repeat(43),
+    recipient: TO.invitee,
+    accountName: 'Summit Digital',
+    role: 'account_manager',
+  }),
   contactRequest: async () => ({ email: SUBMITTED, sites: 12, note: 'A note.', sentAt: null }),
   markContactSent: async () => undefined,
 } as unknown as MailStore;
+
+const reportStore: ReportMailStore = {
+  confirmationRecipient: async () => ({ recipient: TO.confirming, accountId: ACCOUNT }),
+  confirmationsSince: async () => ({ account: 0, address: 0 }),
+  issueConfirmation: async () => ({
+    token: 'R'.repeat(43),
+    declineToken: 'N'.repeat(43),
+    recipient: TO.confirming,
+    agencyName: 'Summit Digital',
+    host: 'shop.example',
+  }),
+  clientReportRecipient: async () => ({ recipient: TO.reportReader, accountId: ACCOUNT }),
+  issueClientReport: async () => ({
+    recipient: TO.reportReader,
+    agencyName: 'Summit Digital',
+    host: 'shop.example',
+    headline: 'Report for shop.example',
+    lines: ['shop.example', 'Checked Fri 13 Nov'],
+    footer: 'Checked with Crawlmouse · Fri 13 Nov',
+    shareToken: 'S'.repeat(22),
+    pauseToken: 'P'.repeat(43),
+  }),
+  markClientReportSent: async () => ({ accountId: ACCOUNT, first: false }),
+};
 
 const change: StoredChange = {
   id: '90000000-0000-4000-8000-0000000000a1',
@@ -118,6 +153,12 @@ async function sweep() {
     log: () => {},
   };
   const h = mailHandlers({ mail, store, capture: async () => undefined });
+  const reports = reportMailHandlers({
+    mail,
+    store: reportStore,
+    capture: async () => undefined,
+    pauseLinks: true,
+  });
 
   const answers = [
     await h.accountEmail({
@@ -134,6 +175,9 @@ async function sweep() {
     await h.accountEmail({ accountId: ACCOUNT, template: 'trial_reminder' }),
     await h.checkNotify(CHECK),
     await h.fixToDeveloper('r0000000-0000-4000-8000-000000000001'),
+    await h.seatInvite(SEAT, 1),
+    await reports.reportConfirm(SITE, 'request-1'),
+    await reports.clientReport('d0000000-0000-4000-8000-0000000000a1'),
     await h.accountEmail({
       template: 'agency_plus_contact',
       contactId: 'd0000000-0000-4000-8000-000000000001',
@@ -218,6 +262,9 @@ describe('no message names its recipient (S3)', () => {
   it('runs every send path, one message each, covering every mail kind', async () => {
     const { answers, sent, kinds } = await sweep();
     expect(answers).toEqual([
+      'sent',
+      'sent',
+      'sent',
       'sent',
       'sent',
       'sent',

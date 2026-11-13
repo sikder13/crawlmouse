@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { AccessCauseSchema, VerdictSchema, type Check } from '@crawlmouse/types/v2';
+import {
+  AccessCauseSchema,
+  VerdictSchema,
+  scoredCrawlersMeasured,
+  CheckSchema,
+  type Check,
+  type Verdict,
+  type WithheldReason,
+} from '@crawlmouse/types/v2';
+import { MIN_MEASURED_CRAWLERS } from '../../../../packages/engine/src/v2/grade/weights';
 import { findCheck, fixesAsOf, fixture } from './fixtures';
 import { CHECKS } from './recordings';
 import { TEMPLATE_NOUNS } from './format';
@@ -15,6 +24,7 @@ import {
   seoSummary,
   structureWord,
   thinSentence,
+  I4_MEASURED_CRAWLERS,
 } from './sentences';
 
 const d = fixture('bad-site');
@@ -228,6 +238,127 @@ describe('the wording at each threshold and form', () => {
       'Only one of the four scored crawlers could be measured. Access is somewhere between 0 and 30 of 40.',
     );
     expect(() => aiWithheldSummary(check, 4)).toThrow(/Not withheld/);
+  });
+
+  it('with every scored crawler measured, gives the grade’s own reason and not a count that explains nothing', () => {
+    // The engine withholds for a part it could not measure too: all four crawlers read the site,
+    // and the grade waits for pages read in a browser.
+    const waiting = structuredClone(
+      findCheck(fixture('challenged-site'), CHECKS.challengedFirstAudit),
+    );
+    for (const c of waiting.crawlers) {
+      if (c.verdict === 'edge_blocks_automation') c.verdict = 'not_measured';
+    }
+    waiting.ai_readability!.withheld_reasons = ['readable_unmeasured'];
+    waiting.ai_readability!.access_range = null;
+    expect(aiWithheldSummary(waiting, 4)).toBe(
+      'AI readability is graded once each template has a page read in a browser.',
+    );
+    // Three of four measured is enough for Access (the engine scores it from two): the count is
+    // still not why, and the grade's reason is given.
+    expect(aiWithheldSummary(waiting, 3)).toBe(
+      'AI readability is graded once each template has a page read in a browser.',
+    );
+    // Of two reasons, the first.
+    waiting.ai_readability!.withheld_reasons = ['quotable_unmeasured', 'readable_unmeasured'];
+    expect(aiWithheldSummary(waiting, 3)).toBe(
+      'AI readability is graded once its content part can be measured.',
+    );
+  });
+
+  describe('a grade withheld for the count of crawlers, where the engine’s count and the contract’s part', () => {
+    const WAITS = 'AI readability is graded once two scored crawlers can be measured.';
+    /** The challenged site's first audit with the scored crawlers' verdicts and the reasons set. */
+    function withheldFor(
+      verdicts: Verdict[],
+      reasons: WithheldReason[],
+      unscoredAtEdge = false,
+    ): { check: Check; measured: number } {
+      const c = structuredClone(findCheck(fixture('challenged-site'), CHECKS.challengedFirstAudit));
+      const scored = c.crawlers.filter((x) => x.scored);
+      expect(scored).toHaveLength(4);
+      scored.forEach((x, i) => (x.verdict = verdicts[i]!));
+      for (const x of c.crawlers.filter((y) => !y.scored)) {
+        x.verdict = unscoredAtEdge ? 'edge_blocks_automation' : 'not_measured';
+      }
+      c.ai_readability!.withheld_reasons = reasons;
+      c.ai_readability!.access_range = null;
+      return { check: c, measured: scoredCrawlersMeasured(c.crawlers) };
+    }
+    const said = (v: Verdict[], r: WithheldReason[], unscoredAtEdge = false) => {
+      const w = withheldFor(v, r, unscoredAtEdge);
+      return [w.measured, aiWithheldSummary(w.check, w.measured)];
+    };
+    const COUNT: WithheldReason[] = ['too_few_crawlers_measured'];
+
+    it('I4’s two is the engine’s', () => {
+      expect(I4_MEASURED_CRAWLERS).toBe(MIN_MEASURED_CRAWLERS);
+    });
+
+    it('each crawler challenged or refused has a verdict and no score: the reason is said, not “four of the four”', () => {
+      for (const verdict of ['challenged_ua', 'refused_unverified'] as const) {
+        expect(said([verdict, verdict, verdict, verdict], COUNT)).toEqual([4, WAITS]);
+      }
+      // One served, two rate limited, one not measured: three by the contract, one by the engine.
+      expect(said(['allowed', 'rate_limited', 'rate_limited', 'not_measured'], COUNT)).toEqual([
+        3,
+        WAITS,
+      ]);
+    });
+
+    it('under two by the contract’s count too, the count is said, and “none” for none', () => {
+      expect(said(['allowed', 'not_measured', 'not_measured', 'not_measured'], COUNT)).toEqual([
+        1,
+        'Only one of the four scored crawlers could be measured.',
+      ]);
+      expect(said(['not_measured', 'not_measured', 'not_measured', 'not_measured'], COUNT)).toEqual(
+        [0, 'None of the four scored crawlers could be measured.'],
+      );
+      expect(
+        said(
+          [
+            'edge_blocks_automation',
+            'edge_blocks_automation',
+            'edge_blocks_automation',
+            'edge_blocks_automation',
+          ],
+          COUNT,
+        ),
+      ).toEqual([
+        0,
+        'The site’s edge blocks all automation, so none of the four scored crawlers could be measured.',
+      ]);
+    });
+
+    it('the edge is named beside the count’s reason, and not in place of another reason', () => {
+      expect(
+        said(['challenged_ua', 'challenged_ua', 'edge_blocks_automation', 'not_measured'], COUNT),
+      ).toEqual([2, `The site’s edge blocks all automation. ${WAITS}`]);
+      const READ = 'AI readability is graded once each template has a page read in a browser.';
+      // One scored crawler unmeasured at the edge, three served, and the grade waits for Readable.
+      expect(
+        said(['allowed', 'allowed', 'allowed', 'edge_blocks_automation'], ['readable_unmeasured']),
+      ).toEqual([3, READ]);
+      // Four served and an unscored crawler at the edge.
+      expect(
+        said(['allowed', 'allowed', 'allowed', 'allowed'], ['readable_unmeasured'], true),
+      ).toEqual([4, READ]);
+    });
+
+    it('wherever the count stands among the reasons it is the one said', () => {
+      expect(
+        said(
+          ['allowed', 'not_measured', 'not_measured', 'not_measured'],
+          ['readable_unmeasured', 'too_few_crawlers_measured'],
+        ),
+      ).toEqual([1, 'Only one of the four scored crawlers could be measured.']);
+    });
+
+    it('a withheld grade that names no reason is refused, as CheckSchema refuses it', () => {
+      const w = withheldFor(['allowed', 'allowed', 'allowed', 'not_measured'], []);
+      expect(() => aiWithheldSummary(w.check, w.measured)).toThrow(/names why/);
+      expect(CheckSchema.safeParse(w.check).success).toBe(false);
+    });
   });
 
   it('names each thin template, in the plural for more than one', () => {

@@ -207,6 +207,8 @@ export const ROUTE_POLICIES: readonly RoutePolicy[] = [
     reason: 'liveness probe; reads nothing',
     origin: 'any',
   },
+  { route: 'api/report-files/[id]/download', methods: ['GET'], class: 'member', origin: 'any' },
+  { route: 'api/reports', methods: ['POST'], class: 'member', origin: 'strict' },
   {
     route: 'api/reports/hide',
     methods: ['POST'],
@@ -230,6 +232,7 @@ export const ROUTE_POLICIES: readonly RoutePolicy[] = [
   { route: 'api/reports/[slug]/mine', methods: ['GET'], class: 'user', origin: 'any' },
   { route: 'api/reports/[slug]/visibility', methods: ['POST'], class: 'user', origin: 'strict' },
   { route: 'api/reports/[slug]/white-label', methods: ['POST'], class: 'user', origin: 'strict' },
+  { route: 'api/seats/switch', methods: ['POST'], class: 'member', origin: 'strict' },
   {
     route: 'api/reports/[slug]/view',
     methods: ['POST'],
@@ -378,11 +381,122 @@ export const ROUTE_POLICIES: readonly RoutePolicy[] = [
     reason: "the restore link's token, from its HttpOnly cookie, is the credential (D4)",
     origin: 'strict',
   },
+  // CC-31 workstream A: extra seats and sites on the Agency subscription (D4).
+  { route: 'api/billing/seats', methods: ['POST'], class: 'member', origin: 'strict' },
+  // CC-31 workstream A: seats and invitations (D3). A seat's own routes sit under `id/`, so no path
+  // here matches two rows (`api/seats/accept` would also match a seat id directly under `seats`).
+  { route: 'api/seats', methods: ['POST'], class: 'member', origin: 'strict' },
+  {
+    route: 'api/seats/id/[id]',
+    methods: ['DELETE', 'PATCH', 'POST'],
+    class: 'member',
+    origin: 'strict',
+  },
+  { route: 'api/seats/id/[id]/resend', methods: ['POST'], class: 'member', origin: 'strict' },
+  // The caller is signed in and holds no seat yet: the invitation's token, read from its cookie,
+  // names the seat, and accept_seat_invite accepts it only for the user whose address was invited.
+  { route: 'api/seats/accept', methods: ['POST'], class: 'user', origin: 'strict' },
+  {
+    route: 'invite/[token]',
+    methods: ['GET'],
+    class: 'public',
+    reason: 'an emailed link: moves its token into a cookie and redirects; changes nothing',
+    origin: 'any',
+  },
   {
     route: 'api/sites/[id]/alert-rules',
     methods: ['POST', 'PUT'],
     class: 'member',
     origin: 'strict',
+  },
+  // CC-31 workstream B2: share links (D7). Making and revoking one is a member's, for a report their
+  // seat covers; opening one needs no account.
+  {
+    route: 'api/report-files/[id]/share',
+    methods: ['DELETE', 'POST'],
+    class: 'member',
+    origin: 'strict',
+  },
+  // CC-31 workstream B2: client report schedules (D8). They sit under `schedules/site/`, so no path
+  // here is also one of a report's `[id]/…` routes.
+  {
+    route: 'api/report-files/schedules/site/[siteId]',
+    methods: ['DELETE', 'POST', 'PUT'],
+    class: 'member',
+    origin: 'strict',
+  },
+  {
+    route: 'api/report-files/schedules/site/[siteId]/client',
+    methods: ['PATCH', 'POST'],
+    class: 'member',
+    origin: 'strict',
+  },
+  {
+    route: 'api/report-files/schedules/site/[siteId]/confirm',
+    methods: ['POST'],
+    class: 'member',
+    origin: 'strict',
+  },
+  {
+    route: 'api/report-files/schedules/site/[siteId]/resume',
+    methods: ['POST'],
+    class: 'member',
+    origin: 'strict',
+  },
+  // The recipient of a client report holds no account: the token of the link they were mailed,
+  // read from its cookie, is the credential.
+  {
+    route: 'api/report-files/confirm',
+    methods: ['POST'],
+    class: 'public',
+    reason: "the confirmation link's token, from its HttpOnly cookie, is the credential (CC-31 D8)",
+    origin: 'strict',
+  },
+  {
+    route: 'api/report-files/pause',
+    methods: ['POST'],
+    class: 'public',
+    reason: "the pause link's token, from its HttpOnly cookie, is the credential (CC-31 D8)",
+    origin: 'strict',
+  },
+  {
+    route: 'api/report-files/decline',
+    methods: ['POST'],
+    class: 'public',
+    reason:
+      "“Don't ask me again”: the token of the decline, confirmation or pause link, from that link's HttpOnly cookie, is the credential (CC-31 D8)",
+    origin: 'strict',
+  },
+  {
+    route: 's/decline/[token]',
+    methods: ['GET', 'POST'],
+    class: 'public',
+    reason:
+      "a mailed link: the GET moves its token into a cookie and changes nothing; the POST is a mail client's one-click unsubscribe (RFC 8058), which records that the recipient is not to be asked again and comes with no cookie and no Origin",
+    origin: 'any',
+  },
+  {
+    route: 's/confirm/[token]',
+    methods: ['GET'],
+    class: 'public',
+    reason: 'a mailed link: moves its token into a cookie and redirects; changes nothing',
+    origin: 'any',
+  },
+  {
+    route: 's/pause/[token]',
+    methods: ['GET', 'POST'],
+    class: 'public',
+    reason:
+      "a mailed link: the GET moves its token into a cookie and changes nothing; the POST is a mail client's one-click unsubscribe (RFC 8058), which pauses the schedule the token names and comes with no cookie and no Origin",
+    origin: 'any',
+  },
+  {
+    route: 's/[token]',
+    methods: ['GET'],
+    class: 'public',
+    reason:
+      'a share link: the token in its path is the credential, stored as its sha256; per-IP limit; it counts the view and redirects (CC-31 D7)',
+    origin: 'any',
   },
 ];
 

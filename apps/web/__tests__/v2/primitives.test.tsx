@@ -436,6 +436,41 @@ describe('Table, with row headers', () => {
     );
     expect(out).toMatch(/<tbody><tr><th scope="row"[^>]*>Schedule<\/th><td[^>]*>weekly<\/td>/);
   });
+
+  it('given a column, makes that column’s cell the header: a row whose first cell does not name it', () => {
+    const out = html(
+      <Table
+        label="Fixes"
+        rowHeader={1}
+        columns={[{ header: 'Rank', mono: true }, { header: 'Fix' }, { header: 'Effect' }]}
+        rows={[
+          { key: 'a', cells: ['1', 'Unblock the crawlers', '+4'] },
+          { key: 'b', cells: ['2', 'Link the orphans', '+2'] },
+        ]}
+      />,
+    );
+    expect(
+      [...out.matchAll(/<tr>((?:<t[dh][^>]*>[^<]*<\/t[dh]>)+)<\/tr>/g)]
+        .slice(1)
+        .map((m) =>
+          [...m[1]!.matchAll(/<(t[dh])( scope="row")?[^>]*>([^<]*)</g)].map((c) => [c[1], c[3]]),
+        ),
+    ).toEqual([
+      [
+        ['td', '1'],
+        ['th', 'Unblock the crawlers'],
+        ['td', '+4'],
+      ],
+      [
+        ['td', '2'],
+        ['th', 'Link the orphans'],
+        ['td', '+2'],
+      ],
+    ]);
+    expect(out.match(/<th scope="row"/g)).toHaveLength(2);
+    // The header cell keeps its own column's face: the rank's mono class stays on the rank.
+    expect(out).toMatch(/<td class="[^"]*mono[^"]*">1<\/td><th scope="row">Unblock/);
+  });
 });
 
 describe('Table', () => {

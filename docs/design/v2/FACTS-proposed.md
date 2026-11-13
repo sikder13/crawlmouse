@@ -270,7 +270,7 @@ R7's strings name four scored crawlers GPTBot, OAI-SearchBot, ClaudeBot, Perplex
 | H4 / ARCH-2 §2.5 | Dashboard day 0, Dashboard, Site, Alerts | `Fri 30 Oct 06:00` | `Fri 30 Oct around 06:00` |
 | H4 | Site settings | `weekly, Fri 06:00 UTC` | `weekly, Fri around 06:00, America/Indiana/Indianapolis` (account timezone) |
 | H4 | Dashboard | `(now Fri 06:00)` | `(now Fri around 06:00)` |
-| ARCH-2 q12 | Ag-Seats | (none) | add under the table: `An invitation is the sign-in email with one extra line; nothing else is sent.` |
+| ARCH-2 q12 | Ag-Seats | (none) | add under the table: `An invitation is one email with a link to accept it. The link works for seven days.` (CC-31: the invitation is its own email with one link; the first wording, "the sign-in email with one extra line; nothing else is sent", described a mail that is not what is sent) |
 
 ### Copy changes that come from the decision log and are not in R7 §2
 

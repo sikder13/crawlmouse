@@ -79,18 +79,40 @@ const ANONYMOUS: Record<
   'api/billing/portal': { status: 401, body: { error: 'auth_required' } },
   'api/agency-trial': { status: 401, body: { error: 'auth_required' } },
   'api/billing/pro-trial/start': { status: 401, body: { code: 'auth_required' } },
+  'api/billing/seats': { status: 401, body: { code: 'auth_required' } },
   'api/billing/status': { status: 401, body: { pro: false } },
   'api/checks/[id]/claim': { status: 401, body: { code: 'auth_required' } },
   'api/fixes/[id]/done': { status: 401, body: { code: 'auth_required' } },
   'api/fixes/[id]/email-developer': { status: 401, body: { code: 'auth_required' } },
   'api/fixes/[id]/packet': { status: 401, body: { code: 'auth_required' } },
   'api/me': { status: 401, body: { code: 'auth_required' } },
+  'api/report-files/[id]/download': { status: 401, body: { code: 'auth_required' } },
+  'api/reports': { status: 401, body: { code: 'auth_required' } },
   'api/reports/[slug]/claim': { status: 401, body: { error: 'auth_required' } },
   'api/reports/[slug]/logo': { status: 401, body: { error: 'auth_required' } },
   // The owner island's probe: a caller with no session gets the deny answer before any read.
   'api/reports/[slug]/mine': { status: 200, body: { owned: false } },
   'api/reports/[slug]/visibility': { status: 401, body: { error: 'auth_required' } },
   'api/reports/[slug]/white-label': { status: 401, body: { error: 'auth_required' } },
+  'api/seats': { status: 401, body: { code: 'auth_required' } },
+  'api/seats/accept': { status: 401, body: { code: 'auth_required' } },
+  'api/seats/id/[id]': { status: 401, body: { code: 'auth_required' } },
+  'api/seats/id/[id]/resend': { status: 401, body: { code: 'auth_required' } },
+  'api/seats/switch': { status: 401, body: { code: 'auth_required' } },
+  'api/report-files/[id]/share': { status: 401, body: { code: 'auth_required' } },
+  'api/report-files/schedules/site/[siteId]': { status: 401, body: { code: 'auth_required' } },
+  'api/report-files/schedules/site/[siteId]/client': {
+    status: 401,
+    body: { code: 'auth_required' },
+  },
+  'api/report-files/schedules/site/[siteId]/confirm': {
+    status: 401,
+    body: { code: 'auth_required' },
+  },
+  'api/report-files/schedules/site/[siteId]/resume': {
+    status: 401,
+    body: { code: 'auth_required' },
+  },
   'api/sites': { status: 401, body: { code: 'auth_required' } },
   'api/sites/[id]': { status: 401, body: { code: 'auth_required' } },
   'api/sites/[id]/alert-rules': { status: 401, body: { code: 'auth_required' } },
@@ -111,6 +133,8 @@ beforeEach(() => {
   vi.stubEnv('V2_CHECKS_PUBLIC', '1');
   vi.stubEnv('V2_PIPELINE', '1');
   vi.stubEnv('CRAWL_PAUSED', '');
+  // The seat purchase answers 404 with V2_BILLING unset, before it reads the session.
+  vi.stubEnv('V2_BILLING', '1');
 });
 afterEach(() => vi.unstubAllEnvs());
 

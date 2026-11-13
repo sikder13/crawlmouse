@@ -115,6 +115,63 @@ export const NOTICE_CODES = [
   'email_requested',
   'invalid_email',
   'rate_limited',
+  // seats and invitations (CC-31)
+  'seat_invited',
+  'seat_resent',
+  'invite_not_mailed',
+  'seat_changed',
+  'seat_removed',
+  'seat_exists',
+  'seats_full',
+  'invalid_scope',
+  'seat_owner',
+  'not_invited',
+  'invite_gone',
+  'invite_no_link',
+  'email_mismatch',
+  'invite_full',
+  'already_member',
+  // buying seats and sites (CC-31)
+  'extras_changed',
+  'extras_unchanged',
+  'in_use',
+  'mixed_change',
+  'payment_failed',
+  'subscription_unchangeable',
+  'extras_in_trial',
+  'billing_unavailable',
+  // making a report (CC-31)
+  'reports_capped',
+  'links_capped',
+  'schedule_saved_not_asked',
+  'client_saved_not_asked',
+  'contact_declined',
+  'asked_recently',
+  'report_declined',
+  'fix_not_verified',
+  // share links (CC-31)
+  'share_made',
+  'share_revoked',
+  'not_ready',
+  // client report schedules, and the recipient's two links (CC-31)
+  'schedule_saved',
+  'schedule_saved_asked',
+  'schedule_saved_waits',
+  'schedule_cleared',
+  'client_saved',
+  'client_saved_asked',
+  'client_saved_waits',
+  'client_saved_later',
+  'invalid_owner',
+  'confirmation_requested',
+  'confirmation_waits',
+  'nothing_to_confirm',
+  'schedule_resumed',
+  'schedule_resumed_later',
+  'not_paused',
+  'report_confirmed',
+  'report_paused',
+  'report_link_gone',
   // any body the route could not read
   'invalid',
   // a form posted without the method it means (`meantMethod`)
@@ -125,14 +182,18 @@ export type NoticeCode = (typeof NOTICE_CODES)[number];
 
 const NOTICE_SET: ReadonlySet<string> = new Set(NOTICE_CODES);
 
-/** The pages a form posts from: the dashboard, or one site's page. */
+/**
+ * The pages a form posts from: the dashboard, Seats, Reports, an invitation's page, a report
+ * recipient's link pages, one site's page, and for an agency the client matrix, its client
+ * reports and one client's page.
+ */
 const BACK =
-  /^\/(?:dashboard|sites\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/;
+  /^\/(?:dashboard|seats|reports|invite|s\/confirm|s\/pause|s\/decline|agency|agency\/reports|(?:sites|agency\/clients)\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/;
 
 /**
- * The page a form was posted from, when it is one a form can go back to (the dashboard or a site
- * page, on this request's own origin, read from `Referer`); otherwise `fallback`. Only the path is
- * kept, so nothing else the header carries reaches the answer.
+ * The page a form was posted from, when it is one a form can go back to (one of `BACK`'s pages, on
+ * this request's own origin, read from `Referer`); otherwise `fallback`. Only the path is kept, so
+ * nothing else the header carries reaches the answer.
  */
 export function backFrom(req: Request, fallback: string): string {
   const referer = req.headers.get('referer');

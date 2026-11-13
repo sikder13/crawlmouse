@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { BrandLink } from './BrandLink';
+import { StatusPill } from './StatusPill';
 import shell from './PageShell.module.css';
 import styles from './AccountShell.module.css';
 
@@ -17,6 +18,10 @@ export interface RailLink {
 export interface AccountShellProps {
   /** The rail's links, in order. */
   nav: RailLink[];
+  /** The plan's name beside the brand ("Agency" on the agency rail), or nothing. */
+  badge?: string | null;
+  /** Under the brand: the account acted in and the switch to another (AccountSwitcher), or nothing. */
+  account?: ReactNode;
   /** The plan card under the links (the trial card), or nothing. */
   card?: ReactNode;
   /** The theme row at the foot of the rail. */
@@ -36,6 +41,8 @@ export interface AccountShellProps {
  */
 export function AccountShell({
   nav,
+  badge,
+  account,
   card,
   theme,
   currentIs = 'page',
@@ -47,7 +54,19 @@ export function AccountShell({
         Skip to the page
       </a>
       <header className={styles.rail}>
-        <BrandLink />
+        {/* One child of the rail, as the brand alone was: the ids React gives the rail's later
+            children (the theme row's) depend on their place among its children. */}
+        <>
+          {badge ? (
+            <div className={styles.brand}>
+              <BrandLink />
+              <StatusPill state="neutral">{badge}</StatusPill>
+            </div>
+          ) : (
+            <BrandLink />
+          )}
+          {account ? <div className={styles.account}>{account}</div> : null}
+        </>
         <nav className={styles.nav} aria-label="Primary">
           {nav.map((l) => (
             <a

@@ -46,21 +46,36 @@ To draw baselines locally in the same environment, run the harness inside that i
 
 ## Update a baseline on purpose
 
-1. Make the change and push the branch. CI runs the harness in six shards (`visual-shard`, one
-   per sixth of the tests); the `visual` check passes only when all six do. A shard fails on
-   each of its screenshots that moved.
+1. Make the change and push the branch. CI runs the harness in twelve jobs (`visual-shard`): six
+   shards, one per sixth of the tests, each run once per half of the preview routes (`part`, below);
+   the `visual` check passes only when all twelve do. A job fails on each of its screenshots that
+   moved.
 2. Each failing shard then re-draws the screenshots it failed on (`--last-failed`) and uploads an artifact named
-   `visual-<run id>-<attempt>-shard<n>`, holding the proposed `tests/visual/__snapshots__/`, and
+   `visual-<run id>-<attempt>-shard<n>-part<k>`, holding the proposed `tests/visual/__snapshots__/`, and
    the `-actual`, `-expected` and `-diff` images of each failure under
    `apps/web/test-results/visual/`. A shard that passed uploads nothing: none of its screenshots
    moved.
 3. Download every shard's artifact
    (`gh run download <run id> -p 'visual-<run id>-<attempt>-shard*' -D /tmp/visual`, one folder
-   per shard), open each diff, and confirm that every change is one you meant.
+   per job; a `gh` without `-p` takes each name with `-n`), open each diff, and confirm that every change is one you meant.
 4. Copy the accepted files from each artifact's `tests/visual/__snapshots__/` into this folder's
-   `__snapshots__/`, taking them from all the shards that failed: each holds only its own sixth
+   `__snapshots__/`, taking them from all the jobs that failed: each holds only its own share
    of the redrawn screenshots. Commit them in their own commit that names what changed, and push.
    The check passes when the committed baselines match.
+
+### Why each shard runs in two parts
+
+The harness keeps every compiled preview route in `next dev` (`next.config.mjs`), and Next restarts
+the server once its used heap passes 80% of the limit. One server holding all the routes crossed that
+line while warming them (CC-31, Q51: measured at CI's 12,288 MB limit, about 57 MB of live heap per
+route and a restart after route 132 of 149). `VISUAL_PART=k/n` (`part.ts`) gives a job every n-th
+route, a route's query moments with it, so each job's server compiles about half. The specs listed in
+`ONCE_SPECS` do not loop over the previews and run in part 1 only, and the routes their source names
+(`routesNamedIn`) are put in part 1, so its warm-up compiles them: compiled during the checks instead,
+they compiled beside the motion checks' replays, and on the two runs where they did, a replay did not
+reach its end (it passes when every route is compiled first). A few fixed checks
+inside the looping specs run in both parts. Unset, `VISUAL_PART` is every route, as on a local run. When the
+routes outgrow two parts, raise `n` in the workflow's matrix and in its `VISUAL_PART` values.
 
 The comparison step in CI runs with `updateSnapshots: 'none'` (set in `playwright.config.ts` when
 `CI` is set), so a missing or changed screenshot fails the job. The images the job re-draws after a

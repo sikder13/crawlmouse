@@ -11,6 +11,7 @@ import { checkRateLimit } from '@/lib/rate-limit';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { supabaseServer } from '@/lib/supabase/server';
 import { admittedHost } from '@/lib/v2/account/sites';
+import { agencyCaptureFor } from '@/lib/v2/agency/events';
 import { pricingCapture } from '@/lib/v2/pricing/events';
 import { agencyCheckouts } from './_lib/checkouts';
 import {
@@ -86,6 +87,7 @@ export async function POST(req: Request) {
           input,
         ),
       capture: pricingCapture(req.headers.get('cookie')),
+      firstClient: (accountId) => agencyCaptureFor(req)('first_client_added', accountId, {}),
       defer: (work) => after(work),
       now,
     },

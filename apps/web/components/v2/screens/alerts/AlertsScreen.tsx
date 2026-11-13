@@ -131,14 +131,18 @@ export function AlertsScreen({
                   <span key="l" data-v2-verdicts={r.verdicts.join(' ')}>
                     {r.label}
                   </span>,
-                  <Switch
-                    key="s"
-                    label={r.label}
-                    name="enabled"
-                    on={r.on}
-                    action={r.toggle.href}
-                    fields={r.toggle.fields}
-                  />,
+                  r.toggle ? (
+                    <Switch
+                      key="s"
+                      label={r.label}
+                      name="enabled"
+                      on={r.on}
+                      action={r.toggle.href}
+                      fields={r.toggle.fields}
+                    />
+                  ) : (
+                    <span key="s">{r.state}</span>
+                  ),
                 ],
               }))}
             />

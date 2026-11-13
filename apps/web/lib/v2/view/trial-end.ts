@@ -234,7 +234,7 @@ export function trialEndView(
               {},
               {
                 primary: true,
-                fields: { plan: v.tier, interval: 'month' },
+                fields: { plan: v.tier, interval: 'month', accountId: v.account.id },
               },
             )
           : null,
@@ -387,7 +387,7 @@ export function trialEndedView(
               'keepPlan',
               COPY.ended.choose(plan, tier === 'agency' ? AGENCY_MONTHLY : PRO_MONTHLY),
               {},
-              { primary: true, fields: { plan: tier, interval: 'month' } },
+              { primary: true, fields: { plan: tier, interval: 'month', accountId: v.account.id } },
             ),
     },
     staysTitle: COPY.staysTitle,

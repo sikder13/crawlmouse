@@ -3,6 +3,8 @@
  * registered changes applied (lib/v2/copy/reports.ts) and nothing else; one orange element; every
  * form posts to a known route; the site picker reloads the page with a GET.
  */
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { ReportsScreen } from '../../components/v2/screens/reports/ReportsScreen';
@@ -54,10 +56,68 @@ describe('Reports against Final-Reports', () => {
   });
 });
 
+describe('Reports, a share link just made', () => {
+  const URL = 'https://crawlmouse.com/s/kJ8sT2mQ9x_p4VnR7bWc-A';
+  const data = reportsPreview('home');
+  const withLink = {
+    ...data,
+    made: {
+      ...data.made,
+      rows: data.made.rows.map((r, i) =>
+        i === 0
+          ? { ...r, madeLink: { label: 'The link, shown here for a short while:', url: URL } }
+          : r,
+      ),
+    },
+  };
+  const html = renderToStaticMarkup(<ReportsScreen data={withLink} />);
+
+  it('is drawn once, in an element session recording masks and blocks', () => {
+    expect(html.split(URL)).toHaveLength(2);
+    const holder = new RegExp(`<([a-z]+)([^>]*)>${URL.replace(/[.]/g, '\\.')}</\\1>`).exec(html)!;
+    expect(holder[1]).toBe('code');
+    // The recorder's own class for an element it leaves out of a recording and of autocapture.
+    expect(holder[2]).toMatch(/ class="ph-no-capture"/);
+    // The attribute this project's recorder is told to mask.
+    expect(holder[2]).toContain(' data-ph-mask=""');
+    const config = readFileSync(join(process.cwd(), 'instrumentation-client.ts'), 'utf8');
+    expect(config).toContain("maskTextSelector: '[data-ph-mask]'");
+  });
+
+  it('a row with no link just made carries neither mark', () => {
+    const plain = renderToStaticMarkup(<ReportsScreen data={data} />);
+    expect(plain).not.toContain('data-ph-mask');
+    expect(plain).not.toContain('ph-no-capture');
+  });
+});
+
 describe('Reports, Agency', () => {
   it('lists the scheduled client reports and has one orange element', () => {
     const html = render('withheld');
     expect(primaries(html)).toHaveLength(1);
     expect(html).toContain('hello@harborlight.example');
+  });
+
+  it('gives each row of Reports and of Scheduled reports a header, its first cell', () => {
+    const html = render('withheld');
+    const data = reportsPreview('withheld');
+    for (const [label, rows] of [
+      ['Reports', data.made.rows.map((r) => r.made)],
+      ['Scheduled reports', data.scheduled.rows.map((r) => r.when)],
+    ] as const) {
+      const table = new RegExp(`<table[^>]*aria-label="${label}"[\\s\\S]*?</table>`).exec(html)![0];
+      const heads = [...table.matchAll(/<th scope="row"[^>]*>([\s\S]*?)<\/th>/g)].map((m) =>
+        m[1]!.replace(/<[^>]+>/g, ''),
+      );
+      expect(rows.length, label).toBeGreaterThan(0);
+      expect(heads, label).toEqual(rows);
+      // The scroll region around the table carries the class whose rule takes the line from under
+      // the last row's header cell (AccountScreen.module.css, held in agency.test.tsx).
+      const region = html
+        .slice(0, html.indexOf(table))
+        .match(/<[a-z]+ [^>]*>/g)!
+        .at(-1)!;
+      expect(region, label).toMatch(/class="[^"]*rowHeaded[^"]*"/);
+    }
   });
 });

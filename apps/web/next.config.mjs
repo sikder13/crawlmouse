@@ -1,5 +1,9 @@
 import { withSentryConfig } from '@sentry/nextjs';
+import { skipBuildChecks } from './lib/build-checks.mjs';
 import { securityHeaders } from './lib/security/headers.mjs';
+
+// On Vercel only: the type check and the lint are CI's there (lib/build-checks.mjs).
+const SKIP_BUILD_CHECKS = skipBuildChecks(process.env);
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -10,6 +14,8 @@ const nextConfig = {
   ...(process.env.CRAWLMOUSE_VISUAL_HARNESS === '1'
     ? { onDemandEntries: { maxInactiveAge: 60 * 60 * 1000, pagesBufferLength: 100 } }
     : {}),
+  typescript: { ignoreBuildErrors: SKIP_BUILD_CHECKS },
+  eslint: { ignoreDuringBuilds: SKIP_BUILD_CHECKS },
   // typedRoutes graduated from `experimental` to a top-level key in Next 15.5; the app relies on it.
   typedRoutes: true,
   // No X-Powered-By: Next.js header (ZAP's baseline flags it; it tells a scanner what to try).
@@ -41,6 +47,13 @@ const nextConfig = {
     ];
   },
   transpilePackages: ['@crawlmouse/engine', '@crawlmouse/types'],
+  // The report PDF's fonts are read from disk when a report is made (lib/v2/reports/pdf.ts), which
+  // the file tracer does not follow, so they are named for the route that makes a report and for
+  // the Inngest route.
+  outputFileTracingIncludes: {
+    '/api/reports': ['./lib/v2/reports/fonts/*'],
+    '/api/webhooks/inngest': ['./lib/v2/reports/fonts/*'],
+  },
   serverExternalPackages: [
     'crawlee',
     '@crawlee/basic',
