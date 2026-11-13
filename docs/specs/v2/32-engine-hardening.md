@@ -93,13 +93,15 @@ v1's JS detector read as an app shell (`content_features.client_rendered`). The 
   measurable effect" and never why the AI effect waits. N is the fix's `affected_pages`: for such a
   template, its crawled empty-root pages, which is what the check saw. How many of them were rendered
   is not on the Fix record, so no sample size is printed. A fix the last check did not detect keeps
-  its count from that detection, so its line reads "Made N pages readable without JavaScript when
-  last detected".
+  its count from that detection, so its line reads "Would make N pages readable without JavaScript,
+  as of the last check that detected it". In a group row, such a fix is counted in the pages part and
+  not as an AI effect that waits.
 - _A known difference from the ruling's letter, for the owner._ The view cannot see whether a
   template has graded pages (the Fix does not carry it), so its line also fires on a
   `client_rendered_template` fix whose template has graded pages, when that fix's AI effect is not
-  above 0. Such a fix reaches 0 only by rounding: its counterfactual sets each graded page's share to
-  1, the most a share can be, so its line is still true. It is not ranked first; the engine's rule is
+  above 0: estimated at 0, or waiting. An estimate reaches 0 only by rounding: its counterfactual sets
+  each graded page's share to 1, the most a share can be. An effect that waits is a grade that waits;
+  the pages the fix counts do not depend on it. In both cases the line is still true. It is not ranked first; the engine's rule is
   the template with no graded page. The ruling keeps D4's wording for every other fix. Verify:
   `pnpm --filter @crawlmouse/engine exec vitest run src/v2/grade/effects.rendered.test.ts src/v2/build/empty-shell-site.test.ts`
   and `pnpm --filter @crawlmouse/web exec vitest run lib/v2/view/pages-readable.test.ts`.
@@ -119,6 +121,11 @@ v1's JS detector read as an app shell (`content_features.client_rendered`). The 
   up to about 225 s, so the deadline it needs before production renders are switched on has to cover
   both phases.
 - A page left `phase_threw` records no detail of the error.
+- `renderCheck` trusts its caller to pass every crawled page as `emptyRootCandidates`, as
+  `renderCandidates` does: a caller that passed empty-root pages alone would get picks in templates
+  with a graded page. It is not refused, because no check on the pool tells that misuse from a real
+  crawl in which every page fetched is an empty-root page: the homepage, the one page classed content
+  whatever its text, is not among the pages when its own fetch failed or robots.txt kept us from it.
 - An open fix's shell template is not put first in the empty-root phase; the order is by key alone.
 - The built-site recording (`fixtures/v2/build/generate.ts`) leaves the empty-root phase off, so the web
   fixture built from it is unchanged; `empty-shell-site.ts` carries the phase.
