@@ -63,6 +63,19 @@ describe('the Agency trial page names only capabilities it can account for', () 
     expect(r.loose).toEqual([]);
   });
 
+  // Q47 (owner ruling): where the offer names scheduled client reports, the page says where a report
+  // goes while the trial runs, once, inside the aside that makes the promise.
+  it.each(pages)(
+    '%s: says where a report goes during the trial, beside the reports it offers',
+    (_n, html) => {
+      const aside = new JSDOM(html).window.document.querySelector('section table')!.parentElement!;
+      const text = aside.textContent!.replace(/\s+/g, ' ');
+      expect(text).toContain('Scheduled client reports');
+      expect(text.split('During the trial, reports go to your own address.')).toHaveLength(2);
+      expect(html.split('During the trial, reports go to your own address.')).toHaveLength(2);
+    },
+  );
+
   // SEO R2-N5: where the card is taken, a row marked coming does not say "yes" beside it.
   it('the aside gives a coming row the value "coming", never "yes"', () => {
     for (const [, html] of pages) {

@@ -169,6 +169,15 @@ export const AGENCY_TRIAL_COPY = {
       ],
       [{ text: 'Everything in Pro, on every site', capabilities: ['sites'] }, YES],
     ],
+    /**
+     * Owner ruling on Q47: the offer names scheduled client reports, and the hourly run sends a
+     * report of an account in its Agency trial to the owner's own address alone
+     * (`lib/v2/agency/schedules-run.ts`). The page says so where it promises them.
+     */
+    trialReports: {
+      text: 'During the trial, reports go to your own address.',
+      capabilities: ['client_reports'],
+    } as Tagged,
     /** D11: no Branding screen in this step, so day 1 names only what is built. */
     foot: (interval: Interval): Tagged => ({
       text:
