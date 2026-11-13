@@ -1,11 +1,12 @@
 /**
  * D3(d): the production worker. Two rows: `/healthz` at the production URL answers 200 `{"ok":true}`,
- * and the release the machines run is the worker build of `origin/main`.
+ * and the release the machines run is the worker build of the live production commit (live.ts).
  *
  * The worker's `/healthz` reports no release (questions.md Q1), so the release is read from the Fly
  * Machines API with a read-only token (`FLY_READ_TOKEN`): `worker-production.yml` deploys with
  * `--image-label <commit sha>`, so each machine's image tag is the commit it was built from. The
- * release is current when no worker-input path changed between that commit and `origin/main`; the
+ * release is current when no worker-input path changed between that commit and the commit of the live
+ * production deployment, which the Vercel project names (not a local ref such as `origin/main`); the
  * paths are the staging workflow's `on.push.paths`, the list that decides when a worker is rebuilt.
  *
  * The URL and the app come from the constant `WORKER_APP`, never from `CRAWL_WORKER_URL`, which in
@@ -15,6 +16,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parse } from 'yaml';
 import { REPO_ROOT } from '../env-scan';
+import { liveCommit } from './live';
 import { fail, httpFailed, noToken, pass, unknown, type Probe } from './types';
 
 /** `app` in packages/worker/fly.production.toml (worker-files.test.ts holds the two equal). */
@@ -56,6 +58,10 @@ export function workerInputPaths(root = REPO_ROOT): string[] {
 
 const SHA = /^[0-9a-f]{40}$/;
 
+/** `flyctl tokens create` prints `FlyV1 fm2_…`, which is sent as it is; any other token as Bearer. */
+export const flyAuthorization = (token: string): string =>
+  token.startsWith('FlyV1 ') ? token : `Bearer ${token}`;
+
 interface Machine {
   state?: unknown;
   image_ref?: { tag?: unknown };
@@ -67,7 +73,7 @@ export const releaseProbe =
     const token = deps.env.FLY_READ_TOKEN;
     if (!token) return noToken('FLY_READ_TOKEN');
     const res = await deps.fetch(`${MACHINES_API}/apps/${WORKER_APP}/machines`, {
-      headers: { authorization: `Bearer ${token}` },
+      headers: { authorization: flyAuthorization(token) },
     });
     if (!res.ok) return httpFailed('Fly Machines API', res.status);
     const machines = (await res.json()) as Machine[];
@@ -86,16 +92,16 @@ export const releaseProbe =
       );
     }
     const short = tag.slice(0, 12);
-    const head = await deps.git(['rev-parse', '--verify', '--quiet', 'origin/main']);
-    if (head.code !== 0) return unknown('origin/main is not in the local clone (git fetch origin)');
+    const live = await liveCommit(deps);
+    if (!live.ok) return live.result;
     const known = await deps.git(['cat-file', '-e', `${tag}^{commit}`]);
     if (known.code !== 0)
       return unknown(`the running commit ${short} is not in the local clone (git fetch origin)`);
-    const diff = await deps.git(['diff', '--quiet', tag, 'origin/main', '--', ...paths()]);
-    const main = head.stdout.trim().slice(0, 12);
+    const diff = await deps.git(['diff', '--quiet', tag, live.sha, '--', ...paths()]);
+    const at = live.sha.slice(0, 12);
     if (diff.code === 0)
-      return pass(`running ${short}; no worker input changed up to origin/main ${main}`);
+      return pass(`running ${short}; no worker input changed up to the live commit ${at}`);
     if (diff.code === 1)
-      return fail(`running ${short}; worker inputs changed up to origin/main ${main}: redeploy`);
+      return fail(`running ${short}; worker inputs changed up to the live commit ${at}: redeploy`);
     return unknown(`git diff exited ${diff.code}`);
   };

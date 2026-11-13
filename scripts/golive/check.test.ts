@@ -1,8 +1,10 @@
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { main, parseArgs, parseEnvFile } from './check';
+import { earlyRedactor, main, parseArgs, parseEnvFile } from './check';
 import { PRECONDITIONS } from './preconditions';
 import { PROBES, type ProbeId } from './probes/index';
 import { pass, type Probe, type ProbeResult } from './probes/types';
+import { VERCEL_PROJECT_ID } from './probes/vercel-env';
 import { MASK } from './redact';
 import { fakeToken, json, scriptedFetch, scriptedGit } from './test-support';
 
@@ -57,6 +59,21 @@ describe('the arguments', () => {
 });
 
 describe('step gating', () => {
+  it('passes step 1 before the worker exists: every automatic probe failing does not block it', async () => {
+    const failing: Answers = {};
+    for (const id of Object.keys(PROBES) as ProbeId[])
+      failing[id] = { status: 'fail', reason: 'x' };
+    const r = await run(
+      ['--step', '1', '--ticked', manualThrough(1).join(',')],
+      probesWith(failing),
+    );
+    expect(r.code).toBe(0);
+    expect(
+      (await run(['--step', '2', '--ticked', manualThrough(2).join(',')], probesWith(failing)))
+        .code,
+    ).toBe(1);
+  });
+
   it('passes a step when every row gating it and every earlier step passes', async () => {
     const r = await run(['--step', '2', '--ticked', manualThrough(2).join(',')], allPass());
     expect(r.code).toBe(0);
@@ -86,8 +103,9 @@ describe('step gating', () => {
     expect(r.code).toBe(1);
   });
 
-  it('never counts unknown as pass, at any step', async () => {
-    for (const step of [1, 2, 3, 4, 5]) {
+  it('never counts unknown as pass, at any step it gates', async () => {
+    // vercel-env-step-1 is step 1's exit check, so it gates step 2 and every later one.
+    for (const step of [2, 3, 4, 5]) {
       const r = await run(
         ['--step', String(step), '--ticked', manualThrough(step).join(',')],
         probesWith({
@@ -106,7 +124,7 @@ describe('step gating', () => {
     probes['worker-healthz'] = async () => {
       throw new Error('secret detail from a library');
     };
-    const r = await run(['--ticked', manualThrough(1).join(',')], probes);
+    const r = await run(['--step', '2', '--ticked', manualThrough(2).join(',')], probes);
     expect(r.code).toBe(1);
     expect(r.all).toContain('worker-healthz: unknown (the probe failed (Error))');
     expect(r.all).not.toContain('secret detail');
@@ -131,6 +149,41 @@ describe('the env file', () => {
       B: 'two',
       C: '3',
     });
+  });
+});
+
+describe('--env-file', () => {
+  const readFrom = async (argv: string[], processEnv: Record<string, string | undefined>) => {
+    const read: string[] = [];
+    await main(argv, {
+      processEnv,
+      readFile: (p) => {
+        read.push(p);
+        return '';
+      },
+      fetch: scriptedFetch(() => json({})).fetch,
+      now: () => new Date(Date.UTC(2026, 10, 13)),
+      git: scriptedGit({}),
+      out: () => {},
+      err: () => {},
+      probes: allPass(),
+    });
+    return read;
+  };
+
+  it("resolves a relative path against pnpm's caller directory (INIT_CWD)", async () => {
+    expect(
+      await readFrom(['--env-file', 'scripts/.env.local'], { INIT_CWD: '/caller/repo' }),
+    ).toEqual(['/caller/repo/scripts/.env.local']);
+  });
+
+  it('keeps an absolute path, and resolves against the working directory without INIT_CWD', async () => {
+    expect(await readFrom(['--env-file', '/abs/.env'], { INIT_CWD: '/caller' })).toEqual([
+      '/abs/.env',
+    ]);
+    expect(await readFrom(['--env-file', 'rel/.env'], {})).toEqual([
+      resolve(process.cwd(), 'rel/.env'),
+    ]);
   });
 });
 
@@ -214,7 +267,7 @@ describe('no token, file value or received value reaches what the command writes
     const got = 'a-received-value-quoted-by-a-bug-' + 'n'.repeat(10);
     const probes = allPass();
     probes['vercel-env-1'] = async (d) => {
-      const res = await d.fetch('https://api.vercel.com/v10/projects/p/env');
+      const res = await d.fetch(`https://api.vercel.com/v10/projects/${VERCEL_PROJECT_ID}/env`);
       const body = (await res.json()) as { v: string };
       return { status: 'fail', reason: `token ${d.env.VERCEL_TOKEN} body ${body.v}` };
     };
@@ -250,5 +303,96 @@ describe('no token, file value or received value reaches what the command writes
     expect(code).toBe(2);
     expect(err.join('\n')).toContain(MASK);
     expect(err.join('\n')).not.toContain(token);
+  });
+});
+
+describe('the redactor masks secrets, not the words the check prints (review r1 N1)', () => {
+  const mainWith = async (
+    file: string,
+    route: Parameters<typeof scriptedFetch>[0],
+    probes?: Record<ProbeId, Probe>,
+  ) => {
+    const out: string[] = [];
+    await main(['--step', '5'], {
+      processEnv: {},
+      readFile: () => file,
+      fetch: scriptedFetch(route).fetch,
+      now: () => new Date(Date.UTC(2026, 10, 13)),
+      git: scriptedGit({}),
+      out: (s) => out.push(s),
+      err: (s) => out.push(s),
+      probes,
+    });
+    return out.join('\n');
+  };
+
+  it('prints the worker host and the JSON keys a response carried, and masks a received value', async () => {
+    const planted = 'a-received-secret-' + 'x'.repeat(12);
+    const all = await mainWith(`FLY_READ_TOKEN=${fakeToken(['fo1'])}`, (url) => {
+      if (url.hostname === 'crawlmouse-worker.fly.dev')
+        return json({ ok: true, app: 'crawlmouse-worker', statements: planted });
+      return json([
+        { state: 'started', image_ref: { repository: 'crawlmouse-worker', tag: planted } },
+      ]);
+    });
+    expect(all).toContain(
+      'worker-healthz: pass (https://crawlmouse-worker.fly.dev/healthz answered 200 ok)',
+    );
+    expect(all).not.toContain(planted);
+  });
+
+  it('masks a received string of 12 characters or more, and leaves a shorter one', async () => {
+    const long = 'r'.repeat(12);
+    const short = 's'.repeat(11);
+    const probes = allPass();
+    probes['vercel-env-1'] = async (d) => {
+      await d.fetch(`https://api.vercel.com/v10/projects/${VERCEL_PROJECT_ID}/env`);
+      return { status: 'fail', reason: `${long} ${short}` };
+    };
+    const all = await mainWith(
+      `VERCEL_TOKEN=${fakeToken(['vcp'])}`,
+      () => json({ a: long, b: short }),
+      probes,
+    );
+    expect(all).toContain(`vercel-env-step-1: fail (${MASK} ${short})`);
+  });
+
+  it('registers a short file value only for a token-named variable', async () => {
+    const probes = allPass();
+    probes['vercel-env-1'] = async (d) => ({
+      status: 'fail',
+      reason: `token ${d.env.VERCEL_TOKEN} pepper ${d.env.TRIAL_LEDGER_PEPPER} region iad 1`,
+    });
+    const all = await mainWith(
+      'CRAWL_PAUSED=1\nWORKER_REGION=iad\nVERCEL_TOKEN=tok9\nTRIAL_LEDGER_PEPPER=pep7',
+      () => json({}),
+      probes,
+    );
+    expect(all).toContain('step 1: ');
+    expect(all).toContain('golive:check — gating step 5');
+    expect(all).toContain(`vercel-env-step-1: fail (token ${MASK} pepper ${MASK} region iad 1)`);
+  });
+
+  it('masks a long file value whatever its name', async () => {
+    const value = 'https://some-long-value.example/' + 'p'.repeat(8);
+    const probes = allPass();
+    probes['vercel-env-1'] = async (d) => ({ status: 'fail', reason: `${d.env.CRAWL_WORKER_URL}` });
+    const all = await mainWith(`CRAWL_WORKER_URL=${value}`, () => json({}), probes);
+    expect(all).toContain(`vercel-env-step-1: fail (${MASK})`);
+  });
+
+  it('the early redactor reads the file --env-file names', () => {
+    const value = 'an-env-file-secret-' + 'e'.repeat(12);
+    const read: string[] = [];
+    const early = earlyRedactor(
+      ['--', '--env-file', 'other/.env'],
+      { INIT_CWD: '/caller' },
+      (p) => {
+        read.push(p);
+        return `SOME_SECRET=${value}\nVERCEL_TOKEN=tok9`;
+      },
+    );
+    expect(read).toEqual(['/caller/other/.env']);
+    expect(early.redact(`x ${value} tok9 step 1`)).toBe(`x ${MASK} ${MASK} step 1`);
   });
 });

@@ -1,6 +1,7 @@
 /**
  * The switch-on steps (CC-35 D4). Step 1 deploys the production worker and sets the app's worker
- * variables; steps 2–5 each set one flag. A precondition gates the earliest step that needs it.
+ * variables; steps 2–5 each set one flag. A precondition gates the earliest step that needs it; what
+ * step 1 itself makes true gates step 2 (preconditions.ts).
  */
 import { SWITCH_ON, type Flag } from './budget';
 
@@ -8,7 +9,7 @@ export type Step = 1 | 2 | 3 | 4 | 5;
 export const STEPS: readonly Step[] = [1, 2, 3, 4, 5];
 
 export const STEP_TITLE: Readonly<Record<Step, string>> = {
-  1: 'production worker deployed, its egress recorded, the worker variables set',
+  1: 'deploy the production worker, record its egress, set the worker variables',
   2: 'V2_PIPELINE=1',
   3: 'V2_ACCOUNT_DOOR=1',
   4: 'V2_CHECKS_PUBLIC=1',

@@ -5,10 +5,13 @@
  *
  * `source` is a tracked `file:line` where one records the precondition, otherwise the session notes'
  * `notes/cc-NN/PR.md:line` (outside the repository; preconditions.test.ts checks tracked sources only).
- * `gates` is the earliest step that needs it (steps.ts). An `auto` row is decided by a probe; a
+ * `gates` is the earliest step that needs it (steps.ts). Step 1 deploys the production worker, so a row
+ * that only that deploy can make true (the worker answering, its release, its egress, the app's worker
+ * variables) is step 1's exit check and gates step 2; step 1 itself is gated on what the owner can make
+ * true before deploying (review r1 D-B1). An `auto` row is decided by a probe; a
  * `manual` row is a box the owner ticks in docs/ops/go-live.md and passes to the check as `--ticked`.
  */
-import { functionCountAfter } from './inngest-sync';
+import { syncedFunctionCount } from './inngest-sync';
 import { PAID_PLAN_TICK } from './probes/inngest';
 import type { ProbeId } from './probes/index';
 import type { Step } from './steps';
@@ -30,12 +33,12 @@ export interface Precondition {
 const auto = (probe: ProbeId): Check => ({ kind: 'auto', probe });
 const manual: Check = { kind: 'manual' };
 
-/** The sync row for a step: Inngest shows the function count of the flags already on. */
-const syncRow = (step: Step): Precondition => {
-  const before = (step === 1 ? 1 : step - 1) as Step;
+/** The sync row for a flag step (2–5): Inngest shows the function count of the flags already on. */
+const syncRow = (step: 2 | 3 | 4 | 5): Precondition => {
+  const before = (step - 1) as Step;
   return {
     id: `inngest-synced-before-step-${step}`,
-    mustBeTrue: `Inngest → Apps → crawlmouse (production) was synced after the last redeploy and lists ${functionCountAfter(before)} functions`,
+    mustBeTrue: `Inngest → Apps → crawlmouse (production) was synced after the last redeploy and lists ${syncedFunctionCount(before)} functions, failure handlers included`,
     why: 'Inngest keeps the function set from its last sync; a stale set fails each tick and still spends executions (plan review B8)',
     source: 'notes/cc-35/questions.md (Q4)',
     gates: step,
@@ -45,7 +48,7 @@ const syncRow = (step: Step): Precondition => {
 };
 
 export const PRECONDITIONS: readonly Precondition[] = [
-  // ── step 1: the production worker ──
+  // ── step 1: before the production worker is deployed ──
   {
     id: 'worker-github-environment',
     mustBeTrue:
@@ -67,21 +70,32 @@ export const PRECONDITIONS: readonly Precondition[] = [
     check: manual,
   },
   {
+    id: 'fly-tokens-scoped',
+    mustBeTrue:
+      "no GitHub environment other than `worker-production` holds a Fly token that reaches `crawlmouse-worker`: the `staging` environment's FLY_API_TOKEN is an app-scoped deploy token for `crawlmouse-worker-staging` (`fly tokens create deploy -a crawlmouse-worker-staging`), and the `spike` environment is deleted or holds no Fly token",
+    why: 'an organisation token in an environment a push to main runs could deploy or destroy the production worker with no owner dispatch (review r1 D-B2)',
+    source: 'docs/ops/worker-runbook.md:14',
+    gates: 1,
+    owner: 'owner',
+    check: manual,
+  },
+  // ── step 2, first: step 1's exit check (true only once the worker is deployed) ──
+  {
     id: 'worker-healthz',
     mustBeTrue: 'https://crawlmouse-worker.fly.dev/healthz answers 200 {"ok":true}',
     why: 'the app posts every batch to that worker',
     source: 'packages/worker/src/server.ts:274',
-    gates: 1,
+    gates: 2,
     owner: 'owner',
     check: auto('worker-healthz'),
   },
   {
     id: 'worker-release',
     mustBeTrue:
-      'the production machines run an image labelled with a commit from which no worker input changed up to origin/main',
+      'the production machines run an image labelled with a commit from which no worker input changed up to the live production commit (the Vercel project names it)',
     why: 'a worker older than the app it serves reads batches the app no longer sends (CC-32)',
     source: '.github/workflows/worker-staging.yml:15',
-    gates: 1,
+    gates: 2,
     owner: 'owner',
     check: auto('worker-release'),
   },
@@ -91,7 +105,7 @@ export const PRECONDITIONS: readonly Precondition[] = [
       "the production worker's egress IPv4 and IPv6 are recorded in the runbook's egress table",
     why: 'sites allow-list the crawler by that address; the table says "not recorded"',
     source: 'docs/ops/worker-runbook.md:304',
-    gates: 1,
+    gates: 2,
     owner: 'owner',
     check: manual,
   },
@@ -100,7 +114,7 @@ export const PRECONDITIONS: readonly Precondition[] = [
     mustBeTrue: "a Sentry uptime monitor watches the production worker's /healthz",
     why: 'a worker that stops answering stops every check; nobody is told otherwise',
     source: 'notes/cc-33/PR.md:121',
-    gates: 1,
+    gates: 2,
     owner: 'CC-33',
     check: manual,
   },
@@ -110,11 +124,10 @@ export const PRECONDITIONS: readonly Precondition[] = [
       "Vercel Production has every name REQUIRED_ENV[1] lists (the worker's three among them), none set after the live deployment, and no INNGEST_DEV",
     why: 'a deployment keeps the environment it was built with (brief F7)',
     source: 'apps/web/lib/worker-client/client.ts:19',
-    gates: 1,
+    gates: 2,
     owner: 'owner',
     check: auto('vercel-env-1'),
   },
-  syncRow(1),
   // ── step 2: V2_PIPELINE ──
   {
     id: 'migrations-applied',
@@ -198,8 +211,8 @@ export const PRECONDITIONS: readonly Precondition[] = [
   {
     id: 'signin-canary',
     mustBeTrue:
-      'the Supabase Auth email limit is raised by at least 6 an hour, then SIGNIN_CANARY_TO is set (an internal mailbox) with Resend subscribed to email.delivered',
-    why: "the canary's own links would use up the sign-in mail limit real users need (CC-33 Q4, Q16)",
+      'SIGNIN_CANARY_TO is unset, or it was set (an internal mailbox) only after the Supabase Auth email limit was raised by at least 6 an hour, with Resend subscribed to email.delivered',
+    why: 'the canary is optional (CC-33: "when wanted"); once set, its own links would use up the sign-in mail limit real users need (CC-33 Q4, Q16)',
     source: 'notes/cc-33/PR.md:116',
     gates: 3,
     owner: 'CC-33',
@@ -236,6 +249,16 @@ export const PRECONDITIONS: readonly Precondition[] = [
     gates: 4,
     owner: 'owner',
     check: auto('vercel-env-4'),
+  },
+  {
+    id: 'worker-variables-paired',
+    mustBeTrue:
+      "the app's worker variables pair with the production worker: CRAWL_WORKER_URL is https://crawlmouse-worker.fly.dev, and WORKER_SIGNING_SECRET and the JWT key pair were set from the same values as the worker's Fly secrets (docs/ops/worker-runbook.md, Production)",
+    why: "golive:check reads the variables' names only, so a wrong value is first met at step 4's first check, on the public home",
+    source: 'docs/ops/worker-runbook.md:397',
+    gates: 4,
+    owner: 'owner',
+    check: manual,
   },
   {
     id: 'resend-domain',
@@ -309,7 +332,7 @@ export const PRECONDITIONS: readonly Precondition[] = [
   {
     id: 'search-console-baseline',
     mustBeTrue:
-      'Search Console impressions and the indexed-URL list are recorded before the switch (and again after), and IndexNow is run after the deploy',
+      "Search Console impressions and the indexed-URL list are recorded before the switch (and again after), and IndexNow is run only after the step's 30-minute watch passes",
     why: 'step 4 rewrites /, /dashboard and /r/:slug, the URLs that earn search traffic (OPERATING-RULES §13)',
     source: 'docs/OPERATING-RULES.md:440',
     gates: 4,
@@ -391,7 +414,7 @@ export const PRECONDITIONS: readonly Precondition[] = [
     id: 'stripe-live-prices',
     mustBeTrue:
       "each of CATALOG's eight lookup keys has an active live-mode price on the v2 Stripe account at the catalog's amount and interval",
-    why: 'checkout refuses a plan whose price is missing or differs from the pages (CC-03)',
+    why: 'checkout refuses a plan whose price is missing or differs from the pages (CC-03); the probe cannot see which Stripe account a restricted key belongs to, so the owner makes sure STRIPE_LIVE_READ_KEY is a key of the v2 account',
     source: 'apps/web/lib/billing/catalog.ts:38',
     gates: 5,
     owner: 'owner',
@@ -425,6 +448,16 @@ export const PRECONDITIONS: readonly Precondition[] = [
     source: 'docs/specs/v2/03-billing.md:4',
     gates: 5,
     owner: 'CC-36',
+    check: manual,
+  },
+  {
+    id: 'search-console-step-5',
+    mustBeTrue:
+      "Search Console impressions and the indexed-URL list are recorded before the switch (and again after), and IndexNow is run only after the step's 30-minute watch passes",
+    why: 'step 5 rewrites /pricing and /developers and adds /agencies to the sitemap (OPERATING-RULES §13); a rollback inside the watch would leave submitted URLs answering 404',
+    source: 'docs/OPERATING-RULES.md:440',
+    gates: 5,
+    owner: 'owner',
     check: manual,
   },
   {

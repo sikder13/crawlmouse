@@ -13,8 +13,8 @@ import {
   FUNCTIONS,
   HOBBY_HEADROOM_LINE,
   HOBBY_MONTHLY_EXECUTIONS,
-  SHAPES,
   alertFiring,
+  allShapes,
   checkExecutions,
   cronPerDay,
   finishedFanOut,
@@ -52,8 +52,11 @@ export async function renderBudget(): Promise<string> {
     '',
     'How the numbers are made: a check is counted by running the real `runCheck` (`inngest/check.ts`)',
     "against a scripted worker with a counting `step` (`checkExecutions`). Every other function's steps",
-    "are a row of `FUNCTIONS`; `scripts/golive/budget.test.ts` recounts each file's step calls and fails",
-    'when a row disagrees, and fails when this file differs from its render.',
+    "are a row of `FUNCTIONS`. `scripts/golive/budget.test.ts` fails when a file's step call sites differ",
+    "from the sum of its rows' call sites, when a cron row's schedule differs from the cron literal in",
+    'its file (its runs a day are read from that schedule), when a line an event row cites holds no step',
+    "call, and when this file differs from its render. An event row's steps a run are written by hand",
+    'from the step calls it cites; no test derives that number from the code.',
     '',
     `## The fixed floor: crons with nothing due, all four flags on, ${DAYS_PER_MONTH} days`,
     '',
@@ -77,11 +80,11 @@ export async function renderBudget(): Promise<string> {
     '',
     '## Event functions, per event',
     '',
-    '| Function | File | Registered with | Trigger | Steps a run |',
-    '| --- | --- | --- | --- | --- |',
+    '| Function | File | Registered with | Trigger | Steps a run | Step calls |',
+    '| --- | --- | --- | --- | --- | --- |',
     ...events.map(
       (f) =>
-        `| \`${f.id}\` | \`${f.file}\` | ${f.registration} | ${f.trigger} | ${f.id === 'crawlmouse.check.run' ? 'see the check shapes' : `${f.steps} (${f.stepsHow})`} |`,
+        `| \`${f.id}\` | \`${f.file}\` | ${f.registration} | ${f.trigger} | ${f.id === 'crawlmouse.check.run' ? 'see the check shapes' : `${f.steps} (${f.stepsHow})`} | ${(f.stepAt ?? []).map((l) => `\`${f.file}:${l}\``).join(', ') || 'measured'} |`,
     ),
     '',
     `A finished check starts three of them (the alert planner, the notify mail, the capture): ${finishedFanOut()} executions.`,
@@ -106,7 +109,8 @@ export async function renderBudget(): Promise<string> {
     '| Shape | Why | checkFn run | First check | Scheduled re-check |',
     '| --- | --- | --- | --- | --- |',
   ];
-  for (const shape of SHAPES) {
+  const shapes = await allShapes();
+  for (const shape of shapes) {
     const [first, recheck] = await scenarios(shape);
     lines.push(
       `| ${shape.label} | ${shape.why} | ${await checkExecutions(shape)} | ${first!.executions} | ${recheck!.executions} |`,
@@ -114,13 +118,17 @@ export async function renderBudget(): Promise<string> {
   }
   lines.push(
     '',
+    'A run that passes its finish timeout is counted to the sleep that passes it, and Inngest cancels',
+    'it there; the table still adds the fan-out of a finished check to it, where the real run would',
+    'start `crawlmouse.check.cancelled` and the failed-check mail instead.',
+    '',
     '## A month, against the quota',
     '',
-    `| Checks a month | ${SHAPES.map((s) => s.label).join(' | ')} |`,
-    `| --- | ${SHAPES.map(() => '---').join(' | ')} |`,
+    `| Checks a month | ${shapes.map((s) => s.label).join(' | ')} |`,
+    `| --- | ${shapes.map(() => '---').join(' | ')} |`,
   );
   for (const checks of CHECK_COUNTS) {
-    const totals = await Promise.all(SHAPES.map((s) => monthlyTotal(checks, s)));
+    const totals = await Promise.all(shapes.map((s) => monthlyTotal(checks, s)));
     lines.push(`| ${n(checks)} | ${totals.map(n).join(' | ')} |`);
   }
   lines.push(

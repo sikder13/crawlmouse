@@ -39,7 +39,13 @@ export function renderBlock(rows: readonly Precondition[] = MANUAL): string {
   for (const step of STEPS) {
     const rows_ = rows.filter((p) => p.gates === step);
     if (rows_.length === 0) continue;
-    lines.push('', `#### Before step ${step}: ${STEP_TITLE[step]}`, '', ...rows_.map(box));
+    lines.push('', `#### Before step ${step}: ${STEP_TITLE[step]}`, '');
+    if (step === 2)
+      lines.push(
+        "Step 1's exit check is part of this list: the rows that only the worker deploy makes true gate step 2.",
+        '',
+      );
+    lines.push(...rows_.map(box));
   }
   lines.push('', END);
   return lines.join('\n');

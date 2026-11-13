@@ -12,12 +12,12 @@
  * check never requests.
  *
  * Tokens come from `scripts/.env.local` of this checkout (or `--env-file`), and from the process
- * environment for the names in `TOKEN_ENV`. Every value of that file, every token, and every string a
- * response carried is redacted from everything the command writes (redact.ts).
+ * environment for the names in `TOKEN_ENV`. Tokens, the file's values and the strings a response
+ * carried are redacted from everything the command writes, by the rules in redact.ts.
  */
 import { execFile } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CATALOG } from '../../apps/web/lib/billing/catalog';
 import { listMigrations } from '../db/files';
@@ -32,11 +32,15 @@ import {
   WORKER_FLY_ENV,
 } from './env-classes';
 import { REPO_ROOT } from './env-scan';
+import { PRODUCTION_REF } from '../db/target';
 import { ALLOWED_HOSTS, guardedFetch } from './http';
 import { PRECONDITIONS, type Precondition } from './preconditions';
 import { PAID_PLAN_TICK } from './probes/inngest';
 import { PROBES, type ProbeId } from './probes/index';
+import { SENDING_DOMAIN } from './probes/resend';
 import type { GitResult, Probe, ProbeDeps, ProbeResult } from './probes/types';
+import { VERCEL_PROJECT_ID, VERCEL_TEAM_ID } from './probes/vercel-env';
+import { WORKER_APP, WORKER_URL } from './probes/worker';
 import { Redactor, TOKEN_ENV } from './redact';
 import { STEPS, STEP_TITLE, isStep, type Step } from './steps';
 
@@ -80,6 +84,15 @@ export function parseArgs(argv: readonly string[]): Args | string {
   return args;
 }
 
+/**
+ * The env file's path. pnpm runs the script with `scripts/` as its working directory and names the
+ * caller's directory in `INIT_CWD`, so a relative `--env-file` is resolved against that.
+ */
+export function resolveEnvFile(path: string, initCwd: string | undefined): string {
+  if (isAbsolute(path)) return path;
+  return resolve(initCwd || process.cwd(), path);
+}
+
 /** `KEY=value` lines; blanks and `#` comments skipped, one pair of surrounding quotes removed. */
 export function parseEnvFile(text: string): Record<string, string> {
   const env: Record<string, string> = {};
@@ -121,7 +134,12 @@ export function vocabulary(): Set<string> {
     ...versions,
     ...ALLOWED_HOSTS,
     ...PRECONDITIONS.map((p) => p.id),
-    'crawlmouse.com',
+    WORKER_APP,
+    WORKER_URL,
+    VERCEL_PROJECT_ID,
+    VERCEL_TEAM_ID,
+    PRODUCTION_REF,
+    SENDING_DOMAIN,
     'production',
   ]);
 }
@@ -148,7 +166,7 @@ const line = (p: Precondition, r: ProbeResult | 'manual' | 'ticked'): string => 
 export async function runCheck(args: Args, deps: CheckDeps, redactor: Redactor): Promise<number> {
   const out = (s: string) => deps.out(redactor.redact(s));
   const probeDeps: ProbeDeps = {
-    fetch: guardedFetch(deps.fetch, (v) => redactor.addReceived(v)),
+    fetch: guardedFetch(deps.fetch, (v) => redactor.addReceived(v), deps.env),
     env: deps.env,
     now: deps.now,
     git: deps.git,
@@ -218,12 +236,13 @@ export async function main(
       return 2;
     }
     const read = deps.readFile ?? ((p: string) => (existsSync(p) ? readFileSync(p, 'utf8') : null));
+    args.envFile = resolveEnvFile(args.envFile, deps.processEnv.INIT_CWD);
     const text = read(args.envFile);
     const fileEnv = text === null ? {} : parseEnvFile(text);
     const env: Record<string, string | undefined> = {};
     for (const name of TOKEN_ENV) env[name] = deps.processEnv[name];
     Object.assign(env, fileEnv);
-    for (const v of Object.values(fileEnv)) redactor.addSecret(v);
+    for (const [k, v] of Object.entries(fileEnv)) redactor.addFileValue(k, v);
     for (const name of TOKEN_ENV) redactor.addSecret(env[name]);
     if (text === null) err(`no env file at ${args.envFile}: every token row answers unknown`);
     return await runCheck(args, { ...deps, env }, redactor);
@@ -233,6 +252,30 @@ export async function main(
     );
     return 2;
   }
+}
+
+/**
+ * The redactor installed on stdout and stderr before main runs: the process environment's tokens and
+ * the env file's values, from the file `--env-file` names (resolved as main resolves it) or the
+ * default one.
+ */
+export function earlyRedactor(
+  argv: readonly string[],
+  processEnv: Record<string, string | undefined>,
+  read: (path: string) => string | null,
+): Redactor {
+  const early = new Redactor(vocabulary());
+  for (const name of TOKEN_ENV) early.addSecret(processEnv[name]);
+  const args = parseArgs(argv);
+  const path = typeof args === 'string' ? DEFAULT_ENV_FILE : args.envFile;
+  try {
+    const text = read(resolveEnvFile(path, processEnv.INIT_CWD));
+    if (text !== null)
+      for (const [k, v] of Object.entries(parseEnvFile(text))) early.addFileValue(k, v);
+  } catch {
+    // main reports an unreadable file.
+  }
+  return early;
 }
 
 function gitRunner(args: readonly string[]): Promise<GitResult> {
@@ -247,14 +290,9 @@ function gitRunner(args: readonly string[]): Promise<GitResult> {
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   // Anything written outside main (a library's warning, an unhandled rejection) passes the same
   // redaction: the token values are registered before any probe runs.
-  const early = new Redactor();
-  for (const name of TOKEN_ENV) early.addSecret(process.env[name]);
-  try {
-    const text = existsSync(DEFAULT_ENV_FILE) ? readFileSync(DEFAULT_ENV_FILE, 'utf8') : '';
-    for (const v of Object.values(parseEnvFile(text))) early.addSecret(v);
-  } catch {
-    // main reports an unreadable file.
-  }
+  const early = earlyRedactor(process.argv.slice(2), process.env, (p) =>
+    existsSync(p) ? readFileSync(p, 'utf8') : null,
+  );
   for (const stream of [process.stdout, process.stderr]) {
     const write = stream.write.bind(stream) as (chunk: unknown, ...rest: unknown[]) => boolean;
     stream.write = ((chunk: unknown, ...rest: unknown[]) =>
