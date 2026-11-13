@@ -8,7 +8,7 @@ import { CONFIRM_MAILS_PER_DAY } from '../agency/confirm-bounds';
 import { sitesFullMessage } from '../agency/gates';
 import { ALERTS_SENDER } from '../../auth/constants';
 import type { Addition } from '../copy-registry';
-import { weekdayTime } from '../format';
+import { dayDate, weekdayTime } from '../format';
 import { noticeOf, type NoticeCode } from '../account/route';
 
 const NEXT_CHECK = 'the next check confirms the fix or reopens it.';
@@ -22,7 +22,11 @@ const WAITS_FOR_PLAN =
  * What a sender is told once the confirmation was asked for. It states a request and not a
  * delivery: the mailer keeps the address's own bound, across senders, and past it sends nothing.
  */
-const ASKED_TO_CONFIRM = `The contact is being asked to confirm, and reports are sent once it does. An address is sent at most ${CONFIRM_MAILS_PER_DAY.address} of these requests in a day, from any sender; past that, the schedule’s next run asks.`;
+const ASKED_TO_CONFIRM = `The contact is being asked to confirm, and reports are sent once it does. These requests are bounded by the day, for an account and for an address (an address is sent at most ${CONFIRM_MAILS_PER_DAY.address}, from any sender); past a bound, the schedule’s next run asks.`;
+
+/** A save whose contact may not be asked: the row on the page says which of the two it is. */
+const NOT_ASKED =
+  'The contact is not asked to confirm: it answered “Don’t ask me again”, or it paused the reports and has been asked again since. The client’s row says which.';
 
 /** `at` is the next-allowed time in the account's zone ("Tue 13:30"), or null when none was sent. */
 export const NOTICE_LINES: Record<NoticeCode, (at: string | null) => string> = {
@@ -117,7 +121,7 @@ export const NOTICE_LINES: Record<NoticeCode, (at: string | null) => string> = {
   reports_capped: (at) =>
     `This account has made as many reports as it may for now, so none was made.${at ? ` The next can be made ${at}.` : ''}`,
   links_capped: (at) =>
-    `This account has made as many links as it may for now, so none was made.${at ? ` The next can be made ${at}.` : ''}`,
+    `No link was made: the account’s limit on new links was reached, or could not be read.${at ? ` Try again from ${at}.` : ''}`,
   fix_not_verified: () =>
     'That check did not verify the fix, so there is no proof to make. Nothing was made.',
   share_made: () =>
@@ -143,9 +147,17 @@ export const NOTICE_LINES: Record<NoticeCode, (at: string | null) => string> = {
   schedule_resumed_later: () =>
     'The pause was lifted. The contact is asked to confirm again at the schedule’s next run; reports start once it confirms.',
   not_paused: () => 'That schedule is not paused.',
+  schedule_saved_not_asked: () => `The schedule was saved. ${NOT_ASKED}`,
+  client_saved_not_asked: () => `Saved. ${NOT_ASKED}`,
+  contact_declined: () =>
+    'This contact answered “Don’t ask me again”, so no request to confirm is sent to that address for this client, and no report. Nothing done here changes that.',
+  asked_recently: (at) =>
+    `This contact paused the reports and has been asked to confirm again since. It is asked once, not again and again.${at ? ` It can be asked again from ${at}.` : ''}`,
+  report_declined: () =>
+    'Done. You will not be asked again about these reports, and none is sent to this address.',
   report_confirmed: () => 'Confirmed. The reports will be sent to this address.',
   report_paused: () =>
-    'Paused. No more reports are sent. They start again only if you are asked to confirm again and do.',
+    'Paused. No more reports are sent. They start again only if you are asked to confirm again and do; you are asked once.',
   report_link_gone: () => 'This link can no longer be used: it was replaced or has expired.',
   invalid: () => 'That request was not understood, so nothing was changed.',
   method_not_allowed: () => 'That form could not be sent that way. Reload the page and try again.',
@@ -159,6 +171,8 @@ export const NOTICE_LINES: Record<NoticeCode, (at: string | null) => string> = {
  * message for sites (`sitesFullMessage`, whose numbers are GATES' and prices.ts's). A page that
  * gives none keeps the code's general line: the address carries the code, not which gate refused.
  */
+const DATED: ReadonlySet<NoticeCode> = new Set(['asked_recently']);
+
 export function noticeLine(
   params: Readonly<Record<string, string | string[] | undefined>>,
   zone: string,
@@ -169,7 +183,13 @@ export function noticeLine(
   if (n.code === 'upgrade_required' && sitesOn !== undefined) {
     return { code: n.code, text: sitesFullMessage(sitesOn) };
   }
-  return { code: n.code, text: NOTICE_LINES[n.code](n.next ? weekdayTime(n.next, zone) : null) };
+  // A day weeks away is named by its date; the others are hours away, a weekday and a time.
+  const at = n.next
+    ? DATED.has(n.code)
+      ? dayDate(n.next, zone)
+      : weekdayTime(n.next, zone)
+    : null;
+  return { code: n.code, text: NOTICE_LINES[n.code](at) };
 }
 
 export const NOTICE_ADDITIONS: Addition[] = [

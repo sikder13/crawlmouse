@@ -5,6 +5,6 @@
  * one shared bucket, so a press past it is answered at once.
  *
  * The routes that import this:
- *   grep -rln "CONFIRM_MAILS_PER_DAY" apps/web/app/api/report-files
+ *   grep -rln --include=route.ts "CONFIRM_MAILS_PER_DAY" apps/web/app/api/report-files
  */
 export const CONFIRM_MAILS_PER_DAY = { account: 20, address: 3 } as const;

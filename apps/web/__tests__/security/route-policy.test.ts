@@ -302,6 +302,7 @@ describe('cross-site refusal covers every state change a session or a visitor ca
       'api/me',
       'api/report-files/[id]/share',
       'api/report-files/confirm',
+      'api/report-files/decline',
       'api/report-files/pause',
       'api/report-files/schedules/site/[siteId]',
       'api/report-files/schedules/site/[siteId]/client',

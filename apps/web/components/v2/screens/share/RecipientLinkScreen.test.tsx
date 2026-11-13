@@ -24,6 +24,45 @@ describe('recipientLinkView', () => {
         'Nothing is sent until you confirm. Each report carries a link that stops them.',
       ],
       act: { action: '/api/report-files/confirm', label: 'Confirm' },
+      // The line and the second button that stop the requests for good; the form names this page.
+      also: {
+        line: 'You can stop these requests for good with one click.',
+        action: '/api/report-files/decline',
+        label: 'Don’t ask me again',
+        from: 'confirm',
+      },
+    });
+  });
+
+  it('“Don’t ask me again”: says what the button does, with or without what the link names, and posts to the decline route', () => {
+    const named = recipientLinkView('decline', { kind: 'confirm', ...LINK }, null, true);
+    expect(named).toEqual({
+      state: 'link',
+      title: 'Stop these requests',
+      lines: [
+        'Summit Digital asked to send reports about client.example to this address.',
+        'The button stops the requests for good: you are not asked again about this site, and no report about it is sent to this address.',
+      ],
+      act: { action: '/api/report-files/decline', label: 'Don’t ask me again' },
+      also: null,
+    });
+    // A confirmation link past its seven days is read as gone, and is still offered the button.
+    const old = recipientLinkView('decline', null, null, true);
+    expect(old).toMatchObject({ state: 'link', act: named.act });
+    expect(old.lines).toEqual([named.lines[1]]);
+    // No token in the cookie: nothing to press.
+    expect(recipientLinkView('decline', null, null, false)).toMatchObject({
+      state: 'gone',
+      act: null,
+    });
+    expect(recipientLinkView('decline', null, 'report_declined', false)).toEqual({
+      state: 'done',
+      title: 'You will not be asked again',
+      lines: [
+        'Done. You will not be asked again about these reports, and none is sent to this address.',
+      ],
+      act: null,
+      also: null,
     });
   });
 
@@ -32,6 +71,7 @@ describe('recipientLinkView', () => {
     expect(v.title).toBe('Stop these reports');
     expect(v.lines[0]).toBe('Summit Digital sends reports about client.example to this address.');
     expect(v.act).toEqual({ action: '/api/report-files/pause', label: 'Stop the reports' });
+    expect(v.also).toMatchObject({ action: '/api/report-files/decline', from: 'pause' });
   });
 
   it('names an account that has no name without inventing one', () => {
@@ -66,6 +106,7 @@ describe('recipientLinkView', () => {
       title: 'Confirmed',
       lines: ['Confirmed. The reports will be sent to this address.'],
       act: null,
+      also: null,
     });
     const paused = recipientLinkView('pause', { kind: 'pause', ...LINK }, 'report_paused');
     expect(paused).toMatchObject({ state: 'done', title: 'Stopped', act: null });
@@ -82,13 +123,28 @@ describe('recipientLinkView', () => {
 });
 
 describe('RecipientLinkScreen', () => {
-  it('draws the button as a form that posts no field, and names no address', () => {
+  it('draws the button as a form that posts no field, then the second form that names the page, and no address', () => {
     const html = render('confirm', { kind: 'confirm', ...LINK }, null);
-    const form = /<form[^>]*>/.exec(html)![0];
-    expect(form).toContain('method="post"');
-    expect(form).toContain('action="/api/report-files/confirm"');
-    expect(html).not.toMatch(/<input/);
+    const forms = html.match(/<form[^>]*>/g)!;
+    expect(forms).toHaveLength(2);
+    expect(forms[0]).toContain('method="post"');
+    expect(forms[0]).toContain('action="/api/report-files/confirm"');
+    expect(forms[1]).toContain('action="/api/report-files/decline"');
+    // One hidden field in all, the second form's: which page's cookie holds the token.
+    expect(html.match(/<input[^>]*>/g)).toEqual([
+      '<input type="hidden" name="from" value="confirm"/>',
+    ]);
+    expect(html.indexOf('<input')).toBeGreaterThan(html.indexOf(forms[1]!));
     expect(html).not.toContain('@');
+    // The page's own action is the one primary button; the second is not drawn as one.
+    expect(primaries(html)).toHaveLength(1);
+  });
+
+  it('“Don’t ask me again”, on its own page, is one form that posts no field', () => {
+    const html = render('decline', { kind: 'confirm', ...LINK }, null);
+    expect(html.match(/<form[^>]*>/g)).toHaveLength(1);
+    expect(html).toContain('action="/api/report-files/decline"');
+    expect(html).not.toMatch(/<input/);
     expect(primaries(html)).toHaveLength(1);
   });
 

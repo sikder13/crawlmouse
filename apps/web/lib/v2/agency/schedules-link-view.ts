@@ -16,6 +16,11 @@ export interface RecipientLinkPageView {
   lines: string[];
   /** The form's route and its button: it posts no field. Null once done, and for a dead link. */
   act: { action: string; label: string } | null;
+  /**
+   * On the confirmation page and the pause page: the line and the button that stop the requests
+   * for good. Its form names the page's own link (`from`), whose cookie holds the token.
+   */
+  also: { line: string; action: string; label: string; from: 'confirm' | 'pause' } | null;
 }
 
 /**
@@ -26,18 +31,42 @@ export function recipientLinkView(
   kind: RecipientLink,
   link: RecipientLinkView | null,
   notice: NoticeCode | null,
+  /** For "Don't ask me again": whether the page's cookie holds a token at all. */
+  held = link !== null,
 ): RecipientLinkPageView {
   const { flow, done } = RECIPIENT_LINKS[kind];
+  const none = { act: null, also: null };
   if (notice === done) {
-    return { state: 'done', title: COPY[kind].done, lines: [NOTICE_LINES[done](null)], act: null };
+    return { state: 'done', title: COPY[kind].done, lines: [NOTICE_LINES[done](null)], ...none };
+  }
+  const act = { action: LINK_FLOWS[flow].api, label: COPY[kind].button };
+  if (kind === 'decline') {
+    // A refusal does not expire: a token the read no longer answers for (a confirmation link past
+    // its seven days) is still pressed, and the press says whether it could be used.
+    if (!held) return { state: 'gone', title: COPY.gone.title, lines: [COPY.gone.line], ...none };
+    return {
+      state: 'link',
+      title: COPY.decline.title,
+      lines: link
+        ? COPY.decline.lines(link.accountName ?? COPY.someone, link.host)
+        : [...COPY.decline.plain],
+      act,
+      also: null,
+    };
   }
   if (link?.kind !== kind) {
-    return { state: 'gone', title: COPY.gone.title, lines: [COPY.gone.line], act: null };
+    return { state: 'gone', title: COPY.gone.title, lines: [COPY.gone.line], ...none };
   }
   return {
     state: 'link',
     title: COPY[kind].title,
     lines: COPY[kind].lines(link.accountName ?? COPY.someone, link.host),
-    act: { action: LINK_FLOWS[flow].api, label: COPY[kind].button },
+    act,
+    also: {
+      line: COPY.forGood,
+      action: LINK_FLOWS.reportDecline.api,
+      label: COPY.declineButton,
+      from: kind,
+    },
   };
 }

@@ -10,7 +10,7 @@
  */
 import { TimeZoneSchema } from '@crawlmouse/types/v2';
 import { z } from 'zod';
-import { clearLinkCookie, type LinkFlow } from '../account/link-cookie';
+import { clearLinkCookie, linkToken, type LinkFlow } from '../account/link-cookie';
 import {
   noticeTo,
   notFound,
@@ -157,8 +157,8 @@ export async function saveSchedule(
   const r = await deps.store.setSchedule(site, input, deps.now());
   switch (r.outcome) {
     case 'saved': {
-      // A contact saved before its schedule has not been asked yet: it is asked now, so the first
-      // run sends a report and not the confirmation.
+      // A contact saved before its schedule has not been asked yet: it is asked now, and not
+      // again by the first run.
       const confirmation = await askToConfirm(deps, site, ['pending']);
       return done(kind, SAVED_SCHEDULE[confirmation], { nextRunAt: r.nextRunAt, confirmation });
     }
@@ -199,15 +199,23 @@ export interface ClientDeps {
  * schedule's next run asks); `none` (nothing to ask: no schedule, no contact, a schedule its
  * recipient has paused, a contact that has confirmed, or one the caller's `when` does not ask again).
  *
+ * `declined` (the contact answered "Don't ask me again": nothing asks that address for this site
+ * again); `recent` (the contact paused the reports and was asked to confirm again since: it may be
+ * asked again once the window has passed).
+ *
  * `asked` says the request was made, not that a mail was delivered: the mailer keeps a bound of its
  * own for each address, across accounts, and answers a request past it by sending nothing.
  */
-export type Confirmation = 'asked' | 'waits' | 'later' | 'none';
+export type Confirmation = 'asked' | 'waits' | 'later' | 'none' | 'declined' | 'recent';
 
-/** The outcome, and with `later` the verdict that refused it (it holds when the bound resets). */
+/**
+ * The outcome; with `later` the verdict that refused it (it holds when the bound resets), and with
+ * `recent` when the contact may be asked again.
+ */
 type Asked =
-  | { confirmation: Exclude<Confirmation, 'later'> }
-  | { confirmation: 'later'; verdict: LimitVerdict };
+  | { confirmation: Exclude<Confirmation, 'later' | 'recent'> }
+  | { confirmation: 'later'; verdict: LimitVerdict }
+  | { confirmation: 'recent'; nextAt: string };
 
 async function ask(
   deps: ClientDeps,
@@ -216,6 +224,12 @@ async function ask(
 ): Promise<Asked> {
   const state = await deps.store.confirmationState(site);
   if (state === 'trial') return { confirmation: 'waits' };
+  if (state === 'no_schedule' || state === 'no_contact') return { confirmation: 'none' };
+  // What the recipient refused comes before anything the account asks (`report_ask_refusals`).
+  const refusal = await deps.store.askRefusal(site, deps.now());
+  if (refusal?.refused === 'declined') return { confirmation: 'declined' };
+  if (refusal?.refused === 'asked_recently')
+    return { confirmation: 'recent', nextAt: refusal.nextAt };
   if (!when.includes(state)) return { confirmation: 'none' };
   const verdict = await deps.confirmations();
   if (!verdict.allowed) return { confirmation: 'later', verdict };
@@ -234,18 +248,26 @@ const SAVED_SCHEDULE: Record<Confirmation, NoticeCode> = {
   waits: 'schedule_saved_waits',
   later: 'schedule_saved',
   none: 'schedule_saved',
+  declined: 'schedule_saved_not_asked',
+  recent: 'schedule_saved_not_asked',
 };
 const RESUMED: Record<Confirmation, NoticeCode> = {
   asked: 'schedule_resumed',
   waits: 'confirmation_waits',
   later: 'schedule_resumed_later',
   none: 'schedule_resumed_later',
+  // The resume itself refuses these two before it lifts anything; they are here for a refusal
+  // recorded between the resume and the ask.
+  declined: 'contact_declined',
+  recent: 'asked_recently',
 };
 const SAVED_CLIENT: Record<Confirmation, NoticeCode> = {
   asked: 'client_saved_asked',
   waits: 'client_saved_waits',
   later: 'client_saved_later',
   none: 'client_saved',
+  declined: 'client_saved_not_asked',
+  recent: 'client_saved_not_asked',
 };
 
 /**
@@ -285,7 +307,7 @@ export async function saveClient(
 /**
  * POST …/confirm: the confirmation mail again, for a schedule whose contact has not confirmed.
  * 409 `nothing_to_confirm` with no schedule, no contact, a contact that has confirmed or a schedule
- * its recipient has paused (resume is the one way to ask then); 409
+ * its recipient has paused (the account's ask of a paused schedule is its resume); 409
  * `confirmation_waits` in an Agency trial for a contact that is not the owner's own address; 429
  * past the account's daily bound.
  */
@@ -302,6 +324,12 @@ export async function resendConfirmation(
       return refuseTo(kind, CLIENT_REPORTS_PAGE, 409, 'confirmation_waits');
     case 'none':
       return refuseTo(kind, CLIENT_REPORTS_PAGE, 409, 'nothing_to_confirm');
+    case 'declined':
+      return refuseTo(kind, CLIENT_REPORTS_PAGE, 409, 'contact_declined');
+    case 'recent':
+      return refuseTo(kind, CLIENT_REPORTS_PAGE, 409, 'asked_recently', {
+        nextAllowedAt: asked.nextAt,
+      });
     case 'later': {
       const { verdict } = asked;
       const seconds = Math.max(
@@ -320,6 +348,8 @@ export async function resendConfirmation(
  * sender's side (owner ruling): this restarts no mail. The pause is lifted and the contact is
  * asked to confirm again, under the bounds of any confirmation; reports start again only when the
  * recipient confirms. The answer says what became of the request (`confirmation`).
+ * It may ask once: 409 `contact_declined` where the recipient answered "Don't ask me again", and
+ * 409 `asked_recently`, with when it may ask again, where they were asked since their pause.
  */
 export async function resumeSchedule(
   deps: ClientDeps,
@@ -332,6 +362,12 @@ export async function resumeSchedule(
       const confirmation = await askToConfirm(deps, site, ['pending']);
       return done(kind, RESUMED[confirmation], { nextRunAt: r.nextRunAt, confirmation });
     }
+    case 'declined':
+      return refuseTo(kind, CLIENT_REPORTS_PAGE, 409, 'contact_declined');
+    case 'asked_recently':
+      return refuseTo(kind, CLIENT_REPORTS_PAGE, 409, 'asked_recently', {
+        nextAllowedAt: r.nextAt,
+      });
     case 'not_paused':
       return refuseTo(kind, CLIENT_REPORTS_PAGE, 409, 'not_paused');
     case 'not_found':
@@ -341,21 +377,31 @@ export async function resumeSchedule(
 
 // ─── the recipient's links ───────────────────────────────────────────────────────────────────────
 
-/** The two links a recipient is sent, by their flow in `LINK_FLOWS`. */
+/**
+ * The links a recipient is sent, by their flow in `LINK_FLOWS`. "Don't ask me again" is in the
+ * mail that asks to confirm, with that link's own token, and on the pause page.
+ */
 export const RECIPIENT_LINKS = {
   confirm: { flow: 'reportConfirm', done: 'report_confirmed' },
   pause: { flow: 'reportPause', done: 'report_paused' },
+  decline: { flow: 'reportDecline', done: 'report_declined' },
 } as const satisfies Record<string, { flow: LinkFlow; done: NoticeCode }>;
 
 export type RecipientLink = keyof typeof RECIPIENT_LINKS;
 
-const PAGES = { confirm: '/s/confirm', pause: '/s/pause' } as const;
+const PAGES = { confirm: '/s/confirm', pause: '/s/pause', decline: '/s/decline' } as const;
+
+const USE = {
+  confirm: (store: SchedulesStore, token: string, now: Date) => store.confirm(token, now),
+  pause: (store: SchedulesStore, token: string, now: Date) => store.pause(token, now),
+  decline: (store: SchedulesStore, token: string, now: Date) => store.decline(token, now),
+} as const;
 
 /** The recipient's form posts no field: the token is the cookie's. */
 const NoFields = z.strictObject({});
 
 /**
- * POST /api/report-files/confirm and /api/report-files/pause, from the page a link landed on. The
+ * POST /api/report-files/confirm, /pause and /decline, from the page a link landed on. The
  * token is read from the link's cookie and from nowhere else. Done: the cookie is cleared and a form
  * goes back to its page with the line saying so. 410 `report_link_gone` for no token and for a link
  * that cannot be used.
@@ -373,10 +419,7 @@ export async function useRecipientLink(
       ? noticeTo(PAGES[link], 'report_link_gone')
       : refuse(410, 'report_link_gone');
   if (token === null) return gone();
-  const outcome =
-    link === 'confirm'
-      ? await deps.store.confirm(token, deps.now())
-      : await deps.store.pause(token, deps.now());
+  const outcome = await USE[link](deps.store, token, deps.now());
   if (outcome === 'gone') {
     const res = gone();
     res.headers.append('Set-Cookie', clearLinkCookie(flow));
@@ -384,6 +427,42 @@ export async function useRecipientLink(
   }
   const res =
     body.kind === 'form' ? noticeTo(PAGES[link], notice) : Response.json({ [outcome]: true });
+  res.headers.append('Set-Cookie', clearLinkCookie(flow));
+  return res;
+}
+
+/** The page a "Don't ask me again" form was on, by the link whose cookie holds its token. */
+const DECLINE_FROM = { confirm: 'reportConfirm', pause: 'reportPause' } as const;
+const DeclineFields = z.strictObject({ from: z.enum(['confirm', 'pause']).optional() });
+
+/**
+ * POST /api/report-files/decline: "Don't ask me again", from its own page (the link in the mail
+ * that asks to confirm) or from the confirmation page or the pause page, whose form names itself
+ * in `from`. The token is read from that page's cookie and from nowhere else; `cookieHeader` is the
+ * request's. Done: that cookie is cleared and a form goes to `/s/decline` with the line saying so.
+ * 410 `report_link_gone` for no token and for a link no schedule holds.
+ */
+export async function declineFromPage(
+  deps: { store: SchedulesStore; now(): Date },
+  cookieHeader: string | null,
+  body: RequestBody | null,
+): Promise<Response> {
+  const fields = body && DeclineFields.safeParse(body.fields);
+  if (!body || !fields?.success) return refuse(400, 'invalid');
+  const flow: LinkFlow = fields.data.from ? DECLINE_FROM[fields.data.from] : 'reportDecline';
+  const token = linkToken(cookieHeader, flow);
+  const gone = () =>
+    body.kind === 'form'
+      ? noticeTo(PAGES.decline, 'report_link_gone')
+      : refuse(410, 'report_link_gone');
+  if (token === null) return gone();
+  const outcome = await deps.store.decline(token, deps.now());
+  const res =
+    outcome === 'gone'
+      ? gone()
+      : body.kind === 'form'
+        ? noticeTo(PAGES.decline, RECIPIENT_LINKS.decline.done)
+        : Response.json({ declined: true });
   res.headers.append('Set-Cookie', clearLinkCookie(flow));
   return res;
 }
@@ -418,8 +497,25 @@ export async function oneClickFields(req: Request): Promise<Record<string, strin
  * changes nothing (it is the link's landing). 200 with no body once paused; 404 for a token no
  * schedule holds.
  */
-export async function oneClickPause(
+export const oneClickPause = (
   deps: { store: SchedulesStore; now(): Date },
+  token: string,
+  fields: Readonly<Record<string, string>> | null,
+): Promise<Response> => oneClick(deps, 'pause', token, fields);
+
+/**
+ * POST /s/decline/[token]: the one-click unsubscribe of the mail that asks to confirm. Its token
+ * is the confirmation link's, and what it records is "Don't ask me again". The same answers.
+ */
+export const oneClickDecline = (
+  deps: { store: SchedulesStore; now(): Date },
+  token: string,
+  fields: Readonly<Record<string, string>> | null,
+): Promise<Response> => oneClick(deps, 'decline', token, fields);
+
+async function oneClick(
+  deps: { store: SchedulesStore; now(): Date },
+  link: 'pause' | 'decline',
   token: string,
   fields: Readonly<Record<string, string>> | null,
 ): Promise<Response> {
@@ -431,7 +527,7 @@ export async function oneClickPause(
   ) {
     return refuse(400, 'invalid', {}, headers);
   }
-  const outcome = await deps.store.pause(token, deps.now());
+  const outcome = await USE[link](deps.store, token, deps.now());
   return outcome === 'gone'
     ? refuse(404, 'not_found', {}, headers)
     : new Response(null, { status: 200, headers });

@@ -23,6 +23,17 @@ export function RecipientLinkScreen({ data }: { data: RecipientLinkPageView }) {
           </p>
         ))}
         {data.act ? <AcceptForm action={data.act.action} label={data.act.label} /> : null}
+        {data.also ? (
+          <>
+            <p className={styles.line}>{data.also.line}</p>
+            <AcceptForm
+              action={data.also.action}
+              label={data.also.label}
+              fields={{ from: data.also.from }}
+              quiet
+            />
+          </>
+        ) : null}
       </Card>
     </PageShell>
   );

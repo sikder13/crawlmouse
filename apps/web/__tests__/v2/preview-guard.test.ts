@@ -242,6 +242,7 @@ describe('v2 stays out of live pages', () => {
       'app/reports/[id]/page.tsx',
       'app/reports/page.tsx',
       'app/s/confirm/page.tsx',
+      'app/s/decline/page.tsx',
       'app/s/pause/page.tsx',
       'app/s/view/[reportId]/page.tsx',
       'app/seats/page.tsx',

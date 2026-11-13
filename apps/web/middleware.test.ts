@@ -276,6 +276,7 @@ describe('a state-changing API request from another site is refused before the r
       'api/me',
       'api/report-files/[id]/share',
       'api/report-files/confirm',
+      'api/report-files/decline',
       'api/report-files/pause',
       'api/report-files/schedules/site/[siteId]',
       'api/report-files/schedules/site/[siteId]/client',

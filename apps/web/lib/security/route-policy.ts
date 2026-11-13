@@ -439,6 +439,22 @@ export const ROUTE_POLICIES: readonly RoutePolicy[] = [
     origin: 'strict',
   },
   {
+    route: 'api/report-files/decline',
+    methods: ['POST'],
+    class: 'public',
+    reason:
+      "“Don't ask me again”: the token of the decline, confirmation or pause link, from that link's HttpOnly cookie, is the credential (CC-31 D8)",
+    origin: 'strict',
+  },
+  {
+    route: 's/decline/[token]',
+    methods: ['GET', 'POST'],
+    class: 'public',
+    reason:
+      "a mailed link: the GET moves its token into a cookie and changes nothing; the POST is a mail client's one-click unsubscribe (RFC 8058), which records that the recipient is not to be asked again and comes with no cookie and no Origin",
+    origin: 'any',
+  },
+  {
     route: 's/confirm/[token]',
     methods: ['GET'],
     class: 'public',

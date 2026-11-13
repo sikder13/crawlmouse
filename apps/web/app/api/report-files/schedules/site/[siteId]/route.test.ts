@@ -55,8 +55,13 @@ vi.mock('@/lib/rate-limit', () => ({
 
 import { CONFIRM_MAILS_PER_DAY } from '@/lib/v2/agency/confirm-bounds';
 import { POST as USE_CONFIRM } from '../../../confirm/route';
+import { POST as USE_DECLINE } from '../../../decline/route';
 import { POST as USE_PAUSE } from '../../../pause/route';
 import { GET as LAND_CONFIRM } from '../../../../../s/confirm/[token]/route';
+import {
+  GET as LAND_DECLINE,
+  POST as ONE_CLICK_DECLINE,
+} from '../../../../../s/decline/[token]/route';
 import { GET as LAND_PAUSE, POST as ONE_CLICK } from '../../../../../s/pause/[token]/route';
 import { PATCH as CLIENT, POST as CLIENT_FORM } from './client/route';
 import { POST as CONFIRM } from './confirm/route';
@@ -270,7 +275,7 @@ describe('what each answer says became of the confirmation', () => {
       [accountId],
     );
 
-  it('a contact saved before its schedule is asked when the schedule is saved, once: the first run then sends a report', async () => {
+  it('a contact saved before its schedule is asked when the schedule is saved, once', async () => {
     const w = await world();
     as(w.owner);
     expect(await said(await patch(w.siteId, { contactEmail: 'c@client.example' }))).toBe('none');
@@ -347,7 +352,7 @@ describe('what each answer says became of the confirmation', () => {
     expect(await schedule(w.siteId)).toBeDefined();
   });
 
-  it('while its recipient has paused a schedule, no save and no “ask again” asks them anything: resume is the one way', async () => {
+  it('while its recipient has paused a schedule, no save and no “ask again” asks them anything', async () => {
     const w = await confirmedWorld();
     const t = await token('issue_report_pause', w.siteId);
     await h.db.query(`select public.pause_report_schedule($1, now())`, [sha256(t)]);
@@ -778,6 +783,8 @@ describe('POST …/confirm', () => {
     expect(h.send.mock.calls.map((c) => (c[0] as { name: string }).name)).toEqual([
       'report.confirmation.requested',
     ]);
+    // Within the account's bound on confirmation mail, which fails closed.
+    expect(h.limits).toEqual([confirmBound(w.accountId)]);
   });
 
   it('answers 409 nothing_to_confirm with no schedule, no contact, and a contact that has confirmed', async () => {
@@ -802,6 +809,8 @@ describe('POST …/confirm', () => {
     expect(res.status).toBe(429);
     expect(Number(res.headers.get('retry-after'))).toBeGreaterThan(0);
     expect(h.send).not.toHaveBeenCalled();
+    // The refused press is counted once: the bound is asked once, and its answer gives the time.
+    expect(h.limits).toEqual([confirmBound(w.accountId)]);
   });
 });
 
@@ -1037,5 +1046,277 @@ describe('the recipient’s pause link, and POST …/resume', () => {
     expect((await use(`cm_link_report_pause=${t}`)).status).toBe(410);
     expect((await oneClick(t)).status).toBe(404);
     expect(await paused(w)).toBeNull();
+  });
+});
+
+describe('what a recipient refused, at the account’s routes (owner ruling on Q42)', () => {
+  const events = () => h.send.mock.calls.map((c) => (c[0] as { name: string }).name);
+  const pauseWith = (t: string) =>
+    h.db.query(`select public.pause_report_schedule($1, now())`, [sha256(t)]);
+  /** The mailer's issue for one request, as SQL does it: the link's token. */
+  const issue = async (siteId: string, request: string) =>
+    (
+      await h.db.query<{ r: { outcome: string; token?: string } }>(
+        `select public.issue_recipient_confirmation($1, now(), $2) r`,
+        [siteId, request],
+      )
+    ).rows[0]!.r;
+  const resumeForm = (siteId: string) =>
+    RESUME(request(`${base(siteId)}/resume`, 'POST', '', FORM), ctx(siteId));
+
+  it('resume asks once: after the request, a second resume is 409 asked_recently with when it may ask, lifts nothing and asks nothing', async () => {
+    const w = await confirmedWorld();
+    const t = await token('issue_report_pause', w.siteId);
+    await pauseWith(t);
+    as(w.owner);
+    expect((await resume(w.siteId)).status).toBe(200);
+    expect((await issue(w.siteId, 'resume-1')).outcome).toBe('issued');
+    await pauseWith(t);
+    h.send.mockClear();
+    h.limits.length = 0;
+
+    const again = await resume(w.siteId);
+    const body = (await again.json()) as { code: string; nextAllowedAt: string };
+    expect([again.status, body.code]).toEqual([409, 'asked_recently']);
+    // Thirty days from the request, to the day.
+    const days = (Date.parse(body.nextAllowedAt) - Date.now()) / 86_400_000;
+    expect(Math.round(days)).toBe(30);
+    expect((await schedule(w.siteId))!.paused_by_recipient_at).not.toBeNull();
+    expect(events()).toEqual([]);
+    expect(h.limits).toEqual([]);
+
+    // A form is sent back with the line and the day.
+    const form = await resumeForm(w.siteId);
+    const to = new URL(form.headers.get('location')!, ORIGIN);
+    expect([form.status, to.pathname, to.searchParams.get('notice')]).toEqual([
+      303,
+      '/agency/reports',
+      'asked_recently',
+    ]);
+    expect(to.searchParams.get('next')).toBe(body.nextAllowedAt);
+  });
+
+  it('removing the schedule and saving it again, or changing the contact away and back, asks a recipient who paused nothing more', async () => {
+    const w = await confirmedWorld();
+    const t = await token('issue_report_pause', w.siteId);
+    await pauseWith(t);
+    as(w.owner);
+    await resume(w.siteId);
+    await issue(w.siteId, 'resume-1');
+    h.send.mockClear();
+
+    await del(w.siteId);
+    const saved = await put(w.siteId);
+    expect(((await saved.json()) as { confirmation: string }).confirmation).toBe('recent');
+    const away = await patch(w.siteId, { contactEmail: 'other@client.example' });
+    expect(((await away.json()) as { confirmation: string }).confirmation).toBe('asked');
+    h.send.mockClear();
+    const back = await patch(w.siteId, { contactEmail: 'client@client.example' });
+    expect(((await back.json()) as { confirmation: string }).confirmation).toBe('recent');
+    const again = await resend(w.siteId);
+    expect([again.status, ((await again.json()) as { code: string }).code]).toEqual([
+      409,
+      'asked_recently',
+    ]);
+    expect(events()).toEqual([]);
+
+    // The form's notice says the contact is not asked.
+    const form = await SCHEDULE_FORM(
+      request(
+        base(w.siteId),
+        'POST',
+        '_method=PUT&cadence=weekly&isoWeekday=1&timeLocal=09%3A00&timezone=UTC',
+        FORM,
+      ),
+      ctx(w.siteId),
+    );
+    expect(form.headers.get('location')).toBe('/agency/reports?notice=schedule_saved_not_asked');
+  });
+
+  it('a contact that answered “Don’t ask me again” is asked by nothing: resume, “ask again” and each save say so', async () => {
+    const w = await world();
+    await scheduled(w);
+    const asked = await issue(w.siteId, 'first');
+    await h.db.query(`select public.decline_report_requests($1, now())`, [sha256(asked.token!)]);
+    as(w.owner);
+    h.limits.length = 0;
+
+    const again = await resend(w.siteId);
+    expect([again.status, await again.json()]).toEqual([409, { code: 'contact_declined' }]);
+    const saved = await put(w.siteId);
+    expect(((await saved.json()) as { confirmation: string }).confirmation).toBe('declined');
+    // The address in another case is the same address.
+    await patch(w.siteId, { contactEmail: null });
+    const back = await patch(w.siteId, { contactEmail: 'CLIENT@client.example' });
+    expect(await back.json()).toEqual({ contactChanged: true, confirmation: 'declined' });
+    expect(events()).toEqual([]);
+    expect(h.limits).toEqual([]);
+    const form = await CLIENT_FORM(
+      request(`${base(w.siteId)}/client`, 'POST', '_method=PATCH&clientName=Renamed', FORM),
+      ctx(w.siteId),
+    );
+    expect(form.headers.get('location')).toBe('/agency/reports?notice=client_saved');
+  });
+
+  it('a contact that declined from the pause page: the schedule is paused, and resume is 409 contact_declined', async () => {
+    const w = await confirmedWorld();
+    const t = await token('issue_report_pause', w.siteId);
+    await h.db.query(`select public.decline_report_requests($1, now())`, [sha256(t)]);
+    as(w.owner);
+    const back = await resume(w.siteId);
+    expect([back.status, await back.json()]).toEqual([409, { code: 'contact_declined' }]);
+    expect((await resumeForm(w.siteId)).headers.get('location')).toBe(
+      '/agency/reports?notice=contact_declined',
+    );
+    expect((await schedule(w.siteId))!.paused_by_recipient_at).not.toBeNull();
+    expect(events()).toEqual([]);
+  });
+});
+
+describe('“Don’t ask me again”: the link, the one-click POST and the pages’ form', () => {
+  const land = (t: string) =>
+    LAND_DECLINE(request(`/s/decline/${t}`, 'GET'), { params: Promise.resolve({ token: t }) });
+  const oneClick = (t: string, body = 'List-Unsubscribe=One-Click', type = FORM) =>
+    ONE_CLICK_DECLINE(request(`/s/decline/${t}`, 'POST', body, type), {
+      params: Promise.resolve({ token: t }),
+    });
+  const use = (cookie?: string, body = '{}', type = 'application/json') =>
+    USE_DECLINE(request('/api/report-files/decline', 'POST', body, type, cookie));
+  const refusals = async (siteId: string) =>
+    (
+      await h.db.query<{ r: Record<string, string>[] }>(
+        `select report_refusals r from public.sites where id = $1`,
+        [siteId],
+      )
+    ).rows[0]!.r;
+  const asked = async () => {
+    const w = await world();
+    await scheduled(w);
+    return { w, t: await token('issue_recipient_confirmation', w.siteId) };
+  };
+
+  it('with the flag off each is a 404 and nothing is recorded', async () => {
+    const { w, t } = await asked();
+    vi.stubEnv('V2_CHECKS_PUBLIC', '');
+    as(null);
+    for (const res of [
+      await land(t),
+      await oneClick(t),
+      await use(`cm_link_report_decline=${t}`),
+    ]) {
+      expect(res.status).toBe(404);
+    }
+    expect(await refusals(w.siteId)).toEqual([]);
+    expect(h.log).toEqual([]);
+  });
+
+  it('a GET of the link records nothing: it moves the token into the decline cookie', async () => {
+    const { w, t } = await asked();
+    as(null);
+    const res = await land(t);
+    expect(res.status).toBe(303);
+    expect(res.headers.get('location')).toBe(`${ORIGIN}/s/decline`);
+    expect(res.headers.get('set-cookie')).toContain(`cm_link_report_decline=${t}`);
+    expect(await refusals(w.siteId)).toEqual([]);
+    expect(h.log).toEqual([]);
+  });
+
+  it('a mail client’s one-click POST records the refusal with the token in the path and no cookie; any other body records nothing', async () => {
+    const { w, t } = await asked();
+    as(null);
+    for (const [body, type] of [
+      ['List-Unsubscribe=Other', FORM],
+      ['{}', 'application/json'],
+    ] as const) {
+      expect((await oneClick(t, body, type)).status).toBe(400);
+    }
+    expect((await oneClick('x'.repeat(43))).status).toBe(404);
+    expect(await refusals(w.siteId)).toEqual([]);
+
+    const res = await oneClick(t);
+    expect([res.status, await res.text()]).toEqual([200, '']);
+    expect(res.headers.get('cache-control')).toBe('no-store');
+    expect(await refusals(w.siteId)).toEqual([
+      { a: sha256('client@client.example'), declined_at: expect.any(String) },
+    ]);
+    // The confirmation link of the same mail no longer confirms.
+    const confirmed = await USE_CONFIRM(
+      request(
+        '/api/report-files/confirm',
+        'POST',
+        '{}',
+        'application/json',
+        `cm_link_report_confirm=${t}`,
+      ),
+    );
+    expect(confirmed.status).toBe(410);
+    expect((await schedule(w.siteId))!.recipient_confirmed_at).toBeNull();
+    expect(h.limits.map((l) => l.key.split(':').slice(0, 2).join(':'))).toContain(
+      'report-decline-click:ip',
+    );
+  });
+
+  it('the page’s POST records it with the decline cookie’s token, clears the cookie, and a form goes to the page with the line', async () => {
+    const { w, t } = await asked();
+    as(null);
+    const res = await use(`cm_link_report_decline=${t}`, '', FORM);
+    expect(res.status).toBe(303);
+    expect(res.headers.get('location')).toBe('/s/decline?notice=report_declined');
+    expect(res.headers.get('set-cookie')).toMatch(/^cm_link_report_decline=; .*Max-Age=0/);
+    expect(await refusals(w.siteId)).toHaveLength(1);
+    // Pressed again with the same token: the request it came with is withdrawn, so it is gone.
+    const again = await use(`cm_link_report_decline=${t}`);
+    expect([again.status, await again.json()]).toEqual([410, { code: 'report_link_gone' }]);
+  });
+
+  it('from the confirmation page and from the pause page, the form names its page and that page’s cookie is the one read', async () => {
+    const first = await asked();
+    as(null);
+    // The token is in the confirmation cookie; with no `from`, the decline cookie is read: none.
+    const cookie = `cm_link_report_confirm=${first.t}`;
+    expect((await use(cookie)).status).toBe(410);
+    expect(await refusals(first.w.siteId)).toEqual([]);
+    const fromConfirm = await use(cookie, 'from=confirm', FORM);
+    expect(fromConfirm.headers.get('location')).toBe('/s/decline?notice=report_declined');
+    expect(fromConfirm.headers.get('set-cookie')).toMatch(/^cm_link_report_confirm=; /);
+    expect(await refusals(first.w.siteId)).toHaveLength(1);
+
+    const sending = await confirmedWorld();
+    const pauseToken = await token('issue_report_pause', sending.siteId);
+    const fromPause = await use(
+      `cm_link_report_pause=${pauseToken}`,
+      JSON.stringify({ from: 'pause' }),
+    );
+    expect([fromPause.status, await fromPause.json()]).toEqual([200, { declined: true }]);
+    // Declined from the pause page: the reports stop as well.
+    expect((await schedule(sending.siteId))!.paused_by_recipient_at).not.toBeNull();
+    expect(await refusals(sending.siteId)).toEqual([
+      { a: sha256('client@client.example'), declined_at: expect.any(String) },
+    ]);
+  });
+
+  it('refuses a field it does not know, a `from` that is not a page, and a token in the body: 400, nothing recorded', async () => {
+    const { w, t } = await asked();
+    as(null);
+    const cookie = `cm_link_report_decline=${t}`;
+    for (const body of [
+      JSON.stringify({ token: t }),
+      JSON.stringify({ from: 'decline' }),
+      JSON.stringify({ from: 'pause', site: w.siteId }),
+    ]) {
+      expect((await use(cookie, body)).status).toBe(400);
+    }
+    expect(await refusals(w.siteId)).toEqual([]);
+  });
+
+  it('answers 429 past the address’s bound, before any read', async () => {
+    const { w, t } = await asked();
+    as(null);
+    h.over.add('report-decline-use');
+    expect((await use(`cm_link_report_decline=${t}`)).status).toBe(429);
+    h.over.add('report-decline-click');
+    expect((await oneClick(t)).status).toBe(429);
+    expect(await refusals(w.siteId)).toEqual([]);
+    expect(h.log).toEqual([]);
   });
 });

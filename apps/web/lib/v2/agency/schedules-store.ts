@@ -31,8 +31,17 @@ const ClientSaved = z.discriminatedUnion('outcome', [
 const Cleared = z.strictObject({ outcome: z.enum(['cleared', 'not_found']) });
 const Resumed = z.discriminatedUnion('outcome', [
   z.strictObject({ outcome: z.literal('resumed'), next_run_at: z.string() }),
-  z.strictObject({ outcome: z.enum(['not_paused', 'not_found']) }),
+  z.strictObject({ outcome: z.literal('asked_recently'), next_at: z.string() }),
+  z.strictObject({ outcome: z.enum(['declined', 'not_paused', 'not_found']) }),
 ]);
+/** `report_ask_refusals`: the sites whose contact may not be asked to confirm, and why. */
+const AskRefusals = z.record(
+  z.string(),
+  z.discriminatedUnion('refused', [
+    z.strictObject({ refused: z.literal('declined') }),
+    z.strictObject({ refused: z.literal('asked_recently'), next_at: z.string() }),
+  ]),
+);
 const LinkRead = z.discriminatedUnion('outcome', [
   z.strictObject({
     outcome: z.enum(['confirm', 'pause']),
@@ -41,7 +50,35 @@ const LinkRead = z.discriminatedUnion('outcome', [
   }),
   z.strictObject({ outcome: z.literal('gone') }),
 ]);
-const LinkUsed = z.strictObject({ outcome: z.enum(['confirmed', 'paused', 'gone']) });
+const LinkUsed = z.strictObject({ outcome: z.enum(['confirmed', 'paused', 'declined', 'gone']) });
+
+/**
+ * Why a site's contact may not be asked to confirm: it declined to be asked, for good; or it
+ * paused the reports and was asked again since, and may be asked again from `nextAt`.
+ */
+export type AskRefusal = { refused: 'declined' } | { refused: 'asked_recently'; nextAt: string };
+
+/** The sites among `siteIds` whose contact may not be asked at `now` (`report_ask_refusals`). */
+export async function askRefusals(
+  admin: SupabaseClient,
+  siteIds: readonly string[],
+  now: Date,
+): Promise<Map<string, AskRefusal>> {
+  if (siteIds.length === 0) return new Map();
+  const { data, error } = await admin.rpc('report_ask_refusals', {
+    p_sites: [...siteIds],
+    p_now: now.toISOString(),
+  });
+  if (error) throw new Error(`report_ask_refusals failed: ${error.message}`);
+  return new Map(
+    Object.entries(AskRefusals.parse(data)).map(([site, r]) => [
+      site,
+      r.refused === 'declined'
+        ? { refused: 'declined' }
+        : { refused: 'asked_recently', nextAt: new Date(r.next_at).toISOString() },
+    ]),
+  );
+}
 
 /** What a recipient's link page says: the kind of link, the site and who sends the reports. */
 export interface RecipientLinkView {
@@ -79,14 +116,22 @@ export interface SchedulesStore {
    * (`issue_recipient_confirmation` holds the same rule); else why there is nothing to ask.
    */
   confirmationState(site: ClientSite): Promise<ConfirmationState>;
+  /** Why the site's contact may not be asked to confirm at `now`, or null when it may. */
+  askRefusal(site: ClientSite, now: Date): Promise<AskRefusal | null>;
   resume(
     site: ClientSite,
     now: Date,
-  ): Promise<{ outcome: 'resumed'; nextRunAt: string } | { outcome: 'not_paused' | 'not_found' }>;
+  ): Promise<
+    | { outcome: 'resumed'; nextRunAt: string }
+    | { outcome: 'asked_recently'; nextAt: string }
+    | { outcome: 'declined' | 'not_paused' | 'not_found' }
+  >;
   /** The link a token opens, or null when it cannot be used. It changes nothing. */
   readLink(token: string, now: Date): Promise<RecipientLinkView | null>;
   confirm(token: string, now: Date): Promise<'confirmed' | 'gone'>;
   pause(token: string, now: Date): Promise<'paused' | 'gone'>;
+  /** "Don't ask me again", with the confirmation link's token or the pause link's. */
+  decline(token: string, now: Date): Promise<'declined' | 'gone'>;
 }
 
 interface RpcError {
@@ -175,7 +220,8 @@ export function supabaseSchedulesStore(admin: SupabaseClient): SchedulesStore {
         recipient_confirm_sent_at: string | null;
         paused_by_recipient_at: string | null;
       };
-      // A recipient's pause is final from the sender's side: resume is the one way to ask.
+      // A recipient's pause is final from the sender's side: a paused schedule is asked by the
+      // account's resume, and by nothing here.
       if (held.paused_by_recipient_at) return 'paused';
       if (held.recipient_confirmed_at) return 'confirmed';
 
@@ -213,9 +259,13 @@ export function supabaseSchedulesStore(admin: SupabaseClient): SchedulesStore {
         { p_site: site.siteId, p_account: site.accountId, p_now: now.toISOString() },
         Resumed,
       );
-      return a.outcome === 'resumed'
-        ? { outcome: 'resumed', nextRunAt: instant(a.next_run_at) }
-        : a;
+      if (a.outcome === 'resumed') return { outcome: 'resumed', nextRunAt: instant(a.next_run_at) };
+      if (a.outcome === 'asked_recently')
+        return { outcome: 'asked_recently', nextAt: instant(a.next_at) };
+      return a;
+    },
+    async askRefusal(site, now) {
+      return (await askRefusals(admin, [site.siteId], now)).get(site.siteId) ?? null;
     },
     async readLink(token, now) {
       const a = await call(
@@ -245,6 +295,15 @@ export function supabaseSchedulesStore(admin: SupabaseClient): SchedulesStore {
         LinkUsed,
       );
       return a.outcome === 'paused' ? 'paused' : 'gone';
+    },
+    async decline(token, now) {
+      const a = await call(
+        admin,
+        'decline_report_requests',
+        { p_token_hash: hashToken(token), p_now: now.toISOString() },
+        LinkUsed,
+      );
+      return a.outcome === 'declined' ? 'declined' : 'gone';
     },
   };
 }
@@ -282,6 +341,7 @@ const DueRow = z.strictObject({
   has_contact: z.boolean(),
   confirmed: z.boolean(),
   confirmation_requested: z.boolean(),
+  ask_refused: z.boolean(),
   contact_is_owner: z.boolean(),
   state: z.enum(['free', 'pro_trial', 'pro', 'agency_trial', 'agency', 'past_due']),
   tier: z.enum(['free', 'pro', 'agency']),
@@ -325,6 +385,7 @@ export function supabaseScheduleRunStore(admin: SupabaseClient): ScheduleRunStor
         hasContact: r.has_contact,
         confirmed: r.confirmed,
         confirmationRequested: r.confirmation_requested,
+        askRefused: r.ask_refused,
         contactIsOwner: r.contact_is_owner,
         account: {
           state: r.state,

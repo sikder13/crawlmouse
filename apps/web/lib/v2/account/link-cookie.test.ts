@@ -43,6 +43,7 @@ describe('landing an emailed link', () => {
       restore: 600,
       invite: 3600,
       reportConfirm: 600,
+      reportDecline: 600,
       reportPause: 600,
     });
     expect(landLink(ORIGIN, 'invite', newToken()).headers.get('set-cookie')).toContain(

@@ -33,6 +33,7 @@ const due = (over: Partial<DueSchedule> = {}): DueSchedule => ({
   hasContact: true,
   confirmed: true,
   confirmationRequested: true,
+  askRefused: false,
   contactIsOwner: false,
   account: AGENCY,
   checkId: 'check-1',
@@ -168,6 +169,20 @@ describe('runDueSchedules', () => {
     expect(f.mail.confirmation.mock.calls).toEqual([[{ siteId: fresh.siteId, key: SLOT }]]);
     expect(f.mail.report).not.toHaveBeenCalled();
     expect(f.store.writeReport).not.toHaveBeenCalled();
+  });
+
+  it('a contact that may not be asked (it declined, or was asked since its pause) is asked nothing by the run, and sent no report', async () => {
+    const [refused, free] = [
+      due({ confirmed: false, confirmationRequested: false, askRefused: true }),
+      due({ confirmed: false, confirmationRequested: false, askRefused: false }),
+    ];
+    const f = fakes([refused, free]);
+    expect(await runDueSchedules(f)).toMatchObject({
+      confirmations: 1,
+      skipped: { unconfirmed: 2 },
+    });
+    expect(f.mail.confirmation.mock.calls).toEqual([[{ siteId: free.siteId, key: SLOT }]]);
+    expect(f.mail.report).not.toHaveBeenCalled();
   });
 
   it('a trial account sends to its owner’s own address and to no other', async () => {

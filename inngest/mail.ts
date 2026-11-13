@@ -40,7 +40,10 @@ export const CLIENT_REPORT_FN_ID = 'crawlmouse.mail.client-report';
  * let the last ones fall after the lease.
  */
 export const MAIL_RETRIES = 8 as const;
-/** Each mail function's concurrency: small, well under the plan cap the serve route's test holds. */
+/**
+ * A mail function's concurrency, where it sets no other (the confirmation's is
+ * `REPORT_CONFIRM_CONCURRENCY`): small, well under the plan cap the serve route's test holds.
+ */
 export const MAIL_CONCURRENCY = 2;
 
 export type EmailRequestedData =

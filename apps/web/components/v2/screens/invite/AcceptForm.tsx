@@ -5,10 +5,22 @@ import { Button } from '../../Button';
 import { useLive } from '../account/LiveActions';
 
 /**
- * The accept form: it posts no field (the route reads the invitation's token from its cookie). It
- * submits on the live page and is inert on a preview.
+ * The accept form: the route reads the link's token from its cookie, and the form posts no field
+ * but the hidden ones it is given. It submits on the live page and is inert on a preview.
  */
-export function AcceptForm({ action, label }: { action: string; label: string }) {
+export function AcceptForm({
+  action,
+  label,
+  fields,
+  quiet = false,
+}: {
+  action: string;
+  label: string;
+  /** Hidden fields the form posts, for a route that reads one. */
+  fields?: Readonly<Record<string, string>>;
+  /** A second action on a page: drawn as the secondary button. */
+  quiet?: boolean;
+}) {
   const live = useLive();
   const stop = (e: FormEvent) => e.preventDefault();
   return (
@@ -18,7 +30,10 @@ export function AcceptForm({ action, label }: { action: string; label: string })
       encType="application/x-www-form-urlencoded"
       onSubmit={live ? undefined : stop}
     >
-      <Button type="submit" variant="primary">
+      {Object.entries(fields ?? {}).map(([name, value]) => (
+        <input key={name} type="hidden" name={name} value={value} />
+      ))}
+      <Button type="submit" variant={quiet ? 'default' : 'primary'}>
         {label}
       </Button>
     </form>

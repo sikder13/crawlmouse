@@ -39,6 +39,12 @@ export const LINK_FLOWS = {
     page: '/s/pause',
     api: '/api/report-files/pause',
   },
+  // "Don't ask me again", from the mail that asks a recipient to confirm (CC-31 D8).
+  reportDecline: {
+    cookie: 'cm_link_report_decline',
+    page: '/s/decline',
+    api: '/api/report-files/decline',
+  },
 } as const;
 
 export type LinkFlow = keyof typeof LINK_FLOWS;

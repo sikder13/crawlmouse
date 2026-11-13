@@ -190,6 +190,7 @@ describe('the finders see what they claim to see', () => {
       'app/reports/[id]/page.tsx',
       'app/reports/page.tsx',
       'app/s/confirm/page.tsx',
+      'app/s/decline/page.tsx',
       'app/s/pause/page.tsx',
       'app/s/view/[reportId]/page.tsx',
       'app/seats/page.tsx',
@@ -219,6 +220,7 @@ describe('the finders see what they claim to see', () => {
       'app/api/report-files/[id]/download/route.ts',
       'app/api/report-files/[id]/share/route.ts',
       'app/api/report-files/confirm/route.ts',
+      'app/api/report-files/decline/route.ts',
       'app/api/report-files/pause/route.ts',
       'app/api/report-files/schedules/site/[siteId]/client/route.ts',
       'app/api/report-files/schedules/site/[siteId]/confirm/route.ts',
@@ -239,6 +241,7 @@ describe('the finders see what they claim to see', () => {
       'app/invite/[token]/route.ts',
       'app/s/[token]/route.ts',
       'app/s/confirm/[token]/route.ts',
+      'app/s/decline/[token]/route.ts',
       'app/s/pause/[token]/route.ts',
     ]);
   });

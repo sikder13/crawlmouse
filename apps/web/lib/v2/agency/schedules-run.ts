@@ -6,7 +6,9 @@
  * 2. the client has no contact address: nothing is sent;
  * 3. the account is in its Agency trial and the contact is not the owner's own address: nothing is
  *    sent, the confirmation mail included;
- * 4. the contact has not confirmed: the confirmation mail is asked for, once, and no report is sent;
+ * 4. the contact has not confirmed: the confirmation mail is asked for, once, and no report is sent.
+ *    It is not asked for where the contact may not be asked (`askRefused`: it declined, or it
+ *    paused the reports and was asked again within the window);
  * 5. the site has no finished check: nothing is sent;
  * 6. no check queued after the one the last sent report ended on found a change, and the schedule
  *    does not send unchanged: nothing is sent;
@@ -35,6 +37,11 @@ export interface DueSchedule {
   hasContact: boolean;
   confirmed: boolean;
   confirmationRequested: boolean;
+  /**
+   * The contact may not be asked to confirm: it declined to be asked, or it paused the reports and
+   * was asked again within the window (`report_ask_refusals`).
+   */
+  askRefused: boolean;
   contactIsOwner: boolean;
   /** The account's plan as stored, with the two clocks `effectiveTier` reads. */
   account: {
@@ -129,7 +136,7 @@ export async function runDueSchedules(deps: ScheduleRunDeps): Promise<ScheduleRu
   };
   for (const s of due) {
     const reason = skipReason(s, deps.now());
-    if (reason === 'unconfirmed' && !s.confirmationRequested) {
+    if (reason === 'unconfirmed' && !s.confirmationRequested && !s.askRefused) {
       // Keyed by the slot: a run that is retried asks once.
       await deps.mail.confirmation({ siteId: s.siteId, key: s.slot });
       counts.confirmations += 1;

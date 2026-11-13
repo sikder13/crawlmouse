@@ -142,6 +142,7 @@ describe('share links and the pages they lead to send no referrer', () => {
     '/s/kJ8sT2mQ9x_p4VnR7bWc-A',
     '/s/view/6f1c2a8e-0000-4000-8000-000000000000',
     '/s/pause',
+    '/s/decline',
     '/s',
   ])('%s: Referrer-Policy no-referrer, every other header as on a page', async (path) => {
     vi.stubEnv('NEXT_PUBLIC_SENTRY_DSN', '');

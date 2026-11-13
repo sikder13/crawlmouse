@@ -72,7 +72,7 @@ describe('the pages a form goes back to', () => {
       '/fallback',
     );
 
-  it('are the dashboard, Seats, Reports, an invitation, a recipient’s two link pages, a site page, and an agency’s matrix, client reports and client page, on our own origin', () => {
+  it('are the dashboard, Seats, Reports, an invitation, a recipient’s link pages, a site page, and an agency’s matrix, client reports and client page, on our own origin', () => {
     for (const path of [
       '/dashboard',
       '/seats',
@@ -80,6 +80,7 @@ describe('the pages a form goes back to', () => {
       '/invite',
       '/s/confirm',
       '/s/pause',
+      '/s/decline',
       `/sites/${ID}`,
       '/agency',
       '/agency/reports',

@@ -123,7 +123,12 @@ describe('/s/confirm', () => {
       `Summit Digital would like to send reports about ${site.host} to this address.`,
     );
     expect(html).toMatch(/<form[^>]* action="\/api\/report-files\/confirm"/);
-    expect(html).not.toMatch(/<input/);
+    // The confirm form posts no field; the second form, "Don't ask me again", names this page.
+    expect(html.match(/<input[^>]*>/g)).toEqual([
+      '<input type="hidden" name="from" value="confirm"/>',
+    ]);
+    expect(html).toContain('You can stop these requests for good with one click.');
+    expect(html).toMatch(/<form[^>]* action="\/api\/report-files\/decline"/);
     expect(html).not.toContain(token);
     expect(html).not.toContain(hashToken(token));
     expect(html).not.toContain('reader@client.example');
@@ -168,6 +173,12 @@ describe('/s/pause', () => {
     const html = await pausePage();
     expect(html).toContain(`Summit Digital sends reports about ${site.host} to this address.`);
     expect(html).toMatch(/<form[^>]* action="\/api\/report-files\/pause"/);
+    // And the way to stop the requests for good: a second form, which names this page.
+    expect(html).toContain('You can stop these requests for good with one click.');
+    expect(html).toMatch(/<form[^>]* action="\/api\/report-files\/decline"/);
+    expect(html.match(/<input[^>]*>/g)).toEqual([
+      '<input type="hidden" name="from" value="pause"/>',
+    ]);
     expect(html).not.toContain(token);
     expect((await row(site.id)).paused_by_recipient_at).toBeNull();
   });
@@ -175,13 +186,17 @@ describe('/s/pause', () => {
   it('after the form’s answer says the reports are stopped', async () => {
     const html = await pausePage({ notice: 'report_paused' });
     expect(html).toContain(
-      'Paused. No more reports are sent. They start again only if you are asked to confirm again and do.',
+      'Paused. No more reports are sent. They start again only if you are asked to confirm again and do; you are asked once.',
     );
     expect(html).not.toMatch(/<form/);
   });
 
   it('is not indexed, and asks the browser to send no referrer', async () => {
-    for (const mod of [await import('./page'), await import('../pause/page')]) {
+    for (const mod of [
+      await import('./page'),
+      await import('../pause/page'),
+      await import('../decline/page'),
+    ]) {
       expect(mod.metadata).toMatchObject({
         robots: { index: false, follow: false },
         alternates: { canonical: null },
@@ -189,5 +204,73 @@ describe('/s/pause', () => {
       });
       expect(mod.dynamic).toBe('force-dynamic');
     }
+  });
+});
+
+describe('/s/decline', () => {
+  const declinePage = async (query: Record<string, string> = {}) =>
+    card(
+      renderToStaticMarkup(
+        await (await import('../decline/page')).default({ searchParams: Promise.resolve(query) }),
+      ),
+    );
+  const refusals = async (siteId: string) =>
+    (
+      await h.db.query<{ r: unknown[] }>(
+        `select report_refusals r from public.sites where id = $1`,
+        [siteId],
+      )
+    ).rows[0]!.r;
+
+  it('is a 404 with V2_CHECKS_PUBLIC unset', async () => {
+    vi.stubEnv('V2_CHECKS_PUBLIC', '');
+    await expect(declinePage()).rejects.toBeInstanceOf(NotFound);
+  });
+
+  it('says what the button does and who asked, with one form that posts no field, and records nothing by being read', async () => {
+    const site = await client();
+    const token = await issue('issue_recipient_confirmation', site.id);
+    h.cookies.set('cm_link_report_decline', token);
+    const html = await declinePage();
+    expect(html).toContain(
+      `Summit Digital asked to send reports about ${site.host} to this address.`,
+    );
+    expect(html).toContain('The button stops the requests for good');
+    expect(html.match(/<form[^>]*>/g)).toHaveLength(1);
+    expect(html).toMatch(/<form[^>]* action="\/api\/report-files\/decline"/);
+    expect(html).not.toMatch(/<input/);
+    expect(html).not.toContain(token);
+    expect(html).not.toContain('reader@');
+    expect(await refusals(site.id)).toEqual([]);
+  });
+
+  it('a confirmation link past its seven days is still offered the button, without the names the read no longer gives', async () => {
+    const site = await client();
+    const token = await issue('issue_recipient_confirmation', site.id);
+    await h.db.query(
+      `update public.report_schedules set recipient_confirm_sent_at = now() - interval '8 days' where site_id = $1`,
+      [site.id],
+    );
+    h.cookies.set('cm_link_report_decline', token);
+    const html = await declinePage();
+    expect(html).not.toContain('Summit Digital');
+    expect(html).toContain('The button stops the requests for good');
+    expect(html).toMatch(/<form[^>]* action="\/api\/report-files\/decline"/);
+  });
+
+  it('says the link cannot be used for no cookie and a value that is not a token', async () => {
+    expect(await declinePage()).toContain('This link can no longer be used');
+    h.cookies.set('cm_link_report_decline', 'not-a-token');
+    const html = await declinePage();
+    expect(html).toContain('This link can no longer be used');
+    expect(html).not.toMatch(/<form/);
+  });
+
+  it('after the form’s answer says they will not be asked again, with no form', async () => {
+    const html = await declinePage({ notice: 'report_declined' });
+    expect(html).toContain(
+      'Done. You will not be asked again about these reports, and none is sent to this address.',
+    );
+    expect(html).not.toMatch(/<form/);
   });
 });
