@@ -37,6 +37,9 @@ export const MINT_REPORTS_PER_IP_PER_DAY_ANON = 10;
 // SPEC 04 §3/§9 — self-service hide for the minter (capability = the audit UUID). Generous (you hide
 // your OWN mints) but bounded as defense-in-depth against a harvested-UUID script.
 export const HIDE_REPORTS_PER_IP_PER_DAY = 30;
+// CC-29 Q14 — the shared report's view beacon (POST /api/reports/[slug]/view): one post per page view,
+// so a reader opening many reports stays well under it; a script counting views does not.
+export const REPORT_VIEWS_PER_IP_PER_HOUR = 120;
 // SPEC 04 §9 — claim a public report. The REAL gate is auth + proving domain ownership (a verified
 // domain_verifications row), so this per-user hourly cap is only defense-in-depth against hammering.
 export const CLAIM_ATTEMPTS_PER_HOUR = 20;

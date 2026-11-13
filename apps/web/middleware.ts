@@ -5,7 +5,8 @@ import { isApiPath, isStateChanging, policyForPath } from '@/lib/security/route-
 import { isCrossSite, isJsonBody, isSameOrigin } from '@/lib/security/same-origin';
 import { updateSession } from '@/lib/supabase/middleware';
 import { checksPublicEnabled } from '@/lib/auth/flags';
-import { isRewriteTarget, REWRITE_HEADER, rewriteOf } from '@/lib/v2/rewrites';
+import { billingV2Enabled } from '@/lib/billing/flags';
+import { isRewriteTarget, REWRITE_HEADER, rewriteOf, type RewriteFlag } from '@/lib/v2/rewrites';
 
 /**
  * API requests: a state change to a route the registry guards (lib/security/route-policy.ts) is
@@ -91,14 +92,19 @@ export async function handleEdge(
 }
 
 /**
- * With V2_CHECKS_PUBLIC on, a path in `V2_REWRITES` is served by its v2 page. The rewrite carries
+ * A path in `V2_REWRITES` is served by its v2 page while the row's flag is on (`FLAG_ON`). The rewrite carries
  * what the session refresh put on its response (the rotated auth cookies and the no-store headers
  * that must ride with them), the request headers the refresh updated, and the query string, so the
  * page reads the refreshed session as a v1 page would; and it marks the request as rewritten.
  */
+const FLAG_ON: Readonly<Record<RewriteFlag, () => boolean>> = {
+  checksPublic: () => checksPublicEnabled(),
+  billing: () => billingV2Enabled(),
+};
+
 function v2Rewrite(req: NextRequest, refreshed: NextResponse): NextResponse {
-  const rewrite = checksPublicEnabled() ? rewriteOf(req.nextUrl.pathname) : null;
-  if (rewrite === null) return refreshed;
+  const rewrite = rewriteOf(req.nextUrl.pathname);
+  if (rewrite === null || !FLAG_ON[rewrite.flag]()) return refreshed;
   const headers = new Headers(req.headers);
   headers.set(REWRITE_HEADER, '1');
   const res = NextResponse.rewrite(new URL(`${rewrite.to}${req.nextUrl.search}`, req.url), {

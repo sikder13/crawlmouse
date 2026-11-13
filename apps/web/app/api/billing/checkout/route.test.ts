@@ -11,12 +11,19 @@ const h = vi.hoisted(() => {
     user: { id: 'u1', email: 'owner@example.com' } as unknown,
     seats: [{ account_id: ACCOUNT, role: 'owner' }] as unknown[],
     role: 'owner' as unknown,
+    personal: [] as unknown[],
     snapshot: null as unknown,
   };
   const seatsChain: Record<string, unknown> = {
     then: (resolve: (v: unknown) => unknown) => resolve({ data: state.seats, error: null }),
   };
   seatsChain.select = seatsChain.eq = () => seatsChain;
+  // What ownedAccountId's accounts read answers, whatever filters it sends: the accounts this test
+  // calls personal. The read itself runs against the schema in app/api/account/email/route.test.ts.
+  const accountsChain: Record<string, unknown> = {
+    then: (resolve: (v: unknown) => unknown) => resolve({ data: state.personal, error: null }),
+  };
+  accountsChain.select = accountsChain.eq = accountsChain.in = () => accountsChain;
   const session = {
     auth: {
       getUser: async () => {
@@ -26,7 +33,7 @@ const h = vi.hoisted(() => {
     },
     from: (table: string) => {
       log.push(`session.from ${table}`);
-      return seatsChain;
+      return table === 'accounts' ? accountsChain : seatsChain;
     },
     rpc: async (fn: string, args: unknown) => {
       log.push(`rpc ${fn} ${JSON.stringify(args)}`);
@@ -128,6 +135,7 @@ beforeEach(() => {
   h.state.user = { id: 'u1', email: 'owner@example.com' };
   h.state.seats = [{ account_id: ACCOUNT, role: 'owner' }];
   h.state.role = 'owner';
+  h.state.personal = [];
   h.state.snapshot = FREE_START;
   h.capture.mockReset();
   h.sessionsCreate.mockReset();
@@ -243,7 +251,26 @@ describe('POST /api/billing/checkout, V2_BILLING=1', () => {
       expect(h.log.filter((l) => l.startsWith('rpc member_role'))).toEqual([]);
     });
 
-    it('409 account_ambiguous for an owner of two accounts naming neither', async () => {
+    // Q26: Settings' Choose Pro names no account; with the Agency trial's second owner seat it
+    // acts on the personal (default) account.
+    it('an owner of two accounts naming neither checks out the personal one', async () => {
+      h.state.seats = [
+        { account_id: ACCOUNT, role: 'owner' },
+        { account_id: OTHER, role: 'owner' },
+      ];
+      h.state.personal = [{ id: OTHER }];
+      const res = await form('plan=pro&interval=month');
+      expect(res.status).toBe(303);
+      expect(h.log.slice(0, 5)).toEqual([
+        'getUser',
+        'session.from seats',
+        'session.from accounts',
+        `rpc member_role {"p_account":"${OTHER}"}`,
+        'supabaseAdmin',
+      ]);
+    });
+
+    it('409 account_ambiguous for an owner of two accounts naming neither, neither personal', async () => {
       h.state.seats = [
         { account_id: ACCOUNT, role: 'owner' },
         { account_id: OTHER, role: 'owner' },

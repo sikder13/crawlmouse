@@ -46,6 +46,14 @@ export interface FixEmailRequest {
   fix: Fix;
 }
 
+/** An Agency Plus request (contact_requests, migration 20261114000001). */
+export interface ContactRequest {
+  email: string;
+  sites: number | null;
+  note: string | null;
+  sentAt: string | null;
+}
+
 export interface FinishedCheck {
   trigger: string;
   status: string;
@@ -92,6 +100,15 @@ export interface MailStore {
    * Null when the function returns no row. The token is never logged or stored.
    */
   issueSeatInvite(seatId: string, seq: number, now: Date): Promise<IssuedSeatInvite | null>;
+  /** An Agency Plus request by id; null when there is no such row. */
+  contactRequest(contactId: string): Promise<ContactRequest | null>;
+  /** Sets `contact_requests.sent_at` when it is not set. */
+  markContactSent(contactId: string, at: Date): Promise<void>;
+  /**
+   * `purge_contact_requests`: deletes the requests sent more than 30 days before `now`, and the unsent
+   * ones made more than 30 days before it; the count.
+   */
+  purgeContacts(now: Date): Promise<number>;
 }
 
 /** Who one of a client report schedule's mails goes to, read before the mail is claimed. */
@@ -189,6 +206,12 @@ const CheckRow = z.object({
   site_id: z.string(),
 });
 const SiteRow = z.object({ host: z.string(), account_id: z.string().nullable() });
+const ContactRow = z.object({
+  email: z.string(),
+  sites: z.number().int().nullable(),
+  note: z.string().nullable(),
+  sent_at: z.string().nullable(),
+});
 const RequestRow = z.object({
   to_email: z.string(),
   sent_at: z.string().nullable(),
@@ -367,6 +390,33 @@ export function supabaseMailStore(sb: SupabaseClient): MailStore {
         accountName: row.account_name,
         role: row.role,
       };
+    },
+
+    async contactRequest(contactId) {
+      const r = await sb
+        .from('contact_requests')
+        .select('email, sites, note, sent_at')
+        .eq('id', contactId)
+        .maybeSingle();
+      if (r.error) fail('contact_requests', r.error);
+      if (r.data === null) return null;
+      const row = ContactRow.parse(r.data);
+      return { email: row.email, sites: row.sites, note: row.note, sentAt: row.sent_at };
+    },
+
+    async markContactSent(contactId, at) {
+      const r = await sb
+        .from('contact_requests')
+        .update({ sent_at: at.toISOString() })
+        .eq('id', contactId)
+        .is('sent_at', null);
+      if (r.error) fail('contact_requests update', r.error);
+    },
+
+    async purgeContacts(now) {
+      const r = await sb.rpc('purge_contact_requests', { p_now: now.toISOString() });
+      if (r.error) fail('purge_contact_requests', r.error);
+      return z.number().int().nonnegative().parse(r.data);
     },
   };
 }

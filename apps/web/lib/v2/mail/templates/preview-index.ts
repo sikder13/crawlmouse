@@ -25,6 +25,7 @@ export const MAIL_PREVIEW_INDEX = [
   { slug: 'account-delete', name: 'Account deletion, confirm and restore', kind: 'account_delete' },
   { slug: 'alert', name: 'Alert', kind: 'alert' },
   { slug: 'weekly-summary', name: 'Weekly summary', kind: 'weekly_summary' },
+  { slug: 'agency-plus-contact', name: 'Agency Plus request', kind: 'agency_plus_contact' },
   { slug: 'seat-invite', name: 'Seat invitation, account manager', kind: 'seat_invite' },
   {
     slug: 'seat-invite-unnamed',

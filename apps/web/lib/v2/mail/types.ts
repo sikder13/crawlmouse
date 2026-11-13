@@ -1,8 +1,9 @@
 /**
  * The mailer's shared types (CC-28 D1, D2). Every v2 email is one of `MAIL_KINDS`; the list is the
- * `email_sends.kind` check of migration 20261113000001 with the kinds migration 20261114000002's
- * section C adds. send.test.ts ("the kinds") reads both files, and __tests__/v2-031-m-mail-kinds.test.ts
- * reads the list from a migrated database.
+ * `email_sends.kind` check as migration 20261114000001 leaves it (CC-29 adds `agency_plus_contact`)
+ * with the kinds migration 20261114000002's section C adds after it. send.test.ts ("the kinds")
+ * reads both files, and __tests__/v2-031-m-mail-kinds.test.ts reads the list from a migrated
+ * database.
  */
 
 export const MAIL_KINDS = [
@@ -14,6 +15,7 @@ export const MAIL_KINDS = [
   'account_delete',
   'alert',
   'weekly_summary',
+  'agency_plus_contact',
   // CC-31: a seat's invitation, and the two mails of a client report schedule.
   'seat_invite',
   'report_confirm',
@@ -35,6 +37,13 @@ export const ACCOUNT_KINDS: ReadonlySet<MailKind> = new Set<MailKind>([
   'seat_invite',
   'report_confirm',
 ]);
+
+/**
+ * Mail to our own inbox (CC-29: an Agency Plus request, to the sales inbox). Like account mail it
+ * carries no unsubscribe and a suppression does not stop it: `email_kind_suppressible` answers false
+ * for it, so a bounce recorded against that inbox cannot silence the requests sent to it.
+ */
+export const OWN_INBOX_KINDS: ReadonlySet<MailKind> = new Set<MailKind>(['agency_plus_contact']);
 
 /**
  * The kinds whose List-Unsubscribe is a seat's signed link (D7), and what the link turns off. A

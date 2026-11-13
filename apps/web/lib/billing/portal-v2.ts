@@ -6,7 +6,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type Stripe from 'stripe';
 import { z } from 'zod';
-import type { BillingResult } from './checkout-v2';
+import type { BillingRefusal, BillingResult } from './checkout-v2';
 import type { RequestBody } from './request-body';
 
 export interface PortalAccounts {
@@ -40,11 +40,17 @@ export function parsePortal(body: RequestBody): { accountId?: string } | null {
   return parsed.success ? parsed.data : null;
 }
 
+/** Why the portal cannot open for an account with this Stripe customer, or null when it can. */
+export function portalRefusal(customer: string | null): BillingRefusal | null {
+  return customer === null ? { ok: false, status: 400, error: 'no_customer' } : null;
+}
+
 export async function portalV2(deps: PortalDeps, accountId: string): Promise<BillingResult> {
   const customer = await deps.accounts.customerOf(accountId);
-  if (customer === null) return { ok: false, status: 400, error: 'no_customer' };
+  const refusal = portalRefusal(customer);
+  if (refusal !== null) return refusal;
   const session = await deps.stripe.billingPortal.sessions.create({
-    customer,
+    customer: customer!,
     configuration: await deps.configuration(),
     return_url: `${deps.origin}/settings/plan`,
   });

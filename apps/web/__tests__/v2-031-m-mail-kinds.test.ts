@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { PGlite } from '@electric-sql/pglite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { ACCOUNT_KINDS, MAIL_KINDS } from '../lib/v2/mail/types';
+import { ACCOUNT_KINDS, MAIL_KINDS, OWN_INBOX_KINDS } from '../lib/v2/mail/types';
 import {
   applyAllMigrations,
   asRole,
@@ -155,12 +155,13 @@ describe('after section C', () => {
     }
   });
 
-  it('the database’s lists are the code’s: MAIL_KINDS, and the kinds that are not account mail', async () => {
+  it('the database’s lists are the code’s: MAIL_KINDS, and the kinds that are neither account mail nor mail to our own inbox', async () => {
     const kinds = await listedKinds();
     expect([...kinds].sort()).toEqual([...MAIL_KINDS].sort());
     const answers = await Promise.all(kinds.map(suppressibleAnswer));
     expect(kinds.filter((_, i) => answers[i]).sort()).toEqual(
-      MAIL_KINDS.filter((k) => !ACCOUNT_KINDS.has(k)).sort(),
+      // Neither account mail nor mail to our own inbox (CC-29's kind, which 031's block keeps).
+      MAIL_KINDS.filter((k) => !ACCOUNT_KINDS.has(k) && !OWN_INBOX_KINDS.has(k)).sort(),
     );
   });
 

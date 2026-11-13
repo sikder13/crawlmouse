@@ -9,6 +9,7 @@ import { mailHandlers, reportMailHandlers, REQUEST_ID_MAX, type CaptureEvent } f
 import { memoryLedger, memoryTransport } from './memory';
 import { MailRetry, type MailDeps } from './send';
 import type {
+  ContactRequest,
   IssuedClientReport,
   IssuedSeatInvite,
   MailStore,
@@ -16,6 +17,7 @@ import type {
   ReportMailStore,
   TrialAccount,
 } from './store';
+import { AGENCY_PLUS_INBOX } from './templates/agency-plus-contact';
 
 const PEPPER = 'p'.repeat(40);
 const NOW = new Date('2026-11-13T10:00:00.000Z');
@@ -84,6 +86,16 @@ function store(over: Partial<MailStore> = {}): MailStore {
         role: 'developer',
       }),
     ),
+    contactRequest: vi.fn(
+      async (): Promise<ContactRequest> => ({
+        email: 'buyer@agency.example',
+        sites: 40,
+        note: 'We would want SSO.',
+        sentAt: null,
+      }),
+    ),
+    markContactSent: vi.fn(async () => undefined),
+    purgeContacts: vi.fn(async () => 0),
     ...over,
   };
 }
@@ -320,6 +332,77 @@ describe('the fix to a developer', () => {
   });
 });
 
+describe('the Agency Plus request (CC-29, rulings Q38)', () => {
+  const CONTACT = 'd0000000-0000-4000-8000-000000000001';
+  const data = { template: 'agency_plus_contact', contactId: CONTACT } as const;
+
+  it('mails the sales inbox, never the submitted address, with the request as data, once', async () => {
+    const s = store();
+    const { h, transport, ledger } = setup(s);
+    expect(await h.accountEmail(data)).toBe('sent');
+    expect(transport.sent).toHaveLength(1);
+    const m = transport.sent[0]!;
+    expect(m.to).toBe(AGENCY_PLUS_INBOX);
+    expect(m.to).not.toBe('buyer@agency.example');
+    expect(m.headers).toEqual({});
+    expect(m.text).toContain('Work email: buyer@agency.example');
+    expect(m.text).toContain('> We would want SSO.');
+    expect(m.idempotencyKey).toBe(`agency_plus_contact:${CONTACT}`);
+    expect(ledger.claims[0]).toMatchObject({ kind: 'agency_plus_contact', accountId: null });
+  });
+
+  it('sets sent_at after the send, and a replay of the event sends nothing more', async () => {
+    const s = store();
+    const { h, transport } = setup(s);
+    await h.accountEmail(data);
+    expect(s.markContactSent).toHaveBeenCalledWith(CONTACT, NOW);
+    expect(await h.accountEmail(data)).toBe('done');
+    expect(transport.sent).toHaveLength(1);
+  });
+
+  it('a row already sent, or none, sends nothing and claims nothing', async () => {
+    for (const row of [
+      { email: 'buyer@agency.example', sites: 40, note: null, sentAt: NOW.toISOString() },
+      null,
+    ]) {
+      const s = store({ contactRequest: vi.fn(async () => row) });
+      const { h, ledger, transport } = setup(s);
+      expect(await h.accountEmail(data)).toBe(row === null ? 'not_found' : 'already_sent');
+      expect(ledger.claims).toEqual([]);
+      expect(transport.sent).toEqual([]);
+      expect(s.markContactSent).not.toHaveBeenCalled();
+    }
+  });
+
+  it('an id that is not a uuid reads nothing', async () => {
+    const s = store();
+    const { h } = setup(s);
+    expect(await h.accountEmail({ ...data, contactId: 'x' })).toBe('not_found');
+    expect(s.contactRequest).not.toHaveBeenCalled();
+  });
+
+  it('a suppression recorded against the sales inbox does not stop it', async () => {
+    const s = store();
+    const { h, transport } = setup(s, [AGENCY_PLUS_INBOX]);
+    expect(await h.accountEmail(data)).toBe('sent');
+    expect(transport.sent).toHaveLength(1);
+  });
+
+  it('does not mark a send that did not go out', async () => {
+    const s = store();
+    const mail: MailDeps = {
+      ledger: memoryLedger(),
+      transport: memoryTransport({ ok: false, code: 'provider_422', retryable: false }),
+      pepper: PEPPER,
+      now: () => NOW,
+      log: vi.fn(),
+    };
+    const h = mailHandlers({ mail, store: s, capture: vi.fn<CaptureEvent>() });
+    expect(await h.accountEmail(data)).toBe('failed');
+    expect(s.markContactSent).not.toHaveBeenCalled();
+  });
+});
+
 describe('a failure around the claim retries the step (inngest/mail.ts `guarded` throws it on)', () => {
   const link = {
     accountId: ACCOUNT,
@@ -372,6 +455,39 @@ describe('a failure around the claim retries the step (inngest/mail.ts `guarded`
     expect(await step(() => t.h.fixToDeveloper('r1'))).toBe('done');
     expect(t.transport.sent).toHaveLength(1);
     expect(mark).toHaveBeenCalledTimes(2);
+  });
+
+  it('an Agency Plus sent_at write that fails: retried, and the retry marks it without sending again', async () => {
+    const CONTACT = 'd0000000-0000-4000-8000-000000000002';
+    let sentAt: string | null = null;
+    const mark = vi
+      .fn<MailStore['markContactSent']>()
+      .mockRejectedValueOnce(new Error('contact_requests update: 503'))
+      .mockImplementation(async (_id, at) => {
+        sentAt ??= at.toISOString();
+      });
+    const t = setup(
+      store({
+        contactRequest: vi.fn(async () => ({
+          email: 'buyer@agency.example',
+          sites: 40,
+          note: null,
+          sentAt,
+        })),
+        markContactSent: mark,
+      }),
+    );
+    const data = { template: 'agency_plus_contact', contactId: CONTACT } as const;
+    await expect(step(() => t.h.accountEmail(data))).rejects.toMatchObject({
+      code: 'mark_sent_failed',
+    });
+    expect(sentAt).toBeNull();
+    expect(await step(() => t.h.accountEmail(data))).toBe('done');
+    expect(t.transport.sent).toHaveLength(1);
+    expect(mark).toHaveBeenCalledTimes(2);
+    expect(sentAt).toBe(NOW.toISOString());
+    // Marked, so the next replay reads it as sent and claims nothing.
+    expect(await step(() => t.h.accountEmail(data))).toBe('already_sent');
   });
 });
 

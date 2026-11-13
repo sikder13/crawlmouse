@@ -6,6 +6,9 @@ import { authorPath, publishedAuthors } from '@/lib/blog/authors';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { fetchIndexableReportSlugs } from '@/lib/sitemap-reports';
 import { SITEMAP_REPORTS_MAX } from '@/lib/limits';
+import { checksPublicEnabled } from '@/lib/auth/flags';
+import { billingV2Enabled } from '@/lib/billing/flags';
+import { CHECK_QUESTIONS, checkPath } from '@/lib/v2/copy/check-pages';
 
 type ChangeFreq = NonNullable<MetadataRoute.Sitemap[number]['changeFrequency']>;
 
@@ -36,6 +39,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     entry('/developers', 0.7, 'monthly'),
     entry('/bot', 0.4, 'yearly'),
     entry('/status', 0.3, 'weekly'),
+  ];
+
+  // CC-29: new pages that answer 404 while their flag is off, so each is listed only while it is on
+  // (OPERATING-RULES §13: no sitemap entry answers an error). For agencies follows V2_BILLING; the
+  // three /check pages follow V2_CHECKS_PUBLIC.
+  const flagged: MetadataRoute.Sitemap = [
+    ...(billingV2Enabled() ? [entry('/agencies', 0.8, 'monthly')] : []),
+    ...(checksPublicEnabled()
+      ? CHECK_QUESTIONS.map((q) => entry(checkPath(q), 0.8, 'monthly'))
+      : []),
   ];
 
   const legal: MetadataRoute.Sitemap = [
@@ -93,5 +106,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     reports = [];
   }
 
-  return [...marketing, ...legal, ...posts, ...tagPages, ...authorPages, ...reports];
+  return [...marketing, ...flagged, ...legal, ...posts, ...tagPages, ...authorPages, ...reports];
 }

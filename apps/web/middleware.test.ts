@@ -177,6 +177,72 @@ describe('the v2 rewrites (owner ruling Q17)', () => {
   );
 });
 
+describe('the CC-29 rows: each follows its own flag', () => {
+  const at = (path: string) => new NextRequest(new Request(`https://crawlmouse.com${path}`));
+  const rewrittenTo = (res: NextResponse) => {
+    const to = res.headers.get('x-middleware-rewrite');
+    return to === null ? null : new URL(to).pathname + new URL(to).search;
+  };
+  const refresh = (req: NextRequest) => Promise.resolve(NextResponse.next({ request: req }));
+  const SLUG = 'aB3dE5fG7hJ9kL1mN3pQ5r';
+  afterEach(() => vi.unstubAllEnvs());
+
+  it.each([
+    ['/pricing', '/v2-pricing'],
+    ['/pricing?interval=year', '/v2-pricing?interval=year'],
+    ['/developers', '/v2-developers'],
+  ])('with V2_BILLING=1, %s is served by %s', async (path, to) => {
+    vi.stubEnv('V2_BILLING', '1');
+    vi.stubEnv('V2_CHECKS_PUBLIC', '');
+    expect(rewrittenTo(await handleEdge(at(path), refresh))).toBe(to);
+  });
+
+  it.each(['/pricing', '/developers'])(
+    'with V2_BILLING unset, %s is not rewritten, whatever V2_CHECKS_PUBLIC says',
+    async (path) => {
+      vi.stubEnv('V2_BILLING', '');
+      vi.stubEnv('V2_CHECKS_PUBLIC', '1');
+      const res = await handleEdge(at(path), refresh);
+      expect(rewrittenTo(res)).toBeNull();
+      expect(res.status).toBe(200);
+    },
+  );
+
+  it('with V2_CHECKS_PUBLIC=1, a report is served by the report target, with its query string', async () => {
+    vi.stubEnv('V2_CHECKS_PUBLIC', '1');
+    vi.stubEnv('V2_BILLING', '');
+    expect(rewrittenTo(await handleEdge(at(`/r/${SLUG}?ref=x`), refresh))).toBe(
+      `/v2-report/${SLUG}?ref=x`,
+    );
+  });
+
+  it.each([
+    ['', `/r/${SLUG}`],
+    ['1', `/r/${SLUG}/opengraph-image`],
+    ['1', '/r'],
+  ])('with V2_CHECKS_PUBLIC=%j, %s is not rewritten', async (flag, path) => {
+    vi.stubEnv('V2_CHECKS_PUBLIC', flag);
+    vi.stubEnv('V2_BILLING', '1');
+    const res = await handleEdge(at(path), refresh);
+    expect(rewrittenTo(res)).toBeNull();
+    expect(res.status).toBe(200);
+  });
+
+  it.each([
+    '/v2-pricing',
+    '/v2-developers',
+    '/v2-report',
+    `/v2-report/${SLUG}`,
+    `/v%32-report/${SLUG}`,
+  ])('a direct request for %s is a 404 with both flags on', async (path) => {
+    vi.stubEnv('V2_CHECKS_PUBLIC', '1');
+    vi.stubEnv('V2_BILLING', '1');
+    const res = await handleEdge(at(path), refresh);
+    expect(res.status).toBe(404);
+    expect(rewrittenTo(res)).toBeNull();
+  });
+});
+
 describe('middleware (exported entrypoint)', () => {
   it('wires handleEdge → updateSession end-to-end and returns a response with the consent cookie for an anonymous request', async () => {
     const event = { waitUntil: vi.fn() } as unknown as NextFetchEvent;
@@ -259,6 +325,7 @@ describe('a state-changing API request from another site is refused before the r
       'api/account/email/confirm',
       'api/account/email/undo',
       'api/account/restore',
+      'api/agency-trial',
       'api/alert-rules',
       'api/audits/[id]/cancel',
       'api/audits/[id]/reaudit',
@@ -285,6 +352,7 @@ describe('a state-changing API request from another site is refused before the r
       'api/reports',
       'api/reports/[slug]/claim',
       'api/reports/[slug]/logo',
+      'api/reports/[slug]/view',
       'api/reports/[slug]/visibility',
       'api/reports/[slug]/white-label',
       'api/seats',
@@ -439,6 +507,7 @@ describe('a public route that reads JSON refuses another site and a body not dec
       'api/auth/magic-link',
       'api/checks',
       'api/checks/[id]/notify',
+      'api/contact/agency-plus',
       'api/developers',
       'api/reports/hide',
       'api/reports/mint',
@@ -533,7 +602,7 @@ describe('the / row of the v2 rewrite table (CC-22b, carried onto lib/v2/rewrite
 
   it('has the home row, and each target is a path of its own', () => {
     expect(HOME.to).toBe('/v2-home');
-    for (const row of V2_REWRITES) expect(row.to).toMatch(/^\/[a-z0-9-]+(\/[a-z0-9-]+)*$/);
+    for (const row of V2_REWRITES) expect(row.to).toMatch(/^\/[a-z0-9-]+(\/:?[a-z0-9-]+)*$/);
     expect(new Set(V2_REWRITES.map((r) => r.to)).size).toBe(V2_REWRITES.length);
   });
 

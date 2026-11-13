@@ -217,6 +217,8 @@ async function freshRow(table: NewTable): Promise<Record<string, unknown>> {
       return ROWS.email_suppressions(hex);
     case 'slack_sends':
       return ROWS.slack_sends(randomUUID(), world.accountId);
+    case 'contact_requests':
+      return ROWS.contact_requests(`contact-${hex.slice(0, 8)}@example.com`);
   }
 }
 
@@ -282,7 +284,8 @@ describe('the row builders', () => {
 const HIDDEN: Record<NewTable, string[] | null> = {
   measurement_lineages: [],
   // 008's pipeline columns: no client reads them.
-  sites: [...SITE_SCHEDULE_COLUMNS],
+  // 031's report_refusals (what the site's recipients refused) is granted to no client.
+  sites: [...SITE_SCHEDULE_COLUMNS, 'report_refusals'],
   // 022b's notify_email is a visitor's address and copied_for holds other accounts' ids: neither
   // is granted to a client role.
   checks: [...CHECK_PIPELINE_COLUMNS, 'notify_email', 'copied_for'],
@@ -321,6 +324,7 @@ const HIDDEN: Record<NewTable, string[] | null> = {
   email_sends: null,
   email_suppressions: null,
   slack_sends: null,
+  contact_requests: null,
 };
 const ALERT_INSERT = ['account_id', 'site_id', 'kind', 'enabled', 'threshold_points', 'channels'];
 const ALERT_UPDATE = ['enabled', 'threshold_points', 'channels'];
@@ -374,8 +378,8 @@ async function postureViolations(d: Db, table: NewTable): Promise<string[]> {
   };
   if (table === 'alert_rules') expectedTable.authenticated = 'd';
   if (table === 'page_results') expectedTable.crawl_worker = 'a';
-  // 008 grants service_role the four statements the pipeline runs, and 026b the same on its table.
-  if (['crawl_batches', 'persist_chunks', 'fix_email_requests'].includes(table))
+  // 008 grants service_role the four statements the pipeline runs, and 026b and 029 the same on theirs.
+  if (['crawl_batches', 'persist_chunks', 'fix_email_requests', 'contact_requests'].includes(table))
     expectedTable.service_role = 'arwd';
   // 027b keeps the Slack destination from service_role too: its functions are the only way in.
   if (table === 'account_slack_destinations') delete expectedTable.service_role;
@@ -1055,6 +1059,11 @@ const RULE_CASES: Record<
   report_schedules_page_slug: {
     table: 'report_schedules',
     row: async () => ({ ...(await freshRow('report_schedules')), page_slug: 'Client A' }),
+  },
+  // 031: what a site's recipients refused is a list.
+  sites_report_refusals_array: {
+    table: 'sites',
+    row: async () => ({ ...(await freshRow('sites')), report_refusals: {} }),
   },
   // 031: a link's hash is a sha256 in lowercase hex, never the token.
   report_schedules_link_hashes: {

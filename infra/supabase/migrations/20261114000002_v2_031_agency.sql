@@ -2090,7 +2090,7 @@ grant execute on function public.mark_client_report_sent(uuid, timestamptz) to s
 -- before this one added stays, with its answer. The block reads the CHECK on the kind column alone
 -- and raises, changing nothing, unless there is one and it is a plain list of kinds. Run again, it
 -- finds the three there and writes the same two definitions. The function's body is written as 028
--- writes it (`select p_kind in (…);` on its own line), so the revert, which writes the same words
+-- writes it (the list after `in`, the statement on its own line), so the revert, which writes the same words
 -- without the three, gives back the text 028 left: the schema fingerprint reads the function's text.
 --
 -- Test: pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-031-m-mail-kinds.test.ts

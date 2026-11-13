@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { hashMailAddress } from './address-hash';
@@ -13,7 +13,8 @@ import type { MailLedger } from './ledger';
 import { memoryLedger, type MemoryLedger } from './memory';
 import { keyRef, MailRetry, send, type MailDeps, type SendRequest } from './send';
 import { resendTransport, type MailTransport, type TransportResult } from './transport';
-import { ACCOUNT_KINDS, MAIL_KINDS, type OutgoingMail } from './types';
+import { AGENCY_PLUS_INBOX } from './templates/agency-plus-contact';
+import { ACCOUNT_KINDS, MAIL_KINDS, OWN_INBOX_KINDS, type OutgoingMail } from './types';
 
 const PEPPER = 'p'.repeat(40);
 const NOW = new Date('2026-11-13T10:00:00.000Z');
@@ -143,6 +144,28 @@ describe('send: claim before send (D1)', () => {
       ),
     ).toBe('sent');
     expect(t.sent.map((m) => m.idempotencyKey)).toEqual(['tr']);
+  });
+
+  it('sends own-inbox mail to our inbox only: any other address is refused before any claim', async () => {
+    expect(OWN_INBOX_KINDS.size).toBeGreaterThan(0);
+    for (const kind of OWN_INBOX_KINDS) {
+      const { d, mem, t, log } = deps();
+      for (const to of ['buyer@agency.example', AGENCY_PLUS_INBOX.toUpperCase(), 'support@x.co']) {
+        expect(await send(d, request({ kind, to, idempotencyKey: `${kind}:${to}` }))).toBe(
+          'invalid_address',
+        );
+      }
+      expect(mem.claims).toHaveLength(0);
+      expect(t.sent).toHaveLength(0);
+      expect(log).toHaveBeenCalledWith('mail.invalid_address', expect.objectContaining({ kind }));
+      expect(await send(d, request({ kind, to: AGENCY_PLUS_INBOX, idempotencyKey: kind }))).toBe(
+        'sent',
+      );
+      expect(t.sent.map((m) => m.to)).toEqual([AGENCY_PLUS_INBOX]);
+    }
+    // Any other kind still goes to the address it names.
+    const { d } = deps();
+    expect(await send(d, request({ to: 'buyer@agency.example' }))).toBe('sent');
   });
 
   it('refuses an address that is not a plain one, before any claim', async () => {
@@ -441,23 +464,35 @@ describe('resendTransport', () => {
 });
 
 describe('the kinds', () => {
-  it('are the migrations’ email_sends.kind list, and the suppressible kinds are the non-account ones', () => {
-    const read = (file: string) =>
-      readFileSync(resolve(__dirname, '../../../../../infra/supabase/migrations', file), 'utf8');
-    const names = (list: string) => [...list.matchAll(/'(\w+)'/g)].map((m) => m[1]);
-    // 028 writes the two lists. 031's section C adds to each the kinds its two arrays name; what the
-    // database holds after both is read in __tests__/v2-031-m-mail-kinds.test.ts.
-    const base = read('20261113000001_v2_028_monitoring.sql');
-    const added = read('20261114000002_v2_031_agency.sql');
-    expect([
-      ...names(/kind text not null check \(kind in \(([^)]*)\)\)/.exec(base)![1]!),
-      ...names(/v_added constant text\[\] := array\[([^\]]*)\]/.exec(added)![1]!),
-    ]).toEqual([...MAIL_KINDS]);
-    expect(
-      [
-        ...names(/select p_kind in \(([^)]*)\)/.exec(base)![1]!),
-        ...names(/v_added_suppressible constant text\[\] := array\[([^\]]*)\]/.exec(added)![1]!),
-      ].sort(),
-    ).toEqual(MAIL_KINDS.filter((k) => !ACCOUNT_KINDS.has(k)).sort());
+  // The migrations in order: the last that sets `email_sends.kind`'s check, or redefines
+  // `email_kind_suppressible`, is the one in force (CC-29's 20261114000001 widens the first).
+  const MIGRATIONS = resolve(__dirname, '../../../../../infra/supabase/migrations');
+  const lastMatch = (re: RegExp): string => {
+    let found: string | undefined;
+    for (const f of readdirSync(MIGRATIONS)
+      .filter((n) => n.endsWith('.sql'))
+      .sort()) {
+      for (const m of readFileSync(resolve(MIGRATIONS, f), 'utf8').matchAll(re))
+        found = m[1] ?? m[2];
+    }
+    return found!;
+  };
+  const quoted = (list: string) => [...list.matchAll(/'(\w+)'/g)].map((m) => m[1]);
+
+  it('are the email_sends.kind check in force, and its suppressible kinds are neither account nor own-inbox mail', () => {
+    const list = lastMatch(
+      /create table if not exists public\.email_sends \([^;]*?kind text not null check \(kind in \(([^)]*)\)\)|constraint email_sends_kind_check\s+check \(kind in \(([^)]*)\)\)/g,
+    );
+    // 031's section C writes no list: it adds to each of the two the kinds its arrays name, after
+    // what is there. What the database holds after every migration is read in
+    // __tests__/v2-031-m-mail-kinds.test.ts.
+    const added = readFileSync(resolve(MIGRATIONS, '20261114000002_v2_031_agency.sql'), 'utf8');
+    const array = (name: string) =>
+      quoted(new RegExp(`${name} constant text\\[\\] := array\\[([^\\]]*)\\]`).exec(added)![1]!);
+    expect([...quoted(list), ...array('v_added')]).toEqual([...MAIL_KINDS]);
+    const supp = lastMatch(/select p_kind in \(([^)]*)\)/g);
+    expect([...quoted(supp), ...array('v_added_suppressible')].sort()).toEqual(
+      MAIL_KINDS.filter((k) => !ACCOUNT_KINDS.has(k) && !OWN_INBOX_KINDS.has(k)).sort(),
+    );
   });
 });

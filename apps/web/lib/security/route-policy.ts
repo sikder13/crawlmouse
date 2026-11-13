@@ -134,6 +134,24 @@ export const ROUTE_POLICIES: readonly RoutePolicy[] = [
     origin: 'strict',
   },
   { route: 'api/billing/status', methods: ['GET'], class: 'user', origin: 'any' },
+  // CC-29: the Agency trial's step before Checkout, and the Agency Plus contact form.
+  { route: 'api/agency-trial', methods: ['POST'], class: 'user', origin: 'strict' },
+  {
+    route: 'api/contact/agency-plus',
+    methods: ['POST'],
+    class: 'public',
+    reason: 'the Agency Plus contact form; Turnstile when enforced and a per-IP limit',
+    origin: 'lenient',
+    jsonBody: true,
+  },
+  {
+    route: 'og/[card]',
+    methods: ['GET'],
+    class: 'public',
+    reason:
+      'a v2 public page’s social card: a fixed title per card key, nothing read from a session',
+    origin: 'any',
+  },
   {
     route: 'api/checks/[id]/cancel',
     methods: ['POST'],
@@ -209,7 +227,8 @@ export const ROUTE_POLICIES: readonly RoutePolicy[] = [
     route: 'api/reports/mint',
     methods: ['POST'],
     class: 'public',
-    reason: 'capability (a completed audit id); per-user and per-IP caps, Turnstile once exhausted',
+    reason:
+      "capability (a completed audit id); per-user and per-IP caps, Turnstile once exhausted. A v2 body ({checkId}, CC-29 D7) needs a session and the check's site's membership",
     session: 'optional',
     origin: 'lenient',
     jsonBody: true,
@@ -220,6 +239,14 @@ export const ROUTE_POLICIES: readonly RoutePolicy[] = [
   { route: 'api/reports/[slug]/visibility', methods: ['POST'], class: 'user', origin: 'strict' },
   { route: 'api/reports/[slug]/white-label', methods: ['POST'], class: 'user', origin: 'strict' },
   { route: 'api/seats/switch', methods: ['POST'], class: 'member', origin: 'strict' },
+  {
+    route: 'api/reports/[slug]/view',
+    methods: ['POST'],
+    class: 'public',
+    reason:
+      "counts one view of a public report for the funnel (CC-29 Q14); it reads the report and writes only the caller's per-IP bucket",
+    origin: 'strict',
+  },
   { route: 'api/sites', methods: ['POST'], class: 'member', origin: 'strict' },
   {
     route: 'api/sites/[id]',

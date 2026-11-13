@@ -296,6 +296,8 @@ async function project(db: PGlite): Promise<Record<string, Rec[]>> {
           'paused_reason',
           'removed_at',
           'updated_at',
+          // 031: what the site's recipients refused; database only.
+          'report_refusals',
           ...SITE_SCHEDULE_COLUMNS,
         ]),
         schedule:

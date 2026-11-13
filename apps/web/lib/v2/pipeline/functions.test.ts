@@ -318,7 +318,7 @@ const limitsOf = (configs: readonly Config[]): number[] =>
 
 /**
  * The mail functions, registered with V2_CHECKS_PUBLIC=1 only (lib/v2/mail/functions.ts): CC-28's
- * four and CC-31's invitation.
+ * four, CC-31's invitation and two report mails, and CC-29's deletion of Agency Plus requests.
  */
 const MAIL_IDS = [
   'crawlmouse-crawlmouse.mail.account',
@@ -328,6 +328,7 @@ const MAIL_IDS = [
   'crawlmouse-crawlmouse.mail.seat-invite',
   'crawlmouse-crawlmouse.mail.report-confirm',
   'crawlmouse-crawlmouse.mail.client-report',
+  'crawlmouse-crawlmouse.mail.contact-purge',
 ];
 const SWEEP = [undefined, '', '0', '-1', '2', '5', '6', '50', '1000', 'abc', '5.5'] as const;
 

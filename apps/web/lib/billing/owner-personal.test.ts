@@ -47,14 +47,10 @@ describe('ownPersonalAccountId', () => {
 });
 
 describe('ownedAccountId, for a person who owns two accounts', () => {
-  it('is ambiguous with no choice, and the chosen one with either choice', async () => {
+  it('is the personal one with no choice (CC-29 Q26), and the chosen one with either choice', async () => {
     const p = await agencyOwner('chooser');
     const sb = sessionOver(db, p);
-    expect(await ownedAccountId(sb, p.id)).toEqual({
-      ok: false,
-      status: 409,
-      error: 'account_ambiguous',
-    });
+    expect(await ownedAccountId(sb, p.id)).toEqual({ ok: true, accountId: p.accountId });
     expect(await ownedAccountId(sb, p.id, p.agencyId)).toEqual({ ok: true, accountId: p.agencyId });
     expect(await ownedAccountId(sb, p.id, p.accountId)).toEqual({
       ok: true,

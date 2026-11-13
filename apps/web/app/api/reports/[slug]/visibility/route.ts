@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { supabaseServer } from '@/lib/supabase/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { readReportRow, purgePublicReport } from '@/lib/reports';
-import { isReportGone } from '@/lib/report-visibility';
+import { isReportGoneEitherKind } from '@/lib/report-visibility';
 import { isDomainVerifiedForUser } from '@/lib/report-ownership';
 import { isUndefinedColumnError } from '@/lib/pg-errors';
 import { checkRateLimit } from '@/lib/rate-limit';
@@ -20,26 +20,35 @@ const HOUR_MS = 60 * 60 * 1000;
 // absent pre-Runbook-B → PGRST204/42703 → 503 (fail-closed, like mint/hide).
 const schema = z
   .object({ listed: z.boolean().optional(), indexable: z.boolean().optional() })
-  .refine((v) => v.listed !== undefined || v.indexable !== undefined, { message: 'no change requested' });
+  .refine((v) => v.listed !== undefined || v.indexable !== undefined, {
+    message: 'no change requested',
+  });
 
 export async function POST(req: Request, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
 
   const sbUser = await supabaseServer();
-  const { data: { user } } = await sbUser.auth.getUser();
+  const {
+    data: { user },
+  } = await sbUser.auth.getUser();
   if (!user) return NextResponse.json({ error: 'auth_required' }, { status: 401 });
 
   const body = await req.json().catch(() => ({}));
   const parsed = schema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: 'invalid request' }, { status: 400 });
 
-  const rl = await checkRateLimit(`report-visibility:${user.id}`, VISIBILITY_UPDATES_PER_HOUR, HOUR_MS);
+  const rl = await checkRateLimit(
+    `report-visibility:${user.id}`,
+    VISIBILITY_UPDATES_PER_HOUR,
+    HOUR_MS,
+  );
   if (!rl.allowed) return NextResponse.json({ error: 'rate_limited' }, { status: 429 });
 
   const sb = supabaseAdmin();
   const report = await readReportRow(sb, slug);
   if (!report) return NextResponse.json({ error: 'not found' }, { status: 404 });
-  if (isReportGone(report)) return NextResponse.json({ error: 'not found' }, { status: 404 });
+  if (isReportGoneEitherKind(report))
+    return NextResponse.json({ error: 'not found' }, { status: 404 });
 
   const owns = await isDomainVerifiedForUser(sb, user.id, report.domain);
   if (!owns) return NextResponse.json({ error: 'verification_required' }, { status: 403 });
@@ -60,7 +69,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
     .maybeSingle();
 
   if (error) {
-    if (isUndefinedColumnError(error)) return NextResponse.json({ error: 'unavailable' }, { status: 503 });
+    if (isUndefinedColumnError(error))
+      return NextResponse.json({ error: 'unavailable' }, { status: 503 });
     return NextResponse.json({ error: 'could not update' }, { status: 500 });
   }
   if (!data) return NextResponse.json({ error: 'not claimed' }, { status: 409 });

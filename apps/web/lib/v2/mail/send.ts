@@ -4,7 +4,9 @@
  *   1. With no transport (no RESEND_API_KEY) or no pepper, nothing is claimed and the miss is logged.
  *      Nothing sends it later: the caller is answered `unconfigured` (an alert records it, a mail
  *      handler returns it as its run's output), and no deploy replays the event that asked for it.
- *   2. An address that is not a plain address is refused and logged; nothing is claimed.
+ *   2. An address that is not a plain address is refused and logged; nothing is claimed. So is any
+ *      address but AGENCY_PLUS_INBOX for an own-inbox kind (`OWN_INBOX_KINDS`): a suppression does
+ *      not stop that kind, so it goes nowhere but our own inbox.
  *   3. The ledger claim, keyed by the caller's idempotency key, before anything is rendered: `done`,
  *      `suppressed` and `exhausted` end here (the last is logged, as a send we gave up on); `busy`
  *      throws `MailRetry`, so the caller's step is retried after the other claim's two-minute lease.
@@ -32,8 +34,9 @@ import { createHash } from 'node:crypto';
 import { hashMailAddress } from './address-hash';
 import { buildOutgoing, HeaderRefused, isPlainAddress } from './headers';
 import type { Claim, MailLedger } from './ledger';
+import { AGENCY_PLUS_INBOX } from './templates/agency-plus-contact';
 import type { MailTransport } from './transport';
-import type { MailKind, RenderedMail } from './types';
+import { OWN_INBOX_KINDS, type MailKind, type RenderedMail } from './types';
 
 export interface MailDeps {
   ledger: MailLedger;
@@ -97,7 +100,7 @@ export async function send(deps: MailDeps, req: SendRequest): Promise<SendOutcom
     });
     return 'unconfigured';
   }
-  if (!isPlainAddress(req.to)) {
+  if (!isPlainAddress(req.to) || (OWN_INBOX_KINDS.has(req.kind) && req.to !== AGENCY_PLUS_INBOX)) {
     deps.log('mail.invalid_address', ref);
     return 'invalid_address';
   }

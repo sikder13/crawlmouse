@@ -6,10 +6,12 @@ import {
   CHECK_FINISHED_EVENT_FN_ID,
   CHECK_NOTIFY_FN_ID,
   CLIENT_REPORT_FN_ID,
+  CONTACT_PURGE_FN_ID,
   createAccountMailFn,
   createCheckFinishedEventFn,
   createCheckNotifyFn,
   createClientReportFn,
+  createContactPurgeFn,
   createFixToDeveloperFn,
   createReportConfirmFn,
   createSeatInviteFn,
@@ -183,6 +185,30 @@ describe('the handlers run in one step, with the event’s ids', () => {
         step: steps().step,
       }),
     ).rejects.toThrow('mail send to be retried');
+  });
+});
+
+describe('CC-29: the Agency Plus request and its deletion', () => {
+  it('the request goes through the account mail function, its data unchanged', async () => {
+    const h = handlers();
+    const data = { template: 'agency_plus_contact', contactId: 'd1' };
+    await handler(createAccountMailFn(() => h))({ event: { data }, step: steps().step });
+    expect(h.accountEmail).toHaveBeenCalledWith(data);
+  });
+
+  it('the deletion runs daily, one at a time, in one step answering the count', async () => {
+    const purge = vi.fn(async () => 3);
+    const fn = createContactPurgeFn(purge);
+    const c = configOf(fn);
+    expect(c).toMatchObject({
+      id: `crawlmouse-${CONTACT_PURGE_FN_ID}`,
+      triggers: [{ cron: '43 5 * * *' }],
+    });
+    expect((c.concurrency as { limit: number }).limit).toBe(1);
+    const { step, ran } = steps();
+    expect(await handler(fn)({ step })).toEqual({ deleted: 3 });
+    expect(ran).toEqual(['purge']);
+    expect(purge).toHaveBeenCalledTimes(1);
   });
 });
 
