@@ -53,7 +53,9 @@ describe('who may import it', () => {
   // the console's actions and the module that builds the sign-in canary's work (questions.md Q11:
   // the inngest package imports nothing of the app, so the canary is handed the function) may call it.
   const ALLOWED = [/^apps\/web\/app\/api\/internal\//, /^apps\/web\/lib\/v2\/ops\/functions\.ts$/];
-  const SPEC = /(?:from\s+|import\s*\(\s*|require\(\s*)['"]([^'"]*ops\/sign-in-link)['"]/g;
+  // Any specifier whose last segment is sign-in-link, so a sibling's './sign-in-link' counts too.
+  const SPEC =
+    /(?:from\s+|import\s*\(\s*|require\(\s*)['"]((?:[^'"]*\/)?sign-in-link(?:\.tsx?)?)['"]/g;
 
   function walk(dir: string, out: string[] = []): string[] {
     for (const entry of readdirSync(dir)) {
@@ -73,6 +75,8 @@ describe('who may import it', () => {
       .filter((f) => [...readFileSync(f, 'utf8').matchAll(SPEC)].length > 0)
       .map((f) => relative(REPO, f));
     expect(importers.filter((f) => !ALLOWED.some((a) => a.test(f)))).toEqual([]);
+    // The canary's wiring imports it by a relative path; the scan must see that import.
+    expect(importers).toContain('apps/web/lib/v2/ops/functions.ts');
   });
 
   it('the scan sees an import in each spelling', () => {
@@ -80,6 +84,8 @@ describe('who may import it', () => {
       "import { requestSignInLink } from '@/lib/v2/ops/sign-in-link';",
       "import { requestSignInLink } from '../../lib/v2/ops/sign-in-link';",
       "const m = await import('../apps/web/lib/v2/ops/sign-in-link');",
+      "import { requestSignInLink } from './sign-in-link';",
+      "import { requestSignInLink } from './sign-in-link.ts';",
     ])
       expect([...src.matchAll(SPEC)].length, src).toBe(1);
   });
