@@ -229,9 +229,7 @@ describe('a sign-up whose mail failed (review C1)', () => {
     await expect(sweep(d)).rejects.toThrow(MailRetry);
     expect(await sweep(d)).toMatchObject({ signups: { sent: 1 } });
     expect(await sweep(d)).toMatchObject({ signups: { done: 1 } });
-    expect(transport.sent.map((m) => m.idempotencyKey)).toEqual([
-      `founder_event:signup:${userId}`,
-    ]);
+    expect(transport.sent.map((m) => m.idempotencyKey)).toEqual([`founder_event:signup:${userId}`]);
   });
 
   it('reads the mail ledger: re-offers a `send` notice whose key is unsent and can still be tried', async () => {
@@ -286,7 +284,9 @@ describe('the sign-up rotation (review C8)', () => {
     expect(await at(3)).toEqual([1, 2]);
     // n = 5 and 2 × 5 = 10 ≡ 0: turn 5 starts where turn 0 did.
     expect(await at(5)).toEqual([0, 1]);
-    await expect(store.unannouncedUsers(since, 2, -1)).rejects.toThrow(/founder_signups_unannounced/);
+    await expect(store.unannouncedUsers(since, 2, -1)).rejects.toThrow(
+      /founder_signups_unannounced/,
+    );
   });
 
   it('a confirmed user behind more than a run’s worth of unconfirmed ones is announced on the next run', async () => {
@@ -302,7 +302,11 @@ describe('the sign-up rotation (review C8)', () => {
     );
     const transport = memoryTransport();
     let clock = now;
-    const d = sweepDeps(() => clock, transport, (u) => u === confirmedUser);
+    const d = sweepDeps(
+      () => clock,
+      transport,
+      (u) => u === confirmedUser,
+    );
     expect((await sweep(d)).signups).toEqual({ unconfirmed: 200 });
     clock = new Date(now.getTime() + 300_000);
     expect((await sweep(d)).signups).toEqual({ unconfirmed: 199, sent: 1 });

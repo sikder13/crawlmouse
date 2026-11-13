@@ -27,9 +27,11 @@ import { founderDigest } from '../mail/templates/founder-digest';
 import {
   founderEvent,
   founderOverflow,
+  STRIPE_INVOICE_STATUSES,
   type FounderAmount,
   type FounderEventInput,
   type FounderEventKind,
+  type StripeInvoiceStatus,
 } from '../mail/templates/founder-event';
 import { digestDue } from './digest-clock';
 import { classifyEntitlement } from './founder-classify';
@@ -59,9 +61,24 @@ export type FounderLogEvent =
   | 'founder.confirmation_unread';
 
 export interface LatestInvoice {
+  /** Stripe's status, as given; null when Stripe gives none. */
+  status: string | null;
   amountPaid: number;
   amountDue: number;
   currency: string;
+}
+
+/**
+ * The amount a notice shows (review C3): `amount_paid` from a paid invoice, else `amount_due` with
+ * the invoice's status, so an invoice Stripe has not charged yet is not shown as a payment of 0.
+ */
+export function amountOf(inv: LatestInvoice): FounderAmount {
+  const status = (STRIPE_INVOICE_STATUSES as readonly (string | null)[]).includes(inv.status)
+    ? (inv.status as StripeInvoiceStatus)
+    : null;
+  return status === 'paid'
+    ? { minor: inv.amountPaid, currency: inv.currency, status }
+    : { minor: inv.amountDue, currency: inv.currency, status };
 }
 
 export interface FounderDeps {
@@ -171,11 +188,7 @@ export async function entitlementNotice(
           if (subscriptionId === null) return null;
           try {
             const inv = await d.latestInvoice(subscriptionId);
-            if (inv === null) return null;
-            return {
-              minor: c.kind === 'payment' ? inv.amountPaid : inv.amountDue,
-              currency: inv.currency,
-            };
+            return inv === null ? null : amountOf(inv);
           } catch {
             return null;
           }

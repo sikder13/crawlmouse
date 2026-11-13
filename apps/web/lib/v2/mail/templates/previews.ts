@@ -139,7 +139,7 @@ const RENDERS: Record<MailPreviewSlug, (opts?: PreviewOptions) => RenderedMail> 
       accountId: ACCOUNT_ID(1),
       plan: 'pro',
       payment: 'first',
-      amount: { minor: 1900, currency: 'usd' },
+      amount: { minor: 1900, currency: 'usd', status: 'paid' },
       host: badHost(),
       ownerEmail: ['owner', 'shop.example'].join('@'),
       occurredAt: '2026-11-13T14:59:00.000Z',

@@ -33,14 +33,19 @@ const serviceClient = (env: Env): SupabaseClient =>
     auth: { persistSession: false },
   });
 
-/** The followed subscription's latest invoice: Stripe's amounts and currency, never a card field. */
+/** The followed subscription's latest invoice: its status, Stripe's amounts and currency, never a card field. */
 async function latestInvoice(env: Env, subscriptionId: string): Promise<LatestInvoice | null> {
   const sub = await stripeAccount(env).subscriptions.retrieve(subscriptionId, {
     expand: ['latest_invoice'],
   });
   const inv = sub.latest_invoice;
   if (inv === null || typeof inv === 'string') return null;
-  return { amountPaid: inv.amount_paid, amountDue: inv.amount_due, currency: inv.currency };
+  return {
+    status: inv.status,
+    amountPaid: inv.amount_paid,
+    amountDue: inv.amount_due,
+    currency: inv.currency,
+  };
 }
 
 export function founderDeps(env: Env): FounderDeps {

@@ -124,7 +124,8 @@ function setup(s: Setup = {}) {
     mail,
     store: notices.store,
     latestInvoice: vi.fn(
-      s.invoice ?? (async () => ({ amountPaid: 1900, amountDue: 1900, currency: 'usd' })),
+      s.invoice ??
+        (async () => ({ status: 'paid', amountPaid: 1900, amountDue: 2500, currency: 'usd' })),
     ),
     confirmed: vi.fn(s.confirmed ?? (async () => true)),
     to: s.to === undefined ? FOUNDER : s.to,
@@ -232,11 +233,28 @@ describe('entitlementNotice', () => {
     await entitlementNotice(none.d, change('pro_trial', 'pro'));
     expect(none.transport.sent[0]!.text).toContain('Amount: not read from Stripe');
     const failed = setup({
-      invoice: async () => ({ amountPaid: 0, amountDue: 19000, currency: 'usd' }),
+      invoice: async () => ({ status: 'open', amountPaid: 0, amountDue: 19000, currency: 'usd' }),
     });
     await entitlementNotice(failed.d, change('pro', 'past_due'));
     expect(failed.transport.sent[0]!.subject).toBe('Payment failed: Pro');
-    expect(failed.transport.sent[0]!.text).toContain('Amount: $190.00');
+    expect(failed.transport.sent[0]!.text).toContain(
+      'Amount: $190.00 due, not yet paid (Stripe invoice status: open)',
+    );
+  });
+
+  it('reads amount_paid only from a paid invoice; an unpaid one is its amount_due, said to be unpaid (review C3)', async () => {
+    const paid = setup();
+    await entitlementNotice(paid.d, change('pro_trial', 'pro'));
+    // amount_paid 1900, amount_due 2500: the paid figure is the one shown.
+    expect(paid.transport.sent[0]!.text).toContain('Amount: $19.00 paid');
+    // A trial's end: Stripe creates the invoice and charges it about an hour later.
+    const pending = setup({
+      invoice: async () => ({ status: 'open', amountPaid: 0, amountDue: 1900, currency: 'usd' }),
+    });
+    await entitlementNotice(pending.d, change('pro_trial', 'pro'));
+    const text = pending.transport.sent[0]!.text;
+    expect(text).toContain('Amount: $19.00 due, not yet paid (Stripe invoice status: open)');
+    expect(text).not.toContain('$0.00');
   });
 
   it('marks an internal account’s notice [TEST]', async () => {

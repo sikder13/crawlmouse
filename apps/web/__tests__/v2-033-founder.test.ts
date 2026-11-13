@@ -527,9 +527,8 @@ describe('claim_founder_notice, held rows', () => {
     for (const k of keys('sendonly-held', LIMIT))
       expect(await claim({ key: k, now: '2032-09-01T10:30:00.000Z' })).toBe('held');
     // The 10:00 sends are out of the hour; the 10:30 held rows are in it, and count for nothing.
-    expect(await claim({ key: keys('sendonly-next', 1)[0]!, now: '2032-09-01T11:00:01.000Z' })).toBe(
-      'send',
-    );
+    expect(
+      await claim({ key: keys('sendonly-next', 1)[0]!, now: '2032-09-01T11:00:01.000Z' }),
+    ).toBe('send');
   });
-
 });
