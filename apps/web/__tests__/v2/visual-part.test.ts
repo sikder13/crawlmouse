@@ -3,7 +3,7 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import { ONCE_SPECS, owner, parsePart } from '../../../../tests/visual/part';
+import { ONCE_SPECS, owner, parsePart, routesNamedIn } from '../../../../tests/visual/part';
 
 // The visual harness splits its preview routes across CI jobs (tests/visual/part.ts, CC-31 Q51):
 // each job's `next dev` compiles only its share. These hold the split to "every path in exactly one
@@ -91,9 +91,58 @@ describe('the owner of a path', () => {
     expect(owner(['/a', '/b'], { k: 2, n: 2 })('/elsewhere?at=1')).toBe(false);
   });
 
+  it('puts a route in `first` in the first share only, a moment with it, and deals the rest', () => {
+    const list = ['/a', '/b', '/c', '/d?x=1', '/d'];
+    const one = owner(list, { k: 1, n: 2 }, ['/b?at=1']);
+    const two = owner(list, { k: 2, n: 2 }, ['/b?at=1']);
+    // Without /b the deal is a, c, d: a and d to the first share, c to the second.
+    expect(list.filter(one)).toEqual(['/a', '/b', '/d?x=1', '/d']);
+    expect(list.filter(two)).toEqual(['/c']);
+  });
+
+  it('keeps every path in exactly one share with routes pinned to the first', () => {
+    fc.assert(
+      fc.property(paths, fc.integer({ min: 1, max: 6 }), fc.nat(), (list, n, seed) => {
+        const first = list.filter((_, i) => (i + seed) % 3 === 0);
+        const owners = Array.from({ length: n }, (_, i) => owner(list, { k: i + 1, n }, first));
+        for (const path of list) {
+          const shares = owners.flatMap((owns, i) => (owns(path) ? [i] : []));
+          expect(shares).toHaveLength(1);
+          if (first.some((f) => route(f) === route(path))) expect(shares).toEqual([0]);
+        }
+      }),
+      { numRuns: 300 },
+    );
+  });
+
   it('owns every path when there is one share', () => {
     const owns = owner(['/a', '/b'], parsePart(undefined));
     expect(['/a', '/b?q', '/z'].every(owns)).toBe(true);
+  });
+});
+
+describe('the routes a spec names', () => {
+  it('reads each quoted preview or mail route once, without its query', () => {
+    const source = [
+      "await page.goto('/v2-preview/screens/crawl?play');",
+      'const a = "/v2-preview/screens/crawl";',
+      'goto(`/v2-preview/screens/crawl/challenged?at=${at}`)',
+      "const m = '/mail-preview/alert';",
+      '// a route in prose, /v2-preview/not-quoted, is not read',
+      "const other = '/api/v2-preview/x';",
+    ].join('\n');
+    expect(routesNamedIn(source)).toEqual([
+      '/v2-preview/screens/crawl',
+      '/v2-preview/screens/crawl/challenged',
+      '/mail-preview/alert',
+    ]);
+  });
+
+  // The routes the motion checks replay, read from the spec itself: the warm-up of the first share
+  // must compile them (part.ts, routesNamedIn).
+  it('finds the crawl screens motion.spec.ts replays', () => {
+    const routes = routesNamedIn(readFileSync(join(VISUAL, 'motion.spec.ts'), 'utf8'));
+    expect(routes).toEqual(expect.arrayContaining(['/v2-preview/screens/crawl']));
   });
 });
 

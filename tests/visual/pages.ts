@@ -1,7 +1,9 @@
 import { expect, type Page } from './pw';
 import { PREVIEWS as REGISTRY } from '../../apps/web/app/(v2-preview)/v2-preview/_preview/registry';
 import { MAIL_PREVIEW_INDEX as MAIL_REGISTRY } from '../../apps/web/lib/v2/mail/templates/preview-index';
-import { owner, parsePart } from './part';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { ONCE_SPECS, owner, parsePart, routesNamedIn } from './part';
 
 /** '/v2-preview/screens/home' -> 'screen-home'; '/v2-preview/button' -> 'button'. */
 export const slugOf = (path: string) =>
@@ -40,6 +42,9 @@ export const PART = parsePart(process.env.VISUAL_PART);
 export const ownsPath = owner(
   [...ALL_PREVIEWS, ...ALL_MAIL_PREVIEWS].map((p) => p.path),
   PART,
+  ONCE_SPECS.flatMap((f) =>
+    routesNamedIn(readFileSync(fileURLToPath(new URL(`./${f}`, import.meta.url)), 'utf8')),
+  ),
 );
 export const PREVIEWS = ALL_PREVIEWS.filter((p) => ownsPath(p.path));
 export const MAIL_PREVIEWS = ALL_MAIL_PREVIEWS.filter((p) => ownsPath(p.path));
