@@ -999,9 +999,21 @@ digit (`gates.test.ts`, "has no digit in its code").
 | `/agency` and `/agency/clients/[siteId]` on an account below Agency                                                    | `agencyGateMessage()`                                                                                                   |
 | the dashboard and `/agency`, after an add was refused because the plan's sites are in use (`?notice=upgrade_required`) | `sitesFullMessage(tier)`: the sites gate below Agency, and on Agency what a site beyond the plan's costs (`EXTRA_SITE`) |
 
-`gates.test.ts` also reads three copy files for a price or a limit written as a digit: the matrix and
-client copy (`lib/v2/copy/agency.ts`), `NOTICE_LINES` (`lib/v2/copy/notices.ts`) and
-`OWN_ACCOUNT_COPY` (`lib/v2/copy/settings-notices.ts`).
+`gates.test.ts` also reads other files for a price or a limit written by hand: a `$` before a digit,
+or a digit before "site", "seat", "client" or "fix". It reads the matrix and client copy
+(`lib/v2/copy/agency.ts`), `NOTICE_LINES` (`lib/v2/copy/notices.ts`), `OWN_ACCOUNT_COPY`
+(`lib/v2/copy/settings-notices.ts`), the words of Seats, client reports and Reports
+(`lib/v2/copy/seats.ts`, `client-reports.ts`, `reports.ts`, each up to its lock corrections), and
+the views that compose a sentence from numbers: `lib/v2/view/seats.ts` (the foot and the buy line),
+`agency-matrix.ts`, `agency-client.ts`, `agency-reports.ts` and `reports.ts`. In those, apart from
+the two Reports files (whose copy says "two checks"), it also fails on a number from two to twelve,
+twenty or thirty spelled out. It does not see a bare digit with neither a `$` nor one of those nouns
+beside it.
+
+`gateMessage('fixes', …)` has no caller: the fix list's and the fix page's Pro lines are locked copy
+(next paragraph), so D10's line for the fix limit is on no screen.
+`grep -rn "gateMessage('fixes'" apps/web/lib apps/web/app apps/web/components | grep -v '\.test\.'`
+prints nothing.
 
 Not moved to `gateMessage` by workstream C, each outside its paths: the dashboard's "Need more?" line
 and its add-site label (`lib/v2/view/dashboard.ts`, which take their numbers from `GATES` and
