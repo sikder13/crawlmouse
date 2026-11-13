@@ -188,7 +188,7 @@ export function groupPoints(fixes: readonly Fix[]): string {
  * points with "estimated" in the unit (FACTS A5), or a dash and why its AI effect waits.
  */
 export function effectOf(
-  f: Pick<Fix, 'type' | 'effect' | 'section' | 'affected_pages'>,
+  f: Pick<Fix, 'type' | 'effect' | 'section' | 'affected_pages' | 'last_state'>,
   siteFixes: readonly Pick<Fix, 'fingerprint' | 'number'>[],
 ): { points: string; unit: string } {
   const h = effectHeadline(f, siteFixes);

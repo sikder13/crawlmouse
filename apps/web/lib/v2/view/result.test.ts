@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import type { Check, FixtureDataset } from '@crawlmouse/types/v2';
+import type { Check, Fix, FixtureDataset } from '@crawlmouse/types/v2';
 import { findCheck, fixture, type FixtureName } from '../fixtures';
 import { CHECKS } from '../recordings';
 import { resultView, type DoorView, type ResultView } from './result';
+import { pagesReadableText } from './effect-headline';
 
 const NO_MAP = { nodes: [], positions: {} };
 
@@ -363,8 +364,10 @@ describe('the tables’ labels', () => {
 
   it('a fix whose Technical SEO effect is not estimated (a refused grade) shows no +0, alone or grouped', () => {
     let section: Record<string, string> = {};
+    let shell: Fix | undefined;
     const v = view('bad-site', (_, d) => {
       section = Object.fromEntries(d.fixes.map((f) => [f.id, f.section]));
+      shell = d.fixes.find((f) => f.type === 'client_rendered_template');
       for (const f of d.fixes) {
         f.effect.ai_readability = null;
         f.effect.ai_readability_pending_on = ['readable_unmeasured'];
@@ -373,12 +376,22 @@ describe('the tables’ labels', () => {
       }
     });
     const rows = v.fixes!.rows;
-    // a structure fix is headed by its Technical SEO effect; the others by their waiting AI effect
+    // a structure fix is headed by its Technical SEO effect, a client-rendered template fix by the
+    // pages it makes readable (CC-32 Q8), the others by their waiting AI effect
+    const pages = pagesReadableText(shell!.affected_pages, shell!.last_state === 'detected');
+    const named = new Set(rows.map((r) => r.key));
     const want = (key: string) =>
-      key === 'rest' || section[key] === 'structure' ? 'SEO not estimated' : 'AI not yet estimated';
-    expect(new Set(rows.map((r) => want(r.key)))).toEqual(
-      new Set(['SEO not estimated', 'AI not yet estimated']),
-    );
+      key === 'rest'
+        ? named.has(shell!.id)
+          ? 'SEO not estimated'
+          : `SEO not estimated; ${pages}`
+        : key === shell!.id
+          ? pages
+          : section[key] === 'structure'
+            ? 'SEO not estimated'
+            : 'AI not yet estimated';
+    expect(new Set(rows.map((r) => want(r.key)))).toContain('SEO not estimated');
+    expect(new Set(rows.map((r) => want(r.key)))).toContain('AI not yet estimated');
     expect(rows.map((r) => r.points)).toEqual(rows.map((r) => want(r.key)));
   });
 });
