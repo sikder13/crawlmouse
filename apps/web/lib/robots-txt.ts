@@ -67,9 +67,10 @@ const DISALLOW = ['/embed/', '/audit/', '/dashboard', '/verify/'];
  * agents. They are low-value to an assistant (a capability URL, an embed iframe, the dashboard)
  * and repeating the disallows would invite a crawler to enumerate them.
  *
- * ⚠ Cloudflare's "managed robots.txt" feature, if ever switched on for this zone, is served AT THE
- * EDGE and OVERRIDES this file entirely — the origin is never asked. Keep it OFF (see
- * docs/OPERATING-RULES.md §12).
+ * ⚠ Cloudflare's robots.txt setting (Bot Preference Sync) prepends its own directives to this file
+ * at the edge when it is on and at least one of the zone's Search, Agent or Training policies blocks.
+ * With every policy on Allow it serves this file unchanged. The zone's settings are in
+ * docs/OPERATING-RULES.md §12.
  */
 export function robotsTxt(): string {
   const wildcard = ['User-Agent: *', 'Allow: /', ...DISALLOW.map((p) => `Disallow: ${p}`)].join('\n');
