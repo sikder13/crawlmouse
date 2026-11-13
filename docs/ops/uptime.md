@@ -108,7 +108,17 @@ Before setting `SIGNIN_CANARY_TO` (questions Q4):
 - **Resend's webhook** stays subscribed to `email.delivered`. If it is not, the canary raises its
   signal on its runs: it fails loud.
 
-Then add a Sentry issue alert on the `signin-canary` message, as for the other signals.
+## The Sentry alerts on the two signals
+
+Two Sentry issue alerts in project `crawlmouse`, each emailing the owner, are created by the CTO after this
+step is merged (owner ruling, 2026-11-13). Each matches the tag value the code sets:
+
+- `signal:signin-canary` — the canary saw no delivery, Auth refused the link, or the canary itself failed
+  (its `stage` tag says which; `apps/web/lib/v2/ops/canary.ts`).
+- `signal:founder-notice-failed` — a founder notice function's run failed past its retries (its
+  `function` tag names it; `apps/web/lib/v2/ops/founder-signal.ts`).
+
+Until they exist, either signal is an issue in Sentry that pages no one.
 
 ### The stored events carry the mail's time (checked)
 
