@@ -52,7 +52,8 @@ two did not (`docs/ops/security-baseline.md`); list what exists before creating 
 ## The sign-in canary
 
 `crawlmouse.ops.signin-canary` (`inngest/signin-canary.ts`), on the cron `*/10 * * * *`, registered when
-`SIGNIN_CANARY_TO` is one plain address and `V2_BILLING` or `V2_CHECKS_PUBLIC` is `1`:
+`SIGNIN_CANARY_TO` is one plain address, whatever the v2 flags (`apps/web/lib/v2/ops/functions.ts`;
+`pnpm --filter @crawlmouse/web exec vitest run lib/v2/ops/functions.test.ts`):
 
 1. asks Supabase Auth for a sign-in link to that address (`requestSignInLink`, with
    `shouldCreateUser: false`, so the address must be an existing user);
