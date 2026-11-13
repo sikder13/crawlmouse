@@ -15,6 +15,7 @@ import {
 import { fixture } from '../fixtures';
 import type { Viewer } from './account';
 import { agencyClientView, type ClientView } from './agency-client';
+import { agencyReportsView } from './agency-reports';
 import { siteView } from './site';
 
 const d = fixture('challenged-site');
@@ -147,10 +148,37 @@ describe('the client page', () => {
       client(d, { ...northwind, seatId }, GRANITEPEAK_SITE).client.rows.map(
         (r) => r.change?.href ?? null,
       );
-    expect(changes(ALEX)).toEqual(['/agency/reports', '/agency/reports', '/seats']);
-    // An account manager edits and sends client reports; seats are the owner's.
-    expect(changes(PRIYA_SEAT)).toEqual(['/agency/reports', '/agency/reports', null]);
+    // The contact, the report and the owning seat are each changed on the client's card on the
+    // client reports screen, by a seat that may schedule reports (`set_client`, `set_schedule`).
+    const card = `/agency/reports?client=${GRANITEPEAK_SITE}#change`;
+    expect(changes(ALEX)).toEqual([card, card, card]);
+    expect(changes(PRIYA_SEAT)).toEqual([card, card, card]);
     expect(changes(LEE)).toEqual([null, null, null]);
+    // The route each link names is the page's, without the client.
+    expect(
+      client(d, northwind, GRANITEPEAK_SITE).client.rows.map((r) => [
+        r.change?.route,
+        r.change?.method,
+        r.change?.context,
+      ]),
+    ).toEqual([
+      ['/agency/reports', 'get', 'Contact'],
+      ['/agency/reports', 'get', 'Report'],
+      ['/agency/reports', 'get', 'Seat'],
+    ]);
+  });
+
+  it('the card a Change link opens is the one the client reports screen draws for that client', () => {
+    const href = client(d, northwind, GRANITEPEAK_SITE).client.rows[0]!.change!.href;
+    const to = new URL(href, 'https://crawlmouse.com');
+    const page = agencyReportsView(
+      d,
+      northwind,
+      { client: to.searchParams.get('client')! },
+      to.pathname,
+    );
+    if (page.kind !== 'reports') throw new Error(page.kind);
+    expect(page.change).toMatchObject({ id: to.hash.slice(1), host: 'granitepeak.example' });
   });
 
   it('sits under Clients on the agency rail', () => {

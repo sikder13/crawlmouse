@@ -120,8 +120,12 @@ describe('the client page against Final-Ag-Client', () => {
 
   it('links the client’s settings to where they are changed, and the grades to the site page', () => {
     const hrefs = [...main(html).matchAll(/<a [^>]*href="([^"]+)"/g)].map((m) => m[1]);
-    expect(hrefs.filter((h) => h === '/agency/reports')).toHaveLength(2);
-    expect(hrefs).toContain('/seats');
+    expect(
+      hrefs.filter(
+        (h) => h === '/agency/reports?client=50000000-0000-4000-8000-0000000000c9#change',
+      ),
+    ).toHaveLength(3);
+    expect(hrefs).not.toContain('/seats');
     expect(hrefs).toContain('/sites/50000000-0000-4000-8000-0000000000c9');
   });
 
@@ -362,7 +366,7 @@ describe('client reports, a client in each state', () => {
       { method: 'post', action: `${site('ca')}/confirm`, fields: {} },
       { method: 'post', action: `${site('f4')}/confirm`, fields: {} },
     ]);
-    expect(rowOf('cedarpoint.example').textContent).toContain('Resume');
+    expect(rowOf('cedarpoint.example').textContent).toContain('Ask to confirm again');
     expect(rowOf('harborlight.example').textContent).toContain('Ask again');
     expect(rowOf('redbird.example').textContent).toContain('Ask to confirm');
   });

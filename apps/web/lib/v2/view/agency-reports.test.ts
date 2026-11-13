@@ -354,7 +354,7 @@ describe('what a seat that may schedule reports is offered', () => {
     ]);
   });
 
-  it('asks for the first time where no confirmation was sent, and resumes a paused schedule', () => {
+  it('asks for the first time where no confirmation was sent, and asks a contact who paused to confirm again', () => {
     const never = reports(d, northwind, {}, sideOf({}));
     expect(row(never, GRANITEPEAK_SITE).actions[0]).toMatchObject({
       label: 'Ask to confirm',
@@ -364,9 +364,13 @@ describe('what a seat that may schedule reports is offered', () => {
       client_report: { ...weekly, paused_by_recipient_at: '2026-11-01T09:00:00Z' },
     });
     expect(row(reports(paused, northwind, {}, side), GRANITEPEAK_SITE).actions).toMatchObject([
-      { label: 'Resume', ...posts(api(GRANITEPEAK_SITE, '/resume')) },
+      { label: 'Ask to confirm again', ...posts(api(GRANITEPEAK_SITE, '/resume')) },
       { label: 'Change' },
     ]);
+    // The card says what a pause means: the reports start again when the contact confirms again.
+    expect(reports(paused, northwind, {}, side).clients.sub).toBe(
+      'A report goes to a client’s contact once the contact has confirmed. The pause link in a report stops them, and they start again only when the contact confirms again.',
+    );
   });
 
   it('offers no ask where there is nothing to confirm: no schedule, or no contact', () => {
@@ -495,6 +499,31 @@ describe('what a seat that may schedule reports is offered', () => {
     ).toEqual(['', ALEX, PRIYA]);
   });
 
+  it('leaves the owning seat out of the form when that seat no longer covers the client, so a save does not clear it', () => {
+    // Priya owns granitepeak.example; her seat is narrowed to the other client, which leaves
+    // `sites.owner_seat_id` as it is (`change_seat`). She is then not one of the seats the field
+    // offers, and a select whose value is not an option posts its first one, "none".
+    const narrowed = edit((x) => ({
+      seats: x.seats.map((s) => (s.id === PRIYA ? { ...s, client_scope: [HARBORLIGHT_SITE] } : s)),
+    }));
+    expect(narrowed.sites.find((s) => s.id === GRANITEPEAK_SITE)!.owner_seat_id).toBe(PRIYA);
+    const view = reports(narrowed, northwind, { client: GRANITEPEAK_SITE });
+    expect(view.change!.client.seats).toBeNull();
+    // The row still names the seat that owns the client.
+    expect(row(view, GRANITEPEAK_SITE).seat).toBe('Priya (account manager)');
+    // While the owning seat covers the client, or the client has none, the field is offered.
+    const offered = (data: FixtureDataset) =>
+      reports(data, northwind, { client: GRANITEPEAK_SITE }).change!.client.seats!.map(
+        (o) => o.value,
+      );
+    expect(offered(d)).toEqual(['', ALEX, PRIYA, LEE]);
+    expect(offered(siteAs(GRANITEPEAK_SITE, { owner_seat_id: null }, narrowed))).toEqual([
+      '',
+      ALEX,
+      LEE,
+    ]);
+  });
+
   it('leaves the owning seat out of the form when the reader’s records do not hold it', () => {
     // Posted, the field would replace a seat the reader cannot see with one they can.
     const hidden = edit((x) => ({ seats: x.seats.filter((s) => s.id !== PRIYA) }));
@@ -575,6 +604,53 @@ describe('an account in its Agency trial', () => {
 
   it('no other account is told it', () => {
     expect(reports(d, northwind).trialNote).toBeNull();
+  });
+
+  // Kestrel's one client, with a schedule; the account's address is its owner's (Jo's).
+  const scheduled = (contact: string) =>
+    siteAs(PINECREST, { client_contact_email: contact, client_report: weekly });
+  const owners = d.accounts.find((a) => a.id === KESTREL_ACCOUNT_ID)!.email;
+  const labels = (view: ClientReportsView) => row(view, PINECREST).actions.map((a) => a.label);
+
+  it('a contact that is not the owner’s own address is offered no ask, and its row says when it is asked', () => {
+    expect(owners).toBe('jo@kestrel-creative.example');
+    for (const sideOfIt of [
+      sideOf({}),
+      sideOf({ [PINECREST]: { confirmSentAt: '2026-11-02T11:58:00Z' } }),
+    ]) {
+      const view = reports(scheduled('client@pinecrest.example'), kestrel, {}, sideOfIt);
+      expect(row(view, PINECREST).contact).toEqual({
+        address: 'client@pinecrest.example',
+        state: 'trial',
+        label: 'asked to confirm once the trial has become the plan',
+      });
+      expect(labels(view)).toEqual(['Change']);
+    }
+  });
+
+  it('the owner’s own address is asked as on any account, whatever its capitals', () => {
+    for (const contact of [owners, 'Jo@Kestrel-Creative.example']) {
+      const view = reports(scheduled(contact), kestrel, {}, sideOf({}));
+      expect(row(view, PINECREST).contact.state).toBe('not_asked');
+      expect(labels(view)).toEqual(['Ask to confirm', 'Change']);
+    }
+    const asked = reports(
+      scheduled(owners),
+      kestrel,
+      {},
+      sideOf({ [PINECREST]: { confirmSentAt: '2026-11-02T11:58:00Z' } }),
+    );
+    expect(labels(asked)).toEqual(['Ask again', 'Change']);
+  });
+
+  it('the same outside contact on the plan is offered the ask', () => {
+    const paid = siteAs(GRANITEPEAK_SITE, { client_contact_email: 'client@pinecrest.example' });
+    const view = reports(paid, northwind, {}, sideOf({}));
+    expect(row(view, GRANITEPEAK_SITE).contact.state).toBe('not_asked');
+    expect(row(view, GRANITEPEAK_SITE).actions.map((a) => a.label)).toEqual([
+      'Ask to confirm',
+      'Change',
+    ]);
   });
 });
 

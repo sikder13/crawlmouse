@@ -451,8 +451,12 @@ manager whose seat covers every client and one whose seat covers some, and the l
 host and the site page's own line and actions; the two grades with their moves, without the parts
 under each; the fixes still to do (open, open again, or not verified) as the site page's rows, with
 their effects and packet links; and "This client": the contact, the report schedule and the owning
-seat. Each of those rows links to where it is changed, `/agency/reports` for the owner and an account
-manager and `/seats` for the owner.
+seat. For a seat that may schedule reports (the owner and an account manager) each of the three rows
+has "Change", a link to that client's card on the client reports screen
+(`/agency/reports?client=<site id>#change`), where the contact, the schedule and the owning seat are
+changed (`set_client`, `set_schedule`). `/seats` changes a seat's role and scope, not which seat
+owns a client, so no row links there.
+`pnpm --filter @crawlmouse/web exec vitest run lib/v2/view/agency-client.test.ts -t 'Change link|each change'`.
 
 It is a 404 for a malformed id, a site that does not exist, a removed one, a staging copy, and a site
 the caller's seat does not cover. A client with no result yet is shown as the site page's first-check

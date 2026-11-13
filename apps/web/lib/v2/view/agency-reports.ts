@@ -84,12 +84,12 @@ export interface ClientReportsReader {
   accounts?: readonly SwitcherAccount[];
 }
 
-export type ContactState = 'none' | 'not_asked' | 'asked' | 'confirmed' | 'paused';
+export type ContactState = 'none' | 'not_asked' | 'asked' | 'confirmed' | 'paused' | 'trial';
 
 export interface ContactView {
   address: string | null;
   state: ContactState;
-  /** "confirmed", "asked to confirm Sat 31 Oct", "no contact". */
+  /** "confirmed", "asked to confirm Sat 31 Oct", "no contact"; in the Agency trial, when it is asked. */
   label: string;
 }
 
@@ -106,7 +106,7 @@ export interface ClientReportRowView {
   /** "Mon 9 Nov 08:00 America/Denver": the schedule's own clock, with its zone. */
   nextRun: string;
   seat: string;
-  /** For a reader who may schedule: the ask or the resume its state calls for, then Change. */
+  /** For a reader who may schedule: the ask its state calls for, where one is sent, then Change. */
   actions: ActionView[];
 }
 
@@ -126,7 +126,10 @@ export interface ClientChangeView {
     name: string;
     email: string;
     seat: string;
-    /** Null when the client's owning seat is one the reader's records do not hold. */
+    /**
+     * Null when the client's owning seat is not one the field can offer: the reader's records do
+     * not hold it, or it no longer covers the client.
+     */
     seats: Option[] | null;
   };
   schedule: {
@@ -237,13 +240,35 @@ function scheduleCounts(clients: readonly Site[]): string[] {
   ];
 }
 
-function contactOf(s: Site, side: ScheduleSide | undefined, zone: string): ContactView {
+/**
+ * Whether the account's Agency trial keeps mail from this client's contact: in the trial a report,
+ * and the confirmation before it, go to the account owner's own address and to no other
+ * (`due_report_schedules` and `issue_recipient_confirmation`, which compare the two in lower case).
+ * The owner's address is the account's (`Account.email`, the owner's `users.email`).
+ */
+function heldByTrial(v: AccountView, s: Site): boolean {
+  const contact = s.client_contact_email;
+  return (
+    v.account.state === 'agency_trial' &&
+    contact !== null &&
+    contact.toLowerCase() !== v.account.email.toLowerCase()
+  );
+}
+
+function contactOf(
+  s: Site,
+  side: ScheduleSide | undefined,
+  zone: string,
+  held: boolean,
+): ContactView {
   const address = s.client_contact_email;
   const as = (state: ContactState, label: string): ContactView => ({ address, state, label });
   if (address === null) return as('none', COPY.contact.none);
   const schedule = s.client_report;
   // The confirmation is the schedule's: a client with no schedule has none.
   if (schedule === null) return as('not_asked', COPY.contact.notAsked);
+  // Nothing was mailed to it and nothing will be while the trial runs, whatever was asked for.
+  if (held) return as('trial', COPY.contact.trial);
   if (schedule.paused_by_recipient_at !== null) return as('paused', COPY.contact.paused);
   if (side?.confirmedAt) return as('confirmed', COPY.contact.confirmed);
   if (side?.confirmSentAt)
@@ -305,7 +330,10 @@ function zoneOptions(current: string): Option[] {
   return names.map((z) => ({ value: z, label: z }));
 }
 
-const changeHref = (base: string, s: Site) => `${base}?client=${s.id}#${CHANGE_ANCHOR}`;
+/** The page with one client's card open, where its contact, schedule and owning seat are changed. */
+export const clientCardHref = (base: string, siteId: string) =>
+  `${base}?client=${siteId}#${CHANGE_ANCHOR}`;
+const changeHref = (base: string, s: Site) => clientCardHref(base, s.id);
 
 /**
  * Of `reports`, the client reports that were sent: how many there are, and the newest SENT_SHOWN,
@@ -322,9 +350,10 @@ export function shownSent(reports: readonly Report[]): { shown: Report[]; total:
 
 function rowActions(s: Site, contact: ContactView, base: string): ActionView[] {
   return [
-    ...(contact.state === 'paused' ? [post('resume', COPY.resume, s)] : []),
+    ...(contact.state === 'paused' ? [post('resume', COPY.askAfterPause, s)] : []),
     // With no schedule, or a contact that has confirmed, the confirm route has nothing to ask
-    // (`resendConfirmation`, lib/v2/agency/schedules.ts).
+    // (`resendConfirmation`, lib/v2/agency/schedules.ts). A contact the Agency trial keeps mail
+    // from (`trial`) is in neither state here, so it is offered no ask.
     ...(s.client_report !== null && (contact.state === 'asked' || contact.state === 'not_asked')
       ? [post('confirm', contact.state === 'asked' ? COPY.askAgain : COPY.askToConfirm, s)]
       : []),
@@ -337,7 +366,11 @@ function changeOf(v: AccountView, s: Site): ClientChangeView {
   const F = COPY.form;
   const seats = owningSeats(v, s);
   const zone = r?.timezone ?? v.account.timezone;
-  const ownerShown = s.owner_seat_id === null || v.d.seats.some((x) => x.id === s.owner_seat_id);
+  // The field is a select: one whose value is not among its options shows its first, "none", and a
+  // save would post that. So it is drawn when the client has no owning seat, or its owning seat is
+  // one of the options: a seat the reader's records hold, accepted, that still covers the client.
+  const ownerOffered =
+    s.owner_seat_id === null || seats.some((option) => option.value === s.owner_seat_id);
   return {
     id: CHANGE_ANCHOR,
     title: F.title(s.client_name?.trim() || s.host),
@@ -349,7 +382,7 @@ function changeOf(v: AccountView, s: Site): ClientChangeView {
       email: s.client_contact_email ?? '',
       seat: s.owner_seat_id ?? '',
       // Left out, the field is not posted and `set_client` leaves the owning seat as it is.
-      seats: ownerShown ? [{ value: '', label: F.noSeat }, ...seats] : null,
+      seats: ownerOffered ? [{ value: '', label: F.noSeat }, ...seats] : null,
     },
     schedule: {
       action: pathOf('schedule', s.id),
@@ -416,7 +449,7 @@ function reportsView(
       title: COPY.clientsTitle(clients.length),
       sub: COPY.clientsSub,
       rows: clients.map((s) => {
-        const contact = contactOf(s, side.schedules?.get(s.id), zone);
+        const contact = contactOf(s, side.schedules?.get(s.id), zone, heldByTrial(v, s));
         return {
           key: s.id,
           client: s.client_name?.trim() || null,

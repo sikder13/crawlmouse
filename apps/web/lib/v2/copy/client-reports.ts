@@ -19,8 +19,8 @@ export const CLIENT_REPORTS_COPY = {
   /** The header's action, for a client that has no schedule. */
   scheduleFor: (host: string) => `Schedule a report for ${host}`,
   /**
-   * Said once on the page of an account in its Agency trial: rule 4 of a schedule's run
-   * (`skipReason`, lib/v2/agency/schedules-run.ts), which
+   * Said once on the page of an account in its Agency trial: the trial rule of a schedule's run,
+   * the third thing it decides (`skipReason`, lib/v2/agency/schedules-run.ts), which
    * `pnpm --filter @crawlmouse/web exec vitest run lib/v2/agency/schedules-run.test.ts` holds.
    */
   trialNote:
@@ -28,7 +28,7 @@ export const CLIENT_REPORTS_COPY = {
 
   clientsTitle: (n: number) => `Clients · ${count(n)}`,
   clientsSub:
-    'A report goes to a client’s contact once the contact has confirmed. The pause link in a report stops them until you resume.',
+    'A report goes to a client’s contact once the contact has confirmed. The pause link in a report stops them, and they start again only when the contact confirms again.',
   clientsLabel: 'Client report schedules',
   columns: {
     client: 'Client',
@@ -44,6 +44,8 @@ export const CLIENT_REPORTS_COPY = {
     asked: (date: string) => `asked to confirm ${date}`,
     confirmed: 'confirmed',
     paused: 'paused by the recipient',
+    /** In the Agency trial, a contact that is not the account owner's own address: nothing is mailed to it. */
+    trial: 'asked to confirm once the trial has become the plan',
   },
   /** "Mon 9 Nov 08:00 America/Denver": the run's clock time in the schedule's own zone, and the zone. */
   nextRun: (when: string, zone: string) => `${when} ${zone}`,
@@ -52,7 +54,8 @@ export const CLIENT_REPORTS_COPY = {
   change: 'Change',
   askToConfirm: 'Ask to confirm',
   askAgain: 'Ask again',
-  resume: 'Resume',
+  /** For a schedule its recipient paused: posts to the resume route, which asks the contact again. */
+  askAfterPause: 'Ask to confirm again',
 
   form: {
     /** The card's title: the client the forms change. */
@@ -145,7 +148,7 @@ export const CLIENT_REPORTS_CHANGES: CopyChange[] = [
     kind: 'ruling',
     locked: '9 weekly and, because Mon 2 Nov is the first Monday, the 3 monthly ones too',
     rendered:
-      'A report goes to a client’s contact once the contact has confirmed. The pause link in a report stops them until you resume.',
+      'A report goes to a client’s contact once the contact has confirmed. The pause link in a report stops them, and they start again only when the contact confirms again.',
     source:
       'CC-31 brief, workstream R §1: each row gives the contact’s state, so the card says what the states mean (the double opt-in and the recipient’s pause, docs/specs/v2/31-agency.md §10); the artboard’s line describes one day’s batch, which the table no longer is',
   },
@@ -249,8 +252,9 @@ export const CLIENT_REPORTS_CHANGES: CopyChange[] = [
 export const CLIENT_REPORTS_ADDITIONS: Addition[] = [
   {
     screen: 'agency-reports',
-    what: 'For a seat that may schedule reports: each row’s “Change”, “Ask to confirm” or “Ask again” while the contact has not confirmed, and “Resume” while the recipient has paused',
-    source: 'CC-31 D8; brief, workstream R §1',
+    what: 'For a seat that may schedule reports: each row’s “Change”, “Ask to confirm” or “Ask again” while the contact has not confirmed, and “Ask to confirm again” while the recipient has paused. In the Agency trial a contact that is not the owner’s own address has neither ask, and its row says it is asked once the trial has become the plan',
+    source:
+      'CC-31 D8; brief, workstream R §1; owner ruling of 2026-11-12: a schedule its recipient paused starts again only when the contact confirms again',
   },
   {
     screen: 'agency-reports',
@@ -260,7 +264,8 @@ export const CLIENT_REPORTS_ADDITIONS: Addition[] = [
   {
     screen: 'agency-reports',
     what: 'The header’s “Schedule a report for <host>”, while a client has no schedule; and, on an account in its Agency trial, one line saying where a report is sent during the trial',
-    source: 'CC-31 brief, workstream R §1; docs/specs/v2/31-agency.md §10, “Sending”, rule 4',
+    source:
+      'CC-31 brief, workstream R §1; docs/specs/v2/31-agency.md §10, “Sending”: the trial rule, third in its list',
   },
   {
     screen: 'agency-reports',
