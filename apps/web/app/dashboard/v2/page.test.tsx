@@ -123,9 +123,18 @@ describe('/dashboard/v2', () => {
     h.viewer = viewerOn(BAD, bad.seats[0]!.id, 'America/Indiana/Indianapolis');
     h.dataset = bad;
     h.nextAt = '2026-11-13T11:37:00.000Z';
-    const el = (await render()).props as unknown as {
-      children: ReactElement<{ data: { header: { line: string } } }>;
-    };
+    // The page reads the clock (`new Date()`): held before the next check, so the test does not
+    // expire once that moment has passed.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-11-13T09:00:00.000Z'));
+    const el = await render()
+      .then(
+        (r) =>
+          r.props as unknown as {
+            children: ReactElement<{ data: { header: { line: string } } }>;
+          },
+      )
+      .finally(() => vi.useRealTimers());
     expect(h.nextRead).toEqual([bad.sites.map((s) => s.id)]);
     expect(el.children.props.data.header.line).toContain('next check Fri 13 Nov around 06:37');
   });
