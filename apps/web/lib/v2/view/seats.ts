@@ -73,7 +73,7 @@ export interface SeatRowView {
   /** Under the name; null when the name is the address. */
   email: string | null;
   role: string;
-  /** "all 12", or "7 · a.example, b.example, …". */
+  /** "all 12", "all clients" for a reader whose seat covers some, or "7 · a.example, b.example, …". */
   clients: string;
   alerts: string;
   /** An invitation not yet accepted. */
@@ -147,9 +147,17 @@ function fields(sites: readonly Site[], role: string, scope: Seat['client_scope'
  * "all 12", or the count and the first two hosts of the clients a scoped seat covers. The clients
  * counted and named are the account's live ones: a removed site stays in the seat's scope rows and
  * is not a client the seat covers, so a seat whose clients were all removed reads "none".
+ *
+ * `sites` is what the reader's records hold. For a reader whose own seat covers some clients
+ * (`partial`) that is their clients and not the account's, so a seat that covers every client reads
+ * "all clients", with no count.
  */
-function clientsCell(scope: Seat['client_scope'], sites: readonly Site[]): string {
-  if (scope === 'all') return `all ${count(sites.length)}`;
+function clientsCell(
+  scope: Seat['client_scope'],
+  sites: readonly Site[],
+  partial: boolean,
+): string {
+  if (scope === 'all') return COPY.everyClientCell(partial ? null : sites.length);
   const covered = sites.filter((s) => scope.includes(s.id)).map((s) => s.host);
   if (covered.length === 0) return COPY.noClients;
   const [first, second, ...more] = covered;
@@ -207,7 +215,7 @@ export function seatsView(
       person,
       email: person === s.email ? null : s.email,
       role: COPY.roleLine[s.role],
-      clients: clientsCell(s.client_scope, sites),
+      clients: clientsCell(s.client_scope, sites, partial),
       alerts: s.alert_channels.map((c) => COPY.channel[c]).join(', ') || COPY.noAlerts,
       invited,
       change:

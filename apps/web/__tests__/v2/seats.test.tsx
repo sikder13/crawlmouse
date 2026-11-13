@@ -252,6 +252,25 @@ describe('seatsView: a reader whose seat covers some clients', () => {
     expect(`${v.header.line} ${v.people.title}`).not.toMatch(/\d/);
     expect([v.header.invite, v.invite, v.buy]).toEqual([null, null, null]);
   });
+
+  it('is told the owner covers all clients, with no count: the reader’s records hold their own clients alone', () => {
+    const p = SEATS_PREVIEWS[OWNER];
+    const d = p.data();
+    const sam = d.seats.find((s) => s.name === 'Sam')!;
+    expect(sam.client_scope).toHaveLength(1);
+    // What Sam's session reads of Northwind's two clients (spec 31 §4): the one his seat covers.
+    const read = { ...d, sites: d.sites.filter((s) => sam.client_scope.includes(s.id)) };
+    expect(d.sites.filter((s) => s.account_id === sam.account_id)).toHaveLength(2);
+    const cells = (v: ReturnType<typeof seatsView>) =>
+      v.people.rows.map((r) => [r.person, r.clients]);
+    expect(cells(seatsView(read, { ...p.viewer(), seatId: sam.id }))).toEqual([
+      ['Alex', 'all clients'],
+      ['You, Sam', '1 · harborlight.example'],
+    ]);
+    // A reader whose seat covers every client reads every client, and is given the count.
+    expect(cells(seatsView(d, p.viewer()))[0]).toEqual(['You, Alex', 'all 2']);
+    expect(cells(seatsPreview(MEMBER))[0]).toEqual(['Alex', 'all 2']);
+  });
 });
 
 describe('the screens, as their previews render them', () => {

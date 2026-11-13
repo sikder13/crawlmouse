@@ -206,7 +206,7 @@ describe('the clients', () => {
     const mine = reports(scoped, as(PRIYA), {}, side);
     expect(mine.clients.rows.map((r) => r.host)).toEqual(['granitepeak.example']);
     expect(JSON.stringify(mine)).not.toContain('harborlight.example');
-    expect(mine.header.line).toBe('1 weekly');
+    expect(mine.header.line).toBe('1 weekly, of the client sites in your seat');
   });
 
   it('says where the contact stands: confirmed, asked, not asked, paused, or none', () => {
@@ -625,6 +625,33 @@ describe('the reports sent', () => {
       rows: [],
       empty: 'No report has been sent to a client yet.',
     });
+  });
+
+  it('a seat that covers some clients is told of its own clients, not of the account: what it reads is theirs alone', () => {
+    // Sam's seat covers harborlight.example; the one report Northwind sent went to
+    // granitepeak.example, which his session does not read (spec 31 §4).
+    const sam = d.seats.find((s) => s.id === SAM)!;
+    expect(sam.client_scope).toEqual([HARBORLIGHT_SITE]);
+    expect(first.site_id).toBe(GRANITEPEAK_SITE);
+    const read = edit((x) => ({
+      sites: x.sites.filter((s) => s.id === HARBORLIGHT_SITE),
+      reports: x.reports.filter((r) => r.site_id === HARBORLIGHT_SITE),
+    }));
+    const view = reports(read, as(SAM));
+    expect(view.sent).toMatchObject({
+      rows: [],
+      empty: 'No report has been sent to a client in your seat yet.',
+    });
+    expect(view.header.line).toBe('1 monthly, of the client sites in your seat');
+    // The owner, and a manager whose seat covers every client, read the account's.
+    const all = edit((x) => ({ reports: x.reports.filter((r) => r.id !== SENT_REPORT) }));
+    expect(reports(all, northwind).sent.empty).toBe('No report has been sent to a client yet.');
+    expect(reports(d, northwind).header.line).toBe('1 weekly, 1 monthly');
+    const unscoped = {
+      ...all,
+      seats: all.seats.map((x) => (x.id === SAM ? { ...x, client_scope: 'all' as const } : x)),
+    };
+    expect(reports(unscoped, as(SAM)).sent.empty).toBe('No report has been sent to a client yet.');
   });
 
   it('does not list a report of another kind, whatever its status', () => {

@@ -223,7 +223,17 @@ describe('the matrix, adding a client', () => {
     ]);
     // Billing off: /seats draws no buy form, so there is nothing to link.
     expect(actions(full, northwind, false)).toEqual([]);
-    // A seat that is not the owner's may not buy.
+    // A seat that is not the owner's may not buy: an account manager whose seat covers every
+    // client, so that the scope is the owner's and the role alone differs; then one whose seat
+    // covers some.
+    const unscoped = seatAs(PRIYA_SEAT, { client_scope: 'all' });
+    const fullUnscoped = { ...full, seats: unscoped.seats };
+    const priya = fullUnscoped.seats.find((s) => s.id === PRIYA_SEAT)!;
+    expect([priya.role, priya.client_scope]).toEqual(['account_manager', 'all']);
+    expect(actions(fullUnscoped, { ...northwind, seatId: PRIYA_SEAT }, true)).toEqual([]);
+    expect(actions(fullUnscoped, northwind, true)).toEqual([
+      ['Add sites to the plan', '/seats#buy', 'get'],
+    ]);
     expect(actions(full, { ...northwind, seatId: PRIYA_SEAT }, true)).toEqual([]);
     // Below the limit the header's action is the add form, not the link.
     expect(actions(d, northwind, true).map((a) => a[1])).not.toContain('/seats#buy');
@@ -316,10 +326,27 @@ describe('the matrix, first run: the next step is the first not done', () => {
       step: 'report',
       action: { href: '/agency/reports', method: 'get', primary: true },
     });
-    expect(step(nothingSent, { ...northwind, seatId: PRIYA_SEAT })?.step).toBe('report');
+    expect(
+      step(
+        { ...nothingSent, seats: seatAs(PRIYA_SEAT, { client_scope: 'all' }).seats },
+        { ...northwind, seatId: PRIYA_SEAT },
+      )?.step,
+    ).toBe('report');
     // A developer may neither invite nor send a client report (the Guard column).
     expect(step(nothingSent, { ...northwind, seatId: LEE })).toBeNull();
     expect(step(oneSeat, { ...northwind, seatId: ALEX })?.step).toBe('invite');
+  });
+
+  it('a seat that covers some clients is not asked to send the first report: its records cannot say none was sent', () => {
+    // Priya's seat covers one of Northwind's two clients, and an account manager may schedule a
+    // report. Her read holds no report sent to the client outside her seat.
+    const priya = d.seats.find((s) => s.id === PRIYA_SEAT)!;
+    expect([priya.role, priya.client_scope]).toEqual(['account_manager', [GRANITEPEAK_SITE]]);
+    const asPriya = { ...northwind, seatId: PRIYA_SEAT };
+    expect(step(nothingSent, asPriya)).toBeNull();
+    const told = agencyHomeView(d, asPriya, { reportSent: false });
+    if (told.kind !== 'matrix') throw new Error(told.kind);
+    expect(told.next).toBeNull();
   });
 
   it('takes the page’s word for whether a report was sent over the dataset’s, which a live page’s records leave empty', () => {

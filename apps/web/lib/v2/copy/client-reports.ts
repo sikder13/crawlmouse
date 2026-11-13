@@ -12,6 +12,8 @@ export const CLIENT_REPORTS_COPY = {
   /** One part of the header's line: "2 weekly". The cadence is the schedule's own word. */
   cadenceCount: (n: number, cadence: string) => `${count(n)} ${cadence}`,
   unscheduledCount: (n: number) => `${count(n)} not scheduled`,
+  /** The header's line for a seat that covers some clients: the count is of its own clients. */
+  inSeat: (line: string) => `${line}, of the client sites in your seat`,
   noClients: 'No client site yet',
   noClientsInSeat: 'No client site is in your seat yet',
   /** The header's action, for a client that has no schedule. */
@@ -84,6 +86,8 @@ export const CLIENT_REPORTS_COPY = {
   sentLabel: 'Sent reports',
   sentColumns: { sent: 'Sent', client: 'Client', to: 'To', actions: 'Actions' },
   sentEmpty: 'No report has been sent to a client yet.',
+  /** For a seat that covers some clients, whose records hold no report sent to another client. */
+  sentEmptyInSeat: 'No report has been sent to a client in your seat yet.',
   open: 'Open',
 } as const;
 

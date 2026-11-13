@@ -144,9 +144,10 @@ export interface AgencyReader {
    */
   billing?: boolean;
   /**
-   * Whether the account has sent a client report, as the page's own read found: the records a
-   * page reads (`loadAccountDataset`) hold no client report. Left out (a preview), the dataset's
-   * own reports say.
+   * Whether a client report was sent, as the page's own read found: the records a page reads
+   * (`loadAccountDataset`) hold no client report. Left out (a preview), the dataset's own reports
+   * say. The read is the reader's, so it speaks for the account where their seat covers every
+   * client; the matrix asks it of no other seat (`nextStep`).
    */
   reportSent?: boolean;
 }
@@ -229,12 +230,17 @@ function stripOf(rows: readonly ClientRowView[], compared: number): MatrixStripV
 /**
  * Setup's next step, in order, the first that is not done and that the reader's seat may do: add a
  * client; run the first check of a client that has none; invite a colleague; send a first report.
+ *
+ * `sent` is read from the reader's own records, which for a seat that covers some clients
+ * (`scoped`) hold no report sent to a client outside it: such a seat is not shown the report step,
+ * which says of the account that none was sent.
  */
 function nextStep(
   v: AccountView,
   rows: readonly ClientRowView[],
   adds: boolean,
   sent: boolean,
+  scoped: boolean,
 ): NextStepView | null {
   const role = readerRole(v);
   const S = COPY.steps;
@@ -260,7 +266,7 @@ function nextStep(
       action: { ...link('/seats', S.inviteAction), primary: true },
     };
   }
-  if (v.d.seats.length > 1 && !sent && roleMay(role, 'schedule_report')) {
+  if (v.d.seats.length > 1 && !sent && !scoped && roleMay(role, 'schedule_report')) {
     return {
       step: 'report',
       title: S.reportTitle,
@@ -318,6 +324,7 @@ function matrixView(
     rows,
     adds,
     reportSent ?? v.d.reports.some((r) => r.kind === 'client_report' && r.status === 'sent'),
+    scoped,
   );
   const role = readerRole(v);
   /** At the plan's limit, a reader who may buy is shown the way to the buy form (`/seats`). */

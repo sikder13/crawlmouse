@@ -4,7 +4,8 @@
  * next run and its owning seat; then the client reports that were sent.
  *
  * The records are the ones the page read for the reader, so a seat that covers some clients lists
- * those. A staging copy is not a client and has no row. What the reader's own session is not
+ * those, and is told that the header's counts and an empty Sent table are of its own clients. A
+ * staging copy is not a client and has no row. What the reader's own session is not
  * granted, the page hands over beside the records (`ClientReportsSide`): whether each schedule's
  * contact was asked to confirm and has confirmed, when the schedule runs next, and whether a
  * report's document is stored. A contact reads as confirmed where the page says it has confirmed.
@@ -397,7 +398,11 @@ function reportsView(
     shell,
     header: {
       title: COPY.title,
-      line: counts.length ? counts.join(', ') : noClients,
+      line: counts.length
+        ? scoped
+          ? COPY.inSeat(counts.join(', '))
+          : counts.join(', ')
+        : noClients,
       action:
         maySchedule && unscheduled && !chosen
           ? link(changeHref(base, unscheduled), COPY.scheduleFor(unscheduled.host), {
@@ -448,7 +453,7 @@ function reportsView(
               : null,
         };
       }),
-      empty: total ? null : COPY.sentEmpty,
+      empty: total ? null : scoped ? COPY.sentEmptyInSeat : COPY.sentEmpty,
     },
   };
 }

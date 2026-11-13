@@ -6,6 +6,7 @@ import type { SeatRole } from '@crawlmouse/types/v2';
 import { EXTRA_SEAT, usd } from '../../billing/prices';
 import type { SeatAction } from '../agency/guard';
 import type { Addition, CopyChange } from '../copy-registry';
+import { count } from '../words';
 import { agencyRailChanges } from './agency';
 
 export const SEATS_COPY = {
@@ -56,6 +57,11 @@ export const SEATS_COPY = {
    */
   mailNote: (days: string) =>
     `An invitation is one email with a link to accept it. The link works for ${days} days.`,
+  /**
+   * The Clients cell of a seat that covers every client: with their count for a reader whose
+   * records hold every client, without one for a reader whose seat covers some.
+   */
+  everyClientCell: (n: number | null) => (n === null ? 'all clients' : `all ${count(n)}`),
   /** The Clients cell of a seat that covers no live client. */
   noClients: 'none',
   /** Ends the foot's price in an Agency trial, where extras cannot be bought yet. */

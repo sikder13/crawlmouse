@@ -267,6 +267,13 @@ last ten minutes, because a reader who is not signed in leaves the page to sign 
 comes back to it.
 `pnpm --filter @crawlmouse/web exec vitest run lib/v2/account/link-cookie.test.ts app/invite/page.test.tsx`.
 
+**What a seat that covers some clients is told.** Its records hold its own clients (§4), so a
+sentence about the account is not built from them. On Seats the owner's Clients cell reads "all
+clients" with no count, the header and the People title give no count of seats, and the foot is
+left out. On `/agency/reports` the header's counts end ", of the client sites in your seat" and an
+empty Sent table says no report has been sent "to a client in your seat".
+`pnpm --filter @crawlmouse/web exec vitest run __tests__/v2/seats.test.tsx lib/v2/view/agency-reports.test.ts -t 'covers some clients'`.
+
 Invitation mail is bounded by the day for an account (`INVITE_MAIL_PER_DAY`, `lib/v2/agency/seats.ts`:
 fewer in a trial than on a paid plan) and at 10 an hour for a client address, an invite and a resend
 counted together (`app/api/seats/route.ts`). An invitation's row is written before its mail is asked
@@ -402,12 +409,17 @@ refusal's notice. The pages a form may be sent back to are `BACK`'s four shapes
 **First run.** `next` is setup's next step: the first of these that is not done and that the caller's
 role may do. Its action is the page's orange element; with no step, "Add a client site" is.
 
-| State                                                | The step                                    | Who                           |
-| ---------------------------------------------------- | ------------------------------------------- | ----------------------------- |
-| no client                                            | the header's form: add one                  | a seat that may add a site    |
-| a client with no check, and none under way           | "Run it now": `POST /api/sites/[id]/checks` | a seat that covers the client |
-| a client has a result, and the records hold one seat | "Open Seats" (`/seats`)                     | the owner                     |
-| more than one seat, and no client report sent        | "Open client reports" (`/agency/reports`)   | the owner, an account manager |
+| State                                                | The step                                    | Who                                                             |
+| ---------------------------------------------------- | ------------------------------------------- | --------------------------------------------------------------- |
+| no client                                            | the header's form: add one                  | a seat that may add a site                                      |
+| a client with no check, and none under way           | "Run it now": `POST /api/sites/[id]/checks` | a seat that covers the client                                   |
+| a client has a result, and the records hold one seat | "Open Seats" (`/seats`)                     | the owner                                                       |
+| more than one seat, and no client report sent        | "Open client reports" (`/agency/reports`)   | the owner, or an account manager whose seat covers every client |
+
+Whether a report was sent is the caller's own read, which for a seat that covers some clients holds
+no report sent to a client outside it. Such a seat is not shown the last step, whose sentence is
+about the account:
+`pnpm --filter @crawlmouse/web exec vitest run lib/v2/view/agency-matrix.test.ts -t 'a seat that covers some clients is not asked'`.
 
 A client with no result yet says in its row what its site page's first-check line says ("Not checked
 yet", "First check queued"), with one button: start the check, or watch it. The first check of such a
@@ -419,7 +431,8 @@ matrix", and "Reports going out Mon · Preview".
 
 At the plan's site limit the header has no add form. Where the plan's extras are sold
 (`V2_BILLING=1`) and more sites can be bought, a reader who may buy (the owner) is shown "Add sites
-to the plan", a link to the buy form on `/seats` (`/seats#buy`); nobody else is shown it:
+to the plan", a link to the buy form on `/seats` (`/seats#buy`). The test runs the owner, an account
+manager whose seat covers every client and one whose seat covers some, and the link is the owner's:
 `pnpm --filter @crawlmouse/web exec vitest run lib/v2/view/agency-matrix.test.ts -t 'the way to buy sites'`.
 
 ### `/agency/clients/[siteId]`
