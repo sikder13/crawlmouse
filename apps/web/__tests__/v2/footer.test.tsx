@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, afterEach, beforeAll, vi } from 'vitest';
-import { existsSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -304,6 +304,38 @@ const footerNav = (markup: string) => {
   if (!m) throw new Error('no footer nav');
   return m[1] ?? '';
 };
+
+/** Every source file under a folder, tests left out. */
+function sourcesUnder(dir: string): string[] {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
+    const p = join(dir, e.name);
+    if (e.isDirectory()) return e.name === 'node_modules' ? [] : sourcesUnder(p);
+    return /\.tsx$/.test(e.name) && !/\.test\.tsx$/.test(e.name) ? [p] : [];
+  });
+}
+
+// A client module renders the footer in the browser, where the server's flags read as unset: unless
+// it passes the gates, the footer's server render and the browser's disagree (a hydration mismatch).
+describe('the footer’s gates on a client page', () => {
+  const clientShells = [join(WEB_ROOT, 'components'), APP].flatMap(sourcesUnder).filter((f) => {
+    const src = readFileSync(f, 'utf8');
+    return /^['"]use client['"]/m.test(src) && /<PageShell\b/.test(src);
+  });
+
+  it('finds the client modules that render the shell (anti-vacuity)', () => {
+    expect(clientShells.map((f) => relative(WEB_ROOT, f))).toEqual(
+      expect.arrayContaining(['components/v2/screens/crawl/CrawlScreen.tsx']),
+    );
+  });
+
+  it.each(clientShells.map((f) => [relative(WEB_ROOT, f), f]))(
+    '%s passes the gates, or renders no footer',
+    (_name, file) => {
+      for (const tag of readFileSync(file, 'utf8').match(/<PageShell\b[^>]*>/g) ?? [])
+        expect(/footer=\{false\}|footerGates=/.test(tag), tag).toBe(true);
+    },
+  );
+});
 
 describe('SiteFooter', () => {
   it('carries the brand block: brand link, the one line, the company, the email, the year', () => {
