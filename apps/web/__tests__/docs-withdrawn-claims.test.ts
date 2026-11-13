@@ -418,6 +418,17 @@ const WITHDRAWN: readonly WithdrawnClaim[] = [
       'later hour re-took them; it takes no new row once a mail was claimed under its key.',
     allowedIn: [],
   },
+  {
+    // The same comment's other withdrawn sentence (round 3 M2), registered as the one above is.
+    text: 'finds no rows under its key',
+    withdrawnIn:
+      'infra/supabase/migrations/20261115000001_v2_033_operations.sql (take_founder_overflow), CC-33 review round 3 M2',
+    truth:
+      'A retry of an earlier hour\'s "N more" notice answers the rows still carrying its key, and ' +
+      'takes no row back from a later hour once a mail was claimed under its own key: the rows it ' +
+      'took, or none once a later hour re-took them.',
+    allowedIn: [],
+  },
 ];
 
 /**
