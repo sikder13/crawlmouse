@@ -414,8 +414,9 @@ two results), and Opened and Resolved when their count is not zero.
 Adding a client is the dashboard's add-site form, posted to `POST /api/sites` for the account acted
 in, offered to a seat that may add a site while the account has a site unused. Posted from `/agency`,
 the route answers a form with a 303 back to `/agency`: with the new client as a row, or with a
-refusal's notice. The pages a form may be sent back to are `BACK`'s four shapes
-(`lib/v2/account/route.ts`): `/dashboard`, `/sites/<id>`, `/agency`, `/agency/clients/<id>`.
+refusal's notice. A form is sent back to a page `BACK` matches (`lib/v2/account/route.ts`), a pattern
+of alternatives of which `/dashboard`, `/sites/<id>`, `/agency` and `/agency/clients/<id>` are four;
+`grep -n "^const BACK" -A2 apps/web/lib/v2/account/route.ts` prints it.
 
 **First run.** `next` is setup's next step: the first of these that is not done and that the caller's
 role may do. Its action is the page's orange element; with no step, "Add a client site" is.
