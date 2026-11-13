@@ -21,11 +21,15 @@ interface EnvEntry {
   target?: unknown;
   gitBranch?: unknown;
   updatedAt?: unknown;
+  createdAt?: unknown;
 }
 
 export interface VercelSnapshot {
-  /** Production names, each with its last update in ms since the epoch (0 when not given). */
-  names: ReadonlyMap<string, number>;
+  /**
+   * Production names, each with its last update in ms since the epoch: `updatedAt`, else `createdAt`,
+   * else null (the name cannot be dated, so whether it is in the live deployment is unknown).
+   */
+  names: ReadonlyMap<string, number | null>;
   /** The live production deployment's creation time, or null when the project did not say. */
   liveCreatedAt: number | null;
 }
@@ -46,15 +50,35 @@ async function load(deps: ProbeDeps): Promise<Loaded> {
     headers,
   });
   if (!envRes.ok) return { ok: false, result: httpFailed('Vercel env list', envRes.status) };
-  const envBody = (await envRes.json()) as { envs?: EnvEntry[] };
+  const envBody = (await envRes.json()) as {
+    envs?: EnvEntry[];
+    pagination?: { next?: unknown } | null;
+  };
   if (!Array.isArray(envBody.envs))
     return { ok: false, result: unknown('Vercel env list had no envs array') };
-  const names = new Map<string, number>();
+  const next = envBody.pagination?.next;
+  if (next !== undefined && next !== null) {
+    // A name on a later page would read as missing, and a forbidden one as absent.
+    return {
+      ok: false,
+      result: unknown('the Vercel env list has another page, which the check does not read'),
+    };
+  }
+  const names = new Map<string, number | null>();
   for (const e of envBody.envs) {
     if (typeof e.key !== 'string' || !targetsProduction(e.target)) continue;
     if (typeof e.gitBranch === 'string' && e.gitBranch !== '') continue;
-    const at = typeof e.updatedAt === 'number' ? e.updatedAt : 0;
-    names.set(e.key, Math.max(at, names.get(e.key) ?? 0));
+    const at =
+      typeof e.updatedAt === 'number'
+        ? e.updatedAt
+        : typeof e.createdAt === 'number'
+          ? e.createdAt
+          : null;
+    const seen = names.get(e.key);
+    names.set(
+      e.key,
+      seen === undefined ? at : seen === null || at === null ? null : Math.max(at, seen),
+    );
   }
   const projRes = await deps.fetch(`${API}/v9/projects/${VERCEL_PROJECT_ID}?${team}`, { headers });
   if (!projRes.ok) return { ok: false, result: httpFailed('Vercel project', projRes.status) };
@@ -98,9 +122,14 @@ export const vercelEnvProbe =
         `all ${required.length} set; the live deployment's creation time was not given`,
       );
     }
-    const stale = required.filter((n) => names.get(n)! > liveCreatedAt);
+    const stale = required.filter((n) => {
+      const at = names.get(n);
+      return typeof at === 'number' && at > liveCreatedAt;
+    });
     if (stale.length > 0) {
       return fail(`set after the live deployment: redeploy (${stale.join(', ')})`);
     }
+    const undated = required.filter((n) => names.get(n) === null);
+    if (undated.length > 0) return unknown(`no update time given for: ${undated.join(', ')}`);
     return pass(`all ${required.length} set for Production, none after the live deployment`);
   };

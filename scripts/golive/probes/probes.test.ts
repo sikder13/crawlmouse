@@ -100,6 +100,60 @@ describe('vercel-env', () => {
     expect(r).toEqual({ status: 'unknown', reason: 'Vercel env list answered HTTP 403' });
   });
 
+  it('answers unknown for a required name with no update or creation time', async () => {
+    const rows = allOf(4).map((e) => {
+      if (e.key !== 'EMAIL_LINK_SECRET') return e;
+      const { updatedAt: _u, ...rest } = e;
+      return rest;
+    });
+    const r = await vercelEnvProbe(4)(
+      deps({ fetch: vercel(rows).fetch, env: { VERCEL_TOKEN: vercelToken } }),
+    );
+    expect(r).toEqual({
+      status: 'unknown',
+      reason: 'no update time given for: EMAIL_LINK_SECRET',
+    });
+  });
+
+  it('dates a name by createdAt when updatedAt is missing', async () => {
+    const dated = (at: number) =>
+      allOf(4).map((e) => {
+        const { updatedAt: _u, ...rest } = e;
+        return { ...rest, createdAt: at };
+      });
+    const env = { VERCEL_TOKEN: vercelToken };
+    const before = await vercelEnvProbe(4)(deps({ fetch: vercel(dated(LIVE_AT - 1)).fetch, env }));
+    expect(before.status).toBe('pass');
+    const after = await vercelEnvProbe(4)(deps({ fetch: vercel(dated(LIVE_AT + 1)).fetch, env }));
+    expect(after.status).toBe('fail');
+  });
+
+  it('answers unknown, never pass, when the listing has another page', async () => {
+    for (const s of [1, 3, 4, 5] as const) {
+      const { fetch } = scriptedFetch((url) =>
+        url.pathname.endsWith('/env')
+          ? json({
+              envs: [...allOf(1), ...allOf(3), ...allOf(4), ...allOf(5)],
+              pagination: { next: 1700000000000 },
+            })
+          : json({ targets: { production: { createdAt: LIVE_AT } } }),
+      );
+      const r = await vercelEnvProbe(s)(deps({ fetch, env: { VERCEL_TOKEN: vercelToken } }));
+      expect(r, `step ${s}`).toEqual({
+        status: 'unknown',
+        reason: 'the Vercel env list has another page, which the check does not read',
+      });
+    }
+    const { fetch } = scriptedFetch((url) =>
+      url.pathname.endsWith('/env')
+        ? json({ envs: allOf(1), pagination: { next: null } })
+        : json({ targets: { production: { createdAt: LIVE_AT } } }),
+    );
+    expect(
+      (await vercelEnvProbe(1)(deps({ fetch, env: { VERCEL_TOKEN: vercelToken } }))).status,
+    ).toBe('pass');
+  });
+
   it('lists once for all five step rows', async () => {
     const { fetch, calls } = vercel([...allOf(1), ...allOf(3), ...allOf(4), ...allOf(5)]);
     const d = deps({ fetch, env: { VERCEL_TOKEN: vercelToken } });
