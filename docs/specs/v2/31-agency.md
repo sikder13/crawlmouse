@@ -751,11 +751,63 @@ pnpm --filter @crawlmouse/web exec vitest run lib/v2/agency/schedules-run.test.t
 pnpm --filter @crawlmouse/inngest exec vitest run report-schedules.test.ts
 ```
 
-**Not built.** `/agency/reports`, the screen of `Final-Ag-Reports` that would carry the schedule
-forms, is not built: the routes above answer JSON and forms, and a form's answer redirects to that
-address. Of what the artboard draws, this step has no route for "Hold all this week", "Hold",
-"Edit headline", "Preview and edit", the Opened column (open tracking) or the sender address
-(Branding is out: D11).
+**The screen.** `app/agency/reports/page.tsx` renders `agencyReportsView`
+(`lib/v2/view/agency-reports.ts`) in `ClientReportsScreen` (`Final-Ag-Reports`) for the account the
+caller acts in. Its states are `/agency`'s (§8): a 404 while `V2_CHECKS_PUBLIC` is off, the sign-in
+page for a caller who is not signed in, and below Agency the gate, worded by
+`gateMessage('clientReports')` where the next plan has client reports, or the switch for a caller
+acting in another account. It is `noindex` and `force-dynamic`.
+
+- **The header** counts the client sites by schedule, by iterating them ("2 weekly, 1 monthly, 1
+  not scheduled"); a count of nothing is left out.
+- **Clients** has one row a client site the caller's records hold, and none for a staging copy: the
+  client and its host; the contact and where it stands (`no contact`, `not asked to confirm yet`,
+  `asked to confirm <date>`, `confirmed`, `paused by the recipient`); the schedule in the client
+  page's words; the next run on the schedule's own clock, with its zone; and the owning seat.
+- **The forms** are for a seat `roleMay(role, 'schedule_report')` allows, the owner and an account
+  manager. A row has "Change"; "Ask to confirm", or "Ask again" once a link was sent, while a
+  scheduled contact has not confirmed; and "Resume" while its recipient has paused.
+  `?client=<site id>` opens that client's card: its name, contact address and owning seat; its
+  schedule (how often, weekday, time, time zone, whether to send when nothing changed); and "Stop
+  the schedule". A form posts to a route of the table above with its verb in `_method`, and the
+  route answers a 303 to `/agency/reports?notice=<code>`. The owning seat's field is left out when
+  the reader's records do not hold the seat that owns the client, so a save leaves that seat as it
+  is. A developer gets the rows and no form.
+- **Sent** lists the client reports whose status is `sent`, the newest `SENT_SHOWN` (20) under a
+  line that says how many there are: when, the client, who it went to, and "Open" (`/reports/<id>`)
+  for a report that is a document whose file is stored. A `scheduled` or `held` report is not
+  listed.
+- **In the Agency trial** one line says where a report is sent while the trial runs (rule 4 of
+  "Sending").
+
+`readAccount` gives the page the records the caller's own session reads. `readClientReports`
+(`lib/v2/agency/client-reports-read.ts`) adds the sent client reports of those sites, read through
+the caller's session, and asks the service role, by the site ids and report ids that session
+returned, for each schedule's `next_run_at`, `recipient_confirm_sent_at` and
+`recipient_confirmed_at`, and for the listed reports' `file_state`. A contact reads as confirmed
+where `recipient_confirmed_at` is set.
+
+Not drawn, each a `ruling` row of `CLIENT_REPORTS_CHANGES` (`lib/v2/copy/client-reports.ts`),
+because this step has no route for it: "Preview Monday's reports", "Preview and edit", "Preview",
+"Hold all this week", "Hold", "Edit headline", "Expand", the Opened column (open tracking), "Fix
+marked done after", and the sender address (Branding is out: D11).
+
+The schedule's time zone is chosen from the names the account's own zone is chosen from (`ZONES`,
+`lib/v2/account/profile.ts`), with the schedule's own name added where it is another;
+`lib/v2/view/agency-reports.test.ts` parses each of `ZONES` with the contract's `TimeZoneSchema` and
+with the schedule route's body.
+
+Known gaps. Saving a schedule does not ask its contact to confirm: a contact saved before its
+schedule reads "not asked to confirm yet" until "Ask to confirm" is pressed or the schedule's first
+run asks (rule 3 of "Sending"). The client page's two "Change" links open `/agency/reports`, not
+that client's card.
+
+Previews, in `app/(v2-preview)/v2-preview/_preview/agency-reports.ts`: the page; a client in each
+state; one client's forms open; a developer; the Agency trial; the gate.
+
+```bash
+pnpm --filter @crawlmouse/web exec vitest run lib/v2/view/agency-reports.test.ts lib/v2/agency/client-reports-read.test.ts app/agency/reports/page.test.tsx __tests__/v2/agency.test.tsx
+```
 
 ### The two mails of a schedule
 
