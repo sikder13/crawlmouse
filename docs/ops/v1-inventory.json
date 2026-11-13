@@ -1411,6 +1411,110 @@
       "ruling": "keep",
       "reason": "kept; audit_id becomes check_id",
       "evidence": "ARCH-2 §2 legacy-table table and §6.1 migration 009 (~/crawlmouse-plan/ARCH-2.md)"
+    },
+    {
+      "kind": "page",
+      "path": "app/internal/page.tsx",
+      "url": "/internal",
+      "ruling": "keep",
+      "reason": "the support console's search (CC-33 D2); flag-free, staff only",
+      "evidence": "docs/specs/v2/33-operations.md (CC-33 D2: the support console, staff only)",
+      "checks": {
+        "input": "pass — ?accounts read as ids only (isId), at most 20, and ?found compared to '0' (app/internal/page.tsx:25-29)",
+        "output": "pass — 404 for anyone but an operator before any read (app/internal/page.tsx:21-22); lists account names, states and ids only",
+        "cache": "pass — force-dynamic, reads the session cookie (app/internal/layout.tsx:8)",
+        "redirect": "n/a — no redirect or next param",
+        "errors": "n/a — no error response of its own; notFound() for a non-operator",
+        "escaping": "pass — JSX text only; result links built from ids (lib/v2/ops/console-view.ts)",
+        "abuse": "n/a — read only; the search itself is the POST route, recorded in operator_actions"
+      },
+      "e2e": {
+        "skip": "staff-only: every caller the e2e run can be is answered 404 before any read; covered by app/internal/page.test.tsx and app/internal/accounts/[id]/page.test.tsx on PGlite"
+      }
+    },
+    {
+      "kind": "page",
+      "path": "app/internal/accounts/[id]/page.tsx",
+      "url": "/internal/accounts/[id]",
+      "ruling": "keep",
+      "reason": "one account in the support console (CC-33 D2); flag-free, staff only",
+      "evidence": "docs/specs/v2/33-operations.md (CC-33 D2: the support console, staff only)",
+      "checks": {
+        "input": "pass — [id] must be a uuid before anything is recorded (app/internal/accounts/[id]/page.tsx:28); ?done read only as a known code (lib/v2/ops/actions.ts)",
+        "output": "pass — 404 for anyone but an operator before any read (app/internal/accounts/[id]/page.tsx:25-26); the view is written to operator_actions before the account is read (app/internal/accounts/[id]/page.tsx:30); the mail ledger is shown without address_hash",
+        "cache": "pass — force-dynamic, reads the session cookie (app/internal/layout.tsx:8)",
+        "redirect": "n/a — no redirect or next param",
+        "errors": "pass — a view that cannot be recorded throws and is not shown (app/internal/accounts/[id]/page.tsx:30)",
+        "escaping": "pass — JSX text only; the Stripe link is built only from a ^cus_[A-Za-z0-9]+$ id, target _blank rel noreferrer (lib/v2/ops/console-view.ts)",
+        "abuse": "n/a — read only; its two forms post to the operator routes"
+      },
+      "e2e": {
+        "skip": "staff-only: every caller the e2e run can be is answered 404 before any read; covered by app/internal/page.test.tsx and app/internal/accounts/[id]/page.test.tsx on PGlite"
+      }
+    },
+    {
+      "kind": "metadata",
+      "path": "app/internal/layout.tsx",
+      "ruling": "keep",
+      "reason": "the support console's layout: v2 tokens, noindex, force-dynamic (CC-33 D2)",
+      "evidence": "apps/web/app/internal/layout.tsx:1",
+      "checks": {
+        "input": "n/a — reads no param, query or body",
+        "output": "pass — renders its children only; robots index false, follow false, no canonical (app/internal/layout.tsx:10-14)",
+        "cache": "pass — force-dynamic (app/internal/layout.tsx:8)",
+        "redirect": "n/a — no redirect and no next/returnTo param in the file",
+        "errors": "n/a — no error path of its own",
+        "escaping": "n/a — no text of its own",
+        "abuse": "n/a — no action that costs money or sends mail"
+      }
+    },
+    {
+      "kind": "route",
+      "path": "app/api/internal/search/route.ts",
+      "ruling": "keep",
+      "reason": "the support console's search (CC-33 D2): a POST so the query is in no URL",
+      "evidence": "apps/web/lib/security/route-policy.ts:171",
+      "checks": {
+        "input": "pass — form or JSON body; q classified by shape, at most 320 characters (lib/v2/ops/search.ts)",
+        "output": "pass — 404 for anyone but an operator before the body is read (:20-21); answers a 303 to account pages by id, never the query (:28-30)",
+        "cache": "pass — POST",
+        "redirect": "pass — fixed /internal paths with account ids only (:28-30)",
+        "errors": "pass — 400 {code: invalid} for an unreadable body (:23)",
+        "escaping": "n/a — no HTML output (JSON, plain text or a redirect)",
+        "abuse": "pass — operators only; each search recorded with its kind and count, never the query (:27)"
+      }
+    },
+    {
+      "kind": "route",
+      "path": "app/api/internal/checks/[id]/rerun/route.ts",
+      "ruling": "keep",
+      "reason": "the support console's re-run of a failed check (CC-33 D2)",
+      "evidence": "apps/web/lib/security/route-policy.ts:173",
+      "checks": {
+        "input": "pass — [id] a uuid (:26); reason required, 1 to 500 characters, no address (lib/v2/ops/actions.ts)",
+        "output": "pass — 404 for anyone but an operator before anything is read (:23-24)",
+        "cache": "pass — POST",
+        "redirect": "pass — a 303 to /internal/accounts/<account id>?done=<code>, the code from a fixed list (lib/v2/ops/actions.ts)",
+        "errors": "pass — 404 for an unknown check (:29); every refusal a fixed notice code",
+        "escaping": "n/a — no HTML output (JSON, plain text or a redirect)",
+        "abuse": "pass — the site's own manualChecksPerSiteDay and the global:audits:day ceiling, through request_capped_check inside operator_request_check, which records the re-run in the same call"
+      }
+    },
+    {
+      "kind": "route",
+      "path": "app/api/internal/accounts/[id]/sign-in-link/route.ts",
+      "ruling": "keep",
+      "reason": "the support console's re-send of a sign-in link (CC-33 D2)",
+      "evidence": "apps/web/lib/security/route-policy.ts:179",
+      "checks": {
+        "input": "pass — [id] and userId uuids (:30, :33); reason required, 1 to 500 characters, no address (:37-38)",
+        "output": "pass — 404 for anyone but an operator before anything is read (:27-28); the address is read from the seat, never typed (:35-36)",
+        "cache": "pass — POST",
+        "redirect": "pass — a 303 to /internal/accounts/<id>?done=<code>, the code from a fixed list (:59)",
+        "errors": "pass — a request that throws is recorded as failed and rethrown (:51-56)",
+        "escaping": "n/a — no HTML output (JSON, plain text or a redirect)",
+        "abuse": "pass — recorded first (:40), then the magic-link route's own per-email bucket (:42-46), then Supabase Auth with shouldCreateUser false (lib/v2/ops/sign-in-link.ts)"
+      }
     }
   ],
   "findings": [
