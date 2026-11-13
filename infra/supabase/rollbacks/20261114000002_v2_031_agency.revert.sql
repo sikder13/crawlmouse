@@ -1,7 +1,7 @@
 -- Revert of infra/supabase/migrations/20261114000002_v2_031_agency.sql, section by section in reverse.
 
 -- ─── C ────────────────────────────────────────────────────────────────────────────────────────────
-drop function if exists public.report_confirm_mail_counts(uuid, text, timestamptz);
+drop function if exists public.report_confirm_mail_counts(uuid, text, timestamptz, text);
 -- The three kinds leave the CHECK on email_sends.kind and email_kind_suppressible, each rebuilt from
 -- what it holds now without them, so a kind another migration added stays with its answer. A ledger
 -- row of one of the three is deleted first, since the CHECK without its kind would refuse it; with it
@@ -61,9 +61,13 @@ begin
   execute pg_catalog.format(
     E'create or replace function public.email_kind_suppressible(p_kind text) returns boolean '
     'language sql immutable set search_path = pg_catalog, pg_temp '
-    'as $f$\n  select p_kind in (%s);\n$f$',
-    (select pg_catalog.string_agg(pg_catalog.quote_literal(u.k), ', ' order by u.n)
-       from pg_catalog.unnest(v_suppressible) with ordinality as u(k, n)));
+    'as $f$\n  select %s;\n$f$',
+    coalesce(
+      'p_kind in ('
+        || (select pg_catalog.string_agg(pg_catalog.quote_literal(u.k), ', ' order by u.n)
+              from pg_catalog.unnest(v_suppressible) with ordinality as u(k, n))
+        || ')',
+      'false'));
 end;
 $$;
 
@@ -81,7 +85,7 @@ drop function if exists public.pause_report_schedule(text, timestamptz);
 drop function if exists public.issue_report_pause(uuid, text, text, timestamptz);
 drop function if exists public.confirm_report_recipient(text, timestamptz);
 drop function if exists public.read_report_link(text, timestamptz);
-drop function if exists public.issue_recipient_confirmation(uuid, timestamptz);
+drop function if exists public.issue_recipient_confirmation(uuid, timestamptz, text);
 drop function if exists public.clear_report_schedule(uuid, uuid);
 drop function if exists public.set_report_schedule(uuid, uuid, jsonb, timestamptz);
 drop function if exists public.set_client(uuid, uuid, jsonb);
@@ -89,6 +93,18 @@ drop function if exists public.report_schedule_next(text, smallint, text, text, 
 drop function if exists public.report_link_token();
 drop trigger if exists sites_contact_changed on public.sites;
 drop function if exists public.sites_contact_changed();
+-- What recipients refused goes with the functions that read it: a refusal recorded meanwhile is
+-- lost, and after a re-apply an address that declined could be asked again.
+drop trigger if exists reports_recipient_erased on public.reports;
+drop function if exists public.reports_recipient_erased();
+drop function if exists public.decline_report_requests(text, timestamptz);
+drop function if exists public.report_ask_refusals(uuid[], timestamptz);
+drop function if exists public.note_report_refusal(uuid, text, jsonb);
+drop function if exists public.report_refusal(uuid, text);
+drop function if exists public.report_reask_window();
+drop function if exists public.report_refusal_key(text);
+alter table public.sites drop constraint if exists sites_report_refusals_array;
+alter table public.sites drop column if exists report_refusals;
 drop index if exists public.report_schedules_pause_hash_uq;
 drop index if exists public.report_schedules_confirm_hash_uq;
 alter table public.report_schedules drop constraint if exists report_schedules_link_hashes;

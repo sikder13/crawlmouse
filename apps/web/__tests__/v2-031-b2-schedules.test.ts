@@ -40,7 +40,7 @@ const FUNCTIONS = [
   'public.set_client(uuid, uuid, jsonb)',
   'public.set_report_schedule(uuid, uuid, jsonb, timestamptz)',
   'public.clear_report_schedule(uuid, uuid)',
-  'public.issue_recipient_confirmation(uuid, timestamptz)',
+  'public.issue_recipient_confirmation(uuid, timestamptz, text)',
   'public.read_report_link(text, timestamptz)',
   'public.confirm_report_recipient(text, timestamptz)',
   'public.issue_report_pause(uuid, text, text, timestamptz)',
@@ -50,6 +50,12 @@ const FUNCTIONS = [
   'public.mark_report_schedule_run(uuid, timestamptz)',
   'public.write_client_report(uuid, timestamptz, uuid, timestamptz)',
   'public.mark_client_report_sent(uuid, timestamptz)',
+  'public.report_refusal_key(text)',
+  'public.report_reask_window()',
+  'public.report_refusal(uuid, text)',
+  'public.note_report_refusal(uuid, text, jsonb)',
+  'public.report_ask_refusals(uuid[], timestamptz)',
+  'public.decline_report_requests(text, timestamptz)',
 ] as const;
 
 const HIDDEN = [
@@ -98,8 +104,26 @@ const setSchedule = (siteId: string, accountId: string, p: unknown = WEEKLY, now
   ]);
 const clear = (siteId: string, accountId: string) =>
   answer(`select public.clear_report_schedule($1, $2) r`, [siteId, accountId]);
-const issueConfirmation = (siteId: string, now = NOW) =>
-  answer(`select public.issue_recipient_confirmation($1, $2) r`, [siteId, now]);
+const issueConfirmation = (siteId: string, now = NOW, request: string | null = null) =>
+  answer(`select public.issue_recipient_confirmation($1, $2, $3) r`, [siteId, now, request]);
+const decline = (token: string, now = NOW) =>
+  answer(`select public.decline_report_requests($1, $2) r`, [sha256(token), now]);
+/** What the site holds of its recipients' refusals, as stored. */
+const refusals = async (siteId: string) =>
+  (
+    await db.query<{ r: Record<string, string>[] }>(
+      `select report_refusals r from public.sites where id = $1`,
+      [siteId],
+    )
+  ).rows[0]!.r;
+/** Why the site's contact may not be asked at `now`, or undefined when it may. */
+const askRefusal = async (siteId: string, now = NOW) =>
+  (
+    await service<{ r: Record<string, Record<string, string>> }>(
+      `select public.report_ask_refusals(array[$1::uuid], $2) r`,
+      [siteId, now],
+    )
+  )[0]!.r[siteId];
 const readLink = (token: string, now = NOW) =>
   answer(`select public.read_report_link($1, $2) r`, [sha256(token), now]);
 const confirm = (token: string, now = NOW) =>
@@ -1032,6 +1056,7 @@ describe('due_report_schedules', () => {
       has_contact: true,
       confirmed: true,
       confirmation_requested: true,
+      ask_refused: false,
       contact_is_owner: false,
       state: 'agency',
       tier: 'agency',
@@ -1239,8 +1264,9 @@ describe('a paused schedule and the confirmation', () => {
     expect((await schedule(c.siteId))!.recipient_confirmed_at).toBeNull();
     // Nothing asks a recipient who paused but the account's resume.
     expect(await issueConfirmation(c.siteId, at(3))).toEqual({ outcome: 'none' });
-    await resume(c.siteId, c.accountId, at(4));
-    expect((await issueConfirmation(c.siteId, at(4))).outcome).toBe('issued');
+    // Asked once since the pause: the next resume inside the window lifts nothing.
+    expect((await resume(c.siteId, c.accountId, at(4))).outcome).toBe('asked_recently');
+    expect((await schedule(c.siteId))!.paused_by_recipient_at).not.toBeNull();
   });
 
   it('a pause leaves a confirmed contact’s record of when it was asked', async () => {
@@ -1269,6 +1295,225 @@ describe('a paused schedule and the confirmation', () => {
       recipient_confirm_sent_at: null,
     });
     expect(await confirm('a-link-from-before', at(2))).toEqual({ outcome: 'gone' });
+  });
+});
+
+describe('what a recipient refused (owner ruling on Q42)', () => {
+  /** A confirmed contact who then paused, at day 1. */
+  async function pausedClient(contact = 'reader@client.example') {
+    const c = await confirmed(contact);
+    const token = pauseToken();
+    await issuePause(c.siteId, NOW, token);
+    await pause(token, at(1));
+    return { ...c, contact, pauseToken: token };
+  }
+  const WINDOW_DAYS = 30;
+  const mine = (rows: Record<string, unknown>[], c: Client) =>
+    rows.filter((r) => r.site_id === c.siteId);
+
+  it('the column is read by no client role, and holds no address', async () => {
+    const c = await pausedClient('Reader@Client.Example');
+    for (const role of ['anon', 'authenticated'] as const) {
+      await expect(
+        asRole(db, role, role === 'anon' ? null : c.owner.id, (tx) =>
+          tx.query(`select report_refusals from public.sites`),
+        ),
+      ).rejects.toMatchObject({ code: '42501' });
+    }
+    const held = await refusals(c.siteId);
+    // One entry, keyed by the sha256 of the address trimmed and in lower case.
+    expect(held).toEqual([{ a: sha256('reader@client.example'), paused_at: expect.any(String) }]);
+    expect(JSON.stringify(held).toLowerCase()).not.toContain('reader');
+    expect(iso(held[0]!.paused_at)).toBe(at(1));
+  });
+
+  it('the window is thirty days', async () => {
+    const rows = await service<{ days: string }>(
+      `select extract(epoch from public.report_reask_window())::int / 86400 || '' days`,
+    );
+    expect(Number(rows[0]!.days)).toBe(WINDOW_DAYS);
+  });
+
+  it('after a pause, resume asks once: a second resume inside the window is refused with when it may ask, and lifts nothing', async () => {
+    const c = await pausedClient();
+    expect((await resume(c.siteId, c.accountId, at(2))).outcome).toBe('resumed');
+    expect(await askRefusal(c.siteId, at(2))).toBeUndefined();
+    expect((await issueConfirmation(c.siteId, at(2), 'resume-1')).outcome).toBe('issued');
+    // The recipient answers by pausing again with the link of an earlier report.
+    await pause(c.pauseToken, at(3));
+    const next = at(2 + WINDOW_DAYS);
+    const again = await resume(c.siteId, c.accountId, at(10));
+    expect([again.outcome, iso(again.next_at)]).toEqual(['asked_recently', next]);
+    expect((await schedule(c.siteId))!.paused_by_recipient_at).not.toBeNull();
+    expect(await askRefusal(c.siteId, at(10))).toMatchObject({ refused: 'asked_recently' });
+    // To the last moment of the window; from the window's end it may ask again.
+    expect((await resume(c.siteId, c.accountId, at(2 + WINDOW_DAYS, -1))).outcome).toBe(
+      'asked_recently',
+    );
+    expect((await resume(c.siteId, c.accountId, next)).outcome).toBe('resumed');
+    expect((await issueConfirmation(c.siteId, next, 'resume-2')).outcome).toBe('issued');
+  });
+
+  it('one confirmation is issued in the window, whatever asks: another request is none, and the same request again is issued', async () => {
+    const c = await pausedClient();
+    await resume(c.siteId, c.accountId, at(2));
+    const first = await issueConfirmation(c.siteId, at(2), 'resume-1');
+    expect(first.outcome).toBe('issued');
+    // "Ask again", the hourly run, a save: each is another request.
+    expect(await issueConfirmation(c.siteId, at(2, 1), 'ask-again')).toEqual({ outcome: 'none' });
+    expect(await issueConfirmation(c.siteId, at(20), null)).toEqual({ outcome: 'none' });
+    // The request whose mail did not go is retried: the same ask, and the window is not moved.
+    const retried = await issueConfirmation(c.siteId, at(2, 5000), 'resume-1');
+    expect(retried.outcome).toBe('issued');
+    expect(iso((await refusals(c.siteId))[0]!.asked_at)).toBe(at(2));
+    expect(await confirm(first.token as string, at(3))).toEqual({ outcome: 'gone' });
+    expect((await confirm(retried.token as string, at(3))).outcome).toBe('confirmed');
+  });
+
+  it('the recipient’s own confirmation ends what the pause left: nothing is remembered, and a later pause starts again', async () => {
+    const c = await pausedClient();
+    await resume(c.siteId, c.accountId, at(2));
+    const asked = await issueConfirmation(c.siteId, at(2), 'r');
+    await confirm(asked.token as string, at(3));
+    expect(await refusals(c.siteId)).toEqual([]);
+    await pause(c.pauseToken, at(4));
+    expect((await resume(c.siteId, c.accountId, at(5))).outcome).toBe('resumed');
+    expect((await issueConfirmation(c.siteId, at(5), 'r2')).outcome).toBe('issued');
+  });
+
+  it('removing the schedule and saving it again does not clear a pause: the address is asked once, then not again in the window', async () => {
+    const c = await pausedClient();
+    await clear(c.siteId, c.accountId);
+    await setSchedule(c.siteId, c.accountId, WEEKLY, at(2));
+    expect((await schedule(c.siteId))!.paused_by_recipient_at).toBeNull();
+    expect((await issueConfirmation(c.siteId, at(2), 'save-1')).outcome).toBe('issued');
+    // Again, a day later, and a week later: nothing more is issued to that address.
+    for (const day of [3, 9]) {
+      await clear(c.siteId, c.accountId);
+      await setSchedule(c.siteId, c.accountId, WEEKLY, at(day));
+      expect(await issueConfirmation(c.siteId, at(day), `save-${day}`)).toEqual({
+        outcome: 'none',
+      });
+    }
+    // And no report goes: the new schedule's contact has not confirmed.
+    expect(mine(await due(at(60)), c)[0]!.confirmed).toBe(false);
+  });
+
+  it.each([
+    ['changed to another address and back', 'other@client.example'],
+    ['taken away and put back', null],
+    ['written with another case and spaces', '  READER@client.example '],
+  ])('the account’s own change of contact does not clear it: %s', async (_how, between) => {
+    const c = await pausedClient();
+    await resume(c.siteId, c.accountId, at(2));
+    await issueConfirmation(c.siteId, at(2), 'resume-1');
+    await setClient(c.siteId, c.accountId, { client_contact_email: between });
+    await setClient(c.siteId, c.accountId, { client_contact_email: c.contact });
+    expect(await refusals(c.siteId)).toEqual([
+      expect.objectContaining({ a: sha256(c.contact), paused_at: expect.any(String) }),
+    ]);
+    expect(await askRefusal(c.siteId, at(3))).toMatchObject({ refused: 'asked_recently' });
+    expect(await issueConfirmation(c.siteId, at(3), 'after-change')).toEqual({ outcome: 'none' });
+  });
+
+  it('another contact of the same site, and the same address on another site, are not refused', async () => {
+    const [c, elsewhere] = [await pausedClient(), await confirmed('reader@client.example')];
+    await resume(c.siteId, c.accountId, at(2));
+    await issueConfirmation(c.siteId, at(2), 'resume-1');
+    expect(await askRefusal(elsewhere.siteId, at(3))).toBeUndefined();
+    await setClient(c.siteId, c.accountId, { client_contact_email: 'other@client.example' });
+    expect(await askRefusal(c.siteId, at(3))).toBeUndefined();
+    expect((await issueConfirmation(c.siteId, at(3), 'other')).outcome).toBe('issued');
+  });
+
+  describe('“Don’t ask me again”', () => {
+    it('with the confirmation link’s token: the request is withdrawn, and nothing asks that address for that site again', async () => {
+      const c = await client();
+      await setClient(c.siteId, c.accountId, { client_contact_email: 'reader@client.example' });
+      await setSchedule(c.siteId, c.accountId);
+      const asked = await issueConfirmation(c.siteId, NOW, 'first');
+      expect(await decline(asked.token as string, at(1))).toEqual({ outcome: 'declined' });
+      expect(await refusals(c.siteId)).toEqual([
+        { a: sha256('reader@client.example'), declined_at: expect.any(String) },
+      ]);
+      expect(await schedule(c.siteId)).toMatchObject({
+        recipient_confirm_hash: null,
+        recipient_confirm_sent_at: null,
+        recipient_confirmed_at: null,
+        paused_by_recipient_at: null,
+      });
+      // The link in the same mail no longer confirms.
+      expect(await confirm(asked.token as string, at(1))).toEqual({ outcome: 'gone' });
+      // No request, by any path, however long after.
+      for (const day of [1, 40, 400]) {
+        expect(await askRefusal(c.siteId, at(day))).toEqual({ refused: 'declined' });
+        expect(await issueConfirmation(c.siteId, at(day), `r-${day}`)).toEqual({
+          outcome: 'none',
+        });
+      }
+      expect(mine(await due(at(60)), c)[0]).toMatchObject({ confirmed: false, ask_refused: true });
+      // Removed and saved again, changed away and back: still declined.
+      await clear(c.siteId, c.accountId);
+      await setSchedule(c.siteId, c.accountId, WEEKLY, at(2));
+      await setClient(c.siteId, c.accountId, { client_contact_email: null });
+      await setClient(c.siteId, c.accountId, { client_contact_email: 'reader@client.example' });
+      expect(await issueConfirmation(c.siteId, at(3), 'again')).toEqual({ outcome: 'none' });
+    });
+
+    it('takes a confirmation link past its seven days: a refusal does not expire', async () => {
+      const c = await client();
+      await setClient(c.siteId, c.accountId, { client_contact_email: 'reader@client.example' });
+      await setSchedule(c.siteId, c.accountId);
+      const asked = await issueConfirmation(c.siteId, NOW, 'first');
+      expect(await confirm(asked.token as string, at(8))).toEqual({ outcome: 'gone' });
+      expect(await decline(asked.token as string, at(8))).toEqual({ outcome: 'declined' });
+    });
+
+    it('with the pause link’s token: the reports stop too, and the account’s resume is refused', async () => {
+      const c = await confirmed('reader@client.example');
+      const token = pauseToken();
+      await issuePause(c.siteId, NOW, token);
+      expect(await decline(token, at(1))).toEqual({ outcome: 'declined' });
+      expect(iso((await schedule(c.siteId))!.paused_by_recipient_at)).toBe(at(1));
+      expect(mine(await due(at(60)), c)).toEqual([]);
+      expect(await resume(c.siteId, c.accountId, at(2))).toEqual({ outcome: 'declined' });
+      expect((await schedule(c.siteId))!.paused_by_recipient_at).not.toBeNull();
+      // Pressed again, the pause link's token still answers; the first time stands.
+      expect(await decline(token, at(5))).toEqual({ outcome: 'declined' });
+      expect(iso((await refusals(c.siteId))[0]!.declined_at)).toBe(at(1));
+    });
+
+    it('answers gone for a token no schedule holds, and records nothing', async () => {
+      const c = await confirmed();
+      expect(await decline(pauseToken())).toEqual({ outcome: 'gone' });
+      expect(await refusals(c.siteId)).toEqual([]);
+    });
+  });
+
+  describe('the erasure', () => {
+    it('a contact blanked by any writer but set_client takes what that address refused with it', async () => {
+      const c = await pausedClient();
+      // The erasure's rule 30, as it writes: the address set null in the site's row.
+      await db.query(
+        `update public.sites set client_contact_email = null where lower(client_contact_email) = $1`,
+        [c.contact],
+      );
+      expect(await refusals(c.siteId)).toEqual([]);
+    });
+
+    it('a report’s recipient blanked (rule 29) takes what that address refused on the report’s site, though it is the contact no longer', async () => {
+      const c = await confirmed('reader@client.example');
+      const report = await writeReport(c.siteId, '2026-11-16T09:00:00.000Z', await check(c.siteId));
+      const token = pauseToken();
+      await issuePause(c.siteId, NOW, token);
+      await pause(token, at(1));
+      await setClient(c.siteId, c.accountId, { client_contact_email: 'successor@client.example' });
+      expect(await refusals(c.siteId)).toHaveLength(1);
+      await db.query(`update public.reports set recipient_email = null where id = $1`, [
+        report.report_id,
+      ]);
+      expect(await refusals(c.siteId)).toEqual([]);
+    });
   });
 });
 
