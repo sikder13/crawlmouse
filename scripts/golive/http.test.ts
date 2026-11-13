@@ -141,8 +141,8 @@ describe('the outbound allow-list', () => {
     expect(seen).toEqual(['plain text body']);
   });
 
-  it('collects nested leaves and keys', () => {
-    expect(stringLeaves({ a: ['x', { b: 'y' }], c: 1 })).toEqual(['a', 'x', 'b', 'y', 'c']);
+  it('collects nested values, not keys', () => {
+    expect(stringLeaves({ a: ['x', { b: 'y' }], c: 1 })).toEqual(['x', 'y']);
   });
 });
 

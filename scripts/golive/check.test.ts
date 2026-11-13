@@ -1,6 +1,6 @@
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { main, parseArgs, parseEnvFile } from './check';
+import { earlyRedactor, main, parseArgs, parseEnvFile } from './check';
 import { PRECONDITIONS } from './preconditions';
 import { PROBES, type ProbeId } from './probes/index';
 import { pass, type Probe, type ProbeResult } from './probes/types';
@@ -287,5 +287,96 @@ describe('no token, file value or received value reaches what the command writes
     expect(code).toBe(2);
     expect(err.join('\n')).toContain(MASK);
     expect(err.join('\n')).not.toContain(token);
+  });
+});
+
+describe('the redactor masks secrets, not the words the check prints (review r1 N1)', () => {
+  const mainWith = async (
+    file: string,
+    route: Parameters<typeof scriptedFetch>[0],
+    probes?: Record<ProbeId, Probe>,
+  ) => {
+    const out: string[] = [];
+    await main(['--step', '5'], {
+      processEnv: {},
+      readFile: () => file,
+      fetch: scriptedFetch(route).fetch,
+      now: () => new Date(Date.UTC(2026, 10, 13)),
+      git: scriptedGit({}),
+      out: (s) => out.push(s),
+      err: (s) => out.push(s),
+      probes,
+    });
+    return out.join('\n');
+  };
+
+  it('prints the worker host and the JSON keys a response carried, and masks a received value', async () => {
+    const planted = 'a-received-secret-' + 'x'.repeat(12);
+    const all = await mainWith(`FLY_READ_TOKEN=${fakeToken(['fo1'])}`, (url) => {
+      if (url.hostname === 'crawlmouse-worker.fly.dev')
+        return json({ ok: true, app: 'crawlmouse-worker', statements: planted });
+      return json([
+        { state: 'started', image_ref: { repository: 'crawlmouse-worker', tag: planted } },
+      ]);
+    });
+    expect(all).toContain(
+      'worker-healthz: pass (https://crawlmouse-worker.fly.dev/healthz answered 200 ok)',
+    );
+    expect(all).not.toContain(planted);
+  });
+
+  it('masks a received string of 12 characters or more, and leaves a shorter one', async () => {
+    const long = 'r'.repeat(12);
+    const short = 's'.repeat(11);
+    const probes = allPass();
+    probes['vercel-env-1'] = async (d) => {
+      await d.fetch(`https://api.vercel.com/v10/projects/${VERCEL_PROJECT_ID}/env`);
+      return { status: 'fail', reason: `${long} ${short}` };
+    };
+    const all = await mainWith(
+      `VERCEL_TOKEN=${fakeToken(['vcp'])}`,
+      () => json({ a: long, b: short }),
+      probes,
+    );
+    expect(all).toContain(`vercel-env-step-1: fail (${MASK} ${short})`);
+  });
+
+  it('registers a short file value only for a token-named variable', async () => {
+    const probes = allPass();
+    probes['vercel-env-1'] = async (d) => ({
+      status: 'fail',
+      reason: `token ${d.env.VERCEL_TOKEN} pepper ${d.env.TRIAL_LEDGER_PEPPER} region iad 1`,
+    });
+    const all = await mainWith(
+      'CRAWL_PAUSED=1\nWORKER_REGION=iad\nVERCEL_TOKEN=tok9\nTRIAL_LEDGER_PEPPER=pep7',
+      () => json({}),
+      probes,
+    );
+    expect(all).toContain('step 1: ');
+    expect(all).toContain('golive:check — gating step 5');
+    expect(all).toContain(`vercel-env-step-1: fail (token ${MASK} pepper ${MASK} region iad 1)`);
+  });
+
+  it('masks a long file value whatever its name', async () => {
+    const value = 'https://some-long-value.example/' + 'p'.repeat(8);
+    const probes = allPass();
+    probes['vercel-env-1'] = async (d) => ({ status: 'fail', reason: `${d.env.CRAWL_WORKER_URL}` });
+    const all = await mainWith(`CRAWL_WORKER_URL=${value}`, () => json({}), probes);
+    expect(all).toContain(`vercel-env-step-1: fail (${MASK})`);
+  });
+
+  it('the early redactor reads the file --env-file names', () => {
+    const value = 'an-env-file-secret-' + 'e'.repeat(12);
+    const read: string[] = [];
+    const early = earlyRedactor(
+      ['--', '--env-file', 'other/.env'],
+      { INIT_CWD: '/caller' },
+      (p) => {
+        read.push(p);
+        return `SOME_SECRET=${value}\nVERCEL_TOKEN=tok9`;
+      },
+    );
+    expect(read).toEqual(['/caller/other/.env']);
+    expect(early.redact(`x ${value} tok9 step 1`)).toBe(`x ${MASK} ${MASK} step 1`);
   });
 });

@@ -12,7 +12,7 @@
  * refused unless it goes to that token's host, and an `authorization` header is refused unless it
  * carries the token of the host it goes to.
  *
- * Every string in a JSON response body is handed to `onValue` (the CLI registers them with its
+ * Every string value in a JSON response body (not its keys) is handed to `onValue` (the CLI registers them with its
  * redactor); a body that is not JSON is handed over whole.
  */
 import { PRODUCTION_REF } from '../db/target';
@@ -130,15 +130,12 @@ export function refusal(
   return null;
 }
 
-/** Every string leaf of a parsed JSON value, keys included. */
+/** Every string value of a parsed JSON value. Object keys are names, not values, and are left out. */
 export function stringLeaves(value: unknown, out: string[] = []): string[] {
   if (typeof value === 'string') out.push(value);
   else if (Array.isArray(value)) for (const v of value) stringLeaves(v, out);
   else if (value !== null && typeof value === 'object') {
-    for (const [k, v] of Object.entries(value)) {
-      out.push(k);
-      stringLeaves(v, out);
-    }
+    for (const v of Object.values(value)) stringLeaves(v, out);
   }
   return out;
 }
