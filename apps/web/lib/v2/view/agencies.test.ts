@@ -83,13 +83,15 @@ describe('the capability table', () => {
 
   // The proof readers themselves, on each side.
   it('tells a present path from an absent one, and text present from text absent', () => {
-    const one: Proof = { kind: 'absent', path: 'apps/web/app/agency' };
+    // A file no step has added: the renewal reminder's template (the row `renewal_reminders`).
+    const NOT_THERE = 'apps/web/lib/v2/mail/templates/renewal-reminder.ts';
+    const one: Proof = { kind: 'absent', path: NOT_THERE };
     const other: Proof = { kind: 'absent', path: 'apps/web/app/api/checks/route.ts' };
     expect(holds({ kind: 'all', of: [one, one] })).toBe(true);
     expect(holds({ kind: 'all', of: [one, other] })).toBe(false);
     expect(holds({ kind: 'all', of: [other, one] })).toBe(false);
     expect(holds({ kind: 'exists', path: 'apps/web/app/api/checks/route.ts' })).toBe(true);
-    expect(holds({ kind: 'exists', path: 'apps/web/app/agency' })).toBe(false);
+    expect(holds({ kind: 'exists', path: NOT_THERE })).toBe(false);
     expect(holds({ kind: 'absent', path: 'apps/web/app/api/checks/route.ts' })).toBe(false);
     expect(holds({ kind: 'holds', path: 'apps/web/lib/billing/prices.ts', text: 'usd(' })).toBe(
       true,
@@ -103,46 +105,46 @@ describe('the capability table', () => {
 // Tier B TB-N1: each coming capability's pattern, varied over the ways the pages and FACTS name it.
 // Pricing's plan rows and FACTS's tier line are in this list, not only the copy written to pass it.
 const PARAPHRASES: Partial<Record<CapabilityKey, readonly string[]>> = {
-  exports: ['PDF, CSV and JSON', 'PDF/CSV/JSON export', 'export', 'Exports'],
   staging: [
     'Audit preview and staging URLs before you deploy',
     'staging/preview audits',
     'a staging URL',
   ],
   renders: ['10 full renders a month', '30 renders', 'Full JavaScript renders a month'],
-  seats: ['5 seats', 'Two seats', '$12 a seat beyond', 'one seat'],
   competitors: ['1 competitor per site', '3 competitors', 'Competitors per site'],
   renewal_reminders: [
     'We email you 45 and 20 days before an annual renewal',
     'renewal reminders at 45 and 20 days',
   ],
-  client_report_page: ['reports on your domain with your logo', 'client report page'],
+  client_report_page: [
+    'reports on your domain with your logo',
+    'client report page',
+    'set your domain and logo under Branding',
+  ],
   sender_address: ['emails from your address', 'Emails to clients from your address'],
-  client_matrix: ['Client matrix', 'every client on one screen'],
   observed_crawlers: [
     'Pro also lists the crawlers it has seen on your site (observed activity).',
     'observed activity',
   ],
   one_pagers: ['client one-pagers', 'Prospect one-pagers', 'one-page summary'],
-  client_reports: [
-    'reports under your name',
-    'Agencies reporting to clients under their own name.',
-    'Weekly or monthly client reports, sent for you',
-    'client reports',
-    'shown on client reports',
-  ],
   evidence_condensed: [
     'Evidence older than 90 days is condensed to headers and the parts of pages that changed.',
     'evidence older than 30 days',
-  ],
-  agency_workspace: [
-    'its first audit runs from the agency workspace',
-    'set your domain and logo under Branding',
   ],
 };
 
 /** Text naming only built things, which no coming pattern may match. */
 const BUILT_ONLY = [
+  // CC-31's merge: what it built is named by no coming pattern.
+  'PDF, CSV and JSON',
+  '5 seats',
+  '$12 a seat beyond',
+  'Client matrix',
+  'every client on one screen',
+  'Weekly or monthly client reports, sent for you',
+  'reports under your name',
+  'shown on client reports',
+  'its first audit runs from the agency workspace',
   'Server-render the product template, 158 pages',
   'Monthly',
   'Yearly',

@@ -54,7 +54,9 @@ describe('the Agency trial page names only capabilities it can account for', () 
   it.each(pages)('%s', (_name, html) => {
     const r = capabilitySweep(html);
     expect(r.tagged).toBeGreaterThan(10);
-    expect(r.seen).toBeGreaterThan(8);
+    // Not a vacuous run: the page still names capabilities that are coming (fewer since CC-31's
+    // merge built five of them).
+    expect(r.seen).toBeGreaterThan(3);
     expect(r.unknown).toEqual([]);
     expect(r.unmarked).toEqual([]);
     expect(r.overMarked).toEqual([]);
