@@ -24,6 +24,8 @@ const CONTACT_PILL: Record<Exclude<ContactState, 'none'>, PillState> = {
   asked: 'unverified',
   not_asked: 'unverified',
   paused: 'warn',
+  // Not asked, and not to be while the trial runs: unconfirmed, as the two above.
+  trial: 'unverified',
 };
 
 function Contact({ contact }: { contact: ClientReportRowView['contact'] }) {
