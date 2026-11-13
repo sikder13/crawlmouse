@@ -4,7 +4,7 @@
  * compiler holds the two lists to one set. A code outside it shows nothing.
  */
 import type { Tier } from '../../entitlement-v2';
-import { CONFIRM_MAILS_PER_DAY } from '../agency/confirm-bounds';
+import { CONFIRM_MAILS_PER_DAY, REASK_WINDOW_DAYS } from '../agency/confirm-bounds';
 import { sitesFullMessage } from '../agency/gates';
 import { ALERTS_SENDER } from '../../auth/constants';
 import type { Addition } from '../copy-registry';
@@ -155,12 +155,12 @@ export const NOTICE_LINES: Record<NoticeCode, (at: string | null) => string> = {
   contact_declined: () =>
     'This contact answered “Don’t ask me again”, so no request to confirm is sent to that address for this client, and no report. Nothing done here changes that.',
   asked_recently: (at) =>
-    `This contact paused the reports and has been asked to confirm again since. It is asked once, not again and again.${at ? ` It can be asked again from ${at}.` : ''}`,
+    `This contact paused the reports and has been asked to confirm again since. A contact that paused is asked at most once in ${REASK_WINDOW_DAYS} days.${at ? ` It can be asked again from ${at}.` : ''}`,
   report_declined: () =>
     'Done. You will not be asked again about these reports, and none is sent to this address.',
   report_confirmed: () => 'Confirmed. The reports will be sent to this address.',
   report_paused: () =>
-    'Paused. No more reports are sent. They start again only if you are asked to confirm again and do; you are asked once.',
+    `Paused. No more reports are sent. They start again only if you are asked to confirm again and do; you are asked at most once in ${REASK_WINDOW_DAYS} days.`,
   report_link_gone: () => 'This link can no longer be used: it was replaced or has expired.',
   invalid: () => 'That request was not understood, so nothing was changed.',
   method_not_allowed: () => 'That form could not be sent that way. Reload the page and try again.',

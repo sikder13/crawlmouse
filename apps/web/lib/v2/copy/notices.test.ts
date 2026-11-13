@@ -106,6 +106,17 @@ describe('noticeLine', () => {
     expect(Object.keys(NOTICE_LINES).sort()).toEqual([...NOTICE_CODES].sort());
   });
 
+  it('a contact asked since its pause: the day it can be asked again is a date in the account’s zone, not a weekday and a time', () => {
+    // 03:00 UTC on Mon 14 Dec is Sunday evening in Indianapolis.
+    const next = '2026-12-14T03:00:00.000Z';
+    const line = (zone: string) => noticeLine({ notice: 'asked_recently', next }, zone)!.text;
+    expect(line('America/Indiana/Indianapolis')).toBe(
+      'This contact paused the reports and has been asked to confirm again since. A contact that paused is asked at most once in 30 days. It can be asked again from Sun 13 Dec.',
+    );
+    expect(line('UTC')).toContain('from Mon 14 Dec.');
+    expect(noticeLine({ notice: 'asked_recently' }, 'UTC')!.text).not.toContain('from');
+  });
+
   it('a cap with no readable time leaves the time out rather than guess', () => {
     expect(noticeLine({ notice: 'capped', next: 'soon' }, ZONE)!.text).toBe(
       'This site has used its re-checks for the last 24 hours on your plan.',

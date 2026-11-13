@@ -85,6 +85,23 @@ describe('recipientLinkView', () => {
     );
   });
 
+  it('shows an account’s name by the mail’s rule: one shaped like a link or an address is not shown', () => {
+    for (const accountName of ['evil.example/login', 'pay@evil.example', 'https://evil.example']) {
+      for (const kind of ['confirm', 'pause'] as const) {
+        const v = recipientLinkView(kind, { kind, host: 'x.example', accountName }, null);
+        expect(v.lines[0]).toMatch(/^A Crawlmouse customer /);
+        expect(v.lines.join(' ')).not.toContain('evil');
+      }
+      const declining = recipientLinkView(
+        'decline',
+        { kind: 'confirm', host: 'x.example', accountName },
+        null,
+        true,
+      );
+      expect(declining.lines.join(' ')).not.toContain('evil');
+    }
+  });
+
   it('offers nothing for no link, and for a link of the other kind', () => {
     for (const v of [
       recipientLinkView('confirm', null, null),

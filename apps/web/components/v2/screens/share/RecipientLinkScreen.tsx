@@ -13,28 +13,34 @@ import styles from './RecipientLinkScreen.module.css';
 export function RecipientLinkScreen({ data }: { data: RecipientLinkPageView }) {
   return (
     <PageShell>
-      <Card as="section" className={styles.card}>
-        <Heading level={1} size="m">
-          {data.title}
-        </Heading>
-        {data.lines.map((line) => (
-          <p key={line} className={styles.line} role={data.state === 'done' ? 'status' : undefined}>
-            {line}
-          </p>
-        ))}
-        {data.act ? <AcceptForm action={data.act.action} label={data.act.label} /> : null}
-        {data.also ? (
-          <>
-            <p className={styles.line}>{data.also.line}</p>
-            <AcceptForm
-              action={data.also.action}
-              label={data.also.label}
-              fields={{ from: data.also.from }}
-              quiet
-            />
-          </>
-        ) : null}
-      </Card>
+      <main>
+        <Card as="section" className={styles.card}>
+          <Heading level={1} size="m">
+            {data.title}
+          </Heading>
+          {data.lines.map((line) => (
+            <p
+              key={line}
+              className={styles.line}
+              role={data.state === 'done' ? 'status' : undefined}
+            >
+              {line}
+            </p>
+          ))}
+          {data.act ? <AcceptForm action={data.act.action} label={data.act.label} /> : null}
+          {data.also ? (
+            <>
+              <p className={styles.line}>{data.also.line}</p>
+              <AcceptForm
+                action={data.also.action}
+                label={data.also.label}
+                fields={{ from: data.also.from }}
+                quiet
+              />
+            </>
+          ) : null}
+        </Card>
+      </main>
     </PageShell>
   );
 }

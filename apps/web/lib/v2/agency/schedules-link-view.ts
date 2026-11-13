@@ -7,8 +7,16 @@ import { LINK_FLOWS } from '../account/link-cookie';
 import type { NoticeCode } from '../account/route';
 import { RECIPIENT_COPY as COPY } from '../copy/agency-reports';
 import { NOTICE_LINES } from '../copy/notices';
+import { accountNameText } from '../mail/templates/parts';
 import { RECIPIENT_LINKS, type RecipientLink } from './schedules';
 import type { RecipientLinkView } from './schedules-store';
+
+/**
+ * Who sends: the account's name as a mail shows it, which is not at all when it holds text of a
+ * shape a mail client or a browser would read as a link or an address (`accountNameText`).
+ */
+const senderOf = (link: RecipientLinkView): string =>
+  accountNameText(link.accountName) ?? COPY.someone;
 
 export interface RecipientLinkPageView {
   state: 'link' | 'done' | 'gone';
@@ -47,9 +55,7 @@ export function recipientLinkView(
     return {
       state: 'link',
       title: COPY.decline.title,
-      lines: link
-        ? COPY.decline.lines(link.accountName ?? COPY.someone, link.host)
-        : [...COPY.decline.plain],
+      lines: link ? COPY.decline.lines(senderOf(link), link.host) : [...COPY.decline.plain],
       act,
       also: null,
     };
@@ -60,10 +66,10 @@ export function recipientLinkView(
   return {
     state: 'link',
     title: COPY[kind].title,
-    lines: COPY[kind].lines(link.accountName ?? COPY.someone, link.host),
+    lines: COPY[kind].lines(senderOf(link), link.host),
     act,
     also: {
-      line: COPY.forGood,
+      line: kind === 'pause' ? `${COPY.forGood} ${COPY.forGoodStopsToo}` : COPY.forGood,
       action: LINK_FLOWS.reportDecline.api,
       label: COPY.declineButton,
       from: kind,

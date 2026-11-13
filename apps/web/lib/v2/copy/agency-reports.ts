@@ -3,11 +3,15 @@
  * link's, the pause link's and "Don't ask me again". Each says what the button does before it is
  * pressed; none names an address.
  */
+import { REASK_WINDOW_DAYS } from '../agency/confirm-bounds';
+
 export const RECIPIENT_COPY = {
   /** The sender, for an account that has no name. */
   someone: 'A Crawlmouse customer',
   /** On the confirmation mail, the confirmation page and the pause page (owner ruling, Q42). */
   forGood: 'You can stop these requests for good with one click.',
+  /** On the pause page, after it: the second button stops the reports as the first does. */
+  forGoodStopsToo: 'It stops these reports as well.',
   declineButton: 'Don’t ask me again',
   confirm: {
     title: 'Confirm these reports',
@@ -22,7 +26,7 @@ export const RECIPIENT_COPY = {
     title: 'Stop these reports',
     lines: (sender: string, host: string) => [
       `${sender} sends reports about ${host} to this address.`,
-      'The button stops them. The sender cannot start them again: they start only if you are asked to confirm again and do, and you are asked once.',
+      `The button stops them. The sender cannot start them again: they start only if you are asked to confirm again and do. You are asked at most once in ${REASK_WINDOW_DAYS} days.`,
     ],
     button: 'Stop the reports',
     done: 'Stopped',
@@ -42,6 +46,6 @@ export const RECIPIENT_COPY = {
   },
   gone: {
     title: 'This link can no longer be used',
-    line: 'It was replaced by a newer one, or it has expired. The latest mail you were sent has the link that works.',
+    line: 'Open the link in the mail again. If it still cannot be used, it was replaced by a newer one or has expired: the latest mail you were sent has the link that works.',
   },
 } as const;
