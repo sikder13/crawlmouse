@@ -14,7 +14,7 @@ export interface SegmentErrorProps {
 /**
  * The error boundary of a signed-in segment (`error.tsx`, CC-33 D5): it reports the error to Sentry
  * and shows the error screen with the event's id, and a support link carrying the page's path, the
- * ids in it and that id. A client boundary holds no account id (questions Q5).
+ * ids in it, that id and the error's digest. A client boundary holds no account id (questions Q5).
  *
  * Retrying refreshes the route before resetting the boundary. In Next 15 `reset` only clears the
  * boundary's state (next/dist/client/components/error-boundary.js, `this.reset`), re-rendering the
@@ -29,7 +29,13 @@ export function SegmentError({ error, reset }: SegmentErrorProps) {
   useEffect(() => {
     setEventId(Sentry.captureException(error));
   }, [error]);
-  const support = supportMailto({ topic: 'error', path: path ?? '', ...idsInPath(path), eventId });
+  const support = supportMailto({
+    topic: 'error',
+    path: path ?? '',
+    ...idsInPath(path),
+    eventId,
+    digest: error.digest ?? null,
+  });
   const retry = () =>
     startTransition(() => {
       router.refresh();

@@ -3,7 +3,7 @@
  * The signed-in segments' error boundaries (CC-33 D5): each reports the error to Sentry, shows the
  * error screen with the event's id, retries by refreshing the route from the server and then
  * resetting the boundary, and links support with the mailto the builder makes from the page's path,
- * the ids in it and the event id.
+ * the ids in it, the event id and the error's digest.
  */
 import { act, type ComponentType } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -24,6 +24,7 @@ vi.mock('next/navigation', () => ({ usePathname: () => nav.path, useRouter: () =
 
 const SITE = '0b0e7a52-5f0b-4b53-9c0e-0d4a3a1f2c11';
 const EVENT = '4f0b6c1d2e3a4b5c6d7e8f9a0b1c2d3e';
+const DIGEST = '2384917703';
 
 let root: Root | null = null;
 afterEach(() => {
@@ -57,7 +58,7 @@ describe.each(BOUNDARIES)('app/%s/error.tsx', (_segment, path, load) => {
     const { default: Boundary } = await load();
     sentry.id = EVENT;
     nav.path = path;
-    const error = new Error('boom');
+    const error = Object.assign(new Error('boom'), { digest: DIGEST });
     const host = mount(Boundary, { error, reset: vi.fn() });
     expect(captureException).toHaveBeenCalledWith(error);
     expect(host.querySelectorAll('h1')).toHaveLength(1);
@@ -72,9 +73,11 @@ describe.each(BOUNDARIES)('app/%s/error.tsx', (_segment, path, load) => {
       path,
       ...(path.startsWith('/sites/') ? { siteId: SITE } : {}),
       eventId: EVENT,
+      digest: DIGEST,
     });
     expect(link.getAttribute('href')).toBe(expected);
     expect(decodeURIComponent(expected)).toContain(`Reference: ${EVENT}`);
+    expect(decodeURIComponent(expected)).toContain(`Server reference: ${DIGEST}`);
   });
 
   // Next 15's `reset` only clears the boundary's state (next/dist/client/components/

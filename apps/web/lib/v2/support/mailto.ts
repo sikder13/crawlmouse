@@ -1,7 +1,7 @@
 /**
  * The support link (CC-33 D5): a `mailto:` to the support address with a fixed subject and a body
  * whose first lines carry the ids the page has. Each value is kept only when it has the shape of its
- * field (an id, the path, a fix type, a Sentry event id); anything else is dropped, never escaped and
+ * field (an id, the path, a fix type, a Sentry event id, an error's digest); anything else is dropped, never escaped and
  * kept, so no value can carry a line break, an address or a header into the email. The property test
  * beside this file holds that for any string in any field.
  */
@@ -21,10 +21,17 @@ export interface SupportRequest {
   fixType?: string | null;
   /** The Sentry event id of the error the page showed. */
   eventId?: string | null;
+  /**
+   * `error.digest`: Next's hash of an error thrown on the server, which the browser receives in place
+   * of the error's message and which matches the error in the server's logs (Next 15's error.js
+   * reference).
+   */
+  digest?: string | null;
 }
 
 const ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const EVENT_ID = /^[0-9a-f]{32}$/i;
+const DIGEST = /^[0-9A-Za-z]{1,32}$/;
 const PATH = /^\/[A-Za-z0-9/_.-]{0,200}$/;
 const FIX_TYPES: ReadonlySet<string> = new Set(FixTypeSchema.options);
 
@@ -39,6 +46,7 @@ const FIELDS: readonly [keyof SupportRequest, string, (v: string) => boolean][] 
   ['fixId', 'Fix', (v) => ID.test(v)],
   ['fixType', 'Fix type', isFixType],
   ['eventId', 'Reference', (v) => EVENT_ID.test(v)],
+  ['digest', 'Server reference', (v) => DIGEST.test(v)],
 ];
 
 export function supportMailto(input: SupportRequest): string {
