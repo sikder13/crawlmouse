@@ -21,6 +21,7 @@ drop function if exists public.operator_finish(bigint, text);
 drop function if exists public.operator_request_check(uuid, uuid, text, jsonb, integer, jsonb);
 drop function if exists public.operator_log(uuid, text, uuid, text, text, text);
 drop table if exists public.operator_actions;
+drop function if exists public.operator_account_counts(uuid, uuid[], uuid[]);
 drop function if exists public.user_id_by_email(text);
 drop function if exists public.operator_account_ids_by_email(text);
 drop function if exists public.is_operator();

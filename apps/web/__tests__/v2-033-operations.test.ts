@@ -20,6 +20,7 @@ const ROLLBACK = '20261115000001_v2_033_operations.revert.sql';
 const FUNCTIONS = [
   'is_internal_subject',
   'is_operator',
+  'operator_account_counts',
   'operator_account_ids_by_email',
   'operator_finish',
   'operator_log',
@@ -292,6 +293,53 @@ describe('operator_account_ids_by_email', () => {
     await expect(
       asRole(db, role, null, (tx) =>
         tx.query('select * from public.operator_account_ids_by_email($1)', ['x']),
+      ),
+    ).rejects.toThrow(/permission denied/);
+  });
+});
+
+describe('operator_account_counts', () => {
+  const counts = async (accountId: string, sites: string[], rules: string[]) =>
+    (
+      await asRole(db, 'service_role', null, (tx) =>
+        tx.query('select * from public.operator_account_counts($1, $2, $3)', [
+          accountId,
+          sites,
+          rules,
+        ]),
+      )
+    ).rows[0];
+
+  it("counts the account's seats, sites, mail and rules, and the checks of the sites it is given", async () => {
+    const { accountId } = await personalAccount(db, await person());
+    const s1 = await site(accountId);
+    const s2 = await site(accountId);
+    await failedCheck(s1);
+    await failedCheck(s1);
+    await failedCheck(s2);
+    const elsewhere = await site((await personalAccount(db, await person())).accountId);
+    await failedCheck(elsewhere);
+    expect(await counts(accountId, [s1, s2], [])).toEqual({
+      seats: 1,
+      sites: 2,
+      checks: 3,
+      mail: 0,
+      rules: 0,
+      alerts: 0,
+      fixes: 0,
+    });
+    expect(await counts(accountId, [s1], [])).toMatchObject({ checks: 2 });
+    expect(await counts(accountId, [s1, elsewhere], [])).toMatchObject({ checks: 2 });
+  });
+
+  it.each(['anon', 'authenticated'] as const)('%s may not execute it', async (role) => {
+    await expect(
+      asRole(db, role, null, (tx) =>
+        tx.query('select * from public.operator_account_counts($1, $2, $3)', [
+          randomUUID(),
+          [],
+          [],
+        ]),
       ),
     ).rejects.toThrow(/permission denied/);
   });

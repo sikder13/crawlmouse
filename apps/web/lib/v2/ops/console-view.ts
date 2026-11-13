@@ -4,7 +4,7 @@
  * dashboard only when it has a customer id's shape, so no other stored value becomes a link.
  */
 import type { Route } from 'next';
-import type { AccountRow, Dossier } from './console-store';
+import type { AccountRow, Dossier, DossierSection } from './console-store';
 
 /** StatusPill's states, named here so this module imports nothing of the v2 components. */
 export type Pill = 'ok' | 'warn' | 'bad' | 'unverified' | 'neutral';
@@ -94,7 +94,21 @@ export interface AccountView {
     reason: string;
   }[];
   fixes: { key: string; number: string; type: string; status: string; host: string }[];
+  /** How many rows of each list the page does not show: the list's count less the rows read. */
+  withheld: Record<DossierSection, number>;
+  /** A line under a list that leaves rows out, when other lists are read from the rows it shows. */
+  notes: { sites: string | null; rules: string | null };
 }
+
+const SECTIONS: readonly DossierSection[] = [
+  'seats',
+  'sites',
+  'checks',
+  'mail',
+  'rules',
+  'alerts',
+  'fixes',
+];
 
 function historyOf(raw: unknown): { state: string; since: string }[] {
   if (!Array.isArray(raw)) return [];
@@ -109,6 +123,9 @@ function historyOf(raw: unknown): { state: string; since: string }[] {
 
 export function accountView(d: Dossier): AccountView {
   const a = d.account;
+  const withheld = Object.fromEntries(
+    SECTIONS.map((k) => [k, Math.max(0, d.totals[k] - d[k].length)]),
+  ) as Record<DossierSection, number>;
   const sites = new Map(d.sites.map((s) => [s.id, s]));
   const hostOf = (siteId: string | null) =>
     siteId === null ? 'Account' : (sites.get(siteId)?.host ?? siteId);
@@ -202,6 +219,12 @@ export function accountView(d: Dossier): AccountView {
       status: f.status,
       host: hostOf(f.site_id),
     })),
+    withheld,
+    notes: {
+      sites:
+        withheld.sites > 0 ? 'The checks and open fixes below are those of the sites shown.' : null,
+      rules: withheld.rules > 0 ? 'The alerts below are those of the rules shown.' : null,
+    },
   };
 }
 

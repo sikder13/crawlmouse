@@ -4,13 +4,15 @@
  * `supabaseConsoleStore` takes the client itself, for tests.
  *
  * What it reads, by table and column (migrations 001, 003, 028 and 20261115000001): the account's
- * row; its seats, with `users.email` for each seat's user; its sites; the last 20 checks across those
+ * row; its seats, with `users.email` for each seat's user; its sites; the last checks across those
  * sites by `queued_at`; its mail ledger (`email_sends`: kind, status, attempts, error_code, claimed_at,
- * sent_at, and not `address_hash`); its alert rules and their last 20 events; and its sites' open and
- * reopened fixes. It writes through `operator_log` and `operator_finish`; a queued re-run's line is
+ * sent_at, and not `address_hash`); its alert rules and their last events; and its sites' open and
+ * reopened fixes. Each list is read up to its `DOSSIER_LIMITS` entry, and `operator_account_counts`
+ * says how many rows it has, so the page can say what it left out. It writes through `operator_log` and `operator_finish`; a queued re-run's line is
  * written by `operator_request_check` (lib/v2/ops/rerun.ts).
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { z } from 'zod';
 import { consoleAdmin, type OperatorProof } from './operator';
 import type { SearchQuery } from './search';
 
@@ -20,6 +22,21 @@ export const SEARCH_RESULTS_MAX = 20;
 export const RECENT_MAX = 20;
 /** How many mail ledger rows an account page shows. */
 export const MAIL_MAX = 50;
+
+/** The lists of an account page. */
+export type DossierSection = 'seats' | 'sites' | 'checks' | 'mail' | 'rules' | 'alerts' | 'fixes';
+export type DossierLimits = Readonly<Record<DossierSection, number>>;
+
+/** How many rows of each list an account page reads; `Dossier.totals` says how many there are. */
+export const DOSSIER_LIMITS: DossierLimits = {
+  seats: 100,
+  sites: 100,
+  checks: RECENT_MAX,
+  mail: MAIL_MAX,
+  rules: 100,
+  alerts: RECENT_MAX,
+  fixes: 100,
+};
 
 /** What a search was, as the record names it: an id resolves to the kind of row it named. */
 export type ResolvedKind =
@@ -122,6 +139,11 @@ export interface Dossier {
   rules: RuleRow[];
   alerts: AlertEventRow[];
   fixes: FixRow[];
+  /**
+   * How many rows each list has in all (`operator_account_counts`): checks and fixes of the sites
+   * read, alert events of the rules read.
+   */
+  totals: Record<DossierSection, number>;
 }
 
 export interface RerunTarget {
@@ -181,7 +203,21 @@ const unique = (ids: readonly (string | null)[]): string[] => [
   ...new Set(ids.filter((x): x is string => x !== null)),
 ];
 
-export function supabaseConsoleStore(admin: SupabaseClient, operatorId: string): ConsoleStore {
+const Totals = z.strictObject({
+  seats: z.number().int(),
+  sites: z.number().int(),
+  checks: z.number().int(),
+  mail: z.number().int(),
+  rules: z.number().int(),
+  alerts: z.number().int(),
+  fixes: z.number().int(),
+});
+
+export function supabaseConsoleStore(
+  admin: SupabaseClient,
+  operatorId: string,
+  limits: DossierLimits = DOSSIER_LIMITS,
+): ConsoleStore {
   const accountsWhere = async (column: 'id' | 'stripe_customer_id', value: string) =>
     rows<{ id: string }>(
       `accounts by ${column}`,
@@ -283,7 +319,8 @@ export function supabaseConsoleStore(admin: SupabaseClient, operatorId: string):
           .from('seats')
           .select('id, user_id, role, status, accepted_at, removed_at')
           .eq('account_id', accountId)
-          .order('created_at', { ascending: true }),
+          .order('created_at', { ascending: true })
+          .limit(limits.seats),
       );
       const userIds = unique(seats.map((s) => s.user_id));
       const users =
@@ -291,7 +328,7 @@ export function supabaseConsoleStore(admin: SupabaseClient, operatorId: string):
           ? []
           : rows<{ id: string; email: string }>(
               'users',
-              await admin.from('users').select('id, email').in('id', userIds),
+              await admin.from('users').select('id, email').in('id', userIds).limit(limits.seats),
             );
       const sites = rows<SiteRow>(
         'sites',
@@ -299,7 +336,8 @@ export function supabaseConsoleStore(admin: SupabaseClient, operatorId: string):
           .from('sites')
           .select('id, host, paused_reason, removed_at')
           .eq('account_id', accountId)
-          .order('created_at', { ascending: true }),
+          .order('created_at', { ascending: true })
+          .limit(limits.sites),
       );
       const siteIds = sites.map((s) => s.id);
       const checks =
@@ -314,7 +352,7 @@ export function supabaseConsoleStore(admin: SupabaseClient, operatorId: string):
                 )
                 .in('site_id', siteIds)
                 .order('queued_at', { ascending: false })
-                .limit(RECENT_MAX),
+                .limit(limits.checks),
             );
       const mail = rows<MailRow>(
         'email_sends',
@@ -323,14 +361,17 @@ export function supabaseConsoleStore(admin: SupabaseClient, operatorId: string):
           .select('id, kind, status, attempts, error_code, claimed_at, sent_at')
           .eq('account_id', accountId)
           .order('claimed_at', { ascending: false })
-          .limit(MAIL_MAX),
+          .limit(limits.mail),
       );
       const rules = rows<RuleRow>(
         'alert_rules',
         await admin
           .from('alert_rules')
           .select('id, site_id, kind, enabled, channels, last_fired_at')
-          .eq('account_id', accountId),
+          .eq('account_id', accountId)
+          .order('kind', { ascending: true })
+          .order('id', { ascending: true })
+          .limit(limits.rules),
       );
       const alerts =
         rules.length === 0
@@ -345,7 +386,7 @@ export function supabaseConsoleStore(admin: SupabaseClient, operatorId: string):
                   rules.map((r) => r.id),
                 )
                 .order('sent_at', { ascending: false })
-                .limit(RECENT_MAX),
+                .limit(limits.alerts),
             );
       const fixes =
         siteIds.length === 0
@@ -357,8 +398,15 @@ export function supabaseConsoleStore(admin: SupabaseClient, operatorId: string):
                 .select('id, site_id, number, type, status')
                 .in('site_id', siteIds)
                 .in('status', ['open', 'reopened'])
-                .order('number', { ascending: true }),
+                .order('number', { ascending: true })
+                .limit(limits.fixes),
             );
+      const counted = await admin.rpc('operator_account_counts', {
+        p_account: accountId,
+        p_sites: siteIds,
+        p_rules: rules.map((r) => r.id),
+      });
+      const totals = Totals.parse(rows<unknown>('operator_account_counts', counted)[0]);
       return {
         account,
         seats,
@@ -369,6 +417,7 @@ export function supabaseConsoleStore(admin: SupabaseClient, operatorId: string):
         rules,
         alerts,
         fixes,
+        totals,
       };
     },
 

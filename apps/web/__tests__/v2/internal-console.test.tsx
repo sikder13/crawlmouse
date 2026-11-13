@@ -61,6 +61,7 @@ const dossier = (customer: string | null): Dossier => ({
   rules: [],
   alerts: [],
   fixes: [],
+  totals: { seats: 1, sites: 1, checks: 1, mail: 0, rules: 0, alerts: 0, fixes: 0 },
 });
 
 const count = (html: string, s: string) => html.split(s).length - 1;
@@ -91,6 +92,25 @@ describe('the account screen', () => {
     expect(count(html, 'name="reason"')).toBe(2);
     expect(count(html, 'required=""')).toBe(2);
     expect(count(html, 'data-v2-primary')).toBe(0);
+  });
+
+  it('says under a section how many rows it does not show, and nothing when it shows them all', () => {
+    const whole = renderToStaticMarkup(
+      <ConsoleAccountScreen view={accountView(dossier(null))} notice={null} />,
+    );
+    expect(whole).not.toContain('more not shown');
+    const d = dossier(null);
+    const html = renderToStaticMarkup(
+      <ConsoleAccountScreen
+        view={accountView({ ...d, totals: { ...d.totals, sites: 4, checks: 21, fixes: 2 } })}
+        notice={null}
+      />,
+    );
+    expect(html).toMatch(/aria-label="Sites"[\s\S]*3 more not shown\./);
+    expect(html).toContain('The checks and open fixes below are those of the sites shown.');
+    expect(html).toMatch(/aria-label="Last 20 checks"[\s\S]*20 more not shown\./);
+    expect(html).toMatch(/aria-label="Open fixes"[\s\S]*2 more not shown\./);
+    expect(count(html, 'more not shown.')).toBe(3);
   });
 
   it('shows a notice as one line', () => {
