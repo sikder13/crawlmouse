@@ -194,6 +194,9 @@ describe('v2 stays out of live pages', () => {
     // CC-28: the Alerts page and the changes log.
     join(WEB_ROOT, 'app', 'alerts'),
     join(WEB_ROOT, 'app', 'changes'),
+    // CC-31 workstream B2: the proof page, signed in and through a share link.
+    join(WEB_ROOT, 'app', 'reports'),
+    join(WEB_ROOT, 'app', 's'),
   ];
   const inV2PageDir = (file: string) => V2_PAGE_DIRS.some((d) => file.startsWith(d + '/'));
   const allowed = (file: string) =>
@@ -235,6 +238,11 @@ describe('v2 stays out of live pages', () => {
       'app/changes/page.tsx',
       'app/dashboard/v2/page.tsx',
       'app/invite/page.tsx',
+      'app/reports/[id]/page.tsx',
+      'app/reports/page.tsx',
+      'app/s/confirm/page.tsx',
+      'app/s/pause/page.tsx',
+      'app/s/view/[reportId]/page.tsx',
       'app/seats/page.tsx',
       'app/sites/[id]/page.tsx',
       'app/v2-home/page.tsx',

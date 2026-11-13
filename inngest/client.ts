@@ -81,6 +81,12 @@ type Events = {
   // CC-28 D6: one account's weekly summary is due (inngest/summary.ts). Names the account and the
   // week only; the recipients are read when it is sent.
   'summary.requested': { data: { accountId: string; weekKey: string; weekStart: string } };
+  // CC-31: a client report schedule's two mails are asked for
+  // (apps/web/lib/v2/agency/schedules.ts). Each event names a site or a report and holds no
+  // address and no token: the handler reads both through issue_recipient_confirmation and
+  // issue_report_pause when it sends.
+  'report.confirmation.requested': { data: { site_id: string } };
+  'report.send.requested': { data: { report_id: string } };
 };
 
 export const inngest = new Inngest({

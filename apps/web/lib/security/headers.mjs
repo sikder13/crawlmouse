@@ -19,6 +19,8 @@ export const DEFAULT_SOURCE = '/((?!embed/[^/]+/?$).*)';
 export const EMBED_SOURCE = '/embed/:domain';
 /** The sign-in landing, which keeps its stricter referrer policy. */
 export const SIGN_IN_SOURCE = '/login/verify';
+/** Share links and the pages they lead to (CC-31 D7): `/s` and every path under it. */
+export const SHARE_SOURCE = '/s/:path*';
 
 /**
  * Sentry's CSP report endpoint and ingest origin for a DSN
@@ -163,5 +165,8 @@ export function securityHeaders({ sentryDsn, supabaseUrl, posthogHost, dev = fal
     // A next.config header replaces the one a route sets, and a later entry replaces an earlier one:
     // the sign-in landing sends no referrer off our origin (its route sets the same value).
     { source: SIGN_IN_SOURCE, headers: [{ key: 'Referrer-Policy', value: 'same-origin' }] },
+    // A share link's token is in its address, and a shared page is read by people outside the
+    // account: neither sends a Referer anywhere.
+    { source: SHARE_SOURCE, headers: [{ key: 'Referrer-Policy', value: 'no-referrer' }] },
   ];
 }

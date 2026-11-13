@@ -72,8 +72,19 @@ describe('the pages a form goes back to', () => {
       '/fallback',
     );
 
-  it('are the dashboard, a site page, the client matrix and a client page, on our own origin', () => {
-    for (const path of ['/dashboard', `/sites/${ID}`, '/agency', `/agency/clients/${ID}`]) {
+  it('are the dashboard, Seats, Reports, an invitation, a recipient’s two link pages, a site page, and an agency’s matrix, client reports and client page, on our own origin', () => {
+    for (const path of [
+      '/dashboard',
+      '/seats',
+      '/reports',
+      '/invite',
+      '/s/confirm',
+      '/s/pause',
+      `/sites/${ID}`,
+      '/agency',
+      '/agency/reports',
+      `/agency/clients/${ID}`,
+    ]) {
       expect(from(`https://crawlmouse.com${path}`)).toBe(path);
       expect(from(`https://crawlmouse.com${path}?notice=capped#x`)).toBe(path);
     }
@@ -81,7 +92,10 @@ describe('the pages a form goes back to', () => {
 
   it('are no other page: any other path, another origin, or no Referer, is the fallback', () => {
     for (const referer of [
-      'https://crawlmouse.com/agency/reports',
+      'https://crawlmouse.com/agency/billing',
+      'https://crawlmouse.com/agency/reports/x',
+      'https://crawlmouse.com/s',
+      'https://crawlmouse.com/s/view',
       'https://crawlmouse.com/agency/',
       'https://crawlmouse.com/agency/clients',
       'https://crawlmouse.com/agency/clients/not-an-id',
@@ -106,7 +120,7 @@ describe('the pages a form goes back to', () => {
         'location',
       ),
     ).toBe(`/agency/clients/${ID}?notice=capped&next=2026-11-03T10%3A00%3A00.000Z`);
-    expect(() => noticeTo('/agency/reports', 'capped')).toThrow(/not a page to go back to/);
+    expect(() => noticeTo('/agency/billing', 'capped')).toThrow(/not a page to go back to/);
     expect(() => noticeTo('https://evil.example/agency', 'capped')).toThrow();
   });
 });

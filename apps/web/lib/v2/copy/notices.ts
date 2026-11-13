@@ -98,6 +98,24 @@ export const NOTICE_LINES: Record<NoticeCode, (at: string | null) => string> = {
     'This plan cannot be changed here: it is set to end, or its last payment has not gone through. Settings › Plan has the details.',
   billing_unavailable: () =>
     'Billing cannot be reached right now, so nothing was changed. Try again later.',
+  share_made: () =>
+    'The link is made. It is shown here once: copy it now. Making another replaces it.',
+  share_revoked: () => 'The link was withdrawn and no longer opens.',
+  not_ready: () => 'That report’s file is not stored yet, so no link was made.',
+  schedule_saved: () => 'The schedule was saved.',
+  schedule_cleared: () => 'The schedule was removed. No more reports are sent for this client.',
+  client_saved: () =>
+    'Saved. A contact that changed is asked to confirm before any report is sent to it.',
+  invalid_owner: () => 'That seat cannot own this client: it is not active, or does not cover it.',
+  confirmation_requested: () =>
+    'A confirmation was asked for. Reports are sent once the contact confirms.',
+  nothing_to_confirm: () =>
+    'There is nothing to confirm: the client has no schedule or no contact, or the contact has confirmed.',
+  schedule_resumed: () => 'Resumed. Reports are sent again from the next run.',
+  not_paused: () => 'That schedule is not paused.',
+  report_confirmed: () => 'Confirmed. The reports will be sent to this address.',
+  report_paused: () => 'Paused. No more reports are sent until the sender resumes them.',
+  report_link_gone: () => 'This link can no longer be used: it was replaced or has expired.',
   invalid: () => 'That request was not understood, so nothing was changed.',
   method_not_allowed: () => 'That form could not be sent that way. Reload the page and try again.',
 };

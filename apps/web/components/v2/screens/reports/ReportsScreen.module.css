@@ -41,10 +41,39 @@
   gap: 6px;
 }
 
+.rowEnd {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
 .rowActions {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: 6px;
+}
+
+/* A share link just made: its address, to select and copy. */
+.madeLink {
+  margin: 0;
+  color: var(--v2-fg2);
+  font-size: var(--v2-text-micro);
+  text-align: right;
+}
+
+.madeLink code {
+  font-family: var(--v2-font-mono);
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
+.gate {
+  margin: 0;
+  padding: 16px 16px 0;
+  color: var(--v2-fg2);
+  font-size: var(--v2-text-small);
 }
 
 .nowrap {

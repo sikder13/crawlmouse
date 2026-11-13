@@ -8,8 +8,10 @@ import {
   ACCOUNT_VIEWERS,
   CLEAN_VIEWER,
 } from '../../../app/(v2-preview)/v2-preview/_preview/accounts';
+import { AGENCY_MONTHLY, PRO_MONTHLY, usd } from '../../billing/prices';
+import { gateMessage } from '../agency/gates';
 import { fixture } from '../fixtures';
-import { reportsView, SHARE_LINK_DAYS } from './reports';
+import { reportsView, SHARE_LINK_DAYS, type ReportsSide } from './reports';
 
 const bad = fixture('bad-site');
 const BASE = '/v2-preview/screens/reports';
@@ -82,14 +84,14 @@ describe('Reports made', () => {
         'example-outfitter.com',
         'PDF audit report',
         'check of Fri 30 Oct · made by the weekly check',
-        ['Download · 1.2 MB'],
+        ['Download · 1.2 MB', 'Link'],
       ],
       [
         'Thu 29 Oct 09:40',
         'example-outfitter.com',
         'Compare',
         'Sat 24 Oct vs Thu 29 Oct',
-        ['Open'],
+        ['Open', 'Link'],
       ],
       // The share link of 25 Oct 07:10Z expires 24 Nov 07:10Z, Tue 24 Nov 02:10 in Indiana (EST).
       [
@@ -97,9 +99,34 @@ describe('Reports made', () => {
         'example-outfitter.com',
         'CSV, all responses',
         'first audit',
-        ['Download · 310 KB', 'Link · until Tue 24 Nov'],
+        ['Download · 310 KB', 'Link · until Tue 24 Nov', 'Withdraw link'],
       ],
     ]);
+  });
+
+  it('opens a proof page at /reports/<id>, downloads a file from its route, and posts the share forms to the share route', () => {
+    const [pdf, compare, csv] = home().made.rows;
+    const routes = (r: typeof pdf) => r!.actions.map((a) => [a.method, a.href, a.fields]);
+    expect(routes(pdf)).toEqual([
+      ['get', '/api/report-files/60000000-0000-4000-8000-000000000001/download', {}],
+      ['post', '/api/report-files/60000000-0000-4000-8000-000000000001/share', {}],
+    ]);
+    expect(routes(compare)).toEqual([
+      ['get', '/reports/60000000-0000-4000-8000-000000000002', {}],
+      ['post', '/api/report-files/60000000-0000-4000-8000-000000000002/share', {}],
+    ]);
+    expect(routes(csv)).toEqual([
+      ['get', '/api/report-files/60000000-0000-4000-8000-000000000003/download', {}],
+      ['post', '/api/report-files/60000000-0000-4000-8000-000000000003/share', {}],
+      [
+        'post',
+        '/api/report-files/60000000-0000-4000-8000-000000000003/share',
+        { _method: 'DELETE' },
+      ],
+    ]);
+    for (const row of home().made.rows) {
+      expect([row.state, row.linkUntil, row.madeLink]).toEqual([null, null, null]);
+    }
   });
 
   it('words the share link and the gate from constants', () => {
@@ -124,8 +151,9 @@ describe('Reports made', () => {
     const s = home().scheduled;
     expect(s.rows).toEqual([]);
     expect(s.sub).toBe('None');
+    expect(s.foot).toBe(gateMessage('clientReports', 'pro'));
     expect(s.foot).toBe(
-      'Scheduled client reports, sent for you weekly or monthly from your own address, are an Agency feature.',
+      `Reports sent to a client are made on Agency. Agency is ${usd(AGENCY_MONTHLY)} a month.`,
     );
     expect(s.compare).toMatchObject({ label: 'Compare plans', href: '/pricing' });
   });
@@ -185,17 +213,96 @@ describe('Reports, on the stand-in Free account', () => {
     expect(v.made.rows).toEqual([]);
     expect(v.made.empty).toBe('No reports yet.');
   });
+
+  it('says which plan makes reports, in the gate’s words; a plan that makes them says nothing', () => {
+    const free = reportsView(fixture('clean-site'), CLEAN_VIEWER, {}, BASE);
+    expect(free.make.gate).toBe(gateMessage('exports', 'free'));
+    expect(free.make.gate).toBe(
+      `Reports and exports are made on Pro. Pro is ${usd(PRO_MONTHLY)} a month.`,
+    );
+    expect(free.scheduled.foot).toBe(gateMessage('clientReports', 'pro'));
+    expect(home().make.gate).toBeNull();
+    expect(northwind().make.gate).toBeNull();
+  });
+});
+
+describe('Reports, with what a live page knows', () => {
+  const PDF = '60000000-0000-4000-8000-000000000001';
+  const COMPARE = '60000000-0000-4000-8000-000000000002';
+  const CSV = '60000000-0000-4000-8000-000000000003';
+  const live = (side: ReportsSide) => reportsView(bad, ACCOUNT_VIEWERS.home(), {}, BASE, side);
+  const row = (v: ReturnType<typeof live>, id: string) => v.made.rows.find((r) => r.key === id)!;
+  const labels = (v: ReturnType<typeof live>, id: string) => row(v, id).actions.map((a) => a.label);
+
+  it('a pending report and a failed one say so and offer nothing; a stored one is offered', () => {
+    const v = live({
+      fileStates: new Map([
+        [PDF, 'pending'],
+        [COMPARE, 'failed'],
+        [CSV, 'stored'],
+      ]),
+    });
+    expect([row(v, PDF).state, labels(v, PDF)]).toEqual(['Being made', []]);
+    expect([row(v, COMPARE).state, labels(v, COMPARE)]).toEqual(['Could not be made', []]);
+    expect([row(v, CSV).state, labels(v, CSV)]).toEqual([
+      null,
+      ['Download · 310 KB', 'Link · until Tue 24 Nov', 'Withdraw link'],
+    ]);
+  });
+
+  it('with the file states given, a report they do not name has no file to offer, whatever its row says', () => {
+    const v = live({ fileStates: new Map([[CSV, 'stored']]) });
+    expect([row(v, PDF).state, labels(v, PDF)]).toEqual([null, []]);
+    expect([row(v, COMPARE).state, labels(v, COMPARE)]).toEqual([null, []]);
+    expect(row(v, PDF).linkUntil).toBeNull();
+  });
+
+  it('a developer gets the file and no share form, and a rail without the owner’s billing; an account manager shares', () => {
+    const v = live({ role: 'developer' });
+    expect(labels(v, PDF)).toEqual(['Download · 1.2 MB']);
+    expect(labels(v, COMPARE)).toEqual(['Open']);
+    expect(labels(v, CSV)).toEqual(['Download · 310 KB']);
+    expect(row(v, CSV).linkUntil).toBe('Link · until Tue 24 Nov');
+    expect(labels(live({ role: 'account_manager' }), PDF)).toEqual(['Download · 1.2 MB', 'Link']);
+    expect(v.shell).toEqual(
+      reportsView(bad, ACCOUNT_VIEWERS.home(), {}, BASE, {
+        role: 'account_manager',
+      }).shell,
+    );
+    expect(v.shell).not.toEqual(home().shell);
+  });
+
+  it('shows a link just made on its own report’s row and no other', () => {
+    const url = 'https://crawlmouse.com/s/kJ8sT2mQ9x_p4VnR7bWc-A';
+    const v = live({ madeLink: { reportId: COMPARE, url } });
+    expect(row(v, COMPARE).madeLink).toEqual({ label: 'The link, shown once:', url });
+    expect([row(v, PDF).madeLink, row(v, CSV).madeLink]).toEqual([null, null]);
+    const pending = live({
+      madeLink: { reportId: COMPARE, url },
+      fileStates: new Map([[COMPARE, 'pending']]),
+    });
+    expect(row(pending, COMPARE).madeLink).toBeNull();
+  });
 });
 
 describe('Reports, a share link after it expires', () => {
-  it('shows the Link while the share link works and not once it has expired', () => {
-    // The CSV's link expires 24 Nov 07:10Z; read a second before and at that moment.
-    const at = (now: string) =>
-      reportsView(bad, { accountId: 'a0000000-0000-4000-8000-000000000001', now }, {}, BASE)
-        .made.rows.find((r) => r.type === 'CSV, all responses')!
-        .actions.map((a) => a.label);
-    expect(at('2026-11-24T07:09:59Z')).toEqual(['Download · 310 KB', 'Link · until Tue 24 Nov']);
-    expect(at('2026-11-24T07:10:00Z')).toEqual(['Download · 310 KB']);
+  it('shows the link while it works and not once it has expired; off the plan it can be withdrawn and not remade', () => {
+    // The CSV's link expires 24 Nov 07:10Z; read a second before and at that moment. By then the
+    // account's Pro trial has ended, so it is on Free: no new link, and the one it has is stated.
+    const at = (now: string) => {
+      const row = reportsView(
+        bad,
+        { accountId: 'a0000000-0000-4000-8000-000000000001', now },
+        {},
+        BASE,
+      ).made.rows.find((r) => r.type === 'CSV, all responses')!;
+      return [row.actions.map((a) => a.label), row.linkUntil];
+    };
+    expect(at('2026-11-24T07:09:59Z')).toEqual([
+      ['Download · 310 KB', 'Withdraw link'],
+      'Link · until Tue 24 Nov',
+    ]);
+    expect(at('2026-11-24T07:10:00Z')).toEqual([['Download · 310 KB'], null]);
   });
 });
 

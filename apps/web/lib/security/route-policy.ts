@@ -388,6 +388,79 @@ export const ROUTE_POLICIES: readonly RoutePolicy[] = [
     class: 'member',
     origin: 'strict',
   },
+  // CC-31 workstream B2: share links (D7). Making and revoking one is a member's, for a report their
+  // seat covers; opening one needs no account.
+  {
+    route: 'api/report-files/[id]/share',
+    methods: ['DELETE', 'POST'],
+    class: 'member',
+    origin: 'strict',
+  },
+  // CC-31 workstream B2: client report schedules (D8). They sit under `schedules/site/`, so no path
+  // here is also one of a report's `[id]/…` routes.
+  {
+    route: 'api/report-files/schedules/site/[siteId]',
+    methods: ['DELETE', 'POST', 'PUT'],
+    class: 'member',
+    origin: 'strict',
+  },
+  {
+    route: 'api/report-files/schedules/site/[siteId]/client',
+    methods: ['PATCH', 'POST'],
+    class: 'member',
+    origin: 'strict',
+  },
+  {
+    route: 'api/report-files/schedules/site/[siteId]/confirm',
+    methods: ['POST'],
+    class: 'member',
+    origin: 'strict',
+  },
+  {
+    route: 'api/report-files/schedules/site/[siteId]/resume',
+    methods: ['POST'],
+    class: 'member',
+    origin: 'strict',
+  },
+  // The recipient of a client report holds no account: the token of the link they were mailed,
+  // read from its cookie, is the credential.
+  {
+    route: 'api/report-files/confirm',
+    methods: ['POST'],
+    class: 'public',
+    reason: "the confirmation link's token, from its HttpOnly cookie, is the credential (CC-31 D8)",
+    origin: 'strict',
+  },
+  {
+    route: 'api/report-files/pause',
+    methods: ['POST'],
+    class: 'public',
+    reason: "the pause link's token, from its HttpOnly cookie, is the credential (CC-31 D8)",
+    origin: 'strict',
+  },
+  {
+    route: 's/confirm/[token]',
+    methods: ['GET'],
+    class: 'public',
+    reason: 'a mailed link: moves its token into a cookie and redirects; changes nothing',
+    origin: 'any',
+  },
+  {
+    route: 's/pause/[token]',
+    methods: ['GET', 'POST'],
+    class: 'public',
+    reason:
+      "a mailed link: the GET moves its token into a cookie and changes nothing; the POST is a mail client's one-click unsubscribe (RFC 8058), which pauses the schedule the token names and comes with no cookie and no Origin",
+    origin: 'any',
+  },
+  {
+    route: 's/[token]',
+    methods: ['GET'],
+    class: 'public',
+    reason:
+      'a share link: the token in its path is the credential, stored as its sha256; per-IP limit; it counts the view and redirects (CC-31 D7)',
+    origin: 'any',
+  },
 ];
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);

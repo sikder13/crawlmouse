@@ -297,7 +297,13 @@ const HIDDEN: Record<NewTable, string[] | null> = {
   alert_events: [],
   // 031's failed_reason is an internal code and subject_fix_id a row id no screen reads.
   reports: ['storage_path', 'failed_reason', 'subject_fix_id'],
-  report_schedules: [],
+  // 031: the confirmation and pause links' hashes and the times around them are granted to no client.
+  report_schedules: [
+    'recipient_confirm_hash',
+    'recipient_confirm_sent_at',
+    'recipient_confirmed_at',
+    'pause_token_hash',
+  ],
   share_links: null,
   api_keys: ['key_hash'],
   deploy_hooks: ['token_hash'],
@@ -1049,6 +1055,11 @@ const RULE_CASES: Record<
   report_schedules_page_slug: {
     table: 'report_schedules',
     row: async () => ({ ...(await freshRow('report_schedules')), page_slug: 'Client A' }),
+  },
+  // 031: a link's hash is a sha256 in lowercase hex, never the token.
+  report_schedules_link_hashes: {
+    table: 'report_schedules',
+    row: async () => ({ ...(await freshRow('report_schedules')), pause_token_hash: 'plain-token' }),
   },
   share_links_token_hash: {
     table: 'share_links',

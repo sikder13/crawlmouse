@@ -517,7 +517,195 @@ D6 names a fourth kind, a one-pager about a prospect's site that holds no site s
 (questions.md Q18). `POST /api/reports` does not take the request (400 `invalid`), `create_report`
 refuses the kind (22023), and no function writes a prospect's site.
 
+### The proof page
+
+The proof page is what an agency shows its client: a report of format `html`, drawn from the
+`ReportDoc` stored for it when it was made (`REPORT_FILES.html`, read back by `parseStoredDoc` in
+`lib/v2/reports/share-doc.ts`). It is outside the locked artboards: no artboard draws it. It is
+built from the design system's Card, Heading and Table (`components/v2/screens/proof/ProofScreen.tsx`,
+view `lib/v2/view/proof.ts`).
+
+What it shows, in the document's order: the title, the lines under it, each section with its text,
+facts, tables and before-and-after pairs, then the not-measured list under the page's own label,
+then the document's footer line as a link to the address the document gives when that address is
+an https one. A pair is two columns, each with its label, date, value and evidence; at 760px and
+narrower the two are stacked (`ProofScreen.module.css`). The page has no form, no button and no
+orange element: its previews are registered with `orange: 0`.
+
+The page adds three labels of its own, kept in `lib/v2/copy/proof.ts`: "Not measured", and
+"Before" and "After" for a pair's side whose own label is empty. A property test renders generated
+documents and holds each text node of the page to the document's strings and those labels, and
+holds each non-empty string of the document to appear on the page:
+
+```bash
+pnpm --filter @crawlmouse/web exec vitest run components/v2/screens/proof/ProofScreen.test.tsx
+```
+
+Two pages draw it. `/reports/[id]` is for a signed-in member: the report is read through the
+caller's own session, and a report that session does not read, one that is not of format `html`, and
+one with no stored document are a 404. `/s/view/[reportId]` is for whoever opened the report's share
+link (§10). Each sends `proof_viewed`, with `via: 'account'` or `via: 'share'`.
+
+```bash
+pnpm --filter @crawlmouse/web exec vitest run 'app/s/view/[reportId]/page.test.tsx' lib/v2/reports/share-doc.test.ts
+```
+
+Previews: `/v2-preview/screens/proof` (two grades moved), `/proof/fix` (a fix verified) and
+`/proof/baseline`. Their documents are stand-ins written in `_preview/proof.ts`; the generator's own
+documents replace them once it is on the branch.
+
 ## 10. Download, share and schedules
+
+### Share links
+
+A share link opens one report for whoever holds it, with no account. The token is 16 random bytes
+in base64url, 22 characters (`newShareToken`, `lib/v2/reports/share.ts`); `share_links` holds its
+sha256, and the CHECK `share_links_token_hash` refuses a value that is not 64 lowercase hex
+characters. The rules are four SQL functions in migration `20261114000002`, section B, granted to
+`service_role`:
+
+| Function             | What it does                                                                                                                                                                            |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `create_share_link`  | Needs a stored file (`report_file_stored`); revokes the report's earlier links; writes the new one, expiring 30 days on, and sets `reports.share_expires_at`. `not_ready`, `not_found`. |
+| `open_share_link`    | In one statement counts the view and returns the report's id, account, site, kind, format and path. `gone` for a link that exists and does not open; `unknown` for none.                |
+| `read_share_link`    | The same answer with no count: the shared page's own read.                                                                                                                              |
+| `revoke_share_links` | Sets `revoked_at` on the report's links and clears `reports.share_expires_at`.                                                                                                          |
+
+Whether a report's file is stored is asked in one SQL function, `report_file_stored`
+(`file_state = 'stored'`; a row names its object from its first write, so the name alone does not say
+the file is there), which the three functions above that need it call. A link does not open once it
+is revoked, from the moment of its expiry, when its report's file is
+no longer stored, and while its account is deleted or marked for deletion.
+
+```bash
+pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-031-b2-share.test.ts
+```
+
+`POST /api/report-files/[id]/share` makes the link and `DELETE` (or a form's `_method=DELETE`)
+revokes it. The report is read through the caller's own session, so a report of a client the seat
+does not cover is a 404; `seat_may('share_report')` refuses a developer with 403; making a link
+needs the plan's `exports` gate (402) and a stored file (409 `not_ready`), under a bound of 60 an
+hour for the account. The link is answered once: JSON gets `{url, expiresAt}`; a form gets a 303 to
+`/reports?notice=share_made` with the link in the HttpOnly cookie `cm_share_made`, scoped to
+`/reports`, which the page shows on the report's row. That cookie lasts 120 seconds and is not
+cleared sooner: a page cannot clear a cookie.
+
+`GET /s/[token]` opens a link. In order: a 404 with `V2_CHECKS_PUBLIC` unset; a 404 for a value that
+is not token-shaped, before the rate limit and any database call; a bound of 60 an hour for the
+address (429); a 404 for a token no link holds; **410** with a static HTML page for a link that has
+expired or was revoked. A link that opens is counted, then answered by format: a file is a 302 to
+a signed URL of the stored object that lives 60 seconds, and a proof page is a 303 to
+`/s/view/[reportId]` with the token in the HttpOnly cookie `cm_share`, scoped to that path for 600
+seconds. The token is therefore in one address, the link's own. A signed URL already handed out
+keeps working until its 60 seconds end, so a revoked link stops opening a file within a minute.
+Each answer after the flag check carries `Cache-Control: no-store`, `Referrer-Policy: no-referrer`
+and `X-Robots-Tag: noindex, nofollow`.
+
+```bash
+pnpm --filter @crawlmouse/web exec vitest run 'app/api/report-files/[id]/share/route.test.ts' lib/v2/reports/share.test.ts
+```
+
+A header set in `next.config` replaces a route's own, so `lib/security/headers.mjs` sets
+`Referrer-Policy: no-referrer` for `/s` and the paths under it; and the `/s/<22 characters>` path
+is scrubbed from what Sentry is sent.
+
+```bash
+pnpm --filter @crawlmouse/web exec vitest run __tests__/security/headers.test.ts lib/auth/sentry-scrub.test.ts
+```
+
+`/reports` lists the reports the caller's session reads, with what the page alone knows handed to
+the view (`ReportsSide`, `lib/v2/view/reports.ts`): each report's file state, the reader's role on
+the account, and a link just made. The file state is the generator's `reports.file_state`
+(`pending`, `stored`, `failed`), read by `reportFileStates` (`lib/v2/reports/share-proof.ts`); whether
+a file is stored is asked in one place in that file, `storedIn`, which the Reports page's file states
+and the signed-in proof page both read.
+
+```bash
+pnpm --filter @crawlmouse/web exec vitest run app/reports/page.test.tsx lib/v2/view/reports.test.ts __tests__/v2/reports.test.tsx
+```
+
+### Client report schedules
+
+A client's report goes to the client's contact, `sites.client_contact_email`, one address a site.
+`set_client` is the writer of `sites.client_name`, `client_contact_email` and `owner_seat_id`. It
+does not write `sites.client_contact_name`: this step stores no contact name, because the erasure
+rules name the contact's address and no rule names the contact's name. A key `set_client` does not
+set raises 22023.
+
+A schedule is one `report_schedules` row a site: weekly or monthly, a weekday, a time and a zone.
+`report_schedule_next` gives the next run: the next such weekday at that time in the zone, and for
+`monthly` the first such weekday of a calendar month. `report_schedules` gains four columns granted
+to no client role: `recipient_confirm_hash`, `recipient_confirm_sent_at`, `recipient_confirmed_at`
+and `pause_token_hash`.
+
+| Route                                                      | What it does                                                                              |
+| ---------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `PUT`, `DELETE /api/report-files/schedules/site/[siteId]`  | Saves or removes the schedule (`set_report_schedule`, `clear_report_schedule`).           |
+| `PATCH /api/report-files/schedules/site/[siteId]/client`   | The client's name, contact and owning seat (`set_client`).                                |
+| `POST /api/report-files/schedules/site/[siteId]/confirm`   | Asks for the confirmation mail again; 409 `nothing_to_confirm` when there is none to ask. |
+| `POST /api/report-files/schedules/site/[siteId]/resume`    | Resumes a schedule its recipient paused; the next run is the first after the resume.      |
+| `GET /s/confirm/[token]`, `POST /api/report-files/confirm` | The recipient's confirmation link, and the press that confirms.                           |
+| `GET /s/pause/[token]`, `POST /api/report-files/pause`     | The recipient's pause link, and the press that pauses.                                    |
+| `POST /s/pause/[token]`                                    | A mail client's one-click unsubscribe (RFC 8058): the body `List-Unsubscribe=One-Click`.  |
+
+The four account routes ask `is_member_for_site` (404), then `seat_may('schedule_report')` (403 for
+a developer), then the plan's `agencyBranding` gate (402). They sit under `schedules/site/` so that
+no path is also one of a report's `[id]/…` routes. A form posted with `_method` is read as the verb
+it names.
+
+**Double opt-in.** No report is sent to a contact that has not confirmed. The confirmation mail's
+link is used within seven days of being issued and works once; issuing another replaces it. A
+contact address that changes clears the confirmation, both links' hashes and the recipient's pause,
+in the statement that writes the site. A changed contact is asked to confirm when it is saved,
+within the account's bound of 20 confirmation requests a day; past that bound the save stands and
+the schedule's next run asks.
+
+**The recipient's links.** Each link's GET moves its token into an HttpOnly cookie and redirects
+to a page with no token in its address (`/s/confirm`, `/s/pause`); the page says what the button
+will do, and the button's POST reads the token from the cookie. A GET changes nothing. The pause
+link's address also takes a mail client's one-click POST, which carries no cookie, so for that one
+request the token is the path's. A pause link is minted when a report is sent
+(`issue_report_pause`), and minting replaces the one before: the link that pauses is the one in the
+latest report sent.
+
+```bash
+pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-031-b2-schedules.test.ts 'app/api/report-files/schedules/site/[siteId]/route.test.ts' app/s/confirm/page.test.tsx components/v2/screens/share/RecipientLinkScreen.test.tsx
+```
+
+**Sending.** `crawlmouse.report.schedules` runs at minute 7 of each hour, with `V2_CHECKS_PUBLIC=1`
+(`inngest/report-schedules.ts`, `lib/v2/agency/schedules-run.ts`). For each schedule
+`due_report_schedules` lists (not paused, its next run reached) it decides in this order, and then
+moves the schedule to its next run whatever it decided:
+
+1. the account's plan has no client reports at that moment: nothing is sent;
+2. the client has no contact: nothing is sent;
+3. the contact has not confirmed: the confirmation mail is asked for if none was issued yet, and no
+   report is sent;
+4. the account is in its Agency trial and the contact is not the owner's own address: nothing is
+   sent;
+5. the site has no finished check: nothing is sent;
+6. no change other than a baseline was detected since the last client report sent for the site, and
+   the schedule does not send unchanged: nothing is sent;
+7. otherwise `write_client_report` writes the slot's row (`client_report`, `scheduled`, one a site
+   and slot) and the report's mail is asked for.
+
+The run stops at a port, `ClientReportMail`. Its implementation here sends two Inngest events that
+hold an id and no address: `report.confirmation.requested {site_id}` and `report.send.requested
+{report_id}`. A report handed on this way stays `scheduled`. The mailer's handlers, written with
+the mail kinds, read the address and mint the link when they send (`issue_recipient_confirmation`,
+`issue_report_pause`) and mark the row sent (`mark_client_report_sent`, which answers whether it is
+the account's first: `first_client_report_sent`).
+
+```bash
+pnpm --filter @crawlmouse/web exec vitest run lib/v2/agency/schedules-run.test.ts lib/v2/agency/schedules-run.pglite.test.ts lib/v2/pipeline/functions.test.ts
+pnpm --filter @crawlmouse/inngest exec vitest run report-schedules.test.ts
+```
+
+**Not built.** `/agency/reports`, the screen of `Final-Ag-Reports` that would carry the schedule
+forms, is not built: the routes above answer JSON and forms, and a form's answer redirects to that
+address. Of what the artboard draws, this step has no route for "Hold all this week", "Hold",
+"Edit headline", "Preview and edit", the Opened column (open tracking) or the sender address
+(Branding is out: D11).
 
 ## 11. Erasure, gate messages and events
 

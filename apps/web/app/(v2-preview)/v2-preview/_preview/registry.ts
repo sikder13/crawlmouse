@@ -336,4 +336,34 @@ export const PREVIEWS: PreviewEntry[] = [
     kind: 'screen',
     orange: 0,
   },
+  // CC-31, the proof page: a report's document, read by a client. Nothing on it is the reader's
+  // action, so it shows no orange element.
+  {
+    path: '/v2-preview/screens/proof',
+    name: 'Proof, two grades moved',
+    kind: 'screen',
+    orange: 0,
+  },
+  {
+    path: '/v2-preview/screens/proof/fix',
+    name: 'Proof, a fix verified',
+    kind: 'screen',
+    orange: 0,
+  },
+  {
+    path: '/v2-preview/screens/proof/baseline',
+    name: 'Proof, baseline',
+    kind: 'screen',
+    orange: 0,
+  },
+  // CC-31, the page a client report's recipient lands on. Its orange element is the one button; a
+  // link that cannot be used offers nothing.
+  { path: '/v2-preview/screens/report-link', name: 'Report link, confirm', kind: 'screen' },
+  { path: '/v2-preview/screens/report-link/pause', name: 'Report link, pause', kind: 'screen' },
+  {
+    path: '/v2-preview/screens/report-link/gone',
+    name: 'Report link, cannot be used',
+    kind: 'screen',
+    orange: 0,
+  },
 ];

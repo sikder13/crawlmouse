@@ -358,7 +358,7 @@ describe('no registered function can declare a concurrency limit above the plan 
   // auditFn reads INNGEST_AUDIT_CONCURRENCY when its module loads, so each case loads the modules
   // afresh, as a new deployment does.
   // V2_BILLING adds CC-03's trial and past-due functions, and V2_CHECKS_PUBLIC CC-27b's three deletion
-  // functions, which the cap covers as well.
+  // functions and CC-31's client report schedules, which the cap covers as well.
   for (const pub of [undefined, '1'] as const)
     for (const billing of [undefined, '1'] as const)
       for (const flag of [undefined, '1'] as const) {
@@ -376,7 +376,8 @@ describe('no registered function can declare a concurrency limit above the plan 
               expect(configs.length).toBe(
                 (flag === '1' ? 10 : 5) +
                   (billing === '1' ? 2 : 0) +
-                  (pub === '1' ? 3 + MAIL_IDS.length : 0) +
+                  // CC-27b's three deletion functions, the mail functions, and CC-31's schedules.
+                  (pub === '1' ? 3 + MAIL_IDS.length + 1 : 0) +
                   // CC-28's scheduler tick, and its alert and summary functions.
                   (pub === '1' && flag === '1' ? 1 + MONITOR_IDS.length : 0),
               );
@@ -391,6 +392,7 @@ describe('no registered function can declare a concurrency limit above the plan 
               for (const id of [...deletionIds, ...MAIL_IDS]) {
                 expect(ids.includes(id), id).toBe(pub === '1');
               }
+              expect(ids.includes('crawlmouse-crawlmouse.report.schedules')).toBe(pub === '1');
               if (billing === '1') {
                 expect(configs.map((c) => c.id)).toEqual(
                   expect.arrayContaining([

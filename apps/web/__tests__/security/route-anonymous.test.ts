@@ -99,6 +99,20 @@ const ANONYMOUS: Record<
   'api/seats/id/[id]': { status: 401, body: { code: 'auth_required' } },
   'api/seats/id/[id]/resend': { status: 401, body: { code: 'auth_required' } },
   'api/seats/switch': { status: 401, body: { code: 'auth_required' } },
+  'api/report-files/[id]/share': { status: 401, body: { code: 'auth_required' } },
+  'api/report-files/schedules/site/[siteId]': { status: 401, body: { code: 'auth_required' } },
+  'api/report-files/schedules/site/[siteId]/client': {
+    status: 401,
+    body: { code: 'auth_required' },
+  },
+  'api/report-files/schedules/site/[siteId]/confirm': {
+    status: 401,
+    body: { code: 'auth_required' },
+  },
+  'api/report-files/schedules/site/[siteId]/resume': {
+    status: 401,
+    body: { code: 'auth_required' },
+  },
   'api/sites': { status: 401, body: { code: 'auth_required' } },
   'api/sites/[id]': { status: 401, body: { code: 'auth_required' } },
   'api/sites/[id]/alert-rules': { status: 401, body: { code: 'auth_required' } },

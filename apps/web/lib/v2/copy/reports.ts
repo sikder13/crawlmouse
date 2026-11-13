@@ -4,6 +4,7 @@
  */
 import type { Report } from '@crawlmouse/types/v2';
 import type { Addition, CopyChange } from '../copy-registry';
+import { gateMessage } from '../agency/gates';
 import { count, plural } from '../words';
 import { railChanges } from './dashboard';
 
@@ -71,15 +72,26 @@ export const REPORTS_COPY = {
   madeByCheck: (cadence: string) => `made by the ${cadence} check`,
   sentTo: (email: string) => `sent to ${email}`,
   download: (size: string) => `Download · ${size}`,
+  /** A stored file whose size was not recorded. */
+  downloadFile: 'Download',
   open: 'Open',
+  /** Makes the report's share link; with one live, the button names its expiry and replaces it. */
+  makeLink: 'Link',
   link: (until: string) => `Link · until ${until}`,
+  withdrawLink: 'Withdraw link',
+  madeLink: 'The link, shown once:',
+  /** What a row says of a report whose file is not stored; a stored one says nothing. */
+  fileStates: { pending: 'Being made', failed: 'Could not be made', stored: null } as Record<
+    'pending' | 'failed' | 'stored',
+    string | null
+  >,
   madeFoot: (days: number, plan: string) =>
     `Files stay here; a share link to one works for ${days} days and needs no account to open. Making new reports and raw-data exports is ${plan}; what is listed here stays downloadable. The public audit link on each site page is free.`,
   scheduledTitle: 'Scheduled',
   none: 'None',
   toSend: (n: number) => `${count(n)} ${plural(n, 'report', 'reports')} to send`,
-  scheduledFoot:
-    'Scheduled client reports, sent for you weekly or monthly from your own address, are an Agency feature.',
+  /** On Agency with no sender of its own on record. */
+  scheduledAgency: 'Client reports are sent for you weekly or monthly, to each client’s contact.',
   sentFrom: (email: string) => `Sent for you from ${email}.`,
   table: { made: 'Reports', scheduled: 'Scheduled reports' },
   columns: {
@@ -151,13 +163,6 @@ export const REPORTS_CHANGES: CopyChange[] = [
   {
     screen: 'reports',
     kind: 'fixture',
-    locked: 'Download · 1.2 MB Link',
-    rendered: 'Download · 1.2 MB',
-    source: 'The fixture’s weekly PDF (report 1) has no share link',
-  },
-  {
-    screen: 'reports',
-    kind: 'fixture',
     locked: 'nahltech.com Compare',
     rendered: 'example-outfitter.com Compare',
     source: 'The fixture’s compare (report 2) is of example-outfitter.com',
@@ -172,17 +177,19 @@ export const REPORTS_CHANGES: CopyChange[] = [
   {
     screen: 'reports',
     kind: 'fixture',
-    locked: 'Open Link',
-    rendered: 'Open',
-    source: 'The fixture’s compare (report 2) has no share link',
+    locked: 'Download · 310 KB',
+    rendered: 'Download · 310 KB Link · until Tue 24 Nov Withdraw link',
+    source:
+      'The fixture’s CSV (report 3) has a share link until 24 Nov 07:10Z, Tue 24 Nov in the account’s zone (D5: the expiry from share_expires_at); CC-31 D7: a link can be withdrawn, so a report with one offers that',
   },
   {
     screen: 'reports',
-    kind: 'fixture',
-    locked: 'Download · 310 KB',
-    rendered: 'Download · 310 KB Link · until Tue 24 Nov',
+    kind: 'ruling',
+    locked:
+      'Scheduled client reports, sent for you weekly or monthly from your own address, are an Agency feature.',
+    rendered: gateMessage('clientReports', 'pro')!,
     source:
-      'The fixture’s CSV (report 3) has a share link until 24 Nov 07:10Z, Tue 24 Nov in the account’s zone (D5: the expiry from share_expires_at)',
+      'CC-31 brief, D10: a gate’s line is written once, from GATES and prices.ts (lib/v2/agency/gates.ts); D11: sending from the agency’s own address is Branding, which the step does not build',
   },
 ];
 

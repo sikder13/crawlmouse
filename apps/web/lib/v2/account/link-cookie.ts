@@ -28,6 +28,17 @@ export const LINK_FLOWS = {
   restore: { cookie: 'cm_link_restore', page: '/account/restore', api: '/api/account/restore' },
   // A seat's invitation (CC-31 D3).
   invite: { cookie: 'cm_link_invite', page: '/invite', api: '/api/seats/accept' },
+  // A client report's recipient: the confirmation link and the pause link (CC-31 D8).
+  reportConfirm: {
+    cookie: 'cm_link_report_confirm',
+    page: '/s/confirm',
+    api: '/api/report-files/confirm',
+  },
+  reportPause: {
+    cookie: 'cm_link_report_pause',
+    page: '/s/pause',
+    api: '/api/report-files/pause',
+  },
 } as const;
 
 export type LinkFlow = keyof typeof LINK_FLOWS;

@@ -314,6 +314,11 @@ async function project(db: PGlite): Promise<Record<string, Rec[]>> {
               'last_run_at',
               'created_at',
               'updated_at',
+              // 031: the recipient's two links and the times around them are no part of the contract.
+              'recipient_confirm_hash',
+              'recipient_confirm_sent_at',
+              'recipient_confirmed_at',
+              'pause_token_hash',
             ])
           : null,
       };

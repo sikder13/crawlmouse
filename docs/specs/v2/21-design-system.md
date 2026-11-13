@@ -580,3 +580,9 @@ From `apps/web/app/(v2-preview)/v2-preview/_preview/registry.ts`. They are serve
 | Invitation, signed in                           | `/v2-preview/screens/invite/signed-in`                   | screen    |                                      |
 | Invitation, another address signed in           | `/v2-preview/screens/invite/mismatch`                    | screen    |                                      |
 | Invitation, link cannot be used                 | `/v2-preview/screens/invite/gone`                        | screen    |                                      |
+| Proof, two grades moved                         | `/v2-preview/screens/proof`                              | screen    |                                      |
+| Proof, a fix verified                           | `/v2-preview/screens/proof/fix`                          | screen    |                                      |
+| Proof, baseline                                 | `/v2-preview/screens/proof/baseline`                     | screen    |                                      |
+| Report link, confirm                            | `/v2-preview/screens/report-link`                        | screen    |                                      |
+| Report link, pause                              | `/v2-preview/screens/report-link/pause`                  | screen    |                                      |
+| Report link, cannot be used                     | `/v2-preview/screens/report-link/gone`                   | screen    |                                      |

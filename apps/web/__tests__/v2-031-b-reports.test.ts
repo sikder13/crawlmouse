@@ -175,7 +175,7 @@ describe('the columns', () => {
 
 describe('create_report', () => {
   it('writes a pending row a person made, for each kind and format it makes', async () => {
-    const made: [string, string][] = [
+    const made: [string, ReportFormat][] = [
       ['audit_pdf', 'pdf'],
       ['compare', 'html'],
       ['raw_export', 'csv'],
