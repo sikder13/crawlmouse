@@ -4,6 +4,8 @@ import { FingerprintSchema } from '@crawlmouse/types/v2';
 import { median } from '../grade/numbers.js';
 import { EMPTY_SHELL_BELOW, type JsTextState } from '../render/state.js';
 import { fingerprintOf, subjectOfKey } from './fingerprint.js';
+import { renderedConfidence } from '../grade/outcomes.js';
+import { PAGES_PER_FIX_TEMPLATE } from '../render/sample.js';
 import { detectRendered, type RenderedInputPage } from './rendered.js';
 
 const page = (
@@ -208,16 +210,81 @@ describe('presence: a template with an empty-root page and no graded page (CC-32
     });
   });
 
-  it('a mixed template, graded pages with text and empty-root pages as shells, is pages_disagree', () => {
+  it('a template with graded pages reads them alone: rendered with text and shells beside them is not_detected', () => {
     const [r] = detectRendered(
       [page('https://a.test/app/text', app, [200, 200, 'readable']), page(A, app, shell, thin)],
       { emptyRoots: new Set([A]) },
     );
     expect(r).toMatchObject({
-      state: 'indeterminate',
-      reason: 'pages_disagree',
-      extent: { pages: 2, graded: 1, rendered: 2 },
+      state: 'not_detected',
+      reason: null,
+      measured: 1,
+      extent: { pages: 2, graded: 1, rendered: 1 },
     });
+    expect(r!.evidence.pages.map((p) => p.url)).toEqual(['https://a.test/app/text']);
+  });
+
+  it('r2: a graded render failed and two shells rendered: not_rendered, as before CC-32', () => {
+    const guide = 'https://a.test/app/guide';
+    const pages = [page(guide, app, null), page(A, app, shell, thin), page(B, app, shell, thin)];
+    const [r] = detectRendered(pages, { emptyRoots: new Set([A, B]) });
+    expect(r).toMatchObject({
+      state: 'indeterminate',
+      reason: 'not_rendered',
+      measured: null,
+      extent: { pages: 3, graded: 1, rendered: 0 },
+      affected_urls: [],
+      evidence: { pages: [] },
+    });
+    const [before] = detectRendered(pages);
+    expect([r!.state, r!.reason]).toEqual([before!.state, before!.reason]);
+  });
+});
+
+/** The verdict before CC-32, stated by hand: the graded pages' renders alone. */
+function gradedVerdict(states: readonly JsTextState[]): [string, string | null] {
+  if (states.length === 0) return ['indeterminate', 'not_rendered'];
+  const shells = states.filter((s) => s === 'empty_shell').length;
+  if (shells === states.length) return ['detected', null];
+  if (shells === 0) return ['not_detected', null];
+  return ['indeterminate', 'pages_disagree'];
+}
+
+describe('a template with a graded page reads as it did before CC-32, whatever its empty-root pages show (property)', () => {
+  const state = fc.constantFrom<JsTextState>('empty_shell', 'partial', 'readable');
+  const row = fc.record({
+    graded: fc.boolean(),
+    template: fc.constantFrom('/a/{slug}', '/b/{slug}'),
+    render: fc.option(state, { nil: null }),
+  });
+  it('gives the graded pages’ verdict and confidence', () => {
+    fc.assert(
+      fc.property(fc.array(row, { maxLength: 12 }), (rows) => {
+        const ps = rows.map((x, i) =>
+          page(
+            `https://a.test/${i}`,
+            x.template,
+            x.render === null ? null : [x.render === 'empty_shell' ? 0 : 200, 200, x.render],
+            { kind: x.graded ? 'content' : 'thin' },
+          ),
+        );
+        const emptyRoots = new Set(ps.filter((p) => p.kind === 'thin').map((p) => p.url));
+        for (const r of detectRendered(ps, { emptyRoots })) {
+          const graded = ps.filter(
+            (p) => p.template_key === r.template_key && p.kind === 'content',
+          );
+          if (graded.length === 0) continue;
+          const rendered = graded.flatMap((p) => (p.without_js ? [p.without_js.state] : []));
+          expect([r.state, r.reason]).toEqual(gradedVerdict(rendered));
+          expect(renderedConfidence(r)).toBe(
+            rendered.length >= Math.min(PAGES_PER_FIX_TEMPLATE, graded.length)
+              ? 'confirmed'
+              : 'likely',
+          );
+        }
+      }),
+      { numRuns: 400 },
+    );
   });
 });
 

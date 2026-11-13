@@ -53,14 +53,17 @@ const CRAWL_CONFIDENCE: Confidence = 'likely';
 export const RENDERED_CLASS: RecommendationClass = 'best_practice';
 
 /**
- * A browser measured the template's pages, and the detector opens a fix only when its rendered pages
- * agree. `confirmed` when PAGES_PER_FIX_TEMPLATE or more of the template's present pages (graded or
- * empty-root, detectors/rendered.ts) were rendered, or when each of them was (a template of one
- * present page, rendered); `likely` otherwise. The graded phase renders up to PAGES_PER_FIX_TEMPLATE
- * graded pages of an open fix's template on the next check.
+ * A browser measured the template's pages, and the detector opens a fix only when its deciding renders
+ * agree (detectors/rendered.ts). `confirmed` when PAGES_PER_FIX_TEMPLATE or more of the pages the
+ * verdict reads were rendered, or each of them was; `likely` otherwise. The verdict reads the graded
+ * pages of a template that has any, and its empty-root pages otherwise. The graded phase renders up to
+ * PAGES_PER_FIX_TEMPLATE graded pages of an open fix's template on the next check.
  */
 export const renderedConfidence = ({ extent }: Pick<RenderedDetection, 'extent'>): Confidence =>
-  extent.rendered >= Math.min(PAGES_PER_FIX_TEMPLATE, extent.pages) ? 'confirmed' : 'likely';
+  extent.rendered >=
+  Math.min(PAGES_PER_FIX_TEMPLATE, extent.graded > 0 ? extent.graded : extent.pages)
+    ? 'confirmed'
+    : 'likely';
 
 /** "its" or "their", for the pages a template key names. */
 const possessive = (key: string) => (namesOnePage(key) ? 'its' : 'their');

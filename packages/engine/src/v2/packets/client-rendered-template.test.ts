@@ -120,7 +120,7 @@ describe('the client-rendered template packet, from its record', () => {
     }
   });
 
-  it('says which counted pages are not graded, for a template with empty-root pages (CC-32 D2)', () => {
+  it('says the pages are too thin to grade, for a template of empty-root pages alone (CC-32 D2)', () => {
     const thin = (path: string, render: boolean): RenderedInputPage => ({
       url: `https://a.test${path}`,
       template_key: T,
@@ -141,14 +141,6 @@ describe('the client-rendered template packet, from its record', () => {
       /The audit rendered its 1 page in a browser; its HTML response held too little text to be graded\.$/,
     );
     expect(one).toContain('Measured by rendering 1 page: every page of the template.');
-    const graded: RenderedInputPage = {
-      ...thin('/guides/graded', true),
-      kind: 'content',
-    };
-    const mixed = recordOf([graded, thin('/guides/a', true), thin('/guides/b', true)]);
-    expect(compose(builder, mixed, factsOf()).context[0]).toMatch(
-      /The audit rendered each of its 3 pages in a browser: 1 graded and 2 whose HTML response held too little text to be graded\.$/,
-    );
     const three = recordOf([
       thin('/guides/a', true),
       thin('/guides/b', true),
@@ -156,7 +148,7 @@ describe('the client-rendered template packet, from its record', () => {
     ]);
     const ctx = compose(builder, three, factsOf()).context;
     expect(ctx[0]).toMatch(
-      /The audit rendered 2 of its 3 pages in a browser: 0 graded and 3 whose HTML response held too little text to be graded\.$/,
+      /The audit rendered 2 of its 3 pages in a browser; their HTML responses held too little text to be graded\.$/,
     );
     expect(ctx).toContain(
       'Measured by rendering 2 pages. The other 1 page of the template was not rendered: the finding is for the template by this sample.',
