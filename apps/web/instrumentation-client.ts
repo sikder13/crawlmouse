@@ -18,8 +18,13 @@ Sentry.init({
 export const onRouterTransitionStart = Sentry.captureRouterTransitionStart;
 
 // PostHog — reverse-proxied via /ingest (ad-blocker resilient); session replay OFF until an
-// error occurs (privacy-masked). Sampling drops noisy autocapture (cost control #6).
-if (typeof window !== 'undefined' && process.env.NEXT_PUBLIC_POSTHOG_KEY) {
+// error occurs (privacy-masked). Sampling drops noisy autocapture (cost control #6). Not started on
+// the support console, /internal (owner ruling, CC-33; __tests__/console-no-analytics.dom.test.ts).
+if (
+  typeof window !== 'undefined' &&
+  process.env.NEXT_PUBLIC_POSTHOG_KEY &&
+  !/^\/internal(\/|$)/.test(window.location.pathname)
+) {
   // Consent gate: in regions that require prior opt-in (cm_consent_required=1, set by middleware
   // from geo), hold ALL capture until the visitor agrees via the CookieConsent banner. Elsewhere
   // (and once granted) analytics load by default. A prior 'denied' decision also keeps us opted out.
