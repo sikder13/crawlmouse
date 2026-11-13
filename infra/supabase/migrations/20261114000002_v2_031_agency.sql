@@ -1037,9 +1037,15 @@ create unique index if not exists report_schedules_pause_hash_uq
 --    "paused_at":   when the recipient paused; taken away when they confirm again,
 --    "asked_at":    when a request to confirm was issued after that pause,
 --    "asked_by":    the request that was (issue_recipient_confirmation's p_request),
---    "declined_at": when the recipient pressed "Don't ask me again"}
--- An entry holds no address. One with neither paused_at nor declined_at is not kept. The column is
--- granted to no client role (sites is granted by column, 20261102000001).
+--    "declined_at": when the recipient pressed "Don't ask me again",
+--    "d":           sha256 (hex) of the token of that address's "Don't ask me again" link, which
+--                   the mailer derives from the site and the address, so the link in each mail it
+--                   was sent keeps answering (issue_recipient_confirmation stores it)}
+-- An entry holds no address. One with none of paused_at, declined_at and d is not kept. A site
+-- holds at most report_refusals_max() entries: past it, the oldest that records no pause and no
+-- refusal goes. A client site removed and added again is a new row: it starts with the list of
+-- the row before it (sites_carry_report_refusals), so removing a client does not clear a refusal.
+-- The column is granted to no client role (sites is granted by column, 20261102000001).
 --
 -- What follows from an entry, for the site's contact as it is at p_now (report_ask_refusals):
 --   declined         no request to confirm is issued to that address for that site, by any path
@@ -1050,6 +1056,51 @@ alter table public.sites add column if not exists report_refusals jsonb not null
 alter table public.sites drop constraint if exists sites_report_refusals_array;
 alter table public.sites add constraint sites_report_refusals_array
   check (pg_catalog.jsonb_typeof(report_refusals) = 'array');
+-- The site a "Don't ask me again" token names is found by its hash, among the entries.
+create index if not exists sites_report_refusals_idx
+  on public.sites using gin (report_refusals jsonb_path_ops);
+
+-- Entries one site keeps.
+create or replace function public.report_refusals_max()
+returns integer
+language sql
+immutable
+set search_path = pg_catalog, pg_temp
+as $$
+  select 200;
+$$;
+
+-- A client site added again starts with what its recipients refused on the row removed before it.
+-- The function is a trigger's: no role is granted it.
+create or replace function public.sites_carry_report_refusals()
+returns trigger
+language plpgsql
+security definer
+set search_path = pg_catalog, pg_temp
+as $$
+begin
+  if new.report_refusals = '[]'::jsonb then
+    new.report_refusals := coalesce(
+      (select s.report_refusals
+         from public.sites s
+        where s.account_id = new.account_id
+          and s.host = new.host
+          and s.removed_at is not null
+          and s.report_refusals <> '[]'::jsonb
+        order by s.removed_at desc, s.id
+        limit 1),
+      '[]'::jsonb);
+  end if;
+  return new;
+end;
+$$;
+alter function public.sites_carry_report_refusals() owner to postgres;
+revoke all on function public.sites_carry_report_refusals()
+  from public, anon, authenticated, service_role;
+drop trigger if exists sites_carry_report_refusals on public.sites;
+create trigger sites_carry_report_refusals
+  before insert on public.sites
+  for each row execute function public.sites_carry_report_refusals();
 
 create or replace function public.report_refusal_key(p_email text)
 returns text
@@ -1086,9 +1137,11 @@ as $$
    limit 1;
 $$;
 
--- Merges p_patch into the entry of p_email on p_site, making it if there is none; a key patched to
--- null is taken away, and an entry left with neither paused_at nor declined_at is removed.
-create or replace function public.note_report_refusal(p_site uuid, p_email text, p_patch jsonb)
+-- Merges p_patch into the entry keyed p_key on p_site, making it if there is none; a key patched to
+-- null is taken away, and an entry left with none of paused_at, declined_at and d is removed. The
+-- entry goes to the end of the list. Past report_refusals_max() entries, the oldest that record no
+-- pause and no refusal go. A patch that changes nothing writes nothing.
+create or replace function public.note_report_refusal_by_key(p_site uuid, p_key text, p_patch jsonb)
 returns void
 language plpgsql
 volatile
@@ -1096,33 +1149,57 @@ security definer
 set search_path = pg_catalog, pg_temp
 as $$
 declare
-  v_key text;
   v_all jsonb;
+  v_old jsonb;
   v_entry jsonb;
   v_rest jsonb;
+  v_over integer;
 begin
-  if p_email is null then
+  if p_key is null then
     return;
   end if;
-  v_key := public.report_refusal_key(p_email);
   select st.report_refusals into v_all from public.sites st where st.id = p_site for update;
   if not found then
     return;
   end if;
-  select e.v into v_entry
+  select e.v into v_old
     from pg_catalog.jsonb_array_elements(v_all) as e(v)
-   where e.v ->> 'a' = v_key
+   where e.v ->> 'a' = p_key
    limit 1;
   v_entry := pg_catalog.jsonb_strip_nulls(
-    coalesce(v_entry, pg_catalog.jsonb_build_object('a', v_key)) || p_patch);
-  select coalesce(pg_catalog.jsonb_agg(e.v), '[]'::jsonb) into v_rest
-    from pg_catalog.jsonb_array_elements(v_all) as e(v)
-   where e.v ->> 'a' <> v_key;
-  if v_entry ? 'paused_at' or v_entry ? 'declined_at' then
+    coalesce(v_old, pg_catalog.jsonb_build_object('a', p_key)) || p_patch);
+  if v_old is not null and v_entry = v_old then
+    return;
+  end if;
+  select coalesce(pg_catalog.jsonb_agg(e.v order by e.n), '[]'::jsonb) into v_rest
+    from pg_catalog.jsonb_array_elements(v_all) with ordinality as e(v, n)
+   where e.v ->> 'a' <> p_key;
+  if v_entry ? 'paused_at' or v_entry ? 'declined_at' or v_entry ? 'd' then
     v_rest := v_rest || pg_catalog.jsonb_build_array(v_entry);
+  end if;
+  v_over := pg_catalog.jsonb_array_length(v_rest) - public.report_refusals_max();
+  if v_over > 0 then
+    select coalesce(pg_catalog.jsonb_agg(k.v order by k.n), '[]'::jsonb) into v_rest
+      from (select e.v, e.n,
+                   pg_catalog.row_number() over (
+                     partition by (e.v ? 'paused_at' or e.v ? 'declined_at') order by e.n) as age
+              from pg_catalog.jsonb_array_elements(v_rest) with ordinality as e(v, n)) k
+     where (k.v ? 'paused_at' or k.v ? 'declined_at') or k.age > v_over;
   end if;
   update public.sites st set report_refusals = v_rest where st.id = p_site;
 end;
+$$;
+
+-- The same, for an address.
+create or replace function public.note_report_refusal(p_site uuid, p_email text, p_patch jsonb)
+returns void
+language sql
+volatile
+security definer
+set search_path = pg_catalog, pg_temp
+as $$
+  select public.note_report_refusal_by_key(p_site, public.report_refusal_key(p_email), p_patch)
+   where p_email is not null;
 $$;
 
 -- Which of p_sites may not have their contact asked to confirm at p_now, and why: an object keyed by
@@ -1317,7 +1394,7 @@ begin
                select coalesce(pg_catalog.jsonb_agg(e.v), '[]'::jsonb)
                  from pg_catalog.jsonb_array_elements(st.report_refusals) as e(v)
                 where e.v ->> 'a' <> public.report_refusal_key(old.client_contact_email))
-       where st.id = new.id;
+       where st.account_id = new.account_id and st.host = new.host;
     end if;
   end if;
   return new;
@@ -1340,14 +1417,15 @@ security definer
 set search_path = pg_catalog, pg_temp
 as $$
 begin
-  if old.recipient_email is not null and new.recipient_email is null
-     and public.report_refusal(new.site_id, old.recipient_email) is not null then
+  if old.recipient_email is not null and new.recipient_email is null then
+    -- Every row of the client: the report's site, and a row the client was added again as.
     update public.sites st
        set report_refusals = (
              select coalesce(pg_catalog.jsonb_agg(e.v), '[]'::jsonb)
                from pg_catalog.jsonb_array_elements(st.report_refusals) as e(v)
               where e.v ->> 'a' <> public.report_refusal_key(old.recipient_email))
-     where st.id = new.site_id;
+      from public.sites own
+     where own.id = new.site_id and st.account_id = own.account_id and st.host = own.host;
   end if;
   return new;
 end;
@@ -1469,7 +1547,8 @@ $$;
 -- (report_ask_refusals), the account is in its Agency trial and the contact is not its owner's
 -- address, the site is removed, or its account is deleted or marked for deletion.
 create or replace function public.issue_recipient_confirmation(
-  p_site uuid, p_now timestamptz, p_request text default null)
+  p_site uuid, p_now timestamptz, p_request text default null,
+  p_email text default null, p_decline_hash text default null)
 returns jsonb
 language plpgsql
 volatile
@@ -1487,6 +1566,11 @@ begin
   if p_now is null then
     raise exception 'issue_recipient_confirmation: p_now is null' using errcode = '22004';
   end if;
+  if p_decline_hash is not null and p_decline_hash !~ '^[0-9a-f]{64}$' then
+    raise exception 'issue_recipient_confirmation: p_decline_hash is not a sha256' using errcode = '22023';
+  end if;
+  -- The site's row first, then its schedule: the order set_client and set_report_schedule lock in.
+  perform 1 from public.sites st where st.id = p_site for update;
   select st.client_contact_email, st.host, a.name into v_email, v_host, v_name
     from public.report_schedules rs
     join public.sites st on st.id = rs.site_id
@@ -1508,13 +1592,21 @@ begin
   if not found then
     return pg_catalog.jsonb_build_object('outcome', 'none');
   end if;
+  -- The mailer names the address it read before it claimed the mail (p_email): a contact changed
+  -- since is not that address, and the "Don't ask me again" token derived for one address is
+  -- never stored for another.
+  if p_email is not null
+     and pg_catalog.lower(pg_catalog.btrim(p_email)) <> pg_catalog.lower(v_email) then
+    return pg_catalog.jsonb_build_object('outcome', 'none');
+  end if;
   v_refusal := public.report_ask_refusals(array[p_site], p_now) -> p_site::text;
   v_entry := public.report_refusal(p_site, v_email);
   -- The request that opened the window is let through again: its mail may not have gone, and a
-  -- retry of it is the same ask. Any other request inside the window is refused.
+  -- retry of it is the same ask. Another request inside the window, and one that names no
+  -- request, is refused.
   if v_refusal ->> 'refused' = 'declined'
      or (v_refusal ->> 'refused' = 'asked_recently'
-         and (v_entry ->> 'asked_by') is distinct from p_request) then
+         and (p_request is null or (v_entry ->> 'asked_by') is distinct from p_request)) then
     return pg_catalog.jsonb_build_object('outcome', 'none');
   end if;
   v_raw := public.report_link_token();
@@ -1527,6 +1619,12 @@ begin
   if v_entry ? 'paused_at' and v_refusal is null then
     perform public.note_report_refusal(
       p_site, v_email, pg_catalog.jsonb_build_object('asked_at', p_now, 'asked_by', p_request));
+  end if;
+  -- The hash of the address's "Don't ask me again" token, kept with the site: the link in this
+  -- mail and in each mail before it answers while the site is there.
+  if p_decline_hash is not null then
+    perform public.note_report_refusal(
+      p_site, v_email, pg_catalog.jsonb_build_object('d', p_decline_hash));
   end if;
   return pg_catalog.jsonb_build_object(
     'outcome', 'issued', 'token', v_raw, 'email', v_email, 'host', v_host, 'account_name', v_name);
@@ -1580,6 +1678,12 @@ begin
   if p_token_hash is null or p_now is null then
     raise exception 'confirm_report_recipient: a required argument is null' using errcode = '22004';
   end if;
+  -- The site's row first, then its schedule (the order set_client and set_report_schedule lock in).
+  perform 1
+     from public.sites st
+    where st.id = (select rs.site_id from public.report_schedules rs
+                    where rs.recipient_confirm_hash = p_token_hash)
+      for update;
   update public.report_schedules rs
      set recipient_confirmed_at = p_now,
          recipient_confirm_hash = null,
@@ -1672,6 +1776,12 @@ begin
   if p_token_hash is null or p_now is null then
     raise exception 'pause_report_schedule: a required argument is null' using errcode = '22004';
   end if;
+  -- The site's row first, then its schedule (the order set_client and set_report_schedule lock in).
+  perform 1
+     from public.sites st
+    where st.id = (select rs.site_id from public.report_schedules rs
+                    where rs.pause_token_hash = p_token_hash)
+      for update;
   update public.report_schedules rs
      set paused_by_recipient_at = coalesce(rs.paused_by_recipient_at, p_now),
          recipient_confirm_hash = null,
@@ -1696,9 +1806,11 @@ $$;
 -- The recipient answers "Don't ask me again" (owner ruling, 2026-11-12): from p_now no request to
 -- confirm is issued to that address for that site, by a resume, an "ask again", a save or the
 -- hourly run, and no report is sent to it. The link is the confirmation's own token (the mail that
--- asks carries it) or the pause link's (the pause page offers it); a confirmation link is taken
--- here whatever its age, since a refusal does not expire. A request that was waiting is withdrawn,
--- and a schedule that was sending is paused. Nothing the account can do lifts it.
+-- asks carries it: the address's own token, the same in each mail) or, from a page's second
+-- button, the confirmation link's or the pause link's; none of them is refused for its age, since
+-- a refusal does not expire. A request that was waiting is withdrawn, and a schedule that was
+-- sending is paused. No function of this migration takes a refusal away but the erasure's two
+-- triggers; a removed client added again starts with it (sites_carry_report_refusals).
 -- Answers {outcome}: 'declined'; 'gone' for a hash no schedule holds.
 create or replace function public.decline_report_requests(p_token_hash text, p_now timestamptz)
 returns jsonb
@@ -1709,25 +1821,48 @@ set search_path = pg_catalog, pg_temp
 as $$
 declare
   v_site uuid;
-  v_email text;
+  v_key text;
 begin
   if p_token_hash is null or p_now is null then
     raise exception 'decline_report_requests: a required argument is null' using errcode = '22004';
   end if;
-  select rs.site_id, st.client_contact_email into v_site, v_email
+  -- The page's second button: the token of the confirmation link or the pause link the page was
+  -- opened with, which a schedule holds for its contact as it is now.
+  select rs.site_id into v_site
     from public.report_schedules rs
-    join public.sites st on st.id = rs.site_id
-   where (rs.recipient_confirm_hash = p_token_hash or rs.pause_token_hash = p_token_hash)
-     and st.client_contact_email is not null
-     for update of rs;
-  if not found then
+   where rs.recipient_confirm_hash = p_token_hash or rs.pause_token_hash = p_token_hash;
+  if found then
+    select public.report_refusal_key(st.client_contact_email) into v_key
+      from public.sites st
+     where st.id = v_site and st.client_contact_email is not null
+       for update;
+  else
+    -- The mail's own link: the address's token, whose hash the site keeps with the address's entry.
+    select st.id, e.v ->> 'a' into v_site, v_key
+      from public.sites st
+     cross join lateral pg_catalog.jsonb_array_elements(st.report_refusals) as e(v)
+     where st.report_refusals @> pg_catalog.jsonb_build_array(
+             pg_catalog.jsonb_build_object('d', p_token_hash))
+       and e.v ->> 'd' = p_token_hash
+     order by st.removed_at desc nulls first, st.id
+     limit 1;
+    perform 1 from public.sites st where st.id = v_site for update;
+  end if;
+  if v_site is null or v_key is null then
     return pg_catalog.jsonb_build_object('outcome', 'gone');
   end if;
-  perform public.note_report_refusal(
-    v_site, v_email,
+  perform public.note_report_refusal_by_key(
+    v_site, v_key,
     pg_catalog.jsonb_build_object(
       'declined_at',
-      coalesce(public.report_refusal(v_site, v_email) -> 'declined_at', pg_catalog.to_jsonb(p_now))));
+      coalesce(
+        (select e.v -> 'declined_at'
+           from public.sites st
+          cross join lateral pg_catalog.jsonb_array_elements(st.report_refusals) as e(v)
+          where st.id = v_site and e.v ->> 'a' = v_key
+          limit 1),
+        pg_catalog.to_jsonb(p_now))));
+  -- For the site's contact as it is now: the waiting request goes, and reports being sent stop.
   update public.report_schedules rs
      set recipient_confirm_hash = null,
          recipient_confirm_sent_at = case when rs.recipient_confirmed_at is null then null
@@ -1736,7 +1871,11 @@ begin
                                        then rs.paused_by_recipient_at
                                        else coalesce(rs.paused_by_recipient_at, p_now) end,
          updated_at = pg_catalog.now()
-   where rs.site_id = v_site;
+    from public.sites st
+   where rs.site_id = v_site
+     and st.id = rs.site_id
+     and st.client_contact_email is not null
+     and public.report_refusal_key(st.client_contact_email) = v_key;
   return pg_catalog.jsonb_build_object('outcome', 'declined');
 end;
 $$;
@@ -1767,6 +1906,7 @@ begin
   if p_now is null then
     raise exception 'resume_report_schedule: p_now is null' using errcode = '22004';
   end if;
+  perform 1 from public.sites st where st.id = p_site for update;
   select rs.* into v
     from public.report_schedules rs
    where rs.site_id = p_site and rs.account_id = p_account
@@ -2024,7 +2164,7 @@ revoke all on function public.set_client(uuid, uuid, jsonb) from public, anon, a
 revoke all on function public.set_report_schedule(uuid, uuid, jsonb, timestamptz)
   from public, anon, authenticated;
 revoke all on function public.clear_report_schedule(uuid, uuid) from public, anon, authenticated;
-revoke all on function public.issue_recipient_confirmation(uuid, timestamptz, text)
+revoke all on function public.issue_recipient_confirmation(uuid, timestamptz, text, text, text)
   from public, anon, authenticated;
 revoke all on function public.read_report_link(text, timestamptz) from public, anon, authenticated;
 revoke all on function public.confirm_report_recipient(text, timestamptz)
@@ -2047,6 +2187,9 @@ revoke all on function public.report_reask_window() from public, anon, authentic
 revoke all on function public.report_refusal(uuid, text) from public, anon, authenticated;
 revoke all on function public.note_report_refusal(uuid, text, jsonb)
   from public, anon, authenticated;
+revoke all on function public.note_report_refusal_by_key(uuid, text, jsonb)
+  from public, anon, authenticated;
+revoke all on function public.report_refusals_max() from public, anon, authenticated;
 revoke all on function public.report_ask_refusals(uuid[], timestamptz)
   from public, anon, authenticated;
 revoke all on function public.decline_report_requests(text, timestamptz)
@@ -2055,6 +2198,8 @@ grant execute on function public.report_refusal_key(text) to service_role;
 grant execute on function public.report_reask_window() to service_role;
 grant execute on function public.report_refusal(uuid, text) to service_role;
 grant execute on function public.note_report_refusal(uuid, text, jsonb) to service_role;
+grant execute on function public.note_report_refusal_by_key(uuid, text, jsonb) to service_role;
+grant execute on function public.report_refusals_max() to service_role;
 grant execute on function public.report_ask_refusals(uuid[], timestamptz) to service_role;
 grant execute on function public.decline_report_requests(text, timestamptz) to service_role;
 grant execute on function public.report_link_token() to service_role;
@@ -2063,7 +2208,7 @@ grant execute on function public.report_schedule_next(text, smallint, text, text
 grant execute on function public.set_client(uuid, uuid, jsonb) to service_role;
 grant execute on function public.set_report_schedule(uuid, uuid, jsonb, timestamptz) to service_role;
 grant execute on function public.clear_report_schedule(uuid, uuid) to service_role;
-grant execute on function public.issue_recipient_confirmation(uuid, timestamptz, text) to service_role;
+grant execute on function public.issue_recipient_confirmation(uuid, timestamptz, text, text, text) to service_role;
 grant execute on function public.read_report_link(text, timestamptz) to service_role;
 grant execute on function public.confirm_report_recipient(text, timestamptz) to service_role;
 grant execute on function public.issue_report_pause(uuid, text, text, timestamptz) to service_role;
