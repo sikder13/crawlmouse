@@ -130,16 +130,28 @@ const invoiceId = (sub: Stripe.Subscription): string => {
 };
 
 /**
+ * How long one request's retries share a key. Stripe keeps the first answer for a key for a day,
+ * a card's decline included, and a declined raise changes nothing the key is built from; so the key
+ * also names the ten minutes it was made in, and the same change asked again after them is a new
+ * attempt (with another card, say). Asking twice is safe either way: the quantities are the ones
+ * wanted, not amounts to add, and a subscription that already holds them is answered before Stripe
+ * is called.
+ */
+export const RETRY_WINDOW_MS = 10 * 60 * 1000;
+
+/**
  * The key Stripe deduplicates a change by. A retry of one request finds the subscription as the
  * first attempt found it, so it repeats the key. A later request for the same quantities (bought,
  * lowered, bought again) must not: it differs in the quantities it starts from, in the
- * subscription's latest invoice (a paid raise makes one) or in the last event the mirror applied.
+ * subscription's latest invoice (a paid raise makes one), in the last event the mirror applied, or
+ * in its `RETRY_WINDOW_MS` window.
  */
 function idempotencyKey(
   sub: Stripe.Subscription,
   lastEventId: string | null,
   from: Extras,
   to: Extras,
+  now: Date,
 ): string {
   return [
     'extras',
@@ -148,6 +160,7 @@ function idempotencyKey(
     lastEventId ?? 'none',
     `${from.seats}-${from.sites}`,
     `${to.seats}-${to.sites}`,
+    Math.floor(now.getTime() / RETRY_WINDOW_MS),
   ].join(':');
 }
 
@@ -238,7 +251,15 @@ export async function changeExtras(
     const updated = await deps.stripe.subscriptions.update(
       sub.id,
       { items: changes.filter((c) => c !== null), ...(rises ? RAISE : LOWER) },
-      { idempotencyKey: idempotencyKey(sub, account.subscription.lastEventId, from, want) },
+      {
+        idempotencyKey: idempotencyKey(
+          sub,
+          account.subscription.lastEventId,
+          from,
+          want,
+          deps.now(),
+        ),
+      },
     );
     const now = await mirrorOf(updated, deps.catalog);
     if ('refused' in now) throw new Error(`extras: Stripe answered a subscription ${now.refused}`);

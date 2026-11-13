@@ -12,6 +12,7 @@ import {
   MAX_EXTRA_SEATS,
   parseExtras,
   RAISE,
+  RETRY_WINDOW_MS,
   type ExtrasAccount,
   type ExtrasDeps,
 } from './extras';
@@ -341,6 +342,19 @@ describe('changeExtras: the idempotency key', () => {
     expect(after.stripe.updates[0]!.idempotencyKey).not.toBe(
       before.stripe.updates[0]!.idempotencyKey,
     );
+  });
+
+  it('is the same within ten minutes and differs after them, so a raise a card declined can be asked again', async () => {
+    const keyAt = async (ms: number) => {
+      const w = world();
+      w.deps.now = () => new Date(ms);
+      await w.change(2, 0);
+      return w.stripe.updates[0]!.idempotencyKey;
+    };
+    const start = Math.ceil(NOW.getTime() / RETRY_WINDOW_MS) * RETRY_WINDOW_MS;
+    expect(RETRY_WINDOW_MS).toBe(10 * 60 * 1000);
+    expect(await keyAt(start + RETRY_WINDOW_MS - 1)).toBe(await keyAt(start));
+    expect(await keyAt(start + RETRY_WINDOW_MS)).not.toBe(await keyAt(start));
   });
 
   it('names the subscription and neither the account nor a person', async () => {
