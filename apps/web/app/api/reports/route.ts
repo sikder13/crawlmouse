@@ -126,6 +126,28 @@ export async function POST(req: Request) {
   }
 
   const admin = supabaseAdmin();
+  if (fixId !== undefined) {
+    // A fix's proof is of a fix of this site that the later check verified; the document could
+    // not be built for another, so none is asked for: no row is written. A fix and its events are
+    // granted to no client role, so these are the service role's reads, of a fix the caller's own
+    // session answered for (`is_member_for_fix`, above).
+    const { data: fix, error: fixReadError } = await admin
+      .from('site_fixes')
+      .select('site_id')
+      .eq('id', fixId)
+      .maybeSingle();
+    if (fixReadError) throw new Error(`site_fixes read failed: ${fixReadError.message}`);
+    if ((fix as { site_id: string } | null)?.site_id !== siteId) return notFound();
+    const { data: verified, error: verifiedError } = await admin
+      .from('fix_events')
+      .select('id')
+      .eq('fix_id', fixId)
+      .eq('check_id', request.checkId)
+      .eq('kind', 'verified')
+      .limit(1);
+    if (verifiedError) throw new Error(`fix_events read failed: ${verifiedError.message}`);
+    if ((verified ?? []).length === 0) return refuse(409, 'fix_not_verified');
+  }
   const store = supabaseReportStore(admin);
   await store.failAbandoned(site.account_id, new Date(Date.now() - ABANDONED_AFTER_MS));
   const format = formatOf(request);

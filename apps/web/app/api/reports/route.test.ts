@@ -472,19 +472,28 @@ describe('POST /api/reports: the answer', () => {
     const form = await post({ kind: 'audit_pdf', siteId: w.site.id, checkId: w.site.first }, true);
     expect([form.status, form.headers.get('location')]).toEqual([303, '/reports']);
     expect(h.events).toEqual([]);
+  });
 
-    // The proof of a fix the later check did not verify cannot be built.
-    h.bucket.state.refuse = false;
+  it('the proof of a fix the later check did not verify is refused before a row or a file is written: 409', async () => {
+    as(w.owner);
+    const before = await countReports();
     const unverified = await post({
       kind: 'compare',
       siteId: w.site.id,
       checkId: w.site.second,
       fixId: w.site.openFix,
     });
-    expect(unverified.status).toBe(500);
-    const failed = (await unverified.json()) as { reportId: string };
-    expect((await reportById(failed.reportId)).failed_reason).toBe('build_failed');
+    expect(await answer(unverified)).toEqual([409, { code: 'fix_not_verified' }]);
+    expect(await countReports()).toBe(before);
     expect(h.bucket.objects.size).toBe(0);
+    // The fix it did verify is made.
+    const verified = await post({
+      kind: 'compare',
+      siteId: w.site.id,
+      checkId: w.site.second,
+      fixId: w.site.verifiedFix,
+    });
+    expect(verified.status).toBe(201);
   });
 
   it.each([
