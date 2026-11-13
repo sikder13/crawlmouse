@@ -103,6 +103,11 @@ describe('the configs', () => {
     }
   });
 
+  it('the confirmation of a client report schedule runs one at a time, so its count of the day’s mail sees every earlier claim', () => {
+    const c = configOf(createReportConfirmFn(() => reportHandlers()));
+    expect(c.concurrency).toEqual({ limit: 1 });
+  });
+
   it('check_finished runs once per check: Inngest’s idempotency is keyed on the check id', () => {
     const c = configOf(createCheckFinishedEventFn(() => handlers()));
     expect(c).toMatchObject({

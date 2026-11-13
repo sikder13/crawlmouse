@@ -158,9 +158,16 @@ export function createSeatInviteFn(handlers: () => MailHandlers) {
   );
 }
 
+/**
+ * One confirmation at a time: the handler counts the day's confirmations in the ledger and then
+ * claims its own, two calls, so two runs together could each read the count before either claimed
+ * and pass the day's bound by one. Run one after another, a count sees every earlier claim.
+ */
+export const REPORT_CONFIRM_CONCURRENCY = 1;
+
 export function createReportConfirmFn(handlers: () => ReportMailHandlers) {
   return inngest.createFunction(
-    mailConfig(REPORT_CONFIRM_FN_ID),
+    { ...mailConfig(REPORT_CONFIRM_FN_ID), concurrency: { limit: REPORT_CONFIRM_CONCURRENCY } },
     { event: 'report.confirmation.requested' },
     async ({ event, step }) =>
       step.run('send', () =>
