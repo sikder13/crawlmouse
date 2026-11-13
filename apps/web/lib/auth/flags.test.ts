@@ -1,6 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { accountDoorEnabled, checksPublicEnabled, pipelineEnabled } from './flags';
+import {
+  accountDoorEnabled,
+  checksPublicEnabled,
+  pipelineEnabled,
+  v2PublicPagesEnabled,
+} from './flags';
 import { trialVariantFor } from './trial-variant';
 
 describe('flags', () => {
@@ -27,5 +32,34 @@ describe('flags', () => {
 describe('trialVariantFor', () => {
   it('is no_card for every sign-up until CC-03', () => {
     expect(trialVariantFor('a@b.co')).toBe('no_card');
+  });
+});
+
+describe('v2PublicPagesEnabled', () => {
+  it('is on when either flag is 1, and off when neither is', () => {
+    expect(v2PublicPagesEnabled({ V2_CHECKS_PUBLIC: '1' })).toBe(true);
+    expect(v2PublicPagesEnabled({ V2_BILLING: ' 1 ' })).toBe(true);
+    expect(v2PublicPagesEnabled({})).toBe(false);
+    expect(v2PublicPagesEnabled({ V2_CHECKS_PUBLIC: 'true', V2_BILLING: '0' })).toBe(false);
+  });
+
+  describe('reads V2_BILLING through billingV2Enabled, its one definition', () => {
+    afterEach(() => {
+      vi.doUnmock('../billing/flags');
+      vi.resetModules();
+    });
+
+    it.each([true, false])(
+      'billingV2Enabled answering %s, with V2_CHECKS_PUBLIC off',
+      async (on) => {
+        vi.resetModules();
+        const env = { V2_BILLING: on ? 'no' : '1' };
+        const billing = vi.fn(() => on);
+        vi.doMock('../billing/flags', () => ({ billingV2Enabled: billing }));
+        const flags = await import('./flags');
+        expect(flags.v2PublicPagesEnabled(env)).toBe(on);
+        expect(billing).toHaveBeenCalledWith(env);
+      },
+    );
   });
 });

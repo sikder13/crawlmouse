@@ -23,8 +23,7 @@ async function metaOf(modulePath: string): Promise<Metadata> {
   return mod.metadata ?? {};
 }
 
-const canonicalOf = (m: Metadata) =>
-  (m.alternates?.canonical ?? null) as string | null;
+const canonicalOf = (m: Metadata) => (m.alternates?.canonical ?? null) as string | null;
 
 // ── Indexable pages: own title + self-canonical ────────────────────────────────────────────
 // `description` is listed only where this change introduces one; the title-only rows are pages
@@ -62,6 +61,10 @@ const INDEXABLE: {
   { route: '/aup', module: '../app/aup/page', title: 'Acceptable Use' },
   { route: '/subprocessors', module: '../app/subprocessors/page', title: 'Subprocessors' },
   { route: '/takedown', module: '../app/takedown/page', title: 'Takedown request' },
+  // CC-29: For agencies, and the v2 Developers page, which serves /developers under V2_BILLING. The
+  // /check pages build theirs per question (__tests__/v2/public-pages.test.tsx).
+  { route: '/agencies', module: '../app/agencies/page', title: 'For agencies' },
+  { route: '/developers', module: '../app/v2-developers/page', title: 'Developers' },
 ];
 
 describe('per-page metadata — self-canonicals', () => {
@@ -148,7 +151,10 @@ describe('per-page metadata — noindex on app surfaces', () => {
     // Two different ids, because a canonical built from the wrong half of the params — or a
     // hardcoded one — passes a single-fixture check and is wrong for every other audit.
     it(`${page.name} canonicalises to the id it was asked about`, async () => {
-      for (const id of ['11111111-2222-3333-4444-555555555555', 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee']) {
+      for (const id of [
+        '11111111-2222-3333-4444-555555555555',
+        'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
+      ]) {
         expect(canonicalOf(await meta(id))).toBe(page.route(id));
       }
     });
@@ -160,7 +166,10 @@ describe('per-page metadata — noindex on app surfaces', () => {
       const c = canonicalOf(await metaOf(page.module));
       if (c === null || c === '/') conflicting.push(page.route);
     }
-    expect(conflicting, 'noindex + a canonical pointing elsewhere are contradictory signals').toEqual([]);
+    expect(
+      conflicting,
+      'noindex + a canonical pointing elsewhere are contradictory signals',
+    ).toEqual([]);
   });
 });
 
@@ -186,7 +195,10 @@ const exportsMetadata = (src: string) =>
   /export\s+(const|async\s+function|function)\s+(metadata|generateMetadata)\b/.test(src);
 
 describe("route metadata never lives in a 'use client' module", () => {
-  const files = appModules(APP).map((f) => ({ rel: f.slice(APP.length + 1), src: readFileSync(f, 'utf8') }));
+  const files = appModules(APP).map((f) => ({
+    rel: f.slice(APP.length + 1),
+    src: readFileSync(f, 'utf8'),
+  }));
   const clientOffenders = files.filter((f) => isClientModule(f.src) && exportsMetadata(f.src));
 
   it('finds the app modules to scan', () => {

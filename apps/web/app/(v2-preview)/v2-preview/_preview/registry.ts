@@ -255,4 +255,46 @@ export const PREVIEWS: PreviewEntry[] = [
   },
   { path: '/v2-preview/screens/continue', name: 'Continue', kind: 'screen' },
   { path: '/v2-preview/screens/continue/expired', name: 'Continue, link expired', kind: 'screen' },
+  // CC-29: Pricing's orange element is the Pro button (DESIGN-LOCK §6); signed in with the Pro trial
+  // used, it is the Pro checkout. The Agency trial's is "Start a 14-day trial"; a used trial shows no
+  // form and asks nothing of the reader.
+  { path: '/v2-preview/screens/pricing', name: 'Final-Pricing', kind: 'screen' },
+  { path: '/v2-preview/screens/pricing/signed-in', name: 'Pricing, signed in', kind: 'screen' },
+  { path: '/v2-preview/screens/agency-trial', name: 'Final-AgencyTrial', kind: 'screen' },
+  {
+    path: '/v2-preview/screens/agency-trial/returning',
+    name: 'Agency trial, Checkout did not finish',
+    kind: 'screen',
+  },
+  {
+    path: '/v2-preview/screens/agency-trial/used',
+    name: 'Agency trial, used',
+    kind: 'screen',
+    orange: 0,
+  },
+  {
+    path: '/v2-preview/screens/agency-trial/held',
+    name: 'Agency trial, on the trial: its billing and Cancel',
+    kind: 'screen',
+    orange: 0,
+  },
+  // CC-29 workstream C. For agencies' orange element is the trial button; Developers' is the
+  // closing audit's button. The /check pages have no artboard: each is the Home screen's parts,
+  // with the hero form's button orange.
+  { path: '/v2-preview/screens/agencies', name: 'Final-Agencies', kind: 'screen' },
+  { path: '/v2-preview/screens/developers', name: 'Final-Developers', kind: 'screen' },
+  { path: '/v2-preview/screens/check/gptbot', name: 'Check: is GPTBot blocked?', kind: 'screen' },
+  {
+    path: '/v2-preview/screens/check/javascript',
+    name: 'Check: readable without JavaScript?',
+    kind: 'screen',
+  },
+  { path: '/v2-preview/screens/check/robots-ai', name: 'Check: robots.txt for AI', kind: 'screen' },
+  // CC-29 workstream B: the shared report. Its orange element is the audit form's "Start the audit".
+  { path: '/v2-preview/screens/public-report', name: 'Final-Public', kind: 'screen' },
+  {
+    path: '/v2-preview/screens/public-report/withheld',
+    name: 'Public report, withheld',
+    kind: 'screen',
+  },
 ];

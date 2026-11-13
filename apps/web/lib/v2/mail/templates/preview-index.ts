@@ -25,6 +25,7 @@ export const MAIL_PREVIEW_INDEX = [
   { slug: 'account-delete', name: 'Account deletion, confirm and restore', kind: 'account_delete' },
   { slug: 'alert', name: 'Alert', kind: 'alert' },
   { slug: 'weekly-summary', name: 'Weekly summary', kind: 'weekly_summary' },
+  { slug: 'agency-plus-contact', name: 'Agency Plus request', kind: 'agency_plus_contact' },
 ] as const satisfies readonly { slug: string; name: string; kind: MailKind }[];
 
 export type MailPreviewSlug = (typeof MAIL_PREVIEW_INDEX)[number]['slug'];

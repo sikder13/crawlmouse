@@ -22,6 +22,9 @@ export function letterFor(score: number): string {
   return FLOORS.find(([floor]) => score >= floor)![1];
 }
 
+/** Whether `s` is a letter of the scale. */
+export const isLetter = (s: string): boolean => FLOORS.some(([, letter]) => letter === s);
+
 /** "A", "B", "C", "D" or "F". */
 export const bandOf = (letter: string) => letter.charAt(0);
 

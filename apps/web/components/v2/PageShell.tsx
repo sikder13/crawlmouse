@@ -19,6 +19,8 @@ export interface PageShellProps {
   footer?: boolean;
   /** What the footer's Status link shows (SiteFooter); the shell fetches nothing. */
   status?: ServiceStatus;
+  /** Shown after the footer's line (SiteFooter `lineMark`). */
+  footerLineMark?: ReactNode;
   children: ReactNode;
 }
 
@@ -48,6 +50,7 @@ export function PageShell({
   actions,
   footer = true,
   status,
+  footerLineMark,
   children,
 }: PageShellProps) {
   return (
@@ -66,7 +69,7 @@ export function PageShell({
         </div>
       </header>
       {children}
-      {footer ? <Footer status={status} /> : null}
+      {footer ? <Footer status={status} lineMark={footerLineMark} /> : null}
     </div>
   );
 }

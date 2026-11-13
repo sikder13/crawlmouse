@@ -18,6 +18,7 @@ import { unsubscribeLinks } from './links';
 import { memoryLedger, memoryTransport } from './memory';
 import type { MailDeps } from './send';
 import type { MailStore } from './store';
+import { AGENCY_PLUS_INBOX } from './templates/agency-plus-contact';
 import { MAIL_KINDS, type OutgoingMail } from './types';
 
 vi.mock('server-only', () => ({}));
@@ -40,7 +41,11 @@ const TO = {
   developer: 'qzx-developer@inbox.example',
   alert: 'qzx-alert@inbox.example',
   summary: 'qzx-summary@inbox.example',
+  // CC-29: an Agency Plus request goes to our own inbox, whatever address the form was given.
+  agencyPlus: AGENCY_PLUS_INBOX,
 };
+/** The address an Agency Plus form was given: in the request's body as data, never a recipient. */
+const SUBMITTED = 'qzx-submitted@inbox.example';
 
 const LINK_ROWS: Record<string, { kind: string; recipient: string; tokens: string[] }> = {
   't-confirm': { kind: 'email_change', recipient: TO.emailChange, tokens: ['email_change'] },
@@ -83,6 +88,8 @@ const store: MailStore = {
   }),
   markFixEmailSent: async () => undefined,
   finishedCheck: async () => null,
+  contactRequest: async () => ({ email: SUBMITTED, sites: 12, note: 'A note.', sentAt: null }),
+  markContactSent: async () => undefined,
 } as unknown as MailStore;
 
 const change: StoredChange = {
@@ -127,6 +134,10 @@ async function sweep() {
     await h.accountEmail({ accountId: ACCOUNT, template: 'trial_reminder' }),
     await h.checkNotify(CHECK),
     await h.fixToDeveloper('r0000000-0000-4000-8000-000000000001'),
+    await h.accountEmail({
+      template: 'agency_plus_contact',
+      contactId: 'd0000000-0000-4000-8000-000000000001',
+    }),
   ];
 
   const alert: AlertDeps = {
@@ -214,16 +225,21 @@ describe('no message names its recipient (S3)', () => {
       'sent',
       'sent',
       'sent',
+      'sent',
       JSON.stringify({ sent: 1, outcomes: ['sent'] }),
     ]);
     expect(MAIL_KINDS.filter((k) => !kinds.has(k))).toEqual([]);
     expect(sent.map((m) => m.to).sort()).toEqual(Object.values(TO).sort());
+    expect(sent.map((m) => m.to)).not.toContain(SUBMITTED);
   });
 
   it('leaves the address, and its local part, out of every subject, text and HTML', async () => {
     const { sent } = await sweep();
+    // The sales inbox is ours, not a person's, and its local part is a word the shared layout holds
+    // (`supported-color-schemes`), so for it the whole address is looked for, not its local part.
+    const needles = (to: string) => (to === AGENCY_PLUS_INBOX ? [to] : [to, to.split('@')[0]!]);
     const named = (m: OutgoingMail) =>
-      [m.to, m.to.split('@')[0]!].flatMap((needle) =>
+      needles(m.to).flatMap((needle) =>
         (['subject', 'text', 'html'] as const)
           .filter((part) => m[part].includes(needle))
           .map((part) => `${m.to} in ${part}`),

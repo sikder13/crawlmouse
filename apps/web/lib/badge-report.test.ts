@@ -9,19 +9,37 @@ import { readLatestVisibleReport } from './badge-report';
 // distinctly yet — every pre-existing report was minted under mandatory verification).
 
 type Filter = [string, ...unknown[]];
-function makeSb(opts: { gated?: { data?: unknown; error?: unknown }; legacy?: { data?: unknown; error?: unknown } }) {
+function makeSb(opts: {
+  gated?: { data?: unknown; error?: unknown };
+  legacy?: { data?: unknown; error?: unknown };
+}) {
   const filters: Filter[] = [];
   const make = () => {
     let sawNot = false; // the gated build calls .not('claimed_at','is',null); the legacy fallback does not
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const chain: any = {
       select: () => chain,
-      eq: (...a: unknown[]) => { filters.push(['eq', ...a]); return chain; },
-      is: (...a: unknown[]) => { filters.push(['is', ...a]); return chain; },
-      not: (...a: unknown[]) => { filters.push(['not', ...a]); sawNot = true; return chain; },
+      eq: (...a: unknown[]) => {
+        filters.push(['eq', ...a]);
+        return chain;
+      },
+      is: (...a: unknown[]) => {
+        filters.push(['is', ...a]);
+        return chain;
+      },
+      not: (...a: unknown[]) => {
+        filters.push(['not', ...a]);
+        sawNot = true;
+        return chain;
+      },
       order: () => chain,
       limit: () => chain,
-      maybeSingle: () => Promise.resolve(sawNot ? (opts.gated ?? { data: null, error: null }) : (opts.legacy ?? { data: null, error: null })),
+      maybeSingle: () =>
+        Promise.resolve(
+          sawNot
+            ? (opts.gated ?? { data: null, error: null })
+            : (opts.legacy ?? { data: null, error: null }),
+        ),
     };
     return chain;
   };
@@ -30,7 +48,9 @@ function makeSb(opts: { gated?: { data?: unknown; error?: unknown }; legacy?: { 
 
 describe('readLatestVisibleReport (badge)', () => {
   it('resolves a claimed, non-hidden report AND gates on claimed_at + hidden_at + takedown (§7 integrity)', async () => {
-    const { sb, filters } = makeSb({ gated: { data: { slug: 's', grade: 'B', score: '80' }, error: null } });
+    const { sb, filters } = makeSb({
+      gated: { data: { slug: 's', grade: 'B', score: '80' }, error: null },
+    });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const r = await readLatestVisibleReport(sb as any, 'ex.com');
     expect(r?.slug).toBe('s');
@@ -38,6 +58,7 @@ describe('readLatestVisibleReport (badge)', () => {
     expect(filters).toContainEqual(['is', 'takedown_requested_at', null]);
     expect(filters).toContainEqual(['not', 'claimed_at', 'is', null]); // V6: claimed-only badge integrity
     expect(filters).toContainEqual(['is', 'hidden_at', null]);
+    expect(filters).toContainEqual(['not', 'grade', 'is', null]); // v1 reports only (CC-29)
   });
 
   it('V6: a fresh unclaimed third-party mint does NOT surface — no claimed report → badge resolves null', async () => {
@@ -48,7 +69,10 @@ describe('readLatestVisibleReport (badge)', () => {
   });
 
   it('falls back (no claim/hidden filter) on an undefined-column error — badge keeps working pre-migration', async () => {
-    const { sb } = makeSb({ gated: { error: { code: '42703' } }, legacy: { data: { slug: 'legacy', grade: 'C', score: '60' } } });
+    const { sb } = makeSb({
+      gated: { error: { code: '42703' } },
+      legacy: { data: { slug: 'legacy', grade: 'C', score: '60' } },
+    });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const r = await readLatestVisibleReport(sb as any, 'ex.com');
     expect(r?.slug).toBe('legacy');

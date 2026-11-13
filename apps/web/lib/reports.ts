@@ -1,34 +1,14 @@
 import { unstable_cache, revalidateTag, revalidatePath } from 'next/cache';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { PublicReportSnapshot, WhiteLabelConfig } from '@crawlmouse/types';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { isUndefinedColumnError } from '@/lib/pg-errors';
+import { EXTENDED_REPORT_COLS, LEGACY_REPORT_COLS, type PublicReportRow } from './report-row';
 
-export interface PublicReportRow {
-  domain: string;
-  grade: string | null;
-  score: number | string | null;
-  cms_detected: string | null;
-  orphan_count: number | null;
-  avg_depth: number | string | null;
-  takedown_requested_at: string | null;
-  created_at: string;
-  // SPEC 04 §3/§4 — present after Runbook B; `undefined` on a legacy/pre-migration (42703) read, in
-  // which case the page renders today's behavior (indexed, denormalized columns). `minted_by` is
-  // deliberately NEVER selected (a user id must not reach the render path — §11).
-  report_snapshot?: PublicReportSnapshot | null;
-  claimed_at?: string | null;
-  listed?: boolean | null;
-  indexable?: boolean | null;
-  hidden_at?: string | null;
-  // SPEC 04 §5 — white-label branding (claimed Pro reports). null/undefined = Crawlmouse-branded.
-  white_label?: WhiteLabelConfig | null;
-}
+export type { PublicReportRow } from './report-row';
 
-// The legacy (pre-SPEC-04) render columns — always present. The extended set adds the visibility +
-// snapshot columns (Runbook B). NEITHER selects minted_by.
-export const LEGACY_REPORT_COLS = 'domain, grade, score, cms_detected, orphan_count, avg_depth, takedown_requested_at, created_at';
-export const EXTENDED_REPORT_COLS = `${LEGACY_REPORT_COLS}, report_snapshot, claimed_at, listed, indexable, hidden_at, white_label`;
+// The row type and the column sets live in report-row.ts, which imports no module of the app, so
+// the slug sweep (scripts/db/report-slug-sweep.ts) reads a report as this page does.
+export { LEGACY_REPORT_COLS, EXTENDED_REPORT_COLS } from './report-row';
 
 // Module-local: the cache tag is only ever read inside this file (takedown.ts purges via
 // purgePublicReport, the single source of truth), so it stays off the public surface.
@@ -40,11 +20,22 @@ const reportTag = (slug: string) => `public-report:${slug}`;
  * existing report still renders. A transient (non-42703) error returns null (today's on-error
  * behavior), never a silent legacy downgrade.
  */
-export async function readReportRow(sb: SupabaseClient, slug: string): Promise<PublicReportRow | null> {
-  const ext = await sb.from('public_reports').select(EXTENDED_REPORT_COLS).eq('slug', slug).maybeSingle();
+export async function readReportRow(
+  sb: SupabaseClient,
+  slug: string,
+): Promise<PublicReportRow | null> {
+  const ext = await sb
+    .from('public_reports')
+    .select(EXTENDED_REPORT_COLS)
+    .eq('slug', slug)
+    .maybeSingle();
   if (!ext.error) return (ext.data as PublicReportRow) ?? null;
   if (isUndefinedColumnError(ext.error)) {
-    const leg = await sb.from('public_reports').select(LEGACY_REPORT_COLS).eq('slug', slug).maybeSingle();
+    const leg = await sb
+      .from('public_reports')
+      .select(LEGACY_REPORT_COLS)
+      .eq('slug', slug)
+      .maybeSingle();
     return (leg.data as PublicReportRow) ?? null;
   }
   return null;
@@ -72,6 +63,9 @@ export function purgePublicReport(slug: string): void {
   revalidateTag(reportTag(slug));
   // Purge the report PAGE's full-route cache.
   revalidatePath(`/r/${slug}`);
+  // With V2_CHECKS_PUBLIC on, /r/<slug> is rewritten to /v2-report/<slug>, which keeps a route cache
+  // of its own under that path (CC-29 Q12).
+  revalidatePath(`/v2-report/${slug}`);
   // The OG card lives at the SEPARATE `/r/<slug>/opengraph-image` route segment, which has its
   // own `revalidate = 3600` full-route cache. revalidatePath('/r/<slug>') does NOT cascade into
   // that child segment, and the tag purge only clears the data layer — the already-rendered PNG

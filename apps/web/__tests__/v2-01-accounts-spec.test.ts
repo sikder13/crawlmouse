@@ -29,11 +29,15 @@ describe('docs/specs/v2/01-accounts.md', () => {
       member_role: ['authenticated', 'service_role'],
     });
     const byTable = Object.fromEntries(catalog.tables.map((t) => [t.name, t.grants]));
-    // 027b adds the deletion mark, which no client reads.
+    // 027b adds the deletion mark, and CC-29 the agency trial's Checkout and consent, which no client reads.
     expect(byTable.accounts!.hiddenColumns).toEqual([
       'stripe_customer_id',
       'deletion_confirmed_at',
       'purge_after',
+      'agency_checkout_url',
+      'agency_checkout_at',
+      'agency_checkout_interval',
+      'agency_trial_consent_at',
     ]);
     expect(byTable.seats!.hiddenColumns).toEqual(['invite_token_hash']);
     expect(byTable.trial_ledger!.authenticatedColumns).toBeNull();

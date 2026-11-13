@@ -1,8 +1,10 @@
+import type { ReactNode } from 'react';
 import { BrandLink } from './BrandLink';
 import { CookieSettings } from './CookieSettings';
 import { CopyEmail } from './CopyEmail';
 import { Glyph } from './StatusPill';
 import { VisuallyHidden } from './VisuallyHidden';
+import { FOOTER_LINE_CAPABILITIES } from '../../lib/v2/copy/footer-line';
 import { FOOTER_COLUMNS, FOOTER_COPY, SUPPORT_EMAIL, type FooterItem } from './footer-links';
 import type { PillState } from './pill-states';
 import layout from './layout.module.css';
@@ -27,6 +29,8 @@ export interface SiteFooterProps {
    * value outside the three, the shape is muted.
    */
   status?: ServiceStatus;
+  /** Shown after the footer's line: a page's "coming" mark for what the line names. */
+  lineMark?: ReactNode;
 }
 
 function FooterEntry({ item, status }: { item: FooterItem; status?: ServiceStatus }) {
@@ -56,13 +60,16 @@ function FooterEntry({ item, status }: { item: FooterItem; status?: ServiceStatu
 }
 
 /** The site footer: the brand block, and the four columns of links from footer-links.ts. */
-export function SiteFooter({ status }: SiteFooterProps) {
+export function SiteFooter({ status, lineMark }: SiteFooterProps) {
   return (
     <footer className={styles.footer} data-v2-footer="">
       <div className={`${layout.wrap} ${styles.grid}`}>
         <div className={styles.brand} data-v2-footer-brand="">
           <BrandLink />
-          <p className={styles.line}>{FOOTER_COPY.line}</p>
+          <p className={styles.line} data-capability={FOOTER_LINE_CAPABILITIES.join(' ')}>
+            {FOOTER_COPY.line}
+            {lineMark ? <> {lineMark}</> : null}
+          </p>
           <p className={layout.mut}>{FOOTER_COPY.company}</p>
           <CopyEmail address={SUPPORT_EMAIL} />
           {/* The year when the page renders; on a page built statically, the year of the build. */}

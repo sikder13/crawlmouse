@@ -316,12 +316,16 @@ const limitsOf = (configs: readonly Config[]): number[] =>
     return (Array.isArray(k) ? k : [k]).map((o) => o.limit);
   });
 
-/** CC-28's mail functions, registered with V2_CHECKS_PUBLIC=1 only (lib/v2/mail/functions.ts). */
+/**
+ * CC-28's mail functions and CC-29's deletion of Agency Plus requests, registered with
+ * V2_CHECKS_PUBLIC=1 only (lib/v2/mail/functions.ts).
+ */
 const MAIL_IDS = [
   'crawlmouse-crawlmouse.mail.account',
   'crawlmouse-crawlmouse.mail.check-notify',
   'crawlmouse-crawlmouse.mail.fix-to-developer',
   'crawlmouse-crawlmouse.events.check-finished',
+  'crawlmouse-crawlmouse.mail.contact-purge',
 ];
 const SWEEP = [undefined, '', '0', '-1', '2', '5', '6', '50', '1000', 'abc', '5.5'] as const;
 
