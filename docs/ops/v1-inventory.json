@@ -793,7 +793,7 @@
         "output": "pass — returns auditId only (:148)",
         "cache": "pass — POST, not cached",
         "redirect": "n/a — no redirect and no next/returnTo param in the file",
-        "errors": "finding — minor (A-3): the engine's validation message is returned verbatim (:45-47), including the resolved private address, e.g. 'URL resolves to private or reserved IP (10.0.0.5): …' (packages/engine/src/ssrf-guard.ts:164-169); owner CC-SEC-2",
+        "errors": "finding — minor (A-3): the engine's validation message is returned verbatim (:45-47), including the resolved private address, e.g. 'URL resolves to private or reserved IP (10.0.0.5): …' (packages/engine/src/ssrf-guard.ts:79-84); owner CC-SEC-2",
         "escaping": "n/a — JSON",
         "abuse": "pass — global ceiling fails closed, per-IP + Turnstile on exhaustion, per-domain (:58-117)"
       }
@@ -1458,7 +1458,7 @@
       "id": "A-3",
       "severity": "minor",
       "items": ["app/api/audits/start/route.ts"],
-      "evidence": "apps/web/app/api/audits/start/route.ts:45; packages/engine/src/ssrf-guard.ts:164",
+      "evidence": "apps/web/app/api/audits/start/route.ts:45; packages/engine/src/ssrf-guard.ts:79",
       "what": "the engine's validation message is returned verbatim, including the private address a name resolved to.",
       "owner": "CC-SEC-2 (the message is the engine's)"
     },

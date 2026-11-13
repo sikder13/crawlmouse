@@ -36,6 +36,7 @@ import {
   STAGE2_MAX_PAGES,
   STAGE2_PICKS,
 } from './plan.js';
+import { FRONTENDS } from './record.js';
 import { PARTIAL_RULE } from './status.js';
 import { SUMMARY_BYTES } from './summaries.js';
 import type { BuildInput, BuiltCheck } from './types.js';
@@ -149,7 +150,8 @@ const CHECK_FIELDS: Record<keyof Check, string> = {
   crawlers:
     "the access matrix (`detectAccess`), with `text_share` null: no step measures a crawler's share yet",
   stack:
-    "`frontend` null (CC-17b); `backend` from the homepage row's `stack_signals`, null when the homepage was not read or `detectCms` recognised no CMS (it answers `custom` then); `edge` Cloudflare when a crawler test (not a browser control) carries the `cloudflare_1020` cause, else null",
+    `\`frontend\` from the homepage row's \`stack_signals.frontend_markers\`: the first of ${FRONTENDS.map((f) => `${f.name} (${f.markers.map(code).join(', ')})`).join(', then ')} that a recorded marker names, with \`version\` and \`router\` null, null when none does or the row was written before the worker recorded markers; ` +
+    "`backend` from the homepage row's `stack_signals`, null when the homepage was not read or `detectCms` recognised no CMS (it answers `custom` then); `edge` Cloudflare when a crawler test (not a browser control) carries the `cloudflare_1020` cause, else null",
   competitors: '`[]`',
   progress: 'null: the contract keeps progress for a running check only (`check_progress`)',
 };

@@ -1,4 +1,9 @@
-import { AccessTestSchema, DECLARATION_PATHS, LinkEdgeSchema } from '@crawlmouse/types/v2';
+import {
+  AccessTestSchema,
+  DECLARATION_PATHS,
+  FrontendMarkerSchema,
+  LinkEdgeSchema,
+} from '@crawlmouse/types/v2';
 import { describe, expect, it, vi } from 'vitest';
 import type { BatchRequest } from './batch/request.js';
 import { runBatch, type BatchResult } from './batch/run.js';
@@ -52,7 +57,8 @@ type Format =
   | 'worker_release'
   | 'declaration_path'
   | 'tag'
-  | 'stack_source';
+  | 'stack_source'
+  | 'frontend_marker';
 /** A field is either made by the helper with the cap named, or a fixed format. */
 type Field = Cap | Format;
 const FORMATS: Record<Format, RegExp> = {
@@ -73,6 +79,8 @@ const FORMATS: Record<Format, RegExp> = {
   tag: /^[a-z][a-z0-9]*$/,
   // A module constant (batch/crawl.ts STACK_SOURCE).
   stack_source: /^HTML and response headers$/,
+  // A FrontendMarker value: the reader returns names from the enum, never page text.
+  frontend_marker: new RegExp(`^(?:${FrontendMarkerSchema.options.join('|')})$`),
   // A registry token, a module constant (identities.ts SEARCH_ENGINES).
   search_engine: new RegExp(`^(?:${identities.SEARCH_ENGINES.map((e) => e.token).join('|')})$`),
 };
@@ -147,6 +155,7 @@ const FIELDS: Record<string, Field> = {
     'content_features.json_ld[].types[]': 'jsonLdType',
     'stack_signals.cms': 'enum',
     'stack_signals.detected_from': 'stack_source',
+    'stack_signals.frontend_markers[]': 'frontend_marker',
   }),
   ...row('declarations[]', {
     origin: 'origin',
@@ -270,7 +279,7 @@ const PAGE = html(
     `<link rel="alternate" hreflang="fr" href="${LONG_URL_PATH}">` +
     `<link rel="alternate" hreflang="de" href="/de">` +
     `<script type="application/ld+json">{"@type":"Product","description":"d"}</script></head><body>` +
-    `<h1>A product</h1>` +
+    `<h1>A product</h1><script src="/_next/static/a.js"></script>` +
     `<a href="/to">${'anchor '.repeat(2000)}</a><a href="${LONG_URL_PATH}">long</a>` +
     `<p>${'word '.repeat(100_000)}</p></body></html>`,
 );
@@ -380,10 +389,10 @@ describe('stored fields', () => {
       ...schemaStrings(LinkEdgeSchema).map((p) => `link_edges[].${p}`),
       ...schemaStrings(AccessTestSchema).map((p) => `access_tests[].${p}`),
     ];
-    // 34 in CrawlPage, 4 in LinkEdge, 26 in AccessTest: the walk reaches the nested header, page
-    // fact and content feature fields. AccessTest's request line is two literals, a fixed format the
-    // walk does not list.
-    expect(declared).toHaveLength(64);
+    // 35 in CrawlPage, 4 in LinkEdge, 26 in AccessTest: the walk reaches the nested header, page
+    // fact, content feature and stack fields. AccessTest's request line is two literals, a fixed
+    // format the walk does not list.
+    expect(declared).toHaveLength(65);
     expect(declared.filter((p) => !(p in FIELDS))).toEqual([]);
   });
 
@@ -406,6 +415,7 @@ describe('stored fields', () => {
       'pages[].content_features.opening[].tag',
       'pages[].content_features.json_ld[].types[]',
       'pages[].stack_signals.detected_from',
+      'pages[].stack_signals.frontend_markers[]',
       'findings[].origin',
       'access_tests[].body_excerpt',
       'pages[].headers[].value',

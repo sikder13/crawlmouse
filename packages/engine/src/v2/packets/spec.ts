@@ -18,6 +18,7 @@ import { format, resolveConfig } from 'prettier';
 import {
   AccessCauseSchema,
   ContentCheckSchema,
+  FrontendMarkerSchema,
   PacketFrameworkSchema,
   type AccessCause,
   type ContentCheck,
@@ -28,6 +29,7 @@ import { gradeSources } from '../../../fixtures/v2/grade/guard.js';
 import { SIGNATURES } from '../../cms-detection/index.js';
 import type { AccessDetection } from '../access/types.js';
 import { DETECTORS_RUN } from '../build/diff.js';
+import { FRONTENDS } from '../build/record.js';
 import type { ContentDetection } from '../content/aggregate.js';
 import { CONTENT_CHECKS } from '../content/checks.js';
 import * as T from '../content/thresholds.js';
@@ -1672,14 +1674,14 @@ export function renderPacketSpec(): string {
     '',
     '## 8. Stack detection',
     '',
-    `The worker records, for the homepage, \`stack_signals: { cms, detected_from }\`: a CMS name from \`detectCms\` and a fixed text naming the source. The field holds no HTML and not which signal matched. \`stackOf\` (${file('build/record.ts')}) writes \`frontend: null\`, the CMS as \`backend\` unless it is \`custom\`, and \`edge\` from \`edgeOf\`. \`frameworkOf\` (${file('packets/stack.ts')}) chooses the first body: \`stack.frontend.framework\` when a later step records a front end, else \`FRAMEWORK_OF_CMS\`:`,
+    `The worker records, for the homepage, \`stack_signals: { cms, detected_from, frontend_markers }\`: a CMS name from \`detectCms\`, a fixed text naming the source, and the names of the front-end markers its reader found (${file('packages/worker/src/reader/frontend-markers.ts')}; \`FrontendMarker\`: ${codes(FrontendMarkerSchema.options)}). The field holds no HTML and not which CMS signal matched. \`stackOf\` (${file('build/record.ts')}) writes \`frontend\` as the first of ${FRONTENDS.map((f) => `${f.name} (${codes(f.markers)})`).join(', then ')} that a recorded marker names, the CMS as \`backend\` unless it is \`custom\`, and \`edge\` from \`edgeOf\`. A row written before the worker recorded markers has none, and names no front end. \`frameworkOf\` (${file('packets/stack.ts')}) chooses the first body: \`stack.frontend.framework\` when a front end was detected, else \`FRAMEWORK_OF_CMS\`:`,
     '',
     table(['CMS', 'First body', 'Builders with that body'], frameworkRows()),
     '',
     ...(Object.hasOwn(FRAMEWORK_OF_CMS, 'shopify')
       ? []
       : [
-          'A Shopify store is not in the table: the CMS name does not say whether the front end is a Liquid theme or Hydrogen.',
+          'A Shopify store is not in the table: the CMS name does not say whether the front end is a Liquid theme or Hydrogen. Its markers can, when the homepage carries one.',
           '',
         ]),
     `A CMS outside the table, and a site with none recognised, get the generic body first; the other bodies are offered by the switch. Held by ${file('packets/stack.test.ts')}.`,
@@ -1690,7 +1692,7 @@ export function renderPacketSpec(): string {
     '',
     'Consequence of a false match: the first body is that CMS’s where a builder has one, on a site whose front end is something else. The context and the verify block do not depend on the stack.',
     '',
-    'Proposed for a later step (Q2; the worker is outside this step): an optional `stack_signals.frontend_markers: string[]` drawn from a fixed list (`next_static_path`, `next_data_script`, `shopify_theme_object`, `shopify_section_class`, `hydrogen_powered_by_header`, `wp_content_path`, `webflow_site_attribute`), written by the worker’s reader and read by `frameworkOf`.',
+    `Markers recorded that name no front end: ${codes(FrontendMarkerSchema.options.filter((m) => !FRONTENDS.some((f) => f.markers.includes(m))))}. \`FRAMEWORK_OF_CMS\` reads the WordPress and Webflow framework from the CMS instead.`,
     '',
     '## 9. Voice (D10)',
     '',

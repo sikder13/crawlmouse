@@ -361,20 +361,39 @@ nahltech.com's.
   `pnpm --filter @crawlmouse/web exec vitest run lib/robots-txt.test.ts`, which asserts the length
   and every entry.
 
-### ⚠ Cloudflare — owner action, and a deadline
+### ⚠ Cloudflare — what the edge does, and the owner's settings
 
-Cloudflare fronts this domain, and **its defaults change on 15 September 2026.** Declaring access in
-our `robots.txt` is only half of it; the edge can override the origin. In the Cloudflare dashboard
-for zone `76e83abf448d438608e27eebdd3ddb9a`:
+Cloudflare fronts this domain, and its settings can block a crawler at the edge or add to
+`robots.txt` before the origin's answer reaches it. What Cloudflare's docs say (read 2026-11-13):
 
-- **AI crawler controls → Search / Agent / Training must all be set to `Allow`.** After 15 Sep 2026
-  the default is not "allow", so leaving these unset silently blocks the crawlers this repo just
-  invited, and `robots.txt` will say the opposite of what the edge does.
-- **"Managed robots.txt" must stay OFF.** When enabled, Cloudflare serves its own `robots.txt` at the
-  edge and the origin is never asked — our file, Content Signals and all, becomes dead code.
+- **Per-purpose controls.** The changelog entry of 1 July 2026, "New options to manage AI traffic"
+  (<https://developers.cloudflare.com/changelog/post/2026-07-01-ai-traffic-options/>), manages AI
+  crawlers by behaviour, Search, Agent and Training, instead of a single Block AI bots toggle. Each
+  can be blocked, blocked on pages that display ads, or not blocked; the policy page below adds
+  Disallow for Training.
+- **New defaults, for new domains.** The same entry: from 15 September 2026, new domains onboarding
+  to Cloudflare get Training and Agent blocked on pages that display ads, and Search allowed; a
+  crawler that does both Search and Training takes the Training default. The entry names new domains
+  only, states no change to a domain already on Cloudflare, and offers all customers an opt-out of
+  the new defaults before 15 September. The policy page
+  (<https://developers.cloudflare.com/bots/additional-configurations/block-ai-bots/>, updated
+  2 November 2026) says instead that a new domain uses Allow for all three, so the two pages disagree.
+- **robots.txt.** The robots.txt setting, Bot Preference Sync
+  (<https://developers.cloudflare.com/bots/additional-configurations/managed-robots-txt/>, whose
+  address still says managed robots.txt): when it is on and at least one policy is Block, Block on pages with
+  ads or (Training) Disallow, Cloudflare prepends its directives to the origin's file. With every
+  policy on Allow, the file is served unchanged.
 
-Both are dashboard-only, identity-bound settings; they do not have an API path we drive from here, so
-they belong to the owner (§9's split).
+**What the edge does to a site is read from a check of that site, never assumed from when its domain
+was added to Cloudflare.** For this site's `robots.txt`, the command
+`curl -sS https://crawlmouse.com/robots.txt | head -1` prints our `# Content-Signal:` line when
+Cloudflare prepends nothing; it did on 2026-11-13.
+
+**Owner settings for zone `76e83abf448d438608e27eebdd3ddb9a`** (Security → Settings → Bot traffic →
+AI Crawler and Agent access policies): Search, Agent and Training on `Allow (do not block)`, which is
+this section's policy; Bot Preference Sync off, or on with all three on Allow, so our `robots.txt` is
+served as the origin wrote it. They are dashboard settings bound to the owner's Cloudflare login, and
+the policy page names no API for them, so they belong to the owner (§9's split).
 
 ### IndexNow — run it after a production deploy
 
