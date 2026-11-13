@@ -250,6 +250,26 @@ describe('Reports, with what a live page knows', () => {
     ]);
   });
 
+  it('a client report that was mailed opens, and is offered no new link: its link is the mail’s, which may be withdrawn', () => {
+    // The comparison's row as a client report the schedule sent, its mailed link still open.
+    const mailed = {
+      ...bad,
+      reports: bad.reports.map((r) =>
+        r.id === COMPARE
+          ? { ...r, kind: 'client_report' as const, share_expires_at: '2026-11-24T09:00:00Z' }
+          : r,
+      ),
+    };
+    const v = reportsView(mailed, ACCOUNT_VIEWERS.home(), {}, BASE, {
+      fileStates: new Map([[COMPARE, 'stored']]),
+    });
+    expect(labels(v, COMPARE)).toEqual(['Open', 'Withdraw link']);
+    expect(row(v, COMPARE).linkUntil).toBe('Link · until Tue 24 Nov');
+    // The same row as a comparison is offered the link itself.
+    const plain = live({ fileStates: new Map([[COMPARE, 'stored']]) });
+    expect(labels(plain, COMPARE)).toContain('Link');
+  });
+
   it('with the file states given, a report they do not name has no file to offer, whatever its row says', () => {
     const v = live({ fileStates: new Map([[CSV, 'stored']]) });
     expect([row(v, PDF).state, labels(v, PDF)]).toEqual([null, []]);

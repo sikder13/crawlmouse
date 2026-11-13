@@ -139,6 +139,21 @@ describe('shareReport', () => {
     ]);
     expect(JSON.stringify(f.capture.mock.calls)).not.toContain(token);
   });
+
+  it('makes no link for a client report, whose link is the one its mail carries: 409, and the store is not asked', async () => {
+    for (const kind of ['json', 'form'] as const) {
+      const f = fakes(opened());
+      const res = await shareReport(
+        f,
+        { userId: 'user-1', origin: ORIGIN },
+        { id: REPORT, account_id: ACCOUNT, kind: 'client_report', format: 'html' },
+        kind,
+      );
+      expect([res.status, await res.json()]).toEqual([409, { code: 'mailed_link' }]);
+      expect(f.store.create).not.toHaveBeenCalled();
+      expect(f.capture).not.toHaveBeenCalled();
+    }
+  });
 });
 
 describe('openShareLink', () => {

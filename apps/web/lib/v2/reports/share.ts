@@ -164,8 +164,10 @@ type Kind = RequestBody['kind'];
  * POST /api/report-files/[id]/share, once the route has established the caller, their seat's reach
  * and role, and the plan. Makes the report's link and answers it once: JSON gets 201
  * `{url, expiresAt}`; a form gets a 303 to the Reports page whose address holds nothing of it, with
- * the link in the flash cookie. 409 `not_ready` for a report whose file is not stored. Nothing here
- * logs the token, and the event names the report's kind and format only.
+ * the link in the flash cookie. 409 `not_ready` for a report whose file is not stored. A client
+ * report's link is the one its mail carries, and a new link would revoke that one, so none is made
+ * here: 409 `mailed_link`. Nothing here logs the token, and the event names the report's kind and
+ * format only.
  */
 export async function shareReport(
   deps: ShareDeps,
@@ -173,6 +175,7 @@ export async function shareReport(
   report: ReportToShare,
   kind: Kind,
 ): Promise<Response> {
+  if (report.kind === 'client_report') return refuse(409, 'mailed_link');
   const token = newShareToken();
   const r = await deps.store.create(report.id, token, caller.userId, deps.now());
   if (r.outcome !== 'created') {

@@ -231,6 +231,11 @@ export function reportsView(
   const mayShare = roleMay(role, 'share_report');
   /** A new link needs the plan's exports as well as the role; withdrawing one needs the role. */
   const mayLink = mayShare && v.gates.exports;
+  /**
+   * Whether the reader may make `r` a link. A client report's link is the one its mail carries; a
+   * new one would revoke it, so none is offered (it may still be withdrawn).
+   */
+  const mayMake = (r: Report): boolean => mayLink && r.kind !== 'client_report';
   const sharedUntil = (r: Report): string | null =>
     hasFile(r) && r.share_expires_at !== null && at(r.share_expires_at) > at(v.now)
       ? COPY.link(dayDate(r.share_expires_at, zone))
@@ -256,7 +261,7 @@ export function reportsView(
             { context: ctx },
           );
     const until = sharedUntil(r);
-    const link = mayLink
+    const link = mayMake(r)
       ? routeAction('reportShare', until ?? COPY.makeLink, { id: r.id }, { context: ctx })
       : null;
     const withdraw =
@@ -330,7 +335,7 @@ export function reportsView(
         covers: coversOf(r),
         state: COPY.fileStates[stateOf(r) ?? 'stored'],
         actions: rowActions(r),
-        linkUntil: mayLink ? null : sharedUntil(r),
+        linkUntil: mayMake(r) ? null : sharedUntil(r),
         madeLink:
           side.madeLink?.reportId === r.id && hasFile(r)
             ? { label: COPY.madeLink, url: side.madeLink.url }
