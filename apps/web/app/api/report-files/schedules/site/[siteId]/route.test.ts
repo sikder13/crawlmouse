@@ -356,6 +356,12 @@ describe('PUT and DELETE …/schedules/site/[siteId]', () => {
       { ...WEEKLY, timezone: 'Mars/Olympus' },
       // An offset: Intl reads it east of UTC and Postgres west.
       { ...WEEKLY, timezone: '+05:00' },
+      // Names Intl and Postgres both take and the contract does not: stored, each would make the
+      // account's records fail to parse when they are read.
+      { ...WEEKLY, timezone: 'Japan' },
+      { ...WEEKLY, timezone: 'EST' },
+      { ...WEEKLY, timezone: 'america/denver' },
+      { ...WEEKLY, timezone: 'utc' },
       { ...WEEKLY, openTracking: true },
       { ...WEEKLY, siteId: randomUUID() },
     ]) {

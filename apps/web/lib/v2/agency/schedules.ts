@@ -8,6 +8,7 @@
  * 20261114000002, section B); this file reads a body, asks the store, and answers. A form is
  * answered with a 303 back to its page and a notice, JSON with JSON.
  */
+import { TimeZoneSchema } from '@crawlmouse/types/v2';
 import { z } from 'zod';
 import { clearLinkCookie, type LinkFlow } from '../account/link-cookie';
 import {
@@ -28,27 +29,15 @@ export type Cadence = (typeof CADENCES)[number];
 
 // ─── bodies ──────────────────────────────────────────────────────────────────────────────────────
 
-/**
- * Whether `zone` is a named time zone the runtime knows (an IANA name, or UTC). An offset such as
- * `+05:00` is not taken, though `Intl` knows it: `Intl` reads it as east of UTC and Postgres, in
- * `AT TIME ZONE`, as west, so a schedule saved with one would run ten hours off. A name Postgres
- * does not know is refused by `set_report_schedule` (22023).
- */
-function isTimeZone(zone: string): boolean {
-  if (!/^[A-Za-z]/.test(zone)) return false;
-  try {
-    new Intl.DateTimeFormat('en', { timeZone: zone });
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 const ScheduleBody = z.strictObject({
   cadence: z.enum(CADENCES),
   isoWeekday: z.int().min(1).max(7),
   timeLocal: z.string().regex(/^([01][0-9]|2[0-3]):[0-5][0-9]$/),
-  timezone: z.string().min(1).max(64).refine(isTimeZone),
+  // The contract's own rule for a zone (`TimeZoneSchema`): an IANA name the runtime knows. The
+  // account's records are parsed with it when they are read, so a name it refuses, stored here,
+  // would make each page of the account throw; and an offset such as `+05:00`, which `Intl` reads
+  // east of UTC and Postgres west, is not a name it takes.
+  timezone: TimeZoneSchema,
   sendWhenUnchanged: z.boolean(),
 });
 
