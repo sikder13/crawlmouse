@@ -20,11 +20,22 @@ const CODE = /\.(ts|tsx|mts|cts|js|mjs|cjs)$/;
 const CONFIG = /\.(json|ya?ml|toml)$/;
 const TEST = /\.test\.(ts|tsx)$/;
 const THIS_FILE = 'apps/web/__tests__/security/billing-agency-trial-removed.test.ts';
+/**
+ * The go-live check names the old path in order to report that it is gone (CC-35 D3): its row and the
+ * probe that reads main's tree. Nothing there calls the URL. Exempt by exact path, so any other file
+ * that names it is still found.
+ */
+const NAMES_IT_TO_CHECK_IT = new Set([
+  'scripts/golive/preconditions.ts',
+  'scripts/golive/probes/repo.ts',
+]);
 
 const tracked = (): string[] =>
   execFileSync('git', ['ls-files'], { cwd: REPO, encoding: 'utf8' })
     .split('\n')
     .filter((f) => f && f !== THIS_FILE && !f.startsWith('docs/') && !f.startsWith('evidence/'));
+
+const callers = (): string[] => tracked().filter((f) => !NAMES_IT_TO_CHECK_IT.has(f));
 
 const read = (file: string): string => readFileSync(resolve(REPO, file), 'utf8');
 const sourceOf = (file: string, text = read(file)) =>
@@ -95,6 +106,25 @@ function starterImports(file: string, text = read(file)): boolean {
   return found;
 }
 
+/** Whether the file sets a `trialDays` property in an object literal, in any spelling of the key. */
+function setsTrialDays(file: string, text = read(file)): boolean {
+  const sf = sourceOf(file, text);
+  let found = false;
+  const keyOf = (name: ts.PropertyName): string | null =>
+    ts.isIdentifier(name) || ts.isStringLiteralLike(name)
+      ? name.text
+      : ts.isComputedPropertyName(name) && ts.isStringLiteralLike(name.expression)
+        ? name.expression.text
+        : null;
+  const visit = (node: ts.Node) => {
+    if (ts.isPropertyAssignment(node) && keyOf(node.name) === 'trialDays') found = true;
+    if (ts.isShorthandPropertyAssignment(node) && node.name.text === 'trialDays') found = true;
+    ts.forEachChild(node, visit);
+  };
+  visit(sf);
+  return found;
+}
+
 describe('POST /api/billing/agency-trial is gone (CC-35 D5)', () => {
   it('the route file no longer exists', () => {
     expect(existsSync(resolve(__dirname, '../../app/api/billing/agency-trial/route.ts'))).toBe(
@@ -120,8 +150,8 @@ describe('POST /api/billing/agency-trial is gone (CC-35 D5)', () => {
     expect(next).not.toHaveBeenCalled();
   });
 
-  it('no tracked code or config names its URL', () => {
-    const files = tracked();
+  it('no tracked code or config names its URL, but the go-live check that reports it gone', () => {
+    const files = callers();
     expect(files.filter((f) => CODE.test(f)).length, 'anti-vacuity').toBeGreaterThan(500);
     const hits = [
       ...files.filter((f) => CODE.test(f)).flatMap((f) => literalHits(f, OLD_URL)),
@@ -136,6 +166,23 @@ describe('POST /api/billing/agency-trial is gone (CC-35 D5)', () => {
       .filter((f) => f.startsWith('apps/web/') && CODE.test(f) && !TEST.test(f))
       .filter((f) => read(f).includes('agency-trial') && starterImports(f));
     expect(importers).toEqual(['apps/web/app/api/agency-trial/route.ts']);
+  });
+
+  it('the Agency trial starter is the one source that gives a Checkout a trial', () => {
+    // A trial is `startCheckout`'s `trialDays` (lib/billing/checkout-v2.ts). Any object literal that sets
+    // it, in source that is not a test, is a second way to open a trial.
+    const setters = tracked()
+      .filter((f) => f.startsWith('apps/web/') && CODE.test(f) && !TEST.test(f))
+      .filter((f) => read(f).includes('trialDays') && setsTrialDays(f));
+    expect(setters).toEqual(['apps/web/lib/billing/agency-trial.ts']);
+  });
+
+  it('finds trialDays set in each object-literal form, and not a type or a read', () => {
+    expect(setsTrialDays('x.ts', 'startCheckout(d, i, a, { trialDays: 14 });')).toBe(true);
+    expect(setsTrialDays('x.ts', 'const trialDays = 14; f({ trialDays });')).toBe(true);
+    expect(setsTrialDays('x.ts', "f({ ['trialDays']: 14 });")).toBe(true);
+    expect(setsTrialDays('x.ts', 'interface T { trialDays?: number }')).toBe(false);
+    expect(setsTrialDays('x.ts', 'const t = terms.trialDays !== undefined;')).toBe(false);
   });
 
   it('reads every import form of the starter', () => {
