@@ -139,7 +139,7 @@ export const CAPABILITIES: Readonly<Record<CapabilityKey, Capability>> = {
   },
   client_report_page: {
     status: 'coming',
-    what: 'Reports and the client report page on your domain, under your logo: CC-31.',
+    what: 'Reports and the client report page under your own name: on your domain, with your logo. The report a client opens is on our domain, names no agency and shows no logo.',
     // CC-31 built the report a client opens (`/s/<token>`), on our domain and with no logo: what
     // the client is shown is drawn here, and nothing here reads a logo.
     proof: {
@@ -147,7 +147,8 @@ export const CAPABILITIES: Readonly<Record<CapabilityKey, Capability>> = {
       dirs: ['apps/web/app/s', 'apps/web/components/v2/screens/proof'],
       text: /logo/i,
     },
-    named: /client report page|on your domain|your logo|under Branding/i,
+    named:
+      /client report page|on your domain|your logo|under Branding|under (?:your|their) (?:own )?name|shown on client reports/i,
   },
   sender_address: {
     status: 'coming',

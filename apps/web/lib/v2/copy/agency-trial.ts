@@ -8,7 +8,7 @@
  */
 import { EMAIL_KINDS, TRIAL_REMINDER_DAYS_BEFORE_END } from '../../auth/constants';
 import type { Interval } from '../../billing/catalog';
-import { AGENCY_YEARLY, EXTRA_SEAT, usd } from '../../billing/prices';
+import { AGENCY_YEARLY, EXTRA_SEAT, EXTRA_SEAT_YEARLY, usd } from '../../billing/prices';
 import { TRIAL_DAYS } from '../../billing/state-machine';
 import { GATES } from '../../entitlement-v2';
 import { count, numberWord, capitalise } from '../words';
@@ -39,7 +39,11 @@ export const AGENCY_TRIAL_COPY = {
     'Your last visit to the card page did not finish, so nothing started. Check the details and continue to the card again.',
   signedInAs: 'Signed in as',
   agencyName: 'Agency name',
-  agencyNameHint: { text: 'shown on client reports', capabilities: ['client_reports'] } as Tagged,
+  // The name is in a client report's mail; the report's page does not show it (`client_report_page`).
+  agencyNameHint: {
+    text: 'shown on client reports',
+    capabilities: ['client_reports', 'client_report_page'],
+  } as Tagged,
   site: 'First client site',
   /** Q5: the site is stored, not audited, before the card is taken. */
   siteHint: {
@@ -75,7 +79,7 @@ export const AGENCY_TRIAL_COPY = {
   },
   /** Q15: where the trialist lands until the agency workspace (CC-31) has its switcher. */
   secondAccount:
-    'The trial is a second account for the agency, separate from your own. After the card page you return to your own account’s plan; the agency account’s billing and its Cancel are on this page.',
+    'The trial is a second account for the agency, separate from your own. After the card page you land on the agency’s workspace, where one press opens the new account; the agency account’s billing and its Cancel are on this page.',
   notSure: `Not sure yet? Your own account can start ${TRIAL_DAYS} days of Pro with no card, from`,
   pricing: 'Pricing',
   seePlans: 'See the plans',
@@ -126,7 +130,7 @@ export const AGENCY_TRIAL_COPY = {
       `Agency · ${usd(priceOf('agency', interval))} a ${period(interval)} after the trial`,
     title: {
       text: `${agency.sites} sites, ${agency.seats} seats, reports under your name`,
-      capabilities: ['sites', 'seats', 'client_reports'],
+      capabilities: ['sites', 'seats', 'client_reports', 'client_report_page'],
     } as Tagged,
     rows: (): [Tagged, string][] => [
       [
@@ -138,7 +142,7 @@ export const AGENCY_TRIAL_COPY = {
       ],
       [
         {
-          text: `Seats · owner, account managers, developers · ${usd(EXTRA_SEAT)} a seat a month beyond`,
+          text: `Seats · owner, account managers, developers · ${usd(EXTRA_SEAT)} a seat a month beyond, or ${usd(EXTRA_SEAT_YEARLY)} a year on a yearly plan`,
           capabilities: ['seats'],
         },
         String(agency.seats),

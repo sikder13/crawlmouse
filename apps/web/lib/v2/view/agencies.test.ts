@@ -120,6 +120,9 @@ const PARAPHRASES: Partial<Record<CapabilityKey, readonly string[]>> = {
     'reports on your domain with your logo',
     'client report page',
     'set your domain and logo under Branding',
+    'reports under your name',
+    'Agencies reporting to clients under their own name.',
+    'shown on client reports',
   ],
   sender_address: ['emails from your address', 'Emails to clients from your address'],
   observed_crawlers: [
@@ -142,8 +145,6 @@ const BUILT_ONLY = [
   'Client matrix',
   'every client on one screen',
   'Weekly or monthly client reports, sent for you',
-  'reports under your name',
-  'shown on client reports',
   'its first audit runs from the agency workspace',
   'Server-render the product template, 158 pages',
   'Monthly',
