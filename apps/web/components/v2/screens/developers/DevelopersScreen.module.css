@@ -54,15 +54,25 @@
 }
 
 /* The example request and response: data, so the mono face, and it scrolls rather than widens. */
+/* The sample scrolls sideways in its region (ScrollRegion: a tab stop while it overflows). */
 .packet {
-  margin: 0;
   padding: 16px 24px;
   font-family: var(--v2-font-mono);
   font-size: var(--v2-text-micro);
   line-height: 1.55;
   background: var(--v2-s2);
-  white-space: pre;
   overflow-x: auto;
+}
+
+.packet:focus-visible {
+  outline: 2px solid var(--v2-fg);
+  outline-offset: -2px;
+}
+
+.packetText {
+  margin: 0;
+  font: inherit;
+  white-space: pre;
 }
 
 .cardFoot {

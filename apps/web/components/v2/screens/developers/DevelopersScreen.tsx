@@ -2,6 +2,7 @@ import { Button } from '../../Button';
 import { Card } from '../../Card';
 import { Heading } from '../../Heading';
 import { PageShell } from '../../PageShell';
+import { ScrollRegion } from '../../ScrollRegion';
 import { StatusPill } from '../../StatusPill';
 import { Table } from '../../Table';
 import { LOG_IN, MARKETING_NAV } from '../../footer-links';
@@ -55,11 +56,13 @@ export function DevelopersScreen({
                 {data.sample.title} <ComingMark label={data.sample.coming} />
               </Heading>
             </div>
-            <pre className={styles.packet}>
-              {data.sample.request}
-              {'\n'}
-              {data.sample.json}
-            </pre>
+            <ScrollRegion label={data.sample.title} className={styles.packet}>
+              <pre className={styles.packetText}>
+                {data.sample.request}
+                {'\n'}
+                {data.sample.json}
+              </pre>
+            </ScrollRegion>
             <div className={styles.cardFoot}>
               <p className={styles.note}>{data.sample.shown}</p>
               <p className={styles.note}>{data.sample.notes}</p>
