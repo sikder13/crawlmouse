@@ -219,6 +219,8 @@ async function freshRow(table: NewTable): Promise<Record<string, unknown>> {
       return ROWS.slack_sends(randomUUID(), world.accountId);
     case 'contact_requests':
       return ROWS.contact_requests(`contact-${hex.slice(0, 8)}@example.com`);
+    case 'founder_notices':
+      return ROWS.founder_notices(`signup:${hex}`, world.accountId);
   }
 }
 
@@ -317,6 +319,7 @@ const HIDDEN: Record<NewTable, string[] | null> = {
   email_suppressions: null,
   slack_sends: null,
   contact_requests: null,
+  founder_notices: null,
 };
 const ALERT_INSERT = ['account_id', 'site_id', 'kind', 'enabled', 'threshold_points', 'channels'];
 const ALERT_UPDATE = ['enabled', 'threshold_points', 'channels'];
@@ -370,8 +373,16 @@ async function postureViolations(d: Db, table: NewTable): Promise<string[]> {
   };
   if (table === 'alert_rules') expectedTable.authenticated = 'd';
   if (table === 'page_results') expectedTable.crawl_worker = 'a';
-  // 008 grants service_role the four statements the pipeline runs, and 026b and 029 the same on theirs.
-  if (['crawl_batches', 'persist_chunks', 'fix_email_requests', 'contact_requests'].includes(table))
+  // 008 grants service_role the four statements the pipeline runs, and 026b, 029 and 033 the same on theirs.
+  if (
+    [
+      'crawl_batches',
+      'persist_chunks',
+      'fix_email_requests',
+      'contact_requests',
+      'founder_notices',
+    ].includes(table)
+  )
     expectedTable.service_role = 'arwd';
   // 027b keeps the Slack destination from service_role too: its functions are the only way in.
   if (table === 'account_slack_destinations') delete expectedTable.service_role;
