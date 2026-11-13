@@ -242,6 +242,11 @@ whose token is missing.
 The boxes are not ticked in this file. When one is true, pass its id to the check:
 `pnpm golive:check -- --step N --ticked id,id`. A manual row counts as not passing until it is passed.
 
+Run the check from a checkout of the live production commit. Its second line says whether this checkout's
+inputs (`CHECK_INPUTS` in `scripts/golive/probes/live.ts`) equal that commit's; until they do, the rows that read
+a table from this checkout (worker-release, vercel-env-step-1, inngest-plan, vercel-env-step-2, vercel-env-step-3, vercel-env-step-4, vercel-env-step-5, stripe-live-prices) answer unknown, and the
+function counts printed in the boxes below are this checkout's.
+
 #### Before step 1: deploy the production worker, record its egress, set the worker variables
 
 - [ ] `worker-github-environment` (owner): GitHub environment `worker-production` holds FLY_API_TOKEN (secret) and FLY_ORG (variable), deployments restricted to main. Why: worker-production.yml takes its Fly credentials from it and nowhere else (CC-35 D1). Source: `docs/ops/worker-runbook.md:337`.

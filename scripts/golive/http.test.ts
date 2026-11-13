@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
+import { CATALOG } from '../../apps/web/lib/billing/catalog';
 import { PRODUCTION_REF } from '../db/target';
 import {
   ROUTES,
   RefusedRequest,
   TOKEN_HOST,
+  TOKEN_RUN,
   guardedFetch,
   refusal,
   stringLeaves,
@@ -90,7 +92,12 @@ describe('the outbound allow-list', () => {
     expect(refusal(READ_ONLY, 'POST')).toBeNull();
     expect(refusal(MACHINES, 'GET')).toBeNull();
     expect(refusal(HEALTHZ, 'GET')).toBeNull();
-    expect(refusal('https://api.stripe.com/v1/prices?lookup_keys[]=a&limit=100', 'GET')).toBeNull();
+    expect(
+      refusal(
+        `https://api.stripe.com/v1/prices?lookup_keys[]=${Object.keys(CATALOG)[0]}&limit=100`,
+        'GET',
+      ),
+    ).toBeNull();
     expect(refusal('https://api.resend.com/domains', 'GET')).toBeNull();
   });
 
@@ -193,5 +200,112 @@ describe('a token goes to its own host only', () => {
       guarded('https://api.stripe.com/v1/prices', { headers: bearer(tokens.VERCEL_TOKEN) }),
     ).rejects.toBeInstanceOf(RefusedRequest);
     expect(calls).toEqual([]);
+  });
+});
+
+const b64 = (s: string) => Buffer.from(s).toString('base64');
+const b64url = (s: string) => Buffer.from(s).toString('base64url');
+const T = VERCEL_TEAM_ID;
+const ENV_T = `${ENV}?teamId=${T}`;
+const withVercel = (extra: Record<string, string>) =>
+  new Headers({ authorization: `Bearer ${tokens.VERCEL_TOKEN}`, ...extra });
+
+describe('a token is found encoded, not only as written (review r2 N-a)', () => {
+  // A key with no repeating stretch: a run of one character encodes alike at every byte alignment.
+  const S = ['rk', 'live', 'abcdefghijklmnopqrstuvwxyz0123456789'].join('_');
+  const varied = { ...tokens, STRIPE_LIVE_READ_KEY: S };
+  // A space every seven characters: no 16-character run of it survives percent- or form-encoding.
+  const FLY = ['FlyV1', 'fm2_aa', 'bbbbbb', 'cccccc', 'dddddd', 'eeeeee', 'ffffff'].join(' ');
+  const spaced = { ...tokens, FLY_READ_TOKEN: FLY };
+  it.each([
+    ['base64 of key:', { 'user-agent': b64(`${S}:`) }],
+    ['base64url', { accept: b64url(S) }],
+    ['base64 after one byte', { 'user-agent': b64(`u${S}`) }],
+    ['base64 after two bytes', { 'user-agent': b64(`u:${S}`) }],
+    ['a 16-character run of it', { 'user-agent': `ua ${S.slice(5, 21)} ua` }],
+  ])('refuses the Stripe key to Vercel as %s', (_label, extra) => {
+    expect(refusal(ENV_T, 'GET', withVercel(extra), varied)).toMatch(
+      /STRIPE_LIVE_READ_KEY in a header to api\.vercel\.com/,
+    );
+  });
+
+  it('refuses a foreign token beside the own one in the authorization header', () => {
+    const h = new Headers({ authorization: `Bearer ${tokens.VERCEL_TOKEN} ${b64(`:${S}`)}` });
+    expect(refusal(ENV_T, 'GET', h, varied)).toMatch(/STRIPE_LIVE_READ_KEY in a header/);
+  });
+
+  it('refuses the own token outside the authorization header, even to its own host', () => {
+    const h = withVercel({ 'user-agent': b64(tokens.VERCEL_TOKEN) });
+    expect(refusal(ENV_T, 'GET', h, tokens)).toMatch(/VERCEL_TOKEN in the user-agent header/);
+  });
+
+  it('allows a 15-character run, the line below 16', () => {
+    expect(refusal(ENV_T, 'GET', withVercel({ 'user-agent': S.slice(5, 20) }), varied)).toBeNull();
+  });
+
+  it.each([
+    ['percent-encoded', `${ENV}?teamId=${encodeURIComponent(FLY)}`],
+    ['percent-encoded twice', `${ENV}?teamId=${encodeURIComponent(encodeURIComponent(FLY))}`],
+    ['base64', `${ENV}?teamId=${b64(FLY)}`],
+    ['form-encoded', `${ENV}?teamId=${FLY.replaceAll(' ', '+')}`],
+  ])('refuses the Fly token in a Vercel URL, %s', (_label, url) => {
+    expect(new URL(url).href).not.toContain(FLY.slice(0, TOKEN_RUN));
+    expect(refusal(url, 'GET', withVercel({}), spaced)).toMatch(/FLY_READ_TOKEN in a URL/);
+  });
+
+  it('refuses the Fly token percent-encoded in a header to Vercel', () => {
+    const h = withVercel({ 'user-agent': encodeURIComponent(FLY) });
+    expect(refusal(ENV_T, 'GET', h, spaced)).toMatch(/FLY_READ_TOKEN in a header/);
+  });
+});
+
+describe('query values and headers are pinned (review r2 N-b)', () => {
+  it.each([
+    ['another team', `${ENV}?teamId=team_other`],
+    ['a value carrying ;decrypt', `${ENV}?teamId=${T};decrypt=true`],
+    ['two teamIds, one other', `${ENV}?teamId=${T}&teamId=team_other`],
+    ['a lookup key outside the catalog', 'https://api.stripe.com/v1/prices?lookup_keys[]=other'],
+    ['a limit that is not a number', 'https://api.stripe.com/v1/prices?limit=all'],
+    ['a limit above 100', 'https://api.stripe.com/v1/prices?limit=1000'],
+    ['a prototype name', `${ENV}?constructor=x`],
+    ['__proto__', `${ENV}?__proto__=x`],
+  ])('refuses %s', (_label, url) => {
+    expect(refusal(url, 'GET')).toMatch(/query parameter/);
+  });
+
+  it('allows the pinned values', () => {
+    const key = Object.keys(CATALOG)[0]!;
+    expect(refusal(ENV_T, 'GET')).toBeNull();
+    expect(
+      refusal(`https://api.stripe.com/v1/prices?lookup_keys[]=${key}&limit=100`, 'GET'),
+    ).toBeNull();
+  });
+
+  it.each([
+    ['x-http-method-override', 'DELETE'],
+    ['proxy-authorization', 'Bearer x'],
+    ['x-extra', 'y'],
+    ['content-type', 'application/json'],
+  ])('refuses a %s header on a GET', (name, value) => {
+    expect(refusal(ENV_T, 'GET', withVercel({ [name]: value }), tokens)).toMatch(
+      new RegExp(`header ${name} is not allowed`),
+    );
+  });
+
+  it('allows accept and user-agent, and content-type on the Supabase POST', () => {
+    expect(
+      refusal(ENV_T, 'GET', withVercel({ accept: 'application/json', 'user-agent': 'x' }), tokens),
+    ).toBeNull();
+    const h = new Headers({
+      authorization: `Bearer ${tokens.SUPABASE_ACCESS_TOKEN}`,
+      'content-type': 'application/json',
+    });
+    expect(refusal(READ_ONLY, 'POST', h, tokens)).toBeNull();
+  });
+
+  it('refuses a token in the URL even to its own host', () => {
+    expect(refusal(`${ENV}?teamId=${tokens.VERCEL_TOKEN}`, 'GET', withVercel({}), tokens)).toMatch(
+      /VERCEL_TOKEN in a URL/,
+    );
   });
 });

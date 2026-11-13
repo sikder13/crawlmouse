@@ -16,7 +16,10 @@ export const MIGRATIONS_PATH = 'infra/supabase/migrations/';
 /** `<14-digit version>_<name>.sql`, as scripts/db/files.ts names a migration. */
 const MIGRATION_NAME = /^(\d{14})_([a-z0-9_]+)\.sql$/;
 
-/** The migration files at `sha`, or why they cannot be listed. diffHistory reads version and name. */
+/**
+ * The migration files at `sha`, or why they cannot be listed: a name that is not a migration's, no
+ * file, or two files with one version. diffHistory reads version and name.
+ */
 async function filesAt(deps: ProbeDeps, sha: string): Promise<MigrationFile[] | string> {
   const tree = await deps.git(['ls-tree', '--name-only', sha, '--', MIGRATIONS_PATH]);
   const short = sha.slice(0, 12);
@@ -29,6 +32,14 @@ async function filesAt(deps: ProbeDeps, sha: string): Promise<MigrationFile[] | 
     files.push({ version: m[1]!, name: m[2]!, file, path, sql: '', sha256: '' });
   }
   if (files.length === 0) return `no migration file at the live commit ${short}`;
+  // listMigrations (scripts/db/files.ts) throws on this; diffHistory keys files by version, so one
+  // recorded row would mark both files applied.
+  const versions = new Set<string>();
+  for (const f of files) {
+    if (versions.has(f.version))
+      return `two files at the live commit ${short} share version ${f.version}`;
+    versions.add(f.version);
+  }
   return files.sort((a, b) => a.version.localeCompare(b.version));
 }
 

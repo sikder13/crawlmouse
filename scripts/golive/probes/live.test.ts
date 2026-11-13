@@ -6,10 +6,17 @@
 import { describe, expect, it } from 'vitest';
 import { PRODUCTION_REF } from '../../db/target';
 import { deps, fakeToken, json, scriptedFetch } from '../test-support';
-import { LIVE_UNKNOWN_HINT, liveCommit } from './live';
+import { GATED_PROBES, PROBES } from './index';
+import {
+  CHECK_INPUTS,
+  LIVE_UNKNOWN_HINT,
+  checkoutMatchesLive,
+  liveCommit,
+  onLiveInputs,
+} from './live';
 import { migrationsProbe } from './migrations';
 import { AGENCY_TRIAL_ROUTE, agencyTrialRemovedProbe } from './repo';
-import type { GitResult, ProbeDeps } from './types';
+import { pass, type GitResult, type ProbeDeps } from './types';
 import { VERCEL_PROJECT_ID } from './vercel-env';
 import { releaseProbe } from './worker';
 
@@ -198,6 +205,17 @@ describe('migrations-applied lists the files at the live commit', () => {
     }
   });
 
+  it('is unknown, not pass, when two files at the live commit share a version (review r2 N2)', async () => {
+    const g = git(lsTree(tree('20260101000001_one.sql', '20260101000001_two.sql')));
+    const r = await migrationsProbe()(
+      deps({ fetch: production(LIVE, recorded('20260101000001')).fetch, git: g.run, env: tokens }),
+    );
+    expect(r).toEqual({
+      status: 'unknown',
+      reason: `two files at the live commit ${LIVE.slice(0, 12)} share version 20260101000001`,
+    });
+  });
+
   it('answers unknown without the Supabase token, and sends nothing', async () => {
     const { fetch, calls } = production();
     const r = await migrationsProbe()(deps({ fetch, git: git().run, env: {} }));
@@ -245,5 +263,141 @@ describe('agency-trial-route-removed reads the live commit', () => {
     const r = await run(git(lsTree(ok(''))), {});
     expect(r.status).toBe('unknown');
     expect(r.reason).toContain(LIVE_UNKNOWN_HINT);
+  });
+});
+
+describe("the checkout's inputs against the live commit (review r2 R2-B1)", () => {
+  const nameOnly =
+    (result: GitResult): Git =>
+    (args) =>
+      args[0] === 'diff' && args[1] === '--name-only' ? result : undefined;
+  const short = LIVE.slice(0, 12);
+
+  it('match when the working tree has no difference from the live commit in CHECK_INPUTS', async () => {
+    const g = git(nameOnly(ok('')));
+    const r = await checkoutMatchesLive(
+      deps({ fetch: production().fetch, git: g.run, env: tokens }),
+    );
+    expect(r).toEqual({ ok: true, sha: LIVE });
+    expect(g.seen).toContainEqual(['diff', '--name-only', LIVE, '--', ...CHECK_INPUTS]);
+  });
+
+  it('differ, naming the paths and the live commit, when a path differs', async () => {
+    const g = git(nameOnly(ok('apps/web/lib/billing/catalog.ts\n')));
+    const r = await checkoutMatchesLive(
+      deps({ fetch: production().fetch, git: g.run, env: tokens }),
+    );
+    expect(r).toEqual({
+      ok: false,
+      result: {
+        status: 'unknown',
+        reason: `this checkout's apps/web/lib/billing/catalog.ts differs from production's ${short}: check out that commit`,
+      },
+    });
+  });
+
+  it('name three paths and count the rest', async () => {
+    const paths = ['a', 'b', 'c', 'd', 'e'].map((x) => `scripts/golive/${x}.ts`);
+    const g = git(nameOnly(ok(paths.join('\n') + '\n')));
+    const r = await checkoutMatchesLive(
+      deps({ fetch: production().fetch, git: g.run, env: tokens }),
+    );
+    expect(r.ok).toBe(false);
+    if (!r.ok)
+      expect(r.result.reason).toBe(
+        `this checkout's ${paths.slice(0, 3).join(', ')} and 2 more differ from production's ${short}: check out that commit`,
+      );
+  });
+
+  it('are unknown on a git error, and without the live commit', async () => {
+    for (const code of [1, 128]) {
+      const r = await checkoutMatchesLive(
+        deps({
+          fetch: production().fetch,
+          git: git(nameOnly({ code, stdout: '' })).run,
+          env: tokens,
+        }),
+      );
+      expect(r.ok, String(code)).toBe(false);
+      if (!r.ok) expect(r.result.status).toBe('unknown');
+    }
+    const g = git(nameOnly(ok('')));
+    const r = await checkoutMatchesLive(deps({ fetch: production().fetch, git: g.run, env: {} }));
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.result.reason).toContain(LIVE_UNKNOWN_HINT);
+    expect(g.seen).toEqual([]);
+  });
+
+  it('gate a probe: it runs only when they match', async () => {
+    let ran = 0;
+    const probe = onLiveInputs(async () => {
+      ran += 1;
+      return pass('inner');
+    });
+    const differ = await probe(
+      deps({
+        fetch: production().fetch,
+        git: git(nameOnly(ok('scripts/golive/x.ts\n'))).run,
+        env: tokens,
+      }),
+    );
+    expect(differ.status).toBe('unknown');
+    expect(ran).toBe(0);
+    const match = await probe(
+      deps({ fetch: production().fetch, git: git(nameOnly(ok(''))).run, env: tokens }),
+    );
+    expect(match).toEqual(pass('inner'));
+    expect(ran).toBe(1);
+  });
+
+  const GATED = GATED_PROBES;
+  const allTokens = {
+    ...tokens,
+    STRIPE_LIVE_READ_KEY: ['rk', 'live', 'q'.repeat(24)].join('_'),
+  };
+
+  it.each(GATED)(
+    '%s answers unknown when the checkout differs, and sends only the project read',
+    async (id) => {
+      const { fetch, calls } = production();
+      const r = await PROBES[id](
+        deps({
+          fetch,
+          git: git(nameOnly(ok('scripts/golive/env-classes.ts\n'))).run,
+          env: allTokens,
+        }),
+      );
+      expect(r).toEqual({
+        status: 'unknown',
+        reason: `this checkout's scripts/golive/env-classes.ts differs from production's ${short}: check out that commit`,
+      });
+      expect(calls.map((c) => new URL(c.url).pathname)).toEqual([
+        `/v9/projects/${VERCEL_PROJECT_ID}`,
+      ]);
+    },
+  );
+
+  it('gates no other row', async () => {
+    const others = (Object.keys(PROBES) as (keyof typeof PROBES)[]).filter(
+      (id) => !GATED.includes(id),
+    );
+    expect(others.length).toBeGreaterThan(0);
+    for (const id of others) {
+      const r = await PROBES[id](
+        deps({
+          fetch: production().fetch,
+          git: git(nameOnly(ok('scripts/golive/env-classes.ts\n'))).run,
+          env: allTokens,
+        }),
+      );
+      expect(r.reason, id).not.toContain("this checkout's");
+    }
+  });
+
+  it('inngest-budget answers its own verdict once the checkout matches', async () => {
+    const r = await PROBES['inngest-budget'](
+      deps({ fetch: production().fetch, git: git(nameOnly(ok(''))).run, env: tokens }),
+    );
+    expect(r.status).not.toBe('unknown');
   });
 });

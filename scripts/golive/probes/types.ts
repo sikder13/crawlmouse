@@ -20,6 +20,7 @@ export interface GitResult {
 export interface ProbeDeps {
   /** Already wrapped by `guardedFetch`: GET (or the one Supabase read-only POST) to fixed hosts only. */
   fetch: typeof fetch;
+  /** The `TOKEN_ENV` names (redact.ts) and their values; no other env-file value. */
   env: Readonly<Record<string, string | undefined>>;
   now: () => Date;
   /** Runs `git` in the repository; read-only commands only. */

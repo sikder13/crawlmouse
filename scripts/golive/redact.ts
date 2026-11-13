@@ -4,21 +4,32 @@
  *
  * Registered:
  * - every value of a `TOKEN_ENV` name in the process environment (`addSecret`, at any length);
- * - each value loaded from the env file (`addFileValue`): at any length when its name is token-named
- *   (`isTokenNamed`), otherwise only at `MIN_RECEIVED_LENGTH` or more, so `CRAWL_PAUSED=1` does not
- *   turn every `1` in the output into a mask;
+ * - each value loaded from the env file (`addFileValue`): a `TOKEN_ENV` name's at any length; a
+ *   `PUBLIC_ENV` name's never, so `CRAWL_PAUSED=1` does not turn every `1` in the output into a mask;
+ *   any other name's at `MIN_FILE_LENGTH` or more (trimmed), whatever the name looks like;
  * - every string value a probe received in a response (`addReceived`, keys are not passed to it), at
  *   `MIN_RECEIVED_LENGTH` or more and not one of the public names the check itself prints
  *   (`vocabulary` in check.ts: environment names, lookup keys, migration versions, hosts, the worker
  *   app, the Vercel project and team ids, the production Supabase ref), which are code constants in
  *   this repository.
  */
+import { SWITCH_FLAGS } from './env-classes';
 
 export const MIN_RECEIVED_LENGTH = 12;
+/** The shortest env-file value registered under a name that is neither a token nor public. */
+export const MIN_FILE_LENGTH = 4;
 
-/** A name whose value is a secret at any length. */
-export const isTokenNamed = (name: string): boolean =>
-  (TOKEN_ENV as readonly string[]).includes(name) || /TOKEN|SECRET|KEY|PASSWORD|PEPPER/i.test(name);
+/**
+ * Env-file names whose values are not secret and are short words the output also uses (`1`, `true`,
+ * `production`): the switch flags and the platform's mode names.
+ */
+export const PUBLIC_ENV: readonly string[] = [
+  ...Object.keys(SWITCH_FLAGS),
+  'CRAWL_PAUSED',
+  'INNGEST_DEV',
+  'NODE_ENV',
+  'VERCEL_ENV',
+];
 export const MASK = '[redacted]';
 
 /** The token names the check reads from scripts/.env.local or the environment. */
@@ -44,8 +55,9 @@ export class Redactor {
   /** A value loaded from the env file, under `name`. */
   addFileValue(name: string, value: string | undefined): void {
     if (!value) return;
-    if (isTokenNamed(name)) this.addSecret(value);
-    else if (value.trim().length >= MIN_RECEIVED_LENGTH) this.addSecret(value);
+    if ((TOKEN_ENV as readonly string[]).includes(name)) this.addSecret(value);
+    else if (PUBLIC_ENV.includes(name)) return;
+    else if (value.trim().length >= MIN_FILE_LENGTH) this.addSecret(value);
   }
 
   /** A string a probe received in a response. */

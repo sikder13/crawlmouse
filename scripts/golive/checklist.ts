@@ -10,7 +10,8 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { format, resolveConfig } from 'prettier';
-import { MANUAL, type Precondition } from './preconditions';
+import { MANUAL, PRECONDITIONS, type Precondition } from './preconditions';
+import { GATED_PROBES } from './probes/index';
 import { STEPS, STEP_TITLE } from './steps';
 
 export const GO_LIVE_PATH = join(
@@ -22,6 +23,12 @@ export const END = '<!-- golive:manual:end -->';
 
 const box = (p: Precondition): string =>
   `- [ ] \`${p.id}\` (${p.owner}): ${p.mustBeTrue}. Why: ${p.why}. Source: \`${p.source}\`.`;
+
+/** The ids of the automatic rows whose probe runs only on a checkout matching production. */
+const gatedRows = (): string =>
+  PRECONDITIONS.filter((p) => p.check.kind === 'auto' && GATED_PROBES.includes(p.check.probe))
+    .map((p) => p.id)
+    .join(', ');
 
 /** The block, markers included, before formatting. */
 export function renderBlock(rows: readonly Precondition[] = MANUAL): string {
@@ -35,6 +42,11 @@ export function renderBlock(rows: readonly Precondition[] = MANUAL): string {
     '',
     'The boxes are not ticked in this file. When one is true, pass its id to the check:',
     '`pnpm golive:check -- --step N --ticked id,id`. A manual row counts as not passing until it is passed.',
+    '',
+    "Run the check from a checkout of the live production commit. Its second line says whether this checkout's",
+    "inputs (`CHECK_INPUTS` in `scripts/golive/probes/live.ts`) equal that commit's; until they do, the rows that read",
+    `a table from this checkout (${gatedRows()}) answer unknown, and the`,
+    "function counts printed in the boxes below are this checkout's.",
   ];
   for (const step of STEPS) {
     const rows_ = rows.filter((p) => p.gates === step);
