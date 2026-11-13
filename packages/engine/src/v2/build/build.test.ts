@@ -532,6 +532,37 @@ describe('what the built check holds, from its own rows', () => {
     });
   });
 
+  it('reads the markers of the homepage row only, not those of another page', () => {
+    const rows = new Map([
+      [
+        HOST,
+        {
+          stack_signals: {
+            cms: 'wordpress',
+            detected_from: 'HTML and response headers',
+            frontend_markers: [],
+          },
+        },
+      ],
+      [
+        `${HOST}/shop`,
+        {
+          stack_signals: {
+            cms: 'shopify',
+            detected_from: 'HTML and response headers',
+            frontend_markers: ['next_data_script', 'shopify_theme_object'],
+          },
+        },
+      ],
+    ]) as unknown as Parameters<typeof stackOf>[0]['rows'];
+    expect(stackOf({ rows, homepage_url: HOST, access_tests: [] }).frontend).toBeNull();
+    // and the same markers on the homepage row name the front end
+    const home = new Map([[HOST, rows.get(`${HOST}/shop`)!]]);
+    expect(stackOf({ rows: home, homepage_url: HOST, access_tests: [] }).frontend?.framework).toBe(
+      'nextjs',
+    );
+  });
+
   it('names no front end when the homepage was not read', () => {
     const rows = new Map([[HOST, { stack_signals: null }]]) as unknown as Parameters<
       typeof stackOf
