@@ -3,6 +3,7 @@
  * request. A time is written as UTC to the minute. The Stripe customer id is a link to Stripe's
  * dashboard only when it has a customer id's shape, so no other stored value becomes a link.
  */
+import type { Route } from 'next';
 import type { AccountRow, Dossier } from './console-store';
 
 /** StatusPill's states, named here so this module imports nothing of the v2 components. */
@@ -206,7 +207,8 @@ export function accountView(d: Dossier): AccountView {
 
 export interface ResultRow {
   id: string;
-  href: string;
+  /** A typed route: the build checks `<Link href>` against the app's routes. */
+  href: Route;
   name: string;
   kind: string;
   state: string;
@@ -225,7 +227,7 @@ export function resultsView(ids: readonly string[], rows: readonly AccountRow[])
       : [
           {
             id: a.id,
-            href: `/internal/accounts/${a.id}`,
+            href: `/internal/accounts/${a.id}` as Route,
             name: nameOf(a),
             kind: a.kind,
             state: a.state,
