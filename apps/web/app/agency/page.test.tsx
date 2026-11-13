@@ -15,6 +15,7 @@ import {
   addSeat,
   adminOver,
   keptSite,
+  makePaid,
   person,
   scopeWorld,
   sessionOver,
@@ -178,6 +179,45 @@ describe('/agency', () => {
   it('a client refused because the plan’s sites are all in use is told so from the gate messages', async () => {
     const screen = await open(w.owner, null, { notice: 'upgrade_required' });
     expect(screen.props.notice?.text).toBe(sitesFullMessage('agency'));
+  });
+});
+
+describe('/agency for an agency account born from the trial form (CC-29), in its trial', () => {
+  /** The account as `start_agency_trial_account` makes it, then on its trial as Checkout leaves it. */
+  async function trialist(tag: string) {
+    const p = await person(h.db, tag);
+    const { rows } = await h.db.query<{ r: { account_id: string; site_id: string } }>(
+      `select public.start_agency_trial_account($1, 'Trial Agency', $2) r`,
+      [p.id, `${tag}-first-client.example`],
+    );
+    const { account_id: accountId, site_id: siteId } = rows[0]!.r;
+    await makePaid(h.db, accountId, 'agency');
+    await h.db.query(
+      `update public.accounts
+          set state = 'agency_trial', trial_variant = 'card_required', trial_used_at = now(),
+              trial_ends_at = now() + interval '5 days',
+              state_history = state_history || jsonb_build_array(
+                jsonb_build_object('state', 'agency_trial', 'since', now()::text))
+        where id = $1`,
+      [accountId],
+    );
+    return { p, accountId, siteId };
+  }
+
+  it('loads: the matrix lists the first client the form stored, and the record holds the consent the form recorded', async () => {
+    const t = await trialist('trialist');
+    const data = await matrixOf(t.p, t.accountId);
+    expect(data.clients.rows.map((r) => r.key)).toEqual([t.siteId]);
+  });
+
+  it('with no consent recorded the account is refused by name, not shown', async () => {
+    const t = await trialist('unconsented');
+    await h.db.query(`update public.accounts set agency_trial_consent_at = null where id = $1`, [
+      t.accountId,
+    ]);
+    await expect(open(t.p, t.accountId)).rejects.toThrow(
+      /had an Agency trial and its consent is not recorded/,
+    );
   });
 });
 

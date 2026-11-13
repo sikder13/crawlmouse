@@ -47,7 +47,17 @@ export interface AccountRows {
   apiKeys: readonly Row[];
   /** The account's `agency_brands` row, or null for none. */
   brand: Row | null;
+  /**
+   * `accounts.agency_trial_consent_at` (migration 20261114000001), which no client role reads: when
+   * the owner ticked the Agency trial's consent. The loaders read it with the service role for an
+   * account whose history holds an Agency trial (`agencyTrialConsentAt`); left out, it reads as none.
+   */
+  trialConsentAt?: unknown;
 }
+
+/** Whether the account's history holds an Agency trial: the accounts whose consent is read. */
+export const hadAgencyTrial = (account: Row): boolean =>
+  ((account.state_history as Row[] | undefined) ?? []).some((h) => h.state === 'agency_trial');
 
 const instantOrNull = (v: unknown): string | null => (v === null ? null : instantFromDb(v));
 
@@ -59,9 +69,14 @@ export function accountFromRow(rows: AccountRows): Account {
     state: h.state,
     since: instantFromDb(h.since),
   }));
-  if (history?.some((h) => h.state === 'agency_trial'))
+  // The contract holds the consent exactly when the account has had an Agency trial (its rule
+  // `trial_consent`). CC-29's form records it before Checkout; a trial with none recorded is refused
+  // here by name, not by the schema.
+  const hadTrial = hadAgencyTrial(a);
+  const consentAt = rows.trialConsentAt ?? null;
+  if (hadTrial && consentAt === null)
     throw new Error(
-      `accountFromRow: account ${String(a.id)} had an Agency trial and no table records its consent`,
+      `accountFromRow: account ${String(a.id)} had an Agency trial and its consent is not recorded`,
     );
   const gates = GATES[a.tier as Tier];
   return AccountSchema.parse({
@@ -93,7 +108,7 @@ export function accountFromRow(rows: AccountRows): Account {
       last_used_at: instantOrNull(k.last_used_at),
     })),
     branding: brand === null ? null : brandingFromRow(brand),
-    agency_trial_consent: null,
+    agency_trial_consent: hadTrial ? { recorded_at: instantFromDb(consentAt) } : null,
   });
 }
 

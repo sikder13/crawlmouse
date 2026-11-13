@@ -209,22 +209,43 @@ describe('accountFromRow', () => {
     expect(() => build(brand)).toThrow(/logo/);
   });
 
-  it('refuses an account whose history holds an Agency trial: no table records its consent', async () => {
+  it('an account whose history holds an Agency trial holds its consent, and is refused with none recorded', async () => {
     const row = await one('accounts', 'id', world.accountId);
     const history = [
       ...(row.state_history as Row[]),
       { state: 'agency_trial', since: '2099-11-01T00:00:00.000Z' },
       { state: 'free', since: '2099-11-08T00:00:00.000Z' },
     ];
-    expect(() =>
-      accountFromRow({
-        account: { ...row, state_history: history },
-        email: 'a@example.com',
-        subscription: null,
-        apiKeys: [],
-        brand: null,
-      }),
-    ).toThrow(/no table records its consent/);
+    const rows = {
+      account: { ...row, state_history: history },
+      email: 'a@example.com',
+      subscription: null,
+      apiKeys: [],
+      brand: null,
+    };
+    // As PostgREST answers a timestamptz, and as the service role's read hands it on.
+    const consented = accountFromRow({ ...rows, trialConsentAt: '2099-10-31T23:58:00+00:00' });
+    expect(consented.agency_trial_consent).toEqual({ recorded_at: '2099-10-31T23:58:00Z' });
+    for (const none of [{}, { trialConsentAt: null }]) {
+      expect(() => accountFromRow({ ...rows, ...none })).toThrow(
+        /had an Agency trial and its consent is not recorded/,
+      );
+    }
+  });
+
+  it('an account that had no Agency trial holds no consent, whatever the column holds', async () => {
+    // The form records the tick before Checkout: an account whose Checkout was never finished has
+    // the time and no trial, and the contract holds a consent for a trial only.
+    const row = await one('accounts', 'id', world.accountId);
+    const built = accountFromRow({
+      account: row,
+      email: 'a@example.com',
+      subscription: null,
+      apiKeys: [],
+      brand: null,
+      trialConsentAt: '2099-10-31T23:58:00+00:00',
+    });
+    expect(built.agency_trial_consent).toBeNull();
   });
 
   it('a row the contract refuses throws', () => {

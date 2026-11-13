@@ -27,6 +27,7 @@ import {
 } from '../pipeline/rows';
 import type { CheckReader } from '../pipeline/types';
 import { sitesInScope } from '../agency/guard';
+import { agencyTrialConsentAt } from './trial-consent';
 import { accountFromRow, alertRuleFromRow, reportFromRow, seatsFromRows } from './rows';
 
 export interface DatasetDeps {
@@ -140,6 +141,7 @@ export async function loadAccountDataset(
       .maybeSingle(),
   );
   if (ownerUser === null) throw new Error(`loadAccountDataset: no user for ${accountId}'s owner`);
+  const trialConsentAt = await agencyTrialConsentAt(admin, accountRow);
 
   const some = siteIds.length > 0;
   const [siteRows, schedules, checkRows, fixRows, changeRows, siteRules, links] = some
@@ -183,6 +185,7 @@ export async function loadAccountDataset(
         account: accountRow,
         email: ownerUser.email as string,
         subscription,
+        trialConsentAt,
         apiKeys: keyRows,
         brand,
       }),
