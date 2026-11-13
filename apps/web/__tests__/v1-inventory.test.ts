@@ -173,6 +173,7 @@ describe('the finders see what they claim to see', () => {
     expect(hidden).toEqual([
       'app/agency/clients/[siteId]/page.tsx',
       'app/agency/page.tsx',
+      'app/agency/reports/page.tsx',
       'app/alerts/page.tsx',
       'app/audit/[id]/access/page.tsx',
       'app/audit/[id]/changes/page.tsx',
