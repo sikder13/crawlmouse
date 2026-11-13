@@ -101,6 +101,7 @@ export function ReportsScreen({
         {made.rows.length ? (
           <Table
             label={T.made}
+            rowHeader
             columns={[
               { header: C.made },
               { header: C.site, mono: true },
@@ -156,6 +157,7 @@ export function ReportsScreen({
         {scheduled.rows.length ? (
           <Table
             label={T.scheduled}
+            rowHeader
             columns={[
               { header: C.when },
               { header: C.site, mono: true },

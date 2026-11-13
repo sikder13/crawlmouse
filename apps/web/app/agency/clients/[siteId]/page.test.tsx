@@ -82,6 +82,15 @@ async function open(siteId: string, p: Person | null, chosen: string | null = nu
 const notFound = { digest: expect.stringMatching(/404/) };
 
 describe('/agency/clients/[siteId]', () => {
+  it('has a document title of its own, and stays out of search results', async () => {
+    const { metadata } = await import('./page');
+    expect(metadata).toEqual({
+      title: 'Client',
+      robots: { index: false, follow: false },
+      alternates: { canonical: null },
+    });
+  });
+
   it('is a 404 while V2_CHECKS_PUBLIC is off, even for the owner', async () => {
     vi.stubEnv('V2_CHECKS_PUBLIC', '');
     h.user = { id: w.owner.id, email: w.owner.email };

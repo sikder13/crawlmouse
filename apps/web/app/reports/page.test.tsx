@@ -142,6 +142,15 @@ function madeRows(html: string): { text: string; html: string }[] {
 const rowOf = (html: string, id: string) => madeRows(html).find((r) => r.html.includes(id));
 
 describe('/reports', () => {
+  it('the proof page a member opens from a row has a document title of its own, and stays out of search results', async () => {
+    const { metadata } = await import('./[id]/page');
+    expect(metadata).toEqual({
+      title: 'Report',
+      robots: { index: false, follow: false },
+      alternates: { canonical: null },
+    });
+  });
+
   it('is a 404 with V2_CHECKS_PUBLIC unset, and the sign-in page for a caller who is not signed in', async () => {
     await expect(page()).rejects.toMatchObject({ to: '/login' });
     vi.stubEnv('V2_CHECKS_PUBLIC', '');

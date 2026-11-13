@@ -97,4 +97,20 @@ describe('Reports, Agency', () => {
     expect(primaries(html)).toHaveLength(1);
     expect(html).toContain('hello@harborlight.example');
   });
+
+  it('gives each row of Reports and of Scheduled reports a header, its first cell', () => {
+    const html = render('withheld');
+    const data = reportsPreview('withheld');
+    for (const [label, rows] of [
+      ['Reports', data.made.rows.map((r) => r.made)],
+      ['Scheduled reports', data.scheduled.rows.map((r) => r.when)],
+    ] as const) {
+      const table = new RegExp(`<table[^>]*aria-label="${label}"[\\s\\S]*?</table>`).exec(html)![0];
+      const heads = [...table.matchAll(/<th scope="row"[^>]*>([\s\S]*?)<\/th>/g)].map((m) =>
+        m[1]!.replace(/<[^>]+>/g, ''),
+      );
+      expect(rows.length, label).toBeGreaterThan(0);
+      expect(heads, label).toEqual(rows);
+    }
+  });
 });

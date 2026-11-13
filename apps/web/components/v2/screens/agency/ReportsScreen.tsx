@@ -113,6 +113,7 @@ function Sent({ sent }: { sent: ClientReportsView['sent'] }) {
       {sent.rows.length ? (
         <Table
           label={COPY.sentLabel}
+          rowHeader
           columns={[
             { header: C.sent, muted: true },
             { header: C.client, mono: true },

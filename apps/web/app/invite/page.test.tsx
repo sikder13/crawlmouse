@@ -187,6 +187,15 @@ describe('/invite', () => {
 });
 
 describe('/seats', () => {
+  it('has a document title of its own, and stays out of search results', async () => {
+    const { metadata } = await import('../seats/page');
+    expect(metadata).toEqual({
+      title: 'Seats',
+      robots: { index: false, follow: false },
+      alternates: { canonical: null },
+    });
+  });
+
   it('is a 404 with V2_CHECKS_PUBLIC unset, and the sign-in page for a caller who is not signed in', async () => {
     await expect(seatsPage()).rejects.toMatchObject({ to: '/login' });
     vi.stubEnv('V2_CHECKS_PUBLIC', '');

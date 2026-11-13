@@ -346,6 +346,41 @@ describe('the screens, as their previews render them', () => {
     expect(forms(owner.slice(owner.indexOf('<main')))).toHaveLength(3 * 2 + 2);
   });
 
+  it('Seats, live: each seat’s Save, new invitation and removal name the seat after the label', () => {
+    const buttons = (path: keyof typeof SEATS_PREVIEWS) => {
+      const html = renderToStaticMarkup(
+        <LiveActions>
+          <SeatsScreen data={seatsPreview(path)} />
+        </LiveActions>,
+      ).replace(/^[\s\S]*<main/, '<main');
+      return [...html.matchAll(/<button[^>]*>([\s\S]*?)<\/button>/g)].map((m) => ({
+        // What a screen reader reads, and what is drawn: the name is in a visually hidden span.
+        name: m[1]!.replace(/<[^>]+>/g, ''),
+        seen: m[1]!.replace(/<span[^>]*data-v2-sr-only[^>]*>[\s\S]*?<\/span>/g, ''),
+      }));
+    };
+    const paid = buttons(PAID).filter((b) => /^(Save|Remove)/.test(b.seen));
+    expect(paid.map((b) => b.name)).toEqual([
+      'Save Priya',
+      'Remove from the account Priya',
+      'Save Sam',
+      'Remove from the account Sam',
+      'Save Lee',
+      'Remove from the account Lee',
+    ]);
+    expect(new Set(paid.map((b) => b.seen))).toEqual(new Set(['Save', 'Remove from the account']));
+    // An invitation: the seat is named by its address, on the new invitation too.
+    expect(
+      buttons(PRO_FULL)
+        .filter((b) => /^(Save|Send a new|Remove)/.test(b.seen))
+        .map((b) => b.name),
+    ).toEqual([
+      'Save dev@company.com',
+      'Send a new invitation dev@company.com',
+      'Remove from the account dev@company.com',
+    ]);
+  });
+
   it('Seats, a member who is not the owner: no form', () => {
     const html = renderToStaticMarkup(
       <LiveActions>

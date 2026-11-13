@@ -103,6 +103,13 @@ describe('the client matrix against Final-Ag-Matrix', () => {
 describe('the client page against Final-Ag-Client', () => {
   const html = render(CLIENT);
 
+  it('gives each row of Open fixes a header, its first cell', () => {
+    const table = /<table[^>]*aria-label="Open fixes"[\s\S]*?<\/table>/.exec(main(html))![0];
+    const rows = table.slice(table.indexOf('<tbody')).match(/<tr/g)!;
+    expect(rows.length).toBeGreaterThan(0);
+    expect(table.match(/<th scope="row"/g)).toHaveLength(rows.length);
+  });
+
   it('reads as the locked HTML outside the rail’s links, with each registered change and nothing else', () => {
     expect(
       firstDifference(
@@ -334,9 +341,9 @@ describe('client reports, a client in each state', () => {
   });
 
   it('counts the clients by schedule in the header, from the rows under it', () => {
-    const scheduled = [...doc.querySelectorAll('tbody tr')].filter(
-      (tr) => tr.querySelector('th[scope="row"]') !== null,
-    );
+    const scheduled = [
+      ...doc.querySelectorAll('table[aria-label="Client report schedules"] tbody tr'),
+    ];
     const cells = scheduled.map((tr) => tr.children[2]!.textContent!);
     const n = (start: string) => cells.filter((c) => c.startsWith(start)).length;
     expect(cells).toHaveLength(6);
@@ -373,6 +380,13 @@ describe('client reports, a client in each state', () => {
 
   it('opens a sent report that is a document at its page', () => {
     expect(main(html)).toContain('href="/reports/60000000-0000-4000-8000-0000000000c9"');
+  });
+
+  it('gives each row of Sent reports a header, its first cell', () => {
+    const table = /<table[^>]*aria-label="Sent reports"[\s\S]*?<\/table>/.exec(main(html))![0];
+    const rows = table.slice(table.indexOf('<tbody')).match(/<tr/g)!;
+    expect(rows.length).toBeGreaterThan(0);
+    expect(table.match(/<th scope="row"/g)).toHaveLength(rows.length);
   });
 });
 

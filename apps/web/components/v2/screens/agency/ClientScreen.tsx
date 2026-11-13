@@ -59,6 +59,7 @@ export function ClientScreen({
             <Table
               label={COPY.fixesLabel}
               headersHidden
+              rowHeader
               columns={[
                 { header: F.number, mono: true, muted: true },
                 { header: F.fix },
