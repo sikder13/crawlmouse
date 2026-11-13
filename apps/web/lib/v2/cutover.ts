@@ -1,5 +1,5 @@
 import { API_GONE, LEADERBOARDS_GONE } from './copy/cutover';
-import { spellings } from './rewrites';
+import { spellings, withoutSlash } from './rewrites';
 
 /**
  * What each retired v1 address answers once v2 has replaced it (CC-36 D1, D2): the one table of the
@@ -32,8 +32,8 @@ export type CutoverAnswer =
 export interface CutoverRow {
   /**
    * The retired address. A segment written `:name` matches one path segment: of `[A-Za-z0-9_-]+` in
-   * a redirect's row (the value goes into its `to`), of any characters otherwise, so no spelling of
-   * an id reaches the v1 route behind a 410. A last segment `*` matches one or more segments.
+   * a redirect's row (the value goes into its `to`), of any characters otherwise. A last segment `*`
+   * matches one or more segments.
    */
   from: string;
   /** Every one must be on for the row to answer. */
@@ -48,10 +48,6 @@ export interface CutoverRow {
  * 2026-11-17); after it, the `gone-api` rows and the v1 handlers they shadow are removed.
  */
 export const API_ALIAS_LAST_DAY = '2027-02-15';
-
-/** Whether `now` is after `API_ALIAS_LAST_DAY` (UTC). */
-export const apiAliasesEnded = (now: Date): boolean =>
-  now.getTime() >= Date.parse(`${API_ALIAS_LAST_DAY}T00:00:00Z`) + 86_400_000;
 
 const apiGone = (from: string, inventory: string, replacement: string | null): CutoverRow => ({
   from,
@@ -147,10 +143,12 @@ export interface CutoverMatch {
 /**
  * The row for a request path, whatever its flags (the middleware answers it only while they are
  * on), read in each spelling the router can reach a page or route by: as sent and percent-decoded,
- * one trailing slash allowed. Null when no row matches or the path does not decode.
+ * one trailing slash allowed, and each also without the `.rsc` suffix of a React Server Components
+ * request (an API path with that suffix reaches no route, so its answer changes from 404 to the
+ * row's). A path that does not decode is read as sent. Null when no row matches.
  */
 export function cutoverOf(pathname: string): CutoverMatch | null {
-  const paths = spellings(pathname, false) ?? [];
+  const paths = spellings(pathname, true) ?? [withoutSlash(pathname)];
   for (const row of V1_CUTOVER) {
     for (const path of paths) {
       const redirect = row.answer.kind === 'redirect' ? row.answer : null;

@@ -73,7 +73,7 @@ const targetRoot = (to: string): string => to.split('/:')[0]!;
 export const REWRITE_HEADER = 'x-crawlmouse-v2-rewrite';
 
 /** `path` without one trailing slash; `/` and `//` keep theirs, so neither is read as the other. */
-const withoutSlash = (path: string): string =>
+export const withoutSlash = (path: string): string =>
   path.length > 2 && path.endsWith('/') ? path.slice(0, -1) : path;
 
 /**

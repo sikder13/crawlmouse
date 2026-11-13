@@ -5,7 +5,6 @@ import {
   API_ALIAS_LAST_DAY,
   GONE_PAGE_TOKENS,
   V1_CUTOVER,
-  apiAliasesEnded,
   apiGoneBody,
   cutoverOf,
   gonePageHtml,
@@ -161,6 +160,8 @@ describe('cutoverOf', () => {
     ['/compare/abc-1/def-2/', '/audit/abc-1'],
     ['/%63ompare', '/'],
     ['/billing', '/settings/plan'],
+    ['/compare.rsc', '/'],
+    ['/billing.rsc', '/settings/plan'],
   ])('%s redirects to %s', (path, to) => {
     expect(cutoverOf(path)?.answer).toMatchObject({ kind: 'redirect', to });
   });
@@ -174,6 +175,7 @@ describe('cutoverOf', () => {
   it.each([
     ['/top/shopify', 'gone-page'],
     ['/top/shopify/', 'gone-page'],
+    ['/top/shopify.rsc', 'gone-page'],
     ['/api/trpc/audit.get', 'not-found'],
     ['/api/trpc/a.b,c.d', 'not-found'],
     ['/api/trpc/a/b', 'not-found'],
@@ -185,6 +187,8 @@ describe('cutoverOf', () => {
     ['/api/audits/%7E/notify', 'gone-api'],
     ['/api/audits/a%2Fb/notify', 'gone-api'],
     ["/api/audits/x'y/reaudit", 'gone-api'],
+    ['/api/audits/%E0%A4%A/notify', 'gone-api'],
+    ['/api/audits/%ZZ/cancel', 'gone-api'],
   ])('%s is answered %s', (path, kind) => {
     expect(cutoverOf(path)?.answer.kind).toBe(kind);
   });
@@ -209,10 +213,15 @@ describe('cutoverOf', () => {
     '/api/checks',
     '/billingx',
     '/%E0%A4%A',
+    '/top/%ZZ/x',
   ])('%s matches no row', (path) => {
     expect(cutoverOf(path)).toBeNull();
   });
 });
+
+/** Whether `now` is after `API_ALIAS_LAST_DAY` (UTC). */
+const apiAliasesEnded = (now: Date): boolean =>
+  now.getTime() >= Date.parse(`${API_ALIAS_LAST_DAY}T00:00:00Z`) + 86_400_000;
 
 describe('the API aliases end on a stated day', () => {
   it('the last day is 90 days after the earliest planned switch-on, 2026-11-17', () => {
@@ -229,7 +238,9 @@ describe('the API aliases end on a stated day', () => {
   });
 
   // The one test here that reads the real clock, on purpose: once the day has passed it fails, and
-  // the fix is to remove the `gone-api` rows and the v1 handlers they shadow, not to move the date.
+  // the fix is to remove the `gone-api` rows together with the v1 handlers they shadow and their
+  // inventory items, not to move the date. Removing the rows alone fails "is answered by a row"
+  // above, since the inventory still lists the handler as retired.
   it('have not ended yet (fails after API_ALIAS_LAST_DAY: remove the alias rows and v1 handlers)', () => {
     expect(apiAliasesEnded(new Date())).toBe(false);
   });

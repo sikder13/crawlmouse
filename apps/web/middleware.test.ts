@@ -716,12 +716,15 @@ describe('the v1 cutover table (CC-36 D1, D2): each row both ways', () => {
       const a = row.answer;
       if (a.kind === 'redirect') {
         expect(res.status).toBe(a.status);
+        expect(res.headers.get('cache-control')).toBe('no-store');
         expect(res.headers.get('location')).toBe(
           `https://crawlmouse.com${a.to.replace(/:([a-z]+)/g, (_, n: string) => `x-${n}`)}?q=1`,
         );
       } else if (a.kind === 'gone-page') {
         expect(res.status).toBe(410);
         expect(res.headers.get('content-type')).toBe('text/html; charset=utf-8');
+        expect(res.headers.get('x-robots-tag')).toBe('noindex');
+        expect(res.headers.get('cache-control')).toBe('no-store');
         expect(await res.text()).toContain('Leaderboards were retired');
       } else if (a.kind === 'gone-api') {
         expect(res.status).toBe(410);

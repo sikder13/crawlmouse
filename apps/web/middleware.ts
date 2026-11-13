@@ -114,18 +114,28 @@ const FLAG_ON: Readonly<Record<CutoverFlag, () => boolean>> = {
 
 const NO_STORE = { 'Cache-Control': 'no-store' };
 
-/** A retired address's answer. A redirect keeps the query string. */
+/**
+ * A retired address's answer. A redirect keeps the query string. Every answer is no-store, so a
+ * browser does not keep it past the rollback that undoes its row.
+ */
 function cutoverAnswer(req: NextRequest, { answer }: CutoverMatch): NextResponse {
   switch (answer.kind) {
-    case 'redirect':
-      return NextResponse.redirect(
+    case 'redirect': {
+      const res = NextResponse.redirect(
         new URL(`${answer.to}${req.nextUrl.search}`, req.url),
         answer.status,
       );
+      res.headers.set('Cache-Control', 'no-store');
+      return res;
+    }
     case 'gone-page':
       return new NextResponse(gonePageHtml(), {
         status: 410,
-        headers: { 'Content-Type': 'text/html; charset=utf-8', 'X-Robots-Tag': 'noindex' },
+        headers: {
+          'Content-Type': 'text/html; charset=utf-8',
+          'X-Robots-Tag': 'noindex',
+          ...NO_STORE,
+        },
       });
     case 'gone-api':
       return NextResponse.json(apiGoneBody(answer.replacement), { status: 410, headers: NO_STORE });
