@@ -32,5 +32,10 @@
   },
   "engines": {
     "node": ">=22"
+  },
+  "pnpm": {
+    "overrides": {
+      "@opentelemetry/instrumentation-http@<0.222.0": "0.222.0"
+    }
   }
 }
