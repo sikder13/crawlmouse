@@ -338,8 +338,10 @@ differences are below.
 
 - **Fly token.** Create an organisation token, `flyctl tokens create org --org <slug>`, and add it as
   the secret `FLY_API_TOKEN` to a new GitHub environment named `worker-production` (Settings,
-  Environments). Once the app exists, it can be replaced by a deploy token for the app alone
-  (`flyctl tokens create deploy --app crawlmouse-worker`).
+  Environments). Once the app exists, replace it with a deploy token for the app alone
+  (`flyctl tokens create deploy --app crawlmouse-worker`) if that token can open the SSH console the
+  egress check uses; if it cannot, keep the organisation token and record why here. An organisation
+  token can also deploy or destroy every other app in the organisation, staging included.
 - **Fly organisation.** Set the variable (not a secret) `FLY_ORG` on `worker-production` to the
   organisation's slug. The workflow refuses to create the app without it.
 - **Branch restriction.** Restrict `worker-production`'s deployment branches to `main`. Once the
@@ -415,8 +417,10 @@ scripts/.env.local`). Not the deploy token: the check needs to read and nothing 
 
 ### Deploy
 
-Only by dispatch, as in step 4. Merging to `main` changes nothing in production; dispatch when the
-change should ship. Every dispatch deploys `main`'s head.
+Only by dispatch, as in step 4. Merging to `main` changes nothing in the production worker, but Vercel
+deploys the app on the same merge: after merging a change to a worker input (the paths
+`worker-staging.yml` lists), dispatch `worker-production`, or make the change work with the running
+worker first. `pnpm golive:check` reports the two apart. Every dispatch deploys `main`'s head.
 
 ### Roll back
 

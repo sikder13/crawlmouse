@@ -19,7 +19,9 @@ passed to it as `--ticked <id>,<id>` once ticked here.
 **On.** Vercel → `crawlmouse-001` → Settings → Environment Variables → Production: add the variable
 with the value `1`. Then redeploy production (Deployments → the current production deployment → ⋯ →
 Redeploy, without the build cache option changed). A variable reaches only a deployment built after
-it is set; the running deployment keeps the environment it was built with.
+it is set; the running deployment keeps the environment it was built with. Then resync Inngest (the
+command below) and check that Inngest → Apps → crawlmouse lists the function count `golive:check`
+prints for the step after this one; after step 5 it is the count the step-5 sync row names.
 
 **Off, in a minute.** Vercel → Deployments → the production deployment from before the step → ⋯ →
 _Instant Rollback_. It serves that deployment with the environment it was built with, so the flag is
@@ -31,12 +33,19 @@ vercel rollback <the previous production deployment's URL> --scope nahl-technolo
 
 Then, in this order:
 
-1. **Unset the variable** in Vercel, so the next deployment agrees with the one now serving.
-2. **Resync Inngest** (Inngest → Apps → crawlmouse → Resync, or open
-   `https://crawlmouse.com/api/webhooks/inngest` with `PUT`): Inngest keeps the function list from the
-   last sync, so the step's crons keep firing against a deployment that no longer serves them until it
-   is resynced. Check the registered function count matches the one `golive:check` lists for the step
-   before.
+1. **Resync Inngest**, at once:
+
+   ```bash
+   curl -fsS -X PUT https://crawlmouse.com/api/webhooks/inngest
+   ```
+
+   (or Inngest → Apps → crawlmouse → Resync). Inngest keeps the function list from its last sync. If it
+   calls `crawlmouse.com`, the step's functions fail against a deployment that no longer serves them; if
+   it calls the rolled-forward deployment's own URL, that deployment keeps running them, mail and alerts
+   included. Either way they run until the resync. Then check the function count matches the one
+   `golive:check` lists for the step before.
+
+2. **Unset the variable** in Vercel, so the next deployment agrees with the one now serving.
 3. **Undo the rollback once the fix is deployed.** After an Instant Rollback, Vercel stops assigning
    the production domains to new deployments until the rollback is undone (Deployments → the rolled-back
    banner → _Undo rollback_, or promote the fixed deployment). Until then a push to `main` builds but
@@ -46,7 +55,9 @@ What a v2 user sees after a rollback is in [After a rollback](#after-a-rollback)
 
 ## Step 0 — the check passes for step 1
 
-`pnpm golive:check -- --step 1` exits 0, with every manual box for step 1 ticked.
+`pnpm golive:check -- --step 1` exits 0, with every manual box for step 1 ticked. Step 1's rows are
+what must hold before the worker is deployed; what step 1 makes true (the worker answering, its
+release, its egress record, the app's worker variables) is checked before step 2.
 
 ## Step 1 — the production crawl worker
 
@@ -57,18 +68,24 @@ What a v2 user sees after a rollback is in [After a rollback](#after-a-rollback)
 
 **Smoke** (no flag is on, so a visitor sees v1 throughout):
 
-| #   | Do                                               | Right looks like                                        |
-| --- | ------------------------------------------------ | ------------------------------------------------------- |
-| 1   | Open `https://crawlmouse-worker.fly.dev/healthz` | `{"ok":true}`                                           |
-| 2   | `pnpm golive:check -- --step 1`                  | the worker lines `pass`, the release the head of `main` |
-| 3   | Open `https://crawlmouse.com/`                   | the v1 home, unchanged                                  |
-| 4   | Run a v1 audit of a small site                   | it completes, as before                                 |
+| #   | Do                                               | Right looks like                            |
+| --- | ------------------------------------------------ | ------------------------------------------- |
+| 1   | Open `https://crawlmouse-worker.fly.dev/healthz` | `{"ok":true}`                               |
+| 2   | `pnpm golive:check -- --step 2`                  | the worker, release and egress lines `pass` |
+| 3   | Open `https://crawlmouse.com/`                   | the v1 home, unchanged                      |
+| 4   | Run a v1 audit of a small site                   | it completes, as before                     |
 
-**Watch for 30 minutes.** Fly → `crawlmouse-worker` → Monitoring (no restarts). Sentry → Issues,
-filtered to the new release.
+**Watch for 30 minutes.** Fly → `crawlmouse-worker` → Monitoring (no restarts), and
+`flyctl logs --app crawlmouse-worker`. The worker reports to no Sentry project.
 
-**Rollback.** Nothing in the app calls the worker until step 2. Roll the worker back to its previous
-release (runbook, _Production_ → _Rolling back_), or leave it running unused.
+**Rollback.** Nothing in the app calls the worker until step 2. After the first deploy there is no
+earlier release to return to: leave the worker running unused. After a later deploy, roll it back to
+its previous release (runbook, _Production_ → _Roll back_).
+
+**After a merge.** Vercel deploys the app on every merge to `main`; the worker changes only on a
+dispatch. After merging a change to a worker input (`packages/**`, the paths `worker-staging.yml`
+lists), dispatch `worker-production`, or make the change work with the running worker first.
+`golive:check`'s release row says when the two differ.
 
 ## Step 2 — `V2_PIPELINE=1`
 
@@ -78,17 +95,18 @@ budget is over its line).
 
 **Smoke.**
 
-| #   | Do                                              | Right looks like                                                              |
-| --- | ----------------------------------------------- | ----------------------------------------------------------------------------- |
-| 1   | Inngest → Apps → crawlmouse                     | synced after the redeploy; the function count `golive:check` lists for step 2 |
-| 2   | Inngest → Functions → `crawlmouse.check.reaper` | a run every ten minutes, each completed                                       |
-| 3   | Open `https://crawlmouse.com/`                  | the v1 home                                                                   |
-| 4   | Run a v1 audit                                  | it completes                                                                  |
+| #   | Do                                                                                                                               | Right looks like                                                                 |
+| --- | -------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| 1   | Inngest → Apps → crawlmouse                                                                                                      | synced after the redeploy; the function count `golive:check` lists for step 2    |
+| 2   | Inngest → Functions → `crawlmouse.check.reaper`                                                                                  | a run every ten minutes, each completed                                          |
+| 3   | Open `https://crawlmouse.com/`                                                                                                   | the v1 home                                                                      |
+| 4   | Run a v1 audit                                                                                                                   | it completes                                                                     |
+| 5   | As the owner's v2 account, request one check of a site it holds (`POST /api/sites/<id>/checks`, served with `V2_PIPELINE` alone) | the check finishes on `crawlmouse-worker`; its run in Inngest has no failed step |
 
 **Watch for 30 minutes.** Inngest → Runs, failed only. Inngest → Usage (executions against the plan).
 Sentry → Issues with `signal:audit-failed`.
 
-**Rollback.** Instant Rollback to the step-1 deployment, unset `V2_PIPELINE`, resync Inngest.
+**Rollback.** Instant Rollback to the step-1 deployment, resync Inngest, unset `V2_PIPELINE`.
 
 ## Step 3 — `V2_ACCOUNT_DOOR=1`
 
@@ -105,7 +123,7 @@ Serves `/signup`, `/check-email` and the claim route, and runs the first-login h
 
 **Watch for 30 minutes.** Supabase → Auth → Logs (no rate-limit errors). Sentry → Issues.
 
-**Rollback.** Instant Rollback to the step-2 deployment, unset `V2_ACCOUNT_DOOR`, resync Inngest.
+**Rollback.** Instant Rollback to the step-2 deployment, resync Inngest, unset `V2_ACCOUNT_DOOR`.
 
 ## Step 4 — `V2_CHECKS_PUBLIC=1`
 
@@ -125,7 +143,7 @@ by v1 still renders as v1's), the check pages, the mail, the scheduler, alerts a
 **Watch for 30 minutes.** Sentry → Issues with `signal:crawl-degraded` and `signal:schedule-claim`.
 Inngest → Runs, failed only. Resend → Logs (bounces).
 
-**Rollback.** Instant Rollback to the step-3 deployment, unset `V2_CHECKS_PUBLIC`, resync Inngest.
+**Rollback.** Instant Rollback to the step-3 deployment, resync Inngest, unset `V2_CHECKS_PUBLIC`.
 
 ## Step 5 — `V2_BILLING=1`
 
@@ -142,10 +160,14 @@ recorded consent), cancel and portal, the Stripe account webhook, the trial and 
 | 3   | Open `/agency-trial`, tick the consent, continue                   | Stripe Checkout for the Agency trial; close it unpaid                   |
 | 4   | `curl -si -X POST https://crawlmouse.com/api/billing/agency-trial` | `404`                                                                   |
 
+**Search.** Step 5 rewrites `/pricing` and `/developers` and adds `/agencies` to the sitemap (OPERATING-RULES
+§13): record Search Console impressions and the indexed-URL list before it, and run `pnpm indexnow` only
+after the 30-minute watch has passed, so a rollback never leaves a just-submitted URL answering 404.
+
 **Watch for 30 minutes.** Stripe → Developers → Webhooks (no failed deliveries). Sentry → Issues
 with `signal:billing-*` and `signal:reconcile-drift`.
 
-**Rollback.** Instant Rollback to the step-4 deployment, unset `V2_BILLING`, resync Inngest.
+**Rollback.** Instant Rollback to the step-4 deployment, resync Inngest, unset `V2_BILLING`.
 
 ## After a rollback
 
@@ -163,8 +185,29 @@ a v1 audit and its public report; then built again with the flags off over the s
 - **A link already sent** in v2 mail to a check or a site page answers 404 until the flag is on again
   (the two pages measured above).
 - `POST /api/billing/agency-trial` answers 404 with the flags on and off.
+- Not in the proof, read from the code: `/check/*` answers 404 with `V2_CHECKS_PUBLIC` off
+  (`apps/web/app/check/[question]/page.tsx:49`), `/agencies` with `V2_BILLING` off
+  (`apps/web/app/agencies/page.tsx:34`), and the `/r/` page of a report minted by v2 with
+  `V2_CHECKS_PUBLIC` off (`apps/web/app/r/[slug]/page.v2-row.test.tsx`); a v1 report is v1's page
+  either way. The reaper is registered only with `V2_PIPELINE` on
+  (`apps/web/lib/v2/pipeline/functions.ts:133`), so a check left running at that rollback stays
+  running until the flag is on again.
 
 The screenshots and the log are kept with the step's notes; the harness is not part of the product.
+
+## Tokens for `golive:check`
+
+Each goes in `scripts/.env.local` (gitignored) and is read by name; the check prints no value, sends
+only the requests its outbound list allows (`scripts/golive/http.ts`), and answers `unknown` for a row
+whose token is missing.
+
+| Variable                | What to create                                                             | Least it needs                                                                                                                                                        |
+| ----------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `VERCEL_TOKEN`          | Vercel → Account Settings → Tokens, scoped to `nahl-technologies-projects` | reads the project and its variables' names; the check never asks for a value                                                                                          |
+| `SUPABASE_ACCESS_TOKEN` | Supabase → Account → Access Tokens                                         | used only on the Management API's read-only query                                                                                                                     |
+| `STRIPE_LIVE_READ_KEY`  | Stripe, on the Crawlmouse v2 account, live mode → a restricted key         | Prices: Read, nothing else. The check refuses any key not starting `rk_live_`; it cannot see which account a restricted key belongs to, so create it on the right one |
+| `RESEND_API_KEY`        | Resend → API Keys                                                          | a key that can list domains                                                                                                                                           |
+| `FLY_READ_TOKEN`        | `flyctl tokens create readonly`                                            | reads the production worker's machines                                                                                                                                |
 
 ## Manual checks
 
