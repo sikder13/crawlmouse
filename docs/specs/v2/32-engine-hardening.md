@@ -37,9 +37,16 @@ guard and by the `client_rendered_template` detector through `emptyRootUrls`
   phase. Owner ruling: on a site where the graded phase uses the cap, a shell template still reads
   `not_rendered`; changing which pages Readable reads is a §5 question for later, with a backtest.
 - _Q8, as ruled._ A template of empty-root pages alone has no graded page, so its fix's estimated effect
-  is 0. The ruling: such a fix ranks first and its effect line says "Makes N pages readable without
-  JavaScript", built from the data, never a grade number and never "no measurable effect". **Not built
-  in this workstream** — see the gaps.
+  is 0. Such a fix now ranks first among the site's fixes (`shellOnly`, `grade/effects.ts`, ties by
+  fingerprint); its counterfactual changes no graded page, so no other fix's effect, absorption or the
+  overview moves. The views head a `client_rendered_template` fix whose AI effect is estimated at 0 or
+  less with "Makes N pages readable without JavaScript" (`pages_readable`,
+  `apps/web/lib/v2/view/effect-headline.ts`), never a grade number and never "no measurable effect"; an
+  AI effect still null keeps saying why it waits. N is the fix's `affected_pages`: for such a template,
+  its crawled empty-root pages, which is what the check saw. How many of them were rendered is not on
+  the Fix record, so no sample size is printed. Verify:
+  `pnpm --filter @crawlmouse/engine exec vitest run src/v2/grade/effects.rendered.test.ts src/v2/build/empty-shell-site.test.ts`
+  and `pnpm --filter @crawlmouse/web exec vitest run lib/v2/view/pages-readable.test.ts`.
 
 **Known gaps.**
 
@@ -47,9 +54,6 @@ guard and by the `client_rendered_template` detector through `emptyRootUrls`
   contract forbids an optional key (`packages/types/src/v2/contract.test.ts`, "no field anywhere in the
   contract is optional"), and a required or nullable key would fail every stored check, so it was
   stopped for the owner. The count is computable from the stored rows today (`emptyRootUrls`).
-- **The Q8 ruling is not built.** It needs `Fix.effect.pages_made_readable`, an optional field the same
-  contract rule refuses. Ranking such a fix first without the page-count line would put "No measurable
-  effect on the grade" at the top of the list, so neither half was shipped.
 - An open fix's shell template is not put first in the empty-root phase; the order is by key alone.
 - The built-site recording (`fixtures/v2/build/generate.ts`) leaves the empty-root phase off, so the web
   fixture built from it is unchanged; `empty-shell-site.ts` carries the phase.
@@ -80,10 +84,11 @@ open, now measured.
 **Decision.** The engine keeps the number it computed. In `apps/web/lib/v2/view/effect-headline.ts`,
 `formatPoints` is the one printer of an effect's sign: a figure above zero only. The headline is, in
 order: waiting where it waited before (and, for a structure fix, when its Technical SEO effect is at or
-below 0 and its AI effect is not estimated); AI points above 0; Technical SEO points above 0; "SEO not
-estimated" when that effect is null; otherwise `no_effect`, "No measurable effect on the grade" (short
-form "No measurable effect"). A group's points take each member at 0 first (`groupSum`). The fix order
-is unchanged. Verify:
+below 0 and its AI effect is not estimated); AI points above 0; for a `client_rendered_template` fix
+whose AI effect is estimated at 0 or less, the pages it makes readable (D2's Q8 ruling); Technical SEO
+points above 0; "SEO not estimated" when that effect is null; otherwise `no_effect`, "No measurable
+effect on the grade" (short form "No measurable effect"). A group's points take each member at 0 first
+(`groupSum`). D4 leaves the fix order unchanged. Verify:
 `pnpm --filter @crawlmouse/web exec vitest run lib/v2/view/effect-points.test.ts lib/v2/view/plus-sign-guard.test.ts`.
 The guard fails on a plus sign printed under `lib/v2/view` outside its allowlist.
 
