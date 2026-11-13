@@ -101,7 +101,8 @@ v1's JS detector read as an app shell (`content_features.client_rendered`). The 
   `client_rendered_template` fix whose template has graded pages, when that fix's AI effect is not
   above 0: estimated at 0, or waiting. An estimate reaches 0 only by rounding: its counterfactual sets
   each graded page's share to 1, the most a share can be. An effect that waits is a grade that waits;
-  the pages the fix counts do not depend on it. In both cases the line is still true. It is not ranked first; the engine's rule is
+  the pages the fix counts do not depend on it, and the line takes the place of the fix's waiting
+  reason. In both cases the line is still true. It is not ranked first; the engine's rule is
   the template with no graded page. The ruling keeps D4's wording for every other fix. Verify:
   `pnpm --filter @crawlmouse/engine exec vitest run src/v2/grade/effects.rendered.test.ts src/v2/build/empty-shell-site.test.ts`
   and `pnpm --filter @crawlmouse/web exec vitest run lib/v2/view/pages-readable.test.ts`.
@@ -171,7 +172,10 @@ allowlisted line of its file; its self-test shows it flags a mid-template `+${` 
 in an allowlisted file.
 
 **Acting on.** _Q5:_ the printers are `points`, `fixFirstBody`, `restPoints` (the "N more" row) in
-`result.ts`, and `effectOf`, `proPoints` and `groupPoints` in `segment/fixes.ts`.
+`result.ts`, and `effectOf`, `proPoints` and `groupPoints` in `segment/fixes.ts`. The grouped "N
+more" row follows `groupPoints`' rule in the table's short words: each grade's summed points, "SEO not
+estimated", the pages line and the AI effects that still wait; "No measurable effect" only when none
+of these has anything to say.
 
 **Known gaps.** A minted report snapshot keeps the text it was minted with. Screens whose fixtures print
 a group of zero effects now read "No measurable effect" where they read "+0 …"; their visual baselines
