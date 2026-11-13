@@ -2,7 +2,6 @@ import { randomUUID } from 'node:crypto';
 import type { PGlite } from '@electric-sql/pglite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { supabaseFounderStore, type FounderStore } from '../lib/v2/ops/founder-store';
-import { withInternal } from './helpers/accounts-internal';
 import { applyAllMigrations, freshDb } from './helpers/pglite-migrations';
 import { postgrestOver } from './helpers/postgrest-pglite';
 import { personalAccount, signUp } from './helpers/v2-check-tables';
@@ -16,7 +15,7 @@ let db: PGlite;
 let store: FounderStore;
 beforeAll(async () => {
   db = await freshDb();
-  await applyAllMigrations(db, withInternal);
+  await applyAllMigrations(db);
   store = supabaseFounderStore(postgrestOver(db));
 }, 300_000);
 afterAll(async () => {

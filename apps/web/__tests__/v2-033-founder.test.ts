@@ -8,7 +8,6 @@ import {
   readMigration,
   readRollback,
 } from './helpers/pglite-migrations';
-import { withInternal } from './helpers/accounts-internal';
 import { personalAccount, signUp } from './helpers/v2-check-tables';
 
 /**
@@ -25,7 +24,7 @@ const ROLLBACK = '20261115000001_v2_033_operations.revert.sql';
 let db: PGlite;
 beforeAll(async () => {
   db = await freshDb();
-  await applyAllMigrations(db, withInternal);
+  await applyAllMigrations(db);
 }, 300_000);
 afterAll(async () => {
   await db?.close();
@@ -476,8 +475,8 @@ describe('the migration and its revert', () => {
   it('applies twice, and the revert removes section C and lets it apply again', async () => {
     const d = await freshDb();
     try {
-      await applyAllMigrations(d, withInternal);
-      await d.exec(withInternal(readMigration(MIGRATION)));
+      await applyAllMigrations(d);
+      await d.exec(readMigration(MIGRATION));
       await d.exec(readRollback(ROLLBACK));
       await d.exec(readRollback(ROLLBACK));
       const gone = await d.query<{ t: string | null; f: number }>(
@@ -487,7 +486,7 @@ describe('the migration and its revert', () => {
                    'signin_delivery_seen', 'founder_signups_unannounced')) as f`,
       );
       expect(gone.rows[0]).toEqual({ t: null, f: 0 });
-      await d.exec(withInternal(readMigration(MIGRATION)));
+      await d.exec(readMigration(MIGRATION));
       const back = await d.query<{ t: string | null }>(
         "select to_regclass('public.founder_notices')::text as t",
       );
