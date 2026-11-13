@@ -51,7 +51,7 @@ afterEach(() => {
 describe('checkRouteDeps().captureFinished', () => {
   it('resolves before the capture is sent: the capture is left for `after`', async () => {
     const deps = checkRouteDeps({} as never, { userId: null });
-    await deps.captureFinished(req(), CHECK, FINISHED);
+    await deps.captureFinished(req(), CHECK, FINISHED, null);
     expect([h.afterTasks.length, fetched]).toEqual([1, []]);
 
     const ran = h.afterTasks[0]!();
@@ -69,7 +69,7 @@ describe('checkRouteDeps().captureFinished', () => {
     h.afterThrows = true;
     const deps = checkRouteDeps({} as never, { userId: null });
     let settled = false;
-    const captured = deps.captureFinished(req(), CHECK, FINISHED).then(() => {
+    const captured = deps.captureFinished(req(), CHECK, FINISHED, null).then(() => {
       settled = true;
     });
     await vi.waitFor(() => expect(fetched).toHaveLength(1));
