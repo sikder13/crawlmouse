@@ -6,7 +6,13 @@
 
 
 -- ═══ §C ═══════════════════════════════════════════════════════════════════════════════════════════
-
+drop function if exists public.signin_delivery_seen(text, timestamptz);
+drop function if exists public.founder_signups_unannounced(timestamptz, integer);
+drop function if exists public.founder_digest_counts(timestamptz, timestamptz);
+drop function if exists public.take_founder_overflow(text, integer);
+drop function if exists public.claim_founder_notice(text, text, uuid, boolean, timestamptz, jsonb,
+                                                    timestamptz, integer, boolean);
+drop table if exists public.founder_notices;
 -- ═══ end §C ══════════════════════════════════════════════════════════════════════════════════════
 
 

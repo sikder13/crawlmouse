@@ -74,6 +74,8 @@ const READ_SCOPE: Record<string, ReadScope> = {
   // 033: the console's operators and its record. Service only.
   operators: 'none',
   operator_actions: 'none',
+  // CC-33: founder notices. Service only.
+  founder_notices: 'none',
 };
 
 let db: PGlite;

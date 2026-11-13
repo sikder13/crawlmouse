@@ -1,7 +1,8 @@
 /**
  * The mailer's shared types (CC-28 D1, D2). Every v2 email is one of `MAIL_KINDS`; the list is the
- * `email_sends.kind` check, set last by migration 20261114000001 (CC-29 adds `agency_plus_contact`),
- * and send.test.ts's "the kinds" reads it from there.
+ * `email_sends.kind` check, set by the last migration that rewrites it (CC-29 adds
+ * `agency_plus_contact`; CC-33's `founder_event` and `founder_digest` are in 20261115000001's section
+ * K), and send.test.ts's "the kinds" reads it from there.
  */
 
 export const MAIL_KINDS = [
@@ -14,18 +15,24 @@ export const MAIL_KINDS = [
   'alert',
   'weekly_summary',
   'agency_plus_contact',
+  'founder_event',
+  'founder_digest',
 ] as const;
 export type MailKind = (typeof MAIL_KINDS)[number];
 
 /**
  * Account mail (D7): about the person's own account, so it carries no unsubscribe and a suppression
  * does not stop it. The others are what `email_kind_suppressible` in the migration answers true for.
+ * CC-33's founder notices and digest are in this class too (questions Q1): the founder sender
+ * (lib/v2/ops/founder.ts) mails them to FOUNDER_NOTIFY_TO and to no other address.
  */
 export const ACCOUNT_KINDS: ReadonlySet<MailKind> = new Set<MailKind>([
   'trial_reminder',
   'email_change_confirm',
   'email_change_notice',
   'account_delete',
+  'founder_event',
+  'founder_digest',
 ]);
 
 /**

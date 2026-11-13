@@ -416,6 +416,14 @@ export const ROWS = {
     account_id: accountId,
     target: accountId,
   }),
+  // CC-33: a founder notice. It names an account and holds no foreign key; service only.
+  founder_notices: (key: string, accountId: string): Row => ({
+    event_key: key,
+    kind: 'signup',
+    account_id: accountId,
+    occurred_at: T1,
+    state: 'send',
+  }),
   account_slack_destinations: (accountId: string, secretId: string): Row => ({
     account_id: accountId,
     vault_secret_id: secretId,
@@ -552,7 +560,7 @@ export const TABLES_028: readonly NewTable[] = ['email_sends', 'email_suppressio
 /** The public tables 029 creates. */
 export const TABLES_029: readonly NewTable[] = ['contact_requests'];
 /** The public tables 033 creates. */
-export const TABLES_033: readonly NewTable[] = ['operators', 'operator_actions'];
+export const TABLES_033: readonly NewTable[] = ['operators', 'operator_actions', 'founder_notices'];
 /** The tables 003 creates. */
 export const NEW_TABLES = (Object.keys(ROWS) as NewTable[])
   .filter(
@@ -839,6 +847,15 @@ export async function seedWorld(db: Db, tag: string): Promise<World> {
       Object.values(ROWS.operator_actions(operatorId, accountId)),
     );
     seeded.operator_actions.push({ pk: { id: action[0]!.id }, scope: 'account' });
+  }
+  if (with033) {
+    const key = `signup:${tag}-${n}`;
+    await put(
+      'founder_notices',
+      ROWS.founder_notices(key, accountId),
+      { event_key: key },
+      'account',
+    );
   }
   await put(
     'seat_sites',

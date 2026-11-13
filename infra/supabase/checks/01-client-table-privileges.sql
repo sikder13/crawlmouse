@@ -20,7 +20,8 @@ v2_tables(rel) as (
     ('public.page_results'), ('public.persist_chunks'), ('public.report_schedules'),
     ('public.reports'), ('public.seat_sites'), ('public.seats'), ('public.share_links'),
     ('public.site_fixes'), ('public.sites'), ('public.slack_sends'), ('public.subscriptions'), ('public.trial_ledger'),
-    ('public.usage_events')
+    ('public.usage_events'),
+    ('public.founder_notices')
 ),
 -- (relation, role, privilege, columns); null columns is a grant on the whole table.
 declared(rel, role, privilege, columns) as (
