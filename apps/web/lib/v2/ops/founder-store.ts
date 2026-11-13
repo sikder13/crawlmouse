@@ -5,7 +5,6 @@
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { z } from 'zod';
-import { AccountStateSchema } from '@crawlmouse/types/v2';
 import {
   DIGEST_FIGURES,
   type DigestCounts,
@@ -16,7 +15,6 @@ import {
   type FounderEventKind,
   type FounderOverflowRow,
 } from '../mail/templates/founder-event';
-import type { History } from './founder-classify';
 
 export type NoticeState = 'send' | 'held' | 'skipped';
 
@@ -36,7 +34,6 @@ export interface NoticeClaim {
 /** An account as a notice names it. */
 export interface NoticeAccount {
   internal: boolean;
-  history: History;
   subscriptionId: string | null;
   /** The active owner's address, or null when the account has none. */
   ownerEmail: string | null;
@@ -49,10 +46,14 @@ export interface FounderStore {
   takeOverflow(key: string, rows: number): Promise<{ total: number; rows: FounderOverflowRow[] }>;
   digestCounts(from: string, to: string): Promise<DigestCounts>;
   account(accountId: string): Promise<NoticeAccount | null>;
-  /** Users created at or after `since` with no signup notice, oldest first. */
+  /**
+   * Users created at or after `since` whose sign-up is not announced, `limit` of them in the
+   * rotation's `turn` (founder_signups_unannounced).
+   */
   unannouncedUsers(
     since: string,
     limit: number,
+    turn: number,
   ): Promise<{ userId: string; accountId: string | null; createdAt: string }[]>;
   /** Agency accounts created at or after `since`. */
   agencyAccounts(since: string): Promise<{ accountId: string; createdAt: string }[]>;
@@ -92,7 +93,6 @@ const CountsSchema = z.strictObject(
     z.ZodInt
   >,
 );
-const HistorySchema = z.array(z.object({ state: AccountStateSchema, since: z.string() }));
 
 function fail(what: string, error: { code?: string } | null): never {
   throw new Error(`${what}: ${error?.code ?? 'error'}`);
@@ -132,7 +132,7 @@ export function supabaseFounderStore(sb: SupabaseClient): FounderStore {
     async account(accountId) {
       const { data: a, error } = await sb
         .from('accounts')
-        .select('internal, state_history, current_subscription_id')
+        .select('internal, current_subscription_id')
         .eq('id', accountId)
         .maybeSingle();
       if (error) fail('accounts', error);
@@ -166,22 +166,21 @@ export function supabaseFounderStore(sb: SupabaseClient): FounderStore {
       const row = z
         .object({
           internal: z.boolean(),
-          state_history: HistorySchema,
           current_subscription_id: z.string().nullable(),
         })
         .parse(a);
       return {
         internal: row.internal,
-        history: row.state_history,
         subscriptionId: row.current_subscription_id,
         ownerEmail,
         host: (sites?.[0]?.host as string | undefined) ?? null,
       };
     },
-    async unannouncedUsers(since, limit) {
+    async unannouncedUsers(since, limit, turn) {
       const { data, error } = await sb.rpc('founder_signups_unannounced', {
         p_since: since,
         p_limit: limit,
+        p_turn: turn,
       });
       if (error) fail('founder_signups_unannounced', error);
       return z

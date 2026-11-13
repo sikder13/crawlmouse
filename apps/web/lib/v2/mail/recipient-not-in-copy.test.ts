@@ -227,10 +227,6 @@ async function sweep() {
     digestCounts: async () => counts,
     account: async () => ({
       internal: false,
-      history: [
-        { state: 'free', since: '2026-11-01T00:00:00.000Z' },
-        { state: 'pro_trial', since: '2026-11-13T09:00:00.000Z' },
-      ],
       subscriptionId: null,
       ownerEmail: 'qzx-owner@inbox.example',
       host: 'shop.example',
@@ -239,7 +235,7 @@ async function sweep() {
   const founder = (now: Date): FounderDeps => ({
     mail: { ...mail, now: () => now },
     store: founderStore,
-    latestInvoice: async () => null,
+    payment: async () => ({ invoice: null, earlier: 'none' }),
     confirmed: async () => true,
     to: TO.founderEvent,
     now: () => now,
@@ -254,7 +250,8 @@ async function sweep() {
       occurredAt: NOW.toISOString(),
     }),
   );
-  answers.push(JSON.stringify(await digest(founder(new Date('2026-11-16T13:07:00.000Z')))));
+  const tick = new Date('2026-11-16T13:07:00.000Z');
+  answers.push(JSON.stringify(await digest(founder(tick), tick)));
   return { answers, sent: transport.sent, kinds: new Set(ledger.claims.map((c) => c.kind)) };
 }
 

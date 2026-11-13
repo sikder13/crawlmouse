@@ -424,9 +424,13 @@ end;
 $$;
 
 -- The held rows one "N more" notice reports, under its key p_key ('overflow:<hour>'). The first call
--- for a key writes the key onto every held row no notice has taken; a later call for the same key
--- takes nothing new and answers the rows already carrying it, so a retried notice reports the same
--- rows. Answers {"total": n, "rows": [...]}, rows oldest first, at most p_rows of them.
+-- for a key writes the key onto every held row no notice has taken, and onto the rows taken by a
+-- notice whose mail gave up: its ledger row (email_sends, key 'founder_event:<its key>') is `failed`
+-- with 3 attempts, claim_email_send's bound, so that notice is not sent again and its rows are
+-- reported in this one (review C6). A later call for the same key takes nothing new and answers the rows already
+-- carrying it, so a retried notice reports the same rows. Rows taken by a notice whose run ended
+-- before its mail was claimed keep that notice's key and are not reported again. Answers
+-- {"total": n, "rows": [...]}, rows oldest first, at most p_rows of them.
 create or replace function public.take_founder_overflow(p_key text, p_rows integer)
 returns jsonb
 language plpgsql
@@ -442,7 +446,11 @@ begin
   perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended('founder_notices', 0));
   if not exists (select 1 from public.founder_notices n where n.overflow_key = p_key) then
     update public.founder_notices n set overflow_key = p_key
-     where n.state = 'held' and n.overflow_key is null;
+     where n.state = 'held'
+       and (n.overflow_key is null
+            or exists (select 1 from public.email_sends e
+                        where e.idempotency_key = 'founder_event:' || n.overflow_key
+                          and e.status = 'failed' and e.attempts >= 3));
   end if;
   return (
     select pg_catalog.jsonb_build_object(
@@ -473,7 +481,10 @@ $$;
 --   checks_failed_all            checks failed, by finished_at; the same sites
 --   mail_bounce_events           email_events of type bounced (v1 mail and the sign-in mail)
 --   mail_suppressions_new        addresses first suppressed (v2 mail: hard bounces and complaints)
---   mail_send_failures           v2 ledger rows (email_sends) whose last attempt failed, by updated_at
+--   mail_send_failures           v2 ledger rows (email_sends) whose last attempt failed, by updated_at;
+--                                an internal account's and the founder kinds' own left out
+-- The two bounce figures are keyed by address (email_events by address, email_suppressions by its
+-- hash) and name no account, so they include internal accounts' mail (questions Q14).
 create or replace function public.founder_digest_counts(p_from timestamptz, p_to timestamptz)
 returns jsonb
 language plpgsql
@@ -522,18 +533,30 @@ begin
     'mail_suppressions_new', (select pg_catalog.count(*) from public.email_suppressions s
                                where s.first_at >= p_from and s.first_at < p_to),
     'mail_send_failures', (select pg_catalog.count(*) from public.email_sends e
+                             left join public.accounts a on a.id = e.account_id
                             where e.status = 'failed'
+                              and coalesce(a.internal, false) = false
+                              and e.kind not in ('founder_event', 'founder_digest')
                               and e.updated_at >= p_from and e.updated_at < p_to))
     into v;
   return v;
 end;
 $$;
 
--- The founder sweep's sign-ups (plan-review M8): users created at or after p_since with no signup
--- notice yet, oldest first, at most p_limit, with their default account. The sweep announces each
--- once Supabase Auth shows its address confirmed; one still unconfirmed when it falls out of the
--- window is never announced.
-create or replace function public.founder_signups_unannounced(p_since timestamptz, p_limit integer)
+-- The founder sweep's sign-ups (plan-review M8): users created at or after p_since whose sign-up is
+-- not yet announced, at most p_limit, with their default account, taken in a rotation: of the n such
+-- users ordered oldest first, the p_limit from position (p_turn * p_limit) mod n on, wrapping to the
+-- oldest. The sweep passes its five-minute tick as p_turn, so consecutive runs start p_limit places
+-- apart, and users found unconfirmed do not keep the first p_limit places from one run to the next
+-- (review C8). Not yet announced:
+-- no signup notice, or a signup notice decided `send` whose mail (the ledger key
+-- `founder_event:signup:<user>`) has no email_sends row, or one that is neither sent nor suppressed
+-- and has fewer than 3 attempts (claim_email_send's bound). So a notice whose send failed is offered
+-- again on the next run and the ledger's key stops a second mail; a `held` or `skipped` notice is not
+-- offered again. The sweep announces each once Supabase Auth shows its address confirmed; one still
+-- unconfirmed when it falls out of the window is never announced.
+create or replace function public.founder_signups_unannounced(p_since timestamptz, p_limit integer,
+                                                              p_turn bigint)
 returns table (user_id uuid, account_id uuid, created_at timestamptz)
 language plpgsql
 stable
@@ -541,22 +564,43 @@ security invoker
 set search_path = pg_catalog, pg_temp
 as $$
 begin
-  if p_since is null or p_limit is null or p_limit < 1 then
-    raise exception 'founder_signups_unannounced: a time and a positive limit are required'
+  if p_since is null or p_limit is null or p_limit < 1 or p_turn is null or p_turn < 0 then
+    raise exception 'founder_signups_unannounced: a time, a positive limit and a turn of 0 or more are required'
       using errcode = '22023';
   end if;
   return query
-    select u.id, u.default_account_id, u.created_at from public.users u
-     where u.created_at >= p_since
-       and not exists (select 1 from public.founder_notices n where n.event_key = 'signup:' || u.id::text)
-     order by u.created_at, u.id
+    with w as (
+      select u.id, u.default_account_id, u.created_at,
+             pg_catalog.row_number() over (order by u.created_at, u.id) - 1 as pos,
+             pg_catalog.count(*) over () as total
+        from public.users u
+        left join public.founder_notices n on n.event_key = 'signup:' || u.id::text
+        left join public.email_sends e on e.idempotency_key = 'founder_event:signup:' || u.id::text
+       where u.created_at >= p_since
+         and (n.event_key is null
+              or (n.state = 'send'
+                  and (e.id is null or (e.status not in ('sent', 'suppressed') and e.attempts < 3))))
+    )
+    select w.id, w.default_account_id, w.created_at from w
+     order by (w.pos - ((p_turn % w.total) * p_limit) % w.total + w.total) % w.total
      limit p_limit;
 end;
 $$;
 
--- The sign-in canary's look (D6, inngest/signin-canary.ts): whether Resend's webhook recorded a
--- delivery to p_address, compared lower-cased, at or after p_since.
-create or replace function public.signin_delivery_seen(p_address text, p_since timestamptz)
+-- The sign-in canary's look (D6, inngest/signin-canary.ts; review Q17): whether Resend's webhook
+-- recorded a delivery to p_address, compared lower-cased, of a mail from p_sender, created at or after
+-- p_since less a minute. The webhook stores Resend's event whole in `payload`
+-- (app/api/webhooks/resend/route.ts):
+--   sender     `data.from`'s address: the part inside a trailing `<…>` when there is one, else the whole
+--              value, trimmed and lower-cased, as isV2MailEvent (lib/v2/mail/suppression.ts) reads it;
+--   mail time  `data.created_at`, "when the email was created" in Resend's webhook reference
+--              (resend.com/docs/webhooks/emails/delivered), not the row's created_at, which is when the
+--              webhook arrived: so the run before's mail, created about ten minutes earlier and
+--              delivered after this request, does not count. The minute allows for a difference
+--              between our clock and Resend's. An event with no `data.created_at`, or one not shaped as
+--              a time, is not counted, so the canary raises its signal rather than pass.
+create or replace function public.signin_delivery_seen(p_address text, p_sender text,
+                                                       p_since timestamptz)
 returns boolean
 language plpgsql
 stable
@@ -564,13 +608,21 @@ security invoker
 set search_path = pg_catalog, pg_temp
 as $$
 begin
-  if p_address is null or p_since is null then
-    raise exception 'signin_delivery_seen: an address and a time are required' using errcode = '22023';
+  if p_address is null or p_sender is null or p_since is null then
+    raise exception 'signin_delivery_seen: an address, a sender and a time are required'
+      using errcode = '22023';
   end if;
-  return exists (select 1 from public.email_events e
-                  where e.event_type = 'delivered'
-                    and pg_catalog.lower(e.email_address) = pg_catalog.lower(p_address)
-                    and e.created_at >= p_since);
+  return exists (
+    select 1 from public.email_events e
+     cross join lateral (select e.payload -> 'data' ->> 'from' as f,
+                                e.payload -> 'data' ->> 'created_at' as at) d
+     where e.event_type = 'delivered'
+       and pg_catalog.lower(e.email_address) = pg_catalog.lower(p_address)
+       and pg_catalog.lower(pg_catalog.btrim(coalesce(pg_catalog.substring(d.f, '<([^<>]*)>\s*$'), d.f)))
+             = pg_catalog.lower(pg_catalog.btrim(p_sender))
+       -- The case reads the time only once its shape is checked; `and` sets no order.
+       and (case when d.at ~ '^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}(:?\d{2})?)$'
+                 then d.at::timestamptz end) >= p_since - interval '1 minute');
 end;
 $$;
 
@@ -581,16 +633,16 @@ revoke all on function public.take_founder_overflow(text, integer)
   from public, anon, authenticated, service_role;
 revoke all on function public.founder_digest_counts(timestamptz, timestamptz)
   from public, anon, authenticated, service_role;
-revoke all on function public.signin_delivery_seen(text, timestamptz)
+revoke all on function public.signin_delivery_seen(text, text, timestamptz)
   from public, anon, authenticated, service_role;
-revoke all on function public.founder_signups_unannounced(timestamptz, integer)
+revoke all on function public.founder_signups_unannounced(timestamptz, integer, bigint)
   from public, anon, authenticated, service_role;
 grant execute on function public.claim_founder_notice(text, text, uuid, boolean, timestamptz, jsonb,
                                                       timestamptz, integer, boolean) to service_role;
 grant execute on function public.take_founder_overflow(text, integer) to service_role;
 grant execute on function public.founder_digest_counts(timestamptz, timestamptz) to service_role;
-grant execute on function public.signin_delivery_seen(text, timestamptz) to service_role;
-grant execute on function public.founder_signups_unannounced(timestamptz, integer) to service_role;
+grant execute on function public.signin_delivery_seen(text, text, timestamptz) to service_role;
+grant execute on function public.founder_signups_unannounced(timestamptz, integer, bigint) to service_role;
 -- ═══ end §C ══════════════════════════════════════════════════════════════════════════════════════
 
 

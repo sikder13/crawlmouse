@@ -8,10 +8,11 @@
  * - `crawlmouse.founder.sweep`, every five minutes: sign-ups, agency accounts and cancellations,
  *   which send no event.
  * - `crawlmouse.founder.digest`, hourly at :07: the daily and weekly digests when due, and the
- *   "N more" notice.
+ *   "N more" notice. The tick's time is taken once, in a `clock` step, and the digest's keys are
+ *   built from it, so a retry that runs in the next hour keeps the tick's keys (review C6).
  *
- * Each is one step, retried as a whole. The notices and mails in it are keyed by their event, so a
- * retry claims the same rows and the mail ledger answers `done` for a mail already sent.
+ * The work is one step, retried as a whole. The notices and mails in it are keyed by their
+ * event, so a retry claims the same rows and the mail ledger answers `done` for a mail already sent.
  * This package imports nothing from the app.
  */
 import type { AccountState } from '@crawlmouse/types/v2';
@@ -38,7 +39,8 @@ export interface FounderEntitlementEvent {
 export interface FounderWork {
   entitlement(event: FounderEntitlementEvent): Promise<unknown>;
   sweep(): Promise<unknown>;
-  digest(): Promise<unknown>;
+  /** `at`: the tick's time, ISO. */
+  digest(at: string): Promise<unknown>;
 }
 
 export function createFounderEntitlementFn(work: () => FounderWork) {
@@ -73,6 +75,9 @@ export function createFounderDigestFn(work: () => FounderWork) {
   return inngest.createFunction(
     { id: FOUNDER_DIGEST_FN_ID, retries: FOUNDER_RETRIES, concurrency: { limit: 1 } },
     { cron: '7 * * * *' },
-    async ({ step }) => step.run('digest', async () => sized('digest', await work().digest())),
+    async ({ step }) => {
+      const at = await step.run('clock', () => new Date().toISOString());
+      return step.run('digest', async () => sized('digest', await work().digest(at)));
+    },
   );
 }

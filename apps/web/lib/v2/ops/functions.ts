@@ -6,6 +6,7 @@
  */
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { InngestFunction } from 'inngest';
+import type Stripe from 'stripe';
 import {
   createFounderDigestFn,
   createFounderEntitlementFn,
@@ -22,7 +23,7 @@ import { isPlainAddress } from '../mail/headers';
 import { supabaseMailLedger } from '../mail/ledger';
 import { resendTransport } from '../mail/transport';
 import { canaryWork, reportCanary, type SignInLink } from './canary';
-import { digest, entitlementNotice, sweep, type FounderDeps, type LatestInvoice } from './founder';
+import { digest, entitlementNotice, sweep, type FounderDeps, type PaymentRecord } from './founder';
 import { supabaseFounderStore } from './founder-store';
 import { requestSignInLink } from './sign-in-link';
 
@@ -33,14 +34,47 @@ const serviceClient = (env: Env): SupabaseClient =>
     auth: { persistSession: false },
   });
 
-/** The followed subscription's latest invoice: Stripe's amounts and currency, never a card field. */
-async function latestInvoice(env: Env, subscriptionId: string): Promise<LatestInvoice | null> {
-  const sub = await stripeAccount(env).subscriptions.retrieve(subscriptionId, {
-    expand: ['latest_invoice'],
-  });
+/** The Stripe reads `stripePayment` makes. */
+export interface StripeReads {
+  subscriptions: Pick<Stripe['subscriptions'], 'retrieve'>;
+  invoices: Pick<Stripe['invoices'], 'list'>;
+}
+
+/** Paid invoices read to find an earlier payment; `unknown` when more are left unread. */
+export const PAID_INVOICES_READ = 10;
+
+/**
+ * Stripe's record of a subscription's payment (review C2, C3): its latest invoice (status, both
+ * amounts, currency, and no card field), and whether the customer has another paid invoice with an
+ * amount above 0. A zero-amount paid invoice is left out: Stripe creates and pays one when a trial
+ * starts. The listing is `invoices.list({ customer, status: 'paid' })`, bounded by PAID_INVOICES_READ.
+ */
+export async function stripePayment(
+  stripe: StripeReads,
+  subscriptionId: string,
+): Promise<PaymentRecord> {
+  const sub = await stripe.subscriptions.retrieve(subscriptionId, { expand: ['latest_invoice'] });
   const inv = sub.latest_invoice;
-  if (inv === null || typeof inv === 'string') return null;
-  return { amountPaid: inv.amount_paid, amountDue: inv.amount_due, currency: inv.currency };
+  const latest = inv === null || typeof inv === 'string' ? null : inv;
+  const customer = typeof sub.customer === 'string' ? sub.customer : sub.customer.id;
+  const paid = await stripe.invoices.list({ customer, status: 'paid', limit: PAID_INVOICES_READ });
+  const earlier = paid.data.some((i) => i.id !== latest?.id && i.amount_paid > 0)
+    ? 'some'
+    : paid.has_more
+      ? 'unknown'
+      : 'none';
+  return {
+    invoice:
+      latest === null
+        ? null
+        : {
+            status: latest.status,
+            amountPaid: latest.amount_paid,
+            amountDue: latest.amount_due,
+            currency: latest.currency,
+          },
+    earlier,
+  };
 }
 
 export function founderDeps(env: Env): FounderDeps {
@@ -54,7 +88,7 @@ export function founderDeps(env: Env): FounderDeps {
       log: mailLog,
     },
     store: supabaseFounderStore(sb),
-    latestInvoice: (id) => latestInvoice(env, id),
+    payment: (id) => stripePayment(stripeAccount(env), id),
     async confirmed(userId) {
       const { data, error } = await sb.auth.admin.getUserById(userId);
       if (error) throw new Error(`getUserById: ${error.status ?? 'error'}`);
@@ -76,7 +110,7 @@ export function opsFunctions(
     return {
       entitlement: (ev) => entitlementNotice(d, ev),
       sweep: () => sweep(d),
-      digest: () => digest(d),
+      digest: (at) => digest(d, new Date(at)),
     };
   };
   const fns: InngestFunction.Like[] = [

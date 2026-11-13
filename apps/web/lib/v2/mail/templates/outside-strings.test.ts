@@ -196,7 +196,8 @@ const CASES: readonly Case<unknown>[] = [
     ours: [],
   }),
   // CC-33: the founder's notices. The host and the owner's address are outside; Stripe's currency
-  // is checked against three lower-case letters before it is shown.
+  // is checked against three lower-case letters before it is shown, and its invoice status against
+  // Stripe's five statuses.
   kase({
     name: 'founder-event',
     input: {
@@ -205,14 +206,22 @@ const CASES: readonly Case<unknown>[] = [
       accountId: ID,
       plan: 'pro',
       payment: 'first',
-      amount: { minor: 1900, currency: 'usd' },
+      amount: { minor: 1900, currency: 'usd', status: 'paid' },
       host: 'example.com',
       ownerEmail: 'owner@example.com',
       occurredAt: '2026-11-13T10:00:00.000Z',
     } satisfies FounderEventInput,
     render: founderEvent,
     outside: ['host', 'ownerEmail'],
-    ours: ['kind', 'accountId', 'plan', 'payment', 'amount.currency', 'occurredAt'],
+    ours: [
+      'kind',
+      'accountId',
+      'plan',
+      'payment',
+      'amount.currency',
+      'amount.status',
+      'occurredAt',
+    ],
   }),
   kase({
     name: 'founder-overflow',

@@ -22,7 +22,7 @@ function work(): { [K in keyof FounderWork]: ReturnType<typeof vi.fn> } {
   return {
     entitlement: vi.fn(async () => 'sent'),
     sweep: vi.fn(async () => ({ signups: {} })),
-    digest: vi.fn(async () => ({ daily: 'not_due' })),
+    digest: vi.fn(async (_at: string) => ({ daily: 'not_due' })),
   };
 }
 
@@ -96,7 +96,37 @@ describe('the founder functions (D3)', () => {
     expect(w.entitlement.mock.calls[0]![0]).toMatchObject({ id: undefined });
   });
 
-  it('runs the sweep and the digest in one step each, and returns their outcome', async () => {
+  it('takes the digest tick’s time once, in its own step, so a retry an hour on keeps the hour’s keys (review C6)', async () => {
+    vi.useFakeTimers();
+    try {
+      // Inngest memoizes a step's answer: a retry runs the function again and is handed the answers
+      // of the steps that finished, here the clock's.
+      const done = new Map<string, unknown>();
+      const memo = {
+        run: async (id: string, fn: () => unknown) => {
+          if (!done.has(id)) done.set(id, await fn());
+          return done.get(id);
+        },
+      };
+      const w = work();
+      w.digest.mockRejectedValueOnce(new Error('transport down'));
+      const fn = createFounderDigestFn(() => w as unknown as FounderWork) as unknown as {
+        fn: (c: unknown) => Promise<unknown>;
+      };
+      vi.setSystemTime(new Date('2026-11-13T15:59:30.000Z'));
+      await expect(fn.fn({ step: memo })).rejects.toThrow('transport down');
+      vi.setSystemTime(new Date('2026-11-13T16:04:00.000Z'));
+      await fn.fn({ step: memo });
+      expect(w.digest.mock.calls).toEqual([
+        ['2026-11-13T15:59:30.000Z'],
+        ['2026-11-13T15:59:30.000Z'],
+      ]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('runs the sweep in one step and the digest after its clock step, and returns their outcome', async () => {
     const w = work();
     expect(
       await run(

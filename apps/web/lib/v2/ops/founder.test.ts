@@ -12,7 +12,7 @@ import {
   sweep,
   type EntitlementEvent,
   type FounderDeps,
-  type LatestInvoice,
+  type PaymentRecord,
 } from './founder';
 import type { FounderStore, NoticeAccount, NoticeClaim, NoticeState } from './founder-store';
 
@@ -86,21 +86,29 @@ function memoryNotices(accounts: Record<string, NoticeAccount> = {}) {
 
 const account = (over: Partial<NoticeAccount> = {}): NoticeAccount => ({
   internal: false,
-  history: [
-    { state: 'free', since: '2026-11-01T00:00:00.000Z' },
-    { state: 'pro_trial', since: '2026-11-02T00:00:00.000Z' },
-    { state: 'pro', since: '2026-11-13T14:59:00.000Z' },
-  ],
   subscriptionId: 'sub_123',
   ownerEmail: OWNER,
   host: 'shop.example',
   ...over,
 });
 
+/** Stripe's record: a paid latest invoice of 19.00 (amount_due 25.00, to tell them apart), and no earlier paid one. */
+const record = (over: Partial<PaymentRecord> = {}): PaymentRecord => ({
+  invoice: { status: 'paid', amountPaid: 1900, amountDue: 2500, currency: 'usd' },
+  earlier: 'none',
+  ...over,
+});
+const unpaid = (amountDue: number) => ({
+  status: 'open',
+  amountPaid: 0,
+  amountDue,
+  currency: 'usd',
+});
+
 interface Setup {
   to?: string | null;
   transport?: MailTransport;
-  invoice?: (sub: string) => Promise<LatestInvoice | null>;
+  payment?: (sub: string) => Promise<PaymentRecord>;
   confirmed?: (user: string) => Promise<boolean>;
   accounts?: Record<string, NoticeAccount>;
   now?: Date;
@@ -123,9 +131,7 @@ function setup(s: Setup = {}) {
   const d: FounderDeps = {
     mail,
     store: notices.store,
-    latestInvoice: vi.fn(
-      s.invoice ?? (async () => ({ amountPaid: 1900, amountDue: 1900, currency: 'usd' })),
-    ),
+    payment: vi.fn(s.payment ?? (async () => record())),
     confirmed: vi.fn(s.confirmed ?? (async () => true)),
     to: s.to === undefined ? FOUNDER : s.to,
     now: () => s.now ?? NOW,
@@ -174,7 +180,7 @@ describe('entitlementNotice', () => {
     expect(m.text).toContain('Amount: $19.00');
     expect(m.text).toContain(`Owner: ${OWNER}`);
     expect(m.idempotencyKey).toBe(`founder_event:entitlement:${id()}`);
-    expect(d.latestInvoice).toHaveBeenCalledWith('sub_123');
+    expect(d.payment).toHaveBeenCalledWith('sub_123');
     // The ledger row names no account: the founder's mail is in no customer's list.
     expect(ledger.claims.map((c) => [c.kind, c.accountId])).toEqual([['founder_event', null]]);
   });
@@ -213,30 +219,117 @@ describe('entitlementNotice', () => {
     }
   });
 
-  it('claims nothing for a change the digest alone reports', async () => {
+  it('claims nothing for a change that has no instant notice', async () => {
     const { d, rows } = setup();
-    expect(await entitlementNotice(d, change('pro', 'agency'))).toBe('digest_only');
-    expect(await entitlementNotice(d, change('pro_trial', 'free'))).toBe('digest_only');
+    expect(await entitlementNotice(d, change('pro', 'agency'))).toBe('no_notice');
+    expect(await entitlementNotice(d, change('pro_trial', 'free'))).toBe('no_notice');
     expect(rows.size).toBe(0);
   });
 
   it('says the amount was not read when Stripe throws or has no invoice, and uses amount_due for a failure', async () => {
     const thrown = setup({
-      invoice: async () => {
+      payment: async () => {
         throw new Error('stripe down');
       },
     });
     await entitlementNotice(thrown.d, change('pro_trial', 'pro'));
     expect(thrown.transport.sent[0]!.text).toContain('Amount: not read from Stripe');
-    const none = setup({ invoice: async () => null });
+    const none = setup({ payment: async () => record({ invoice: null }) });
     await entitlementNotice(none.d, change('pro_trial', 'pro'));
     expect(none.transport.sent[0]!.text).toContain('Amount: not read from Stripe');
     const failed = setup({
-      invoice: async () => ({ amountPaid: 0, amountDue: 19000, currency: 'usd' }),
+      payment: async () => record({ invoice: unpaid(19000) }),
     });
     await entitlementNotice(failed.d, change('pro', 'past_due'));
     expect(failed.transport.sent[0]!.subject).toBe('Payment failed: Pro');
-    expect(failed.transport.sent[0]!.text).toContain('Amount: $190.00');
+    expect(failed.transport.sent[0]!.text).toContain(
+      'Amount: $190.00 due, not yet paid (Stripe invoice status: open)',
+    );
+  });
+
+  it('reads amount_paid only from a paid invoice; an unpaid one is its amount_due, said to be unpaid (review C3)', async () => {
+    const paid = setup();
+    await entitlementNotice(paid.d, change('pro_trial', 'pro'));
+    // amount_paid 1900, amount_due 2500: the paid figure is the one shown.
+    expect(paid.transport.sent[0]!.text).toContain('Amount: $19.00 paid');
+    // A trial's end: Stripe creates the invoice and charges it about an hour later.
+    const pending = setup({ payment: async () => record({ invoice: unpaid(1900) }) });
+    await entitlementNotice(pending.d, change('pro_trial', 'pro'));
+    const text = pending.transport.sent[0]!.text;
+    expect(text).toContain('Amount: $19.00 due, not yet paid (Stripe invoice status: open)');
+    expect(text).not.toContain('$0.00');
+  });
+
+  it('calls a payment first or returning as Stripe’s paid invoices say, not the account’s history (review C2)', async () => {
+    const first = setup({ payment: async () => record({ earlier: 'none' }) });
+    await entitlementNotice(first.d, change('free', 'pro'));
+    const returning = setup({ payment: async () => record({ earlier: 'some' }) });
+    await entitlementNotice(returning.d, change('free', 'pro'));
+    const unsaid = setup({ payment: async () => record({ earlier: 'unknown' }) });
+    await entitlementNotice(unsaid.d, change('free', 'pro'));
+    const unread = setup({
+      payment: async () => {
+        throw new Error('stripe down');
+      },
+    });
+    await entitlementNotice(unread.d, change('agency_trial', 'agency'));
+    expect(
+      [first, returning, unsaid, unread].map((s) => s.transport.sent.map((m) => m.subject)),
+    ).toEqual([
+      ['First payment: Pro'],
+      ['Payment (returning): Pro'],
+      ['Payment: Pro'],
+      ['Payment: Agency'],
+    ]);
+  });
+
+  it('pro_trial → past_due → pro: the failed charge, then the first payment once Stripe holds no earlier paid invoice (review C2)', async () => {
+    const { d, transport } = setup({ payment: async () => record({ invoice: unpaid(1900) }) });
+    expect(
+      await entitlementNotice(d, change('pro_trial', 'past_due', { id: id(ACCOUNT, 'evt_fail') })),
+    ).toBe('sent');
+    vi.mocked(d.payment).mockResolvedValue(record({ earlier: 'none' }));
+    expect(
+      await entitlementNotice(d, change('past_due', 'pro', { id: id(ACCOUNT, 'evt_paid') })),
+    ).toBe('sent');
+    expect(transport.sent.map((m) => m.subject)).toEqual([
+      'Payment failed: Pro',
+      'First payment: Pro',
+    ]);
+    expect(transport.sent[1]!.text).toContain('Amount: $19.00 paid');
+  });
+
+  it('past_due → pro after an earlier payment is a recovery: no instant notice, nothing claimed (review C2)', async () => {
+    for (const earlier of ['some', 'unknown'] as const) {
+      const { d, transport, rows } = setup({ payment: async () => record({ earlier }) });
+      expect(await entitlementNotice(d, change('past_due', 'pro'))).toBe('no_notice');
+      expect(transport.sent).toEqual([]);
+      expect(rows.size).toBe(0);
+    }
+    const unread = setup({
+      payment: async () => {
+        throw new Error('stripe down');
+      },
+    });
+    expect(await entitlementNotice(unread.d, change('past_due', 'agency'))).toBe('no_notice');
+    expect(unread.rows.size).toBe(0);
+  });
+
+  it('pro_trial → past_due → free → pro: the payment is the first when Stripe holds no earlier paid invoice (review C2)', async () => {
+    const { d, transport } = setup({ payment: async () => record({ earlier: 'none' }) });
+    await entitlementNotice(d, change('free', 'pro'));
+    expect(transport.sent.map((m) => m.subject)).toEqual(['First payment: Pro']);
+  });
+
+  it('the same from → to twice: each labelled by Stripe’s record when it is sent (review C2)', async () => {
+    const { d, transport } = setup({ payment: async () => record({ earlier: 'none' }) });
+    await entitlementNotice(d, change('free', 'pro', { id: id(ACCOUNT, 'evt_a') }));
+    vi.mocked(d.payment).mockResolvedValue(record({ earlier: 'some' }));
+    await entitlementNotice(d, change('free', 'pro', { id: id(ACCOUNT, 'evt_b') }));
+    expect(transport.sent.map((m) => m.subject)).toEqual([
+      'First payment: Pro',
+      'Payment (returning): Pro',
+    ]);
   });
 
   it('marks an internal account’s notice [TEST]', async () => {
@@ -266,14 +359,31 @@ describe('entitlementNotice', () => {
     for (let i = 0; i < FOUNDER_LIMIT + 5; i++)
       await entitlementNotice(d, change('free', 'pro_trial', { id: id(ACCOUNT, `evt_${i}`) }));
     expect(transport.sent).toHaveLength(FOUNDER_LIMIT);
-    expect((await digest(d)).overflow).toBe('sent');
+    expect((await digest(d, d.now())).overflow).toBe('sent');
     const notices = transport.sent.filter((m) => m.idempotencyKey.includes(':overflow:'));
     expect(notices.map((m) => [m.idempotencyKey, m.subject])).toEqual([
       ['founder_event:overflow:2026-11-13T15', '5 more notices in the last hour'],
     ]);
     // A second tick in the same hour sends nothing more.
-    expect((await digest(d)).overflow).toBe('done');
+    expect((await digest(d, d.now())).overflow).toBe('done');
     expect(transport.sent.filter((m) => m.subject.includes('more notice'))).toHaveLength(1);
+  });
+
+  it('D3’s bound is 20 an hour: of 21 notices, 20 are mailed and 1 is held', async () => {
+    const { d, transport, rows } = setup();
+    for (let i = 0; i < 21; i++)
+      await entitlementNotice(d, change('free', 'pro_trial', { id: id(ACCOUNT, `evt_${i}`) }));
+    expect(transport.sent).toHaveLength(20);
+    expect([...rows.values()].filter((r) => r.state === 'held')).toHaveLength(1);
+  });
+
+  it('a notice decided `send` and retried after FOUNDER_NOTIFY_TO was unset mails nothing and answers unconfigured', async () => {
+    const { d, transport } = setup({ transport: throwsOnce() });
+    await expect(entitlementNotice(d, change('free', 'pro_trial'))).rejects.toThrow(MailRetry);
+    expect(await entitlementNotice({ ...d, to: null }, change('free', 'pro_trial'))).toBe(
+      'unconfigured',
+    );
+    expect(transport.sent).toEqual([]);
   });
 
   it('an overflow notice retried after the transport threw is one notice with the same count', async () => {
@@ -287,10 +397,10 @@ describe('entitlementNotice', () => {
         change('free', 'pro_trial', { id: id(ACCOUNT, `evt_${i}`) }),
       );
     const d2: FounderDeps = { ...d, store: filled.store };
-    await expect(digest(d2)).rejects.toThrow(MailRetry);
+    await expect(digest(d2, d2.now())).rejects.toThrow(MailRetry);
     // A held notice arriving between the attempts goes to the next hour's notice.
     await entitlementNotice(filled.d, change('free', 'pro_trial', { id: id(ACCOUNT, 'evt_late') }));
-    expect((await digest(d2)).overflow).toBe('sent');
+    expect((await digest(d2, d2.now())).overflow).toBe('sent');
     expect(transport.sent.map((m) => m.subject)).toEqual(['3 more notices in the last hour']);
   });
 });
@@ -331,13 +441,44 @@ describe('sweep', () => {
       [`founder_event:agency:${ACCOUNT}`, 'Agency account created'],
       ['founder_event:cancel:sub_9:2026-11-13T14:30:00.000Z', 'Cancellation: Agency'],
     ]);
-    // Seven days back for sign-ups, at most 200; two hours back for the rest.
-    expect(store.unannouncedUsers).toHaveBeenCalledWith('2026-11-06T15:00:00.000Z', 200);
+    // Seven days back for sign-ups, at most 200 in the run's turn; two hours back for the rest.
+    // The rotation's turn is the run's five-minute tick: 2026-11-13T15:00Z / 5 min.
+    expect(store.unannouncedUsers).toHaveBeenCalledWith('2026-11-06T15:00:00.000Z', 200, 5_981_940);
     expect(store.agencyAccounts).toHaveBeenCalledWith('2026-11-13T13:00:00.000Z');
     expect(store.cancellations).toHaveBeenCalledWith('2026-11-13T13:00:00.000Z');
     // A second sweep over the same rows sends nothing more.
     await sweep(d);
     expect(transport.sent).toHaveLength(3);
+  });
+
+  it('keeps an internal account’s mark in each loop: [TEST] subjects, and stored internal so no digest counts them', async () => {
+    const { d, store, transport, rows } = setup();
+    const user = 'b0000000-0000-4000-8000-0000000000ff';
+    vi.mocked(store.unannouncedUsers).mockResolvedValue([
+      { userId: user, accountId: INTERNAL, createdAt: '2026-11-13T10:00:00.000Z' },
+    ]);
+    vi.mocked(store.agencyAccounts).mockResolvedValue([
+      { accountId: INTERNAL, createdAt: '2026-11-13T14:00:00.000Z' },
+    ]);
+    vi.mocked(store.cancellations).mockResolvedValue([
+      {
+        subscriptionId: 'sub_int',
+        accountId: INTERNAL,
+        plan: 'pro',
+        canceledAt: '2026-11-13T14:30:00.000Z',
+      },
+    ]);
+    await sweep(d);
+    expect(transport.sent.map((m) => m.subject)).toEqual([
+      '[TEST] New sign-up',
+      '[TEST] Agency account created',
+      '[TEST] Cancellation: Pro',
+    ]);
+    expect([...rows.values()].map((r) => [r.claim.kind, r.claim.internal])).toEqual([
+      ['signup', true],
+      ['agency_created', true],
+      ['cancellation', true],
+    ]);
   });
 
   it('logs unconfigured once for the whole run', async () => {
@@ -354,7 +495,7 @@ describe('digest', () => {
   it('on a Monday from 08:00 New York sends the daily and the weekly, each once', async () => {
     // 2026-11-02 08:07 EST, a Monday.
     const { d, transport, windows } = setup({ now: new Date('2026-11-02T13:07:00.000Z') });
-    expect(await digest(d)).toEqual({ daily: 'sent', weekly: 'sent', overflow: 'none' });
+    expect(await digest(d, d.now())).toEqual({ daily: 'sent', weekly: 'sent', overflow: 'none' });
     expect(transport.sent.map((m) => [m.idempotencyKey, m.subject, m.to])).toEqual([
       ['founder_digest:daily:2026-11-01', 'Crawlmouse daily: 2026-11-01', FOUNDER],
       ['founder_digest:weekly:2026-10-26', 'Crawlmouse weekly: week of 2026-10-26', FOUNDER],
@@ -365,19 +506,34 @@ describe('digest', () => {
       ['2026-10-19T04:00:00.000Z', '2026-10-26T04:00:00.000Z'],
     ]);
     // The next hour's tick finds both sent and reads no counts.
-    expect(await digest(d)).toEqual({ daily: 'done', weekly: 'done', overflow: 'none' });
+    expect(await digest(d, d.now())).toEqual({ daily: 'done', weekly: 'done', overflow: 'none' });
     expect(windows).toHaveLength(3);
+  });
+
+  it('keys the overflow notice by the tick’s time, not by the time of the attempt (review C6)', async () => {
+    // The attempt runs at 16:01, a retry of the 15:07 tick: the notice is still 15:00's.
+    const { d, transport } = setup({ now: new Date('2026-11-13T16:01:00.000Z') });
+    const tick = new Date('2026-11-13T15:07:00.000Z');
+    for (let i = 0; i < 22; i++)
+      await entitlementNotice(
+        { ...d, now: () => tick },
+        change('free', 'pro_trial', { id: id(ACCOUNT, `evt_${i}`) }),
+      );
+    expect((await digest(d, tick)).overflow).toBe('sent');
+    expect(
+      transport.sent.filter((m) => m.subject.includes('more notice')).map((m) => m.idempotencyKey),
+    ).toEqual(['founder_event:overflow:2026-11-13T15']);
   });
 
   it('sends nothing before 08:00 New York, and nothing at all unconfigured', async () => {
     const early = setup({ now: new Date('2026-11-02T12:59:00.000Z') });
-    expect(await digest(early.d)).toEqual({
+    expect(await digest(early.d, early.d.now())).toEqual({
       daily: 'not_due',
       weekly: 'not_due',
       overflow: 'none',
     });
     const off = setup({ to: null, now: new Date('2026-11-02T13:07:00.000Z') });
-    expect(await digest(off.d)).toEqual({
+    expect(await digest(off.d, off.d.now())).toEqual({
       daily: 'unconfigured',
       weekly: 'unconfigured',
       overflow: 'unconfigured',

@@ -32,7 +32,7 @@ export type FounderDigestInput =
   | { variant: 'weekly'; monday: string; week: DigestCounts; previous: DigestCounts };
 
 const SCOPE =
-  'Internal accounts are left out of the sign-up, trial, payment, cancellation and check figures. The mail figures name an address, not an account, so they include internal mail.';
+  'Internal accounts are left out of the sign-up, trial, payment, cancellation, check and send-failure figures; the send failures also leave out these notices’ own mail. The two bounce figures count addresses, not accounts, so they include internal accounts’ mail.';
 const WHY =
   'Sent to the founder address set in FOUNDER_NOTIFY_TO once a day, from 08:00 New York time.';
 

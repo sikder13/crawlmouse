@@ -20,7 +20,7 @@ const event = (over: Partial<FounderEventInput> = {}): FounderEventInput => ({
   accountId: ACCOUNT,
   plan: 'pro',
   payment: 'first',
-  amount: { minor: 1900, currency: 'usd' },
+  amount: { minor: 1900, currency: 'usd', status: 'paid' },
   host: 'shop.example',
   ownerEmail: OWNER,
   occurredAt: '2026-11-13T12:00:00.000Z',
@@ -66,11 +66,25 @@ describe('founderEvent', () => {
     expect(founderEvent(event({ payment: 'unknown' })).subject).toBe('Payment: Pro');
   });
 
+  it('says whether Stripe’s invoice is paid: paid, or due and not yet paid with its status (review C3)', () => {
+    expect(founderEvent(event()).text).toContain('Amount: $19.00 paid');
+    for (const status of ['open', 'draft'] as const) {
+      const text = founderEvent(event({ amount: { minor: 1900, currency: 'usd', status } })).text;
+      expect(text).toContain(`Amount: $19.00 due, not yet paid (Stripe invoice status: ${status})`);
+      expect(text).not.toContain('$19.00 paid');
+    }
+    expect(
+      founderEvent(event({ amount: { minor: 1900, currency: 'usd', status: null } })).text,
+    ).toContain('Amount: $19.00 due, not yet paid (Stripe invoice status: not given)');
+  });
+
   it('shows an amount only for payments, and says when Stripe’s was not read', () => {
     expect(founderEvent(event({ kind: 'signup', plan: null })).text).not.toContain('Amount');
     expect(founderEvent(event({ amount: null })).text).toContain('Amount: not read from Stripe');
     expect(
-      founderEvent(event({ kind: 'payment_failed', amount: { minor: 1.5, currency: 'usd' } })).text,
+      founderEvent(
+        event({ kind: 'payment_failed', amount: { minor: 1.5, currency: 'usd', status: 'open' } }),
+      ).text,
     ).toContain('Amount: not read from Stripe');
   });
 

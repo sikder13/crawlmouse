@@ -26,11 +26,20 @@ export const FOUNDER_EVENT_KINDS = [
 ] as const;
 export type FounderEventKind = (typeof FOUNDER_EVENT_KINDS)[number];
 
+/** Stripe's invoice statuses (the `Invoice.Status` of the stripe package's types). */
+export const STRIPE_INVOICE_STATUSES = ['draft', 'open', 'paid', 'uncollectible', 'void'] as const;
+export type StripeInvoiceStatus = (typeof STRIPE_INVOICE_STATUSES)[number];
+
 export interface FounderAmount {
-  /** Stripe's figure, in the currency's minor units (cents for USD). */
+  /**
+   * Stripe's figure, in the currency's minor units (cents for USD): the invoice's `amount_paid` when
+   * its status is `paid`, its `amount_due` otherwise.
+   */
   minor: number;
   /** Stripe's lower-case ISO 4217 code. */
   currency: string;
+  /** The invoice's status as Stripe gives it; null when Stripe gives none. */
+  status: StripeInvoiceStatus | null;
 }
 
 export interface FounderEventInput {
@@ -41,7 +50,7 @@ export interface FounderEventInput {
   plan: 'pro' | 'agency' | null;
   /** For a payment: whether the account had paid before; `unknown` when its history did not say. */
   payment?: 'first' | 'returning' | 'unknown';
-  /** For a payment or a failed one: Stripe's figure, or null when it was not read. */
+  /** For a payment or a failed one: Stripe's figure and the invoice's status, or null when not read. */
   amount?: FounderAmount | null;
   /** The account's first site, or null when it has none. */
   host: string | null;
@@ -89,7 +98,7 @@ export function eventWords(kind: FounderEventKind, payment?: FounderEventInput['
  * Stripe's minor units in the currency's own format, or null for a figure that is not a whole number
  * or a code that is not three lower-case letters (Stripe's spelling) or that `Intl` refuses.
  */
-export function amountText(amount: FounderAmount): string | null {
+export function amountText(amount: Pick<FounderAmount, 'minor' | 'currency'>): string | null {
   if (!Number.isSafeInteger(amount.minor) || !/^[a-z]{3}$/.test(amount.currency)) return null;
   try {
     const format = new Intl.NumberFormat('en-US', {
@@ -103,6 +112,20 @@ export function amountText(amount: FounderAmount): string | null {
   }
 }
 
+/**
+ * The amount line: Stripe's figure and whether it is paid. An invoice that is not `paid` shows its
+ * amount due, said to be unpaid, with Stripe's status.
+ */
+function moneyLine(amount: FounderAmount | null | undefined): string {
+  const text = amount ? amountText(amount) : null;
+  if (!amount || text === null) return 'Amount: not read from Stripe';
+  if (amount.status === 'paid') return `Amount: ${text} paid`;
+  const status = (STRIPE_INVOICE_STATUSES as readonly unknown[]).includes(amount.status)
+    ? amount.status
+    : 'not given';
+  return `Amount: ${text} due, not yet paid (Stripe invoice status: ${status})`;
+}
+
 /** The console link for an account id, or null for none or one that is not an id. */
 const accountUrl = (id: string | null): string | null =>
   id !== null && UUID.test(id) ? internalAccountUrl(id) : null;
@@ -112,9 +135,7 @@ export const founderEvent: Template<FounderEventInput> = (input) => {
   const plan = input.plan === null ? null : PLAN_WORDS[input.plan];
   const headline = plan === null ? words : `${words}: ${plan}`;
   const money =
-    input.kind === 'payment' || input.kind === 'payment_failed'
-      ? `Amount: ${(input.amount && amountText(input.amount)) ?? 'not read from Stripe'}`
-      : null;
+    input.kind === 'payment' || input.kind === 'payment_failed' ? moneyLine(input.amount) : null;
   const lines = [
     ...(money === null ? [] : [money]),
     `Site: ${input.host === null ? 'none yet' : hostText(input.host)}`,

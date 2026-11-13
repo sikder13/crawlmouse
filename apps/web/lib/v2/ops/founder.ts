@@ -4,9 +4,9 @@
  *   entitlementNotice  one `entitlement.changed` event: a trial started, a payment or a failed one
  *                      (founder-classify.ts); key `entitlement:<event id>`
  *   sweep              sign-ups confirmed (users of the last 7 days not yet announced, at most 200 a
- *                      run, oldest first), agency accounts created and subscriptions canceled in the
- *                      last 2 hours; keys `signup:<user>`, `agency:<account>`,
- *                      `cancel:<subscription>:<canceled_at>`
+ *                      run, in a rotation whose turn is the run's five-minute tick), agency accounts
+ *                      created and subscriptions canceled in the last 2 hours; keys `signup:<user>`,
+ *                      `agency:<account>`, `cancel:<subscription>:<canceled_at>`
  *   digest             the daily and weekly digests when due (digest-clock.ts), and the "N more"
  *                      notice for the notices held over the hour's bound
  *
@@ -27,12 +27,14 @@ import { founderDigest } from '../mail/templates/founder-digest';
 import {
   founderEvent,
   founderOverflow,
+  STRIPE_INVOICE_STATUSES,
   type FounderAmount,
   type FounderEventInput,
   type FounderEventKind,
+  type StripeInvoiceStatus,
 } from '../mail/templates/founder-event';
 import { digestDue } from './digest-clock';
-import { classifyEntitlement } from './founder-classify';
+import { classifyEntitlement, paymentLabel, type PaymentRecord } from './founder-classify';
 import type { FounderStore, NoticeAccount } from './founder-store';
 
 /** Instant notices of one kind of account (internal or not) mailed in an hour before the rest are held. */
@@ -42,6 +44,8 @@ export const OVERFLOW_ROWS = 50;
 /** Sign-ups the sweep reads a run, and how far back. */
 export const SIGNUP_BATCH = 200;
 export const SIGNUP_LOOKBACK_MS = 7 * 24 * 3_600_000;
+/** The sweep's cron period (inngest/founder.ts, every five minutes): the sign-up rotation's turn. */
+export const SWEEP_EVERY_MS = 5 * 60_000;
 /** How far back the sweep reads agency accounts and cancellations. */
 export const SWEEP_LOOKBACK_MS = 2 * 3_600_000;
 /** The longest notice key: the mail ledger's 200 less `founder_event:`. */
@@ -56,17 +60,27 @@ export type FounderLogEvent =
   | 'founder.key_refused'
   | 'founder.confirmation_unread';
 
-export interface LatestInvoice {
-  amountPaid: number;
-  amountDue: number;
-  currency: string;
+export type { PaymentRecord };
+type InvoiceFacts = NonNullable<PaymentRecord['invoice']>;
+
+/**
+ * The amount a notice shows (review C3): `amount_paid` from a paid invoice, else `amount_due` with
+ * the invoice's status, so an invoice Stripe has not charged yet is not shown as a payment of 0.
+ */
+export function amountOf(inv: InvoiceFacts): FounderAmount {
+  const status = (STRIPE_INVOICE_STATUSES as readonly (string | null)[]).includes(inv.status)
+    ? (inv.status as StripeInvoiceStatus)
+    : null;
+  return status === 'paid'
+    ? { minor: inv.amountPaid, currency: inv.currency, status }
+    : { minor: inv.amountDue, currency: inv.currency, status };
 }
 
 export interface FounderDeps {
   mail: MailDeps;
   store: FounderStore;
-  /** The followed subscription's latest invoice from Stripe; null when it has none. */
-  latestInvoice(subscriptionId: string): Promise<LatestInvoice | null>;
+  /** Stripe's record of the followed subscription's payment; throws when Stripe cannot be read. */
+  payment(subscriptionId: string): Promise<PaymentRecord>;
   /** Whether Supabase Auth shows the user's address confirmed. */
   confirmed(userId: string): Promise<boolean>;
   /** FOUNDER_NOTIFY_TO as set, unchecked. */
@@ -91,8 +105,7 @@ interface Notice {
   occurredAt: string;
   plan: FounderEventInput['plan'];
   payment?: FounderEventInput['payment'];
-  /** Read when the mail is rendered, after the ledger's claim. */
-  amount?: () => Promise<FounderAmount | null>;
+  amount?: FounderAmount | null;
 }
 
 export type NoticeOutcome = 'held' | 'skipped' | 'key_refused' | SendOutcome;
@@ -129,7 +142,7 @@ async function notify(d: FounderDeps, to: string | null, n: Notice): Promise<Not
         accountId: n.accountId,
         plan: n.plan,
         payment: n.payment,
-        amount: n.amount === undefined ? undefined : await n.amount(),
+        amount: n.amount,
         host: n.account?.host ?? null,
         ownerEmail: n.account?.ownerEmail ?? null,
         occurredAt: n.occurredAt,
@@ -146,10 +159,15 @@ export interface EntitlementEvent {
   occurredAt: string;
 }
 
+/**
+ * A payment's notice reads Stripe before its claim: the label (first, returning or neither) and the
+ * amount are Stripe's. A recovery from past_due is noticed when it is a first payment; when it is not,
+ * or Stripe cannot be read, it answers `no_notice` and claims nothing.
+ */
 export async function entitlementNotice(
   d: FounderDeps,
   ev: EntitlementEvent,
-): Promise<NoticeOutcome | 'event_id_refused' | 'digest_only'> {
+): Promise<NoticeOutcome | 'event_id_refused' | 'no_notice'> {
   if (
     ev.id === undefined ||
     !ENTITLEMENT_ID.test(ev.id) ||
@@ -158,26 +176,20 @@ export async function entitlementNotice(
     d.log('founder.event_id_refused', { length: ev.id?.length ?? 0 });
     return 'event_id_refused';
   }
+  const c = classifyEntitlement(ev.from, ev.to);
+  if (c === null) return 'no_notice';
   const account = await d.store.account(ev.accountId);
-  const c = classifyEntitlement(ev.from, ev.to, account?.history ?? []);
-  if (c === null) return 'digest_only';
   const subscriptionId = account?.subscriptionId ?? null;
-  const amount =
-    c.kind === 'trial_started'
-      ? undefined
-      : async (): Promise<FounderAmount | null> => {
-          if (subscriptionId === null) return null;
-          try {
-            const inv = await d.latestInvoice(subscriptionId);
-            if (inv === null) return null;
-            return {
-              minor: c.kind === 'payment' ? inv.amountPaid : inv.amountDue,
-              currency: inv.currency,
-            };
-          } catch {
-            return null;
-          }
-        };
+  let record: PaymentRecord | null = null;
+  if (c.kind !== 'trial_started' && subscriptionId !== null) {
+    try {
+      record = await d.payment(subscriptionId);
+    } catch {
+      record = null;
+    }
+  }
+  const payment = c.kind === 'payment' ? paymentLabel(record) : undefined;
+  if (c.kind === 'payment' && c.recovery && payment !== 'first') return 'no_notice';
   return notify(d, recipient(d), {
     key: `entitlement:${ev.id}`,
     kind: c.kind,
@@ -185,8 +197,9 @@ export async function entitlementNotice(
     account,
     occurredAt: ev.occurredAt,
     plan: c.plan,
-    payment: c.kind === 'payment' ? c.payment : undefined,
-    amount,
+    payment,
+    amount:
+      c.kind === 'trial_started' ? undefined : record?.invoice ? amountOf(record.invoice) : null,
   });
 }
 
@@ -201,7 +214,7 @@ const tally = (into: Record<string, number>, outcome: string) => {
 };
 
 /**
- * Sign-ups confirmed since the sign-up look-back (at most SIGNUP_BATCH a run), then agency accounts
+ * Sign-ups confirmed since the sign-up look-back (SIGNUP_BATCH a run, in the rotation), then agency accounts
  * created and subscriptions canceled since the sweep look-back, at the period's end or at once.
  */
 export async function sweep(d: FounderDeps): Promise<SweepOutcome> {
@@ -212,6 +225,7 @@ export async function sweep(d: FounderDeps): Promise<SweepOutcome> {
   const users = await d.store.unannouncedUsers(
     new Date(now - SIGNUP_LOOKBACK_MS).toISOString(),
     SIGNUP_BATCH,
+    Math.floor(now / SWEEP_EVERY_MS),
   );
   for (const u of users) {
     let confirmed: boolean;
@@ -275,12 +289,15 @@ export interface DigestOutcome {
   overflow: SendOutcome | 'none' | 'unconfigured';
 }
 
-/** The digests that are due, and the "N more" notice when notices are held. */
-export async function digest(d: FounderDeps): Promise<DigestOutcome> {
+/**
+ * The digests due at `at`, the tick's time, and the "N more" notice when notices are held. The keys
+ * are built from `at` (`digestDue`), so a retry of the tick keeps them (review C6).
+ */
+export async function digest(d: FounderDeps, at: Date): Promise<DigestOutcome> {
   const to = recipient(d);
   if (to === null)
     return { daily: 'unconfigured', weekly: 'unconfigured', overflow: 'unconfigured' };
-  const due = digestDue(d.now());
+  const due = digestDue(at);
   const mail = (key: string, render: () => Promise<ReturnType<typeof founderDigest>>) =>
     send(d.mail, { kind: 'founder_digest', to, idempotencyKey: key, accountId: null, render });
 

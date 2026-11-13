@@ -260,6 +260,67 @@ describe('take_founder_overflow', () => {
     expect(t.rows).toHaveLength(2);
   });
 
+  it('lists the oldest held rows first and keeps the oldest when it bounds them', async () => {
+    await take(`overflow:clear-${randomUUID()}`);
+    const now = '2027-10-01T10:00:00.000Z';
+    for (const k of keys('ovo-fill', LIMIT)) await claim({ key: k, now });
+    const byMinute: Record<string, string> = {};
+    for (const minute of ['03', '01', '04', '02']) {
+      byMinute[minute] = randomUUID();
+      expect(
+        await claim({
+          key: keys(`ovo-${minute}`, 1)[0]!,
+          account: byMinute[minute],
+          occurred: `2027-10-01T09:${minute}:00.000Z`,
+          now,
+        }),
+      ).toBe('held');
+    }
+    const t = await take(`overflow:${randomUUID()}`, 2);
+    expect(t.total).toBe(4);
+    expect(t.rows.map((r) => r.account_id)).toEqual([byMinute['01'], byMinute['02']]);
+  });
+
+  it('re-takes the rows of a notice whose mail gave up, and no other key’s (review C6)', async () => {
+    await take(`overflow:clear-${randomUUID()}`);
+    const now = '2027-11-01T10:00:00.000Z';
+    for (const k of keys('ovx-fill', LIMIT)) await claim({ key: k, now });
+    // The ledger row of a notice's mail; the rule reads its key, status and attempts, not its kind.
+    const ledger = (overflowKey: string, status: string, attempts: number) =>
+      db.query(
+        `insert into public.email_sends (idempotency_key, kind, address_hash, status, attempts,
+                                         claimed_at, sent_at, updated_at)
+         values ($1, 'alert', $2, $3, $4, $5, case when $3 = 'sent' then $5::timestamptz end, $5)`,
+        [
+          `founder_event:${overflowKey}`,
+          randomUUID().replace(/-/g, '').padEnd(64, '0'),
+          status,
+          attempts,
+          now,
+        ],
+      );
+    // Three notices take their rows first; then their mails' ledger rows say how each ended.
+    const heldUnder = async (tag: string, n: number) => {
+      const account = randomUUID();
+      for (const k of keys(tag, n)) expect(await claim({ key: k, account, now })).toBe('held');
+      const key = `overflow:${randomUUID()}`;
+      expect((await take(key)).total).toBe(n);
+      return { account, key };
+    };
+    const gaveUp = await heldUnder('ovx-gave-up', 2);
+    const retrying = await heldUnder('ovx-retrying', 1);
+    const sent = await heldUnder('ovx-sent', 1);
+    await ledger(gaveUp.key, 'failed', 3);
+    await ledger(retrying.key, 'failed', 1);
+    await ledger(sent.key, 'sent', 1);
+    const exhausted = gaveUp.account;
+    const fresh = randomUUID();
+    expect(await claim({ key: keys('ovx-new', 1)[0]!, account: fresh, now })).toBe('held');
+    const next = await take(`overflow:${randomUUID()}`);
+    expect(next.total).toBe(3);
+    expect(next.rows.map((r) => r.account_id).sort()).toEqual([exhausted, exhausted, fresh].sort());
+  });
+
   it('refuses a key that is not an overflow key', async () => {
     await expect(take('signup:x')).rejects.toThrow(/an overflow key/);
   });
@@ -432,42 +493,135 @@ describe('founder_digest_counts', () => {
   });
 });
 
+describe('founder_digest_counts, send failures (review C5)', () => {
+  it('leaves out an internal account’s failed send and the founder notices’ own', async () => {
+    // §K adds the founder kinds to email_sends' kind check; until then this database widens it.
+    await db.query(
+      'alter table public.email_sends drop constraint if exists email_sends_kind_check',
+    );
+    const at = '2031-02-05T12:00:00.000Z';
+    const account = async (internal: boolean) => {
+      const { accountId } = await personalAccount(
+        db,
+        await signUp(db, `fail-${randomUUID()}@example.com`),
+      );
+      await db.query('update public.accounts set internal = $2 where id = $1', [
+        accountId,
+        internal,
+      ]);
+      return accountId;
+    };
+    const failed = (kind: string, accountId: string | null) =>
+      db.query(
+        `insert into public.email_sends (idempotency_key, kind, address_hash, account_id, status, attempts,
+                                         error_code, claimed_at, updated_at)
+         values ($1, $2, $3, $4, 'failed', 3, 'network', $5, $5)`,
+        [
+          `fail:${randomUUID()}`,
+          kind,
+          randomUUID().replace(/-/g, '').padEnd(64, '0'),
+          accountId,
+          at,
+        ],
+      );
+    await failed('alert', await account(false));
+    await failed('check_notify', null);
+    await failed('alert', await account(true));
+    await failed('founder_event', null);
+    await failed('founder_digest', null);
+    const c = await asRole(db, 'service_role', null, async (tx) => {
+      const { rows } = await tx.query<{ c: Record<string, number> }>(
+        'select public.founder_digest_counts($1, $2) as c',
+        ['2031-02-05T05:00:00.000Z', '2031-02-06T05:00:00.000Z'],
+      );
+      return rows[0]!.c;
+    });
+    // A customer's failed send and one that names no account; not staff's, not the founder's.
+    expect(c.mail_send_failures).toBe(2);
+  });
+});
+
 describe('signin_delivery_seen', () => {
-  const seen = (address: string, since: string) =>
+  const SENDER = ['magic', 'crawlmouse.com'].join('@');
+  const seen = (address: string, since: string, sender = SENDER) =>
     asRole(db, 'service_role', null, async (tx) => {
       const { rows } = await tx.query<{ s: boolean }>(
-        'select public.signin_delivery_seen($1, $2) as s',
-        [address, since],
+        'select public.signin_delivery_seen($1, $2, $3) as s',
+        [address, sender, since],
       );
       return rows[0]!.s;
     });
-  const event = (address: string, type: string, at: string) =>
+  /** An email_events row as the Resend webhook stores it: the event whole in `payload`. */
+  const event = (
+    address: string,
+    type: string,
+    rowAt: string,
+    data: { from?: string; created_at?: string } = {},
+  ) =>
     db.query(
-      'insert into public.email_events (email_address, event_type, created_at) values ($1, $2, $3)',
-      [address, type, at],
+      'insert into public.email_events (email_address, event_type, created_at, payload) values ($1, $2, $3, $4)',
+      [address, type, rowAt, JSON.stringify({ type: `email.${type}`, created_at: rowAt, data })],
     );
+  const canary = () => `canary-${randomUUID().slice(0, 8)}@example.test`;
+  const AT = '2026-11-13T12:00:00.000Z';
+  const mailAt = (ms: number) => new Date(Date.parse(AT) + ms).toISOString();
 
   it('is executable by service_role only', async () => {
     await expect(
       asRole(db, 'authenticated', randomUUID(), (tx) =>
-        tx.query("select public.signin_delivery_seen('a@example.com', now())"),
+        tx.query("select public.signin_delivery_seen('a@example.com', 'b@example.com', now())"),
       ),
     ).rejects.toThrow(/permission denied/);
   });
 
-  it('answers whether a delivery to the address, in any case, was recorded at or after the time', async () => {
-    const local = `canary-${randomUUID().slice(0, 8)}`;
-    const address = `${local}@example.test`;
-    const at = '2026-11-13T12:00:00.000Z';
-    expect(await seen(address, at)).toBe(false);
-    // A delivery before the time, a sent event at it, and a delivery to another address do not count.
-    await event(address, 'delivered', '2026-11-13T11:59:59.999Z');
-    await event(address, 'sent', at);
-    await event(`x${address}`, 'delivered', at);
-    expect(await seen(address, at)).toBe(false);
-    await event(address.toUpperCase(), 'delivered', at);
-    expect(await seen(address, at)).toBe(true);
-    expect(await seen(address.toUpperCase(), at)).toBe(true);
+  it('answers whether the sign-in mail to the address, in any case, was delivered for this request', async () => {
+    const address = canary();
+    expect(await seen(address, AT)).toBe(false);
+    // A sent event, and a delivery to another address, do not count.
+    await event(address, 'sent', AT, { from: SENDER, created_at: mailAt(1000) });
+    await event(`x${address}`, 'delivered', AT, { from: SENDER, created_at: mailAt(1000) });
+    expect(await seen(address, AT)).toBe(false);
+    await event(address.toUpperCase(), 'delivered', mailAt(5000), {
+      from: `Crawlmouse <${SENDER.toUpperCase()}>`,
+      created_at: mailAt(1000),
+    });
+    expect(await seen(address, AT)).toBe(true);
+    expect(await seen(address.toUpperCase(), AT)).toBe(true);
+  });
+
+  it('does not count another sender’s delivery to the address (review Q17)', async () => {
+    const address = canary();
+    await event(address, 'delivered', mailAt(5000), {
+      from: `Someone <${['news', 'example.test'].join('@')}>`,
+      created_at: mailAt(1000),
+    });
+    // The sender's address must be the whole of `from`'s address, not a part of it.
+    await event(address, 'delivered', mailAt(5000), {
+      from: `x${SENDER}`,
+      created_at: mailAt(1000),
+    });
+    expect(await seen(address, AT)).toBe(false);
+    await event(address, 'delivered', mailAt(5000), { from: SENDER, created_at: mailAt(1000) });
+    expect(await seen(address, AT)).toBe(true);
+  });
+
+  it('does not count an earlier mail delivered late, by the mail’s own time (review Q17)', async () => {
+    const address = canary();
+    // The run before's mail, created 10 minutes before this request, delivered after it.
+    await event(address, 'delivered', mailAt(30_000), {
+      from: SENDER,
+      created_at: mailAt(-10 * 60_000),
+    });
+    // A delivery event that carries no mail time, or one not shaped as a time, is not counted either.
+    await event(address, 'delivered', mailAt(30_000), { from: SENDER });
+    await event(address, 'delivered', mailAt(30_000), { from: SENDER, created_at: 'soon' });
+    expect(await seen(address, AT)).toBe(false);
+    // A mail created within a minute before the request time is this request's (clock difference).
+    await event(address, 'delivered', mailAt(30_000), {
+      from: SENDER,
+      created_at: mailAt(-30_000),
+    });
+    expect(await seen(address, AT)).toBe(true);
   });
 });
 
@@ -495,4 +649,19 @@ describe('the migration and its revert', () => {
       await d.close();
     }
   }, 300_000);
+});
+
+// Last in the file: its rows are later than every other test's, and the bound counts every row created
+// after the hour's start, so a later row would count against an earlier test's claims.
+describe('claim_founder_notice, held rows', () => {
+  it('counts only `send` rows against the bound: held rows in the hour do not hold the next notice', async () => {
+    for (const k of keys('sendonly', LIMIT))
+      expect(await claim({ key: k, now: '2032-09-01T10:00:00.000Z' })).toBe('send');
+    for (const k of keys('sendonly-held', LIMIT))
+      expect(await claim({ key: k, now: '2032-09-01T10:30:00.000Z' })).toBe('held');
+    // The 10:00 sends are out of the hour; the 10:30 held rows are in it, and count for nothing.
+    expect(
+      await claim({ key: keys('sendonly-next', 1)[0]!, now: '2032-09-01T11:00:01.000Z' }),
+    ).toBe('send');
+  });
 });
