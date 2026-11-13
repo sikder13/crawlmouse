@@ -28,8 +28,14 @@ export type Cadence = (typeof CADENCES)[number];
 
 // ─── bodies ──────────────────────────────────────────────────────────────────────────────────────
 
-/** Whether the runtime knows `zone` as a time zone (an IANA name, or UTC). */
+/**
+ * Whether `zone` is a named time zone the runtime knows (an IANA name, or UTC). An offset such as
+ * `+05:00` is not taken, though `Intl` knows it: `Intl` reads it as east of UTC and Postgres, in
+ * `AT TIME ZONE`, as west, so a schedule saved with one would run ten hours off. A name Postgres
+ * does not know is refused by `set_report_schedule` (22023).
+ */
 function isTimeZone(zone: string): boolean {
+  if (!/^[A-Za-z]/.test(zone)) return false;
   try {
     new Intl.DateTimeFormat('en', { timeZone: zone });
     return true;

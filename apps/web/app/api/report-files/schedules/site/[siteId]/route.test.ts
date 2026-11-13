@@ -354,6 +354,8 @@ describe('PUT and DELETE …/schedules/site/[siteId]', () => {
       { ...WEEKLY, isoWeekday: 8 },
       { ...WEEKLY, timeLocal: '9am' },
       { ...WEEKLY, timezone: 'Mars/Olympus' },
+      // An offset: Intl reads it east of UTC and Postgres west.
+      { ...WEEKLY, timezone: '+05:00' },
       { ...WEEKLY, openTracking: true },
       { ...WEEKLY, siteId: randomUUID() },
     ]) {
