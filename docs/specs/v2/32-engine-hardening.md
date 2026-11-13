@@ -174,10 +174,11 @@ in an allowlisted file.
 **Acting on.** _Q5:_ the printers are `points`, `fixFirstBody`, `restPoints` (the "N more" row) in
 `result.ts`, and `effectOf`, `proPoints` and `groupPoints` in `segment/fixes.ts`. The grouped "N
 more" row has its own short rule, so it reads as the locked Final-Result does ("+5 SEO"): first what
-the group adds up to (Technical SEO and AI points, each member taken at 0, a known Technical SEO sum
-shown beside unknown ones, and the pages line), or "SEO not estimated" when no member's Technical SEO
-is estimated and nothing else adds up; with nothing of that, "AI not yet estimated for N"; otherwise
-"No measurable effect". So a pages-headed fix is never counted as waiting there.
+the group adds up to (Technical SEO and AI points, a member counted as 0 when its effect is below 0 or
+not estimated, a known Technical SEO sum shown beside unknown ones, and the pages line), or "SEO not
+estimated" when no member's Technical SEO is estimated and nothing else adds up; with nothing of that,
+"AI not yet estimated for N"; otherwise "SEO not estimated" when a member's Technical SEO effect is not
+estimated, and "No measurable effect" only when every member's is. So a pages-headed fix is never counted as waiting there.
 
 **Known gaps.** A minted report snapshot keeps the text it was minted with. Screens whose fixtures print
 a group of zero effects now read "No measurable effect" where they read "+0 …"; their visual baselines

@@ -193,8 +193,8 @@ describe('where the markers are not read (review B2)', () => {
   });
 
   it('reads an assignment after a string that holds an escaped quote', () => {
-    // The string ends at its last quote: an escaped one inside it does not end it, so the code after
-    // it is read as code.
+    // The string ends at its first unescaped quote: an escaped one inside it does not end it, so the
+    // code after it is read as code.
     const script = String.raw`<script>var s = "say \"hi\" to Shopify.theme"; Shopify.theme = {};</script>`;
     expect(markersOf(page(script))).toEqual(['shopify_theme_object']);
     const single = String.raw`<script>var s = 'it\'s'; Shopify.theme = {};</script>`;
