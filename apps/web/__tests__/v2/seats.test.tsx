@@ -141,6 +141,25 @@ describe('seatsView: an Agency account read by its owner (Northwind)', () => {
     expect(seatsView(d, viewer, { seatLimit: 5, billing: true }).buy).not.toBeNull();
   });
 
+  it('a seat whose only client was removed covers none, and says so; the others count the clients still there', () => {
+    const p = SEATS_PREVIEWS[OWNER];
+    const d = p.data();
+    const base = seatsView(d, p.viewer(), { seatLimit: 5, billing: false });
+    expect(base.people.rows.map((r) => r.clients)).toEqual([
+      'all 2',
+      '1 · granitepeak.example',
+      '1 · harborlight.example',
+      'all 2',
+    ]);
+    // The account's live sites without granitepeak: its seat_sites rows stay, as a removal leaves them.
+    const removed = { ...d, sites: d.sites.filter((x) => x.host !== 'granitepeak.example') };
+    expect(
+      seatsView(removed, p.viewer(), { seatLimit: 5, billing: false }).people.rows.map(
+        (r) => r.clients,
+      ),
+    ).toEqual(['all 1', 'none', '1 · harborlight.example', 'all 1']);
+  });
+
   it('takes the seat limit it is given over the account’s own, and leaves the buy form out with billing off', () => {
     const p = SEATS_PREVIEWS[OWNER];
     const full = seatsView(p.data(), p.viewer(), { seatLimit: 4, billing: false });

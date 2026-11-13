@@ -142,12 +142,18 @@ function fields(sites: readonly Site[], role: string, scope: Seat['client_scope'
   };
 }
 
-/** "all 12", or the count and the first two hosts of the clients a scoped seat covers. */
+/**
+ * "all 12", or the count and the first two hosts of the clients a scoped seat covers. The clients
+ * counted and named are the account's live ones: a removed site stays in the seat's scope rows and
+ * is not a client the seat covers, so a seat whose clients were all removed reads "none".
+ */
 function clientsCell(scope: Seat['client_scope'], sites: readonly Site[]): string {
   if (scope === 'all') return `all ${count(sites.length)}`;
-  const [first, second, ...more] = sites.filter((s) => scope.includes(s.id)).map((s) => s.host);
+  const covered = sites.filter((s) => scope.includes(s.id)).map((s) => s.host);
+  if (covered.length === 0) return COPY.noClients;
+  const [first, second, ...more] = covered;
   const shown = [first, second].filter((h) => h !== undefined).join(', ');
-  return `${count(scope.length)} · ${shown}${more.length > 0 ? ', …' : ''}`;
+  return `${count(covered.length)} · ${shown}${more.length > 0 ? ', …' : ''}`;
 }
 
 /** "owner, 2 account managers, 1 developer": the owner unnumbered, the other roles counted. */

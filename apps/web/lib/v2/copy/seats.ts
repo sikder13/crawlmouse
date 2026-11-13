@@ -52,6 +52,8 @@ export const SEATS_COPY = {
   no: 'no',
   /** FACTS-proposed.md, "Other copy changes named by R7", the Ag-Seats row (ARCH-2 q12). */
   mailNote: 'An invitation is the sign-in email with one extra line; nothing else is sent.',
+  /** The Clients cell of a seat that covers no live client. */
+  noClients: 'none',
   /** Ends the foot's price in an Agency trial, where extras cannot be bought yet. */
   onceTrialEnds: ', once the trial has become the plan',
   form: {
