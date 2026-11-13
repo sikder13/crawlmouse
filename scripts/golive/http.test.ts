@@ -258,3 +258,54 @@ describe('a token is found encoded, not only as written (review r2 N-a)', () => 
     expect(refusal(ENV_T, 'GET', h, spaced)).toMatch(/FLY_READ_TOKEN in a header/);
   });
 });
+
+describe('query values and headers are pinned (review r2 N-b)', () => {
+  it.each([
+    ['another team', `${ENV}?teamId=team_other`],
+    ['a value carrying ;decrypt', `${ENV}?teamId=${T};decrypt=true`],
+    ['two teamIds, one other', `${ENV}?teamId=${T}&teamId=team_other`],
+    ['a lookup key outside the catalog', 'https://api.stripe.com/v1/prices?lookup_keys[]=other'],
+    ['a limit that is not a number', 'https://api.stripe.com/v1/prices?limit=all'],
+    ['a limit above 100', 'https://api.stripe.com/v1/prices?limit=1000'],
+    ['a prototype name', `${ENV}?constructor=x`],
+    ['__proto__', `${ENV}?__proto__=x`],
+  ])('refuses %s', (_label, url) => {
+    expect(refusal(url, 'GET')).toMatch(/query parameter/);
+  });
+
+  it('allows the pinned values', () => {
+    const key = Object.keys(CATALOG)[0]!;
+    expect(refusal(ENV_T, 'GET')).toBeNull();
+    expect(
+      refusal(`https://api.stripe.com/v1/prices?lookup_keys[]=${key}&limit=100`, 'GET'),
+    ).toBeNull();
+  });
+
+  it.each([
+    ['x-http-method-override', 'DELETE'],
+    ['proxy-authorization', 'Bearer x'],
+    ['x-extra', 'y'],
+    ['content-type', 'application/json'],
+  ])('refuses a %s header on a GET', (name, value) => {
+    expect(refusal(ENV_T, 'GET', withVercel({ [name]: value }), tokens)).toMatch(
+      new RegExp(`header ${name} is not allowed`),
+    );
+  });
+
+  it('allows accept and user-agent, and content-type on the Supabase POST', () => {
+    expect(
+      refusal(ENV_T, 'GET', withVercel({ accept: 'application/json', 'user-agent': 'x' }), tokens),
+    ).toBeNull();
+    const h = new Headers({
+      authorization: `Bearer ${tokens.SUPABASE_ACCESS_TOKEN}`,
+      'content-type': 'application/json',
+    });
+    expect(refusal(READ_ONLY, 'POST', h, tokens)).toBeNull();
+  });
+
+  it('refuses a token in the URL even to its own host', () => {
+    expect(refusal(`${ENV}?teamId=${tokens.VERCEL_TOKEN}`, 'GET', withVercel({}), tokens)).toMatch(
+      /VERCEL_TOKEN in a URL/,
+    );
+  });
+});
