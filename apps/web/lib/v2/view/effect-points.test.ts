@@ -163,6 +163,11 @@ describe('the Result, built from a fixture whose fixes are edited', () => {
     expect(rest.points).toBe(`+${2 * rest.count} SEO`);
   });
 
+  it('keeps the fix order: the rows are in the same order with every effect at or below zero', () => {
+    const order = (v: ReturnType<typeof resultOf>) => v.fixes!.rows.map((r) => [r.key, r.count]);
+    expect(order(resultOf((fixes) => setAll(fixes, -2, -1)))).toEqual(order(resultOf(() => {})));
+  });
+
   it('the first-fix card: no measurable effect on the grade, with no figure', () => {
     const v = resultOf((fixes) => setAll(fixes, 0, -1));
     expect(v.first.kind).toBe('fix');
