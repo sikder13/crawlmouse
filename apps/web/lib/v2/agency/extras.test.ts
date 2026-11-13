@@ -6,6 +6,7 @@ import { stripeSubscription, type FakeSubscription } from '../../billing/stripe.
 import { FREE_START, next } from '../../billing/state-machine';
 import { mirrorOf } from '../../billing/subscription-mirror';
 import { GATES, limitsFor } from '../../entitlement-v2';
+import { NOTICE_LINES } from '../copy/notices';
 import {
   changeExtras,
   extrasResponse,
@@ -172,10 +173,19 @@ describe('changeExtras: a raise', () => {
 
   it('a trialing subscription is not changed: its limits would not follow, since the webhook ignores a trialing update', async () => {
     const w = world({ status: 'trialing', trialEnd: 1_800_000_000 });
-    expect(await w.change(1, 0)).toEqual({
-      ok: false,
-      status: 409,
-      code: 'subscription_not_active',
+    const refused = await w.change(1, 0);
+    expect(refused).toEqual({ ok: false, status: 409, code: 'subscription_trialing' });
+    // A form is told when extras are bought, and not that the plan is ending or unpaid.
+    const form = extrasResponse('form', refused);
+    expect([form.status, form.headers.get('location')]).toEqual([
+      303,
+      '/seats?notice=extras_in_trial',
+    ]);
+    expect(NOTICE_LINES.extras_in_trial(null)).toBe(
+      'Seats and sites are bought once the trial has become the plan.',
+    );
+    expect(await extrasResponse('json', refused).json()).toEqual({
+      code: 'subscription_trialing',
     });
     expect(w.stripe.updates).toEqual([]);
     expect(await w.extras()).toEqual({ seats: 0, sites: 0 });

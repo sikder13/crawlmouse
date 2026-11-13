@@ -17,6 +17,7 @@ import {
   KESTREL_ACCOUNT_ID,
   PRIYA_SEAT,
 } from '../../../app/(v2-preview)/v2-preview/_preview/agency';
+import { SEATS_PREVIEWS } from '../../../app/(v2-preview)/v2-preview/_preview/seats';
 import { AGENCY_MONTHLY } from '../../billing/prices';
 import { GATES } from '../../entitlement-v2';
 import { fixture } from '../fixtures';
@@ -27,6 +28,8 @@ import { dashboardView } from './dashboard';
 const d = fixture('challenged-site');
 const northwind: Viewer = ACCOUNT_VIEWERS.withheld();
 const kestrel: Viewer = { accountId: KESTREL_ACCOUNT_ID, now: d.as_of };
+/** Northwind's owner the day before its invoice failed: on the plan and paid (state `agency`). */
+const paid: Viewer = SEATS_PREVIEWS['/v2-preview/screens/seats/paid'].viewer();
 const ALEX = 'e0000000-0000-4000-8000-0000000000c9';
 const LEE = 'e0000000-0000-4000-8000-0000000000cc';
 const PINECREST = '50000000-0000-4000-8000-0000000000cb';
@@ -218,11 +221,27 @@ describe('the matrix, adding a client', () => {
       if (v.kind !== 'matrix') throw new Error(`not the matrix: ${v.kind}`);
       return v.header.actions.map((a) => [a.label, a.href, a.method]);
     };
-    expect(actions(full, northwind, true)).toEqual([
-      ['Add sites to the plan', '/seats#buy', 'get'],
-    ]);
+    // Northwind is past due at the fixture's as_of; `paid` reads it the day before, on the plan.
+    expect(actions(full, paid, true)).toEqual([['Add sites to the plan', '/seats#buy', 'get']]);
+    // Past due, or in its Agency trial: /seats draws no buy form (the purchase route refuses the
+    // change), so there is nothing to link.
+    expect(actions(full, northwind, true)).toEqual([]);
+    const trial = {
+      ...full,
+      accounts: full.accounts.map((a) =>
+        a.id === NORTHWIND_ACCOUNT_ID
+          ? {
+              ...a,
+              state: 'agency_trial' as const,
+              trial_ends_at: '2026-11-20T00:00:00Z',
+              state_history: [{ state: 'agency_trial' as const, since: a.state_history[0]!.since }],
+            }
+          : a,
+      ),
+    };
+    expect(actions(trial, northwind, true)).toEqual([]);
     // Billing off: /seats draws no buy form, so there is nothing to link.
-    expect(actions(full, northwind, false)).toEqual([]);
+    expect(actions(full, paid, false)).toEqual([]);
     // A seat that is not the owner's may not buy: an account manager whose seat covers every
     // client, so that the scope is the owner's and the role alone differs; then one whose seat
     // covers some.
@@ -230,13 +249,13 @@ describe('the matrix, adding a client', () => {
     const fullUnscoped = { ...full, seats: unscoped.seats };
     const priya = fullUnscoped.seats.find((s) => s.id === PRIYA_SEAT)!;
     expect([priya.role, priya.client_scope]).toEqual(['account_manager', 'all']);
-    expect(actions(fullUnscoped, { ...northwind, seatId: PRIYA_SEAT }, true)).toEqual([]);
-    expect(actions(fullUnscoped, northwind, true)).toEqual([
+    expect(actions(fullUnscoped, { ...paid, seatId: PRIYA_SEAT }, true)).toEqual([]);
+    expect(actions(fullUnscoped, paid, true)).toEqual([
       ['Add sites to the plan', '/seats#buy', 'get'],
     ]);
-    expect(actions(full, { ...northwind, seatId: PRIYA_SEAT }, true)).toEqual([]);
+    expect(actions(full, { ...paid, seatId: PRIYA_SEAT }, true)).toEqual([]);
     // Below the limit the header's action is the add form, not the link.
-    expect(actions(d, northwind, true).map((a) => a[1])).not.toContain('/seats#buy');
+    expect(actions(d, paid, true).map((a) => a[1])).not.toContain('/seats#buy');
   });
 
   it('a seat that covers some clients is told how many are in it, not how many slots are unused', () => {

@@ -13,6 +13,7 @@
  */
 import { instant, type Site } from '@crawlmouse/types/v2';
 import { GATES } from '../../entitlement-v2';
+import { extrasSold } from '../agency/extras-bounds';
 import { roleMay } from '../agency/guard';
 import { agencyGateMessage } from '../agency/gates';
 import { MATRIX_COPY as COPY } from '../copy/agency';
@@ -333,8 +334,8 @@ function matrixView(
     adds &&
     n >= limit &&
     limit < GATES.agency.maxSites &&
-    // No buy form is drawn in an Agency trial (lib/v2/view/seats.ts).
-    v.account.state !== 'agency_trial' &&
+    // The link is to the buy form, which `/seats` draws for these accounts (lib/v2/view/seats.ts).
+    extrasSold(v.account.state, v.gates.agencyBranding) &&
     role !== null &&
     roleMay(role, 'buy_seats');
   const compared = clients.filter((s) => resultChecks(v, s.id).length > 1).length;

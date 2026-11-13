@@ -346,7 +346,8 @@ confirms.
 | ---------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
 | Quantities the plan does not sell (`limitsFor`), or more than 100 extra seats in one request                                       | 400 `invalid`, before any Stripe call               |
 | A seat limit below the seats in use (active, and invited with a link not yet expired), or a site limit below the live client sites | 409 `in_use`, before any Stripe call                |
-| No subscription; one set to end; one not `active` (a trial's included); one whose items are not the catalog's Agency plan          | 409                                                 |
+| No subscription; one set to end; one that is not `active`; one whose items are not the catalog's Agency plan                       | 409                                                 |
+| A trialing subscription                                                                                                            | 409 `subscription_trialing`                         |
 | The card is declined on a raise                                                                                                    | 402 `payment_failed`; the subscription is as it was |
 | The quantities the subscription already holds                                                                                      | 200 `changed: false`; no Stripe write               |
 
@@ -363,11 +364,19 @@ made in (`RETRY_WINDOW_MS`). A retry of one request within a window repeats it; 
 bought, lowered and bought again do not; and a raise the card declined can be asked again in a
 later window, where Stripe would otherwise replay the decline for a day.
 
-**In an Agency trial nothing is bought.** A trialing subscription is refused (409): the webhook's
-reading of a trialing update changes no entitlement (`lib/billing/state-machine.ts`), so the limits
-would not follow what Stripe held. Seats draws no buy form for such an account and its foot says
-that the price applies once the trial has become the plan; the matrix draws no link to buying
-sites.
+**In an Agency trial nothing is bought.** A trialing subscription is refused (409
+`subscription_trialing`): the webhook's reading of a trialing update changes no entitlement
+(`lib/billing/state-machine.ts`), so the limits would not follow what Stripe held. A form is sent
+back to Seats with the line "Seats and sites are bought once the trial has become the plan."
+(`extras_in_trial`), not the line of a plan that is ending or unpaid.
+
+**Where buying is offered** is one predicate, `extrasSold(state, gates.agencyBranding)`
+(`lib/v2/agency/extras-bounds.ts`): on Agency, and not in the Agency trial or past due, the two
+states whose subscription the route refuses. Seats draws its buy form by it (in a trial the foot
+says the price applies once the trial has become the plan), the matrix its link to buying sites,
+and `POST /api/seats` its `canBuySeats` in the 402 at the seat limit.
+`pnpm --filter @crawlmouse/web exec vitest run __tests__/v2/seats.test.tsx lib/v2/view/agency-matrix.test.ts app/api/seats/route.test.ts`
+runs an account on the plan, in its trial and past due through each of the three.
 
 `pnpm --filter @crawlmouse/web exec vitest run lib/v2/agency/extras.test.ts app/api/billing/seats/route.test.ts`
 runs these against a Stripe subscription in memory and CC-03's fake catalog, and reads each

@@ -107,6 +107,7 @@ export type ExtrasRefusal =
       code:
         | 'no_subscription'
         | 'subscription_ending'
+        | 'subscription_trialing'
         | 'subscription_not_active'
         | 'not_agency_subscription';
     }
@@ -228,6 +229,10 @@ export async function changeExtras(
   }
 
   const sub = await deps.stripe.subscriptions.retrieve(account.subscription.id);
+  // A trial is told so: it is neither set to end nor behind on a payment.
+  if (sub.status === 'trialing') {
+    return { ok: false, status: 409, code: 'subscription_trialing' };
+  }
   if (!CHANGEABLE.has(sub.status)) {
     return { ok: false, status: 409, code: 'subscription_not_active' };
   }
@@ -341,7 +346,10 @@ export function supabaseExtrasAccounts(admin: SupabaseClient): ExtrasAccounts {
 /** The page the buy form is on. */
 const BACK = '/seats';
 
-/** What a refused form is told: the subscription's three refusals share one line. */
+/**
+ * What a refused form is told. A trialing subscription has its own line; no subscription, one set
+ * to end, one that is not active and one that is not Agency's share a line.
+ */
 const FORM_NOTICE: Record<ExtrasRefusal['code'], NoticeCode | null> = {
   invalid: 'invalid',
   mixed_change: 'mixed_change',
@@ -350,6 +358,7 @@ const FORM_NOTICE: Record<ExtrasRefusal['code'], NoticeCode | null> = {
   in_use: 'in_use',
   no_subscription: 'subscription_unchangeable',
   subscription_ending: 'subscription_unchangeable',
+  subscription_trialing: 'extras_in_trial',
   subscription_not_active: 'subscription_unchangeable',
   not_agency_subscription: 'subscription_unchangeable',
   billing_unavailable: 'billing_unavailable',

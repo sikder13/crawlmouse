@@ -385,6 +385,34 @@ describe('POST /api/seats', () => {
     });
   });
 
+  it.each(['agency_trial', 'past_due'] as const)(
+    'a full Agency account in %s cannot buy a seat yet: 402 says so, where the paid account’s says it can',
+    async (state) => {
+      const agency = await paidOwner('agency');
+      await h.db.query(
+        `update public.accounts
+            set seat_limit = 1, state = $2,
+                trial_variant = case when $2 = 'agency_trial' then 'card_required' end,
+                trial_ends_at = case when $2 = 'agency_trial' then now() + interval '5 days' end,
+                trial_used_at = case when $2 = 'agency_trial' then now() end,
+                past_due_since = case when $2 = 'past_due' then now() end,
+                past_due_tier = case when $2 = 'past_due' then 'agency' end,
+                state_history = state_history || jsonb_build_array(
+                  jsonb_build_object('state', $2::text, 'since', now()::text))
+          where id = $1`,
+        [agency.accountId, state],
+      );
+      as(agency);
+      const res = await invite({ email: 'two@example.com', role: 'developer', scope: 'all' });
+      expect(res.status).toBe(402);
+      expect(await res.json()).toEqual({
+        code: 'upgrade_required',
+        gate: 'seats',
+        canBuySeats: false,
+      });
+    },
+  );
+
   it('a body cannot set the limit, name an account, or invite an owner: 400', async () => {
     const owner = await paidOwner('pro');
     as(owner);
@@ -732,7 +760,7 @@ describe('GET /invite/[token]', () => {
     expect(res.status).toBe(303);
     expect(res.headers.get('location')).toBe('https://crawlmouse.com/invite');
     expect(setCookies(res)).toEqual([
-      `cm_link_invite=${token}; Path=/; Max-Age=600; HttpOnly; Secure; SameSite=Lax`,
+      `cm_link_invite=${token}; Path=/; Max-Age=3600; HttpOnly; Secure; SameSite=Lax`,
     ]);
     expect(res.headers.get('referrer-policy')).toBe('no-referrer');
     expect(h.log).toEqual([]);

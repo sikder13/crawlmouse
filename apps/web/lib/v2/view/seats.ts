@@ -10,13 +10,14 @@
  * `GATES`'s; a line about a limit is `gateMessage`'s.
  *
  * What a reader is offered follows `roleMay`: the invite, change, remove and resend forms for a role
- * that may invite (the owner), the buy form for a role that may buy on a plan that sells seats. Any
- * other member sees the people and the role table. The routes ask `seat_may` again.
+ * that may invite (the owner), the buy form for a role that may buy on an account the purchase route
+ * would not refuse for its state (`extrasSold`). Any other member sees the people and the role
+ * table. The routes ask `seat_may` again.
  */
 import type { Seat, SeatRole, Site } from '@crawlmouse/types/v2';
 import { EXTRA_SEAT, EXTRA_SITE, usd } from '../../billing/prices';
 import { GATES } from '../../entitlement-v2';
-import { MAX_EXTRA_SEATS } from '../agency/extras-bounds';
+import { extrasSold, MAX_EXTRA_SEATS } from '../agency/extras-bounds';
 import { gateMessage } from '../agency/gates';
 import { roleMay } from '../agency/guard';
 import { INVITE_LINK_DAYS } from '../agency/seats';
@@ -109,7 +110,10 @@ export interface SeatsView {
   };
   /** Null when the reader may not invite, or no seat is free. */
   invite: { id: string; action: string; fields: SeatFields } | null;
-  /** Null unless the reader may buy and the plan sells seats and sites beyond its own. */
+  /**
+   * Null unless the reader may buy and the account is sold seats and sites beyond the plan's
+   * (`extrasSold`: not in its Agency trial, and not past due).
+   */
   buy: {
     id: string;
     action: string;
@@ -282,7 +286,7 @@ export function seatsView(
         ? { id: INVITE_ANCHOR, action: '/api/seats', fields: fields(sites, 'developer', 'all') }
         : null,
     buy:
-      mayBuy && billing && v.gates.agencyBranding && !inTrial
+      mayBuy && billing && extrasSold(v.account.state, v.gates.agencyBranding)
         ? {
             id: BUY_ANCHOR,
             action: '/api/billing/seats',

@@ -27,6 +27,7 @@ const OWNER = '/v2-preview/screens/seats';
 const PRO_FULL = '/v2-preview/screens/seats/pro-full';
 const FREE = '/v2-preview/screens/seats/free';
 const MEMBER = '/v2-preview/screens/seats/member';
+const PAID = '/v2-preview/screens/seats/paid';
 
 const primaries = (html: string) => html.match(/<[^>]*data-v2-primary=""[^>]*>[^<]*/g) ?? [];
 const forms = (html: string) =>
@@ -85,9 +86,23 @@ describe('seatsView: an Agency account read by its owner (Northwind)', () => {
   it('prices a seat beyond the plan from prices.ts, not from the artboard', () => {
     expect(v.people.foot).toBe(`One seat free. Beyond five, ${usd(EXTRA_SEAT)} a seat a month.`);
     expect(v.people.foot).toBe('One seat free. Beyond five, $12 a seat a month.');
-    expect(v.buy!.line).toBe(
+    expect(seatsPreview(PAID).buy!.line).toBe(
       `${usd(EXTRA_SEAT)} a month for each seat beyond five, ${usd(EXTRA_SITE)} a month for each site beyond ${GATES.agency.sites}, up to ${GATES.agency.maxSites} sites.`,
     );
+  });
+
+  it('draws the buy form while the plan is paid, and not for the same account past due, which the route would refuse', () => {
+    const state = (path: typeof OWNER | typeof PAID) => {
+      const p = SEATS_PREVIEWS[path];
+      const at = Date.parse(p.viewer().now);
+      const account = p.data().accounts.find((a) => a.id === p.viewer().accountId)!;
+      return account.state_history.filter((h) => Date.parse(h.since) <= at).at(-1)!.state;
+    };
+    expect([state(PAID), seatsPreview(PAID).buy === null]).toEqual(['agency', false]);
+    expect([state(OWNER), seatsPreview(OWNER).buy === null]).toEqual(['past_due', true]);
+    // Past due, the owner still invites, and reads the same people and the same price of a seat.
+    expect(seatsPreview(OWNER).invite).not.toBeNull();
+    expect(seatsPreview(OWNER).people.foot).toBe(seatsPreview(PAID).people.foot);
   });
 
   it('says what an invitation is: one email with a link, for as many days as the link works', () => {
@@ -113,7 +128,7 @@ describe('seatsView: an Agency account read by its owner (Northwind)', () => {
     expect(priya.change.fields).toMatchObject({ role: 'account_manager', scopeValue: 'some' });
     expect(priya.change.fields.sites.map((s) => s.ticked)).toEqual([true, false]);
     expect(priya.resend).toBeNull();
-    expect(v.buy).toMatchObject({
+    expect(seatsPreview(PAID).buy).toMatchObject({
       action: '/api/billing/seats',
       seats: { value: 0 },
       sites: { value: 0, max: GATES.agency.maxSites - GATES.agency.sites },
@@ -143,8 +158,10 @@ describe('seatsView: an Agency account read by its owner (Northwind)', () => {
     expect(v.people.foot).toBe(
       `One seat free. Beyond five, ${usd(EXTRA_SEAT)} a seat a month, once the trial has become the plan.`,
     );
-    // The same account on the plan is offered the form.
-    expect(seatsView(d, viewer, { seatLimit: 5, billing: true }).buy).not.toBeNull();
+    // The same account on the plan, paid, is offered the form.
+    expect(
+      seatsView(d, SEATS_PREVIEWS[PAID].viewer(), { seatLimit: 5, billing: true }).buy,
+    ).not.toBeNull();
   });
 
   it('a seat whose only client was removed covers none, and says so; the others count the clients still there', () => {
@@ -278,7 +295,7 @@ describe('the screens, as their previews render them', () => {
 
   it('has an element for each preview the registry lists', () => {
     expect(Object.keys(CC31_SEAT_ELEMENTS).sort()).toEqual(entries.map((p) => p.path).sort());
-    expect(entries).toHaveLength(8);
+    expect(entries).toHaveLength(9);
   });
 
   it.each(entries.map((p) => [p.path, p.orange ?? 1] as const))(
@@ -289,13 +306,17 @@ describe('the screens, as their previews render them', () => {
   );
 
   it('Seats: the orange element is the link to the invite form, and each form posts to a seat route', () => {
-    const html = renderToStaticMarkup(CC31_SEAT_ELEMENTS[OWNER]!());
+    const html = renderToStaticMarkup(CC31_SEAT_ELEMENTS[PAID]!());
     expect(primaries(html)).toEqual([expect.stringMatching(/href="#invite"[^>]*>Invite someone$/)]);
     expect(html).toMatch(/<section[^>]* id="invite"/);
     expect(forms(html.slice(html.indexOf('<main')))).toEqual([
       ['post', '/api/seats'],
       ['post', '/api/billing/seats'],
     ]);
+    // Past due, the same account is drawn the invite form and no buy form.
+    const pastDue = renderToStaticMarkup(CC31_SEAT_ELEMENTS[OWNER]!());
+    expect(forms(pastDue.slice(pastDue.indexOf('<main')))).toEqual([['post', '/api/seats']]);
+    expect(pastDue).not.toMatch(/<section[^>]* id="buy"/);
   });
 
   it('Seats, live: a change, a removal and, for an invitation, a resend, for each seat but the owner’s', () => {
@@ -318,7 +339,7 @@ describe('the screens, as their previews render them', () => {
       'name="_method" value="DELETE"',
     ]);
     // Three members besides the owner, none of them an invitation: two forms each, and the two below.
-    const owner = live(OWNER);
+    const owner = live(PAID);
     expect(forms(owner.slice(owner.indexOf('<main')))).toHaveLength(3 * 2 + 2);
   });
 
