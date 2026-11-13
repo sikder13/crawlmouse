@@ -280,8 +280,13 @@ such as `email_mismatch`, is a line above what the page read.
 sentence about the account is not built from them. On Seats the owner's Clients cell reads "all
 clients" with no count, the header and the People title give no count of seats, and the foot is
 left out. On `/agency/reports` the header's counts end ", of the client sites in your seat" and an
-empty Sent table says no report has been sent "to a client in your seat".
-`pnpm --filter @crawlmouse/web exec vitest run __tests__/v2/seats.test.tsx lib/v2/view/agency-reports.test.ts -t 'covers some clients'`.
+empty Sent table says no report has been sent "to a client in your seat". On `/reports` the header
+counts the sites "in your seat", and the count of reports to send, "None", "No reports yet" and the
+line for no site are each said "for the sites in your seat"; the page hands the view the caller's
+seat, which `readSettingsPage`'s viewer does not name.
+`pnpm --filter @crawlmouse/web exec vitest run __tests__/v2/seats.test.tsx lib/v2/view/agency-reports.test.ts -t 'covers some clients'`
+and
+`pnpm --filter @crawlmouse/web exec vitest run lib/v2/view/reports.test.ts app/reports/page.test.tsx -t 'seat'`.
 
 Invitation mail is bounded by the day for an account (`INVITE_MAIL_PER_DAY`, `lib/v2/agency/seats.ts`:
 fewer in a trial than on a paid plan) and at 10 an hour for a client address, an invite and a resend

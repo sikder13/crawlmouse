@@ -217,6 +217,11 @@ describe('/reports', () => {
     expect(html).not.toContain(ids.csv);
     expect(html).not.toMatch(/action="\/api\/report-files\/[^"]+\/share"/);
     expect(rowOf(html, ids.pdf)!.html).toContain(`/api/report-files/${ids.pdf}/download`);
+    // The header counts what the seat reads as the seat's; the owner's count is the account's.
+    const line = (page: string) => />(\d+ sites?[^<]*?) · exports and PDF/.exec(page)![1];
+    expect(line(html)).toBe('1 site in your seat');
+    as(w.owner);
+    expect(line(await page())).toBe('2 sites');
   });
 
   it('an account manager is offered the share forms', async () => {

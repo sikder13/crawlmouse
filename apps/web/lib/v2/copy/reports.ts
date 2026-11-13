@@ -37,6 +37,14 @@ export const RAW_FORMATS = [
 export const REPORTS_COPY = {
   title: 'Reports and exports',
   sites: (n: number) => `${count(n)} ${plural(n, 'site', 'sites')}`,
+  /**
+   * For a reader whose seat covers some clients, whose records hold those clients' sites and
+   * reports and no others: a count or an absence read from them is said of the seat's sites.
+   */
+  sitesInSeat: (n: number) => `${count(n)} ${plural(n, 'site', 'sites')} in your seat`,
+  ofSeat: (line: string) => `${line} for the sites in your seat`,
+  madeEmptyInSeat: 'No reports yet for the sites in your seat.',
+  noSitesInSeat: 'No site is in your seat yet: reports are made from a site’s checks.',
   exportsOn: (plan: string) => `exports and PDF on ${plan}`,
   exportsAre: (plan: string) => `exports and PDF are ${plan}`,
   daysLeft: (n: number, plan: string) => `${count(n)} ${plural(n, 'day', 'days')} of ${plan} left`,

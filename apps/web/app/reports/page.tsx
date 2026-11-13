@@ -27,7 +27,8 @@ export const metadata: Metadata = {
 /**
  * Reports and exports of the account the caller acts in (CC-31 D6, D7). A 404 while V2_CHECKS_PUBLIC
  * is off; the sign-in page for a caller who is not signed in. The reports are read with the caller's
- * own client, so a seat that covers some clients lists those clients' reports. A share link made a
+ * own client, so a seat that covers some clients lists those clients' reports; the view is told the
+ * caller's seat, and says what it counts from such a read of the seat's sites. A share link made a
  * moment ago arrives in the share form's cookie and is shown on its report's row; the page's address
  * holds no part of it.
  */
@@ -51,7 +52,7 @@ export default async function ReportsPage({
         data={withSwitcher(
           reportsView(
             page.d,
-            page.viewer,
+            { ...page.viewer, seatId: page.seatId },
             { site: typeof query.site === 'string' ? query.site : undefined },
             '/reports',
             {
