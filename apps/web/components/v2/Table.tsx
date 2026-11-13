@@ -35,10 +35,11 @@ export interface TableProps {
    */
   headersHidden?: boolean;
   /**
-   * The first cell of each row names the row (`<th scope="row">`), so a control later in the row is
-   * read with the row it acts on.
+   * One cell of each row names the row (`<th scope="row">`), so a control later in the row is read
+   * with the row it acts on: the first cell, or the cell of the column given (counted from 0) for a
+   * table whose first cell does not name its row, such as a rank.
    */
-  rowHeader?: boolean;
+  rowHeader?: boolean | number;
   className?: string;
 }
 
@@ -74,6 +75,7 @@ export function Table({
       .filter(Boolean)
       .join(' ') || undefined;
   const numeric = (c: Partial<TableColumn>) => (c.numeric ? { 'data-v2-numeric': '' } : {});
+  const headerColumn = typeof rowHeader === 'number' ? rowHeader : rowHeader ? 0 : null;
 
   return (
     <ScrollRegion label={label} className={[styles.scroll, className].filter(Boolean).join(' ')}>
@@ -100,7 +102,7 @@ export function Table({
             >
               {row.cells.map((cell, i) => {
                 const col = columns[i] ?? {};
-                const Cell = rowHeader && i === 0 ? 'th' : 'td';
+                const Cell = i === headerColumn ? 'th' : 'td';
                 return (
                   <Cell
                     key={i}

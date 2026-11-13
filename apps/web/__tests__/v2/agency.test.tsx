@@ -6,10 +6,13 @@
  * `/agency/reports` as its preview renders it: the orange element the registry says it has, the
  * routes its forms post to, and what a reader of that state is and is not offered.
  */
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { JSDOM } from 'jsdom';
 import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import {
+  clientPreview,
   GRANITEPEAK_SITE,
   KESTREL_ACCOUNT_ID,
 } from '../../app/(v2-preview)/v2-preview/_preview/agency';
@@ -108,11 +111,51 @@ describe('the client matrix against Final-Ag-Matrix', () => {
 describe('the client page against Final-Ag-Client', () => {
   const html = render(CLIENT);
 
-  it('gives each row of Open fixes a header, its first cell', () => {
-    const table = /<table[^>]*aria-label="Open fixes"[\s\S]*?<\/table>/.exec(main(html))![0];
-    const rows = table.slice(table.indexOf('<tbody')).match(/<tr/g)!;
+  it('heads each row of Open fixes by the fix, not by its rank', () => {
+    const table = new JSDOM(main(html)).window.document.querySelector(
+      'table[aria-label="Open fixes"]',
+    )!;
+    const fixes = clientPreview(CLIENT);
+    if (fixes.kind !== 'client') throw new Error(`expected the client page, got ${fixes.kind}`);
+    const rows = [...table.querySelectorAll('tbody tr')];
     expect(rows.length).toBeGreaterThan(0);
-    expect(table.match(/<th scope="row"/g)).toHaveLength(rows.length);
+    /** A row's header cells as text, without the "new" pill a title may carry. */
+    const heads = (tr: Element) =>
+      [...tr.querySelectorAll('th[scope="row"]')].map((th) => {
+        const cell = th.cloneNode(true) as Element;
+        for (const pill of cell.querySelectorAll('[data-v2-pill]')) pill.remove();
+        return cell.textContent!.trim();
+      });
+    expect(rows.map(heads)).toEqual(fixes.fixes.rows.map((f) => [f.title]));
+    // The rank stays the row's first cell, as the locked screen draws it, and is not the header.
+    expect(
+      rows.map((tr) => [tr.firstElementChild!.tagName, tr.firstElementChild!.textContent]),
+    ).toEqual(fixes.fixes.rows.map((f) => ['TD', String(f.number)]));
+    // Each row has the control its header is read with: the link to the fix's packet.
+    for (const tr of rows) expect(tr.querySelector('td a, td button')).not.toBeNull();
+  });
+
+  it('draws no line under the last row’s header cell, on either of its tables', () => {
+    // Table removes the last row's line from `td`; the account screens' rule does it for a row
+    // header, on the tables that carry its class.
+    const css = readFileSync(
+      resolve(__dirname, '../../components/v2/screens/account/AccountScreen.module.css'),
+      'utf8',
+    );
+    expect(css).toMatch(/\.rowHeaded tbody tr:last-child th \{\s*border-bottom: 0;\s*\}/);
+    const doc = new JSDOM(main(html)).window.document;
+    const tables = [...doc.querySelectorAll('table')];
+    expect(tables.map((t) => t.getAttribute('aria-label'))).toEqual([
+      'Open fixes',
+      'Client settings',
+    ]);
+    for (const table of tables) {
+      expect(table.querySelector('tbody th[scope="row"]')).not.toBeNull();
+      expect(
+        table.closest('[class*="rowHeaded"]'),
+        table.getAttribute('aria-label')!,
+      ).not.toBeNull();
+    }
   });
 
   it('reads as the locked HTML outside the rail’s links, with each registered change and nothing else', () => {

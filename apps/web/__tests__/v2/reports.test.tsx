@@ -111,6 +111,13 @@ describe('Reports, Agency', () => {
       );
       expect(rows.length, label).toBeGreaterThan(0);
       expect(heads, label).toEqual(rows);
+      // The scroll region around the table carries the class whose rule takes the line from under
+      // the last row's header cell (AccountScreen.module.css, held in agency.test.tsx).
+      const region = html
+        .slice(0, html.indexOf(table))
+        .match(/<[a-z]+ [^>]*>/g)!
+        .at(-1)!;
+      expect(region, label).toMatch(/class="[^"]*rowHeaded[^"]*"/);
     }
   });
 });
