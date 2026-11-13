@@ -76,6 +76,32 @@ function sessionFirst(sf: ts.SourceFile): string[] {
   return early.length ? [`calls supabaseAdmin() before getUser() (${early.length} call)`] : [];
 }
 
+/**
+ * The support console's routes (CC-33): `requireOperator()` answers before the route makes a
+ * service-role client (`supabaseAdmin`, `consoleAdmin`, or the store built on it, `consoleStore`) and
+ * before it reads the request body, so a caller who is not an operator is answered with nothing read.
+ */
+function operatorFirst(sf: ts.SourceFile): string[] {
+  const at = first(callPositions(sf, 'requireOperator'));
+  if (at === Infinity) return ['never calls requireOperator()'];
+  const problems: string[] = [];
+  const admin = ['supabaseAdmin', 'consoleAdmin', 'consoleStore']
+    .flatMap((n) => callPositions(sf, n))
+    .filter((p) => p < at);
+  if (admin.length) {
+    problems.push(
+      `calls supabaseAdmin(), consoleAdmin() or consoleStore() before requireOperator() (${admin.length} call${admin.length === 1 ? '' : 's'})`,
+    );
+  }
+  const body = [...bodyReads(sf), ...callPositions(sf, 'readBody')].filter((p) => p < at);
+  if (body.length) {
+    problems.push(
+      `reads the request body before requireOperator() (${body.length} read${body.length === 1 ? '' : 's'})`,
+    );
+  }
+  return problems;
+}
+
 /** Every method the route exports is destructured from `serve()` of `inngest/next`. */
 function servedByInngest(sf: ts.SourceFile): string[] {
   if (importSource(sf, 'serve') !== 'inngest/next')
@@ -205,6 +231,8 @@ export function mechanismProblems(
     case 'webhook':
       if (!verifier) return ['no verifier named'];
       return verifier === 'serve' ? servedByInngest(sf) : verifiedFirst(sf, verifier);
+    case 'operator':
+      return operatorFirst(sf);
     case 'public':
       return [];
   }

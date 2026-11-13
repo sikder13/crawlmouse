@@ -9,7 +9,12 @@
  * Edge-safe: no Node import, because the middleware runs on the Edge runtime.
  */
 
-export type RouteClass = 'public' | 'user' | 'member' | 'service' | 'webhook';
+/**
+ * `operator`: the support console's routes (CC-33), for staff only. The route asks
+ * `requireOperator()` (lib/v2/ops/operator.ts), which reads the session and `is_operator()`, before
+ * anything else, and answers anyone else 404.
+ */
+export type RouteClass = 'public' | 'user' | 'member' | 'operator' | 'service' | 'webhook';
 export type Method = 'GET' | 'HEAD' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'OPTIONS';
 
 export interface RoutePolicy {
@@ -162,6 +167,20 @@ export const ROUTE_POLICIES: readonly RoutePolicy[] = [
   },
   { route: 'api/checks/[id]/claim', methods: ['POST'], class: 'user', origin: 'strict' },
   { route: 'api/me', methods: ['PATCH', 'POST'], class: 'user', origin: 'strict' },
+  // CC-33: the support console's search and its two actions.
+  { route: 'api/internal/search', methods: ['POST'], class: 'operator', origin: 'strict' },
+  {
+    route: 'api/internal/checks/[id]/rerun',
+    methods: ['POST'],
+    class: 'operator',
+    origin: 'strict',
+  },
+  {
+    route: 'api/internal/accounts/[id]/sign-in-link',
+    methods: ['POST'],
+    class: 'operator',
+    origin: 'strict',
+  },
   { route: 'api/fixes/[id]/done', methods: ['POST'], class: 'member', origin: 'strict' },
   {
     route: 'api/fixes/[id]/email-developer',

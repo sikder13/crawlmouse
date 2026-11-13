@@ -85,6 +85,10 @@ const ANONYMOUS: Record<
   'api/fixes/[id]/done': { status: 401, body: { code: 'auth_required' } },
   'api/fixes/[id]/email-developer': { status: 401, body: { code: 'auth_required' } },
   'api/fixes/[id]/packet': { status: 401, body: { code: 'auth_required' } },
+  // CC-33: the support console's actions answer anyone but an operator as an unknown address.
+  'api/internal/accounts/[id]/sign-in-link': { status: 404, body: { code: 'not_found' } },
+  'api/internal/checks/[id]/rerun': { status: 404, body: { code: 'not_found' } },
+  'api/internal/search': { status: 404, body: { code: 'not_found' } },
   'api/me': { status: 401, body: { code: 'auth_required' } },
   'api/reports/[slug]/claim': { status: 401, body: { error: 'auth_required' } },
   'api/reports/[slug]/logo': { status: 401, body: { error: 'auth_required' } },
@@ -101,7 +105,9 @@ const ANONYMOUS: Record<
   billing: { status: 307, location: 'https://crawlmouse.com/login' },
 };
 
-const signedIn = ROUTE_POLICIES.filter((p) => p.class === 'user' || p.class === 'member');
+const signedIn = ROUTE_POLICIES.filter(
+  (p) => p.class === 'user' || p.class === 'member' || p.class === 'operator',
+);
 const ID = '6f1c2a8e-0000-4000-8000-000000000000';
 
 beforeEach(() => {
@@ -116,7 +122,7 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllEnvs());
 
 describe('a signed-in route refuses a caller with no session, and writes nothing', () => {
-  it('every user and member route has an expected anonymous answer here', () => {
+  it('every user, member and operator route has an expected anonymous answer here', () => {
     expect(signedIn.map((p) => p.route).sort()).toEqual(Object.keys(ANONYMOUS).sort());
   });
 
