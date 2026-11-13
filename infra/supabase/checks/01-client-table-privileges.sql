@@ -16,6 +16,7 @@ v2_tables(rel) as (
     ('public.checks'), ('public.crawl_batches'), ('public.deploy_hooks'), ('public.email_sends'),
     ('public.email_suppressions'), ('public.evidence_blobs'),
     ('public.contact_requests'), ('public.fix_email_requests'), ('public.fix_events'), ('public.link_edges'), ('public.measurement_lineages'),
+    ('public.operator_actions'), ('public.operators'),
     ('public.page_results'), ('public.persist_chunks'), ('public.report_schedules'),
     ('public.reports'), ('public.seat_sites'), ('public.seats'), ('public.share_links'),
     ('public.site_fixes'), ('public.sites'), ('public.slack_sends'), ('public.subscriptions'), ('public.trial_ledger'),
