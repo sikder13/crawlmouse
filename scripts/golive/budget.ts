@@ -5,10 +5,12 @@
  *
  * A check's count is not written down here: `checkExecutions` runs the real `runCheck`
  * (inngest/check.ts) against a scripted worker and a counting `step`, so the figure moves when the
- * orchestration does. Every other function is a row of `FUNCTIONS` naming the step calls one run
- * makes; `budget.test.ts` counts the step call sites in each function's file and fails when the rows
- * name a different number. `docs/ops/inngest-budget.md` is rendered from this module
- * (`renderBudget`), and the same test fails when the file differs from the render.
+ * orchestration does. Every other function is a row of `FUNCTIONS`. What `budget.test.ts` checks of
+ * the rows: each file's step call sites equal the sum of its rows' `callSites`; each cron row's
+ * schedule equals the cron literal in its file, and its runs a day are read from that schedule; each
+ * line an event row cites in `stepAt` holds a step call. An event row's `steps` is written by hand from
+ * those lines. `docs/ops/inngest-budget.md` is rendered from this module (`renderBudget`), and the same
+ * test fails when the file differs from the render.
  */
 import {
   PACE,
@@ -44,8 +46,11 @@ export interface FunctionRow {
    */
   onFailure: boolean;
   registration: Registration;
+  /** The event (or events) that start it; for a cron, `cron \`<schedule>\``. */
   trigger: string;
-  /** Cron runs a day; 0 for an event-triggered function. */
+  /** The cron schedule as its file writes it (budget.test.ts holds them equal), or null for an event. */
+  cron: string | null;
+  /** Cron runs a day, derived from `cron` (`cronRunsPerDay`); 0 for an event-triggered function. */
   runsPerDay: number;
   /** The step calls written in the function's code (budget.test.ts recounts them per file). */
   callSites: number;
@@ -53,17 +58,48 @@ export interface FunctionRow {
   steps: number;
   /** How `steps` is reached, citing the step ids. */
   stepsHow: string;
+  /**
+   * An event row's step calls, as lines of `file` (budget.test.ts checks each holds a step call).
+   * An event row's `steps` is written by hand from these lines; nothing derives it from the code.
+   */
+  stepAt?: readonly number[];
 }
 
-const HOURLY = 24;
-const EVERY_TEN_MINUTES = 144;
-const DAILY = 1;
+/**
+ * Runs a day of a five-field cron schedule, for the forms the functions use: a minute field that is a
+ * number, `*` or `*\/k`, an hour field that is a number, `*` or `*\/k`, and `*` for day of month, month
+ * and day of week. Any other form throws, so a schedule the parser does not read cannot be counted.
+ */
+export function cronRunsPerDay(cron: string): number {
+  const fields = cron.trim().split(/\s+/);
+  if (fields.length !== 5) throw new Error(`cron '${cron}' does not have five fields`);
+  const [minute, hour, ...rest] = fields as [string, string, string, string, string];
+  if (rest.some((f) => f !== '*'))
+    throw new Error(`cron '${cron}' restricts the day; not read here`);
+  const per = (field: string, span: number): number => {
+    if (field === '*') return span;
+    const step = /^\*\/(\d+)$/.exec(field);
+    if (step) {
+      const k = Number(step[1]);
+      if (k < 1 || span % k !== 0)
+        throw new Error(`cron '${cron}': step ${field} does not divide ${span}`);
+      return span / k;
+    }
+    if (/^\d+$/.test(field) && Number(field) < span) return 1;
+    throw new Error(`cron '${cron}': field '${field}' is not read here`);
+  };
+  return per(minute, 60) * per(hour, 24);
+}
+
+/** A row as written: a cron row names `cron`, an event row names `trigger`. */
+type RowInput = Omit<FunctionRow, 'trigger' | 'cron' | 'runsPerDay'> &
+  ({ cron: string; trigger?: never } | { trigger: string; cron?: never });
 
 /**
  * Every function a production build can register. The step counts are a run with nothing due: a
  * cron's floor. Event functions' counts are per event.
  */
-export const FUNCTIONS: readonly FunctionRow[] = [
+const ROWS: readonly RowInput[] = [
   // ── v1 ──
   {
     file: 'inngest/audit.ts',
@@ -72,9 +108,9 @@ export const FUNCTIONS: readonly FunctionRow[] = [
     callSites: 5,
     registration: 'v1',
     trigger: 'audit.requested',
-    runsPerDay: 0,
     steps: 5,
     stepsHow: 'pause-gate, mark-crawling, crawl-and-persist, emit-completed, send-notify-email',
+    stepAt: [357, 361, 376, 378, 386],
   },
   {
     file: 'inngest/billing.ts',
@@ -82,8 +118,7 @@ export const FUNCTIONS: readonly FunctionRow[] = [
     onFailure: false,
     callSites: 2,
     registration: 'v1',
-    trigger: "cron '0 3 * * *'",
-    runsPerDay: DAILY,
+    cron: '0 3 * * *',
     steps: 2,
     stepsHow: 'reconcile-dry-run; reconcile-accounts in v2 mode (V2_BILLING=1), counted here',
   },
@@ -94,9 +129,9 @@ export const FUNCTIONS: readonly FunctionRow[] = [
     callSites: 1,
     registration: 'v1',
     trigger: 'billing.reconcile.requested',
-    runsPerDay: 0,
     steps: 1,
     stepsHow: 'reconcile',
+    stepAt: [95],
   },
   {
     file: 'inngest/billing.ts',
@@ -104,8 +139,7 @@ export const FUNCTIONS: readonly FunctionRow[] = [
     onFailure: false,
     callSites: 2,
     registration: 'v1',
-    trigger: "cron '0 4 * * *'",
-    runsPerDay: DAILY,
+    cron: '0 4 * * *',
     steps: 2,
     stepsHow: 'delete-expired, prune-rate-limits',
   },
@@ -117,7 +151,6 @@ export const FUNCTIONS: readonly FunctionRow[] = [
     callSites: 11,
     registration: 'V2_PIPELINE',
     trigger: 'check.requested',
-    runsPerDay: 0,
     steps: 0,
     stepsHow: 'measured by checkExecutions (runCheck against a scripted worker)',
   },
@@ -128,9 +161,9 @@ export const FUNCTIONS: readonly FunctionRow[] = [
     callSites: 2,
     registration: 'V2_PIPELINE',
     trigger: 'inngest/function.cancelled (checkFn)',
-    runsPerDay: 0,
     steps: 2,
     stepsHow: 'fail, emit-failed',
+    stepAt: [445, 447],
   },
   {
     file: 'inngest/check-reaper.ts',
@@ -138,8 +171,7 @@ export const FUNCTIONS: readonly FunctionRow[] = [
     onFailure: false,
     callSites: 1,
     registration: 'V2_PIPELINE',
-    trigger: "cron '*/10 * * * *'",
-    runsPerDay: EVERY_TEN_MINUTES,
+    cron: '*/10 * * * *',
     steps: 1,
     stepsHow: 'reap',
   },
@@ -149,8 +181,7 @@ export const FUNCTIONS: readonly FunctionRow[] = [
     onFailure: false,
     callSites: 2,
     registration: 'V2_PIPELINE',
-    trigger: "cron '17 5 * * *'",
-    runsPerDay: DAILY,
+    cron: '17 5 * * *',
     steps: 2,
     stepsHow: 'expire-unkept, settle-kept',
   },
@@ -162,9 +193,9 @@ export const FUNCTIONS: readonly FunctionRow[] = [
     callSites: 6,
     registration: 'V2_BILLING',
     trigger: 'trial.started',
-    runsPerDay: 0,
     steps: 6,
     stepsHow: 'reminder-due, remind, remind-effects, trial-ends, expire, expire-effects',
+    stepAt: [87, 89, 99, 102, 103, 113],
   },
   {
     file: 'inngest/past-due-sweep.ts',
@@ -172,8 +203,7 @@ export const FUNCTIONS: readonly FunctionRow[] = [
     onFailure: false,
     callSites: 4,
     registration: 'V2_BILLING',
-    trigger: "cron '0 * * * *'",
-    runsPerDay: HOURLY,
+    cron: '0 * * * *',
     steps: 2,
     stepsHow: 'now, candidates; then two per due account, none when nothing is due',
   },
@@ -185,9 +215,9 @@ export const FUNCTIONS: readonly FunctionRow[] = [
     callSites: 1,
     registration: 'V2_CHECKS_PUBLIC',
     trigger: 'account.deletion_confirmed',
-    runsPerDay: 0,
     steps: 1,
     stepsHow: 'cancel',
+    stepAt: [73],
   },
   {
     file: 'inngest/deletion.ts',
@@ -196,9 +226,9 @@ export const FUNCTIONS: readonly FunctionRow[] = [
     callSites: 1,
     registration: 'V2_CHECKS_PUBLIC',
     trigger: 'account.restored',
-    runsPerDay: 0,
     steps: 1,
     stepsHow: 'resume-{id}, one per subscription',
+    stepAt: [85],
   },
   {
     file: 'inngest/deletion.ts',
@@ -206,8 +236,7 @@ export const FUNCTIONS: readonly FunctionRow[] = [
     onFailure: false,
     callSites: 4,
     registration: 'V2_CHECKS_PUBLIC',
-    trigger: "cron '30 3 * * *'",
-    runsPerDay: DAILY,
+    cron: '30 3 * * *',
     steps: 2,
     stepsHow: 'now, due; then one per person due',
   },
@@ -218,9 +247,9 @@ export const FUNCTIONS: readonly FunctionRow[] = [
     callSites: 1,
     registration: 'V2_CHECKS_PUBLIC',
     trigger: 'email.requested',
-    runsPerDay: 0,
     steps: 1,
     stepsHow: 'send',
+    stepAt: [88],
   },
   {
     file: 'inngest/mail.ts',
@@ -229,9 +258,9 @@ export const FUNCTIONS: readonly FunctionRow[] = [
     callSites: 1,
     registration: 'V2_CHECKS_PUBLIC',
     trigger: 'check.notify_requested, check.finished, check.failed',
-    runsPerDay: 0,
     steps: 1,
     stepsHow: 'send',
+    stepAt: [99],
   },
   {
     file: 'inngest/mail.ts',
@@ -240,9 +269,9 @@ export const FUNCTIONS: readonly FunctionRow[] = [
     callSites: 1,
     registration: 'V2_CHECKS_PUBLIC',
     trigger: 'fix.email_developer_requested',
-    runsPerDay: 0,
     steps: 1,
     stepsHow: 'send',
+    stepAt: [110],
   },
   {
     file: 'inngest/mail.ts',
@@ -251,9 +280,9 @@ export const FUNCTIONS: readonly FunctionRow[] = [
     callSites: 1,
     registration: 'V2_CHECKS_PUBLIC',
     trigger: 'check.finished',
-    runsPerDay: 0,
     steps: 1,
     stepsHow: 'capture',
+    stepAt: [126],
   },
   {
     file: 'inngest/mail.ts',
@@ -261,8 +290,7 @@ export const FUNCTIONS: readonly FunctionRow[] = [
     onFailure: false,
     callSites: 1,
     registration: 'V2_CHECKS_PUBLIC',
-    trigger: "cron '43 5 * * *'",
-    runsPerDay: DAILY,
+    cron: '43 5 * * *',
     steps: 1,
     stepsHow: 'purge',
   },
@@ -273,8 +301,7 @@ export const FUNCTIONS: readonly FunctionRow[] = [
     onFailure: false,
     callSites: 5,
     registration: 'V2_PIPELINE+V2_CHECKS_PUBLIC',
-    trigger: "cron '0 * * * *'",
-    runsPerDay: HOURLY,
+    cron: '0 * * * *',
     steps: 2,
     stepsHow: 'pause-gate, claim-0; then request:{site} per site claimed (counted per re-check)',
   },
@@ -285,9 +312,9 @@ export const FUNCTIONS: readonly FunctionRow[] = [
     callSites: 2,
     registration: 'V2_PIPELINE+V2_CHECKS_PUBLIC',
     trigger: 'check.finished',
-    runsPerDay: 0,
     steps: 1,
     stepsHow: "plan; then one per channel ('email', 'slack') when an alert fires",
+    stepAt: [51, 57],
   },
   {
     file: 'inngest/summary.ts',
@@ -295,8 +322,7 @@ export const FUNCTIONS: readonly FunctionRow[] = [
     onFailure: false,
     callSites: 3,
     registration: 'V2_PIPELINE+V2_CHECKS_PUBLIC',
-    trigger: "cron '11 * * * *'",
-    runsPerDay: HOURLY,
+    cron: '11 * * * *',
     steps: 2,
     stepsHow: 'clock, due-0; then request-{page} when a page has summaries due',
   },
@@ -307,11 +333,21 @@ export const FUNCTIONS: readonly FunctionRow[] = [
     callSites: 1,
     registration: 'V2_PIPELINE+V2_CHECKS_PUBLIC',
     trigger: 'summary.requested',
-    runsPerDay: 0,
     steps: 1,
     stepsHow: 'send',
+    stepAt: [88],
   },
 ];
+
+export const FUNCTIONS: readonly FunctionRow[] = ROWS.map((r): FunctionRow => {
+  const cron = r.cron ?? null;
+  return {
+    ...r,
+    cron,
+    trigger: cron === null ? r.trigger! : `cron \`${cron}\``,
+    runsPerDay: cron === null ? 0 : cronRunsPerDay(cron),
+  };
+});
 
 /** A cron's executions a day with nothing due: its runs, each with its steps. */
 export const cronPerDay = (f: FunctionRow): number => f.runsPerDay * (1 + f.steps);

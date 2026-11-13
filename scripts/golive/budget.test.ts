@@ -9,6 +9,7 @@ import {
   SHAPES,
   checkExecutions,
   cronPerDay,
+  cronRunsPerDay,
   finishedFanOut,
   floorBySwitchOn,
   hobbyVerdict,
@@ -26,6 +27,8 @@ function code(source: string): string {
 
 const STEP_CALL = /\bstep\.(run|sleep|sleepUntil|waitForEvent|sendEvent|invoke)\(/g;
 const count = (text: string, re: RegExp): number => (text.match(re) ?? []).length;
+/** A `cron: '…'` trigger, in any quote. */
+const CRON_LITERAL = /\bcron\s*:\s*(['"`])([^'"`]+)\1/g;
 /** `onFailure` as an options key: property, method or shorthand. */
 const ON_FAILURE = /(?<![\w$])onFailure\s*(?::|\(|,|\})/g;
 
@@ -94,6 +97,64 @@ describe('the function rows against the code', () => {
     ).toBe(0);
   });
 
+  it("names each cron row's schedule as its file writes it", () => {
+    for (const file of functionFiles()) {
+      const literals = [...code(readFileSync(join(ROOT, file), 'utf8')).matchAll(CRON_LITERAL)]
+        .map((m) => m[2]!)
+        .sort();
+      const rows = FUNCTIONS.filter((f) => f.file === file && f.cron !== null)
+        .map((f) => f.cron!)
+        .sort();
+      expect(rows, file).toEqual(literals);
+    }
+  });
+
+  it.each([
+    ["{ cron: '0 3 * * *' }", '0 3 * * *'],
+    ['{cron:"*/10 * * * *"}', '*/10 * * * *'],
+    ['{ cron : `11 * * * *` }', '11 * * * *'],
+  ])('reads the cron literal in %s', (text, cron) => {
+    expect([...text.matchAll(CRON_LITERAL)].map((m) => m[2])).toEqual([cron]);
+  });
+
+  it('cites, for each event row, lines of its file that hold a step call', () => {
+    for (const f of FUNCTIONS.filter((x) => x.cron === null && x.id !== 'crawlmouse.check.run')) {
+      expect(f.stepAt?.length, f.id).toBeGreaterThan(0);
+      const lines = readFileSync(join(ROOT, f.file), 'utf8').split('\n');
+      for (const at of f.stepAt!) {
+        expect(count(code(lines[at - 1] ?? ''), STEP_CALL), `${f.file}:${at}`).toBe(1);
+      }
+      expect(new Set(f.stepAt).size, f.id).toBe(f.stepAt!.length);
+    }
+  });
+
+  // Counted by hand from each file (the step call lines), independently of STEP_CALL and the rows.
+  const HAND: Record<string, number> = {
+    'inngest/audit.ts': 5, // 357 361 376 378 386
+    'inngest/billing.ts': 5, // 65 77 95 116 120
+    'inngest/check.ts': 13, // 193 197 205 235 256 313 379 380 390 391 392 445 447
+    'inngest/check-reaper.ts': 1, // 39
+    'inngest/check-expiry.ts': 2, // 41 44
+    'inngest/trial-lifecycle.ts': 6, // 87 89 99 102 103 113
+    'inngest/past-due-sweep.ts': 4, // 51 52 58 61
+    'inngest/deletion.ts': 6, // 73 85 97 98 106 110
+    'inngest/mail.ts': 5, // 88 99 110 126 141
+    'inngest/schedule.ts': 5, // 98 104 113 122 139
+    'inngest/alerts.ts': 2, // 51 57
+    'inngest/summary.ts': 4, // 52 57 61 88
+  };
+  it.each(Object.entries(HAND))('counts %s step call sites as a hand count does', (file, hand) => {
+    expect(count(code(readFileSync(join(ROOT, file), 'utf8')), STEP_CALL)).toBe(hand);
+    expect(
+      FUNCTIONS.filter((f) => f.file === file).reduce((n, f) => n + f.callSites, 0),
+      file,
+    ).toBe(hand);
+  });
+
+  it('has a hand count for every file that makes a function', () => {
+    expect(Object.keys(HAND).sort()).toEqual(functionFiles().sort());
+  });
+
   it('does not count a step named only in a comment', () => {
     expect(
       count(code("// step.run('x')\n/* step.sleep('y') */\nstep.run('z', f)"), STEP_CALL),
@@ -153,6 +214,40 @@ describe('a check, by running runCheck', () => {
     const long = { ...base, batchSeconds: 64 };
     // Two batches (crawl-1, access-1), each three polls more than the 5 s batch.
     expect((await checkExecutions(long)) - (await checkExecutions(base))).toBe(2 * 3 * 2);
+  });
+});
+
+describe('a cron schedule, read', () => {
+  it.each([
+    ['*/10 * * * *', 144],
+    ['0 * * * *', 24],
+    ['11 * * * *', 24],
+    ['0 3 * * *', 1],
+    ['17 5 * * *', 1],
+    ['* * * * *', 1440],
+    ['*/15 */2 * * *', 48],
+  ])('runs %s %i times a day', (cron, perDay) => {
+    expect(cronRunsPerDay(cron)).toBe(perDay);
+  });
+
+  it.each([
+    '0 3 * * 1',
+    '0 3 1 * *',
+    '0 3 * 1 *',
+    '*/7 * * * *',
+    '0 3 * *',
+    '0-5 * * * *',
+    '60 * * * *',
+  ])('refuses %s, a form it does not read', (cron) => {
+    expect(() => cronRunsPerDay(cron)).toThrow();
+  });
+
+  it("derives each cron row's runs a day from its schedule", () => {
+    const reaper = FUNCTIONS.find((f) => f.id === 'crawlmouse.check.reaper')!;
+    expect(reaper.cron).toBe('*/10 * * * *');
+    expect(reaper.runsPerDay).toBe(144);
+    for (const f of FUNCTIONS)
+      expect(f.runsPerDay, f.id).toBe(f.cron === null ? 0 : cronRunsPerDay(f.cron));
   });
 });
 
