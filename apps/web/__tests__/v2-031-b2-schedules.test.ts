@@ -1468,15 +1468,74 @@ describe('what a recipient refused (owner ruling on Q42)', () => {
       expect(await issueConfirmation(again, at(6), 'after-readd')).toEqual({ outcome: 'none' });
     });
 
-    it('another account that adds the same host starts with nothing', async () => {
+    it('another account that adds the same host starts with nothing, and is refused nothing', async () => {
       const c = await client();
       await setClient(c.siteId, c.accountId, { client_contact_email: 'reader@client.example' });
       await setSchedule(c.siteId, c.accountId);
       await decline((await issueConfirmation(c.siteId, NOW, 'first')).token as string, at(1));
+      // The first account's row is removed, as the row a carry would read is.
+      await db.query(`update public.sites set removed_at = $2 where id = $1`, [c.siteId, at(5)]);
       const other = await client();
       const id = randomUUID();
       await insertRow(db, 'sites', ROWS.sites(id, other.accountId, c.host));
+      await setClient(id, other.accountId, { client_contact_email: 'reader@client.example' });
+      await setSchedule(id, other.accountId, WEEKLY, at(5));
       expect(await refusals(id)).toEqual([]);
+      expect(await askRefusal(id, at(6))).toBeUndefined();
+      expect((await issueConfirmation(id, at(6), 'theirs')).outcome).toBe('issued');
+    });
+
+    it('a row that becomes the client’s by an update, as a host kept from a public check does, is refused what the client’s other rows hold', async () => {
+      const c = await client();
+      await setClient(c.siteId, c.accountId, { client_contact_email: 'reader@client.example' });
+      await setSchedule(c.siteId, c.accountId);
+      await decline((await issueConfirmation(c.siteId, NOW, 'first')).token as string, at(1));
+      await db.query(`update public.sites set removed_at = $2 where id = $1`, [c.siteId, at(5)]);
+      // No insert names the account and the host together: the carry's trigger does not run.
+      const kept = randomUUID();
+      await insertRow(db, 'sites', ROWS.sites(kept, c.accountId, `held-${c.host}`));
+      await db.query(`update public.sites set host = $2 where id = $1`, [kept, c.host]);
+      expect(await refusals(kept)).toEqual([]);
+      await setClient(kept, c.accountId, { client_contact_email: 'reader@client.example' });
+      await setSchedule(kept, c.accountId, WEEKLY, at(5));
+      expect(await askRefusal(kept, at(6))).toEqual({ refused: 'declined' });
+      expect(await issueConfirmation(kept, at(6), 'after-keep')).toEqual({ outcome: 'none' });
+    });
+
+    it('the link of a mail sent before the client was removed still stops the row it was added again as', async () => {
+      const c = await client();
+      await setClient(c.siteId, c.accountId, { client_contact_email: 'reader@client.example' });
+      await setSchedule(c.siteId, c.accountId);
+      const issueWith = (site: string, request: string, token: string, now: string) =>
+        answer(`select public.issue_recipient_confirmation($1, $2, $3, $4, $5) r`, [
+          site,
+          now,
+          request,
+          'reader@client.example',
+          sha256(token),
+        ]);
+      // The mailer derives the token from the row's id: the first row's, then the second's.
+      const [firstLink, secondLink] = [pauseToken(), pauseToken()];
+      expect((await issueWith(c.siteId, 'ask-1', firstLink, NOW)).outcome).toBe('issued');
+      const again = await readded(c);
+      const waiting = await issueWith(again, 'ask-2', secondLink, at(6));
+      expect(waiting.outcome).toBe('issued');
+      // The recipient presses the link of the FIRST mail.
+      expect(await decline(firstLink, at(7))).toEqual({ outcome: 'declined' });
+      expect(await askRefusal(again, at(7))).toEqual({ refused: 'declined' });
+      expect(await confirm(waiting.token as string, at(7))).toEqual({ outcome: 'gone' });
+      expect(await issueWith(again, 'ask-3', secondLink, at(8))).toEqual({ outcome: 'none' });
+    });
+
+    it('the erasure takes the address’s entry from each row of the client', async () => {
+      const c = await pausedClient();
+      const again = await readded(c);
+      expect([await refusals(c.siteId), await refusals(again)].map((r) => r.length)).toEqual([
+        1, 1,
+      ]);
+      // Rule 30, on the live row alone.
+      await db.query(`update public.sites set client_contact_email = null where id = $1`, [again]);
+      expect([await refusals(c.siteId), await refusals(again)]).toEqual([[], []]);
     });
   });
 
@@ -1546,6 +1605,21 @@ describe('what a recipient refused (owner ruling on Q42)', () => {
       ]);
       await setSchedule(c.siteId, c.accountId, WEEKLY, at(3));
       expect(await issue('ask-3', at(3))).toEqual({ outcome: 'none' });
+    });
+
+    it('raises for a token given with no address: a token is stored for the address it was derived for and no other', async () => {
+      const c = await client();
+      await setClient(c.siteId, c.accountId, { client_contact_email: 'reader@client.example' });
+      await setSchedule(c.siteId, c.accountId);
+      await expect(
+        answer(`select public.issue_recipient_confirmation($1, $2, $3, null, $4) r`, [
+          c.siteId,
+          NOW,
+          'ask-1',
+          sha256(pauseToken()),
+        ]),
+      ).rejects.toMatchObject({ code: '22023' });
+      expect(await refusals(c.siteId)).toEqual([]);
     });
 
     it('issues nothing, and stores no token, when the mailer’s address is no longer the contact', async () => {
