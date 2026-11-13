@@ -84,6 +84,46 @@ alter function public.is_operator() owner to postgres;
 revoke all on function public.is_operator() from public, anon, authenticated, service_role;
 grant execute on function public.is_operator() to authenticated, service_role;
 
+-- ─── operator_account_ids_by_email, user_id_by_email ─────────────────────────────────────────────
+-- An address is looked up through these, as an rpc: PostgREST takes an rpc's arguments in the POST
+-- body, which the gateway does not log, where a filter (`users?email=eq.<address>`) is in the logged
+-- query string. operator_account_ids_by_email answers the default account of the user whose address
+-- equals p_email as written, and the accounts that user holds a seat on, without repeats (the support
+-- console's search, apps/web/lib/v2/ops/console-store.ts). user_id_by_email answers that user's id,
+-- or null (scripts/ops/operator.ts). Security invoker: service_role holds select on users and seats.
+
+create or replace function public.operator_account_ids_by_email(p_email text)
+returns table (account_id uuid)
+language sql
+stable
+security invoker
+set search_path = pg_catalog, pg_temp
+as $$
+  select u.default_account_id from public.users u
+   where u.email = p_email and u.default_account_id is not null
+  union
+  select s.account_id from public.seats s join public.users u on u.id = s.user_id
+   where u.email = p_email
+  order by 1;
+$$;
+
+revoke all on function public.operator_account_ids_by_email(text)
+  from public, anon, authenticated, service_role;
+grant execute on function public.operator_account_ids_by_email(text) to service_role;
+
+create or replace function public.user_id_by_email(p_email text)
+returns uuid
+language sql
+stable
+security invoker
+set search_path = pg_catalog, pg_temp
+as $$
+  select u.id from public.users u where u.email = p_email;
+$$;
+
+revoke all on function public.user_id_by_email(text) from public, anon, authenticated, service_role;
+grant execute on function public.user_id_by_email(text) to service_role;
+
 -- ─── operator_actions ────────────────────────────────────────────────────────────────────────────
 -- The console's record: who (operator_id), what (action), whose account (account_id), on what
 -- (target), why (reason), with what result (outcome), when (created_at). account_id is not a

@@ -20,9 +20,11 @@ const ROLLBACK = '20261115000001_v2_033_operations.revert.sql';
 const FUNCTIONS = [
   'is_internal_subject',
   'is_operator',
+  'operator_account_ids_by_email',
   'operator_finish',
   'operator_log',
   'operator_request_check',
+  'user_id_by_email',
 ];
 
 let db: PGlite;
@@ -246,6 +248,66 @@ describe('is_internal_subject', () => {
       asRole(db, role, null, (tx) =>
         tx.query(`select public.is_internal_subject('account', $1)`, [randomUUID()]),
       ),
+    ).rejects.toThrow(/permission denied/);
+  });
+});
+
+describe('operator_account_ids_by_email', () => {
+  const ids = async (email: string) =>
+    (
+      await asRole(db, 'service_role', null, (tx) =>
+        tx.query<{ account_id: string }>(
+          'select account_id from public.operator_account_ids_by_email($1)',
+          [email],
+        ),
+      )
+    ).rows
+      .map((r) => r.account_id)
+      .sort();
+
+  it("answers the user's default account and every account they hold a seat on, once each", async () => {
+    const email = `ops-${randomUUID()}@example.com`;
+    const user = await signUp(db, email);
+    const { accountId: own } = await personalAccount(db, user);
+    const other = (await personalAccount(db, await person())).accountId;
+    const left = (await personalAccount(db, await person())).accountId;
+    await db.query(
+      `insert into public.seats (account_id, user_id, invited_email, role, status, accepted_at,
+                                 removed_at)
+       values ($1, $2, $3, 'developer', 'active', now(), null),
+              ($4, $2, $3, 'developer', 'removed', now(), now())`,
+      [other, user, ['seat', 'example.com'].join('@'), left],
+    );
+    expect(await ids(email)).toEqual([own, other, left].sort());
+  });
+
+  it('answers nothing for an address no user has, and matches the address exactly', async () => {
+    const email = `ops-${randomUUID()}@example.com`;
+    await personalAccount(db, await signUp(db, email));
+    expect(await ids(`x${email}`)).toEqual([]);
+    expect(await ids(email.toUpperCase())).toEqual([]);
+  });
+
+  it.each(['anon', 'authenticated'] as const)('%s may not execute it', async (role) => {
+    await expect(
+      asRole(db, role, null, (tx) =>
+        tx.query('select * from public.operator_account_ids_by_email($1)', ['x']),
+      ),
+    ).rejects.toThrow(/permission denied/);
+  });
+});
+
+describe('user_id_by_email', () => {
+  it('answers the user with that address, and null for none', async () => {
+    const email = `ops-${randomUUID()}@example.com`;
+    const user = await signUp(db, email);
+    expect(await call<string | null>('user_id_by_email', [email])).toBe(user);
+    expect(await call<string | null>('user_id_by_email', [`x${email}`])).toBeNull();
+  });
+
+  it.each(['anon', 'authenticated'] as const)('%s may not execute it', async (role) => {
+    await expect(
+      asRole(db, role, null, (tx) => tx.query('select public.user_id_by_email($1)', ['x'])),
     ).rejects.toThrow(/permission denied/);
   });
 });

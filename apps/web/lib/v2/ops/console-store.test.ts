@@ -6,7 +6,7 @@ import { randomUUID } from 'node:crypto';
 import type { PGlite } from '@electric-sql/pglite';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { applyAllMigrations, freshDb } from '../../../__tests__/helpers/pglite-migrations';
-import { postgrestOver } from '../../../__tests__/helpers/postgrest-pglite';
+import { postgrestOver, type Call } from '../../../__tests__/helpers/postgrest-pglite';
 import {
   insertRow,
   personalAccount,
@@ -133,6 +133,19 @@ describe('resolve', () => {
     const found = await store.resolve({ kind: 'email', email: p.email });
     expect(found.kind).toBe('email');
     expect([...found.accountIds].sort()).toEqual([p.accountId, other.accountId].sort());
+  });
+
+  it('an address is resolved by an rpc, whose body carries it, and never by a read of users', async () => {
+    const p = await person();
+    const log: Call[][] = [];
+    const logged = supabaseConsoleStore(postgrestOver(db, { log }), operatorId);
+    expect(await logged.resolve({ kind: 'email', email: p.email })).toEqual({
+      kind: 'email',
+      accountIds: [p.accountId],
+    });
+    expect(log.map((calls) => calls[0])).toEqual([
+      ['rpc', 'operator_account_ids_by_email', { p_email: p.email }],
+    ]);
   });
 
   it('a host finds the accounts that keep it, and not an anonymous site of it', async () => {

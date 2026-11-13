@@ -220,25 +220,15 @@ export function supabaseConsoleStore(admin: SupabaseClient, operatorId: string):
           return capped('check_id', [s?.account_id ?? null]);
         }
         case 'email': {
-          const users = rows<{ id: string; default_account_id: string | null }>(
-            'users by email',
-            await admin.from('users').select('id, default_account_id').eq('email', q.email),
+          // An rpc carries the address in its POST body; a filter would put it in the logged URL.
+          const found = rows<{ account_id: string }>(
+            'accounts by email',
+            await admin.rpc('operator_account_ids_by_email', { p_email: q.email }),
           );
-          if (users.length === 0) return { kind: 'email', accountIds: [] };
-          const seats = rows<{ account_id: string }>(
-            'seats by user',
-            await admin
-              .from('seats')
-              .select('account_id')
-              .in(
-                'user_id',
-                users.map((u) => u.id),
-              ),
+          return capped(
+            'email',
+            found.map((r) => r.account_id),
           );
-          return capped('email', [
-            ...users.map((u) => u.default_account_id),
-            ...seats.map((s) => s.account_id),
-          ]);
         }
         case 'host': {
           const sites = rows<{ account_id: string | null }>(

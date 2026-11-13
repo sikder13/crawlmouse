@@ -8,19 +8,19 @@ import { credentials, restClient, type Rest } from './supabase-rest';
  *   pnpm ops:operator remove <email>   they stop being one
  *   pnpm ops:operator list             every operator's user id, and when they were added
  *
- * The address is matched lower-cased against `users.email`; an address with no user is refused. It
- * prints user ids only, never an address. Credentials: scripts/ops/supabase-rest.ts.
+ * The address is lower-cased and looked up by the rpc `user_id_by_email`; an address with no user is
+ * refused. It prints user ids, not an address. Credentials: scripts/ops/supabase-rest.ts.
  */
 
 const USAGE = 'usage: ops:operator add <email> | remove <email> | list';
 
+/** The address goes in an rpc's POST body, which Supabase's gateway does not log, not in a URL. */
 async function userIdOf(rest: Rest, email: string): Promise<string> {
-  const rows = (await rest.call(
-    'GET',
-    `users?select=id&email=eq.${encodeURIComponent(email.trim().toLowerCase())}`,
-  )) as { id: string }[];
-  if (rows.length !== 1) throw new Error('no user has that address');
-  return rows[0]!.id;
+  const id = await rest.call('POST', 'rpc/user_id_by_email', {
+    p_email: email.trim().toLowerCase(),
+  });
+  if (typeof id !== 'string') throw new Error('no user has that address');
+  return id;
 }
 
 export async function runOperator(
