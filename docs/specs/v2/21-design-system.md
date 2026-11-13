@@ -276,15 +276,16 @@ nothing; a press outside it, or focus moving to an element outside it, closes it
 
 The page frame: canvas colours, the header with the brand, and the footer.
 
-| Prop             | Type                                | Required | Note                                                                                                                                                   |
-| ---------------- | ----------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `header`         | `"marketing" \| "app" \| undefined` | no       | `marketing`: 72px header, no rule. `app`: 64px header with a hairline under it.                                                                        |
-| `nav`            | `NavEntry[] \| undefined`           | no       | Links, and groups that open as a menu (NavMenu). The marketing header's entries are MARKETING_NAV in footer-links.ts; a planned entry renders as text. |
-| `actions`        | `ReactNode`                         | no       | Buttons at the right of the header.                                                                                                                    |
-| `footer`         | `boolean \| undefined`              | no       |                                                                                                                                                        |
-| `status`         | `ServiceStatus \| undefined`        | no       | What the footer's Status link shows (SiteFooter); the shell fetches nothing.                                                                           |
-| `footerLineMark` | `ReactNode`                         | no       | Shown after the footer's line (SiteFooter `lineMark`).                                                                                                 |
-| `children`       | `ReactNode`                         | yes      |                                                                                                                                                        |
+| Prop             | Type                                                     | Required | Note                                                                                                                                                                              |
+| ---------------- | -------------------------------------------------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `header`         | `"marketing" \| "app" \| undefined`                      | no       | `marketing`: 72px header, no rule. `app`: 64px header with a hairline under it.                                                                                                   |
+| `nav`            | `NavEntry[] \| undefined`                                | no       | Links, and groups that open as a menu (NavMenu). The marketing header's entries are MARKETING_NAV in footer-links.ts; a planned entry renders as text.                            |
+| `actions`        | `ReactNode`                                              | no       | Buttons at the right of the header.                                                                                                                                               |
+| `footer`         | `boolean \| undefined`                                   | no       |                                                                                                                                                                                   |
+| `status`         | `ServiceStatus \| undefined`                             | no       | What the footer's Status link shows (SiteFooter); the shell fetches nothing.                                                                                                      |
+| `footerLineMark` | `ReactNode`                                              | no       | Shown after the footer's line (SiteFooter `lineMark`).                                                                                                                            |
+| `footerGates`    | `Readonly<Record<"checksPublic", boolean>> \| undefined` | no       | Which of the footer's gated links are links (SiteFooter `gates`). A server page leaves it out and the footer reads the flags; a client page passes it, since it cannot read them. |
+| `children`       | `ReactNode`                                              | yes      |                                                                                                                                                                                   |
 
 ### Select
 
@@ -304,10 +305,11 @@ A labelled native select: the browser gives it its keyboard, its list and its fo
 
 The site footer: the brand block, and the four columns of links from footer-links.ts.
 
-| Prop       | Type                         | Required | Note                                                                                                                                     |
-| ---------- | ---------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `status`   | `ServiceStatus \| undefined` | no       | What the Status link shows. The page passes it in; the footer fetches nothing. Absent, or a value outside the three, the shape is muted. |
-| `lineMark` | `ReactNode`                  | no       | Shown after the footer's line: a page's "coming" mark for what the line names.                                                           |
+| Prop       | Type                                                     | Required | Note                                                                                                                                     |
+| ---------- | -------------------------------------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `status`   | `ServiceStatus \| undefined`                             | no       | What the Status link shows. The page passes it in; the footer fetches nothing. Absent, or a value outside the three, the shape is muted. |
+| `lineMark` | `ReactNode`                                              | no       | Shown after the footer's line: a page's "coming" mark for what the line names.                                                           |
+| `gates`    | `Readonly<Record<"checksPublic", boolean>> \| undefined` | no       | Which gated entries are links; absent, `footerGates()`.                                                                                  |
 
 ### StatusPill
 
@@ -438,32 +440,33 @@ Learn opens as a disclosure (NavMenu). Log in is the header's action, at `/login
 
 ### Footer
 
-| Column            | Item                     | Target                                 | Note                                                                                    |
-| ----------------- | ------------------------ | -------------------------------------- | --------------------------------------------------------------------------------------- |
-| Product           | Free audit               | `/`                                    |                                                                                         |
-| Product           | Pricing                  | `/pricing`                             |                                                                                         |
-| Product           | For agencies             | planned                                |                                                                                         |
-| Product           | Developers               | `/developers`                          |                                                                                         |
-| Product           | Changelog                | planned                                |                                                                                         |
-| Product           | Status                   | `/status` + status shape               |                                                                                         |
-| Learn             | Blog                     | `/blog`                                |                                                                                         |
-| Learn             | Research                 | `/blog/research`                       |                                                                                         |
-| Learn             | Guides                   | `/guides`                              |                                                                                         |
-| Learn             | Docs                     | planned                                |                                                                                         |
-| Learn             | How the grade works      | planned                                |                                                                                         |
-| Learn             | Our crawler              | `/bot`                                 |                                                                                         |
-| Free checks       | Is GPTBot blocked?       | `/ai-readiness-checker`                | The checker reads robots.txt and builds the per-crawler access matrix, GPTBot included. |
-| Free checks       | JavaScript-only content? | `/blog/can-ai-crawlers-see-javascript` | An article on how to check, until a dedicated check exists.                             |
-| Free checks       | robots.txt for AI        | `/blog/block-ai-crawlers-robots-txt`   | An article: the robots.txt guide for GPTBot, ClaudeBot and the rest.                    |
-| Company and legal | About                    | planned                                |                                                                                         |
-| Company and legal | Contact                  | planned                                |                                                                                         |
-| Company and legal | Privacy                  | `/privacy`                             |                                                                                         |
-| Company and legal | Terms                    | `/terms`                               |                                                                                         |
-| Company and legal | Acceptable use           | `/aup`                                 |                                                                                         |
-| Company and legal | Refunds                  | planned                                | The refund terms are one sentence in /terms §8, which has no anchor to link to.         |
-| Company and legal | DPA                      | planned                                |                                                                                         |
-| Company and legal | Subprocessors            | `/subprocessors`                       |                                                                                         |
-| Company and legal | Cookie settings          | button (cookie-settings)               |                                                                                         |
+| Column            | Item                     | Target                                 | Note                                                                                                               |
+| ----------------- | ------------------------ | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Product           | Free audit               | `/`                                    |                                                                                                                    |
+| Product           | Pricing                  | `/pricing`                             |                                                                                                                    |
+| Product           | For agencies             | planned                                |                                                                                                                    |
+| Product           | Developers               | `/developers`                          |                                                                                                                    |
+| Product           | Changelog                | planned                                |                                                                                                                    |
+| Product           | Status                   | `/status` + status shape               |                                                                                                                    |
+| Learn             | Blog                     | `/blog`                                |                                                                                                                    |
+| Learn             | Research                 | `/blog/research`                       |                                                                                                                    |
+| Learn             | Guides                   | `/guides`                              |                                                                                                                    |
+| Learn             | Docs                     | planned                                |                                                                                                                    |
+| Learn             | How the grade works      | planned                                |                                                                                                                    |
+| Learn             | Our crawler              | `/bot`                                 |                                                                                                                    |
+| Free checks       | Is GPTBot blocked?       | `/ai-readiness-checker`                | The checker reads robots.txt and builds the per-crawler access matrix, GPTBot included.                            |
+| Free checks       | JavaScript-only content? | `/blog/can-ai-crawlers-see-javascript` | An article on how to check, until a dedicated check exists.                                                        |
+| Free checks       | robots.txt for AI        | `/blog/block-ai-crawlers-robots-txt`   | An article: the robots.txt guide for GPTBot, ClaudeBot and the rest.                                               |
+| Company and legal | About                    | planned                                |                                                                                                                    |
+| Company and legal | Contact                  | planned                                |                                                                                                                    |
+| Company and legal | Help                     | `/help`                                | The help centre (CC-33 D4) answers 404 while V2_CHECKS_PUBLIC is off: a link while it is on, text while it is off. |
+| Company and legal | Privacy                  | `/privacy`                             |                                                                                                                    |
+| Company and legal | Terms                    | `/terms`                               |                                                                                                                    |
+| Company and legal | Acceptable use           | `/aup`                                 |                                                                                                                    |
+| Company and legal | Refunds                  | planned                                | The refund terms are one sentence in /terms §8, which has no anchor to link to.                                    |
+| Company and legal | DPA                      | planned                                |                                                                                                                    |
+| Company and legal | Subprocessors            | `/subprocessors`                       |                                                                                                                    |
+| Company and legal | Cookie settings          | button (cookie-settings)               |                                                                                                                    |
 
 ## Preview pages
 
@@ -570,3 +573,6 @@ From `apps/web/app/(v2-preview)/v2-preview/_preview/registry.ts`. They are serve
 | Check: robots.txt for AI                           | `/v2-preview/screens/check/robots-ai`                    | screen    |                                      |
 | Final-Public                                       | `/v2-preview/screens/public-report`                      | screen    |                                      |
 | Public report, withheld                            | `/v2-preview/screens/public-report/withheld`             | screen    |                                      |
+| Help                                               | `/v2-preview/screens/help`                               | screen    |                                      |
+| Help article                                       | `/v2-preview/screens/help-article`                       | screen    |                                      |
+| Error screen                                       | `/v2-preview/screens/error`                              | screen    |                                      |

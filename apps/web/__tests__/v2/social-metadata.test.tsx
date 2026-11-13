@@ -10,6 +10,8 @@ import type { Metadata } from 'next';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { PublicReportRow } from '@/lib/reports';
 import { CHECK_COPY, CHECK_QUESTIONS } from '../../lib/v2/copy/check-pages';
+import { helpArticles } from '../../lib/v2/help/articles';
+import { HELP_COPY } from '../../lib/v2/help/copy';
 import { PRICING_COPY } from '../../lib/v2/copy/pricing';
 import { SOCIAL_CARDS, socialCardPath } from '../../lib/v2/social-card';
 import { fixture } from '../../lib/v2/fixtures';
@@ -102,6 +104,28 @@ describe('social metadata of the CC-29 public pages', () => {
       title: copy.title + SUFFIX,
       description: copy.description,
       card: `check-${question}`,
+    });
+  });
+
+  // CC-33 D4: the help centre's index and its twelve articles.
+  it('/help', async () => {
+    const { metadata } = await import('../../app/help/page');
+    expectOwn(metadata, {
+      url: '/help',
+      title: HELP_COPY.title + SUFFIX,
+      description: HELP_COPY.description,
+      card: 'help',
+    });
+  });
+
+  it.each(helpArticles().map((a) => [a.slug, a] as const))('/help/%s', async (slug, a) => {
+    const { generateMetadata } = await import('../../app/help/[slug]/page');
+    const meta = await generateMetadata({ params: Promise.resolve({ slug }) });
+    expectOwn(meta, {
+      url: `/help/${slug}`,
+      title: a.question + SUFFIX,
+      description: a.description,
+      card: `help-${slug}`,
     });
   });
 

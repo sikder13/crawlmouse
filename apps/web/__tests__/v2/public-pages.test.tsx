@@ -10,6 +10,7 @@
  *   CC-29 rows").
  * - `/agencies` and the `/v2-developers` target are 404s with V2_BILLING unset; the three `/check`
  *   pages are 404s with V2_CHECKS_PUBLIC unset, and every other `/check` segment is a 404 always.
+ *   So is the help centre (CC-33 D4), whose articles `help.test.tsx` covers one by one.
  * - Lit, each has its own canonical, no robots of its own (the root layout's, which index), one h1,
  *   and no "#" link.
  */
@@ -199,4 +200,26 @@ describe('/check/[question] (D8)', () => {
     },
     60_000,
   );
+});
+
+describe('/help (CC-33 D4)', () => {
+  const load = () => import('../../app/help/page');
+
+  it('is a 404 with V2_CHECKS_PUBLIC unset, whatever V2_BILLING says', async () => {
+    for (const billing of [false, true]) {
+      flags({ billing, checks: false });
+      const { default: Page } = await load();
+      expect(await digestOf(() => Page())).toContain('404');
+    }
+  });
+
+  it('with V2_CHECKS_PUBLIC on is the page, canonical at /help, indexable, one h1', async () => {
+    flags({ checks: true });
+    const { default: Page, metadata } = await load();
+    expect(metadata.alternates?.canonical).toBe('/help');
+    expect(metadata.robots).toBeUndefined();
+    const markup = renderToStaticMarkup(Page() as ReactElement);
+    expect(markup.match(/<h1/g)).toHaveLength(1);
+    expect(markup).not.toContain('href="#"');
+  });
 });

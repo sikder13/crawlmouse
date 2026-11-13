@@ -32,12 +32,14 @@ import {
   viewAt,
   type Viewer,
 } from './account';
-import { action, type ActionView, type RouteSpec } from './account-actions';
+import { ACCOUNT_ACTIONS, action, type ActionView, type RouteSpec } from './account-actions';
 import { FREE_SCHEDULE, accountShellView, type ShellView } from './account-shell';
 import { FREE_FIXES } from './free-fixes';
 import { DELETE_COPY, deletionMoney } from '../copy/deletion';
 import { REFUSAL_SENTENCES, SETTINGS_NOTICES as NOTICES } from '../copy/settings-notices';
 import type { SeatRole } from '../account/profile';
+import { SUPPORT_COPY } from '../copy/support';
+import { supportMailto } from '../support/mailto';
 
 export const CC27B_ROUTES = {
   accountAlertRules: {
@@ -264,6 +266,8 @@ export interface SettingsView {
     terms: { label: string; text: string; action: ActionView | null }[];
   };
   columns: typeof COPY.columns;
+  /** "Email support": the support link with the account's id and this page's path (CC-33 D5). */
+  support: { lead: string; label: string; href: string };
 }
 
 /**
@@ -520,6 +524,15 @@ export function settingsView(
       ],
     },
     columns: COPY.columns,
+    support: {
+      lead: SUPPORT_COPY.settings.lead,
+      label: SUPPORT_COPY.settings.link,
+      href: supportMailto({
+        topic: 'general',
+        accountId: a.id,
+        path: ACCOUNT_ACTIONS.emailSettings.route,
+      }),
+    },
   };
 }
 

@@ -310,4 +310,9 @@ export const SETTINGS_ADDITIONS: Addition[] = [
     what: 'A line under the email kinds when mail to the reader’s own address hard-bounced or was reported as spam, saying that only sign-in links and account mail go to it now',
     source: 'CC-28 D7 (Resend’s bounces and complaints suppress all but account mail)',
   },
+  {
+    screen: 'settings',
+    what: 'A line under the cards, “A question about this account? Email support”: a mailto to the support address whose body carries the account’s id and the page’s path',
+    source: 'CC-33 D5 (lib/v2/support/mailto.ts)',
+  },
 ];

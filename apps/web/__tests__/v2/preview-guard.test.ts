@@ -27,6 +27,8 @@ const V2_LIVE = [
   // CC-29: For agencies (V2_BILLING) and the three /check pages (V2_CHECKS_PUBLIC), new addresses.
   join(WEB_ROOT, 'app', 'agencies'),
   join(WEB_ROOT, 'app', 'check'),
+  // CC-33: the help centre (V2_CHECKS_PUBLIC), a new address.
+  join(WEB_ROOT, 'app', 'help'),
 ];
 
 function walk(dir: string, out: string[] = []): string[] {
@@ -289,6 +291,7 @@ describe('v2 stays out of live pages', () => {
       'app/(account)/account/restore/[token]/route.ts',
       'app/(account)/account/restore/page.tsx',
       'app/(account)/check-email/page.tsx',
+      'app/(account)/error.tsx',
       'app/(account)/layout.tsx',
       'app/(account)/login/verify/continue/page.tsx',
       'app/(account)/settings/delete/page.tsx',
