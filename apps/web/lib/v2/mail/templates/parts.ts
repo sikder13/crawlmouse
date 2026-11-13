@@ -14,15 +14,19 @@ export const hostText = (host: string): string => oneLine(host, HOST_MAX);
 export const ACCOUNT_NAME_MAX = 80;
 
 /**
- * What a mail client turns into a link when it meets it in plain text: a scheme, `www.`, an address,
- * or a dotted name such as `example.com` (a letter, digit or hyphen, a dot, two letters or more).
+ * What a mail client may turn into a link when it meets it in plain text. The rule refuses more
+ * than clients link, and says so: `@`, `:`, `/` and `\\` anywhere (an address, a scheme, a path); a
+ * dot with a character straight after it (`example.com`, `1.2.3.4`, and also "Node.js"); an
+ * invisible format character, which can split a host a filter would see; and seven digits or more,
+ * with or without separators (a telephone number).
  */
-const LINKABLE = /:\/\/|www\.|@|[\p{L}\p{N}-]\.\p{L}{2,}/iu;
+const LINKABLE = /[@:/\\]|\.(?=\S)|\p{Cf}|(?:\d[\s().+-]*){7,}/u;
 
 /**
  * An account's name, which its owner typed, as one bounded line; null when it has none, and null
- * when it holds text a mail client would link: the name goes to an address its owner chose, so a
- * message shows it only as a name. A template then writes what it writes for an account with no name.
+ * when it holds text of a shape a mail client may link (`LINKABLE`): the name goes to an address
+ * its owner chose, so a message shows it only as a name. A template then writes what it writes for
+ * an account with no name. An ordinary name with a dot inside a word is not shown either.
  */
 export function accountNameText(name: string | null): string | null {
   const line = oneLine(name ?? '', ACCOUNT_NAME_MAX);
