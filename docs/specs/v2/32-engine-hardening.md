@@ -190,8 +190,10 @@ stored batches).
 **Decision.** The render step reads the same-site link targets of both sides of each page it measures, with one
 extractor (`packages/engine/src/v2/render/links.ts`): the crawl's own `extractPage` with non-content links left
 out, each target in `canonicalizeUrl`'s spelling, kept when it is on the page's site by the planner's rule
-(`inSiteScope`), is not the page itself and is within the URL bound. A side keeps at most `MAX_RENDER_LINKS`
-targets, sorted; a side past that, or with a target past the URL bound, marks the page `truncated`. The lists sit
+(`inSiteScope`), is not the page itself and is within the URL bound. A side keeps the longest prefix of its
+sorted targets that holds at most `MAX_RENDER_LINKS` (200) targets and `MAX_RENDER_LINK_CHARS` (32 KiB) of URL
+characters; a side that leaves a target out, or has a target past the URL bound, marks the page `truncated`, and
+the detector reads no truncated page. The lists sit
 on the engine's `RenderOutcome` page as `links`, which the pipeline stores as evidence. They are not written to
 `PageResult.without_js`: the `page_results_without_js` CHECK allows four keys, and a test pins them. No contract
 field and no migration was needed.
@@ -230,8 +232,12 @@ grade guard's `expected.json` changed its source digest only; its cases are unch
   `client_rendered_template`. Doing so would change which graded pages are rendered, and so Readable.
 - The counterfactual links only from the evidence pages, and only the kept targets.
 - An effect computed after higher-ranked fixes can be 0 or less; D4 prints that as no measurable effect.
-- The stored render outcome grows: worst case, `MAX_RENDER_LINKS` targets of up to `MAX_URL_LENGTH` characters,
-  on two sides, for each rendered page. The evidence store gzips it, and no bound on that file was added here.
+- The stored render outcome grows, by at most 64 KiB of URL characters a rendered page (2 sides × 32 KiB). On the
+  Free cap of 25 graded and 5 empty-root renders that is at most 1,920 KiB a check (30 × 64 KiB), against
+  800 KiB a page (2 × 200 × 2,048 characters) and about 23 MiB a check before the character budget. A canonical
+  URL is ASCII, so characters are bytes, before JSON quoting. The graded cap is the caller's (`maxRenders`), so
+  a larger cap adds 64 KiB a render. The evidence store gzips the file. The figures are rendered in spec 14 from
+  the constants.
 - The readings stay with the crawl's link rules: a link that is not an `<a href>` (a click handler on a `div`) is
   not a link on either side.
 
