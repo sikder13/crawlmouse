@@ -15,7 +15,13 @@ import { fixesAsOf } from '../../fixtures';
 import { listOf } from '../../format';
 import { oneLine } from '../../packet-text';
 import { numberWord, plural } from '../../words';
-import { effectHeadline } from '../effect-headline';
+import {
+  effectHeadline,
+  formatPoints,
+  groupSum,
+  NO_EFFECT,
+  NO_EFFECT_SHORT,
+} from '../effect-headline';
 import { openFixes, type FixPlan } from '../free-fixes';
 import { noPacketLine } from '../no-packet';
 import { noPacketReason } from '../packet-reason';
@@ -113,11 +119,16 @@ export function effortText(f: Pick<Fix, 'effort'>): string | null {
 }
 
 /** "+1 Technical SEO; AI effect estimated after fixes 1 and 2", from the fix's own numbers. */
-function proPoints(f: Fix, all: readonly Fix[]): string {
+export function proPoints(f: Fix, all: readonly Fix[]): string {
   const parts: string[] = [];
-  if (f.effect.ai_readability) parts.push(`+${f.effect.ai_readability} AI readability`);
-  if (f.effect.technical_seo) parts.push(`+${f.effect.technical_seo} Technical SEO`);
-  const head = parts.join(', ') || 'no estimated effect';
+  const { ai_readability: ai, technical_seo: seo } = f.effect;
+  const aiSigned = ai === null ? null : formatPoints(ai);
+  const seoSigned = seo === null ? null : formatPoints(seo);
+  if (aiSigned) parts.push(`${aiSigned} AI readability`);
+  if (seoSigned) parts.push(`${seoSigned} Technical SEO`);
+  const head =
+    parts.join(', ') ||
+    (effectHeadline(f, all).kind === 'no_effect' ? NO_EFFECT_SHORT : 'no estimated effect');
   const waits = f.effect.ai_readability_pending_on
     .map((fp) => all.find((x) => x.fingerprint === fp)?.number)
     .filter((n): n is number => n !== undefined);
@@ -138,26 +149,32 @@ function tally(fixes: readonly Fix[]): ProFixView['recommendations'] {
 }
 
 /**
- * A grouped row's effect: both grades' points summed, and how many fixes have an AI readability
- * effect not yet estimated, so no part of the group's effect is left out.
+ * A grouped row's effect: both grades' points summed (`groupSum`: a member below 0 counts 0), and how
+ * many fixes have an AI readability effect not yet estimated, so no part of the group's effect is left
+ * out. A sum of 0 is no measurable effect, printed without a figure.
  */
 export function groupPoints(fixes: readonly Fix[]): string {
-  const seo = fixes.reduce((n, f) => n + (f.effect.technical_seo ?? 0), 0);
-  const ai = fixes.reduce((n, f) => n + (f.effect.ai_readability ?? 0), 0);
+  const seo = groupSum(fixes.map((f) => f.effect.technical_seo ?? 0));
+  const ai = groupSum(fixes.map((f) => f.effect.ai_readability ?? 0));
   const pending = fixes.filter((f) => f.effect.ai_readability === null).length;
   const seoPending = fixes.filter((f) => f.effect.technical_seo === null).length;
   const seoShown = seoPending < fixes.length;
-  // an AI effect estimated at 0 is still an estimate, shown when no Technical SEO points are
-  const aiShown = ai !== 0 || (!seoShown && pending < fixes.length);
+  const estimated = seoShown || pending < fixes.length;
+  const seoSigned = seoShown ? formatPoints(seo) : null;
+  const aiSigned = formatPoints(ai);
   const parts = [
-    seoShown ? `+${seo} Technical SEO` : null,
-    aiShown ? `+${ai} AI readability` : null,
+    seoSigned ? `${seoSigned} Technical SEO` : null,
+    aiSigned ? `${aiSigned} AI readability` : null,
   ].filter(Boolean);
   const waits = [
     seoPending ? `Technical SEO effect not estimated for ${seoPending}` : null,
     pending ? `AI effect not yet estimated for ${pending}` : null,
   ].filter(Boolean);
-  const head = parts.length ? `${parts.join(', ')} together` : 'no estimated effect';
+  const head = parts.length
+    ? `${parts.join(', ')} together`
+    : estimated
+      ? NO_EFFECT_SHORT
+      : 'no estimated effect';
   return `${head}${waits.length ? `; ${waits.join('; ')}` : ''}`;
 }
 
@@ -170,8 +187,9 @@ export function effectOf(
   siteFixes: readonly Pick<Fix, 'fingerprint' | 'number'>[],
 ): { points: string; unit: string } {
   const h = effectHeadline(f, siteFixes);
-  if (h.kind === 'ai') return { points: `+${h.points}`, unit: 'AI readability, estimated' };
-  if (h.kind === 'seo') return { points: `+${h.points}`, unit: 'Technical SEO, estimated' };
+  if (h.kind === 'ai') return { points: h.signed, unit: 'AI readability, estimated' };
+  if (h.kind === 'seo') return { points: h.signed, unit: 'Technical SEO, estimated' };
+  if (h.kind === 'no_effect') return { points: '—', unit: NO_EFFECT };
   return h.kind === 'waiting'
     ? { points: '—', unit: h.sentence }
     : { points: '—', unit: 'Technical SEO, not estimated' };
