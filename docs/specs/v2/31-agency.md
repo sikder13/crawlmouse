@@ -1112,6 +1112,15 @@ on a link minted again on a retry, §9 on the prospect's one-pager, §10 on a cl
 - **Invitation mail is bounded by the day, lower in a trial** (`INVITE_MAIL_PER_DAY`,
   `lib/v2/agency/seats.ts`): an invitation names the account, a string its owner chose, to an address
   the owner chose. An invitation and a resend count into one bucket.
+- **Text inside a `data-v2-addition` marker is compared with no artboard.** The lock comparison
+  leaves a marked element out (`__tests__/v2/_lib/lock.ts`), on every screen of the product. For
+  Seats, the matrix, the client page and client reports a test holds each text node inside a marker,
+  on each preview and as a live page draws it, to a string of the screen's view or of the step's
+  copy modules, so a sentence typed into a component there fails:
+  `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2/agency-additions.test.tsx`. It does
+  not see a sentence added to a copy module or composed in a view, an attribute, a state no preview
+  renders, or a marker on another screen (Reports among them). Tying each marker to a registry row
+  by a key is a change to the harness every screen uses, and is not made here.
 - **The PDF's not-measured list has no heading.** The proof page titles the list "Not measured"
   (`lib/v2/copy/proof.ts`); the PDF draws the same sentences after a rule with no title
   (`drawDoc`, `lib/v2/reports/pdf-layout.ts`). A title would be a string the document does not hold,
