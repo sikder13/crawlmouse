@@ -54,6 +54,10 @@ status-page vendor, switching any flag.
   read "first and returning payments". The two bounce figures count addresses and include internal
   accounts' mail; send failures leave out internal accounts and the founder notices' own mail
   (questions Q14).
+- **The canary's look** (`signin_delivery_seen`, questions Q17) counts a delivery to its address of a
+  mail from `SIGNIN_SENDER` whose own creation time in Resend's event (`data.created_at`) is at or
+  after the request, less a minute for clock difference; the run before's mail, delivered late, and
+  another sender's mail do not count (`apps/web/__tests__/v2-033-founder.test.ts`, "review Q17").
 - **/status** (owner ruling on questions Q6): the page shows "Website: answering" from `/api/health`'s
   own logic (`apps/web/lib/v2/ops/health.ts`), rendered on each request, with the deploy's version and
   commit, and says that audits, email and billing are not monitored there. `app/status/page.test.tsx`

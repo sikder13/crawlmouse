@@ -7,6 +7,7 @@ const sentry = vi.hoisted(() => ({
 }));
 vi.mock('@sentry/nextjs', () => sentry);
 
+import { SIGNIN_SENDER } from '../../auth/constants';
 import { canaryWork, reportCanary } from './canary';
 
 const TO = ['canary', 'example.test'].join('@');
@@ -19,7 +20,7 @@ beforeEach(() => {
 });
 
 describe('canaryWork', () => {
-  it('asks for a link to the canary address, and looks with signin_delivery_seen from the request time', async () => {
+  it('asks for a link to the canary address, and looks with signin_delivery_seen for the sign-in sender from the request time', async () => {
     const signIn = vi.fn(async () => 'sent' as const);
     const rpc = vi.fn(async () => ({ data: true, error: null }));
     const report = vi.fn(async () => undefined);
@@ -27,7 +28,11 @@ describe('canaryWork', () => {
     expect(await w.request()).toBe('sent');
     expect(signIn).toHaveBeenCalledWith(TO);
     expect(await w.delivered(AT)).toBe(true);
-    expect(rpc).toHaveBeenCalledWith('signin_delivery_seen', { p_address: TO, p_since: AT });
+    expect(rpc).toHaveBeenCalledWith('signin_delivery_seen', {
+      p_address: TO,
+      p_sender: SIGNIN_SENDER,
+      p_since: AT,
+    });
     expect(w.now().toISOString()).toBe(AT);
     await w.report('delivery');
     expect(report).toHaveBeenCalledWith('delivery');

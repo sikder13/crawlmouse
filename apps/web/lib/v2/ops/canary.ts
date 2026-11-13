@@ -1,12 +1,14 @@
 /**
  * The sign-in canary's work as production wires it (D6; the function is inngest/signin-canary.ts):
  * the link is asked for through `SignInLink` (lib/v2/ops/sign-in-link.ts's `requestSignInLink`), the
- * delivery is looked for with `signin_delivery_seen` over the service-role client, and a failure is
- * Sentry's `signal: signin-canary`. Nothing here logs or reports the address.
+ * delivery of a mail from SIGNIN_SENDER is looked for with `signin_delivery_seen` over the
+ * service-role client, and a failure is Sentry's `signal: signin-canary`. Nothing here logs or
+ * reports the address.
  */
 import * as Sentry from '@sentry/nextjs';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { CanaryWork } from '../../../../../inngest/signin-canary';
+import { SIGNIN_SENDER } from '../../auth/constants';
 
 /** Asks Supabase Auth for a sign-in link to an existing user's address. */
 export type SignInLink = (email: string) => Promise<'sent' | 'refused'>;
@@ -27,6 +29,7 @@ export function canaryWork(d: CanaryDeps): CanaryWork {
     async delivered(sinceIso) {
       const { data, error } = await d.sb.rpc('signin_delivery_seen', {
         p_address: d.to,
+        p_sender: SIGNIN_SENDER,
         p_since: sinceIso,
       });
       if (error) throw new Error(`signin_delivery_seen: ${error.code ?? 'error'}`);

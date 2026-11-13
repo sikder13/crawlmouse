@@ -494,9 +494,20 @@ begin
 end;
 $$;
 
--- The sign-in canary's look (D6, inngest/signin-canary.ts): whether Resend's webhook recorded a
--- delivery to p_address, compared lower-cased, at or after p_since.
-create or replace function public.signin_delivery_seen(p_address text, p_since timestamptz)
+-- The sign-in canary's look (D6, inngest/signin-canary.ts; review Q17): whether Resend's webhook
+-- recorded a delivery to p_address, compared lower-cased, of a mail from p_sender, created at or after
+-- p_since less a minute. The webhook stores Resend's event whole in `payload`
+-- (app/api/webhooks/resend/route.ts):
+--   sender     `data.from`'s address: the part inside a trailing `<…>` when there is one, else the whole
+--              value, trimmed and lower-cased, as isV2MailEvent (lib/v2/mail/suppression.ts) reads it;
+--   mail time  `data.created_at`, "when the email was created" in Resend's webhook reference
+--              (resend.com/docs/webhooks/emails/delivered), not the row's created_at, which is when the
+--              webhook arrived: so the run before's mail, created about ten minutes earlier and
+--              delivered after this request, does not count. The minute allows for a difference
+--              between our clock and Resend's. An event with no `data.created_at`, or one not shaped as
+--              a time, is not counted, so the canary raises its signal rather than pass.
+create or replace function public.signin_delivery_seen(p_address text, p_sender text,
+                                                       p_since timestamptz)
 returns boolean
 language plpgsql
 stable
@@ -504,13 +515,21 @@ security invoker
 set search_path = pg_catalog, pg_temp
 as $$
 begin
-  if p_address is null or p_since is null then
-    raise exception 'signin_delivery_seen: an address and a time are required' using errcode = '22023';
+  if p_address is null or p_sender is null or p_since is null then
+    raise exception 'signin_delivery_seen: an address, a sender and a time are required'
+      using errcode = '22023';
   end if;
-  return exists (select 1 from public.email_events e
-                  where e.event_type = 'delivered'
-                    and pg_catalog.lower(e.email_address) = pg_catalog.lower(p_address)
-                    and e.created_at >= p_since);
+  return exists (
+    select 1 from public.email_events e
+     cross join lateral (select e.payload -> 'data' ->> 'from' as f,
+                                e.payload -> 'data' ->> 'created_at' as at) d
+     where e.event_type = 'delivered'
+       and pg_catalog.lower(e.email_address) = pg_catalog.lower(p_address)
+       and pg_catalog.lower(pg_catalog.btrim(coalesce(pg_catalog.substring(d.f, '<([^<>]*)>\s*$'), d.f)))
+             = pg_catalog.lower(pg_catalog.btrim(p_sender))
+       -- The case reads the time only once its shape is checked; `and` sets no order.
+       and (case when d.at ~ '^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}(:?\d{2})?)$'
+                 then d.at::timestamptz end) >= p_since - interval '1 minute');
 end;
 $$;
 
@@ -521,7 +540,7 @@ revoke all on function public.take_founder_overflow(text, integer)
   from public, anon, authenticated, service_role;
 revoke all on function public.founder_digest_counts(timestamptz, timestamptz)
   from public, anon, authenticated, service_role;
-revoke all on function public.signin_delivery_seen(text, timestamptz)
+revoke all on function public.signin_delivery_seen(text, text, timestamptz)
   from public, anon, authenticated, service_role;
 revoke all on function public.founder_signups_unannounced(timestamptz, integer, bigint)
   from public, anon, authenticated, service_role;
@@ -529,7 +548,7 @@ grant execute on function public.claim_founder_notice(text, text, uuid, boolean,
                                                       timestamptz, integer, boolean) to service_role;
 grant execute on function public.take_founder_overflow(text, integer) to service_role;
 grant execute on function public.founder_digest_counts(timestamptz, timestamptz) to service_role;
-grant execute on function public.signin_delivery_seen(text, timestamptz) to service_role;
+grant execute on function public.signin_delivery_seen(text, text, timestamptz) to service_role;
 grant execute on function public.founder_signups_unannounced(timestamptz, integer, bigint) to service_role;
 -- ═══ end §C ══════════════════════════════════════════════════════════════════════════════════════
 

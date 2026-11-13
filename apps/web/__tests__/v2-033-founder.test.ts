@@ -542,41 +542,86 @@ describe('founder_digest_counts, send failures (review C5)', () => {
 });
 
 describe('signin_delivery_seen', () => {
-  const seen = (address: string, since: string) =>
+  const SENDER = ['magic', 'crawlmouse.com'].join('@');
+  const seen = (address: string, since: string, sender = SENDER) =>
     asRole(db, 'service_role', null, async (tx) => {
       const { rows } = await tx.query<{ s: boolean }>(
-        'select public.signin_delivery_seen($1, $2) as s',
-        [address, since],
+        'select public.signin_delivery_seen($1, $2, $3) as s',
+        [address, sender, since],
       );
       return rows[0]!.s;
     });
-  const event = (address: string, type: string, at: string) =>
+  /** An email_events row as the Resend webhook stores it: the event whole in `payload`. */
+  const event = (
+    address: string,
+    type: string,
+    rowAt: string,
+    data: { from?: string; created_at?: string } = {},
+  ) =>
     db.query(
-      'insert into public.email_events (email_address, event_type, created_at) values ($1, $2, $3)',
-      [address, type, at],
+      'insert into public.email_events (email_address, event_type, created_at, payload) values ($1, $2, $3, $4)',
+      [address, type, rowAt, JSON.stringify({ type: `email.${type}`, created_at: rowAt, data })],
     );
+  const canary = () => `canary-${randomUUID().slice(0, 8)}@example.test`;
+  const AT = '2026-11-13T12:00:00.000Z';
+  const mailAt = (ms: number) => new Date(Date.parse(AT) + ms).toISOString();
 
   it('is executable by service_role only', async () => {
     await expect(
       asRole(db, 'authenticated', randomUUID(), (tx) =>
-        tx.query("select public.signin_delivery_seen('a@example.com', now())"),
+        tx.query("select public.signin_delivery_seen('a@example.com', 'b@example.com', now())"),
       ),
     ).rejects.toThrow(/permission denied/);
   });
 
-  it('answers whether a delivery to the address, in any case, was recorded at or after the time', async () => {
-    const local = `canary-${randomUUID().slice(0, 8)}`;
-    const address = `${local}@example.test`;
-    const at = '2026-11-13T12:00:00.000Z';
-    expect(await seen(address, at)).toBe(false);
-    // A delivery before the time, a sent event at it, and a delivery to another address do not count.
-    await event(address, 'delivered', '2026-11-13T11:59:59.999Z');
-    await event(address, 'sent', at);
-    await event(`x${address}`, 'delivered', at);
-    expect(await seen(address, at)).toBe(false);
-    await event(address.toUpperCase(), 'delivered', at);
-    expect(await seen(address, at)).toBe(true);
-    expect(await seen(address.toUpperCase(), at)).toBe(true);
+  it('answers whether the sign-in mail to the address, in any case, was delivered for this request', async () => {
+    const address = canary();
+    expect(await seen(address, AT)).toBe(false);
+    // A sent event, and a delivery to another address, do not count.
+    await event(address, 'sent', AT, { from: SENDER, created_at: mailAt(1000) });
+    await event(`x${address}`, 'delivered', AT, { from: SENDER, created_at: mailAt(1000) });
+    expect(await seen(address, AT)).toBe(false);
+    await event(address.toUpperCase(), 'delivered', mailAt(5000), {
+      from: `Crawlmouse <${SENDER.toUpperCase()}>`,
+      created_at: mailAt(1000),
+    });
+    expect(await seen(address, AT)).toBe(true);
+    expect(await seen(address.toUpperCase(), AT)).toBe(true);
+  });
+
+  it('does not count another sender’s delivery to the address (review Q17)', async () => {
+    const address = canary();
+    await event(address, 'delivered', mailAt(5000), {
+      from: `Someone <${['news', 'example.test'].join('@')}>`,
+      created_at: mailAt(1000),
+    });
+    // The sender's address must be the whole of `from`'s address, not a part of it.
+    await event(address, 'delivered', mailAt(5000), {
+      from: `x${SENDER}`,
+      created_at: mailAt(1000),
+    });
+    expect(await seen(address, AT)).toBe(false);
+    await event(address, 'delivered', mailAt(5000), { from: SENDER, created_at: mailAt(1000) });
+    expect(await seen(address, AT)).toBe(true);
+  });
+
+  it('does not count an earlier mail delivered late, by the mail’s own time (review Q17)', async () => {
+    const address = canary();
+    // The run before's mail, created 10 minutes before this request, delivered after it.
+    await event(address, 'delivered', mailAt(30_000), {
+      from: SENDER,
+      created_at: mailAt(-10 * 60_000),
+    });
+    // A delivery event that carries no mail time, or one not shaped as a time, is not counted either.
+    await event(address, 'delivered', mailAt(30_000), { from: SENDER });
+    await event(address, 'delivered', mailAt(30_000), { from: SENDER, created_at: 'soon' });
+    expect(await seen(address, AT)).toBe(false);
+    // A mail created within a minute before the request time is this request's (clock difference).
+    await event(address, 'delivered', mailAt(30_000), {
+      from: SENDER,
+      created_at: mailAt(-30_000),
+    });
+    expect(await seen(address, AT)).toBe(true);
   });
 });
 
