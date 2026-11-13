@@ -427,9 +427,13 @@ lists those. A staging copy has no row. A row's grades, pills, last check and sc
 dashboard's own site row (`dashboardView`), so a withheld grade reads "withheld" as it does there.
 Rows with a problem opened since the site's previous check come first, then by host. The columns are
 Site, Client, Technical SEO, AI readability, Since last check, Next check, Last check, and Schedule ·
-report; Next check is an addition to the artboard. The report's part of the last column says what
-holds a schedule's reports where something does: "(paused by the recipient)", the client page's
-words, or "(no contact)".
+report; Next check is an addition to the artboard. The report's part of the last column says which
+of three things holds a schedule's reports, read from the account's own records: "(no contact)";
+"(not sent during the trial)" for an account in its Agency trial whose client's contact is not the
+owner's own address (§10, "Sending"); or "(paused by the recipient)", the client page's words. A
+contact that has not confirmed holds a report too (§10), and is not in those records
+(`/agency/reports` reads it apart), so on the matrix such a schedule reads as one that sends.
+`pnpm --filter @crawlmouse/web exec vitest run lib/v2/view/agency-matrix.test.ts -t 'says of a schedule'`.
 
 The header counts the clients against the account's site limit; for a seat that covers some clients
 it says how many are in the seat. The strip is absent until a client has two results. It then gives
