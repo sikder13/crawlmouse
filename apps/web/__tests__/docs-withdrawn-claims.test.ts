@@ -69,6 +69,15 @@ interface WithdrawnClaim {
 
 const WITHDRAWN: readonly WithdrawnClaim[] = [
   {
+    text: 'The records the screen reads do not say which the account pays',
+    withdrawnIn:
+      'docs/specs/v2/22-audit-flow.md (the Seats foot’s registry entry), CC-31 review round 7',
+    truth:
+      'account.billing_period_months is read from the account’s subscription, and the Seats foot ' +
+      'gives the year’s price of a seat to an account charged by the year.',
+    allowedIn: [],
+  },
+  {
     text: 'the changed and cascaded rows read 0',
     withdrawnIn: 'docs/ops/erasure.md §5, CC-V1FIX review round 1',
     truth:

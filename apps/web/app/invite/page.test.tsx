@@ -286,9 +286,7 @@ describe('/seats', () => {
     await subscription(owner.accountId, false);
     const renewing = await page();
     expect(renewing).toMatch(/<form[^>]* action="\/api\/billing\/seats"/);
-    expect(renewing).toContain(
-      'Four seats free. Beyond five, $12 a seat a month, or $120 a year on a yearly plan.',
-    );
+    expect(renewing).toContain('Four seats free. Beyond five, $12 a seat a month.');
     await subscription(owner.accountId, true);
     const ending = await page();
     expect(ending).not.toContain('/api/billing/seats');
