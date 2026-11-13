@@ -162,6 +162,9 @@ export const RULES = {
   links_read_html: one('only an HTML response has its links read'),
   // The crawl worker's batch result
   robots_body: two('a robots.txt body is kept exactly when the whole file was read'),
+  frontend_markers_order: one(
+    'front-end markers are listed once each, in the order FrontendMarker lists them',
+  ),
 } as const;
 
 export type RuleId = keyof typeof RULES;

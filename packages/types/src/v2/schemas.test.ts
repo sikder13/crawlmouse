@@ -19,6 +19,7 @@ import {
   AccessTestSchema,
   DeclarationFetchSchema,
   RobotsEvidenceSchema,
+  StackSignalsSchema,
   PageTitleSchema,
   AccountSchema,
   AgencyBrandingSchema,
@@ -1151,6 +1152,27 @@ const CASES: RuleCase[] = [
     breaks: 'a file read whole with no body kept',
     schema: RobotsEvidenceSchema,
     input: () => ({ ...robotsEvidence(), body: null, body_complete: true }),
+  },
+  // ── StackSignals ────────────────────────────────────────────────────────────────────────────
+  {
+    rule: 'frontend_markers_order',
+    breaks: 'a marker listed twice',
+    schema: StackSignalsSchema,
+    input: () => ({
+      cms: 'custom',
+      detected_from: 'HTML and response headers',
+      frontend_markers: ['next_data_script', 'next_data_script'],
+    }),
+  },
+  {
+    rule: 'frontend_markers_order',
+    breaks: 'markers out of the enum order',
+    schema: StackSignalsSchema,
+    input: () => ({
+      cms: 'custom',
+      detected_from: 'HTML and response headers',
+      frontend_markers: ['wp_content_path', 'next_static_path'],
+    }),
   },
   // ── DeclarationFetch ────────────────────────────────────────────────────────────────────────
   {

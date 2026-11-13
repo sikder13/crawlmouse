@@ -39,7 +39,7 @@ import {
   RedirectChainSchema,
   SearchRobotsSchema,
 } from './page-facts.js';
-import { CmsNameSchema } from './enums.js';
+import { CmsNameSchema, FrontendMarkerSchema } from './enums.js';
 import { rules } from './rules.js';
 import { MetaDescriptionSchema, PageTitleSchema } from './page-result.js';
 
@@ -131,10 +131,27 @@ export const ContentFeaturesSchema = z.strictObject({
 
 export type ContentFeaturesRow = z.infer<typeof ContentFeaturesSchema>;
 
-/** The CMS a page's HTML and response headers point to (v1's detectCms), and what it was read from. */
+const MARKER_ORDER = FrontendMarkerSchema.options;
+
+/**
+ * The CMS a page's HTML and response headers point to (v1's detectCms), and what it was read from;
+ * and the front-end markers the reader found there. `frontend_markers` is absent on a row written
+ * before the worker recorded it, which is not the same as an empty list: an empty list is a read that
+ * found none.
+ */
 export const StackSignalsSchema = z.strictObject({
   cms: CmsNameSchema,
   detected_from: z.string().min(1).max(200),
+  frontend_markers: z
+    .array(FrontendMarkerSchema)
+    .max(MARKER_ORDER.length)
+    .check(
+      rules((list, rule) => {
+        const at = list.map((m) => MARKER_ORDER.indexOf(m));
+        if (at.some((i, n) => n > 0 && i <= at[n - 1]!)) rule.fail('frontend_markers_order');
+      }),
+    )
+    .optional(),
 });
 
 /**
