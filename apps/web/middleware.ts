@@ -4,9 +4,16 @@ import { reportRefusal, reportedMethod, type Refusal } from '@/lib/security/refu
 import { isApiPath, isStateChanging, policyForPath } from '@/lib/security/route-policy';
 import { isCrossSite, isJsonBody, isSameOrigin } from '@/lib/security/same-origin';
 import { updateSession } from '@/lib/supabase/middleware';
-import { checksPublicEnabled } from '@/lib/auth/flags';
+import { checksPublicEnabled, pipelineEnabled } from '@/lib/auth/flags';
 import { billingV2Enabled } from '@/lib/billing/flags';
-import { isRewriteTarget, REWRITE_HEADER, rewriteOf, type RewriteFlag } from '@/lib/v2/rewrites';
+import {
+  apiGoneBody,
+  cutoverOf,
+  gonePageHtml,
+  type CutoverFlag,
+  type CutoverMatch,
+} from '@/lib/v2/cutover';
+import { isRewriteTarget, REWRITE_HEADER, rewriteOf } from '@/lib/v2/rewrites';
 
 /**
  * API requests: a state change to a route the registry guards (lib/security/route-policy.ts) is
@@ -60,6 +67,13 @@ export async function handleEdge(
   refresh: (req: NextRequest) => Promise<NextResponse> = updateSession,
   report: (r: Refusal) => void = (r) => void reportRefusal(r),
 ): Promise<NextResponse> {
+  // A retired v1 address whose flags are all on is answered here, page or API, before anything else
+  // reads the request (lib/v2/cutover.ts): its v1 page or route is not reached.
+  const retired = cutoverOf(req.nextUrl.pathname);
+  if (retired !== null && retired.row.flags.every((f) => FLAG_ON[f]())) {
+    return cutoverAnswer(req, retired);
+  }
+
   if (isApiPath(req.nextUrl.pathname)) return guardApi(req, report);
 
   // A rewrite target has no address of its own (lib/v2/rewrites.ts): no spelling of one is served,
@@ -91,17 +105,44 @@ export async function handleEdge(
   return res;
 }
 
+/** Whether each v2 flag is on, read per request: `V2_REWRITES` rows name one, `V1_CUTOVER` rows several. */
+const FLAG_ON: Readonly<Record<CutoverFlag, () => boolean>> = {
+  pipeline: () => pipelineEnabled(),
+  checksPublic: () => checksPublicEnabled(),
+  billing: () => billingV2Enabled(),
+};
+
+const NO_STORE = { 'Cache-Control': 'no-store' };
+
+/** A retired address's answer. A redirect keeps the query string. */
+function cutoverAnswer(req: NextRequest, { answer }: CutoverMatch): NextResponse {
+  switch (answer.kind) {
+    case 'redirect':
+      return NextResponse.redirect(
+        new URL(`${answer.to}${req.nextUrl.search}`, req.url),
+        answer.status,
+      );
+    case 'gone-page':
+      return new NextResponse(gonePageHtml(), {
+        status: 410,
+        headers: { 'Content-Type': 'text/html; charset=utf-8', 'X-Robots-Tag': 'noindex' },
+      });
+    case 'gone-api':
+      return NextResponse.json(apiGoneBody(answer.replacement), { status: 410, headers: NO_STORE });
+    case 'not-found':
+      return NextResponse.json(
+        { error: 'Not found', code: 'not_found' },
+        { status: 404, headers: NO_STORE },
+      );
+  }
+}
+
 /**
  * A path in `V2_REWRITES` is served by its v2 page while the row's flag is on (`FLAG_ON`). The rewrite carries
  * what the session refresh put on its response (the rotated auth cookies and the no-store headers
  * that must ride with them), the request headers the refresh updated, and the query string, so the
  * page reads the refreshed session as a v1 page would; and it marks the request as rewritten.
  */
-const FLAG_ON: Readonly<Record<RewriteFlag, () => boolean>> = {
-  checksPublic: () => checksPublicEnabled(),
-  billing: () => billingV2Enabled(),
-};
-
 function v2Rewrite(req: NextRequest, refreshed: NextResponse): NextResponse {
   const rewrite = rewriteOf(req.nextUrl.pathname);
   if (rewrite === null || !FLAG_ON[rewrite.flag]()) return refreshed;

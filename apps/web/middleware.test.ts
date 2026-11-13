@@ -4,6 +4,7 @@ import { unstable_doesMiddlewareMatch } from 'next/experimental/testing/server';
 import { config, handleEdge, middleware } from './middleware';
 import { CONSENT_REQUIRED_COOKIE } from '@/lib/consent';
 import { REWRITE_HEADER, V2_REWRITES } from '@/lib/v2/rewrites';
+import { V1_CUTOVER, type CutoverFlag } from '@/lib/v2/cutover';
 import { ROUTE_POLICIES, isStateChanging, type RoutePolicy } from '@/lib/security/route-policy';
 import type { Refusal } from '@/lib/security/refusal-event';
 
@@ -683,6 +684,104 @@ describe('the / row of the v2 rewrite table (CC-22b, carried onto lib/v2/rewrite
       expect(matches(row.from), row.from).toBe(true);
       expect(matches(row.to), row.to).toBe(true);
       expect(matches(`${row.to}/`), row.to).toBe(true);
+    }
+  });
+});
+
+describe('the v1 cutover table (CC-36 D1, D2): each row both ways', () => {
+  const ENV: Record<CutoverFlag, string> = {
+    pipeline: 'V2_PIPELINE',
+    checksPublic: 'V2_CHECKS_PUBLIC',
+    billing: 'V2_BILLING',
+  };
+  const FLAGS = Object.keys(ENV) as CutoverFlag[];
+  const refresh = (req: NextRequest) => Promise.resolve(NextResponse.next({ request: req }));
+  /** A path the row matches: each `:name` filled, a `*` tail as one procedure. */
+  const example = (from: string) =>
+    from.replace(/:([a-z]+)/g, (_, n: string) => `x-${n}`).replace(/\*$/, 'audit.get');
+  const set = (on: readonly CutoverFlag[]) => {
+    for (const f of FLAGS) vi.stubEnv(ENV[f], on.includes(f) ? '1' : '');
+  };
+  afterEach(() => vi.unstubAllEnvs());
+
+  const ROWS = V1_CUTOVER.map((r) => [r.from, r] as const);
+
+  it.each(ROWS)('%s, every flag it names on: its answer', async (from, row) => {
+    set(row.flags);
+    for (const method of row.from.startsWith('/api/') ? ['GET', 'POST'] : ['GET']) {
+      const req = new NextRequest(
+        new Request(`https://crawlmouse.com${example(from)}?q=1`, { method }),
+      );
+      const res = await handleEdge(req, refresh, () => {});
+      const a = row.answer;
+      if (a.kind === 'redirect') {
+        expect(res.status).toBe(a.status);
+        expect(res.headers.get('location')).toBe(
+          `https://crawlmouse.com${a.to.replace(/:([a-z]+)/g, (_, n: string) => `x-${n}`)}?q=1`,
+        );
+      } else if (a.kind === 'gone-page') {
+        expect(res.status).toBe(410);
+        expect(res.headers.get('content-type')).toBe('text/html; charset=utf-8');
+        expect(await res.text()).toContain('Leaderboards were retired');
+      } else if (a.kind === 'gone-api') {
+        expect(res.status).toBe(410);
+        expect(await res.json()).toMatchObject({ code: 'gone', replacement: a.replacement });
+        expect(res.headers.get('cache-control')).toBe('no-store');
+      } else {
+        expect(res.status).toBe(404);
+        expect(await res.json()).toEqual({ error: 'Not found', code: 'not_found' });
+      }
+      expect(res.headers.get('x-middleware-rewrite')).toBeNull();
+      expect(res.headers.get('x-middleware-next')).toBeNull();
+    }
+  });
+
+  // Each flag the row names switched off in turn, the others it names on and every other flag on:
+  // the middleware does what it does on main, so v1's page or route answers.
+  it.each(ROWS.flatMap(([from, row]) => row.flags.map((off) => [from, off, row] as const)))(
+    '%s with %s off: passed on to v1, as on main',
+    async (from, off, row) => {
+      set(FLAGS.filter((f) => f !== off));
+      const path = example(from);
+      const req = new NextRequest(new Request(`https://crawlmouse.com${path}`));
+      const res = await handleEdge(req, refresh, () => {});
+      expect(res.status).toBe(200);
+      expect(res.headers.get('x-middleware-next')).toBe('1');
+      expect(res.headers.get('x-middleware-rewrite')).toBeNull();
+      expect(res.headers.get('location')).toBeNull();
+      // A page is still refreshed and given the consent cookie; an API path is guardApi's.
+      expect(res.cookies.get(CONSENT_REQUIRED_COOKIE) !== undefined).toBe(
+        !row.from.startsWith('/api/'),
+      );
+    },
+  );
+
+  it('with every flag off, no row answers (the flag-off state is main)', async () => {
+    set([]);
+    for (const row of V1_CUTOVER) {
+      const req = new NextRequest(new Request(`https://crawlmouse.com${example(row.from)}`));
+      const res = await handleEdge(req, refresh, () => {});
+      expect([res.status, res.headers.get('x-middleware-next')]).toEqual([200, '1']);
+    }
+  });
+
+  it('a retired API path answers before the cross-site guard, so a v1 handler is never reached', async () => {
+    set(FLAGS);
+    const req = new NextRequest(
+      new Request('https://crawlmouse.com/api/audits/start', {
+        method: 'POST',
+        headers: { origin: 'https://evil.example', 'content-type': 'text/plain' },
+      }),
+    );
+    const report = vi.fn();
+    const res = await handleEdge(req, refresh, report);
+    expect(res.status).toBe(410);
+    expect(report).not.toHaveBeenCalled();
+  });
+
+  it('the matcher sends every row through the middleware', () => {
+    for (const row of V1_CUTOVER) {
+      expect(unstable_doesMiddlewareMatch({ config, url: example(row.from) }), row.from).toBe(true);
     }
   });
 });
