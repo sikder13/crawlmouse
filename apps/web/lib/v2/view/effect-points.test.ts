@@ -168,15 +168,12 @@ describe('the Result, built from a fixture whose fixes are edited', () => {
     expect(rest.points).toBe(`+${2 * rest.count} SEO`);
   });
 
-  it('the grouped "N more" row: counts AI effects, the pages line and waiting effects, as groupPoints does', () => {
+  it('the grouped "N more" row: its sums and pages first, the waiting count only when nothing adds up', () => {
     const v = resultOf((fixes) => setAll(fixes, 5, 0));
     const rest = v.fixes!.rows.find((r) => r.key === 'rest')!;
     expect(rest.points).toBe(`+${5 * rest.count} AI`);
     expect(restPoints([fixWith(5, 0, 'crawler_access'), fixWith(0, 2, 'structure')])).toBe(
       '+2 SEO, +5 AI',
-    );
-    expect(restPoints([fixWith(null, 0, 'crawler_access'), fixWith(0, 0, 'structure')])).toBe(
-      'AI not yet estimated for 1',
     );
     const shell: Fix = {
       ...fixWith(0, 0, 'without_js'),
@@ -190,8 +187,32 @@ describe('the Result, built from a fixture whose fixes are edited', () => {
     expect(restPoints([shell, fixWith(0, 3, 'structure')])).toBe(
       '+3 SEO; Makes 4 pages readable without JavaScript',
     );
+    // a sum shows, so a waiting member is not counted
+    expect(restPoints([fixWith(0, 5, 'structure'), fixWith(null, 0, 'crawler_access')])).toBe(
+      '+5 SEO',
+    );
+    // nothing adds up: the waiting count
+    expect(restPoints([fixWith(null, 0, 'crawler_access'), fixWith(0, 0, 'structure')])).toBe(
+      'AI not yet estimated for 1',
+    );
+    // a fix headed by its pages is never counted as waiting, beside another waiting fix
+    const waitingShell: Fix = { ...shell, effect: { ...shell.effect, ai_readability: null } };
+    expect(restPoints([waitingShell, fixWith(null, 0, 'crawler_access')])).toBe(
+      'Makes 4 pages readable without JavaScript',
+    );
+  });
+
+  it('the grouped "N more" row: a known Technical SEO sum shows beside unknown ones', () => {
+    const mixed = [fixWith(0, 3, 'structure'), fixWith(0, null, 'structure')];
+    expect(restPoints(mixed)).toBe('+3 SEO');
     expect(restPoints([fixWith(2, null, 'crawler_access'), fixWith(0, 0, 'structure')])).toBe(
-      '+2 AI; SEO not estimated',
+      '+2 AI',
+    );
+    // every member's unknown: "SEO not estimated" when nothing else adds up
+    const unknown = [fixWith(0, null, 'structure'), fixWith(null, null, 'crawler_access')];
+    expect(restPoints(unknown)).toBe('SEO not estimated');
+    expect(restPoints([fixWith(4, null, 'crawler_access'), fixWith(0, null, 'structure')])).toBe(
+      '+4 AI',
     );
   });
 

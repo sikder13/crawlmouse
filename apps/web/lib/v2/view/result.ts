@@ -20,7 +20,6 @@ import {
   formatPoints,
   groupSum,
   NO_EFFECT,
-  makesReadable,
   NO_EFFECT_SHORT,
   pagesReadable,
 } from './effect-headline';
@@ -822,27 +821,31 @@ function fixRows(
 }
 
 /**
- * The grouped row's points, in the table's short words and by `groupPoints`' rule
- * (segment/fixes.ts): each grade's points summed with every member taken at 0 when below it
- * (`groupSum`), "SEO not estimated" when a member's Technical SEO effect is, the pages the
- * `pages_readable` members make readable, and how many members' AI effect still waits. "No measurable
- * effect" only when none of that has anything to say.
+ * The grouped row's points, in the table's short words. Its own rule, so the row reads as the locked
+ * Final-Result does ("+5 SEO"):
+ *   1. what the group adds up to: Technical SEO points and AI points, each member taken at 0 when
+ *      below it (`groupSum`; a member whose effect is not estimated counts 0, so a known sum shows
+ *      beside unknown ones), and the pages the `pages_readable` members make readable; when no
+ *      member's Technical SEO effect is estimated and nothing else adds up, "SEO not estimated";
+ *   2. with nothing of that, how many members' AI effect still waits, "AI not yet estimated for N";
+ *   3. otherwise "No measurable effect".
+ * A pages-headed fix is never counted as waiting: its pages line is a part of step 1, so step 2 is
+ * not reached.
  */
 export function restPoints(
   fixes: readonly Pick<Fix, 'type' | 'effect' | 'affected_pages' | 'last_state'>[],
 ): string {
-  const seoUnknown = fixes.some((f) => f.effect.technical_seo === null);
-  const seo = seoUnknown ? null : formatPoints(groupSum(fixes.map((f) => f.effect.technical_seo!)));
+  const seoKnown = fixes.some((f) => f.effect.technical_seo !== null);
+  const seo = seoKnown
+    ? formatPoints(groupSum(fixes.map((f) => f.effect.technical_seo ?? 0)))
+    : null;
   const ai = formatPoints(groupSum(fixes.map((f) => f.effect.ai_readability ?? 0)));
   const figures = [seo && `${seo} SEO`, ai && `${ai} AI`].filter(Boolean).join(', ');
-  const waiting = fixes.filter((f) => f.effect.ai_readability === null && !makesReadable(f)).length;
-  const parts = [
-    figures || null,
-    seoUnknown ? 'SEO not estimated' : null,
-    pagesReadable(fixes),
-    waiting ? `AI not yet estimated for ${waiting}` : null,
-  ].filter(Boolean);
-  return parts.length ? parts.join('; ') : NO_EFFECT_SHORT;
+  const sums = [figures || null, pagesReadable(fixes)].filter(Boolean);
+  if (sums.length) return sums.join('; ');
+  if (!seoKnown) return 'SEO not estimated';
+  const waiting = fixes.filter((f) => f.effect.ai_readability === null).length;
+  return waiting ? `AI not yet estimated for ${waiting}` : NO_EFFECT_SHORT;
 }
 
 const GROUP_NAMES: Record<CrawlerResult['group'], string> = {
