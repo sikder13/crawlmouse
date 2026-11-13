@@ -80,7 +80,9 @@ export function SeatsScreen({
           }))}
         />
         {people.foot ? <div className={shared.foot}>{people.foot}</div> : null}
-        <p className={styles.mailNote}>{people.mailNote}</p>
+        <p className={styles.mailNote} data-v2-addition="">
+          {people.mailNote}
+        </p>
       </Card>
 
       <Card as="section" className={shared.panel}>

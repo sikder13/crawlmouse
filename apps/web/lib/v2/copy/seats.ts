@@ -3,7 +3,10 @@
  * not here: the view reads them from the account's rows, `GATES` and `prices.ts`.
  */
 import type { SeatRole } from '@crawlmouse/types/v2';
+import { EXTRA_SEAT, usd } from '../../billing/prices';
 import type { SeatAction } from '../agency/guard';
+import type { Addition, CopyChange } from '../copy-registry';
+import { agencyRailChanges } from './agency';
 
 export const SEATS_COPY = {
   title: 'Seats',
@@ -102,3 +105,80 @@ export const INVITE_COPY = {
   goneTitle: 'This invitation cannot be used',
   gone: 'It was accepted, replaced by a newer one, removed, or it has expired. The account’s owner can send another.',
 } as const;
+
+// ── Where Seats differs from its locked HTML ─────────────────────────────────────────────────
+// Applied in order by the lock comparison (__tests__/v2/seats.test.tsx). The preview reads
+// challenged-site's Northwind Digital, the contract's one agency; the artboard drew an agency of
+// twelve clients that no fixture holds.
+
+const NORTHWIND_SEATS =
+  'The fixture: Northwind Digital, whose four seats are Alex (owner), Priya and Sam (account managers, one client each) and Lee (developer), with two clients; the artboard drew an agency of twelve';
+
+export const SEATS_CHANGES: CopyChange[] = [
+  ...agencyRailChanges('agency-seats'),
+  {
+    screen: 'agency-seats',
+    kind: 'fixture',
+    locked: '@summitdigital.co',
+    rendered: '@northwind-digital.example',
+    all: true,
+    source: NORTHWIND_SEATS,
+  },
+  {
+    screen: 'agency-seats',
+    kind: 'fixture',
+    locked: 'all 12',
+    rendered: 'all 2',
+    all: true,
+    source: NORTHWIND_SEATS,
+  },
+  {
+    screen: 'agency-seats',
+    kind: 'fixture',
+    locked: '7 · example-outfitter, holicfoods, …',
+    rendered: '1 · granitepeak.example',
+    source: `${NORTHWIND_SEATS}. A seat that covers some clients names them, up to two, and then an ellipsis`,
+  },
+  {
+    screen: 'agency-seats',
+    kind: 'fixture',
+    locked: '5 · nahltech, ridgelineoutdoors, …',
+    rendered: '1 · harborlight.example',
+    source: NORTHWIND_SEATS,
+  },
+  {
+    screen: 'agency-seats',
+    kind: 'ruling',
+    locked: '$9 a seat a month',
+    rendered: `${usd(EXTRA_SEAT)} a seat a month`,
+    source: 'The price of a seat beyond the plan’s is lib/billing/prices.ts EXTRA_SEAT',
+  },
+];
+
+export const SEATS_ADDITIONS: Addition[] = [
+  {
+    screen: 'agency-seats',
+    what: 'Under the People table: "An invitation is the sign-in email with one extra line; nothing else is sent."',
+    source: 'FACTS: what an invited person receives',
+  },
+  {
+    screen: 'agency-seats',
+    what: 'An "Invited" pill on a seat whose invitation is not yet accepted',
+    source: 'CC-31 D3: an invited seat holds its place until the invitation is accepted or expires',
+  },
+  {
+    screen: 'agency-seats',
+    what: 'The invite form (address, role, the clients the seat covers), which "Invite someone" links to, and each row’s Change form',
+    source: 'CC-31 D3; the artboard draws the buttons and no form',
+  },
+  {
+    screen: 'agency-seats',
+    what: 'The buy form: seats and sites beyond the plan’s, for the owner where they are sold',
+    source: 'CC-31 D4',
+  },
+  {
+    screen: 'agency-seats',
+    what: 'The line a form’s answer sends back (a notice)',
+    source: 'CC-31 D3 and D4: each form answers on the page it was posted from',
+  },
+];

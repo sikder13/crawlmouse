@@ -19,6 +19,7 @@ import { SEAT_GUARD } from '../../lib/v2/agency/guard';
 import { ROLE_ROWS } from '../../lib/v2/copy/seats';
 import { inviteView, seatsView } from '../../lib/v2/view/seats';
 import { CC31_SEAT_ELEMENTS } from './_lib/screens';
+import { expected, firstDifference, locked, renderedText, withoutShell } from './_lib/lock';
 
 const OWNER = '/v2-preview/screens/seats';
 const PRO_FULL = '/v2-preview/screens/seats/pro-full';
@@ -318,5 +319,17 @@ describe('inviteView', () => {
       lines: [expect.any(String)],
       notice: 'gone',
     });
+  });
+});
+
+describe('Seats against Final-Ag-Seats', () => {
+  it('reads as the locked HTML outside the rail’s links, with each registered change and nothing else', () => {
+    const html = renderToStaticMarkup(CC31_SEAT_ELEMENTS[OWNER]!());
+    expect(
+      firstDifference(
+        expected(withoutShell(locked('Final-Ag-Seats.dc.html')).rest, 'agency-seats'),
+        renderedText(withoutShell(html).rest),
+      ),
+    ).toBeNull();
   });
 });
