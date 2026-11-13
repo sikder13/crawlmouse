@@ -131,7 +131,7 @@ const NORTHWIND =
   'The fixture: Northwind Digital at its as_of, Mon 2 Nov in the account’s zone, with two clients (granitepeak.example and harborlight.example); the artboard drew an agency of twelve that no fixture holds';
 const D11 = 'CC-31 brief, D11: Branding (the agency’s domain and sender) is not in this step';
 
-/** The agency rail's plan card, which the matrix, the client page and Seats share. */
+/** The agency rail's plan card, which the matrix, the client page, Seats and client reports share. */
 export function agencyRailChanges(screen: LockedScreen): CopyChange[] {
   return [
     {

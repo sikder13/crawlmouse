@@ -67,6 +67,7 @@ import {
 } from '../../../app/(v2-preview)/v2-preview/_preview/seats';
 import { ClientScreen } from '../../../components/v2/screens/agency/ClientScreen';
 import { MatrixScreen } from '../../../components/v2/screens/agency/MatrixScreen';
+import { ClientReportsScreen } from '../../../components/v2/screens/agency/ReportsScreen';
 import {
   AGENCY_PREVIEWS,
   CLIENT_PREVIEWS,
@@ -75,6 +76,11 @@ import {
   type AgencyPreview,
   type ClientPreview,
 } from '../../../app/(v2-preview)/v2-preview/_preview/agency';
+import {
+  CLIENT_REPORTS_PREVIEWS,
+  clientReportsPreview,
+  type ClientReportsPreview,
+} from '../../../app/(v2-preview)/v2-preview/_preview/agency-reports';
 
 export const homeData = homePreview;
 
@@ -174,7 +180,7 @@ export const CC31_SEAT_ELEMENTS: Record<string, () => React.ReactElement> = {
   ),
 };
 
-/** CC-31's agency screens: each state of the client matrix, and the client page. */
+/** CC-31's agency screens: each state of the client matrix, the client page, and client reports. */
 export const CC31_ELEMENTS: Record<string, () => React.ReactElement> = {
   ...Object.fromEntries(
     (Object.keys(AGENCY_PREVIEWS) as AgencyPreview[]).map((path) => [
@@ -190,6 +196,12 @@ export const CC31_ELEMENTS: Record<string, () => React.ReactElement> = {
         if (data?.kind !== 'client') throw new Error(`${path} has no client page to render`);
         return <ClientScreen data={data} />;
       },
+    ]),
+  ),
+  ...Object.fromEntries(
+    (Object.keys(CLIENT_REPORTS_PREVIEWS) as ClientReportsPreview[]).map((path) => [
+      path,
+      () => <ClientReportsScreen data={clientReportsPreview(path)} />,
     ]),
   ),
 };

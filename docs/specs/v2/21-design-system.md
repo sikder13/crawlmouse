@@ -559,6 +559,12 @@ From `apps/web/app/(v2-preview)/v2-preview/_preview/registry.ts`. They are serve
 | Clients, acting in another account              | `/v2-preview/screens/agency/open`                        | screen    |                                      |
 | Final-Ag-Client                                 | `/v2-preview/screens/agency/client`                      | screen    |                                      |
 | Client, nothing open                            | `/v2-preview/screens/agency/client/clean`                | screen    |                                      |
+| Final-Ag-Reports                                | `/v2-preview/screens/agency/reports`                     | screen    |                                      |
+| Client reports, a client in each state          | `/v2-preview/screens/agency/reports/states`              | screen    |                                      |
+| Client reports, one client’s forms open         | `/v2-preview/screens/agency/reports/change`              | screen    |                                      |
+| Client reports, a developer                     | `/v2-preview/screens/agency/reports/developer`           | screen    |                                      |
+| Client reports, the Agency trial                | `/v2-preview/screens/agency/reports/trial`               | screen    |                                      |
+| Client reports, below Agency                    | `/v2-preview/screens/agency/reports/gate`                | screen    |                                      |
 | Final-LinkMap                                   | `/v2-preview/screens/map`                                | screen    |                                      |
 | Link map, every page                            | `/v2-preview/screens/map/all`                            | screen    |                                      |
 | Link map, clean bill                            | `/v2-preview/screens/map/clean`                          | screen    |                                      |

@@ -37,9 +37,10 @@ export const SPEC_27_PATH = join(
 );
 
 const SCREENS = ['alerts', 'reports', 'settings', 'trial-end'] as const;
+// An agency screen is SPEC 31's, whatever its name holds ("agency-reports").
 const ours = (screen: string) =>
   (SCREENS as readonly string[]).includes(screen) ||
-  /changes log|alerts|reports|settings/i.test(screen);
+  (!screen.startsWith('agency-') && /changes log|alerts|reports|settings/i.test(screen));
 
 /** The brief's decisions, each with its reason (the brief asks for them in the spec). */
 const DECISIONS: [string, string, string][] = [

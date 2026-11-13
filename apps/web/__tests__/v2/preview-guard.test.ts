@@ -189,7 +189,7 @@ describe('v2 stays out of live pages', () => {
     join(WEB_ROOT, 'app', 'sites'),
     join(WEB_ROOT, 'app', 'seats'),
     join(WEB_ROOT, 'app', 'invite'),
-    // CC-31: the agency's client matrix and client page.
+    // CC-31: the agency's client matrix, client page and client reports.
     join(WEB_ROOT, 'app', 'agency'),
     // CC-28: the Alerts page and the changes log.
     join(WEB_ROOT, 'app', 'alerts'),
@@ -234,6 +234,7 @@ describe('v2 stays out of live pages', () => {
     expect(pages.map((f) => relative(WEB_ROOT, f)).sort()).toEqual([
       'app/agency/clients/[siteId]/page.tsx',
       'app/agency/page.tsx',
+      'app/agency/reports/page.tsx',
       'app/alerts/page.tsx',
       'app/changes/page.tsx',
       'app/dashboard/v2/page.tsx',

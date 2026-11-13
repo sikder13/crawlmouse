@@ -35,6 +35,7 @@ import { SIGNALS_ADDITIONS, SIGNALS_CHANGES } from './copy/segment-signals';
 import { STRUCTURE_ADDITIONS, STRUCTURE_CHANGES } from './copy/segment-structure';
 import { ACCOUNT_DOOR_ADDITIONS, ACCOUNT_DOOR_CHANGES } from './copy/account-door';
 import { CLIENT_ADDITIONS, CLIENT_CHANGES, MATRIX_ADDITIONS, MATRIX_CHANGES } from './copy/agency';
+import { CLIENT_REPORTS_ADDITIONS, CLIENT_REPORTS_CHANGES } from './copy/client-reports';
 import { SEATS_ADDITIONS, SEATS_CHANGES } from './copy/seats';
 
 export type LockedScreen =
@@ -61,7 +62,8 @@ export type LockedScreen =
   | 'trial-end'
   | 'agency-matrix'
   | 'agency-client'
-  | 'agency-seats';
+  | 'agency-seats'
+  | 'agency-reports';
 
 export interface CopyChange {
   screen: LockedScreen;
@@ -406,6 +408,7 @@ export const COPY_CHANGES: CopyChange[] = [
   ...MATRIX_CHANGES,
   ...CLIENT_CHANGES,
   ...SEATS_CHANGES,
+  ...CLIENT_REPORTS_CHANGES,
 ];
 
 export interface Addition {
@@ -478,6 +481,7 @@ export const ADDITIONS: Addition[] = [
   ...MATRIX_ADDITIONS,
   ...CLIENT_ADDITIONS,
   ...SEATS_ADDITIONS,
+  ...CLIENT_REPORTS_ADDITIONS,
 ];
 
 /**
