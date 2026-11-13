@@ -9,7 +9,7 @@
  * Refused before any Stripe call: quantities the plan does not sell (`limitsFor`), more extra seats
  * than `MAX_EXTRA_SEATS`, and a limit below what the account uses (`in_use`), so the webhook does not
  * remove a person or pause a site because of a request made here. Refused once the subscription is
- * read: one that is set to end, one that is not `active` or `trialing`, one whose items are not
+ * read: one that is set to end, one that is not `active` (a trial's included), one whose items are not
  * the catalog's Agency plan (`mirrorOf`), and a change that raises one quantity and lowers the other
  * (`mixed_change`): one update has one proration rule, and a raise's would credit the lowered item.
  */
@@ -136,21 +136,22 @@ const invoiceId = (sub: Stripe.Subscription): string => {
 };
 
 /**
- * How long one request's retries share a key. Stripe keeps the first answer for a key for a day,
- * a card's decline included, and a declined raise changes nothing the key is built from; so the key
- * also names the ten minutes it was made in, and the same change asked again after them is a new
- * attempt (with another card, say). Asking twice is safe either way: the quantities are the ones
- * wanted, not amounts to add, and a subscription that already holds them is answered before Stripe
- * is called.
+ * The length of the clock windows a key names. Stripe keeps the first answer for a key for a day,
+ * a card's decline included, and a declined raise changes nothing else the key is built from; so
+ * the key also names the ten-minute window of the clock it was made in, and the same change asked
+ * in a later window is a new attempt (with another card, say). The windows are fixed, so two
+ * attempts a second apart on either side of a boundary have two keys. Asking twice is safe either
+ * way: the quantities are the ones wanted, not amounts to add, and a subscription that already
+ * holds them is answered before Stripe is called.
  */
 export const RETRY_WINDOW_MS = 10 * 60 * 1000;
 
 /**
- * The key Stripe deduplicates a change by. A retry of one request finds the subscription as the
- * first attempt found it, so it repeats the key. A later request for the same quantities (bought,
- * lowered, bought again) must not: it differs in the quantities it starts from, in the
- * subscription's latest invoice (a paid raise makes one), in the last event the mirror applied, or
- * in its `RETRY_WINDOW_MS` window.
+ * The key Stripe deduplicates a change by. A retry of one request within one `RETRY_WINDOW_MS`
+ * window finds the subscription as the first attempt found it, and repeats the key. A later
+ * request for the same quantities (bought, lowered, bought again) does not: it differs in the
+ * quantities it starts from, in the subscription's latest invoice (a paid raise makes one), in the
+ * last event the mirror applied, or in its window.
  */
 function idempotencyKey(
   sub: Stripe.Subscription,
