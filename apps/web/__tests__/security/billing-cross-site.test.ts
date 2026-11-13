@@ -71,7 +71,6 @@ const ROUTES = [
   ['checkout', () => import('../../app/api/billing/checkout/route')],
   ['portal', () => import('../../app/api/billing/portal/route')],
   ['cancel', () => import('../../app/api/billing/cancel/route')],
-  ['agency-trial', () => import('../../app/api/billing/agency-trial/route')],
 ] as const;
 
 const BODY = new URLSearchParams({ plan: 'pro', interval: 'month' }).toString();

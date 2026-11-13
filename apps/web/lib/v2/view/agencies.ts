@@ -101,8 +101,8 @@ export const CAPABILITIES: Readonly<Record<CapabilityKey, Capability>> = {
   },
   agency_trial: {
     status: 'built',
-    what: 'The 14-day Agency trial with the card taken at Checkout (CC-03).',
-    proof: { kind: 'exists', path: 'apps/web/app/api/billing/agency-trial/route.ts' },
+    what: 'The 14-day Agency trial with the card taken at Checkout, consent recorded (CC-03, CC-29).',
+    proof: { kind: 'exists', path: 'apps/web/app/api/agency-trial/route.ts' },
   },
   cancel: {
     status: 'built',
