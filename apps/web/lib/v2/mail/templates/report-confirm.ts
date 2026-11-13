@@ -22,8 +22,14 @@ export interface ReportConfirmInput {
 
 export const reportConfirm: Template<ReportConfirmInput> = ({ token, agencyName, host }) => {
   const link = reportConfirmUrl(token);
-  const subject = `${accountNameText(agencyName) ?? 'An agency'} asks to send you reports about ${hostText(host)}`;
-  const lead = `${subject}. Open the link and confirm on that page if you want them.`;
+  // The subject and the first words are ours, and within the mailer's 200 characters whatever
+  // the host (`hostText` bounds it): a longer subject is refused after the link was issued. The
+  // agency's name is text its owner typed, mailed to an address its owner chose: it is given after
+  // them, in quotation marks, as a name.
+  const subject = `An agency asks to send you reports about ${hostText(host)}`;
+  const name = accountNameText(agencyName);
+  const named = name === null ? '' : ` The agency’s account is called “${name}”.`;
+  const lead = `${subject}.${named} Open the link and confirm on that page if you want them.`;
   const rule = 'No report is sent unless you confirm. You need no account.';
   const ignore = "If you weren't expecting this, you can safely ignore this email.";
   return {

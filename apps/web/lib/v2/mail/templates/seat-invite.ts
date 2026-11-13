@@ -24,8 +24,12 @@ export interface SeatInviteInput {
 
 export const seatInvite: Template<SeatInviteInput> = ({ token, accountName, role }) => {
   const link = seatInviteUrl(token);
-  const subject = `${INVITE_COPY.title} ${INVITE_COPY.to(accountNameText(accountName))}`;
-  const lead = `${subject}. ${INVITE_COPY.role[role]}`;
+  // The subject and the first words are ours. The account's name is text its owner typed, mailed
+  // to an address its owner chose: it is given after them, in quotation marks, as a name.
+  const subject = `${INVITE_COPY.title} ${INVITE_COPY.to(null)}`;
+  const name = accountNameText(accountName);
+  const named = name === null ? '' : ` Its owner calls it “${name}”.`;
+  const lead = `${subject}.${named} ${INVITE_COPY.role[role]}`;
   const how =
     'The page asks you to sign in with the address this email was sent to, and then to accept.';
   const life = `The link works for ${INVITE_LINK_DAYS} days.`;

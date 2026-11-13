@@ -111,7 +111,8 @@ describe('one invitation, one mail', () => {
     expect(transport.sent).toHaveLength(1);
     const m = transport.sent[0]!;
     expect(m.to).toBe(inv.email);
-    expect(m.subject).toBe('You are invited to Summit Digital on Crawlmouse');
+    expect(m.subject).toBe('You are invited to an account on Crawlmouse');
+    expect(m.text).toContain('Its owner calls it “Summit Digital”.');
     expect(m.idempotencyKey).toBe(`seat_invite:${inv.seatId}:1`);
 
     const token = tokenIn(m.text);

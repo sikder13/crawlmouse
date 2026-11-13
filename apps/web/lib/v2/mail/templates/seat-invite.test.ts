@@ -13,9 +13,10 @@ const HOSTILE = '<script>x</script>"\'&\r\nBcc: victim@example.com https://evil.
 describe('seat-invite (CC-31 D3)', () => {
   it('says which account invites the reader and as what, and links the invitation alone', () => {
     const m = seatInvite({ token: TOKEN, accountName: 'Summit Digital', role: 'account_manager' });
-    expect(m.subject).toBe('You are invited to Summit Digital on Crawlmouse');
+    // The subject and the first words are fixed; the name its owner typed follows, quoted.
+    expect(m.subject).toBe('You are invited to an account on Crawlmouse');
     expect(m.text).toContain(
-      'You are invited to Summit Digital on Crawlmouse. As an account manager you see audits and packets, run checks, and edit and send client reports.',
+      'You are invited to an account on Crawlmouse. Its owner calls it “Summit Digital”. As an account manager you see audits and packets, run checks, and edit and send client reports.',
     );
     expect(htmlTargets(m.html)).toEqual([LINK]);
     expect(textUrls(m.text)).toEqual([LINK]);
@@ -35,6 +36,7 @@ describe('seat-invite (CC-31 D3)', () => {
       const m = seatInvite({ token: TOKEN, accountName, role: 'developer' });
       expect(m.subject).toBe('You are invited to an account on Crawlmouse');
       expect(m.text).toContain('You are invited to an account on Crawlmouse. As a developer');
+      expect(m.text).not.toContain('calls it');
     },
   );
 

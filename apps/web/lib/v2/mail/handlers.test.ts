@@ -418,7 +418,8 @@ describe('the seat invitation (CC-31 D3)', () => {
     expect(m.to).toBe(INVITEE);
     expect(m.headers).toEqual({});
     expect(m.text).toContain(`https://crawlmouse.com/invite/${inviteToken(1)}`);
-    expect(m.subject).toBe('You are invited to Summit Digital on Crawlmouse');
+    expect(m.subject).toBe('You are invited to an account on Crawlmouse');
+    expect(m.text).toContain('Its owner calls it “Summit Digital”.');
     for (const part of [m.subject, m.text, m.html]) expect(part).not.toContain('invitee');
     expect(s.issueSeatInvite).toHaveBeenCalledTimes(1);
     expect(s.issueSeatInvite).toHaveBeenCalledWith(SEAT, 1, NOW);
@@ -646,7 +647,8 @@ describe('the confirmation asked of a client’s contact (CC-31 D8)', () => {
     expect(m.to).toBe(CONTACT);
     expect(m.headers).toEqual({});
     expect(m.text).toContain(`https://crawlmouse.com/s/confirm/${RAW}`);
-    expect(m.subject).toBe('Summit Digital asks to send you reports about client.example');
+    expect(m.subject).toBe('An agency asks to send you reports about client.example');
+    expect(m.text).toContain('The agency’s account is called “Summit Digital”.');
     for (const part of [m.subject, m.text, m.html]) expect(part).not.toContain('contact@');
     expect(s.issueConfirmation).toHaveBeenCalledWith(SITE, NOW);
   });

@@ -10,8 +10,11 @@ const HOSTILE = '<script>x</script>"\'&\r\nBcc: victim@example.com https://evil.
 describe('report-confirm (CC-31 D8)', () => {
   it('says which agency asks to send reports about which site, and links the confirmation alone', () => {
     const m = reportConfirm({ token: TOKEN, agencyName: 'Summit Digital', host: 'example.com' });
-    expect(m.subject).toBe('Summit Digital asks to send you reports about example.com');
-    expect(m.text).toContain('Summit Digital asks to send you reports about example.com.');
+    // The subject and the first words are fixed; the name its owner typed follows, quoted.
+    expect(m.subject).toBe('An agency asks to send you reports about example.com');
+    expect(m.text).toContain(
+      'An agency asks to send you reports about example.com. The agency’s account is called “Summit Digital”. Open the link',
+    );
     expect(htmlTargets(m.html)).toEqual([LINK]);
     expect(textUrls(m.text)).toEqual([LINK]);
   });
@@ -27,7 +30,10 @@ describe('report-confirm (CC-31 D8)', () => {
   it.each([null, '', '  '])('names no agency when the account has no name (%j)', (agencyName) => {
     const m = reportConfirm({ token: TOKEN, agencyName, host: 'example.com' });
     expect(m.subject).toBe('An agency asks to send you reports about example.com');
-    expect(m.text).toContain('An agency asks to send you reports about example.com.');
+    expect(m.text).toContain(
+      'An agency asks to send you reports about example.com. Open the link and confirm',
+    );
+    expect(m.text).not.toContain('is called');
   });
 
   it.each(['agencyName', 'host'] as const)(
@@ -38,6 +44,10 @@ describe('report-confirm (CC-31 D8)', () => {
       expect(m.html).not.toContain('<script>');
       expect(m.subject).not.toMatch(/[\r\n]/);
       expect(m.subject.length).toBeLessThanOrEqual(200);
+      // The subject holds none of the agency's own words, whatever they are.
+      if (field === 'agencyName') {
+        expect(m.subject).toBe('An agency asks to send you reports about example.com');
+      }
       expect(foreignTargets(m)).toEqual([]);
       expect(htmlTargets(m.html)).toEqual([LINK]);
       expect(() =>
