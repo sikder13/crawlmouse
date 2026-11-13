@@ -370,13 +370,24 @@ later window, where Stripe would otherwise replay the decline for a day.
 back to Seats with the line "Seats and sites are bought once the trial has become the plan."
 (`extras_in_trial`), not the line of a plan that is ending or unpaid.
 
-**Where buying is offered** is one predicate, `extrasSold(state, gates.agencyBranding)`
-(`lib/v2/agency/extras-bounds.ts`): on Agency, and not in the Agency trial or past due, the two
-states whose subscription the route refuses. Seats draws its buy form by it (in a trial the foot
-says the price applies once the trial has become the plan), the matrix its link to buying sites,
-and `POST /api/seats` its `canBuySeats` in the 402 at the seat limit.
+**Where buying is offered.** The state is asked first: `extrasSold(state, gates.agencyBranding)`
+(`lib/v2/agency/extras-bounds.ts`) holds on Agency outside the Agency trial and past due, the two
+states whose subscription the route refuses. `POST /api/seats` answers it as `canBuySeats` in the
+402 at the seat limit; its viewer holds the state and no subscription. Seats, for its buy form, and
+the matrix, for its link to buying sites, ask `extrasOffered(account, gates.agencyBranding)`: the
+same, on a plan the reader's records say renews. `renews_at` is null in those records for an
+account with no subscription and for one whose subscription is set to end (`accountFromRow`,
+`lib/v2/account/rows.ts`), and the route refuses both (409 `no_subscription`,
+`subscription_ending`). So an account whose plan is set to end is drawn no buy form and no link,
+while the 402 at its seat limit still says `canBuySeats: true`, and a purchase it then posts is
+answered 409.
+
+The foot under the People table follows the form. On a plan that renews it prices a seat beyond the
+plan's; in the Agency trial it adds "once the trial has become the plan" and past due "once the
+plan’s last payment has gone through"; on a plan the records do not say renews it gives no price.
 `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2/seats.test.tsx lib/v2/view/agency-matrix.test.ts app/api/seats/route.test.ts`
-runs an account on the plan, in its trial and past due through each of the three.
+runs an account on the plan, in its trial and past due through the form, the link and the 402, and
+a plan that does not renew through the form, the foot and the link.
 
 `pnpm --filter @crawlmouse/web exec vitest run lib/v2/agency/extras.test.ts app/api/billing/seats/route.test.ts`
 runs these against a Stripe subscription in memory and CC-03's fake catalog, and reads each

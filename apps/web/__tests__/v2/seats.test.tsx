@@ -84,8 +84,9 @@ describe('seatsView: an Agency account read by its owner (Northwind)', () => {
   });
 
   it('prices a seat beyond the plan from prices.ts, not from the artboard', () => {
-    expect(v.people.foot).toBe(`One seat free. Beyond five, ${usd(EXTRA_SEAT)} a seat a month.`);
-    expect(v.people.foot).toBe('One seat free. Beyond five, $12 a seat a month.');
+    const paid = seatsPreview(PAID).people.foot;
+    expect(paid).toBe(`One seat free. Beyond five, ${usd(EXTRA_SEAT)} a seat a month.`);
+    expect(paid).toBe('One seat free. Beyond five, $12 a seat a month.');
     expect(seatsPreview(PAID).buy!.line).toBe(
       `${usd(EXTRA_SEAT)} a month for each seat beyond five, ${usd(EXTRA_SITE)} a month for each site beyond ${GATES.agency.sites}, up to ${GATES.agency.maxSites} sites.`,
     );
@@ -100,9 +101,13 @@ describe('seatsView: an Agency account read by its owner (Northwind)', () => {
     };
     expect([state(PAID), seatsPreview(PAID).buy === null]).toEqual(['agency', false]);
     expect([state(OWNER), seatsPreview(OWNER).buy === null]).toEqual(['past_due', true]);
-    // Past due, the owner still invites, and reads the same people and the same price of a seat.
+    // Past due, the owner still invites and reads the same people; the foot says what the price of
+    // a seat waits for, which is why no form is drawn.
     expect(seatsPreview(OWNER).invite).not.toBeNull();
-    expect(seatsPreview(OWNER).people.foot).toBe(seatsPreview(PAID).people.foot);
+    expect(seatsPreview(OWNER).people.rows).toEqual(seatsPreview(PAID).people.rows);
+    expect(seatsPreview(OWNER).people.foot).toBe(
+      'One seat free. Beyond five, $12 a seat a month, once the plan’s last payment has gone through.',
+    );
   });
 
   it('says what an invitation is: one email with a link, for as many days as the link works', () => {
@@ -233,6 +238,27 @@ describe('seatsView: who is offered the buy form, on an account where seats and 
     expect(buyFor(seat('Alex').id, d, { billing: false })).toBeNull();
     expect(buyFor(undefined, d, { billing: false })).toBeNull();
     expect(buyFor(seat('Alex').id, d, { billing: true })).not.toBeNull();
+  });
+
+  it('nobody is on a plan the records do not say renews: one set to end, or with no subscription', () => {
+    // `accountFromRow` writes `renews_at: null` for both, and the purchase route refuses both (409
+    // `subscription_ending`, `no_subscription`). The state stays `agency`.
+    const account = d.accounts.find((a) => a.id === p.viewer().accountId)!;
+    expect(account.renews_at).not.toBeNull();
+    const ending = {
+      ...d,
+      accounts: d.accounts.map((a) => (a.id === account.id ? { ...a, renews_at: null } : a)),
+    };
+    expect(buyFor(seat('Alex').id, ending)).toBeNull();
+    expect(buyFor(undefined, ending)).toBeNull();
+    // The owner still invites: an invitation changes no subscription.
+    expect(seatsView(ending, p.viewer()).invite).not.toBeNull();
+    // The foot counts the free seats and prices none: the records do not say which of the two it
+    // is, so it names no cause.
+    expect(seatsView(ending, p.viewer()).people.foot).toBe('One seat free.');
+    expect(seatsView(d, p.viewer()).people.foot).toBe(
+      'One seat free. Beyond five, $12 a seat a month.',
+    );
   });
 });
 

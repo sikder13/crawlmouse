@@ -278,6 +278,16 @@ describe('the matrix, adding a client', () => {
       ),
     };
     expect(actions(trial, northwind, true)).toEqual([]);
+    // On the plan and paid, but the records do not say it renews (a subscription set to end, or
+    // none: `accountFromRow` writes `renews_at: null`): the purchase route refuses the change.
+    const ending = {
+      ...full,
+      accounts: full.accounts.map((a) =>
+        a.id === NORTHWIND_ACCOUNT_ID ? { ...a, renews_at: null } : a,
+      ),
+    };
+    expect(full.accounts.find((a) => a.id === NORTHWIND_ACCOUNT_ID)!.renews_at).not.toBeNull();
+    expect(actions(ending, paid, true)).toEqual([]);
     // Billing off: /seats draws no buy form, so there is nothing to link.
     expect(actions(full, paid, false)).toEqual([]);
     // A seat that is not the owner's may not buy: an account manager whose seat covers every

@@ -69,6 +69,8 @@ export const SEATS_COPY = {
   noClients: 'none',
   /** Ends the foot's price in an Agency trial, where extras cannot be bought yet. */
   onceTrialEnds: ', once the trial has become the plan',
+  /** Ends the foot's price on a past-due account, where the purchase route refuses a change. */
+  oncePaid: ', once the plan’s last payment has gone through',
   form: {
     title: 'Invite someone',
     email: 'Their email address',
@@ -174,6 +176,14 @@ export const SEATS_CHANGES: CopyChange[] = [
     rendered: `${usd(EXTRA_SEAT)} a seat a month`,
     source:
       'CC-31 brief, D10: a price is read from prices.ts, where a seat beyond the plan’s is EXTRA_SEAT',
+  },
+  {
+    screen: 'agency-seats',
+    kind: 'fixture',
+    locked: `${usd(EXTRA_SEAT)} a seat a month.`,
+    rendered: `${usd(EXTRA_SEAT)} a seat a month${SEATS_COPY.oncePaid}.`,
+    source:
+      'The fixture: Northwind’s invoice failed on 1 Nov (state past_due). A past-due account is drawn no buy form, since the purchase route refuses its change, and the foot says what the price waits for',
   },
 ];
 
