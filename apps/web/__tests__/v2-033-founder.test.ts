@@ -444,6 +444,45 @@ describe('founder_digest_counts', () => {
   });
 });
 
+describe('signin_delivery_seen', () => {
+  const seen = (address: string, since: string) =>
+    asRole(db, 'service_role', null, async (tx) => {
+      const { rows } = await tx.query<{ s: boolean }>(
+        'select public.signin_delivery_seen($1, $2) as s',
+        [address, since],
+      );
+      return rows[0]!.s;
+    });
+  const event = (address: string, type: string, at: string) =>
+    db.query(
+      'insert into public.email_events (email_address, event_type, created_at) values ($1, $2, $3)',
+      [address, type, at],
+    );
+
+  it('is executable by service_role only', async () => {
+    await expect(
+      asRole(db, 'authenticated', randomUUID(), (tx) =>
+        tx.query("select public.signin_delivery_seen('a@example.com', now())"),
+      ),
+    ).rejects.toThrow(/permission denied/);
+  });
+
+  it('answers whether a delivery to the address, in any case, was recorded at or after the time', async () => {
+    const local = `canary-${randomUUID().slice(0, 8)}`;
+    const address = `${local}@example.test`;
+    const at = '2026-11-13T12:00:00.000Z';
+    expect(await seen(address, at)).toBe(false);
+    // A delivery before the time, a sent event at it, and a delivery to another address do not count.
+    await event(address, 'delivered', '2026-11-13T11:59:59.999Z');
+    await event(address, 'sent', at);
+    await event(`x${address}`, 'delivered', at);
+    expect(await seen(address, at)).toBe(false);
+    await event(address.toUpperCase(), 'delivered', at);
+    expect(await seen(address, at)).toBe(true);
+    expect(await seen(address.toUpperCase(), at)).toBe(true);
+  });
+});
+
 describe('the migration and its revert', () => {
   it('applies twice, and the revert removes section C and lets it apply again', async () => {
     const d = await freshDb();
@@ -455,7 +494,8 @@ describe('the migration and its revert', () => {
       const gone = await d.query<{ t: string | null; f: number }>(
         `select to_regclass('public.founder_notices')::text as t,
                 (select count(*)::int from pg_proc where proname in
-                  ('claim_founder_notice', 'take_founder_overflow', 'founder_digest_counts')) as f`,
+                  ('claim_founder_notice', 'take_founder_overflow', 'founder_digest_counts',
+                   'signin_delivery_seen')) as f`,
       );
       expect(gone.rows[0]).toEqual({ t: null, f: 0 });
       await d.exec(withInternal(readMigration(MIGRATION)));

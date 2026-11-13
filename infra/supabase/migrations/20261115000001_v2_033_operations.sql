@@ -201,6 +201,26 @@ begin
 end;
 $$;
 
+-- The sign-in canary's look (D6, inngest/signin-canary.ts): whether Resend's webhook recorded a
+-- delivery to p_address, compared lower-cased, at or after p_since.
+create or replace function public.signin_delivery_seen(p_address text, p_since timestamptz)
+returns boolean
+language plpgsql
+stable
+security invoker
+set search_path = pg_catalog, pg_temp
+as $$
+begin
+  if p_address is null or p_since is null then
+    raise exception 'signin_delivery_seen: an address and a time are required' using errcode = '22023';
+  end if;
+  return exists (select 1 from public.email_events e
+                  where e.event_type = 'delivered'
+                    and pg_catalog.lower(e.email_address) = pg_catalog.lower(p_address)
+                    and e.created_at >= p_since);
+end;
+$$;
+
 revoke all on function public.claim_founder_notice(text, text, uuid, boolean, timestamptz, jsonb,
                                                    timestamptz, integer, boolean)
   from public, anon, authenticated, service_role;
@@ -208,10 +228,13 @@ revoke all on function public.take_founder_overflow(text, integer)
   from public, anon, authenticated, service_role;
 revoke all on function public.founder_digest_counts(timestamptz, timestamptz)
   from public, anon, authenticated, service_role;
+revoke all on function public.signin_delivery_seen(text, timestamptz)
+  from public, anon, authenticated, service_role;
 grant execute on function public.claim_founder_notice(text, text, uuid, boolean, timestamptz, jsonb,
                                                       timestamptz, integer, boolean) to service_role;
 grant execute on function public.take_founder_overflow(text, integer) to service_role;
 grant execute on function public.founder_digest_counts(timestamptz, timestamptz) to service_role;
+grant execute on function public.signin_delivery_seen(text, timestamptz) to service_role;
 -- ═══ end §C ══════════════════════════════════════════════════════════════════════════════════════
 
 
