@@ -12,12 +12,14 @@ import {
   crawlerRegistryVersion,
   FixEventSchema,
   FixSchema,
+  FrontendMarkerSchema,
   LinkEdgeSchema,
   MeasurementLineageSchema,
   PageResultSchema,
   type AccessBatchResult,
   type BatchResult,
   type CrawlBatchResult,
+  type FrontendMarker,
 } from '@crawlmouse/types/v2';
 import {
   CANONICAL_PAGE,
@@ -41,6 +43,8 @@ import {
   recordedInput,
 } from '../../../fixtures/v2/build/recorded.js';
 import { CRAWLER_REGISTRY_V2 } from '../crawler-registry.js';
+import { fingerprintOf } from '../detectors/fingerprint.js';
+import { EMPTY_ROOT_MAX_RENDERS, emptyRoot } from '../render/empty-root.js';
 import { renderable } from '../render/sample.js';
 import { assemble } from './assemble.js';
 import { renderCandidates, sample } from './plan.js';
@@ -192,7 +196,7 @@ describe('the planted defects', () => {
     );
   });
 
-  it('a client-rendered template: read as an app shell, and (found by this fixture) classified thin, so never rendered', () => {
+  it('a client-rendered template: read as an app shell, and (found by this fixture) classified thin, so not graded; not rendered here, as the recording leaves the empty-root phase off', () => {
     const rows = readRecorded('batches').flatMap((b) => (b.kind === 'crawl' ? b.pages : []));
     for (const path of CLIENT_RENDERED) {
       expect(rows.find((r) => r.url === at(path))!.content_features!.client_rendered).toBe(true);
@@ -201,7 +205,13 @@ describe('the planted defects', () => {
     }
   });
 
-  it("offers the client-rendered pages to the render step: CC-14's renderable bars them, not this planner", () => {
+  it('the client-rendered template is present all the same: its record is indeterminate, not_rendered', () => {
+    const fingerprint = fingerprintOf('shell:/guides/{slug}');
+    expect(built.diff_inputs.indeterminate).toContain(fingerprint);
+    expect(built.fixes.map((f) => f.fingerprint)).not.toContain(fingerprint);
+  });
+
+  it("offers the client-rendered pages to the render step: the graded phase's renderable bars them, the empty-root phase takes them", () => {
     const input = recordedBuild();
     const a = assemble(
       input,
@@ -212,9 +222,12 @@ describe('the planted defects', () => {
     for (const path of CLIENT_RENDERED) {
       const c = plan.candidates.find((x) => x.url === at(path));
       expect(c, path).toMatchObject({ kind: 'thin', status_code: 200, is_html: true });
-      // render/sample.ts:62: a render candidate must be a content page.
+      // render/sample.ts: a graded-phase candidate must be a content page.
       expect(renderable(c!)).toBe(false);
+      const e = plan.emptyRootCandidates.find((x) => x.url === at(path));
+      expect(emptyRoot(e!), path).toBe(true);
     }
+    expect(plan.maxEmptyRootRenders).toBe(EMPTY_ROOT_MAX_RENDERS);
   });
 
   it('stage 2 of the sample, because a scored crawler is refused on the blog only', () => {
@@ -297,7 +310,7 @@ describe('what buildCheck refuses', () => {
   it('a render of a page the sample does not hold', () => {
     const unsampled = built.page_results.find((p) => !p.sampled)!;
     expect(() => buildCheck(edited((i) => (i.render!.pages[0]!.url = unsampled.url)))).toThrow(
-      /a render of .* the sample does not hold/,
+      /a render of .* which neither the sample nor the empty-root picks hold/,
     );
   });
 
@@ -445,17 +458,148 @@ describe('what the built check holds, from its own rows', () => {
     expect(built.check.stack!.backend).toBeNull();
   });
 
-  it('names the CMS the worker recognised as the backend, and no front end: nothing recorded tells one', () => {
-    const rows = new Map([
-      [HOST, { stack_signals: { cms: 'wordpress', detected_from: 'HTML and response headers' } }],
-    ]) as unknown as Parameters<typeof stackOf>[0]['rows'];
-    expect(stackOf({ rows, homepage_url: HOST, access_tests: [] })).toEqual({
-      frontend: null,
-      backend: { cms: 'wordpress', detected_from: 'homepage HTML and response headers' },
-      edge: null,
-    });
+  it('names the CMS the worker recognised as the backend, and no front end when no marker names one', () => {
+    const lists: Array<FrontendMarker[] | undefined> = [
+      undefined,
+      [],
+      ['wp_content_path', 'webflow_site_attribute'],
+    ];
+    for (const frontend_markers of lists) {
+      expect(stackOf(homeWith({ cms: 'wordpress', frontend_markers }))).toEqual({
+        frontend: null,
+        backend: { cms: 'wordpress', detected_from: 'homepage HTML and response headers' },
+        edge: null,
+      });
+    }
     expect(built.check.stack!.frontend).toBeNull();
   });
+
+  it.each([
+    [['next_static_path'], 'nextjs', 'Next.js', 'homepage asset paths under /_next/static/'],
+    [['next_data_script'], 'nextjs', 'Next.js', 'homepage __NEXT_DATA__ script'],
+    [
+      ['next_static_path', 'next_data_script'],
+      'nextjs',
+      'Next.js',
+      'homepage asset paths under /_next/static/ and __NEXT_DATA__ script',
+    ],
+    [['shopify_theme_object'], 'shopify_liquid', 'Shopify Liquid', 'homepage Shopify.theme script'],
+    [
+      ['shopify_section_class'],
+      'shopify_liquid',
+      'Shopify Liquid',
+      'homepage shopify-section elements',
+    ],
+    [
+      ['hydrogen_powered_by_header'],
+      'shopify_hydrogen',
+      'Shopify Hydrogen',
+      'homepage powered-by response header',
+    ],
+  ] as const)('names the front end %j marks: %s', (markers, framework, name, detected_from) => {
+    expect(stackOf(homeWith({ cms: 'shopify', frontend_markers: [...markers] })).frontend).toEqual({
+      name,
+      framework,
+      version: null,
+      router: null,
+      detected_from,
+    });
+  });
+
+  it('takes Hydrogen before Next.js before a Liquid theme, and names only the markers of the one taken', () => {
+    const front = (frontend_markers: FrontendMarker[]) =>
+      stackOf(homeWith({ cms: 'shopify', frontend_markers })).frontend;
+    expect(front([...FrontendMarkerSchema.options])).toMatchObject({
+      framework: 'shopify_hydrogen',
+      detected_from: 'homepage powered-by response header',
+    });
+    expect(
+      front([
+        'next_static_path',
+        'shopify_theme_object',
+        'shopify_section_class',
+        'wp_content_path',
+      ]),
+    ).toMatchObject({
+      framework: 'nextjs',
+      detected_from: 'homepage asset paths under /_next/static/',
+    });
+    expect(front(['shopify_section_class', 'hydrogen_powered_by_header'])).toMatchObject({
+      framework: 'shopify_hydrogen',
+    });
+    expect(front(['next_data_script', 'shopify_theme_object'])).toMatchObject({
+      framework: 'nextjs',
+    });
+  });
+
+  it('reads the markers of the homepage row only, not those of another page', () => {
+    const rows = new Map([
+      [
+        HOST,
+        {
+          stack_signals: {
+            cms: 'wordpress',
+            detected_from: 'HTML and response headers',
+            frontend_markers: [],
+          },
+        },
+      ],
+      [
+        `${HOST}/shop`,
+        {
+          stack_signals: {
+            cms: 'shopify',
+            detected_from: 'HTML and response headers',
+            frontend_markers: ['next_data_script', 'shopify_theme_object'],
+          },
+        },
+      ],
+    ]) as unknown as Parameters<typeof stackOf>[0]['rows'];
+    expect(stackOf({ rows, homepage_url: HOST, access_tests: [] }).frontend).toBeNull();
+    // and the same markers on the homepage row name the front end
+    const home = new Map([[HOST, rows.get(`${HOST}/shop`)!]]);
+    expect(stackOf({ rows: home, homepage_url: HOST, access_tests: [] }).frontend?.framework).toBe(
+      'nextjs',
+    );
+  });
+
+  it('names no front end when the homepage was not read', () => {
+    const rows = new Map([[HOST, { stack_signals: null }]]) as unknown as Parameters<
+      typeof stackOf
+    >[0]['rows'];
+    expect(stackOf({ rows, homepage_url: HOST, access_tests: [] }).frontend).toBeNull();
+    expect(stackOf({ rows: new Map(), homepage_url: HOST, access_tests: [] }).frontend).toBeNull();
+  });
+
+  it("writes the packet's first body for the front end the homepage's markers name", () => {
+    const marked = buildCheck(
+      edited((i) => {
+        const home = crawlOf(i)
+          .flatMap((b) => b.pages)
+          .find((p) => p.url === HOST)!;
+        home.stack_signals = { ...home.stack_signals!, frontend_markers: ['next_data_script'] };
+      }),
+    );
+    expect(marked.check.stack!.frontend!.framework).toBe('nextjs');
+    const withNext = marked.fixes.filter((f) => f.packet?.frameworks.includes('nextjs'));
+    expect(withNext.length).toBeGreaterThan(0);
+    for (const f of withNext) expect(f.packet!.framework, f.type).toBe('nextjs');
+    // The recorded check, with no marker, writes the generic body first for the same fixes.
+    const before = built.fixes.filter((f) => withNext.some((n) => n.fingerprint === f.fingerprint));
+    expect(before.map((f) => f.packet!.framework)).toEqual(withNext.map(() => 'generic'));
+  });
+});
+
+/** The rows of a homepage that read as `signals`, for stackOf. */
+const homeWith = (signals: {
+  cms: 'wordpress' | 'shopify';
+  frontend_markers: FrontendMarker[] | undefined;
+}): Parameters<typeof stackOf>[0] => ({
+  rows: new Map([
+    [HOST, { stack_signals: { ...signals, detected_from: 'HTML and response headers' } }],
+  ]) as unknown as Parameters<typeof stackOf>[0]['rows'],
+  homepage_url: HOST,
+  access_tests: [],
 });
 
 describe('a check the pipeline did not finish', () => {

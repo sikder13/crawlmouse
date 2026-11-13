@@ -55,8 +55,8 @@ describe('isPrivateOrReservedIp - IPv6 link-local fe80::/10 full range', () => {
     ['fe90::1', true, 'fe90::'],
     ['fea0::1', true, 'fea0::'],
     ['febf::1', true, 'febf:: (upper end of fe80::/10)'],
-    ['fec0::1', false, 'fec0:: (just above fe80::/10)'],
-  ])('IPv6 %s is link-local=%s (%s)', (ip, expected) => {
+    ['fec0::1', true, 'fec0:: (just above fe80::/10: site-local fec0::/10, also refused)'],
+  ])('IPv6 %s refused=%s (%s)', (ip, expected) => {
     expect(isPrivateOrReservedIp(ip)).toBe(expected);
   });
 });
@@ -146,7 +146,9 @@ describe('validateUrlOrThrow', () => {
 
   it('rejects URLs that carry credentials (parser-confusion / auth-leak vector)', async () => {
     await expect(
-      validateUrlOrThrow('https://expected.com@169.254.169.254/', { resolver: async () => ['8.8.8.8'] }),
+      validateUrlOrThrow('https://expected.com@169.254.169.254/', {
+        resolver: async () => ['8.8.8.8'],
+      }),
     ).rejects.toThrow(/credentials/i);
     await expect(
       validateUrlOrThrow('https://user:pass@example.com/', { resolver: async () => ['8.8.8.8'] }),

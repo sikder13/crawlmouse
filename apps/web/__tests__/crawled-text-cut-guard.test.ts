@@ -556,21 +556,34 @@ const INVENTORY: [entry: string, why: string][] = [
     "packages/engine/src/robots.ts :: return kept.slice(0, Math.max(kept.lastIndexOf('\\n'), kept.lastIndexOf('\\r')) + 1);",
     'ASCII/structural \u2014 cut just after the last CR or LF, found by lastIndexOf',
   ],
+  // The fetch guard's address parser (CC-32): it reads an address a resolver returned, never page text.
   [
-    'packages/engine/src/ssrf-guard.ts :: const ipv4CompatHex = lower.match(/^::([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);',
-    'ASCII/structural — IPv6 hex parse, not a truncation',
+    'packages/engine/src/address-ranges.ts :: const bytes = parseIpv6(percent === -1 ? text : text.slice(0, percent));',
+    'ASCII/structural \u2014 reading an IP address the resolver returned into bytes; not crawled text and not a truncation',
   ],
   [
-    'packages/engine/src/ssrf-guard.ts :: const ipv4MappedHex = lower.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);',
-    'ASCII/structural — IPv6 hex parse, not a truncation',
+    'packages/engine/src/address-ranges.ts :: const lastFour = (bytes: Uint8Array) => bytes.slice(12, 16);',
+    'ASCII/structural \u2014 reading an IP address the resolver returned into bytes; not crawled text and not a truncation',
   ],
   [
-    'packages/engine/src/ssrf-guard.ts :: const nat64 = lower.match(/^64:ff9b::([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);',
-    'ASCII/structural — IPv6 hex parse, not a truncation',
+    'packages/engine/src/address-ranges.ts :: const sixToFour = (bytes: Uint8Array) => bytes.slice(2, 6);',
+    'ASCII/structural \u2014 reading an IP address the resolver returned into bytes; not crawled text and not a truncation',
   ],
   [
-    'packages/engine/src/ssrf-guard.ts :: const sixToFour = lower.match(/^2002:([0-9a-f]{1,4}):([0-9a-f]{1,4})(?::|$)/);',
-    'ASCII/structural — IPv6 hex parse, not a truncation',
+    'packages/engine/src/address-ranges.ts :: const tail = text.slice(lastColon + 1);',
+    'ASCII/structural \u2014 reading an IP address the resolver returned into bytes; not crawled text and not a truncation',
+  ],
+  [
+    'packages/engine/src/address-ranges.ts :: const teredoClient = (bytes: Uint8Array) => bytes.slice(12, 16).map((b) => b ^ 0xff);',
+    'ASCII/structural \u2014 reading an IP address the resolver returned into bytes; not crawled text and not a truncation',
+  ],
+  [
+    'packages/engine/src/address-ranges.ts :: const zone = percent === -1 ? null : text.slice(percent + 1);',
+    'ASCII/structural \u2014 reading an IP address the resolver returned into bytes; not crawled text and not a truncation',
+  ],
+  [
+    'packages/engine/src/address-ranges.ts :: hex = `${text.slice(0, lastColon + 1)}${high}:${low}`;',
+    'ASCII/structural \u2014 reading an IP address the resolver returned into bytes; not crawled text and not a truncation',
   ],
   // safeFetch's keepBytes (CC-12). Both cut raw bytes before they are decoded: the first keeps a
   // chunk's bytes up to the limit, the second trims what was kept back to a whole UTF-8 character.
@@ -583,14 +596,6 @@ const INVENTORY: [entry: string, why: string][] = [
     'packages/engine/src/safe-fetch.ts :: const part = kept + chunk.length > keepBytes ? chunk.subarray(0, keepBytes - kept) : chunk;',
     'byte cut of an undecoded chunk, trimmed to a UTF-8 character boundary before decoding \u2014 ' +
       'cannot yield a lone surrogate',
-  ],
-  [
-    'packages/engine/src/ssrf-guard.ts :: const firstByte = parseInt(lower.slice(0, 2), 16);',
-    'ASCII/structural \u2014 hex, percent-encoding, punctuation, a date prefix or a file extension',
-  ],
-  [
-    'packages/engine/src/ssrf-guard.ts :: const secondByte = parseInt(lower.slice(2, 4), 16);',
-    'ASCII/structural \u2014 hex, percent-encoding, punctuation, a date prefix or a file extension',
   ],
   [
     "inngest/persist-results.ts :: const { error: pagesErr } = await sb.from('pages').insert(pageRows.slice(i, i + PAGE_INSERT_CHUNK));",
@@ -666,6 +671,10 @@ const INVENTORY: [entry: string, why: string][] = [
   [
     'packages/engine/src/v2/packets/by-type/client-rendered-template.ts :: const shown = all.slice(0, PAGES_SHOWN);',
     'ARRAY slice of the record’s rendered pages (`RenderedPage[]`), to bound how many a packet lists; the line counts the rest. No string is cut (CC-30).',
+  ],
+  [
+    'packages/engine/src/v2/detectors/js-only-navigation.ts :: js_only_targets: targets.slice(0, MAX_JS_ONLY_TARGETS),',
+    'ARRAY slice of a page’s JS-only link targets (`string[]`), to bound how many a record keeps; `js_only_count` keeps the whole count. No string is cut (CC-32 D6).',
   ],
   [
     'packages/engine/src/v2/packets/by-type/generic-anchor-text.ts :: const shown = links.slice(0, MAX_LINKS).map(({ to, text }): Line => {',

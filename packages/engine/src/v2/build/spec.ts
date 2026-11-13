@@ -20,6 +20,8 @@ import {
 } from '../../../fixtures/v2/build/recorded.js';
 import { code, table } from '../detectors/spec.js';
 import { GRADE_VERSION } from '../grade/weights.js';
+import { fingerprintOf } from '../detectors/fingerprint.js';
+import { EMPTY_ROOT_MAX_RENDERS } from '../render/empty-root.js';
 import { FREE_MAX_RENDERS } from '../render/sample.js';
 import { assemble, SAMPLE_MAX_PAGES } from './assemble.js';
 import { readBatches } from './batches.js';
@@ -34,6 +36,7 @@ import {
   STAGE2_MAX_PAGES,
   STAGE2_PICKS,
 } from './plan.js';
+import { FRONTENDS } from './record.js';
 import { PARTIAL_RULE } from './status.js';
 import { SUMMARY_BYTES } from './summaries.js';
 import type { BuildInput, BuiltCheck } from './types.js';
@@ -55,7 +58,8 @@ const INPUT: Record<keyof BuildInput, string> = {
   render: "CC-14's `RenderOutcome` over `renderCandidates`; null when nothing rendered.",
   previous:
     "The site's last graded check as `diffCheck` reads it: its `Check` and its `diff_inputs`.",
-  fixes: "The site's fixes before this check.",
+  fixes:
+    "The site's fixes before this check. The diff reads them, and the `client_rendered_template` detector gives a record to each template an awaiting one names (`awaitingShellTemplates`).",
   events: 'Every event of those fixes.',
   lineage:
     '`engine_sha`, and `worker_release`: a batch row that names a worker release must name this one.',
@@ -146,7 +150,8 @@ const CHECK_FIELDS: Record<keyof Check, string> = {
   crawlers:
     "the access matrix (`detectAccess`), with `text_share` null: no step measures a crawler's share yet",
   stack:
-    "`frontend` null (CC-17b); `backend` from the homepage row's `stack_signals`, null when the homepage was not read or `detectCms` recognised no CMS (it answers `custom` then); `edge` Cloudflare when a crawler test (not a browser control) carries the `cloudflare_1020` cause, else null",
+    `\`frontend\` from the homepage row's \`stack_signals.frontend_markers\`: the first of ${FRONTENDS.map((f) => `${f.name} (${f.markers.map(code).join(', ')})`).join(', then ')} that a recorded marker names, with \`version\` and \`router\` null, null when none does or the row was written before the worker recorded markers; ` +
+    "`backend` from the homepage row's `stack_signals`, null when the homepage was not read or `detectCms` recognised no CMS (it answers `custom` then); `edge` Cloudflare when a crawler test (not a browser control) carries the `cloudflare_1020` cause, else null",
   competitors: '`[]`',
   progress: 'null: the contract keeps progress for a running check only (`check_progress`)',
 };
@@ -295,7 +300,7 @@ export function renderBuildSpec(): string {
     [
       '1. `readBatches`: parse each batch; keep a batch that arrived twice once, refuse two different results for one batch id, a URL crawled in two batches, a non-canonical URL, and a row from another worker build than `lineage.worker_release`.',
       '2. `assemble`: crawl rows to pages by `outcome`, links, classification, depth, PageRank, coverage and the refusal evidence.',
-      '3. Refuse an access test or a render of a page the planners would not have sampled.',
+      '3. Refuse an access test of a page outside the sample, and a render of a page that is neither a sampled page the graded phase may render (`renderable`) nor one of the empty-root picks (`plannedEmptyRoots`).',
       '4. `detectAccess`, then `detectStructure`, then orphans and their parents onto the pages, then `gradeCheck`, then `detectorOutcomes` (which runs `effectsOf`).',
       "5. The `Check` record, then `diffCheck` with this check's side.",
       '6. Lineage and usage, then validation.',
@@ -322,6 +327,10 @@ export function renderBuildSpec(): string {
         [
           'Render candidates',
           `the sampled pages; ${code('maxRenders')} ${FREE_MAX_RENDERS}; open fix templates from client-rendered fixes in ${AWAITING_FIX_STATUSES.map(code).join(', ')}`,
+        ],
+        [
+          'Empty-root candidates',
+          `every crawled page, with its row's ${code('content_features.client_rendered')}; ${code('maxEmptyRootRenders')} ${EMPTY_ROOT_MAX_RENDERS}`,
         ],
       ],
     ),
@@ -353,7 +362,10 @@ export function renderBuildSpec(): string {
         ['`id`', 'derived from the five values the table keeps unique'],
         ['usage `result`', '`delivered` when either grade has a score, else `withheld`'],
         ['usage `billable`', '`result` is `delivered` (owner ruling)'],
-        ['usage `compute_seconds`', "the batches' durations and the render's browser time"],
+        [
+          'usage `compute_seconds`',
+          "the batches' durations and the render's browser time, both render phases",
+        ],
         ['usage `request_count`', "the batches' requests"],
         ['usage `occurred_at`', "the check's `finished_at`"],
       ],
@@ -376,6 +388,6 @@ export function renderBuildSpec(): string {
     ].join('\n'),
     '## Found by the built fixture',
     `- **A redirect that lands on a crawled page hides absences.** \`detectors/scope.ts\` files a redirected row's links under the requested URL only when no other row has the final URL; \`grade/effects.ts\` \`linkedStraight\` describes them as filed there anyway. On the fixture's variant (one more link, to ${code(site.REDIRECT_TO)}, so it is crawled as its own page): without it, ${states(before).join(', ')}; with it, ${states(after).join(', ')}. Technical SEO ${before.check.technical_seo!.score} without, ${after.check.technical_seo!.score} with. In the variant both URLs answer 200 with the same content, so v1's duplicate rule keeps the one that sorts first: ${code(site.REDIRECT_FROM)} is ${code(pageOf(after, site.REDIRECT_FROM)!.kind)}, ${code(site.REDIRECT_TO)} is ${code(pageOf(after, site.REDIRECT_TO)!.kind)}. Not settled here.`,
-    `- **A client-rendered template leaves the graded population before it can be rendered.** v1's thin-content rule classifies the app-shell pages ${site.CLIENT_RENDERED.map((p) => `${code(p)} as ${code(pageOf(golden, p)!.kind)}`).join(', ')}; CC-14's \`renderable\` (\`packages/engine/src/v2/render/sample.ts:62\`) bars a render candidate that is not a content page, and the thin rule is v1's (\`packages/engine/src/analysis/classify-pages.ts:98\`), so none of them is rendered; the builder's planner offers them (build.test.ts). For CC-20b. The ${code('client_rendered_template')} detector (\`packages/engine/src/v2/detectors/rendered.ts\`, CC-30) reads the graded pages that were rendered, so these pages give it no record: the golden check holds ${golden.fixes.filter((f) => f.type === 'client_rendered_template').length} fixes of that type.`,
+    `- **A client-rendered template leaves the graded population before it can be rendered.** v1's thin-content rule classifies the app-shell pages ${site.CLIENT_RENDERED.map((p) => `${code(p)} as ${code(pageOf(golden, p)!.kind)}`).join(', ')}, and the thin rule is v1's (\`packages/engine/src/analysis/classify-pages.ts:98\`), so the graded phase's \`renderable\` (\`packages/engine/src/v2/render/sample.ts\`) bars them. Since CC-32 they are empty-root pages: the empty-root phase (\`render/empty-root.ts\`) renders up to two of them, and the ${code('client_rendered_template')} detector (\`packages/engine/src/v2/detectors/rendered.ts\`) counts their template as present. The recording leaves that phase off (\`generate.ts\`), so here ${site.CLIENT_RENDERED.filter((p) => pageOf(golden, p)!.without_js !== null).length} of them are rendered, the template's fingerprint is ${golden.diff_inputs.indeterminate.includes(fingerprintOf(`shell:${pageOf(golden, site.CLIENT_RENDERED[0])!.template_key}`)) ? '' : 'not '}among the check's indeterminate ones, and the golden check holds ${golden.fixes.filter((f) => f.type === 'client_rendered_template').length} fixes of that type; \`fixtures/v2/build/empty-shell-site.ts\` carries the phase.`,
   ].join('\n\n')}\n`;
 }

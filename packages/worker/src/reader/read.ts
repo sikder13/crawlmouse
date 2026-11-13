@@ -8,11 +8,13 @@ import {
   CONTENT_FEATURES_BYTES,
   ContentFeaturesSchema,
   type ContentFeaturesRow,
+  type FrontendMarker,
 } from '@crawlmouse/types/v2';
 import { bounded, CAPS } from '../rows/bounded.js';
 import { readLinks, type PageLinks } from '../rows/links.js';
 import { countWords, readHtml, servedText } from '../rows/text.js';
 import { headText, type HeadText } from '../rows/head-text.js';
+import { frontendMarkers } from './frontend-markers.js';
 
 /**
  * Reading a page: parsing its HTML and taking its text, word count and links. It costs CPU in
@@ -80,8 +82,11 @@ export interface PageRead {
     /** What the content checks read (see `contentFeatures`); null with `featuresNote` saying why. */
     features: ContentFeaturesRow | null;
     featuresNote: string | null;
-    /** The CMS the page's HTML and headers point to, when the caller asked (a batch's first URL). */
-    stack: { cms: ReturnType<typeof detectCms>['cms'] } | null;
+    /**
+     * When the caller asked (a batch's first URL): the CMS the page's HTML and headers point to, and
+     * the front-end markers found in them (frontend-markers.ts).
+     */
+    stack: { cms: ReturnType<typeof detectCms>['cms']; frontendMarkers: FrontendMarker[] } | null;
   } | null;
 }
 
@@ -182,7 +187,12 @@ export function readPage(
       metaNoindex: whole ? metaNoindex : null,
       features: features.features,
       featuresNote: features.note,
-      stack: req.stackHeaders ? { cms: detectCms(req.body, req.stackHeaders).cms } : null,
+      stack: req.stackHeaders
+        ? {
+            cms: detectCms(req.body, req.stackHeaders).cms,
+            frontendMarkers: frontendMarkers($, req.stackHeaders),
+          }
+        : null,
     },
   };
 }

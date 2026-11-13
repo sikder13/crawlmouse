@@ -136,7 +136,9 @@ beforeEach(async () => {
   dns.clear();
   dns.set('example.com', [PUBLIC_ADDRESS]);
   dns.set('www.example.com', [PUBLIC_ADDRESS]);
-  dns.set('other.example', ['198.51.100.7']);
+  // A second public address: one outside every range the fetch guard refuses (198.51.100.0/24 is
+  // documentation space, refused since CC-32).
+  dns.set('other.example', ['93.184.216.35']);
   // The first call of `doorDb` applies each migration to the template database; later calls clone it.
 }, 120_000);
 
@@ -695,20 +697,15 @@ describe('hosts that are not public', () => {
     const hexPair = (n: number) => `${(n >>> 16).toString(16)}:${(n & 0xffff).toString(16)}`;
     const hex = (max: number) => fc.integer({ min: 0, max }).map((n) => n.toString(16));
 
-    // The guard reads an IPv4-compatible, NAT64 or 6to4 address from two hex groups, and a group of
-    // zeros can be written away (`2002:a00::1`, `64:ff9b::5`); those spellings are generated for
-    // addresses whose two halves are both non-zero. The gap is the engine's and is in the report.
-    const bothHalves = v4.filter((n) => n >>> 16 !== 0 && (n & 0xffff) !== 0);
-
     /** One resolved address of the class: an IPv4 one in a spelling that embeds it, or an IPv6 one. */
     const resolved = fc.oneof(
       v4.map(dotted),
       v4.map((n) => `::ffff:${dotted(n)}`),
       v4.map((n) => `::ffff:${hexPair(n)}`),
       v4.map((n) => `0:0:0:0:0:ffff:${hexPair(n)}`),
-      bothHalves.map((n) => `::${dotted(n)}`),
-      bothHalves.map((n) => `64:ff9b::${hexPair(n)}`),
-      bothHalves.map((n) => `2002:${hexPair(n)}::1`),
+      v4.map((n) => `::${dotted(n)}`),
+      v4.map((n) => `64:ff9b::${hexPair(n)}`),
+      v4.map((n) => `2002:${hexPair(n)}::1`),
       fc.constantFrom('::1', '::', '0:0:0:0:0:0:0:1'),
       fc
         .tuple(fc.integer({ min: 0xfe80, max: 0xfebf }), hex(0xffff))

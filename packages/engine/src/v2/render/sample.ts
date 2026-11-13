@@ -1,7 +1,8 @@
 /**
- * Which pages a check renders: a pure function of the crawl, the open fixes and the cap.
+ * Which pages a check's graded phase renders (run.ts): a pure function of the crawl, the open fixes and
+ * the cap. The empty-root phase that follows it picks its own pages (empty-root.ts).
  *
- * Only a graded page can be rendered (a 200 HTML content page, the population Readable is computed
+ * Only a graded page is picked here (a 200 HTML content page, the population Readable is computed
  * over), and only one the crawl fetched as our crawler under our robots.txt group: a page robots.txt
  * disallows to us is never rendered. Picks are made in this order until `maxRenders` is reached:
  *

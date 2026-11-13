@@ -32223,6 +32223,7 @@
       "robots_txt_blocks_crawler",
       "edge_rule_blocks_crawler",
       "client_rendered_template",
+      "js_only_navigation",
       "quotable_opening",
       "no_question_headings",
       "missing_schema_description",
@@ -32235,6 +32236,8 @@
       "761121382ecd3016",
       "8cdf4fe54a7bd473",
       "940d5300be1d7b98",
+      "da156470a3a155be",
+      "e63ab61458411de0",
       "fb0a8e62535281bb",
       "fc8d36d469c56df0"
     ]

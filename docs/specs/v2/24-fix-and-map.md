@@ -136,10 +136,10 @@ An open fix whose `packet` is null shows one sentence in the packet’s place, o
 | a builder (the stored fix has no packet all the same) | The check that last measured this fix wrote no steps for it. What the audit found is above.          |
 | no packet, with a reason                              | The audit writes no steps for this kind of fix. (the engine’s reason) What the audit found is above. |
 
-| Fix type                    | The engine’s reason                                                                                                                                                                                                |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `robots_txt_blocks_crawler` | robots.txt disallows the crawler, which is the site’s stated intent: the engine opens no fix for it.                                                                                                               |
-| `js_only_navigation`        | Not measured: the audit’s rendering records word counts only. It keeps no link from the rendered page, so it cannot tell which links exist only once JavaScript has run, and the engine opens no fix of this type. |
+| Fix type                    | The engine’s reason                                                                                                                                                                    |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `robots_txt_blocks_crawler` | robots.txt disallows the crawler, which is the site’s stated intent: the engine opens no fix for it.                                                                                   |
+| `js_only_navigation`        | No packet yet: the audit finds these links by reading each sampled page before and after its JavaScript runs, and the steps to put them in the HTML are not written for any stack yet. |
 
 The prompt and the blocks put each packet string and the fix’s title on one line (`oneLine` in `apps/web/lib/v2/packet-text.ts`), so a packet stored with a line break or a control character in a string adds no line to what is copied. Verify: `pnpm --filter @crawlmouse/web exec vitest run lib/v2/view/segment/fixes.property.test.ts lib/v2/packet-text.test.ts`.
 
