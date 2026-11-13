@@ -19,14 +19,20 @@ import {
   TRIAL_REMINDER_DAYS_BEFORE_END,
 } from '../../lib/auth/constants';
 import * as PRICES from '../../lib/billing/prices';
-import { TRIAL_DAYS } from '../../lib/billing/state-machine';
+import { TRIAL_DAYS, type SubscriptionStatus } from '../../lib/billing/state-machine';
 import { GATES } from '../../lib/entitlement-v2';
 import { MAGIC_LINK_PER_EMAIL_PER_HOUR } from '../../lib/limits';
-import { RESTORE_DAYS } from '../../lib/v2/copy/deletion';
+import { DELETE_COPY, deletionMoney, RESTORE_DAYS } from '../../lib/v2/copy/deletion';
 import { CANCEL_CLICKS } from '../../lib/v2/copy/settings';
 import { helpArticles } from '../../lib/v2/help/articles';
 import { HELP_COPY } from '../../lib/v2/help/copy';
-import { AI_WEIGHTS, CRAWL_USER_AGENT, CRAWLER_TAG, SEO_WEIGHTS } from '../../lib/v2/help/pinned';
+import {
+  AI_WEIGHTS,
+  CRAWL_USER_AGENT,
+  CRAWLER_TAG,
+  RECHECK_WINDOW_HOURS,
+  SEO_WEIGHTS,
+} from '../../lib/v2/help/pinned';
 import { HELP_QUESTIONS, HELP_SLUGS, helpPath } from '../../lib/v2/help/questions';
 import { helpArticleView, helpIndexView } from '../../lib/v2/help/view';
 import { ANONYMOUS_EXPIRY_HOURS } from '../../lib/v2/pipeline/limits';
@@ -65,6 +71,7 @@ const NAMED: Record<string, number> = {
   'the trial reminder goes this many days before the end': TRIAL_REMINDER_DAYS_BEFORE_END,
   'cancelling takes this many clicks': CANCEL_CLICKS,
   'the restore link works this many days': RESTORE_DAYS,
+  're-checks are counted over this many hours': RECHECK_WINDOW_HOURS,
   'Technical SEO needs this many gradeable pages': MIN_GRADEABLE_PAGES,
   'the footer’s copyright year': new Date().getFullYear(),
 };
@@ -242,6 +249,62 @@ describe('the figures follow GATES and prices.ts, not the values typed today', (
           new RegExp(`\\b${numberWord(n)}\\b`, 'i').test(text)),
     );
     expect(left).toEqual([]);
+  });
+});
+
+/** An article's text, its sentences joined. */
+function articleText(slug: string): string {
+  const a = helpArticles().find((x) => x.slug === slug)!;
+  return a.blocks
+    .flatMap((b) => (b.kind === 'paragraph' ? b.sentences : b.kind === 'list' ? b.items : []))
+    .map((x) => x.text)
+    .join(' ');
+}
+
+describe('the delete article’s money sentences (deletionMoney)', () => {
+  // Every state Stripe gives a subscription; the Record makes the compiler hold the list complete.
+  const STATUSES: Record<SubscriptionStatus, true> = {
+    trialing: true,
+    active: true,
+    past_due: true,
+    canceled: true,
+    unpaid: true,
+    incomplete: true,
+    incomplete_expired: true,
+    paused: true,
+  };
+
+  it('say what deletionMoney says for each state the code tells apart', () => {
+    const text = articleText('delete-account');
+    const said = new Set(Object.keys(STATUSES).flatMap((status) => deletionMoney(status) ?? []));
+    expect(said.size).toBeGreaterThan(2);
+    for (const sentence of said) expect(text).toContain(sentence);
+    expect(text).toContain(DELETE_COPY.moneyNotCollected);
+  });
+});
+
+describe('the Pro trial, where an article promises it', () => {
+  it('is said to be offered once, by the trial record', () => {
+    const paragraphs = helpArticles().flatMap((a) =>
+      a.blocks.flatMap((b) =>
+        b.kind === 'paragraph' ? [b.sentences.map((x) => x.text).join(' ')] : [],
+      ),
+    );
+    const promising = paragraphs.filter(
+      (p) => p.includes(`${TRIAL_DAYS} days of Pro`) || p.startsWith('Pro’s trial'),
+    );
+    expect(promising).toHaveLength(2);
+    for (const p of promising) expect(p).toMatch(/offered once/);
+  });
+});
+
+describe('the re-check limit', () => {
+  it('is counted over the cap’s window, which no page calls a day', () => {
+    const texts = [articleText('fix-still-open'), articleText('plans')];
+    for (const t of texts) {
+      expect(t).toContain(`${RECHECK_WINDOW_HOURS} hours`);
+      expect(t).not.toMatch(/\b(a|the) day\b|day’s re-checks/);
+    }
   });
 });
 

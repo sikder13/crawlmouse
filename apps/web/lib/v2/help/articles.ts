@@ -18,10 +18,10 @@ import {
   TRIAL_REMINDER_DAYS_BEFORE_END,
 } from '../../auth/constants';
 import { AGENCY_MONTHLY, AGENCY_YEARLY, PRO_MONTHLY, PRO_YEARLY, usd } from '../../billing/prices';
-import { TRIAL_DAYS } from '../../billing/state-machine';
+import { TRIAL_DAYS, type SubscriptionStatus } from '../../billing/state-machine';
 import { GATES, type Tier } from '../../entitlement-v2';
 import { MAGIC_LINK_PER_EMAIL_PER_HOUR } from '../../limits';
-import { DELETE_COPY, REFUND_POLICY } from '../copy/deletion';
+import { DELETE_COPY, deletionMoney, REFUND_POLICY } from '../copy/deletion';
 import { CANCEL_CLICKS, SETTINGS_COPY } from '../copy/settings';
 import { listOf } from '../format';
 import { ANONYMOUS_EXPIRY_HOURS } from '../pipeline/limits';
@@ -33,7 +33,9 @@ import {
   AI_WEIGHTS,
   CRAWL_USER_AGENT,
   CRAWLER_TAG,
+  FROM_HEADER,
   OUR_ROBOTS_TOKENS,
+  RECHECK_WINDOW_HOURS,
   SCORED_SIGNALS,
   SEO_WEIGHTS,
   VERDICT_LABELS,
@@ -76,6 +78,13 @@ const p = (...sentences: HelpSentence[]): HelpBlock => ({ kind: 'paragraph', sen
 const list = (...items: HelpSentence[]): HelpBlock => ({ kind: 'list', items });
 const see = (slug: HelpSlug): HelpBlock => ({ kind: 'see', slug });
 const quote = (text: string) => `“${text}”`;
+
+/**
+ * What the trial ledger decides (lib/auth/trial-decision.ts; spec 06c's ledger rule): a refused
+ * trial leaves the new account on Free.
+ */
+const TRIAL_ONCE =
+  'The trial is offered once: our trial record refuses it to an email that has had one recently, and can refuse it to a device or network that has had more than one, and the account then stays on Free.';
 
 const cadence = (tier: Tier) => (GATES[tier].schedule === 'weekly' ? 'weekly' : 'monthly');
 const times = (n: number, unit: string, units: string) => `${count(n)} ${plural(n, unit, units)}`;
@@ -222,8 +231,11 @@ function crawlerShownAsBlocked(): HelpArticle {
       ),
       p(
         s(
-          'Where the audit opens a fix for a blocked crawler, its steps end with a command under Verify that you can run from your own machine. It sends the request with the crawler’s own user agent; ours carries our tag as well, so the two answers differ only when a rule matches the exact string.',
+          'Where the audit opens a fix for a blocked crawler, its steps end with a command under Verify that you can run from your own machine. It sends the request with the crawler’s own user agent.',
           'fix_packets',
+        ),
+        s(
+          `Our request differs from it: it carries our tag after the user agent and a ${FROM_HEADER} header, and it comes from our servers. A rule that matches the exact user-agent string, reads the ${FROM_HEADER} header, or looks at where a request comes from can answer the two differently.`,
         ),
       ),
       see('how-we-crawl'),
@@ -244,9 +256,11 @@ function fixStillOpen(): HelpArticle {
       p(
         s('Marking a fix done starts a re-check of the site.'),
         s(
-          paidSame
-            ? `It counts toward the site’s re-checks for the day: ${count(free)} on Free, ${count(pro)} on Pro and Agency.`
-            : `It counts toward the site’s re-checks for the day: ${count(free)} on Free, ${count(pro)} on Pro and ${count(GATES.agency.manualChecksPerSiteDay)} on Agency.`,
+          `It counts toward the site’s re-checks, which are counted over the last ${count(RECHECK_WINDOW_HOURS)} hours rather than by calendar day: ${
+            paidSame
+              ? `${count(free)} on Free, ${count(pro)} on Pro and Agency.`
+              : `${count(free)} on Free, ${count(pro)} on Pro and ${count(GATES.agency.manualChecksPerSiteDay)} on Agency.`
+          }`,
         ),
       ),
       list(
@@ -256,7 +270,7 @@ function fixStillOpen(): HelpArticle {
       ),
       p(
         s(
-          'If the day’s re-checks are used up, or a check of the site is already running, the fix stays marked done and the next check of the site measures it.',
+          'If the site’s re-checks are used up, or a check of the site is already running, the fix stays marked done and the next check of the site measures it.',
           'weekly_checks',
         ),
       ),
@@ -265,7 +279,7 @@ function fixStillOpen(): HelpArticle {
           'The re-check reads what your site serves at that moment, at the address you audited. A change that is not live there yet, or a cache that still serves the old page, reads as not fixed.',
         ),
         s(
-          'When a fix covers several pages, the re-check runs its check on all of them, so a change made on some of the pages leaves the fix open.',
+          'The re-check is an ordinary check of the site, not a request for the fix’s pages alone, and the fix is judged from the pages that check reads, as on any other check.',
         ),
       ),
     ],
@@ -286,9 +300,10 @@ function auditExpired(): HelpArticle {
       ),
       p(
         s(
-          `To keep an audit, use “Keep this audit” on its result. One email creates a free account, starts ${TRIAL_DAYS} days of Pro and keeps the site, which is then checked on its plan’s schedule.`,
+          'To keep an audit, use “Keep this audit” on its result. One email creates a free account and keeps the site, which is then checked on its plan’s schedule.',
           'weekly_checks',
         ),
+        s(`The new account also starts ${TRIAL_DAYS} days of Pro. ${TRIAL_ONCE}`),
       ),
       p(s('A new audit from the home page reads the site again, as it is now.', 'free_audit')),
     ],
@@ -334,8 +349,9 @@ function trials(): HelpArticle {
     blocks: [
       p(
         s(
-          `Pro’s trial needs no card: its ${TRIAL_DAYS} days start with your email. When they end, the account goes back to Free unless you have chosen Pro.`,
+          `Pro’s trial needs no card: its ${TRIAL_DAYS} days start with your email when you first sign in. ${TRIAL_ONCE}`,
         ),
+        s('When the trial ends, the account goes back to Free unless you have chosen Pro.'),
       ),
       p(
         s(
@@ -492,7 +508,7 @@ function planLines(tier: Tier): HelpSentence[] {
           'fix_packets',
         ),
     s(
-      `Up to ${count(g.manualChecksPerSiteDay)} re-checks a site a day, fixes marked done included.`,
+      `Up to ${count(g.manualChecksPerSiteDay)} re-checks a site in any ${count(RECHECK_WINDOW_HOURS)} hours, fixes marked done included.`,
     ),
   ];
   if (g.slack)
@@ -545,6 +561,30 @@ function plans(): HelpArticle {
   };
 }
 
+/** Every state Stripe gives a subscription; the Record holds the list complete. */
+const SUBSCRIPTION_STATUSES: Record<SubscriptionStatus, true> = {
+  trialing: true,
+  active: true,
+  past_due: true,
+  canceled: true,
+  unpaid: true,
+  incomplete: true,
+  incomplete_expired: true,
+  paused: true,
+};
+
+/**
+ * What `deletionMoney` says of the money for each subscription state, once each and in the order
+ * first met; the refund policy it adds to each is said once, after them.
+ */
+function moneySentences(): string[] {
+  const said = Object.keys(SUBSCRIPTION_STATUSES).flatMap((status) => {
+    const money = deletionMoney(status);
+    return money === null ? [] : [money[0]];
+  });
+  return [...new Set(said)];
+}
+
 function deleteAccount(): HelpArticle {
   return {
     slug: 'delete-account',
@@ -561,7 +601,7 @@ function deleteAccount(): HelpArticle {
         s(SETTINGS_COPY.retypeHint),
       ),
       list(...DELETE_COPY.what.map((line) => s(line))),
-      p(s(DELETE_COPY.moneyEnds, 'cancel'), s(REFUND_POLICY)),
+      p(...moneySentences().map((text) => s(text, 'cancel')), s(REFUND_POLICY)),
     ],
   };
 }
