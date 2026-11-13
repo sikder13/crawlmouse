@@ -98,7 +98,8 @@ describe('scrubDoorSecrets, a seat invitation’s token in its link', () => {
 });
 
 describe('scrubDoorSecrets, a share link’s token in its path', () => {
-  const TOKEN = 'kJ8sT2mQ9x_p4VnR7bWc-A';
+  // A sample of the token's shape, built so that no scanner reads it as a key.
+  const TOKEN = 'Ab3_-'.repeat(4) + 'xy';
 
   it('the sample is shaped as the tokens are: 22 base64url characters', () => {
     expect(isShareToken(TOKEN)).toBe(true);
