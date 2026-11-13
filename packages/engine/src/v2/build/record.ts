@@ -7,6 +7,7 @@ import {
   type Check,
   type CrawlBatchResult,
   type DeclarationFetch,
+  type FrontendMarker,
   type PageResult,
 } from '@crawlmouse/types/v2';
 import { TOP_HUB_FRACTION } from '../../analysis/structure.js';
@@ -57,16 +58,68 @@ function edgeOf(tests: readonly AccessTest[]): NonNullable<Check['stack']>['edge
     : null;
 }
 
+type Frontend = NonNullable<NonNullable<Check['stack']>['frontend']>;
+
 /**
- * The check's stack: the CMS the worker recognised on the homepage, and the edge vendor. No front end
- * is read yet.
+ * The front ends a homepage's markers name, in the order they are taken (CC-32 D5): Hydrogen, then
+ * Next.js, then a Liquid theme. Hydrogen's header is set by Hydrogen itself, which can run inside a
+ * Next.js app (the Shopify/hydrogen repository's examples/nextjs), so a page carrying both is taken
+ * as Hydrogen. The WordPress and Webflow markers name no front end here: the CMS already names that
+ * framework (packets/stack.ts).
+ */
+export const FRONTENDS: ReadonlyArray<{
+  framework: Frontend['framework'];
+  name: string;
+  markers: readonly FrontendMarker[];
+}> = [
+  {
+    framework: 'shopify_hydrogen',
+    name: 'Shopify Hydrogen',
+    markers: ['hydrogen_powered_by_header'],
+  },
+  { framework: 'nextjs', name: 'Next.js', markers: ['next_static_path', 'next_data_script'] },
+  {
+    framework: 'shopify_liquid',
+    name: 'Shopify Liquid',
+    markers: ['shopify_theme_object', 'shopify_section_class'],
+  },
+];
+
+/** What each marker that names a front end is, in words, for `detected_from`. */
+const MARKER_WORDS: Readonly<Partial<Record<FrontendMarker, string>>> = {
+  next_static_path: 'asset paths under /_next/static/',
+  next_data_script: '__NEXT_DATA__ script',
+  shopify_theme_object: 'Shopify.theme script',
+  shopify_section_class: 'shopify-section elements',
+  hydrogen_powered_by_header: 'powered-by response header',
+};
+
+/** The first front end in FRONTENDS a marker names, said from the markers found that name it. */
+function frontendOf(markers: readonly FrontendMarker[]): Frontend | null {
+  for (const f of FRONTENDS) {
+    const found = f.markers.filter((m) => markers.includes(m));
+    if (found.length === 0) continue;
+    return {
+      name: f.name,
+      framework: f.framework,
+      version: null,
+      router: null,
+      detected_from: `homepage ${found.map((m) => MARKER_WORDS[m]).join(' and ')}`,
+    };
+  }
+  return null;
+}
+
+/**
+ * The check's stack: the front end the homepage's markers name, the CMS the worker recognised on the
+ * homepage, and the edge vendor. A row written before the worker recorded markers names no front end.
  */
 export function stackOf(
   assembled: Pick<Assembled, 'rows' | 'homepage_url' | 'access_tests'>,
 ): NonNullable<Check['stack']> {
   const home = assembled.rows.get(assembled.homepage_url);
   return {
-    frontend: null,
+    frontend: frontendOf(home?.stack_signals?.frontend_markers ?? []),
     // detectCms answers `custom` when no signature matched: no CMS was recognised, which is not one.
     backend:
       home?.stack_signals && home.stack_signals.cms !== 'custom'

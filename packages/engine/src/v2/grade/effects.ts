@@ -2,7 +2,12 @@
  * Each fix's effect on the two grades, by counterfactual recompute: apply what fixing it means to the
  * grade inputs, recompute, take the difference. Never typed.
  *
- * Order and sum. Fixes whose AI effect applied alone can be stated rank first, by that effect
+ * Order and sum. A shell-only template fix ranks first (`shellOnly`): a detected client-rendered
+ * template fix whose template has no graded page, only empty-root pages (detectors/rendered.ts). Its
+ * effect is 0 by construction, because Readable reads graded pages only, yet a template that serves
+ * no text without JavaScript is the most serious AI-access finding a check makes (owner ruling on
+ * CC-32 Q8); ties by fingerprint. Its counterfactual changes no graded page, so applying it first
+ * moves no other fix's effect. Then fixes whose AI effect applied alone can be stated, by that effect
  * (Technical SEO plus AI readability, larger first; an effect not estimated counts 0); then those whose
  * AI effect waits on a reason; ties by fingerprint. In that order each fix's effect is the grade with
  * it and every fix ranked above it applied, less the grade without it:
@@ -40,7 +45,7 @@ import type { AccessDetection } from '../access/types.js';
 import type { ContentDetection } from '../content/aggregate.js';
 import { CONTENT_CHECKS } from '../content/checks.js';
 import { subjectOfKey } from '../detectors/fingerprint.js';
-import type { RenderedDetection } from '../detectors/rendered.js';
+import type { JsOnlyDetection, RenderedRecord } from '../detectors/js-only-navigation.js';
 import type { Detection } from '../detectors/types.js';
 import { accessScore, crawlerShare, type CrawlerTally } from './access.js';
 import { aiReadability } from './ai-readability.js';
@@ -57,7 +62,7 @@ export type FixRecord =
   | { family: 'structure'; record: Detection }
   | { family: 'access'; record: AccessDetection }
   | { family: 'content'; record: ContentDetection }
-  | { family: 'rendered'; record: RenderedDetection };
+  | { family: 'rendered'; record: RenderedRecord };
 
 interface Inputs {
   seo: TechnicalSeoInput;
@@ -163,6 +168,21 @@ function linkedStraight(seo: TechnicalSeoInput, url: string): TechnicalSeoInput 
   return { ...seo, pages, edges: unique, homepage_url: to(seo.homepage_url) };
 }
 
+/**
+ * The JS-only navigation fix: each evidence page links in its HTML to the JS-only targets its record
+ * keeps (at most MAX_JS_ONLY_TARGETS a page), through `addEdge`, so anchor diversity leaves the links
+ * out. Only targets the crawl holds as pages are linked: a target it never fetched is not a node of
+ * the graph, and the counterfactual adds none.
+ */
+function linkedInHtml(seo: TechnicalSeoInput, record: JsOnlyDetection): TechnicalSeoInput {
+  const crawled = new Set(seo.pages.map((p) => p.url));
+  let next = seo;
+  for (const page of record.evidence.pages)
+    for (const target of page.js_only_targets)
+      if (crawled.has(target)) next = addEdge(next, page.url, target);
+  return next;
+}
+
 const cleared = (seo: TechnicalSeoInput, fingerprint: string): TechnicalSeoInput => ({
   ...seo,
   detections: seo.detections.map((d) =>
@@ -234,11 +254,9 @@ export function applyFix(
     return { seo, ai: { ...ai, quotable: { checks } } };
   }
   if (f.family === 'rendered') {
-    // The render step keeps no link, so only the client-rendered template has a counterfactual: the
-    // template's graded pages serve their words without JavaScript, rendered this check or not.
-    if (f.record.type !== 'client_rendered_template') {
-      throw new Error(`effects: no counterfactual for ${f.record.type}`);
-    }
+    if (f.record.type === 'js_only_navigation') return { seo: linkedInHtml(seo, f.record), ai };
+    // The client-rendered template: its graded pages serve their words without JavaScript, rendered
+    // this check or not.
     const template = f.record.template_key;
     return {
       seo,
@@ -354,6 +372,13 @@ function effectOf(
   };
 }
 
+/** A detected client-rendered template fix whose template has no graded page (see Order and sum). */
+export const shellOnly = (f: FixRecord): boolean =>
+  f.family === 'rendered' &&
+  f.record.type === 'client_rendered_template' &&
+  f.record.state === 'detected' &&
+  f.record.extent.graded === 0;
+
 /** Both grades' points, an effect not estimated counting 0. */
 const sizeOf = (e: Effect) => (e.technical_seo ?? 0) + (e.ai_readability ?? 0);
 
@@ -403,6 +428,7 @@ export function effectsOf(
   });
   alone.sort(
     (x, y) =>
+      Number(shellOnly(y.f)) - Number(shellOnly(x.f)) ||
       Number(y.stated) - Number(x.stated) ||
       y.size - x.size ||
       (fingerprintOf(x.f) < fingerprintOf(y.f) ? -1 : 1),

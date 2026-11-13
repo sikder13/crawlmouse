@@ -19,6 +19,7 @@ import { FIX_SECTION } from '../diff/subjects.js';
 import type { DetectorOutcome, FixDraft } from '../diff/types.js';
 import { namesOnePage, templateNoun } from '../build/template-noun.js';
 import { subjectOfKey } from '../detectors/fingerprint.js';
+import type { RenderedRecord } from '../detectors/js-only-navigation.js';
 import type { RenderedDetection } from '../detectors/rendered.js';
 import type { Detection } from '../detectors/types.js';
 import { clean } from '../clean-text.js';
@@ -53,13 +54,17 @@ const CRAWL_CONFIDENCE: Confidence = 'likely';
 export const RENDERED_CLASS: RecommendationClass = 'best_practice';
 
 /**
- * A browser measured the template's pages, and the detector opens a fix only when its rendered pages
- * agree. `confirmed` when PAGES_PER_FIX_TEMPLATE or more of the template's graded pages were rendered,
- * or when each of them was (a template of one graded page, rendered); `likely` otherwise. The render
- * planner renders up to PAGES_PER_FIX_TEMPLATE pages of an open fix's template on the next check.
+ * A browser measured the template's pages, and the detector opens a fix only when its deciding renders
+ * agree (detectors/rendered.ts). `confirmed` when PAGES_PER_FIX_TEMPLATE or more of the pages the
+ * verdict reads were rendered, or each of them was; `likely` otherwise. The verdict reads the graded
+ * pages of a template that has any, and its empty-root pages otherwise. The graded phase renders up to
+ * PAGES_PER_FIX_TEMPLATE graded pages of an open fix's template on the next check.
  */
 export const renderedConfidence = ({ extent }: Pick<RenderedDetection, 'extent'>): Confidence =>
-  extent.rendered >= Math.min(PAGES_PER_FIX_TEMPLATE, extent.pages) ? 'confirmed' : 'likely';
+  extent.rendered >=
+  Math.min(PAGES_PER_FIX_TEMPLATE, extent.graded > 0 ? extent.graded : extent.pages)
+    ? 'confirmed'
+    : 'likely';
 
 /** "its" or "their", for the pages a template key names. */
 const possessive = (key: string) => (namesOnePage(key) ? 'its' : 'their');
@@ -78,6 +83,7 @@ export const TITLES: Readonly<Partial<Record<FixType, (subject: string) => strin
   hreflang_gap: (s) => `Complete the hreflang annotations of ${s}`,
   edge_rule_blocks_crawler: (s) => `Let ${s} through the user-agent rule`,
   client_rendered_template: (k) => `Serve the text of ${templateNoun(k)} without JavaScript`,
+  js_only_navigation: (k) => `Put the links of ${templateNoun(k)} in the HTML`,
   quotable_opening: (k) => `Open ${templateNoun(k)} with a direct answer`,
   missing_author_date: (k) => `Show an author and a date on ${templateNoun(k)}`,
   specs_as_images: (k) => `Give the specifications on ${templateNoun(k)} as text`,
@@ -160,7 +166,9 @@ function draft(
       recommendation_class: RENDERED_CLASS,
       confidence: renderedConfidence(r),
       affected_pages: r.affected_urls.length,
-      // the render planner renders more pages of an open fix's template (build/plan.ts)
+      // For client_rendered_template the render planner renders more pages of an open fix's template
+      // (build/plan.ts awaitingShellTemplates); for js_only_navigation it does not. For both, the
+      // detector gives a template an awaiting fix names a record whether or not it is present.
       template_key: r.template_key,
       crawler_uas: [],
     };
@@ -190,7 +198,7 @@ export function detectorOutcomes(
   grades: Grades,
   access: readonly AccessDetection[],
   structure: readonly Detection[],
-  rendered: readonly RenderedDetection[],
+  rendered: readonly RenderedRecord[],
   written: WriteFix,
 ): Outcomes {
   const records: FixRecord[] = [

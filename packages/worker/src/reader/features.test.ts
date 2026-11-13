@@ -70,13 +70,19 @@ describe('stack signals', () => {
   it('are read only when asked, from the HTML and the headers given', () => {
     const wp =
       '<html><head><link rel="stylesheet" href="/wp-content/a.css"></head><body></body></html>';
-    expect(read(wp, false, {}).stack).toEqual({ cms: 'wordpress' });
+    expect(read(wp, false, {}).stack).toEqual({
+      cms: 'wordpress',
+      frontendMarkers: ['wp_content_path'],
+    });
     expect(read(wp).stack).toBeNull();
     // A header alone: x-pingback names xmlrpc.php on WordPress.
     expect(
       read('<html><body></body></html>', false, { 'x-pingback': '/xmlrpc.php' }).stack,
-    ).toEqual({ cms: 'wordpress' });
-    expect(read('<html><body></body></html>', false, {}).stack).toEqual({ cms: 'custom' });
+    ).toEqual({ cms: 'wordpress', frontendMarkers: [] });
+    expect(read('<html><body></body></html>', false, {}).stack).toEqual({
+      cms: 'custom',
+      frontendMarkers: [],
+    });
   });
 });
 

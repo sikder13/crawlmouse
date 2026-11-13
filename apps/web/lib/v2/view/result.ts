@@ -14,7 +14,15 @@ import {
   type FixSection,
 } from '@crawlmouse/types/v2';
 import { findCheck, fixesAsOf, siteOf } from '../fixtures';
-import { AI_WAITING, effectHeadline } from './effect-headline';
+import {
+  AI_WAITING,
+  effectHeadline,
+  formatPoints,
+  groupSum,
+  NO_EFFECT,
+  NO_EFFECT_SHORT,
+  pagesReadable,
+} from './effect-headline';
 import { openFixes, type FixPlan } from './free-fixes';
 import { SCREEN_SIGNALS, screenSignals, type ScreenSignal } from './screen-signals';
 import { dateTimeUtc, dayTimeUtc, listOf, percent, templateNoun } from '../format';
@@ -705,12 +713,18 @@ function allClear(
 
 /**
  * A fix's points as the fixes table gives them, by `effectHeadline`'s rule: "+24 AI", "+4 SEO",
- * "SEO not estimated", or why its AI effect waits ("AI not yet estimated", "AI after fix 1").
+ * "No measurable effect", "SEO not estimated", or why its AI effect waits ("AI not yet estimated",
+ * "AI after fix 1").
  */
-export function points(f: Pick<Fix, 'effect' | 'section'>, siteFixes: readonly Fix[]): string {
+export function points(
+  f: Pick<Fix, 'type' | 'effect' | 'section' | 'affected_pages' | 'last_state'>,
+  siteFixes: readonly Fix[],
+): string {
   const h = effectHeadline(f, siteFixes);
-  if (h.kind === 'ai') return `+${h.points} AI`;
-  if (h.kind === 'seo') return `+${h.points} SEO`;
+  if (h.kind === 'ai') return `${h.signed} AI`;
+  if (h.kind === 'seo') return `${h.signed} SEO`;
+  if (h.kind === 'no_effect') return NO_EFFECT_SHORT;
+  if (h.kind === 'pages_readable') return h.text;
   return h.kind === 'waiting' ? h.short : 'SEO not estimated';
 }
 
@@ -749,9 +763,13 @@ function fixFirstBody(check: Check, f: Fix, siteFixes: readonly Fix[]): string {
         : `AI readability ${ai.total} → ${Math.min(100, ai.total + h.points)}, estimated.`
       : h.kind === 'waiting'
         ? `${h.sentence}.`
-        : seo === null || h.kind === 'seo_not_estimated'
-          ? 'Technical SEO is not graded for this audit, so no change to it is estimated.'
-          : `Technical SEO ${seo} → ${Math.min(100, seo + h.points)}, estimated.`;
+        : h.kind === 'no_effect'
+          ? `${NO_EFFECT}.`
+          : h.kind === 'pages_readable'
+            ? `${h.text}.`
+            : seo === null || h.kind === 'seo_not_estimated'
+              ? 'Technical SEO is not graded for this audit, so no change to it is estimated.'
+              : `Technical SEO ${seo} → ${Math.min(100, seo + h.points)}, estimated.`;
   // The steps are named only where a packet was written; a fix with none ends at its effect.
   const open = f.packet ? ' The steps and the evidence are open, free.' : '';
   return `${what ? `${capitalise(what)}. ` : ''}${effect}${open}`;
@@ -793,15 +811,45 @@ function fixRows(
       key: 'rest',
       title: `${capitalise(numberWord(rest.length))} more, grouped by type`,
       scope: null,
-      points: rest.some((f) => f.effect.technical_seo === null)
-        ? 'SEO not estimated'
-        : `+${rest.reduce((n, f) => n + f.effect.technical_seo!, 0)} SEO`,
+      points: restPoints(rest),
       open: false,
       count: rest.length,
       href: '#pro',
     });
   }
   return rows;
+}
+
+/**
+ * The grouped row's points, in the table's short words. Its own rule, so the row reads as the locked
+ * Final-Result does ("+5 SEO"):
+ *   1. what the group adds up to: Technical SEO points and AI points, each member taken at 0 when
+ *      below it (`groupSum`; a member whose effect is not estimated counts 0, so a known sum shows
+ *      beside unknown ones), and the pages the `pages_readable` members make readable; when no
+ *      member's Technical SEO effect is estimated and nothing else adds up, "SEO not estimated";
+ *   2. with nothing of that, how many members' AI effect still waits, "AI not yet estimated for N";
+ *   3. otherwise "SEO not estimated" when a member's Technical SEO effect is not estimated (a fix first
+ *      opened in a refused check keeps a null effect until it is found again), else "No measurable
+ *      effect", so the row never reads "No measurable effect" beside a member whose Technical SEO
+ *      effect is not estimated.
+ * A pages-headed fix is never counted as waiting: its pages line is a part of step 1, so step 2 is
+ * not reached.
+ */
+export function restPoints(
+  fixes: readonly Pick<Fix, 'type' | 'effect' | 'affected_pages' | 'last_state'>[],
+): string {
+  const seoKnown = fixes.some((f) => f.effect.technical_seo !== null);
+  const seo = seoKnown
+    ? formatPoints(groupSum(fixes.map((f) => f.effect.technical_seo ?? 0)))
+    : null;
+  const ai = formatPoints(groupSum(fixes.map((f) => f.effect.ai_readability ?? 0)));
+  const figures = [seo && `${seo} SEO`, ai && `${ai} AI`].filter(Boolean).join(', ');
+  const sums = [figures || null, pagesReadable(fixes)].filter(Boolean);
+  if (sums.length) return sums.join('; ');
+  if (!seoKnown) return 'SEO not estimated';
+  const waiting = fixes.filter((f) => f.effect.ai_readability === null).length;
+  if (waiting) return `AI not yet estimated for ${waiting}`;
+  return fixes.some((f) => f.effect.technical_seo === null) ? 'SEO not estimated' : NO_EFFECT_SHORT;
 }
 
 const GROUP_NAMES: Record<CrawlerResult['group'], string> = {
