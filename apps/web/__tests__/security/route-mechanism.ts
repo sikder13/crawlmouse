@@ -80,6 +80,9 @@ function sessionFirst(sf: ts.SourceFile): string[] {
  * The support console's routes (CC-33): `requireOperator()` answers before the route makes a
  * service-role client (`supabaseAdmin`, `consoleAdmin`, or the store built on it, `consoleStore`) and
  * before it reads the request body, so a caller who is not an operator is answered with nothing read.
+ * The route builds no client itself: a `supabaseAdmin()` or `createClient()` call anywhere in it is a
+ * problem, so its service-role client is `consoleAdmin(proof)`'s, which throws on a proof
+ * `requireOperator` did not issue (lib/v2/ops/operator.ts).
  */
 function operatorFirst(sf: ts.SourceFile): string[] {
   const at = first(callPositions(sf, 'requireOperator'));
@@ -97,6 +100,12 @@ function operatorFirst(sf: ts.SourceFile): string[] {
   if (body.length) {
     problems.push(
       `reads the request body before requireOperator() (${body.length} read${body.length === 1 ? '' : 's'})`,
+    );
+  }
+  const built = ['supabaseAdmin', 'createClient'].flatMap((n) => callPositions(sf, n));
+  if (built.length) {
+    problems.push(
+      `builds a client with supabaseAdmin() or createClient() (${built.length} call${built.length === 1 ? '' : 's'}); an operator route reaches the service role through consoleAdmin() or consoleStore()`,
     );
   }
   return problems;

@@ -21,11 +21,16 @@ function Section({
   columns,
   rows,
   empty,
+  withheld = 0,
+  note = null,
 }: {
   title: string;
   columns: TableColumn[];
   rows: TableRow[];
   empty: string;
+  /** How many rows the list has that it does not show. */
+  withheld?: number;
+  note?: string | null;
 }) {
   return (
     <Card as="section" className={styles.panel} aria-label={title}>
@@ -37,6 +42,8 @@ function Section({
       ) : (
         <p className={styles.empty}>{empty}</p>
       )}
+      {withheld > 0 ? <p className={styles.empty}>{withheld} more not shown.</p> : null}
+      {note ? <p className={styles.empty}>{note}</p> : null}
     </Card>
   );
 }
@@ -84,8 +91,9 @@ function ActionForm({
 export function ConsoleAccountScreen({ view: v, notice }: ConsoleAccountProps) {
   return (
     <PageShell header="app" footer={false}>
-      {/* PostHog is set up for every page (instrumentation-client.ts): `ph-no-capture` keeps its
-          autocapture off this staff page, and `data-ph-mask` masks its text in an error replay. */}
+      {/* PostHog is not started on a page loaded under /internal (instrumentation-client.ts). As a
+          second guard, should it be running: `ph-no-capture` keeps its autocapture off this staff
+          page, and `data-ph-mask` masks its text in an error replay. */}
       <main className={`${layout.wrap} ${styles.main} ph-no-capture`} data-ph-mask="">
         <div className={styles.header}>
           <a href="/internal">Support console</a>
@@ -138,6 +146,7 @@ export function ConsoleAccountScreen({ view: v, notice }: ConsoleAccountProps) {
 
         <Section
           title="Seats"
+          withheld={v.withheld.seats}
           empty="No seats."
           columns={[
             { header: 'Email' },
@@ -170,6 +179,8 @@ export function ConsoleAccountScreen({ view: v, notice }: ConsoleAccountProps) {
 
         <Section
           title="Sites"
+          withheld={v.withheld.sites}
+          note={v.notes.sites}
           empty="No sites."
           columns={[{ header: 'Host' }, { header: 'State' }]}
           rows={v.sites.map((s) => ({ key: s.key, cells: [s.host, s.state] }))}
@@ -177,6 +188,7 @@ export function ConsoleAccountScreen({ view: v, notice }: ConsoleAccountProps) {
 
         <Section
           title="Last 20 checks"
+          withheld={v.withheld.checks}
           empty="No checks."
           columns={[
             { header: 'Queued', mono: true },
@@ -218,6 +230,7 @@ export function ConsoleAccountScreen({ view: v, notice }: ConsoleAccountProps) {
 
         <Section
           title="Mail sent"
+          withheld={v.withheld.mail}
           empty="No mail in the ledger."
           columns={[
             { header: 'Claimed', mono: true },
@@ -244,6 +257,8 @@ export function ConsoleAccountScreen({ view: v, notice }: ConsoleAccountProps) {
 
         <Section
           title="Alert rules"
+          withheld={v.withheld.rules}
+          note={v.notes.rules}
           empty="No alert rules."
           columns={[
             { header: 'Kind' },
@@ -260,6 +275,7 @@ export function ConsoleAccountScreen({ view: v, notice }: ConsoleAccountProps) {
 
         <Section
           title="Last 20 alerts"
+          withheld={v.withheld.alerts}
           empty="No alerts sent."
           columns={[
             { header: 'Sent', mono: true },
@@ -277,6 +293,7 @@ export function ConsoleAccountScreen({ view: v, notice }: ConsoleAccountProps) {
 
         <Section
           title="Open fixes"
+          withheld={v.withheld.fixes}
           empty="No open or reopened fixes."
           columns={[
             { header: 'Number', numeric: true },

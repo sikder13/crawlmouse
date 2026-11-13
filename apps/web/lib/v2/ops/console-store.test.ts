@@ -6,7 +6,7 @@ import { randomUUID } from 'node:crypto';
 import type { PGlite } from '@electric-sql/pglite';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { applyAllMigrations, freshDb } from '../../../__tests__/helpers/pglite-migrations';
-import { postgrestOver } from '../../../__tests__/helpers/postgrest-pglite';
+import { postgrestOver, type Call } from '../../../__tests__/helpers/postgrest-pglite';
 import {
   insertRow,
   personalAccount,
@@ -135,6 +135,19 @@ describe('resolve', () => {
     expect([...found.accountIds].sort()).toEqual([p.accountId, other.accountId].sort());
   });
 
+  it('an address is resolved by an rpc, whose body carries it, and never by a read of users', async () => {
+    const p = await person();
+    const log: Call[][] = [];
+    const logged = supabaseConsoleStore(postgrestOver(db, { log }), operatorId);
+    expect(await logged.resolve({ kind: 'email', email: p.email })).toEqual({
+      kind: 'email',
+      accountIds: [p.accountId],
+    });
+    expect(log.map((calls) => calls[0])).toEqual([
+      ['rpc', 'operator_account_ids_by_email', { p_email: p.email }],
+    ]);
+  });
+
   it('a host finds the accounts that keep it, and not an anonymous site of it', async () => {
     const host = `${randomUUID().slice(0, 8)}.example`;
     const a = await person();
@@ -225,6 +238,82 @@ describe('dossier', () => {
 
   it('answers null for an id that is no account', async () => {
     expect(await store.dossier(randomUUID())).toBeNull();
+  });
+});
+
+describe('dossier bounds', () => {
+  it("reads at most each section's limit, and counts what it did not show", async () => {
+    const p = await person('owner');
+    const dev = await person('dev');
+    await db.query(
+      `insert into public.seats (account_id, user_id, invited_email, role, status, accepted_at)
+       values ($1, $2, $3, 'developer', 'active', now())`,
+      [p.accountId, dev.userId, dev.email],
+    );
+    const s1 = await site(p.accountId);
+    await site(p.accountId);
+    const c1 = await check(s1.id, 'failed', 2);
+    const c2 = await check(s1.id, 'failed', 1);
+    for (let i = 0; i < 2; i++) {
+      await db.query(
+        `insert into public.email_sends (idempotency_key, kind, address_hash, account_id, status,
+                                         attempts, claimed_at, updated_at)
+         values ($1, 'alert', $2, $3, 'failed', 1, now(), now())`,
+        [`k-${randomUUID()}`, 'a'.repeat(64), p.accountId],
+      );
+    }
+    const first = randomUUID();
+    await insertRow(db, 'alert_rules', ROWS.alert_rules(first, p.accountId, null, 'any_change'));
+    await insertRow(db, 'alert_rules', ROWS.alert_rules(randomUUID(), p.accountId, null));
+    for (const c of [c1, c2]) {
+      await insertRow(db, 'alert_events', ROWS.alert_events(randomUUID(), first, s1.id, c));
+    }
+    await insertRow(db, 'site_fixes', ROWS.site_fixes(randomUUID(), s1.id, c1, 1));
+    await insertRow(db, 'site_fixes', ROWS.site_fixes(randomUUID(), s1.id, c1, 2));
+
+    const one = { seats: 1, sites: 1, checks: 1, mail: 1, rules: 1, alerts: 1, fixes: 1 };
+    const d = (await supabaseConsoleStore(postgrestOver(db), operatorId, one).dossier(
+      p.accountId,
+    ))!;
+    expect(
+      [d.seats, d.sites, d.checks, d.mail, d.rules, d.alerts, d.fixes].map((x) => x.length),
+    ).toEqual([1, 1, 1, 1, 1, 1, 1]);
+    expect(d.sites[0]!.id).toBe(s1.id);
+    expect(d.totals).toEqual({
+      seats: 2,
+      sites: 2,
+      checks: 2,
+      mail: 2,
+      rules: 2,
+      alerts: 2,
+      fixes: 2,
+    });
+  });
+
+  it('bounds each list it reads: a read of a table carries a limit, or asks for one row', async () => {
+    const p = await person();
+    await check((await site(p.accountId)).id, 'failed', 1);
+    await insertRow(db, 'alert_rules', ROWS.alert_rules(randomUUID(), p.accountId, null));
+    const log: Call[][] = [];
+    await supabaseConsoleStore(postgrestOver(db, { log }), operatorId).dossier(p.accountId);
+    const reads = log.filter((calls) => calls[0]![0] === 'from');
+    expect(reads.map((calls) => calls[0]![1])).toEqual([
+      'accounts',
+      'seats',
+      'users',
+      'sites',
+      'checks',
+      'email_sends',
+      'alert_rules',
+      'alert_events',
+      'site_fixes',
+    ]);
+    for (const calls of reads) {
+      expect(
+        calls.some(([m]) => m === 'limit' || m === 'maybeSingle'),
+        String(calls[0]![1]),
+      ).toBe(true);
+    }
   });
 });
 

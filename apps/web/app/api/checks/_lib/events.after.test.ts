@@ -29,21 +29,42 @@ beforeEach(() => {
 
 describe('capturePublicEventAfterResponse', () => {
   it('leaves the capture for `after`: nothing is sent until the platform runs it', async () => {
-    await capturePublicEventAfterResponse(request(), 'check_started', CHECK, {
-      trigger: 'first_audit',
-    });
+    await capturePublicEventAfterResponse(
+      request(),
+      'check_started',
+      CHECK,
+      { trigger: 'first_audit' },
+      null,
+    );
     expect(h.sent).toEqual([]);
     expect(h.tasks).toHaveLength(1);
     await h.tasks[0]!();
     expect(h.sent).toHaveLength(1);
   });
 
+  it('hands the account it is given to the sender, for the internal marker', async () => {
+    const account = 'a0000000-0000-4000-8000-000000000001';
+    await capturePublicEventAfterResponse(
+      request(),
+      'check_finished',
+      CHECK,
+      { trigger: 'manual', status: 'failed', pages: 0, durationMs: 1 },
+      account,
+    );
+    await h.tasks[0]!();
+    expect(h.sent).toEqual([expect.objectContaining({ accountId: account })]);
+  });
+
   it('when `after` refuses, sends the capture itself and does not throw', async () => {
     h.refuse = true;
     await expect(
-      capturePublicEventAfterResponse(request(), 'check_started', CHECK, {
-        trigger: 'first_audit',
-      }),
+      capturePublicEventAfterResponse(
+        request(),
+        'check_started',
+        CHECK,
+        { trigger: 'first_audit' },
+        null,
+      ),
     ).resolves.toBeUndefined();
     expect(h.sent).toHaveLength(1);
     expect(h.tasks).toEqual([]);

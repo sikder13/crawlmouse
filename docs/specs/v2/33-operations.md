@@ -41,3 +41,16 @@ status-page vendor, switching any flag.
   own logic (`apps/web/lib/v2/ops/health.ts`), rendered on each request, with the deploy's version and
   commit, and says that audits, email and billing are not monitored there. `app/status/page.test.tsx`
   fails on a state word outside that line.
+
+## D1 as built: which server events carry `internal: true`
+
+`captureServerEvent` reads the account from the event's distinct id (`account:<id>`, `seat:<id>`, or a
+bare account or user id) and from the `accountId` its caller passes (`lib/v2/ops/internal-marker.ts`).
+The check stream passes the kept check's account with `check_finished`
+(`app/api/checks/[id]/stream/serve.test.ts`, "check_finished is handed the account of a kept check").
+These events cannot carry the mark (questions Q13):
+
+- `check_started` from the public check flow: the check's site has no account when it is created.
+- `report_viewed` (`report:<slug>`): the report row the route reads selects no account.
+- A signed-out visitor's pricing events (`anon:<uuid>`): there is no account.
+- `account_purged`: it is sent after the erasure has deleted the account, so the lookup finds no row.

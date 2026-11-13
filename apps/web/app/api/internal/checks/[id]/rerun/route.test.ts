@@ -5,6 +5,7 @@ import { applyAllMigrations, freshDb } from '@/__tests__/helpers/pglite-migratio
 import {
   adminOver,
   keptSite,
+  makePaid,
   person,
   sessionOver,
   type Person,
@@ -168,7 +169,17 @@ describe("an operator's re-run", () => {
     expect(h.send).not.toHaveBeenCalled();
   });
 
-  it('refuses a check that did not fail', async () => {
+  /** The line a refusal made in the route writes: the outcome is the refusal. */
+  const refusedLine = (op: Person, accountId: string, target: string, outcome: string) => ({
+    operator_id: op.id,
+    action: 'rerun_check',
+    account_id: accountId,
+    target,
+    reason: 'stuck since Tuesday',
+    outcome,
+  });
+
+  it('refuses a check that did not fail, and records the refusal', async () => {
     const op = await operatorPerson(h.db);
     const { owner, site } = await world();
     const { rows } = await h.db.query<{ id: string }>(
@@ -182,9 +193,12 @@ describe("an operator's re-run", () => {
       `/internal/accounts/${owner.accountId}?done=not_failed`,
     );
     expect(h.send).not.toHaveBeenCalled();
+    expect((await recordLines(h.db)).at(-1)).toEqual(
+      refusedLine(op, owner.accountId, rows[0]!.id, 'not_failed'),
+    );
   });
 
-  it('refuses while crawls are paused, and while the pipeline is off', async () => {
+  it('refuses while crawls are paused, and while the pipeline is off, and records each', async () => {
     const op = await operatorPerson(h.db);
     const { owner, failed } = await world();
     as(op);
@@ -192,13 +206,66 @@ describe("an operator's re-run", () => {
     expect((await rerun(failed)).headers.get('location')).toBe(
       `/internal/accounts/${owner.accountId}?done=paused`,
     );
+    expect((await recordLines(h.db)).at(-1)).toEqual(
+      refusedLine(op, owner.accountId, failed, 'paused'),
+    );
     vi.stubEnv('CRAWL_PAUSED', '');
     vi.stubEnv('V2_PIPELINE', '');
     expect((await rerun(failed)).headers.get('location')).toBe(
       `/internal/accounts/${owner.accountId}?done=unavailable`,
     );
+    expect((await recordLines(h.db)).at(-1)).toEqual(
+      refusedLine(op, owner.accountId, failed, 'unavailable'),
+    );
     expect(h.send).not.toHaveBeenCalled();
   });
+
+  it.each([
+    ['removed', 'update public.sites set removed_at = now() where id = $1', 'site_removed'],
+    ['paused', `update public.sites set paused_reason = 'user' where id = $1`, 'site_paused'],
+  ])('refuses a check of a %s site, and records the refusal', async (_name, sql, code) => {
+    const op = await operatorPerson(h.db);
+    const { owner, site, failed } = await world();
+    await h.db.query(sql, [site.id]);
+    as(op);
+    const res = await rerun(failed);
+    expect(res.headers.get('location')).toBe(`/internal/accounts/${owner.accountId}?done=${code}`);
+    expect(h.send).not.toHaveBeenCalled();
+    expect((await recordLines(h.db)).at(-1)).toEqual(
+      refusedLine(op, owner.accountId, failed, code),
+    );
+  });
+
+  it.each(['pro', 'agency'] as const)(
+    "a %s account is capped at 10 manual checks a day, not Free's 2",
+    async (tier) => {
+      pinBucket();
+      const op = await operatorPerson(h.db);
+      as(op);
+      const withManual = async (n: number) => {
+        const w = await world();
+        await makePaid(h.db, w.owner.accountId, tier);
+        for (let i = 0; i < n; i++) {
+          await h.db.query(
+            `insert into public.checks (id, site_id, status, trigger, grade_version, queued_at,
+                                        started_at, finished_at, failure_reason)
+             values (gen_random_uuid(), $1, 'failed', 'manual', '2.0.0', now() - interval '1 hour',
+                     now() - interval '1 hour', now() - interval '1 hour', 'internal')`,
+            [w.site.id],
+          );
+        }
+        return w;
+      };
+      const under = await withManual(9);
+      expect((await rerun(under.failed)).headers.get('location')).toBe(
+        `/internal/accounts/${under.owner.accountId}?done=rerun_queued`,
+      );
+      const at = await withManual(10);
+      expect((await rerun(at.failed)).headers.get('location')).toBe(
+        `/internal/accounts/${at.owner.accountId}?done=capped`,
+      );
+    },
+  );
 
   it('answers 404 for an id that is malformed or names no check', async () => {
     as(await operatorPerson(h.db));

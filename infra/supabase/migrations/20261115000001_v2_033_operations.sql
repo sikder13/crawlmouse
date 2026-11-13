@@ -84,6 +84,91 @@ alter function public.is_operator() owner to postgres;
 revoke all on function public.is_operator() from public, anon, authenticated, service_role;
 grant execute on function public.is_operator() to authenticated, service_role;
 
+-- ─── operator_account_ids_by_email, user_id_by_email ─────────────────────────────────────────────
+-- An address is looked up through these, as an rpc: PostgREST takes an rpc's arguments in the POST
+-- body, which the gateway does not log, where a filter (`users?email=eq.<address>`) is in the logged
+-- query string. operator_account_ids_by_email answers the default account of the user whose address
+-- equals p_email as written, and the accounts that user holds a seat on, without repeats (the support
+-- console's search, apps/web/lib/v2/ops/console-store.ts). user_id_by_email answers that user's id,
+-- or null (scripts/ops/operator.ts). Security invoker: service_role holds select on users and seats.
+
+create or replace function public.operator_account_ids_by_email(p_email text)
+returns table (account_id uuid)
+language sql
+stable
+security invoker
+set search_path = pg_catalog, pg_temp
+as $$
+  select u.default_account_id from public.users u
+   where u.email = p_email and u.default_account_id is not null
+  union
+  select s.account_id from public.seats s join public.users u on u.id = s.user_id
+   where u.email = p_email
+  order by 1;
+$$;
+
+revoke all on function public.operator_account_ids_by_email(text)
+  from public, anon, authenticated, service_role;
+grant execute on function public.operator_account_ids_by_email(text) to service_role;
+
+create or replace function public.user_id_by_email(p_email text)
+returns uuid
+language sql
+stable
+security invoker
+set search_path = pg_catalog, pg_temp
+as $$
+  select u.id from public.users u where u.email = p_email;
+$$;
+
+revoke all on function public.user_id_by_email(text) from public, anon, authenticated, service_role;
+grant execute on function public.user_id_by_email(text) to service_role;
+
+-- ─── operator_account_counts ─────────────────────────────────────────────────────────────────────
+-- How many rows each section of the console's account page has, so a page that shows a bounded list
+-- says how many it left out (apps/web/lib/v2/ops/console-store.ts `dossier`): the account's seats,
+-- sites, mail ledger rows and alert rules; the checks and open or reopened fixes of the sites in
+-- p_sites, and the alert events of the rules in p_rules (the sites and rules the page shows), counted
+-- where the site or rule is the account's. Security invoker: service_role holds select on these
+-- tables.
+
+create or replace function public.operator_account_counts(
+  p_account uuid,
+  p_sites uuid[],
+  p_rules uuid[]
+)
+returns table (
+  seats integer,
+  sites integer,
+  checks integer,
+  mail integer,
+  rules integer,
+  alerts integer,
+  fixes integer
+)
+language sql
+stable
+security invoker
+set search_path = pg_catalog, pg_temp
+as $$
+  select
+    (select count(*)::integer from public.seats s where s.account_id = p_account),
+    (select count(*)::integer from public.sites s where s.account_id = p_account),
+    (select count(*)::integer from public.checks c join public.sites s on s.id = c.site_id
+      where s.account_id = p_account and c.site_id = any(p_sites)),
+    (select count(*)::integer from public.email_sends e where e.account_id = p_account),
+    (select count(*)::integer from public.alert_rules r where r.account_id = p_account),
+    (select count(*)::integer from public.alert_events e join public.alert_rules r on r.id = e.rule_id
+      where r.account_id = p_account and e.rule_id = any(p_rules)),
+    (select count(*)::integer from public.site_fixes f join public.sites s on s.id = f.site_id
+      where s.account_id = p_account and f.site_id = any(p_sites)
+        and f.status in ('open', 'reopened'));
+$$;
+
+revoke all on function public.operator_account_counts(uuid, uuid[], uuid[])
+  from public, anon, authenticated, service_role;
+grant execute on function public.operator_account_counts(uuid, uuid[], uuid[]) to service_role;
+
 -- ─── operator_actions ────────────────────────────────────────────────────────────────────────────
 -- The console's record: who (operator_id), what (action), whose account (account_id), on what
 -- (target), why (reason), with what result (outcome), when (created_at). account_id is not a
@@ -96,7 +181,7 @@ create table if not exists public.operator_actions (
   operator_id uuid not null,
   action text not null
     constraint operator_actions_action_check
-    check (action in ('search', 'view_account', 'rerun_check', 'resend_sign_in')),
+    check (action in ('search', 'list_accounts', 'view_account', 'rerun_check', 'resend_sign_in')),
   account_id uuid,
   target text
     constraint operator_actions_target_check
@@ -118,11 +203,15 @@ revoke all on table public.operator_actions from public, anon, authenticated, se
 grant select, insert on table public.operator_actions to service_role;
 
 -- ─── operator_log ────────────────────────────────────────────────────────────────────────────────
--- Writes one search, view_account or resend_sign_in row and answers its id. p_outcome is known when
--- the row is written for a search (how many accounts it found) and null otherwise; a re-send's is set
--- afterwards by operator_finish. p_operator must be in operators (42501 otherwise). A re-run is
--- recorded by operator_request_check, in the call that queues it, so rerun_check is refused here
--- (22023). Security invoker: service_role holds the insert.
+-- Writes one search, list_accounts, view_account or resend_sign_in row and answers its id
+-- (list_accounts: a row for an account a search listing shows, written before the listing reads it).
+-- p_outcome is known when the row is written for a search (how many accounts it found) and null
+-- otherwise; a re-send's is set afterwards by operator_finish. p_operator must be in operators
+-- (42501 otherwise). A queued or capped re-run is recorded by operator_request_check, in the call
+-- that queues it; a re-run the console's route refuses before that call is recorded here, as a
+-- rerun_check row with a reason and one of the route's refusals as its outcome (paused, unavailable,
+-- not_failed, site_removed, site_paused). Any other rerun_check row is refused (22023). Security
+-- invoker: service_role holds the insert.
 
 create or replace function public.operator_log(
   p_operator uuid,
@@ -141,7 +230,11 @@ as $$
 declare
   v_id bigint;
 begin
-  if p_action = 'rerun_check' then
+  if p_action = 'rerun_check'
+     and (p_reason is null
+          or p_outcome is null
+          or p_outcome not in ('paused', 'unavailable', 'not_failed', 'site_removed', 'site_paused'))
+  then
     raise exception 'operator_log: a re-run is recorded by operator_request_check'
       using errcode = '22023';
   end if;

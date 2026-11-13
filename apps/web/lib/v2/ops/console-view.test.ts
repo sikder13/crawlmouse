@@ -124,7 +124,52 @@ const dossier = (over: Partial<Dossier> = {}): Dossier => ({
     },
   ],
   fixes: [{ id: 'f1', site_id: S1, number: 7, type: 'orphan_pages', status: 'reopened' }],
+  totals: { seats: 2, sites: 2, checks: 3, mail: 1, rules: 2, alerts: 1, fixes: 1 },
   ...over,
+});
+
+describe('what an account page leaves out', () => {
+  it('is nothing when each section shows its whole count', () => {
+    const v = accountView(dossier());
+    expect(v.withheld).toEqual({
+      seats: 0,
+      sites: 0,
+      checks: 0,
+      mail: 0,
+      rules: 0,
+      alerts: 0,
+      fixes: 0,
+    });
+    expect(v.notes).toEqual({ sites: null, rules: null });
+  });
+
+  it('is the count less what is shown, for each section, with a note where a list reads another', () => {
+    const v = accountView(
+      dossier({
+        totals: { seats: 3, sites: 5, checks: 40, mail: 51, rules: 2, alerts: 9, fixes: 4 },
+      }),
+    );
+    expect(v.withheld).toEqual({
+      seats: 1,
+      sites: 3,
+      checks: 37,
+      mail: 50,
+      rules: 0,
+      alerts: 8,
+      fixes: 3,
+    });
+    expect(v.notes.sites).toBe('The checks and open fixes below are those of the sites shown.');
+    expect(v.notes.rules).toBeNull();
+    expect(accountView(dossier({ totals: { ...dossier().totals, rules: 3 } })).notes.rules).toBe(
+      'The alerts below are those of the rules shown.',
+    );
+  });
+
+  it('is never negative when a count was read before a row was added', () => {
+    expect(
+      accountView(dossier({ totals: { ...dossier().totals, checks: 0 } })).withheld.checks,
+    ).toBe(0);
+  });
 });
 
 describe('when', () => {

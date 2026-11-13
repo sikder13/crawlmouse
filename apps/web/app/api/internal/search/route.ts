@@ -10,11 +10,13 @@ export const dynamic = 'force-dynamic';
 const see = (location: string) => new Response(null, { status: 303, headers: { location } });
 
 /**
- * The support console's search (CC-33 D2): a POST, so the query (an address, often) is in no URL and
- * no log. Anyone but an operator gets 404, before anything is read. The query's kind is decided by
- * its shape (`classifyQuery`) and resolved to account ids; the search is recorded with its kind and
- * how many accounts it found, never the query. One account: a 303 to its page. Several: to the search
- * page with their ids (at most 20). None: to the search page with `found=0`.
+ * The support console's search (CC-33 D2). Anyone but an operator gets 404, before anything is read.
+ * The query (an address, often) arrives in the POST body, not the URL, and the store looks an address
+ * up through an rpc, whose arguments travel in a POST body too, not through a filter in a URL
+ * (lib/v2/ops/address-in-url.test.ts scans the console's source for such a filter). The query's kind
+ * is decided by its shape (`classifyQuery`) and resolved to account ids; the search is recorded with
+ * its kind and how many accounts it found, not the query. One account: a 303 to its page. Several: to
+ * the search page with their ids (at most 20). None: to the search page with `found=0`.
  */
 export async function POST(req: Request) {
   const proof = await requireOperator(await supabaseServer());

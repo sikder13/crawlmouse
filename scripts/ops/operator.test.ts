@@ -49,11 +49,9 @@ describe('credentials', () => {
 });
 
 describe('ops:operator', () => {
-  it('add finds the user by the lower-cased address, adds them, and prints the id alone', async () => {
+  it('add finds the user by the lower-cased address in an rpc body, adds them, and prints the id alone', async () => {
     const f = fakeFetch((method, path) =>
-      method === 'GET' && path.startsWith('/rest/v1/users')
-        ? [200, [{ id: USER }]]
-        : [201, undefined],
+      path === '/rest/v1/rpc/user_id_by_email' ? [200, USER] : [201, undefined],
     );
     const o = out();
     await runOperator(
@@ -62,9 +60,10 @@ describe('ops:operator', () => {
       o.print,
     );
     expect(f.calls.map((c) => [c.method, c.path])).toEqual([
-      ['GET', `/rest/v1/users?select=id&email=eq.${encodeURIComponent(ADDRESS.toLowerCase())}`],
+      ['POST', '/rest/v1/rpc/user_id_by_email'],
       ['POST', '/rest/v1/operators?on_conflict=user_id'],
     ]);
+    expect(f.calls[0]!.body).toEqual({ p_email: ADDRESS.toLowerCase() });
     expect(f.calls[1]!.body).toEqual({ user_id: USER });
     expect(f.calls[0]!.headers.get('apikey')).toBe(KEY);
     expect(f.calls[0]!.headers.get('authorization')).toBe(`Bearer ${KEY}`);
@@ -73,19 +72,19 @@ describe('ops:operator', () => {
   });
 
   it('add refuses an address with no user, adds nothing, and does not print the address', async () => {
-    const f = fakeFetch(() => [200, []]);
+    const f = fakeFetch(() => [200, null]);
     const o = out();
     await expect(
       runOperator(['add', ADDRESS], restClient({ url: URL_, key: KEY, fetch: f.fetch }), o.print),
     ).rejects.toThrow(/no user has that address/);
-    expect(f.calls.map((c) => c.method)).toEqual(['GET']);
+    expect(f.calls.map((c) => [c.method, c.path])).toEqual([
+      ['POST', '/rest/v1/rpc/user_id_by_email'],
+    ]);
     expect(o.lines).toEqual([]);
   });
 
   it('remove deletes the row of the user with that address', async () => {
-    const f = fakeFetch((method) =>
-      method === 'GET' ? [200, [{ id: USER }]] : [200, [{ user_id: USER }]],
-    );
+    const f = fakeFetch((method) => (method === 'POST' ? [200, USER] : [200, [{ user_id: USER }]]));
     const o = out();
     await runOperator(
       ['remove', ADDRESS],
@@ -98,7 +97,7 @@ describe('ops:operator', () => {
   });
 
   it('remove says so when the user was not an operator', async () => {
-    const f = fakeFetch((method) => (method === 'GET' ? [200, [{ id: USER }]] : [200, []]));
+    const f = fakeFetch((method) => (method === 'POST' ? [200, USER] : [200, []]));
     const o = out();
     await runOperator(
       ['remove', ADDRESS],
@@ -108,12 +107,71 @@ describe('ops:operator', () => {
     expect(o.lines).toEqual([`user ${USER} was not an operator`]);
   });
 
-  it('list prints user ids and when each was added', async () => {
-    const f = fakeFetch(() => [200, [{ user_id: USER, added_at: '2026-11-13T12:00:00+00:00' }]]);
+  it('puts no address in any URL it requests', async () => {
+    const f = fakeFetch((method, path) =>
+      path === '/rest/v1/rpc/user_id_by_email' ? [200, USER] : [200, [{ user_id: USER }]],
+    );
+    const c = restClient({ url: URL_, key: KEY, fetch: f.fetch });
+    await runOperator(['add', ADDRESS], c, () => undefined);
+    await runOperator(['remove', ADDRESS], c, () => undefined);
+    expect(f.calls.length).toBeGreaterThanOrEqual(4);
+    for (const call of f.calls) expect(call.path).not.toMatch(/@|%40/i);
+  });
+
+  it('remove takes a user id as well, without looking an address up, for a user since deleted', async () => {
+    const f = fakeFetch(() => [200, [{ user_id: USER }]]);
+    const o = out();
+    await runOperator(
+      ['remove', USER],
+      restClient({ url: URL_, key: KEY, fetch: f.fetch }),
+      o.print,
+    );
+    expect(f.calls.map((c) => [c.method, c.path])).toEqual([
+      ['DELETE', `/rest/v1/operators?user_id=eq.${USER}`],
+    ]);
+    expect(o.lines).toEqual([`operator removed: user ${USER}`]);
+  });
+
+  it('add still takes an address only', async () => {
+    const f = fakeFetch(() => [200, null]);
+    const c = restClient({ url: URL_, key: KEY, fetch: f.fetch });
+    await expect(runOperator(['add', USER], c, () => undefined)).rejects.toThrow(
+      /no user has that address/,
+    );
+    expect(f.calls.map((x) => x.path)).toEqual(['/rest/v1/rpc/user_id_by_email']);
+  });
+
+  it('list prints user ids and when each was added, and marks a row whose user no longer exists', async () => {
+    const GONE = 'b0000000-0000-4000-8000-000000000002';
+    const f = fakeFetch((_, path) =>
+      path.startsWith('/rest/v1/operators')
+        ? [
+            200,
+            [
+              { user_id: USER, added_at: '2026-11-13T12:00:00+00:00' },
+              { user_id: GONE, added_at: '2026-11-13T13:00:00+00:00' },
+            ],
+          ]
+        : [200, [{ id: USER }]],
+    );
     const o = out();
     await runOperator(['list'], restClient({ url: URL_, key: KEY, fetch: f.fetch }), o.print);
-    expect(f.calls[0]!.path).toBe('/rest/v1/operators?select=user_id,added_at&order=added_at.asc');
-    expect(o.lines).toEqual([`${USER}  added 2026-11-13T12:00:00+00:00`]);
+    expect(f.calls.map((c) => [c.method, c.path])).toEqual([
+      ['GET', '/rest/v1/operators?select=user_id,added_at&order=added_at.asc'],
+      ['GET', `/rest/v1/users?select=id&id=in.(${USER},${GONE})`],
+    ]);
+    expect(o.lines).toEqual([
+      `${USER}  added 2026-11-13T12:00:00+00:00`,
+      `${GONE}  added 2026-11-13T13:00:00+00:00  (no such user: remove it with ops:operator remove ${GONE})`,
+    ]);
+  });
+
+  it('list with no operators reads no users', async () => {
+    const f = fakeFetch(() => [200, []]);
+    const o = out();
+    await runOperator(['list'], restClient({ url: URL_, key: KEY, fetch: f.fetch }), o.print);
+    expect(f.calls).toHaveLength(1);
+    expect(o.lines).toEqual(['no operators']);
   });
 
   it('refuses anything else, and a database refusal is an error', async () => {

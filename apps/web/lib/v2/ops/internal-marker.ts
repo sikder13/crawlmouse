@@ -5,7 +5,8 @@
  * What an event says about its account: its distinct id, `account:<uuid>`, `seat:<uuid>` or a bare
  * uuid (an account's or a user's), and an `accountId` its caller passes. `check:<ref>`,
  * `report:<slug>` and `anon:<uuid>` name no account and are not looked up. Each subject is one
- * service-role call to `is_internal_subject` (migration 20261115000001), remembered for 60 seconds.
+ * service-role call to `is_internal_subject` (migration 20261115000001), remembered for 60 seconds,
+ * up to 500 answers.
  * A lookup that fails answers false (the event is sent unmarked) and logs one line without the id.
  */
 import { createClient } from '@supabase/supabase-js';
@@ -15,6 +16,8 @@ export type InternalLookup = (s: Subject) => Promise<boolean>;
 
 /** How long a lookup's answer is kept. */
 export const INTERNAL_CACHE_MS = 60_000;
+/** How many answers are kept; past it, the one written longest ago is dropped. */
+export const INTERNAL_CACHE_MAX = 500;
 /** How long one lookup may take before it is abandoned (and answers false). */
 export const INTERNAL_LOOKUP_TIMEOUT_MS = 1_000;
 
@@ -37,7 +40,10 @@ export function subjectsOf(distinctId: string, accountId?: string | null): Subje
   return out;
 }
 
-/** `lookup`, its answers kept for INTERNAL_CACHE_MS, and failing open to false. */
+/**
+ * `lookup`, its answers kept for INTERNAL_CACHE_MS, at most INTERNAL_CACHE_MAX of them (the one
+ * written longest ago is dropped first), and failing open to false.
+ */
 export function cachedLookup(lookup: InternalLookup, now: () => number = Date.now): InternalLookup {
   const kept = new Map<string, { value: boolean; until: number }>();
   return async (s) => {
@@ -46,7 +52,9 @@ export function cachedLookup(lookup: InternalLookup, now: () => number = Date.no
     if (hit !== undefined && hit.until > now()) return hit.value;
     try {
       const value = await lookup(s);
+      kept.delete(key);
       kept.set(key, { value, until: now() + INTERNAL_CACHE_MS });
+      if (kept.size > INTERNAL_CACHE_MAX) kept.delete(kept.keys().next().value!);
       return value;
     } catch {
       console.error('analytics: internal lookup failed');

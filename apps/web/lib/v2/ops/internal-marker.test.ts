@@ -42,6 +42,22 @@ describe('cachedLookup', () => {
     expect(inner).toHaveBeenCalledTimes(3);
   });
 
+  it('keeps at most 500 answers, dropping the oldest first', async () => {
+    const inner = vi.fn<InternalLookup>(async () => false);
+    const look = cachedLookup(inner, () => 0);
+    const id = (n: number) => `a0000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
+    for (let n = 0; n < 500; n++) await look({ kind: 'account', id: id(n) });
+    await look({ kind: 'account', id: id(0) });
+    expect(inner).toHaveBeenCalledTimes(500);
+    await look({ kind: 'account', id: id(500) });
+    expect(inner).toHaveBeenCalledTimes(501);
+    await look({ kind: 'account', id: id(499) });
+    await look({ kind: 'account', id: id(500) });
+    expect(inner).toHaveBeenCalledTimes(501);
+    await look({ kind: 'account', id: id(0) });
+    expect(inner).toHaveBeenCalledTimes(502);
+  });
+
   it('fails open: a lookup that throws answers false, logs without the id, and is asked again next time', async () => {
     const log = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const inner = vi.fn<InternalLookup>(async () => {

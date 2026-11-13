@@ -144,6 +144,28 @@ describe("an operator's re-send", () => {
     });
   });
 
+  it('lower-cases the address for the bucket key and the link, as the magic-link route does', async () => {
+    const op = await operatorPerson(h.db);
+    const mixed = await person(h.db, 'Mixed');
+    const upper = mixed.email.replace('example.com', 'Example.COM');
+    await h.db.query('update auth.users set email = $1 where id = $2', [upper, mixed.id]);
+    await h.db.query('update public.users set email = $1 where id = $2', [upper, mixed.id]);
+    const stored = await h.db.query<{ email: string }>(
+      'select email from public.users where id = $1',
+      [mixed.id],
+    );
+    expect(stored.rows[0]!.email).not.toBe(stored.rows[0]!.email.toLowerCase());
+    as(op);
+    await resend(mixed.accountId, { userId: mixed.id, reason: 'locked out' });
+    const lower = upper.toLowerCase();
+    expect(h.rate).toHaveBeenCalledWith(
+      `magic:email:${lower}`,
+      MAGIC_LINK_PER_EMAIL_PER_HOUR,
+      HOUR_MS,
+    );
+    expect(h.link).toHaveBeenCalledWith(lower);
+  });
+
   it('goes to the address of an active seat of the account, a member who is not the owner included', async () => {
     const op = await operatorPerson(h.db);
     const owner = await person(h.db, 'owner');

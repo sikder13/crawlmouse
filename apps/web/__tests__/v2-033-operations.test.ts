@@ -20,9 +20,12 @@ const ROLLBACK = '20261115000001_v2_033_operations.revert.sql';
 const FUNCTIONS = [
   'is_internal_subject',
   'is_operator',
+  'operator_account_counts',
+  'operator_account_ids_by_email',
   'operator_finish',
   'operator_log',
   'operator_request_check',
+  'user_id_by_email',
 ];
 
 let db: PGlite;
@@ -250,6 +253,113 @@ describe('is_internal_subject', () => {
   });
 });
 
+describe('operator_account_ids_by_email', () => {
+  const ids = async (email: string) =>
+    (
+      await asRole(db, 'service_role', null, (tx) =>
+        tx.query<{ account_id: string }>(
+          'select account_id from public.operator_account_ids_by_email($1)',
+          [email],
+        ),
+      )
+    ).rows
+      .map((r) => r.account_id)
+      .sort();
+
+  it("answers the user's default account and every account they hold a seat on, once each", async () => {
+    const email = `ops-${randomUUID()}@example.com`;
+    const user = await signUp(db, email);
+    const { accountId: own } = await personalAccount(db, user);
+    const other = (await personalAccount(db, await person())).accountId;
+    const left = (await personalAccount(db, await person())).accountId;
+    await db.query(
+      `insert into public.seats (account_id, user_id, invited_email, role, status, accepted_at,
+                                 removed_at)
+       values ($1, $2, $3, 'developer', 'active', now(), null),
+              ($4, $2, $3, 'developer', 'removed', now(), now())`,
+      [other, user, ['seat', 'example.com'].join('@'), left],
+    );
+    expect(await ids(email)).toEqual([own, other, left].sort());
+  });
+
+  it('answers nothing for an address no user has, and matches the address exactly', async () => {
+    const email = `ops-${randomUUID()}@example.com`;
+    await personalAccount(db, await signUp(db, email));
+    expect(await ids(`x${email}`)).toEqual([]);
+    expect(await ids(email.toUpperCase())).toEqual([]);
+  });
+
+  it.each(['anon', 'authenticated'] as const)('%s may not execute it', async (role) => {
+    await expect(
+      asRole(db, role, null, (tx) =>
+        tx.query('select * from public.operator_account_ids_by_email($1)', ['x']),
+      ),
+    ).rejects.toThrow(/permission denied/);
+  });
+});
+
+describe('operator_account_counts', () => {
+  const counts = async (accountId: string, sites: string[], rules: string[]) =>
+    (
+      await asRole(db, 'service_role', null, (tx) =>
+        tx.query('select * from public.operator_account_counts($1, $2, $3)', [
+          accountId,
+          sites,
+          rules,
+        ]),
+      )
+    ).rows[0];
+
+  it("counts the account's seats, sites, mail and rules, and the checks of the sites it is given", async () => {
+    const { accountId } = await personalAccount(db, await person());
+    const s1 = await site(accountId);
+    const s2 = await site(accountId);
+    await failedCheck(s1);
+    await failedCheck(s1);
+    await failedCheck(s2);
+    const elsewhere = await site((await personalAccount(db, await person())).accountId);
+    await failedCheck(elsewhere);
+    expect(await counts(accountId, [s1, s2], [])).toEqual({
+      seats: 1,
+      sites: 2,
+      checks: 3,
+      mail: 0,
+      rules: 0,
+      alerts: 0,
+      fixes: 0,
+    });
+    expect(await counts(accountId, [s1], [])).toMatchObject({ checks: 2 });
+    expect(await counts(accountId, [s1, elsewhere], [])).toMatchObject({ checks: 2 });
+  });
+
+  it.each(['anon', 'authenticated'] as const)('%s may not execute it', async (role) => {
+    await expect(
+      asRole(db, role, null, (tx) =>
+        tx.query('select * from public.operator_account_counts($1, $2, $3)', [
+          randomUUID(),
+          [],
+          [],
+        ]),
+      ),
+    ).rejects.toThrow(/permission denied/);
+  });
+});
+
+describe('user_id_by_email', () => {
+  it('answers the user with that address, and null for none', async () => {
+    const email = `ops-${randomUUID()}@example.com`;
+    const user = await signUp(db, email);
+    expect(await call<string | null>('user_id_by_email', [email])).toBe(user);
+    expect(await call<string | null>('user_id_by_email', [`x${email}`])).toBeNull();
+  });
+
+  it.each(['anon', 'authenticated'] as const)('%s may not execute it', async (role) => {
+    await expect(
+      asRole(db, role, null, (tx) => tx.query('select public.user_id_by_email($1)', ['x'])),
+    ).rejects.toThrow(/permission denied/);
+  });
+});
+
 describe('is_operator()', () => {
   const ask = (role: 'anon' | 'authenticated' | 'service_role', userId: string | null) =>
     asRole(db, role, userId, async (tx) => {
@@ -360,6 +470,15 @@ describe('operator_log', () => {
     ]);
   });
 
+  it('writes a list_accounts row for an account a listing showed', async () => {
+    const op = await operator();
+    const { accountId } = await personalAccount(db, await person());
+    await call<number>('operator_log', [op, 'list_accounts', accountId, accountId, null, null]);
+    expect(await actionsOf(op)).toEqual([
+      expect.objectContaining({ action: 'list_accounts', account_id: accountId }),
+    ]);
+  });
+
   it('refuses a caller who is not an operator, and writes nothing', async () => {
     const someone = await person();
     await expect(
@@ -368,13 +487,40 @@ describe('operator_log', () => {
     expect(await actionsOf(someone)).toEqual([]);
   });
 
-  it('refuses rerun_check, which only operator_request_check records', async () => {
-    const op = await operator();
-    await expect(
-      call('operator_log', [op, 'rerun_check', null, randomUUID(), 'x', null]),
-    ).rejects.toThrow(/operator_request_check/);
-    expect(await actionsOf(op)).toEqual([]);
-  });
+  it.each(['paused', 'unavailable', 'not_failed', 'site_removed', 'site_paused'])(
+    'writes a rerun_check row for a re-run the route refused as %s',
+    async (outcome) => {
+      const op = await operator();
+      const { accountId } = await personalAccount(db, await person());
+      const target = randomUUID();
+      await call('operator_log', [op, 'rerun_check', accountId, target, 'stuck', outcome]);
+      expect(await actionsOf(op)).toEqual([
+        expect.objectContaining({
+          action: 'rerun_check',
+          account_id: accountId,
+          target,
+          reason: 'stuck',
+          outcome,
+        }),
+      ]);
+    },
+  );
+
+  it.each([
+    ['no outcome', 'stuck', null],
+    ['a queued outcome', 'stuck', 'created'],
+    ['an outcome request_capped_check gives', 'stuck', 'capped'],
+    ['no reason', null, 'paused'],
+  ])(
+    'refuses a rerun_check row with %s, which only operator_request_check records',
+    async (_name, reason, outcome) => {
+      const op = await operator();
+      await expect(
+        call('operator_log', [op, 'rerun_check', null, randomUUID(), reason, outcome]),
+      ).rejects.toThrow(/operator_request_check/);
+      expect(await actionsOf(op)).toEqual([]);
+    },
+  );
 
   it.each(['anon', 'authenticated'] as const)('%s may not execute it', async (role) => {
     const op = await operator();
