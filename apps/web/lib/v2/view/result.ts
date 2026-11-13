@@ -828,7 +828,9 @@ function fixRows(
  *      beside unknown ones), and the pages the `pages_readable` members make readable; when no
  *      member's Technical SEO effect is estimated and nothing else adds up, "SEO not estimated";
  *   2. with nothing of that, how many members' AI effect still waits, "AI not yet estimated for N";
- *   3. otherwise "No measurable effect".
+ *   3. otherwise "SEO not estimated" when a member's Technical SEO effect is not estimated (a fix first
+ *      opened in a refused check keeps a null effect until it is found again), else "No measurable
+ *      effect", so the row never says less than a member's own headline.
  * A pages-headed fix is never counted as waiting: its pages line is a part of step 1, so step 2 is
  * not reached.
  */
@@ -845,7 +847,8 @@ export function restPoints(
   if (sums.length) return sums.join('; ');
   if (!seoKnown) return 'SEO not estimated';
   const waiting = fixes.filter((f) => f.effect.ai_readability === null).length;
-  return waiting ? `AI not yet estimated for ${waiting}` : NO_EFFECT_SHORT;
+  if (waiting) return `AI not yet estimated for ${waiting}`;
+  return fixes.some((f) => f.effect.technical_seo === null) ? 'SEO not estimated' : NO_EFFECT_SHORT;
 }
 
 const GROUP_NAMES: Record<CrawlerResult['group'], string> = {

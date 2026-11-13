@@ -214,6 +214,11 @@ describe('the Result, built from a fixture whose fixes are edited', () => {
     expect(restPoints([fixWith(4, null, 'crawler_access'), fixWith(0, null, 'structure')])).toBe(
       '+4 AI',
     );
+    // a known SEO effect of 0 beside one not estimated, nothing adding up and nothing waiting: the row
+    // says what the member's own headline says, not "No measurable effect"
+    expect(restPoints([fixWith(0, null, 'structure'), fixWith(0, 0, 'structure')])).toBe(
+      'SEO not estimated',
+    );
   });
 
   it('keeps the fix order: the rows are in the same order with every effect at or below zero', () => {
