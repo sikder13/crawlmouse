@@ -57,9 +57,14 @@ export async function POST(req: Request) {
       mail: inngestInviteMail(),
       limits: {
         perAccount: () =>
-          checkRateLimit(`seat-invite:account:${account.id}`, inviteMailPerDay(account.state), DAY_MS, {
-            failClosed: true,
-          }),
+          checkRateLimit(
+            `seat-invite:account:${account.id}`,
+            inviteMailPerDay(account.state),
+            DAY_MS,
+            {
+              failClosed: true,
+            },
+          ),
         perIp: () =>
           checkRateLimit(`seat-invite:ip:${ipHash(ip)}`, PER_IP_HOUR, HOUR_MS, {
             failClosed: true,
