@@ -276,7 +276,7 @@ describe('(c) the owner of an agency with invited seats, stored reports, share l
   let site: string;
   const invited = `colleague-${randomUUID().slice(0, 8)}@example.com`;
   const contact = `client-${randomUUID().slice(0, 8)}@example.com`;
-  const paths = { pdf: '', csv: '' };
+  const paths = { pdf: '', csv: '', left: '' };
   let outsideLink: string;
 
   beforeAll(async () => {
@@ -300,8 +300,20 @@ describe('(c) the owner of an agency with invited seats, stored reports, share l
     paths.csv = `${agencyId}/${randomUUID()}.csv`;
     const pdf = await storedReport(agencyId, site, check, paths.pdf);
     await storedReport(agencyId, site, check, paths.csv);
-    // A report whose file was never stored: there is nothing in the bucket to remove for it.
+    // A report that has no file (a public link): there is nothing in the bucket to remove for it.
     await insertRow(db, 'reports', ROWS.reports(randomUUID(), agencyId, site, check));
+    // A report whose file was put and whose row was never marked stored (security review r1, M2):
+    // the row names its object from its first write, so the object is found all the same.
+    paths.left = `${agencyId}/${randomUUID()}.pdf`;
+    await insertRow(db, 'reports', {
+      ...ROWS.reports(randomUUID(), agencyId, site, check),
+      file_state: 'failed',
+      failed_reason: 'object_left',
+      storage_path: paths.left,
+    });
+    await db.query(`insert into storage.objects (bucket_id, name) values ('reports', $1)`, [
+      paths.left,
+    ]);
     await insertRow(db, 'report_schedules', {
       ...ROWS.report_schedules(site, agencyId),
       page_slug: `kestrel-${site.slice(0, 8)}`,
@@ -322,32 +334,31 @@ describe('(c) the owner of an agency with invited seats, stored reports, share l
     const p = await plan({ userId: owner.id });
     expect([...p.accounts].sort()).toEqual([owner.accountId, agencyId].sort());
     expect(p.counts['accounts deleted']).toBe(2);
-    expect(p.counts['reports deleted']).toBe(3);
+    expect(p.counts['reports deleted']).toBe(4);
     expect(p.counts['sites deleted']).toBe(1);
     expect(p.counts['share_links.created_by nulled']).toBe(2);
     // The files are the one thing in the way, and the sequence removes them itself.
     expect(p.refusalCodes).toEqual(['storage']);
   });
 
-  it('lists a stored report’s file for removal before its row goes', async () => {
+  it('lists each report’s object for removal before its row goes: the stored files, and the object of a report that failed after its file was put', async () => {
     const p = await plan({ userId: owner.id });
     expect(p.storage).toEqual(
-      [paths.pdf, paths.csv].sort().map((name) => ({ bucket: 'reports', name })),
+      [paths.pdf, paths.csv, paths.left].sort().map((name) => ({ bucket: 'reports', name })),
     );
   });
 
   it('the erasure removes the files first, then the accounts with their seats, reports and links', async () => {
     const { calls } = await erase({ userId: owner.id });
     expect(calls).toEqual([
-      `removeStorage ${[paths.pdf, paths.csv]
+      `removeStorage ${[paths.pdf, paths.csv, paths.left]
         .sort()
         .map((name) => `reports/${name}`)
         .join(' ')}`,
       'apply',
       'deleteAuthUser',
     ]);
-    expect(await stored(paths.pdf)).toBe(0);
-    expect(await stored(paths.csv)).toBe(0);
+    for (const path of Object.values(paths)) expect(await stored(path), path).toBe(0);
     for (const table of ['seats', 'sites', 'reports', 'report_schedules']) {
       expect(
         await n(`select count(*) from public.${table} where account_id = $1`, [agencyId]),
