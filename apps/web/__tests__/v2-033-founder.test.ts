@@ -453,6 +453,54 @@ describe('founder_digest_counts', () => {
   });
 });
 
+describe('founder_digest_counts, send failures (review C5)', () => {
+  it('leaves out an internal account’s failed send and the founder notices’ own', async () => {
+    // §K adds the founder kinds to email_sends' kind check; until then this database widens it.
+    await db.query(
+      'alter table public.email_sends drop constraint if exists email_sends_kind_check',
+    );
+    const at = '2031-02-05T12:00:00.000Z';
+    const account = async (internal: boolean) => {
+      const { accountId } = await personalAccount(
+        db,
+        await signUp(db, `fail-${randomUUID()}@example.com`),
+      );
+      await db.query('update public.accounts set internal = $2 where id = $1', [
+        accountId,
+        internal,
+      ]);
+      return accountId;
+    };
+    const failed = (kind: string, accountId: string | null) =>
+      db.query(
+        `insert into public.email_sends (idempotency_key, kind, address_hash, account_id, status, attempts,
+                                         error_code, claimed_at, updated_at)
+         values ($1, $2, $3, $4, 'failed', 3, 'network', $5, $5)`,
+        [
+          `fail:${randomUUID()}`,
+          kind,
+          randomUUID().replace(/-/g, '').padEnd(64, '0'),
+          accountId,
+          at,
+        ],
+      );
+    await failed('alert', await account(false));
+    await failed('check_notify', null);
+    await failed('alert', await account(true));
+    await failed('founder_event', null);
+    await failed('founder_digest', null);
+    const c = await asRole(db, 'service_role', null, async (tx) => {
+      const { rows } = await tx.query<{ c: Record<string, number> }>(
+        'select public.founder_digest_counts($1, $2) as c',
+        ['2031-02-05T05:00:00.000Z', '2031-02-06T05:00:00.000Z'],
+      );
+      return rows[0]!.c;
+    });
+    // A customer's failed send and one that names no account; not staff's, not the founder's.
+    expect(c.mail_send_failures).toBe(2);
+  });
+});
+
 describe('signin_delivery_seen', () => {
   const seen = (address: string, since: string) =>
     asRole(db, 'service_role', null, async (tx) => {

@@ -31,7 +31,10 @@ describe('founderDigest', () => {
       expect(m.text).toContain(`${label}: ${i + 1}`);
       expect(m.html).toContain(label);
     });
-    expect(m.text).toContain('Internal accounts are left out');
+    expect(m.text).toContain(
+      'Internal accounts are left out of the sign-up, trial, payment, cancellation, check and send-failure figures',
+    );
+    expect(m.text).toContain('they include internal accounts’ mail');
   });
 
   it('weekly: this week, the week before and the change, for each figure', () => {

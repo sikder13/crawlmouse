@@ -380,7 +380,10 @@ $$;
 --   checks_failed_all            checks failed, by finished_at; the same sites
 --   mail_bounce_events           email_events of type bounced (v1 mail and the sign-in mail)
 --   mail_suppressions_new        addresses first suppressed (v2 mail: hard bounces and complaints)
---   mail_send_failures           v2 ledger rows (email_sends) whose last attempt failed, by updated_at
+--   mail_send_failures           v2 ledger rows (email_sends) whose last attempt failed, by updated_at;
+--                                an internal account's and the founder kinds' own left out
+-- The two bounce figures are keyed by address (email_events by address, email_suppressions by its
+-- hash) and name no account, so they include internal accounts' mail (questions Q14).
 create or replace function public.founder_digest_counts(p_from timestamptz, p_to timestamptz)
 returns jsonb
 language plpgsql
@@ -429,7 +432,10 @@ begin
     'mail_suppressions_new', (select pg_catalog.count(*) from public.email_suppressions s
                                where s.first_at >= p_from and s.first_at < p_to),
     'mail_send_failures', (select pg_catalog.count(*) from public.email_sends e
+                             left join public.accounts a on a.id = e.account_id
                             where e.status = 'failed'
+                              and coalesce(a.internal, false) = false
+                              and e.kind not in ('founder_event', 'founder_digest')
                               and e.updated_at >= p_from and e.updated_at < p_to))
     into v;
   return v;
