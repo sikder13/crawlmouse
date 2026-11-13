@@ -5,7 +5,8 @@
  *
  *   pnpm golive:check -- [--step N] [--ticked id,id] [--env-file path]
  *
- * Prints every precondition, grouped by the step it gates, as `pass`, `fail`, `unknown (reason)` or
+ * Prints whether this checkout's inputs equal the live production commit's (probes/live.ts), then
+ * every precondition, grouped by the step it gates, as `pass`, `fail`, `unknown (reason)` or
  * `manual`; exits 1 when a row gating step N or an earlier one is not `pass` (a manual row passes only
  * when its id is in `--ticked`), 0 when none is, 2 when the arguments cannot be used. `--step`
  * defaults to 1: which steps are done cannot be read without reading the flags' values, which the
@@ -37,6 +38,7 @@ import { ALLOWED_HOSTS, guardedFetch } from './http';
 import { PRECONDITIONS, type Precondition } from './preconditions';
 import { PAID_PLAN_TICK } from './probes/inngest';
 import { PROBES, type ProbeId } from './probes/index';
+import { checkoutMatchesLive } from './probes/live';
 import { SENDING_DOMAIN } from './probes/resend';
 import type { GitResult, Probe, ProbeDeps, ProbeResult } from './probes/types';
 import { VERCEL_PROJECT_ID, VERCEL_TEAM_ID } from './probes/vercel-env';
@@ -200,6 +202,12 @@ export async function runCheck(args: Args, deps: CheckDeps, redactor: Redactor):
   }
   const blocking: string[] = [];
   out(`golive:check — gating step ${args.step} (${STEP_TITLE[args.step]})`);
+  const match = await checkoutMatchesLive(probeDeps);
+  out(
+    match.ok
+      ? `checkout: matches the live production commit ${match.sha.slice(0, 12)} in the check's inputs`
+      : `checkout: unknown (${match.result.reason})`,
+  );
   for (const step of STEPS) {
     out('');
     out(`step ${step}: ${STEP_TITLE[step]}`);
