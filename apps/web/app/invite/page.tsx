@@ -28,7 +28,9 @@ export const metadata: Metadata = {
  * `cm_link_invite` cookie, so this page's address holds none. It reads what the invitation is
  * (`read_seat_invite`, which returns no address) and changes nothing; accepting is the form's POST
  * to /api/seats/accept. With no token in the cookie it says to open the mailed link again, and
- * names no cause of a link that cannot be used. A 404 until V2_CHECKS_PUBLIC=1.
+ * names no cause of a link that cannot be used; unless the accept route sent the form back for a
+ * link that is gone (it cleared the cookie), which the page then says. A 404 until
+ * V2_CHECKS_PUBLIC=1.
  */
 export default async function InvitePage({
   searchParams,
@@ -47,7 +49,7 @@ export default async function InvitePage({
   const notice = noticeLine(await searchParams, 'UTC');
   return (
     <LiveActions>
-      <InviteScreen data={inviteView(invitation, user !== null, notice?.text ?? null)} />
+      <InviteScreen data={inviteView(invitation, user !== null, notice)} />
     </LiveActions>
   );
 }

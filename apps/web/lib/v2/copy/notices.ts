@@ -96,6 +96,9 @@ export const NOTICE_LINES: Record<NoticeCode, (at: string | null) => string> = {
     'The invitation is saved, but its email could not be sent just now. Use “Send a new invitation” on the seat’s row.',
   invite_gone: () =>
     'This invitation cannot be used: it was accepted, replaced, removed or has expired.',
+  // `/invite` says this and `invite_gone` as its own state (`inviteView`), not as a line beside it.
+  invite_no_link: () =>
+    'Nothing was accepted: this page no longer holds the invitation. Open the link in the invitation email again.',
   email_mismatch: () =>
     'This invitation was sent to another address. Sign in with the address it was sent to.',
   invite_full: () =>

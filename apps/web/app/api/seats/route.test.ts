@@ -849,9 +849,34 @@ describe('POST /api/seats/accept', () => {
     expect(inBody.status).toBe(400);
     const inUrl = await accept(null, { path: `/api/seats/accept?token=${inv.token}` });
     expect(inUrl.status).toBe(410);
-    expect(await inUrl.json()).toEqual({ code: 'invite_gone' });
+    expect(await inUrl.json()).toEqual({ code: 'invite_no_link' });
     expect((await seat(inv.seatId)).status).toBe('invited');
     expect(h.log.filter((l) => l.startsWith('admin.rpc'))).toEqual([]);
+  });
+
+  it('a form goes back to /invite with the code of what refused it: no token, or a link that is gone', async () => {
+    const owner = await paidOwner();
+    const guest = await person(h.db, 'guest');
+    const inv = await invited(owner.accountId, guest.email);
+    as(guest);
+    // No token in the cookie: the invitation was not read, and no cookie is there to clear.
+    const none = await accept(null, { type: FORM });
+    expect([none.status, none.headers.get('location')]).toEqual([
+      303,
+      '/invite?notice=invite_no_link',
+    ]);
+    expect(setCookies(none)).toEqual([]);
+    expect((await seat(inv.seatId)).status).toBe('invited');
+    // A link that is gone (accepted a moment ago): its own code, and the cookie is cleared.
+    expect((await accept(inv.token)).status).toBe(200);
+    const gone = await accept(inv.token, { type: FORM });
+    expect([gone.status, gone.headers.get('location')]).toEqual([
+      303,
+      '/invite?notice=invite_gone',
+    ]);
+    expect(setCookies(gone)).toEqual([
+      'cm_link_invite=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax',
+    ]);
   });
 
   it('another person’s sign-in is 403, the cookie is kept, and the invited person can still accept', async () => {

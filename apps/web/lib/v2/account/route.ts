@@ -127,6 +127,7 @@ export const NOTICE_CODES = [
   'seat_owner',
   'not_invited',
   'invite_gone',
+  'invite_no_link',
   'email_mismatch',
   'invite_full',
   'already_member',

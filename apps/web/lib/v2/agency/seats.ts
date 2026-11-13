@@ -366,9 +366,10 @@ const inviteRefusal = (kind: Kind, status: number, code: NoticeCode, spent: bool
  * POST /api/seats/accept, for a signed-in caller. The token is read from the invitation's cookie and
  * from nowhere else. Accepted: the switcher's cookie is set to the joined account, the invitation's
  * cookie is cleared, and the caller goes to the dashboard (a form) or is told the account (JSON).
- * 410 `invite_gone` for no token and for a link that cannot be used (its cookie is cleared); 403
- * `email_mismatch` when the caller's address is not the invited one, with the cookie kept so the
- * invited person can still accept; 409 `invite_full` and `already_member`.
+ * 410 `invite_no_link` for no token in the cookie, where no invitation was read; 410 `invite_gone`
+ * for a link that cannot be used (its cookie is cleared) and for an account marked for deletion (the
+ * cookie is kept); 403 `email_mismatch` when the caller's address is not the invited one, with the
+ * cookie kept so the invited person can still accept; 409 `invite_full` and `already_member`.
  */
 export async function acceptInvite(
   deps: Pick<SeatDeps, 'store' | 'capture' | 'now'>,
@@ -377,7 +378,7 @@ export async function acceptInvite(
 ): Promise<Response> {
   if (!body || !AcceptBody.safeParse(body.fields).success) return refuse(400, 'invalid');
   const kind = body.kind;
-  if (caller.token === null) return inviteRefusal(kind, 410, 'invite_gone', false);
+  if (caller.token === null) return inviteRefusal(kind, 410, 'invite_no_link', false);
 
   const r = await deps.store.accept(caller.token, caller.userId, deps.now());
   switch (r.outcome) {

@@ -244,14 +244,14 @@ account with members and an invitation.
 
 **Routes** (each a 404 with `V2_CHECKS_PUBLIC` unset):
 
-| Route                                      | Who                                                                  | Answers                                                                                                                                                        |
-| ------------------------------------------ | -------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `POST /api/seats` `{email, role, scope}`   | `seat_may('invite_seat')`, in the account the caller acts in         | 201; 402 `upgrade_required` with gate `seats` and `canBuySeats` (Free, or no seat free); 409 `seat_exists`; 400 `invalid_scope`; 429 `rate_limited`            |
-| `PATCH /api/seats/id/[id]` `{role, scope}` | `seat_may('change_seat')`                                            | 200; 404; 409 `seat_owner`                                                                                                                                     |
-| `DELETE /api/seats/id/[id]`                | `seat_may('remove_seat')`                                            | 200; 404; 409 `seat_owner`                                                                                                                                     |
-| `POST /api/seats/id/[id]/resend`           | `seat_may('invite_seat')`                                            | 200; 404; 409 `not_invited`; 429                                                                                                                               |
-| `POST /api/seats/accept`                   | a signed-in user; the token is read from the `cm_link_invite` cookie | 200 or a 303 to `/dashboard`, with the switcher cookie set to the joined account; 410 `invite_gone`; 403 `email_mismatch`; 409 `invite_full`, `already_member` |
-| `GET /invite/[token]`                      | anyone holding the link                                              | moves the token into the cookie and answers 303 to `/invite`; changes nothing                                                                                  |
+| Route                                      | Who                                                                  | Answers                                                                                                                                                                                                     |
+| ------------------------------------------ | -------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST /api/seats` `{email, role, scope}`   | `seat_may('invite_seat')`, in the account the caller acts in         | 201; 402 `upgrade_required` with gate `seats` and `canBuySeats` (Free, or no seat free); 409 `seat_exists`; 400 `invalid_scope`; 429 `rate_limited`                                                         |
+| `PATCH /api/seats/id/[id]` `{role, scope}` | `seat_may('change_seat')`                                            | 200; 404; 409 `seat_owner`                                                                                                                                                                                  |
+| `DELETE /api/seats/id/[id]`                | `seat_may('remove_seat')`                                            | 200; 404; 409 `seat_owner`                                                                                                                                                                                  |
+| `POST /api/seats/id/[id]/resend`           | `seat_may('invite_seat')`                                            | 200; 404; 409 `not_invited`; 429                                                                                                                                                                            |
+| `POST /api/seats/accept`                   | a signed-in user; the token is read from the `cm_link_invite` cookie | 200 or a 303 to `/dashboard`, with the switcher cookie set to the joined account; 410 `invite_no_link` (no token in the cookie) or `invite_gone`; 403 `email_mismatch`; 409 `invite_full`, `already_member` |
+| `GET /invite/[token]`                      | anyone holding the link                                              | moves the token into the cookie and answers 303 to `/invite`; changes nothing                                                                                                                               |
 
 A seat's own routes are under `/api/seats/id/`: a seat id directly under `/api/seats` would also match
 `/api/seats/accept` and `/api/seats/switch`, and the route registry holds each path to one row
@@ -266,6 +266,15 @@ hour (`linkCookieSeconds('invite')`, `lib/v2/account/link-cookie.ts`) where the 
 last ten minutes, because a reader who is not signed in leaves the page to sign in by email and
 comes back to it.
 `pnpm --filter @crawlmouse/web exec vitest run lib/v2/account/link-cookie.test.ts app/invite/page.test.tsx`.
+
+A refused acceptance sends the form back to `/invite?notice=<code>`. Two codes are about the link:
+`invite_no_link`, for a post whose cookie held no token, and `invite_gone`, for a link
+`accept_seat_invite` refuses (the route then clears the cookie, except for an account marked for
+deletion). The page says each as one of the states above and draws no line beside it. With
+`invite_gone` and no token the state is "This invitation cannot be used": the route read the link
+and refused it, so the page does not say to open it again. A refusal that is not about the link,
+such as `email_mismatch`, is a line above what the page read.
+`pnpm --filter @crawlmouse/web exec vitest run __tests__/v2/seats.test.tsx app/invite/page.test.tsx app/api/seats/route.test.ts -t 'refus'`.
 
 **What a seat that covers some clients is told.** Its records hold its own clients (§4), so a
 sentence about the account is not built from them. On Seats the owner's Clients cell reads "all

@@ -17,6 +17,7 @@ import { GATES } from '../../lib/entitlement-v2';
 import { gateMessage } from '../../lib/v2/agency/gates';
 import { SEAT_GUARD } from '../../lib/v2/agency/guard';
 import { INVITE_LINK_DAYS } from '../../lib/v2/agency/seats';
+import { NOTICE_LINES } from '../../lib/v2/copy/notices';
 import { ROLE_ROWS } from '../../lib/v2/copy/seats';
 import { inviteView, seatsView } from '../../lib/v2/view/seats';
 import { numberWord } from '../../lib/v2/words';
@@ -519,26 +520,58 @@ describe('inviteView', () => {
     });
   });
 
-  it('a link that cannot be used offers nothing, and keeps the notice it came back with', () => {
-    expect(inviteView(null, true, 'gone')).toEqual({
-      state: 'gone',
-      title: 'This invitation cannot be used',
-      lines: [
-        'It was accepted, replaced by a newer one, removed, or it has expired. The account’s owner can send another.',
-      ],
-      notice: 'gone',
-    });
+  const GONE = {
+    state: 'gone',
+    title: 'This invitation cannot be used',
+    lines: [
+      'It was accepted, replaced by a newer one, removed, or it has expired. The account’s owner can send another.',
+    ],
+    notice: null,
+  };
+  const NO_LINK = {
+    state: 'no_link',
+    title: 'This page holds no invitation',
+    lines: [
+      'A page keeps an invitation for a short while after its link is opened, in the browser that opened it. Open the link in the invitation email again.',
+    ],
+    notice: null,
+  };
+  const noticeOf = (code: 'invite_gone' | 'invite_no_link' | 'email_mismatch') => ({
+    code,
+    text: NOTICE_LINES[code](null),
+  });
+
+  it('a link that cannot be used offers nothing', () => {
+    expect(inviteView(null, true)).toEqual(GONE);
   });
 
   it('a page that holds no link names none of those causes: it says to open the mailed link again', () => {
-    expect(inviteView('no_link', false)).toEqual({
-      state: 'no_link',
-      title: 'This page holds no invitation',
-      lines: [
-        'A page keeps an invitation for a short while after its link is opened, in the browser that opened it. Open the link in the invitation email again.',
-      ],
-      notice: null,
+    expect(inviteView('no_link', false)).toEqual(NO_LINK);
+  });
+
+  it('a refused acceptance comes back to one message: the state says what the notice would', () => {
+    // The accept route cleared the cookie of a link that is gone, so the page holds no token: it
+    // says the link cannot be used, and not to open that link again.
+    expect(inviteView('no_link', true, noticeOf('invite_gone'))).toEqual(GONE);
+    // A link the page read as gone (the cookie was kept: an account marked for deletion).
+    expect(inviteView(null, true, noticeOf('invite_gone'))).toEqual(GONE);
+    // No token when the form was posted (the cookie ran out with the page open): nothing is said
+    // of the invitation, which was not read.
+    expect(inviteView('no_link', true, noticeOf('invite_no_link'))).toEqual(NO_LINK);
+    // An invitation the page has just read is not called unusable by a notice left in the address.
+    for (const stale of ['invite_gone', 'invite_no_link'] as const) {
+      expect(inviteView(invitation, true, noticeOf(stale))).toEqual(inviteView(invitation, true));
+    }
+  });
+
+  it('a refusal that is not about the link is said above the invitation it left as it was', () => {
+    const mismatch = noticeOf('email_mismatch');
+    expect(inviteView(invitation, true, mismatch)).toEqual({
+      ...inviteView(invitation, true),
+      notice:
+        'This invitation was sent to another address. Sign in with the address it was sent to.',
     });
+    expect(inviteView('no_link', true, mismatch)).toEqual({ ...NO_LINK, notice: mismatch.text });
   });
 });
 

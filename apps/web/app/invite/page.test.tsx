@@ -187,6 +187,34 @@ describe('/invite', () => {
     expect(html).not.toMatch(/<form/);
   });
 
+  it('after an acceptance refused for a link that is gone, says the link cannot be used and nothing else', async () => {
+    const owner = await paidOwner('agency');
+    const guest = await person(h.db, 'guest');
+    await invitation(owner, guest.email);
+    as(guest);
+    // POST /api/seats/accept cleared the cookie and sent the form back with the code.
+    const html = await invitePage({ notice: 'invite_gone' });
+    const card = /<section[\s\S]*<\/section>/.exec(html)![0];
+    expect(card).toContain('This invitation cannot be used');
+    expect(card).toContain('accepted, replaced by a newer one, removed, or it has expired');
+    expect(card).not.toContain('This page holds no invitation');
+    expect(card).not.toContain('Open the link in the invitation email again');
+    // One message: the notice's own sentence is not drawn beside the state's.
+    expect(card).not.toContain('accepted, replaced, removed or has expired');
+    expect(card.match(/<p[ >]/g)).toHaveLength(1);
+    expect(card).not.toMatch(/<form/);
+  });
+
+  it('after an acceptance refused for no token, says the page holds no invitation and nothing else', async () => {
+    as(await person(h.db, 'guest'));
+    const html = await invitePage({ notice: 'invite_no_link' });
+    const card = /<section[\s\S]*<\/section>/.exec(html)![0];
+    expect(card).toContain('This page holds no invitation');
+    expect(card).toContain('Open the link in the invitation email again.');
+    expect(card).not.toContain('cannot be used');
+    expect(card.match(/<p[ >]/g)).toHaveLength(1);
+  });
+
   it('shows the line of a refused acceptance', async () => {
     const owner = await paidOwner('agency');
     const guest = await person(h.db, 'guest');

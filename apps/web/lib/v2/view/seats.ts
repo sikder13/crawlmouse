@@ -17,6 +17,7 @@
 import type { Seat, SeatRole, Site } from '@crawlmouse/types/v2';
 import { EXTRA_SEAT, EXTRA_SITE, usd } from '../../billing/prices';
 import { GATES } from '../../entitlement-v2';
+import type { NoticeCode } from '../account/route';
 import { extrasOffered, MAX_EXTRA_SEATS } from '../agency/extras-bounds';
 import { gateMessage } from '../agency/gates';
 import { roleMay } from '../agency/guard';
@@ -326,11 +327,27 @@ export type InviteView =
         | { kind: 'sign_in'; href: string; label: string; note: string };
     };
 
+/** A refused acceptance's notice, as the page read it from its address. */
+export interface InviteNotice {
+  code: NoticeCode;
+  text: string;
+}
+
+/**
+ * The two refusals that are about the link itself. The page says each as its state, from its own
+ * read of the cookie and the invitation, so neither is drawn as a line beside that state.
+ */
+const LINK_NOTICES: readonly NoticeCode[] = ['invite_gone', 'invite_no_link'];
+
 /**
  * What `/invite` shows, for a reader who is signed in or not: the invitation its cookie's token
  * opens, read through `read_seat_invite`; null for a token that function refuses; `'no_link'` when
- * the cookie holds no token, which says nothing about the invitation itself. `notice` is the line of
- * a refused acceptance the form was sent back with.
+ * the cookie holds no token, which says nothing about the invitation itself.
+ *
+ * `notice` is what a refused acceptance sent the form back with. `invite_gone` with no token is a
+ * link the accept route refused and whose cookie it cleared: the page says the link cannot be used,
+ * not that the mailed link should be opened again. Any other refusal is said above what the page
+ * read.
  */
 export function inviteView(
   invitation:
@@ -342,18 +359,19 @@ export function inviteView(
     | null
     | 'no_link',
   signedIn: boolean,
-  notice: string | null = null,
+  notice: InviteNotice | null = null,
 ): InviteView {
+  const line = notice === null || LINK_NOTICES.includes(notice.code) ? null : notice.text;
+  if (invitation === null || (invitation === 'no_link' && notice?.code === 'invite_gone')) {
+    return { state: 'gone', title: INVITE_COPY.goneTitle, lines: [INVITE_COPY.gone], notice: line };
+  }
   if (invitation === 'no_link') {
     return {
       state: 'no_link',
       title: INVITE_COPY.noLinkTitle,
       lines: [INVITE_COPY.noLink],
-      notice,
+      notice: line,
     };
-  }
-  if (invitation === null) {
-    return { state: 'gone', title: INVITE_COPY.goneTitle, lines: [INVITE_COPY.gone], notice };
   }
   return {
     state: 'invite',
@@ -362,7 +380,7 @@ export function inviteView(
       INVITE_COPY.role[invitation.role],
       invitation.everyClient ? INVITE_COPY.everyClient : INVITE_COPY.someClients,
     ],
-    notice,
+    notice: line,
     act: signedIn
       ? { kind: 'accept', action: '/api/seats/accept', label: INVITE_COPY.accept }
       : {

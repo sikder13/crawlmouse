@@ -120,7 +120,10 @@ export const INVITE_PREVIEWS = {
   '/v2-preview/screens/invite/signed-in': (): InviteView => inviteView(INVITATION, true),
   /** Sent back by the accept route: the sign-in's address is not the invited one. */
   '/v2-preview/screens/invite/mismatch': (): InviteView =>
-    inviteView(INVITATION, true, NOTICE_LINES.email_mismatch(null)),
+    inviteView(INVITATION, true, {
+      code: 'email_mismatch',
+      text: NOTICE_LINES.email_mismatch(null),
+    }),
   /** A link that cannot be used. */
   '/v2-preview/screens/invite/gone': (): InviteView => inviteView(null, true),
 } as const;
