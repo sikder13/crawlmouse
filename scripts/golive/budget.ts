@@ -396,6 +396,10 @@ export interface CheckShape {
   accessStages: 1 | 2;
   /** Seconds the worker takes over each batch, crawl and access alike. */
   batchSeconds: number;
+  /** Busy answers before the worker takes each post (at most PACE.busyRetries); 0 when absent. */
+  busyPerPost?: number;
+  /** The first read of each batch finds it gone, so the batch is posted once more; false when absent. */
+  readFailsFirst?: boolean;
 }
 
 /**
@@ -420,15 +424,66 @@ export const SHAPES: readonly CheckShape[] = [
     accessStages: 2,
     batchSeconds: 62,
   },
-  {
-    label: 'worst',
-    why: `the constants' bound: every claim wait (${PACE.claimWaits}), all ${PACE.maxCrawlBatches} crawl batches, both access stages, each batch done at its first poll`,
-    claimWaits: PACE.claimWaits,
-    crawlBatches: PACE.maxCrawlBatches,
-    accessStages: 2,
-    batchSeconds: PACE.pollStartS,
-  },
 ];
+
+/** A batch's max_seconds as the post step answers it (apps/web/lib/v2/pipeline/limits.ts). */
+export const MAX_SECONDS = 240;
+
+/** The values the heaviest-shape search tries, each a uniform shape over a whole check. */
+export const SEARCH = {
+  claimWaits: [0, PACE.claimWaits],
+  busyPerPost: [0, 1, PACE.busyRetries],
+  /** Done at the first, second and third poll, and at the last poll before the deadline. */
+  batchSeconds: [PACE.pollStartS, 15, 35, MAX_SECONDS + PACE.pollGraceS - 1],
+  readFailsFirst: [false, true],
+} as const;
+
+/**
+ * The shape with the most executions among `SEARCH`'s combinations, every one with all
+ * `PACE.maxCrawlBatches` crawl batches and both access stages, each cut at the run's finish timeout.
+ * It is the heaviest of the shapes tried, not a bound: a check whose batches differ from one another
+ * is not among them.
+ */
+export async function heaviestSearched(): Promise<{
+  shape: CheckShape;
+  executions: number;
+  tried: number;
+}> {
+  let best: { shape: CheckShape; executions: number } | null = null;
+  let tried = 0;
+  for (const claimWaits of SEARCH.claimWaits)
+    for (const busyPerPost of SEARCH.busyPerPost)
+      for (const batchSeconds of SEARCH.batchSeconds)
+        for (const readFailsFirst of SEARCH.readFailsFirst) {
+          const shape: CheckShape = {
+            label: 'heaviest searched',
+            why: '',
+            claimWaits,
+            crawlBatches: PACE.maxCrawlBatches,
+            accessStages: 2,
+            batchSeconds,
+            busyPerPost,
+            readFailsFirst,
+          };
+          tried += 1;
+          const executions = await checkExecutions(shape);
+          if (best === null || executions > best.executions) best = { shape, executions };
+        }
+  const { shape, executions } = best!;
+  const why =
+    `the most executions of ${tried} shapes tried (claim waits ${SEARCH.claimWaits.join(' or ')}; ` +
+    `${SEARCH.busyPerPost.join(', ')} busy answers a post; batches done at ${SEARCH.batchSeconds.join(', ')} s; ` +
+    `a first read that finds the batch gone, or not), all ${PACE.maxCrawlBatches} crawl batches and both access stages, ` +
+    `cut at the ${PACE.finishS / 60}-minute finish timeout. This one: ${shape.claimWaits} claim waits, ` +
+    `${shape.busyPerPost} busy a post, batches of ${shape.batchSeconds} s, ` +
+    `${shape.readFailsFirst ? 'each re-posted once' : 'none re-posted'}. Not a bound: batches that differ from one another are not tried`;
+  return { shape: { ...shape, why }, executions, tried };
+}
+
+/** The measured shapes and the heaviest searched one, in the order the doc prints them. */
+export async function allShapes(): Promise<CheckShape[]> {
+  return [...SHAPES, (await heaviestSearched()).shape];
+}
 
 const EVENT = {
   checkId: '00000000-0000-4000-8000-000000000001',
@@ -438,16 +493,26 @@ const EVENT = {
   homepageUrl: 'https://example.test/',
 } as const;
 
+/** Thrown by the counting `sleep` once the virtual clock passes the run's finish timeout. */
+class FinishTimeout extends Error {}
+
 /**
  * The executions of one checkFn run of this shape: 1 for the run, plus each step call runCheck makes
- * against a worker that behaves as `shape` says. The clock is virtual: each sleep advances it.
+ * against a worker that behaves as `shape` says. The clock is virtual: each sleep advances it, and
+ * step.run takes no time. Inngest cancels a run at its finish timeout (`PACE.finishS`), so the sleep
+ * that passes it is the last call counted and the run ends there.
  */
 export async function checkExecutions(shape: CheckShape): Promise<number> {
+  const busyPerPost = shape.busyPerPost ?? 0;
+  if (busyPerPost > PACE.busyRetries) {
+    throw new Error(`the ${shape.label} shape answers busy more than PACE.busyRetries a post`);
+  }
   let now = 0;
   let calls = 0;
   let busy = shape.claimWaits;
+  let busyLeft = busyPerPost;
   let postedAt = 0;
-  const crawlPosts = { n: 0 };
+  const readFailed = new Set<number>();
   const step: CheckStepTools = {
     run: async (_id, fn) => {
       calls += 1;
@@ -456,6 +521,7 @@ export async function checkExecutions(shape: CheckShape): Promise<number> {
     sleep: async (_id, ms) => {
       calls += 1;
       now += ms;
+      if (now > PACE.finishS * 1000) throw new FinishTimeout();
     },
     sendEvent: async () => {
       calls += 1;
@@ -464,7 +530,7 @@ export async function checkExecutions(shape: CheckShape): Promise<number> {
   };
   const posted = (): PostOutput => {
     postedAt = now;
-    return { status: 'posted', urls: 50, at: now, max_seconds: 240 };
+    return { status: 'posted', urls: 50, at: now, max_seconds: MAX_SECONDS };
   };
   const steps: CheckSteps = {
     claim: async () => {
@@ -476,9 +542,13 @@ export async function checkExecutions(shape: CheckShape): Promise<number> {
     },
     discover: async () => ({ seeds: 1, sitemap_urls: 0, at: now }),
     post: async (_e, at) => {
+      if (busyLeft > 0) {
+        busyLeft -= 1;
+        return { status: 'busy', at: now };
+      }
+      busyLeft = busyPerPost;
       if (at.kind === 'crawl') {
-        crawlPosts.n += 1;
-        return crawlPosts.n <= shape.crawlBatches ? posted() : { status: 'none', why: 'done' };
+        return at.batch <= shape.crawlBatches ? posted() : { status: 'none', why: 'done' };
       }
       return at.stage === 1 || shape.accessStages === 2
         ? posted()
@@ -488,14 +558,20 @@ export async function checkExecutions(shape: CheckShape): Promise<number> {
       status: now - postedAt >= shape.batchSeconds * 1000 ? 'done' : 'running',
       at: now,
     }),
-    read: async () => ({
-      status: 'read',
-      pages: 50,
-      links: 0,
-      access_tests: 0,
-      partial: false,
-      release: 'r',
-    }),
+    read: async (_e, at) => {
+      if (shape.readFailsFirst && !readFailed.has(at.batch)) {
+        readFailed.add(at.batch);
+        return { status: 'not_found' };
+      }
+      return {
+        status: 'read',
+        pages: 50,
+        links: 0,
+        access_tests: 0,
+        partial: false,
+        release: 'r',
+      };
+    },
     failBatch: async () => ({}),
     render: async () => ({ rendered: 0, not_rendered: 0 }),
     build: async () => ({ status: 'finished', pages: 1, fixes: 0 }),
@@ -503,10 +579,13 @@ export async function checkExecutions(shape: CheckShape): Promise<number> {
     finalize: async () => ({}),
     fail: async () => ({ failed: false }),
   };
-  const result = await runCheck(
-    { event: { data: { ...EVENT } as never }, step, runId: 'r' },
-    steps,
-  );
+  let result;
+  try {
+    result = await runCheck({ event: { data: { ...EVENT } as never }, step, runId: 'r' }, steps);
+  } catch (e) {
+    if (e instanceof FinishTimeout) return 1 + calls;
+    throw e;
+  }
   if (result.status !== 'finished') {
     throw new Error(`the ${shape.label} check did not finish: ${JSON.stringify(result)}`);
   }

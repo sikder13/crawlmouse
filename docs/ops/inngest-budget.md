@@ -81,19 +81,23 @@ from audits where status = 'completed' and started_at > now() - interval '30 day
 A v1 audit's time is not a v2 batch's time; the worker's own batch times are not yet measured on
 production, so the shapes stand in for them until they are.
 
-| Shape   | Why                                                                                                                     | checkFn run | First check | Scheduled re-check |
-| ------- | ----------------------------------------------------------------------------------------------------------------------- | ----------- | ----------- | ------------------ |
-| typical | v1's median audit: 27 pages, one crawl batch, 14 s; access stage 1 only                                                 | 22          | 28          | 29                 |
-| large   | v1's 90th percentile: 195 pages, four crawl batches, 247 s in all; both access stages                                   | 69          | 75          | 76                 |
-| worst   | the constants' bound: every claim wait (5), all 40 crawl batches, both access stages, each batch done at its first poll | 186         | 192         | 193                |
+| Shape             | Why                                                                                                                                                                                                                                                                                                                                                                                                          | checkFn run | First check | Scheduled re-check |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------- | ----------- | ------------------ |
+| typical           | v1's median audit: 27 pages, one crawl batch, 14 s; access stage 1 only                                                                                                                                                                                                                                                                                                                                      | 22          | 28          | 29                 |
+| large             | v1's 90th percentile: 195 pages, four crawl batches, 247 s in all; both access stages                                                                                                                                                                                                                                                                                                                        | 69          | 75          | 76                 |
+| heaviest searched | the most executions of 48 shapes tried (claim waits 0 or 5; 0, 1, 20 busy answers a post; batches done at 5, 15, 35, 299 s; a first read that finds the batch gone, or not), all 40 crawl batches and both access stages, cut at the 20-minute finish timeout. This one: 0 claim waits, 0 busy a post, batches of 15 s, each re-posted once. Not a bound: batches that differ from one another are not tried | 485         | 491         | 492                |
+
+A run that passes its finish timeout is counted to the sleep that passes it, and Inngest cancels
+it there; the table still adds the fan-out of a finished check to it, where the real run would
+start `crawlmouse.check.cancelled` and the failed-check mail instead.
 
 ## A month, against the quota
 
-| Checks a month | typical | large   | worst   |
-| -------------- | ------- | ------- | ------- |
-| 100            | 18,858  | 23,558  | 35,258  |
-| 1,000          | 44,058  | 91,058  | 208,058 |
-| 5,000          | 156,058 | 391,058 | 976,058 |
+| Checks a month | typical | large   | heaviest searched |
+| -------------- | ------- | ------- | ----------------- |
+| 100            | 18,858  | 23,558  | 65,158            |
+| 1,000          | 44,058  | 91,058  | 507,058           |
+| 5,000          | 156,058 | 391,058 | 2,471,058         |
 
 Every figure is a clean run: a step that fails and is retried is one more execution, and an
 `onFailure` handler's run and steps are more again. The totals are a floor under real traffic.

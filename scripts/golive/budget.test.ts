@@ -2,14 +2,18 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { PACE } from '@crawlmouse/inngest/check';
 import { DOC_PATH, renderBudget } from './budget-doc';
 import {
   FUNCTIONS,
   HOBBY_HEADROOM_LINE,
   SHAPES,
+  MAX_SECONDS,
+  SEARCH,
   checkExecutions,
   cronPerDay,
   cronRunsPerDay,
+  heaviestSearched,
   finishedFanOut,
   floorBySwitchOn,
   hobbyVerdict,
@@ -248,6 +252,81 @@ describe('a cron schedule, read', () => {
     expect(reaper.runsPerDay).toBe(144);
     for (const f of FUNCTIONS)
       expect(f.runsPerDay, f.id).toBe(f.cron === null ? 0 : cronRunsPerDay(f.cron));
+  });
+});
+
+describe('a check against a worker that answers busy, runs long or loses a batch', () => {
+  const one: CheckShape = {
+    label: 't',
+    why: '',
+    claimWaits: 0,
+    crawlBatches: 1,
+    accessStages: 1,
+    batchSeconds: 5,
+  };
+  // Hand count of `one`: run, claim, discover; crawl-1 post, wait, poll, read (4); crawl-2-post
+  // none (1); access-1 as crawl-1 (4); access-2-post not_needed (1); render, build, persist, emit,
+  // finalize (5). 1 + 1 + 1 + 4 + 1 + 4 + 1 + 5 = 18.
+  it('counts 18 for one batch each phase, done at the first poll', async () => {
+    expect(await checkExecutions(one)).toBe(18);
+  });
+
+  it('adds a sleep and a post for each busy answer, on each of the four posts', async () => {
+    expect(await checkExecutions({ ...one, busyPerPost: 1 })).toBe(18 + 4 * 2);
+    // At 20 busy answers a post the clock decides: run, claim, discover 3; crawl-1-post 20 busy (post
+    // and 30 s sleep each) and taken 41, now 600 s; wait 5 s, poll, read 3, now 605 s; crawl-2-post
+    // busy: the 20th sleep reaches 1,205 s, past the finish timeout: 40. 3 + 41 + 3 + 40 = 87.
+    expect(await checkExecutions({ ...one, busyPerPost: PACE.busyRetries })).toBe(87);
+  });
+
+  it('refuses more busy answers than a post retries', async () => {
+    await expect(checkExecutions({ ...one, busyPerPost: PACE.busyRetries + 1 })).rejects.toThrow();
+  });
+
+  it('polls a batch done just before its deadline 12 times', async () => {
+    // Polls at 5, 15, 35, 65, 95, …, 275, 305 s after the post: 12, the last past 299 s.
+    const atDeadline = { ...one, batchSeconds: MAX_SECONDS + PACE.pollGraceS - 1 };
+    expect(await checkExecutions(atDeadline)).toBe(18 + 2 * (11 * 2));
+  });
+
+  it('re-posts a batch whose first read finds it gone: repost, wait, poll, read-2', async () => {
+    expect(await checkExecutions({ ...one, readFailsFirst: true })).toBe(18 + 2 * 4);
+  });
+
+  it('stops counting at the sleep that passes the finish timeout', async () => {
+    // Hand count: run 1; claim 1 and five waits of 60 s (sleep + claim) 10, now 300 s; discover 1;
+    // crawl-1-post busy 20 times (20 posts, 20 sleeps of 30 s) and taken at the 21st post: 41, now
+    // 900 s; polls at 905, 915, 935, 965, 995, …, 1175 (11 sleeps, 11 polls): 22; the sleep to 1205 s
+    // passes 1,200 s and is the last: 1. 1 + 1 + 10 + 1 + 41 + 22 + 1 = 77.
+    const cut: CheckShape = {
+      ...one,
+      claimWaits: PACE.claimWaits,
+      busyPerPost: PACE.busyRetries,
+      batchSeconds: MAX_SECONDS + PACE.pollGraceS - 1,
+    };
+    expect(PACE.finishS).toBe(1200);
+    expect(await checkExecutions(cut)).toBe(77);
+  });
+
+  it('names as heaviest the largest count of the shapes it tries, and says it is no bound', async () => {
+    const { shape, executions, tried } = await heaviestSearched();
+    expect(tried).toBe(2 * 3 * 4 * 2);
+    expect(await checkExecutions(shape)).toBe(executions);
+    for (const busyPerPost of SEARCH.busyPerPost)
+      for (const batchSeconds of SEARCH.batchSeconds) {
+        const other = { ...shape, busyPerPost, batchSeconds };
+        expect(await checkExecutions(other)).toBeLessThanOrEqual(executions);
+      }
+    expect(shape.why).toMatch(/Not a bound/);
+    expect(shape.why).not.toMatch(/the constants' bound/);
+  });
+
+  it("copies max_seconds from the pipeline's limits", () => {
+    const limits = readFileSync(join(ROOT, 'apps/web/lib/v2/pipeline/limits.ts'), 'utf8');
+    expect([...limits.matchAll(/max_seconds: (\d+)/g)].map((m) => Number(m[1]))).toEqual([
+      MAX_SECONDS,
+      MAX_SECONDS,
+    ]);
   });
 });
 

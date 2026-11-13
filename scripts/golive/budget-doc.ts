@@ -13,8 +13,8 @@ import {
   FUNCTIONS,
   HOBBY_HEADROOM_LINE,
   HOBBY_MONTHLY_EXECUTIONS,
-  SHAPES,
   alertFiring,
+  allShapes,
   checkExecutions,
   cronPerDay,
   finishedFanOut,
@@ -109,7 +109,8 @@ export async function renderBudget(): Promise<string> {
     '| Shape | Why | checkFn run | First check | Scheduled re-check |',
     '| --- | --- | --- | --- | --- |',
   ];
-  for (const shape of SHAPES) {
+  const shapes = await allShapes();
+  for (const shape of shapes) {
     const [first, recheck] = await scenarios(shape);
     lines.push(
       `| ${shape.label} | ${shape.why} | ${await checkExecutions(shape)} | ${first!.executions} | ${recheck!.executions} |`,
@@ -117,13 +118,17 @@ export async function renderBudget(): Promise<string> {
   }
   lines.push(
     '',
+    'A run that passes its finish timeout is counted to the sleep that passes it, and Inngest cancels',
+    'it there; the table still adds the fan-out of a finished check to it, where the real run would',
+    'start `crawlmouse.check.cancelled` and the failed-check mail instead.',
+    '',
     '## A month, against the quota',
     '',
-    `| Checks a month | ${SHAPES.map((s) => s.label).join(' | ')} |`,
-    `| --- | ${SHAPES.map(() => '---').join(' | ')} |`,
+    `| Checks a month | ${shapes.map((s) => s.label).join(' | ')} |`,
+    `| --- | ${shapes.map(() => '---').join(' | ')} |`,
   );
   for (const checks of CHECK_COUNTS) {
-    const totals = await Promise.all(SHAPES.map((s) => monthlyTotal(checks, s)));
+    const totals = await Promise.all(shapes.map((s) => monthlyTotal(checks, s)));
     lines.push(`| ${n(checks)} | ${totals.map(n).join(' | ')} |`);
   }
   lines.push(
