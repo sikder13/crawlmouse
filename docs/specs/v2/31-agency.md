@@ -1099,9 +1099,14 @@ entry for that address. So the link of an earlier mail answers after a later req
 confirmation link, and with the schedule removed. A request is not mailed without it: with no
 `EMAIL_LINK_SECRET` the confirmation is `unconfigured`, as a report is.
 
-A client site removed and added again is a new row, and starts with the list of the row removed
-before it (`sites_carry_report_refusals`), so removing a client clears nothing. A site keeps at
-most `report_refusals_max()` entries; past it the oldest that record no pause and no refusal go.
+A client is an account's host, whichever row holds it. What an address refused is read across
+each row of that account and host (`report_refusal`): the row removed, the row `add_site` made when
+the client was added again (which also starts with the removed row's list,
+`sites_carry_report_refusals`), and a row that became the client's when its host was kept from a
+public check. So removing a client and bringing it back, by either route, clears nothing, and the
+link of a mail sent before the removal stops what the live row was about to send. Another account
+that adds the same host holds none of it. Past `report_refusals_max()` entries on a row, the oldest
+that record no pause and no refusal go; an entry that records one is kept whatever the count.
 
 Left as it is. An address written another way (`name+tag@…`) is another address, and is asked as
 one. The recipient's functions lock the site's row and then its schedule, the order the account's
