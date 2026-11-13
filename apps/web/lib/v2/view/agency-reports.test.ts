@@ -698,6 +698,8 @@ describe('an account in its Agency trial', () => {
         mayAsk: true,
         label: 'asked to confirm once the trial has become the plan',
       });
+      // Nothing is sent to it while the trial runs, so the row names no next run.
+      expect(row(view, PINECREST).nextRun).toBe('none during the trial');
       expect(labels(view)).toEqual(['Change']);
     }
   });

@@ -153,6 +153,17 @@ describe('agencyTrialView', () => {
     expect(v.otherIntervalHref).toBe('/agency-trial?interval=year');
   });
 
+  it('the aside prices a seat beyond the plan by the month and by the year, on either form', () => {
+    for (const interval of ['month', 'year'] as const) {
+      const v = view(NONE, interval);
+      if (v.kind !== 'form') throw new Error('form expected');
+      const seats = v.aside.rows.map(([what]) => what.text).filter((t) => t.startsWith('Seats'));
+      expect(seats).toEqual([
+        'Seats · owner, account managers, developers · $12 a seat a month beyond, or $120 a year on a yearly plan',
+      ]);
+    }
+  });
+
   it('yearly: the year’s price, and a link back to monthly', () => {
     const v = view(NONE, 'year');
     if (v.kind !== 'form') throw new Error('form expected');

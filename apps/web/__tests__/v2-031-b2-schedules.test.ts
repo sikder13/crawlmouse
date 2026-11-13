@@ -1696,6 +1696,32 @@ describe('what a recipient refused (owner ruling on Q42)', () => {
       expect(iso((await refusals(c.siteId))[0]!.declined_at)).toBe(at(1));
     });
 
+    it('an address that is the contact no longer declines for itself alone: the new contact’s request still waits', async () => {
+      const c = await client();
+      await setClient(c.siteId, c.accountId, { client_contact_email: 'old@client.example' });
+      await setSchedule(c.siteId, c.accountId);
+      const issueFor = (email: string, request: string, token: string, now: string) =>
+        answer(`select public.issue_recipient_confirmation($1, $2, $3, $4, $5) r`, [
+          c.siteId,
+          now,
+          request,
+          email,
+          sha256(token),
+        ]);
+      const [oldLink, newLink] = [pauseToken(), pauseToken()];
+      expect((await issueFor('old@client.example', 'ask-old', oldLink, NOW)).outcome).toBe(
+        'issued',
+      );
+      await setClient(c.siteId, c.accountId, { client_contact_email: 'new@client.example' });
+      const waiting = await issueFor('new@client.example', 'ask-new', newLink, at(1));
+      expect(waiting.outcome).toBe('issued');
+      // The old address presses the link of its own mail.
+      expect(await decline(oldLink, at(2))).toEqual({ outcome: 'declined' });
+      expect((await schedule(c.siteId))!.recipient_confirm_hash).not.toBeNull();
+      expect(await askRefusal(c.siteId, at(2))).toBeUndefined();
+      expect((await confirm(waiting.token as string, at(2))).outcome).toBe('confirmed');
+    });
+
     it('answers gone for a token no schedule holds, and records nothing', async () => {
       const c = await confirmed();
       expect(await decline(pauseToken())).toEqual({ outcome: 'gone' });
@@ -1726,6 +1752,25 @@ describe('what a recipient refused (owner ruling on Q42)', () => {
         report.report_id,
       ]);
       expect(await refusals(c.siteId)).toEqual([]);
+    });
+
+    it('a report’s recipient blanked takes the entry from the row the client was added again as, too', async () => {
+      const c = await confirmed('reader@client.example');
+      const report = await writeReport(c.siteId, '2026-11-16T09:00:00.000Z', await check(c.siteId));
+      const token = pauseToken();
+      await issuePause(c.siteId, NOW, token);
+      await pause(token, at(1));
+      await db.query(`update public.sites set removed_at = $2 where id = $1`, [c.siteId, at(5)]);
+      const again = randomUUID();
+      await insertRow(db, 'sites', ROWS.sites(again, c.accountId, c.host));
+      expect([await refusals(c.siteId), await refusals(again)].map((r) => r.length)).toEqual([
+        1, 1,
+      ]);
+      // Rule 29: the report is the removed row's.
+      await db.query(`update public.reports set recipient_email = null where id = $1`, [
+        report.report_id,
+      ]);
+      expect([await refusals(c.siteId), await refusals(again)]).toEqual([[], []]);
     });
   });
 });

@@ -172,6 +172,10 @@ describe('/s/pause', () => {
     h.cookies.set('cm_link_report_pause', token);
     const html = await pausePage();
     expect(html).toContain(`Summit Digital sends reports about ${site.host} to this address.`);
+    // What a pause does and does not end, in the page's own words before the button is pressed.
+    expect(html).toContain(
+      'The button stops them. The sender cannot start them again: they start only if you are asked to confirm again and do. You are asked at most once in 30 days.',
+    );
     expect(html).toMatch(/<form[^>]* action="\/api\/report-files\/pause"/);
     // And the way to stop the requests for good: a second form, which names this page.
     expect(html).toContain('You can stop these requests for good with one click.');
