@@ -57,6 +57,13 @@ describe('the founder functions (D3)', () => {
     }
   });
 
+  it('retries a step 4 times, 5 runs in all, as the spec states (review T4)', () => {
+    expect(FOUNDER_RETRIES).toBe(4);
+    const steps = config(createFounderEntitlementFn(() => work() as unknown as FounderWork))
+      .steps as Record<string, { retries: { attempts: number } }>;
+    expect(Object.values(steps)[0]!.retries.attempts).toBe(4);
+  });
+
   it('passes the event’s own id, its data and its time to the notice', async () => {
     const w = work();
     const id = `entitlement.changed:${ACCOUNT}:evt_1`;
