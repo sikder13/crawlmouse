@@ -607,16 +607,29 @@ function reportStore(over: Partial<ReportMailStore> = {}): ReportMailStore {
         pauseToken: PAUSE,
       }),
     ),
+    markClientReportSent: vi.fn(async () => ({ accountId: ACCOUNT, first: true })),
     ...over,
   };
 }
 
-function reportSetup(s: ReportMailStore = reportStore(), suppressed: string[] = []) {
+function reportSetup(
+  s: ReportMailStore = reportStore(),
+  suppressed: string[] = [],
+  pauseLinks = true,
+) {
   const ledger = memoryLedger(new Set(suppressed.map((a) => hashMailAddress(PEPPER, a))));
   const transport = memoryTransport();
   const log = vi.fn();
+  const capture = vi.fn(async () => undefined);
   const mail: MailDeps = { ledger, transport, pepper: PEPPER, now: () => NOW, log };
-  return { h: reportMailHandlers({ mail, store: s }), ledger, transport, log, s };
+  return {
+    h: reportMailHandlers({ mail, store: s, capture, pauseLinks }),
+    ledger,
+    transport,
+    log,
+    capture,
+    s,
+  };
 }
 
 describe('the confirmation asked of a client’s contact (CC-31 D8)', () => {
@@ -751,5 +764,65 @@ describe('the client report (CC-31 D8)', () => {
     );
     await expect(h.clientReport(REPORT)).rejects.toBeInstanceOf(MailRetry);
     expect(ledger.claims).toEqual([]);
+  });
+  it('marks the report sent once its mail has gone, and captures the account’s first', async () => {
+    const mark = vi
+      .fn<ReportMailStore['markClientReportSent']>()
+      .mockResolvedValueOnce({ accountId: ACCOUNT, first: true })
+      .mockResolvedValue(null);
+    const { h, capture, transport } = reportSetup(reportStore({ markClientReportSent: mark }));
+    expect(await h.clientReport(REPORT)).toBe('sent');
+    expect(mark).toHaveBeenCalledWith(REPORT, NOW);
+    expect(capture.mock.calls).toEqual([['first_client_report_sent', ACCOUNT, {}]]);
+    // The event again: the ledger answers `done`, the mark answers null, and nothing is captured twice.
+    expect(await h.clientReport(REPORT)).toBe('done');
+    expect(mark).toHaveBeenCalledTimes(2);
+    expect(capture).toHaveBeenCalledTimes(1);
+    expect(transport.sent).toHaveLength(1);
+  });
+
+  it('captures nothing for a report that is not the account’s first', async () => {
+    const { h, capture } = reportSetup(
+      reportStore({
+        markClientReportSent: vi.fn(async () => ({ accountId: ACCOUNT, first: false })),
+      }),
+    );
+    expect(await h.clientReport(REPORT)).toBe('sent');
+    expect(capture).not.toHaveBeenCalled();
+  });
+
+  it('a mail sent by a run that stopped before the mark is marked by the next run', async () => {
+    const mark = vi
+      .fn<ReportMailStore['markClientReportSent']>()
+      .mockRejectedValueOnce(new Error('x'))
+      .mockResolvedValue({ accountId: ACCOUNT, first: true });
+    const { h, capture, transport } = reportSetup(reportStore({ markClientReportSent: mark }));
+    await expect(h.clientReport(REPORT)).rejects.toThrow();
+    expect(await h.clientReport(REPORT)).toBe('done');
+    expect(transport.sent).toHaveLength(1);
+    expect(capture.mock.calls).toEqual([['first_client_report_sent', ACCOUNT, {}]]);
+  });
+
+  it('marks nothing for a report whose mail did not go', async () => {
+    const suppressed = reportSetup(reportStore(), [CONTACT]);
+    expect(await suppressed.h.clientReport(REPORT)).toBe('suppressed');
+    expect(suppressed.s.markClientReportSent).not.toHaveBeenCalled();
+    const gone = reportSetup(reportStore({ issueClientReport: vi.fn(async () => null) }));
+    expect(await gone.h.clientReport(REPORT)).toBe('nothing_to_send');
+    expect(gone.s.markClientReportSent).not.toHaveBeenCalled();
+    expect(gone.capture).not.toHaveBeenCalled();
+  });
+
+  it('with no link secret no report is mailed: nothing is read, claimed or sent, and the log says why', async () => {
+    const { h, s, ledger, transport, log } = reportSetup(reportStore(), [], false);
+    expect(await h.clientReport(REPORT)).toBe('unconfigured');
+    expect(s.clientReportRecipient).not.toHaveBeenCalled();
+    expect(ledger.claims).toEqual([]);
+    expect(transport.sent).toEqual([]);
+    expect(log.mock.calls).toEqual([
+      ['mail.unconfigured', { kind: 'client_report', link_secret: 0 }],
+    ]);
+    // The confirmation carries no pause link, and goes.
+    expect(await h.reportConfirm(SITE, 'req-1')).toBe('sent');
   });
 });

@@ -326,6 +326,8 @@ const MAIL_IDS = [
   'crawlmouse-crawlmouse.mail.fix-to-developer',
   'crawlmouse-crawlmouse.events.check-finished',
   'crawlmouse-crawlmouse.mail.seat-invite',
+  'crawlmouse-crawlmouse.mail.report-confirm',
+  'crawlmouse-crawlmouse.mail.client-report',
 ];
 const SWEEP = [undefined, '', '0', '-1', '2', '5', '6', '50', '1000', 'abc', '5.5'] as const;
 

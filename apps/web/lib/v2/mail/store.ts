@@ -138,6 +138,14 @@ export interface ReportMailStore {
   issueConfirmation(siteId: string, now: Date): Promise<IssuedConfirmation | null>;
   clientReportRecipient(reportId: string): Promise<ReportRecipient | null>;
   issueClientReport(reportId: string, now: Date): Promise<IssuedClientReport | null>;
+  /**
+   * The report's mail has gone: its row becomes `sent`. Answers the account, and whether this is
+   * the first client report it has sent; null for a report already marked, or none.
+   */
+  markClientReportSent(
+    reportId: string,
+    now: Date,
+  ): Promise<{ accountId: string; first: boolean } | null>;
 }
 
 const fail = (what: string, error: { code?: string } | null): never => {

@@ -29,6 +29,7 @@ import type {
   ReportMailHandlers,
 } from '../../../../../inngest/mail';
 import { packetPrompt } from '../view/segment/fixes';
+import type { AgencyCapture } from '../agency/events';
 import { checkRef } from '../pipeline/public';
 import { unsubscribeHeaders } from './headers';
 import { reportPauseUrl } from './links';
@@ -230,10 +231,17 @@ export const REQUEST_ID_MAX = 100;
 export interface ReportMailHandlerDeps {
   mail: MailDeps;
   store: ReportMailStore;
+  /** `first_client_report_sent`, when the report mailed is the account's first (CC-31 D10). */
+  capture: AgencyCapture;
+  /**
+   * Whether the pause link can be made (`EMAIL_LINK_SECRET` is set). A report is not mailed
+   * without its pause link: with this false, nothing is read, claimed or sent.
+   */
+  pauseLinks: boolean;
 }
 
 export function reportMailHandlers(d: ReportMailHandlerDeps): ReportMailHandlers {
-  const { mail, store } = d;
+  const { mail, store, capture } = d;
   return {
     async reportConfirm(siteId, requestId) {
       if (requestId.length === 0 || requestId.length > REQUEST_ID_MAX) return 'invalid_request';
@@ -257,11 +265,15 @@ export function reportMailHandlers(d: ReportMailHandlerDeps): ReportMailHandlers
     },
 
     async clientReport(reportId) {
+      if (!d.pauseLinks) {
+        mail.log('mail.unconfigured', { kind: 'client_report', link_secret: 0 });
+        return 'unconfigured';
+      }
       const contact = await read(store.clientReportRecipient(reportId));
       if (contact === null) return 'not_found';
       // Set by `render`, which `send` calls before it asks for the headers.
       let unsubscribe: Readonly<Record<string, string>> = {};
-      return send(mail, {
+      const outcome = await send(mail, {
         kind: 'client_report',
         to: contact.recipient,
         idempotencyKey: `client_report:${reportId}`,
@@ -283,6 +295,13 @@ export function reportMailHandlers(d: ReportMailHandlerDeps): ReportMailHandlers
         },
         headers: () => unsubscribe,
       });
+      // The row becomes `sent` once its mail has gone. `done` is a mail an earlier run sent and
+      // stopped before it marked: the mark is made now, and a report already marked answers null.
+      if (outcome === 'sent' || outcome === 'done') {
+        const marked = await store.markClientReportSent(reportId, mail.now());
+        if (marked?.first) await capture('first_client_report_sent', marked.accountId, {});
+      }
+      return outcome;
     },
   };
 }

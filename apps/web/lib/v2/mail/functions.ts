@@ -11,16 +11,26 @@ import {
   createCheckFinishedEventFn,
   createCheckNotifyFn,
   createFixToDeveloperFn,
+  createClientReportFn,
+  createReportConfirmFn,
   createSeatInviteFn,
   type MailHandlers,
+  type ReportMailHandlers,
 } from '../../../../../inngest/mail';
 import { captureServerEvent } from '../../analytics-server';
+import { siteUrl } from '../../site-url';
+import { agencyCaptureWithoutRequest } from '../agency/events';
+import { supabaseCheckReader } from '../pipeline/load';
+import { generateReport, supabaseReportBucket, supabaseReportStore } from '../reports/generate-run';
+import { supabaseShareFiles } from '../reports/share-store';
 import { mailPepper } from './address-hash';
-import { mailHandlers } from './handlers';
+import { mailHandlers, reportMailHandlers } from './handlers';
 import { supabaseMailLedger } from './ledger';
+import { supabaseReportMailStore } from './report-mail-store';
 import type { MailDeps } from './send';
 import { supabaseMailStore } from './store';
 import { resendTransport } from './transport';
+import { linkSecret } from './unsubscribe-token';
 
 type Env = Readonly<Record<string, string | undefined>>;
 
@@ -28,22 +38,57 @@ type Env = Readonly<Record<string, string | undefined>>;
 export const mailLog: MailDeps['log'] = (event, fields) =>
   console.warn(JSON.stringify({ event, ...fields }));
 
-export function productionMailHandlers(env: Env): MailHandlers {
-  const sb = createClient(env.NEXT_PUBLIC_SUPABASE_URL ?? '', env.SUPABASE_SERVICE_ROLE_KEY ?? '', {
+const serviceClient = (env: Env) =>
+  createClient(env.NEXT_PUBLIC_SUPABASE_URL ?? '', env.SUPABASE_SERVICE_ROLE_KEY ?? '', {
     auth: { persistSession: false },
   });
+
+const mailDeps = (env: Env, sb: ReturnType<typeof serviceClient>): MailDeps => ({
+  ledger: supabaseMailLedger(sb),
+  transport: resendTransport(env.RESEND_API_KEY),
+  pepper: mailPepper(env),
+  now: () => new Date(),
+  log: mailLog,
+});
+
+export function productionMailHandlers(env: Env): MailHandlers {
+  const sb = serviceClient(env);
   return mailHandlers({
-    mail: {
-      ledger: supabaseMailLedger(sb),
-      transport: resendTransport(env.RESEND_API_KEY),
-      pepper: mailPepper(env),
-      now: () => new Date(),
-      log: mailLog,
-    },
+    mail: mailDeps(env, sb),
     store: supabaseMailStore(sb),
     // A step has no request, so no cookie header: serverCaptureAllowed reads none (CC-26b's known gap).
     capture: (event, distinctId, properties) =>
       captureServerEvent(null, { event, distinctId, properties }),
+  });
+}
+
+/**
+ * The two mails of a client report schedule (CC-31 D8). A report's document is made by the report
+ * generator and stored in the reports bucket, as a report a member asks for is; with no
+ * `EMAIL_LINK_SECRET` the pause link cannot be made and no report is mailed.
+ */
+export function productionReportMailHandlers(env: Env): ReportMailHandlers {
+  const sb = serviceClient(env);
+  const secret = linkSecret(env);
+  return reportMailHandlers({
+    mail: mailDeps(env, sb),
+    store: supabaseReportMailStore({
+      admin: sb,
+      generate: (reportId) =>
+        generateReport(
+          {
+            store: supabaseReportStore(sb),
+            bucket: supabaseReportBucket(sb),
+            read: supabaseCheckReader(sb),
+            home: siteUrl('/'),
+          },
+          reportId,
+        ),
+      files: supabaseShareFiles(sb),
+      linkSecret: secret,
+    }),
+    capture: agencyCaptureWithoutRequest(),
+    pauseLinks: secret !== null,
   });
 }
 
@@ -55,5 +100,7 @@ export function mailFunctions(env: Env = process.env): InngestFunction.Like[] {
     createFixToDeveloperFn(handlers),
     createCheckFinishedEventFn(handlers),
     createSeatInviteFn(handlers),
+    createReportConfirmFn(() => productionReportMailHandlers(env)),
+    createClientReportFn(() => productionReportMailHandlers(env)),
   ];
 }

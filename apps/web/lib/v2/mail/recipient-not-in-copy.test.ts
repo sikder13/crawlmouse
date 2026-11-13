@@ -115,6 +115,7 @@ const reportStore: ReportMailStore = {
     shareToken: 'S'.repeat(22),
     pauseToken: 'P'.repeat(43),
   }),
+  markClientReportSent: async () => ({ accountId: ACCOUNT, first: false }),
 };
 
 const change: StoredChange = {
@@ -143,7 +144,12 @@ async function sweep() {
     log: () => {},
   };
   const h = mailHandlers({ mail, store, capture: async () => undefined });
-  const reports = reportMailHandlers({ mail, store: reportStore });
+  const reports = reportMailHandlers({
+    mail,
+    store: reportStore,
+    capture: async () => undefined,
+    pauseLinks: true,
+  });
 
   const answers = [
     await h.accountEmail({
