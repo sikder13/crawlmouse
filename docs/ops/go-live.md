@@ -81,12 +81,12 @@ release, its egress record, the app's worker variables) is checked before step 2
 
 **Smoke** (no flag is on, so a visitor sees v1 throughout):
 
-| #   | Do                                               | Right looks like                                                                                      |
-| --- | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------- |
-| 1   | Open `https://crawlmouse-worker.fly.dev/healthz` | `{"ok":true}`                                                                                         |
-| 2   | `pnpm golive:check -- --step 2`                  | the worker and release lines `pass`; tick `worker-egress-recorded` once the runbook's table is filled |
-| 3   | Open `https://crawlmouse.com/`                   | the v1 home, unchanged                                                                                |
-| 4   | Run a v1 audit of a small site                   | it completes, as before                                                                               |
+| #   | Do                                               | Right looks like                                                                                                                                                              |
+| --- | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Open `https://crawlmouse-worker.fly.dev/healthz` | `{"ok":true}`                                                                                                                                                                 |
+| 2   | `pnpm golive:check -- --step 2`                  | the worker and release lines `pass`; it still exits 1 on step 2's own rows, which is expected here. Pass `--ticked worker-egress-recorded` once the runbook's table is filled |
+| 3   | Open `https://crawlmouse.com/`                   | the v1 home, unchanged                                                                                                                                                        |
+| 4   | Run a v1 audit of a small site                   | it completes, as before                                                                                                                                                       |
 
 **Watch for 30 minutes.** Fly → `crawlmouse-worker` → Monitoring (no restarts), and
 `flyctl logs --app crawlmouse-worker`. The worker reports to no Sentry project.

@@ -18,7 +18,9 @@ const OLD_URL = ['', 'api', 'billing', 'agency-trial'].join('/');
 const OLD_ROUTE = OLD_URL.slice(1);
 const CODE = /\.(ts|tsx|mts|cts|js|mjs|cjs)$/;
 const CONFIG = /\.(json|ya?ml|toml)$/;
-const TEST = /\.test\.(ts|tsx)$/;
+// Test support too: a `*.fixture.ts` is imported only by tests and their helpers (the Stripe sandbox's creates a trial on
+// purpose, in the sandbox).
+const TEST = /\.(test|fixture)\.(ts|tsx)$/;
 const THIS_FILE = 'apps/web/__tests__/security/billing-agency-trial-removed.test.ts';
 /**
  * The go-live check names the old path in order to report that it is gone (CC-35 D3): its row and the
@@ -119,6 +121,16 @@ function setsTrialDays(file: string, text = read(file)): boolean {
   const visit = (node: ts.Node) => {
     if (ts.isPropertyAssignment(node) && keyOf(node.name) === 'trialDays') found = true;
     if (ts.isShorthandPropertyAssignment(node) && node.name.text === 'trialDays') found = true;
+    // `terms.trialDays = 14` or `terms['trialDays'] = 14`.
+    if (
+      ts.isBinaryExpression(node) &&
+      node.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+      ((ts.isPropertyAccessExpression(node.left) && node.left.name.text === 'trialDays') ||
+        (ts.isElementAccessExpression(node.left) &&
+          ts.isStringLiteralLike(node.left.argumentExpression) &&
+          node.left.argumentExpression.text === 'trialDays'))
+    )
+      found = true;
     ts.forEachChild(node, visit);
   };
   visit(sf);
@@ -177,10 +189,21 @@ describe('POST /api/billing/agency-trial is gone (CC-35 D5)', () => {
     expect(setters).toEqual(['apps/web/lib/billing/agency-trial.ts']);
   });
 
-  it('finds trialDays set in each object-literal form, and not a type or a read', () => {
+  it("names Stripe's trial field only where startCheckout turns trialDays into it", () => {
+    // A Checkout given `trial_period_days` directly would bypass trialDays altogether.
+    const field = ['trial', 'period', 'days'].join('_');
+    const naming = tracked()
+      .filter((f) => f.startsWith('apps/web/') && CODE.test(f) && !TEST.test(f))
+      .filter((f) => read(f).includes(field));
+    expect(naming).toEqual(['apps/web/lib/billing/checkout-v2.ts']);
+  });
+
+  it('finds trialDays set in each object-literal and assignment form, and not a type or a read', () => {
     expect(setsTrialDays('x.ts', 'startCheckout(d, i, a, { trialDays: 14 });')).toBe(true);
     expect(setsTrialDays('x.ts', 'const trialDays = 14; f({ trialDays });')).toBe(true);
     expect(setsTrialDays('x.ts', "f({ ['trialDays']: 14 });")).toBe(true);
+    expect(setsTrialDays('x.ts', 'terms.trialDays = 14;')).toBe(true);
+    expect(setsTrialDays('x.ts', "terms['trialDays'] = 14;")).toBe(true);
     expect(setsTrialDays('x.ts', 'interface T { trialDays?: number }')).toBe(false);
     expect(setsTrialDays('x.ts', 'const t = terms.trialDays !== undefined;')).toBe(false);
   });
