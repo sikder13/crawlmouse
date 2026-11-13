@@ -161,7 +161,7 @@ A check is `partial` when a batch carries a reason marked partial below, when th
 | usage `request_count`      | the batches' requests                                                                                                                       |
 | usage `occurred_at`        | the check's `finished_at`                                                                                                                   |
 
-The detectors that run on a built check, which `diff_inputs.detectors` lists: `orphan_pages`, `deep_pages`, `generic_anchor_text`, `redirect_chain`, `duplicate_pagination`, `canonical_mismatch`, `hreflang_gap`, `robots_txt_blocks_crawler`, `edge_rule_blocks_crawler`, `client_rendered_template`, `quotable_opening`, `no_question_headings`, `missing_schema_description`, `missing_author_date`, `specs_as_images`.
+The detectors that run on a built check, which `diff_inputs.detectors` lists: `orphan_pages`, `deep_pages`, `generic_anchor_text`, `redirect_chain`, `duplicate_pagination`, `canonical_mismatch`, `hreflang_gap`, `robots_txt_blocks_crawler`, `edge_rule_blocks_crawler`, `client_rendered_template`, `js_only_navigation`, `quotable_opening`, `no_question_headings`, `missing_schema_description`, `missing_author_date`, `specs_as_images`.
 
 ## Bounds on the new crawl-row fields
 

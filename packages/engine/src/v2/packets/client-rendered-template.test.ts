@@ -345,11 +345,11 @@ describe('the client-rendered template packet, from its record', () => {
 });
 
 describe('js_only_navigation', () => {
-  it('has no packet, and says what was not measured', () => {
+  it('has no packet, and says why without claiming the render keeps no link (CC-32 Q7)', () => {
     expect(jsOnlyNavigation.kind).toBe('none');
     if (jsOnlyNavigation.kind !== 'none') return;
-    expect(jsOnlyNavigation.reason).toMatch(/word counts/);
-    expect(jsOnlyNavigation.reason).toMatch(/keeps no link from the rendered page/);
+    expect(jsOnlyNavigation.reason).toMatch(/^No packet yet: /);
+    expect(jsOnlyNavigation.reason).not.toMatch(/word counts|keeps no link/);
     // the page prints this reason: no field name or enum value in it
     expect(jsOnlyNavigation.reason).not.toMatch(/[a-z]+_[a-z_]+/);
   });

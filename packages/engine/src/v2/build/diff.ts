@@ -19,6 +19,7 @@ export const DETECTORS_RUN: readonly FixType[] = [
   'robots_txt_blocks_crawler',
   'edge_rule_blocks_crawler',
   'client_rendered_template',
+  'js_only_navigation',
   ...Object.values(CONTENT_CHECKS).flatMap((c) => (c.fix ? [c.fix] : [])),
 ];
 

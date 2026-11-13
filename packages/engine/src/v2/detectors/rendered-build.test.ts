@@ -49,10 +49,11 @@ function nextCheck(first: BuiltCheck, input: BuildInput): BuiltCheck {
 }
 
 describe('the detector runs on every built check', () => {
-  it('is listed among the detectors the diff reads, and js_only_navigation is not', () => {
+  it('is listed among the detectors the diff reads, with js_only_navigation (CC-32 D6)', () => {
     expect(DETECTORS_RUN).toContain('client_rendered_template');
-    expect(DETECTORS_RUN).not.toContain('js_only_navigation');
+    expect(DETECTORS_RUN).toContain('js_only_navigation');
     expect(buildCheck(recordedBuild()).diff_inputs.detectors).toContain('client_rendered_template');
+    expect(buildCheck(recordedBuild()).diff_inputs.detectors).toContain('js_only_navigation');
   });
 });
 

@@ -35,6 +35,9 @@ import {
   RESERVE_PER_RENDER_MS,
 } from './run.js';
 import { EMPTY_ROOT_MAX_RENDERS, EMPTY_ROOT_PER_TEMPLATE } from './empty-root.js';
+import { MAX_RENDER_LINK_CHARS, MAX_RENDER_LINKS } from './links.js';
+import { MAX_URL_LENGTH } from '../batch-bounds.js';
+import { MAX_JS_ONLY_TARGETS } from '../detectors/js-only-navigation.js';
 import { FREE_MAX_RENDERS, PAGES_PER_FIX_TEMPLATE } from './sample.js';
 import { EMPTY_SHELL_BELOW, EMPTY_SHELL_LEAVES_ABOVE, READABLE_FROM } from './state.js';
 import { BOUNDARY_ELEMENTS } from './words.js';
@@ -253,6 +256,30 @@ pages alone reads \`not_rendered\`. An empty-root page's \`without_js\` is writt
 \`PageResult\`. The \`client_rendered_template\` detector reads it only for a template with no graded
 page: a template with a graded page is judged on its graded renders alone, as before. It reaches
 neither the site estimate nor Readable, which read graded pages only.`,
+
+    `## The links of a rendered page
+
+A measured page's outcome also carries \`links\`: the same-site link targets of its static side and of
+its rendered side (\`links.ts\`, CC-32 D6). One extractor reads both sides, the crawl's own (extract.ts
+\`extractPage\`, share actions and media files left out), so each target is in \`canonicalizeUrl\`'s
+spelling. A target is kept when it is on the page's own site by the crawl planner's rule
+(\`inSiteScope\`: the page's host or its \`www.\` twin, on the default port), is not the page itself, and
+is at most ${MAX_URL_LENGTH} characters. Each side keeps, once each, the longest prefix of its sorted
+targets that holds at most ${MAX_RENDER_LINKS} targets (\`MAX_RENDER_LINKS\`) and ${MAX_RENDER_LINK_CHARS / 1024} KiB of URL
+characters (\`MAX_RENDER_LINK_CHARS\`). \`truncated\` is set when either side left a target out, or had a
+target past the URL bound.
+
+So a rendered page adds at most ${(2 * MAX_RENDER_LINK_CHARS) / 1024} KiB of URL characters to the stored outcome, its two sides
+together; a canonical URL is ASCII, so that is also its bytes, before JSON quoting. On the Free cap, ${FREE_MAX_RENDERS} graded
+and ${EMPTY_ROOT_MAX_RENDERS} empty-root renders, a check adds at most ${((FREE_MAX_RENDERS + EMPTY_ROOT_MAX_RENDERS) * 2 * MAX_RENDER_LINK_CHARS) / 1024} KiB. The graded cap is the caller's
+(\`maxRenders\`), so a larger cap raises the second figure by ${(2 * MAX_RENDER_LINK_CHARS) / 1024} KiB a render.
+
+The lists stay on the render outcome, which the pipeline keeps as evidence; they are never written to
+\`PageResult.without_js\`, whose stored shape holds the four keys above. A page whose links cannot be read
+keeps its measurement and carries no \`links\`, and so does every page of an outcome stored before this.
+The \`js_only_navigation\` detector (detectors/js-only-navigation.ts) reads them: a page's JS-only targets
+are its rendered side's less its static side's, and a page with a truncated side, or with no \`links\`, is
+not evidence. A record keeps at most ${MAX_JS_ONLY_TARGETS} of a page's targets.`,
 
     `## The site estimate
 

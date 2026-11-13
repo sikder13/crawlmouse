@@ -66,7 +66,7 @@ export const COVERAGE_DEPENDENCE: Readonly<Record<FixType, CoverageDependence>> 
   missing_schema_description: 'page_cap',
   no_question_headings: 'page_cap',
   missing_author_date: 'page_cap',
-  js_only_navigation: 'page_cap',
+  js_only_navigation: 'sample',
   redirect_chain: 'page_cap',
   duplicate_pagination: 'page_cap',
   canonical_mismatch: 'page_cap',

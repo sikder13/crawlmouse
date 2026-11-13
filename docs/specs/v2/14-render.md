@@ -203,6 +203,30 @@ pages alone reads `not_rendered`. An empty-root page's `without_js` is written t
 page: a template with a graded page is judged on its graded renders alone, as before. It reaches
 neither the site estimate nor Readable, which read graded pages only.
 
+## The links of a rendered page
+
+A measured page's outcome also carries `links`: the same-site link targets of its static side and of
+its rendered side (`links.ts`, CC-32 D6). One extractor reads both sides, the crawl's own (extract.ts
+`extractPage`, share actions and media files left out), so each target is in `canonicalizeUrl`'s
+spelling. A target is kept when it is on the page's own site by the crawl planner's rule
+(`inSiteScope`: the page's host or its `www.` twin, on the default port), is not the page itself, and
+is at most 2048 characters. Each side keeps, once each, the longest prefix of its sorted
+targets that holds at most 200 targets (`MAX_RENDER_LINKS`) and 32 KiB of URL
+characters (`MAX_RENDER_LINK_CHARS`). `truncated` is set when either side left a target out, or had a
+target past the URL bound.
+
+So a rendered page adds at most 64 KiB of URL characters to the stored outcome, its two sides
+together; a canonical URL is ASCII, so that is also its bytes, before JSON quoting. On the Free cap, 25 graded
+and 5 empty-root renders, a check adds at most 1920 KiB. The graded cap is the caller's
+(`maxRenders`), so a larger cap raises the second figure by 64 KiB a render.
+
+The lists stay on the render outcome, which the pipeline keeps as evidence; they are never written to
+`PageResult.without_js`, whose stored shape holds the four keys above. A page whose links cannot be read
+keeps its measurement and carries no `links`, and so does every page of an outcome stored before this.
+The `js_only_navigation` detector (detectors/js-only-navigation.ts) reads them: a page's JS-only targets
+are its rendered side's less its static side's, and a page with a truncated side, or with no `links`, is
+not evidence. A record keeps at most 20 of a page's targets.
+
 ## The site estimate
 
 ```text
