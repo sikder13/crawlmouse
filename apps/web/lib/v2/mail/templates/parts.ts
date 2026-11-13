@@ -13,10 +13,20 @@ export const hostText = (host: string): string => oneLine(host, HOST_MAX);
 /** Longest account or agency name a message shows. */
 export const ACCOUNT_NAME_MAX = 80;
 
-/** An account's name, which its owner typed, as one bounded line; null when it has none. */
+/**
+ * What a mail client turns into a link when it meets it in plain text: a scheme, `www.`, an address,
+ * or a dotted name such as `example.com` (a letter, digit or hyphen, a dot, two letters or more).
+ */
+const LINKABLE = /:\/\/|www\.|@|[\p{L}\p{N}-]\.\p{L}{2,}/iu;
+
+/**
+ * An account's name, which its owner typed, as one bounded line; null when it has none, and null
+ * when it holds text a mail client would link: the name goes to an address its owner chose, so a
+ * message shows it only as a name. A template then writes what it writes for an account with no name.
+ */
 export function accountNameText(name: string | null): string | null {
   const line = oneLine(name ?? '', ACCOUNT_NAME_MAX);
-  return line === '' ? null : line;
+  return line === '' || LINKABLE.test(line) ? null : line;
 }
 
 /** One paragraph of plain text. */
