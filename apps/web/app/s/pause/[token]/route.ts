@@ -5,9 +5,9 @@ import { checkRateLimit } from '@/lib/rate-limit';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { landLink } from '@/lib/v2/account/link-cookie';
 import { ipHash } from '@/lib/v2/account/rate-keys';
-import { notFound, readBody, refuse } from '@/lib/v2/account/route';
+import { notFound, refuse } from '@/lib/v2/account/route';
 import { isToken } from '@/lib/v2/account/tokens';
-import { oneClickPause } from '@/lib/v2/agency/schedules';
+import { oneClickFields, oneClickPause } from '@/lib/v2/agency/schedules';
 import { supabaseSchedulesStore } from '@/lib/v2/agency/schedules-store';
 
 export const runtime = 'nodejs';
@@ -30,7 +30,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ token: s
 
 /**
  * The same address as a mail client posts to it for a one-click unsubscribe (RFC 8058): the body is
- * `List-Unsubscribe=One-Click`, there is no cookie, and the token in the path is the credential.
+ * `List-Unsubscribe=One-Click`, form-encoded or as multipart form data, there is no cookie, and the
+ * token in the path is the credential.
  * It pauses the schedule (`oneClickPause`). A token that is not token-shaped is a 404 before the
  * rate limit and any database call.
  */
@@ -47,6 +48,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   return oneClickPause(
     { store: supabaseSchedulesStore(supabaseAdmin()), now: () => new Date() },
     token,
-    await readBody(req),
+    await oneClickFields(req),
   );
 }

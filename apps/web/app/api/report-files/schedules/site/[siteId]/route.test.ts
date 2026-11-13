@@ -807,6 +807,42 @@ describe('the recipient’s pause link, and POST …/resume', () => {
     expect(await paused(w)).not.toBeNull();
   });
 
+  it('the one-click POST pauses with a multipart body too, which RFC 8058 allows and some mail clients send', async () => {
+    const w = await confirmedWorld();
+    const t = await token('issue_report_pause', w.siteId);
+    const form = new FormData();
+    form.set('List-Unsubscribe', 'One-Click');
+    const res = await ONE_CLICK(
+      new Request(`${ORIGIN}/s/pause/${t}`, {
+        method: 'POST',
+        headers: { 'x-forwarded-for': '198.51.100.7' },
+        body: form,
+      }),
+      { params: Promise.resolve({ token: t }) },
+    );
+    expect(res.status).toBe(200);
+    expect(await paused(w)).not.toBeNull();
+    // A multipart body that says something else, or says it twice, pauses nothing.
+    const other = await confirmedWorld();
+    const t2 = await token('issue_report_pause', other.siteId);
+    for (const fields of [
+      [['List-Unsubscribe', 'Yes']],
+      [
+        ['List-Unsubscribe', 'One-Click'],
+        ['x', '1'],
+      ],
+    ]) {
+      const bad = new FormData();
+      for (const [name, value] of fields) bad.append(name!, value!);
+      const refused = await ONE_CLICK(
+        new Request(`${ORIGIN}/s/pause/${t2}`, { method: 'POST', body: bad }),
+        { params: Promise.resolve({ token: t2 }) },
+      );
+      expect(refused.status, JSON.stringify(fields)).toBe(400);
+    }
+    expect(await paused(other)).toBeNull();
+  });
+
   it('the one-click POST refuses any other body, an unknown token and a malformed one, and pauses nothing', async () => {
     const w = await confirmedWorld();
     const t = await token('issue_report_pause', w.siteId);

@@ -19,6 +19,7 @@ import {
   type NoticeCode,
   type RequestBody,
 } from '../account/route';
+import { readBounded } from '../mail/unsubscribe';
 import type { ConfirmationState, SchedulesStore } from './schedules-store';
 
 /** The page the schedule forms are on. */
@@ -360,6 +361,29 @@ export async function useRecipientLink(
 }
 
 /**
+ * The fields of a one-click POST, which a mail client sends form-encoded or as multipart form data
+ * (RFC 8058 allows both), read up to the mailer's bound. Null for another media type, a body past
+ * the bound, and one that does not parse or holds a file.
+ */
+export async function oneClickFields(req: Request): Promise<Record<string, string> | null> {
+  const type = req.headers.get('content-type') ?? '';
+  if (!/^(?:application\/x-www-form-urlencoded|multipart\/form-data)\b/i.test(type)) return null;
+  const text = await readBounded(req);
+  if (text === null) return null;
+  try {
+    const form = await new Response(text, { headers: { 'content-type': type } }).formData();
+    const fields: Record<string, string> = {};
+    for (const [name, value] of form.entries()) {
+      if (typeof value !== 'string' || name in fields) return null;
+      fields[name] = value;
+    }
+    return fields;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * POST /s/pause/[token]: a mail client's one-click unsubscribe (RFC 8058). It posts
  * `List-Unsubscribe=One-Click` to the address in the mail's List-Unsubscribe header, with no cookie,
  * so for this one request the token is the path's. Any other body is 400, and a GET of that address
@@ -369,13 +393,13 @@ export async function useRecipientLink(
 export async function oneClickPause(
   deps: { store: SchedulesStore; now(): Date },
   token: string,
-  body: RequestBody | null,
+  fields: Readonly<Record<string, string>> | null,
 ): Promise<Response> {
   const headers = { 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' };
   if (
-    body?.kind !== 'form' ||
-    Object.keys(body.fields).length !== 1 ||
-    body.fields['List-Unsubscribe'] !== 'One-Click'
+    fields === null ||
+    Object.keys(fields).length !== 1 ||
+    fields['List-Unsubscribe'] !== 'One-Click'
   ) {
     return refuse(400, 'invalid', {}, headers);
   }
