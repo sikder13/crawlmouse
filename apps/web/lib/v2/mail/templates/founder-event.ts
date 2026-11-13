@@ -30,6 +30,12 @@ export type FounderEventKind = (typeof FOUNDER_EVENT_KINDS)[number];
 export const STRIPE_INVOICE_STATUSES = ['draft', 'open', 'paid', 'uncollectible', 'void'] as const;
 export type StripeInvoiceStatus = (typeof STRIPE_INVOICE_STATUSES)[number];
 
+/**
+ * What a notice records of Stripe's invoice (founder_notices.facts.invoice, review N4): its status,
+ * `not_given` when Stripe gave none, `not_read` when Stripe was not read or held no invoice.
+ */
+export type InvoiceFact = StripeInvoiceStatus | 'not_given' | 'not_read';
+
 export interface FounderAmount {
   /**
    * Stripe's figure, in the currency's minor units (cents for USD): the invoice's `amount_paid` when
@@ -94,6 +100,18 @@ export function eventWords(kind: FounderEventKind, payment?: FounderEventInput['
   }
 }
 
+/** The invoice fact of a notice's amount (`FounderEventInput.amount`). */
+export function invoiceFact(amount: FounderAmount | null | undefined): InvoiceFact {
+  if (!amount) return 'not_read';
+  return amount.status ?? 'not_given';
+}
+
+/** What a plan start whose invoice is not paid says of it. */
+const unpaidWords = (fact: InvoiceFact | null | undefined, first: boolean): string =>
+  fact === 'not_read' || fact === null || fact === undefined
+    ? 'invoice not read from Stripe'
+    : `${first ? 'first invoice' : 'invoice'} not yet paid`;
+
 /**
  * Stripe's minor units in the currency's own format, or null for a figure that is not a whole number
  * or a code that is not three lower-case letters (Stripe's spelling) or that `Intl` refuses.
@@ -130,10 +148,21 @@ function moneyLine(amount: FounderAmount | null | undefined): string {
 const accountUrl = (id: string | null): string | null =>
   id !== null && UUID.test(id) ? internalAccountUrl(id) : null;
 
+/**
+ * A payment whose invoice Stripe shows `paid` is headed as a payment (first, returning or neither); any
+ * other payment notice is headed as a plan start and says whether its invoice is unpaid or unread
+ * (review N4).
+ */
 export const founderEvent: Template<FounderEventInput> = (input) => {
   const words = eventWords(input.kind, input.payment);
   const plan = input.plan === null ? null : PLAN_WORDS[input.plan];
-  const headline = plan === null ? words : `${words}: ${plan}`;
+  const fact = input.kind === 'payment' ? invoiceFact(input.amount) : null;
+  const headline =
+    fact !== null && fact !== 'paid'
+      ? `Plan started${plan === null ? '' : `: ${plan}`} — ${unpaidWords(fact, input.payment === 'first')}`
+      : plan === null
+        ? words
+        : `${words}: ${plan}`;
   const money =
     input.kind === 'payment' || input.kind === 'payment_failed' ? moneyLine(input.amount) : null;
   const lines = [
@@ -172,7 +201,15 @@ export interface FounderOverflowRow {
   kind: FounderEventKind;
   accountId: string | null;
   internal: boolean;
+  /** For a payment, the invoice fact its notice recorded; null or absent when none was. */
+  invoice?: InvoiceFact | null;
 }
+
+/** A held notice in words: a payment whose invoice was not recorded `paid` is a plan start. */
+const overflowWords = (r: FounderOverflowRow): string =>
+  r.kind === 'payment' && r.invoice !== 'paid'
+    ? `Plan started, ${unpaidWords(r.invoice, false)}`
+    : eventWords(r.kind);
 
 export interface FounderOverflowInput {
   /** How many notices were held. */
@@ -187,7 +224,7 @@ const LEAD =
 export const founderOverflow: Template<FounderOverflowInput> = ({ total, rows }) => {
   const allTest = rows.length > 0 && rows.length === total && rows.every((r) => r.internal);
   const headline = `${count(total)} more ${plural(total, 'notice', 'notices')} in the last hour`;
-  const words = (r: FounderOverflowRow) => `${r.internal ? TEST_PREFIX : ''}${eventWords(r.kind)}`;
+  const words = (r: FounderOverflowRow) => `${r.internal ? TEST_PREFIX : ''}${overflowWords(r)}`;
   const withheld = total - rows.length;
   const tail =
     withheld > 0

@@ -143,29 +143,30 @@ describe('agencyAccounts and cancellations', () => {
 describe('the RPCs parse', () => {
   it('claim, take and the digest counts answer in the shapes the store reads', async () => {
     const now = new Date('2032-01-01T10:00:00Z');
-    const claim = (key: string) =>
+    const claim = (key: string, invoice: string) =>
       store.claim({
         key,
         kind: 'payment',
         accountId: null,
         internal: false,
         occurredAt: now.toISOString(),
-        facts: { plan: 'pro', payment: 'first' },
+        facts: { plan: 'pro', payment: 'first', invoice },
         now,
         limit: 1,
         configured: true,
       });
-    expect(await claim(`entitlement:${randomUUID()}`)).toBe('send');
-    expect(await claim(`entitlement:${randomUUID()}`)).toBe('held');
+    expect(await claim(`entitlement:${randomUUID()}`, 'paid')).toBe('send');
+    expect(await claim(`entitlement:${randomUUID()}`, 'open')).toBe('held');
     const t = await store.takeOverflow(`overflow:${randomUUID()}`, 10);
     expect(t.total).toBeGreaterThanOrEqual(1);
     expect(t.rows[t.rows.length - 1]).toEqual({
       kind: 'payment',
       accountId: null,
       internal: false,
+      invoice: 'open',
     });
     const counts = await store.digestCounts('2032-01-01T00:00:00.000Z', '2032-01-02T00:00:00.000Z');
-    expect(counts.payments_first_or_returning).toBe(2);
+    expect([counts.payments_paid, counts.plans_started_unpaid]).toEqual([1, 1]);
   });
 });
 

@@ -15,6 +15,7 @@ import {
   type FounderDeps,
   type PaymentRecord,
 } from './founder';
+import type { InvoiceFact } from '../mail/templates/founder-event';
 import type { FounderStore, NoticeAccount, NoticeClaim, NoticeState } from './founder-store';
 
 /**
@@ -68,6 +69,7 @@ function memoryNotices(accounts: Record<string, NoticeAccount> = {}) {
             kind: r.claim.kind,
             accountId: r.claim.accountId,
             internal: r.claim.internal,
+            invoice: (r.claim.facts.invoice ?? null) as InvoiceFact | null,
           })),
       };
     },
@@ -261,6 +263,58 @@ describe('entitlementNotice', () => {
     expect(text).not.toContain('$0.00');
   });
 
+  it('heads and records a conversion whose invoice is not paid as a plan start, not a payment (review N4)', async () => {
+    const at = async (payment: FounderDeps['payment'], from: AccountState = 'pro_trial') => {
+      const s = setup({ payment });
+      expect(await entitlementNotice(s.d, change(from, 'pro'))).toBe('sent');
+      return { subject: s.transport.sent[0]!.subject, facts: [...s.rows.values()][0]!.claim.facts };
+    };
+    const down = async (): Promise<PaymentRecord> => {
+      throw new Error('stripe down');
+    };
+    expect(
+      await Promise.all([
+        at(async () => record()),
+        at(async () => record({ invoice: unpaid(1900) })),
+        at(async () => record({ invoice: { ...unpaid(1900), status: 'draft' }, earlier: 'some' })),
+        at(async () => record({ invoice: { ...unpaid(1900), status: null } })),
+        at(async () => record({ invoice: null })),
+        at(down),
+      ]),
+    ).toEqual([
+      { subject: 'First payment: Pro', facts: { plan: 'pro', payment: 'first', invoice: 'paid' } },
+      {
+        subject: 'Plan started: Pro — first invoice not yet paid',
+        facts: { plan: 'pro', payment: 'first', invoice: 'open' },
+      },
+      {
+        subject: 'Plan started: Pro — invoice not yet paid',
+        facts: { plan: 'pro', payment: 'returning', invoice: 'draft' },
+      },
+      {
+        subject: 'Plan started: Pro — first invoice not yet paid',
+        facts: { plan: 'pro', payment: 'first', invoice: 'not_given' },
+      },
+      {
+        subject: 'Plan started: Pro — invoice not read from Stripe',
+        facts: { plan: 'pro', payment: 'first', invoice: 'not_read' },
+      },
+      {
+        subject: 'Plan started: Pro — invoice not read from Stripe',
+        facts: { plan: 'pro', payment: 'unknown', invoice: 'not_read' },
+      },
+    ]);
+    // A failed payment records its invoice's status too; a trial start reads no invoice.
+    const failed = setup({ payment: async () => record({ invoice: unpaid(1900) }) });
+    await entitlementNotice(failed.d, change('pro', 'past_due'));
+    const trial = setup();
+    await entitlementNotice(trial.d, change('free', 'pro_trial'));
+    expect([failed, trial].map((s) => [...s.rows.values()][0]!.claim.facts)).toEqual([
+      { plan: 'pro', invoice: 'open' },
+      { plan: 'pro' },
+    ]);
+  });
+
   it('calls a payment first or returning as Stripe’s paid invoices say, not the account’s history (review C2)', async () => {
     const first = setup({ payment: async () => record({ earlier: 'none' }) });
     await entitlementNotice(first.d, change('free', 'pro'));
@@ -280,7 +334,7 @@ describe('entitlementNotice', () => {
       ['First payment: Pro'],
       ['Payment (returning): Pro'],
       ['Payment: Pro'],
-      ['Payment: Agency'],
+      ['Plan started: Agency — invoice not read from Stripe'],
     ]);
   });
 

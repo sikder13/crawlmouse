@@ -10,7 +10,8 @@ describe('founderDigest', () => {
       'signups_confirmed',
       'trials_started',
       'trials_ended',
-      'payments_first_or_returning',
+      'payments_paid',
+      'plans_started_unpaid',
       'payments_failed',
       'cancellations',
       'checks_run_all',
@@ -21,7 +22,13 @@ describe('founderDigest', () => {
     ]);
     const labels = Object.fromEntries(DIGEST_FIGURES);
     expect(labels.checks_run_all).toBe('Checks run (all, incl. anonymous)');
-    expect(labels.payments_first_or_returning).toBe('First and returning payments');
+    // review N4: a payment is counted when Stripe's invoice was paid; the rest of the plan starts apart.
+    expect(labels.payments_paid).toBe(
+      'Payments, first and returning, with the Stripe invoice paid (a failed charge settled later is counted only when it was the first payment)',
+    );
+    expect(labels.plans_started_unpaid).toBe(
+      'Plans started with the invoice not yet paid or not read from Stripe',
+    );
   });
 
   it('daily: the day, each figure with its count, and what is left out', () => {

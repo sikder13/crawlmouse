@@ -405,6 +405,7 @@ describe('founder_digest_counts', () => {
       await claim({
         key: `${kind}:${randomUUID()}`,
         kind,
+        facts: kind === 'payment' ? { invoice: 'paid' } : {},
         account: customer,
         now: IN,
         limit: 1000,
@@ -412,6 +413,7 @@ describe('founder_digest_counts', () => {
       await claim({
         key: `${kind}:${randomUUID()}`,
         kind,
+        facts: kind === 'payment' ? { invoice: 'paid' } : {},
         account: staff,
         internal: true,
         now: IN,
@@ -420,6 +422,7 @@ describe('founder_digest_counts', () => {
       await claim({
         key: `${kind}:${randomUUID()}`,
         kind,
+        facts: kind === 'payment' ? { invoice: 'paid' } : {},
         account: customer,
         now: BEFORE,
         limit: 1000,
@@ -427,19 +430,24 @@ describe('founder_digest_counts', () => {
       await claim({
         key: `${kind}:${randomUUID()}`,
         kind,
+        facts: kind === 'payment' ? { invoice: 'paid' } : {},
         account: customer,
         now: AT_END,
         limit: 1000,
       });
     }
-    // A second payment and an agency account created, which no figure counts.
-    await claim({
-      key: `payment:${randomUUID()}`,
-      kind: 'payment',
-      account: customer,
-      now: IN,
-      limit: 1000,
-    });
+    // Three more payment notices whose invoice was not recorded paid (review N4): Stripe's status
+    // `open`, Stripe not read, and no invoice fact at all. They are plan starts, not payments. And an
+    // agency account created, which no figure counts.
+    for (const facts of [{ invoice: 'open' }, { invoice: 'not_read' }, {}])
+      await claim({
+        key: `payment:${randomUUID()}`,
+        kind: 'payment',
+        facts,
+        account: customer,
+        now: IN,
+        limit: 1000,
+      });
     await claim({ key: `agency:${randomUUID()}`, kind: 'agency_created', now: IN, limit: 1000 });
 
     // Trials: a customer's Pro trial and another customer's Agency trial end in the window; a
@@ -490,7 +498,8 @@ describe('founder_digest_counts', () => {
       signups_confirmed: 1,
       trials_started: 1,
       trials_ended: 2,
-      payments_first_or_returning: 2,
+      payments_paid: 1,
+      plans_started_unpaid: 3,
       payments_failed: 1,
       cancellations: 1,
       checks_run_all: 4,

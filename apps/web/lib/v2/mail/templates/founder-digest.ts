@@ -14,7 +14,11 @@ export const DIGEST_FIGURES = [
   ['signups_confirmed', 'Sign-ups (counted when the address is confirmed)'],
   ['trials_started', 'Trials started'],
   ['trials_ended', 'Trials ended (an account left a trial state)'],
-  ['payments_first_or_returning', 'First and returning payments'],
+  [
+    'payments_paid',
+    'Payments, first and returning, with the Stripe invoice paid (a failed charge settled later is counted only when it was the first payment)',
+  ],
+  ['plans_started_unpaid', 'Plans started with the invoice not yet paid or not read from Stripe'],
   ['payments_failed', 'Payments failed'],
   ['cancellations', 'Cancellations'],
   ['checks_run_all', 'Checks run (all, incl. anonymous)'],

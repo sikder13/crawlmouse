@@ -47,7 +47,15 @@ status-page vendor, switching any flag.
   `founder.stripe_unread` line an attempt. Any other notice is sent with Stripe unread
   (`apps/web/lib/v2/ops/founder.test.ts`, "review N3"). The amount is the invoice's `amount_paid` when its status is `paid`, and otherwise its
   `amount_due`, said to be unpaid, with Stripe's status (`apps/web/lib/v2/ops/founder.test.ts`,
-  "review C2" and "review C3").
+  "review C2" and "review C3"). A payment notice is headed as a payment only when Stripe shows its
+  invoice `paid`; otherwise it is a plan start, "Plan started: Pro — first invoice not yet paid" (or
+  "invoice not yet paid", or "invoice not read from Stripe"), and the "N more" notice lists it the
+  same way. Its stored facts record the invoice as `invoice`: Stripe's status, `not_given` or
+  `not_read` ("review N4"). A card trial's end is commonly announced this way: at a trial's end
+  Stripe creates the invoice with a one-hour draft period before charging it
+  (docs.stripe.com/billing/invoices/subscription, "Update the first invoice of a subscription"), and
+  the charge that follows has no notice, since billing records `invoice.paid` without an entitlement change
+  (`apps/web/lib/billing/state-machine.ts`, `'invoice.paid': 'recorded_only'`).
 - **Sign-ups** are announced once Supabase Auth shows the address confirmed. The sweep reads users
   created in the 7 days before it runs (`apps/web/lib/v2/ops/founder.test.ts` asserts the window), so
   a user still unconfirmed 7 days after signing up is not announced. A sign-up whose notice was
@@ -57,8 +65,11 @@ status-page vendor, switching any flag.
   and "review C8").
 - **The digest** is mailed at the first hourly tick at or after 08:00 New York time, keyed
   `founder_digest:daily:<date>` and, on Mondays, `founder_digest:weekly:<Monday>`. Its figures are
-  `founder_digest_counts`'s, each labelled as it is computed; renewals are not recorded, so payments
-  read "first and returning payments". The two bounce figures count addresses and include internal
+  `founder_digest_counts`'s, each labelled as it is computed. Payments count payment notices whose
+  invoice was recorded `paid`, first and returning; renewals have no notice and are not counted, and a
+  recovery from `past_due` is counted only when it is a first payment, the one case it has a notice.
+  The other payment notices are counted as plans started with the invoice not yet paid or not read
+  (`apps/web/__tests__/v2-033-founder.test.ts`, "counts each figure"). The two bounce figures count addresses and include internal
   accounts' mail; send failures leave out internal accounts and the founder notices' own mail
   (questions Q14).
 - **The canary's look** (`signin_delivery_seen`, questions Q17) counts a delivery to its address of a

@@ -27,6 +27,7 @@ import { founderDigest } from '../mail/templates/founder-digest';
 import {
   founderEvent,
   founderOverflow,
+  invoiceFact,
   STRIPE_INVOICE_STATUSES,
   type FounderAmount,
   type FounderEventInput,
@@ -135,7 +136,11 @@ async function notify(d: FounderDeps, to: string | null, n: Notice): Promise<Not
     accountId: n.accountId,
     internal,
     occurredAt: n.occurredAt,
-    facts: { plan: n.plan, ...(n.payment === undefined ? {} : { payment: n.payment }) },
+    facts: {
+      plan: n.plan,
+      ...(n.payment === undefined ? {} : { payment: n.payment }),
+      ...(n.amount === undefined ? {} : { invoice: invoiceFact(n.amount) }),
+    },
     now: d.now(),
     limit: FOUNDER_LIMIT,
     configured: to !== null,
