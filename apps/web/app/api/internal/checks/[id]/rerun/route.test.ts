@@ -204,10 +204,10 @@ describe("an operator's re-run", () => {
     as(op);
     vi.stubEnv('CRAWL_PAUSED', '1');
     expect((await rerun(failed)).headers.get('location')).toBe(
-      `/internal/accounts/${owner.accountId}?done=paused`,
+      `/internal/accounts/${owner.accountId}?done=crawl_paused`,
     );
     expect((await recordLines(h.db)).at(-1)).toEqual(
-      refusedLine(op, owner.accountId, failed, 'paused'),
+      refusedLine(op, owner.accountId, failed, 'crawl_paused'),
     );
     vi.stubEnv('CRAWL_PAUSED', '');
     vi.stubEnv('V2_PIPELINE', '');

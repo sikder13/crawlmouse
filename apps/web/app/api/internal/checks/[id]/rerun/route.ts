@@ -17,7 +17,7 @@ export const dynamic = 'force-dynamic';
 
 /** Why the route refuses a re-run before it asks the database, or null. */
 function refusalOf(target: RerunTarget): RerunRefusal | null {
-  if (isCrawlPaused()) return 'paused';
+  if (isCrawlPaused()) return 'crawl_paused';
   if (!pipelineEnabled()) return 'unavailable';
   if (target.status !== 'failed') return 'not_failed';
   if (target.removedAt !== null) return 'site_removed';

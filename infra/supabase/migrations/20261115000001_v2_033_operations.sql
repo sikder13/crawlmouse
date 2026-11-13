@@ -209,8 +209,8 @@ grant select, insert on table public.operator_actions to service_role;
 -- otherwise; a re-send's is set afterwards by operator_finish. p_operator must be in operators
 -- (42501 otherwise). A queued or capped re-run is recorded by operator_request_check, in the call
 -- that queues it; a re-run the console's route refuses before that call is recorded here, as a
--- rerun_check row with a reason and one of the route's refusals as its outcome (paused, unavailable,
--- not_failed, site_removed, site_paused). Any other rerun_check row is refused (22023). Security
+-- rerun_check row with a reason and one of the route's refusals as its outcome (crawl_paused,
+-- unavailable, not_failed, site_removed, site_paused). Any other rerun_check row is refused (22023). Security
 -- invoker: service_role holds the insert.
 
 create or replace function public.operator_log(
@@ -233,7 +233,7 @@ begin
   if p_action = 'rerun_check'
      and (p_reason is null
           or p_outcome is null
-          or p_outcome not in ('paused', 'unavailable', 'not_failed', 'site_removed', 'site_paused'))
+          or p_outcome not in ('crawl_paused', 'unavailable', 'not_failed', 'site_removed', 'site_paused'))
   then
     raise exception 'operator_log: a re-run is recorded by operator_request_check'
       using errcode = '22023';
@@ -255,7 +255,9 @@ grant execute on function public.operator_log(uuid, text, uuid, text, text, text
 
 -- ─── operator_request_check ──────────────────────────────────────────────────────────────────────
 -- An operator's re-run of a failed check: in one call, request_capped_check(p_row, p_cap, p_global)
--- (20261112000001) and the rerun_check row, whose outcome is that answer's outcome, whose target is
+-- (20261112000001) and the rerun_check row, whose outcome is that answer's outcome in the route's words
+-- (request_capped_check's paused and removed are recorded as site_paused and site_removed, so a site's
+-- state is not read as a crawl pause), whose target is
 -- the failed check p_target and whose account is the site's. Refused before either, with nothing
 -- written: a p_operator not in operators (42501), and a p_target that is not a failed check of
 -- p_row's site (22023). A call that request_capped_check raises in writes neither. Answers
@@ -296,7 +298,12 @@ begin
   v_answer := public.request_capped_check(p_row, p_cap, p_global);
   select s.account_id into v_account from public.sites s where s.id = v_site;
   insert into public.operator_actions (operator_id, action, account_id, target, reason, outcome)
-  values (p_operator, 'rerun_check', v_account, p_target::text, p_reason, v_answer ->> 'outcome');
+  values (p_operator, 'rerun_check', v_account, p_target::text, p_reason,
+          case v_answer ->> 'outcome'
+            when 'paused' then 'site_paused'
+            when 'removed' then 'site_removed'
+            else v_answer ->> 'outcome'
+          end);
   return v_answer;
 end;
 $$;

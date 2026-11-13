@@ -159,7 +159,9 @@ export interface RerunTarget {
 export type ResendOutcome = 'sent' | 'refused' | 'rate_limited' | 'failed';
 
 /** A re-run the console's route refuses before `operator_request_check` is called. */
-export type RerunRefusal = 'paused' | 'unavailable' | 'not_failed' | 'site_removed' | 'site_paused';
+export type RerunRefusal =
+  | 'crawl_paused'
+  | 'unavailable' | 'not_failed' | 'site_removed' | 'site_paused';
 
 export interface ConsoleStore {
   resolve(q: SearchQuery): Promise<{ kind: ResolvedKind; accountIds: string[] }>;

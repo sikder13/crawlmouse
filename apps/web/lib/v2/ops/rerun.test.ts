@@ -121,7 +121,7 @@ describe('operatorRerun', () => {
     expect((await actions()).slice(before).map((a) => a.outcome)).toEqual(['capped']);
   });
 
-  it('a paused site is answered paused, and recorded', async () => {
+  it('a paused site is answered paused, and recorded as site_paused', async () => {
     const t = await failedSite('user');
     const send = vi.fn(async () => undefined);
     const r = await operatorRerun(adminOver(db), operatorId, {
@@ -133,7 +133,7 @@ describe('operatorRerun', () => {
     });
     expect(r).toEqual({ queued: false, reason: 'paused' });
     expect(send).not.toHaveBeenCalled();
-    expect((await actions()).at(-1)?.outcome).toBe('paused');
+    expect((await actions()).at(-1)?.outcome).toBe('site_paused');
   });
 
   it('a target that is not a failed check of the site throws, and records nothing', async () => {

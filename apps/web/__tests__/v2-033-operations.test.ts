@@ -487,7 +487,7 @@ describe('operator_log', () => {
     expect(await actionsOf(someone)).toEqual([]);
   });
 
-  it.each(['paused', 'unavailable', 'not_failed', 'site_removed', 'site_paused'])(
+  it.each(['crawl_paused', 'unavailable', 'not_failed', 'site_removed', 'site_paused'])(
     'writes a rerun_check row for a re-run the route refused as %s',
     async (outcome) => {
       const op = await operator();
@@ -510,7 +510,8 @@ describe('operator_log', () => {
     ['no outcome', 'stuck', null],
     ['a queued outcome', 'stuck', 'created'],
     ['an outcome request_capped_check gives', 'stuck', 'capped'],
-    ['no reason', null, 'paused'],
+    ['no reason', null, 'crawl_paused'],
+    ['request_capped_check’s own word for a paused site', 'stuck', 'paused'],
   ])(
     'refuses a rerun_check row with %s, which only operator_request_check records',
     async (_name, reason, outcome) => {
@@ -582,13 +583,13 @@ describe('operator_request_check', () => {
     expect(actions[0]).toMatchObject({ action: 'rerun_check', outcome: 'capped' });
   });
 
-  it('a paused site writes one row with the outcome paused', async () => {
+  it('a paused site writes one row with the outcome site_paused, not a crawl pause', async () => {
     const op = await operator();
     const { accountId } = await personalAccount(db, await person());
     const s = await site(accountId, { paused_reason: 'user' });
     const failed = await failedCheck(s);
     expect((await request(op, failed, row(s))).outcome).toBe('paused');
-    expect((await actionsOf(op)).map((a) => a.outcome)).toEqual(['paused']);
+    expect((await actionsOf(op)).map((a) => a.outcome)).toEqual(['site_paused']);
   });
 
   it('refuses a target that did not fail, or is another site’s, and writes nothing', async () => {
