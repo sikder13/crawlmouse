@@ -1,6 +1,7 @@
 -- Revert of infra/supabase/migrations/20261114000002_v2_031_agency.sql, section by section in reverse.
 
 -- ─── C ────────────────────────────────────────────────────────────────────────────────────────────
+drop function if exists public.report_confirm_mail_counts(uuid, text, timestamptz);
 -- The three kinds leave the CHECK on email_sends.kind and email_kind_suppressible, each rebuilt from
 -- what it holds now without them, so a kind another migration added stays with its answer. A ledger
 -- row of one of the three is deleted first, since the CHECK without its kind would refuse it; with it

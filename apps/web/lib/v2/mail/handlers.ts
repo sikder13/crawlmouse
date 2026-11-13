@@ -31,6 +31,7 @@ import type {
 import { packetPrompt } from '../view/segment/fixes';
 import type { AgencyCapture } from '../agency/events';
 import { checkRef } from '../pipeline/public';
+import { hashMailAddress } from './address-hash';
 import { unsubscribeHeaders } from './headers';
 import { reportPauseUrl } from './links';
 import { MailRetry, send, type MailDeps } from './send';
@@ -225,6 +226,12 @@ export function mailHandlers(d: MailHandlerDeps): MailHandlers {
   };
 }
 
+/**
+ * Confirmation mails in any 24 hours: for one account (the bound its two routes also keep), and to
+ * one address, whichever account or site asks.
+ */
+export const CONFIRM_MAILS_PER_DAY = { account: 20, address: 3 } as const;
+
 /** The longest `request_id` a confirmation's ledger key takes; the key itself holds 200 characters. */
 export const REQUEST_ID_MAX = 100;
 
@@ -247,6 +254,26 @@ export function reportMailHandlers(d: ReportMailHandlerDeps): ReportMailHandlers
       if (requestId.length === 0 || requestId.length > REQUEST_ID_MAX) return 'invalid_request';
       const contact = await read(store.confirmationRecipient(siteId));
       if (contact === null) return 'not_found';
+      // The day's bound, on the mail itself: the hourly run asks with no bound of its own, and a
+      // confirmation is account mail, which a complaint does not stop. With no pepper there is no
+      // hash to count by, and `send` below answers `unconfigured`.
+      if (mail.pepper !== null) {
+        const since = new Date(mail.now().getTime() - 24 * 60 * 60 * 1000);
+        const held = await read(
+          store.confirmationsSince(
+            contact.accountId,
+            hashMailAddress(mail.pepper, contact.recipient),
+            since,
+          ),
+        );
+        if (
+          held.account >= CONFIRM_MAILS_PER_DAY.account ||
+          held.address >= CONFIRM_MAILS_PER_DAY.address
+        ) {
+          mail.log('mail.bounded', { kind: 'report_confirm' });
+          return 'bounded';
+        }
+      }
       return send(mail, {
         kind: 'report_confirm',
         to: contact.recipient,

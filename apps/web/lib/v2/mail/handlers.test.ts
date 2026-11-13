@@ -588,6 +588,7 @@ describe('the seat invitation (CC-31 D3)', () => {
 function reportStore(over: Partial<ReportMailStore> = {}): ReportMailStore {
   return {
     confirmationRecipient: vi.fn(async () => ({ recipient: CONTACT, accountId: ACCOUNT })),
+    confirmationsSince: vi.fn(async () => ({ account: 0, address: 0 })),
     issueConfirmation: vi.fn(async () => ({
       token: RAW,
       recipient: CONTACT,
@@ -704,6 +705,47 @@ describe('the confirmation asked of a client’s contact (CC-31 D8)', () => {
     const { h, transport } = reportSetup(reportStore(), [CONTACT]);
     expect(await h.reportConfirm(SITE, 'req-1')).toBe('sent');
     expect(transport.sent).toHaveLength(1);
+  });
+});
+
+describe('the confirmation’s daily bound, on the mail itself (security review r2, M1)', () => {
+  it('asks the ledger’s count for the account and for the address’s hash, over the last 24 hours', async () => {
+    const { h, s } = reportSetup();
+    await h.reportConfirm(SITE, 'req-1');
+    expect(s.confirmationsSince).toHaveBeenCalledWith(
+      ACCOUNT,
+      hashMailAddress(PEPPER, CONTACT),
+      new Date(NOW.getTime() - 24 * 60 * 60 * 1000),
+    );
+  });
+
+  it.each([
+    ['the account’s twentieth', { account: 19, address: 0 }, 'sent'],
+    ['the account’s twenty-first', { account: 20, address: 0 }, 'bounded'],
+    ['the address’s third', { account: 2, address: 2 }, 'sent'],
+    ['the address’s fourth', { account: 3, address: 3 }, 'bounded'],
+  ] as const)('%s in a day is %s', async (_name, held, outcome) => {
+    const { h, ledger, transport, log, s } = reportSetup(
+      reportStore({ confirmationsSince: vi.fn(async () => held) }),
+    );
+    expect(await h.reportConfirm(SITE, 'req-1')).toBe(outcome);
+    if (outcome === 'bounded') {
+      // Nothing is claimed, minted or sent, and the log names no address.
+      expect(ledger.claims).toEqual([]);
+      expect(s.issueConfirmation).not.toHaveBeenCalled();
+      expect(transport.sent).toEqual([]);
+      expect(log.mock.calls).toEqual([['mail.bounded', { kind: 'report_confirm' }]]);
+    } else {
+      expect(transport.sent).toHaveLength(1);
+    }
+  });
+
+  it('a count that cannot be read retries: nothing is claimed', async () => {
+    const { h, ledger } = reportSetup(
+      reportStore({ confirmationsSince: vi.fn(async () => Promise.reject(new Error('x'))) }),
+    );
+    await expect(h.reportConfirm(SITE, 'req-1')).rejects.toBeInstanceOf(MailRetry);
+    expect(ledger.claims).toEqual([]);
   });
 });
 

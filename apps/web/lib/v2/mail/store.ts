@@ -135,6 +135,15 @@ export interface IssuedClientReport {
  */
 export interface ReportMailStore {
   confirmationRecipient(siteId: string): Promise<ReportRecipient | null>;
+  /**
+   * The confirmation mails the ledger holds as sent or being sent, claimed after `since`: for the
+   * account, and for the address of `addressHash`. Read before another is claimed.
+   */
+  confirmationsSince(
+    accountId: string,
+    addressHash: string,
+    since: Date,
+  ): Promise<{ account: number; address: number }>;
   issueConfirmation(siteId: string, now: Date): Promise<IssuedConfirmation | null>;
   clientReportRecipient(reportId: string): Promise<ReportRecipient | null>;
   issueClientReport(reportId: string, now: Date): Promise<IssuedClientReport | null>;

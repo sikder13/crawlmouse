@@ -49,7 +49,9 @@ export type MailLogEvent =
   | 'mail.exhausted'
   | 'mail.nothing_to_send'
   | 'mail.header_refused'
-  | 'mail.failed';
+  | 'mail.failed'
+  // CC-31: a kind's own daily bound was reached before anything was claimed (handlers.ts).
+  | 'mail.bounded';
 
 export interface SendRequest {
   kind: MailKind;

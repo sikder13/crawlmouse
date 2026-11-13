@@ -98,6 +98,7 @@ const store: MailStore = {
 
 const reportStore: ReportMailStore = {
   confirmationRecipient: async () => ({ recipient: TO.confirming, accountId: ACCOUNT }),
+  confirmationsSince: async () => ({ account: 0, address: 0 }),
   issueConfirmation: async () => ({
     token: 'R'.repeat(43),
     recipient: TO.confirming,

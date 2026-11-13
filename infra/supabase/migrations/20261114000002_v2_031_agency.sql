@@ -1849,4 +1849,33 @@ $$;
 revoke all on function public.email_kind_suppressible(text) from public, anon, authenticated;
 grant execute on function public.email_kind_suppressible(text) to service_role;
 
+-- How many confirmation mails of a client report schedule the ledger holds as sent or being sent,
+-- claimed after p_since: for the account, and for one address (its keyed hash). The mailer asks this
+-- before it claims another, so the day's bound is on the mail itself, whatever asked for it: a
+-- route, or the hourly run, which has no bound of its own. email_sends is granted to no role, so the
+-- count is a function's, granted to service_role.
+create or replace function public.report_confirm_mail_counts(
+  p_account uuid, p_address_hash text, p_since timestamptz)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = pg_catalog, pg_temp
+as $$
+  select pg_catalog.jsonb_build_object(
+    'account', (select pg_catalog.count(*)
+                  from public.email_sends e
+                 where e.kind = 'report_confirm' and e.account_id = p_account
+                   and e.status in ('sending', 'sent') and e.claimed_at > p_since),
+    'address', (select pg_catalog.count(*)
+                  from public.email_sends e
+                 where e.kind = 'report_confirm' and e.address_hash = p_address_hash
+                   and e.status in ('sending', 'sent') and e.claimed_at > p_since));
+$$;
+alter function public.report_confirm_mail_counts(uuid, text, timestamptz) owner to postgres;
+revoke all on function public.report_confirm_mail_counts(uuid, text, timestamptz)
+  from public, anon, authenticated;
+grant execute on function public.report_confirm_mail_counts(uuid, text, timestamptz)
+  to service_role;
+
 -- ═══ end C ════════════════════════════════════════════════════════════════════════════════════════

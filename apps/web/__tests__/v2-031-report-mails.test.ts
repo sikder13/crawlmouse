@@ -9,6 +9,7 @@ import type { PGlite } from '@electric-sql/pglite';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { adminOver } from '../lib/v2/account/sites-test-support';
 import { reportMailHandlers } from '../lib/v2/mail/handlers';
+import { supabaseMailLedger } from '../lib/v2/mail/ledger';
 import { memoryLedger, memoryTransport } from '../lib/v2/mail/memory';
 import { supabaseReportMailStore } from '../lib/v2/mail/report-mail-store';
 import { reportPauseToken } from '../lib/v2/mail/report-pause-token';
@@ -282,5 +283,55 @@ describe('the pause link’s token', () => {
 
   it('with no secret the store issues no report', async () => {
     await expect(store(null).issueClientReport(SITE, new Date())).rejects.toThrow(/no link secret/);
+  });
+});
+
+describe('the confirmation’s daily bound over the real ledger', () => {
+  it('a fourth confirmation to one address in a day is not sent, whatever asks for it; a day on, it is', async () => {
+    // A second client of the agency, its contact not confirmed, asked again and again: each ask is
+    // another request id, as each hourly run's is.
+    const site = w.other.id;
+    await db.query(`select public.set_client($1, $2, $3::jsonb)`, [
+      site,
+      w.accountId,
+      JSON.stringify({ client_contact_email: 'asked-often@client.example' }),
+    ]);
+    await db.query(`select public.set_report_schedule($1, $2, $3::jsonb, $4)`, [
+      site,
+      w.accountId,
+      JSON.stringify({
+        cadence: 'weekly',
+        iso_weekday: 1,
+        time_local: '09:00',
+        timezone: 'UTC',
+        send_when_unchanged: true,
+      }),
+      SAVED,
+    ]);
+    const transport = memoryTransport();
+    const handlersAt = (at: Date) =>
+      reportMailHandlers({
+        mail: {
+          ledger: supabaseMailLedger(adminOver(db)),
+          transport,
+          pepper: PEPPER,
+          now: () => at,
+          log: () => {},
+        },
+        store: store(),
+        capture: async () => undefined,
+        pauseLinks: true,
+      });
+    const day = new Date('2026-12-01T09:00:00.000Z');
+    const asked: string[] = [];
+    for (let hour = 0; hour < 5; hour++) {
+      const at = new Date(day.getTime() + hour * 60 * 60 * 1000);
+      asked.push(await handlersAt(at).reportConfirm(site, `run-${hour}`));
+    }
+    expect(asked).toEqual(['sent', 'sent', 'sent', 'bounded', 'bounded']);
+    expect(transport.sent).toHaveLength(3);
+    // Twenty-four hours after the first, the first has left the window.
+    const next = new Date(day.getTime() + 24 * 60 * 60 * 1000 + 1000);
+    expect(await handlersAt(next).reportConfirm(site, 'run-next-day')).toBe('sent');
   });
 });

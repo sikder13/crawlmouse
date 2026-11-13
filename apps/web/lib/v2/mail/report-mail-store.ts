@@ -110,6 +110,14 @@ export function supabaseReportMailStore(deps: ReportMailStoreDeps): ReportMailSt
       return { recipient: site.client_contact_email, accountId: site.account_id };
     },
 
+    async confirmationsSince(accountId, addressHash, since) {
+      return rpc(
+        'report_confirm_mail_counts',
+        { p_account: accountId, p_address_hash: addressHash, p_since: since.toISOString() },
+        z.object({ account: z.number().int(), address: z.number().int() }),
+      );
+    },
+
     async issueConfirmation(siteId, now) {
       const a = await rpc(
         'issue_recipient_confirmation',
