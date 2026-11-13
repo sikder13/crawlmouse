@@ -14,34 +14,36 @@ import styles from './InviteScreen.module.css';
 export function InviteScreen({ data }: { data: InviteView }) {
   return (
     <PageShell>
-      <Card as="section" className={styles.card}>
-        <Heading level={1} size="m">
-          {data.title}
-        </Heading>
-        {data.notice ? (
-          <p className={styles.notice} role="status">
-            {data.notice}
-          </p>
-        ) : null}
-        {data.lines.map((line) => (
-          <p key={line} className={styles.line}>
-            {line}
-          </p>
-        ))}
-        {data.state === 'invite' && data.act.kind === 'accept' ? (
-          <AcceptForm action={data.act.action} label={data.act.label} />
-        ) : null}
-        {data.state === 'invite' && data.act.kind === 'sign_in' ? (
-          <>
-            <div>
-              <Button href={data.act.href} variant="primary">
-                {data.act.label}
-              </Button>
-            </div>
-            <p className={styles.note}>{data.act.note}</p>
-          </>
-        ) : null}
-      </Card>
+      <main className={styles.main}>
+        <Card as="section" className={styles.card}>
+          <Heading level={1} size="m">
+            {data.title}
+          </Heading>
+          {data.notice ? (
+            <p className={styles.notice} role="status">
+              {data.notice}
+            </p>
+          ) : null}
+          {data.lines.map((line) => (
+            <p key={line} className={styles.line}>
+              {line}
+            </p>
+          ))}
+          {data.state === 'invite' && data.act.kind === 'accept' ? (
+            <AcceptForm action={data.act.action} label={data.act.label} />
+          ) : null}
+          {data.state === 'invite' && data.act.kind === 'sign_in' ? (
+            <>
+              <div>
+                <Button href={data.act.href} variant="primary">
+                  {data.act.label}
+                </Button>
+              </div>
+              <p className={styles.note}>{data.act.note}</p>
+            </>
+          ) : null}
+        </Card>
+      </main>
     </PageShell>
   );
 }

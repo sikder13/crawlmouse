@@ -1,5 +1,11 @@
 /* The invitation page: one card, its lines and its one action. */
 
+/* The page's landmark. A column, as the shell is, so the card's auto margins centre it at its own width. */
+.main {
+  display: flex;
+  flex-direction: column;
+}
+
 .card {
   display: flex;
   flex-direction: column;

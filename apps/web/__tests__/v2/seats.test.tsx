@@ -418,6 +418,19 @@ describe('the screens, as their previews render them', () => {
     },
   );
 
+  // axe's `region` rule (tests/visual/a11y.spec.ts) failed on every invitation page in CI run
+  // 43445984137: the card sat beside the header, in no landmark. Each page's card is in its <main>.
+  it.each(entries.filter((p) => p.path.includes('/invite')).map((p) => p.path))(
+    '%s puts its heading and lines inside <main>',
+    (path) => {
+      const html = renderToStaticMarkup(CC31_SEAT_ELEMENTS[path]!());
+      const main = /<main[^>]*>([\s\S]*)<\/main>/.exec(html);
+      expect(main, 'a <main> landmark').not.toBeNull();
+      expect(main![1]).toMatch(/<h1[\s>]/);
+      expect(html.slice(0, html.indexOf('<main'))).not.toMatch(/<h1[\s>]/);
+    },
+  );
+
   it('Seats: the orange element is the link to the invite form, and each form posts to a seat route', () => {
     const html = renderToStaticMarkup(CC31_SEAT_ELEMENTS[PAID]!());
     expect(primaries(html)).toEqual([expect.stringMatching(/href="#invite"[^>]*>Invite someone$/)]);
