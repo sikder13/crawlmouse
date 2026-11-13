@@ -166,7 +166,9 @@ function draft(
       recommendation_class: RENDERED_CLASS,
       confidence: renderedConfidence(r),
       affected_pages: r.affected_urls.length,
-      // the render planner renders more pages of an open fix's template (build/plan.ts)
+      // For client_rendered_template the render planner renders more pages of an open fix's template
+      // (build/plan.ts awaitingShellTemplates); for js_only_navigation it does not. For both, the
+      // detector gives a template an awaiting fix names a record whether or not it is present.
       template_key: r.template_key,
       crawler_uas: [],
     };

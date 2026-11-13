@@ -3,7 +3,9 @@
  * through the pipeline's own order: sample → renderCandidates → renderCheck → buildCheck. The records
  * below are written by hand from the fixture's description, not read back from a run.
  */
+import type { Fix, FixEvent } from '@crawlmouse/types/v2';
 import { describe, expect, it } from 'vitest';
+import { fixWithHistory } from '../../../fixtures/v2/diff/builders.js';
 import {
   JS_NAV_REPLIES,
   jsNavBuild,
@@ -18,11 +20,11 @@ import { readBatches } from './batches.js';
 import { buildCheck } from './build.js';
 import { emptyRootUrls, renderCandidates, sample } from './plan.js';
 
-async function pipeline() {
-  const input = jsNavBuild();
+async function pipeline(fixes: Fix[] = [], events: FixEvent[] = []) {
+  const input = { ...jsNavBuild(), fixes, events };
   const a = assemble(input, readBatches(input.batches, input.check, input.lineage.worker_release));
   const s = sample(a);
-  const plan = renderCandidates(a, [...s.stage1, ...s.stage2], [], new Map());
+  const plan = renderCandidates(a, [...s.stage1, ...s.stage2], fixes, new Map());
   const render = await renderCheck({
     ...plan,
     client: fakeClient(JS_NAV_REPLIES),
@@ -146,5 +148,45 @@ describe('a site whose product pages add their navigation in the browser', () =>
     expect(stored.check.technical_seo).toEqual(built.check.technical_seo);
     expect(stored.check.ai_readability).toEqual(built.check.ai_readability);
     expect(stored.page_results).toEqual(built.page_results);
+  });
+
+  describe('an awaiting fix whose template the check no longer holds (CC-32 D3, for this type)', () => {
+    const gone = '/gone/{slug}';
+    const awaiting = (status: 'open' | 'marked_done') => {
+      const input = jsNavBuild();
+      const { fix, events } = fixWithHistory(1, status, { type: 'js_only_navigation' });
+      const at = (f: Fix): Fix => ({
+        ...f,
+        site_id: input.check.site_id,
+        fingerprint: fingerprintOf(`jsnav:${gone}`),
+        template_key: gone,
+        last_measured_check_id: 'c0000000-0000-4000-8000-0000000000aa',
+        first_seen_check_id: 'c0000000-0000-4000-8000-0000000000aa',
+      });
+      return { fix: at(fix), events };
+    };
+
+    it('an open one is template_absent, indeterminate, and remeasured', async () => {
+      const { fix, events } = awaiting('open');
+      expect(events).toEqual([]);
+      const { built, input } = await pipeline([fix], events);
+      expect(built.diff_inputs.indeterminate).toContain(fingerprintOf(`jsnav:${gone}`));
+      expect(built.fixes.find((f) => f.id === fix.id)).toMatchObject({
+        status: 'open',
+        last_state: 'indeterminate',
+        last_measured_check_id: input.check.id,
+      });
+    });
+
+    it('a marked_done one cannot be verified', async () => {
+      const { fix, events } = awaiting('marked_done');
+      const { built } = await pipeline([fix], events);
+      expect(built.diff_inputs.indeterminate).toContain(fingerprintOf(`jsnav:${gone}`));
+      expect(built.fixes.find((f) => f.id === fix.id)).toMatchObject({
+        status: 'unable_to_verify',
+        last_state: 'indeterminate',
+      });
+      expect(built.fix_events.map((e) => e.kind)).toContain('unable_to_verify');
+    });
   });
 });

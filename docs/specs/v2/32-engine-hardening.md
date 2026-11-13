@@ -200,22 +200,31 @@ stored batches).
 
 **Decision.** The render step reads the same-site link targets of both sides of each page it measures, with one
 extractor (`packages/engine/src/v2/render/links.ts`): the crawl's own `extractPage` with non-content links left
-out, each target in `canonicalizeUrl`'s spelling, kept when it is on the page's site by the planner's rule
-(`inSiteScope`), is not the page itself and is within the URL bound. A side keeps the longest prefix of its
-sorted targets that holds at most `MAX_RENDER_LINKS` (200) targets and `MAX_RENDER_LINK_CHARS` (32 KiB) of URL
-characters; a side that leaves a target out, or has a target past the URL bound, marks the page `truncated`, and
-the detector reads no truncated page. The lists sit
-on the engine's `RenderOutcome` page as `links`, which the pipeline stores as evidence. They are not written to
-`PageResult.without_js`: the `page_results_without_js` CHECK allows four keys, and a test pins them. No contract
-field and no migration was needed.
+out, each target in `canonicalizeUrl`'s spelling with no options, read when it is on the page's site by the
+planner's rule (`inSiteScope`) and is not the page itself. A target over `MAX_URL_LENGTH` (2,048) characters is
+left out on both sides alike, as the worker leaves it out of its edges. Both sides are read whole, in memory, and
+the difference (rendered targets less static targets) is taken over the whole sets. Only the difference is
+stored, as `links: { js_only, js_only_count, truncated }`: `js_only` sorted, the longest prefix within
+`MAX_RENDER_LINKS` (200) targets and `MAX_RENDER_LINK_CHARS` (32 KiB) of URL characters; `js_only_count` the
+whole difference's size; `truncated` when the bound left some out. An empty difference is evidence of absence,
+however many links the page has; a cut one still detects, with its whole count. `links` sits on the engine's
+`RenderOutcome` page, which the pipeline stores as evidence. It is not written to `PageResult.without_js`: the
+`page_results_without_js` CHECK allows four keys, and a test pins them. No contract field and no migration was
+needed; production has stored no render outcome, so the shape changed in place during review.
+
+**www twins.** The v2 crawl keeps a `www.` twin a page of its own: the worker's edges carry `canonicalizeUrl`
+with no options, and the planner crawls the twin as its own URL (`inSiteScope`). The extractor does the same, so a
+static `/x` and a rendered `https://www.<host>/x` on a page at `<host>` are two targets, and the second is JS-only,
+as the crawl would count it. Held by `render/links.test.ts`.
 
 The detector (`detectors/js-only-navigation.ts`) reuses `client_rendered_template`'s population, deciding pages,
-verdict and `template_absent` rule. A deciding page is evidence when it was measured and carries `links` with no
-side truncated; its JS-only targets are its rendered targets less its static ones. The record keeps each evidence
-page's count and its first `MAX_JS_ONLY_TARGETS` targets. The fix's counterfactual (`grade/effects.ts`
-`linkedInHtml`) adds each kept target as a static link from its page through `addEdge`, only for targets the crawl
-holds as pages, so anchor diversity leaves those links out. `COVERAGE_DEPENDENCE.js_only_navigation` is `sample`,
-and the type is in `DETECTORS_RUN`. The generated specs 14, 17, 19, 20a and 30 say the rest.
+verdict and `template_absent` rule, the last for the templates its own awaiting fixes name. A deciding page is
+evidence when it was measured and carries `links`. The record keeps each evidence page's whole count and its first
+`MAX_JS_ONLY_TARGETS` (20) targets. The fix's counterfactual (`grade/effects.ts` `linkedInHtml`) adds each kept
+target as a static link from its page through `addEdge`, only for targets the crawl holds as pages, so anchor
+diversity leaves those links out. `COVERAGE_DEPENDENCE.js_only_navigation` is `sample`, and the type is in
+`DETECTORS_RUN`. An awaiting fix whose template leaves the check is `indeterminate` (`template_absent`):
+remeasured when open, `unable_to_verify` when marked done. The generated specs 14, 17, 19, 20a and 30 say the rest.
 
 Tests: `pnpm --filter @crawlmouse/engine exec vitest run src/v2/render/links.test.ts src/v2/render/run-links.test.ts src/v2/detectors/js-only-navigation.test.ts src/v2/grade/effects.js-only.test.ts src/v2/build/js-nav-site.test.ts`.
 
@@ -231,7 +240,8 @@ Tests: `pnpm --filter @crawlmouse/engine exec vitest run src/v2/render/links.tes
 build fixture, `expected.json` gains `js_only_navigation` in `diff_inputs.detectors` and one indeterminate
 fingerprint, `jsnav:/guides/{slug}`: that template's pages were not rendered, so it reads `not_rendered`, as its
 `client_rendered_template` record does. Its other templates read `not_detected`. `render.json` was re-recorded
-with `fixtures/v2/build/generate.ts`: each rendered page gains `links`, and nothing else in it changed. The
+with `fixtures/v2/build/generate.ts`: each rendered page gains `links`, and nothing else in it changed. Every
+rendered page there has an empty difference. The
 grade guard's `expected.json` changed its source digest only; its cases are unchanged, and
 `fixtures/v2/grade/write-expected.ts` refuses to write changed cases under the same grade version.
 
@@ -243,12 +253,21 @@ grade guard's `expected.json` changed its source digest only; its cases are unch
   `client_rendered_template`. Doing so would change which graded pages are rendered, and so Readable.
 - The counterfactual links only from the evidence pages, and only the kept targets.
 - An effect computed after higher-ranked fixes can be 0 or less; D4 prints that as no measurable effect.
-- The stored render outcome grows, by at most 64 KiB of URL characters a rendered page (2 sides × 32 KiB). On the
-  Free cap of 25 graded and 5 empty-root renders that is at most 1,920 KiB a check (30 × 64 KiB), against
-  800 KiB a page (2 × 200 × 2,048 characters) and about 23 MiB a check before the character budget. A canonical
-  URL is ASCII, so characters are bytes, before JSON quoting. The graded cap is the caller's (`maxRenders`), so
-  a larger cap adds 64 KiB a render. The evidence store gzips the file. The figures are rendered in spec 14 from
-  the constants.
+- The stored render outcome grows, by at most 32 KiB of URL characters a rendered page (the kept difference). On
+  the Free cap of 25 graded and 5 empty-root renders that is at most 960 KiB a check (30 × 32 KiB), against
+  800 KiB a page (2 sides × 200 × 2,048 characters) and about 23 MiB a check when both sides' lists were stored
+  without a character budget. A canonical URL is ASCII, so characters are bytes, before JSON quoting. The graded
+  cap is the caller's (`maxRenders`), so a larger cap adds 32 KiB a render. The evidence store gzips the file. The
+  figures are rendered in spec 14 from the constants.
+- One JS-only same-site link on every evidence page detects: a link that a consent banner or a chat widget adds
+  on every page (a `/privacy` link, say) opens a fix for the template, `likely` on a one-page sample. Its effect is
+  often 0, so D4 prints no measurable effect and it ranks after fixes that have one. A minimum count, or counting
+  only targets the static crawl does not reach, is a product call for the owner.
+- A `www.` twin a script writes is JS-only when the static side links the bare host's spelling (above). That is
+  the crawl's own rule, and it can read a site that mixes the two spellings as adding links.
+- Extraction adds CPU to the render path: both sides go through `extractPage`, in memory, with no read cap. The
+  D6 review measured 5.1 s for a 10 MiB side with 2,000 nested links, where `measurePage` took 10.9 s for its two
+  sides; `renderCheck` has no deadline yet (`apps/web/lib/v2/pipeline/steps/finish.ts`).
 - The readings stay with the crawl's link rules: a link that is not an `<a href>` (a click handler on a `div`) is
   not a link on either side.
 
