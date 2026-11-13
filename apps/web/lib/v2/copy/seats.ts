@@ -3,7 +3,7 @@
  * not here: the view reads them from the account's rows, `GATES` and `prices.ts`.
  */
 import type { SeatRole } from '@crawlmouse/types/v2';
-import { EXTRA_SEAT, usd } from '../../billing/prices';
+import { EXTRA_SEAT, EXTRA_SEAT_YEARLY, usd } from '../../billing/prices';
 import type { SeatAction } from '../agency/guard';
 import type { Addition, CopyChange } from '../copy-registry';
 import { count, plural } from '../words';
@@ -173,15 +173,15 @@ export const SEATS_CHANGES: CopyChange[] = [
     screen: 'agency-seats',
     kind: 'ruling',
     locked: '$9 a seat a month',
-    rendered: `${usd(EXTRA_SEAT)} a seat a month`,
+    rendered: `${usd(EXTRA_SEAT)} a seat a month, or ${usd(EXTRA_SEAT_YEARLY)} a year on a yearly plan`,
     source:
-      'CC-31 brief, D10: a price is read from prices.ts, where a seat beyond the plan’s is EXTRA_SEAT',
+      'CC-31 brief, D10: a price is read from prices.ts, where a seat beyond the plan’s is EXTRA_SEAT by the month and EXTRA_SEAT_YEARLY by the year. The records the screen reads do not say which the account pays, so the foot gives both',
   },
   {
     screen: 'agency-seats',
     kind: 'fixture',
-    locked: `${usd(EXTRA_SEAT)} a seat a month.`,
-    rendered: `${usd(EXTRA_SEAT)} a seat a month${SEATS_COPY.oncePaid}.`,
+    locked: `${usd(EXTRA_SEAT_YEARLY)} a year on a yearly plan.`,
+    rendered: `${usd(EXTRA_SEAT_YEARLY)} a year on a yearly plan${SEATS_COPY.oncePaid}.`,
     source:
       'The fixture: Northwind’s invoice failed on 1 Nov (state past_due). A past-due account is drawn no buy form, since the purchase route refuses its change, and the foot says what the price waits for',
   },

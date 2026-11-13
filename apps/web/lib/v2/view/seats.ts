@@ -104,7 +104,7 @@ export interface SeatsView {
     sub: string;
     rows: SeatRowView[];
     /**
-     * "One seat free. Beyond five, $12 a seat a month.", with what the price waits for in an Agency
+     * "One seat free. Beyond five, $12 a seat a month, or $120 a year on a yearly plan.", with what the price waits for in an Agency
      * trial and past due, and without the price on a plan that does not renew; below Agency the
      * plan's gate message; null for a reader who is not shown every seat.
      */
@@ -260,7 +260,7 @@ export function seatsView(
   const priced =
     v.account.renews_at === null
       ? freeLine
-      : `${freeLine} Beyond ${numberWord(GATES.agency.seats)}, ${usd(EXTRA_SEAT)} a seat a month${waits}.`;
+      : `${freeLine} Beyond ${numberWord(GATES.agency.seats)}, ${usd(EXTRA_SEAT)} a seat a month, or ${usd(EXTRA_SEAT_YEARLY)} a year on a yearly plan${waits}.`;
   const foot =
     v.tier === 'agency'
       ? priced

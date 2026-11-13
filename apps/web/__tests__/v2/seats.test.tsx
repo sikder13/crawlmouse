@@ -92,8 +92,13 @@ describe('seatsView: an Agency account read by its owner (Northwind)', () => {
 
   it('prices a seat beyond the plan from prices.ts, not from the artboard', () => {
     const paid = seatsPreview(PAID).people.foot;
-    expect(paid).toBe(`One seat free. Beyond five, ${usd(EXTRA_SEAT)} a seat a month.`);
-    expect(paid).toBe('One seat free. Beyond five, $12 a seat a month.');
+    expect(paid).toBe(
+      `One seat free. Beyond five, ${usd(EXTRA_SEAT)} a seat a month, or ${usd(EXTRA_SEAT_YEARLY)} a year on a yearly plan.`,
+    );
+    // An account charged by the year reads its own price here, whether or not it is offered the form.
+    expect(paid).toBe(
+      'One seat free. Beyond five, $12 a seat a month, or $120 a year on a yearly plan.',
+    );
     expect(seatsPreview(PAID).buy!.line).toBe(
       // A yearly plan's extras are charged by the year, and the line says what they are then.
       `${usd(EXTRA_SEAT)} a month for each seat beyond five, ${usd(EXTRA_SITE)} a month for each site beyond ${GATES.agency.sites}, up to ${GATES.agency.maxSites} sites. On a yearly plan each is charged by the year: ${usd(EXTRA_SEAT_YEARLY)} a seat, ${usd(EXTRA_SITE_YEARLY)} a site.`,
@@ -115,7 +120,7 @@ describe('seatsView: an Agency account read by its owner (Northwind)', () => {
     expect(seatsPreview(OWNER).invite).not.toBeNull();
     expect(seatsPreview(OWNER).people.rows).toEqual(seatsPreview(PAID).people.rows);
     expect(seatsPreview(OWNER).people.foot).toBe(
-      'One seat free. Beyond five, $12 a seat a month, once the plan’s last payment has gone through.',
+      'One seat free. Beyond five, $12 a seat a month, or $120 a year on a yearly plan, once the plan’s last payment has gone through.',
     );
   });
 
@@ -170,7 +175,7 @@ describe('seatsView: an Agency account read by its owner (Northwind)', () => {
     const v = seatsView(trial, viewer, { seatLimit: 5, billing: true });
     expect(v.buy).toBeNull();
     expect(v.people.foot).toBe(
-      `One seat free. Beyond five, ${usd(EXTRA_SEAT)} a seat a month, once the trial has become the plan.`,
+      `One seat free. Beyond five, ${usd(EXTRA_SEAT)} a seat a month, or ${usd(EXTRA_SEAT_YEARLY)} a year on a yearly plan, once the trial has become the plan.`,
     );
     // The same account on the plan, paid, is offered the form.
     expect(
@@ -201,7 +206,9 @@ describe('seatsView: an Agency account read by its owner (Northwind)', () => {
     const p = SEATS_PREVIEWS[PAID];
     const full = seatsView(p.data(), p.viewer(), { seatLimit: 4 });
     expect(full.header.line).toMatch(/^4 of 4 used/);
-    expect(full.people.foot).toBe('No seat free. Beyond five, $12 a seat a month.');
+    expect(full.people.foot).toBe(
+      'No seat free. Beyond five, $12 a seat a month, or $120 a year on a yearly plan.',
+    );
     expect(full.header.invite).toBeNull();
     expect(full.invite).toBeNull();
   });
@@ -266,7 +273,7 @@ describe('seatsView: who is offered the buy form, on an account where seats and 
     // is, so it names no cause.
     expect(seatsView(ending, p.viewer()).people.foot).toBe('One seat free.');
     expect(seatsView(d, p.viewer()).people.foot).toBe(
-      'One seat free. Beyond five, $12 a seat a month.',
+      'One seat free. Beyond five, $12 a seat a month, or $120 a year on a yearly plan.',
     );
   });
 });
