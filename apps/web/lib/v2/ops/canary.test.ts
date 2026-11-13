@@ -1,8 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+// A client as Sentry.init builds it: getDsn() is the parsed DSN, or undefined when none was given.
+const { DSN_CLIENT, NO_DSN_CLIENT } = vi.hoisted(() => ({
+  DSN_CLIENT: { getDsn: () => ({ host: 'o0.ingest.example.test', projectId: '1' }) },
+  NO_DSN_CLIENT: { getDsn: () => undefined },
+}));
 const sentry = vi.hoisted(() => ({
   captureMessage: vi.fn(),
-  getClient: vi.fn((): unknown => ({})),
+  getClient: vi.fn((): unknown => DSN_CLIENT),
   flush: vi.fn(async () => true),
 }));
 vi.mock('@sentry/nextjs', () => sentry);
@@ -15,7 +20,7 @@ const AT = '2026-11-13T12:00:00.000Z';
 
 beforeEach(() => {
   vi.clearAllMocks();
-  sentry.getClient.mockReturnValue({});
+  sentry.getClient.mockReturnValue(DSN_CLIENT);
   sentry.flush.mockResolvedValue(true);
 });
 
@@ -85,6 +90,17 @@ describe('reportCanary', () => {
 
   it('logs, without an address, when Sentry has no client', async () => {
     sentry.getClient.mockReturnValue(undefined);
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    await reportCanary('request');
+    expect(sentry.flush).not.toHaveBeenCalled();
+    expect(error).toHaveBeenCalledWith(
+      JSON.stringify({ event: 'ops.signin_canary', stage: 'request', sentry: 0 }),
+    );
+    error.mockRestore();
+  });
+
+  it('logs, without an address, when Sentry has a client with no DSN (review r4 S1)', async () => {
+    sentry.getClient.mockReturnValue(NO_DSN_CLIENT);
     const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     await reportCanary('request');
     expect(sentry.flush).not.toHaveBeenCalled();
