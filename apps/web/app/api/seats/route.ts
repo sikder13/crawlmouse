@@ -7,14 +7,16 @@ import { ipHash } from '@/lib/v2/account/rate-keys';
 import { notFound, readBody, refuse, refuseTo } from '@/lib/v2/account/route';
 import { loadViewer } from '@/lib/v2/account/viewer';
 import { agencyCaptureFor } from '@/lib/v2/agency/events';
-import { inviteSeat, SEATS_PAGE } from '@/lib/v2/agency/seats';
+import { inviteMailPerDay, inviteSeat, SEATS_PAGE } from '@/lib/v2/agency/seats';
 import { inngestInviteMail, supabaseSeatsStore } from '@/lib/v2/agency/seats-store';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-/** Invitation mail an account may ask for in a day, and one address in an hour; both fail closed. */
-const PER_ACCOUNT_DAY = 20;
+/**
+ * Invitation mail an account may ask for in a day (`inviteMailPerDay`: fewer in a trial), and one
+ * address in an hour; both fail closed.
+ */
 const DAY_MS = 24 * 60 * 60 * 1000;
 const PER_IP_HOUR = 10;
 const HOUR_MS = 60 * 60 * 1000;
@@ -55,7 +57,7 @@ export async function POST(req: Request) {
       mail: inngestInviteMail(),
       limits: {
         perAccount: () =>
-          checkRateLimit(`seat-invite:account:${account.id}`, PER_ACCOUNT_DAY, DAY_MS, {
+          checkRateLimit(`seat-invite:account:${account.id}`, inviteMailPerDay(account.state), DAY_MS, {
             failClosed: true,
           }),
         perIp: () =>

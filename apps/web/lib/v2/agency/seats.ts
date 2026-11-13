@@ -35,6 +35,19 @@ export const INVITE_LINK_DAYS = 7;
 
 /** The page the seat forms are on. */
 export const SEATS_PAGE = '/seats';
+
+/**
+ * Invitation mail an account may ask for in a day (an invitation and a resend count alike). An
+ * invitation names the account, a string its owner chose, to an address the owner chose, so an
+ * account in a trial, which has paid nothing yet, is held to a few.
+ */
+export const INVITE_MAIL_PER_DAY = { trial: 3, paid: 20 } as const;
+
+const TRIAL_STATES: ReadonlySet<string> = new Set(['pro_trial', 'agency_trial']);
+
+/** The day's bound for an account in `state` (`accounts.state`). */
+export const inviteMailPerDay = (state: string): number =>
+  TRIAL_STATES.has(state) ? INVITE_MAIL_PER_DAY.trial : INVITE_MAIL_PER_DAY.paid;
 /** The page an invitation's link lands on (`LINK_FLOWS.invite.page`). */
 const INVITE_PAGE = LINK_FLOWS.invite.page;
 

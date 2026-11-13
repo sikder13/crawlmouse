@@ -6,14 +6,13 @@ import { supabaseServer } from '@/lib/supabase/server';
 import { ipHash } from '@/lib/v2/account/rate-keys';
 import { isId, notFound, readBody, refuse, refuseTo } from '@/lib/v2/account/route';
 import { loadViewer } from '@/lib/v2/account/viewer';
-import { resendInvite, SEATS_PAGE } from '@/lib/v2/agency/seats';
+import { inviteMailPerDay, resendInvite, SEATS_PAGE } from '@/lib/v2/agency/seats';
 import { inngestInviteMail, supabaseSeatsStore } from '@/lib/v2/agency/seats-store';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 /** The bounds of POST /api/seats: a resend counts into the same two buckets. */
-const PER_ACCOUNT_DAY = 20;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const PER_IP_HOUR = 10;
 const HOUR_MS = 60 * 60 * 1000;
@@ -37,7 +36,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const viewer = await loadViewer();
   if (viewer.kind === 'signed_out') return refuse(401, 'auth_required');
   if (viewer.kind !== 'viewer') return notFound();
-  const accountId = viewer.viewer.account.id;
+  const { id: accountId, state } = viewer.viewer.account;
 
   const { data: allowed, error } = await sb.rpc('seat_may', {
     p_account: accountId,
@@ -54,7 +53,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       mail: inngestInviteMail(),
       limits: {
         perAccount: () =>
-          checkRateLimit(`seat-invite:account:${accountId}`, PER_ACCOUNT_DAY, DAY_MS, {
+          checkRateLimit(`seat-invite:account:${accountId}`, inviteMailPerDay(state), DAY_MS, {
             failClosed: true,
           }),
         perIp: () =>

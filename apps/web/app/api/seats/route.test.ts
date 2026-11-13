@@ -132,6 +132,8 @@ function request(
 }
 
 const invite = (v: unknown) => POST(request('/api/seats', 'POST', JSON.stringify(v)));
+const resend = (id: string, type = 'application/json') =>
+  RESEND(request(`/api/seats/id/${id}/resend`, 'POST', type === FORM ? '' : '{}', type), ctx(id));
 const inviteForm = (body: string) => POST(request('/api/seats', 'POST', body, FORM));
 const ctx = (id: string) => ({ params: Promise.resolve({ id }) });
 
@@ -413,6 +415,27 @@ describe('POST /api/seats', () => {
     ]);
   });
 
+  it('holds an account in a trial to 3 invitation mails a day, for an invitation and for a resend', async () => {
+    const owner = await paidOwner();
+    await h.db.query(
+      `update public.accounts
+          set state = 'agency_trial', trial_variant = 'card_required',
+              trial_ends_at = now() + interval '5 days', trial_used_at = now(),
+              state_history = state_history || jsonb_build_array(
+                jsonb_build_object('state', 'agency_trial', 'since', now()::text))
+        where id = $1`,
+      [owner.accountId],
+    );
+    as(owner);
+    const res = await invite({ email: 'trial@example.com', role: 'developer', scope: 'all' });
+    expect(res.status).toBe(201);
+    const { seatId } = (await res.json()) as { seatId: string };
+    await resend(seatId);
+    const perAccount = h.limits.filter((l) => l.key.startsWith('seat-invite:account:'));
+    expect(perAccount.map((l) => l.limit)).toEqual([3, 3]);
+    expect(perAccount.every((l) => l.failClosed)).toBe(true);
+  });
+
   it.each(['account', 'ip'])(
     'past the %s bound: 429 with Retry-After, nothing written',
     async (bucket) => {
@@ -592,9 +615,6 @@ describe('PATCH and DELETE /api/seats/id/[id]', () => {
 });
 
 describe('POST /api/seats/id/[id]/resend', () => {
-  const resend = (id: string, type = 'application/json') =>
-    RESEND(request(`/api/seats/id/${id}/resend`, 'POST', type === FORM ? '' : '{}', type), ctx(id));
-
   it('with V2_CHECKS_PUBLIC unset: 404', async () => {
     vi.stubEnv('V2_CHECKS_PUBLIC', '');
     const owner = await paidOwner();
