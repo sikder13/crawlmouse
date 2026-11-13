@@ -360,11 +360,11 @@ describe('the redactor masks secrets, not the words the check prints (review r1 
     expect(all).toContain(`vercel-env-step-1: fail (${MASK} ${short})`);
   });
 
-  it('registers a short file value only for a token-named variable', async () => {
+  it('registers a short file value from 4 characters under a name that is not public (review r2 N-c)', async () => {
     const probes = allPass();
-    probes['vercel-env-1'] = async (d) => ({
+    probes['vercel-env-1'] = async () => ({
       status: 'fail',
-      reason: `token ${d.env.VERCEL_TOKEN} pepper ${d.env.TRIAL_LEDGER_PEPPER} region iad 1`,
+      reason: 'token tok9 pepper pep7 region iad 1',
     });
     const all = await mainWith(
       'CRAWL_PAUSED=1\nWORKER_REGION=iad\nVERCEL_TOKEN=tok9\nTRIAL_LEDGER_PEPPER=pep7',
