@@ -35,7 +35,7 @@ describe('opsFunctions', () => {
     expect(ids(opsFunctions({ V2_CHECKS_PUBLIC: '1' }))).toEqual(FOUNDER);
   });
 
-  it('adds the canary only with a sign-in link and SIGNIN_CANARY_TO one plain address', () => {
+  it('adds the canary only with SIGNIN_CANARY_TO one plain address', () => {
     expect(ids(opsFunctions({ V2_BILLING: '1', SIGNIN_CANARY_TO: TO }, signIn))).toEqual([
       ...FOUNDER,
       CANARY,
@@ -47,6 +47,9 @@ describe('opsFunctions', () => {
       expect(ids(opsFunctions({ V2_BILLING: '1', SIGNIN_CANARY_TO: to }, signIn))).not.toContain(
         CANARY,
       );
-    expect(ids(opsFunctions({ V2_BILLING: '1', SIGNIN_CANARY_TO: TO }))).not.toContain(CANARY);
+  });
+
+  it("asks for the canary's link through requestSignInLink unless another is given", () => {
+    expect(ids(opsFunctions({ V2_BILLING: '1', SIGNIN_CANARY_TO: TO }))).toContain(CANARY);
   });
 });
