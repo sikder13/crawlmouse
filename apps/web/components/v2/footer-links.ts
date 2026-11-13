@@ -143,8 +143,12 @@ export const FOOTER_COLUMNS: FooterColumn[] = [
     items: [
       { label: 'About', planned: true },
       { label: 'Contact', planned: true },
-      // CC-33 D4: the help centre answers 404 while V2_CHECKS_PUBLIC is off.
-      { label: 'Help', href: '/help', gate: 'checksPublic' },
+      {
+        label: 'Help',
+        href: '/help',
+        gate: 'checksPublic',
+        note: 'The help centre (CC-33 D4) answers 404 while V2_CHECKS_PUBLIC is off: a link while it is on, text while it is off.',
+      },
       { label: 'Privacy', href: '/privacy' },
       { label: 'Terms', href: '/terms' },
       { label: 'Acceptable use', href: '/aup' },
