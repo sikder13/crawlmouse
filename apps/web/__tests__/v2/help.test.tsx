@@ -564,8 +564,10 @@ describe('the capabilities the help pages name', () => {
   });
 
   it('the sweep sees coming capabilities named, and the plans mark them (anti-vacuity)', () => {
+    // How many depends on what CAPABILITIES still marks coming (CC-31 built five); the sweep must
+    // see at least one, or its other assertions pass by reading nothing.
     const seen = pages().reduce((n, [, html]) => n + capabilitySweep(html).seen, 0);
-    expect(seen).toBeGreaterThan(3);
+    expect(seen).toBeGreaterThan(0);
     const plans = render(helpPath('plans'));
     expect(plans.match(/data-v2-coming=""/g)!.length).toBeGreaterThan(2);
   });
