@@ -573,3 +573,6 @@ From `apps/web/app/(v2-preview)/v2-preview/_preview/registry.ts`. They are serve
 | Check: robots.txt for AI                           | `/v2-preview/screens/check/robots-ai`                    | screen    |                                      |
 | Final-Public                                       | `/v2-preview/screens/public-report`                      | screen    |                                      |
 | Public report, withheld                            | `/v2-preview/screens/public-report/withheld`             | screen    |                                      |
+| Help                                               | `/v2-preview/screens/help`                               | screen    |                                      |
+| Help article                                       | `/v2-preview/screens/help-article`                       | screen    |                                      |
+| Error screen                                       | `/v2-preview/screens/error`                              | screen    |                                      |
