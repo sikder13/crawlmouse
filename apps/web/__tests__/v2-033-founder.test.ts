@@ -260,6 +260,27 @@ describe('take_founder_overflow', () => {
     expect(t.rows).toHaveLength(2);
   });
 
+  it('lists the oldest held rows first and keeps the oldest when it bounds them', async () => {
+    await take(`overflow:clear-${randomUUID()}`);
+    const now = '2027-10-01T10:00:00.000Z';
+    for (const k of keys('ovo-fill', LIMIT)) await claim({ key: k, now });
+    const byMinute: Record<string, string> = {};
+    for (const minute of ['03', '01', '04', '02']) {
+      byMinute[minute] = randomUUID();
+      expect(
+        await claim({
+          key: keys(`ovo-${minute}`, 1)[0]!,
+          account: byMinute[minute],
+          occurred: `2027-10-01T09:${minute}:00.000Z`,
+          now,
+        }),
+      ).toBe('held');
+    }
+    const t = await take(`overflow:${randomUUID()}`, 2);
+    expect(t.total).toBe(4);
+    expect(t.rows.map((r) => r.account_id)).toEqual([byMinute['01'], byMinute['02']]);
+  });
+
   it('refuses a key that is not an overflow key', async () => {
     await expect(take('signup:x')).rejects.toThrow(/an overflow key/);
   });
@@ -495,4 +516,20 @@ describe('the migration and its revert', () => {
       await d.close();
     }
   }, 300_000);
+});
+
+// Last in the file: its rows are later than every other test's, and the bound counts every row created
+// after the hour's start, so a later row would count against an earlier test's claims.
+describe('claim_founder_notice, held rows', () => {
+  it('counts only `send` rows against the bound: held rows in the hour do not hold the next notice', async () => {
+    for (const k of keys('sendonly', LIMIT))
+      expect(await claim({ key: k, now: '2032-09-01T10:00:00.000Z' })).toBe('send');
+    for (const k of keys('sendonly-held', LIMIT))
+      expect(await claim({ key: k, now: '2032-09-01T10:30:00.000Z' })).toBe('held');
+    // The 10:00 sends are out of the hour; the 10:30 held rows are in it, and count for nothing.
+    expect(await claim({ key: keys('sendonly-next', 1)[0]!, now: '2032-09-01T11:00:01.000Z' })).toBe(
+      'send',
+    );
+  });
+
 });

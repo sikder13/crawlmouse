@@ -276,6 +276,23 @@ describe('entitlementNotice', () => {
     expect(transport.sent.filter((m) => m.subject.includes('more notice'))).toHaveLength(1);
   });
 
+  it('D3’s bound is 20 an hour: of 21 notices, 20 are mailed and 1 is held', async () => {
+    const { d, transport, rows } = setup();
+    for (let i = 0; i < 21; i++)
+      await entitlementNotice(d, change('free', 'pro_trial', { id: id(ACCOUNT, `evt_${i}`) }));
+    expect(transport.sent).toHaveLength(20);
+    expect([...rows.values()].filter((r) => r.state === 'held')).toHaveLength(1);
+  });
+
+  it('a notice decided `send` and retried after FOUNDER_NOTIFY_TO was unset mails nothing and answers unconfigured', async () => {
+    const { d, transport } = setup({ transport: throwsOnce() });
+    await expect(entitlementNotice(d, change('free', 'pro_trial'))).rejects.toThrow(MailRetry);
+    expect(await entitlementNotice({ ...d, to: null }, change('free', 'pro_trial'))).toBe(
+      'unconfigured',
+    );
+    expect(transport.sent).toEqual([]);
+  });
+
   it('an overflow notice retried after the transport threw is one notice with the same count', async () => {
     const t = throwsOnce();
     const { d, transport } = setup({ transport: t, now: new Date('2026-11-13T11:00:00.000Z') });
