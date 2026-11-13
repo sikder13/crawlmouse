@@ -185,7 +185,9 @@ range.
 An empty-root page answered 200 with HTML, v1's classifier classed it `thin`, and v1's JS detector
 read the bytes the crawl fetched as an app shell (`content_features.client_rendered`). It is not
 graded, so the graded phase never picks it. The pool is every crawled page, not the access sample.
-The picks are the empty-root pages ordered by template key, then PageRank (highest first), then URL,
+The picks are the empty-root pages of templates with no graded page in the crawl: the detector
+judges a template with a graded page on its graded renders alone, so an empty-root render there
+would decide nothing. They are ordered by template key, then PageRank (highest first), then URL,
 at most 2 of a template (`EMPTY_ROOT_PER_TEMPLATE`) and 5 in all
 (`EMPTY_ROOT_MAX_RENDERS`), less any URL the graded phase took. A URL listed twice is taken once,
 and not at all when any listing of it is not an empty-root page. An open fix's template is not put
@@ -269,8 +271,12 @@ leaves unrendered depends on how long the earlier renders took.
 
 The empty-root phase adds wall time after the graded phase, inside the same render step and its
 function time limit: at most 5 pages, each two requests of at most
-45 s apart from the waits on a 429 below. Its browser time is added to
-`browser_ms`, which the usage event's `compute_seconds` counts (`build/lineage.ts` `usageOf`).
+45 s apart from the waits on a 429 below; at 2 requests open at
+once that is up to about 225 s. A check can now make up to
+30 renders (25 graded and 5 empty-root) under the unchanged browser-time caps. The render step has no
+deadline of its own: the one it needs before production renders are switched on has to cover both
+phases. Its browser time is added to `browser_ms`, which the usage event's `compute_seconds`
+counts (`build/lineage.ts` `usageOf`). A page left `phase_threw` records no detail of the error.
 
 **Across checks.** The empty-root phase spends per-check browser time the graded phase left, under
 the unchanged per-check and per-day caps. A day's total can therefore be reached sooner, and a later

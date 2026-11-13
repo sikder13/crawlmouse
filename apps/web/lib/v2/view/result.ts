@@ -717,7 +717,7 @@ function allClear(
  * "AI after fix 1").
  */
 export function points(
-  f: Pick<Fix, 'type' | 'effect' | 'section' | 'affected_pages'>,
+  f: Pick<Fix, 'type' | 'effect' | 'section' | 'affected_pages' | 'last_state'>,
   siteFixes: readonly Fix[],
 ): string {
   const h = effectHeadline(f, siteFixes);

@@ -15,10 +15,16 @@ import { FIRST_AUDIT } from './segment/test-helpers';
 
 const base = fixture('bad-site').fixes.find((f) => f.type === 'client_rendered_template')!;
 
-function shellFix(pages: number, ai: number | null = 0, seo: number | null = 0): Fix {
+function shellFix(
+  pages: number,
+  ai: number | null = 0,
+  seo: number | null = 0,
+  last_state: Fix['last_state'] = 'detected',
+): Fix {
   return {
     ...base,
     affected_pages: pages,
+    last_state,
     effect: {
       ...base.effect,
       ai_readability: ai,
@@ -65,10 +71,36 @@ describe('the pages a shell-only template fix makes readable', () => {
     }
   });
 
-  it('keeps saying why it waits while its AI effect is null', () => {
+  it('reads the pages line while its AI effect is not yet estimated, not why it waits', () => {
     const p = printed(shellFix(7, null));
-    expect(p.table).toBe('AI not yet estimated');
-    expect(p.head).not.toContain('readable without JavaScript');
+    expect(p.table).toBe('Makes 7 pages readable without JavaScript');
+    expect(p.head).toBe('— Makes 7 pages readable without JavaScript');
+    expect(p.pro).toBe('Makes 7 pages readable without JavaScript');
+    for (const text of Object.values(p)) expect(text).not.toMatch(GRADE_OR_NONE);
+  });
+
+  it('on a template with graded pages whose AI effect is 0 by rounding, the line still reads (CC-32 D4/Q8 note)', () => {
+    // a graded-template fix: its counterfactual sets every graded page's share to 1, so its pages are
+    // made readable; its AI effect rounded to 0 (grade/effects.ts DECIMALS)
+    const p = printed(shellFix(40, 0, 0));
+    expect(p.table).toBe('Makes 40 pages readable without JavaScript');
+  });
+
+  it('says the count is from the last detection when the last check did not detect it', () => {
+    expect(points(shellFix(1, 0, 0, 'detected'), [])).toBe(
+      'Makes 1 page readable without JavaScript',
+    );
+    for (const state of ['indeterminate', 'not_detected'] as const) {
+      expect(points(shellFix(12, 0, 0, state), [])).toBe(
+        'Made 12 pages readable without JavaScript when last detected',
+      );
+      expect(points(shellFix(1, null, 0, state), [])).toBe(
+        'Made 1 page readable without JavaScript when last detected',
+      );
+    }
+    expect(groupPoints([shellFix(4), shellFix(3, 0, 0, 'indeterminate')])).toBe(
+      'Makes 4 pages readable without JavaScript; Made 3 pages readable without JavaScript when last detected',
+    );
   });
 
   it('a client-rendered fix with a positive AI effect still shows its points', () => {

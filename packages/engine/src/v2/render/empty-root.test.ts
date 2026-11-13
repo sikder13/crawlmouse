@@ -82,6 +82,33 @@ describe('the picks', () => {
   });
 });
 
+describe('templates with a graded page (R2-B1)', () => {
+  const graded = (path: string, template_key: string) =>
+    shell(path, template_key, 0.5, { kind: 'content', client_rendered: false });
+
+  it('r8: are left out, so the picks go to the template with no graded page', () => {
+    const pool = [
+      ...['/a', '/b', '/c'].flatMap((t) => [
+        graded(`${t}/g`, t),
+        shell(`${t}/1`, t, 0.01),
+        shell(`${t}/2`, t, 0.01),
+      ]),
+      shell('/z/1', '/z', 0.01),
+      shell('/z/2', '/z', 0.01),
+    ];
+    expect(paths(selectEmptyRoots(pool, EMPTY_ROOT_MAX_RENDERS))).toEqual(['/z/1', '/z/2']);
+  });
+
+  it('only a graded page counts: a 404 or non-HTML content page leaves the template in', () => {
+    const pool = [
+      shell('/a/404', '/a', 0.5, { kind: 'content', status_code: 404 }),
+      shell('/a/pdf', '/a', 0.5, { kind: 'content', is_html: false }),
+      shell('/a/1', '/a', 0.01),
+    ];
+    expect(paths(selectEmptyRoots(pool, 5))).toEqual(['/a/1']);
+  });
+});
+
 describe('what an empty-root page is', () => {
   it('a thin page that answered 200 with HTML, fetched under our robots.txt, read as an app shell', () => {
     expect(emptyRoot(shell('/x', '/x', 0.1))).toBe(true);
@@ -112,13 +139,23 @@ describe('what an empty-root page is', () => {
   });
 });
 
-/** The picks, computed another way: per template in key order, its best two; then the first `max`. */
+/**
+ * The picks, computed another way: drop the templates with a page that answered 200 with HTML as
+ * content; per remaining template in key order, its best two; then the first `max`.
+ */
 function expected(pool: readonly EmptyRootCandidate[], max: number): string[] {
+  const graded = new Set(
+    pool
+      .filter((p) => p.kind === 'content' && p.status_code === 200 && p.is_html)
+      .map((p) => p.template_key),
+  );
   const byUrl = new Map<string, EmptyRootCandidate[]>();
   for (const p of pool) byUrl.set(p.url, [...(byUrl.get(p.url) ?? []), p]);
   const kept: EmptyRootCandidate[] = [];
-  for (const listings of byUrl.values()) {
-    if (!listings.every(emptyRoot)) continue;
+  for (const all of byUrl.values()) {
+    if (!all.every(emptyRoot)) continue;
+    const listings = all.filter((p) => !graded.has(p.template_key));
+    if (listings.length === 0) continue;
     const pr = (p: EmptyRootCandidate) => p.pagerank_share ?? -1;
     const best = Math.max(...listings.map(pr));
     const keys = listings.filter((p) => pr(p) === best).map((p) => p.template_key);

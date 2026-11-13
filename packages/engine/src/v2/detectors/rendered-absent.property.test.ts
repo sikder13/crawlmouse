@@ -11,8 +11,8 @@
  * are dated on the previous check, before this one finished (diff.ts reads a later event as the owner
  * acting after the measurement).
  *
- * A fix with no template key cannot be named by template, so it gets no record and the diff leaves it
- * as it was: the property states that too. Each fix the detector opens carries its record's template
+ * A fix with no template key cannot be named by template, so it gets no record, and the diff changes
+ * nothing of it but its rank among the site's live fixes: the property states that too. Each fix the detector opens carries its record's template
  * key, which is never null.
  */
 import { FixStatusSchema, type Fix, type FixEvent, type FixStatus } from '@crawlmouse/types/v2';
@@ -150,10 +150,10 @@ describe('an awaiting client-rendered fix is always measured (CC-32 D3)', () => 
               );
             }
             if (f.template_key === null) {
+              // no record names it: the diff changes nothing of it but its rank among the live fixes
               expect(byFingerprint.has(f.fingerprint)).toBe(false);
-              expect(
-                after.get(f.fingerprint)?.last_measured_check_id ?? f.last_measured_check_id,
-              ).toBe(f.last_measured_check_id);
+              const same = after.get(f.fingerprint) ?? f;
+              expect({ ...same, rank: f.rank }).toEqual(f);
             }
           }
           // a template with no present page is the one case the reason names

@@ -5,6 +5,7 @@
  * case below runs the same check twice, with the empty-root pool empty and full, under caps that bind.
  */
 import { describe, expect, it } from 'vitest';
+import { NotAdmitted } from './admission.js';
 import type { DailyBudget } from './budget.js';
 import { EMPTY_ROOT_MAX_RENDERS, type EmptyRootCandidate } from './empty-root.js';
 import { fakeClient, memoryDailyBudget, replyFixtures, type ReplyFixture } from './fakes.js';
@@ -178,6 +179,27 @@ describe('with room for both phases', () => {
   });
 });
 
+describe('admission, in the empty-root phase', () => {
+  it('refuses an empty-root URL as it refuses a graded one: not_admitted with the rule, no request, the graded phase unchanged', async () => {
+    // /app/3, the empty-root phase's first pick
+    const refused = SHELLS[2]!.url;
+    const admit = async (url: string) => {
+      if (url === refused) throw new NotAdmitted('private_address');
+    };
+    const { without, withPool } = await both(() => ({ admit }));
+    const client = fakeClient([...FIXTURES.values(), ...SHELLS]);
+    await renderCheck(input({ admit, client }));
+    expect(gradedPart(withPool)).toEqual(gradedPart(without));
+    expect(emptyRootPart(withPool).find((p) => p.url === refused)).toMatchObject({
+      rendered: false,
+      reason: 'not_admitted',
+      detail: 'private_address',
+    });
+    expect(client.calls.filter((c) => c.url === refused)).toEqual([]);
+    expect(emptyRootPart(withPool).filter((p) => p.rendered)).toHaveLength(4);
+  });
+});
+
 describe('under caps that bind, the graded phase is what it is with no empty-root page offered', () => {
   it('a per-check cap the graded phase uses up: each empty-root page is check_cap', async () => {
     const { without, withPool } = await both(() => ({
@@ -343,10 +365,11 @@ describe('a throw out of a page', () => {
 });
 
 describe('r5: a large site, where the graded phase takes the cap and the empty-root phase still renders', () => {
-  it('renders the shells of a template the graded phase skipped, and they do not decide its verdict', async () => {
+  it('spends its renders on the template with no graded page, and the shells of a graded template decide nothing', async () => {
     const text = `<html><body><main><h1>x</h1><p>${'word '.repeat(80)}</p></main></body></html>`;
     const empty = '<html><body><div id="root"></div></body></html>';
     const t = (i: number) => `/t${String(i).padStart(2, '0')}`;
+    const shellAt = (template: string, k: number) => `https://s.example${template}/shell${k}`;
     const replies: ReplyFixture[] = [
       ...Array.from({ length: 30 }, (_, i) => ({
         provenance: 'r5',
@@ -354,12 +377,14 @@ describe('r5: a large site, where the graded phase takes the cap and the empty-r
         static: { html: text, browser_ms: 1000 },
         rendered: { html: text, browser_ms: 1000 },
       })),
-      ...[1, 2].map((k) => ({
-        provenance: 'r5',
-        url: `https://s.example${t(29)}/shell${k}`,
-        static: { html: empty, browser_ms: 500 },
-        rendered: { html: text, browser_ms: 900 },
-      })),
+      ...[t(29), '/shell'].flatMap((template) =>
+        [1, 2].map((k) => ({
+          provenance: 'r5',
+          url: shellAt(template, k),
+          static: { html: empty, browser_ms: 500 },
+          rendered: { html: text, browser_ms: 900 },
+        })),
+      ),
     ];
     const candidates: RenderCandidate[] = Array.from({ length: 30 }, (_, i) => ({
       url: `https://s.example${t(i)}/a`,
@@ -370,27 +395,35 @@ describe('r5: a large site, where the graded phase takes the cap and the empty-r
       pagerank_share: 0.01,
       fetched_under_our_robots: true,
     }));
-    const ers: EmptyRootCandidate[] = [1, 2].map((k) => ({
-      url: `https://s.example${t(29)}/shell${k}`,
-      template_key: t(29),
-      kind: 'thin',
-      status_code: 200,
-      is_html: true,
-      pagerank_share: 0.001,
-      fetched_under_our_robots: true,
-      client_rendered: true,
-    }));
+    const ers: EmptyRootCandidate[] = [t(29), '/shell'].flatMap((template) =>
+      [1, 2].map((k) => ({
+        url: shellAt(template, k),
+        template_key: template,
+        kind: 'thin' as const,
+        status_code: 200,
+        is_html: true,
+        pagerank_share: 0.001,
+        fetched_under_our_robots: true,
+        client_rendered: true,
+      })),
+    );
+    // the pool is every crawled page, as renderCandidates passes it
+    const pool = [...candidates.map((c) => ({ ...c, client_rendered: false })), ...ers];
     const out = await renderCheck(
       input({
         candidates,
         client: fakeClient(replies),
         caps: { perCheckMs: 2_250_000, perDayMs: 36_000_000 },
         inFlight: 2,
-        emptyRootCandidates: ers,
+        emptyRootCandidates: pool,
       }),
     );
     const er = emptyRootPart(out);
-    expect([out.pages.length - er.length, er.filter((p) => p.rendered).length]).toEqual([25, 2]);
+    expect(out.pages.length - er.length).toBe(25);
+    expect(er.map((p) => [p.template_key, p.rendered])).toEqual([
+      ['/shell', true],
+      ['/shell', true],
+    ]);
     const measured = new Map(
       out.pages.flatMap((p) => (p.rendered ? [[p.url, p.without_js] as const] : [])),
     );
@@ -398,15 +431,18 @@ describe('r5: a large site, where the graded phase takes the cap and the empty-r
       ...c,
       without_js: measured.get(c.url) ?? null,
     }));
-    const r = detectRendered(pages, { emptyRoots: new Set(ers.map((e) => e.url)) }).find(
-      (x) => x.template_key === t(29),
-    )!;
-    expect(r).toMatchObject({
+    const records = detectRendered(pages, { emptyRoots: new Set(ers.map((e) => e.url)) });
+    const r29 = records.find((x) => x.template_key === t(29))!;
+    expect(r29).toMatchObject({
       state: 'indeterminate',
       reason: 'not_rendered',
       extent: { pages: 3, graded: 1, rendered: 0 },
       affected_urls: [],
     });
-    expect(renderedConfidence(r)).toBe('likely');
+    expect(renderedConfidence(r29)).toBe('likely');
+    expect(records.find((x) => x.template_key === '/shell')).toMatchObject({
+      state: 'detected',
+      extent: { pages: 2, graded: 0, rendered: 2 },
+    });
   });
 });

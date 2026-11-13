@@ -4,18 +4,21 @@
  * do not: they give a fix's Technical SEO points beside what its AI effect waits on, as the locked
  * Final-Seg-Content does.
  *
- * - An AI readability effect that is estimated and not 0 heads the fix with its points.
+ * - An AI readability effect above 0 heads the fix with its points.
  * - A fix in crawler_access, without_js or content moves AI readability. While its AI effect is null
- *   it is headed by why it waits, from the first entry of `ai_readability_pending_on`: no Technical
+ *   it is headed by why it waits (a client-rendered template fix excepted, below), from the first entry of `ai_readability_pending_on`: no Technical
  *   SEO figure and no "+0".
  * - A structure fix whose AI effect is null keeps its Technical SEO points, and waits when they are 0
  *   or less.
  * - Otherwise the fix is headed by its Technical SEO points, or says they are not estimated.
- * - A client-rendered template fix whose AI effect is estimated at 0 or less is headed by the pages
- *   it makes readable, `pages_readable`: "Makes N pages readable without JavaScript", N its
- *   `affected_pages`, never a grade number (owner ruling on CC-32 Q8). For a template of empty-root
- *   pages alone, `affected_pages` is the template's crawled empty-root pages: the pages the check saw,
- *   not the ones it rendered, which the Fix record does not carry.
+ * - A client-rendered template fix whose AI effect is not above 0 (estimated at 0 or less, or not
+ *   estimated yet) is headed by the pages it makes readable, `pages_readable`: "Makes N pages
+ *   readable without JavaScript", N its `affected_pages`, never a grade number and never why its AI
+ *   effect waits (owner ruling on CC-32 Q8). For a template of empty-root pages alone,
+ *   `affected_pages` is the template's crawled empty-root pages: the pages the check saw, not the ones
+ *   it rendered, which the Fix record does not carry. A fix the last check did not detect keeps the
+ *   count from when it was detected, so it reads "Made N pages readable without JavaScript when last
+ *   detected".
  * - An effect at or below zero is never printed with a sign: `formatPoints` gives it no figure, so a
  *   fix whose estimated effects are all 0 or less is headed `no_effect`, "No measurable effect on the
  *   grade" (CC-32 D4). The engine keeps the number it computed.
@@ -74,22 +77,42 @@ export const NO_EFFECT_SHORT = 'No measurable effect';
  */
 export const formatPoints = (n: number): string | null => (n > 0 ? `+${n}` : null);
 
-/** "Makes 3 pages readable without JavaScript", singular for one page. */
-export const pagesReadableText = (pages: number): string =>
-  `Makes ${pages} ${plural(pages, 'page', 'pages')} readable without JavaScript`;
+/**
+ * "Makes 3 pages readable without JavaScript", singular for one page; for a count from an earlier
+ * detection (`current` false), "Made 3 pages readable without JavaScript when last detected".
+ */
+export const pagesReadableText = (pages: number, current = true): string => {
+  const n = `${pages} ${plural(pages, 'page', 'pages')}`;
+  return current
+    ? `Makes ${n} readable without JavaScript`
+    : `Made ${n} readable without JavaScript when last detected`;
+};
 
-type Headed = Pick<Fix, 'type' | 'effect' | 'section' | 'affected_pages'>;
+type Readable = Pick<Fix, 'type' | 'effect' | 'affected_pages' | 'last_state'>;
+type Headed = Readable & Pick<Fix, 'section'>;
 
-/** A client-rendered template fix whose AI effect is estimated and gives no figure (`formatPoints`). */
+/** A client-rendered template fix whose AI effect gives no figure: at 0 or less, or not estimated. */
 const makesReadable = (f: Pick<Fix, 'type' | 'effect'>): boolean =>
   f.type === 'client_rendered_template' &&
-  f.effect.ai_readability !== null &&
-  formatPoints(f.effect.ai_readability) === null;
+  (f.effect.ai_readability === null || formatPoints(f.effect.ai_readability) === null);
 
-/** The pages the `pages_readable` fixes among `fixes` make readable, as text; null when none is one. */
-export function pagesReadable(fixes: readonly Pick<Fix, 'type' | 'effect' | 'affected_pages'>[]) {
+/**
+ * The pages the `pages_readable` fixes among `fixes` make readable, as text: those the last check
+ * detected, then those it did not; null when none is one.
+ */
+export function pagesReadable(fixes: readonly Readable[]): string | null {
   const these = fixes.filter(makesReadable);
-  return these.length ? pagesReadableText(these.reduce((n, f) => n + f.affected_pages, 0)) : null;
+  const sum = (current: boolean) =>
+    these
+      .filter((f) => (f.last_state === 'detected') === current)
+      .reduce((n, f) => n + f.affected_pages, 0);
+  const parts = [true, false].flatMap((current) => {
+    const n = sum(current);
+    return these.some((f) => (f.last_state === 'detected') === current)
+      ? [pagesReadableText(n, current)]
+      : [];
+  });
+  return parts.length ? parts.join('; ') : null;
 }
 
 /** A group's points: each member's taken at 0 when below it, so a negative member lowers no sum. */
@@ -143,15 +166,15 @@ export function effectHeadline(f: Headed, siteFixes: readonly Numbered[]): Effec
   const { ai_readability: ai, technical_seo: seo } = f.effect;
   const aiSigned = ai === null ? null : formatPoints(ai);
   if (aiSigned !== null) return { kind: 'ai', points: ai!, signed: aiSigned };
-  if (ai === null && (AI_SECTIONS.has(f.section) || (seo !== null && seo <= 0))) {
-    return waiting(f, siteFixes);
-  }
   if (makesReadable(f)) {
     return {
       kind: 'pages_readable',
       pages: f.affected_pages,
-      text: pagesReadableText(f.affected_pages),
+      text: pagesReadableText(f.affected_pages, f.last_state === 'detected'),
     };
+  }
+  if (ai === null && (AI_SECTIONS.has(f.section) || (seo !== null && seo <= 0))) {
+    return waiting(f, siteFixes);
   }
   if (seo === null) return { kind: 'seo_not_estimated' };
   const seoSigned = formatPoints(seo);
