@@ -78,7 +78,7 @@ export const PRECONDITIONS: readonly Precondition[] = [
   {
     id: 'worker-release',
     mustBeTrue:
-      'the production machines run an image labelled with a commit from which no worker input changed up to origin/main',
+      'the production machines run an image labelled with a commit from which no worker input changed up to the live production commit (the Vercel project names it)',
     why: 'a worker older than the app it serves reads batches the app no longer sends (CC-32)',
     source: '.github/workflows/worker-staging.yml:15',
     gates: 1,

@@ -98,7 +98,7 @@ describe('the outbound allow-list', () => {
     const { fetch, calls } = scriptedFetch(() => json({}, 500));
     const d = deps({ fetch, env: tokens });
     await vercelEnvProbe(1)(d);
-    await migrationsProbe(() => [])(d);
+    await migrationsProbe()(d);
     await healthzProbe(d);
     await releaseProbe(() => ['packages/**'])(d);
     await stripeProbe(d);
