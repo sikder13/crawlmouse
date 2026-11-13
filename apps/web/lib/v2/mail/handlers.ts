@@ -8,20 +8,38 @@
  *   trial reminder  trial_reminder:<accountId>:<trialEndsAt>  (one per trial end)
  *   check notify    check_notify:<checkId>
  *   fix to a dev    fix_to_developer:<requestId>
+ *   seat invite     seat_invite:<seatId>:<seq>                (recipient: the seat's invited address)
+ *
+ * `reportMailHandlers` holds the two mails of a client report schedule, over their own port:
+ *
+ *   confirmation    report_confirm:<siteId>:<requestId>       (recipient: the site's client contact)
+ *   client report   client_report:<reportId>
+ *
+ * The invitation's link, the confirmation's and a report's two are minted inside `render`, after the
+ * claim, as an account link is (Q10).
  *
  * A database read that fails before anything is claimed throws `MailRetry`: nothing was sent and
  * nothing claimed, so the step can safely try again. What happens from the claim to the ledger's
  * record is `send()`'s, which answers a failure there with `MailRetry` too; a fix email's `sent_at`
  * write that fails after the send is retried the same way.
  */
-import type { EmailRequestedData, MailHandlers } from '../../../../../inngest/mail';
+import type {
+  EmailRequestedData,
+  MailHandlers,
+  ReportMailHandlers,
+} from '../../../../../inngest/mail';
 import { packetPrompt } from '../view/segment/fixes';
 import { checkRef } from '../pipeline/public';
+import { unsubscribeHeaders } from './headers';
+import { reportPauseUrl } from './links';
 import { MailRetry, send, type MailDeps } from './send';
-import type { MailStore } from './store';
+import type { MailStore, ReportMailStore } from './store';
 import { accountDelete, emailChangeConfirm, emailChangeNotice } from './templates/account-links';
 import { checkNotify } from './templates/check-notify';
+import { clientReport } from './templates/client-report';
 import { fixToDeveloper } from './templates/fix-to-developer';
+import { reportConfirm } from './templates/report-confirm';
+import { seatInvite } from './templates/seat-invite';
 import { trialReminder } from './templates/trial-reminder';
 import type { RenderedMail } from './types';
 
@@ -177,6 +195,94 @@ export function mailHandlers(d: MailHandlerDeps): MailHandlers {
         { trigger: c.trigger, status: c.status, check_ref: ref, source: 'pipeline' },
       );
       return 'captured';
+    },
+
+    async seatInvite(seatId, seq) {
+      const invitation = await read(store.seatInvitation(seatId, seq));
+      if (invitation === null) return 'not_invited';
+      if (invitation.marked) return 'marked';
+      return send(mail, {
+        kind: 'seat_invite',
+        to: invitation.recipient,
+        idempotencyKey: `seat_invite:${seatId}:${seq}`,
+        accountId: invitation.accountId,
+        // Minted only now, after the claim answered go: a retry of this key mints nothing, and a
+        // resend is another key. The token goes into the link and nowhere else.
+        render: async () => {
+          const issued = await store.issueSeatInvite(seatId, seq, mail.now());
+          // No row: accepted, removed, re-sent or its account marked since the read above. The
+          // link is mailed only to the address it was issued for.
+          if (issued === null || issued.recipient !== invitation.recipient) return null;
+          return seatInvite({
+            token: issued.token,
+            accountName: issued.accountName,
+            role: issued.role,
+          });
+        },
+      });
+    },
+  };
+}
+
+/** The longest `request_id` a confirmation's ledger key takes; the key itself holds 200 characters. */
+export const REQUEST_ID_MAX = 100;
+
+export interface ReportMailHandlerDeps {
+  mail: MailDeps;
+  store: ReportMailStore;
+}
+
+export function reportMailHandlers(d: ReportMailHandlerDeps): ReportMailHandlers {
+  const { mail, store } = d;
+  return {
+    async reportConfirm(siteId, requestId) {
+      if (requestId.length === 0 || requestId.length > REQUEST_ID_MAX) return 'invalid_request';
+      const contact = await read(store.confirmationRecipient(siteId));
+      if (contact === null) return 'not_found';
+      return send(mail, {
+        kind: 'report_confirm',
+        to: contact.recipient,
+        idempotencyKey: `report_confirm:${siteId}:${requestId}`,
+        accountId: contact.accountId,
+        render: async () => {
+          const issued = await store.issueConfirmation(siteId, mail.now());
+          if (issued === null || issued.recipient !== contact.recipient) return null;
+          return reportConfirm({
+            token: issued.token,
+            agencyName: issued.agencyName,
+            host: issued.host,
+          });
+        },
+      });
+    },
+
+    async clientReport(reportId) {
+      const contact = await read(store.clientReportRecipient(reportId));
+      if (contact === null) return 'not_found';
+      // Set by `render`, which `send` calls before it asks for the headers.
+      let unsubscribe: Readonly<Record<string, string>> = {};
+      return send(mail, {
+        kind: 'client_report',
+        to: contact.recipient,
+        idempotencyKey: `client_report:${reportId}`,
+        accountId: contact.accountId,
+        render: async () => {
+          const issued = await store.issueClientReport(reportId, mail.now());
+          if (issued === null || issued.recipient !== contact.recipient) return null;
+          // The pause link is the message's footer link and its one-click List-Unsubscribe target.
+          unsubscribe = unsubscribeHeaders({ url: reportPauseUrl(issued.pauseToken) });
+          return clientReport({
+            agencyName: issued.agencyName,
+            host: issued.host,
+            headline: issued.headline,
+            lines: issued.lines,
+            footer: issued.footer,
+            shareToken: issued.shareToken,
+            pauseToken: issued.pauseToken,
+          });
+        },
+        headers: () => unsubscribe,
+      });
     },
   };
 }

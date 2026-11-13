@@ -67,8 +67,10 @@ export const NOTICE_LINES: Record<NoticeCode, (at: string | null) => string> = {
   invalid_email: () => 'That is not an email address, so nothing was recorded.',
   rate_limited: (at) =>
     `Too many emails were asked for in a short time, so nothing was recorded.${at ? ` Ask again from ${at}.` : ''}`,
+  // The mailer sends the invitation (`seat.invite.requested`, inngest/mail.ts), registered under the
+  // same V2_CHECKS_PUBLIC that serves the route this line answers.
   seat_invited: () =>
-    'Invited. The seat is held for that address until the invitation is accepted or removed.',
+    `Invited. The invitation will be emailed to that address from ${ALERTS_SENDER}, and the seat is held for it until the invitation is accepted or removed.`,
   seat_resent: () =>
     'A new invitation replaces the one sent before; the earlier link no longer works.',
   seat_changed: () => 'The seat was changed.',

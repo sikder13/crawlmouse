@@ -441,19 +441,23 @@ describe('resendTransport', () => {
 });
 
 describe('the kinds', () => {
-  it('are the migration’s email_sends.kind list, and its suppressible kinds are the non-account ones', () => {
-    const sql = readFileSync(
-      resolve(
-        __dirname,
-        '../../../../../infra/supabase/migrations/20261113000001_v2_028_monitoring.sql',
-      ),
-      'utf8',
-    );
-    const list = /kind text not null check \(kind in \(([^)]*)\)\)/.exec(sql)![1]!;
-    expect([...list.matchAll(/'(\w+)'/g)].map((m) => m[1])).toEqual([...MAIL_KINDS]);
-    const supp = /select p_kind in \(([^)]*)\)/.exec(sql)![1]!;
-    expect([...supp.matchAll(/'(\w+)'/g)].map((m) => m[1]).sort()).toEqual(
-      MAIL_KINDS.filter((k) => !ACCOUNT_KINDS.has(k)).sort(),
-    );
+  it('are the migrations’ email_sends.kind list, and the suppressible kinds are the non-account ones', () => {
+    const read = (file: string) =>
+      readFileSync(resolve(__dirname, '../../../../../infra/supabase/migrations', file), 'utf8');
+    const names = (list: string) => [...list.matchAll(/'(\w+)'/g)].map((m) => m[1]);
+    // 028 writes the two lists. 031's section C adds to each the kinds its two arrays name; what the
+    // database holds after both is read in __tests__/v2-031-m-mail-kinds.test.ts.
+    const base = read('20261113000001_v2_028_monitoring.sql');
+    const added = read('20261114000002_v2_031_agency.sql');
+    expect([
+      ...names(/kind text not null check \(kind in \(([^)]*)\)\)/.exec(base)![1]!),
+      ...names(/v_added constant text\[\] := array\[([^\]]*)\]/.exec(added)![1]!),
+    ]).toEqual([...MAIL_KINDS]);
+    expect(
+      [
+        ...names(/select p_kind in \(([^)]*)\)/.exec(base)![1]!),
+        ...names(/v_added_suppressible constant text\[\] := array\[([^\]]*)\]/.exec(added)![1]!),
+      ].sort(),
+    ).toEqual(MAIL_KINDS.filter((k) => !ACCOUNT_KINDS.has(k)).sort());
   });
 });

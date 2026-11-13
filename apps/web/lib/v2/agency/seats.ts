@@ -27,6 +27,12 @@ export const INVITED_ROLES = ['account_manager', 'developer'] as const;
 /** The roles a seat is invited as or changed to: an owner is neither. */
 export type InvitedRole = (typeof INVITED_ROLES)[number];
 
+/**
+ * How long an invitation's link works, in days: `issue_seat_invite`'s interval (migration
+ * 20261114000002). The invitation's mail states it, and its test reads the interval from the SQL.
+ */
+export const INVITE_LINK_DAYS = 7;
+
 /** The page the seat forms are on. */
 export const SEATS_PAGE = '/seats';
 /** The page an invitation's link lands on (`LINK_FLOWS.invite.page`). */
@@ -115,9 +121,10 @@ export interface InviteMailEvent {
 
 /**
  * The event that asks for an invitation's mail. It names the seat and the invitation's number and
- * holds no address and no token: the handler reads both through `issue_seat_invite`. The event's id
- * is the invitation's, so the same invitation asked for twice is one event to Inngest, and a resend,
- * which is the next number, is another.
+ * holds no address and no token: the handler reads the address from the seat and mints the token
+ * through `issue_seat_invite` (lib/v2/mail/handlers.ts). The event's id is the invitation's, so the
+ * same invitation asked for twice is one event to Inngest, and a resend, which is the next number,
+ * is another.
  */
 export function inviteMailEvent({ seatId, seq }: Invitation): InviteMailEvent {
   return {

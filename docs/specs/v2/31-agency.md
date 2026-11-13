@@ -248,6 +248,48 @@ and a resend counted together (`app/api/seats/route.ts`).
 a resend is another. The event holds no address and no token.
 `pnpm --filter @crawlmouse/web exec vitest run lib/v2/agency/seats.test.ts app/api/seats/route.test.ts`.
 
+**Sending it.** The function `crawlmouse.mail.seat-invite` (`createSeatInviteFn`, `inngest/mail.ts`)
+is one of the mail functions `mailFunctions` lists (`lib/v2/mail/functions.ts`), registered with
+`V2_CHECKS_PUBLIC=1`. It runs `seatInvite(seat, seq)` (`lib/v2/mail/handlers.ts`) in one step, through
+CC-28's `send()` (spec 28, the send ledger):
+
+| Step  | What happens                                                                                                                                                                                                                                                                                                         |
+| ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Read  | `seatInvitation` (`lib/v2/mail/store.ts`): the invited address and the account of a seat whose status is `invited` and whose `invite_seq` is `seq`. No such seat (accepted, removed, or re-sent since) answers `not_invited`; an account marked for deletion, `marked`. Neither claims a ledger row or mints a link. |
+| Claim | The ledger key is `seat_invite:<seat>:<seq>`, the kind `seat_invite`, with the address's hash and the account. The same event a second time is answered `done`.                                                                                                                                                      |
+| Mint  | `issue_seat_invite(seat, seq, now)`, inside `render`, after the claim answered `go`. No row is `nothing_to_send`. The link is mailed when the address it was issued for is the address claimed.                                                                                                                      |
+| Send  | The template `seat-invite`: which account invites the reader and as what, in the invitation page's words (`INVITE_COPY`); the link `/invite/<token>`; that it works for 7 days (`INVITE_LINK_DAYS`, which the template's test holds to `issue_seat_invite`'s interval); and that ignoring it changes nothing.        |
+
+The account's name is escaped, bounded and left out when the account has none; the address is in no
+part of the message. A resend is the next number, so another key and another mail, and
+`issue_seat_invite` for it replaces the stored hash.
+
+A suppression does not stop an invitation: `seat_invite` is account mail (`ACCOUNT_KINDS`,
+`lib/v2/mail/types.ts`; `email_kind_suppressible` in SQL), with no unsubscribe header. The link is
+in the mail and nowhere else, so an address that could not be mailed could not take its seat, while
+the seat stayed held; and the invite routes bound how many are sent (above). The page's notice for a
+written invitation says it will be emailed from `alerts@crawlmouse.com` (`seat_invited`,
+`lib/v2/copy/notices.ts`).
+
+Known gap, the one spec 28 states for an account link (its Known gaps, first item): after Resend
+has accepted an invitation, a failure before the ledger records it as sent makes the retry mint a new
+link, which replaces the delivered one, and Resend refuses the second send; that mail's link then
+does not work and the owner sends the invitation again.
+
+The mail over the migrated schema, with the real `issue_seat_invite`, `read_seat_invite` and
+`claim_email_send`, and the handler and template alone:
+`pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-031-m-invite-mail.test.ts lib/v2/mail/handlers.test.ts lib/v2/mail/store.test.ts lib/v2/mail/recipient-not-in-copy.test.ts lib/v2/mail/templates/seat-invite.test.ts`.
+
+**The mail kinds in SQL** (migration section C). `seat_invite`, `report_confirm` and
+`client_report` join 028's two lists of kinds: the CHECK on `email_sends.kind` and
+`email_kind_suppressible`. Section C rebuilds both from what they hold when it runs, with the three
+added, so a kind that a migration sorting before this one added stays, with its answer under a
+suppression. It raises and changes nothing unless the `kind` column has one CHECK and that CHECK is a
+plain list. The revert takes the three out the same way, after deleting the ledger rows of those
+kinds. `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-031-m-mail-kinds.test.ts` reads
+the lists before the migration from the catalog, claims a row of each kind after it, and stands in
+for an earlier migration's kind under two constraint names.
+
 ## 7. Buying seats and sites
 
 `POST /api/billing/seats` `{seats, sites}` sets the Agency plan's extra seats and extra sites to the
@@ -706,6 +748,46 @@ forms, is not built: the routes above answer JSON and forms, and a form's answer
 address. Of what the artboard draws, this step has no route for "Hold all this week", "Hold",
 "Edit headline", "Preview and edit", the Opened column (open tracking) or the sender address
 (Branding is out: D11).
+
+### The two mails of a schedule
+
+A client report schedule sends two kinds of mail, each a kind of CC-28's ledger (§6, "The mail kinds
+in SQL") with a template in `lib/v2/mail/templates/` and a handler in `reportMailHandlers`
+(`lib/v2/mail/handlers.ts`):
+
+| Kind             | Event                                                 | Ledger key                           | Template         | Under a suppression |
+| ---------------- | ----------------------------------------------------- | ------------------------------------ | ---------------- | ------------------- |
+| `report_confirm` | `report.confirmation.requested {site_id, request_id}` | `report_confirm:<site>:<request_id>` | `report-confirm` | sent                |
+| `client_report`  | `report.send.requested {report_id}`                   | `client_report:<report>`             | `client-report`  | not sent            |
+
+- **The confirmation** says which agency asks to send reports about which site, links
+  `/s/confirm/<token>`, and says that no report is sent unless the reader confirms and that they need
+  no account. `request_id` names one request: the same value again is answered `done`, and the next
+  request is another mail. An empty one, or one longer than 100 characters, is `invalid_request`.
+- **The report** shows the report document's own title, lines and closing line
+  (`ReportDoc.title`, `.lines`, `.footer.text`) as given, and links the report (`/s/<token>`) and the
+  schedule's pause (`/s/pause/<token>`). The pause link is also the message's `List-Unsubscribe`
+  target, with `List-Unsubscribe-Post: List-Unsubscribe=One-Click`. The template writes no sentence
+  about what a check found.
+- **Each link is minted after the ledger's claim**, as an account link is (spec 28, Q10): a handler
+  reads who the mail goes to before the claim (`confirmationRecipient`, `clientReportRecipient`) and
+  mints inside `render` (`issueConfirmation`, `issueClientReport`). An issue that answers null, or
+  that names another address than the one claimed, is `nothing_to_send`.
+
+The handlers take their reads and mints through the port `ReportMailStore`
+(`lib/v2/mail/store.ts`), and their Inngest functions are `createReportConfirmFn` and
+`createClientReportFn` (`inngest/mail.ts`). The port is declared and used and has no implementation
+over the database, and `mailFunctions`, the list of mail functions a deployment registers, holds
+neither function:
+`grep -rln 'ReportMailStore' apps/web/lib apps/web/app --include='*.ts' | grep -v '\.test\.'; grep -n 'Fn(handlers)' apps/web/lib/v2/mail/functions.ts`.
+
+`pnpm --filter @crawlmouse/web exec vitest run lib/v2/mail/handlers.test.ts lib/v2/mail/recipient-not-in-copy.test.ts lib/v2/mail/templates/report-confirm.test.ts lib/v2/mail/templates/client-report.test.ts`
+and `pnpm --filter @crawlmouse/inngest exec vitest run mail.test.ts`.
+
+Known gaps. A contact whose address is under a suppression (a hard bounce or a complaint) is still
+sent the confirmation, and a report to that address is then answered `suppressed` and not sent; no
+screen says so. And the gap §6 states for an invitation's link holds for these links: a failure
+between Resend's acceptance and the ledger's record makes the retry mint again.
 
 ## 11. Erasure, gate messages and events
 

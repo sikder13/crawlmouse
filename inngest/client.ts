@@ -76,17 +76,18 @@ type Events = {
   'fix.email_developer_requested': { data: { requestId: string } };
   // CC-31: an invitation to a seat was written or re-sent (apps/web/lib/v2/agency/seats.ts). The
   // event names the seat and the invitation's number, never an address or a token: the handler
-  // reads both through issue_seat_invite.
+  // reads the address from the seat and mints the token through issue_seat_invite.
   'seat.invite.requested': { data: { seat_id: string; seq: number } };
+  // CC-31: the two mails of a client report schedule (inngest/mail.ts). Each names a row and holds
+  // no address and no token: the confirmation asked of a site's client contact, and a report to send.
+  // request_id names one request for a confirmation. The mail's ledger key holds it, so an event
+  // that repeats a value asks for no second mail; the handler refuses an empty one and one longer
+  // than 100 characters.
+  'report.confirmation.requested': { data: { site_id: string; request_id: string } };
+  'report.send.requested': { data: { report_id: string } };
   // CC-28 D6: one account's weekly summary is due (inngest/summary.ts). Names the account and the
   // week only; the recipients are read when it is sent.
   'summary.requested': { data: { accountId: string; weekKey: string; weekStart: string } };
-  // CC-31: a client report schedule's two mails are asked for
-  // (apps/web/lib/v2/agency/schedules.ts). Each event names a site or a report and holds no
-  // address and no token: the handler reads both through issue_recipient_confirmation and
-  // issue_report_pause when it sends.
-  'report.confirmation.requested': { data: { site_id: string } };
-  'report.send.requested': { data: { report_id: string } };
 };
 
 export const inngest = new Inngest({

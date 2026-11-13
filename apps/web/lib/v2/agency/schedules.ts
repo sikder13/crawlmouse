@@ -110,7 +110,7 @@ export interface ClientReportMail {
 export interface ConfirmationRequestedEvent {
   id: string;
   name: 'report.confirmation.requested';
-  data: { site_id: string };
+  data: { site_id: string; request_id: string };
 }
 
 export interface ReportSendRequestedEvent {
@@ -125,7 +125,8 @@ export const confirmationRequestedEvent = (
 ): ConfirmationRequestedEvent => ({
   id: `report_confirm:${siteId}:${key}`,
   name: 'report.confirmation.requested',
-  data: { site_id: siteId },
+  // The mail's ledger key holds request_id, so a repeat of one ask sends one mail (lib/v2/mail/handlers.ts).
+  data: { site_id: siteId, request_id: key },
 });
 
 /** The event's id is the report's, so a report asked for twice is one event to Inngest. */

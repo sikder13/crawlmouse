@@ -11,6 +11,14 @@
  * - fixToDeveloperFn, on `fix.email_developer_requested`.
  * - checkFinishedEventFn, on `check.finished`: the product event `check_finished`, once per check
  *   (Inngest's idempotency on the check id, and one step).
+ * - seatInviteFn, on `seat.invite.requested` (CC-31): a seat's invitation. The event names the seat and
+ *   the invitation's number; the ledger's key is both (`seat_invite:<seat>:<seq>`), so a resend, which
+ *   is the next number, is another mail.
+ *
+ * The two mails of a client report schedule (CC-31) have their functions here as well, over
+ * `ReportMailHandlers`: reportConfirmFn, on `report.confirmation.requested`, and clientReportFn, on
+ * `report.send.requested`. Which of this file's functions a deployment registers is the list
+ * `mailFunctions` returns (apps/web/lib/v2/mail/functions.ts).
  *
  * Each runs its handler in one step. A `MailRetry` (a send worth retrying, or a claim another worker
  * holds) is thrown on, so Inngest retries the step; any other error is logged by name and the step
@@ -22,6 +30,9 @@ export const ACCOUNT_MAIL_FN_ID = 'crawlmouse.mail.account';
 export const CHECK_NOTIFY_FN_ID = 'crawlmouse.mail.check-notify';
 export const FIX_TO_DEVELOPER_FN_ID = 'crawlmouse.mail.fix-to-developer';
 export const CHECK_FINISHED_EVENT_FN_ID = 'crawlmouse.events.check-finished';
+export const SEAT_INVITE_FN_ID = 'crawlmouse.mail.seat-invite';
+export const REPORT_CONFIRM_FN_ID = 'crawlmouse.mail.report-confirm';
+export const CLIENT_REPORT_FN_ID = 'crawlmouse.mail.client-report';
 
 /**
  * Retries of a mail step. A claim held by a worker that died is taken back after two minutes
@@ -46,6 +57,19 @@ export interface MailHandlers {
   checkNotify(checkId: string): Promise<string>;
   fixToDeveloper(requestId: string): Promise<string>;
   checkFinished(checkId: string): Promise<string>;
+  /** Invitation `seq` of the seat `seatId` (`seats.invite_seq`). */
+  seatInvite(seatId: string, seq: number): Promise<string>;
+}
+
+/** What the two functions of a client report schedule's mail do; each answers an outcome word. */
+export interface ReportMailHandlers {
+  /**
+   * The confirmation asked of a site's client contact. `requestId` is the event's `request_id`: it
+   * names the request, so a retry or a replay of one request is one mail and the next request is
+   * another.
+   */
+  reportConfirm(siteId: string, requestId: string): Promise<string>;
+  clientReport(reportId: string): Promise<string>;
 }
 
 /** The mailer's retry signal, read by name: the app's `MailRetry` class (lib/v2/mail/send.ts). */
@@ -119,6 +143,41 @@ export function createCheckFinishedEventFn(handlers: () => MailHandlers) {
     async ({ event, step }) =>
       step.run('capture', () =>
         guarded(CHECK_FINISHED_EVENT_FN_ID, () => handlers().checkFinished(event.data.checkId)),
+      ),
+  );
+}
+
+export function createSeatInviteFn(handlers: () => MailHandlers) {
+  return inngest.createFunction(
+    mailConfig(SEAT_INVITE_FN_ID),
+    { event: 'seat.invite.requested' },
+    async ({ event, step }) =>
+      step.run('send', () =>
+        guarded(SEAT_INVITE_FN_ID, () => handlers().seatInvite(event.data.seat_id, event.data.seq)),
+      ),
+  );
+}
+
+export function createReportConfirmFn(handlers: () => ReportMailHandlers) {
+  return inngest.createFunction(
+    mailConfig(REPORT_CONFIRM_FN_ID),
+    { event: 'report.confirmation.requested' },
+    async ({ event, step }) =>
+      step.run('send', () =>
+        guarded(REPORT_CONFIRM_FN_ID, () =>
+          handlers().reportConfirm(event.data.site_id, event.data.request_id),
+        ),
+      ),
+  );
+}
+
+export function createClientReportFn(handlers: () => ReportMailHandlers) {
+  return inngest.createFunction(
+    mailConfig(CLIENT_REPORT_FN_ID),
+    { event: 'report.send.requested' },
+    async ({ event, step }) =>
+      step.run('send', () =>
+        guarded(CLIENT_REPORT_FN_ID, () => handlers().clientReport(event.data.report_id)),
       ),
   );
 }

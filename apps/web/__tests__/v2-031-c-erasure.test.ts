@@ -14,12 +14,16 @@
  *       once with none (erased by address).
  * For each: the plan's counts name the rows, the erasure removes or blanks them, and a plan read
  * again counts none.
+ *
+ * And (e), the mailer's record of an invitation that was sent (`email_sends`, CC-28): found by the
+ * invited address's hash when the invitee is erased, and by its account when the owner is.
  */
 import { createHash, randomUUID } from 'node:crypto';
 import type { PGlite } from '@electric-sql/pglite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   erasePerson,
+  MAIL_SENDS_KEY,
   type ErasurePlan,
   type ErasurePorts,
   type ErasureTarget,
@@ -28,15 +32,24 @@ import {
 } from '../lib/v2/account/erase';
 import {
   addSeat,
+  adminOver,
   keptSite,
   person,
   scopeWorld,
   type Person,
   type ScopeWorld,
 } from '../lib/v2/account/sites-test-support';
+import { supabaseSeatsStore } from '../lib/v2/agency/seats-store';
 import { agencyAccount } from '../lib/v2/agency/test-support';
+import { hashMailAddress } from '../lib/v2/mail/address-hash';
+import { mailHandlers } from '../lib/v2/mail/handlers';
+import { supabaseMailLedger } from '../lib/v2/mail/ledger';
+import { memoryTransport } from '../lib/v2/mail/memory';
+import { supabaseMailStore } from '../lib/v2/mail/store';
 import { applyAllMigrations, freshDb } from './helpers/pglite-migrations';
 import { insertRow, ROWS } from './helpers/v2-check-tables';
+
+const MAIL_PEPPER = 'cc31-erasure-test-pepper';
 
 let db: PGlite;
 let world: ScopeWorld;
@@ -103,7 +116,7 @@ function ports(calls: string[]): ErasurePorts {
       ).rows[0]!.r,
     // The mailer's records of the person's address hashes (CC-28): the real function, with a pepper
     // of the test's own.
-    mailPepper: 'cc31-erasure-test-pepper',
+    mailPepper: MAIL_PEPPER,
     mailRecords: async (hashes, apply) =>
       (
         await db.query<{ r: MailRecordCounts }>(
@@ -479,5 +492,99 @@ describe('(d) the client contact and report recipient of another account', () =>
     await asContact(email);
     await erase({ email });
     expect(await contactOf()).toEqual({ name: 'Jordan', email: null });
+  });
+});
+
+describe('(e) an invitation that was mailed', () => {
+  const NOW = new Date('2026-11-14T12:00:00.000Z');
+
+  /**
+   * Invites `email` to `accountId` as the seats route does and sends its mail as the mail function
+   * does, over production's store and ledger with the erasure's pepper; the transport is in memory.
+   */
+  async function mailedInvitation(accountId: string, email: string) {
+    const invited = await supabaseSeatsStore(adminOver(db)).invite({
+      accountId,
+      email,
+      role: 'developer',
+      siteIds: null,
+      cap: 100,
+      now: NOW,
+    });
+    if (invited.outcome !== 'invited') throw new Error(`not invited: ${invited.outcome}`);
+    const transport = memoryTransport();
+    const handlers = mailHandlers({
+      mail: {
+        ledger: supabaseMailLedger(adminOver(db)),
+        transport,
+        pepper: MAIL_PEPPER,
+        now: () => NOW,
+        log: () => undefined,
+      },
+      store: supabaseMailStore(adminOver(db)),
+      capture: async () => undefined,
+    });
+    expect(await handlers.seatInvite(invited.seatId, invited.seq)).toBe('sent');
+    expect(transport.sent.map((m) => m.to)).toEqual([email]);
+    return { seatId: invited.seatId, key: `seat_invite:${invited.seatId}:${invited.seq}` };
+  }
+
+  /** An agency with seats free, to invite from: the world's own has none left by now. */
+  const inviter = async () =>
+    (await agencyAccount(db, await person(db, 'inviting-owner'), 'Harbor & Vale')).accountId;
+
+  const sendsTo = (email: string) =>
+    n(`select count(*) from public.email_sends where address_hash = $1`, [
+      hashMailAddress(MAIL_PEPPER, email),
+    ]);
+  const sendsKeyed = (key: string) =>
+    n(`select count(*) from public.email_sends where idempotency_key = $1`, [key]);
+
+  it('an invitee with an account, erased: no ledger row is left for their address hash', async () => {
+    const invitee = await person(db, 'mailed-invitee');
+    const agencyId = await inviter();
+    const { seatId, key } = await mailedInvitation(agencyId, invitee.email);
+    expect(await sendsTo(invitee.email)).toBe(1);
+
+    const { before, after } = await erase({ userId: invitee.id });
+    expect(before.counts[MAIL_SENDS_KEY]).toBe(1);
+    expect(after.counts[MAIL_SENDS_KEY]).toBe(0);
+    expect(await sendsTo(invitee.email)).toBe(0);
+    expect(await sendsKeyed(key)).toBe(0);
+    expect(await n(`select count(*) from public.seats where id = $1`, [seatId])).toBe(0);
+    // The inviting account is another person's and stays.
+    expect(await n(`select count(*) from public.accounts where id = $1`, [agencyId])).toBe(1);
+    await nothingLeftOf(invitee.email);
+  });
+
+  it('an invitee with no account, erased by address in another case: the same', async () => {
+    const email = `mailed-${randomUUID().slice(0, 8)}@example.com`;
+    const { seatId, key } = await mailedInvitation(await inviter(), email);
+    expect(await sendsTo(email)).toBe(1);
+
+    const { before } = await erase({ email: email.toUpperCase() });
+    expect(before.userId).toBeNull();
+    expect(before.counts[MAIL_SENDS_KEY]).toBe(1);
+    expect(await sendsTo(email)).toBe(0);
+    expect(await sendsKeyed(key)).toBe(0);
+    expect(await n(`select count(*) from public.seats where id = $1`, [seatId])).toBe(0);
+    await nothingLeftOf(email);
+  });
+
+  it('an owner erased with their agency: no ledger row is left for the account, the invitation’s among them', async () => {
+    const owner = await person(db, 'mailing-owner');
+    const agencyId = (await agencyAccount(db, owner, 'Fernhill Studio')).accountId;
+    const colleague = `colleague-${randomUUID().slice(0, 8)}@example.com`;
+    const { key } = await mailedInvitation(agencyId, colleague);
+    const ofAccount = () =>
+      n(`select count(*) from public.email_sends where account_id = $1`, [agencyId]);
+    expect(await ofAccount()).toBe(1);
+
+    const { before } = await erase({ userId: owner.id });
+    expect(before.counts['email_sends deleted (accounts)']).toBe(1);
+    expect(await ofAccount()).toBe(0);
+    // The row is gone, not kept with its account blanked: the colleague's hash finds nothing either.
+    expect(await sendsKeyed(key)).toBe(0);
+    expect(await sendsTo(colleague)).toBe(0);
   });
 });

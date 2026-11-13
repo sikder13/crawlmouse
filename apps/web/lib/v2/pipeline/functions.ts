@@ -2,10 +2,10 @@
  * The functions the Inngest serve route registers (D3): v1's four, in today's order; and checkFn, its
  * cancel handler, the reaper and the daily expiry (CC-22b D8) only when V2_PIPELINE=1 in the
  * environment the route module loads with. CC-03's two billing functions follow, only when
- * V2_BILLING=1, then CC-27b's three deletion functions, the mail functions and CC-31's client report
- * schedules, only when V2_CHECKS_PUBLIC=1. CC-28's scheduler tick, alert and summary functions are
- * registered only when both V2_PIPELINE=1 and V2_CHECKS_PUBLIC=1. With the flags unset the list is
- * v1's four objects, unchanged
+ * V2_BILLING=1, then CC-27b's three deletion functions, the mail functions (CC-28's four and CC-31's:
+ * lib/v2/mail/functions.ts) and CC-31's client report schedules, only when V2_CHECKS_PUBLIC=1.
+ * CC-28's scheduler tick, alert and summary functions are registered only when both V2_PIPELINE=1 and
+ * V2_CHECKS_PUBLIC=1. With the flags unset the list is v1's four objects, unchanged
  * (functions.test.ts).
  *
  * What each function is built from (correctness 1): the reaper, the cancel handler and checkFn's
@@ -118,7 +118,7 @@ export function inngestFunctions(
   const billing = billingFunctions(env);
   // CC-27b's deletion functions, with V2_CHECKS_PUBLIC=1 only (lib/v2/account/deletion-ports.ts).
   const deletion = checksPublicEnabled(env) ? deletionFunctions(env) : [];
-  // CC-28's mail handlers and the check_finished listener, with V2_CHECKS_PUBLIC=1 only
+  // The mail functions and the check_finished listener, with V2_CHECKS_PUBLIC=1 only
   // (lib/v2/mail/functions.ts).
   const mail = checksPublicEnabled(env) ? mailFunctions(env) : [];
   // CC-31's client report schedules, with V2_CHECKS_PUBLIC=1 only (lib/v2/agency/schedules-wiring.ts).

@@ -1,6 +1,8 @@
 /**
  * The mailer's shared types (CC-28 D1, D2). Every v2 email is one of `MAIL_KINDS`; the list is the
- * `email_sends.kind` check of migration 20261113000001, and `types.test.ts` reads it from there.
+ * `email_sends.kind` check of migration 20261113000001 with the kinds migration 20261114000002's
+ * section C adds. send.test.ts ("the kinds") reads both files, and __tests__/v2-031-m-mail-kinds.test.ts
+ * reads the list from a migrated database.
  */
 
 export const MAIL_KINDS = [
@@ -12,21 +14,33 @@ export const MAIL_KINDS = [
   'account_delete',
   'alert',
   'weekly_summary',
+  // CC-31: a seat's invitation, and the two mails of a client report schedule.
+  'seat_invite',
+  'report_confirm',
+  'client_report',
 ] as const;
 export type MailKind = (typeof MAIL_KINDS)[number];
 
 /**
  * Account mail (D7): about the person's own account, so it carries no unsubscribe and a suppression
  * does not stop it. The others are what `email_kind_suppressible` in the migration answers true for.
+ * CC-31 adds two that a suppression does not stop either: a seat's invitation, which is the one way
+ * into the seat, and the confirmation asked of a client's contact before any report is sent to it.
  */
 export const ACCOUNT_KINDS: ReadonlySet<MailKind> = new Set<MailKind>([
   'trial_reminder',
   'email_change_confirm',
   'email_change_notice',
   'account_delete',
+  'seat_invite',
+  'report_confirm',
 ]);
 
-/** The kinds that carry List-Unsubscribe (D7), and what the link turns off. */
+/**
+ * The kinds whose List-Unsubscribe is a seat's signed link (D7), and what the link turns off. A
+ * client report carries List-Unsubscribe as well: its target is the schedule's pause link, which the
+ * report's handler builds (handlers.ts).
+ */
 export const UNSUBSCRIBE_KIND = {
   alert: 'alerts',
   weekly_summary: 'summary',

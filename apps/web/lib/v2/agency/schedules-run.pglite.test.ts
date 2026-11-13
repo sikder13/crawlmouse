@@ -138,7 +138,7 @@ describe('the hourly run over the schedule functions', () => {
       {
         id: `report_confirm:${pending.siteId}:2026-11-16T09:00:00.000Z`,
         name: 'report.confirmation.requested',
-        data: { site_id: pending.siteId },
+        data: { site_id: pending.siteId, request_id: '2026-11-16T09:00:00.000Z' },
       },
       {
         id: `client_report:${row!.id}`,

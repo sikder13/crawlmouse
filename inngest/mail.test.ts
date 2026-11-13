@@ -5,14 +5,21 @@ import {
   ACCOUNT_MAIL_FN_ID,
   CHECK_FINISHED_EVENT_FN_ID,
   CHECK_NOTIFY_FN_ID,
+  CLIENT_REPORT_FN_ID,
   createAccountMailFn,
   createCheckFinishedEventFn,
   createCheckNotifyFn,
+  createClientReportFn,
   createFixToDeveloperFn,
+  createReportConfirmFn,
+  createSeatInviteFn,
   FIX_TO_DEVELOPER_FN_ID,
   guarded,
   MAIL_RETRIES,
+  REPORT_CONFIRM_FN_ID,
+  SEAT_INVITE_FN_ID,
   type MailHandlers,
+  type ReportMailHandlers,
 } from './mail';
 
 type Config = Record<string, unknown>;
@@ -40,6 +47,13 @@ const handlers = (over: Partial<MailHandlers> = {}): MailHandlers => ({
   checkNotify: vi.fn(async () => 'sent'),
   fixToDeveloper: vi.fn(async () => 'sent'),
   checkFinished: vi.fn(async () => 'captured'),
+  seatInvite: vi.fn(async () => 'sent'),
+  ...over,
+});
+
+const reportHandlers = (over: Partial<ReportMailHandlers> = {}): ReportMailHandlers => ({
+  reportConfirm: vi.fn(async () => 'sent'),
+  clientReport: vi.fn(async () => 'sent'),
   ...over,
 });
 
@@ -68,6 +82,17 @@ describe('the configs', () => {
         createFixToDeveloperFn(h),
         FIX_TO_DEVELOPER_FN_ID,
         [{ event: 'fix.email_developer_requested' }],
+      ],
+      [createSeatInviteFn(h), SEAT_INVITE_FN_ID, [{ event: 'seat.invite.requested' }]],
+      [
+        createReportConfirmFn(() => reportHandlers()),
+        REPORT_CONFIRM_FN_ID,
+        [{ event: 'report.confirmation.requested' }],
+      ],
+      [
+        createClientReportFn(() => reportHandlers()),
+        CLIENT_REPORT_FN_ID,
+        [{ event: 'report.send.requested' }],
       ],
     ] as const;
     for (const [fn, id, triggers] of cases) {
@@ -114,6 +139,45 @@ describe('the handlers run in one step, with the event’s ids', () => {
     });
     expect(h.checkFinished).toHaveBeenCalledWith('c1');
     expect(out).toBe('captured');
+  });
+
+  it('an invitation’s event gives its handler the seat and the invitation’s number', async () => {
+    const h = handlers();
+    const { step, ran } = steps();
+    const out = await handler(createSeatInviteFn(() => h))({
+      event: { data: { seat_id: 's1', seq: 2 } },
+      step,
+    });
+    expect(h.seatInvite).toHaveBeenCalledWith('s1', 2);
+    expect(ran).toEqual(['send']);
+    expect(out).toBe('sent');
+  });
+
+  it('a report schedule’s two events give their handlers the site with the request, and the report', async () => {
+    const h = reportHandlers();
+    const confirm = steps();
+    await handler(createReportConfirmFn(() => h))({
+      event: { data: { site_id: 'site1', request_id: 'req-7' } },
+      step: confirm.step,
+    });
+    expect(h.reportConfirm).toHaveBeenCalledWith('site1', 'req-7');
+    const report = steps();
+    await handler(createClientReportFn(() => h))({
+      event: { data: { report_id: 'rep1' } },
+      step: report.step,
+    });
+    expect(h.clientReport).toHaveBeenCalledWith('rep1');
+    expect([...confirm.ran, ...report.ran]).toEqual(['send', 'send']);
+  });
+
+  it('a retry signal from an invitation’s handler is thrown on, so its step retries', async () => {
+    const h = handlers({ seatInvite: vi.fn(async () => Promise.reject(new MailRetry())) });
+    await expect(
+      handler(createSeatInviteFn(() => h))({
+        event: { data: { seat_id: 's1', seq: 1 } },
+        step: steps().step,
+      }),
+    ).rejects.toThrow('mail send to be retried');
   });
 });
 

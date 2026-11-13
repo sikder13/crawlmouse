@@ -410,6 +410,10 @@ describe('PATCH …/client', () => {
       data: { site_id: w.siteId },
     });
     expect(event.id.startsWith(`report_confirm:${w.siteId}:`)).toBe(true);
+    // The handler's ledger key holds request_id: the event's id and the mail's key name one ask.
+    expect(event.id).toBe(
+      `report_confirm:${w.siteId}:${(event.data as { request_id: string }).request_id}`,
+    );
     expect(JSON.stringify(event)).not.toContain('harborlight');
     expect(h.limits).toEqual([
       {
