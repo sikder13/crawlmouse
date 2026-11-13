@@ -2,7 +2,12 @@
  * Each fix's effect on the two grades, by counterfactual recompute: apply what fixing it means to the
  * grade inputs, recompute, take the difference. Never typed.
  *
- * Order and sum. Fixes whose AI effect applied alone can be stated rank first, by that effect
+ * Order and sum. A shell-only template fix ranks first (`shellOnly`): a detected client-rendered
+ * template fix whose template has no graded page, only empty-root pages (detectors/rendered.ts). Its
+ * effect is 0 by construction, because Readable reads graded pages only, yet a template that serves
+ * no text without JavaScript is the most serious AI-access finding a check makes (owner ruling on
+ * CC-32 Q8); ties by fingerprint. Its counterfactual changes no graded page, so applying it first
+ * moves no other fix's effect. Then fixes whose AI effect applied alone can be stated, by that effect
  * (Technical SEO plus AI readability, larger first; an effect not estimated counts 0); then those whose
  * AI effect waits on a reason; ties by fingerprint. In that order each fix's effect is the grade with
  * it and every fix ranked above it applied, less the grade without it:
@@ -354,6 +359,13 @@ function effectOf(
   };
 }
 
+/** A detected client-rendered template fix whose template has no graded page (see Order and sum). */
+export const shellOnly = (f: FixRecord): boolean =>
+  f.family === 'rendered' &&
+  f.record.type === 'client_rendered_template' &&
+  f.record.state === 'detected' &&
+  f.record.extent.graded === 0;
+
 /** Both grades' points, an effect not estimated counting 0. */
 const sizeOf = (e: Effect) => (e.technical_seo ?? 0) + (e.ai_readability ?? 0);
 
@@ -403,6 +415,7 @@ export function effectsOf(
   });
   alone.sort(
     (x, y) =>
+      Number(shellOnly(y.f)) - Number(shellOnly(x.f)) ||
       Number(y.stated) - Number(x.stated) ||
       y.size - x.size ||
       (fingerprintOf(x.f) < fingerprintOf(y.f) ? -1 : 1),
