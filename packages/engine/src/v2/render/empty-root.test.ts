@@ -122,7 +122,7 @@ function expected(pool: readonly EmptyRootCandidate[], max: number): string[] {
     const pr = (p: EmptyRootCandidate) => p.pagerank_share ?? -1;
     const best = Math.max(...listings.map(pr));
     const keys = listings.filter((p) => pr(p) === best).map((p) => p.template_key);
-    kept.push(listings.find((p) => p.template_key === [...keys].sort()[0])!);
+    kept.push(listings.find((p) => pr(p) === best && p.template_key === [...keys].sort()[0])!);
   }
   const templates = [...new Set(kept.map((p) => p.template_key))].sort();
   return templates
