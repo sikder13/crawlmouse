@@ -16,8 +16,10 @@
   align-items: center;
   gap: 8px;
   width: 100%;
+  /* Border-box: a one-line name (14px × 1.55, with this padding) stays inside the 36px minimum,
+     centred where it was; a name that wraps grows the control, with room above and below. */
   min-height: var(--v2-control-h-sm);
-  padding: 0 10px;
+  padding: 6px 10px;
   border: 1px solid var(--v2-line);
   border-radius: var(--v2-radius-control);
   background: var(--v2-s1);
@@ -38,13 +40,11 @@
   outline-offset: 2px;
 }
 
-/* A long account name is cut with an ellipsis; the whole name is the button's accessible name. */
+/* A long account name wraps onto more lines inside the rail: the whole name is shown, never cut. */
 .name {
   flex: 1 1 auto;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 /* The account a page shows while the reader acts in another: its name, as the button reads. */
@@ -52,9 +52,7 @@
   margin: 0;
   padding: 0 10px;
   font-weight: 500;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .chevron {
@@ -98,17 +96,17 @@
 .item {
   display: block;
   width: 100%;
+  /* Border-box: a one-line name (14px × 1.55, with this padding) stays inside the 36px minimum,
+     centred where it was; a name that wraps grows the control, with room above and below. */
   min-height: var(--v2-control-h-sm);
-  padding: 0 10px;
+  padding: 6px 10px;
   border: 0;
   border-radius: var(--v2-radius-control);
   background: none;
   color: var(--v2-fg2);
   font: inherit;
   text-align: left;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
   cursor: pointer;
 }
 

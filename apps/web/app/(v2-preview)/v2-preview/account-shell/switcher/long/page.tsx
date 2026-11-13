@@ -5,7 +5,7 @@ import styles from '../../../_preview/PreviewFrame.module.css';
 import { switcherPreview } from '../../../_preview/accounts';
 import { previewOnly } from '../../../_preview/guard';
 
-/** An agency with a long name on the agency rail, the list open: a name wider than the rail is cut with an ellipsis. */
+/** An agency with a long name on the agency rail, the list open: a name wider than the rail wraps onto more lines. */
 export default function AccountSwitcherLongPreview() {
   previewOnly();
   const shell = switcherPreview('long');
@@ -21,7 +21,7 @@ export default function AccountSwitcherLongPreview() {
       <Card className={styles.cardBody}>
         <p className={styles.note}>
           An agency with a long name on the agency rail, the list open: a name wider than the rail
-          is cut with an ellipsis.
+          wraps onto more lines.
         </p>
       </Card>
     </AccountShell>

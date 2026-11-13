@@ -172,7 +172,7 @@ const KESTREL_SEAT: SwitcherAccount = {
   kind: 'agency',
   name: 'Kestrel Creative',
 };
-/** Names longer than the rail is wide: the button and the list cut them with an ellipsis. */
+/** Names longer than the rail is wide: the button and the list wrap them onto more lines. */
 const LONG_NAME = 'Whitcombe, Okonkwo & Featherstonehaugh Digital Marketing Partners';
 const LONG_SEAT: SwitcherAccount = {
   id: 'a0000000-0000-4000-8000-0000000000f2',
