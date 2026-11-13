@@ -474,6 +474,28 @@ describe('POST /api/reports: a refused form goes back to Reports with a line; JS
     await expectNothingDone(before);
   });
 
+  it('400, a comparison with no earlier check to compare with: the same notice', async () => {
+    as(w.owner);
+    const before = await countReports();
+    for (const bad of [
+      // The earlier check named is the later one.
+      {
+        kind: 'compare',
+        siteId: w.site.id,
+        checkId: w.site.second,
+        previousCheckId: w.site.second,
+      },
+      // A fix at the site's first check, which was compared with none.
+      { kind: 'compare', siteId: w.site.id, checkId: w.site.first, fixId: w.site.verifiedFix },
+    ]) {
+      const form = await post(bad, true);
+      expect(sentTo(form)).toEqual([303, '/reports', 'invalid']);
+      expect(lineOf(form)).toBe(NOTICE_LINES.invalid(null));
+      expect(await answer(await post(bad))).toEqual([400, { code: 'invalid' }]);
+    }
+    await expectNothingDone(before);
+  });
+
   it('402, a plan with no exports: the notice that a paid plan is needed', async () => {
     as(w.stranger);
     const before = await countReports();

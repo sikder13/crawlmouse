@@ -540,11 +540,15 @@ in `apps/web/app/api/reports/route.ts`, and `route.test.ts` beside it has a test
 the 403 `role_refused`, which no request reaches today, since `seat_may` lets each role
 `export_report` (§3).
 
-The Reports screen's forms post to this route. A form refused with 400, 402, 409 or 429 is answered
-with a 303 to `/reports?notice=<code>` and the page says the code's line (`NOTICE_LINES`,
-`lib/v2/copy/notices.ts`): `invalid`, `upgrade_required`, `fix_not_verified`, and `reports_capped`
-with the time the bound that refused it ends. JSON gets the status and code as before
-(429 `rate_limited`). A form's 401 and 404 are JSON too.
+The Reports screen's forms post to this route. A form refused with 400, 402, 403, 409 or 429 is
+answered with a 303 to `/reports?notice=<code>` and the page says the code's line (`NOTICE_LINES`,
+`lib/v2/copy/notices.ts`): `invalid`, `upgrade_required`, `role_refused`, `fix_not_verified`, and
+`reports_capped` with the time the bound that refused it ends. The route has two 400s, and a form
+is sent back for both: a body that is not one of the requests, and a comparison with no earlier
+check to compare with (the one named is the later check itself, or the fix's check was compared
+with none). The 403 is the answer no request reaches today (above), so it is the one of the five
+with no form test. JSON gets the status and code as before (429 `rate_limited`). A form's 401 and
+404 are JSON too.
 `pnpm --filter @crawlmouse/web exec vitest run app/api/reports/route.test.ts -t 'a refused form'`.
 
 The file is made inside the request and the row is written first: `create_report` writes it

@@ -47,20 +47,21 @@ const ABANDONED_AFTER_MS = 15 * 60 * 1000;
  * a proof page's document, or a raw export.
  *
  * In order: 404 with V2_CHECKS_PUBLIC unset; 401 signed out; 400 `invalid` for a body that is not
- * one of the requests; 404 for
- * a site the caller's seat does not cover or a removed one, and for a check (or the fix) that is
- * not a result of that site as the caller's own session reads it; 403 `role_refused` for a role
+ * one of the requests; 404 for a site the caller's seat does not cover or a removed one, and for a
+ * check (or the fix) that is not a result of that site as the caller's own session reads it; 400
+ * `invalid` for a comparison with no earlier check to compare with (the one named is the later
+ * check itself, or the fix's check was compared with none); 403 `role_refused` for a role
  * `seat_may` refuses `export_report`; 402 `exports` when the site's account's tier has no exports;
  * 429 `rate_limited` past the account's hourly bound or its daily one, each failing closed. Only
  * then is the service-role client made: 409 `fix_not_verified` for a fix the named check did not
  * verify (404 for a fix of another site); then the row is written (`create_report`, which checks
- * the checks against the site again), the file made and stored, and `report_generated` sent. The answer is 201 `{reportId}` to JSON and a 303
- * to `/reports` to a form; when the file could not be made the row is left failed, and JSON gets
- * 500 `report_failed` with the row's id.
+ * the checks against the site again), the file made and stored, and `report_generated` sent. The
+ * answer is 201 `{reportId}` to JSON and a 303 to `/reports` to a form; when the file could not be
+ * made the row is left failed, and JSON gets 500 `report_failed` with the row's id.
  *
- * The Reports screen's forms post here. A form refused with 400, 402, 403, 409 or 429 is sent back
- * to `/reports` with the refusal's notice (`NOTICE_LINES`); a 401 and a 404 are JSON for a form
- * too (`refuseTo`).
+ * The Reports screen's forms post here. A form refused with either 400, the 402, the 403, the 409
+ * or the 429 is sent back to `/reports` with the refusal's notice (`NOTICE_LINES`; for the 429,
+ * `reports_capped`); a 401 and a 404 are JSON for a form too (`refuseTo`).
  */
 export async function POST(req: Request) {
   if (!checksPublicEnabled()) return notFound();
