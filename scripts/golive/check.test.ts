@@ -3,6 +3,7 @@ import { main, parseArgs, parseEnvFile } from './check';
 import { PRECONDITIONS } from './preconditions';
 import { PROBES, type ProbeId } from './probes/index';
 import { pass, type Probe, type ProbeResult } from './probes/types';
+import { VERCEL_PROJECT_ID } from './probes/vercel-env';
 import { MASK } from './redact';
 import { fakeToken, json, scriptedFetch, scriptedGit } from './test-support';
 
@@ -214,7 +215,7 @@ describe('no token, file value or received value reaches what the command writes
     const got = 'a-received-value-quoted-by-a-bug-' + 'n'.repeat(10);
     const probes = allPass();
     probes['vercel-env-1'] = async (d) => {
-      const res = await d.fetch('https://api.vercel.com/v10/projects/p/env');
+      const res = await d.fetch(`https://api.vercel.com/v10/projects/${VERCEL_PROJECT_ID}/env`);
       const body = (await res.json()) as { v: string };
       return { status: 'fail', reason: `token ${d.env.VERCEL_TOKEN} body ${body.v}` };
     };

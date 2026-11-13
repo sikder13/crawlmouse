@@ -148,7 +148,7 @@ const line = (p: Precondition, r: ProbeResult | 'manual' | 'ticked'): string => 
 export async function runCheck(args: Args, deps: CheckDeps, redactor: Redactor): Promise<number> {
   const out = (s: string) => deps.out(redactor.redact(s));
   const probeDeps: ProbeDeps = {
-    fetch: guardedFetch(deps.fetch, (v) => redactor.addReceived(v)),
+    fetch: guardedFetch(deps.fetch, (v) => redactor.addReceived(v), deps.env),
     env: deps.env,
     now: deps.now,
     git: deps.git,
