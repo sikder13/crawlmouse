@@ -632,6 +632,11 @@ hour for the account. The link is answered once: JSON gets `{url, expiresAt}`; a
 `/reports`, which the page shows on the report's row. That cookie lasts 120 seconds and is not
 cleared sooner: a page cannot clear a cookie.
 
+A client report's link is the one its mail carries, and a new link revokes the one before, so none
+is made for one here: the `POST` answers 409 `mailed_link`, and the Reports screen offers such a row
+Open and "Withdraw link" and no link form (`shareReport`, `lib/v2/reports/share.ts`; `mayMake`,
+`lib/v2/view/reports.ts`).
+
 `GET /s/[token]` opens a link. In order: a 404 with `V2_CHECKS_PUBLIC` unset; a 404 for a value that
 is not token-shaped, before the rate limit and any database call; a bound of 60 an hour for the
 address (429); a 404 for a token no link holds; **410** with a static HTML page for a link that has
@@ -706,9 +711,12 @@ the schedule's next run asks.
 to a page with no token in its address (`/s/confirm`, `/s/pause`); the page says what the button
 will do, and the button's POST reads the token from the cookie. A GET changes nothing. The pause
 link's address also takes a mail client's one-click POST, which carries no cookie, so for that one
-request the token is the path's. A pause link is minted when a report is sent
-(`issue_report_pause`), and minting replaces the one before: the link that pauses is the one in the
-latest report sent.
+request the token is the path's. The pause link's token is derived, not random: an HMAC-SHA256 under
+`EMAIL_LINK_SECRET` of the site and the contact's address (`reportPauseToken`,
+`lib/v2/mail/report-pause-token.ts`), whose sha256 `issue_report_pause` stores when a report is
+sent. Each report to one contact therefore carries the same pause link, and the link in an earlier
+report still pauses; a changed contact clears the stored hash, so the link mailed to the address
+before stops working once it is cleared.
 
 ```bash
 pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-031-b2-schedules.test.ts 'app/api/report-files/schedules/site/[siteId]/route.test.ts' app/s/confirm/page.test.tsx components/v2/screens/share/RecipientLinkScreen.test.tsx
@@ -729,14 +737,14 @@ moves the schedule to its next run whatever it decided:
 6. no change other than a baseline was detected since the last client report sent for the site, and
    the schedule does not send unchanged: nothing is sent;
 7. otherwise `write_client_report` writes the slot's row (`client_report`, `scheduled`, one a site
-   and slot) and the report's mail is asked for.
+   and slot) and the report's mail is asked for. The row covers the site's latest finished or
+   partial check, and before it the check the last sent client report ended on when that is another
+   check; it names its document's object from that write, with `file_state` `pending` (§9).
 
 The run stops at a port, `ClientReportMail`. Its implementation here sends two Inngest events that
 hold an id and no address: `report.confirmation.requested {site_id}` and `report.send.requested
-{report_id}`. A report handed on this way stays `scheduled`. The mailer's handlers, written with
-the mail kinds, read the address and mint the link when they send (`issue_recipient_confirmation`,
-`issue_report_pause`) and mark the row sent (`mark_client_report_sent`, which answers whether it is
-the account's first: `first_client_report_sent`).
+{report_id}`. A report handed on this way stays `scheduled` until the mailer's handler has sent it
+("The two mails of a schedule", below).
 
 ```bash
 pnpm --filter @crawlmouse/web exec vitest run lib/v2/agency/schedules-run.test.ts lib/v2/agency/schedules-run.pglite.test.ts lib/v2/pipeline/functions.test.ts
@@ -775,19 +783,40 @@ in SQL") with a template in `lib/v2/mail/templates/` and a handler in `reportMai
   that names another address than the one claimed, is `nothing_to_send`.
 
 The handlers take their reads and mints through the port `ReportMailStore`
-(`lib/v2/mail/store.ts`), and their Inngest functions are `createReportConfirmFn` and
-`createClientReportFn` (`inngest/mail.ts`). The port is declared and used and has no implementation
-over the database, and `mailFunctions`, the list of mail functions a deployment registers, holds
-neither function:
-`grep -rln 'ReportMailStore' apps/web/lib apps/web/app --include='*.ts' | grep -v '\.test\.'; grep -n 'Fn(handlers)' apps/web/lib/v2/mail/functions.ts`.
+(`lib/v2/mail/store.ts`), which production implements over section B's SQL
+(`supabaseReportMailStore`, `lib/v2/mail/report-mail-store.ts`); their Inngest functions are
+`createReportConfirmFn` and `createClientReportFn` (`inngest/mail.ts`), registered with the other
+mail functions (`mailFunctions`, `lib/v2/mail/functions.ts`).
 
-`pnpm --filter @crawlmouse/web exec vitest run lib/v2/mail/handlers.test.ts lib/v2/mail/recipient-not-in-copy.test.ts lib/v2/mail/templates/report-confirm.test.ts lib/v2/mail/templates/client-report.test.ts`
-and `pnpm --filter @crawlmouse/inngest exec vitest run mail.test.ts`.
+What `issueClientReport` does for a report that waits to be sent, in this order, each step ending
+the send with `nothing_to_send` when it has nothing to give:
+
+1. `issue_report_pause` answers whether there is still a schedule to send for (a contact that
+   confirmed and has not paused, a site and an account still there), with the address, and stores
+   the pause link's hash.
+2. The report's document is made and stored as a report's file is (`generateReport`, §9): a
+   comparison of the two checks the row covers, or the baseline of the one. The mail's title, lines
+   and closing line are read back from the stored object.
+3. `create_share_link` makes the report's link, which expires 30 days on like any share link. A
+   render that is retried makes a new link and revokes the one before.
+
+When the mail has gone (`sent`, or `done` for a mail an earlier run sent and stopped before
+marking) the handler calls `mark_client_report_sent`, and captures `first_client_report_sent` when
+that answers that the report is the account's first. With no `EMAIL_LINK_SECRET` the pause link
+cannot be made, and no report is read, claimed or sent (`unconfigured`, with a log line); the
+confirmation, which carries no pause link, still goes.
+
+`pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-031-report-mails.test.ts lib/v2/mail/handlers.test.ts lib/v2/mail/recipient-not-in-copy.test.ts lib/v2/mail/templates/report-confirm.test.ts lib/v2/mail/templates/client-report.test.ts lib/v2/pipeline/functions.test.ts`
+and `pnpm --filter @crawlmouse/inngest exec vitest run mail.test.ts`. The first of those runs both
+mails over the migrated schema, from the confirmation to a paused schedule.
 
 Known gaps. A contact whose address is under a suppression (a hard bounce or a complaint) is still
 sent the confirmation, and a report to that address is then answered `suppressed` and not sent; no
-screen says so. And the gap §6 states for an invitation's link holds for these links: a failure
-between Resend's acceptance and the ledger's record makes the retry mint again.
+screen says so. The gap §6 states for an invitation's link holds for the confirmation's link and the
+report's share link: a failure between Resend's acceptance and the ledger's record makes the retry
+mint again (the pause link is the same either way). A client report whose mail does not go
+(`suppressed`, `nothing_to_send`, `failed`, `exhausted`) stays `scheduled`; nothing marks it and no
+screen says why.
 
 ## 11. Erasure, gate messages and events
 
