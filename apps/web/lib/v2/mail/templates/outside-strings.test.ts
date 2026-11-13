@@ -6,6 +6,13 @@ import { agencyPlusContact, type AgencyPlusContactInput } from './agency-plus-co
 import { alertTemplate, type AlertMailInput, type MailChange } from './alert';
 import { checkNotify, type CheckNotifyInput } from './check-notify';
 import { fixToDeveloper, type FixToDeveloperInput } from './fix-to-developer';
+import { DIGEST_FIGURES, founderDigest, type DigestCounts } from './founder-digest';
+import {
+  founderEvent,
+  founderOverflow,
+  type FounderEventInput,
+  type FounderOverflowInput,
+} from './founder-event';
 import { foreignTargets } from './inspect';
 import { trialReminder, type TrialReminderInput } from './trial-reminder';
 import { weeklySummaryTemplate, type WeeklySummaryInput } from './weekly-summary';
@@ -188,6 +195,47 @@ const CASES: readonly Case<unknown>[] = [
     outside: ['email', 'note'],
     ours: [],
   }),
+  // CC-33: the founder's notices. The host and the owner's address are outside; Stripe's currency
+  // is checked against three lower-case letters before it is shown.
+  kase({
+    name: 'founder-event',
+    input: {
+      kind: 'payment',
+      internal: false,
+      accountId: ID,
+      plan: 'pro',
+      payment: 'first',
+      amount: { minor: 1900, currency: 'usd' },
+      host: 'example.com',
+      ownerEmail: 'owner@example.com',
+      occurredAt: '2026-11-13T10:00:00.000Z',
+    } satisfies FounderEventInput,
+    render: founderEvent,
+    outside: ['host', 'ownerEmail'],
+    ours: ['kind', 'accountId', 'plan', 'payment', 'amount.currency', 'occurredAt'],
+  }),
+  kase({
+    name: 'founder-overflow',
+    input: {
+      total: 1,
+      rows: [{ kind: 'signup', accountId: ID, internal: false }],
+    } satisfies FounderOverflowInput,
+    render: founderOverflow,
+    outside: [],
+    ours: ['rows.*.kind', 'rows.*.accountId'],
+  }),
+  kase({
+    name: 'founder-digest',
+    input: {
+      variant: 'weekly',
+      monday: '2026-11-09',
+      week: Object.fromEntries(DIGEST_FIGURES.map(([k]) => [k, 1])) as DigestCounts,
+      previous: Object.fromEntries(DIGEST_FIGURES.map(([k]) => [k, 0])) as DigestCounts,
+    },
+    render: founderDigest,
+    outside: [],
+    ours: ['variant', 'monday'],
+  }),
 ];
 
 /** Every string leaf of `v`, as a path with `*` for each array index. */
@@ -230,6 +278,7 @@ describe('D3: every outside string, set to each hostile value, leaves a sendable
         'alert',
         'weekly-summary',
         'agency-plus-contact',
+        'founder-event',
       ]),
     );
   });
