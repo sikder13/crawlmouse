@@ -196,7 +196,6 @@ export function ConsoleAccountScreen({ view: v, notice }: ConsoleAccountProps) {
             { header: 'Trigger' },
             { header: 'Status' },
             { header: 'Failure' },
-            { header: 'Started', mono: true, hideOnPhone: true },
             { header: 'Finished', mono: true, hideOnPhone: true },
             { header: 'Check id', mono: true, hideOnPhone: true },
             { header: 'Re-run' },
@@ -211,7 +210,6 @@ export function ConsoleAccountScreen({ view: v, notice }: ConsoleAccountProps) {
                 {c.status}
               </StatusPill>,
               c.failure,
-              c.started,
               c.finished,
               c.id,
               c.rerun ? (

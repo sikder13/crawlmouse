@@ -61,7 +61,6 @@ export interface AccountView {
     pill: Pill;
     failure: string;
     queued: string;
-    started: string;
     finished: string;
     /** A failed check of a site that is kept, not paused and not removed. */
     rerun: boolean;
@@ -176,7 +175,6 @@ export function accountView(d: Dossier): AccountView {
         pill: CHECK_PILL[c.status] ?? 'neutral',
         failure: c.failure_reason ?? NONE,
         queued: when(c.queued_at),
-        started: when(c.started_at),
         finished: when(c.finished_at),
         rerun:
           c.status === 'failed' &&

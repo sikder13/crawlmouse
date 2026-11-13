@@ -86,7 +86,6 @@ export interface CheckRow {
   trigger: string;
   failure_reason: string | null;
   queued_at: string;
-  started_at: string | null;
   finished_at: string | null;
 }
 
@@ -352,9 +351,7 @@ export function supabaseConsoleStore(
               'checks',
               await admin
                 .from('checks')
-                .select(
-                  'id, site_id, status, trigger, failure_reason, queued_at, started_at, finished_at',
-                )
+                .select('id, site_id, status, trigger, failure_reason, queued_at, finished_at')
                 .in('site_id', siteIds)
                 .order('queued_at', { ascending: false })
                 .limit(limits.checks),

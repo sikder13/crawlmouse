@@ -53,7 +53,6 @@ const dossier = (customer: string | null): Dossier => ({
       trigger: 'scheduled',
       failure_reason: 'reaped',
       queued_at: '2026-11-12T08:00:00.000Z',
-      started_at: '2026-11-12T08:01:00.000Z',
       finished_at: '2026-11-12T08:31:00.000Z',
     },
   ],
