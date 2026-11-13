@@ -4,6 +4,8 @@ import { FingerprintSchema } from '@crawlmouse/types/v2';
 import { median } from '../grade/numbers.js';
 import { EMPTY_SHELL_BELOW, type JsTextState } from '../render/state.js';
 import { fingerprintOf, subjectOfKey } from './fingerprint.js';
+import { renderedConfidence } from '../grade/outcomes.js';
+import { PAGES_PER_FIX_TEMPLATE } from '../render/sample.js';
 import { detectRendered, type RenderedInputPage } from './rendered.js';
 
 const page = (
@@ -51,7 +53,7 @@ describe('the client-rendered template detector', () => {
       state: 'detected',
       reason: null,
       measured: 0.125,
-      extent: { pages: 3, rendered: 2 },
+      extent: { pages: 3, graded: 3, rendered: 2 },
       affected_urls: [
         'https://a.test/guides/a',
         'https://a.test/guides/b',
@@ -119,7 +121,7 @@ describe('the client-rendered template detector', () => {
       state: 'indeterminate',
       reason: 'not_rendered',
       measured: null,
-      extent: { pages: 2, rendered: 0 },
+      extent: { pages: 2, graded: 2, rendered: 0 },
       affected_urls: [],
       evidence: { pages: [] },
     });
@@ -146,6 +148,191 @@ describe('the client-rendered template detector', () => {
       ['/', 'indeterminate'],
       [T, 'detected'],
       ['/products/{slug}', 'not_detected'],
+    ]);
+  });
+});
+
+describe('presence: a template with an empty-root page and no graded page (CC-32 D2)', () => {
+  const shell: [number, number, JsTextState] = [0, 200, 'empty_shell'];
+  const thin = { kind: 'thin' as const };
+  const A = 'https://a.test/app/a';
+  const B = 'https://a.test/app/b';
+  const C = 'https://a.test/app/c';
+  const app = '/app/{slug}';
+
+  it('is present when the caller names its pages, and its rendered empty-root pages decide it', () => {
+    const records = detectRendered(
+      [page(A, app, shell, thin), page(B, app, null, thin), page(C, app, shell, thin)],
+      { emptyRoots: new Set([A, B, C]) },
+    );
+    expect(records).toEqual([
+      {
+        type: 'client_rendered_template',
+        key: `shell:${app}`,
+        fingerprint: fingerprintOf(`shell:${app}`),
+        template_key: app,
+        state: 'detected',
+        reason: null,
+        measured: 0,
+        extent: { pages: 3, graded: 0, rendered: 2 },
+        affected_urls: [A, B, C],
+        evidence: {
+          pages: [
+            { url: A, raw_words: 0, rendered_words: 200, text_share: 0 },
+            { url: C, raw_words: 0, rendered_words: 200, text_share: 0 },
+          ],
+        },
+      },
+    ]);
+  });
+
+  it('is present and not_rendered when none of its pages was rendered', () => {
+    const [r] = detectRendered([page(A, app, null, thin)], { emptyRoots: new Set([A]) });
+    expect(r).toMatchObject({
+      state: 'indeterminate',
+      reason: 'not_rendered',
+      extent: { pages: 1, rendered: 0 },
+      affected_urls: [],
+    });
+  });
+
+  it('counts only the pages named: a thin page not named is neither present nor read', () => {
+    const [r] = detectRendered(
+      [page(A, app, shell, thin), page(B, app, [200, 200, 'readable'], thin)],
+      {
+        emptyRoots: new Set([A]),
+      },
+    );
+    expect(r).toMatchObject({
+      state: 'detected',
+      extent: { pages: 1, rendered: 1 },
+      affected_urls: [A],
+    });
+  });
+
+  it('a template with graded pages reads them alone: rendered with text and shells beside them is not_detected', () => {
+    const [r] = detectRendered(
+      [page('https://a.test/app/text', app, [200, 200, 'readable']), page(A, app, shell, thin)],
+      { emptyRoots: new Set([A]) },
+    );
+    expect(r).toMatchObject({
+      state: 'not_detected',
+      reason: null,
+      measured: 1,
+      extent: { pages: 2, graded: 1, rendered: 1 },
+    });
+    expect(r!.evidence.pages.map((p) => p.url)).toEqual(['https://a.test/app/text']);
+  });
+
+  it('r2: a graded render failed and two shells rendered: not_rendered, as before CC-32', () => {
+    const guide = 'https://a.test/app/guide';
+    const pages = [page(guide, app, null), page(A, app, shell, thin), page(B, app, shell, thin)];
+    const [r] = detectRendered(pages, { emptyRoots: new Set([A, B]) });
+    expect(r).toMatchObject({
+      state: 'indeterminate',
+      reason: 'not_rendered',
+      measured: null,
+      extent: { pages: 3, graded: 1, rendered: 0 },
+      affected_urls: [],
+      evidence: { pages: [] },
+    });
+    const [before] = detectRendered(pages);
+    expect([r!.state, r!.reason]).toEqual([before!.state, before!.reason]);
+  });
+});
+
+/** The verdict before CC-32, stated by hand: the graded pages' renders alone. */
+function gradedVerdict(states: readonly JsTextState[]): [string, string | null] {
+  if (states.length === 0) return ['indeterminate', 'not_rendered'];
+  const shells = states.filter((s) => s === 'empty_shell').length;
+  if (shells === states.length) return ['detected', null];
+  if (shells === 0) return ['not_detected', null];
+  return ['indeterminate', 'pages_disagree'];
+}
+
+describe('a template with a graded page reads as it did before CC-32, whatever its empty-root pages show (property)', () => {
+  const state = fc.constantFrom<JsTextState>('empty_shell', 'partial', 'readable');
+  const row = fc.record({
+    graded: fc.boolean(),
+    template: fc.constantFrom('/a/{slug}', '/b/{slug}'),
+    render: fc.option(state, { nil: null }),
+  });
+  it('gives the graded pages’ verdict and confidence', () => {
+    fc.assert(
+      fc.property(fc.array(row, { maxLength: 12 }), (rows) => {
+        const ps = rows.map((x, i) =>
+          page(
+            `https://a.test/${i}`,
+            x.template,
+            x.render === null ? null : [x.render === 'empty_shell' ? 0 : 200, 200, x.render],
+            { kind: x.graded ? 'content' : 'thin' },
+          ),
+        );
+        const emptyRoots = new Set(ps.filter((p) => p.kind === 'thin').map((p) => p.url));
+        for (const r of detectRendered(ps, { emptyRoots })) {
+          const graded = ps.filter(
+            (p) => p.template_key === r.template_key && p.kind === 'content',
+          );
+          if (graded.length === 0) continue;
+          const rendered = graded.flatMap((p) => (p.without_js ? [p.without_js.state] : []));
+          expect([r.state, r.reason]).toEqual(gradedVerdict(rendered));
+          expect(renderedConfidence(r)).toBe(
+            rendered.length >= Math.min(PAGES_PER_FIX_TEMPLATE, graded.length)
+              ? 'confirmed'
+              : 'likely',
+          );
+        }
+      }),
+      { numRuns: 400 },
+    );
+  });
+});
+
+describe('a template an awaiting fix names, with no present page (CC-32 D3)', () => {
+  const gone = '/gone/{slug}';
+
+  it('gets an indeterminate record, template_absent, with no page', () => {
+    expect(detectRendered([], { openTemplates: [gone] })).toEqual([
+      {
+        type: 'client_rendered_template',
+        key: `shell:${gone}`,
+        fingerprint: fingerprintOf(`shell:${gone}`),
+        template_key: gone,
+        state: 'indeterminate',
+        reason: 'template_absent',
+        measured: null,
+        extent: { pages: 0, graded: 0, rendered: 0 },
+        affected_urls: [],
+        evidence: { pages: [] },
+      },
+    ]);
+  });
+
+  it('is absent when its only pages are neither graded nor empty-root pages', () => {
+    const [r] = detectRendered(
+      [page('https://a.test/gone/a', gone, [0, 200, 'empty_shell'], { kind: 'thin' })],
+      { openTemplates: [gone] },
+    );
+    expect(r).toMatchObject({ state: 'indeterminate', reason: 'template_absent' });
+  });
+
+  it('takes the usual verdict when the template is present, once', () => {
+    const records = detectRendered([page('https://a.test/gone/a', gone, [0, 200, 'empty_shell'])], {
+      openTemplates: [gone, gone],
+    });
+    expect(records.map((r) => [r.template_key, r.state, r.reason])).toEqual([
+      [gone, 'detected', null],
+    ]);
+  });
+
+  it('sits in template-key order among the present templates', () => {
+    const records = detectRendered([page('https://a.test/a/1', '/a/{slug}', null)], {
+      openTemplates: ['/z/{slug}', '/0/{slug}'],
+    });
+    expect(records.map((r) => [r.template_key, r.reason])).toEqual([
+      ['/0/{slug}', 'template_absent'],
+      ['/a/{slug}', 'not_rendered'],
+      ['/z/{slug}', 'template_absent'],
     ]);
   });
 });
@@ -191,7 +378,11 @@ describe('the client-rendered template detector (properties)', () => {
                   ? ['not_detected', null]
                   : ['indeterminate', 'pages_disagree'];
           expect([r.state, r.reason]).toEqual(expected);
-          expect(r.extent).toEqual({ pages: mine.length, rendered: rendered.length });
+          expect(r.extent).toEqual({
+            pages: mine.length,
+            graded: mine.length,
+            rendered: rendered.length,
+          });
           expect(r.measured).toBe(
             rendered.length === 0 ? null : median(rendered.map((w) => w.text_share)),
           );

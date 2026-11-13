@@ -342,6 +342,23 @@ export const DeclarationNotRequestedSchema = named(
   'DeclarationNotRequested',
   z.enum(['robots_disallowed', 'budget', 'site_stopped', 'site_blocked']),
 );
+/**
+ * What the worker's reader found on a batch's first page that names a front end (CC-30 Q2): each is
+ * one fixed test (packages/worker/src/reader/frontend-markers.ts), and the stored value is the name,
+ * never what the page held. The order here is the order a row lists them in.
+ */
+export const FrontendMarkerSchema = named(
+  'FrontendMarker',
+  z.enum([
+    'next_static_path',
+    'next_data_script',
+    'shopify_theme_object',
+    'shopify_section_class',
+    'hydrogen_powered_by_header',
+    'wp_content_path',
+    'webflow_site_attribute',
+  ]),
+);
 
 // ─── Reused value sets (pinned, not re-covered) ────────────────────────────────────────────────
 
@@ -482,13 +499,15 @@ export const REGISTRY_ONLY_ENUMS = {
 
 /**
  * Values of a worker batch result, which is not fixture data. Each is pinned to the worker
- * (packages/worker/src/batch/partial-reasons.test.ts, declarations.test.ts).
+ * (packages/worker/src/batch/partial-reasons.test.ts, declarations.test.ts,
+ * reader/frontend-markers.test.ts).
  */
 export const BATCH_RESULT_ENUMS = {
   BatchPartialReason: BatchPartialReasonSchema,
   DeclarationPath: DeclarationPathSchema,
   DeclarationState: DeclarationStateSchema,
   DeclarationNotRequested: DeclarationNotRequestedSchema,
+  FrontendMarker: FrontendMarkerSchema,
 } as const;
 
 export const DERIVED_ENUMS = {
@@ -510,6 +529,7 @@ export type WitnessRole = z.infer<typeof WitnessRoleSchema>;
 export type CloudflareCategory = z.infer<typeof CloudflareCategorySchema>;
 export type BatchPartialReason = z.infer<typeof BatchPartialReasonSchema>;
 export type DeclarationPath = z.infer<typeof DeclarationPathSchema>;
+export type FrontendMarker = z.infer<typeof FrontendMarkerSchema>;
 export type VerificationMethod = z.infer<typeof VerificationMethodSchema>;
 export type GradeName = z.infer<typeof GradeNameSchema>;
 export type GradeLetter = z.infer<typeof GradeLetterSchema>;

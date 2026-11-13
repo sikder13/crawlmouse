@@ -424,6 +424,25 @@ const WITHDRAWN: readonly WithdrawnClaim[] = [
       'that has not confirmed is not in those records, and the cell says nothing of it.',
     allowedIn: [],
   },
+  {
+    // CC-32 D7: Cloudflare's changelog of 1 July 2026 gives the new defaults to new domains only.
+    text: 'After 15 Sep 2026 the default is not "allow"',
+    withdrawnIn: 'docs/OPERATING-RULES.md §12 (Cloudflare), CC-32 D7',
+    truth:
+      "From 15 September 2026 Cloudflare's changelog gives new domains Training and Agent blocked on " +
+      'pages with ads and Search allowed; it states no change for a domain already on Cloudflare, and ' +
+      "its policy page says a new domain uses Allow for all three. A site's edge is read from a check.",
+    allowedIn: [],
+  },
+  {
+    text: 'serves its own `robots.txt` at the edge and the origin is never asked',
+    withdrawnIn: 'docs/OPERATING-RULES.md §12 (Cloudflare), CC-32 D7',
+    truth:
+      'Bot Preference Sync prepends managed directives to the origin robots.txt, and only when a ' +
+      'policy is Block, Block on pages with ads or (Training) Disallow; with every policy on Allow ' +
+      'the file is served unchanged.',
+    allowedIn: [],
+  },
 ];
 
 /**

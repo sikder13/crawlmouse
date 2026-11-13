@@ -260,7 +260,8 @@
       },
       "stack_signals": {
         "cms": "custom",
-        "detected_from": "HTML and response headers"
+        "detected_from": "HTML and response headers",
+        "frontend_markers": []
       },
       "main_text_chars": 2999,
       "noindex": false

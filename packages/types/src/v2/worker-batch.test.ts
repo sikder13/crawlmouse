@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { BatchResultSchema, type CrawlBatchResult } from './worker-batch.js';
+import { FrontendMarkerSchema } from './enums.js';
+import { BatchResultSchema, StackSignalsSchema, type CrawlBatchResult } from './worker-batch.js';
 
 const CHECK = '00000000-0000-4000-8000-0000000000c4';
 
@@ -107,5 +108,47 @@ describe('BatchResultSchema', () => {
       BatchResultSchema.safeParse({ ...crawl, batch_id: `${CHECK}:${n}` }).success;
     expect([id('0'), id('7'), id('10')]).toEqual([true, true, true]);
     expect([id('01'), id('007'), id('')]).toEqual([false, false, false]);
+  });
+});
+
+describe('StackSignalsSchema', () => {
+  const signals = { cms: 'shopify', detected_from: 'HTML and response headers' } as const;
+  const markers = (frontend_markers: unknown) =>
+    StackSignalsSchema.safeParse({ ...signals, frontend_markers }).success;
+
+  it('parses the shape stored before front-end markers were recorded', () => {
+    expect(StackSignalsSchema.safeParse(signals).success).toBe(true);
+  });
+
+  it('parses no markers, one, and all seven in the enum order', () => {
+    expect(markers([])).toBe(true);
+    expect(markers(['hydrogen_powered_by_header'])).toBe(true);
+    expect(markers([...FrontendMarkerSchema.options])).toBe(true);
+    expect(FrontendMarkerSchema.options).toEqual([
+      'next_static_path',
+      'next_data_script',
+      'shopify_theme_object',
+      'shopify_section_class',
+      'hydrogen_powered_by_header',
+      'wp_content_path',
+      'webflow_site_attribute',
+    ]);
+  });
+
+  it('refuses a marker outside the closed list, whatever its spelling', () => {
+    for (const m of [
+      'nuxt_data_script',
+      'Next_Static_Path',
+      'next_static_path ',
+      '/_next/static/',
+      '',
+    ])
+      expect(markers([m]), m).toBe(false);
+    expect(markers('next_static_path')).toBe(false);
+    expect(markers(null)).toBe(false);
+  });
+
+  it('refuses more markers than the list holds', () => {
+    expect(markers([...FrontendMarkerSchema.options, 'next_static_path'])).toBe(false);
   });
 });

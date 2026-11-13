@@ -63,7 +63,8 @@ const urlOf = (name: string) => fixture(name).url;
 describe('a check whose renders all succeed', () => {
   it('measures each sampled page from its two renders, in the order they were picked', async () => {
     const out = await renderCheck(input());
-    // One page per template, so each is a template pick, smallest key first among equal sizes.
+    // One page per template, so each is a template pick, smallest key first among equal sizes. Each
+    // reply fixture's two sides carry the same links (`/`, `/shop`, `/about`): none is JS-only.
     expect(out.pages).toEqual([
       {
         url: urlOf('partial'),
@@ -71,6 +72,7 @@ describe('a check whose renders all succeed', () => {
         picked_for: 'template',
         rendered: true,
         without_js: { raw_words: 50, rendered_words: 100, text_share: 0.5, state: 'partial' },
+        links: { js_only: [], js_only_count: 0, truncated: false },
       },
       {
         url: urlOf('server-rendered'),
@@ -78,6 +80,7 @@ describe('a check whose renders all succeed', () => {
         picked_for: 'template',
         rendered: true,
         without_js: { raw_words: 119, rendered_words: 119, text_share: 1, state: 'readable' },
+        links: { js_only: [], js_only_count: 0, truncated: false },
       },
       {
         url: urlOf('client-rendered'),
@@ -85,6 +88,7 @@ describe('a check whose renders all succeed', () => {
         picked_for: 'template',
         rendered: true,
         without_js: { raw_words: 0, rendered_words: 203, text_share: 0, state: 'empty_shell' },
+        links: { js_only: [], js_only_count: 0, truncated: false },
       },
     ]);
   });

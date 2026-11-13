@@ -951,6 +951,7 @@ The whole result (`worker-batch.ts`), parsed with `BatchResultSchema`: one of tw
 | `pages[].stack_signals`                                    | `object`                  | yes  |
 | `pages[].stack_signals.cms`                                | `CmsName`                 | no   |
 | `pages[].stack_signals.detected_from`                      | `string`                  | no   |
+| `pages[].stack_signals.frontend_markers`                   | `FrontendMarker[]`        | no   |
 | `pages[].main_text_chars`                                  | `integer`                 | yes  |
 | `pages[].noindex`                                          | `boolean`                 | yes  |
 | `link_edges`                                               | `object[]`                | no   |
@@ -1168,6 +1169,7 @@ One URL of a crawl batch, as our crawler fetched it; the check builder assembles
 | `stack_signals`                                    | `object`                | yes  |
 | `stack_signals.cms`                                | `CmsName`               | no   |
 | `stack_signals.detected_from`                      | `string`                | no   |
+| `stack_signals.frontend_markers`                   | `FrontendMarker[]`      | no   |
 | `main_text_chars`                                  | `integer`               | yes  |
 | `noindex`                                          | `boolean`               | yes  |
 
@@ -1506,6 +1508,7 @@ Every rule a schema enforces beyond shape, from `rules.ts`. A two-way rule ("X e
 | `robots_ua_unique`          | each search engine has one robots.txt verdict                                                                                                             | one way   |
 | `links_read_html`           | only an HTML response has its links read                                                                                                                  | one way   |
 | `robots_body`               | a robots.txt body is kept exactly when the whole file was read                                                                                            | both ways |
+| `frontend_markers_order`    | front-end markers are listed once each, in the order FrontendMarker lists them                                                                            | one way   |
 
 ## Enums
 
@@ -1570,6 +1573,7 @@ Every rule a schema enforces beyond shape, from `rules.ts`. A two-way rule ("X e
 | `DeclarationPath`         | worker batch result, pinned by the worker             | /llms.txt, /llms-full.txt, /.well-known/ucp, /.well-known/mcp, /.well-known/agent-card.json, /rsl.xml, /sitemap.xml                                                                                                                                                                                                                |
 | `DeclarationState`        | worker batch result, pinned by the worker             | answered, no_response, not_requested                                                                                                                                                                                                                                                                                               |
 | `DeclarationNotRequested` | worker batch result, pinned by the worker             | robots_disallowed, budget, site_stopped, site_blocked                                                                                                                                                                                                                                                                              |
+| `FrontendMarker`          | worker batch result, pinned by the worker             | next_static_path, next_data_script, shopify_theme_object, shopify_section_class, hydrogen_powered_by_header, wp_content_path, webflow_site_attribute                                                                                                                                                                               |
 
 ## Open items for the engine stream
 

@@ -1,7 +1,7 @@
 /**
  * The crawl row's fields for the check builder (CC-20a), as a batch writes them: content features and
- * main-content length on a page read whole, the CMS on the batch's first URL only, noindex from the
- * meta tags and from the X-Robots-Tag header, and robots.txt kept whole.
+ * main-content length on a page read whole, the CMS and front-end markers on the batch's first URL
+ * only, noindex from the meta tags and from the X-Robots-Tag header, and robots.txt kept whole.
  */
 import { readContentFeatures } from '@crawlmouse/engine/worker';
 import { describe, expect, it } from 'vitest';
@@ -26,6 +26,12 @@ function respond(url: string): FakeResponse {
     return {
       headers: { 'content-type': 'text/html', 'x-robots-tag': 'googlebot: noindex' },
       body: '<html><body><p>x</p></body></html>',
+    };
+  if (path === '/hydrogen')
+    return {
+      // The value Hydrogen sets (reader/frontend-markers.ts).
+      headers: { 'content-type': 'text/html', 'powered-by': 'Shopify, Hydrogen' },
+      body: '<html><body><h1>Shop</h1><script id="__NEXT_DATA__" type="application/json">{}</script></body></html>',
     };
   if (path === '/file.pdf')
     return { headers: { 'content-type': 'application/pdf', 'x-robots-tag': 'none' }, body: '%PDF' };
@@ -67,8 +73,19 @@ describe('crawl row fields for the check builder', () => {
     expect(row('/').stack_signals).toEqual({
       cms: 'wordpress',
       detected_from: 'HTML and response headers',
+      frontend_markers: ['wp_content_path'],
     });
     expect(row('/other').stack_signals).toBeNull();
+  });
+
+  it("reads the front-end markers on the batch's first URL, from its HTML and its response headers", async () => {
+    const { row } = await crawl(['/hydrogen', '/']);
+    expect(row('/hydrogen').stack_signals).toEqual({
+      cms: 'custom',
+      detected_from: 'HTML and response headers',
+      frontend_markers: ['next_data_script', 'hydrogen_powered_by_header'],
+    });
+    expect(row('/').stack_signals).toBeNull();
   });
 
   it('reads noindex from the X-Robots-Tag header, also on a response it does not read', async () => {
