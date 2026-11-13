@@ -12,7 +12,13 @@ import {
 } from '../../app/(v2-preview)/v2-preview/_preview/seats';
 import { LiveActions } from '../../components/v2/screens/account/LiveActions';
 import { SeatsScreen } from '../../components/v2/screens/seats/SeatsScreen';
-import { EXTRA_SEAT, EXTRA_SITE, usd } from '../../lib/billing/prices';
+import {
+  EXTRA_SEAT,
+  EXTRA_SEAT_YEARLY,
+  EXTRA_SITE,
+  EXTRA_SITE_YEARLY,
+  usd,
+} from '../../lib/billing/prices';
 import { GATES } from '../../lib/entitlement-v2';
 import { gateMessage } from '../../lib/v2/agency/gates';
 import { SEAT_GUARD } from '../../lib/v2/agency/guard';
@@ -89,8 +95,10 @@ describe('seatsView: an Agency account read by its owner (Northwind)', () => {
     expect(paid).toBe(`One seat free. Beyond five, ${usd(EXTRA_SEAT)} a seat a month.`);
     expect(paid).toBe('One seat free. Beyond five, $12 a seat a month.');
     expect(seatsPreview(PAID).buy!.line).toBe(
-      `${usd(EXTRA_SEAT)} a month for each seat beyond five, ${usd(EXTRA_SITE)} a month for each site beyond ${GATES.agency.sites}, up to ${GATES.agency.maxSites} sites.`,
+      // A yearly plan's extras are charged by the year, and the line says what they are then.
+      `${usd(EXTRA_SEAT)} a month for each seat beyond five, ${usd(EXTRA_SITE)} a month for each site beyond ${GATES.agency.sites}, up to ${GATES.agency.maxSites} sites. On a yearly plan each is charged by the year: ${usd(EXTRA_SEAT_YEARLY)} a seat, ${usd(EXTRA_SITE_YEARLY)} a site.`,
     );
+    expect([EXTRA_SEAT_YEARLY, EXTRA_SITE_YEARLY]).toEqual([120, 30]);
   });
 
   it('draws the buy form while the plan is paid, and not for the same account past due, which the route would refuse', () => {

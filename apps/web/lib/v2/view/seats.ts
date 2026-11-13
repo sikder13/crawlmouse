@@ -15,7 +15,13 @@
  * member sees the people and the role table. The routes ask `seat_may` again.
  */
 import type { Seat, SeatRole, Site } from '@crawlmouse/types/v2';
-import { EXTRA_SEAT, EXTRA_SITE, usd } from '../../billing/prices';
+import {
+  EXTRA_SEAT,
+  EXTRA_SEAT_YEARLY,
+  EXTRA_SITE,
+  EXTRA_SITE_YEARLY,
+  usd,
+} from '../../billing/prices';
 import { GATES } from '../../entitlement-v2';
 import type { NoticeCode } from '../account/route';
 import { extrasOffered, MAX_EXTRA_SEATS } from '../agency/extras-bounds';
@@ -304,7 +310,7 @@ export function seatsView(
             id: BUY_ANCHOR,
             action: '/api/billing/seats',
             accountId: v.account.id,
-            line: `${usd(EXTRA_SEAT)} a month for each seat beyond ${numberWord(GATES.agency.seats)}, ${usd(EXTRA_SITE)} a month for each site beyond ${count(GATES.agency.sites)}, up to ${count(GATES.agency.maxSites)} sites.`,
+            line: `${usd(EXTRA_SEAT)} a month for each seat beyond ${numberWord(GATES.agency.seats)}, ${usd(EXTRA_SITE)} a month for each site beyond ${count(GATES.agency.sites)}, up to ${count(GATES.agency.maxSites)} sites. On a yearly plan each is charged by the year: ${usd(EXTRA_SEAT_YEARLY)} a seat, ${usd(EXTRA_SITE_YEARLY)} a site.`,
             seats: { value: extras.seats, max: MAX_EXTRA_SEATS },
             sites: { value: extras.sites, max: GATES.agency.maxSites - GATES.agency.sites },
           }
