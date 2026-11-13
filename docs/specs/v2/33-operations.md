@@ -30,9 +30,10 @@ status-page vendor, switching any flag.
 - **The bound.** 20 instant notices an hour for customers' accounts and 20 for internal ones, counted
   apart. The rest are held, and the hourly tick at :07 mails them as one "N more" notice, keyed
   `founder_event:overflow:<UTC hour>` from the tick's time, taken once in a `clock` step so a retry in
-  the next hour keeps the key. Rows taken by a notice whose mail gave up (its ledger row failed after 3
-  attempts) are listed again in the next notice (`apps/web/__tests__/v2-033-founder.test.ts`, "re-takes
-  the rows of a notice whose mail gave up").
+  the next hour keeps the key. Rows taken by a notice whose mail's ledger row is `failed` are listed
+  again by a later hour's notice, whether `send` gave up after 3 attempts or recorded, after one, a
+  provider answer it does not retry (`apps/web/__tests__/v2-033-founder.test.ts`, "re-takes the rows
+  of a notice whose mail gave up").
 - **Payments.** Whether a payment is the first is Stripe's record, not the account's state history:
   the customer's paid invoices (`invoices.list` with `status: 'paid'`), leaving out the latest invoice
   and zero-amount ones (Stripe pays a zero invoice when a trial starts). With none, "First payment";

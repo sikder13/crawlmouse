@@ -281,7 +281,7 @@ describe('take_founder_overflow', () => {
     expect(t.rows.map((r) => r.account_id)).toEqual([byMinute['01'], byMinute['02']]);
   });
 
-  it('re-takes the rows of a notice whose mail gave up, and no other key’s (review C6)', async () => {
+  it('re-takes the rows of a notice whose mail gave up, and no other key’s (review C6, N1)', async () => {
     await take(`overflow:clear-${randomUUID()}`);
     const now = '2027-11-01T10:00:00.000Z';
     for (const k of keys('ovx-fill', LIMIT)) await claim({ key: k, now });
@@ -299,26 +299,35 @@ describe('take_founder_overflow', () => {
           now,
         ],
       );
-    // Three notices take their rows first; then their mails' ledger rows say how each ended.
-    const heldUnder = async (tag: string, n: number) => {
+    // Notices take their rows under their hour's key first; then their mails' ledger rows say how
+    // each ended.
+    const heldUnder = async (tag: string, n: number, key: string) => {
       const account = randomUUID();
       for (const k of keys(tag, n)) expect(await claim({ key: k, account, now })).toBe('held');
-      const key = `overflow:${randomUUID()}`;
       expect((await take(key)).total).toBe(n);
       return { account, key };
     };
-    const gaveUp = await heldUnder('ovx-gave-up', 2);
-    const retrying = await heldUnder('ovx-retrying', 1);
-    const sent = await heldUnder('ovx-sent', 1);
+    // 3 attempts: claim_email_send sends it no more, whatever the hour.
+    const gaveUp = await heldUnder('ovx-gave-up', 2, 'overflow:2099-11-01T13');
+    // 1 attempt, an earlier hour: a provider answer not retried (a 4xx), or retries left over.
+    const failedOnce = await heldUnder('ovx-failed-once', 1, 'overflow:2027-11-01T08');
+    // 1 attempt, a later hour than the take's: that notice's run may still retry it.
+    const later = await heldUnder('ovx-later', 1, 'overflow:2027-11-01T12');
+    // 1 attempt under a key that is not an hour's: not compared.
+    const notAnHour = await heldUnder('ovx-not-an-hour', 1, `overflow:0-${randomUUID()}`);
+    const sent = await heldUnder('ovx-sent', 1, 'overflow:2027-11-01T07');
     await ledger(gaveUp.key, 'failed', 3);
-    await ledger(retrying.key, 'failed', 1);
+    await ledger(failedOnce.key, 'failed', 1);
+    await ledger(later.key, 'failed', 1);
+    await ledger(notAnHour.key, 'failed', 1);
     await ledger(sent.key, 'sent', 1);
-    const exhausted = gaveUp.account;
     const fresh = randomUUID();
     expect(await claim({ key: keys('ovx-new', 1)[0]!, account: fresh, now })).toBe('held');
-    const next = await take(`overflow:${randomUUID()}`);
-    expect(next.total).toBe(3);
-    expect(next.rows.map((r) => r.account_id).sort()).toEqual([exhausted, exhausted, fresh].sort());
+    const next = await take('overflow:2027-11-01T10');
+    expect(next.total).toBe(4);
+    expect(next.rows.map((r) => r.account_id).sort()).toEqual(
+      [gaveUp.account, gaveUp.account, failedOnce.account, fresh].sort(),
+    );
   });
 
   it('refuses a key that is not an overflow key', async () => {

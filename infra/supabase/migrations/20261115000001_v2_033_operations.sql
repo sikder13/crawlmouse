@@ -430,11 +430,17 @@ begin
 end;
 $$;
 
--- The held rows one "N more" notice reports, under its key p_key ('overflow:<hour>'). The first call
--- for a key writes the key onto every held row no notice has taken, and onto the rows taken by a
--- notice whose mail gave up: its ledger row (email_sends, key 'founder_event:<its key>') is `failed`
--- with 3 attempts, claim_email_send's bound, so that notice is not sent again and its rows are
--- reported in this one (review C6). A later call for the same key takes nothing new and answers the rows already
+-- The held rows one "N more" notice reports, under its key p_key ('overflow:<hour>', the hour as
+-- 'YYYY-MM-DDTHH' in UTC). The first call for a key writes the key onto every held row no notice has
+-- taken, and onto the rows taken by an earlier notice whose mail's ledger row (email_sends, key
+-- 'founder_event:<its key>') is `failed` and either
+--   has 3 attempts, claim_email_send's bound, so that notice is not sent again (review C6), or
+--   is under an earlier hour's key than p_key, whatever its attempts: `send` records `failed` after
+--   one attempt for a provider answer it does not retry (review N1).
+-- Both keys must be hour keys for the second; they compare as text in the "C" collation, which for
+-- that fixed-width shape is the hours' order. A retry of the earlier notice's run, if one is left,
+-- finds no rows under its key, and takes a later hour's rows back only when that later mail has 3
+-- failed attempts (apps/web/__tests__/v2-033-founder.test.ts, "review C6, N1"). A later call for the same key takes nothing new and answers the rows already
 -- carrying it, so a retried notice reports the same rows. Rows taken by a notice whose run ended
 -- before its mail was claimed keep that notice's key and are not reported again. Answers
 -- {"total": n, "rows": [...]}, rows oldest first, at most p_rows of them.
@@ -457,7 +463,11 @@ begin
        and (n.overflow_key is null
             or exists (select 1 from public.email_sends e
                         where e.idempotency_key = 'founder_event:' || n.overflow_key
-                          and e.status = 'failed' and e.attempts >= 3));
+                          and e.status = 'failed'
+                          and (e.attempts >= 3
+                               or (n.overflow_key ~ '^overflow:[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}$'
+                                   and p_key ~ '^overflow:[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}$'
+                                   and n.overflow_key collate "C" < p_key collate "C"))));
   end if;
   return (
     select pg_catalog.jsonb_build_object(
