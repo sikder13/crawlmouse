@@ -19,6 +19,7 @@ import { supabasePipelineStore, type QueuedCheck } from '../pipeline/store';
 
 const Iso = z.iso.datetime();
 
+// Twin of `CappedAnswer` and its mapping in `supabaseRequestRecheck` (lib/v2/account/sites-store.ts).
 const Answer = z.discriminatedUnion('outcome', [
   z.strictObject({ outcome: z.literal('created') }),
   z.strictObject({ outcome: z.literal('exists'), status: z.string() }),

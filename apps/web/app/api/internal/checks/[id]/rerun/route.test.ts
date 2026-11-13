@@ -168,7 +168,17 @@ describe("an operator's re-run", () => {
     expect(h.send).not.toHaveBeenCalled();
   });
 
-  it('refuses a check that did not fail', async () => {
+  /** The line a refusal made in the route writes: the outcome is the refusal. */
+  const refusedLine = (op: Person, accountId: string, target: string, outcome: string) => ({
+    operator_id: op.id,
+    action: 'rerun_check',
+    account_id: accountId,
+    target,
+    reason: 'stuck since Tuesday',
+    outcome,
+  });
+
+  it('refuses a check that did not fail, and records the refusal', async () => {
     const op = await operatorPerson(h.db);
     const { owner, site } = await world();
     const { rows } = await h.db.query<{ id: string }>(
@@ -182,9 +192,12 @@ describe("an operator's re-run", () => {
       `/internal/accounts/${owner.accountId}?done=not_failed`,
     );
     expect(h.send).not.toHaveBeenCalled();
+    expect((await recordLines(h.db)).at(-1)).toEqual(
+      refusedLine(op, owner.accountId, rows[0]!.id, 'not_failed'),
+    );
   });
 
-  it('refuses while crawls are paused, and while the pipeline is off', async () => {
+  it('refuses while crawls are paused, and while the pipeline is off, and records each', async () => {
     const op = await operatorPerson(h.db);
     const { owner, failed } = await world();
     as(op);
@@ -192,12 +205,34 @@ describe("an operator's re-run", () => {
     expect((await rerun(failed)).headers.get('location')).toBe(
       `/internal/accounts/${owner.accountId}?done=paused`,
     );
+    expect((await recordLines(h.db)).at(-1)).toEqual(
+      refusedLine(op, owner.accountId, failed, 'paused'),
+    );
     vi.stubEnv('CRAWL_PAUSED', '');
     vi.stubEnv('V2_PIPELINE', '');
     expect((await rerun(failed)).headers.get('location')).toBe(
       `/internal/accounts/${owner.accountId}?done=unavailable`,
     );
+    expect((await recordLines(h.db)).at(-1)).toEqual(
+      refusedLine(op, owner.accountId, failed, 'unavailable'),
+    );
     expect(h.send).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['removed', 'update public.sites set removed_at = now() where id = $1', 'site_removed'],
+    ['paused', `update public.sites set paused_reason = 'user' where id = $1`, 'site_paused'],
+  ])('refuses a check of a %s site, and records the refusal', async (_name, sql, code) => {
+    const op = await operatorPerson(h.db);
+    const { owner, site, failed } = await world();
+    await h.db.query(sql, [site.id]);
+    as(op);
+    const res = await rerun(failed);
+    expect(res.headers.get('location')).toBe(`/internal/accounts/${owner.accountId}?done=${code}`);
+    expect(h.send).not.toHaveBeenCalled();
+    expect((await recordLines(h.db)).at(-1)).toEqual(
+      refusedLine(op, owner.accountId, failed, code),
+    );
   });
 
   it('answers 404 for an id that is malformed or names no check', async () => {

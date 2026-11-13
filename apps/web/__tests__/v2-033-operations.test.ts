@@ -439,13 +439,40 @@ describe('operator_log', () => {
     expect(await actionsOf(someone)).toEqual([]);
   });
 
-  it('refuses rerun_check, which only operator_request_check records', async () => {
-    const op = await operator();
-    await expect(
-      call('operator_log', [op, 'rerun_check', null, randomUUID(), 'x', null]),
-    ).rejects.toThrow(/operator_request_check/);
-    expect(await actionsOf(op)).toEqual([]);
-  });
+  it.each(['paused', 'unavailable', 'not_failed', 'site_removed', 'site_paused'])(
+    'writes a rerun_check row for a re-run the route refused as %s',
+    async (outcome) => {
+      const op = await operator();
+      const { accountId } = await personalAccount(db, await person());
+      const target = randomUUID();
+      await call('operator_log', [op, 'rerun_check', accountId, target, 'stuck', outcome]);
+      expect(await actionsOf(op)).toEqual([
+        expect.objectContaining({
+          action: 'rerun_check',
+          account_id: accountId,
+          target,
+          reason: 'stuck',
+          outcome,
+        }),
+      ]);
+    },
+  );
+
+  it.each([
+    ['no outcome', 'stuck', null],
+    ['a queued outcome', 'stuck', 'created'],
+    ['an outcome request_capped_check gives', 'stuck', 'capped'],
+    ['no reason', null, 'paused'],
+  ])(
+    'refuses a rerun_check row with %s, which only operator_request_check records',
+    async (_name, reason, outcome) => {
+      const op = await operator();
+      await expect(
+        call('operator_log', [op, 'rerun_check', null, randomUUID(), reason, outcome]),
+      ).rejects.toThrow(/operator_request_check/);
+      expect(await actionsOf(op)).toEqual([]);
+    },
+  );
 
   it.each(['anon', 'authenticated'] as const)('%s may not execute it', async (role) => {
     const op = await operator();

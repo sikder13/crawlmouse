@@ -7,7 +7,8 @@
  * row; its seats, with `users.email` for each seat's user; its sites; the last 20 checks across those
  * sites by `queued_at`; its mail ledger (`email_sends`: kind, status, attempts, error_code, claimed_at,
  * sent_at, and not `address_hash`); its alert rules and their last 20 events; and its sites' open and
- * reopened fixes. Writes go through `operator_log` and `operator_finish` only.
+ * reopened fixes. It writes through `operator_log` and `operator_finish`; a queued re-run's line is
+ * written by `operator_request_check` (lib/v2/ops/rerun.ts).
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { consoleAdmin, type OperatorProof } from './operator';
@@ -135,6 +136,9 @@ export interface RerunTarget {
 
 export type ResendOutcome = 'sent' | 'refused' | 'rate_limited' | 'failed';
 
+/** A re-run the console's route refuses before `operator_request_check` is called. */
+export type RerunRefusal = 'paused' | 'unavailable' | 'not_failed' | 'site_removed' | 'site_paused';
+
 export interface ConsoleStore {
   resolve(q: SearchQuery): Promise<{ kind: ResolvedKind; accountIds: string[] }>;
   summaries(accountIds: readonly string[]): Promise<AccountRow[]>;
@@ -149,6 +153,13 @@ export interface ConsoleStore {
   /** The re-send's row, written before the link is asked for; its outcome is set by `finish`. */
   logResend(accountId: string, userId: string, reason: string): Promise<number>;
   finish(actionId: number, outcome: ResendOutcome): Promise<boolean>;
+  /** The `rerun_check` line of a re-run the route refused, with the refusal as its outcome. */
+  logRerunRefused(
+    accountId: string,
+    checkId: string,
+    reason: string,
+    refusal: RerunRefusal,
+  ): Promise<number>;
 }
 
 const ACCOUNT_COLUMNS =
@@ -178,7 +189,7 @@ export function supabaseConsoleStore(admin: SupabaseClient, operatorId: string):
     ).map((r) => r.id);
 
   async function log(
-    action: 'search' | 'list_accounts' | 'view_account' | 'resend_sign_in',
+    action: 'search' | 'list_accounts' | 'view_account' | 'resend_sign_in' | 'rerun_check',
     account: string | null,
     target: string,
     reason: string | null,
@@ -415,6 +426,8 @@ export function supabaseConsoleStore(admin: SupabaseClient, operatorId: string):
     },
     logResend: (accountId, userId, reason) =>
       log('resend_sign_in', accountId, userId, reason, null),
+    logRerunRefused: (accountId, checkId, reason, refusal) =>
+      log('rerun_check', accountId, checkId, reason, refusal),
 
     async finish(actionId, outcome) {
       const { data, error } = await admin.rpc('operator_finish', {

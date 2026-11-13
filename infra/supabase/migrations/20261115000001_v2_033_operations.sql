@@ -161,9 +161,12 @@ grant select, insert on table public.operator_actions to service_role;
 -- Writes one search, list_accounts, view_account or resend_sign_in row and answers its id
 -- (list_accounts: a row for an account a search listing shows, written before the listing reads it).
 -- p_outcome is known when the row is written for a search (how many accounts it found) and null
--- otherwise; a re-send's is set afterwards by operator_finish. p_operator must be in operators (42501 otherwise). A re-run is
--- recorded by operator_request_check, in the call that queues it, so rerun_check is refused here
--- (22023). Security invoker: service_role holds the insert.
+-- otherwise; a re-send's is set afterwards by operator_finish. p_operator must be in operators
+-- (42501 otherwise). A queued or capped re-run is recorded by operator_request_check, in the call
+-- that queues it; a re-run the console's route refuses before that call is recorded here, as a
+-- rerun_check row with a reason and one of the route's refusals as its outcome (paused, unavailable,
+-- not_failed, site_removed, site_paused). Any other rerun_check row is refused (22023). Security
+-- invoker: service_role holds the insert.
 
 create or replace function public.operator_log(
   p_operator uuid,
@@ -182,7 +185,11 @@ as $$
 declare
   v_id bigint;
 begin
-  if p_action = 'rerun_check' then
+  if p_action = 'rerun_check'
+     and (p_reason is null
+          or p_outcome is null
+          or p_outcome not in ('paused', 'unavailable', 'not_failed', 'site_removed', 'site_paused'))
+  then
     raise exception 'operator_log: a re-run is recorded by operator_request_check'
       using errcode = '22023';
   end if;
