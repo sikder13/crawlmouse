@@ -255,6 +255,10 @@ describe('the mechanism checks fail on the code they guard against', () => {
         `import { supabaseAdmin as a } from './../../../../../../lib/supabase/../supabase/admin.js';`,
         './../../../../../../lib/supabase/../supabase/admin.js',
       ],
+      aliasDotted: [
+        `import { supabaseAdmin as a } from '@/lib/supabase/../supabase/admin';`,
+        '@/lib/supabase/../supabase/admin',
+      ],
       subpath: [
         `import { createClient as c } from '@supabase/supabase-js/dist/module/index.js';`,
         '@supabase/supabase-js/dist/module/index.js',
