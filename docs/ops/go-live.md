@@ -6,11 +6,20 @@ Instant Rollback; the worker (step 1) by returning to its previous Fly release, 
 deploy, which has none, by leaving it unused, since nothing calls it before step 2. Nothing here is per
 account.
 
-Before every step:
+Before every step, from a checkout of the commit production is serving (the check's second line names
+it, read from Vercel; it blocks every step while this checkout's inputs differ from it). In the
+checkout that holds `scripts/.env.local`:
+
+```bash
+git fetch origin && git switch --detach <the live production commit>
+```
 
 ```bash
 pnpm golive:check -- --step <N>
 ```
+
+From another worktree, which has no `scripts/.env.local` of its own, add
+`--env-file <path to that checkout>/scripts/.env.local`. `git switch -` returns to the branch after.
 
 It prints one line per precondition, grouped by the step it gates, and exits non-zero while any line
 gating step N or an earlier one is not `pass`. `unknown` is not `pass`: it names the token to add to
@@ -242,10 +251,11 @@ whose token is missing.
 The boxes are not ticked in this file. When one is true, pass its id to the check:
 `pnpm golive:check -- --step N --ticked id,id`. A manual row counts as not passing until it is passed.
 
-Run the check from a checkout of the live production commit. Its second line says whether this checkout's
-inputs (`CHECK_INPUTS` in `scripts/golive/probes/live.ts`) equal that commit's; until they do, the rows that read
-a table from this checkout (worker-release, vercel-env-step-1, inngest-plan, vercel-env-step-2, vercel-env-step-3, vercel-env-step-4, vercel-env-step-5, stripe-live-prices) answer unknown, and the
-function counts printed in the boxes below are this checkout's.
+Run the check from a checkout of the live production commit (_Before every step_, above). The second line of
+its standard output says whether this checkout's inputs (`CHECK_INPUTS` in `scripts/golive/probes/live.ts`)
+equal that commit's. Until they do, the check exits non-zero at every step, the rows that read a table from
+this checkout (worker-release, vercel-env-step-1, inngest-plan, vercel-env-step-2, vercel-env-step-3, vercel-env-step-4, vercel-env-step-5, stripe-live-prices) answer unknown, and the function counts printed in the boxes
+below are this checkout's.
 
 #### Before step 1: deploy the production worker, record its egress, set the worker variables
 

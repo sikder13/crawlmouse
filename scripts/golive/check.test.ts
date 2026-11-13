@@ -22,15 +22,28 @@ const probesWith = (answers: Answers): Record<ProbeId, Probe> => {
 const manualThrough = (step: number) =>
   PRECONDITIONS.filter((p) => p.check.kind === 'manual' && p.gates <= step).map((p) => p.id);
 
-async function run(argv: string[], probes: Record<ProbeId, Probe>, file: string | null = '') {
+/**
+ * A run whose checkout matches the live production commit (the case the gating tests are about); the
+ * tests of a checkout that does not match are further down.
+ */
+const MATCHING_LIVE = 'c'.repeat(40);
+async function run(
+  argv: string[],
+  probes: Record<ProbeId, Probe>,
+  file: string | null = `VERCEL_TOKEN=${fakeToken(['vcp'])}`,
+) {
   const out: string[] = [];
   const err: string[] = [];
   const code = await main(argv, {
     processEnv: {},
     readFile: () => file,
-    fetch: scriptedFetch(() => json({})).fetch,
+    fetch: scriptedFetch((url) =>
+      url.pathname === `/v9/projects/${VERCEL_PROJECT_ID}`
+        ? json({ targets: { production: { meta: { githubCommitSha: MATCHING_LIVE } } } })
+        : json({}),
+    ).fetch,
     now: () => new Date(Date.UTC(2026, 10, 13)),
-    git: scriptedGit({}),
+    git: scriptedGit({ 'cat-file': { code: 0, stdout: '' }, diff: { code: 0, stdout: '' } }),
     out: (s) => out.push(s),
     err: (s) => err.push(s),
     probes,
@@ -436,6 +449,42 @@ describe('the header names the live commit and whether this checkout matches it 
     expect((await header({ code: 0, stdout: '' }, null))[1]).toMatch(
       /^checkout: unknown \(the live production commit is unknown /,
     );
+  });
+});
+
+describe('a checkout that does not match the live commit blocks every step (review r3 R3-N1)', () => {
+  const LIVE = 'c'.repeat(40);
+  const ticked = PRECONDITIONS.filter((p) => p.gates === 1 && p.check.kind === 'manual').map((p) => p.id);
+  async function exitAt(diff: { code: number; stdout: string }, file: string | null) {
+    const out: string[] = [];
+    const code = await main(['--step', '1', '--ticked', ticked.join(',')], {
+      processEnv: {},
+      readFile: () => file,
+      fetch: scriptedFetch((url) =>
+        url.pathname === `/v9/projects/${VERCEL_PROJECT_ID}`
+          ? json({ targets: { production: { meta: { githubCommitSha: LIVE } } } })
+          : json({}),
+      ).fetch,
+      now: () => new Date(Date.UTC(2026, 10, 13)),
+      git: scriptedGit({ 'cat-file': { code: 0, stdout: '' }, diff }),
+      out: (s) => out.push(s),
+      err: () => {},
+      probes: allPass(),
+    });
+    return { code, last: out.at(-1) ?? '' };
+  }
+  const file = `VERCEL_TOKEN=${fakeToken(['vcp'])}`;
+
+  it('passes step 1 with its boxes ticked when the checkout matches', async () => {
+    expect((await exitAt({ code: 0, stdout: '' }, file)).code).toBe(0);
+  });
+  it('fails step 1, naming the checkout, when an input differs', async () => {
+    const r = await exitAt({ code: 0, stdout: 'scripts/golive/preconditions.ts\n' }, file);
+    expect(r.code).toBe(1);
+    expect(r.last).toContain('checkout');
+  });
+  it('fails step 1 when the live commit cannot be read', async () => {
+    expect((await exitAt({ code: 0, stdout: '' }, null)).code).toBe(1);
   });
 });
 

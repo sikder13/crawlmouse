@@ -14,11 +14,14 @@
  * whatever host it goes to (a URL lands in server and proxy logs), or in any of its headers except the
  * `authorization` header of a request to that token's own host. Found means `tokenFound`: a run of
  * `TOKEN_RUN` characters of the token (the whole token when it is shorter), or of its base64 or
- * base64url form with the four characters at each end left out (they depend on the bytes around the
- * token), at each of the three byte alignments so a prefix such as `user:` does not hide it, appears
+ * base64url form with the characters that depend on the bytes around the token left out, at each of
+ * the three byte alignments so a prefix such as `user:` does not hide it (a token too short to leave
+ * `TOKEN_RUN` such characters is matched as written only), appears
  * in the string as sent, in the string after each of up to three rounds of percent-decoding, or in
  * any of those with `+` read as a space. An `authorization` header is refused unless it carries the
- * token of the host it goes to.
+ * token of the host it goes to. A body must be a string and is refused when a token is found in it;
+ * the inner fetch is given the method, the headers, the body and `redirect: 'error'`, and nothing
+ * else from the caller's options.
  *
  * Every string value in a JSON response body (not its keys) is handed to `onValue` (the CLI
  * registers them with its redactor); a body that is not JSON is handed over whole.
@@ -251,7 +254,24 @@ export function guardedFetch(
     for (const [k, v] of new Headers(init?.headers)) headers.set(k, v);
     const why = refusal(url, method, headers, tokens);
     if (why) throw new RefusedRequest(why);
-    const res = await inner(url, { ...init, method, headers, redirect: 'error' });
+    // The one body sent is the read-only query's SQL, a string; no token may ride in it.
+    const body = init?.body;
+    if (body !== undefined && body !== null && typeof body !== 'string') {
+      throw new RefusedRequest('a request body that is not a string');
+    }
+    for (const [name, token] of Object.entries(tokens)) {
+      if (body && token && tokenFound(token, body)) {
+        throw new RefusedRequest(`${name} in the request body`);
+      }
+    }
+    // Only these options reach the inner fetch, so nothing else in `init` (a dispatcher among
+    // them) can send the request anywhere the checks above did not read.
+    const res = await inner(url, {
+      method,
+      headers,
+      redirect: 'error',
+      ...(body === undefined || body === null ? {} : { body }),
+    });
     const text = await res.text();
     try {
       for (const v of stringLeaves(JSON.parse(text))) onValue(v);

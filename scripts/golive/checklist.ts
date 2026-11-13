@@ -43,10 +43,11 @@ export function renderBlock(rows: readonly Precondition[] = MANUAL): string {
     'The boxes are not ticked in this file. When one is true, pass its id to the check:',
     '`pnpm golive:check -- --step N --ticked id,id`. A manual row counts as not passing until it is passed.',
     '',
-    "Run the check from a checkout of the live production commit. Its second line says whether this checkout's",
-    "inputs (`CHECK_INPUTS` in `scripts/golive/probes/live.ts`) equal that commit's; until they do, the rows that read",
-    `a table from this checkout (${gatedRows()}) answer unknown, and the`,
-    "function counts printed in the boxes below are this checkout's.",
+    'Run the check from a checkout of the live production commit (_Before every step_, above). The second line of',
+    "its standard output says whether this checkout's inputs (`CHECK_INPUTS` in `scripts/golive/probes/live.ts`)",
+    "equal that commit's. Until they do, the check exits non-zero at every step, the rows that read a table from",
+    `this checkout (${gatedRows()}) answer unknown, and the function counts printed in the boxes`,
+    "below are this checkout's.",
   ];
   for (const step of STEPS) {
     const rows_ = rows.filter((p) => p.gates === step);

@@ -309,3 +309,55 @@ describe('query values and headers are pinned (review r2 N-b)', () => {
     );
   });
 });
+
+describe('the request body and the fetch options (review r3 N3-a, N3-b)', () => {
+  const sql = { query: 'select version from supabase_migrations.schema_migrations' };
+  const post = (body: unknown, extra: RequestInit = {}) => {
+    const seen: RequestInit[] = [];
+    const inner = (async (_u: unknown, init?: RequestInit) => {
+      seen.push(init ?? {});
+      return new Response('[]', { status: 200 });
+    }) as typeof fetch;
+    const send = guardedFetch(
+      inner,
+      () => {},
+      tokens,
+    )(READ_ONLY, {
+      method: 'POST',
+      headers: {
+        ...Object.fromEntries(bearer(tokens.SUPABASE_ACCESS_TOKEN)),
+        'content-type': 'application/json',
+      },
+      body: typeof body === 'string' ? body : JSON.stringify(body),
+      ...extra,
+    });
+    return { send, seen };
+  };
+
+  it('sends the read-only query with its body', async () => {
+    const { send, seen } = post(sql);
+    await send;
+    expect(seen).toHaveLength(1);
+    expect(seen[0]!.body).toBe(JSON.stringify(sql));
+  });
+
+  it.each(Object.keys(TOKEN_HOST) as (keyof typeof TOKEN_HOST)[])(
+    'refuses a body that carries %s',
+    async (name) => {
+      const { send, seen } = post({ query: `select '${tokens[name]}'` });
+      await expect(send).rejects.toThrow(RefusedRequest);
+      expect(seen).toHaveLength(0);
+    },
+  );
+
+  it('passes the inner fetch no option but method, headers, body and redirect', async () => {
+    const dispatcher = { dispatch: () => true };
+    const { send, seen } = post(sql, {
+      dispatcher,
+      keepalive: true,
+      signal: undefined,
+    } as RequestInit);
+    await send;
+    expect(Object.keys(seen[0]!).sort()).toEqual(['body', 'headers', 'method', 'redirect']);
+  });
+});

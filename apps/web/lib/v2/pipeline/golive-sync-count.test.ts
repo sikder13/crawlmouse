@@ -44,5 +44,7 @@ describe("golive:check's Inngest functions per step", () => {
       expect([...synced].sort()).toEqual([...expected].sort());
       expect(synced.length).toBe(syncedFunctionCount(step));
     },
+    // Each case imports the serve route's whole function graph afresh; under load that took over 5 s.
+    30_000,
   );
 });

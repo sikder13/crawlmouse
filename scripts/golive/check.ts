@@ -214,6 +214,9 @@ export async function runCheck(args: Args, deps: CheckDeps, redactor: Redactor):
       ? `checkout: matches the live production commit ${match.sha.slice(0, 12)} in the check's inputs`
       : `checkout: unknown (${match.result.reason})`,
   );
+  // The rows themselves are this checkout's: a checkout that is not production's gates nothing truly,
+  // so it blocks every step, step 1's manual rows included.
+  if (!match.ok) blocking.push('checkout');
   for (const step of STEPS) {
     out('');
     out(`step ${step}: ${STEP_TITLE[step]}`);
