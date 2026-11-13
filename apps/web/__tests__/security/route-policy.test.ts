@@ -212,6 +212,79 @@ describe('the mechanism checks fail on the code they guard against', () => {
     }
   });
 
+  it('operator: an import from the service-role modules is refused, whatever name it binds (review SEC-2)', () => {
+    const file = 'api/internal/checks/[id]/rerun/route.ts';
+    const gated = (imports: string, body = '') =>
+      mechanismProblems(
+        parseSource(
+          `${imports}\nexport async function POST(req) { const proof = await requireOperator(await supabaseServer()); if (!proof) return notFound(); ${body} }`,
+          file,
+        ),
+        'operator',
+      );
+    const problem = (specs: string[]) =>
+      `imports from @/lib/supabase/admin or @supabase/supabase-js (${specs.join(', ')}); an operator route reaches the service role through consoleAdmin() or consoleStore()`;
+    // The reviewer's probe: both modules, aliased, so no call is named supabaseAdmin or createClient.
+    expect(
+      gated(
+        `import { supabaseAdmin as sa } from '@/lib/supabase/admin';\nimport { createClient as cc } from '@supabase/supabase-js';`,
+        `sa(); supabaseConsoleStore(cc(url, key), 'x');`,
+      ),
+    ).toEqual([problem(['@/lib/supabase/admin', '@supabase/supabase-js'])]);
+    const refused: Record<string, [string, string]> = {
+      namespace: [`import * as admin from '@/lib/supabase/admin';`, '@/lib/supabase/admin'],
+      default: [`import sb from '@supabase/supabase-js';`, '@supabase/supabase-js'],
+      typeOnly: [
+        `import type { SupabaseClient } from '@supabase/supabase-js';`,
+        '@supabase/supabase-js',
+      ],
+      sideEffect: [`import '@/lib/supabase/admin';`, '@/lib/supabase/admin'],
+      extension: [
+        `import { supabaseAdmin as a } from '@/lib/supabase/admin.ts';`,
+        '@/lib/supabase/admin.ts',
+      ],
+      index: [
+        `import { supabaseAdmin as a } from '@/lib/supabase/admin/index';`,
+        '@/lib/supabase/admin/index',
+      ],
+      relative: [
+        `import { supabaseAdmin as a } from '../../../../../../lib/supabase/admin';`,
+        '../../../../../../lib/supabase/admin',
+      ],
+      relativeDotted: [
+        `import { supabaseAdmin as a } from './../../../../../../lib/supabase/../supabase/admin.js';`,
+        './../../../../../../lib/supabase/../supabase/admin.js',
+      ],
+      subpath: [
+        `import { createClient as c } from '@supabase/supabase-js/dist/module/index.js';`,
+        '@supabase/supabase-js/dist/module/index.js',
+      ],
+      reExport: [
+        `export { supabaseAdmin as a } from '@/lib/supabase/admin';`,
+        '@/lib/supabase/admin',
+      ],
+      dynamic: ['', '@/lib/supabase/admin'],
+      required: ['', '@supabase/supabase-js'],
+    };
+    const bodies: Record<string, string> = {
+      dynamic: `const m = await import('@/lib/supabase/admin');`,
+      required: `const m = require('@supabase/supabase-js');`,
+    };
+    for (const [name, [imports, spec]] of Object.entries(refused)) {
+      expect(gated(imports, bodies[name]), name).toEqual([problem([spec])]);
+    }
+    // Neighbouring modules, and a relative path that resolves elsewhere, pass.
+    const allowed = [
+      `import { supabaseServer } from '@/lib/supabase/server';`,
+      `import { createServerClient } from '@supabase/ssr';`,
+      `import { supabaseAdmin } from '@/lib/supabase/administrator';`,
+      `import { x } from '@supabase/supabase-jsx';`,
+      `import { supabaseAdmin } from '../../../../../lib/supabase/admin';`,
+      `import { consoleAdmin } from '@/lib/v2/ops/operator';`,
+    ];
+    for (const imports of allowed) expect(gated(imports), imports).toEqual([]);
+  });
+
   it('service: the credential is checked before any service-role call', () => {
     const ok = `export async function POST(req) { if (!timingSafeEqual(a, b)) return; supabaseAdmin(); }`;
     const late = `export async function POST(req) { supabaseAdmin(); timingSafeEqual(a, b); }`;

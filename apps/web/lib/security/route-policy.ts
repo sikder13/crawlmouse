@@ -13,8 +13,10 @@
  * `operator`: the support console's routes (CC-33), for staff only. The route asks
  * `requireOperator()` (lib/v2/ops/operator.ts), which reads the session and `is_operator()`, before
  * it reads the body or makes a service-role client, and answers anyone else 404. It builds no client
- * itself (no `supabaseAdmin()` or `createClient()` call): its service-role client is
- * `consoleAdmin(proof)`'s. __tests__/security/route-mechanism.ts checks both in the route's source.
+ * itself: no `supabaseAdmin()` or `createClient()` call, and no import of `@/lib/supabase/admin`
+ * (through `@/` or a relative path) or `@supabase/supabase-js`, whatever name the import binds. Its
+ * service-role client is `consoleAdmin(proof)`'s. __tests__/security/route-mechanism.ts checks these
+ * in the route's own source; it does not follow a third module that re-exports either.
  */
 export type RouteClass = 'public' | 'user' | 'member' | 'operator' | 'service' | 'webhook';
 export type Method = 'GET' | 'HEAD' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'OPTIONS';

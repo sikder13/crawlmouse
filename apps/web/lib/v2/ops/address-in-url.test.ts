@@ -2,15 +2,26 @@
  * No customer address in a URL (CC-33 D2, security review round 1 S1). PostgREST's gateway logs a
  * request's query string, so a filter on an address column (`.eq('email', …)`, `email=eq.…`) puts
  * the address in Supabase's API log. The console and the ops scripts resolve an address through an
- * rpc, a POST whose body carries it. This scans their source for a filter on any column whose name
- * holds `email`, in the query builder's spellings and the raw URL's.
+ * rpc, a POST whose body carries it. This scans the source under lib/v2/ops, scripts/ops, app/internal
+ * and app/api/internal, and inngest's founder*.ts and signin-canary.ts (test files aside), for a filter
+ * on any column whose name holds `email`, in the query builder's spellings and the raw URL's.
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const WEB = resolve(__dirname, '../../..');
-const ROOTS = [resolve(WEB, 'lib/v2/ops'), resolve(WEB, '../../scripts/ops')];
+const INNGEST = resolve(WEB, '../../inngest');
+const ROOTS = [
+  resolve(WEB, 'lib/v2/ops'),
+  resolve(WEB, '../../scripts/ops'),
+  resolve(WEB, 'app/internal'),
+  resolve(WEB, 'app/api/internal'),
+];
+/** The founder notices and the sign-in canary, which read and mail addresses. */
+const JOBS = readdirSync(INNGEST)
+  .filter((name) => /^(founder.*|signin-canary)\.ts$/.test(name) && !/\.test\.ts$/.test(name))
+  .map((name) => join(INNGEST, name));
 
 const QUOTE = `['"\`]`;
 const COLUMN = `${QUOTE}\\w*email\\w*${QUOTE}`;
@@ -71,10 +82,10 @@ describe('the scanner', () => {
   });
 });
 
-describe('the console and the ops scripts', () => {
-  const files = ROOTS.flatMap(sources);
+describe('the console, the ops scripts and the two jobs', () => {
+  const files = [...ROOTS.flatMap(sources), ...JOBS];
 
-  it('are read: the scan covers the store, the search and both scripts', () => {
+  it('are read: the scan covers the store, the search, both scripts, the pages, the routes and the two jobs', () => {
     const names = files.map((f) => relative(resolve(WEB, '../..'), f));
     expect(names).toEqual(
       expect.arrayContaining([
@@ -82,6 +93,14 @@ describe('the console and the ops scripts', () => {
         'apps/web/lib/v2/ops/search.ts',
         'scripts/ops/operator.ts',
         'scripts/ops/internal.ts',
+        'apps/web/app/internal/page.tsx',
+        'apps/web/app/internal/layout.tsx',
+        'apps/web/app/internal/accounts/[id]/page.tsx',
+        'apps/web/app/api/internal/search/route.ts',
+        'apps/web/app/api/internal/checks/[id]/rerun/route.ts',
+        'apps/web/app/api/internal/accounts/[id]/sign-in-link/route.ts',
+        'inngest/founder.ts',
+        'inngest/signin-canary.ts',
       ]),
     );
   });

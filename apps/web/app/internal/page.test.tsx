@@ -137,6 +137,28 @@ describe('/internal', () => {
     expect(lines.every((l) => l.action === 'list_accounts')).toBe(true);
   });
 
+  it('lists and records a repeated id once, and repeats do not use up the 20 (review T-2)', async () => {
+    as(await operatorPerson(h.db));
+    const a = await person(h.db, 'a');
+    const b = await person(h.db, 'b');
+    let before = (await recordLines(h.db)).length;
+    const html = renderToStaticMarkup(
+      await open({ accounts: [a.accountId, a.accountId, b.accountId].join(',') }),
+    );
+    expect(html.split(`href="/internal/accounts/${a.accountId}"`)).toHaveLength(2);
+    expect((await recordLines(h.db)).slice(before).map((l) => l.account_id)).toEqual([
+      a.accountId,
+      b.accountId,
+    ]);
+
+    const ids = Array.from({ length: 21 }, () => randomUUID());
+    before = (await recordLines(h.db)).length;
+    await open({ accounts: [ids[0]!, ids[0]!, ids[1]!, ids[0]!, ...ids.slice(2)].join(',') });
+    expect((await recordLines(h.db)).slice(before).map((l) => l.account_id)).toEqual(
+      ids.slice(0, 20),
+    );
+  });
+
   it('says when a search found nothing', async () => {
     as(await operatorPerson(h.db));
     expect(renderToStaticMarkup(await open({ found: '0' }))).toContain(

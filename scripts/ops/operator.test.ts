@@ -71,6 +71,31 @@ describe('ops:operator', () => {
     expect(o.lines.join('\n')).not.toContain('@');
   });
 
+  it('add of a user who is already an operator is a no-op: no error and no second row (review T-4)', async () => {
+    // PostgREST applies `on_conflict` only with `Prefer: resolution=…`; without one, a POST is a plain
+    // insert, and a second row for the same `operators.user_id` (its primary key) is a 409.
+    const rows: string[] = [];
+    const f = fakeFetch((method, path, body) => {
+      if (path === '/rest/v1/rpc/user_id_by_email') return [200, USER];
+      const userId = (body as { user_id: string }).user_id;
+      const ignore = f.calls.at(-1)!.headers.get('prefer') === 'resolution=ignore-duplicates';
+      if (rows.includes(userId)) return ignore ? [201, undefined] : [409, { code: '23505' }];
+      rows.push(userId);
+      return [201, undefined];
+    });
+    const o = out();
+    const c = restClient({ url: URL_, key: KEY, fetch: f.fetch });
+    await runOperator(['add', ADDRESS], c, o.print);
+    await runOperator(['add', ADDRESS], c, o.print);
+    expect(rows).toEqual([USER]);
+    expect(o.lines).toEqual([`operator added: user ${USER}`, `operator added: user ${USER}`]);
+    const inserts = f.calls.filter((x) => x.path.startsWith('/rest/v1/operators'));
+    expect(inserts.map((x) => x.headers.get('prefer'))).toEqual([
+      'resolution=ignore-duplicates',
+      'resolution=ignore-duplicates',
+    ]);
+  });
+
   it('add refuses an address with no user, adds nothing, and does not print the address', async () => {
     const f = fakeFetch(() => [200, null]);
     const o = out();

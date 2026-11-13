@@ -58,6 +58,25 @@ describe('cachedLookup', () => {
     expect(inner).toHaveBeenCalledTimes(502);
   });
 
+  it('counts a re-written answer as new: an expired answer asked again is not the next dropped (review T-3)', async () => {
+    let now = 0;
+    const inner = vi.fn<InternalLookup>(async () => false);
+    const look = cachedLookup(inner, () => now);
+    const id = (n: number) => `a0000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
+    await look({ kind: 'account', id: id(0) });
+    now = 1_000;
+    for (let n = 1; n < 500; n++) await look({ kind: 'account', id: id(n) });
+    now = INTERNAL_CACHE_MS;
+    await look({ kind: 'account', id: id(0) });
+    expect(inner).toHaveBeenCalledTimes(501);
+    await look({ kind: 'account', id: id(500) });
+    expect(inner).toHaveBeenCalledTimes(502);
+    await look({ kind: 'account', id: id(0) });
+    expect(inner).toHaveBeenCalledTimes(502);
+    await look({ kind: 'account', id: id(1) });
+    expect(inner).toHaveBeenCalledTimes(503);
+  });
+
   it('fails open: a lookup that throws answers false, logs without the id, and is asked again next time', async () => {
     const log = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const inner = vi.fn<InternalLookup>(async () => {

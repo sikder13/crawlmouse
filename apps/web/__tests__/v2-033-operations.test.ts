@@ -8,7 +8,7 @@ import {
   readMigration,
   readRollback,
 } from './helpers/pglite-migrations';
-import { personalAccount, signUp } from './helpers/v2-check-tables';
+import { insertRow, personalAccount, ROWS, signUp } from './helpers/v2-check-tables';
 
 /**
  * Migration 20261115000001, section A (CC-33 D1, D2): operators, accounts.internal, is_operator(),
@@ -330,6 +330,31 @@ describe('operator_account_counts', () => {
     });
     expect(await counts(accountId, [s1], [])).toMatchObject({ checks: 2 });
     expect(await counts(accountId, [s1, elsewhere], [])).toMatchObject({ checks: 2 });
+  });
+
+  it('counts only the open and reopened fixes of the sites it is given (review T-1)', async () => {
+    const { accountId } = await personalAccount(db, await person());
+    const s1 = await site(accountId);
+    const c1 = await failedCheck(s1);
+    const shapes = [
+      { status: 'open', last_state: 'detected', rank: 1 },
+      { status: 'reopened', last_state: 'detected', rank: 2 },
+      { status: 'marked_done', last_state: 'detected', rank: 3 },
+      { status: 'verified_resolved', last_state: 'not_detected', rank: null },
+      { status: 'unable_to_verify', last_state: 'indeterminate', rank: 4 },
+    ];
+    for (const [i, shape] of shapes.entries()) {
+      await insertRow(db, 'site_fixes', {
+        ...ROWS.site_fixes(randomUUID(), s1, c1, i + 1),
+        ...shape,
+      });
+    }
+    const statuses = await db.query<{ status: string }>(
+      'select status from public.site_fixes where site_id = $1 order by number',
+      [s1],
+    );
+    expect(statuses.rows.map((r) => r.status)).toEqual(shapes.map((x) => x.status));
+    expect(await counts(accountId, [s1], [])).toMatchObject({ fixes: 2 });
   });
 
   it.each(['anon', 'authenticated'] as const)('%s may not execute it', async (role) => {
