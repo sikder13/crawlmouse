@@ -391,6 +391,11 @@ client goes through the re-check route as it stands. That route queues it with t
 Left out, each a `ruling` row in `lib/v2/copy/agency.ts`: "Audit a prospect", "Filter", "Export
 matrix", and "Reports going out Mon · Preview".
 
+At the plan's site limit the header has no add form. Where the plan's extras are sold
+(`V2_BILLING=1`) and more sites can be bought, a reader who may buy (the owner) is shown "Add sites
+to the plan", a link to the buy form on `/seats` (`/seats#buy`); nobody else is shown it:
+`pnpm --filter @crawlmouse/web exec vitest run lib/v2/view/agency-matrix.test.ts -t 'the way to buy sites'`.
+
 ### `/agency/clients/[siteId]`
 
 `app/agency/clients/[siteId]/page.tsx` renders `agencyClientView` (`lib/v2/view/agency-client.ts`) in
@@ -939,3 +944,7 @@ on a link minted again on a retry, §9 on the prospect's one-pager, §10 on a cl
 - **Invitation mail is bounded by the day, lower in a trial** (`INVITE_MAIL_PER_DAY`,
   `lib/v2/agency/seats.ts`): an invitation names the account, a string its owner chose, to an address
   the owner chose. An invitation and a resend count into one bucket.
+- **The PDF's not-measured list has no heading.** The proof page titles the list "Not measured"
+  (`lib/v2/copy/proof.ts`); the PDF draws the same sentences after a rule with no title
+  (`drawDoc`, `lib/v2/reports/pdf-layout.ts`). A title would be a string the document does not hold,
+  and the PDF draws only the document's strings, so adding it means adding it to `ReportDoc`.
