@@ -3,6 +3,7 @@ import {
   AccessCauseSchema,
   VerdictSchema,
   scoredCrawlersMeasured,
+  CheckSchema,
   type Check,
   type Verdict,
   type WithheldReason,
@@ -353,12 +354,10 @@ describe('the wording at each threshold and form', () => {
       ).toEqual([1, 'Only one of the four scored crawlers could be measured.']);
     });
 
-    it('a grade that names no reason is given the count where it is short, and nothing where it is not', () => {
-      expect(said(['allowed', 'allowed', 'allowed', 'not_measured'], [])).toEqual([
-        3,
-        'Only three of the four scored crawlers could be measured.',
-      ]);
-      expect(said(['allowed', 'allowed', 'allowed', 'allowed'], [])).toEqual([4, '']);
+    it('a withheld grade that names no reason is refused, as CheckSchema refuses it', () => {
+      const w = withheldFor(['allowed', 'allowed', 'allowed', 'not_measured'], []);
+      expect(() => aiWithheldSummary(w.check, w.measured)).toThrow(/names why/);
+      expect(CheckSchema.safeParse(w.check).success).toBe(false);
     });
   });
 
