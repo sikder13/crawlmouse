@@ -1,6 +1,7 @@
 import { expect, type Page } from './pw';
 import { PREVIEWS as REGISTRY } from '../../apps/web/app/(v2-preview)/v2-preview/_preview/registry';
 import { MAIL_PREVIEW_INDEX as MAIL_REGISTRY } from '../../apps/web/lib/v2/mail/templates/preview-index';
+import { owner, parsePart } from './part';
 
 /** '/v2-preview/screens/home' -> 'screen-home'; '/v2-preview/button' -> 'button'. */
 export const slugOf = (path: string) =>
@@ -13,7 +14,7 @@ export const slugOf = (path: string) =>
  * Every page the harness checks: each preview, and a screen that plays a recording once at each
  * of its moments, opened paused there. `orange` is how many orange elements it should show.
  */
-export const PREVIEWS = REGISTRY.flatMap((p) =>
+const ALL_PREVIEWS = REGISTRY.flatMap((p) =>
   p.moments
     ? p.moments.map((m) => ({
         path: `${p.path}${m.query}`,
@@ -29,11 +30,20 @@ export const PREVIEWS = REGISTRY.flatMap((p) =>
  * Every email template's preview page (`apps/web/lib/v2/mail/templates/preview-index.ts`), screenshotted at
  * a mail client's widths: 600 px, the layout's column, and 390 px, a phone.
  */
-export const MAIL_PREVIEWS = MAIL_REGISTRY.map((p) => ({
+const ALL_MAIL_PREVIEWS = MAIL_REGISTRY.map((p) => ({
   path: `/mail-preview/${p.slug}`,
   name: `Mail: ${p.name}`,
   slug: `mail-${p.slug}`,
 }));
+/** This job's share of the routes (part.ts): every route unless VISUAL_PART is set. */
+export const PART = parsePart(process.env.VISUAL_PART);
+export const ownsPath = owner(
+  [...ALL_PREVIEWS, ...ALL_MAIL_PREVIEWS].map((p) => p.path),
+  PART,
+);
+export const PREVIEWS = ALL_PREVIEWS.filter((p) => ownsPath(p.path));
+export const MAIL_PREVIEWS = ALL_MAIL_PREVIEWS.filter((p) => ownsPath(p.path));
+
 export const MAIL_WIDTHS = [600, 390] as const;
 export const MAIL_HEIGHT = { 600: 900, 390: 844 } as const;
 
