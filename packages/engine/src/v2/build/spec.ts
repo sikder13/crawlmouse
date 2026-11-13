@@ -300,7 +300,7 @@ export function renderBuildSpec(): string {
     [
       '1. `readBatches`: parse each batch; keep a batch that arrived twice once, refuse two different results for one batch id, a URL crawled in two batches, a non-canonical URL, and a row from another worker build than `lineage.worker_release`.',
       '2. `assemble`: crawl rows to pages by `outcome`, links, classification, depth, PageRank, coverage and the refusal evidence.',
-      '3. Refuse an access test of a page the planners would not have sampled, and a render of a page that is neither sampled nor an empty-root page (`emptyRootUrls`).',
+      '3. Refuse an access test of a page outside the sample, and a render of a page that is neither a sampled page the graded phase may render (`renderable`) nor one of the empty-root picks (`plannedEmptyRoots`).',
       '4. `detectAccess`, then `detectStructure`, then orphans and their parents onto the pages, then `gradeCheck`, then `detectorOutcomes` (which runs `effectsOf`).',
       "5. The `Check` record, then `diffCheck` with this check's side.",
       '6. Lineage and usage, then validation.',

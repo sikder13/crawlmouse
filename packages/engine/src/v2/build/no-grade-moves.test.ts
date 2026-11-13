@@ -1,14 +1,20 @@
 /**
- * CC-32 D2: rendering empty-root pages moves no grade. Every build fixture goes through the pipeline's
- * order (sample → renderCandidates → renderCheck → buildCheck), and every grade case through
- * renderCheck and gradeCheck, twice: with the empty-root phase's cap at 0 and at
- * EMPTY_ROOT_MAX_RENDERS. Each pair runs under caps with room for both phases and under a per-day cap
- * the graded phase's allowance fills exactly, where an empty-root render that took the graded phase's
- * room would leave a graded page unrendered. Any technical_seo, ai_readability, component, content,
- * signals, coverage or site text-share number that differs fails the test.
+ * CC-32 D2: rendering empty-root pages moves no grade within a check. Each build fixture named below
+ * goes through the pipeline's order (sample → renderCandidates → renderCheck → buildCheck), and each
+ * grade-guard case through renderCheck and gradeCheck, twice: with the empty-root phase's cap at 0 and
+ * at EMPTY_ROOT_MAX_RENDERS. Each pair runs under caps with room for both phases and under a per-day
+ * cap the graded phase's allowance fills exactly, where an empty-root render that took the graded
+ * phase's room would leave a graded page unrendered. For a build fixture the whole `Check` record of the
+ * two runs must be equal; for a grade case, the grades, content and signals.
+ *
+ * The recorded built site's render-outcome variants (fixtures/v2/build/rendered-states.ts) edit a
+ * render outcome after the fact rather than run the render, so they are compared with the empty-root
+ * picks added to their outcome as rendered shells, not through renderCheck.
  *
  * So that a pair cannot pass by rendering no empty-root page, each fixture states how many the second
- * run rendered, and the grade cases gain two empty-root pages of their own.
+ * run rendered, and the grade cases gain two empty-root pages of their own. This compares two runs of
+ * this engine; that the engine before CC-32 gave the same grades rests on build/expected.json and
+ * grade/expected.json, whose regenerations changed no grade (see the step's notes).
  */
 import type { PageResult } from '@crawlmouse/types/v2';
 import { describe, expect, it } from 'vitest';
@@ -23,20 +29,25 @@ import {
   recordedInput,
 } from '../../../fixtures/v2/build/recorded.js';
 import { SHELL_ROUTES, shellBuild, shellUrl } from '../../../fixtures/v2/build/shell-site.js';
+import { recordedWith } from '../../../fixtures/v2/build/rendered-states.js';
 import { servedSite } from '../../../fixtures/v2/build/site/serve.js';
 import { CLIENT_RENDERED } from '../../../fixtures/v2/build/site/site.js';
 import { guardInputs } from '../../../fixtures/v2/grade/guard.js';
 import { gradeCheck, type GradeInput } from '../grade/index.js';
 import type { DailyBudget, RenderCaps } from '../render/budget.js';
-import { EMPTY_ROOT_MAX_RENDERS, type EmptyRootCandidate } from '../render/empty-root.js';
+import {
+  EMPTY_ROOT_MAX_RENDERS,
+  selectEmptyRoots,
+  type EmptyRootCandidate,
+} from '../render/empty-root.js';
 import { fakeClient, memoryDailyBudget, type ReplyFixture } from '../render/fakes.js';
 import { renderCheck, RESERVE_PER_RENDER_MS, type RenderOutcome } from '../render/run.js';
 import { selectRenders, type RenderCandidate } from '../render/sample.js';
 import { assemble } from './assemble.js';
 import { readBatches } from './batches.js';
 import { buildCheck } from './build.js';
-import { renderCandidates, sample } from './plan.js';
-import type { BuildInput, BuiltCheck } from './types.js';
+import { emptyRootPool, renderCandidates, sample } from './plan.js';
+import type { BuildInput } from './types.js';
 
 const PAGE = 2 * RESERVE_PER_RENDER_MS;
 const LOOSE: RenderCaps = { perCheckMs: 600_000, perDayMs: 3_600_000 };
@@ -99,16 +110,6 @@ async function render(
   });
 }
 
-/** Every number the grade, its components, the content score, the signals and the coverage hold. */
-const gradeNumbers = (b: BuiltCheck) => ({
-  technical_seo: b.check.technical_seo,
-  ai_readability: b.check.ai_readability,
-  content: b.check.content,
-  signals: b.check.signals,
-  coverage: b.check.coverage,
-  without_js: b.check.without_js,
-});
-
 const emptyRootRendered = (o: RenderOutcome) =>
   o.pages.filter((p) => p.picked_for === 'empty_root' && p.rendered).length;
 
@@ -167,7 +168,7 @@ describe('no grade moves when empty-root pages are rendered: the build fixtures'
       for (const [capsName, caps] of Object.entries(capsFor(picks))) {
         const off = await buildWith(f, caps, 0);
         const on = await buildWith(f, caps, EMPTY_ROOT_MAX_RENDERS);
-        expect(gradeNumbers(on.built), capsName).toEqual(gradeNumbers(off.built));
+        expect(on.built.check, capsName).toEqual(off.built.check);
         expect(emptyRootRendered(off.outcome), capsName).toBe(0);
         if (caps === LOOSE) expect(emptyRootRendered(on.outcome), capsName).toBe(f.emptyRoots);
       }
@@ -248,6 +249,40 @@ describe('no grade moves when empty-root pages are rendered: the grade cases', (
         expect(on.numbers, capsName).toEqual(off.numbers);
         if (caps === LOOSE) expect(emptyRootRendered(on.outcome), capsName).toBe(2);
       }
+    });
+  }
+});
+
+describe('no grade moves when empty-root pages are rendered: the rendered-states variants', () => {
+  for (const edit of ['shell', 'one_shell', 'not_rendered'] as const) {
+    it(`the recorded built site, ${edit}`, () => {
+      const input = recordedWith(edit);
+      const a = assemble(
+        input,
+        readBatches(input.batches, input.check, input.lineage.worker_release),
+      );
+      const picks = selectEmptyRoots(emptyRootPool(a), EMPTY_ROOT_MAX_RENDERS);
+      expect(picks.length).toBeGreaterThan(0);
+      const render = input.render!;
+      const withShells = {
+        ...render,
+        pages: [
+          ...render.pages,
+          ...picks.map((p) => ({
+            ...p,
+            rendered: true as const,
+            without_js: {
+              raw_words: 0,
+              rendered_words: 300,
+              text_share: 0,
+              state: 'empty_shell' as const,
+            },
+          })),
+        ],
+      };
+      const off = buildCheck(input);
+      const on = buildCheck({ ...input, render: withShells });
+      expect(on.check).toEqual(off.check);
     });
   }
 });

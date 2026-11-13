@@ -4,18 +4,23 @@
  *
  * A template is present when it has a graded page (`isGraded`) or an empty-root page: a crawled page
  * the empty-root rule holds for (render/empty-root.ts `emptyRoot`; the caller passes their URLs). The
- * present pages are the population: `extent.pages` counts them and a detection affects them. The
- * verdict reads the rendered pages among them, whether the graded phase or the empty-root phase
- * rendered them (render/run.ts). `client_rendered_template` reads the render step's own state for each
- * page (render/state.ts, which carries the hysteresis), so there is one definition of an empty shell:
+ * present pages are the population: `extent.pages` counts them and a detection affects them.
  *
- *   detected       a page of the template was rendered, and each rendered page is `empty_shell`
- *   not_detected   a page was rendered, and none is `empty_shell`
- *   indeterminate  `pages_disagree`: some rendered pages are `empty_shell` and some are not
- *                  `not_rendered`: no page of the template was rendered
+ * The verdict reads the deciding renders. For a template with a graded page they are the rendered
+ * graded pages, and nothing else: an empty-root page is rendered because its static root is empty, so
+ * its render would read as a shell whatever the graded pages serve, and the verdict, `measured`, the
+ * evidence and `extent.rendered` are what they were before empty-root pages were rendered. For a
+ * template with no graded page they are its rendered empty-root pages (render/run.ts, the empty-root
+ * phase). `client_rendered_template` reads the render step's own state for each page (render/state.ts,
+ * which carries the hysteresis), so there is one definition of an empty shell:
  *
- * A template whose graded pages render with text and whose empty-root pages render as shells is
- * `pages_disagree`.
+ *   detected       a deciding render exists, and each is `empty_shell`
+ *   not_detected   a deciding render exists, and none is `empty_shell`
+ *   indeterminate  `pages_disagree`: some deciding renders are `empty_shell` and some are not
+ *                  `not_rendered`: there is no deciding render
+ *
+ * So a template whose graded pages were not rendered is `not_rendered`, however its empty-root pages
+ * rendered.
  *
  * A template an awaiting client-rendered fix names (the caller passes them) and that has no present
  * page gets a record too: `indeterminate`, reason `template_absent`, with no page. So the fix is
@@ -60,7 +65,10 @@ export interface RenderedDetection {
   reason: RenderedIndeterminateReason | null;
   /** The median `text_share` of the template's rendered pages; null when none was rendered. */
   measured: number | null;
-  /** The template's present pages, how many of them are graded, and how many the render step measured. */
+  /**
+   * The template's present pages, how many of them are graded, and how many deciding renders there
+   * were (rendered graded pages, or, with no graded page, rendered empty-root pages).
+   */
   extent: { pages: number; graded: number; rendered: number };
   /** The template's present pages, sorted: empty unless detected. */
   affected_urls: string[];
@@ -113,7 +121,8 @@ export function detectRendered(
   return [...templates]
     .sort(([a], [b]) => byText(a, b))
     .map(([template_key, present]): RenderedDetection => {
-      const rendered = present
+      const graded = present.filter(isGraded);
+      const rendered = (graded.length > 0 ? graded : present)
         .flatMap((p) => (p.without_js ? [{ url: p.url, ...p.without_js }] : []))
         .sort((a, b) => byText(a.url, b.url));
       const shells = rendered.filter((p) => p.state === 'empty_shell').length;
@@ -132,7 +141,7 @@ export function detectRendered(
         measured: rendered.length === 0 ? null : median(rendered.map((p) => p.text_share)),
         extent: {
           pages: present.length,
-          graded: present.filter(isGraded).length,
+          graded: graded.length,
           rendered: rendered.length,
         },
         affected_urls: state === 'detected' ? present.map((p) => p.url).sort(byText) : [],

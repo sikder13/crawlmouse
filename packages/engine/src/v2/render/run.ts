@@ -9,9 +9,12 @@
  * took. Each phase runs the COST rules below on its own: its own reservation from today's budget, its
  * own allowance, its own stop and its own settle. The graded phase's allowance is the check's cap or
  * what its pages could reserve, whichever is less; the empty-root phase's is what the cap leaves after
- * the graded phase counted, or what its own pages could reserve, whichever is less. So the graded
- * phase's pages, and the estimate drawn from them alone, are what they would be with no empty-root
- * phase; the empty-root phase adds its wall time after them, and its browser time to `browser_ms`.
+ * the graded phase counted, or what its own pages could reserve, whichever is less. When today's
+ * budget refused the graded phase or threw, the empty-root phase does not ask it, and each of its
+ * pages carries the graded phase's reason. A throw out of an empty-root page leaves every page of that
+ * phase `phase_threw` once the phase has settled, and the check goes on. So the graded phase's pages,
+ * and the estimate drawn from them alone, are what they would be with no empty-root phase; the
+ * empty-root phase adds its wall time after them, and its browser time to `browser_ms`.
  *
  * COST. Today's budget is asked once per phase, before any of its pages, to reserve the phase's
  * allowance. When it refuses or throws, no page of the phase renders and each carries the reason.
@@ -22,8 +25,7 @@
  * report more than its reservation, so a phase can end above its allowance by that excess on the pages
  * in flight. After the phase's last page, the budget is settled once, at what the phase counted. Which
  * pages a binding cap leaves unrendered depends on how long the earlier renders took. A throw out of a
- * page is passed on after its phase settled; a throw in the graded phase means the empty-root phase
- * does not run.
+ * graded page is passed on after its phase settled, and the empty-root phase does not run.
  *
  * RATE LIMITS. At most `inFlight` requests are open at once (RENDER_MAX_IN_FLIGHT in the environment,
  * read by inFlightFromEnv). A 429 is retried no sooner than its Retry-After asks, in seconds or as a
@@ -90,6 +92,8 @@ export const NOT_RENDERED = {
   challenged: 'A side of the render matches a challenge title or marker listed in challenge.ts.',
   nothing_rendered: 'The rendered side has no words, so there is no share.',
   measure_failed: 'Counting the words of the two renders threw.',
+  phase_threw:
+    "A page of the empty-root phase threw out of the render; each page of that phase is left unrendered, and the graded phase's pages stand.",
 } as const;
 
 export type NotRenderedReason = keyof typeof NOT_RENDERED;
@@ -166,10 +170,17 @@ export async function renderCheck(input: RenderCheckInput): Promise<RenderOutcom
   if (gradedPhase.thrown) throw gradedPhase.thrown.reason;
   // The empty-root phase starts once the graded phase has settled, under its own allowance: what the
   // check's cap leaves after the graded phase, or what its own pages could reserve, whichever is less.
-  const emptyRootPhase = await renderPhase(run, emptyRoots, (n) =>
-    Math.min(input.caps.perCheckMs - gradedPhase.browserMs, n * PAGE_RESERVE_MS),
+  // When today's budget refused the graded phase, or could not be read, it is not asked again.
+  const emptyRootPhase = await renderPhase(
+    run,
+    emptyRoots,
+    (n) => Math.min(input.caps.perCheckMs - gradedPhase.browserMs, n * PAGE_RESERVE_MS),
+    gradedPhase.stoppedAtBudget,
   );
-  if (emptyRootPhase.thrown) throw emptyRootPhase.thrown.reason;
+  // A throw in the empty-root phase leaves that phase's pages unrendered; the graded phase stands.
+  const emptyRootResults = emptyRootPhase.thrown
+    ? emptyRoots.map((p): RenderedPage => ({ ...p, rendered: false, reason: 'phase_threw' }))
+    : emptyRootPhase.results;
 
   const shares = new Map(
     gradedPhase.results.flatMap((r) =>
@@ -183,7 +194,7 @@ export async function renderCheck(input: RenderCheckInput): Promise<RenderOutcom
     })),
   );
   return {
-    pages: [...gradedPhase.results, ...emptyRootPhase.results],
+    pages: [...gradedPhase.results, ...emptyRootResults],
     browser_ms: gradedPhase.browserMs + emptyRootPhase.browserMs,
     estimate,
     settle_failed: gradedPhase.settleFailed || emptyRootPhase.settleFailed,
@@ -195,8 +206,10 @@ interface PhaseResult {
   results: RenderedPage[];
   browserMs: number;
   settleFailed: boolean;
-  /** The first worker that threw, passed on by the caller after the phase settled. */
+  /** The first worker that threw, after the phase settled. */
   thrown: PromiseRejectedResult | undefined;
+  /** `daily_cap` or `daily_budget_unavailable` when today's budget was asked and did not grant. */
+  stoppedAtBudget: NotRenderedReason | null;
 }
 
 /**
@@ -207,6 +220,8 @@ async function renderPhase(
   input: RenderCheckInput & { admit: Admit; sleep: (ms: number) => Promise<void> },
   sample: readonly Picked[],
   allowanceFor: (pages: number) => number,
+  /** A reason the phase renders nothing, decided before it: today's budget is then not asked. */
+  stoppedBefore: NotRenderedReason | null = null,
 ): Promise<PhaseResult> {
   const { admit, sleep } = input;
   let browserMs = 0;
@@ -216,7 +231,7 @@ async function renderPhase(
       ? 'not_configured'
       : !usableCap(input.caps.perCheckMs) || !usableCap(input.caps.perDayMs)
         ? 'caps_not_configured'
-        : null;
+        : stoppedBefore;
 
   const notRendered = (p: Picked, reason: NotRenderedReason, detail?: string): RenderedPage =>
     detail === undefined
@@ -320,12 +335,13 @@ async function renderPhase(
   let settleFailed = false;
   if (!stopped && sample.length > 0 && allowanceMs < PAGE_RESERVE_MS) stopped = 'check_cap';
   let reserved = false;
+  let stoppedAtBudget: NotRenderedReason | null = null;
   if (!stopped && sample.length > 0) {
     try {
       reserved = (await input.daily.reserve(allowanceMs, input.caps.perDayMs)) === true;
-      if (!reserved) stopped = 'daily_cap';
+      if (!reserved) stopped = stoppedAtBudget = 'daily_cap';
     } catch {
-      stopped = 'daily_budget_unavailable';
+      stopped = stoppedAtBudget = 'daily_budget_unavailable';
     }
   }
 
@@ -357,5 +373,5 @@ async function renderPhase(
     }
   }
   const thrown = ran.find((r): r is PromiseRejectedResult => r.status === 'rejected');
-  return { results, browserMs, settleFailed, thrown };
+  return { results, browserMs, settleFailed, thrown, stoppedAtBudget };
 }

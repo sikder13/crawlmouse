@@ -88,39 +88,38 @@ const byUrl = (a: RenderedPage, b: RenderedPage) => (a.url < b.url ? -1 : a.url 
 const renderedPages = (record: RenderedDetection): RenderedPage[] =>
   [...record.evidence.pages].sort(byUrl);
 
-/** How many of the template's graded pages were rendered, as a sentence. */
+/**
+ * How many of the pages the verdict reads were rendered, as a sentence: the template's graded pages
+ * when it has any, its pages too thin to grade otherwise (detectors/rendered.ts).
+ */
 function sample({ pages, graded, rendered }: RenderedDetection['extent']): Safe {
-  if (graded === pages) {
-    if (pages === 1) return ours('The audit rendered its 1 graded page in a browser.');
+  if (graded > 0) {
+    if (graded === 1) return ours('The audit rendered its 1 graded page in a browser.');
     return ours(
-      rendered === pages
-        ? `The audit rendered each of its ${pages} graded pages in a browser.`
-        : `The audit rendered ${rendered} of its ${pages} graded pages in a browser.`,
+      rendered === graded
+        ? `The audit rendered each of its ${graded} graded pages in a browser.`
+        : `The audit rendered ${rendered} of its ${graded} graded pages in a browser.`,
     );
   }
-  // A template with pages too thin to grade whose HTML response reads as a page the browser fills in
-  // (detectors/rendered.ts): they are counted, and said to be ungraded.
-  const ungraded = pages - graded;
-  const which = `${graded} graded and ${ungraded} whose HTML response held too little text to be graded`;
   if (pages === 1) {
     return ours(
       'The audit rendered its 1 page in a browser; its HTML response held too little text to be graded.',
     );
   }
   return ours(
-    rendered === pages
-      ? `The audit rendered each of its ${pages} pages in a browser: ${which}.`
-      : `The audit rendered ${rendered} of its ${pages} pages in a browser: ${which}.`,
+    `${rendered === pages ? `The audit rendered each of its ${pages} pages` : `The audit rendered ${rendered} of its ${pages} pages`} in a browser; their HTML responses held too little text to be graded.`,
   );
 }
 
 function context(record: RenderedDetection, facts: PacketFacts): Line[] {
   const { pages, graded, rendered } = record.extent;
-  const kind = graded === pages ? 'graded ' : '';
+  // the pages the verdict reads: the graded ones, or, with none, those too thin to grade
+  const read = graded > 0 ? graded : pages;
+  const kind = graded > 0 ? 'graded ' : '';
   const all = renderedPages(record);
   const shown = all.slice(0, PAGES_SHOWN);
   const rest = all.length - shown.length;
-  const unrendered = pages - rendered;
+  const unrendered = read - rendered;
   const lines: Line[] = [
     line`The HTML response of the template ${code(record.template_key)} holds far fewer words than its pages show once rendered in a browser: the difference is content added in the browser. ${sample(record.extent)}`,
     ...shown.map(

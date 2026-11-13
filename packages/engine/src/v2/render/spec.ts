@@ -244,11 +244,13 @@ first here: the order is by key alone.
 
 The phase runs after the graded phase has settled (below), so the graded phase's pages, and the
 estimate, which is drawn from them alone, are what they would be with no empty-root page in the crawl.
-It comes last in the budget too: it renders only what the per-check cap leaves after the graded phase
-counted, so where the graded phase uses the cap, no empty-root page renders, and a template of
-empty-root pages alone reads \`not_rendered\`. An empty-root page's \`without_js\` is written to its \`PageResult\` and
-read by the \`client_rendered_template\` detector; it reaches neither the site estimate nor Readable,
-which read graded pages only.`,
+It comes last in the budget too: its allowance is the per-check browser time the graded phase left,
+not render slots. So on a large site whose graded renders are fast the empty-root phase still renders,
+and where the graded phase uses the time, no empty-root page renders and a template of empty-root
+pages alone reads \`not_rendered\`. An empty-root page's \`without_js\` is written to its
+\`PageResult\`. The \`client_rendered_template\` detector reads it only for a template with no graded
+page: a template with a graded page is judged on its graded renders alone, as before. It reaches
+neither the site estimate nor Readable, which read graded pages only.`,
 
     `## The site estimate
 
@@ -302,13 +304,14 @@ them. A phase whose allowance is below one page's ${seconds(2 * RESERVE_PER_REND
 of its pages is \`check_cap\`. When it grants, the budget is settled once, after the phase's last page
 has finished, at the browser time the phase counted; a settle that throws is returned as
 \`settle_failed\`, and the day may still count the whole allowance, depending on the store. So a day with
-room for some pages of a phase but not its allowance renders none of that phase. A refusal by the
-budget, or a page Browser Run fails, in the empty-root phase reaches only that phase's pages. If a page
-throws out of
-the render, the other pages of its phase go on, taking and rendering the phase's pages left in the
-queue; once all have finished, the budget is settled at what the phase counted and the throw is passed
-on, so the check's results are discarded, and a throw in the graded phase means the empty-root phase
-does not run.
+room for some pages of a phase but not its allowance renders none of that phase. When the budget
+refused the graded phase or threw, the empty-root phase does not ask it, and each of its pages carries
+the graded phase's reason. A refusal by the budget, or a page Browser Run fails, in the empty-root
+phase reaches only that phase's pages. If a page throws out of the render, the other pages of its
+phase go on, taking and rendering the phase's pages left in the queue; once all have finished, the
+budget is settled at what the phase counted. A throw in the graded phase is then passed on, so the
+check's results are discarded and the empty-root phase does not run; a throw in the empty-root phase
+leaves each of its pages \`phase_threw\`, and the graded phase's pages stand.
 
 Within a phase, before a page starts it reserves both of its renders at ${seconds(RESERVE_PER_RENDER_MS)} each
 from the phase's allowance. When the allowance cannot take them while other pages of the phase are in
@@ -325,6 +328,12 @@ The empty-root phase adds wall time after the graded phase, inside the same rend
 function time limit: at most ${EMPTY_ROOT_MAX_RENDERS} pages, each two requests of at most
 ${seconds(REQUEST_TIMEOUT_MS)} apart from the waits on a 429 below. Its browser time is added to
 \`browser_ms\`, which the usage event's \`compute_seconds\` counts (\`build/lineage.ts\` \`usageOf\`).
+
+**Across checks.** The empty-root phase spends per-check browser time the graded phase left, under
+the unchanged per-check and per-day caps. A day's total can therefore be reached sooner, and a later
+check's graded phase can then be refused \`daily_cap\`, and its Readable read with fewer renders. Within
+one check no grade input moves; across checks this is the one way the empty-root phase can, bounded by
+${EMPTY_ROOT_MAX_RENDERS} renders a check.
 
 One check keeps at most \`${IN_FLIGHT_ENV}\` requests open at once, ${RENDER_IN_FLIGHT_DEFAULT} unless set; checks
 running together each have their own. A 429 is retried no sooner than its \`Retry-After\` asks, as a

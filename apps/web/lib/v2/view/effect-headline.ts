@@ -11,6 +11,11 @@
  * - A structure fix whose AI effect is null keeps its Technical SEO points, and waits when they are 0
  *   or less.
  * - Otherwise the fix is headed by its Technical SEO points, or says they are not estimated.
+ * - A client-rendered template fix whose AI effect is estimated at 0 or less is headed by the pages
+ *   it makes readable, `pages_readable`: "Makes N pages readable without JavaScript", N its
+ *   `affected_pages`, never a grade number (owner ruling on CC-32 Q8). For a template of empty-root
+ *   pages alone, `affected_pages` is the template's crawled empty-root pages: the pages the check saw,
+ *   not the ones it rendered, which the Fix record does not carry.
  * - An effect at or below zero is never printed with a sign: `formatPoints` gives it no figure, so a
  *   fix whose estimated effects are all 0 or less is headed `no_effect`, "No measurable effect on the
  *   grade" (CC-32 D4). The engine keeps the number it computed.
@@ -30,6 +35,8 @@ export type EffectHeadline =
   | { kind: 'seo'; points: number; signed: string }
   | { kind: 'seo_not_estimated' }
   | { kind: 'no_effect' }
+  /** `text` is `pagesReadableText(pages)`. */
+  | { kind: 'pages_readable'; pages: number; text: string }
   /** `sentence` heads the card, the open fix and the fix page; `short` the table. */
   | { kind: 'waiting'; sentence: string; short: string };
 
@@ -66,6 +73,24 @@ export const NO_EFFECT_SHORT = 'No measurable effect';
  * which a view prints as no measurable effect, never with a minus sign.
  */
 export const formatPoints = (n: number): string | null => (n > 0 ? `+${n}` : null);
+
+/** "Makes 3 pages readable without JavaScript", singular for one page. */
+export const pagesReadableText = (pages: number): string =>
+  `Makes ${pages} ${plural(pages, 'page', 'pages')} readable without JavaScript`;
+
+type Headed = Pick<Fix, 'type' | 'effect' | 'section' | 'affected_pages'>;
+
+/** A client-rendered template fix whose AI effect is estimated and gives no figure (`formatPoints`). */
+const makesReadable = (f: Pick<Fix, 'type' | 'effect'>): boolean =>
+  f.type === 'client_rendered_template' &&
+  f.effect.ai_readability !== null &&
+  formatPoints(f.effect.ai_readability) === null;
+
+/** The pages the `pages_readable` fixes among `fixes` make readable, as text; null when none is one. */
+export function pagesReadable(fixes: readonly Pick<Fix, 'type' | 'effect' | 'affected_pages'>[]) {
+  const these = fixes.filter(makesReadable);
+  return these.length ? pagesReadableText(these.reduce((n, f) => n + f.affected_pages, 0)) : null;
+}
 
 /** A group's points: each member's taken at 0 when below it, so a negative member lowers no sum. */
 export const groupSum = (points: readonly number[]): number =>
@@ -114,15 +139,19 @@ function waiting(
   };
 }
 
-export function effectHeadline(
-  f: Pick<Fix, 'effect' | 'section'>,
-  siteFixes: readonly Numbered[],
-): EffectHeadline {
+export function effectHeadline(f: Headed, siteFixes: readonly Numbered[]): EffectHeadline {
   const { ai_readability: ai, technical_seo: seo } = f.effect;
   const aiSigned = ai === null ? null : formatPoints(ai);
   if (aiSigned !== null) return { kind: 'ai', points: ai!, signed: aiSigned };
   if (ai === null && (AI_SECTIONS.has(f.section) || (seo !== null && seo <= 0))) {
     return waiting(f, siteFixes);
+  }
+  if (makesReadable(f)) {
+    return {
+      kind: 'pages_readable',
+      pages: f.affected_pages,
+      text: pagesReadableText(f.affected_pages),
+    };
   }
   if (seo === null) return { kind: 'seo_not_estimated' };
   const seoSigned = formatPoints(seo);

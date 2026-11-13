@@ -27,7 +27,8 @@ import { readBatches } from './batches.js';
 import { diffBuilt, diffInputsOf } from './diff.js';
 import { gradeAssembled } from './grade.js';
 import { lineagesOf, usageOf } from './lineage.js';
-import { emptyRootUrls, sample } from './plan.js';
+import { renderable } from '../render/sample.js';
+import { plannedEmptyRoots, renderCandidates, sample } from './plan.js';
 import { decideStatus } from './status.js';
 import { checkRecord, robotsText } from './record.js';
 import { summariesOf } from './summaries.js';
@@ -83,13 +84,19 @@ export function buildCheck(input: BuildInput): BuiltCheck {
         ...assembledOf,
         status: decideStatus(batches, [...assembledOf.status.unfinished, 'sample']),
       };
-  // renderCandidates offers the sampled pages to the graded phase and the crawled empty-root pages to
-  // the empty-root phase (render/empty-root.ts), and nothing else.
-  const emptyRoots = emptyRootUrls(assembledOf);
+  // The graded phase renders sampled pages it may render (render/sample.ts `renderable`), and the
+  // empty-root phase the empty-root pages `selectEmptyRoots` picks from this crawl
+  // (render/empty-root.ts); nothing else is admitted.
+  const gradedPhase = new Set(
+    renderCandidates(assembledOf, [...planned.stage1, ...planned.stage2], [], new Map())
+      .candidates.filter(renderable)
+      .map((c) => c.url),
+  );
+  const emptyRoots = plannedEmptyRoots(assembledOf);
   for (const p of input.render?.pages ?? []) {
-    if (!sampled.has(p.url) && !emptyRoots.has(p.url))
+    if (!gradedPhase.has(p.url) && !emptyRoots.has(p.url))
       throw new Error(
-        `buildCheck: a render of ${p.url}, which neither the sample nor the empty-root pages hold`,
+        `buildCheck: a render of ${p.url}, which neither the sample nor the empty-root picks hold`,
       );
   }
 
