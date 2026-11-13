@@ -171,6 +171,23 @@ describe('the finders see what they claim to see', () => {
       isFlagGated(join(WEB, p)),
     );
     expect(hidden).toEqual([
+      // CC-36 D3: the kept v1 public pages' targets, v1's page in the v2 shell.
+      'app/(v2-kept)/v2-kept/ai-readiness-checker/page.tsx',
+      'app/(v2-kept)/v2-kept/audit/[id]/page.tsx',
+      'app/(v2-kept)/v2-kept/aup/page.tsx',
+      'app/(v2-kept)/v2-kept/authors/[slug]/page.tsx',
+      'app/(v2-kept)/v2-kept/blog/[slug]/page.tsx',
+      'app/(v2-kept)/v2-kept/blog/page.tsx',
+      'app/(v2-kept)/v2-kept/blog/research/page.tsx',
+      'app/(v2-kept)/v2-kept/bot/page.tsx',
+      'app/(v2-kept)/v2-kept/guides/page.tsx',
+      'app/(v2-kept)/v2-kept/login/page.tsx',
+      'app/(v2-kept)/v2-kept/privacy/page.tsx',
+      'app/(v2-kept)/v2-kept/status/page.tsx',
+      'app/(v2-kept)/v2-kept/subprocessors/page.tsx',
+      'app/(v2-kept)/v2-kept/takedown/page.tsx',
+      'app/(v2-kept)/v2-kept/terms/page.tsx',
+      'app/(v2-kept)/v2-kept/verify/[id]/page.tsx',
       'app/agencies/page.tsx',
       'app/agency-trial/page.tsx',
       'app/agency/clients/[siteId]/page.tsx',

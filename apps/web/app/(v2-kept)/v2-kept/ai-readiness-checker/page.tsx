@@ -1,0 +1,27 @@
+import { notFound } from 'next/navigation';
+import {
+  AiReadinessCheckerLd,
+  AiReadinessCheckerMain,
+} from '@/app/ai-readiness-checker/AiReadinessChecker';
+import { KeptShell } from '@/app/(v2-kept)/_lib/KeptShell';
+import { AuditForm } from '@/components/v2/screens/home/AuditForm';
+import { checksPublicEnabled } from '@/lib/auth/flags';
+
+export { metadata } from '@/app/ai-readiness-checker/AiReadinessChecker';
+
+/**
+ * `/ai-readiness-checker` in the v2 shell while V2_CHECKS_PUBLIC is on (CC-36 D3, `V2_REWRITES`);
+ * a 404 with it off. The page's own content, with v2's audit form, which starts a v2 check
+ * (`POST /api/checks`), in place of v1's, whose route answers 410 once the cutover is on.
+ */
+export default function KeptAiReadinessCheckerPage() {
+  if (!checksPublicEnabled()) return notFound();
+  return (
+    <KeptShell>
+      <AiReadinessCheckerLd />
+      <AiReadinessCheckerMain
+        form={<AuditForm fieldId="url" label="Start an audit" primary start />}
+      />
+    </KeptShell>
+  );
+}

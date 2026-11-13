@@ -51,6 +51,48 @@ describe('V2_REWRITES', () => {
       expect(rewriteOf(p), p).toBeNull();
   });
 
+  it('each kept v1 public page is rewritten to its page in the kept group, with its param', () => {
+    const kept: [string, string][] = [
+      ['/ai-readiness-checker', '/v2-kept/ai-readiness-checker'],
+      ['/audit/abc-123', '/v2-kept/audit/abc-123'],
+      ['/authors/jane-doe', '/v2-kept/authors/jane-doe'],
+      ['/blog', '/v2-kept/blog'],
+      ['/blog/research', '/v2-kept/blog/research'],
+      ['/blog/orphan-pages', '/v2-kept/blog/orphan-pages'],
+      ['/bot', '/v2-kept/bot'],
+      ['/guides', '/v2-kept/guides'],
+      ['/login', '/v2-kept/login'],
+      ['/status', '/v2-kept/status'],
+      ['/takedown', '/v2-kept/takedown'],
+      ['/verify/abc-123', '/v2-kept/verify/abc-123'],
+      ['/privacy', '/v2-kept/privacy'],
+      ['/terms', '/v2-kept/terms'],
+      ['/aup', '/v2-kept/aup'],
+      ['/subprocessors', '/v2-kept/subprocessors'],
+    ];
+    for (const [from, to] of kept) {
+      for (const p of [from, `${from}/`]) {
+        expect(rewriteOf(p)?.to, p).toBe(to);
+        expect(rewriteOf(p)?.flag, p).toBe('checksPublic');
+      }
+      expect(isRewriteTarget(to), to).toBe(true);
+      expect(isRewriteTarget(from), from).toBe(false);
+    }
+    for (const p of [
+      '/blog/x/y',
+      '/blog/a.b',
+      '/blog/orphan-pages/opengraph-image',
+      '/audit/abc/overview',
+      '/audit/a.b',
+      '/login/verify',
+      '/verify',
+      '/authors',
+      '/Blog',
+      '/privacy-policy',
+    ])
+      expect(rewriteOf(p), p).toBeNull();
+  });
+
   it('each row is a page path, no target is a source, and no source repeats', () => {
     const froms = V2_REWRITES.map((r) => r.from);
     expect(new Set(froms).size).toBe(froms.length);
