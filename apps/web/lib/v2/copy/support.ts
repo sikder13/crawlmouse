@@ -1,8 +1,12 @@
 /**
  * The words of in-product support (CC-33 D5): the support email's fixed subject and prompt, the
  * error screen, and the links on Settings and the fix page. The ids the email carries are added by
- * `supportMailto` (lib/v2/support/mailto.ts); nothing here holds an address or an id.
+ * `supportMailto` (lib/v2/support/mailto.ts); nothing here holds an id.
  */
+
+/** The support address: the footer shows it (components/v2/footer-links.ts) and the link mails it. */
+export const SUPPORT_EMAIL = 'support@crawlmouse.com';
+
 export const SUPPORT_COPY = {
   mail: {
     subject: {

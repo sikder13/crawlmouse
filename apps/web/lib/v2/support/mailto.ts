@@ -6,8 +6,7 @@
  * beside this file holds that for any string in any field.
  */
 import { FixTypeSchema } from '@crawlmouse/types/v2';
-import { SUPPORT_EMAIL } from '../../../components/v2/footer-links';
-import { SUPPORT_COPY } from '../copy/support';
+import { SUPPORT_COPY, SUPPORT_EMAIL } from '../copy/support';
 
 export type SupportTopic = keyof typeof SUPPORT_COPY.mail.subject;
 
@@ -55,7 +54,8 @@ export function supportMailto(input: SupportRequest): string {
   return `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }
 
-const SITE_PAGE = /^\/sites\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?:\/|$)/i;
+const SITE_PAGE =
+  /^\/sites\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?:\/|$)/i;
 
 /** The ids a path names: a site page's site id. */
 export function idsInPath(path: string | null): { siteId?: string } {

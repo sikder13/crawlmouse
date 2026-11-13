@@ -51,7 +51,8 @@ export interface FooterColumn {
 
 export const isGroup = (e: NavEntry): e is NavGroup => 'items' in e;
 
-export const SUPPORT_EMAIL = 'support@crawlmouse.com';
+// Declared in lib, so the support link's builder (lib/v2/support/mailto.ts) reads the same constant.
+export { SUPPORT_EMAIL } from '../../lib/v2/copy/support';
 
 /** The footer's own words. */
 export const FOOTER_COPY = {
