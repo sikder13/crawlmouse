@@ -22,7 +22,8 @@ vi.mock('./sign-in-link', () => ({ requestSignInLink: vi.fn(async () => 'sent') 
 vi.mock('../../billing/stripe-account', () => ({ stripeAccount: vi.fn() }));
 const sentry = vi.hoisted(() => ({
   captureMessage: vi.fn(),
-  getClient: vi.fn((): unknown => ({})),
+  // A client built with a DSN, so the signal is flushed rather than logged (founder-signal.ts).
+  getClient: vi.fn((): unknown => ({ getDsn: () => ({ host: 'o0.ingest.example.test' }) })),
   flush: vi.fn(async () => true),
 }));
 vi.mock('@sentry/nextjs', () => sentry);
