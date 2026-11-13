@@ -418,13 +418,13 @@
       "reason": "kept",
       "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
       "checks": {
-        "input": "n/a — static page, reads no params, query or body (app/status/page.tsx:5 (constants at :12))",
-        "output": "pass — renders only build-time constants; no DB read, no user or internal id in the HTML or RSC payload (app/status/page.tsx:5 (constants at :12))",
-        "cache": "pass — static (○ in the build table), reads no cookies, so nothing per-user can be cached (app/status/page.tsx:5 (constants at :12))",
-        "redirect": "n/a — no redirect or next param (app/status/page.tsx:5 (constants at :12))",
+        "input": "n/a — reads no params, query or body (app/status/page.tsx:16)",
+        "output": "pass — renders the deployment's version and commit from the health logic, which reads no database and no request (app/status/page.tsx:17); no user or internal id in the HTML or RSC payload",
+        "cache": "pass — rendered on each request (force-dynamic, app/status/page.tsx:14), reads no cookies, so nothing per-user is in it",
+        "redirect": "n/a — no redirect or next param (app/status/page.tsx:16)",
         "errors": "n/a — no error response of its own; a render throw goes to app/global-error.tsx, which shows no error text (app/global-error.tsx:14)",
-        "escaping": "pass — no crawled or user text; JSX text only; no dangerouslySetInnerHTML in the file (app/status/page.tsx:5 (constants at :12))",
-        "abuse": "n/a — no action that costs money or sends mail (app/status/page.tsx:5 (constants at :12))"
+        "escaping": "pass — no crawled or user text; JSX text only; no dangerouslySetInnerHTML in the file (app/status/page.tsx:16)",
+        "abuse": "n/a — no action that costs money or sends mail (app/status/page.tsx:16)"
       },
       "e2e": {
         "url": "/status",
@@ -902,8 +902,8 @@
       "evidence": "apps/web/app/api/health/route.ts:1",
       "checks": {
         "input": "n/a — no input",
-        "output": "pass — ok, version, commit only (app/api/health/route.ts:10-11)",
-        "cache": "pass — no-store (:12)",
+        "output": "pass — ok, version, commit only (app/api/health/route.ts:10, from lib/v2/ops/health.ts healthReport)",
+        "cache": "pass — no-store (:10)",
         "redirect": "n/a — no redirect and no next/returnTo param in the file",
         "errors": "n/a — no error path",
         "escaping": "n/a — JSON",
