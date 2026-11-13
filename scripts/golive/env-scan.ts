@@ -4,7 +4,7 @@
  * not an index is not a read. What counts as a read:
  *
  *   process.env.X        process.env['X']        process.env?.X
- *   env.X  env?.X  env['X']   where the object is an identifier named `env` or ending in `Env`/`env`
+ *   env.X  env?.X  env['X']   where the object is an identifier named `env` or ending in `Env`
  *   const { X } = process.env    (and the same from an `env` identifier)
  *   const SOME_ENV = 'X'         a name constant (the worker client's `WORKER_URL_ENV`)
  *   const ENV = { token: 'X' }   a table of name constants (`ENV` or `*_ENV`; the render client's)
@@ -61,8 +61,7 @@ function isEnvObject(node: ts.Expression): boolean {
       node.expression.text === 'process'
     );
   }
-  if (ts.isIdentifier(node))
-    return node.text === 'env' || /Env$/.test(node.text) || /env$/.test(node.text);
+  if (ts.isIdentifier(node)) return node.text === 'env' || /Env$/.test(node.text);
   return false;
 }
 

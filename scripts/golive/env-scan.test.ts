@@ -72,6 +72,7 @@ describe('the matcher, one fixture per spelling', () => {
     ['a bare name string', "export const s = 'FIX_B';"],
     ['a lower-case property', 'export const f = (env: E) => env.fixB;'],
     ['a property of another object', 'export const f = (cfg: E) => cfg.FIX_B;'],
+    ['an identifier that only ends in env', 'export const f = (seven: E) => seven.FIX_B;'],
     ['a constant not named *_ENV', "export const URL_NAME = 'FIX_B';"],
   ];
   it.each(notReads)('does not count %s', (_label, source) => {
