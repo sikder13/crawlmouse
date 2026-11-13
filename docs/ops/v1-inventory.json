@@ -651,6 +651,70 @@
     },
     {
       "kind": "metadata",
+      "path": "app/alerts/error.tsx",
+      "ruling": "keep",
+      "reason": "error boundary of the Alerts page (CC-33 D5): the v2 error screen with a retry, the support link and the Sentry event id",
+      "evidence": "apps/web/app/alerts/error.tsx:1",
+      "checks": {
+        "input": "n/a — reads no param, query or body; the path it puts in the support link is the browser's own, kept only when it matches the builder's pattern (lib/v2/support/mailto.ts)",
+        "output": "pass — the error is sent to Sentry, not rendered; the screen shows its event id only (components/v2/screens/support/SegmentError.tsx)",
+        "cache": "n/a — a client boundary, rendered in the browser after an error; nothing of its own is cached",
+        "redirect": "n/a — no redirect and no next/returnTo param in the file",
+        "errors": "pass — no message, stack or digest in the markup",
+        "escaping": "pass — JSX text only; the mailto's values are encoded and each is dropped unless it has its field's shape (lib/v2/support/mailto.ts)",
+        "abuse": "n/a — no action that costs money or sends mail"
+      }
+    },
+    {
+      "kind": "metadata",
+      "path": "app/changes/error.tsx",
+      "ruling": "keep",
+      "reason": "error boundary of the changes log (CC-33 D5): the v2 error screen with a retry, the support link and the Sentry event id",
+      "evidence": "apps/web/app/changes/error.tsx:1",
+      "checks": {
+        "input": "n/a — reads no param, query or body; the path it puts in the support link is the browser's own, kept only when it matches the builder's pattern (lib/v2/support/mailto.ts)",
+        "output": "pass — the error is sent to Sentry, not rendered; the screen shows its event id only (components/v2/screens/support/SegmentError.tsx)",
+        "cache": "n/a — a client boundary, rendered in the browser after an error; nothing of its own is cached",
+        "redirect": "n/a — no redirect and no next/returnTo param in the file",
+        "errors": "pass — no message, stack or digest in the markup",
+        "escaping": "pass — JSX text only; the mailto's values are encoded and each is dropped unless it has its field's shape (lib/v2/support/mailto.ts)",
+        "abuse": "n/a — no action that costs money or sends mail"
+      }
+    },
+    {
+      "kind": "metadata",
+      "path": "app/dashboard/v2/error.tsx",
+      "ruling": "keep",
+      "reason": "error boundary of the v2 dashboard (CC-33 D5): the v2 error screen with a retry, the support link and the Sentry event id",
+      "evidence": "apps/web/app/dashboard/v2/error.tsx:1",
+      "checks": {
+        "input": "n/a — reads no param, query or body; the path it puts in the support link is the browser's own, kept only when it matches the builder's pattern (lib/v2/support/mailto.ts)",
+        "output": "pass — the error is sent to Sentry, not rendered; the screen shows its event id only (components/v2/screens/support/SegmentError.tsx)",
+        "cache": "n/a — a client boundary, rendered in the browser after an error; nothing of its own is cached",
+        "redirect": "n/a — no redirect and no next/returnTo param in the file",
+        "errors": "pass — no message, stack or digest in the markup",
+        "escaping": "pass — JSX text only; the mailto's values are encoded and each is dropped unless it has its field's shape (lib/v2/support/mailto.ts)",
+        "abuse": "n/a — no action that costs money or sends mail"
+      }
+    },
+    {
+      "kind": "metadata",
+      "path": "app/sites/error.tsx",
+      "ruling": "keep",
+      "reason": "error boundary of a site's page (CC-33 D5): the v2 error screen with a retry, the support link and the Sentry event id",
+      "evidence": "apps/web/app/sites/error.tsx:1",
+      "checks": {
+        "input": "n/a — reads no param, query or body; the path it puts in the support link is the browser's own, kept only when it matches the builder's pattern (lib/v2/support/mailto.ts)",
+        "output": "pass — the error is sent to Sentry, not rendered; the screen shows its event id only (components/v2/screens/support/SegmentError.tsx)",
+        "cache": "n/a — a client boundary, rendered in the browser after an error; nothing of its own is cached",
+        "redirect": "n/a — no redirect and no next/returnTo param in the file",
+        "errors": "pass — no message, stack or digest in the markup",
+        "escaping": "pass — JSX text only; the mailto's values are encoded and each is dropped unless it has its field's shape (lib/v2/support/mailto.ts)",
+        "abuse": "n/a — no action that costs money or sends mail"
+      }
+    },
+    {
+      "kind": "metadata",
       "path": "app/sitemap.ts",
       "ruling": "keep",
       "reason": "sitemap; outside this step's allowed paths (§13)",

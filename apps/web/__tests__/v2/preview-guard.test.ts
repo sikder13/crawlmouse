@@ -291,6 +291,7 @@ describe('v2 stays out of live pages', () => {
       'app/(account)/account/restore/[token]/route.ts',
       'app/(account)/account/restore/page.tsx',
       'app/(account)/check-email/page.tsx',
+      'app/(account)/error.tsx',
       'app/(account)/layout.tsx',
       'app/(account)/login/verify/continue/page.tsx',
       'app/(account)/settings/delete/page.tsx',
