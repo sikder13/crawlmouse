@@ -6,7 +6,8 @@
  * applies the per-email bucket itself. The client is an anon one with no cookies and no session, so
  * the request carries nobody's session.
  *
- * Callers: app/api/internal/** and inngest/signin-canary.ts (sign-in-link.test.ts holds the list).
+ * Callers: app/api/internal/** and lib/v2/ops/functions.ts, which hands it to the sign-in canary
+ * (sign-in-link.test.ts holds the list).
  */
 import { createClient } from '@supabase/supabase-js';
 

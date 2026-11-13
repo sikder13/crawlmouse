@@ -50,8 +50,9 @@ describe('requestSignInLink', () => {
 
 describe('who may import it', () => {
   // It sends a sign-in link to any address it is given, past the magic-link route's Turnstile: only
-  // the console's actions and the sign-in canary may call it.
-  const ALLOWED = [/^apps\/web\/app\/api\/internal\//, /^inngest\/signin-canary\.ts$/];
+  // the console's actions and the module that builds the sign-in canary's work (questions.md Q11:
+  // the inngest package imports nothing of the app, so the canary is handed the function) may call it.
+  const ALLOWED = [/^apps\/web\/app\/api\/internal\//, /^apps\/web\/lib\/v2\/ops\/functions\.ts$/];
   const SPEC = /(?:from\s+|import\s*\(\s*|require\(\s*)['"]([^'"]*ops\/sign-in-link)['"]/g;
 
   function walk(dir: string, out: string[] = []): string[] {
@@ -64,7 +65,7 @@ describe('who may import it', () => {
     return out;
   }
 
-  it('is imported only by app/api/internal and inngest/signin-canary.ts', () => {
+  it('is imported only by app/api/internal and lib/v2/ops/functions.ts', () => {
     const files = [...walk(WEB), ...walk(join(REPO, 'inngest'))];
     expect(files.length).toBeGreaterThan(200);
     const importers = files
