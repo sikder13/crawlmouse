@@ -5,8 +5,11 @@
  * apps/web/lib/v2/ops/functions.ts). The work is injected; this package stays Sentry-agnostic.
  *
  * The request time is taken before the request and kept in the `request` step's output, so a
- * replayed run looks from the same time. Each report is made inside its step, so a replay does not
- * report again.
+ * replayed run looks from the same time. Each report is a step of its own (`report-<stage>`), run
+ * after the step that found its reason has returned, so a replay does not report again, and a
+ * report that throws (`reportCanary` throws when Sentry does not flush) is retried alone: the link
+ * is not asked for again, nor looked for again. A report that throws past its retries fails the
+ * run with its error, and is not reported as `look_error`.
  *
  * The canary reports its own failure too. A step that throws is retried by Inngest; once its retries
  * are used, `step.run` rejects in the handler with a `StepError` (inngest 3.54.2,
@@ -47,9 +50,11 @@ export function createSigninCanaryFn(work: () => CanaryWork) {
     { id: SIGNIN_CANARY_FN_ID, concurrency: { limit: 1 } },
     { cron: '*/10 * * * *' },
     async ({ step }): Promise<CanaryOutput> => {
+      const report = (stage: CanaryStage) =>
+        step.run(`report-${stage}`, () => work().report(stage));
       /** Reports a step that failed past its retries, then fails the run with its error. */
       const failed = async (stage: CanaryStage, error: unknown): Promise<never> => {
-        await step.run(`report-${stage}`, () => work().report(stage));
+        await report(stage);
         throw error;
       };
       let asked: { at: string; outcome: 'sent' | 'refused' };
@@ -57,26 +62,23 @@ export function createSigninCanaryFn(work: () => CanaryWork) {
         asked = await step.run('request', async () => {
           const w = work();
           const at = w.now().toISOString();
-          const outcome = await w.request();
-          if (outcome === 'refused') await w.report('request');
-          return { at, outcome };
+          return { at, outcome: await w.request() };
         });
       } catch (error) {
         return await failed('request_error', error);
       }
-      if (asked.outcome === 'refused') return { requested: 'refused', delivered: null };
+      if (asked.outcome === 'refused') {
+        await report('request');
+        return { requested: 'refused', delivered: null };
+      }
       await step.sleep('wait', CANARY_WAIT);
       let delivered: boolean;
       try {
-        delivered = await step.run('look', async () => {
-          const w = work();
-          const seen = await w.delivered(asked.at);
-          if (!seen) await w.report('delivery');
-          return seen;
-        });
+        delivered = await step.run('look', () => work().delivered(asked.at));
       } catch (error) {
         return await failed('look_error', error);
       }
+      if (!delivered) await report('delivery');
       return { requested: 'sent', delivered };
     },
   );
