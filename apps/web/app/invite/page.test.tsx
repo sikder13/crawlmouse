@@ -130,13 +130,27 @@ describe('/invite', () => {
     expect(html).not.toMatch(/<form/);
   });
 
-  it('says the link cannot be used for no cookie, a value that is not a token, and a link re-sent since', async () => {
+  it('with no cookie, or a value that is not a token, says the page holds no invitation and to open the mailed link again', async () => {
+    const owner = await paidOwner('agency');
+    const guest = await person(h.db, 'guest');
+    // A live invitation the page's cookie no longer holds: none of the four causes below is true.
+    await invitation(owner, guest.email);
+    as(guest);
+    for (const held of [null, 'short']) {
+      if (held) h.cookies.set('cm_link_invite', held);
+      const html = await invitePage();
+      expect(html, String(held)).toContain('This page holds no invitation');
+      expect(html, String(held)).toContain('Open the link in the invitation email again.');
+      expect(html, String(held)).not.toContain('This invitation cannot be used');
+      expect(html, String(held)).not.toContain('accepted, replaced');
+      expect(html, String(held)).not.toMatch(/<form/);
+    }
+  });
+
+  it('says the link cannot be used for a link re-sent since', async () => {
     const owner = await paidOwner('agency');
     const guest = await person(h.db, 'guest');
     as(guest);
-    expect(await invitePage()).toContain('This invitation cannot be used');
-    h.cookies.set('cm_link_invite', 'short');
-    expect(await invitePage()).toContain('This invitation cannot be used');
     const token = await invitation(owner, guest.email);
     await h.db.query(
       `update public.seats set invite_token_hash = null, invite_expires_at = null, invite_seq = invite_seq + 1
@@ -146,6 +160,8 @@ describe('/invite', () => {
     h.cookies.set('cm_link_invite', token);
     const html = await invitePage();
     expect(html).toContain('This invitation cannot be used');
+    expect(html).toContain('accepted, replaced by a newer one, removed, or it has expired');
+    expect(html).not.toContain('This page holds no invitation');
     expect(html).not.toMatch(/<form/);
   });
 
@@ -155,7 +171,7 @@ describe('/invite', () => {
     const token = await invitation(owner, guest.email);
     as(guest);
     const html = await invitePage({ token });
-    expect(html).toContain('This invitation cannot be used');
+    expect(html).toContain('This page holds no invitation');
     expect(html).not.toMatch(/<form/);
   });
 

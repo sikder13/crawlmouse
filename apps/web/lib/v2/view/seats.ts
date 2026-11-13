@@ -19,6 +19,7 @@ import { GATES } from '../../entitlement-v2';
 import { MAX_EXTRA_SEATS } from '../agency/extras-bounds';
 import { gateMessage } from '../agency/gates';
 import { roleMay } from '../agency/guard';
+import { INVITE_LINK_DAYS } from '../agency/seats';
 import { INVITE_COPY, ROLE_ROWS, SEATS_COPY as COPY } from '../copy/seats';
 import { capitalise, count, numberWord, plural } from '../words';
 import {
@@ -258,7 +259,7 @@ export function seatsView(
       sub: COPY.peopleSub,
       rows,
       foot: partial ? null : foot,
-      mailNote: COPY.mailNote,
+      mailNote: COPY.mailNote(numberWord(INVITE_LINK_DAYS)),
     },
     roles: {
       title: COPY.rolesTitle,
@@ -289,7 +290,7 @@ export function seatsView(
 // ─── the invitation page ─────────────────────────────────────────────────────────────────────────
 
 export type InviteView =
-  | { state: 'gone'; title: string; lines: string[]; notice: string | null }
+  | { state: 'gone' | 'no_link'; title: string; lines: string[]; notice: string | null }
   | {
       state: 'invite';
       title: string;
@@ -302,19 +303,31 @@ export type InviteView =
     };
 
 /**
- * What `/invite` shows: the invitation its cookie's token opens, read through `read_seat_invite`
- * (null when the link cannot be used), for a reader who is signed in or not. `notice` is the line of
+ * What `/invite` shows, for a reader who is signed in or not: the invitation its cookie's token
+ * opens, read through `read_seat_invite`; null for a token that function refuses; `'no_link'` when
+ * the cookie holds no token, which says nothing about the invitation itself. `notice` is the line of
  * a refused acceptance the form was sent back with.
  */
 export function inviteView(
-  invitation: {
-    accountName: string | null;
-    role: (typeof INVITED_ROLES)[number];
-    everyClient: boolean;
-  } | null,
+  invitation:
+    | {
+        accountName: string | null;
+        role: (typeof INVITED_ROLES)[number];
+        everyClient: boolean;
+      }
+    | null
+    | 'no_link',
   signedIn: boolean,
   notice: string | null = null,
 ): InviteView {
+  if (invitation === 'no_link') {
+    return {
+      state: 'no_link',
+      title: INVITE_COPY.noLinkTitle,
+      lines: [INVITE_COPY.noLink],
+      notice,
+    };
+  }
   if (invitation === null) {
     return { state: 'gone', title: INVITE_COPY.goneTitle, lines: [INVITE_COPY.gone], notice };
   }

@@ -257,6 +257,16 @@ A seat's own routes are under `/api/seats/id/`: a seat id directly under `/api/s
 `/api/seats/accept` and `/api/seats/switch`, and the route registry holds each path to one row
 (`__tests__/security/route-policy.test.ts`, "no two rows overlap").
 
+**The page `/invite`.** It shows one of three things. With an invitation its cookie's token opens:
+the account, the role, the scope, and the form that accepts (or, signed out, the link to sign in
+first). With a token `read_seat_invite` refuses: "This invitation cannot be used". With no token in
+the cookie: "This page holds no invitation", which says to open the link in the invitation mail
+again and gives no cause, since the invitation itself was not read. The invitation's cookie lasts an
+hour (`linkCookieSeconds('invite')`, `lib/v2/account/link-cookie.ts`) where the other emailed links'
+last ten minutes, because a reader who is not signed in leaves the page to sign in by email and
+comes back to it.
+`pnpm --filter @crawlmouse/web exec vitest run lib/v2/account/link-cookie.test.ts app/invite/page.test.tsx`.
+
 Invitation mail is bounded by the day for an account (`INVITE_MAIL_PER_DAY`, `lib/v2/agency/seats.ts`:
 fewer in a trial than on a paid plan) and at 10 an hour for a client address, an invite and a resend
 counted together (`app/api/seats/route.ts`). An invitation's row is written before its mail is asked

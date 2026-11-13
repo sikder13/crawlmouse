@@ -16,8 +16,10 @@ import { EXTRA_SEAT, EXTRA_SITE, usd } from '../../lib/billing/prices';
 import { GATES } from '../../lib/entitlement-v2';
 import { gateMessage } from '../../lib/v2/agency/gates';
 import { SEAT_GUARD } from '../../lib/v2/agency/guard';
+import { INVITE_LINK_DAYS } from '../../lib/v2/agency/seats';
 import { ROLE_ROWS } from '../../lib/v2/copy/seats';
 import { inviteView, seatsView } from '../../lib/v2/view/seats';
+import { numberWord } from '../../lib/v2/words';
 import { CC31_SEAT_ELEMENTS } from './_lib/screens';
 import { expected, firstDifference, locked, renderedText, withoutShell } from './_lib/lock';
 
@@ -88,10 +90,14 @@ describe('seatsView: an Agency account read by its owner (Northwind)', () => {
     );
   });
 
-  it('says how an invitation arrives, in FACTS’ words', () => {
+  it('says what an invitation is: one email with a link, for as many days as the link works', () => {
     expect(v.people.mailNote).toBe(
-      'An invitation is the sign-in email with one extra line; nothing else is sent.',
+      `An invitation is one email with a link to accept it. The link works for ${numberWord(INVITE_LINK_DAYS)} days.`,
     );
+    expect(v.people.mailNote).toBe(
+      'An invitation is one email with a link to accept it. The link works for seven days.',
+    );
+    expect(v.people.mailNote).not.toContain('sign-in email');
   });
 
   it('offers the owner the invite form, a change for each seat but their own, and the plan’s extras', () => {
@@ -362,8 +368,21 @@ describe('inviteView', () => {
     expect(inviteView(null, true, 'gone')).toEqual({
       state: 'gone',
       title: 'This invitation cannot be used',
-      lines: [expect.any(String)],
+      lines: [
+        'It was accepted, replaced by a newer one, removed, or it has expired. The account’s owner can send another.',
+      ],
       notice: 'gone',
+    });
+  });
+
+  it('a page that holds no link names none of those causes: it says to open the mailed link again', () => {
+    expect(inviteView('no_link', false)).toEqual({
+      state: 'no_link',
+      title: 'This page holds no invitation',
+      lines: [
+        'A page keeps an invitation for a short while after its link is opened, in the browser that opened it. Open the link in the invitation email again.',
+      ],
+      notice: null,
     });
   });
 });

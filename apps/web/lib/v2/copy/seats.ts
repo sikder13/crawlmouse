@@ -50,8 +50,12 @@ export const SEATS_COPY = {
   rolesTitle: 'What each role can do',
   yes: 'yes',
   no: 'no',
-  /** FACTS-proposed.md, "Other copy changes named by R7", the Ag-Seats row (ARCH-2 q12). */
-  mailNote: 'An invitation is the sign-in email with one extra line; nothing else is sent.',
+  /**
+   * What an invitation is, under the People table: the `seat_invite` mail, whose one link is the
+   * invitation's. `days` is how long that link works, in words.
+   */
+  mailNote: (days: string) =>
+    `An invitation is one email with a link to accept it. The link works for ${days} days.`,
   /** The Clients cell of a seat that covers no live client. */
   noClients: 'none',
   /** Ends the foot's price in an Agency trial, where extras cannot be bought yet. */
@@ -108,6 +112,10 @@ export const INVITE_COPY = {
     'Sign in with the address the invitation was sent to. This page opens again afterwards.',
   goneTitle: 'This invitation cannot be used',
   gone: 'It was accepted, replaced by a newer one, removed, or it has expired. The account’s owner can send another.',
+  /** The page's cookie holds no token: it ran out, or the link was opened in another browser. */
+  noLinkTitle: 'This page holds no invitation',
+  noLink:
+    'A page keeps an invitation for a short while after its link is opened, in the browser that opened it. Open the link in the invitation email again.',
 } as const;
 
 // ── Where Seats differs from its locked HTML ─────────────────────────────────────────────────
@@ -163,8 +171,9 @@ export const SEATS_CHANGES: CopyChange[] = [
 export const SEATS_ADDITIONS: Addition[] = [
   {
     screen: 'agency-seats',
-    what: 'Under the People table: "An invitation is the sign-in email with one extra line; nothing else is sent."',
-    source: 'FACTS: what an invited person receives',
+    what: 'Under the People table: "An invitation is one email with a link to accept it. The link works for seven days."',
+    source:
+      'FACTS (ARCH-2 q12, as corrected in CC-31): what an invited person receives. The invitation is its own mail (seat_invite) with one link, which works for INVITE_LINK_DAYS days',
   },
   {
     screen: 'agency-seats',

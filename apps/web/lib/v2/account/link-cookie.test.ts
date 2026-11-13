@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { clearLinkCookie, landLink, LINK_FLOWS, linkToken, type LinkFlow } from './link-cookie';
+import {
+  clearLinkCookie,
+  landLink,
+  LINK_COOKIE_SECONDS,
+  LINK_FLOWS,
+  linkCookieSeconds,
+  linkToken,
+  type LinkFlow,
+} from './link-cookie';
 import { newToken } from './tokens';
 
 const ORIGIN = 'https://crawlmouse.com';
@@ -17,13 +25,33 @@ describe('landing an emailed link', () => {
       expect(location).not.toContain(token);
       const set = res.headers.get('set-cookie')!;
       expect(set).toContain(`${LINK_FLOWS[flow].cookie}=${token};`);
-      for (const attr of ['HttpOnly', 'Secure', 'SameSite=Lax', 'Path=/', 'Max-Age=600']) {
+      for (const attr of ['HttpOnly', 'Secure', 'SameSite=Lax', 'Path=/']) {
         expect(set).toContain(attr);
       }
+      expect(set).toContain(`Max-Age=${linkCookieSeconds(flow)};`);
       expect(res.headers.get('cache-control')).toBe('no-store');
       expect(res.headers.get('referrer-policy')).toBe('no-referrer');
     },
   );
+
+  it('keeps the invitation for an hour, across a sign-in by email, and the other flows for ten minutes', () => {
+    expect(LINK_COOKIE_SECONDS).toBe(600);
+    expect(Object.fromEntries(FLOWS.map((flow) => [flow, linkCookieSeconds(flow)]))).toEqual({
+      emailChange: 600,
+      emailUndo: 600,
+      deleteConfirm: 600,
+      restore: 600,
+      invite: 3600,
+      reportConfirm: 600,
+      reportPause: 600,
+    });
+    expect(landLink(ORIGIN, 'invite', newToken()).headers.get('set-cookie')).toContain(
+      'Max-Age=3600;',
+    );
+    expect(landLink(ORIGIN, 'restore', newToken()).headers.get('set-cookie')).toContain(
+      'Max-Age=600;',
+    );
+  });
 
   it('sets no cookie for a value that is not a token, and still redirects', () => {
     for (const bad of ['', 'abc', `${newToken()}x`, '../../etc', `${'a'.repeat(42)};`]) {
