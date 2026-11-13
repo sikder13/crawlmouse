@@ -314,6 +314,8 @@ function matrixView(
     adds &&
     n >= limit &&
     limit < GATES.agency.maxSites &&
+    // No buy form is drawn in an Agency trial (lib/v2/view/seats.ts).
+    v.account.state !== 'agency_trial' &&
     role !== null &&
     roleMay(role, 'buy_seats');
   const compared = clients.filter((s) => resultChecks(v, s.id).length > 1).length;

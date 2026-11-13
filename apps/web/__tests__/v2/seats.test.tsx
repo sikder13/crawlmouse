@@ -114,6 +114,33 @@ describe('seatsView: an Agency account read by its owner (Northwind)', () => {
     });
   });
 
+  it('in its Agency trial an account is offered no buy form, and the foot says when extras can be bought', () => {
+    const p = SEATS_PREVIEWS[OWNER];
+    const d = p.data();
+    const viewer = p.viewer();
+    const trial = {
+      ...d,
+      accounts: d.accounts.map((a) =>
+        a.id === viewer.accountId
+          ? {
+              ...a,
+              state: 'agency_trial' as const,
+              trial_ends_at: '2026-11-20T00:00:00Z',
+              // The view reads the state the history holds at the viewer's moment.
+              state_history: [{ state: 'agency_trial' as const, since: a.state_history[0]!.since }],
+            }
+          : a,
+      ),
+    };
+    const v = seatsView(trial, viewer, { seatLimit: 5, billing: true });
+    expect(v.buy).toBeNull();
+    expect(v.people.foot).toBe(
+      `One seat free. Beyond five, ${usd(EXTRA_SEAT)} a seat a month, once the trial has become the plan.`,
+    );
+    // The same account on the plan is offered the form.
+    expect(seatsView(d, viewer, { seatLimit: 5, billing: true }).buy).not.toBeNull();
+  });
+
   it('takes the seat limit it is given over the account’s own, and leaves the buy form out with billing off', () => {
     const p = SEATS_PREVIEWS[OWNER];
     const full = seatsView(p.data(), p.viewer(), { seatLimit: 4, billing: false });

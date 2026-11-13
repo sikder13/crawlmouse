@@ -220,9 +220,12 @@ export function seatsView(
   });
 
   const freeLine = `${capitalise(free === 0 ? 'no' : numberWord(free))} ${free > 1 ? 'seats' : 'seat'} free.`;
+  // In its Agency trial an account cannot buy yet: a trialing subscription's limits do not follow
+  // its extras (lib/v2/agency/extras.ts `CHANGEABLE`).
+  const inTrial = v.account.state === 'agency_trial';
   const foot =
     v.tier === 'agency'
-      ? `${freeLine} Beyond ${numberWord(GATES.agency.seats)}, ${usd(EXTRA_SEAT)} a seat a month.`
+      ? `${freeLine} Beyond ${numberWord(GATES.agency.seats)}, ${usd(EXTRA_SEAT)} a seat a month${inTrial ? COPY.onceTrialEnds : ''}.`
       : v.tier === 'free' || free === 0
         ? gateMessage('seats', v.tier)!
         : freeLine;
@@ -264,7 +267,7 @@ export function seatsView(
         ? { id: INVITE_ANCHOR, action: '/api/seats', fields: fields(sites, 'developer', 'all') }
         : null,
     buy:
-      mayBuy && billing && v.gates.agencyBranding
+      mayBuy && billing && v.gates.agencyBranding && !inTrial
         ? {
             id: BUY_ANCHOR,
             action: '/api/billing/seats',

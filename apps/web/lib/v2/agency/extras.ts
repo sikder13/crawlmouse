@@ -118,7 +118,13 @@ export type ExtrasResult =
 
 const UNAVAILABLE: ExtrasRefusal = { ok: false, status: 503, code: 'billing_unavailable' };
 
-const CHANGEABLE: ReadonlySet<string> = new Set(['active', 'trialing']);
+/**
+ * The subscription statuses a change is made in. Not `trialing`: the webhook's reading of a
+ * trialing update changes no entitlement (`lib/billing/state-machine.ts` ignores the status), so
+ * the account's limits would stay the plan's while Stripe held the extras and this route said they
+ * were bought. Extras are bought once the trial has become the plan.
+ */
+const CHANGEABLE: ReadonlySet<string> = new Set(['active']);
 
 const isCardError = (err: unknown): boolean =>
   (err as { type?: unknown } | null)?.type === 'StripeCardError';

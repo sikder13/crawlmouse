@@ -3,8 +3,9 @@ import type { Catalog } from '../../billing/catalog';
 import { fakeCatalog, fakePriceId } from '../../billing/catalog.fake';
 import { CatalogError } from '../../billing/stripe-catalog';
 import { stripeSubscription, type FakeSubscription } from '../../billing/stripe.fake';
+import { FREE_START, next } from '../../billing/state-machine';
 import { mirrorOf } from '../../billing/subscription-mirror';
-import { GATES } from '../../entitlement-v2';
+import { GATES, limitsFor } from '../../entitlement-v2';
 import {
   changeExtras,
   extrasResponse,
@@ -169,10 +170,45 @@ describe('changeExtras: a raise', () => {
     });
   });
 
-  it('a trialing subscription is changed too', async () => {
+  it('a trialing subscription is not changed: its limits would not follow, since the webhook ignores a trialing update', async () => {
     const w = world({ status: 'trialing', trialEnd: 1_800_000_000 });
-    expect((await w.change(1, 0)).ok).toBe(true);
-    expect(await w.extras()).toEqual({ seats: 1, sites: 0 });
+    expect(await w.change(1, 0)).toEqual({
+      ok: false,
+      status: 409,
+      code: 'subscription_not_active',
+    });
+    expect(w.stripe.updates).toEqual([]);
+    expect(await w.extras()).toEqual({ seats: 0, sites: 0 });
+    // What the webhook makes of the update Stripe would have delivered: no entitlement change.
+    const m = await mirrorOf(
+      stripeSubscription({ ...agency, status: 'trialing', trialEnd: 1_800_000_000, seats: 1 }),
+      catalog,
+    );
+    if ('refused' in m) throw new Error(m.refused);
+    const day = 86_400_000;
+    const t = next(
+      {
+        ...FREE_START,
+        state: 'agency_trial',
+        tier: 'agency',
+        trialVariant: 'card_required',
+        trialEndsAt: new Date(1_800_000_000_000),
+        trialUsedAt: new Date(NOW.getTime() - day),
+        subscriptionId: agency.id,
+        lastChangeAt: new Date(NOW.getTime() - day),
+      },
+      {
+        type: 'subscription_updated',
+        at: NOW,
+        subscriptionId: agency.id,
+        status: 'trialing',
+        plan: m.plan,
+        cancelAtPeriodEnd: false,
+        extras: m.extras,
+      },
+    );
+    expect(t.outcome).toBe('ignored');
+    expect(limitsFor(t.state.tier, t.state.extras).seats).toBe(GATES.agency.seats);
   });
 });
 
@@ -332,11 +368,8 @@ describe('changeExtras: the idempotency key', () => {
   });
 
   it('differs once the mirror has applied another event, where no invoice tells two changes apart', async () => {
-    const before = world({ status: 'trialing' });
-    const after = world(
-      { status: 'trialing' },
-      { subscription: { id: agency.id, lastEventId: 'evt_2' } },
-    );
+    const before = world();
+    const after = world({}, { subscription: { id: agency.id, lastEventId: 'evt_2' } });
     await before.change(0, 2);
     await after.change(0, 2);
     expect(after.stripe.updates[0]!.idempotencyKey).not.toBe(
