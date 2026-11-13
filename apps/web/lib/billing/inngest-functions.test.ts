@@ -169,11 +169,14 @@ describe('the Inngest serve route’s function list', { timeout: 60_000 }, () =>
     expect(await routeIds(undefined)).toEqual(V1);
   });
 
-  it('with V2_BILLING=1 is v1’s four, first, then the two billing functions', async () => {
+  it('with V2_BILLING=1 is v1’s four, first, then the two billing functions and the founder notices (CC-33)', async () => {
     expect(await routeIds('1')).toEqual([
       ...V1,
       'crawlmouse-crawlmouse.trial.lifecycle',
       'crawlmouse-crawlmouse.billing.past-due-sweep',
+      'crawlmouse-crawlmouse.founder.entitlement',
+      'crawlmouse-crawlmouse.founder.sweep',
+      'crawlmouse-crawlmouse.founder.digest',
     ]);
   });
 });
