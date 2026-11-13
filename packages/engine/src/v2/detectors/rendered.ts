@@ -1,17 +1,21 @@
 /**
- * The rendered-page detector: one record per template of the graded pages, from the pages of it the
+ * The rendered-page detector: one record per template present in the check, from the pages of it the
  * render step measured (`PageResult.without_js`).
  *
- * `client_rendered_template` reads the render step's own state for each page (render/state.ts, which
- * carries the hysteresis), so there is one definition of an empty shell:
+ * A template is present when it has a graded page (`isGraded`) or an empty-root page: a crawled page
+ * the empty-root rule holds for (render/empty-root.ts `emptyRoot`; the caller passes their URLs). The
+ * present pages are the population: `extent.pages` counts them and a detection affects them. The
+ * verdict reads the rendered pages among them, whether the graded phase or the empty-root phase
+ * rendered them (render/run.ts). `client_rendered_template` reads the render step's own state for each
+ * page (render/state.ts, which carries the hysteresis), so there is one definition of an empty shell:
  *
  *   detected       a page of the template was rendered, and each rendered page is `empty_shell`
  *   not_detected   a page was rendered, and none is `empty_shell`
  *   indeterminate  `pages_disagree`: some rendered pages are `empty_shell` and some are not
  *                  `not_rendered`: no page of the template was rendered
  *
- * The population is the grade's (`isGraded`). A route that serves only an empty root is classed thin,
- * is not graded and is not rendered (render/sample.ts), so it gets no record here.
+ * A template whose graded pages render with text and whose empty-root pages render as shells is
+ * `pages_disagree`.
  *
  * `js_only_navigation` has no detector: the render step keeps word counts and no link.
  */
@@ -47,9 +51,9 @@ export interface RenderedDetection {
   reason: RenderedIndeterminateReason | null;
   /** The median `text_share` of the template's rendered pages; null when none was rendered. */
   measured: number | null;
-  /** The template's graded pages, and how many of them the render step measured. */
-  extent: { pages: number; rendered: number };
-  /** The template's graded pages, sorted: empty unless detected. */
+  /** The template's present pages, how many of them are graded, and how many the render step measured. */
+  extent: { pages: number; graded: number; rendered: number };
+  /** The template's present pages, sorted: empty unless detected. */
   affected_urls: string[];
   /** The rendered pages the verdict rests on, sorted by URL. */
   evidence: { pages: RenderedPage[] };
@@ -73,16 +77,25 @@ function verdict(rendered: number, shells: number): Pick<RenderedDetection, 'sta
   return { state: 'indeterminate', reason: 'pages_disagree' };
 }
 
-/** One `client_rendered_template` record per template of the graded pages, in template-key order. */
-export function detectRendered(pages: readonly RenderedInputPage[]): RenderedDetection[] {
+/** What the detector reads besides the pages. */
+export interface RenderedContext {
+  /** The URLs of the crawled empty-root pages (build/plan.ts `emptyRootUrls`); none when left out. */
+  emptyRoots?: ReadonlySet<string>;
+}
+
+/** One `client_rendered_template` record per template present in the check, in template-key order. */
+export function detectRendered(
+  pages: readonly RenderedInputPage[],
+  { emptyRoots = new Set() }: RenderedContext = {},
+): RenderedDetection[] {
   const templates = new Map<string, RenderedInputPage[]>();
-  for (const p of pages.filter(isGraded)) {
+  for (const p of pages.filter((p) => isGraded(p) || emptyRoots.has(p.url))) {
     templates.set(p.template_key, [...(templates.get(p.template_key) ?? []), p]);
   }
   return [...templates]
     .sort(([a], [b]) => byText(a, b))
-    .map(([template_key, graded]): RenderedDetection => {
-      const rendered = graded
+    .map(([template_key, present]): RenderedDetection => {
+      const rendered = present
         .flatMap((p) => (p.without_js ? [{ url: p.url, ...p.without_js }] : []))
         .sort((a, b) => byText(a.url, b.url));
       const shells = rendered.filter((p) => p.state === 'empty_shell').length;
@@ -96,8 +109,12 @@ export function detectRendered(pages: readonly RenderedInputPage[]): RenderedDet
         state,
         reason,
         measured: rendered.length === 0 ? null : median(rendered.map((p) => p.text_share)),
-        extent: { pages: graded.length, rendered: rendered.length },
-        affected_urls: state === 'detected' ? graded.map((p) => p.url).sort(byText) : [],
+        extent: {
+          pages: present.length,
+          graded: present.filter(isGraded).length,
+          rendered: rendered.length,
+        },
+        affected_urls: state === 'detected' ? present.map((p) => p.url).sort(byText) : [],
         evidence: {
           pages: rendered.map(({ url, raw_words, rendered_words, text_share }) => ({
             url,

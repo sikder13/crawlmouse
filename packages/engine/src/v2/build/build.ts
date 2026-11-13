@@ -27,7 +27,7 @@ import { readBatches } from './batches.js';
 import { diffBuilt, diffInputsOf } from './diff.js';
 import { gradeAssembled } from './grade.js';
 import { lineagesOf, usageOf } from './lineage.js';
-import { sample } from './plan.js';
+import { emptyRootUrls, sample } from './plan.js';
 import { decideStatus } from './status.js';
 import { checkRecord, robotsText } from './record.js';
 import { summariesOf } from './summaries.js';
@@ -83,10 +83,14 @@ export function buildCheck(input: BuildInput): BuiltCheck {
         ...assembledOf,
         status: decideStatus(batches, [...assembledOf.status.unfinished, 'sample']),
       };
-  // renderCandidates offers the sampled pages and nothing else.
+  // renderCandidates offers the sampled pages to the graded phase and the crawled empty-root pages to
+  // the empty-root phase (render/empty-root.ts), and nothing else.
+  const emptyRoots = emptyRootUrls(assembledOf);
   for (const p of input.render?.pages ?? []) {
-    if (!sampled.has(p.url))
-      throw new Error(`buildCheck: a render of ${p.url}, which the sample does not hold`);
+    if (!sampled.has(p.url) && !emptyRoots.has(p.url))
+      throw new Error(
+        `buildCheck: a render of ${p.url}, which neither the sample nor the empty-root pages hold`,
+      );
   }
 
   const robots = robotsText(batches.crawl, assembled.homepage_url);

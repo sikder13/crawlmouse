@@ -4,16 +4,26 @@
  * a client that throws is read as `network_error`, and a word count that throws as `measure_failed`.
  * Nothing is written to disk.
  *
- * COST. Today's budget is asked once per check, before any page, to reserve the check's allowance: its
- * cap, or RESERVE_PER_RENDER_MS for each render of each sampled page, whichever is less. When it
- * refuses or throws, no page renders and every sampled page carries the reason. When it grants, the
- * pages reserve their two renders from that allowance, here and not from the budget: a page that
- * finds no room waits while another page of the check is in flight, and when none is, rendering stops
- * for the rest of the check. A render counts the browser time Browser Run reports for it, or, when that
- * is not known, the request timeout, which is also its reservation. A render can report more than its
- * reservation, so a check can end above its allowance by that excess on the pages in flight. After
- * the last page, the budget is settled once, at what the check counted. Which pages a binding cap
- * leaves unrendered depends on how long the earlier renders took.
+ * TWO PHASES. The graded phase renders `selectRenders`' picks (sample.ts). Once it has settled, the
+ * empty-root phase renders `selectEmptyRoots`' picks (empty-root.ts), less any URL the graded phase
+ * took. Each phase runs the COST rules below on its own: its own reservation from today's budget, its
+ * own allowance, its own stop and its own settle. The graded phase's allowance is the check's cap or
+ * what its pages could reserve, whichever is less; the empty-root phase's is what the cap leaves after
+ * the graded phase counted, or what its own pages could reserve, whichever is less. So the graded
+ * phase's pages, and the estimate drawn from them alone, are what they would be with no empty-root
+ * phase; the empty-root phase adds its wall time after them, and its browser time to `browser_ms`.
+ *
+ * COST. Today's budget is asked once per phase, before any of its pages, to reserve the phase's
+ * allowance. When it refuses or throws, no page of the phase renders and each carries the reason.
+ * When it grants, the pages reserve their two renders from that allowance, here and not from the
+ * budget: a page that finds no room waits while another page of the phase is in flight, and when none
+ * is, rendering stops for the rest of the phase. A render counts the browser time Browser Run reports
+ * for it, or, when that is not known, the request timeout, which is also its reservation. A render can
+ * report more than its reservation, so a phase can end above its allowance by that excess on the pages
+ * in flight. After the phase's last page, the budget is settled once, at what the phase counted. Which
+ * pages a binding cap leaves unrendered depends on how long the earlier renders took. A throw out of a
+ * page is passed on after its phase settled; a throw in the graded phase means the empty-root phase
+ * does not run.
  *
  * RATE LIMITS. At most `inFlight` requests are open at once (RENDER_MAX_IN_FLIGHT in the environment,
  * read by inFlightFromEnv). A 429 is retried no sooner than its Retry-After asks, in seconds or as a
@@ -31,6 +41,7 @@ import {
 } from './client.js';
 import { siteEstimate, type SiteEstimate } from './estimate.js';
 import { measurePage, type WithoutJs } from './page.js';
+import { selectEmptyRoots, type EmptyRootCandidate } from './empty-root.js';
 import { oncePerUrl, selectRenders, type PickedFor, type RenderCandidate } from './sample.js';
 import type { JsTextState } from './state.js';
 
@@ -50,23 +61,23 @@ export function inFlightFromEnv(env: Record<string, string | undefined>): number
 }
 export const RENDER_RETRY = { attempts: 5, base_ms: 2000, max_ms: 60_000 } as const;
 /**
- * What one render reserves from the check's allowance before it runs: the request timeout, which is also
+ * What one render reserves from its phase's allowance before it runs: the request timeout, which is also
  * what a render of unknown browser time is counted at, so such a render never counts above it.
  */
 export const RESERVE_PER_RENDER_MS = REQUEST_TIMEOUT_MS;
 
-/** Why a sampled page has no `without_js`, and what each reason means (the spec renders this). */
+/** Why a picked page has no `without_js`, and what each reason means (the spec renders this). */
 export const NOT_RENDERED = {
   not_configured: 'The environment holds no Browser Run account or token.',
   caps_not_configured: 'A cost cap is not a positive whole number of seconds, so nothing renders.',
   not_admitted:
     'Admission refused the URL. `detail` is the policy rule, `resolution`, `unparseable`, or `error` for an admission that threw something else.',
   check_cap:
-    "The check's allowance could not take a page's two renders with no page in flight; rendering stopped for this page and those after it.",
+    "The phase's allowance could not take a page's two renders with no page of the phase in flight; rendering stopped for this page and the phase's pages after it.",
   daily_cap:
-    "Today's budget refused the check's allowance, asked for once before any page; no page of the check rendered.",
+    "Today's budget refused the phase's allowance, asked for once before any of its pages; no page of the phase rendered.",
   daily_budget_unavailable:
-    "Today's budget threw when asked for the check's allowance; no page of the check rendered.",
+    "Today's budget threw when asked for the phase's allowance; no page of the phase rendered.",
   rate_limited: `Browser Run answered 429 on each of ${RENDER_RETRY.attempts} tries, or its Retry-After asked for a wait longer than ${RENDER_RETRY.max_ms} ms.`,
   timed_out: `Browser Run did not answer, or did not finish its reply, within ${REQUEST_TIMEOUT_MS / 1000} s.`,
   page_failed:
@@ -86,7 +97,8 @@ export type NotRenderedReason = keyof typeof NOT_RENDERED;
 interface Picked {
   url: string;
   template_key: string;
-  picked_for: PickedFor;
+  /** `empty_root` for a page of the empty-root phase (empty-root.ts). */
+  picked_for: PickedFor | 'empty_root';
 }
 
 export type RenderedPage =
@@ -94,18 +106,18 @@ export type RenderedPage =
   | (Picked & { rendered: false; reason: NotRenderedReason; detail?: string });
 
 export interface RenderOutcome {
-  /** The sampled pages, in the order they were picked. */
+  /** The graded phase's pages, then the empty-root phase's, each in the order they were picked. */
   pages: RenderedPage[];
   /**
-   * Browser time counted against this check's caps, both sides of each rendered page: what Browser Run
-   * reported, or the request timeout where that is not known.
+   * Browser time counted against this check's caps, both sides of each rendered page of both phases:
+   * what Browser Run reported, or the request timeout where that is not known.
    */
   browser_ms: number;
   estimate: SiteEstimate;
   /**
-   * True when today's budget threw on the closing settle. The day may then still count the whole
-   * allowance, which is at least what the check used unless a render reported more than its
-   * reservation; CC-20 decides how the store is corrected.
+   * True when today's budget threw on a phase's closing settle. The day may then still count that
+   * phase's whole allowance, which is at least what the phase used unless a render reported more than
+   * its reservation; CC-20 decides how the store is corrected.
    */
   settle_failed: boolean;
 }
@@ -115,6 +127,10 @@ export interface RenderCheckInput {
   /** Template keys of the site's open client-rendered fixes. */
   openFixTemplates: readonly string[];
   maxRenders: number;
+  /** Every crawled page, for the empty-root phase (empty-root.ts); none when left out. */
+  emptyRootCandidates?: readonly EmptyRootCandidate[];
+  /** The most pages the empty-root phase renders; 0 when left out. */
+  maxEmptyRootRenders?: number;
   /** Each page's state in the previous check, where it was measured there. */
   previousStates: ReadonlyMap<string, JsTextState>;
   /** Null when the environment holds no Browser Run credentials. */
@@ -131,11 +147,68 @@ const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, 
 
 const graded = (p: RenderCandidate) => p.kind === 'content' && p.status_code === 200 && p.is_html;
 
+/** What one page reserves from its phase's allowance before it runs: both of its renders. */
+const PAGE_RESERVE_MS = 2 * RESERVE_PER_RENDER_MS;
+
 export async function renderCheck(input: RenderCheckInput): Promise<RenderOutcome> {
   const sample = selectRenders(input.candidates, input.openFixTemplates, input.maxRenders);
-  const admit = input.admit ?? defaultAdmit();
-  const sleep = input.sleep ?? wait;
-  const pageReserve = 2 * RESERVE_PER_RENDER_MS;
+  const inSample = new Set(sample.map((p) => p.url));
+  // A URL the graded sample took is not rendered again.
+  const emptyRoots = selectEmptyRoots(
+    input.emptyRootCandidates ?? [],
+    input.maxEmptyRootRenders ?? 0,
+  ).filter((p) => !inSample.has(p.url));
+  const run = { ...input, admit: input.admit ?? defaultAdmit(), sleep: input.sleep ?? wait };
+
+  const gradedPhase = await renderPhase(run, sample, (n) =>
+    Math.min(input.caps.perCheckMs, n * PAGE_RESERVE_MS),
+  );
+  if (gradedPhase.thrown) throw gradedPhase.thrown.reason;
+  // The empty-root phase starts once the graded phase has settled, under its own allowance: what the
+  // check's cap leaves after the graded phase, or what its own pages could reserve, whichever is less.
+  const emptyRootPhase = await renderPhase(run, emptyRoots, (n) =>
+    Math.min(input.caps.perCheckMs - gradedPhase.browserMs, n * PAGE_RESERVE_MS),
+  );
+  if (emptyRootPhase.thrown) throw emptyRootPhase.thrown.reason;
+
+  const shares = new Map(
+    gradedPhase.results.flatMap((r) =>
+      r.rendered ? [[r.url, r.without_js.text_share] as const] : [],
+    ),
+  );
+  const estimate = siteEstimate(
+    oncePerUrl(input.candidates.filter(graded)).map((c) => ({
+      template_key: c.template_key,
+      text_share: shares.get(c.url) ?? null,
+    })),
+  );
+  return {
+    pages: [...gradedPhase.results, ...emptyRootPhase.results],
+    browser_ms: gradedPhase.browserMs + emptyRootPhase.browserMs,
+    estimate,
+    settle_failed: gradedPhase.settleFailed || emptyRootPhase.settleFailed,
+  };
+}
+
+interface PhaseResult {
+  /** The phase's pages, in the order they were picked. */
+  results: RenderedPage[];
+  browserMs: number;
+  settleFailed: boolean;
+  /** The first worker that threw, passed on by the caller after the phase settled. */
+  thrown: PromiseRejectedResult | undefined;
+}
+
+/**
+ * One phase of a check's render: its own reservation from today's budget, its own allowance, its own
+ * stop, and its own settle. Nothing a phase does reaches the pages of another.
+ */
+async function renderPhase(
+  input: RenderCheckInput & { admit: Admit; sleep: (ms: number) => Promise<void> },
+  sample: readonly Picked[],
+  allowanceFor: (pages: number) => number,
+): Promise<PhaseResult> {
+  const { admit, sleep } = input;
   let browserMs = 0;
   let checkHeld = 0;
   let stopped: NotRenderedReason | null =
@@ -187,8 +260,8 @@ export async function renderCheck(input: RenderCheckInput): Promise<RenderOutcom
   async function reserve(allowanceMs: number): Promise<NotRenderedReason | null> {
     for (;;) {
       if (stopped) return stopped;
-      if (checkHeld + pageReserve <= allowanceMs) {
-        checkHeld += pageReserve;
+      if (checkHeld + PAGE_RESERVE_MS <= allowanceMs) {
+        checkHeld += PAGE_RESERVE_MS;
         rendering += 1;
         return null;
       }
@@ -212,7 +285,7 @@ export async function renderCheck(input: RenderCheckInput): Promise<RenderOutcom
       return await renderReserved(p, used);
     } finally {
       browserMs += used.ms;
-      checkHeld += used.ms - pageReserve;
+      checkHeld += used.ms - PAGE_RESERVE_MS;
       rendering -= 1;
       forRoom.splice(0).forEach((resolve) => resolve());
     }
@@ -239,13 +312,13 @@ export async function renderCheck(input: RenderCheckInput): Promise<RenderOutcom
   }
 
   /**
-   * Today's budget is asked once, before any page: for the check's whole allowance, which is its cap or
-   * what its sampled pages could reserve, whichever is less. Refused, or unreadable, nothing renders.
-   * Granted, it is settled once, at the browser time the check counted, after every page has finished.
+   * Today's budget is asked once a phase, before any of its pages: for the phase's whole allowance.
+   * Refused, or unreadable, no page of the phase renders. Granted, it is settled once, at the browser
+   * time the phase counted, after every page of the phase has finished.
    */
-  const allowanceMs = Math.min(input.caps.perCheckMs, sample.length * pageReserve);
+  const allowanceMs = allowanceFor(sample.length);
   let settleFailed = false;
-  if (!stopped && sample.length > 0 && allowanceMs < pageReserve) stopped = 'check_cap';
+  if (!stopped && sample.length > 0 && allowanceMs < PAGE_RESERVE_MS) stopped = 'check_cap';
   let reserved = false;
   if (!stopped && sample.length > 0) {
     try {
@@ -284,16 +357,5 @@ export async function renderCheck(input: RenderCheckInput): Promise<RenderOutcom
     }
   }
   const thrown = ran.find((r): r is PromiseRejectedResult => r.status === 'rejected');
-  if (thrown) throw thrown.reason;
-
-  const shares = new Map(
-    results.flatMap((r) => (r.rendered ? [[r.url, r.without_js.text_share] as const] : [])),
-  );
-  const estimate = siteEstimate(
-    oncePerUrl(input.candidates.filter(graded)).map((c) => ({
-      template_key: c.template_key,
-      text_share: shares.get(c.url) ?? null,
-    })),
-  );
-  return { pages: results, browser_ms: browserMs, estimate, settle_failed: settleFailed };
+  return { results, browserMs, settleFailed, thrown };
 }

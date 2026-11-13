@@ -965,7 +965,7 @@ keep (nextjs):
 
 ## 6. The `client_rendered_template` detector
 
-`detectRendered` (`detectors/rendered.ts`) gives one record per template key of the graded pages (`isGraded`), from the pages of it the render step measured (`PageResult.without_js`). It reads the render step’s `state` for a page and defines no threshold of its own. The lines `state` is drawn on (`render/state.ts`): a page is an `empty_shell` below a text share of 0.3 (`EMPTY_SHELL_BELOW`), stays one until its share rises above 0.45 (`EMPTY_SHELL_LEAVES_ABOVE`), and is `readable` from 0.8 (`READABLE_FROM`).
+`detectRendered` (`detectors/rendered.ts`) gives one record per template key present in the check: a template with a graded page (`isGraded`) or an empty-root page (a crawled page `emptyRoot` holds for, `render/empty-root.ts`). It reads the present pages the render step measured (`PageResult.without_js`), from either render phase. It reads the render step’s `state` for a page and defines no threshold of its own. The lines `state` is drawn on (`render/state.ts`): a page is an `empty_shell` below a text share of 0.3 (`EMPTY_SHELL_BELOW`), stays one until its share rises above 0.45 (`EMPTY_SHELL_LEAVES_ABOVE`), and is `readable` from 0.8 (`READABLE_FROM`).
 
 The detector’s verdict on a template of 4 graded pages, computed when this document is rendered. The reasons it can give (`RENDERED_INDETERMINATE_REASONS`): `not_rendered`, `pages_disagree`.
 
@@ -978,10 +978,10 @@ The detector’s verdict on a template of 4 graded pages, computed when this doc
 | none rendered                | `indeterminate` | `not_rendered`: no page of the template was rendered                    | no        |             |
 
 - Key: `shell:<template_key>`. `measured` is the median `text_share` of the rendered pages.
-- Scope (Q5): a route that serves an empty root is classed `thin`, is not graded and is not rendered, so it gets no record. The fix opens for a template whose pages carry enough static text to be graded and whose rendered pages are empty shells. The packet’s context says so.
+- Scope (Q5, CC-32 D2): a route that serves an empty root is classed `thin` and is not graded; it is an empty-root page, so its template is present and gets a record, and the empty-root phase renders up to two of its pages (`render/empty-root.ts`). A template whose graded pages render with text and whose empty-root pages render as shells is `pages_disagree`, so an open fix for it stays open and is measured again. A template of empty-root pages alone has no graded page, so its fix moves no grade: its effect is 0.
 - Listed in `DETECTORS_RUN` (build/diff.ts): `client_rendered_template` yes, `js_only_navigation` no.
 - Effect (grade/effects.ts `applyFix`): the `text_share` of every graded page of the template becomes 1, rendered this check or not; only Readable moves. The share it sets is `SERVER_RENDERED_SHARE`, 1.
-- Outcome (grade/outcomes.ts): section `without_js`; recommendation class `best_practice` (`RENDERED_CLASS`); confidence `confirmed` when 2 (`PAGES_PER_FIX_TEMPLATE`) or more of the template’s graded pages were rendered, or each of them was, and `likely` otherwise (`renderedConfidence`); `template_key` set, which the render planner reads to render up to that many pages of an open fix’s template on the next check. Title for `/guides/{slug}`: “Serve the text of guides without JavaScript”.
+- Outcome (grade/outcomes.ts): section `without_js`; recommendation class `best_practice` (`RENDERED_CLASS`); confidence `confirmed` when 2 (`PAGES_PER_FIX_TEMPLATE`) or more of the template’s present pages were rendered, or each of them was, and `likely` otherwise (`renderedConfidence`); `template_key` set, which the graded phase reads to render up to that many graded pages of an open fix’s template on the next check. Title for `/guides/{slug}`: “Serve the text of guides without JavaScript”.
 - Open (Q10): a template that loses its graded pages gets no record, so an open fix for it is not measured again.
 
 ## 7. Effort and before/after

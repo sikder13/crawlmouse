@@ -144,7 +144,9 @@ describe('the client-rendered template fix', () => {
   });
 
   it('is confirmed when every graded page of the template was rendered, however few', () => {
-    const extent = (pages: number, rendered: number) => ({ extent: { pages, rendered } });
+    const extent = (pages: number, rendered: number) => ({
+      extent: { pages, graded: pages, rendered },
+    });
     expect(PAGES_PER_FIX_TEMPLATE).toBe(2);
     expect(renderedConfidence(extent(1, 1))).toBe('confirmed');
     expect(renderedConfidence(extent(2, 1))).toBe('likely');
