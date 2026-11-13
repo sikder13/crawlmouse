@@ -830,7 +830,8 @@ function fixRows(
  *   2. with nothing of that, how many members' AI effect still waits, "AI not yet estimated for N";
  *   3. otherwise "SEO not estimated" when a member's Technical SEO effect is not estimated (a fix first
  *      opened in a refused check keeps a null effect until it is found again), else "No measurable
- *      effect", so the row never says less than a member's own headline.
+ *      effect", so the row never reads "No measurable effect" beside a member whose Technical SEO
+ *      effect is not estimated.
  * A pages-headed fix is never counted as waiting: its pages line is a part of step 1, so step 2 is
  * not reached.
  */
