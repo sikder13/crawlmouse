@@ -3,6 +3,7 @@
 import { Button } from '../../Button';
 import { Field } from '../../Field';
 import { Select } from '../../Select';
+import { VisuallyHidden } from '../../VisuallyHidden';
 import { SEATS_COPY } from '../../../../lib/v2/copy/seats';
 import type { SeatChangeView, SeatFields, SeatsView } from '../../../../lib/v2/view/seats';
 import { useLive } from '../account/LiveActions';
@@ -68,6 +69,7 @@ export function InviteForm({ invite }: { invite: NonNullable<SeatsView['invite']
 /**
  * A seat's "Change": on a preview the button the locked screen draws; on a live page a disclosure
  * with the role and scope form, a new invitation for a seat not yet accepted, and the removal.
+ * Each of its buttons names the seat for a screen reader, after the label a sighted reader sees.
  */
 export function ChangeSeat({ seat, who }: { seat: SeatChangeView; who: string }) {
   const live = useLive();
@@ -90,6 +92,7 @@ export function ChangeSeat({ seat, who }: { seat: SeatChangeView; who: string })
           <div>
             <Button type="submit" size="sm">
               {F.save}
+              <VisuallyHidden>{` ${who}`}</VisuallyHidden>
             </Button>
           </div>
         </PostForm>
@@ -97,12 +100,14 @@ export function ChangeSeat({ seat, who }: { seat: SeatChangeView; who: string })
           <PostForm action={seat.resend.action}>
             <Button type="submit" variant="quiet" size="sm">
               {seat.resend.label}
+              <VisuallyHidden>{` ${who}`}</VisuallyHidden>
             </Button>
           </PostForm>
         ) : null}
         <PostForm action={seat.remove.action} method="DELETE">
           <Button type="submit" variant="quiet" size="sm">
             {seat.remove.label}
+            <VisuallyHidden>{` ${who}`}</VisuallyHidden>
           </Button>
         </PostForm>
       </div>

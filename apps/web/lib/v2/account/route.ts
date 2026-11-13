@@ -137,7 +137,11 @@ export const NOTICE_CODES = [
   'mixed_change',
   'payment_failed',
   'subscription_unchangeable',
+  'extras_in_trial',
   'billing_unavailable',
+  // making a report (CC-31)
+  'reports_capped',
+  'fix_not_verified',
   // share links (CC-31)
   'share_made',
   'share_revoked',

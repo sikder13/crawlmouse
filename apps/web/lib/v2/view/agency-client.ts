@@ -23,6 +23,7 @@ import {
 } from './account';
 import { action, type ActionView } from './account-actions';
 import { accountShellView, type ShellView, type SwitcherAccount } from './account-shell';
+import { clientCardHref } from './agency-reports';
 import {
   sitePage,
   siteView,
@@ -44,7 +45,7 @@ export interface ClientRowView {
   value: string;
   /** An address or a host: the data face. */
   mono: boolean;
-  /** Where the row is changed, for a seat that may change it. */
+  /** The client's card on the client reports screen, for a seat that may schedule reports. */
   change: ActionView | null;
 }
 
@@ -86,10 +87,14 @@ export interface ClientReader {
   actingIn?: string;
 }
 
-const link = (href: string, label: string, context: string): ActionView => ({
-  label,
-  route: href,
-  href,
+/** The client reports screen, where a client's contact, schedule and owning seat are changed. */
+const CLIENT_REPORTS = '/agency/reports';
+
+/** "Change", to the client's card on the client reports screen; `context` names the row for a screen reader. */
+const changeLink = (siteId: string, context: string): ActionView => ({
+  label: COPY.change,
+  route: CLIENT_REPORTS,
+  href: clientCardHref(CLIENT_REPORTS, siteId),
   method: 'get',
   fields: {},
   primary: false,
@@ -177,19 +182,21 @@ export function agencyClientView(
           label: COPY.contact,
           value: contactOf(site),
           mono: site.client_contact_email !== null,
-          change: mayReport ? link('/agency/reports', COPY.change, COPY.contact) : null,
+          change: mayReport ? changeLink(site.id, COPY.contact) : null,
         },
         {
           label: COPY.report,
           value: reportOf(site),
           mono: false,
-          change: mayReport ? link('/agency/reports', COPY.change, COPY.report) : null,
+          change: mayReport ? changeLink(site.id, COPY.report) : null,
         },
         {
           label: COPY.seatLabel,
           value: seatOf(v, site),
           mono: false,
-          change: roleMay(role, 'change_seat') ? link('/seats', COPY.change, COPY.seatLabel) : null,
+          // The client's owning seat is `set_client`'s, on the same card; `/seats` changes a
+          // seat's role and scope, not which seat owns a client.
+          change: mayReport ? changeLink(site.id, COPY.seatLabel) : null,
         },
       ],
     },

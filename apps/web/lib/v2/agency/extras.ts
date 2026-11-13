@@ -107,14 +107,18 @@ export type ExtrasRefusal =
       code:
         | 'no_subscription'
         | 'subscription_ending'
+        | 'subscription_trialing'
         | 'subscription_not_active'
         | 'not_agency_subscription';
     }
   | { ok: false; status: 503; code: 'billing_unavailable' };
 
 export type ExtrasResult =
-  /** `changed` is false when the subscription already held these quantities: no Stripe write. */
-  { ok: true; extras: Extras; changed: boolean } | ExtrasRefusal;
+  /**
+   * `changed` is false when the subscription already held these quantities: no Stripe write.
+   * `raised` says a quantity rose, which is a purchase; a change that is not one is a lowering.
+   */
+  { ok: true; extras: Extras; changed: boolean; raised: boolean } | ExtrasRefusal;
 
 const UNAVAILABLE: ExtrasRefusal = { ok: false, status: 503, code: 'billing_unavailable' };
 
@@ -228,6 +232,10 @@ export async function changeExtras(
   }
 
   const sub = await deps.stripe.subscriptions.retrieve(account.subscription.id);
+  // A trial is told so: it is neither set to end nor behind on a payment.
+  if (sub.status === 'trialing') {
+    return { ok: false, status: 409, code: 'subscription_trialing' };
+  }
   if (!CHANGEABLE.has(sub.status)) {
     return { ok: false, status: 409, code: 'subscription_not_active' };
   }
@@ -240,7 +248,7 @@ export async function changeExtras(
     }
     const from = held.extras;
     if (from.seats === want.seats && from.sites === want.sites) {
-      return { ok: true, extras: from, changed: false };
+      return { ok: true, extras: from, changed: false, raised: false };
     }
 
     const existing: Partial<Record<'seat' | 'site', string>> = {};
@@ -270,7 +278,7 @@ export async function changeExtras(
     );
     const now = await mirrorOf(updated, deps.catalog);
     if ('refused' in now) throw new Error(`extras: Stripe answered a subscription ${now.refused}`);
-    return { ok: true, extras: now.extras, changed: true };
+    return { ok: true, extras: now.extras, changed: true, raised: rises };
   } catch (err) {
     if (err instanceof CatalogError) return UNAVAILABLE;
     if (isCardError(err)) return { ok: false, status: 402, code: 'payment_failed' };
@@ -341,7 +349,10 @@ export function supabaseExtrasAccounts(admin: SupabaseClient): ExtrasAccounts {
 /** The page the buy form is on. */
 const BACK = '/seats';
 
-/** What a refused form is told: the subscription's three refusals share one line. */
+/**
+ * What a refused form is told. A trialing subscription has its own line; no subscription, one set
+ * to end, one that is not active and one that is not Agency's share a line.
+ */
 const FORM_NOTICE: Record<ExtrasRefusal['code'], NoticeCode | null> = {
   invalid: 'invalid',
   mixed_change: 'mixed_change',
@@ -350,6 +361,7 @@ const FORM_NOTICE: Record<ExtrasRefusal['code'], NoticeCode | null> = {
   in_use: 'in_use',
   no_subscription: 'subscription_unchangeable',
   subscription_ending: 'subscription_unchangeable',
+  subscription_trialing: 'extras_in_trial',
   subscription_not_active: 'subscription_unchangeable',
   not_agency_subscription: 'subscription_unchangeable',
   billing_unavailable: 'billing_unavailable',

@@ -579,6 +579,7 @@ From `apps/web/app/(v2-preview)/v2-preview/_preview/registry.ts`. They are serve
 | Continue                                        | `/v2-preview/screens/continue`                           | screen    |                                      |
 | Continue, link expired                          | `/v2-preview/screens/continue/expired`                   | screen    |                                      |
 | Final-Ag-Seats (Northwind)                      | `/v2-preview/screens/seats`                              | screen    |                                      |
+| Seats, Agency with its plan paid: the buy form  | `/v2-preview/screens/seats/paid`                         | screen    |                                      |
 | Seats, Pro with no seat free                    | `/v2-preview/screens/seats/pro-full`                     | screen    |                                      |
 | Seats, Free                                     | `/v2-preview/screens/seats/free`                         | screen    |                                      |
 | Seats, a member who is not the owner            | `/v2-preview/screens/seats/member`                       | screen    |                                      |

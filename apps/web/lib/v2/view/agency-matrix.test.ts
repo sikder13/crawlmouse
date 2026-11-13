@@ -17,16 +17,20 @@ import {
   KESTREL_ACCOUNT_ID,
   PRIYA_SEAT,
 } from '../../../app/(v2-preview)/v2-preview/_preview/agency';
+import { SEATS_PREVIEWS } from '../../../app/(v2-preview)/v2-preview/_preview/seats';
 import { AGENCY_MONTHLY } from '../../billing/prices';
 import { GATES } from '../../entitlement-v2';
 import { fixture } from '../fixtures';
 import type { Viewer } from './account';
+import { agencyClientView } from './agency-client';
 import { agencyGate, agencyHomeView, type MatrixView } from './agency-matrix';
 import { dashboardView } from './dashboard';
 
 const d = fixture('challenged-site');
 const northwind: Viewer = ACCOUNT_VIEWERS.withheld();
 const kestrel: Viewer = { accountId: KESTREL_ACCOUNT_ID, now: d.as_of };
+/** Northwind's owner the day before its invoice failed: on the plan and paid (state `agency`). */
+const paid: Viewer = SEATS_PREVIEWS['/v2-preview/screens/seats/paid'].viewer();
 const ALEX = 'e0000000-0000-4000-8000-0000000000c9';
 const LEE = 'e0000000-0000-4000-8000-0000000000cc';
 const PINECREST = '50000000-0000-4000-8000-0000000000cb';
@@ -127,6 +131,43 @@ describe('the client matrix', () => {
     });
   });
 
+  it('says of a schedule what holds it: paused by its recipient, or no contact to send to', () => {
+    const cell = (data: FixtureDataset, siteId: string) =>
+      matrix(data, northwind).clients.rows.find((r) => r.key === siteId)!.schedule;
+    const granite = d.sites.find((s) => s.id === GRANITEPEAK_SITE)!;
+    const paused = edit((x) => ({
+      sites: x.sites.map((s) =>
+        s.id === GRANITEPEAK_SITE
+          ? {
+              ...s,
+              client_report: {
+                ...granite.client_report!,
+                paused_by_recipient_at: '2026-11-01T09:00:00Z',
+              },
+            }
+          : s,
+      ),
+    }));
+    expect(cell(paused, GRANITEPEAK_SITE)).toBe(
+      'weekly, Fri · report weekly, Mon (paused by the recipient)',
+    );
+    const uncontacted = edit((x) => ({
+      sites: x.sites.map((s) =>
+        s.id === HARBORLIGHT_SITE ? { ...s, client_contact_email: null } : s,
+      ),
+    }));
+    expect(cell(uncontacted, HARBORLIGHT_SITE)).toBe(
+      'weekly, Fri · report monthly, first Mon (no contact)',
+    );
+    // A schedule with a contact that is not paused says neither, and no schedule says "no report".
+    expect(cell(d, GRANITEPEAK_SITE)).toBe('weekly, Fri · report weekly, Mon');
+    expect(cell(paused, HARBORLIGHT_SITE)).toBe('weekly, Fri · report monthly, first Mon');
+    // The words are the client page's for the same schedule.
+    const page = agencyClientView(paused, northwind, GRANITEPEAK_SITE);
+    if (page?.kind !== 'client') throw new Error('expected the client page');
+    expect(page.client.rows[1]!.value).toContain('paused by the recipient');
+  });
+
   it('leaves a staging copy out: it is not a client', () => {
     const copy = { ...d.sites[0]!, id: 'copy', host: 'staging.granitepeak.example' };
     const withCopy = edit((x) => ({
@@ -218,15 +259,41 @@ describe('the matrix, adding a client', () => {
       if (v.kind !== 'matrix') throw new Error(`not the matrix: ${v.kind}`);
       return v.header.actions.map((a) => [a.label, a.href, a.method]);
     };
-    expect(actions(full, northwind, true)).toEqual([
+    // Northwind is past due at the fixture's as_of; `paid` reads it the day before, on the plan.
+    expect(actions(full, paid, true)).toEqual([['Add sites to the plan', '/seats#buy', 'get']]);
+    // Past due, or in its Agency trial: /seats draws no buy form (the purchase route refuses the
+    // change), so there is nothing to link.
+    expect(actions(full, northwind, true)).toEqual([]);
+    const trial = {
+      ...full,
+      accounts: full.accounts.map((a) =>
+        a.id === NORTHWIND_ACCOUNT_ID
+          ? {
+              ...a,
+              state: 'agency_trial' as const,
+              trial_ends_at: '2026-11-20T00:00:00Z',
+              state_history: [{ state: 'agency_trial' as const, since: a.state_history[0]!.since }],
+            }
+          : a,
+      ),
+    };
+    expect(actions(trial, northwind, true)).toEqual([]);
+    // Billing off: /seats draws no buy form, so there is nothing to link.
+    expect(actions(full, paid, false)).toEqual([]);
+    // A seat that is not the owner's may not buy: an account manager whose seat covers every
+    // client, so that the scope is the owner's and the role alone differs; then one whose seat
+    // covers some.
+    const unscoped = seatAs(PRIYA_SEAT, { client_scope: 'all' });
+    const fullUnscoped = { ...full, seats: unscoped.seats };
+    const priya = fullUnscoped.seats.find((s) => s.id === PRIYA_SEAT)!;
+    expect([priya.role, priya.client_scope]).toEqual(['account_manager', 'all']);
+    expect(actions(fullUnscoped, { ...paid, seatId: PRIYA_SEAT }, true)).toEqual([]);
+    expect(actions(fullUnscoped, paid, true)).toEqual([
       ['Add sites to the plan', '/seats#buy', 'get'],
     ]);
-    // Billing off: /seats draws no buy form, so there is nothing to link.
-    expect(actions(full, northwind, false)).toEqual([]);
-    // A seat that is not the owner's may not buy.
-    expect(actions(full, { ...northwind, seatId: PRIYA_SEAT }, true)).toEqual([]);
+    expect(actions(full, { ...paid, seatId: PRIYA_SEAT }, true)).toEqual([]);
     // Below the limit the header's action is the add form, not the link.
-    expect(actions(d, northwind, true).map((a) => a[1])).not.toContain('/seats#buy');
+    expect(actions(d, paid, true).map((a) => a[1])).not.toContain('/seats#buy');
   });
 
   it('a seat that covers some clients is told how many are in it, not how many slots are unused', () => {
@@ -283,6 +350,38 @@ describe('the matrix, first run: the next step is the first not done', () => {
     expect(v.header.actions[0]!.primary).toBe(false);
   });
 
+  it('a first check that failed: the step says so, and not that the site was never checked', () => {
+    const failed = edit((x) => ({
+      checks: x.checks.map((c) =>
+        c.site_id === PINECREST
+          ? ({
+              ...c,
+              status: 'failed',
+              started_at: c.queued_at,
+              finished_at: c.queued_at,
+              failure_reason: 'unreachable',
+            } as typeof c)
+          : c,
+      ),
+    }));
+    const v = matrix(failed, kestrel);
+    expect(v.clients.rows[0]!.first).toMatchObject({
+      label: 'First check failed',
+      action: { label: 'Run the first check', method: 'post' },
+    });
+    expect(v.next).toMatchObject({
+      step: 'check',
+      title: 'Run the first check of pinecrest.example',
+      body: 'The first check ended without a result. Run it again to grade the site.',
+      action: { label: 'Run it now', method: 'post', primary: true },
+    });
+    expect(v.next!.body).not.toContain('not been checked');
+    // A client that was never checked keeps its own sentence.
+    expect(matrix(notChecked, kestrel).next!.body).toBe(
+      'It has not been checked yet. The first check grades the site and lists its fixes.',
+    );
+  });
+
   it('a first check under way: the row links to it, and there is no step to take', () => {
     const v = matrix(d, kestrel);
     expect(v.clients.rows[0]!.first).toMatchObject({
@@ -316,10 +415,27 @@ describe('the matrix, first run: the next step is the first not done', () => {
       step: 'report',
       action: { href: '/agency/reports', method: 'get', primary: true },
     });
-    expect(step(nothingSent, { ...northwind, seatId: PRIYA_SEAT })?.step).toBe('report');
+    expect(
+      step(
+        { ...nothingSent, seats: seatAs(PRIYA_SEAT, { client_scope: 'all' }).seats },
+        { ...northwind, seatId: PRIYA_SEAT },
+      )?.step,
+    ).toBe('report');
     // A developer may neither invite nor send a client report (the Guard column).
     expect(step(nothingSent, { ...northwind, seatId: LEE })).toBeNull();
     expect(step(oneSeat, { ...northwind, seatId: ALEX })?.step).toBe('invite');
+  });
+
+  it('a seat that covers some clients is not asked to send the first report: its records cannot say none was sent', () => {
+    // Priya's seat covers one of Northwind's two clients, and an account manager may schedule a
+    // report. Her read holds no report sent to the client outside her seat.
+    const priya = d.seats.find((s) => s.id === PRIYA_SEAT)!;
+    expect([priya.role, priya.client_scope]).toEqual(['account_manager', [GRANITEPEAK_SITE]]);
+    const asPriya = { ...northwind, seatId: PRIYA_SEAT };
+    expect(step(nothingSent, asPriya)).toBeNull();
+    const told = agencyHomeView(d, asPriya, { reportSent: false });
+    if (told.kind !== 'matrix') throw new Error(told.kind);
+    expect(told.next).toBeNull();
   });
 
   it('takes the page’s word for whether a report was sent over the dataset’s, which a live page’s records leave empty', () => {
@@ -372,6 +488,33 @@ describe('/agency for an account that is not on Agency', () => {
         },
       ],
     });
+  });
+
+  it('a reader acting in the agency, on a page of their personal account, is not told they act in the personal one', () => {
+    // `/agency/clients/<a site of the personal account>`, opened while acting in Northwind.
+    const visiting = agencyGate(bad, home, {
+      accounts: [PERSONAL, AGENCY],
+      actingIn: NORTHWIND_ACCOUNT_ID,
+    });
+    if (visiting?.kind !== 'open') throw new Error(`expected the switch, got ${visiting?.kind}`);
+    expect(visiting.body).toBe(
+      'This page is of Personal account, which has no client workspace. Open the agency to see its clients.',
+    );
+    expect(visiting.body).not.toContain('You are acting in');
+    // The rail says which account they act in, and offers the switch to the one shown.
+    expect(visiting.shell.switcher?.visiting?.acting).toBe('Northwind Digital');
+    // Acting in the personal account, the sentence is theirs.
+    const acting = agencyGate(bad, home, { accounts: [PERSONAL, AGENCY] });
+    if (acting?.kind !== 'open') throw new Error('expected the switch');
+    expect(acting.body).toBe(
+      'You are acting in Personal account, which has no client workspace. Open the agency to see its clients.',
+    );
+    expect(acting.shell.switcher?.visiting).toBeNull();
+    const named = agencyGate(bad, home, {
+      accounts: [PERSONAL, AGENCY],
+      actingIn: BAD_ACCOUNT_ID,
+    });
+    expect(named).toMatchObject({ kind: 'open', body: acting.body });
   });
 
   it('an agency account with no plan is told the same as any account below Agency', () => {

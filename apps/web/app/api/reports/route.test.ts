@@ -5,6 +5,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { applyAllMigrations, freshDb } from '@/__tests__/helpers/pglite-migrations';
 import { insertRow, ROWS } from '@/__tests__/helpers/v2-check-tables';
 import { rateLimitWindowStart } from '@/lib/rate-limit-window';
+import { NOTICE_LINES, noticeLine } from '@/lib/v2/copy/notices';
 import {
   adminOver,
   keptSite,
@@ -448,6 +449,103 @@ describe('POST /api/reports: what a report may cover', () => {
     expect(await answer(await compare({ fixId: elsewhere }))).toEqual([404, { code: 'not_found' }]);
     expect(await countReports()).toBe(before);
     expect(h.bucket.objects.size).toBe(0);
+  });
+});
+
+describe('POST /api/reports: a refused form goes back to Reports with a line; JSON keeps its answer', () => {
+  /** Where a form was sent, as the page reads it back: the path, the notice and the next time. */
+  const sentTo = (res: Response) => {
+    const to = new URL(res.headers.get('location')!, 'https://crawlmouse.com');
+    return [res.status, to.pathname, to.searchParams.get('notice')] as const;
+  };
+  const lineOf = (res: Response) => {
+    const to = new URL(res.headers.get('location')!, 'https://crawlmouse.com');
+    return noticeLine(Object.fromEntries(to.searchParams), 'UTC')!.text;
+  };
+
+  it('400, a request that is not one of the kinds: the notice for a request not understood', async () => {
+    as(w.owner);
+    const before = await countReports();
+    const bad = { kind: 'client_report', siteId: w.site.id, checkId: w.site.first };
+    const form = await post(bad, true);
+    expect(sentTo(form)).toEqual([303, '/reports', 'invalid']);
+    expect(lineOf(form)).toBe(NOTICE_LINES.invalid(null));
+    expect(await answer(await post(bad))).toEqual([400, { code: 'invalid' }]);
+    await expectNothingDone(before);
+  });
+
+  it('402, a plan with no exports: the notice that a paid plan is needed', async () => {
+    as(w.stranger);
+    const before = await countReports();
+    const own = { kind: 'audit_pdf', siteId: w.stranger.site, checkId: w.stranger.check };
+    const form = await post(own, true);
+    expect(sentTo(form)).toEqual([303, '/reports', 'upgrade_required']);
+    expect(lineOf(form)).toBe('That needs a paid plan.');
+    expect((await post(own)).status).toBe(402);
+    await expectNothingDone(before);
+  });
+
+  it('409, the proof of a fix the check did not verify: its own notice', async () => {
+    as(w.owner);
+    const before = await countReports();
+    const unverified = {
+      kind: 'compare',
+      siteId: w.site.id,
+      checkId: w.site.second,
+      fixId: w.site.openFix,
+    };
+    const form = await post(unverified, true);
+    expect(sentTo(form)).toEqual([303, '/reports', 'fix_not_verified']);
+    expect(lineOf(form)).toBe(
+      'That check did not verify the fix, so there is no proof to make. Nothing was made.',
+    );
+    expect(await answer(await post(unverified))).toEqual([409, { code: 'fix_not_verified' }]);
+    expect(await countReports()).toBe(before);
+    expect(h.bucket.objects.size).toBe(0);
+  });
+
+  it.each([
+    ['hourly', 'reports:account:', 60 * 60 * 1000, 30],
+    ['daily', 'reports:account-day:', 24 * 60 * 60 * 1000, 100],
+  ] as const)(
+    '429, past the account’s %s bound: the notice says reports, and when the next can be made',
+    async (_name, prefix, windowMs, bound) => {
+      as(w.owner);
+      const windowStart = rateLimitWindowStart(Date.now(), windowMs);
+      await h.db.query(
+        `insert into public.rate_limits (bucket_key, window_start, request_count) values ($1, $2, $3)`,
+        [`${prefix}${w.accountId}`, windowStart.toISOString(), bound],
+      );
+      const before = await countReports();
+      const form = await post(
+        { kind: 'audit_pdf', siteId: w.site.id, checkId: w.site.first },
+        true,
+      );
+      expect(sentTo(form)).toEqual([303, '/reports', 'reports_capped']);
+      // The next is allowed when the window that is full ends.
+      const next = new URL(
+        form.headers.get('location')!,
+        'https://crawlmouse.com',
+      ).searchParams.get('next');
+      expect(next).toBe(new Date(windowStart.getTime() + windowMs).toISOString());
+      expect(lineOf(form)).toMatch(
+        /^This account has made as many reports as it may for now, so none was made\. The next can be made \w{3} \d{2}:\d{2}\.$/,
+      );
+      expect(lineOf(form)).not.toContain('email');
+      const json = await post(audit());
+      expect(await answer(json)).toEqual([429, { code: 'rate_limited' }]);
+      expect(Number(json.headers.get('retry-after'))).toBeGreaterThan(0);
+      expect(await countReports()).toBe(before);
+      expect(h.bucket.objects.size).toBe(0);
+    },
+  );
+
+  it('401 and 404 are not answered with a page: a form gets the JSON refusal too', async () => {
+    const own = { kind: 'audit_pdf', siteId: w.site.id, checkId: w.site.first };
+    as(null);
+    expect(await answer(await post(own, true))).toEqual([401, { code: 'auth_required' }]);
+    as(w.stranger);
+    expect(await answer(await post(own, true))).toEqual([404, { code: 'not_found' }]);
   });
 });
 

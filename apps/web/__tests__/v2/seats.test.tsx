@@ -16,8 +16,10 @@ import { EXTRA_SEAT, EXTRA_SITE, usd } from '../../lib/billing/prices';
 import { GATES } from '../../lib/entitlement-v2';
 import { gateMessage } from '../../lib/v2/agency/gates';
 import { SEAT_GUARD } from '../../lib/v2/agency/guard';
+import { INVITE_LINK_DAYS } from '../../lib/v2/agency/seats';
 import { ROLE_ROWS } from '../../lib/v2/copy/seats';
 import { inviteView, seatsView } from '../../lib/v2/view/seats';
+import { numberWord } from '../../lib/v2/words';
 import { CC31_SEAT_ELEMENTS } from './_lib/screens';
 import { expected, firstDifference, locked, renderedText, withoutShell } from './_lib/lock';
 
@@ -25,6 +27,7 @@ const OWNER = '/v2-preview/screens/seats';
 const PRO_FULL = '/v2-preview/screens/seats/pro-full';
 const FREE = '/v2-preview/screens/seats/free';
 const MEMBER = '/v2-preview/screens/seats/member';
+const PAID = '/v2-preview/screens/seats/paid';
 
 const primaries = (html: string) => html.match(/<[^>]*data-v2-primary=""[^>]*>[^<]*/g) ?? [];
 const forms = (html: string) =>
@@ -83,15 +86,33 @@ describe('seatsView: an Agency account read by its owner (Northwind)', () => {
   it('prices a seat beyond the plan from prices.ts, not from the artboard', () => {
     expect(v.people.foot).toBe(`One seat free. Beyond five, ${usd(EXTRA_SEAT)} a seat a month.`);
     expect(v.people.foot).toBe('One seat free. Beyond five, $12 a seat a month.');
-    expect(v.buy!.line).toBe(
+    expect(seatsPreview(PAID).buy!.line).toBe(
       `${usd(EXTRA_SEAT)} a month for each seat beyond five, ${usd(EXTRA_SITE)} a month for each site beyond ${GATES.agency.sites}, up to ${GATES.agency.maxSites} sites.`,
     );
   });
 
-  it('says how an invitation arrives, in FACTS’ words', () => {
+  it('draws the buy form while the plan is paid, and not for the same account past due, which the route would refuse', () => {
+    const state = (path: typeof OWNER | typeof PAID) => {
+      const p = SEATS_PREVIEWS[path];
+      const at = Date.parse(p.viewer().now);
+      const account = p.data().accounts.find((a) => a.id === p.viewer().accountId)!;
+      return account.state_history.filter((h) => Date.parse(h.since) <= at).at(-1)!.state;
+    };
+    expect([state(PAID), seatsPreview(PAID).buy === null]).toEqual(['agency', false]);
+    expect([state(OWNER), seatsPreview(OWNER).buy === null]).toEqual(['past_due', true]);
+    // Past due, the owner still invites, and reads the same people and the same price of a seat.
+    expect(seatsPreview(OWNER).invite).not.toBeNull();
+    expect(seatsPreview(OWNER).people.foot).toBe(seatsPreview(PAID).people.foot);
+  });
+
+  it('says what an invitation is: one email with a link, for as many days as the link works', () => {
     expect(v.people.mailNote).toBe(
-      'An invitation is the sign-in email with one extra line; nothing else is sent.',
+      `An invitation is one email with a link to accept it. The link works for ${numberWord(INVITE_LINK_DAYS)} days.`,
     );
+    expect(v.people.mailNote).toBe(
+      'An invitation is one email with a link to accept it. The link works for seven days.',
+    );
+    expect(v.people.mailNote).not.toContain('sign-in email');
   });
 
   it('offers the owner the invite form, a change for each seat but their own, and the plan’s extras', () => {
@@ -107,7 +128,7 @@ describe('seatsView: an Agency account read by its owner (Northwind)', () => {
     expect(priya.change.fields).toMatchObject({ role: 'account_manager', scopeValue: 'some' });
     expect(priya.change.fields.sites.map((s) => s.ticked)).toEqual([true, false]);
     expect(priya.resend).toBeNull();
-    expect(v.buy).toMatchObject({
+    expect(seatsPreview(PAID).buy).toMatchObject({
       action: '/api/billing/seats',
       seats: { value: 0 },
       sites: { value: 0, max: GATES.agency.maxSites - GATES.agency.sites },
@@ -137,8 +158,10 @@ describe('seatsView: an Agency account read by its owner (Northwind)', () => {
     expect(v.people.foot).toBe(
       `One seat free. Beyond five, ${usd(EXTRA_SEAT)} a seat a month, once the trial has become the plan.`,
     );
-    // The same account on the plan is offered the form.
-    expect(seatsView(d, viewer, { seatLimit: 5, billing: true }).buy).not.toBeNull();
+    // The same account on the plan, paid, is offered the form.
+    expect(
+      seatsView(d, SEATS_PREVIEWS[PAID].viewer(), { seatLimit: 5, billing: true }).buy,
+    ).not.toBeNull();
   });
 
   it('a seat whose only client was removed covers none, and says so; the others count the clients still there', () => {
@@ -217,6 +240,9 @@ describe('seatsView: the other readers', () => {
   it('a Free account: the gate message and no form', () => {
     const v = seatsPreview(FREE);
     expect(v.header.line).toBe('1 of 1 used · owner');
+    // One seat is "seat": the title's noun follows the limit.
+    expect(v.people.title).toBe('People · 1 of 1 seat');
+    expect(seatsPreview(PRO_FULL).people.title).toBe('People · 2 of 2 seats');
     expect(v.people.foot).toBe(gateMessage('seats', 'free'));
     expect([v.header.invite, v.invite, v.buy]).toEqual([null, null, null]);
   });
@@ -246,6 +272,25 @@ describe('seatsView: a reader whose seat covers some clients', () => {
     expect(`${v.header.line} ${v.people.title}`).not.toMatch(/\d/);
     expect([v.header.invite, v.invite, v.buy]).toEqual([null, null, null]);
   });
+
+  it('is told the owner covers all clients, with no count: the reader’s records hold their own clients alone', () => {
+    const p = SEATS_PREVIEWS[OWNER];
+    const d = p.data();
+    const sam = d.seats.find((s) => s.name === 'Sam')!;
+    expect(sam.client_scope).toHaveLength(1);
+    // What Sam's session reads of Northwind's two clients (spec 31 §4): the one his seat covers.
+    const read = { ...d, sites: d.sites.filter((s) => sam.client_scope.includes(s.id)) };
+    expect(d.sites.filter((s) => s.account_id === sam.account_id)).toHaveLength(2);
+    const cells = (v: ReturnType<typeof seatsView>) =>
+      v.people.rows.map((r) => [r.person, r.clients]);
+    expect(cells(seatsView(read, { ...p.viewer(), seatId: sam.id }))).toEqual([
+      ['Alex', 'all clients'],
+      ['You, Sam', '1 · harborlight.example'],
+    ]);
+    // A reader whose seat covers every client reads every client, and is given the count.
+    expect(cells(seatsView(d, p.viewer()))[0]).toEqual(['You, Alex', 'all 2']);
+    expect(cells(seatsPreview(MEMBER))[0]).toEqual(['Alex', 'all 2']);
+  });
 });
 
 describe('the screens, as their previews render them', () => {
@@ -253,7 +298,7 @@ describe('the screens, as their previews render them', () => {
 
   it('has an element for each preview the registry lists', () => {
     expect(Object.keys(CC31_SEAT_ELEMENTS).sort()).toEqual(entries.map((p) => p.path).sort());
-    expect(entries).toHaveLength(8);
+    expect(entries).toHaveLength(9);
   });
 
   it.each(entries.map((p) => [p.path, p.orange ?? 1] as const))(
@@ -264,13 +309,17 @@ describe('the screens, as their previews render them', () => {
   );
 
   it('Seats: the orange element is the link to the invite form, and each form posts to a seat route', () => {
-    const html = renderToStaticMarkup(CC31_SEAT_ELEMENTS[OWNER]!());
+    const html = renderToStaticMarkup(CC31_SEAT_ELEMENTS[PAID]!());
     expect(primaries(html)).toEqual([expect.stringMatching(/href="#invite"[^>]*>Invite someone$/)]);
     expect(html).toMatch(/<section[^>]* id="invite"/);
     expect(forms(html.slice(html.indexOf('<main')))).toEqual([
       ['post', '/api/seats'],
       ['post', '/api/billing/seats'],
     ]);
+    // Past due, the same account is drawn the invite form and no buy form.
+    const pastDue = renderToStaticMarkup(CC31_SEAT_ELEMENTS[OWNER]!());
+    expect(forms(pastDue.slice(pastDue.indexOf('<main')))).toEqual([['post', '/api/seats']]);
+    expect(pastDue).not.toMatch(/<section[^>]* id="buy"/);
   });
 
   it('Seats, live: a change, a removal and, for an invitation, a resend, for each seat but the owner’s', () => {
@@ -293,8 +342,43 @@ describe('the screens, as their previews render them', () => {
       'name="_method" value="DELETE"',
     ]);
     // Three members besides the owner, none of them an invitation: two forms each, and the two below.
-    const owner = live(OWNER);
+    const owner = live(PAID);
     expect(forms(owner.slice(owner.indexOf('<main')))).toHaveLength(3 * 2 + 2);
+  });
+
+  it('Seats, live: each seat’s Save, new invitation and removal name the seat after the label', () => {
+    const buttons = (path: keyof typeof SEATS_PREVIEWS) => {
+      const html = renderToStaticMarkup(
+        <LiveActions>
+          <SeatsScreen data={seatsPreview(path)} />
+        </LiveActions>,
+      ).replace(/^[\s\S]*<main/, '<main');
+      return [...html.matchAll(/<button[^>]*>([\s\S]*?)<\/button>/g)].map((m) => ({
+        // What a screen reader reads, and what is drawn: the name is in a visually hidden span.
+        name: m[1]!.replace(/<[^>]+>/g, ''),
+        seen: m[1]!.replace(/<span[^>]*data-v2-sr-only[^>]*>[\s\S]*?<\/span>/g, ''),
+      }));
+    };
+    const paid = buttons(PAID).filter((b) => /^(Save|Remove)/.test(b.seen));
+    expect(paid.map((b) => b.name)).toEqual([
+      'Save Priya',
+      'Remove from the account Priya',
+      'Save Sam',
+      'Remove from the account Sam',
+      'Save Lee',
+      'Remove from the account Lee',
+    ]);
+    expect(new Set(paid.map((b) => b.seen))).toEqual(new Set(['Save', 'Remove from the account']));
+    // An invitation: the seat is named by its address, on the new invitation too.
+    expect(
+      buttons(PRO_FULL)
+        .filter((b) => /^(Save|Send a new|Remove)/.test(b.seen))
+        .map((b) => b.name),
+    ).toEqual([
+      'Save dev@company.com',
+      'Send a new invitation dev@company.com',
+      'Remove from the account dev@company.com',
+    ]);
   });
 
   it('Seats, a member who is not the owner: no form', () => {
@@ -362,8 +446,21 @@ describe('inviteView', () => {
     expect(inviteView(null, true, 'gone')).toEqual({
       state: 'gone',
       title: 'This invitation cannot be used',
-      lines: [expect.any(String)],
+      lines: [
+        'It was accepted, replaced by a newer one, removed, or it has expired. The account’s owner can send another.',
+      ],
       notice: 'gone',
+    });
+  });
+
+  it('a page that holds no link names none of those causes: it says to open the mailed link again', () => {
+    expect(inviteView('no_link', false)).toEqual({
+      state: 'no_link',
+      title: 'This page holds no invitation',
+      lines: [
+        'A page keeps an invitation for a short while after its link is opened, in the browser that opened it. Open the link in the invitation email again.',
+      ],
+      notice: null,
     });
   });
 });

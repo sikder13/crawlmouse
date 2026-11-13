@@ -345,6 +345,11 @@ export const PREVIEWS: PreviewEntry[] = [
   // may invite while a seat is free; the other three states offer no invitation.
   { path: '/v2-preview/screens/seats', name: 'Final-Ag-Seats (Northwind)', kind: 'screen' },
   {
+    path: '/v2-preview/screens/seats/paid',
+    name: 'Seats, Agency with its plan paid: the buy form',
+    kind: 'screen',
+  },
+  {
     path: '/v2-preview/screens/seats/pro-full',
     name: 'Seats, Pro with no seat free',
     kind: 'screen',

@@ -18,6 +18,7 @@ import {
   BAD_ACCOUNT_ID,
   CLEAN_VIEWER,
   DATASET,
+  NORTHWIND_ACCOUNT_ID,
   STAND_IN_FREE_ACCOUNT,
 } from './accounts';
 
@@ -58,11 +59,30 @@ const STAND_IN_FREE_OWNER: Seat = {
   accepted_at: clean.sites[0]!.created_at,
 };
 
+/**
+ * Northwind's owner a day before the account's invoice failed, as the fixture's own history dates
+ * it: on the plan and paid (state `agency`), which is when seats and sites beyond the plan's are
+ * sold. At the fixture's `as_of` the account is past due.
+ */
+function northwindPaid(): Viewer {
+  const account = fixture(DATASET.withheld).accounts.find((a) => a.id === NORTHWIND_ACCOUNT_ID)!;
+  const failed = account.state_history.find((h) => h.state === 'past_due')!.since;
+  return {
+    accountId: account.id,
+    now: new Date(Date.parse(failed) - 86_400_000).toISOString(),
+  };
+}
+
 export const SEATS_PREVIEWS = {
-  /** Final-Ag-Seats: Northwind's Agency account, read by its owner. */
+  /** Final-Ag-Seats: Northwind's Agency account, read by its owner. Past due, so no buy form. */
   '/v2-preview/screens/seats': {
     data: (): AccountDataset => fixture(DATASET.withheld),
     viewer: ACCOUNT_VIEWERS.withheld,
+  },
+  /** The same account while its plan is paid: the buy form, under the invite form. */
+  '/v2-preview/screens/seats/paid': {
+    data: (): AccountDataset => fixture(DATASET.withheld),
+    viewer: northwindPaid,
   },
   /** A Pro account whose two seats are taken: the gate message, and no invite form. */
   '/v2-preview/screens/seats/pro-full': {

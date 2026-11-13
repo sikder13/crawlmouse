@@ -87,6 +87,15 @@ describe('noticeLine', () => {
       'rate_limited',
       'Too many emails were asked for in a short time, so nothing was recorded. Ask again from Tue 13:30.',
     ],
+    [
+      'reports_capped',
+      'This account has made as many reports as it may for now, so none was made. The next can be made Tue 13:30.',
+    ],
+    [
+      'fix_not_verified',
+      'That check did not verify the fix, so there is no proof to make. Nothing was made.',
+    ],
+    ['extras_in_trial', 'Seats and sites are bought once the trial has become the plan.'],
     ['invalid', 'That request was not understood, so nothing was changed.'],
     ['method_not_allowed', 'That form could not be sent that way. Reload the page and try again.'],
   ] as const)('%s', (code, line) => {

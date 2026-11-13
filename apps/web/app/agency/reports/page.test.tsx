@@ -236,7 +236,7 @@ describe('/agency/reports', () => {
     for (const client of [w.site1.id, w.site2.id]) {
       const data = await reportsOf(w.developer, w.accountId, { client });
       expect(data.clients.rows.map((r) => r.key)).toEqual([w.site1.id]);
-      expect(data.header.line).toBe('1 weekly');
+      expect(data.header.line).toBe('1 weekly, of the client sites in your seat');
       expect(data.clients.rows.flatMap((r) => r.actions)).toEqual([]);
       expect(data.change).toBeNull();
       expect(data.header.action).toBeNull();

@@ -257,6 +257,23 @@ A seat's own routes are under `/api/seats/id/`: a seat id directly under `/api/s
 `/api/seats/accept` and `/api/seats/switch`, and the route registry holds each path to one row
 (`__tests__/security/route-policy.test.ts`, "no two rows overlap").
 
+**The page `/invite`.** It shows one of three things. With an invitation its cookie's token opens:
+the account, the role, the scope, and the form that accepts (or, signed out, the link to sign in
+first). With a token `read_seat_invite` refuses: "This invitation cannot be used". With no token in
+the cookie: "This page holds no invitation", which says to open the link in the invitation mail
+again and gives no cause, since the invitation itself was not read. The invitation's cookie lasts an
+hour (`linkCookieSeconds('invite')`, `lib/v2/account/link-cookie.ts`) where the other emailed links'
+last ten minutes, because a reader who is not signed in leaves the page to sign in by email and
+comes back to it.
+`pnpm --filter @crawlmouse/web exec vitest run lib/v2/account/link-cookie.test.ts app/invite/page.test.tsx`.
+
+**What a seat that covers some clients is told.** Its records hold its own clients (§4), so a
+sentence about the account is not built from them. On Seats the owner's Clients cell reads "all
+clients" with no count, the header and the People title give no count of seats, and the foot is
+left out. On `/agency/reports` the header's counts end ", of the client sites in your seat" and an
+empty Sent table says no report has been sent "to a client in your seat".
+`pnpm --filter @crawlmouse/web exec vitest run __tests__/v2/seats.test.tsx lib/v2/view/agency-reports.test.ts -t 'covers some clients'`.
+
 Invitation mail is bounded by the day for an account (`INVITE_MAIL_PER_DAY`, `lib/v2/agency/seats.ts`:
 fewer in a trial than on a paid plan) and at 10 an hour for a client address, an invite and a resend
 counted together (`app/api/seats/route.ts`). An invitation's row is written before its mail is asked
@@ -329,7 +346,8 @@ confirms.
 | ---------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
 | Quantities the plan does not sell (`limitsFor`), or more than 100 extra seats in one request                                       | 400 `invalid`, before any Stripe call               |
 | A seat limit below the seats in use (active, and invited with a link not yet expired), or a site limit below the live client sites | 409 `in_use`, before any Stripe call                |
-| No subscription; one set to end; one not `active` (a trial's included); one whose items are not the catalog's Agency plan          | 409                                                 |
+| No subscription; one set to end; one that is not `active`; one whose items are not the catalog's Agency plan                       | 409                                                 |
+| A trialing subscription                                                                                                            | 409 `subscription_trialing`                         |
 | The card is declined on a raise                                                                                                    | 402 `payment_failed`; the subscription is as it was |
 | The quantities the subscription already holds                                                                                      | 200 `changed: false`; no Stripe write               |
 
@@ -346,11 +364,19 @@ made in (`RETRY_WINDOW_MS`). A retry of one request within a window repeats it; 
 bought, lowered and bought again do not; and a raise the card declined can be asked again in a
 later window, where Stripe would otherwise replay the decline for a day.
 
-**In an Agency trial nothing is bought.** A trialing subscription is refused (409): the webhook's
-reading of a trialing update changes no entitlement (`lib/billing/state-machine.ts`), so the limits
-would not follow what Stripe held. Seats draws no buy form for such an account and its foot says
-that the price applies once the trial has become the plan; the matrix draws no link to buying
-sites.
+**In an Agency trial nothing is bought.** A trialing subscription is refused (409
+`subscription_trialing`): the webhook's reading of a trialing update changes no entitlement
+(`lib/billing/state-machine.ts`), so the limits would not follow what Stripe held. A form is sent
+back to Seats with the line "Seats and sites are bought once the trial has become the plan."
+(`extras_in_trial`), not the line of a plan that is ending or unpaid.
+
+**Where buying is offered** is one predicate, `extrasSold(state, gates.agencyBranding)`
+(`lib/v2/agency/extras-bounds.ts`): on Agency, and not in the Agency trial or past due, the two
+states whose subscription the route refuses. Seats draws its buy form by it (in a trial the foot
+says the price applies once the trial has become the plan), the matrix its link to buying sites,
+and `POST /api/seats` its `canBuySeats` in the 402 at the seat limit.
+`pnpm --filter @crawlmouse/web exec vitest run __tests__/v2/seats.test.tsx lib/v2/view/agency-matrix.test.ts app/api/seats/route.test.ts`
+runs an account on the plan, in its trial and past due through each of the three.
 
 `pnpm --filter @crawlmouse/web exec vitest run lib/v2/agency/extras.test.ts app/api/billing/seats/route.test.ts`
 runs these against a Stripe subscription in memory and CC-03's fake catalog, and reads each
@@ -376,7 +402,9 @@ lists those. A staging copy has no row. A row's grades, pills, last check and sc
 dashboard's own site row (`dashboardView`), so a withheld grade reads "withheld" as it does there.
 Rows with a problem opened since the site's previous check come first, then by host. The columns are
 Site, Client, Technical SEO, AI readability, Since last check, Next check, Last check, and Schedule ·
-report; Next check is an addition to the artboard.
+report; Next check is an addition to the artboard. The report's part of the last column says what
+holds a schedule's reports where something does: "(paused by the recipient)", the client page's
+words, or "(no contact)".
 
 The header counts the clients against the account's site limit; for a seat that covers some clients
 it says how many are in the seat. The strip is absent until a client has two results. It then gives
@@ -386,21 +414,29 @@ two results), and Opened and Resolved when their count is not zero.
 Adding a client is the dashboard's add-site form, posted to `POST /api/sites` for the account acted
 in, offered to a seat that may add a site while the account has a site unused. Posted from `/agency`,
 the route answers a form with a 303 back to `/agency`: with the new client as a row, or with a
-refusal's notice. The pages a form may be sent back to are `BACK`'s four shapes
-(`lib/v2/account/route.ts`): `/dashboard`, `/sites/<id>`, `/agency`, `/agency/clients/<id>`.
+refusal's notice. A form is sent back to a page `BACK` matches (`lib/v2/account/route.ts`), a pattern
+of alternatives of which `/dashboard`, `/sites/<id>`, `/agency` and `/agency/clients/<id>` are four;
+`grep -n "^const BACK" -A2 apps/web/lib/v2/account/route.ts` prints it.
 
 **First run.** `next` is setup's next step: the first of these that is not done and that the caller's
 role may do. Its action is the page's orange element; with no step, "Add a client site" is.
 
-| State                                                | The step                                    | Who                           |
-| ---------------------------------------------------- | ------------------------------------------- | ----------------------------- |
-| no client                                            | the header's form: add one                  | a seat that may add a site    |
-| a client with no check, and none under way           | "Run it now": `POST /api/sites/[id]/checks` | a seat that covers the client |
-| a client has a result, and the records hold one seat | "Open Seats" (`/seats`)                     | the owner                     |
-| more than one seat, and no client report sent        | "Open client reports" (`/agency/reports`)   | the owner, an account manager |
+| State                                                | The step                                    | Who                                                             |
+| ---------------------------------------------------- | ------------------------------------------- | --------------------------------------------------------------- |
+| no client                                            | the header's form: add one                  | a seat that may add a site                                      |
+| a client with no check, and none under way           | "Run it now": `POST /api/sites/[id]/checks` | a seat that covers the client                                   |
+| a client has a result, and the records hold one seat | "Open Seats" (`/seats`)                     | the owner                                                       |
+| more than one seat, and no client report sent        | "Open client reports" (`/agency/reports`)   | the owner, or an account manager whose seat covers every client |
+
+Whether a report was sent is the caller's own read, which for a seat that covers some clients holds
+no report sent to a client outside it. Such a seat is not shown the last step, whose sentence is
+about the account:
+`pnpm --filter @crawlmouse/web exec vitest run lib/v2/view/agency-matrix.test.ts -t 'a seat that covers some clients is not asked'`.
 
 A client with no result yet says in its row what its site page's first-check line says ("Not checked
-yet", "First check queued"), with one button: start the check, or watch it. The first check of such a
+yet", "First check queued"), with one button: start the check, or watch it. Where the first check
+ended without a result the step's sentence is the site page's for that state, not "It has not been
+checked yet". The first check of such a
 client goes through the re-check route as it stands. That route queues it with the trigger `manual`
 (`__tests__/v2-031-c-first-check.test.ts`), so it counts toward the site's `manualChecksPerSiteDay`.
 
@@ -409,7 +445,8 @@ matrix", and "Reports going out Mon · Preview".
 
 At the plan's site limit the header has no add form. Where the plan's extras are sold
 (`V2_BILLING=1`) and more sites can be bought, a reader who may buy (the owner) is shown "Add sites
-to the plan", a link to the buy form on `/seats` (`/seats#buy`); nobody else is shown it:
+to the plan", a link to the buy form on `/seats` (`/seats#buy`). The test runs the owner, an account
+manager whose seat covers every client and one whose seat covers some, and the link is the owner's:
 `pnpm --filter @crawlmouse/web exec vitest run lib/v2/view/agency-matrix.test.ts -t 'the way to buy sites'`.
 
 ### `/agency/clients/[siteId]`
@@ -419,12 +456,19 @@ to the plan", a link to the buy form on `/seats` (`/seats#buy`); nobody else is 
 host and the site page's own line and actions; the two grades with their moves, without the parts
 under each; the fixes still to do (open, open again, or not verified) as the site page's rows, with
 their effects and packet links; and "This client": the contact, the report schedule and the owning
-seat. Each of those rows links to where it is changed, `/agency/reports` for the owner and an account
-manager and `/seats` for the owner.
+seat. For a seat that may schedule reports (the owner and an account manager) each of the three rows
+has "Change", a link to that client's card on the client reports screen
+(`/agency/reports?client=<site id>#change`), where the contact, the schedule and the owning seat are
+changed (`set_client`, `set_schedule`). `/seats` changes a seat's role and scope, not which seat
+owns a client, so no row links there.
+`pnpm --filter @crawlmouse/web exec vitest run lib/v2/view/agency-client.test.ts -t 'Change link|each change'`.
 
 It is a 404 for a malformed id, a site that does not exist, a removed one, a staging copy, and a site
 the caller's seat does not cover. A client with no result yet is shown as the site page's first-check
-screen, on the agency rail. On an account below Agency the page is the gate.
+screen, on the agency rail. On an account below Agency the page is the gate. The page is of the
+site's account, which need not be the one the caller acts in: the gate's switch then says "This page
+is of <that account>", and the rail says which account the caller acts in
+(`agencyGate`'s `actingIn`).
 
 Left out, each a `ruling` row: the "What to tell … this week" paragraph (no view renders its
 sentences from the data) with its two buttons, "Client portal", the line under the fixes about whose
@@ -433,7 +477,8 @@ name a packet carries, the report row's sender, and the seat row's alert channel
 ### Both pages
 
 `noindex`, `force-dynamic`, a 404 while `V2_CHECKS_PUBLIC` is off, and the sign-in page for a caller
-who is not signed in. Neither has a `loading.tsx`: `find apps/web/app -name loading.tsx` prints no
+who is not signed in. Each has a document title of its own ("Clients", "Client"), as `/seats`
+("Seats") and `/reports/[id]` ("Report") have; each page's test reads its `metadata`. Neither has a `loading.tsx`: `find apps/web/app -name loading.tsx` prints no
 file in this tree.
 
 Previews, in `app/(v2-preview)/v2-preview/_preview/agency.ts`: the matrix; no client; a client not
@@ -465,6 +510,13 @@ no row (a fix of another site is a 404). The route's answers, in order, are in t
 in `apps/web/app/api/reports/route.ts`, and `route.test.ts` beside it has a test for each but one:
 the 403 `role_refused`, which no request reaches today, since `seat_may` lets each role
 `export_report` (§3).
+
+The Reports screen's forms post to this route. A form refused with 400, 402, 409 or 429 is answered
+with a 303 to `/reports?notice=<code>` and the page says the code's line (`NOTICE_LINES`,
+`lib/v2/copy/notices.ts`): `invalid`, `upgrade_required`, `fix_not_verified`, and `reports_capped`
+with the time the bound that refused it ends. JSON gets the status and code as before
+(429 `rate_limited`). A form's 401 and 404 are JSON too.
+`pnpm --filter @crawlmouse/web exec vitest run app/api/reports/route.test.ts -t 'a refused form'`.
 
 The file is made inside the request and the row is written first: `create_report` writes it
 `pending`, `finish_report` marks it `stored` with its path and size, `fail_report` marks it `failed`
@@ -634,8 +686,17 @@ pnpm --filter @crawlmouse/web exec vitest run 'app/s/view/[reportId]/page.test.t
 ```
 
 Previews: `/v2-preview/screens/proof` (two grades moved), `/proof/fix` (a fix verified) and
-`/proof/baseline`. Their documents are stand-ins written in `_preview/proof.ts`; the generator's own
-documents replace them once it is on the branch.
+`/proof/baseline`. The first and the last are the generator's own documents, `compareDoc` of
+bad-site's fifth and sixth checks and `baselineDoc` of clean-site's check, built in
+`_preview/proof.ts` as `POST /api/reports` builds them; the test below compares each with the
+builder's output. The fix's document is written by hand there, not made by `fixProofDoc`: no fixture
+holds a fix a check verified. It shows the layout of a pair with facts under it, and its sentences
+are a stand-in.
+
+The outline has no gap: a pair's title is an `h3` under its section's heading, and an `h2` in a
+section that has none. A table's first cell is its row's header (`th scope="row"`) where each row
+of the table has a first cell that is not empty.
+`pnpm --filter @crawlmouse/web exec vitest run components/v2/screens/proof/ProofScreen.test.tsx -t 'heading order|row a header|generator'`.
 
 ## 10. Download, share and schedules
 
@@ -673,7 +734,19 @@ needs the plan's `exports` gate (402) and a stored file (409 `not_ready`), under
 hour for the account. The link is answered once: JSON gets `{url, expiresAt}`; a form gets a 303 to
 `/reports?notice=share_made` with the link in the HttpOnly cookie `cm_share_made`, scoped to
 `/reports`, which the page shows on the report's row. That cookie lasts 120 seconds and is not
-cleared sooner: a page cannot clear a cookie.
+cleared sooner: a page cannot clear a cookie; the notice and the row's label say the link is shown
+"for a short while". The element that holds the link carries the class `ph-no-capture`, which
+posthog-js's recorder blocks, and `data-ph-mask`, the selector this project's recorder masks
+(`instrumentation-client.ts`): `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2/reports.test.tsx -t 'a share link just made'`.
+It is the first element in the tree to carry either; not seen in a recording.
+
+A row whose report has a link that works says "Link · until <date>" as text. Its share actions are
+"New link", which replaces the link (the one before stops opening), and "Withdraw link"; a row with
+no link has "Link".
+
+The Reports screen says how long a link works from `SHARE_LINK_DAYS` (`lib/v2/copy/reports.ts`),
+which a test holds to the interval `create_share_link` adds, read from the migration's text:
+`pnpm --filter @crawlmouse/web exec vitest run lib/v2/view/reports.test.ts -t 'how long a share link works'`.
 
 A client report's link is the one its mail carries, and a new link revokes the one before, so none
 is made for one here: the `POST` answers 409 `mailed_link`, and the Reports screen offers such a row
@@ -1004,9 +1077,21 @@ digit (`gates.test.ts`, "has no digit in its code").
 | `/agency` and `/agency/clients/[siteId]` on an account below Agency                                                    | `agencyGateMessage()`                                                                                                   |
 | the dashboard and `/agency`, after an add was refused because the plan's sites are in use (`?notice=upgrade_required`) | `sitesFullMessage(tier)`: the sites gate below Agency, and on Agency what a site beyond the plan's costs (`EXTRA_SITE`) |
 
-`gates.test.ts` also reads three copy files for a price or a limit written as a digit: the matrix and
-client copy (`lib/v2/copy/agency.ts`), `NOTICE_LINES` (`lib/v2/copy/notices.ts`) and
-`OWN_ACCOUNT_COPY` (`lib/v2/copy/settings-notices.ts`).
+`gates.test.ts` also reads other files for a price or a limit written by hand: a `$` before a digit,
+or a digit before "site", "seat", "client" or "fix". It reads the matrix and client copy
+(`lib/v2/copy/agency.ts`), `NOTICE_LINES` (`lib/v2/copy/notices.ts`), `OWN_ACCOUNT_COPY`
+(`lib/v2/copy/settings-notices.ts`), the words of Seats, client reports and Reports
+(`lib/v2/copy/seats.ts`, `client-reports.ts`, `reports.ts`, each up to its lock corrections), and
+the views that compose a sentence from numbers: `lib/v2/view/seats.ts` (the foot and the buy line),
+`agency-matrix.ts`, `agency-client.ts`, `agency-reports.ts` and `reports.ts`. In those, apart from
+the two Reports files (whose copy says "two checks"), it also fails on a number from two to twelve,
+twenty or thirty spelled out. It does not see a bare digit with neither a `$` nor one of those nouns
+beside it.
+
+`gateMessage('fixes', …)` has no caller: the fix list's and the fix page's Pro lines are locked copy
+(next paragraph), so D10's line for the fix limit is on no screen.
+`grep -rn "gateMessage('fixes'" apps/web/lib apps/web/app apps/web/components | grep -v '\.test\.'`
+prints nothing.
 
 Not moved to `gateMessage` by workstream C, each outside its paths: the dashboard's "Need more?" line
 and its add-site label (`lib/v2/view/dashboard.ts`, which take their numbers from `GATES` and
@@ -1025,7 +1110,7 @@ where it is sent.
 | `first_client_added`       | C          | `POST /api/sites`, when `add_site` reports the account's first site and the account's kind is `agency` |
 | `seat_invited`             | A          | the invite route (`POST /api/seats`)                                                                   |
 | `seat_accepted`            | A          | the accept route (`POST /api/seats/accept`)                                                            |
-| `seats_bought`             | A          | `POST /api/billing/seats`                                                                              |
+| `seats_bought`             | A          | `POST /api/billing/seats`, when a quantity rose; a lowering alone sends none                           |
 | `report_generated`         | B          | `POST /api/reports`                                                                                    |
 | `report_downloaded`        | B          | `GET /api/report-files/[id]/download`                                                                  |
 | `report_shared`            | B2         | `POST /api/report-files/[id]/share`                                                                    |
@@ -1071,6 +1156,15 @@ on a link minted again on a retry, §9 on the prospect's one-pager, §10 on a cl
 - **Invitation mail is bounded by the day, lower in a trial** (`INVITE_MAIL_PER_DAY`,
   `lib/v2/agency/seats.ts`): an invitation names the account, a string its owner chose, to an address
   the owner chose. An invitation and a resend count into one bucket.
+- **Text inside a `data-v2-addition` marker is compared with no artboard.** The lock comparison
+  leaves a marked element out (`__tests__/v2/_lib/lock.ts`), on every screen of the product. For
+  Seats, the matrix, the client page and client reports a test holds each text node inside a marker,
+  on each preview and as a live page draws it, to a string of the screen's view or of the step's
+  copy modules, so a sentence typed into a component there fails:
+  `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2/agency-additions.test.tsx`. It does
+  not see a sentence added to a copy module or composed in a view, an attribute, a state no preview
+  renders, or a marker on another screen (Reports among them). Tying each marker to a registry row
+  by a key is a change to the harness every screen uses, and is not made here.
 - **The PDF's not-measured list has no heading.** The proof page titles the list "Not measured"
   (`lib/v2/copy/proof.ts`); the PDF draws the same sentences after a rule with no title
   (`drawDoc`, `lib/v2/reports/pdf-layout.ts`). A title would be a string the document does not hold,

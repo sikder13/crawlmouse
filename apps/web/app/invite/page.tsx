@@ -27,7 +27,8 @@ export const metadata: Metadata = {
  * Where an invitation's link lands (CC-31 D3): `/invite/[token]` put the token in the
  * `cm_link_invite` cookie, so this page's address holds none. It reads what the invitation is
  * (`read_seat_invite`, which returns no address) and changes nothing; accepting is the form's POST
- * to /api/seats/accept. A 404 until V2_CHECKS_PUBLIC=1.
+ * to /api/seats/accept. With no token in the cookie it says to open the mailed link again, and
+ * names no cause of a link that cannot be used. A 404 until V2_CHECKS_PUBLIC=1.
  */
 export default async function InvitePage({
   searchParams,
@@ -42,7 +43,7 @@ export default async function InvitePage({
   } = await session.auth.getUser();
   const invitation = isToken(raw)
     ? await supabaseSeatsStore(supabaseAdmin()).readInvite(raw, new Date())
-    : null;
+    : 'no_link';
   const notice = noticeLine(await searchParams, 'UTC');
   return (
     <LiveActions>

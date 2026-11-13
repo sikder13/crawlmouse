@@ -4,7 +4,7 @@ import { checkRateLimit } from '@/lib/rate-limit';
 import { siteUrl } from '@/lib/site-url';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { supabaseServer } from '@/lib/supabase/server';
-import { notFound, paywall, readBody, refuse } from '@/lib/v2/account/route';
+import { notFound, noticeTo, paywall, readBody, refuse, refuseTo } from '@/lib/v2/account/route';
 import { readSite } from '@/lib/v2/account/sites';
 import { readEntitlement } from '@/lib/v2/account/viewer';
 import { agencyCaptureFor } from '@/lib/v2/agency/events';
@@ -20,6 +20,7 @@ import {
   supabaseReportBucket,
   supabaseReportStore,
 } from '@/lib/v2/reports/generate-run';
+import { REPORTS_PAGE } from '@/lib/v2/reports/share';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -56,6 +57,10 @@ const ABANDONED_AFTER_MS = 15 * 60 * 1000;
  * the checks against the site again), the file made and stored, and `report_generated` sent. The answer is 201 `{reportId}` to JSON and a 303
  * to `/reports` to a form; when the file could not be made the row is left failed, and JSON gets
  * 500 `report_failed` with the row's id.
+ *
+ * The Reports screen's forms post here. A form refused with 400, 402, 403, 409 or 429 is sent back
+ * to `/reports` with the refusal's notice (`NOTICE_LINES`); a 401 and a 404 are JSON for a form
+ * too (`refuseTo`).
  */
 export async function POST(req: Request) {
   if (!checksPublicEnabled()) return notFound();
@@ -67,7 +72,7 @@ export async function POST(req: Request) {
 
   const body = await readBody(req);
   const request = body === null ? null : parseReportRequest(body.fields);
-  if (body === null || request === null) return refuse(400, 'invalid');
+  if (body === null || request === null) return refuseTo(req, REPORTS_PAGE, 400, 'invalid');
 
   const { siteId } = request;
   const { data: member, error: memberError } = await sb.rpc('is_member_for_site', {
@@ -94,7 +99,9 @@ export async function POST(req: Request) {
       : fixId !== undefined
         ? (later[0]!.previous_check_id ?? null)
         : request.previousCheckId;
-  if (earlierId === null || earlierId === request.checkId) return refuse(400, 'invalid');
+  if (earlierId === null || earlierId === request.checkId) {
+    return refuseTo(body.kind, REPORTS_PAGE, 400, 'invalid');
+  }
   const earlier = earlierId === undefined ? [] : await readResultChecks(sb, siteId, [earlierId]);
   if (earlier === null) return notFound();
 
@@ -103,10 +110,12 @@ export async function POST(req: Request) {
     p_action: 'export_report',
   });
   if (guardError) throw new Error(`seat_may failed: ${guardError.message}`);
-  if (allowed !== true) return refuse(403, 'role_refused');
+  if (allowed !== true) return refuseTo(body.kind, REPORTS_PAGE, 403, 'role_refused');
   const entitlement = await readEntitlement(sb, site.account_id, new Date());
   if (entitlement === null) return notFound();
-  if (!entitlement.gates.exports) return paywall('exports');
+  if (!entitlement.gates.exports) {
+    return body.kind === 'form' ? noticeTo(REPORTS_PAGE, 'upgrade_required') : paywall('exports');
+  }
 
   // Each bound is its own call, with its window written out: lib/rate-limit-callers.test.ts reads
   // the window of each checkRateLimit call from the source.
@@ -122,6 +131,11 @@ export async function POST(req: Request) {
       })
     : hour;
   if (!limit.allowed) {
+    // A form's line says reports and when the bound that refused it ends; `rate_limited`'s line
+    // is the fix mail's.
+    if (body.kind === 'form') {
+      return noticeTo(REPORTS_PAGE, 'reports_capped', limit.resetAt.toISOString());
+    }
     const seconds = Math.max(1, Math.ceil((limit.resetAt.getTime() - Date.now()) / 1000));
     return refuse(429, 'rate_limited', {}, { 'retry-after': String(seconds) });
   }
@@ -147,7 +161,9 @@ export async function POST(req: Request) {
       .eq('kind', 'verified')
       .limit(1);
     if (verifiedError) throw new Error(`fix_events read failed: ${verifiedError.message}`);
-    if ((verified ?? []).length === 0) return refuse(409, 'fix_not_verified');
+    if ((verified ?? []).length === 0) {
+      return refuseTo(body.kind, REPORTS_PAGE, 409, 'fix_not_verified');
+    }
   }
   const store = supabaseReportStore(admin);
   await store.failAbandoned(site.account_id, new Date(Date.now() - ABANDONED_AFTER_MS));

@@ -7,6 +7,7 @@ import { ipHash } from '@/lib/v2/account/rate-keys';
 import { notFound, readBody, refuse, refuseTo } from '@/lib/v2/account/route';
 import { loadViewer } from '@/lib/v2/account/viewer';
 import { agencyCaptureFor } from '@/lib/v2/agency/events';
+import { extrasSold } from '@/lib/v2/agency/extras-bounds';
 import { inviteMailPerDay, inviteSeat, SEATS_PAGE } from '@/lib/v2/agency/seats';
 import { inngestInviteMail, supabaseSeatsStore } from '@/lib/v2/agency/seats-store';
 
@@ -76,7 +77,8 @@ export async function POST(req: Request) {
       accountId: account.id,
       tier,
       seatLimit: limits.seats,
-      canBuySeats: gates.agencyBranding,
+      // False in an Agency trial and past due, where the purchase route refuses the change.
+      canBuySeats: extrasSold(account.state, gates.agencyBranding),
     },
     await readBody(req),
   );

@@ -65,6 +65,9 @@ export const MATRIX_COPY = {
   report: (cadence: string, weekday: string) =>
     cadence === 'monthly' ? `report monthly, first ${weekday}` : `report ${cadence}, ${weekday}`,
   noReport: 'no report',
+  /** After a schedule, what keeps its reports from going: "report weekly, Mon (no contact)". */
+  reportHeld: (report: string, why: string) => `${report} (${why})`,
+  noContact: 'no contact',
   runFirst: 'Run the first check',
   /** Setup, one step at a time: each is the page's one next step while it is the first not done. */
   steps: {
@@ -89,6 +92,9 @@ export const MATRIX_COPY = {
   openTitle: 'Your clients are in another account',
   openBody: (acting: string) =>
     `You are acting in ${acting}, which has no client workspace. Open the agency to see its clients.`,
+  /** For a reader acting in another account, on a page of `shown`: the rail says where they act. */
+  openBodyVisiting: (shown: string) =>
+    `This page is of ${shown}, which has no client workspace. Open the agency to see its clients.`,
   open: (name: string) => `Open ${name}`,
 };
 

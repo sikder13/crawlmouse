@@ -10,15 +10,17 @@
  * `GATES`'s; a line about a limit is `gateMessage`'s.
  *
  * What a reader is offered follows `roleMay`: the invite, change, remove and resend forms for a role
- * that may invite (the owner), the buy form for a role that may buy on a plan that sells seats. Any
- * other member sees the people and the role table. The routes ask `seat_may` again.
+ * that may invite (the owner), the buy form for a role that may buy on an account the purchase route
+ * would not refuse for its state (`extrasSold`). Any other member sees the people and the role
+ * table. The routes ask `seat_may` again.
  */
 import type { Seat, SeatRole, Site } from '@crawlmouse/types/v2';
 import { EXTRA_SEAT, EXTRA_SITE, usd } from '../../billing/prices';
 import { GATES } from '../../entitlement-v2';
-import { MAX_EXTRA_SEATS } from '../agency/extras-bounds';
+import { extrasSold, MAX_EXTRA_SEATS } from '../agency/extras-bounds';
 import { gateMessage } from '../agency/gates';
 import { roleMay } from '../agency/guard';
+import { INVITE_LINK_DAYS } from '../agency/seats';
 import { INVITE_COPY, ROLE_ROWS, SEATS_COPY as COPY } from '../copy/seats';
 import { capitalise, count, numberWord, plural } from '../words';
 import {
@@ -72,7 +74,7 @@ export interface SeatRowView {
   /** Under the name; null when the name is the address. */
   email: string | null;
   role: string;
-  /** "all 12", or "7 · a.example, b.example, …". */
+  /** "all 12", "all clients" for a reader whose seat covers some, or "7 · a.example, b.example, …". */
   clients: string;
   alerts: string;
   /** An invitation not yet accepted. */
@@ -108,7 +110,10 @@ export interface SeatsView {
   };
   /** Null when the reader may not invite, or no seat is free. */
   invite: { id: string; action: string; fields: SeatFields } | null;
-  /** Null unless the reader may buy and the plan sells seats and sites beyond its own. */
+  /**
+   * Null unless the reader may buy and the account is sold seats and sites beyond the plan's
+   * (`extrasSold`: not in its Agency trial, and not past due).
+   */
   buy: {
     id: string;
     action: string;
@@ -146,9 +151,17 @@ function fields(sites: readonly Site[], role: string, scope: Seat['client_scope'
  * "all 12", or the count and the first two hosts of the clients a scoped seat covers. The clients
  * counted and named are the account's live ones: a removed site stays in the seat's scope rows and
  * is not a client the seat covers, so a seat whose clients were all removed reads "none".
+ *
+ * `sites` is what the reader's records hold. For a reader whose own seat covers some clients
+ * (`partial`) that is their clients and not the account's, so a seat that covers every client reads
+ * "all clients", with no count.
  */
-function clientsCell(scope: Seat['client_scope'], sites: readonly Site[]): string {
-  if (scope === 'all') return `all ${count(sites.length)}`;
+function clientsCell(
+  scope: Seat['client_scope'],
+  sites: readonly Site[],
+  partial: boolean,
+): string {
+  if (scope === 'all') return COPY.everyClientCell(partial ? null : sites.length);
   const covered = sites.filter((s) => scope.includes(s.id)).map((s) => s.host);
   if (covered.length === 0) return COPY.noClients;
   const [first, second, ...more] = covered;
@@ -206,7 +219,7 @@ export function seatsView(
       person,
       email: person === s.email ? null : s.email,
       role: COPY.roleLine[s.role],
-      clients: clientsCell(s.client_scope, sites),
+      clients: clientsCell(s.client_scope, sites, partial),
       alerts: s.alert_channels.map((c) => COPY.channel[c]).join(', ') || COPY.noAlerts,
       invited,
       change:
@@ -254,11 +267,11 @@ export function seatsView(
           : null,
     },
     people: {
-      title: partial ? COPY.people : `${COPY.people} · ${count(used)} of ${count(limit)} seats`,
+      title: partial ? COPY.people : COPY.peopleOf(used, limit),
       sub: COPY.peopleSub,
       rows,
       foot: partial ? null : foot,
-      mailNote: COPY.mailNote,
+      mailNote: COPY.mailNote(numberWord(INVITE_LINK_DAYS)),
     },
     roles: {
       title: COPY.rolesTitle,
@@ -273,7 +286,7 @@ export function seatsView(
         ? { id: INVITE_ANCHOR, action: '/api/seats', fields: fields(sites, 'developer', 'all') }
         : null,
     buy:
-      mayBuy && billing && v.gates.agencyBranding && !inTrial
+      mayBuy && billing && extrasSold(v.account.state, v.gates.agencyBranding)
         ? {
             id: BUY_ANCHOR,
             action: '/api/billing/seats',
@@ -289,7 +302,7 @@ export function seatsView(
 // ─── the invitation page ─────────────────────────────────────────────────────────────────────────
 
 export type InviteView =
-  | { state: 'gone'; title: string; lines: string[]; notice: string | null }
+  | { state: 'gone' | 'no_link'; title: string; lines: string[]; notice: string | null }
   | {
       state: 'invite';
       title: string;
@@ -302,19 +315,31 @@ export type InviteView =
     };
 
 /**
- * What `/invite` shows: the invitation its cookie's token opens, read through `read_seat_invite`
- * (null when the link cannot be used), for a reader who is signed in or not. `notice` is the line of
+ * What `/invite` shows, for a reader who is signed in or not: the invitation its cookie's token
+ * opens, read through `read_seat_invite`; null for a token that function refuses; `'no_link'` when
+ * the cookie holds no token, which says nothing about the invitation itself. `notice` is the line of
  * a refused acceptance the form was sent back with.
  */
 export function inviteView(
-  invitation: {
-    accountName: string | null;
-    role: (typeof INVITED_ROLES)[number];
-    everyClient: boolean;
-  } | null,
+  invitation:
+    | {
+        accountName: string | null;
+        role: (typeof INVITED_ROLES)[number];
+        everyClient: boolean;
+      }
+    | null
+    | 'no_link',
   signedIn: boolean,
   notice: string | null = null,
 ): InviteView {
+  if (invitation === 'no_link') {
+    return {
+      state: 'no_link',
+      title: INVITE_COPY.noLinkTitle,
+      lines: [INVITE_COPY.noLink],
+      notice,
+    };
+  }
   if (invitation === null) {
     return { state: 'gone', title: INVITE_COPY.goneTitle, lines: [INVITE_COPY.gone], notice };
   }

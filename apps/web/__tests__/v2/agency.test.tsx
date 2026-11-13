@@ -9,14 +9,19 @@
 import { JSDOM } from 'jsdom';
 import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { GRANITEPEAK_SITE } from '../../app/(v2-preview)/v2-preview/_preview/agency';
+import {
+  GRANITEPEAK_SITE,
+  KESTREL_ACCOUNT_ID,
+} from '../../app/(v2-preview)/v2-preview/_preview/agency';
 import { PREVIEWS } from '../../app/(v2-preview)/v2-preview/_preview/registry';
 import { AGENCY_MONTHLY } from '../../lib/billing/prices';
 import { GATES } from '../../lib/entitlement-v2';
 import { gateMessage } from '../../lib/v2/agency/gates';
 import { parseClientBody, parseScheduleBody } from '../../lib/v2/agency/schedules';
+import { ClientReportsScreen } from '../../components/v2/screens/agency/ReportsScreen';
+import { fixture } from '../../lib/v2/fixtures';
 import { ACCOUNT_ACTIONS } from '../../lib/v2/view/account-actions';
-import { CLIENT_REPORT_ROUTES } from '../../lib/v2/view/agency-reports';
+import { agencyReportsView, CLIENT_REPORT_ROUTES } from '../../lib/v2/view/agency-reports';
 import { CC31_ELEMENTS } from './_lib/screens';
 import { expected, firstDifference, locked, renderedText, withoutShell } from './_lib/lock';
 
@@ -103,6 +108,13 @@ describe('the client matrix against Final-Ag-Matrix', () => {
 describe('the client page against Final-Ag-Client', () => {
   const html = render(CLIENT);
 
+  it('gives each row of Open fixes a header, its first cell', () => {
+    const table = /<table[^>]*aria-label="Open fixes"[\s\S]*?<\/table>/.exec(main(html))![0];
+    const rows = table.slice(table.indexOf('<tbody')).match(/<tr/g)!;
+    expect(rows.length).toBeGreaterThan(0);
+    expect(table.match(/<th scope="row"/g)).toHaveLength(rows.length);
+  });
+
   it('reads as the locked HTML outside the rail’s links, with each registered change and nothing else', () => {
     expect(
       firstDifference(
@@ -120,8 +132,12 @@ describe('the client page against Final-Ag-Client', () => {
 
   it('links the client’s settings to where they are changed, and the grades to the site page', () => {
     const hrefs = [...main(html).matchAll(/<a [^>]*href="([^"]+)"/g)].map((m) => m[1]);
-    expect(hrefs.filter((h) => h === '/agency/reports')).toHaveLength(2);
-    expect(hrefs).toContain('/seats');
+    expect(
+      hrefs.filter(
+        (h) => h === '/agency/reports?client=50000000-0000-4000-8000-0000000000c9#change',
+      ),
+    ).toHaveLength(3);
+    expect(hrefs).not.toContain('/seats');
     expect(hrefs).toContain('/sites/50000000-0000-4000-8000-0000000000c9');
   });
 
@@ -330,9 +346,9 @@ describe('client reports, a client in each state', () => {
   });
 
   it('counts the clients by schedule in the header, from the rows under it', () => {
-    const scheduled = [...doc.querySelectorAll('tbody tr')].filter(
-      (tr) => tr.querySelector('th[scope="row"]') !== null,
-    );
+    const scheduled = [
+      ...doc.querySelectorAll('table[aria-label="Client report schedules"] tbody tr'),
+    ];
     const cells = scheduled.map((tr) => tr.children[2]!.textContent!);
     const n = (start: string) => cells.filter((c) => c.startsWith(start)).length;
     expect(cells).toHaveLength(6);
@@ -362,13 +378,20 @@ describe('client reports, a client in each state', () => {
       { method: 'post', action: `${site('ca')}/confirm`, fields: {} },
       { method: 'post', action: `${site('f4')}/confirm`, fields: {} },
     ]);
-    expect(rowOf('cedarpoint.example').textContent).toContain('Resume');
+    expect(rowOf('cedarpoint.example').textContent).toContain('Ask to confirm again');
     expect(rowOf('harborlight.example').textContent).toContain('Ask again');
     expect(rowOf('redbird.example').textContent).toContain('Ask to confirm');
   });
 
   it('opens a sent report that is a document at its page', () => {
     expect(main(html)).toContain('href="/reports/60000000-0000-4000-8000-0000000000c9"');
+  });
+
+  it('gives each row of Sent reports a header, its first cell', () => {
+    const table = /<table[^>]*aria-label="Sent reports"[\s\S]*?<\/table>/.exec(main(html))![0];
+    const rows = table.slice(table.indexOf('<tbody')).match(/<tr/g)!;
+    expect(rows.length).toBeGreaterThan(0);
+    expect(table.match(/<th scope="row"/g)).toHaveLength(rows.length);
   });
 });
 
@@ -482,6 +505,38 @@ describe('client reports for a reader who is not offered the forms', () => {
     const head = main(html).match(/<thead[\s\S]*?<\/thead>/)![0];
     expect(head).not.toContain('Actions');
     expect(primaries(html)).toHaveLength(0);
+  });
+
+  it('in the Agency trial, a scheduled contact that is not the owner’s is drawn with its state and no ask', () => {
+    // Kestrel Creative's one client, given a schedule and an outside contact (the fixture's has
+    // neither): what the screen draws for the row the trial keeps mail from.
+    const d = fixture('challenged-site');
+    const weekly = d.sites.find((s) => s.id === GRANITEPEAK_SITE)!.client_report!;
+    const held = {
+      ...d,
+      sites: d.sites.map((s) =>
+        s.account_id === KESTREL_ACCOUNT_ID
+          ? { ...s, client_contact_email: 'client@pinecrest.example', client_report: weekly }
+          : s,
+      ),
+    };
+    const html = renderToStaticMarkup(
+      <ClientReportsScreen
+        data={agencyReportsView(
+          held,
+          { accountId: KESTREL_ACCOUNT_ID, now: d.as_of },
+          {},
+          '/agency/reports',
+        )}
+      />,
+    );
+    const row = new JSDOM(main(html)).window.document.querySelector('[data-v2-contact="trial"]')!;
+    expect(row.textContent).toContain('client@pinecrest.example');
+    expect(row.textContent).toContain('asked to confirm once the trial has become the plan');
+    // Its pill has a shape as well as a colour, as each contact state's has.
+    expect(row.querySelector('[data-v2-pill] svg[data-v2-glyph]')).not.toBeNull();
+    expect(forms(html).map((f) => f.action)).toEqual([]);
+    expect(main(html)).not.toContain('Ask to confirm');
   });
 
   it('an account in its Agency trial is told once where a report is sent meanwhile', () => {

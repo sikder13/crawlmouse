@@ -185,6 +185,21 @@ describe('POST /api/billing/seats', () => {
     expect(h.capture.mock.calls).toEqual([['seats_bought', a.accountId, { seats: 2, sites: 3 }]]);
   });
 
+  it('sends seats_bought for a raise and not for a lowering alone, which buys nothing', async () => {
+    const a = await agency({ seats: 2, sites: 3 });
+    as(a.owner);
+    const lowered = await buy({ seats: 1, sites: 3 }, chosen(a));
+    expect(await lowered.json()).toEqual({ seats: 1, sites: 3, changed: true });
+    expect(h.stripe.updates).toHaveLength(1);
+    expect(h.capture).not.toHaveBeenCalled();
+    // The quantities it already holds: no change, and no event.
+    await buy({ seats: 1, sites: 3 }, chosen(a));
+    expect(h.capture).not.toHaveBeenCalled();
+    const raised = await buy({ seats: 1, sites: 4 }, chosen(a));
+    expect(await raised.json()).toEqual({ seats: 1, sites: 4, changed: true });
+    expect(h.capture.mock.calls).toEqual([['seats_bought', a.accountId, { seats: 1, sites: 4 }]]);
+  });
+
   it('a form is answered with a 303 back to Seats', async () => {
     const a = await agency();
     as(a.owner);

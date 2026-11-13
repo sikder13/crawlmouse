@@ -46,6 +46,16 @@ export type LinkFlow = keyof typeof LINK_FLOWS;
 /** Long enough to read the page and press the button; the token's own expiry is the database's. */
 export const LINK_COOKIE_SECONDS = 600;
 
+/**
+ * A flow whose page is left and come back to before its button is pressed keeps its cookie longer.
+ * The invitation's page sends a reader who is not signed in to sign in by email (`/login?next=/invite`)
+ * and that mail has to arrive and be opened first.
+ */
+const LONGER: Partial<Record<LinkFlow, number>> = { invite: 3600 };
+
+/** How long a flow's cookie lasts, in seconds. */
+export const linkCookieSeconds = (flow: LinkFlow): number => LONGER[flow] ?? LINK_COOKIE_SECONDS;
+
 const NO_STORE = { 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' } as const;
 
 function cookie(flow: LinkFlow, value: string, maxAge: number): string {
@@ -64,7 +74,8 @@ export function landLink(origin: string, flow: LinkFlow, token: string): Respons
     Location: `${origin}${LINK_FLOWS[flow].page}`,
   };
   const res = new Response(null, { status: 303, headers });
-  if (isToken(token)) res.headers.append('Set-Cookie', cookie(flow, token, LINK_COOKIE_SECONDS));
+  if (isToken(token))
+    res.headers.append('Set-Cookie', cookie(flow, token, linkCookieSeconds(flow)));
   return res;
 }
 

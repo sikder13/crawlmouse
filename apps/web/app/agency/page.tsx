@@ -16,6 +16,7 @@ export const dynamic = 'force-dynamic';
 
 // A signed-in page: never a search result.
 export const metadata: Metadata = {
+  title: 'Clients',
   robots: { index: false, follow: false },
   alternates: { canonical: null },
 };
@@ -39,7 +40,8 @@ export default async function AgencyPage({
   const { account, seat, accounts, tier } = r.viewer;
   const sb = await supabaseServer();
   const { d, viewer } = await readAccount(sb, account.id, seat.id, new Date());
-  // Whether a client report was sent: the caller's own read, of the clients their seat covers.
+  // Whether a client report was sent: the caller's own read, of the clients their seat covers. The
+  // matrix shows "Send the first report" to a seat that covers every client and to no other.
   const sent = await sb
     .from('reports')
     .select('id')

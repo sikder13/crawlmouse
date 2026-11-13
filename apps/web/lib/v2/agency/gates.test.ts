@@ -135,6 +135,63 @@ describe('the gate sentences other files say', () => {
     expect(copy.match(HAND_WRITTEN)).toBeNull();
   });
 
+  // The screens of this step word limits and prices outside gates.ts too: the Seats foot and its
+  // buy line are composed in the view, and each screen's copy module holds the sentences around
+  // them. In these the number is a parameter or a constant's value, in digits or in words.
+  const SPELLED =
+    /\b(?:two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|twenty|thirty)\b/i;
+  const whole = (path: string) => uncommented(read(path));
+  const between = (path: string, from: string, to: string) => {
+    const source = read(path);
+    const [start, end] = [source.indexOf(from), source.indexOf(to)];
+    expect(start, `${path}: ${from}`).toBeGreaterThan(-1);
+    expect(end, `${path}: ${to}`).toBeGreaterThan(start);
+    return uncommented(source.slice(start, end));
+  };
+
+  it('finds a limit spelled out where there is one', () => {
+    expect('Beyond five, a seat is more').toMatch(SPELLED);
+    expect('`Beyond ${numberWord(GATES.agency.seats)}, `').not.toMatch(SPELLED);
+  });
+
+  it.each([
+    ['../view/seats.ts', () => whole('../view/seats.ts')],
+    ['../view/agency-matrix.ts', () => whole('../view/agency-matrix.ts')],
+    ['../view/agency-client.ts', () => whole('../view/agency-client.ts')],
+    ['../view/agency-reports.ts', () => whole('../view/agency-reports.ts')],
+    [
+      '../copy/seats.ts, the screen’s and the invitation’s words',
+      () => between('../copy/seats.ts', 'export const SEATS_COPY', '// ── Where Seats differs'),
+    ],
+    [
+      '../copy/client-reports.ts, the screen’s words',
+      () =>
+        between(
+          '../copy/client-reports.ts',
+          'export const CLIENT_REPORTS_COPY',
+          '// ── Where the client reports screen differs',
+        ),
+    ],
+  ])('%s: no price or limit as a digit, and no number spelled out', (_name, code) => {
+    const copy = code();
+    expect(copy.length).toBeGreaterThan(1000);
+    expect(copy.match(HAND_WRITTEN)).toBeNull();
+    expect(copy.match(SPELLED)).toBeNull();
+  });
+
+  it.each([
+    ['../view/reports.ts', () => whole('../view/reports.ts')],
+    [
+      '../copy/reports.ts, the screen’s words',
+      () =>
+        between('../copy/reports.ts', 'export const REPORTS_COPY', '// ── Where Reports differs'),
+    ],
+  ])('%s: no price or limit as a digit', (_name, code) => {
+    const copy = code();
+    expect(copy.length).toBeGreaterThan(1000);
+    expect(copy.match(HAND_WRITTEN)).toBeNull();
+  });
+
   it('the rail’s plan card takes its price as a parameter', () => {
     const source = read('../copy/agency.ts');
     const rail = uncommented(source.slice(0, source.indexOf('export const MATRIX_COPY')));

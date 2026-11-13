@@ -142,6 +142,15 @@ function madeRows(html: string): { text: string; html: string }[] {
 const rowOf = (html: string, id: string) => madeRows(html).find((r) => r.html.includes(id));
 
 describe('/reports', () => {
+  it('the proof page a member opens from a row has a document title of its own, and stays out of search results', async () => {
+    const { metadata } = await import('./[id]/page');
+    expect(metadata).toEqual({
+      title: 'Report',
+      robots: { index: false, follow: false },
+      alternates: { canonical: null },
+    });
+  });
+
   it('is a 404 with V2_CHECKS_PUBLIC unset, and the sign-in page for a caller who is not signed in', async () => {
     await expect(page()).rejects.toMatchObject({ to: '/login' });
     vi.stubEnv('V2_CHECKS_PUBLIC', '');
@@ -224,7 +233,10 @@ describe('/reports', () => {
     const html = await page({ notice: 'share_made' });
     expect(rowOf(html, ids.proof)!.text).toContain(`https://crawlmouse.com/s/${token}`);
     expect(html.split(token)).toHaveLength(2);
-    expect(html).toContain('The link is made. It is shown here once');
+    expect(html).toContain(
+      'The link is made. It is shown on its report’s row for a short while: copy it now.',
+    );
+    expect(rowOf(html, ids.proof)!.text).toContain('The link, shown here for a short while:');
   });
 
   it('shows no link for a cookie that names a report the caller does not list, or is not one this product wrote', async () => {
@@ -255,6 +267,16 @@ describe('/reports', () => {
     const row = rowOf(await page(), ids.csv)!;
     expect(row.text).toMatch(/Link · until \w{3} \d{1,2} \w{3}/);
     expect(row.text).toContain('Withdraw link');
+    // The expiry is text; the two buttons are the replacement and the withdrawal.
+    const buttons = [...row.html.matchAll(/<button[^>]*>([\s\S]*?)<\/button>/g)].map((m) =>
+      m[1]!
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim(),
+    );
+    expect(buttons.filter((b) => b.includes('until'))).toEqual([]);
+    expect(buttons.some((b) => b.startsWith('New link'))).toBe(true);
+    expect(buttons.some((b) => b.startsWith('Withdraw link'))).toBe(true);
     expect(row.html).toMatch(
       /name="_method"[^>]* value="DELETE"|value="DELETE"[^>]* name="_method"/,
     );

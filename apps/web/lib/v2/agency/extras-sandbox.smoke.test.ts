@@ -71,7 +71,12 @@ describe.skipIf(KEY === null)('extra seats against the Stripe sandbox (Q4)', () 
   it('a raise is invoiced at once: one more invoice, paid, for no more than the seats’ full price', async () => {
     const before = await invoices();
     const result = await changeExtras(deps, { accountId: ACCOUNT, want: { seats: 2, sites: 0 } });
-    expect(result).toEqual({ ok: true, extras: { seats: 2, sites: 0 }, changed: true });
+    expect(result).toEqual({
+      ok: true,
+      extras: { seats: 2, sites: 0 },
+      changed: true,
+      raised: true,
+    });
     const after = await invoices();
     expect(after).toHaveLength(before.length + 1);
     const added = after[0]!;
@@ -83,7 +88,12 @@ describe.skipIf(KEY === null)('extra seats against the Stripe sandbox (Q4)', () 
   it('a lowering makes no invoice and leaves no credit on the customer', async () => {
     const before = await invoices();
     const result = await changeExtras(deps, { accountId: ACCOUNT, want: { seats: 1, sites: 0 } });
-    expect(result).toEqual({ ok: true, extras: { seats: 1, sites: 0 }, changed: true });
+    expect(result).toEqual({
+      ok: true,
+      extras: { seats: 1, sites: 0 },
+      changed: true,
+      raised: false,
+    });
     expect(await invoices()).toEqual(before);
     const now = await stripe.customers.retrieve(customer!);
     expect('deleted' in now && now.deleted ? null : (now as Stripe.Customer).balance).toBe(0);

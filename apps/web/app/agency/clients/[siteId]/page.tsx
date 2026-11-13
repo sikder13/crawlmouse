@@ -19,6 +19,7 @@ export const dynamic = 'force-dynamic';
 
 // A signed-in page: never a search result.
 export const metadata: Metadata = {
+  title: 'Client',
   robots: { index: false, follow: false },
   alternates: { canonical: null },
 };

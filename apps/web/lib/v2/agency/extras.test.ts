@@ -6,6 +6,7 @@ import { stripeSubscription, type FakeSubscription } from '../../billing/stripe.
 import { FREE_START, next } from '../../billing/state-machine';
 import { mirrorOf } from '../../billing/subscription-mirror';
 import { GATES, limitsFor } from '../../entitlement-v2';
+import { NOTICE_LINES } from '../copy/notices';
 import {
   changeExtras,
   extrasResponse,
@@ -118,6 +119,7 @@ describe('changeExtras: a raise', () => {
       ok: true,
       extras: { seats: 2, sites: 0 },
       changed: true,
+      raised: true,
     });
     expect(w.stripe.updates).toHaveLength(1);
     expect(w.stripe.updates[0]!.id).toBe(agency.id);
@@ -172,10 +174,19 @@ describe('changeExtras: a raise', () => {
 
   it('a trialing subscription is not changed: its limits would not follow, since the webhook ignores a trialing update', async () => {
     const w = world({ status: 'trialing', trialEnd: 1_800_000_000 });
-    expect(await w.change(1, 0)).toEqual({
-      ok: false,
-      status: 409,
-      code: 'subscription_not_active',
+    const refused = await w.change(1, 0);
+    expect(refused).toEqual({ ok: false, status: 409, code: 'subscription_trialing' });
+    // A form is told when extras are bought, and not that the plan is ending or unpaid.
+    const form = extrasResponse('form', refused);
+    expect([form.status, form.headers.get('location')]).toEqual([
+      303,
+      '/seats?notice=extras_in_trial',
+    ]);
+    expect(NOTICE_LINES.extras_in_trial(null)).toBe(
+      'Seats and sites are bought once the trial has become the plan.',
+    );
+    expect(await extrasResponse('json', refused).json()).toEqual({
+      code: 'subscription_trialing',
     });
     expect(w.stripe.updates).toEqual([]);
     expect(await w.extras()).toEqual({ seats: 0, sites: 0 });
@@ -219,6 +230,7 @@ describe('changeExtras: a lowering', () => {
       ok: true,
       extras: { seats: 1, sites: 5 },
       changed: true,
+      raised: false,
     });
     expect(w.stripe.updates[0]!.params).toEqual({
       items: [{ id: `si_${agency.id}_seat`, quantity: 1 }],
@@ -322,6 +334,7 @@ describe('changeExtras: refused once the subscription is read, with no update', 
       ok: true,
       extras: { seats: 2, sites: 5 },
       changed: false,
+      raised: false,
     });
     expect(w.stripe.updates).toEqual([]);
   });
@@ -361,6 +374,7 @@ describe('changeExtras: the idempotency key', () => {
       ok: true,
       extras: { seats: 2, sites: 0 },
       changed: true,
+      raised: true,
     });
     const keys = w.stripe.updates.map((u) => u.idempotencyKey);
     expect(new Set(keys).size).toBe(3);
@@ -403,7 +417,12 @@ describe('extrasResponse', () => {
   const location = (r: Response) => [r.status, r.headers.get('location')];
 
   it('JSON: the quantities, or the refusal with its detail', async () => {
-    const ok = extrasResponse('json', { ok: true, extras: { seats: 2, sites: 1 }, changed: true });
+    const ok = extrasResponse('json', {
+      ok: true,
+      extras: { seats: 2, sites: 1 },
+      changed: true,
+      raised: true,
+    });
     expect([ok.status, await ok.json()]).toEqual([200, { seats: 2, sites: 1, changed: true }]);
     const refused = extrasResponse('json', {
       ok: false,
@@ -419,11 +438,23 @@ describe('extrasResponse', () => {
 
   it('a form: back to Seats with a notice', () => {
     expect(
-      location(extrasResponse('form', { ok: true, extras: { seats: 2, sites: 1 }, changed: true })),
+      location(
+        extrasResponse('form', {
+          ok: true,
+          extras: { seats: 2, sites: 1 },
+          changed: true,
+          raised: true,
+        }),
+      ),
     ).toEqual([303, '/seats?notice=extras_changed']);
     expect(
       location(
-        extrasResponse('form', { ok: true, extras: { seats: 2, sites: 1 }, changed: false }),
+        extrasResponse('form', {
+          ok: true,
+          extras: { seats: 2, sites: 1 },
+          changed: false,
+          raised: false,
+        }),
       ),
     ).toEqual([303, '/seats?notice=extras_unchanged']);
     expect(

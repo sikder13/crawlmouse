@@ -111,10 +111,15 @@ export const NOTICE_LINES: Record<NoticeCode, (at: string | null) => string> = {
   payment_failed: () => 'The card was declined, so nothing was changed.',
   subscription_unchangeable: () =>
     'This plan cannot be changed here: it is set to end, or its last payment has not gone through. Settings › Plan has the details.',
+  extras_in_trial: () => 'Seats and sites are bought once the trial has become the plan.',
   billing_unavailable: () =>
     'Billing cannot be reached right now, so nothing was changed. Try again later.',
+  reports_capped: (at) =>
+    `This account has made as many reports as it may for now, so none was made.${at ? ` The next can be made ${at}.` : ''}`,
+  fix_not_verified: () =>
+    'That check did not verify the fix, so there is no proof to make. Nothing was made.',
   share_made: () =>
-    'The link is made. It is shown here once: copy it now. Making another replaces it.',
+    'The link is made. It is shown on its report’s row for a short while: copy it now. Making another replaces it.',
   share_revoked: () => 'The link was withdrawn and no longer opens.',
   not_ready: () => 'That report’s file is not stored yet, so no link was made.',
   schedule_saved: () => 'The schedule was saved.',

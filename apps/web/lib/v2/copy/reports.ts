@@ -73,11 +73,15 @@ export const REPORTS_COPY = {
   /** A stored file whose size was not recorded. */
   downloadFile: 'Download',
   open: 'Open',
-  /** Makes the report's share link; with one live, the button names its expiry and replaces it. */
+  /** Makes the report's first share link. */
   makeLink: 'Link',
+  /** What a row says of a link that works: text, not a control. */
   link: (until: string) => `Link · until ${until}`,
+  /** Replaces a link that works: the one before stops opening. */
+  newLink: 'New link',
   withdrawLink: 'Withdraw link',
-  madeLink: 'The link, shown once:',
+  /** Beside a link just made, which the page shows while the share form's cookie lasts. */
+  madeLink: 'The link, shown here for a short while:',
   /** What a row says of a report whose file is not stored; a stored one says nothing. */
   fileStates: { pending: 'Being made', failed: 'Could not be made', stored: null } as Record<
     'pending' | 'failed' | 'stored',
@@ -88,9 +92,8 @@ export const REPORTS_COPY = {
   scheduledTitle: 'Scheduled',
   none: 'None',
   toSend: (n: number) => `${count(n)} ${plural(n, 'report', 'reports')} to send`,
-  /** On Agency with no sender of its own on record. */
+  /** On Agency. */
   scheduledAgency: 'Client reports are sent for you weekly or monthly, to each client’s contact.',
-  sentFrom: (email: string) => `Sent for you from ${email}.`,
   table: { made: 'Reports', scheduled: 'Scheduled reports' },
   columns: {
     made: 'Made',
@@ -192,9 +195,9 @@ export const REPORTS_CHANGES: CopyChange[] = [
     screen: 'reports',
     kind: 'fixture',
     locked: 'Download · 310 KB',
-    rendered: 'Download · 310 KB Link · until Tue 24 Nov Withdraw link',
+    rendered: 'Link · until Tue 24 Nov Download · 310 KB New link Withdraw link',
     source:
-      'The fixture’s CSV (report 3) has a share link until 24 Nov 07:10Z, Tue 24 Nov in the account’s zone (D5: the expiry from share_expires_at); CC-31 D7: a link can be withdrawn, so a report with one offers that',
+      'The fixture’s CSV (report 3) has a share link until 24 Nov 07:10Z, Tue 24 Nov in the account’s zone (D5: the expiry from share_expires_at); CC-31 D7: a link can be replaced and withdrawn, so a report with one says until when it works and offers both',
   },
   {
     screen: 'reports',

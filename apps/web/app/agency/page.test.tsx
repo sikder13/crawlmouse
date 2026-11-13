@@ -88,6 +88,15 @@ const matrixOf = async (p: Person, chosen: string | null = null) => {
 };
 
 describe('/agency', () => {
+  it('has a document title of its own, and stays out of search results', async () => {
+    const { metadata } = await import('./page');
+    expect(metadata).toEqual({
+      title: 'Clients',
+      robots: { index: false, follow: false },
+      alternates: { canonical: null },
+    });
+  });
+
   it('is a 404 while V2_CHECKS_PUBLIC is off, even for the owner', async () => {
     vi.stubEnv('V2_CHECKS_PUBLIC', '');
     h.user = { id: w.owner.id, email: w.owner.email };
