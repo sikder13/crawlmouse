@@ -114,11 +114,24 @@ describe('report-slug-sweep', () => {
     ).toThrow(/refusing to run against production/);
   });
 
-  it('the script sets the flag, and offers no production override', async () => {
+  it('the script sets the flag, and reaches production only with --yes-production', async () => {
     const { readFileSync } = await import('node:fs');
     const src = readFileSync(new URL('./report-slug-sweep.ts', import.meta.url), 'utf8');
     expect(src).toContain("process.env.V2_CHECKS_PUBLIC = '1'");
-    expect(src).toContain('yesProduction: false');
-    expect(src).not.toMatch(/yes-production|yesProduction: (true|values)/);
+    expect(src).toContain("'yes-production': { type: 'boolean', default: false }");
+    expect(src).toContain("yesProduction: values['yes-production']");
+    expect(src).not.toMatch(/yesProduction: true/);
+  });
+
+  it('reads in a read-only transaction: a write inside the sweep is refused', async () => {
+    const { readFileSync } = await import('node:fs');
+    const src = readFileSync(new URL('./report-slug-sweep.ts', import.meta.url), 'utf8');
+    expect(src).toContain("await tx.exec('set transaction read only')");
+    await expect(
+      pgliteDb(db).transaction(async (tx) => {
+        await tx.exec('set transaction read only');
+        await tx.exec("update public.public_reports set domain = 'x' where false");
+      }),
+    ).rejects.toThrow(/read-only transaction/);
   });
 });

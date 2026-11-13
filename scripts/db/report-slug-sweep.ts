@@ -5,14 +5,14 @@ import { EXTENDED_REPORT_COLS, type PublicReportRow } from '../../apps/web/lib/r
 import { isReportGone } from '../../apps/web/lib/report-visibility';
 import { reportCardOf, reportPageOf } from '../../apps/web/lib/v2/view/public-report';
 import type { Db, Row } from './db';
-import { openTarget, PRODUCTION_REF, refOfUrl } from './target';
+import { openTarget } from './target';
 
 /**
  * The every-slug sweep (CC-29 D6, Q20): reads every `public_reports` row, read-only, and passes each
  * through the code `/r/<slug>` runs with V2_CHECKS_PUBLIC on, reporting pass or fail per slug.
  *
  *   V2_CHECKS_PUBLIC=1 is set by the sweep itself, so it judges the page the flag serves.
- *   tsx scripts/db/report-slug-sweep.ts --db-url-env DB_URL
+ *   tsx scripts/db/report-slug-sweep.ts --db-url-env DB_URL [--yes-production]
  *
  * What it reads: `slug` and the columns the report page reads (`EXTENDED_REPORT_COLS`), in one
  * `select` inside a read-only transaction. It writes nothing.
@@ -23,8 +23,9 @@ import { openTarget, PRODUCTION_REF, refOfUrl } from './target';
  * module, which CC-29 does not change; the sweep checks that such a row reaches it, and does not
  * render v1's React tree. A hidden or taken-down report is `gone`: a 404 by design, and a pass.
  *
- * It exits non-zero when any row fails, when it reads no row at all, and on any error. It refuses
- * a database URL whose project ref is production's (`openTarget`, with no override offered).
+ * It exits non-zero when any row fails, when it reads no row at all, and on any error. A database URL
+ * whose project ref is production's is refused unless `--yes-production` is given (`openTarget`):
+ * the owner runs the sweep on production before switch-on (rulings Q20); the read stays read-only.
  */
 
 export type Outcome = 'v2' | 'v1' | 'gone' | 'error';
@@ -79,14 +80,19 @@ export function summarise(results: SweepResult[]): { text: string; failed: boole
 }
 
 async function main(): Promise<void> {
-  const { values } = parseArgs({ options: { 'db-url-env': { type: 'string' } } });
+  const { values } = parseArgs({
+    options: {
+      'db-url-env': { type: 'string' },
+      'yes-production': { type: 'boolean', default: false },
+    },
+  });
   if (!values['db-url-env']) throw new Error('name the target: --db-url-env <VAR>');
-  const url = process.env[values['db-url-env']];
-  if (url && refOfUrl(url) === PRODUCTION_REF)
-    throw new Error(`refusing to sweep production (${PRODUCTION_REF}): sweep a branch`);
   // The flag the swept page is served under; isReportGone reads it.
   process.env.V2_CHECKS_PUBLIC = '1';
-  const target = openTarget({ dbUrlEnv: values['db-url-env'], yesProduction: false });
+  const target = openTarget({
+    dbUrlEnv: values['db-url-env'],
+    yesProduction: values['yes-production'],
+  });
   try {
     const { text, failed } = summarise(await sweep(target.db));
     console.log(`report slug sweep on ${target.label}\n${text}`);
