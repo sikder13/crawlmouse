@@ -323,7 +323,13 @@ async function crawlPage(
     title: read.title,
     meta_description: read.description,
     content_features: recorded ? read.features : null,
-    stack_signals: read.stack ? { cms: read.stack.cms, detected_from: STACK_SOURCE } : null,
+    stack_signals: read.stack
+      ? {
+          cms: read.stack.cms,
+          detected_from: STACK_SOURCE,
+          frontend_markers: read.stack.frontendMarkers,
+        }
+      : null,
     main_text_chars: read.mainTextChars,
     noindex: headerNoindex(f) || read.metaNoindex,
   });
