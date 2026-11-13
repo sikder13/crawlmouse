@@ -50,6 +50,13 @@
   scroll-margin: 8px;
 }
 
+/* For a Table with a row header (`<th scope="row">`): in the last row the header cell gives up its
+   line with the row's other cells. Table's own rule for that names `td`, so a header cell there
+   would keep a line under itself alone. */
+.rowHeaded tbody tr:last-child th {
+  border-bottom: 0;
+}
+
 .head {
   display: flex;
   justify-content: space-between;

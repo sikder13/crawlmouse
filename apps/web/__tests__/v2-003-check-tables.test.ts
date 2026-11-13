@@ -290,7 +290,8 @@ describe('the row builders', () => {
 const HIDDEN: Record<NewTable, string[] | null> = {
   measurement_lineages: [],
   // 008's pipeline columns: no client reads them.
-  sites: [...SITE_SCHEDULE_COLUMNS],
+  // 031's report_refusals (what the site's recipients refused) is granted to no client.
+  sites: [...SITE_SCHEDULE_COLUMNS, 'report_refusals'],
   // 022b's notify_email is a visitor's address and copied_for holds other accounts' ids: neither
   // is granted to a client role.
   checks: [...CHECK_PIPELINE_COLUMNS, 'notify_email', 'copied_for'],
@@ -303,8 +304,15 @@ const HIDDEN: Record<NewTable, string[] | null> = {
   evidence_blobs: [],
   alert_rules: [],
   alert_events: [],
-  reports: ['storage_path'],
-  report_schedules: [],
+  // 031's failed_reason is an internal code and subject_fix_id a row id no screen reads.
+  reports: ['storage_path', 'failed_reason', 'subject_fix_id'],
+  // 031: the confirmation and pause links' hashes and the times around them are granted to no client.
+  report_schedules: [
+    'recipient_confirm_hash',
+    'recipient_confirm_sent_at',
+    'recipient_confirmed_at',
+    'pause_token_hash',
+  ],
   share_links: null,
   api_keys: ['key_hash'],
   deploy_hooks: ['token_hash'],
@@ -1048,6 +1056,14 @@ const RULE_CASES: Record<
     table: 'reports',
     row: async () => ({ ...(await freshRow('reports')), covers_check_ids: [] }),
   },
+  reports_file_path: {
+    table: 'reports',
+    row: async () => ({ ...(await freshRow('reports')), storage_path: 'a/b.pdf' }),
+  },
+  reports_failed_reason: {
+    table: 'reports',
+    row: async () => ({ ...(await freshRow('reports')), failed_reason: 'abandoned' }),
+  },
   report_schedules_client_report_cadence: {
     table: 'report_schedules',
     row: async () => ({ ...(await freshRow('report_schedules')), cadence: 'on_deploy' }),
@@ -1063,6 +1079,16 @@ const RULE_CASES: Record<
   report_schedules_page_slug: {
     table: 'report_schedules',
     row: async () => ({ ...(await freshRow('report_schedules')), page_slug: 'Client A' }),
+  },
+  // 031: what a site's recipients refused is a list.
+  sites_report_refusals_array: {
+    table: 'sites',
+    row: async () => ({ ...(await freshRow('sites')), report_refusals: {} }),
+  },
+  // 031: a link's hash is a sha256 in lowercase hex, never the token.
+  report_schedules_link_hashes: {
+    table: 'report_schedules',
+    row: async () => ({ ...(await freshRow('report_schedules')), pause_token_hash: 'plain-token' }),
   },
   share_links_token_hash: {
     table: 'share_links',
@@ -1349,6 +1375,22 @@ const OTHER_WAY: {
     table: 'reports',
     label: 'a public slug on a report that is not a public link',
     row: async () => ({ ...(await freshRow('reports')), public_slug: `r-${randomUUID()}` }),
+  },
+  {
+    constraint: 'reports_file_path',
+    table: 'reports',
+    label: 'a stored file with no path',
+    row: async () => ({ ...(await freshRow('reports')), file_state: 'stored' }),
+  },
+  {
+    constraint: 'reports_failed_reason',
+    table: 'reports',
+    label: 'a failed file with no reason',
+    row: async () => ({
+      ...(await freshRow('reports')),
+      file_state: 'failed',
+      storage_path: 'a/b.pdf',
+    }),
   },
   {
     constraint: 'fix_events_kind_fields',

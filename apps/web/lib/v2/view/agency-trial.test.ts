@@ -11,6 +11,7 @@ import {
   type AgencyStanding,
 } from './agency-trial';
 import { footerComing } from './agencies';
+import { skipReason } from '../agency/schedules-run';
 
 const NOW = new Date('2026-10-25T15:00:00Z');
 
@@ -151,6 +152,66 @@ describe('agencyTrialView', () => {
     expect(v.consent).toContain('withdrawal period');
     expect(v.consent).toContain('Terms');
     expect(v.otherIntervalHref).toBe('/agency-trial?interval=year');
+  });
+
+  it('the aside says where a report goes while the trial runs, which is what the run does (Q47)', () => {
+    for (const interval of ['month', 'year'] as const) {
+      const v = view(NONE, interval);
+      if (v.kind !== 'form') throw new Error('form expected');
+      expect(v.aside.trialReports).toMatchObject({
+        text: 'During the trial, reports go to your own address.',
+        coming: false,
+      });
+      // It is said once, where the aside promises the reports.
+      const page = JSON.stringify(v);
+      expect(page.split(v.aside.trialReports.text)).toHaveLength(2);
+      expect(v.aside.rows.some(([what]) => what.text.startsWith('Scheduled client reports'))).toBe(
+        true,
+      );
+    }
+    // And the rule the sentence states: in its Agency trial an account sends to the owner's own
+    // address and to no other, whatever else would let the report through.
+    const due = {
+      account: {
+        state: 'agency_trial' as const,
+        tier: 'agency' as const,
+        pastDueTier: null,
+        pastDueSince: null,
+        trialVariant: 'card_required' as const,
+        trialEndsAt: new Date('2026-12-01T00:00:00Z'),
+      },
+      hasContact: true,
+      confirmed: true,
+      confirmationRequested: true,
+      askRefused: false,
+      checkId: 'c0000000-0000-4000-8000-000000000001',
+      changed: true,
+      sendWhenUnchanged: true,
+      siteId: 's0000000-0000-4000-8000-000000000001',
+      accountId: 'a0000000-0000-4000-8000-00000000000b',
+      slot: NOW.toISOString(),
+      contactIsOwner: true,
+    };
+    expect(skipReason(due, NOW)).toBeNull();
+    expect(skipReason({ ...due, contactIsOwner: false }, NOW)).toBe('trial');
+    // On the plan the same outside contact is sent to.
+    expect(
+      skipReason(
+        { ...due, contactIsOwner: false, account: { ...due.account, state: 'agency' } },
+        NOW,
+      ),
+    ).toBeNull();
+  });
+
+  it('the aside prices a seat beyond the plan by the month and by the year, on either form', () => {
+    for (const interval of ['month', 'year'] as const) {
+      const v = view(NONE, interval);
+      if (v.kind !== 'form') throw new Error('form expected');
+      const seats = v.aside.rows.map(([what]) => what.text).filter((t) => t.startsWith('Seats'));
+      expect(seats).toEqual([
+        'Seats · owner, account managers, developers · $12 a seat a month beyond, or $120 a year on a yearly plan',
+      ]);
+    }
   });
 
   it('yearly: the year’s price, and a link back to monthly', () => {

@@ -28,6 +28,22 @@ export const PREVIEWS: PreviewEntry[] = [
   { path: '/v2-preview/switch', name: 'Switch', kind: 'primitive' },
   { path: '/v2-preview/page-shell', name: 'PageShell', kind: 'primitive' },
   { path: '/v2-preview/account-shell', name: 'AccountShell', kind: 'primitive' },
+  // CC-31: the rail of a person with seats on several accounts.
+  {
+    path: '/v2-preview/account-shell/switcher',
+    name: 'AccountSwitcher, two accounts',
+    kind: 'primitive',
+  },
+  {
+    path: '/v2-preview/account-shell/switcher/open',
+    name: 'AccountSwitcher, three accounts, open',
+    kind: 'primitive',
+  },
+  {
+    path: '/v2-preview/account-shell/switcher/long',
+    name: 'AccountSwitcher, a long name on the agency rail',
+    kind: 'primitive',
+  },
   { path: '/v2-preview/trial-card', name: 'TrialCard', kind: 'primitive' },
   { path: '/v2-preview/theme-control', name: 'ThemeControl', kind: 'primitive' },
   { path: '/v2-preview/grade-history', name: 'GradeHistory', kind: 'primitive' },
@@ -218,6 +234,76 @@ export const PREVIEWS: PreviewEntry[] = [
       { name: 'opened', query: '?kind=opened', orange: 0 },
     ],
   },
+  // CC-31, the agency's workspace. The matrix's orange element is setup's next step while there is
+  // one, and "Add a client site" after it.
+  { path: '/v2-preview/screens/agency', name: 'Final-Ag-Matrix', kind: 'screen' },
+  { path: '/v2-preview/screens/agency/no-client', name: 'Clients, none yet', kind: 'screen' },
+  {
+    path: '/v2-preview/screens/agency/not-checked',
+    name: 'Clients, one not checked yet',
+    kind: 'screen',
+  },
+  {
+    path: '/v2-preview/screens/agency/first-check',
+    name: 'Clients, a first check queued',
+    kind: 'screen',
+  },
+  { path: '/v2-preview/screens/agency/invite', name: 'Clients, one seat', kind: 'screen' },
+  { path: '/v2-preview/screens/agency/report', name: 'Clients, no report sent', kind: 'screen' },
+  // A seat that covers one client adds none, and setup is done: nothing here is its next action.
+  {
+    path: '/v2-preview/screens/agency/scoped',
+    name: 'Clients, a seat that covers one',
+    kind: 'screen',
+    orange: 0,
+  },
+  { path: '/v2-preview/screens/agency/gate', name: 'Clients, below Agency', kind: 'screen' },
+  {
+    path: '/v2-preview/screens/agency/open',
+    name: 'Clients, acting in another account',
+    kind: 'screen',
+  },
+  { path: '/v2-preview/screens/agency/client', name: 'Final-Ag-Client', kind: 'screen' },
+  {
+    path: '/v2-preview/screens/agency/client/clean',
+    name: 'Client, nothing open',
+    kind: 'screen',
+  },
+  // CC-31, the agency's client reports. With each client scheduled, and for a developer, the page
+  // asks nothing of the reader; else its orange element is the header's "Schedule a report for …",
+  // or the open form's "Save the schedule".
+  {
+    path: '/v2-preview/screens/agency/reports',
+    name: 'Final-Ag-Reports',
+    kind: 'screen',
+    orange: 0,
+  },
+  {
+    path: '/v2-preview/screens/agency/reports/states',
+    name: 'Client reports, a client in each state',
+    kind: 'screen',
+  },
+  {
+    path: '/v2-preview/screens/agency/reports/change',
+    name: 'Client reports, one client’s forms open',
+    kind: 'screen',
+  },
+  {
+    path: '/v2-preview/screens/agency/reports/developer',
+    name: 'Client reports, a developer',
+    kind: 'screen',
+    orange: 0,
+  },
+  {
+    path: '/v2-preview/screens/agency/reports/trial',
+    name: 'Client reports, the Agency trial',
+    kind: 'screen',
+  },
+  {
+    path: '/v2-preview/screens/agency/reports/gate',
+    name: 'Client reports, below Agency',
+    kind: 'screen',
+  },
   { path: '/v2-preview/screens/map', name: 'Final-LinkMap', kind: 'screen' },
   { path: '/v2-preview/screens/map/all', name: 'Link map, every page', kind: 'screen' },
   // No fix to open from any page: the keep bar's button is the orange element.
@@ -255,6 +341,71 @@ export const PREVIEWS: PreviewEntry[] = [
   },
   { path: '/v2-preview/screens/continue', name: 'Continue', kind: 'screen' },
   { path: '/v2-preview/screens/continue/expired', name: 'Continue, link expired', kind: 'screen' },
+  // CC-31, seats and invitations. Seats' orange element is "Invite someone", shown to a reader who
+  // may invite while a seat is free; the other three states offer no invitation.
+  { path: '/v2-preview/screens/seats', name: 'Final-Ag-Seats (Northwind)', kind: 'screen' },
+  {
+    path: '/v2-preview/screens/seats/paid',
+    name: 'Seats, Agency with its plan paid: the buy form',
+    kind: 'screen',
+  },
+  {
+    path: '/v2-preview/screens/seats/pro-full',
+    name: 'Seats, Pro with no seat free',
+    kind: 'screen',
+    orange: 0,
+  },
+  { path: '/v2-preview/screens/seats/free', name: 'Seats, Free', kind: 'screen', orange: 0 },
+  {
+    path: '/v2-preview/screens/seats/member',
+    name: 'Seats, a member who is not the owner',
+    kind: 'screen',
+    orange: 0,
+  },
+  { path: '/v2-preview/screens/invite', name: 'Invitation, signed out', kind: 'screen' },
+  { path: '/v2-preview/screens/invite/signed-in', name: 'Invitation, signed in', kind: 'screen' },
+  {
+    path: '/v2-preview/screens/invite/mismatch',
+    name: 'Invitation, another address signed in',
+    kind: 'screen',
+  },
+  // A link that cannot be used offers nothing.
+  {
+    path: '/v2-preview/screens/invite/gone',
+    name: 'Invitation, link cannot be used',
+    kind: 'screen',
+    orange: 0,
+  },
+  // CC-31, the proof page: a report's document, read by a client. Nothing on it is the reader's
+  // action, so it shows no orange element.
+  {
+    path: '/v2-preview/screens/proof',
+    name: 'Proof, two grades moved',
+    kind: 'screen',
+    orange: 0,
+  },
+  {
+    path: '/v2-preview/screens/proof/fix',
+    name: 'Proof, a fix verified',
+    kind: 'screen',
+    orange: 0,
+  },
+  {
+    path: '/v2-preview/screens/proof/baseline',
+    name: 'Proof, baseline',
+    kind: 'screen',
+    orange: 0,
+  },
+  // CC-31, the page a client report's recipient lands on. Its orange element is the one button; a
+  // link that cannot be used offers nothing.
+  { path: '/v2-preview/screens/report-link', name: 'Report link, confirm', kind: 'screen' },
+  { path: '/v2-preview/screens/report-link/pause', name: 'Report link, pause', kind: 'screen' },
+  {
+    path: '/v2-preview/screens/report-link/gone',
+    name: 'Report link, cannot be used',
+    kind: 'screen',
+    orange: 0,
+  },
   // CC-29: Pricing's orange element is the Pro button (DESIGN-LOCK §6); signed in with the Pro trial
   // used, it is the Pro checkout. The Agency trial's is "Start a 14-day trial"; a used trial shows no
   // form and asks nothing of the reader.

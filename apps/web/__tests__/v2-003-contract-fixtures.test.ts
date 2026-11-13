@@ -296,6 +296,8 @@ async function project(db: PGlite): Promise<Record<string, Rec[]>> {
           'paused_reason',
           'removed_at',
           'updated_at',
+          // 031: what the site's recipients refused; database only.
+          'report_refusals',
           ...SITE_SCHEDULE_COLUMNS,
         ]),
         schedule:
@@ -314,6 +316,11 @@ async function project(db: PGlite): Promise<Record<string, Rec[]>> {
               'last_run_at',
               'created_at',
               'updated_at',
+              // 031: the recipient's two links and the times around them are no part of the contract.
+              'recipient_confirm_hash',
+              'recipient_confirm_sent_at',
+              'recipient_confirmed_at',
+              'pause_token_hash',
             ])
           : null,
       };
@@ -333,7 +340,9 @@ async function project(db: PGlite): Promise<Record<string, Rec[]>> {
     ),
     changes: await rowsOf(db, 'changes'),
     alert_rules: await rowsOf(db, 'alert_rules'),
-    reports: (await rowsOf(db, 'reports')).map((r) => omit(r, ['storage_path'])),
+    reports: (await rowsOf(db, 'reports')).map((r) =>
+      omit(r, ['storage_path', 'file_state', 'failed_reason', 'subject_fix_id']),
+    ),
     lineages: await rowsOf(db, 'measurement_lineages'),
     usage_events: (await rowsOf(db, 'usage_events')).map((r) =>
       omit(r, ['api_key_id', 'idempotency_key']),

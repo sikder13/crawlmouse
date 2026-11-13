@@ -150,9 +150,14 @@ export interface CheckoutTerms {
   interval: Interval;
   /** The page Stripe's back link returns to, under the origin. */
   cancelPath: string;
+  /** Where a finished Checkout lands, under the origin; Settings' plan page when left out. */
+  successPath?: string;
   /** A trial of this many days, with the card taken now and the plan charged at its end. */
   trialDays?: number;
 }
+
+/** Where a finished Checkout lands unless its terms say otherwise. */
+const PLAN_PAGE_DONE = '/settings/plan?checkout=done';
 
 /** Resolves the price and the customer, expires the customer's open sessions and opens one. */
 export async function startCheckout(
@@ -193,7 +198,7 @@ export async function startCheckout(
           trial_settings: { end_behavior: { missing_payment_method: 'cancel' } },
         }
       : { metadata },
-    success_url: `${deps.origin}/settings/plan?checkout=done`,
+    success_url: `${deps.origin}${terms.successPath ?? PLAN_PAGE_DONE}`,
     cancel_url: `${deps.origin}${terms.cancelPath}`,
   });
   if (!session.url) throw new Error('the Checkout Session has no url');

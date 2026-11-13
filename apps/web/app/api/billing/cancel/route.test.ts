@@ -8,7 +8,7 @@ const h = vi.hoisted(() => {
   const log: string[] = [];
   const state = {
     user: { id: 'u1' } as unknown,
-    seats: [{ account_id: ACCOUNT }] as unknown[],
+    seats: [{ account_id: ACCOUNT, role: 'owner' }] as unknown[],
     role: 'owner' as unknown,
     personal: [] as unknown[],
     followed: null as unknown,
@@ -104,7 +104,7 @@ beforeEach(() => {
   process.env.NEXT_PUBLIC_BASE_URL = SITE;
   h.log.length = 0;
   h.state.user = { id: 'u1' };
-  h.state.seats = [{ account_id: ACCOUNT }];
+  h.state.seats = [{ account_id: ACCOUNT, role: 'owner' }];
   h.state.role = 'owner';
   h.state.personal = [];
   h.state.followed = {
@@ -211,10 +211,38 @@ describe('POST /api/billing/cancel', () => {
     expect(h.log).toEqual(['getUser', `rpc member_role {"p_account":"${OTHER}"}`]);
   });
 
+  it('an owner of two accounts naming neither acts on the one their switcher names, and on neither when it names a third', async () => {
+    h.state.seats = [
+      { account_id: ACCOUNT, role: 'owner' },
+      { account_id: OTHER, role: 'owner' },
+    ];
+    const withChoice = (accountId: string) =>
+      POST(
+        new Request(`${SITE}/api/billing/cancel`, {
+          method: 'POST',
+          headers: {
+            origin: SITE,
+            'content-type': 'application/x-www-form-urlencoded',
+            cookie: `theme=dark; cm_account=${accountId}`,
+          },
+          body: '',
+        }),
+      );
+    await withChoice(OTHER);
+    expect(h.log).toContain(`rpc member_role {"p_account":"${OTHER}"}`);
+    h.log.length = 0;
+    const third = await withChoice('9a1e2d3c-4b5a-4c6d-8e7f-0a1b2c3d4e5f');
+    expect([third.status, await third.json()]).toEqual([409, { error: 'account_ambiguous' }]);
+    expect(h.log.filter((l) => l.startsWith('rpc member_role'))).toEqual([]);
+  });
+
   // Q26: the Agency trial is a second owner seat. Settings' Cancel names no account, so it acts on
   // the caller's personal (default) account, found with the caller's own client before the role.
   it('an owner of two accounts naming neither cancels the personal one', async () => {
-    h.state.seats = [{ account_id: ACCOUNT }, { account_id: OTHER }];
+    h.state.seats = [
+      { account_id: ACCOUNT, role: 'owner' },
+      { account_id: OTHER, role: 'owner' },
+    ];
     h.state.personal = [{ id: OTHER }];
     const res = await post('confirm=true');
     expect([res.status, res.headers.get('location')]).toEqual([
@@ -231,7 +259,10 @@ describe('POST /api/billing/cancel', () => {
   });
 
   it('409 account_ambiguous for an owner of two accounts naming neither, neither personal', async () => {
-    h.state.seats = [{ account_id: ACCOUNT }, { account_id: OTHER }];
+    h.state.seats = [
+      { account_id: ACCOUNT, role: 'owner' },
+      { account_id: OTHER, role: 'owner' },
+    ];
     const res = await post('confirm=true');
     expect([res.status, await res.json()]).toEqual([409, { error: 'account_ambiguous' }]);
     expect(stripeCalls()).toEqual([]);

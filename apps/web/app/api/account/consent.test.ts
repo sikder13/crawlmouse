@@ -50,7 +50,13 @@ vi.mock('@/lib/supabase/server', () => ({
       getClaims: async () => ({ data: null }),
     },
     rpc: async (fn: string) => ({ data: fn === 'member_role' ? 'owner' : null, error: null }),
-    from: () => h.chain([{ account_id: 'a0000000-0000-4000-8000-000000000001' }]),
+    // The caller's one owner seat (`seats`), and its account, their personal one (`accounts`).
+    from: (table: string) =>
+      h.chain([
+        table === 'accounts'
+          ? { id: 'a0000000-0000-4000-8000-000000000001' }
+          : { account_id: 'a0000000-0000-4000-8000-000000000001', role: 'owner' },
+      ]),
   }),
 }));
 vi.mock('@/lib/supabase/admin', () => ({
@@ -59,7 +65,7 @@ vi.mock('@/lib/supabase/admin', () => ({
 vi.mock('@/lib/v2/account/viewer', () => ({
   loadViewer: async () => ({
     kind: 'viewer',
-    viewer: { account: { id: 'a0000000-0000-4000-8000-000000000001' } },
+    viewer: { account: { id: 'a0000000-0000-4000-8000-000000000001', kind: 'personal' } },
   }),
 }));
 

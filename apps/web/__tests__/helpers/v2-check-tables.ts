@@ -597,7 +597,8 @@ let worldSerial = 0;
 
 /**
  * One account with two sites and one row in every new table per site (and one account-level row
- * where a table has them), plus a developer seat scoped to site1. Written as postgres, which
+ * where a table has them), plus a developer seat scoped to site1 and an invited one scoped to site2.
+ * Written as postgres, which
  * bypasses RLS here as service_role does on Supabase.
  */
 export async function seedWorld(db: Db, tag: string): Promise<World> {
@@ -861,7 +862,20 @@ export async function seedWorld(db: Db, tag: string): Promise<World> {
     'seat_sites',
     ROWS.seat_sites(scopedSeatId, site1, accountId),
     { seat_id: scopedSeatId, site_id: site1 },
-    'account',
+    'site1',
+  );
+  // A second scoped seat, invited and not yet accepted, covers site2: site2's scope row.
+  const invitedSeatId = randomUUID();
+  await db.query(
+    `insert into public.seats (id, account_id, invited_email, role, status, client_scope_all)
+     values ($1, $2, $3, 'developer', 'invited', false)`,
+    [invitedSeatId, accountId, `invited-${tag}-${n}@example.com`],
+  );
+  await put(
+    'seat_sites',
+    ROWS.seat_sites(invitedSeatId, site2, accountId),
+    { seat_id: invitedSeatId, site_id: site2 },
+    'site2',
   );
 
   return { accountId, ownerId, ownerSeatId, scopedUserId, scopedSeatId, site1, site2, seeded };

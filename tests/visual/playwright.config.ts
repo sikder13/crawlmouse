@@ -1,5 +1,6 @@
 import { totalmem } from 'node:os';
 import { defineConfig } from './pw';
+import { ONCE_SPECS, parsePart } from './part';
 
 /**
  * Visual harness for the v2 design system: screenshots, layout, accessibility and motion checks
@@ -14,6 +15,8 @@ const HEAP_MB = Math.floor((totalmem() / 1024 / 1024) * 0.75);
 const PORT = Number(process.env.VISUAL_PORT ?? 3130);
 const CI = Boolean(process.env.CI);
 const START = process.env.VISUAL_SERVER === 'start';
+/** This job's share of the preview routes (part.ts); the specs that do not loop over them run in the first. */
+const PART = parsePart(process.env.VISUAL_PART);
 
 export default defineConfig({
   testDir: '.',
@@ -25,6 +28,7 @@ export default defineConfig({
     // The budgets are set for the production build: they run only on next start.
     ...(process.env.VISUAL_PERF && START ? [] : [/perf\.spec\.ts$/]),
     ...(START ? [] : [/production\.spec\.ts$/]),
+    ...(PART.k > 1 ? ONCE_SPECS.map((f) => `**/${f}`) : []),
   ],
   // Compiles each preview route once before the tests (warm-routes.ts).
   globalSetup: './warm-routes.ts',

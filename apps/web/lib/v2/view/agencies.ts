@@ -14,7 +14,10 @@
  *
  * A file a coming proof names is the one its step adds, by name, so the row's test fails at the merge
  * that brings that file and not before (SEO R2-N3). CC-28's merge flipped its four rows this way; the
- * Agency Plus request's template (CC-29) flipped `agency_plus_reply`.
+ * Agency Plus request's template (CC-29) flipped `agency_plus_reply`. CC-31's merge flipped the five
+ * it built (seats, client reports, the client matrix, exports, the agency workspace) and gave the
+ * three it did not (the report page on your domain, your own sender address, the one-pager) a proof
+ * that still holds beside its routes.
  */
 import { TRIAL_DAYS } from '../../billing/state-machine';
 import { AGENCY_MONTHLY, PRO_MONTHLY, usd } from '../../billing/prices';
@@ -110,10 +113,9 @@ export const CAPABILITIES: Readonly<Record<CapabilityKey, Capability>> = {
     proof: { kind: 'exists', path: 'apps/web/app/api/billing/cancel/route.ts' },
   },
   seats: {
-    status: 'coming',
-    what: 'Inviting people to seats beyond the owner; seats are CC-31’s.',
-    proof: { kind: 'absent', path: 'apps/web/app/api/billing/seats' },
-    named: /\bseats?\b/i,
+    status: 'built',
+    what: 'Inviting people to seats beyond the owner, by email, with a role and the clients a seat covers (POST /api/seats, CC-31).',
+    proof: { kind: 'exists', path: 'apps/web/app/api/seats/route.ts' },
   },
   competitors: {
     status: 'coming',
@@ -137,34 +139,46 @@ export const CAPABILITIES: Readonly<Record<CapabilityKey, Capability>> = {
   },
   client_report_page: {
     status: 'coming',
-    what: 'Reports and the client report page on your domain, under your logo: CC-31.',
-    proof: { kind: 'absent', path: 'apps/web/app/s' },
-    named: /client report page|on your domain|your logo/i,
+    what: 'Reports and the client report page under your own name: on your domain, with your logo. The report a client opens is on our domain, names no agency and shows no logo.',
+    // CC-31 built the report a client opens (`/s/<token>`), on our domain and with no logo: what
+    // the client is shown is drawn here, and nothing here reads a logo.
+    proof: {
+      kind: 'nowhere',
+      dirs: ['apps/web/app/s', 'apps/web/components/v2/screens/proof'],
+      text: /logo/i,
+    },
+    named:
+      /client report page|on your domain|your logo|under Branding|under (?:your|their) (?:own )?name|shown on client reports/i,
   },
   sender_address: {
     status: 'coming',
-    what: 'Emails from your own address, with its records verified in Settings: CC-31.',
-    proof: { kind: 'absent', path: 'apps/web/app/agency' },
+    what: 'Emails from your own address, with its records verified in Settings: every v2 email is sent from one address of ours.',
+    proof: {
+      kind: 'holds',
+      path: 'apps/web/lib/v2/mail/headers.ts',
+      text: 'export const MAIL_FROM = `Crawlmouse <${ALERTS_SENDER}>`;',
+    },
     named: /your address|sender address|\bDKIM\b/i,
   },
   one_pagers: {
     status: 'coming',
-    what: 'The branded one-pager made from an audit: CC-31.',
-    proof: { kind: 'absent', path: 'apps/web/app/agency' },
+    what: 'The branded one-pager made from an audit: the report generator makes four kinds, and the one-pager is not one of them.',
+    proof: {
+      kind: 'holds',
+      path: 'apps/web/lib/v2/reports/generate-run.ts',
+      text: "kind: z.enum(['audit_pdf', 'compare', 'raw_export', 'client_report']),",
+    },
     named: /one-pager|one-page summary/i,
   },
   client_reports: {
-    status: 'coming',
-    what: 'Client reports sent on a schedule: CC-31.',
-    proof: { kind: 'absent', path: 'apps/web/app/api/report-files' },
-    named:
-      /client reports?\b(?! page)|report to them|report from you|under (?:your|their) (?:own )?name/i,
+    status: 'built',
+    what: 'Client reports sent on a schedule to a contact who confirmed, naming the agency (CC-31’s hourly run).',
+    proof: { kind: 'exists', path: 'apps/web/lib/v2/agency/schedules-run.ts' },
   },
   client_matrix: {
-    status: 'coming',
-    what: 'The client matrix, every client site on one screen: CC-31.',
-    proof: { kind: 'absent', path: 'apps/web/app/agency' },
-    named: /client matrix|every client on one screen/i,
+    status: 'built',
+    what: 'The client matrix, every client site on one screen (/agency, CC-31).',
+    proof: { kind: 'exists', path: 'apps/web/app/agency/page.tsx' },
   },
   fix_packets: {
     status: 'built',
@@ -177,10 +191,9 @@ export const CAPABILITIES: Readonly<Record<CapabilityKey, Capability>> = {
     proof: { kind: 'exists', path: 'apps/web/lib/v2/monitor/slack.ts' },
   },
   exports: {
-    status: 'coming',
-    what: 'Exporting an audit as PDF or JSON: v1’s CSV of an audit is the only export.',
-    proof: { kind: 'nowhere', dirs: SOURCE_DIRS, text: 'application/pdf' },
-    named: /\b[Ee]xport|\bPDF\b|\bJSON\b/,
+    status: 'built',
+    what: 'Exporting an audit as a PDF, and its pages as CSV, JSON or an edge list (POST /api/reports, CC-31).',
+    proof: { kind: 'exists', path: 'apps/web/app/api/reports/route.ts' },
   },
   staging: {
     status: 'coming',
@@ -238,10 +251,9 @@ export const CAPABILITIES: Readonly<Record<CapabilityKey, Capability>> = {
     named: /condensed|older than \d+ days/i,
   },
   agency_workspace: {
-    status: 'coming',
-    what: 'The agency workspace, where an agency account’s sites are audited: CC-31.',
-    proof: { kind: 'absent', path: 'apps/web/app/agency' },
-    named: /agency workspace|under Branding/i,
+    status: 'built',
+    what: 'The agency workspace, where an agency account’s sites are added and audited (/agency, CC-31).',
+    proof: { kind: 'exists', path: 'apps/web/app/agency/page.tsx' },
   },
 };
 

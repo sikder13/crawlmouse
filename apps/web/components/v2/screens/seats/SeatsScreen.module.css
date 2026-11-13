@@ -1,0 +1,87 @@
+/* Final-Ag-Seats: the People table, the role table, and the forms a reader who may invite is given. */
+
+.name {
+  font-weight: 500;
+}
+
+.email {
+  color: var(--v2-mut);
+  font-family: var(--v2-font-mono);
+  font-size: var(--v2-text-micro);
+}
+
+.mailNote {
+  padding: 0 16px 16px;
+  color: var(--v2-mut);
+  font-size: var(--v2-text-micro);
+}
+
+.formWrap {
+  padding: 16px;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 0;
+}
+
+.sites {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.legend {
+  padding: 0;
+  color: var(--v2-mut);
+  font-size: var(--v2-text-micro);
+}
+
+.site {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.host {
+  font-family: var(--v2-font-mono);
+  font-size: var(--v2-text-small);
+}
+
+.quantity {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* The field's focus ring (Field.module.css) on the inputs that are not a Field: the scope's
+   checkboxes and the plan's quantities. Without it each showed the browser's own, at 1.1:1. */
+.site input:focus-visible,
+.quantity input:focus-visible {
+  outline: 2px solid var(--v2-fg);
+  outline-offset: 2px;
+}
+
+.change {
+  text-align: left;
+}
+
+.summary {
+  cursor: pointer;
+  color: var(--v2-fg);
+  text-decoration: underline;
+}
+
+.changeBody {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  margin-top: 12px;
+}

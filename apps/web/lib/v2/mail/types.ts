@@ -1,8 +1,9 @@
 /**
  * The mailer's shared types (CC-28 D1, D2). Every v2 email is one of `MAIL_KINDS`; the list is the
- * `email_sends.kind` check, set by the last migration that rewrites it (CC-29 adds
- * `agency_plus_contact`; CC-33's `founder_event` and `founder_digest` are in 20261115000001's section
- * K), and send.test.ts's "the kinds" reads it from there.
+ * `email_sends.kind` check as migration 20261115000001's section K sets it last: CC-28's kinds, CC-29's
+ * `agency_plus_contact`, CC-31's three (20261114000002) and CC-33's two founder kinds. send.test.ts
+ * ("the kinds") reads the migrations, and __tests__/v2-031-m-mail-kinds.test.ts reads the list from a
+ * migrated database.
  */
 
 export const MAIL_KINDS = [
@@ -15,6 +16,11 @@ export const MAIL_KINDS = [
   'alert',
   'weekly_summary',
   'agency_plus_contact',
+  // CC-31: a seat's invitation, and the two mails of a client report schedule.
+  'seat_invite',
+  'report_confirm',
+  'client_report',
+  // CC-33: the founder's instant notices and digests.
   'founder_event',
   'founder_digest',
 ] as const;
@@ -23,6 +29,8 @@ export type MailKind = (typeof MAIL_KINDS)[number];
 /**
  * Account mail (D7): about the person's own account, so it carries no unsubscribe and a suppression
  * does not stop it. The others are what `email_kind_suppressible` in the migration answers true for.
+ * CC-31 adds two that a suppression does not stop either: a seat's invitation, which is the one way
+ * into the seat, and the confirmation asked of a client's contact before any report is sent to it.
  * CC-33's founder notices and digest are in this class too (questions Q1): the founder sender
  * (lib/v2/ops/founder.ts) mails them to FOUNDER_NOTIFY_TO and to no other address.
  */
@@ -31,6 +39,8 @@ export const ACCOUNT_KINDS: ReadonlySet<MailKind> = new Set<MailKind>([
   'email_change_confirm',
   'email_change_notice',
   'account_delete',
+  'seat_invite',
+  'report_confirm',
   'founder_event',
   'founder_digest',
 ]);
@@ -42,7 +52,11 @@ export const ACCOUNT_KINDS: ReadonlySet<MailKind> = new Set<MailKind>([
  */
 export const OWN_INBOX_KINDS: ReadonlySet<MailKind> = new Set<MailKind>(['agency_plus_contact']);
 
-/** The kinds that carry List-Unsubscribe (D7), and what the link turns off. */
+/**
+ * The kinds whose List-Unsubscribe is a seat's signed link (D7), and what the link turns off. A
+ * client report carries List-Unsubscribe as well: its target is the schedule's pause link, which the
+ * report's handler builds (handlers.ts).
+ */
 export const UNSUBSCRIBE_KIND = {
   alert: 'alerts',
   weekly_summary: 'summary',

@@ -125,6 +125,12 @@ export function AgencyTrialScreen({
               <Capability
                 as="div"
                 className={styles.foot}
+                item={view.aside.trialReports}
+                comingLabel={view.comingLabel}
+              />
+              <Capability
+                as="div"
+                className={styles.foot}
                 item={view.aside.foot}
                 comingLabel={view.comingLabel}
               />

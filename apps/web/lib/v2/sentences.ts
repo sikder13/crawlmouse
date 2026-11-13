@@ -16,6 +16,7 @@ import {
   type Fix,
   type Verdict,
 } from '@crawlmouse/types/v2';
+import { AI_WAITING } from './view/effect-headline';
 import { letterFor, nextBandFloor } from './letters';
 import { listOf, percent, templateNoun } from './format';
 import { capitalise, count, numberWord, plural } from './words';
@@ -294,14 +295,38 @@ export function aiShortSummary(check: Check): string {
   return [out.length ? `${capitalise(out.join('; '))}.` : null, thin].filter(Boolean).join(' ');
 }
 
-/** The withheld AI readability grade, said plainly (FACTS I4). */
+/** FACTS I4: the scored crawlers a grade needs measured. The engine's MIN_MEASURED_CRAWLERS. */
+export const I4_MEASURED_CRAWLERS = 2;
+
+/**
+ * The withheld AI readability grade, said plainly (FACTS I4). `measured` is the contract's count
+ * (`scoredCrawlersMeasured`: a scored crawler with a verdict). The engine withholds by a count of
+ * its own (a crawler with pages enough that were served or blocked by a rule), so the two can part:
+ * a site that challenges each crawler has four measured by the contract and none by the engine.
+ * What is said therefore follows the reasons the grade names (`withheld_reasons`), of which a
+ * withheld grade names at least one (CheckSchema refuses one that names none, and so does this):
+ *   - where the grade names the count and the contract's count is itself under I4's two, the count
+ *     of crawlers, with the edge named when a crawler met it;
+ *   - where the grade names the count and the contract's count is not under two, the reason's own
+ *     sentence (`AI_WAITING`), after the edge's when a crawler met it;
+ *   - for a grade that does not name the count, its first reason's sentence.
+ */
 export function aiWithheldSummary(check: Check, measured: number): string {
   const ai = check.ai_readability!;
   if (!ai.withheld) throw new Error('Not withheld');
+  if (ai.withheld_reasons.length === 0) throw new Error('A withheld grade names why');
   const scored = check.crawlers.filter((c) => c.scored).length;
-  const why = meetsEdge(check)
-    ? `${EDGE_SENTENCE}, so only ${numberWord(measured)} of the ${numberWord(scored)} scored crawlers could be measured.`
-    : `Only ${numberWord(measured)} of the ${numberWord(scored)} scored crawlers could be measured.`;
+  const reasons = ai.withheld_reasons;
+  const byCount = reasons.includes('too_few_crawlers_measured');
+  const edge = meetsEdge(check);
+  const few = `${measured === 0 ? 'none' : `only ${numberWord(measured)}`} of the ${numberWord(scored)} scored crawlers could be measured`;
+  const counted = edge ? `${EDGE_SENTENCE}, so ${few}.` : `${capitalise(few)}.`;
+  const why = !byCount
+    ? `${AI_WAITING[reasons[0]!]}.`
+    : measured < I4_MEASURED_CRAWLERS
+      ? counted
+      : `${edge ? `${EDGE_SENTENCE}. ` : ''}${AI_WAITING.too_few_crawlers_measured}.`;
   const range = ai.access_range;
-  return range ? `${why} Access is somewhere between ${range.min} and ${range.max} of 40.` : why;
+  const access = range ? `Access is somewhere between ${range.min} and ${range.max} of 40.` : '';
+  return [why, access].filter(Boolean).join(' ');
 }

@@ -13,6 +13,7 @@ import { readAccount } from '@/lib/v2/account/pages';
 import { loadViewer } from '@/lib/v2/account/viewer';
 import { settingsNotice } from '@/lib/v2/copy/settings-notices';
 import type { AccountDataset } from '@/lib/v2/view/account';
+import { withSwitcher } from '@/lib/v2/view/account-shell';
 import { alertsView } from '@/lib/v2/view/alerts';
 
 export const dynamic = 'force-dynamic';
@@ -44,7 +45,7 @@ export default async function AlertsPage({
   const r = await loadViewer();
   if (r.kind === 'signed_out') redirect('/login');
   if (r.kind !== 'viewer') return <AccountStateScreen state={r.kind} />;
-  const { account, seat } = r.viewer;
+  const { account, seat, accounts } = r.viewer;
   // The account's default rules exist before the page reads them (Q13).
   await seedDefaultAlertRules(supabaseAdmin(), account.id);
   const { d, viewer } = await readAccount(await supabaseServer(), account.id, seat.id, new Date());
@@ -52,7 +53,11 @@ export default async function AlertsPage({
   return (
     <LiveActions>
       <AlertsScreen
-        data={alertsView(withSlack(d, account.id, last4 !== null), viewer)}
+        data={withSwitcher(
+          alertsView(withSlack(d, account.id, last4 !== null), viewer),
+          accounts,
+          account.id,
+        )}
         notice={settingsNotice(await searchParams, 'alerts')}
       />
     </LiveActions>

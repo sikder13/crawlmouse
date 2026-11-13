@@ -20,6 +20,20 @@
   background: var(--v2-railbg);
 }
 
+/* The brand with the plan's badge (Final-Ag-Matrix): the badge moves under the brand where the
+   rail is too narrow for both on one line. */
+.brand {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+
+/* The account acted in, under the brand. It takes no room in the column beyond its own row. */
+.account {
+  min-width: 0;
+}
+
 .nav {
   display: flex;
   flex-direction: column;

@@ -18,6 +18,7 @@ const MEMBERSHIP_FUNCTIONS = new Set([
   'is_member_for_site',
   'is_member_for_fix',
   'member_role',
+  'seat_may',
 ]);
 
 const first = (xs: number[]) => (xs.length ? Math.min(...xs) : Infinity);

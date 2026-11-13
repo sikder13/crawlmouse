@@ -1,6 +1,7 @@
 /**
- * The links of the check-notify, account-link and unsubscribe mail are built here, from values this
- * code checked (D3): our origin, a path we serve, and an id or token of a shape we know. The alert and
+ * The links of the check-notify, account-link, invitation, client-report and unsubscribe mail are
+ * built here, from values this code checked (D3): our origin, a path we serve, and an id or token of
+ * a shape we know. The alert and
  * weekly-summary templates build their page links in templates/alert.ts (`pageUrl`, `SITE_ORIGIN`, the
  * same origin and the same id check); their senders pass in the unsubscribe link `unsubscribeLinks`
  * builds here (lib/v2/monitor/functions.ts).
@@ -41,6 +42,45 @@ export type AccountLinkKind = keyof typeof ACCOUNT_LINK_FLOW;
 export function accountLinkUrl(kind: AccountLinkKind, token: string): string {
   if (!isToken(token)) throw new RangeError('not an account link token');
   return mailUrl(`${LINK_FLOWS[ACCOUNT_LINK_FLOW[kind]].page}/${token}`);
+}
+
+/** A seat's invitation (CC-31 D3): the link route that moves the token into the invitation's cookie. */
+export function seatInviteUrl(token: string): string {
+  if (!isToken(token)) throw new RangeError('not an invitation token');
+  return mailUrl(`${LINK_FLOWS.invite.page}/${token}`);
+}
+
+/**
+ * The links a client report schedule mails its recipient (CC-31 D8, spec 31 §10): the confirmation
+ * of the address, and the pause, which is also the report mail's List-Unsubscribe target. Each
+ * token is minted in SQL in the shape an account link's is.
+ */
+export function reportConfirmUrl(token: string): string {
+  if (!isToken(token)) throw new RangeError('not a confirmation token');
+  return mailUrl(`/s/confirm/${token}`);
+}
+
+/**
+ * "Don't ask me again", in the mail that asks to confirm: the address's own token
+ * (`report-decline-token.ts`), which records a refusal.
+ */
+export function reportDeclineUrl(token: string): string {
+  if (!isToken(token)) throw new RangeError('not a decline token');
+  return mailUrl(`/s/decline/${token}`);
+}
+
+export function reportPauseUrl(token: string): string {
+  if (!isToken(token)) throw new RangeError('not a pause token');
+  return mailUrl(`/s/pause/${token}`);
+}
+
+/** A share link's token (CC-31 D7): 16 random bytes in base64url, 22 characters. */
+const SHARE_TOKEN = /^[A-Za-z0-9_-]{22}$/;
+
+/** A shared report: `/s/<token>`. */
+export function sharedReportUrl(token: string): string {
+  if (!SHARE_TOKEN.test(token)) throw new RangeError('not a share token');
+  return mailUrl(`/s/${token}`);
 }
 
 export interface UnsubscribeLinks {

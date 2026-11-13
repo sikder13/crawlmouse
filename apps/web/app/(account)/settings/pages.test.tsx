@@ -17,9 +17,18 @@ import { pgliteCheckReader } from '../../../lib/v2/pipeline/test-support/pglite'
 const h = vi.hoisted(() => ({
   db: null as unknown,
   user: null as { id: string; email: string } | null,
+  /** The switcher cookie's value on this request, or null for none. */
+  chosen: null as string | null,
 }));
 
 vi.mock('server-only', () => ({}));
+// No switcher cookie unless a test sets one: each person acts in their default account.
+vi.mock('next/headers', () => ({
+  cookies: async () => ({
+    get: (name: string) =>
+      name === 'cm_account' && h.chosen !== null ? { name, value: h.chosen } : undefined,
+  }),
+}));
 vi.mock('@/lib/supabase/server', () => ({
   supabaseServer: async () => ({
     ...postgrestOver(h.db as PGlite, h.user ? { as: { userId: h.user.id } } : {}),
@@ -34,7 +43,12 @@ vi.mock('@/lib/v2/pipeline/load', () => ({
 import { DELETE_COPY, REFUND_POLICY } from '@/lib/v2/copy/deletion';
 import { SETTINGS_COPY } from '@/lib/v2/copy/settings';
 import { hashMailAddress } from '@/lib/v2/mail/address-hash';
-import { REFUSAL_SENTENCES, SETTINGS_NOTICES } from '@/lib/v2/copy/settings-notices';
+import {
+  OWN_ACCOUNT_COPY,
+  REFUSAL_SENTENCES,
+  SETTINGS_NOTICES,
+} from '@/lib/v2/copy/settings-notices';
+import { agencyAccount } from '@/lib/v2/agency/test-support';
 import { DeleteScreen } from '@/components/v2/screens/settings/DeleteScreen';
 import { PlanScreen } from '@/components/v2/screens/settings/PlanScreen';
 import { SettingsScreen } from '@/components/v2/screens/settings/SettingsScreen';
@@ -177,7 +191,10 @@ afterAll(async () => {
   await (h.db as PGlite).close();
 });
 
-afterEach(() => vi.unstubAllEnvs());
+afterEach(() => {
+  vi.unstubAllEnvs();
+  h.chosen = null;
+});
 
 const as = (u: { id: string; email: string } | null) => {
   h.user = u === null ? null : { id: u.id, email: u.email };
@@ -280,6 +297,67 @@ describe('/settings', () => {
     as(manager);
     vi.stubEnv('TRIAL_LEDGER_PEPPER', '');
     expect(renderToStaticMarkup(screen(await SettingsPage(q())))).not.toContain(line);
+  });
+});
+
+describe('/settings of an account that is not the caller’s own personal account (CC-31 D2b)', () => {
+  let boss: Person;
+  let agencyId: string;
+
+  beforeAll(async () => {
+    boss = await person('agency-owner');
+    agencyId = (await agencyAccount(h.db as PGlite, boss, 'Summit Digital')).accountId;
+  });
+
+  const NEW_EMAIL = /<input(?=[^>]*name="newEmail")[^>]*>/i;
+  const settings = async () => renderToStaticMarkup(screen(await SettingsPage(q())));
+
+  it('acting in their own account: the address can be changed and Delete… is offered, as before', async () => {
+    as(boss);
+    const html = await settings();
+    expect(html.match(NEW_EMAIL)![0]).not.toMatch(/readonly/i);
+    expect(html).toContain('href="/settings/delete"');
+    expect(html).not.toContain(OWN_ACCOUNT_COPY.address);
+    expect(html).not.toContain(OWN_ACCOUNT_COPY.deletion);
+  });
+
+  it('acting in their agency: the address change is not offered, and the page says where it belongs', async () => {
+    as(boss);
+    h.chosen = agencyId;
+    const html = await settings();
+    expect(html.match(NEW_EMAIL)![0]).toMatch(/readonly/i);
+    expect(html).toContain(OWN_ACCOUNT_COPY.address);
+    // The rest of the form is the agency's own: its name is saved to the account acted in.
+    expect(html).toContain('action="/api/account"');
+  });
+
+  it('acting in their agency: Delete… is not offered; the page says where it belongs and offers the switch', async () => {
+    as(boss);
+    h.chosen = agencyId;
+    const html = await settings();
+    expect(html).not.toContain('href="/settings/delete"');
+    expect(html).toContain(OWN_ACCOUNT_COPY.deletion);
+    const main = html.slice(html.indexOf('<main'));
+    const form = main.match(/<form [^>]*action="\/api\/seats\/switch"[\s\S]*?<\/form>/)![0];
+    expect(form).toContain(`name="accountId" value="${boss.accountId}"`);
+    expect(form).toContain(OWN_ACCOUNT_COPY.switchTo);
+  });
+
+  it('acting in their agency: the delete step sends them to Settings', async () => {
+    as(boss);
+    h.chosen = agencyId;
+    await expect(DeletePage(q())).rejects.toMatchObject(redirectTo('/settings'));
+    h.chosen = null;
+    expect(screen(await DeletePage(q())).type).toBe(DeleteScreen);
+  });
+
+  it('the rail has the switcher, naming the account acted in', async () => {
+    as(boss);
+    h.chosen = agencyId;
+    expect(await settings()).toMatch(/data-v2-account-switcher=""[\s\S]*?Summit Digital/);
+    as(owner);
+    h.chosen = null;
+    expect(await settings()).not.toContain('data-v2-account-switcher');
   });
 });
 

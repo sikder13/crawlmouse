@@ -182,6 +182,7 @@ describe('POST /api/account/email', () => {
     expect(h.log).toEqual([
       'getUser',
       'session.from seats',
+      'session.from accounts',
       'session.rpc member_role',
       'supabaseAdmin',
     ]);

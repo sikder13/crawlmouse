@@ -491,6 +491,14 @@ jobs:
   # reached its 60-minute limit: 45.4 min of checks, then "Propose baselines" cancelled at 13.8 min,
   # so the run left no artifact (CC-28, owner ruling 4).
   #
+  # Each shard runs twice, once per half of the preview routes (`part`, VISUAL_PART in
+  # tests/visual/part.ts), each on its own runner and its own `next dev`. The harness keeps every
+  # compiled route, and one server holding all 149 crossed Next's restart line (used heap above 80% of
+  # its limit) while warming, in every shard of dispatches 43399235243 and 43421508188: measured at
+  # CI's heap limit, ~57 MB of live heap per route, a restart after route 132 (CC-31, Q51). The specs
+  # that do not loop over the previews run in part 1 only; the production-build steps run on shard 1,
+  # part 1, over every route.
+  #
   # Skipped when the `changes` job finds nothing on the branch that can affect rendering.
   visual-shard:
     needs: changes
@@ -503,6 +511,7 @@ jobs:
       fail-fast: false
       matrix:
         shard: [1, 2, 3, 4, 5, 6]
+        part: [1, 2]
     container:
       image: mcr.microsoft.com/playwright:v1.60.0-noble@sha256:9bd26ad900bb5e0f4dee75839e957a89ae89c2b7ab1e76050e559790e946b948
     # Steps in a container job default to sh, which has no `set -o pipefail`.
@@ -516,6 +525,8 @@ jobs:
       - uses: ./.github/actions/setup
       - name: Visual, layout and accessibility checks
         working-directory: apps/web
+        env:
+          VISUAL_PART: ${{ matrix.part }}/2
         run: |
           set -euo pipefail
           set -a
@@ -531,7 +542,7 @@ jobs:
       # run whether or not the screenshots above matched: a baseline waiting to be redrawn says
       # nothing about performance, and their numbers are wanted on every run.
       - name: Production build for the budgets
-        if: ${{ matrix.shard == 1 && !cancelled() }}
+        if: ${{ matrix.shard == 1 && matrix.part == 1 && !cancelled() }}
         working-directory: apps/web
         run: |
           set -euo pipefail
@@ -542,7 +553,7 @@ jobs:
       # A fixed CPU workload timed on this runner, against its time on a runner of normal speed
       # (packages/timing/src/probe.ts). The budgets step reads it when deciding what a failure means.
       - name: Runner probe
-        if: ${{ matrix.shard == 1 && !cancelled() }}
+        if: ${{ matrix.shard == 1 && matrix.part == 1 && !cancelled() }}
         run: |
           set -euo pipefail
           pnpm --silent --filter @crawlmouse/timing exec tsx src/probe-cli.ts | tee "$RUNNER_TEMP/probe.json"
@@ -553,7 +564,7 @@ jobs:
       # and the second attempt and the probe decide; docs/ops/ci-timing.md has the
       # rule. This is the one retried step in the workflow.
       - name: Performance budgets, on next start
-        if: ${{ matrix.shard == 1 && !cancelled() }}
+        if: ${{ matrix.shard == 1 && matrix.part == 1 && !cancelled() }}
         working-directory: apps/web
         env:
           VISUAL_PERF: '1'
@@ -570,7 +581,7 @@ jobs:
           ../../packages/timing/scripts/perf-retry.sh "$RUNNER_TEMP/probe.json" -- \
             pnpm exec playwright test -c ../../tests/visual/playwright.config.ts perf.spec.ts --workers=1
       - name: Production checks, on next start
-        if: ${{ matrix.shard == 1 && !cancelled() }}
+        if: ${{ matrix.shard == 1 && matrix.part == 1 && !cancelled() }}
         working-directory: apps/web
         env:
           VISUAL_SERVER: start
@@ -583,7 +594,7 @@ jobs:
       # A budget failure that passed on retry, or failed twice on a slow runner, leaves a row for
       # the flake register in docs/ops/ci-timing.md. The PR author commits it.
       - name: Upload the flake register row
-        if: ${{ matrix.shard == 1 && !cancelled() }}
+        if: ${{ matrix.shard == 1 && matrix.part == 1 && !cancelled() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: flake-entry-${{ github.run_id }}-${{ github.run_attempt }}
@@ -591,7 +602,7 @@ jobs:
           retention-days: 30
           if-no-files-found: ignore
       - name: On any Vercel environment the previews are a 404
-        if: ${{ matrix.shard == 1 && !cancelled() }}
+        if: ${{ matrix.shard == 1 && matrix.part == 1 && !cancelled() }}
         working-directory: apps/web
         run: |
           set -euo pipefail
@@ -602,6 +613,8 @@ jobs:
       - name: Propose baselines from this run
         if: failure()
         working-directory: apps/web
+        env:
+          VISUAL_PART: ${{ matrix.part }}/2
         run: |
           set -uo pipefail
           set -a
@@ -616,7 +629,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: visual-${{ github.run_id }}-${{ github.run_attempt }}-shard${{ matrix.shard }}
+          name: visual-${{ github.run_id }}-${{ github.run_attempt }}-shard${{ matrix.shard }}-part${{ matrix.part }}
           path: |
             tests/visual/__snapshots__/
             apps/web/test-results/visual/
@@ -853,6 +866,18 @@ jobs:
           TRIAL_RACE_DB_URL: postgresql://postgres:postgres@localhost:5432/postgres?sslmode=disable
           TRIAL_RACE_REQUIRED: '1'
         run: pnpm exec vitest run db/agency-trial-race.test.ts --passWithNoTests=false
+      - name: Two transactions race for an account's last seat (CC-31)
+        working-directory: scripts
+        env:
+          TRIAL_RACE_DB_URL: postgresql://postgres:postgres@localhost:5432/postgres?sslmode=disable
+          TRIAL_RACE_REQUIRED: '1'
+        run: pnpm exec vitest run db/seats-race.test.ts --passWithNoTests=false
+      - name: A recipient's refusal over a client's rows, and two calls at once (CC-31)
+        working-directory: scripts
+        env:
+          TRIAL_RACE_DB_URL: postgresql://postgres:postgres@localhost:5432/postgres?sslmode=disable
+          TRIAL_RACE_REQUIRED: '1'
+        run: pnpm exec vitest run db/report-links-race.test.ts --passWithNoTests=false
       - name: Concurrent claims race in claim_founder_notice (CC-33)
         working-directory: scripts
         env:

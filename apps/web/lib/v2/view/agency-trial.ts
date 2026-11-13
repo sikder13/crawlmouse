@@ -128,7 +128,13 @@ export interface AgencyTrialForm {
   consent: string;
   hints: { agencyName: TaggedView; site: TaggedView };
   fine: TaggedView;
-  aside: { kicker: string; title: TaggedView; rows: [TaggedView, string][]; foot: TaggedView };
+  aside: {
+    kicker: string;
+    title: TaggedView;
+    rows: [TaggedView, string][];
+    trialReports: TaggedView;
+    foot: TaggedView;
+  };
   comingLabel: string;
 }
 
@@ -244,6 +250,7 @@ export function agencyTrialView(input: AgencyTrialInput, now: Date): AgencyTrial
         const row = tagged(what);
         return [row, row.coming && value === COPY.aside.yes ? AGENCIES_COPY.coming : value];
       }),
+      trialReports: tagged(COPY.aside.trialReports),
       foot: tagged(COPY.aside.foot(interval)),
     },
     comingLabel: AGENCIES_COPY.coming,

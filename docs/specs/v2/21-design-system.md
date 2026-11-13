@@ -96,6 +96,8 @@ phone the rail becomes a band across the top.
 | Prop        | Type                                | Required | Note                                                                                                                      |
 | ----------- | ----------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------- |
 | `nav`       | `RailLink[]`                        | yes      | The rail's links, in order.                                                                                               |
+| `badge`     | `string \| null \| undefined`       | no       | The plan's name beside the brand ("Agency" on the agency rail), or nothing.                                               |
+| `account`   | `ReactNode`                         | no       | Under the brand: the account acted in and the switch to another (AccountSwitcher), or nothing.                            |
 | `card`      | `ReactNode`                         | no       | The plan card under the links (the trial card), or nothing.                                                               |
 | `theme`     | `ReactNode`                         | no       | The theme row at the foot of the rail.                                                                                    |
 | `currentIs` | `"page" \| "location" \| undefined` | no       | `page` when this page is the rail entry itself (/dashboard); `location` when it sits under it (a site page, under Sites). |
@@ -342,15 +344,15 @@ handler, the field would already hold the next click's value when the form is re
 
 A table of records that scrolls sideways on a phone rather than squeezing (phone rules).
 
-| Prop            | Type                   | Required | Note                                                                                                                                                                                                                                                  |
-| --------------- | ---------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `label`         | `string`               | yes      | Names the table, and the scroll region when it overflows.                                                                                                                                                                                             |
-| `columns`       | `TableColumn[]`        | yes      |                                                                                                                                                                                                                                                       |
-| `rows`          | `TableRow[]`           | yes      |                                                                                                                                                                                                                                                       |
-| `heading`       | `ReactNode`            | no       | Rendered inside the scroll region, above the table (a heading row with pills).                                                                                                                                                                        |
-| `headersHidden` | `boolean \| undefined` | no       | The column headers are read by assistive technology but not drawn, for a table the locked screen shows without a header row; each column still has its name. The header row stays in the table's layout, zero height, so every cell keeps its header. |
-| `rowHeader`     | `boolean \| undefined` | no       | The first cell of each row names the row (`<th scope="row">`), so a control later in the row is read with the row it acts on.                                                                                                                         |
-| `className`     | `string \| undefined`  | no       |                                                                                                                                                                                                                                                       |
+| Prop            | Type                             | Required | Note                                                                                                                                                                                                                                                         |
+| --------------- | -------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `label`         | `string`                         | yes      | Names the table, and the scroll region when it overflows.                                                                                                                                                                                                    |
+| `columns`       | `TableColumn[]`                  | yes      |                                                                                                                                                                                                                                                              |
+| `rows`          | `TableRow[]`                     | yes      |                                                                                                                                                                                                                                                              |
+| `heading`       | `ReactNode`                      | no       | Rendered inside the scroll region, above the table (a heading row with pills).                                                                                                                                                                               |
+| `headersHidden` | `boolean \| undefined`           | no       | The column headers are read by assistive technology but not drawn, for a table the locked screen shows without a header row; each column still has its name. The header row stays in the table's layout, zero height, so every cell keeps its header.        |
+| `rowHeader`     | `number \| boolean \| undefined` | no       | One cell of each row names the row (`<th scope="row">`), so a control later in the row is read with the row it acts on: the first cell, or the cell of the column given (counted from 0) for a table whose first cell does not name its row, such as a rank. |
+| `className`     | `string \| undefined`            | no       |                                                                                                                                                                                                                                                              |
 
 ### ThemeControl
 
@@ -366,15 +368,16 @@ the page staying put, or, without script, by the form itself. A preview saves no
 ### TrialCard
 
 The rail's trial banner: when the trial ends, how long is left, and what Free keeps. On a phone
-it is a single strip with the action still in reach (DESIGN-LOCK §6, phone rules).
+it is a single strip with the action still in reach (DESIGN-LOCK §6, phone rules). The Agency
+plan card is drawn with it too: the plan and its price, what it keeps, and the renewal.
 
-| Prop       | Type        | Required | Note                                                                             |
-| ---------- | ----------- | -------- | -------------------------------------------------------------------------------- |
-| `title`    | `string`    | yes      | "Pro, trial · ends Sat 7 Nov".                                                   |
-| `left`     | `string`    | yes      | "8 days left".                                                                   |
-| `note`     | `string`    | yes      | What happens when the trial ends. Hidden on a phone, where the card is one line. |
-| `aside`    | `ReactNode` | no       | Beside the days left: the billing link on the first run.                         |
-| `children` | `ReactNode` | no       | Under the note: keeping the plan.                                                |
+| Prop       | Type             | Required | Note                                                                                                                                                                      |
+| ---------- | ---------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `title`    | `string`         | yes      | "Pro, trial · ends Sat 7 Nov".                                                                                                                                            |
+| `left`     | `string`         | yes      | "8 days left".                                                                                                                                                            |
+| `note`     | `string \| null` | yes      | What happens when the trial ends. Hidden on a phone, where the card is one line. Null leaves the line out (the Agency plan card of a seat that is not shown the renewal). |
+| `aside`    | `ReactNode`      | no       | Beside the days left: the billing link on the first run.                                                                                                                  |
+| `children` | `ReactNode`      | no       | Under the note: keeping the plan.                                                                                                                                         |
 
 ### VerdictCell
 
@@ -486,6 +489,9 @@ From `apps/web/app/(v2-preview)/v2-preview/_preview/registry.ts`. They are serve
 | Switch                                             | `/v2-preview/switch`                                     | primitive |                                      |
 | PageShell                                          | `/v2-preview/page-shell`                                 | primitive |                                      |
 | AccountShell                                       | `/v2-preview/account-shell`                              | primitive |                                      |
+| AccountSwitcher, two accounts                      | `/v2-preview/account-shell/switcher`                     | primitive |                                      |
+| AccountSwitcher, three accounts, open              | `/v2-preview/account-shell/switcher/open`                | primitive |                                      |
+| AccountSwitcher, a long name on the agency rail    | `/v2-preview/account-shell/switcher/long`                | primitive |                                      |
 | TrialCard                                          | `/v2-preview/trial-card`                                 | primitive |                                      |
 | ThemeControl                                       | `/v2-preview/theme-control`                              | primitive |                                      |
 | GradeHistory                                       | `/v2-preview/grade-history`                              | primitive |                                      |
@@ -547,6 +553,23 @@ From `apps/web/app/(v2-preview)/v2-preview/_preview/registry.ts`. They are serve
 | Settings, delete (owner ruling 12)                 | `/v2-preview/screens/settings/delete`                    | screen    |                                      |
 | Final-TrialEnd                                     | `/v2-preview/screens/trial-end`                          | screen    |                                      |
 | Changes log                                        | `/v2-preview/screens/changes-log`                        | screen    | ``, `?kind=opened`                   |
+| Final-Ag-Matrix                                    | `/v2-preview/screens/agency`                             | screen    |                                      |
+| Clients, none yet                                  | `/v2-preview/screens/agency/no-client`                   | screen    |                                      |
+| Clients, one not checked yet                       | `/v2-preview/screens/agency/not-checked`                 | screen    |                                      |
+| Clients, a first check queued                      | `/v2-preview/screens/agency/first-check`                 | screen    |                                      |
+| Clients, one seat                                  | `/v2-preview/screens/agency/invite`                      | screen    |                                      |
+| Clients, no report sent                            | `/v2-preview/screens/agency/report`                      | screen    |                                      |
+| Clients, a seat that covers one                    | `/v2-preview/screens/agency/scoped`                      | screen    |                                      |
+| Clients, below Agency                              | `/v2-preview/screens/agency/gate`                        | screen    |                                      |
+| Clients, acting in another account                 | `/v2-preview/screens/agency/open`                        | screen    |                                      |
+| Final-Ag-Client                                    | `/v2-preview/screens/agency/client`                      | screen    |                                      |
+| Client, nothing open                               | `/v2-preview/screens/agency/client/clean`                | screen    |                                      |
+| Final-Ag-Reports                                   | `/v2-preview/screens/agency/reports`                     | screen    |                                      |
+| Client reports, a client in each state             | `/v2-preview/screens/agency/reports/states`              | screen    |                                      |
+| Client reports, one client’s forms open            | `/v2-preview/screens/agency/reports/change`              | screen    |                                      |
+| Client reports, a developer                        | `/v2-preview/screens/agency/reports/developer`           | screen    |                                      |
+| Client reports, the Agency trial                   | `/v2-preview/screens/agency/reports/trial`               | screen    |                                      |
+| Client reports, below Agency                       | `/v2-preview/screens/agency/reports/gate`                | screen    |                                      |
 | Final-LinkMap                                      | `/v2-preview/screens/map`                                | screen    |                                      |
 | Link map, every page                               | `/v2-preview/screens/map/all`                            | screen    |                                      |
 | Link map, clean bill                               | `/v2-preview/screens/map/clean`                          | screen    |                                      |
@@ -560,6 +583,21 @@ From `apps/web/app/(v2-preview)/v2-preview/_preview/registry.ts`. They are serve
 | Check-email, sign-in                               | `/v2-preview/screens/check-email/signin`                 | screen    |                                      |
 | Continue                                           | `/v2-preview/screens/continue`                           | screen    |                                      |
 | Continue, link expired                             | `/v2-preview/screens/continue/expired`                   | screen    |                                      |
+| Final-Ag-Seats (Northwind)                         | `/v2-preview/screens/seats`                              | screen    |                                      |
+| Seats, Agency with its plan paid: the buy form     | `/v2-preview/screens/seats/paid`                         | screen    |                                      |
+| Seats, Pro with no seat free                       | `/v2-preview/screens/seats/pro-full`                     | screen    |                                      |
+| Seats, Free                                        | `/v2-preview/screens/seats/free`                         | screen    |                                      |
+| Seats, a member who is not the owner               | `/v2-preview/screens/seats/member`                       | screen    |                                      |
+| Invitation, signed out                             | `/v2-preview/screens/invite`                             | screen    |                                      |
+| Invitation, signed in                              | `/v2-preview/screens/invite/signed-in`                   | screen    |                                      |
+| Invitation, another address signed in              | `/v2-preview/screens/invite/mismatch`                    | screen    |                                      |
+| Invitation, link cannot be used                    | `/v2-preview/screens/invite/gone`                        | screen    |                                      |
+| Proof, two grades moved                            | `/v2-preview/screens/proof`                              | screen    |                                      |
+| Proof, a fix verified                              | `/v2-preview/screens/proof/fix`                          | screen    |                                      |
+| Proof, baseline                                    | `/v2-preview/screens/proof/baseline`                     | screen    |                                      |
+| Report link, confirm                               | `/v2-preview/screens/report-link`                        | screen    |                                      |
+| Report link, pause                                 | `/v2-preview/screens/report-link/pause`                  | screen    |                                      |
+| Report link, cannot be used                        | `/v2-preview/screens/report-link/gone`                   | screen    |                                      |
 | Final-Pricing                                      | `/v2-preview/screens/pricing`                            | screen    |                                      |
 | Pricing, signed in                                 | `/v2-preview/screens/pricing/signed-in`                  | screen    |                                      |
 | Final-AgencyTrial                                  | `/v2-preview/screens/agency-trial`                       | screen    |                                      |

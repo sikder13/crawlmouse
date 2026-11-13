@@ -46,6 +46,9 @@ async function ownerEmail(admin: SupabaseClient, accountId: string): Promise<str
  * - DELETE, the owner only, with `hostname` re-typed: deletes nothing, and emails a confirmation link
  *   to the sign-in address (D4).
  *
+ * A person's sign-in address and their deletion belong to their own personal account: acting in
+ * another account (the switcher, CC-31 D2b), both are refused with 409 `personal_account_only`.
+ *
  * The caller's role in the account is read through the caller's own session (`member_role`) before
  * the service-role client is made; a caller with no seat there answers 404. Each write names the
  * caller's account only. A form posts either verb as POST with `_method`.
@@ -74,6 +77,7 @@ async function handle(req: Request, verb: 'PATCH' | 'DELETE' | null): Promise<Re
   if (viewer.kind === 'no_account') return no(409, 'no_account');
   if (viewer.kind === 'ambiguous') return no(409, 'account_ambiguous');
   const accountId = viewer.viewer.account.id;
+  const personal = viewer.viewer.account.kind === 'personal';
 
   const { data: role, error: roleError } = await sb.rpc('member_role', { p_account: accountId });
   if (roleError) throw new Error(`member_role failed: ${roleError.message}`);
@@ -82,6 +86,7 @@ async function handle(req: Request, verb: 'PATCH' | 'DELETE' | null): Promise<Re
   const admin = supabaseAdmin();
   if (method === 'DELETE') {
     if (role !== 'owner') return no(403, 'not_owner');
+    if (!personal) return no(409, 'personal_account_only');
     const input = DeleteBody.safeParse(meant.fields);
     if (!input.success) return no(400, 'invalid');
     const answer = await requestAccountDeletion(
@@ -108,6 +113,7 @@ async function handle(req: Request, verb: 'PATCH' | 'DELETE' | null): Promise<Re
   );
   if (!outcome.ok) return no(outcome.status, outcome.code);
   if (outcome.forwardEmailChange !== null) {
+    if (!personal) return no(409, 'personal_account_only');
     const change = await requestEmailChange(emailChangePorts(admin, req.headers.get('cookie')), {
       accountId,
       userId: user.id,

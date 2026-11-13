@@ -483,9 +483,15 @@ describe('the kinds', () => {
     const list = lastMatch(
       /create table if not exists public\.email_sends \([^;]*?kind text not null check \(kind in \(([^)]*)\)\)|constraint email_sends_kind_check\s+check \(kind in \(([^)]*)\)\)/g,
     );
-    expect(quoted(list)).toEqual([...MAIL_KINDS]);
+    // 031's section C writes no list: it adds to each of the two the kinds its arrays name, after
+    // what is there. What the database holds after every migration is read in
+    // __tests__/v2-031-m-mail-kinds.test.ts.
+    const added = readFileSync(resolve(MIGRATIONS, '20261114000002_v2_031_agency.sql'), 'utf8');
+    const array = (name: string) =>
+      quoted(new RegExp(`${name} constant text\\[\\] := array\\[([^\\]]*)\\]`).exec(added)![1]!);
+    expect([...quoted(list), ...array('v_added')]).toEqual([...MAIL_KINDS]);
     const supp = lastMatch(/select p_kind in \(([^)]*)\)/g);
-    expect(quoted(supp).sort()).toEqual(
+    expect([...quoted(supp), ...array('v_added_suppressible')].sort()).toEqual(
       MAIL_KINDS.filter((k) => !ACCOUNT_KINDS.has(k) && !OWN_INBOX_KINDS.has(k)).sort(),
     );
   });

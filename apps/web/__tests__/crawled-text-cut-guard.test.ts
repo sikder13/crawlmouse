@@ -382,6 +382,10 @@ const INVENTORY: [entry: string, why: string][] = [
     'ARRAY slice over check records in the CC-26 account previews (development-only, never persisted): no string is indexed, so no surrogate pair can be split. The six latest checks the grades and the crawler grid show; the heading states how many.',
   ],
   [
+    'apps/web/lib/v2/view/agency-reports.ts :: const shown = sent.slice(0, SENT_SHOWN);',
+    'ARRAY slice over report records on the client reports page: no string is indexed, so no surrogate pair can be split. The newest sent client reports the Sent table lists; the line over it states how many are shown of how many.',
+  ],
+  [
     'apps/web/lib/v2/view/free-fixes.ts :: return fixesAsOf(d, check).slice(0, FREE_FIXES);',
     'ARRAY slice over fix records in the v2 preview screens (development-only, never persisted): no string is indexed, so no surrogate pair can be split. The fixes the Free plan opens (FACTS: three per audit), the one rule the Result, the segments and the fix page share.',
   ],

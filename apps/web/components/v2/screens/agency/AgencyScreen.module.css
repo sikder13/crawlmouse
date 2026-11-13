@@ -1,0 +1,137 @@
+/* The client matrix's own pieces (Final-Ag-Matrix); the rest is the account screens' shared sheet
+   and the dashboard's strip. */
+
+/* A client with no result yet: what its first check is doing, then its one action. */
+.first {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* The gate, and the switch to the agency: a heading and one card, as a page with one thing to do. */
+.state {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.message {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 16px;
+  max-width: 640px;
+}
+
+.body {
+  margin: 0;
+  font-size: var(--v2-text-ui);
+}
+
+/* Client reports (Final-Ag-Reports). A client: its name, then its host as data. */
+.client {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.host {
+  color: var(--v2-mut);
+  font-family: var(--v2-font-mono);
+  font-size: var(--v2-text-micro);
+  font-weight: 400;
+}
+
+/* A contact: its address, then where it stands. */
+.contact {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.rowActions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.nowrap {
+  white-space: nowrap;
+}
+
+.trialNote {
+  margin: 0;
+  color: var(--v2-fg2);
+  font-size: var(--v2-text-micro);
+}
+
+/* The chosen client's two forms: side by side, one under the other on a phone (the shared grid). */
+.forms {
+  padding: 16px;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 0;
+  min-width: 0;
+}
+
+/* A field is no wider than its column, so the forms fit a phone without scrolling sideways. */
+.form :is(input, select) {
+  max-width: 100%;
+}
+
+.legend {
+  margin: 0;
+  font-size: var(--v2-text-ui);
+  font-weight: 500;
+}
+
+.hint {
+  margin: -6px 0 0;
+  color: var(--v2-mut);
+  font-size: var(--v2-text-micro);
+}
+
+/* The time field: the Field primitive's look, for an input type it does not take. */
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.label {
+  font-size: var(--v2-text-small);
+  color: var(--v2-fg2);
+}
+
+.time {
+  height: var(--v2-field-h);
+  padding: 0 14px;
+  border: 1px solid var(--v2-ctl);
+  border-radius: var(--v2-radius-control);
+  font-size: var(--v2-text-body);
+  background: var(--v2-s1);
+  color: var(--v2-fg);
+  font-family: var(--v2-font-mono);
+  box-sizing: border-box;
+}
+
+.time:focus-visible {
+  outline: 2px solid var(--v2-fg);
+  outline-offset: 2px;
+}
+
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--v2-text-small);
+}

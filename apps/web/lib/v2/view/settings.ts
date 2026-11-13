@@ -36,7 +36,11 @@ import { ACCOUNT_ACTIONS, action, type ActionView, type RouteSpec } from './acco
 import { FREE_SCHEDULE, accountShellView, type ShellView } from './account-shell';
 import { FREE_FIXES } from './free-fixes';
 import { DELETE_COPY, deletionMoney } from '../copy/deletion';
-import { REFUSAL_SENTENCES, SETTINGS_NOTICES as NOTICES } from '../copy/settings-notices';
+import {
+  OWN_ACCOUNT_COPY as OWN,
+  REFUSAL_SENTENCES,
+  SETTINGS_NOTICES as NOTICES,
+} from '../copy/settings-notices';
 import type { SeatRole } from '../account/profile';
 import { SUPPORT_COPY } from '../copy/support';
 import { supportMailto } from '../support/mailto';
@@ -47,7 +51,7 @@ export const CC27B_ROUTES = {
     route: '/api/alert-rules',
     owner: 'CC-27b',
     guard:
-      'Signed-in member; the account’s rules (`site_id` null); Slack needs a paid tier, and its URL is kept in Vault and never answered back (its last four characters are). ARCH-2 §5 has only the per-site route: this one is CC-27b’s contract (owner ruling 6).',
+      'The owner or an account manager (`seat_may`, spec 31 §3); the account’s rules (`site_id` null); Slack needs a paid tier, and its URL is kept in Vault and never answered back (its last four characters are). ARCH-2 §5 has only the per-site route: this one is CC-27b’s contract (owner ruling 6).',
   },
   account: {
     verb: 'PATCH',
@@ -101,15 +105,16 @@ export const CC27B_ROUTES = {
   reportDownload: {
     verb: 'GET',
     route: '/api/report-files/[id]/download',
-    owner: 'wave 2',
+    owner: 'built',
     guard:
-      'Signed-in member of the report’s account; redirects to a 10-minute signed URL. Under `/api/report-files`, not `/api/reports/[id]`, because `/api/reports/[slug]` is a live segment and Next refuses two names at one level.',
+      'Signed-in member whose seat covers the report’s site and whose role may export; redirects to a 10-minute signed URL. Under `/api/report-files`, not `/api/reports/[id]`, because `/api/reports/[slug]` is a live segment and Next refuses two names at one level.',
   },
   reportShare: {
     verb: 'POST',
     route: '/api/report-files/[id]/share',
-    owner: 'wave 2',
-    guard: 'Signed-in member; a share link works for 30 days and needs no account to open.',
+    owner: 'built',
+    guard:
+      'Signed-in owner or account manager whose seat covers the report’s site, on a plan with exports; a share link works for 30 days and needs no account to open.',
   },
   trialEnded: {
     verb: 'GET',
@@ -290,8 +295,16 @@ export function settingsView(
     billingEnd = null,
     role = 'owner',
     subscriptionStatus,
+    notOwnAccount,
     undeliverable = null,
   }: {
+    /**
+     * Set where the account shown is not the reader's own personal account (an agency's, or one
+     * they hold a seat on): their sign-in address and their deletion belong to their own account
+     * (`PATCH` and `DELETE /api/account` answer 409 `personal_account_only` here), so neither is
+     * offered. `personalAccountId` is that account, to switch to, or null where it is not known.
+     */
+    notOwnAccount?: { personalAccountId: string | null };
     /**
      * The reader's own address when mail to it is suppressed, read by the live page; null or left out
      * when it is not, or cannot be read (no pepper), and in a preview.
@@ -377,7 +390,7 @@ export function settingsView(
           'keepPlan',
           COPY.keep(plan, monthly),
           {},
-          { fields: { plan: v.tier, interval: 'month' } },
+          { fields: { plan: v.tier, interval: 'month', accountId: v.account.id } },
         )
       : v.tier === 'free' && !pastDue
         ? action(
@@ -385,13 +398,16 @@ export function settingsView(
             COPY.choose(PLAN_NAMES.pro, PRO_MONTHLY),
             {},
             {
-              fields: { plan: 'pro', interval: 'month' },
+              fields: { plan: 'pro', interval: 'month', accountId: v.account.id },
             },
           )
         : null;
   const keepShown = keep !== null;
-  const cancel = owner ? routeAction('cancelPlan', COPY.cancelAction) : null;
-  const portal = owner ? routeAction('billingPortal', COPY.portalAction) : null;
+  // Each billing form names the account it was rendered for, so it is acted on in that account
+  // whichever one the reader has switched to since.
+  const billing = { fields: { accountId: v.account.id } };
+  const cancel = owner ? routeAction('cancelPlan', COPY.cancelAction, {}, billing) : null;
+  const portal = owner ? routeAction('billingPortal', COPY.portalAction, {}, billing) : null;
 
   return {
     // The plan card carries the plan's terms and its Keep, so the rail's trial card leaves them out.
@@ -408,8 +424,8 @@ export function settingsView(
         name: 'newEmail',
         value: a.email,
         placeholder: null,
-        hint: owner ? COPY.emailHint : COPY.emailOwnerOnly,
-        readOnly: !owner,
+        hint: !owner ? COPY.emailOwnerOnly : notOwnAccount ? OWN.address : COPY.emailHint,
+        readOnly: !owner || notOwnAccount !== undefined,
       },
       name: {
         id: 'account-name',
@@ -437,8 +453,19 @@ export function settingsView(
       title: COPY.dangerTitle,
       tableLabel: COPY.tables.danger,
       label: COPY.deleteLabel,
-      text: deleteText(v, subscriptionStatus),
-      action: owner ? routeAction('deleteConfirm', COPY.deleteAction) : null,
+      text: owner && notOwnAccount ? OWN.deletion : deleteText(v, subscriptionStatus),
+      action: !owner
+        ? null
+        : !notOwnAccount
+          ? routeAction('deleteConfirm', COPY.deleteAction)
+          : notOwnAccount.personalAccountId === null
+            ? null
+            : action(
+                'switchAccount',
+                OWN.switchTo,
+                {},
+                { fields: { accountId: notOwnAccount.personalAccountId } },
+              ),
     },
     plan: {
       title: COPY.planTitle,

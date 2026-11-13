@@ -6,6 +6,7 @@
  * database, an environment variable or the clock.
  */
 import { fixture } from '../../fixtures';
+import { dayDate } from '../../format';
 import { packetPrompt } from '../../view/segment/fixes';
 import type { MailKind, RenderedMail } from '../types';
 import { MAIL_PREVIEW_INDEX, type MailPreviewSlug } from './preview-index';
@@ -13,9 +14,12 @@ import { accountDelete, emailChangeConfirm, emailChangeNotice } from './account-
 import { agencyPlusContact } from './agency-plus-contact';
 import { alertTemplate } from './alert';
 import { checkNotify } from './check-notify';
+import { clientReport } from './client-report';
 import { fixToDeveloper } from './fix-to-developer';
 import { DIGEST_FIGURES, founderDigest, type DigestCounts } from './founder-digest';
 import { founderEvent, founderOverflow } from './founder-event';
+import { reportConfirm } from './report-confirm';
+import { seatInvite } from './seat-invite';
 import { trialReminder } from './trial-reminder';
 import { weeklySummaryTemplate } from './weekly-summary';
 
@@ -39,6 +43,12 @@ export interface PreviewOptions {
 /** Stand-in link tokens: the shape `issue_account_link` returns, minted by nothing. */
 const TOKEN = 'PREVIEWtokenPREVIEWtokenPREVIEWtokenPREVIEW';
 const RESTORE = 'RESTOREtokenRESTOREtokenRESTOREtokenRESTORE';
+/** A stand-in pause token for a report schedule: the shape SQL mints, naming no schedule. */
+const PAUSE = 'PAUSEtokenPAUSEtokenPAUSEtokenPAUSEtokenPAU';
+/** A stand-in share link token: the shape a share link's has, naming no report. */
+const SHARE = 'PREVIEWsharePREVIEWsha';
+/** A stand-in agency name, for the mail an agency's account sends. */
+const AGENCY = 'Summit Digital';
 /** A stand-in unsubscribe page link: the shape `unsubscribeLinks` builds, signed by nothing. */
 const UNSUBSCRIBE = 'https://crawlmouse.com/unsubscribe?t=PREVIEW.token';
 
@@ -80,6 +90,18 @@ const ACCOUNT_ID = (n: number) => `a0000000-0000-4000-8000-${String(n).padStart(
 
 /** What one alert lists: that check's changes. */
 const alertChanges = () => siteChanges().filter((c) => c.check_id === alertCheck().id);
+/**
+ * Stand-ins for a report document's title, lines and closing line, over the fixture's site and its
+ * check's day. They show the mail's layout; no report generator wrote them.
+ */
+const reportSample = () => {
+  const day = dayDate(alertCheck().finished_at ?? '2026-11-09T06:00:00.000Z', 'UTC');
+  return {
+    headline: `Report for ${badHost()}`,
+    lines: [badHost(), `Checked ${day}`],
+    footer: `Checked with Crawlmouse · ${day}`,
+  };
+};
 
 const RENDERS: Record<MailPreviewSlug, (opts?: PreviewOptions) => RenderedMail> = {
   'check-notify': () => checkNotify({ host: badHost(), checkId: badCheck(), outcome: 'finished' }),
@@ -131,6 +153,18 @@ const RENDERS: Record<MailPreviewSlug, (opts?: PreviewOptions) => RenderedMail> 
       email: 'ops@summit-digital.example',
       sites: 40,
       note: 'We look after 40 client sites, most on WordPress.\nWe would want SSO for our team.',
+    }),
+  'seat-invite': () => seatInvite({ token: TOKEN, accountName: AGENCY, role: 'account_manager' }),
+  'seat-invite-unnamed': () => seatInvite({ token: TOKEN, accountName: null, role: 'developer' }),
+  'report-confirm': () =>
+    reportConfirm({ token: TOKEN, declineToken: PAUSE, agencyName: AGENCY, host: badHost() }),
+  'client-report': () =>
+    clientReport({
+      agencyName: AGENCY,
+      host: badHost(),
+      ...reportSample(),
+      shareToken: SHARE,
+      pauseToken: PAUSE,
     }),
   'founder-event': () =>
     founderEvent({

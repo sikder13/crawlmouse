@@ -41,7 +41,12 @@ describe('docs/specs/v2/01-accounts.md', () => {
       'agency_trial_consent_at',
       'internal',
     ]);
-    expect(byTable.seats!.hiddenColumns).toEqual(['invite_token_hash']);
+    // 031 adds the invitation's expiry and number, which no client reads.
+    expect(byTable.seats!.hiddenColumns).toEqual([
+      'invite_token_hash',
+      'invite_expires_at',
+      'invite_seq',
+    ]);
     expect(byTable.trial_ledger!.authenticatedColumns).toBeNull();
     for (const t of catalog.tables) {
       expect(t.grants.anon, t.name).toEqual([]);

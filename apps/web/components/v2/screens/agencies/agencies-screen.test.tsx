@@ -95,10 +95,10 @@ describe('For agencies names only capabilities it can account for', () => {
 describe('the matcher finds an untagged mention', () => {
   it('reports a coming capability named outside its tag', () => {
     const doc = new JSDOM(
-      '<p data-capability="free_audit">Audit it free.</p><p>Your client matrix.</p>',
+      '<p data-capability="free_audit">Audit it free.</p><p>Your one-pager.</p>',
     ).window.document;
     const node = doc.querySelectorAll('p')[1]!.firstChild!;
-    expect(CAPABILITIES.client_matrix.named!.test(node.textContent!)).toBe(true);
-    expect(carried(node).has('client_matrix')).toBe(false);
+    expect(CAPABILITIES.one_pagers.named!.test(node.textContent!)).toBe(true);
+    expect(carried(node).has('one_pagers')).toBe(false);
   });
 });

@@ -11,8 +11,9 @@ import { supabaseServer } from '@/lib/supabase/server';
 import { isId } from '@/lib/v2/account/route';
 import { readAccount, siteOfCaller } from '@/lib/v2/account/pages';
 import { readNextChecks } from '@/lib/v2/account/sites-store';
-import { viewAt } from '@/lib/v2/view/account';
-import { accountShellView } from '@/lib/v2/view/account-shell';
+import { chosenFromRequest, readViewer } from '@/lib/v2/account/viewer';
+import { readerRole, viewAt } from '@/lib/v2/view/account';
+import { accountShellView, withSwitcher } from '@/lib/v2/view/account-shell';
 import { sitePage } from '@/lib/v2/view/site';
 import { noticeLine } from '@/lib/v2/copy/notices';
 
@@ -29,6 +30,10 @@ export const metadata: Metadata = {
  * malformed id, a site that does not exist, a removed one, or one on an account the caller does
  * not sit on; the sign-in page for a caller who is not signed in. It seeds the account's default
  * alert rules before it reads them (CC-28 S4).
+ *
+ * The page shows the site's own account, which for a caller with several seats need not be the one
+ * they act in (CC-31 D2b). Then the rail says so, offers the switch to the site's account, and
+ * leaves out Keep and the billing links, whose routes act on the account acted in.
  */
 export default async function SitePage({
   params,
@@ -52,19 +57,40 @@ export default async function SitePage({
   // account's site lists its six rules before it ever opens /alerts or its first alert runs.
   await seedDefaultAlertRules(supabaseAdmin(), site.accountId);
   const { d, viewer } = await readAccount(session, site.accountId, site.seatId, now);
+  const found = await readViewer(
+    { session, admin: supabaseAdmin(), now: () => now },
+    { id: user.id, email: user.email ?? null },
+    await chosenFromRequest(),
+  );
+  // A caller the viewer cannot place on one account acts in none: the rail has no switcher.
+  const reader =
+    found.kind === 'viewer'
+      ? { accounts: found.viewer.accounts, actingIn: found.viewer.account.id }
+      : null;
   // The scheduler's own column (CC-28 D8), read once the caller's seat is established.
   const page = sitePage(d, viewer, id, await readNextChecks(supabaseAdmin(), [id]));
   const notice = noticeLine(await searchParams, d.accounts[0]!.timezone);
+  const account = viewAt(d, viewer);
   return (
     <LiveActions>
       {page.kind === 'site' ? (
         <SiteScreen
           data={page.site}
-          shell={accountShellView(viewAt(d, viewer), 'Sites')}
+          shell={accountShellView(account, 'Sites', {
+            role: readerRole(account) ?? 'developer',
+            ...reader,
+          })}
           notice={notice}
         />
       ) : (
-        <FirstCheckScreen data={page.first} notice={notice} />
+        <FirstCheckScreen
+          data={
+            reader
+              ? withSwitcher(page.first, reader.accounts, site.accountId, reader.actingIn)
+              : page.first
+          }
+          notice={notice}
+        />
       )}
     </LiveActions>
   );

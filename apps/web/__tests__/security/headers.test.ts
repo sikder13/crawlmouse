@@ -137,6 +137,34 @@ describe('the sign-in landing keeps its stricter referrer policy', () => {
   });
 });
 
+describe('share links and the pages they lead to send no referrer', () => {
+  it.each([
+    '/s/kJ8sT2mQ9x_p4VnR7bWc-A',
+    '/s/view/6f1c2a8e-0000-4000-8000-000000000000',
+    '/s/pause',
+    '/s/decline',
+    '/s',
+  ])('%s: Referrer-Policy no-referrer, every other header as on a page', async (path) => {
+    vi.stubEnv('NEXT_PUBLIC_SENTRY_DSN', '');
+    expect(await headersFor(path)).toEqual({
+      ...COMMON,
+      'referrer-policy': 'no-referrer',
+      'x-frame-options': 'DENY',
+      'content-security-policy': enforced("'none'", false),
+      'content-security-policy-report-only': reportOnly("'none'", false),
+      'reporting-endpoints': null,
+    });
+  });
+
+  it('only under /s: a path that starts with those letters keeps the default', async () => {
+    for (const path of ['/sites', '/seats', '/settings', '/reports/s/x']) {
+      expect((await headersFor(path))['referrer-policy'], path).toBe(
+        'strict-origin-when-cross-origin',
+      );
+    }
+  });
+});
+
 describe('connect-src names the origins the browser calls', () => {
   const connectSrc = async () =>
     (await headersFor('/'))

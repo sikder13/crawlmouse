@@ -6,6 +6,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { isShareToken } from '../v2/reports/share';
 import { scrubDoorSecrets, sentryBrowserOptions, sentryServerOptions } from './sentry-scrub';
 
 const ID = '0b8c6f8e-3c55-4d1b-9a7a-2f0c4f9d6c11';
@@ -63,6 +64,96 @@ describe('scrubDoorSecrets, an id in an audit address', () => {
       url: '/api/checks/[Filtered]/stream',
       method: 'GET',
     });
+  });
+});
+
+describe('scrubDoorSecrets, a seat invitation’s token in its link', () => {
+  const TOKEN = 'Ab3_-'.repeat(8) + 'xyz';
+
+  it('the sample is shaped as the tokens are: 43 base64url characters', () => {
+    expect(TOKEN).toMatch(/^[A-Za-z0-9_-]{43}$/);
+  });
+
+  it.each([
+    ['the link', `/invite/${TOKEN}`, '/invite/[Filtered]'],
+    ['a transaction name', `GET /invite/${TOKEN}`, 'GET /invite/[Filtered]'],
+    ['a query after it', `${ORIGIN}/invite/${TOKEN}?x=1`, `${ORIGIN}/invite/[Filtered]?x=1`],
+    ['encoded slashes', `to=%2Finvite%2F${TOKEN}`, 'to=%2Finvite%2F[Filtered]'],
+    ['lower-case encoding', `to=%2finvite%2f${TOKEN}`, 'to=%2finvite%2f[Filtered]'],
+    ['upper case', `/INVITE/${TOKEN}`, '/INVITE/[Filtered]'],
+  ])('%s', (_, text, scrubbed) => {
+    expect(scrubDoorSecrets({ text }).text).toBe(scrubbed);
+  });
+
+  it('leaves the page the link lands on, and a segment that is not a token', () => {
+    for (const text of [
+      'GET /invite',
+      '/invite?notice=invite_gone',
+      `/invite/${TOKEN}x`,
+      '/invite/short',
+    ]) {
+      expect(scrubDoorSecrets({ text }).text).toBe(text);
+    }
+  });
+});
+
+describe('scrubDoorSecrets, a share link’s token in its path', () => {
+  // A sample of the token's shape, built so that no scanner reads it as a key.
+  const TOKEN = 'Ab3_-'.repeat(4) + 'xy';
+
+  it('the sample is shaped as the tokens are: 22 base64url characters', () => {
+    expect(isShareToken(TOKEN)).toBe(true);
+  });
+
+  it.each([
+    ['the link', `/s/${TOKEN}`, '/s/[Filtered]'],
+    ['a transaction name', `GET /s/${TOKEN}`, 'GET /s/[Filtered]'],
+    ['a full address with a query', `${ORIGIN}/s/${TOKEN}?x=1`, `${ORIGIN}/s/[Filtered]?x=1`],
+    ['encoded slashes', `to=%2Fs%2F${TOKEN}`, 'to=%2Fs%2F[Filtered]'],
+    ['lower-case encoding', `to=%2fs%2f${TOKEN}`, 'to=%2fs%2f[Filtered]'],
+    ['upper case', `/S/${TOKEN}`, '/S/[Filtered]'],
+    ['a Referer header', `referer: ${ORIGIN}/s/${TOKEN}`, `referer: ${ORIGIN}/s/[Filtered]`],
+  ])('%s', (_, text, scrubbed) => {
+    expect(scrubDoorSecrets({ text }).text).toBe(scrubbed);
+  });
+
+  it('leaves the proof page’s address, and a segment that is not a token', () => {
+    for (const text of [
+      `/s/view/${ID}`,
+      'GET /s/view/[reportId]',
+      `/s/${TOKEN}x`,
+      '/s/short',
+      `/reports/${TOKEN}`,
+    ]) {
+      expect(scrubDoorSecrets({ text }).text).toBe(text);
+    }
+  });
+});
+
+describe('scrubDoorSecrets, a report recipient’s token in its link', () => {
+  const TOKEN = 'Ab3_-'.repeat(8) + 'xyz';
+
+  it.each([
+    ['the confirmation link', `/s/confirm/${TOKEN}`, '/s/confirm/[Filtered]'],
+    ['the pause link', `/s/pause/${TOKEN}`, '/s/pause/[Filtered]'],
+    ['a one-click POST', `POST /s/pause/${TOKEN}`, 'POST /s/pause/[Filtered]'],
+    ['a full address', `${ORIGIN}/s/confirm/${TOKEN}?x=1`, `${ORIGIN}/s/confirm/[Filtered]?x=1`],
+    ['encoded slashes', `to=%2Fs%2Fpause%2F${TOKEN}`, 'to=%2Fs%2Fpause%2F[Filtered]'],
+    ['upper case', `/S/PAUSE/${TOKEN}`, '/S/PAUSE/[Filtered]'],
+  ])('%s', (_, text, scrubbed) => {
+    expect(scrubDoorSecrets({ text }).text).toBe(scrubbed);
+  });
+
+  it('leaves the pages the links land on, and a segment that is not a token', () => {
+    for (const text of [
+      'GET /s/confirm',
+      '/s/pause?notice=report_paused',
+      `/s/confirm/${TOKEN}x`,
+      '/s/pause/short',
+      `/s/other/${TOKEN}`,
+    ]) {
+      expect(scrubDoorSecrets({ text }).text).toBe(text);
+    }
   });
 });
 
