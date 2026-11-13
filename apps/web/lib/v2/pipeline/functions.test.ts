@@ -391,8 +391,8 @@ describe('no registered function can declare a concurrency limit above the plan 
                 (flag === '1' ? 10 : 5) +
                   (billing === '1' ? 2 : 0) +
                   (pub === '1' ? 3 + MAIL_IDS.length : 0) +
-                  // CC-33's founder functions, with either flag.
-                  (pub === '1' || billing === '1' ? FOUNDER_IDS.length : 0) +
+                  // CC-33's founder functions and their failure handlers, with either flag.
+                  (pub === '1' || billing === '1' ? 2 * FOUNDER_IDS.length : 0) +
                   // CC-28's scheduler tick, and its alert and summary functions.
                   (pub === '1' && flag === '1' ? 1 + MONITOR_IDS.length : 0),
               );
@@ -409,6 +409,7 @@ describe('no registered function can declare a concurrency limit above the plan 
               }
               for (const id of FOUNDER_IDS) {
                 expect(ids.includes(id), id).toBe(pub === '1' || billing === '1');
+                expect(ids.includes(`${id}-failure`), id).toBe(pub === '1' || billing === '1');
               }
               if (billing === '1') {
                 expect(configs.map((c) => c.id)).toEqual(

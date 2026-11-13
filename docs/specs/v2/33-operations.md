@@ -46,8 +46,8 @@ status-page vendor, switching any flag.
   a recovery, nothing else). For a recovery the notice then throws `FounderStripeUnread` before
   claiming anything, and Inngest retries the step (FOUNDER_RETRIES, 4). When the retries are spent
   the run is marked failed in Inngest's dashboard under `crawlmouse.founder.entitlement`, with that
-  error's message; no notice was mailed or claimed, and the function's log holds one
-  `founder.stripe_unread` line an attempt. Any other notice is sent with Stripe unread
+  error's message, and reported to Sentry as below; no notice was mailed or claimed, and the
+  function's log holds one `founder.stripe_unread` line an attempt. Any other notice is sent with Stripe unread
   (`apps/web/lib/v2/ops/founder.test.ts`, "review N3"). The amount is the invoice's `amount_paid` when its status is `paid`, and otherwise its
   `amount_due`, said to be unpaid, with Stripe's status (`apps/web/lib/v2/ops/founder.test.ts`,
   "review C2" and "review C3"). A payment notice is headed as a payment only when Stripe shows its
@@ -59,6 +59,15 @@ status-page vendor, switching any flag.
   (docs.stripe.com/billing/invoices/subscription, "Update the first invoice of a subscription"), and
   the charge that follows has no notice, since billing records `invoice.paid` without an entitlement change
   (`apps/web/lib/billing/state-machine.ts`, `'invoice.paid': 'recorded_only'`).
+- **A founder function that fails.** A run of `crawlmouse.founder.entitlement`, `.sweep` or
+  `.digest` that fails past its retries runs that function's `onFailure`, which Inngest registers as
+  `<id>-failure` (inngest 3.54.2, `components/InngestFunction.js`, `getConfig`). It raises Sentry's
+  `founder-notice-failed` at level `error`, tagged `signal: founder-notice-failed` and
+  `function: <id>`, with Inngest's run id as an extra and nothing of the run's error, so no address
+  (`inngest/founder.test.ts` and `apps/web/lib/v2/ops/founder-signal.test.ts`, "review M3"). The
+  founder sees a Sentry issue under that message, and the run id finds the run in Inngest's
+  dashboard. Sentry's issue alerts, read on 2026-11-13, include none on this message; a page needs
+  one, added as `docs/ops/uptime.md` asks for `signin-canary`.
 - **Sign-ups** are announced once Supabase Auth shows the address confirmed. The sweep reads users
   created in the 7 days before it runs (`apps/web/lib/v2/ops/founder.test.ts` asserts the window), so
   a user still unconfirmed 7 days after signing up is not announced. A sign-up whose notice was

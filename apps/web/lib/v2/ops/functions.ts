@@ -1,7 +1,8 @@
 /**
  * CC-33's Inngest functions as production wires them, for the serve route's list
  * (lib/v2/pipeline/functions.ts): the founder's notices (D3) with V2_BILLING or V2_CHECKS_PUBLIC set
- * to `1`, and the sign-in canary (D6) as well when SIGNIN_CANARY_TO is one plain address; its link is
+ * to `1`, each reporting a run failed past its retries through `reportFounderFailure`
+ * (founder-signal.ts), and the sign-in canary (D6) as well when SIGNIN_CANARY_TO is one plain address; its link is
  * asked for through `requestSignInLink` unless a test passes another `SignInLink`. Everything is built when a function runs, not when the route loads.
  */
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
@@ -24,6 +25,7 @@ import { supabaseMailLedger } from '../mail/ledger';
 import { resendTransport } from '../mail/transport';
 import { canaryWork, reportCanary, type SignInLink } from './canary';
 import { digest, entitlementNotice, sweep, type FounderDeps, type PaymentRecord } from './founder';
+import { reportFounderFailure } from './founder-signal';
 import { supabaseFounderStore } from './founder-store';
 import { requestSignInLink } from './sign-in-link';
 
@@ -114,9 +116,9 @@ export function opsFunctions(
     };
   };
   const fns: InngestFunction.Like[] = [
-    createFounderEntitlementFn(work),
-    createFounderSweepFn(work),
-    createFounderDigestFn(work),
+    createFounderEntitlementFn(work, reportFounderFailure),
+    createFounderSweepFn(work, reportFounderFailure),
+    createFounderDigestFn(work, reportFounderFailure),
   ];
   const canaryTo = env.SIGNIN_CANARY_TO?.trim() ?? '';
   if (canaryTo !== '' && isPlainAddress(canaryTo)) {
