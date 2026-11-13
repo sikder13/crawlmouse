@@ -6,7 +6,7 @@
  *
  *   pnpm --filter @crawlmouse/scripts exec tsx golive/checklist.ts --write
  */
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { format, resolveConfig } from 'prettier';
@@ -77,6 +77,12 @@ if (
   fileURLToPath(import.meta.url) === process.argv[1] &&
   process.argv.includes('--write')
 ) {
-  const current = existsSync(GO_LIVE_PATH) ? readFileSync(GO_LIVE_PATH, 'utf8') : null;
+  // One read that may find no file, rather than a check then a read (CodeQL js/file-system-race).
+  let current: string | null = null;
+  try {
+    current = readFileSync(GO_LIVE_PATH, 'utf8');
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+  }
   writeFileSync(GO_LIVE_PATH, await renderFile(current));
 }

@@ -221,7 +221,7 @@ export const PRECONDITIONS: readonly Precondition[] = [
   {
     id: 'cc36-v1-accounts',
     mustBeTrue:
-      "v1's users, the owner's Pro among them, have v2 accounts (the backfill), and users.pro_until's readers are moved before migration 009 drops it",
+      "v1's users, the owner's Pro among them, have v2 accounts (the backfill), and the readers of v1's Pro-expiry column on users are moved before migration 009 drops it (the list: docs/specs/v2/01-accounts.md)",
     why: 'a user from before migration 001 has no v2 account until the backfill, so the door cannot attach their site (spec 25)',
     source: 'docs/specs/v2/25-account-door.md:157',
     gates: 3,

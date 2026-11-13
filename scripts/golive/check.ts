@@ -16,7 +16,7 @@
  * carried are redacted from everything the command writes, by the rules in redact.ts.
  */
 import { execFile } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CATALOG } from '../../apps/web/lib/billing/catalog';
@@ -43,6 +43,16 @@ import { VERCEL_PROJECT_ID, VERCEL_TEAM_ID } from './probes/vercel-env';
 import { WORKER_APP, WORKER_URL } from './probes/worker';
 import { Redactor, TOKEN_ENV } from './redact';
 import { STEPS, STEP_TITLE, isStep, type Step } from './steps';
+
+/** The file's text, or null when there is none: one read, not a check then a read. */
+function readIfPresent(path: string): string | null {
+  try {
+    return readFileSync(path, 'utf8');
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
+    throw error;
+  }
+}
 
 export const USAGE = 'usage: pnpm golive:check -- [--step 1-5] [--ticked id,id] [--env-file path]';
 export const DEFAULT_ENV_FILE = join(REPO_ROOT, 'scripts/.env.local');
@@ -235,7 +245,7 @@ export async function main(
       err(USAGE);
       return 2;
     }
-    const read = deps.readFile ?? ((p: string) => (existsSync(p) ? readFileSync(p, 'utf8') : null));
+    const read = deps.readFile ?? readIfPresent;
     args.envFile = resolveEnvFile(args.envFile, deps.processEnv.INIT_CWD);
     const text = read(args.envFile);
     const fileEnv = text === null ? {} : parseEnvFile(text);
@@ -290,9 +300,7 @@ function gitRunner(args: readonly string[]): Promise<GitResult> {
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   // Anything written outside main (a library's warning, an unhandled rejection) passes the same
   // redaction: the token values are registered before any probe runs.
-  const early = earlyRedactor(process.argv.slice(2), process.env, (p) =>
-    existsSync(p) ? readFileSync(p, 'utf8') : null,
-  );
+  const early = earlyRedactor(process.argv.slice(2), process.env, (p) => readIfPresent(p));
   for (const stream of [process.stdout, process.stderr]) {
     const write = stream.write.bind(stream) as (chunk: unknown, ...rest: unknown[]) => boolean;
     stream.write = ((chunk: unknown, ...rest: unknown[]) =>
