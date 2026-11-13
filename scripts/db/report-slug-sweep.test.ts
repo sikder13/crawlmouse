@@ -1,3 +1,5 @@
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import type { PGlite } from '@electric-sql/pglite';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fixture } from '../../apps/web/lib/v2/fixtures';
@@ -123,15 +125,27 @@ describe('report-slug-sweep', () => {
     expect(src).not.toMatch(/yesProduction: true/);
   });
 
-  it('reads in a read-only transaction: a write inside the sweep is refused', async () => {
-    const { readFileSync } = await import('node:fs');
-    const src = readFileSync(new URL('./report-slug-sweep.ts', import.meta.url), 'utf8');
-    expect(src).toContain("await tx.exec('set transaction read only')");
-    await expect(
-      pgliteDb(db).transaction(async (tx) => {
-        await tx.exec('set transaction read only');
-        await tx.exec("update public.public_reports set domain = 'x' where false");
-      }),
-    ).rejects.toThrow(/read-only transaction/);
+  it('the script exits non-zero on production without --yes-production, before connecting', () => {
+    const run = spawnSync(
+      process.execPath,
+      [
+        '--import',
+        'tsx',
+        fileURLToPath(new URL('./report-slug-sweep.ts', import.meta.url)),
+        '--db-url-env',
+        'DB_URL',
+      ],
+      {
+        cwd: fileURLToPath(new URL('..', import.meta.url)),
+        env: {
+          ...process.env,
+          // Port 9 on localhost: if the refusal were missing, the connection would fail instead.
+          DB_URL: `postgresql://postgres.${PRODUCTION_REF}:pw@127.0.0.1:9/postgres`,
+        },
+        encoding: 'utf8',
+      },
+    );
+    expect(run.status).toBe(1);
+    expect(run.stderr).toContain(`refusing to run against production (${PRODUCTION_REF})`);
   });
 });

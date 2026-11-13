@@ -16,6 +16,7 @@ import { JSDOM } from 'jsdom';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { AgencyTrialScreen } from '../../components/v2/screens/agency-trial/AgencyTrialScreen';
+import { AGENCY_PLUS_INBOX } from '../../lib/v2/mail/templates/agency-plus-contact';
 import { PricingScreen } from '../../components/v2/screens/pricing/PricingScreen';
 import * as authFlags from '../../lib/auth/flags';
 import * as billingFlags from '../../lib/billing/flags';
@@ -309,5 +310,27 @@ describe('the Pro column’s words follow its button, under each flag combinatio
       '/login checksPublic=true',
       '/signup',
     ]);
+  });
+});
+
+// Security R3-1 / scoped review L3: where the contact form is not offered, the card links the inbox
+// the form would have mailed, and nothing else.
+describe('the Agency Plus fallback', () => {
+  it('links mailto: the mailed inbox exactly while V2_CHECKS_PUBLIC is off', () => {
+    for (const env of ENVS) {
+      const flags = {
+        accountDoor: authFlags.accountDoorEnabled(env),
+        checksPublic: authFlags.checksPublicEnabled(env),
+      };
+      const html = renderToStaticMarkup(
+        <PricingScreen view={pricingView({ kind: 'signed_out' }, 'month', NOW, flags)} />,
+      );
+      const mailtos = [
+        ...new JSDOM(html).window.document.querySelectorAll('a[href^="mailto:"]'),
+      ].map((a) => a.getAttribute('href'));
+      expect(mailtos, JSON.stringify(env)).toEqual(
+        flags.checksPublic ? [] : [`mailto:${AGENCY_PLUS_INBOX}`],
+      );
+    }
   });
 });

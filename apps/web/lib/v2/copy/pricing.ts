@@ -29,7 +29,6 @@ import { CANCEL_CLICKS, EVIDENCE_CONDENSED_AFTER_DAYS } from './settings';
 import { capitalise, count, numberWord, plural } from '../words';
 
 /** FACTS A3: the Agency Plus anchor row. A contact form only; nothing is built behind it. */
-
 export const AGENCY_PLUS = Object.freeze({ sites: 100, seats: 15, fromMonthly: 249 });
 
 /** FACTS L6: an annual subscriber is emailed this many days before the renewal. */
