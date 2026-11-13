@@ -144,6 +144,8 @@ export interface ConsoleStore {
   rerunTarget(checkId: string): Promise<RerunTarget | null>;
   logSearch(kind: ResolvedKind, found: number): Promise<number>;
   logView(accountId: string): Promise<number>;
+  /** One `list_accounts` line for each id, in order, written before a listing reads them. */
+  logList(accountIds: readonly string[]): Promise<void>;
   /** The re-send's row, written before the link is asked for; its outcome is set by `finish`. */
   logResend(accountId: string, userId: string, reason: string): Promise<number>;
   finish(actionId: number, outcome: ResendOutcome): Promise<boolean>;
@@ -176,7 +178,7 @@ export function supabaseConsoleStore(admin: SupabaseClient, operatorId: string):
     ).map((r) => r.id);
 
   async function log(
-    action: 'search' | 'view_account' | 'resend_sign_in',
+    action: 'search' | 'list_accounts' | 'view_account' | 'resend_sign_in',
     account: string | null,
     target: string,
     reason: string | null,
@@ -408,6 +410,9 @@ export function supabaseConsoleStore(admin: SupabaseClient, operatorId: string):
 
     logSearch: (kind, found) => log('search', null, kind, null, String(found)),
     logView: (accountId) => log('view_account', accountId, accountId, null, null),
+    async logList(accountIds) {
+      for (const id of accountIds) await log('list_accounts', id, id, null, null);
+    },
     logResend: (accountId, userId, reason) =>
       log('resend_sign_in', accountId, userId, reason, null),
 

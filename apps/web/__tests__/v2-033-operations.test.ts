@@ -422,6 +422,15 @@ describe('operator_log', () => {
     ]);
   });
 
+  it('writes a list_accounts row for an account a listing showed', async () => {
+    const op = await operator();
+    const { accountId } = await personalAccount(db, await person());
+    await call<number>('operator_log', [op, 'list_accounts', accountId, accountId, null, null]);
+    expect(await actionsOf(op)).toEqual([
+      expect.objectContaining({ action: 'list_accounts', account_id: accountId }),
+    ]);
+  });
+
   it('refuses a caller who is not an operator, and writes nothing', async () => {
     const someone = await person();
     await expect(

@@ -10,8 +10,11 @@ export const dynamic = 'force-dynamic';
 
 /**
  * The support console's search page (CC-33 D2). Anyone but an operator gets 404, before anything is
- * read. `?accounts=<id>,<id>` (ids only, at most 20, as the search route writes it) lists those
- * accounts; `?found=0` says the last search found nothing.
+ * read. `?accounts=<id>,<id>` (as the search route writes it) lists those accounts: the ids that are
+ * uuids, without repeats, the first 20 of them, recorded in `operator_actions` as one `list_accounts`
+ * line an id before any is read (page.test.tsx); a listing that cannot be recorded is not shown (the
+ * log's error is thrown).
+ * `?found=0` says the last search found nothing.
  */
 export default async function ConsolePage({
   searchParams,
@@ -25,6 +28,11 @@ export default async function ConsolePage({
     typeof q.accounts === 'string'
       ? [...new Set(q.accounts.split(',').filter(isId))].filter((_, i) => i < SEARCH_RESULTS_MAX)
       : [];
-  const results = ids.length ? resultsView(ids, await consoleStore(proof).summaries(ids)) : null;
+  let results = null;
+  if (ids.length) {
+    const store = consoleStore(proof);
+    await store.logList(ids);
+    results = resultsView(ids, await store.summaries(ids));
+  }
   return <ConsoleSearchScreen results={results} nothingFound={q.found === '0'} />;
 }

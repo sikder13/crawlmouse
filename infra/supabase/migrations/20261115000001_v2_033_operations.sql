@@ -136,7 +136,7 @@ create table if not exists public.operator_actions (
   operator_id uuid not null,
   action text not null
     constraint operator_actions_action_check
-    check (action in ('search', 'view_account', 'rerun_check', 'resend_sign_in')),
+    check (action in ('search', 'list_accounts', 'view_account', 'rerun_check', 'resend_sign_in')),
   account_id uuid,
   target text
     constraint operator_actions_target_check
@@ -158,9 +158,10 @@ revoke all on table public.operator_actions from public, anon, authenticated, se
 grant select, insert on table public.operator_actions to service_role;
 
 -- ─── operator_log ────────────────────────────────────────────────────────────────────────────────
--- Writes one search, view_account or resend_sign_in row and answers its id. p_outcome is known when
--- the row is written for a search (how many accounts it found) and null otherwise; a re-send's is set
--- afterwards by operator_finish. p_operator must be in operators (42501 otherwise). A re-run is
+-- Writes one search, list_accounts, view_account or resend_sign_in row and answers its id
+-- (list_accounts: a row for an account a search listing shows, written before the listing reads it).
+-- p_outcome is known when the row is written for a search (how many accounts it found) and null
+-- otherwise; a re-send's is set afterwards by operator_finish. p_operator must be in operators (42501 otherwise). A re-run is
 -- recorded by operator_request_check, in the call that queues it, so rerun_check is refused here
 -- (22023). Security invoker: service_role holds the insert.
 
