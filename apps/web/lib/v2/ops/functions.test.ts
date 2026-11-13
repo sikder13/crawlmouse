@@ -5,10 +5,26 @@ import {
   FOUNDER_SWEEP_FN_ID,
 } from '../../../../../inngest/founder';
 import { SIGNIN_CANARY_FN_ID } from '../../../../../inngest/signin-canary';
-import { opsFunctions, stripePayment, type StripeReads } from './functions';
+import { stripeAccount } from '../../billing/stripe-account';
+import { founderDeps, opsFunctions, stripePayment, type StripeReads } from './functions';
+import { requestSignInLink } from './sign-in-link';
 
 // stripe-account.ts imports 'server-only', which throws outside Next.
 vi.mock('server-only', () => ({}));
+
+/** The service-role client production builds: Auth's user read and the canary's delivery look. */
+const sb = vi.hoisted(() => ({
+  auth: { admin: { getUserById: vi.fn() } },
+  rpc: vi.fn(async () => ({ data: true, error: null })),
+}));
+vi.mock('@supabase/supabase-js', () => ({ createClient: vi.fn(() => sb) }));
+vi.mock('./sign-in-link', () => ({ requestSignInLink: vi.fn(async () => 'sent') }));
+vi.mock('../../billing/stripe-account', () => ({ stripeAccount: vi.fn() }));
+
+const ENV = {
+  NEXT_PUBLIC_SUPABASE_URL: 'https://project.supabase.example',
+  SUPABASE_SERVICE_ROLE_KEY: ['service', 'role', 'x'].join('_'),
+};
 
 const ids = (fns: readonly unknown[]) =>
   fns.flatMap((fn) =>
@@ -49,8 +65,66 @@ describe('opsFunctions', () => {
       );
   });
 
-  it("asks for the canary's link through requestSignInLink unless another is given", () => {
-    expect(ids(opsFunctions({ V2_BILLING: '1', SIGNIN_CANARY_TO: TO }))).toContain(CANARY);
+  it("asks for the canary's link through requestSignInLink unless another is given (review T5)", async () => {
+    const fns = opsFunctions({ ...ENV, V2_BILLING: '1', SIGNIN_CANARY_TO: TO });
+    const canary = fns.find((fn) => ids([fn])[0] === CANARY) as unknown as {
+      fn: (c: unknown) => Promise<unknown>;
+    };
+    const step = {
+      run: async (_id: string, fn: () => unknown) => fn(),
+      sleep: async () => undefined,
+    };
+    expect(await canary.fn({ step })).toEqual({ requested: 'sent', delivered: true });
+    expect(vi.mocked(requestSignInLink).mock.calls).toEqual([[TO]]);
+  });
+});
+
+describe('founderDeps, as production wires D3 (review T2)', () => {
+  it('has no recipient with FOUNDER_NOTIFY_TO unset, and the one set otherwise', () => {
+    expect(founderDeps(ENV).to).toBeNull();
+    const to = ['founder', 'example.test'].join('@');
+    expect(founderDeps({ ...ENV, FOUNDER_NOTIFY_TO: to }).to).toBe(to);
+  });
+
+  it('reads confirmation from Auth’s email_confirmed_at: a user without one is not confirmed', async () => {
+    const d = founderDeps(ENV);
+    const user = (email_confirmed_at: string | null) => ({
+      data: { user: { id: 'u1', email_confirmed_at } },
+      error: null,
+    });
+    sb.auth.admin.getUserById.mockResolvedValueOnce(user('2026-11-13T10:00:00Z'));
+    expect(await d.confirmed('u1')).toBe(true);
+    sb.auth.admin.getUserById.mockResolvedValueOnce(user(null));
+    expect(await d.confirmed('u1')).toBe(false);
+    sb.auth.admin.getUserById.mockResolvedValueOnce({ data: { user: null }, error: null });
+    expect(await d.confirmed('u1')).toBe(false);
+    sb.auth.admin.getUserById.mockResolvedValueOnce({
+      data: { user: null },
+      error: { status: 500 },
+    });
+    await expect(d.confirmed('u1')).rejects.toThrow('getUserById: 500');
+    expect(sb.auth.admin.getUserById).toHaveBeenLastCalledWith('u1');
+  });
+
+  it('reads the payment from the deploy’s Stripe account', async () => {
+    const latest = {
+      id: 'in_1',
+      status: 'open',
+      amount_paid: 0,
+      amount_due: 1900,
+      currency: 'usd',
+    };
+    vi.mocked(stripeAccount).mockReturnValue({
+      subscriptions: {
+        retrieve: vi.fn(async () => ({ customer: 'cus_1', latest_invoice: latest })),
+      },
+      invoices: { list: vi.fn(async () => ({ data: [], has_more: false })) },
+    } as unknown as ReturnType<typeof stripeAccount>);
+    expect(await founderDeps(ENV).payment('sub_1')).toEqual({
+      invoice: { status: 'open', amountPaid: 0, amountDue: 1900, currency: 'usd' },
+      earlier: 'none',
+    });
+    expect(vi.mocked(stripeAccount)).toHaveBeenCalledWith(ENV);
   });
 });
 
