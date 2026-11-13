@@ -241,8 +241,9 @@ export interface DeleteExpiredResult {
 
 /**
  * Delete expired audits in bounded id-chunks instead of one unscoped statement, keeping every
- * expired audit that a published report names, one neither taken down nor hidden (C-4: deleting it would set the report's
- * `audit_id` null, through the FK's `on delete set null`, and cut the report's link to it).
+ * expired audit that a published report names, one neither taken down nor hidden (C-4: deleting
+ * it would set the report's `audit_id` null, through the FK's `on delete set null`, and cut the
+ * report's link to it).
  *
  * Each batch reads up to `batchSize` expired ids after the last id the batch before it read, in id
  * order. The id is the primary key, so the order is total: a kept audit is read once per run and

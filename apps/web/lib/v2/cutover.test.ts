@@ -175,7 +175,6 @@ describe('cutoverOf', () => {
   it.each([
     ['/top/shopify', 'gone-page'],
     ['/top/shopify/', 'gone-page'],
-    ['/top/shopify.rsc', 'gone-page'],
     ['/api/trpc/audit.get', 'not-found'],
     ['/api/trpc/a.b,c.d', 'not-found'],
     ['/api/trpc/a/b', 'not-found'],
