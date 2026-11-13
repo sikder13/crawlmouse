@@ -115,8 +115,9 @@ describe('the client page against Final-Ag-Client', () => {
     const table = new JSDOM(main(html)).window.document.querySelector(
       'table[aria-label="Open fixes"]',
     )!;
-    const fixes = clientPreview(CLIENT);
-    if (fixes.kind !== 'client') throw new Error(`expected the client page, got ${fixes.kind}`);
+    const page = clientPreview(CLIENT);
+    if (page?.kind !== 'client') throw new Error(`expected the client page, got ${page?.kind}`);
+    const fixes = page.fixes.rows;
     const rows = [...table.querySelectorAll('tbody tr')];
     expect(rows.length).toBeGreaterThan(0);
     /** A row's header cells as text, without the "new" pill a title may carry. */
@@ -126,11 +127,11 @@ describe('the client page against Final-Ag-Client', () => {
         for (const pill of cell.querySelectorAll('[data-v2-pill]')) pill.remove();
         return cell.textContent!.trim();
       });
-    expect(rows.map(heads)).toEqual(fixes.fixes.rows.map((f) => [f.title]));
+    expect(rows.map(heads)).toEqual(fixes.map((f) => [f.title]));
     // The rank stays the row's first cell, as the locked screen draws it, and is not the header.
     expect(
       rows.map((tr) => [tr.firstElementChild!.tagName, tr.firstElementChild!.textContent]),
-    ).toEqual(fixes.fixes.rows.map((f) => ['TD', String(f.number)]));
+    ).toEqual(fixes.map((f) => ['TD', String(f.number)]));
     // Each row has the control its header is read with: the link to the fix's packet.
     for (const tr of rows) expect(tr.querySelector('td a, td button')).not.toBeNull();
   });
