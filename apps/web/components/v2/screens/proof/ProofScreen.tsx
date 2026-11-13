@@ -34,7 +34,9 @@ export function ProofScreen({ data }: { data: ProofView }) {
               </Heading>
             ) : null}
             {section.blocks.map((block, j) => (
-              <Block key={j} block={block} />
+              // A pair's title sits one level under its section's heading, or under the page's
+              // title where the section has none, so the outline has no gap.
+              <Block key={j} block={block} pairLevel={section.heading ? 3 : 2} />
             ))}
           </section>
         ))}
@@ -62,7 +64,7 @@ export function ProofScreen({ data }: { data: ProofView }) {
   );
 }
 
-function Block({ block }: { block: ProofBlockView }) {
+function Block({ block, pairLevel }: { block: ProofBlockView; pairLevel: 2 | 3 }) {
   switch (block.type) {
     case 'text':
       return <p className={styles.text}>{block.text}</p>;
@@ -84,6 +86,9 @@ function Block({ block }: { block: ProofBlockView }) {
         <Card className={styles.tableCard}>
           <Table
             label={block.label}
+            // The first cell names its row where each row has one: an empty header cell names
+            // nothing, so a table with such a row keeps plain cells.
+            rowHeader={block.rows.every((cells) => (cells[0] ?? '').trim() !== '')}
             heading={block.caption ? <p className={styles.caption}>{block.caption}</p> : null}
             columns={block.columns.map((header) => ({ header }))}
             rows={block.rows.map((cells, i) => ({ key: String(i), cells }))}
@@ -94,7 +99,7 @@ function Block({ block }: { block: ProofBlockView }) {
       return (
         <Card as="article" className={styles.card}>
           {block.title ? (
-            <Heading level={3} size="s">
+            <Heading level={pairLevel} size="s">
               {block.title}
             </Heading>
           ) : null}

@@ -476,7 +476,8 @@ name a packet carries, the report row's sender, and the seat row's alert channel
 ### Both pages
 
 `noindex`, `force-dynamic`, a 404 while `V2_CHECKS_PUBLIC` is off, and the sign-in page for a caller
-who is not signed in. Neither has a `loading.tsx`: `find apps/web/app -name loading.tsx` prints no
+who is not signed in. Each has a document title of its own ("Clients", "Client"), as `/seats`
+("Seats") and `/reports/[id]` ("Report") have; each page's test reads its `metadata`. Neither has a `loading.tsx`: `find apps/web/app -name loading.tsx` prints no
 file in this tree.
 
 Previews, in `app/(v2-preview)/v2-preview/_preview/agency.ts`: the matrix; no client; a client not
@@ -684,8 +685,17 @@ pnpm --filter @crawlmouse/web exec vitest run 'app/s/view/[reportId]/page.test.t
 ```
 
 Previews: `/v2-preview/screens/proof` (two grades moved), `/proof/fix` (a fix verified) and
-`/proof/baseline`. Their documents are stand-ins written in `_preview/proof.ts`; the generator's own
-documents replace them once it is on the branch.
+`/proof/baseline`. The first and the last are the generator's own documents, `compareDoc` of
+bad-site's fifth and sixth checks and `baselineDoc` of clean-site's check, built in
+`_preview/proof.ts` as `POST /api/reports` builds them; the test below compares each with the
+builder's output. The fix's document is written by hand there, not made by `fixProofDoc`: no fixture
+holds a fix a check verified. It shows the layout of a pair with facts under it, and its sentences
+are a stand-in.
+
+The outline has no gap: a pair's title is an `h3` under its section's heading, and an `h2` in a
+section that has none. A table's first cell is its row's header (`th scope="row"`) where each row
+of the table has a first cell that is not empty.
+`pnpm --filter @crawlmouse/web exec vitest run components/v2/screens/proof/ProofScreen.test.tsx -t 'heading order|row a header|generator'`.
 
 ## 10. Download, share and schedules
 

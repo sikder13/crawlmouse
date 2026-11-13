@@ -43,6 +43,18 @@
   overflow: hidden;
 }
 
+/* A row's first cell is its header (`th[scope='row']`). It reads as the row's first cell, in the
+   row's colour, weight and size, where Table's `.table th` is the column header's face. */
+.tableCard tbody th {
+  color: inherit;
+  font-weight: 400;
+  font-size: var(--v2-text-ui);
+}
+
+.tableCard tbody tr:last-child th {
+  border-bottom: 0;
+}
+
 .caption {
   margin: 0;
   padding: 16px 16px 8px;
