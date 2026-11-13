@@ -1,10 +1,11 @@
 /**
- * The help centre's twelve articles (CC-33 D4) as data. Each is titled as the reader's question.
- * Every number is read from the constant that owns it (prices, GATES, the trial, the pipeline's and
- * the account's limits, the grade formulas), and every sentence that names a capability carries its
- * `CAPABILITIES` key, so a coming one renders its "coming" mark. A point the code does not establish
- * is left out; where the tree disagrees with itself (questions.md Q7), the articles state what the v2
- * product does.
+ * The help centre's twelve articles (CC-33 D4) as data, each titled as the reader's question. Their
+ * numbers are read from the constants that own them (prices, GATES, the trial, the pipeline's and
+ * the account's limits, the grade formulas), and a sentence that names a capability carries its
+ * `CAPABILITIES` key, so a coming one renders its "coming" mark; both are held by
+ * `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2/help.test.tsx`. A point the code does
+ * not establish is left out; where the tree disagrees with itself (questions.md Q7), the articles
+ * state what the v2 product does.
  *
  * The articles are built when called, from the values the modules hold then.
  */
