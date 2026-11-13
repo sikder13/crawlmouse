@@ -47,7 +47,7 @@ export const REPORTS_COPY = {
   siteLabel: 'Site',
   show: 'Show',
   pdfTitle: 'PDF audit report',
-  pdfBody: 'Grades, crawler table, every open fix, link map.',
+  pdfBody: 'Grades, crawler table, every open fix, the link map’s figures.',
   brandedOnAgency: 'Under your own name and domain on Agency.',
   branded: 'Under your own name and domain.',
   makePdf: 'Make the PDF',
@@ -135,6 +135,14 @@ export const REPORTS_CHANGES: CopyChange[] = [
     locked: ' 6–9 pages.',
     rendered: '',
     source: 'The fixture records no PDF’s page count: the length is not in fixture (D2)',
+  },
+  {
+    screen: 'reports',
+    kind: 'facts',
+    locked: 'every open fix, link map.',
+    rendered: 'every open fix, the link map’s figures.',
+    source:
+      'What the PDF holds (auditDoc, lib/v2/reports/generate-doc.ts): the structure page’s figures and no drawing of the map',
   },
   {
     screen: 'reports',
