@@ -137,7 +137,7 @@ export async function renderBudget(): Promise<string> {
     "`onFailure` handler's run and steps are more again. The totals are a floor under real traffic.",
     '',
     "v1's audits are left out of the table: each is one run and five steps (`crawlmouse.audit`), and",
-    'the brief measured 85 audits in production in the 30 days to 2026-11-13 (F2).',
+    'the brief measured 85 audits in production in the 30 days to 2026-11-13 (F2), counting every status; the 72 above are the completed ones.',
     '',
     '## The rule (CC-35 D2)',
     '',
@@ -146,9 +146,14 @@ export async function renderBudget(): Promise<string> {
       ? 'It is under the line: the Hobby plan passes `golive:check`.'
       : '**It is over the line: `golive:check` reports the Hobby plan as a failing precondition of `V2_PIPELINE`, and the owner decides the plan (Pro starts at $99 a month for 1M executions) before step 2.**',
     '',
-    `The largest part of the floor is \`crawlmouse.check.reaper\` every ten minutes (${n(
-      cronPerDay(FUNCTIONS.find((f) => f.id === 'crawlmouse.check.reaper')!) * DAYS_PER_MONTH,
-    )} a month).`,
+    ((largest) =>
+      `The largest part of the floor is \`${largest.id}\`, on cron \`${largest.cron}\` (${n(
+        cronPerDay(largest) * DAYS_PER_MONTH,
+      )} a month).`)(
+      [...FUNCTIONS]
+        .filter((f) => f.runsPerDay > 0)
+        .sort((x, y) => cronPerDay(y) - cronPerDay(x))[0]!,
+    ),
     '',
     '## Not confirmed on a running app',
     '',

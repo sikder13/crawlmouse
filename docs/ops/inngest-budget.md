@@ -103,14 +103,14 @@ Every figure is a clean run: a step that fails and is retried is one more execut
 `onFailure` handler's run and steps are more again. The totals are a floor under real traffic.
 
 v1's audits are left out of the table: each is one run and five steps (`crawlmouse.audit`), and
-the brief measured 85 audits in production in the 30 days to 2026-11-13 (F2).
+the brief measured 85 audits in production in the 30 days to 2026-11-13 (F2), counting every status; the 72 above are the completed ones.
 
 ## The rule (CC-35 D2)
 
 The floor plus 1,000 typical checks is **44,058** against the line of 40,000.
 **It is over the line: `golive:check` reports the Hobby plan as a failing precondition of `V2_PIPELINE`, and the owner decides the plan (Pro starts at $99 a month for 1M executions) before step 2.**
 
-The largest part of the floor is `crawlmouse.check.reaper` every ten minutes (8,928 a month).
+The largest part of the floor is `crawlmouse.check.reaper`, on cron `*/10 * * * *` (8,928 a month).
 
 ## Not confirmed on a running app
 

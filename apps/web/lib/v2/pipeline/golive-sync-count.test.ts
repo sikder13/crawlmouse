@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { FUNCTIONS, registered, type Flag } from '../../../../../scripts/golive/budget';
 import { syncedFunctionCount } from '../../../../../scripts/golive/inngest-sync';
 import { STEPS, flagsAfter } from '../../../../../scripts/golive/steps';
 
@@ -25,7 +26,7 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 
-describe("golive:check's Inngest function count per step", () => {
+describe("golive:check's Inngest functions per step", () => {
   it.each(STEPS)(
     'equals what the serve route syncs with the flags set once step %i is done',
     async (step) => {
@@ -33,7 +34,15 @@ describe("golive:check's Inngest function count per step", () => {
       for (const flag of FLAGS) vi.stubEnv(flag, on.has(flag) ? '1' : '');
       vi.resetModules();
       const { inngestFunctions } = await import('./functions');
-      expect(configsOf(inngestFunctions(process.env)).length).toBe(syncedFunctionCount(step));
+      const synced = configsOf(inngestFunctions(process.env)).map((c) => c.id);
+      // The same functions, by id, not only as many: a failure handler syncs as `<id>-failure`.
+      const expected = FUNCTIONS.filter((f) =>
+        registered(f, new Set<Flag>(flagsAfter(step))),
+      ).flatMap((f) =>
+        f.onFailure ? [`crawlmouse-${f.id}`, `crawlmouse-${f.id}-failure`] : [`crawlmouse-${f.id}`],
+      );
+      expect([...synced].sort()).toEqual([...expected].sort());
+      expect(synced.length).toBe(syncedFunctionCount(step));
     },
   );
 });

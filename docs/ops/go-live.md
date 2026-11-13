@@ -2,7 +2,8 @@
 
 Crawlmouse v2 goes live for everyone, one flag at a time, with no beta (owner decision, 2026-11-13).
 Each step below has a check before it and a way back after it: the app's steps (2–5) by Vercel's
-Instant Rollback, the worker (step 1) by returning to its previous Fly release. Nothing here is per
+Instant Rollback; the worker (step 1) by returning to its previous Fly release, or, after its first
+deploy, which has none, by leaving it unused, since nothing calls it before step 2. Nothing here is per
 account.
 
 Before every step:
@@ -15,7 +16,7 @@ It prints one line per precondition, grouped by the step it gates, and exits non
 gating step N or an earlier one is not `pass`. `unknown` is not `pass`: it names the token to add to
 `scripts/.env.local`. The gating is pinned by
 `pnpm --filter @crawlmouse/scripts exec vitest run golive/check.test.ts`. The boxes it cannot check are listed under [Manual checks](#manual-checks) and
-passed to it as `--ticked <id>,<id>` once ticked here.
+passed to it as `--ticked <id>,<id>` once each is true (the boxes in this file stay unticked).
 
 ## How a step is switched on, and off
 
@@ -107,7 +108,8 @@ lists), dispatch `worker-production`, or make the change work with the running w
 
 Registers the check pipeline's Inngest functions. No page or route changes for a visitor: each route
 that reads the flag also needs `V2_CHECKS_PUBLIC`
-(`grep -rln pipelineEnabled apps/web/app --include=*.ts | grep -v test`), so no check can be requested
+(`grep -rln pipelineEnabled apps/web/app --include=*.ts --include=*.tsx | grep -v test` lists four routes, and
+each answers 404 before it reads the flag when `V2_CHECKS_PUBLIC` is off), so no check can be requested
 before step 4, and the app's first call to the worker is step 4's first check. **Precondition:**
 the Inngest plan (`docs/ops/inngest-budget.md`; the check fails while the plan is Hobby and the
 budget is over its line).
