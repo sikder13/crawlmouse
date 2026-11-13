@@ -17,7 +17,7 @@
  */
 import { execFile } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CATALOG } from '../../apps/web/lib/billing/catalog';
 import { listMigrations } from '../db/files';
@@ -78,6 +78,15 @@ export function parseArgs(argv: readonly string[]): Args | string {
     }
   }
   return args;
+}
+
+/**
+ * The env file's path. pnpm runs the script with `scripts/` as its working directory and names the
+ * caller's directory in `INIT_CWD`, so a relative `--env-file` is resolved against that.
+ */
+export function resolveEnvFile(path: string, initCwd: string | undefined): string {
+  if (isAbsolute(path)) return path;
+  return resolve(initCwd || process.cwd(), path);
 }
 
 /** `KEY=value` lines; blanks and `#` comments skipped, one pair of surrounding quotes removed. */
@@ -218,6 +227,7 @@ export async function main(
       return 2;
     }
     const read = deps.readFile ?? ((p: string) => (existsSync(p) ? readFileSync(p, 'utf8') : null));
+    args.envFile = resolveEnvFile(args.envFile, deps.processEnv.INIT_CWD);
     const text = read(args.envFile);
     const fileEnv = text === null ? {} : parseEnvFile(text);
     const env: Record<string, string | undefined> = {};

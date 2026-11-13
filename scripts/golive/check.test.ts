@@ -1,3 +1,4 @@
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { main, parseArgs, parseEnvFile } from './check';
 import { PRECONDITIONS } from './preconditions';
@@ -132,6 +133,41 @@ describe('the env file', () => {
       B: 'two',
       C: '3',
     });
+  });
+});
+
+describe('--env-file', () => {
+  const readFrom = async (argv: string[], processEnv: Record<string, string | undefined>) => {
+    const read: string[] = [];
+    await main(argv, {
+      processEnv,
+      readFile: (p) => {
+        read.push(p);
+        return '';
+      },
+      fetch: scriptedFetch(() => json({})).fetch,
+      now: () => new Date(Date.UTC(2026, 10, 13)),
+      git: scriptedGit({}),
+      out: () => {},
+      err: () => {},
+      probes: allPass(),
+    });
+    return read;
+  };
+
+  it("resolves a relative path against pnpm's caller directory (INIT_CWD)", async () => {
+    expect(
+      await readFrom(['--env-file', 'scripts/.env.local'], { INIT_CWD: '/caller/repo' }),
+    ).toEqual(['/caller/repo/scripts/.env.local']);
+  });
+
+  it('keeps an absolute path, and resolves against the working directory without INIT_CWD', async () => {
+    expect(await readFrom(['--env-file', '/abs/.env'], { INIT_CWD: '/caller' })).toEqual([
+      '/abs/.env',
+    ]);
+    expect(await readFrom(['--env-file', 'rel/.env'], {})).toEqual([
+      resolve(process.cwd(), 'rel/.env'),
+    ]);
   });
 });
 
