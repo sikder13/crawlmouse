@@ -186,12 +186,30 @@ describe('the mechanism checks fail on the code they guard against', () => {
     expect(check(ok, 'operator')).toEqual([]);
     expect(check(late, 'operator')).toEqual([
       'calls supabaseAdmin(), consoleAdmin() or consoleStore() before requireOperator() (3 calls)',
+      'builds a client with supabaseAdmin() or createClient() (1 call); an operator route reaches the service role through consoleAdmin() or consoleStore()',
     ]);
     expect(check(bodyFirst, 'operator')).toEqual([
       'reads the request body before requireOperator() (2 reads)',
     ]);
     expect(check(none, 'operator')).toEqual(['never calls requireOperator()']);
     expect(check(commented, 'operator')).toEqual(['never calls requireOperator()']);
+  });
+
+  it('operator: a client built by the route itself is refused, before or after requireOperator', () => {
+    const gate = `const proof = await requireOperator(await supabaseServer()); if (!proof) return notFound();`;
+    const variants = {
+      admin: `${gate} const admin = supabaseAdmin();`,
+      created: `${gate} const s = supabaseConsoleStore(createClient(url, key), proof.userId);`,
+      member: `${gate} const s = supabase.createClient(url, key);`,
+      discarded: `await requireOperator(await supabaseServer()); const c = createClient(url, key); const a = supabaseAdmin();`,
+    };
+    const problem = (n: number) =>
+      `builds a client with supabaseAdmin() or createClient() (${n} call${n === 1 ? '' : 's'}); an operator route reaches the service role through consoleAdmin() or consoleStore()`;
+    for (const [name, body] of Object.entries(variants)) {
+      expect(check(`export async function POST(req) { ${body} }`, 'operator'), name).toEqual([
+        problem(name === 'discarded' ? 2 : 1),
+      ]);
+    }
   });
 
   it('service: the credential is checked before any service-role call', () => {
