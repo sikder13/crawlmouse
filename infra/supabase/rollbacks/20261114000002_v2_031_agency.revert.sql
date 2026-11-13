@@ -6,7 +6,10 @@ drop function if exists public.report_confirm_mail_counts(uuid, text, timestampt
 -- what it holds now without them, so a kind another migration added stays with its answer. A ledger
 -- row of one of the three is deleted first, since the CHECK without its kind would refuse it; with it
 -- goes the record that its message was sent. Like the migration's block, this raises and changes
--- nothing unless the kind column has one CHECK and it is a plain list.
+-- nothing unless the kind column has one CHECK and it is a plain list. The function's body is
+-- written in 028's own words, since the schema fingerprint reads its text: reverted over 028 alone,
+-- the function is 028's to the character.
+--   pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-031-revert-fingerprint.test.ts
 do $$
 declare
   v_removed constant text[] := array['seat_invite', 'report_confirm', 'client_report'];
@@ -56,9 +59,11 @@ begin
     (select pg_catalog.string_agg(pg_catalog.quote_literal(u.k), ', ' order by u.n)
        from pg_catalog.unnest(v_kinds) with ordinality as u(k, n)));
   execute pg_catalog.format(
-    'create or replace function public.email_kind_suppressible(p_kind text) returns boolean '
+    E'create or replace function public.email_kind_suppressible(p_kind text) returns boolean '
     'language sql immutable set search_path = pg_catalog, pg_temp '
-    'as $f$ select p_kind = any (%L::text[]); $f$', v_suppressible);
+    'as $f$\n  select p_kind in (%s);\n$f$',
+    (select pg_catalog.string_agg(pg_catalog.quote_literal(u.k), ', ' order by u.n)
+       from pg_catalog.unnest(v_suppressible) with ordinality as u(k, n)));
 end;
 $$;
 

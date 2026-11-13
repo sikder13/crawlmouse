@@ -146,6 +146,12 @@ const writeReport = (siteId: string, slot: string, checkId: string, now = NOW) =
   answer(`select public.write_client_report($1, $2, $3, $4) r`, [siteId, slot, checkId, now]);
 const markSent = (reportId: unknown, now = NOW) =>
   answer(`select public.mark_client_report_sent($1, $2) r`, [reportId, now]);
+/** Gives a report an id that sorts after any random one, and returns it. */
+const greatestId = async (reportId: string) => {
+  const id = `ffffffff-ffff-4fff-bfff-${randomBytes(6).toString('hex')}`;
+  await db.query(`update public.reports set id = $2 where id = $1`, [reportId, id]);
+  return id;
+};
 const next = async (cadence: string, weekday: number, time: string, zone: string, after: string) =>
   iso(
     (
@@ -530,8 +536,13 @@ describe('set_client', () => {
   it('a changed contact clears the confirmation, both links’ hashes and the recipient’s pause; the same address in another case does not', async () => {
     const c = await confirmed('first@client.example');
     const link = await issuePause(c.siteId);
-    await pause(link.token as string);
+    // A link that waits, then the pause: written to the row, since a pause withdraws a waiting
+    // link and a paused schedule is issued none.
     const pending = await issueConfirmationAgain(c);
+    await db.query(
+      `update public.report_schedules set paused_by_recipient_at = $2 where site_id = $1`,
+      [c.siteId, NOW],
+    );
     expect(await schedule(c.siteId)).toMatchObject({
       recipient_confirm_hash: sha256(pending),
       pause_token_hash: sha256(link.token as string),
@@ -1151,6 +1162,35 @@ describe('due_report_schedules', () => {
     expect(await changed()).toBe(true);
   });
 
+  it('changed: of two reports marked sent at one instant, the later slot’s is the one a change is measured from', async () => {
+    const c = await confirmed();
+    const checkAt = async (day: string) => {
+      const id = randomUUID();
+      await insertRow(db, 'checks', {
+        ...ROWS.checks(id, c.siteId),
+        queued_at: `${day}T06:00:00.000Z`,
+        started_at: `${day}T06:00:05.000Z`,
+        finished_at: `${day}T06:10:00.000Z`,
+        tested_at: `${day}T06:00:05.000Z`,
+      });
+      return id;
+    };
+    const [older, newer] = [await checkAt('2026-11-01'), await checkAt('2026-11-08')];
+    // The newer check found a change. It is in the later slot's report.
+    await insertRow(db, 'changes', {
+      ...ROWS.changes(randomUUID(), c.siteId, newer),
+      detected_at: '2026-11-08T06:10:00.000Z',
+      where: '/in-the-later-report',
+    });
+    const first = await writeReport(c.siteId, '2026-11-02T09:00:00.000Z', older);
+    const second = await writeReport(c.siteId, '2026-11-09T09:00:00.000Z', newer);
+    const greatest = await greatestId(first.report_id as string);
+    await markSent(second.report_id, at(12));
+    await markSent(greatest, at(12));
+    // Measured from the earlier slot's report, the newer check's change would count again.
+    expect(mine(await due(at(30)), c)[0]!.changed).toBe(false);
+  });
+
   it('lists the earliest first, and no more than the limit', async () => {
     const [a, b] = [await confirmed(), await confirmed()];
     await setSchedule(b.siteId, b.accountId, { ...WEEKLY, iso_weekday: 5 });
@@ -1176,6 +1216,59 @@ describe('mark_report_schedule_run', () => {
       [],
     );
     expect(await markRun(randomUUID(), ran)).toBeNull();
+  });
+});
+
+describe('a paused schedule and the confirmation', () => {
+  it('a pause withdraws a request that is waiting: its link is gone, and none is issued while the pause stands', async () => {
+    const c = await confirmed('reader@client.example');
+    const token = pauseToken();
+    await issuePause(c.siteId, NOW, token);
+    await pause(token, at(1));
+    await resume(c.siteId, c.accountId, at(2));
+    const asked = await issueConfirmation(c.siteId, at(2));
+    expect(asked.outcome).toBe('issued');
+    // The recipient answers the new request with the pause link of an earlier report.
+    expect(await pause(token, at(3))).toEqual({ outcome: 'paused' });
+    expect(await schedule(c.siteId)).toMatchObject({
+      recipient_confirmed_at: null,
+      recipient_confirm_hash: null,
+      recipient_confirm_sent_at: null,
+    });
+    expect(await confirm(asked.token as string, at(3))).toEqual({ outcome: 'gone' });
+    expect((await schedule(c.siteId))!.recipient_confirmed_at).toBeNull();
+    // Nothing asks a recipient who paused but the account's resume.
+    expect(await issueConfirmation(c.siteId, at(3))).toEqual({ outcome: 'none' });
+    await resume(c.siteId, c.accountId, at(4));
+    expect((await issueConfirmation(c.siteId, at(4))).outcome).toBe('issued');
+  });
+
+  it('a pause leaves a confirmed contact’s record of when it was asked', async () => {
+    const c = await confirmed();
+    const before = (await schedule(c.siteId))!;
+    await pause((await issuePause(c.siteId)).token as string, at(1));
+    const after = (await schedule(c.siteId))!;
+    expect(after.recipient_confirmed_at).toEqual(before.recipient_confirmed_at);
+    expect(after.recipient_confirm_sent_at).toEqual(before.recipient_confirm_sent_at);
+  });
+
+  it('resume leaves no link of an earlier request, whatever the row held', async () => {
+    const c = await confirmed();
+    await pause((await issuePause(c.siteId)).token as string, at(1));
+    // A row as no function of this migration leaves it: paused, with a request's link still held.
+    const held = sha256('a-link-from-before');
+    await db.query(
+      `update public.report_schedules
+          set recipient_confirmed_at = null, recipient_confirm_hash = $2, recipient_confirm_sent_at = $3
+        where site_id = $1`,
+      [c.siteId, held, at(1)],
+    );
+    expect((await resume(c.siteId, c.accountId, at(2))).outcome).toBe('resumed');
+    expect(await schedule(c.siteId)).toMatchObject({
+      recipient_confirm_hash: null,
+      recipient_confirm_sent_at: null,
+    });
+    expect(await confirm('a-link-from-before', at(2))).toEqual({ outcome: 'gone' });
   });
 });
 
@@ -1226,9 +1319,11 @@ describe('write_client_report and mark_client_report_sent', () => {
     const [older, newer] = [await check(c.siteId), await check(c.siteId)];
     const first = await writeReport(c.siteId, '2026-11-16T09:00:00.000Z', older);
     const second = await writeReport(c.siteId, '2026-11-23T09:00:00.000Z', newer);
-    // Marked in the other order, at the same instant: an id decides nothing.
+    // The earlier slot's report is given the greater id, so an order that fell to the id would
+    // take it; both are marked at the same instant.
+    const greatest = await greatestId(first.report_id as string);
     await markSent(second.report_id, at(12));
-    await markSent(first.report_id, at(12));
+    await markSent(greatest, at(12));
     const third = await check(c.siteId);
     const next = await writeReport(c.siteId, '2026-11-30T09:00:00.000Z', third);
     const covers = (

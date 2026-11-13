@@ -895,7 +895,8 @@ end;
 $$;
 
 -- The link a token hash names, when it opens: not revoked, p_now before its expiry, its report's
--- file stored, and the report's account neither deleted nor marked for deletion.
+-- file stored, the report's site not removed, and the report's account neither deleted nor marked
+-- for deletion.
 -- open_share_link counts the view in the statement that reads the link, so a link that does not
 -- open is not counted. Answers {outcome}: 'open' with report_id, account_id, site_id, kind, format
 -- and storage_path; 'gone' when a row holds the hash and does not open; 'unknown' when none does.
@@ -1289,9 +1290,10 @@ $$;
 -- for this mail as for a report: for such an account the contact must be the address of the
 -- account's owner. The rule is here, so the hourly run, a saved contact and "ask again" share it.
 -- Answers {outcome}: 'issued' with token, email, host and account_name; 'none' when the site has no
--- schedule or no contact address, the contact has confirmed, the account is in its Agency trial and
--- the contact is not its owner's address, the site is removed, or its account is deleted or marked
--- for deletion.
+-- schedule or no contact address, the contact has confirmed, the recipient has paused the schedule
+-- (the account's resume is then the one way to ask), the account is in its Agency trial and the
+-- contact is not its owner's address, the site is removed, or its account is deleted or marked for
+-- deletion.
 create or replace function public.issue_recipient_confirmation(p_site uuid, p_now timestamptz)
 returns jsonb
 language plpgsql
@@ -1314,6 +1316,7 @@ begin
     join public.accounts a on a.id = st.account_id
    where rs.site_id = p_site
      and rs.recipient_confirmed_at is null
+     and rs.paused_by_recipient_at is null
      and st.client_contact_email is not null
      and (a.state <> 'agency_trial'
           or exists (select 1
@@ -1453,6 +1456,8 @@ $$;
 
 -- The recipient pauses: the schedule whose pause link hashes to p_token_hash is paused from p_now.
 -- A schedule already paused keeps the time it was first paused, and the link keeps answering.
+-- A pause withdraws a confirmation request that is waiting: its link stops answering, so a paused
+-- schedule holds no link that could confirm it.
 -- Answers {outcome}: 'paused'; 'gone' for a hash no schedule holds.
 create or replace function public.pause_report_schedule(p_token_hash text, p_now timestamptz)
 returns jsonb
@@ -1467,6 +1472,9 @@ begin
   end if;
   update public.report_schedules rs
      set paused_by_recipient_at = coalesce(rs.paused_by_recipient_at, p_now),
+         recipient_confirm_hash = null,
+         recipient_confirm_sent_at = case when rs.recipient_confirmed_at is null then null
+                                          else rs.recipient_confirm_sent_at end,
          updated_at = pg_catalog.now()
    where rs.pause_token_hash = p_token_hash;
   if not found then
@@ -1796,7 +1804,9 @@ grant execute on function public.mark_client_report_sent(uuid, timestamptz) to s
 -- are rebuilt here from what they hold when this runs, with the three added, so a kind a migration
 -- before this one added stays, with its answer. The block reads the CHECK on the kind column alone
 -- and raises, changing nothing, unless there is one and it is a plain list of kinds. Run again, it
--- finds the three there and writes the same two definitions.
+-- finds the three there and writes the same two definitions. The function's body is written as 028
+-- writes it (`select p_kind in (…);` on its own line), so the revert, which writes the same words
+-- without the three, gives back the text 028 left: the schema fingerprint reads the function's text.
 --
 -- Test: pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-031-m-mail-kinds.test.ts
 do $$
@@ -1849,9 +1859,11 @@ begin
     (select pg_catalog.string_agg(pg_catalog.quote_literal(u.k), ', ' order by u.n)
        from pg_catalog.unnest(v_kinds) with ordinality as u(k, n)));
   execute pg_catalog.format(
-    'create or replace function public.email_kind_suppressible(p_kind text) returns boolean '
+    E'create or replace function public.email_kind_suppressible(p_kind text) returns boolean '
     'language sql immutable set search_path = pg_catalog, pg_temp '
-    'as $f$ select p_kind = any (%L::text[]); $f$', v_suppressible);
+    'as $f$\n  select p_kind in (%s);\n$f$',
+    (select pg_catalog.string_agg(pg_catalog.quote_literal(u.k), ', ' order by u.n)
+       from pg_catalog.unnest(v_suppressible) with ordinality as u(k, n)));
 end;
 $$;
 
@@ -1861,8 +1873,8 @@ grant execute on function public.email_kind_suppressible(text) to service_role;
 -- How many confirmation mails of a client report schedule the ledger holds as sent or being sent,
 -- claimed after p_since: for the account, and for one address (its keyed hash). The mailer asks this
 -- before it claims another, so the day's bound is on the mail itself, whatever asked for it: a
--- route, or the hourly run, which has no bound of its own. email_sends is granted to no role, so the
--- count is a function's, granted to service_role.
+-- route, or the hourly run, which has no bound of its own. The count is a function's, granted to
+-- service_role, so the mailer reads two numbers and no row of the ledger.
 create or replace function public.report_confirm_mail_counts(
   p_account uuid, p_address_hash text, p_since timestamptz)
 returns jsonb
