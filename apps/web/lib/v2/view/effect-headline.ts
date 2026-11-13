@@ -17,8 +17,8 @@
  *   effect waits (owner ruling on CC-32 Q8). For a template of empty-root pages alone,
  *   `affected_pages` is the template's crawled empty-root pages: the pages the check saw, not the ones
  *   it rendered, which the Fix record does not carry. A fix the last check did not detect keeps the
- *   count from when it was detected, so it reads "Made N pages readable without JavaScript when last
- *   detected".
+ *   count from when it was detected, so it reads "Would make N pages readable without JavaScript, as
+ *   of the last check that detected it".
  * - An effect at or below zero is never printed with a sign: `formatPoints` gives it no figure, so a
  *   fix whose estimated effects are all 0 or less is headed `no_effect`, "No measurable effect on the
  *   grade" (CC-32 D4). The engine keeps the number it computed.
@@ -79,20 +79,21 @@ export const formatPoints = (n: number): string | null => (n > 0 ? `+${n}` : nul
 
 /**
  * "Makes 3 pages readable without JavaScript", singular for one page; for a count from an earlier
- * detection (`current` false), "Made 3 pages readable without JavaScript when last detected".
+ * detection (`current` false), "Would make 3 pages readable without JavaScript, as of the last check
+ * that detected it".
  */
 export const pagesReadableText = (pages: number, current = true): string => {
   const n = `${pages} ${plural(pages, 'page', 'pages')}`;
   return current
     ? `Makes ${n} readable without JavaScript`
-    : `Made ${n} readable without JavaScript when last detected`;
+    : `Would make ${n} readable without JavaScript, as of the last check that detected it`;
 };
 
 type Readable = Pick<Fix, 'type' | 'effect' | 'affected_pages' | 'last_state'>;
 type Headed = Readable & Pick<Fix, 'section'>;
 
 /** A client-rendered template fix whose AI effect gives no figure: at 0 or less, or not estimated. */
-const makesReadable = (f: Pick<Fix, 'type' | 'effect'>): boolean =>
+export const makesReadable = (f: Pick<Fix, 'type' | 'effect'>): boolean =>
   f.type === 'client_rendered_template' &&
   (f.effect.ai_readability === null || formatPoints(f.effect.ai_readability) === null);
 

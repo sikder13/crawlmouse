@@ -21,6 +21,7 @@ import {
   groupSum,
   NO_EFFECT,
   NO_EFFECT_SHORT,
+  makesReadable,
   pagesReadable,
 } from '../effect-headline';
 import { openFixes, type FixPlan } from '../free-fixes';
@@ -153,15 +154,17 @@ function tally(fixes: readonly Fix[]): ProFixView['recommendations'] {
 /**
  * A grouped row's effect: both grades' points summed (`groupSum`: a member below 0 counts 0), and how
  * many fixes have an AI readability effect not yet estimated, so no part of the group's effect is left
- * out. A sum of 0 is no measurable effect, printed without a figure.
+ * out; a client-rendered fix headed by its pages is counted in the pages part, not as waiting. A sum of 0 is no measurable effect, printed without a figure.
  */
 export function groupPoints(fixes: readonly Fix[]): string {
   const seo = groupSum(fixes.map((f) => f.effect.technical_seo ?? 0));
   const ai = groupSum(fixes.map((f) => f.effect.ai_readability ?? 0));
-  const pending = fixes.filter((f) => f.effect.ai_readability === null).length;
+  const aiNull = fixes.filter((f) => f.effect.ai_readability === null);
+  // a fix headed by the pages it makes readable is not said to wait (effect-headline.ts)
+  const pending = aiNull.filter((f) => !makesReadable(f)).length;
   const seoPending = fixes.filter((f) => f.effect.technical_seo === null).length;
   const seoShown = seoPending < fixes.length;
-  const estimated = seoShown || pending < fixes.length;
+  const estimated = seoShown || aiNull.length < fixes.length;
   const seoSigned = seoShown ? formatPoints(seo) : null;
   const aiSigned = formatPoints(ai);
   const parts = [
