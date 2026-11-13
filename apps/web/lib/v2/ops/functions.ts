@@ -45,7 +45,7 @@ export const PAID_INVOICES_READ = 10;
 
 /**
  * Stripe's record of a subscription's payment (review C2, C3): its latest invoice (status, both
- * amounts, currency; never a card field), and whether the customer has another paid invoice with an
+ * amounts, currency, and no card field), and whether the customer has another paid invoice with an
  * amount above 0. A zero-amount paid invoice is left out: Stripe creates and pays one when a trial
  * starts. The listing is `invoices.list({ customer, status: 'paid' })`, bounded by PAID_INVOICES_READ.
  */

@@ -161,8 +161,8 @@ export interface EntitlementEvent {
 
 /**
  * A payment's notice reads Stripe before its claim: the label (first, returning or neither) and the
- * amount are Stripe's. A recovery from past_due is noticed only as a first payment; otherwise, or when
- * Stripe cannot be read, it answers `no_notice` and claims nothing.
+ * amount are Stripe's. A recovery from past_due is noticed when it is a first payment; when it is not,
+ * or Stripe cannot be read, it answers `no_notice` and claims nothing.
  */
 export async function entitlementNotice(
   d: FounderDeps,
@@ -290,8 +290,8 @@ export interface DigestOutcome {
 }
 
 /**
- * The digests due at `at`, the tick's time, and the "N more" notice when notices are held. Every key
- * is built from `at`, so a retry of the tick keeps them (review C6).
+ * The digests due at `at`, the tick's time, and the "N more" notice when notices are held. The keys
+ * are built from `at` (`digestDue`), so a retry of the tick keeps them (review C6).
  */
 export async function digest(d: FounderDeps, at: Date): Promise<DigestOutcome> {
   const to = recipient(d);

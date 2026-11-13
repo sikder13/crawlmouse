@@ -11,7 +11,7 @@
  *   "N more" notice. The tick's time is taken once, in a `clock` step, and the digest's keys are
  *   built from it, so a retry that runs in the next hour keeps the tick's keys (review C6).
  *
- * The work of each is one step, retried as a whole. The notices and mails in it are keyed by their
+ * The work is one step, retried as a whole. The notices and mails in it are keyed by their
  * event, so a retry claims the same rows and the mail ledger answers `done` for a mail already sent.
  * This package imports nothing from the app.
  */

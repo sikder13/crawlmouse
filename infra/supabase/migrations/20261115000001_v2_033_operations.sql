@@ -331,10 +331,10 @@ end;
 $$;
 
 -- The held rows one "N more" notice reports, under its key p_key ('overflow:<hour>'). The first call
--- for a key writes the key onto every held row no notice has taken, and onto every row taken by a
+-- for a key writes the key onto every held row no notice has taken, and onto the rows taken by a
 -- notice whose mail gave up: its ledger row (email_sends, key 'founder_event:<its key>') is `failed`
--- with 3 attempts, claim_email_send's bound, so that notice is never sent and its rows are reported in
--- this one (review C6). A later call for the same key takes nothing new and answers the rows already
+-- with 3 attempts, claim_email_send's bound, so that notice is not sent again and its rows are
+-- reported in this one (review C6). A later call for the same key takes nothing new and answers the rows already
 -- carrying it, so a retried notice reports the same rows. Rows taken by a notice whose run ended
 -- before its mail was claimed keep that notice's key and are not reported again. Answers
 -- {"total": n, "rows": [...]}, rows oldest first, at most p_rows of them.
@@ -453,9 +453,9 @@ $$;
 -- The founder sweep's sign-ups (plan-review M8): users created at or after p_since whose sign-up is
 -- not yet announced, at most p_limit, with their default account, taken in a rotation: of the n such
 -- users ordered oldest first, the p_limit from position (p_turn * p_limit) mod n on, wrapping to the
--- oldest. The sweep passes its five-minute tick as p_turn, so while the set holds still, consecutive
--- runs look at every user once in ceil(n / p_limit) runs, and users found unconfirmed cannot hold the
--- first p_limit places every run (review C8). Not yet announced:
+-- oldest. The sweep passes its five-minute tick as p_turn, so consecutive runs start p_limit places
+-- apart, and users found unconfirmed do not keep the first p_limit places from one run to the next
+-- (review C8). Not yet announced:
 -- no signup notice, or a signup notice decided `send` whose mail (the ledger key
 -- `founder_event:signup:<user>`) has no email_sends row, or one that is neither sent nor suppressed
 -- and has fewer than 3 attempts (claim_email_send's bound). So a notice whose send failed is offered

@@ -5,8 +5,9 @@
  *   free → pro_trial, free → agency_trial             trial started (Pro, Agency)
  *   free, pro_trial or agency_trial → pro or agency   payment
  *   past_due → pro or agency                          payment, `recovery`: a failed charge settled.
- *                                                     founder.ts sends it only when it is the first
- *                                                     payment (a trial whose first charge failed)
+ *                                                     founder.ts sends it when it is the first
+ *                                                     payment (a trial whose first charge failed),
+ *                                                     and not otherwise
  *   any other state → past_due                        payment failed (the plan of the state left)
  *
  * Any other change answers null and has no instant notice. Whether a payment is the customer's first
