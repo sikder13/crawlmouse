@@ -267,46 +267,91 @@ describe('runReconcile', () => {
   });
 });
 
-// Fake Supabase for the batched delete: select(...).lte(...).limit(n) returns the next page of
-// expired ids; delete().in('id', ids) removes them from the backing store. The page size is
-// driven entirely by the `n` the implementation passes to limit() — the fake imposes no cap of
-// its own, so batching is exercised against the impl's real batchSize argument. A `selectError`
-// makes the first select reject (to prove the loop surfaces a read fault).
-function makeTtlSb(expiredIds: string[], opts: { selectError?: Error } = {}) {
+// Fake Supabase for the batched delete, over a store of expired audits (`reported` names those a
+// public report links). `audits`: select('id').lte(...)[.gt('id', after)].order('id').limit(n)
+// answers the next n expired ids in id order after `after`; delete().in('id', ids) removes them.
+// `public_reports`: select('audit_id').in('audit_id', ids) answers the reported ones among ids.
+// The page size is the `n` the implementation passes (the fake imposes no cap of its own). A
+// `selectError` makes the first audits select reject (to prove the loop surfaces a read fault).
+function makeTtlSb(
+  expiredIds: string[],
+  opts: { selectError?: Error; reported?: string[]; reportsError?: Error } = {},
+) {
   const store = new Set(expiredIds);
+  const reported = new Set(opts.reported ?? []);
   const deleted: string[] = [];
+  const reads: { after: string | null; limit: number }[] = [];
+  const auditsRead = () => {
+    let after: string | null = null;
+    const chain = {
+      lte: () => chain,
+      gt: (col: string, value: string) => {
+        expect(col).toBe('id');
+        after = value;
+        return chain;
+      },
+      order: (col: string, o: { ascending: boolean }) => {
+        expect([col, o.ascending]).toEqual(['id', true]);
+        return chain;
+      },
+      limit: (n: number) => {
+        reads.push({ after, limit: n });
+        if (opts.selectError) return Promise.resolve({ data: null, error: opts.selectError });
+        const page = [...store]
+          .sort()
+          .filter((id) => after === null || id > after)
+          .slice(0, n);
+        return Promise.resolve({ data: page.map((id) => ({ id })), error: null });
+      },
+    };
+    return chain;
+  };
   const sb = {
     deleted,
-    from: () => ({
-      select: () => ({
-        lte: () => ({
-          order: () => ({
-            limit: (n: number) =>
-              Promise.resolve(
-                opts.selectError
-                  ? { data: null, error: opts.selectError }
-                  : { data: [...store].slice(0, n).map((id) => ({ id })), error: null },
-              ),
-          }),
-        }),
-      }),
-      delete: () => ({
-        in: (_col: string, ids: string[]) => {
-          ids.forEach((id) => {
-            store.delete(id);
-            deleted.push(id);
-          });
-          return Promise.resolve({ error: null });
-        },
-      }),
-    }),
+    reads,
+    from: (table: string) =>
+      table === 'public_reports'
+        ? {
+            select: (cols: string) => ({
+              in: (col: string, ids: string[]) => {
+                expect([cols, col]).toEqual(['audit_id', 'audit_id']);
+                return Promise.resolve(
+                  opts.reportsError
+                    ? { data: null, error: opts.reportsError }
+                    : {
+                        data: ids.filter((id) => reported.has(id)).map((id) => ({ audit_id: id })),
+                        error: null,
+                      },
+                );
+              },
+            }),
+          }
+        : {
+            select: () => auditsRead(),
+            delete: () => ({
+              in: (_col: string, ids: string[]) => {
+                ids.forEach((id) => {
+                  store.delete(id);
+                  deleted.push(id);
+                });
+                return Promise.resolve({ error: null });
+              },
+            }),
+          },
   };
-  return sb as unknown as Parameters<typeof deleteExpiredAudits>[0] & { deleted: string[] };
+  return sb as unknown as Parameters<typeof deleteExpiredAudits>[0] & {
+    deleted: string[];
+    reads: { after: string | null; limit: number }[];
+  };
 }
+
+/** `a00`…: ids whose string order is their numeric order, as uuids' is in Postgres. */
+const idsOf = (n: number, prefix = 'a') =>
+  Array.from({ length: n }, (_, i) => `${prefix}${String(i).padStart(2, '0')}`);
 
 describe('deleteExpiredAudits', () => {
   it('deletes the entire expired set in <= batchSize chunks and terminates', async () => {
-    const ids = Array.from({ length: 23 }, (_, i) => `a${i}`);
+    const ids = idsOf(23);
     const sb = makeTtlSb(ids);
     const res = await deleteExpiredAudits(sb, '2026-06-03T00:00:00Z', {
       batchSize: 10,
@@ -314,7 +359,7 @@ describe('deleteExpiredAudits', () => {
     });
     // 23 ids / batch 10 → two full batches then a partial (3) batch that exits via the
     // `ids.length < batchSize` branch with iterations incremented to 3.
-    expect(res).toMatchObject({ deleted: 23, drained: true, iterations: 3 });
+    expect(res).toMatchObject({ deleted: 23, kept: 0, drained: true, iterations: 3 });
     expect(sb.deleted.sort()).toEqual(ids.sort());
   });
 
@@ -322,7 +367,7 @@ describe('deleteExpiredAudits', () => {
     // The most error-prone branch: 20 ids / batch 10 → two full batches, then an extra select
     // returns 0 rows and exits via the `ids.length === 0` early-return with drained=true. A
     // broken impl that returned drained=false or looped to maxIterations would be caught here.
-    const ids = Array.from({ length: 20 }, (_, i) => `a${i}`);
+    const ids = idsOf(20);
     const sb = makeTtlSb(ids);
     const res = await deleteExpiredAudits(sb, '2026-06-03T00:00:00Z', {
       batchSize: 10,
@@ -338,19 +383,19 @@ describe('deleteExpiredAudits', () => {
       batchSize: 10,
       maxIterations: 5,
     });
-    expect(res).toEqual({ deleted: 0, drained: true, iterations: 0 });
+    expect(res).toEqual({ deleted: 0, kept: 0, drained: true, iterations: 0 });
     expect(sb.deleted).toEqual([]);
   });
 
   it('stops at maxIterations even if rows remain (no infinite loop)', async () => {
-    const ids = Array.from({ length: 100 }, (_, i) => `a${i}`);
-    const sb = makeTtlSb(ids);
+    const sb = makeTtlSb(idsOf(100));
     const res = await deleteExpiredAudits(sb, '2026-06-03T00:00:00Z', {
       batchSize: 10,
       maxIterations: 3,
     });
     expect(res.deleted).toBe(30); // 3 * 10
     expect(res.drained).toBe(false);
+    expect(res.iterations).toBe(3);
   });
 
   it('reports drained=true when the set empties before the cap', async () => {
@@ -368,6 +413,61 @@ describe('deleteExpiredAudits', () => {
       deleteExpiredAudits(sb, '2026-06-03T00:00:00Z', { batchSize: 10, maxIterations: 5 }),
     ).rejects.toThrow(/select down/);
     expect(sb.deleted).toEqual([]); // nothing deleted on a read fault
+  });
+
+  // C-4 (docs/ops/v1-inventory.json): a minted report links its audit; deleting the audit would
+  // set the report's audit_id null (the FK's `on delete set null`) and cut that link.
+  it('keeps an expired audit that a public report names, and deletes every other', async () => {
+    const ids = idsOf(7);
+    const sb = makeTtlSb(ids, { reported: ['a02', 'a05'] });
+    const res = await deleteExpiredAudits(sb, '2026-06-03T00:00:00Z', {
+      batchSize: 3,
+      maxIterations: 10,
+    });
+    expect(res).toEqual({ deleted: 5, kept: 2, drained: true, iterations: 3 });
+    expect(sb.deleted.sort()).toEqual(['a00', 'a01', 'a03', 'a04', 'a06']);
+  });
+
+  it('kept audits that fill whole batches do not block the batches after them', async () => {
+    // The first two batches are all reported: an implementation that re-read from the start each
+    // time would read them forever and delete nothing.
+    const reported = idsOf(6, 'k');
+    const doomed = idsOf(5, 'z');
+    const sb = makeTtlSb([...reported, ...doomed], { reported });
+    const res = await deleteExpiredAudits(sb, '2026-06-03T00:00:00Z', {
+      batchSize: 3,
+      maxIterations: 10,
+    });
+    expect(res).toEqual({ deleted: 5, kept: 6, drained: true, iterations: 4 });
+    expect(sb.deleted.sort()).toEqual(doomed);
+    // Each batch reads after the last id the one before it read.
+    expect(sb.reads.map((r) => r.after)).toEqual([null, 'k02', 'k05', 'z02']);
+  });
+
+  it('a set wholly kept drains with nothing deleted, and the cap still bounds it', async () => {
+    const ids = idsOf(9);
+    const all = await deleteExpiredAudits(
+      makeTtlSb(ids, { reported: ids }),
+      '2026-06-03T00:00:00Z',
+      {
+        batchSize: 3,
+        maxIterations: 10,
+      },
+    );
+    expect(all).toEqual({ deleted: 0, kept: 9, drained: true, iterations: 3 });
+    const capped = makeTtlSb(ids, { reported: ids });
+    expect(
+      await deleteExpiredAudits(capped, '2026-06-03T00:00:00Z', { batchSize: 3, maxIterations: 2 }),
+    ).toEqual({ deleted: 0, kept: 6, drained: false, iterations: 2 });
+    expect(capped.deleted).toEqual([]);
+  });
+
+  it('throws when the report read fails, deleting nothing (a delete without it could cut a link)', async () => {
+    const sb = makeTtlSb(['a', 'b'], { reported: ['a'], reportsError: new Error('reports down') });
+    await expect(
+      deleteExpiredAudits(sb, '2026-06-03T00:00:00Z', { batchSize: 10, maxIterations: 5 }),
+    ).rejects.toThrow(/reports down/);
+    expect(sb.deleted).toEqual([]);
   });
 });
 
