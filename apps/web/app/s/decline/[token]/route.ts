@@ -19,8 +19,8 @@ const HOUR_MS = 60 * 60 * 1000;
 
 /**
  * "Don't ask me again", as a person follows the link in the mail that asks them to confirm a
- * client's reports (CC-31 D8, owner ruling on Q42): its token, which is the confirmation link's,
- * goes into the `cm_link_report_decline` cookie and the browser is sent to `/s/decline`, whose
+ * client's reports (CC-31 D8, owner ruling on Q42): its token, the address's own
+ * (`lib/v2/mail/report-decline-token.ts`), goes into the `cm_link_report_decline` cookie and the browser is sent to `/s/decline`, whose
  * address holds no token. Nothing changes here; the refusal is that page's POST. A 404 with
  * V2_CHECKS_PUBLIC unset.
  */

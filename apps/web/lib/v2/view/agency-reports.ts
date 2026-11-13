@@ -281,7 +281,8 @@ function contactOf(
   refusal: AskRefusalSide | undefined,
 ): ContactView {
   const address = s.client_contact_email;
-  // A contact asked since its pause is asked once: the row says from when it can be asked again.
+  // A contact asked since its pause is not asked again inside the window: the row says from when
+  // it can be.
   const again =
     refusal?.refused === 'asked_recently'
       ? COPY.contact.askAgainFrom(dayDate(refusal.nextAt, zone))
