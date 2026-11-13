@@ -85,8 +85,6 @@ export const CLIENT_REPORTS_COPY = {
   sentColumns: { sent: 'Sent', client: 'Client', to: 'To', actions: 'Actions' },
   sentEmpty: 'No report has been sent to a client yet.',
   open: 'Open',
-  /** Where the account acted in is not on Agency. */
-  gateAction: 'Compare plans',
 } as const;
 
 // ── Where the client reports screen differs from its locked HTML ─────────────────────────────
