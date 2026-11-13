@@ -859,3 +859,9 @@ jobs:
           TRIAL_RACE_DB_URL: postgresql://postgres:postgres@localhost:5432/postgres?sslmode=disable
           TRIAL_RACE_REQUIRED: '1'
         run: pnpm exec vitest run db/seats-race.test.ts --passWithNoTests=false
+      - name: A recipient's refusal over a client's rows, and two calls at once (CC-31)
+        working-directory: scripts
+        env:
+          TRIAL_RACE_DB_URL: postgresql://postgres:postgres@localhost:5432/postgres?sslmode=disable
+          TRIAL_RACE_REQUIRED: '1'
+        run: pnpm exec vitest run db/report-links-race.test.ts --passWithNoTests=false
