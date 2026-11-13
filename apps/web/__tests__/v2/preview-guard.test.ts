@@ -27,6 +27,9 @@ const V2_LIVE = [
   // CC-29: For agencies (V2_BILLING) and the three /check pages (V2_CHECKS_PUBLIC), new addresses.
   join(WEB_ROOT, 'app', 'agencies'),
   join(WEB_ROOT, 'app', 'check'),
+  // CC-33: the support console, flag-free and staff-only: each page is a 404 for anyone but an
+  // operator (requireOperator), before it reads anything, and its layout sets noindex.
+  join(WEB_ROOT, 'app', 'internal'),
 ];
 
 function walk(dir: string, out: string[] = []): string[] {

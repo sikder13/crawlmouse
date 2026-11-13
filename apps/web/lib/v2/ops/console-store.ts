@@ -198,7 +198,7 @@ export function supabaseConsoleStore(admin: SupabaseClient, operatorId: string):
     async resolve(q) {
       const capped = (kind: ResolvedKind, ids: readonly (string | null)[]) => ({
         kind,
-        accountIds: unique(ids).slice(0, SEARCH_RESULTS_MAX),
+        accountIds: unique(ids).filter((_, i) => i < SEARCH_RESULTS_MAX),
       });
       switch (q.kind) {
         case 'none':
