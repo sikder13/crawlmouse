@@ -6,16 +6,18 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
 import {
+  CLOSED_FOOTER_GATES,
   FOOTER_COLUMNS,
   FOOTER_COPY,
   LOG_IN,
   MARKETING_NAV,
   SUPPORT_EMAIL,
   isGroup,
+  type FooterGates,
   type FooterItem,
   type SiteLink,
 } from '../../components/v2/footer-links';
-import { SiteFooter, type ServiceStatus } from '../../components/v2/SiteFooter';
+import { SiteFooter, footerGates, type ServiceStatus } from '../../components/v2/SiteFooter';
 import { CopyEmail } from '../../components/v2/CopyEmail';
 import { CookieSettings } from '../../components/v2/CookieSettings';
 import { PageShell } from '../../components/v2/PageShell';
@@ -54,6 +56,12 @@ function served(href: string): boolean {
 
 const liveLinks = (items: readonly (FooterItem | SiteLink)[]) =>
   items.filter((i): i is SiteLink & { href: string } => 'href' in i && typeof i.href === 'string');
+
+const OPEN: FooterGates = { checksPublic: true };
+/** The footer's links with these gates: a gated entry is a link only while its gate is open. */
+const linksWith = (items: readonly FooterItem[], gates: FooterGates) =>
+  liveLinks(items).filter((i) => !('gate' in i) || gates[(i as { gate: keyof FooterGates }).gate]);
+const gatedOf = (items: readonly FooterItem[]) => liveLinks(items).filter((i) => 'gate' in i);
 
 const footerItems = FOOTER_COLUMNS.flatMap((c) => c.items);
 const navLinks = MARKETING_NAV.flatMap((e) => (isGroup(e) ? e.items : [e]));
@@ -108,7 +116,13 @@ describe('footer-links.ts: the one map of header and footer links', () => {
   // has to change this table too.
   it('points each footer entry at the approved target', () => {
     const target = (i: FooterItem) =>
-      'control' in i ? `control:${i.control}` : i.planned ? 'planned' : i.href;
+      'control' in i
+        ? `control:${i.control}`
+        : i.planned
+          ? 'planned'
+          : 'gate' in i
+            ? `${i.gate}:${i.href}`
+            : i.href;
     expect(FOOTER_COLUMNS.map((c) => [c.title, c.items.map((i) => [i.label, target(i)])])).toEqual([
       [
         'Product',
@@ -145,6 +159,7 @@ describe('footer-links.ts: the one map of header and footer links', () => {
         [
           ['About', 'planned'],
           ['Contact', 'planned'],
+          ['Help', 'checksPublic:/help'],
           ['Privacy', '/privacy'],
           ['Terms', '/terms'],
           ['Acceptable use', '/aup'],
@@ -230,17 +245,45 @@ describe('footer-links.ts: the one map of header and footer links', () => {
   });
 
   describe('against the sitemap', () => {
+    const url = (p: string) =>
+      p === '/' ? 'https://crawlmouse.com' : `https://crawlmouse.com${p}`;
+    const sitemapUrls = async (checksPublic: boolean) => {
+      vi.stubEnv('V2_CHECKS_PUBLIC', checksPublic ? '1' : '');
+      try {
+        const sitemap = (await import('../../app/sitemap')).default;
+        return (await sitemap()).map((e) => e.url);
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    };
     let urls: string[] = [];
     beforeAll(async () => {
-      const sitemap = (await import('../../app/sitemap')).default;
-      urls = (await sitemap()).map((e) => e.url);
+      urls = await sitemapUrls(false);
     });
 
     it('lists every footer target in the sitemap: the footer links only indexed pages', () => {
       expect(urls.length).toBeGreaterThan(10);
-      const url = (p: string) =>
-        p === '/' ? 'https://crawlmouse.com' : `https://crawlmouse.com${p}`;
-      expect(liveLinks(footerItems).filter((l) => !urls.includes(url(l.href)))).toEqual([]);
+      const links = linksWith(footerItems, CLOSED_FOOTER_GATES);
+      expect(links.length).toBeGreaterThan(10);
+      expect(links.filter((l) => !urls.includes(url(l.href)))).toEqual([]);
+    });
+
+    // Questions Q3, plan review M13: /help is served only while V2_CHECKS_PUBLIC is on, so its
+    // footer entry is a link then and text otherwise, and the rule above holds in each state.
+    it('names /help as the one gated entry, gated on V2_CHECKS_PUBLIC', () => {
+      expect(gatedOf(footerItems).map((l) => [l.href, (l as { gate: string }).gate])).toEqual([
+        ['/help', 'checksPublic'],
+      ]);
+    });
+
+    it('with V2_CHECKS_PUBLIC on, lists every footer target, the gated ones included', async () => {
+      const lit = await sitemapUrls(true);
+      expect(lit).toContain(url('/help'));
+      expect(linksWith(footerItems, OPEN).filter((l) => !lit.includes(url(l.href)))).toEqual([]);
+    });
+
+    it('with V2_CHECKS_PUBLIC off, lists no gated target, which the footer then shows as text', () => {
+      for (const l of gatedOf(footerItems)) expect(urls).not.toContain(url(l.href));
     });
   });
 
@@ -252,7 +295,8 @@ describe('footer-links.ts: the one map of header and footer links', () => {
   });
 });
 
-const html = (status?: ServiceStatus) => renderToStaticMarkup(<SiteFooter status={status} />);
+const html = (status?: ServiceStatus, gates: FooterGates = CLOSED_FOOTER_GATES) =>
+  renderToStaticMarkup(<SiteFooter status={status} gates={gates} />);
 
 /** The footer's column navigation, cut out of the markup. */
 const footerNav = (markup: string) => {
@@ -288,22 +332,48 @@ describe('SiteFooter', () => {
     expect(titles).toEqual(FOOTER_COLUMNS.map((c) => c.title));
   });
 
-  it('renders a link for each live entry and plain text for each planned one, never a dead link', () => {
-    const nav = footerNav(html());
-    const links = [...nav.matchAll(/<a [^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/g)].map((m) => [
-      m[1],
-      (m[2] ?? '')
-        .replace(/<svg[\s\S]*?<\/svg>/g, '')
-        .replace(/<span [^>]*data-v2-sr-only[\s\S]*?<\/span>/g, ''),
-    ]);
-    expect(links).toEqual(liveLinks(footerItems).map((l) => [l.href, l.label]));
-    const planned = [...nav.matchAll(/<span [^>]*data-v2-planned=""[^>]*>([^<]*)<\/span>/g)].map(
-      (m) => m[1],
-    );
-    expect(planned).toEqual(
-      footerItems.filter((i) => 'planned' in i && i.planned).map((i) => i.label),
-    );
-    expect(nav).not.toMatch(/href="#?"/);
+  it.each([
+    ['shut', CLOSED_FOOTER_GATES],
+    ['open', OPEN],
+  ] as const)(
+    'with the gates %s, renders a link for each served entry and text for the rest, never a dead link',
+    (_state, gates) => {
+      const nav = footerNav(html(undefined, gates));
+      const links = [...nav.matchAll(/<a [^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/g)].map((m) => [
+        m[1],
+        (m[2] ?? '')
+          .replace(/<svg[\s\S]*?<\/svg>/g, '')
+          .replace(/<span [^>]*data-v2-sr-only[\s\S]*?<\/span>/g, ''),
+      ]);
+      expect(links).toEqual(linksWith(footerItems, gates).map((l) => [l.href, l.label]));
+      const planned = [...nav.matchAll(/<span [^>]*data-v2-planned=""[^>]*>([^<]*)<\/span>/g)].map(
+        (m) => m[1],
+      );
+      const shut = gatedOf(footerItems).filter((l) => !linksWith(footerItems, gates).includes(l));
+      expect(planned).toEqual(
+        footerItems
+          .filter((i) => ('planned' in i && i.planned) || shut.includes(i as never))
+          .map((i) => i.label),
+      );
+      expect(nav).not.toMatch(/href="#?"/);
+    },
+  );
+
+  it('reads its gates from V2_CHECKS_PUBLIC when no page passes them', () => {
+    vi.stubEnv('V2_CHECKS_PUBLIC', '1');
+    try {
+      expect(footerGates()).toEqual(OPEN);
+      expect(footerNav(renderToStaticMarkup(<SiteFooter />))).toContain('href="/help"');
+    } finally {
+      vi.unstubAllEnvs();
+    }
+    vi.stubEnv('V2_CHECKS_PUBLIC', '');
+    try {
+      expect(footerGates()).toEqual(CLOSED_FOOTER_GATES);
+      expect(footerNav(renderToStaticMarkup(<SiteFooter />))).not.toContain('href="/help"');
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   it('renders Cookie settings as a button', () => {

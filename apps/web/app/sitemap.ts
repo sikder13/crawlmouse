@@ -9,6 +9,7 @@ import { SITEMAP_REPORTS_MAX } from '@/lib/limits';
 import { checksPublicEnabled } from '@/lib/auth/flags';
 import { billingV2Enabled } from '@/lib/billing/flags';
 import { CHECK_QUESTIONS, checkPath } from '@/lib/v2/copy/check-pages';
+import { HELP_SLUGS, helpPath } from '@/lib/v2/help/questions';
 
 type ChangeFreq = NonNullable<MetadataRoute.Sitemap[number]['changeFrequency']>;
 
@@ -43,11 +44,17 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   // CC-29: new pages that answer 404 while their flag is off, so each is listed only while it is on
   // (OPERATING-RULES §13: no sitemap entry answers an error). For agencies follows V2_BILLING; the
-  // three /check pages follow V2_CHECKS_PUBLIC.
+  // three /check pages and the help centre (CC-33 D4) follow V2_CHECKS_PUBLIC.
   const flagged: MetadataRoute.Sitemap = [
     ...(billingV2Enabled() ? [entry('/agencies', 0.8, 'monthly')] : []),
     ...(checksPublicEnabled()
       ? CHECK_QUESTIONS.map((q) => entry(checkPath(q), 0.8, 'monthly'))
+      : []),
+    ...(checksPublicEnabled()
+      ? [
+          entry('/help', 0.5, 'monthly'),
+          ...HELP_SLUGS.map((s) => entry(helpPath(s), 0.5, 'monthly')),
+        ]
       : []),
   ];
 

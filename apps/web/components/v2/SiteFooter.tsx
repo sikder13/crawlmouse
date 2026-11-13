@@ -4,8 +4,15 @@ import { CookieSettings } from './CookieSettings';
 import { CopyEmail } from './CopyEmail';
 import { Glyph } from './StatusPill';
 import { VisuallyHidden } from './VisuallyHidden';
+import { checksPublicEnabled } from '../../lib/auth/flags';
 import { FOOTER_LINE_CAPABILITIES } from '../../lib/v2/copy/footer-line';
-import { FOOTER_COLUMNS, FOOTER_COPY, SUPPORT_EMAIL, type FooterItem } from './footer-links';
+import {
+  FOOTER_COLUMNS,
+  FOOTER_COPY,
+  SUPPORT_EMAIL,
+  type FooterGates,
+  type FooterItem,
+} from './footer-links';
 import type { PillState } from './pill-states';
 import layout from './layout.module.css';
 import styles from './SiteFooter.module.css';
@@ -23,6 +30,14 @@ const STATUS: Record<ServiceStatus | 'unknown', { shape: PillState; spoken: stri
   unknown: { shape: 'unverified', spoken: null },
 };
 
+/**
+ * The footer's gates as this process's environment sets them. Read on the server; a client page
+ * cannot read the server's flags, so it passes its own (PageShell `footerGates`).
+ */
+export function footerGates(): FooterGates {
+  return { checksPublic: checksPublicEnabled() };
+}
+
 export interface SiteFooterProps {
   /**
    * What the Status link shows. The page passes it in; the footer fetches nothing. Absent, or a
@@ -31,11 +46,21 @@ export interface SiteFooterProps {
   status?: ServiceStatus;
   /** Shown after the footer's line: a page's "coming" mark for what the line names. */
   lineMark?: ReactNode;
+  /** Which gated entries are links; absent, `footerGates()`. */
+  gates?: FooterGates;
 }
 
-function FooterEntry({ item, status }: { item: FooterItem; status?: ServiceStatus }) {
+function FooterEntry({
+  item,
+  status,
+  gates,
+}: {
+  item: FooterItem;
+  status?: ServiceStatus;
+  gates: FooterGates;
+}) {
   if ('control' in item) return <CookieSettings label={item.label} />;
-  if (item.planned) {
+  if (item.planned || ('gate' in item && !gates[item.gate])) {
     return (
       <span className={styles.planned} data-v2-planned="">
         {item.label}
@@ -60,7 +85,7 @@ function FooterEntry({ item, status }: { item: FooterItem; status?: ServiceStatu
 }
 
 /** The site footer: the brand block, and the four columns of links from footer-links.ts. */
-export function SiteFooter({ status, lineMark }: SiteFooterProps) {
+export function SiteFooter({ status, lineMark, gates = footerGates() }: SiteFooterProps) {
   return (
     <footer className={styles.footer} data-v2-footer="">
       <div className={`${layout.wrap} ${styles.grid}`}>
@@ -84,7 +109,7 @@ export function SiteFooter({ status, lineMark }: SiteFooterProps) {
               <ul className={styles.list}>
                 {column.items.map((item) => (
                   <li key={item.label}>
-                    <FooterEntry item={item} status={status} />
+                    <FooterEntry item={item} status={status} gates={gates} />
                   </li>
                 ))}
               </ul>
