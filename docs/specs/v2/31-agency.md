@@ -736,7 +736,7 @@ and `pause_token_hash`.
 | `PUT`, `DELETE /api/report-files/schedules/site/[siteId]`  | Saves or removes the schedule (`set_report_schedule`, `clear_report_schedule`).           |
 | `PATCH /api/report-files/schedules/site/[siteId]/client`   | The client's name, contact and owning seat (`set_client`).                                |
 | `POST /api/report-files/schedules/site/[siteId]/confirm`   | Asks for the confirmation mail again; 409 `nothing_to_confirm` when there is none to ask. |
-| `POST /api/report-files/schedules/site/[siteId]/resume`    | Resumes a schedule its recipient paused; the next run is the first after the resume.      |
+| `POST /api/report-files/schedules/site/[siteId]/resume`    | Lifts a recipient's pause and asks the recipient to confirm again; restarts no mail.      |
 | `GET /s/confirm/[token]`, `POST /api/report-files/confirm` | The recipient's confirmation link, and the press that confirms.                           |
 | `GET /s/pause/[token]`, `POST /api/report-files/pause`     | The recipient's pause link, and the press that pauses.                                    |
 | `POST /s/pause/[token]`                                    | A mail client's one-click unsubscribe (RFC 8058): the body `List-Unsubscribe=One-Click`.  |
@@ -923,10 +923,18 @@ confirmation, which carries no pause link, still goes.
 and `pnpm --filter @crawlmouse/inngest exec vitest run mail.test.ts`. The first of those runs both
 mails over the migrated schema, from the confirmation to a paused schedule.
 
+A recipient's pause is final from the sender's side (owner ruling, 2026-11-12).
+`resume_report_schedule` lifts the pause and clears the confirmation with it, and the route asks for
+the confirmation mail again from the bucket of the client and confirm routes
+(`report-confirm:account:`); reports start again when the recipient confirms. Past the day's bound
+the pause is still lifted and no mail is asked for (`confirmation: 'later'`); the next run asks. The
+pause page tells the recipient so. The account has no pause of its own in this step: it removes a
+schedule (`DELETE`) and saves one again.
+`pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-031-b2-schedules.test.ts __tests__/v2-031-report-mails.test.ts "app/api/report-files/schedules/site/[siteId]/route.test.ts"`
+
 Known gaps. The recipient's two link cookies are set for the whole site (`Path=/`, the convention of
 `lib/v2/account/link-cookie.ts`), since the page and the route that reads the token are under
-different paths. "Resume" starts a schedule its recipient paused with one press and asks for no new
-confirmation; the pause page says so to the recipient. A contact whose address is under a suppression (a hard bounce or a complaint) is still
+different paths. A contact whose address is under a suppression (a hard bounce or a complaint) is still
 sent the confirmation, and a report to that address is then answered `suppressed` and not sent; no
 screen says so. The gap §6 states for an invitation's link holds for the confirmation's link and the
 report's share link: a failure between Resend's acceptance and the ledger's record makes the retry
