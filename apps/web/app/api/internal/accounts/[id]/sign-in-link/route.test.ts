@@ -44,14 +44,17 @@ vi.mock('@/lib/supabase/admin', () => ({
 vi.mock('@/lib/rate-limit', () => ({
   checkRateLimit: async (...args: unknown[]) => {
     h.rate(...args);
-    h.linesAtRate = (await h.db.query('select 1 from public.operator_actions')).rows.length;
+    // The first call's count: a later call cannot hide that an earlier one came before the record.
+    if (h.linesAtRate < 0)
+      h.linesAtRate = (await h.db.query('select 1 from public.operator_actions')).rows.length;
     return { allowed: h.allowed };
   },
 }));
 vi.mock('@/lib/v2/ops/sign-in-link', () => ({
   requestSignInLink: async (email: string) => {
     h.link(email);
-    h.linesAtLink = (await h.db.query('select 1 from public.operator_actions')).rows.length;
+    if (h.linesAtLink < 0)
+      h.linesAtLink = (await h.db.query('select 1 from public.operator_actions')).rows.length;
     if (h.answer === 'throw') throw new Error('network');
     return h.answer;
   },
@@ -129,6 +132,7 @@ describe("an operator's re-send", () => {
       MAGIC_LINK_PER_EMAIL_PER_HOUR,
       HOUR_MS,
     );
+    expect(h.link).toHaveBeenCalledOnce();
     expect(h.link).toHaveBeenCalledWith(owner.email);
     expect((await recordLines(h.db)).at(-1)).toEqual({
       operator_id: op.id,
