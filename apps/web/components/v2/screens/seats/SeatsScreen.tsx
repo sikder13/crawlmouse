@@ -53,6 +53,7 @@ export function SeatsScreen({
         <Table
           label={SEATS_COPY.tables.seats}
           rowHeader
+          className={shared.rowHeaded}
           columns={[
             { header: C.person },
             { header: C.role },
@@ -90,6 +91,7 @@ export function SeatsScreen({
         <Table
           label={SEATS_COPY.tables.roles}
           rowHeader
+          className={shared.rowHeaded}
           columns={roles.columns.map((header, i) => ({ header, numeric: i > 0 }))}
           rows={roles.rows.map((r) => ({
             key: r.can,

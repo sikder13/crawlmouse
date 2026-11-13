@@ -103,6 +103,7 @@ function Clients({ clients }: { clients: MatrixView['clients'] }) {
         <Table
           label={COPY.tableLabel}
           rowHeader
+          className={shared.rowHeaded}
           columns={[
             { header: C.site, mono: true },
             { header: C.client },

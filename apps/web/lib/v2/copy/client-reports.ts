@@ -55,6 +55,8 @@ export const CLIENT_REPORTS_COPY = {
   nextRun: (when: string, zone: string) => `${when} ${zone}`,
   noNextRun: 'none',
   noNextRunPaused: 'none while paused',
+  noNextRunDeclined: 'none: the contact declined',
+  noNextRunTrial: 'none during the trial',
   change: 'Change',
   askToConfirm: 'Ask to confirm',
   askAgain: 'Ask again',

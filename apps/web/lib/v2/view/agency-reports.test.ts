@@ -428,6 +428,14 @@ describe('what a seat that may schedule reports is offered', () => {
       label: 'paused by the recipient; asked again since, and can be asked again from Tue 1 Dec',
     });
     expect(again.actions.map((a) => a.label)).toEqual(['Change']);
+    // The day is the account's (America/Indiana/Indianapolis): 03:00 UTC on 1 Dec is 30 Nov there.
+    const late = new Map([
+      [GRANITEPEAK_SITE, { refused: 'asked_recently' as const, nextAt: '2026-12-01T03:00:00Z' }],
+    ]);
+    expect(
+      row(reports(paused, northwind, {}, { ...side, refusals: late }), GRANITEPEAK_SITE).contact
+        .label,
+    ).toContain('can be asked again from Mon 30 Nov');
     // Asked and waiting (the schedule was removed and saved again): no "Ask again" either.
     const waiting = row(
       reports(d, northwind, {}, { ...side, refusals: recent(HARBORLIGHT_SITE) }),

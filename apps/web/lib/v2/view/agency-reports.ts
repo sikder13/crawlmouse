@@ -286,11 +286,14 @@ function contactOf(
     refusal?.refused === 'asked_recently'
       ? COPY.contact.askAgainFrom(dayDate(refusal.nextAt, zone))
       : '';
+  // "asked again since" is said of a contact that paused or is waiting to confirm, not of one with
+  // no schedule or one the trial holds.
+  const SAYS_AGAIN: readonly ContactState[] = ['paused', 'asked', 'not_asked'];
   const as = (state: ContactState, label: string): ContactView => ({
     address,
     state,
     mayAsk: refusal === undefined,
-    label: `${label}${again}`,
+    label: SAYS_AGAIN.includes(state) && s.client_report !== null ? `${label}${again}` : label,
   });
   if (address === null) return as('none', COPY.contact.none);
   // "Don't ask me again" is the recipient's, and stands whatever the schedule holds.
@@ -314,9 +317,12 @@ function scheduleOf(s: Site): string {
     : CLIENT_COPY.noReport;
 }
 
-function nextRunOf(s: Site, side: ScheduleSide | undefined): string {
+function nextRunOf(s: Site, side: ScheduleSide | undefined, contact: ContactState): string {
   const r = s.client_report;
   if (r === null) return COPY.noNextRun;
+  // A run at which nothing is sent is not a next run: the recipient declined, or the trial holds it.
+  if (contact === 'declined') return COPY.noNextRunDeclined;
+  if (contact === 'trial') return COPY.noNextRunTrial;
   if (r.paused_by_recipient_at !== null) return COPY.noNextRunPaused;
   const at = side?.nextRunAt;
   return at
@@ -498,7 +504,7 @@ function reportsView(
           href: `/agency/clients/${s.id}`,
           contact,
           schedule: scheduleOf(s),
-          nextRun: nextRunOf(s, side.schedules?.get(s.id)),
+          nextRun: nextRunOf(s, side.schedules?.get(s.id), contact.state),
           seat: seatOf(v, s),
           actions: maySchedule ? rowActions(s, contact, base) : [],
         };

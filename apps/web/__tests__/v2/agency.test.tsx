@@ -584,6 +584,50 @@ describe('client reports for a reader who is not offered the forms', () => {
     expect(main(html)).not.toContain('Ask to confirm');
   });
 
+  it('a contact that answered “Don’t ask me again” is drawn declined, by words and a shape, with no ask and no next run', () => {
+    const d = fixture('challenged-site');
+    const html = renderToStaticMarkup(
+      <ClientReportsScreen
+        data={agencyReportsView(
+          d,
+          // Northwind: the account that holds the Granite Peak client.
+          {
+            accountId: d.sites.find((s) => s.id === GRANITEPEAK_SITE)!.account_id!,
+            now: d.as_of,
+          },
+          {},
+          '/agency/reports',
+          { refusals: new Map([[GRANITEPEAK_SITE, { refused: 'declined' as const }]]) },
+        )}
+      />,
+    );
+    const row = new JSDOM(main(html)).window.document.querySelector(
+      '[data-v2-contact="declined"]',
+    )!;
+    expect(row.textContent).toContain('declined: answered “Don’t ask me again”');
+    // Not the confirmed state's pill: the state is told by its words and its glyph.
+    const pill = row.querySelector('[data-v2-pill]')!;
+    expect(pill.getAttribute('data-v2-pill')).toBe('unverified');
+    expect(pill.querySelector('svg[data-v2-glyph]')).not.toBeNull();
+    const tr = row.closest('tr')!;
+    expect(tr.textContent).toContain('none: the contact declined');
+    expect(tr.textContent).not.toMatch(/Ask to confirm|Ask again/);
+  });
+
+  it('each table that heads its rows carries the class that takes the line off the last row’s header', () => {
+    for (const file of [
+      'agency/MatrixScreen.tsx',
+      'agency/ClientScreen.tsx',
+      'agency/ReportsScreen.tsx',
+      'seats/SeatsScreen.tsx',
+    ]) {
+      const source = readFileSync(resolve(__dirname, '../../components/v2/screens', file), 'utf8');
+      const headed = source.match(/\n\s+rowHeader(?:=\{[^}]*\})?\n/g) ?? [];
+      const classed = source.match(/\n\s+className=\{shared\.rowHeaded\}\n/g) ?? [];
+      expect([file, headed.length > 0, classed.length]).toEqual([file, true, headed.length]);
+    }
+  });
+
   it('an account in its Agency trial is told once where a report is sent meanwhile', () => {
     const html = render(reports('trial'));
     expect(html.match(/data-v2-trial-note=""/g)).toHaveLength(1);
