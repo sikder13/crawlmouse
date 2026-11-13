@@ -177,6 +177,23 @@ describe('the mechanism checks fail on the code they guard against', () => {
     expect(check(other, 'webhook', 'serve')).toEqual(['does not import serve from inngest/next']);
   });
 
+  it('operator: requireOperator runs before any service-role client or body read', () => {
+    const ok = `export async function POST(req) { const proof = await requireOperator(await supabaseServer()); if (!proof) return notFound(); const body = await readBody(req); consoleStore(proof); }`;
+    const late = `export async function POST(req) { const s = consoleStore(p); const a = supabaseAdmin(); const b = consoleAdmin(p); await requireOperator(sb); }`;
+    const bodyFirst = `export async function POST(req) { const body = await readBody(req); const f = await req.formData(); await requireOperator(sb); }`;
+    const none = `export async function POST(req) { const a = supabaseAdmin(); }`;
+    const commented = `// requireOperator(sb)\nexport async function POST() { consoleStore(p); }`;
+    expect(check(ok, 'operator')).toEqual([]);
+    expect(check(late, 'operator')).toEqual([
+      'calls supabaseAdmin(), consoleAdmin() or consoleStore() before requireOperator() (3 calls)',
+    ]);
+    expect(check(bodyFirst, 'operator')).toEqual([
+      'reads the request body before requireOperator() (2 reads)',
+    ]);
+    expect(check(none, 'operator')).toEqual(['never calls requireOperator()']);
+    expect(check(commented, 'operator')).toEqual(['never calls requireOperator()']);
+  });
+
   it('service: the credential is checked before any service-role call', () => {
     const ok = `export async function POST(req) { if (!timingSafeEqual(a, b)) return; supabaseAdmin(); }`;
     const late = `export async function POST(req) { supabaseAdmin(); timingSafeEqual(a, b); }`;
@@ -263,10 +280,10 @@ describe('the registry finds the row a request path reaches', () => {
 });
 
 describe('cross-site refusal covers every state change a session or a visitor can be made to send', () => {
-  it('every state-changing user or member route takes the strict rule', () => {
+  it('every state-changing user, member or operator route takes the strict rule', () => {
     const open = ROUTE_POLICIES.filter(
       (p) =>
-        (p.class === 'user' || p.class === 'member') &&
+        (p.class === 'user' || p.class === 'member' || p.class === 'operator') &&
         p.methods.some(isStateChanging) &&
         p.origin !== 'strict',
     );
@@ -299,6 +316,9 @@ describe('cross-site refusal covers every state change a session or a visitor ca
       'api/checks/[id]/claim',
       'api/fixes/[id]/done',
       'api/fixes/[id]/email-developer',
+      'api/internal/accounts/[id]/sign-in-link',
+      'api/internal/checks/[id]/rerun',
+      'api/internal/search',
       'api/me',
       'api/reports/[slug]/claim',
       'api/reports/[slug]/logo',
