@@ -16,6 +16,7 @@ import {
   type Fix,
   type Verdict,
 } from '@crawlmouse/types/v2';
+import { AI_WAITING } from './view/effect-headline';
 import { letterFor, nextBandFloor } from './letters';
 import { listOf, percent, templateNoun } from './format';
 import { capitalise, count, numberWord, plural } from './words';
@@ -299,9 +300,15 @@ export function aiWithheldSummary(check: Check, measured: number): string {
   const ai = check.ai_readability!;
   if (!ai.withheld) throw new Error('Not withheld');
   const scored = check.crawlers.filter((c) => c.scored).length;
+  // The engine withholds by its own count and for other reasons too (a part of the grade it could
+  // not measure): with each scored crawler measured, the count is not why, and the grade's own
+  // first reason is given (`withheld_reasons`, one sentence each in `AI_WAITING`).
+  const reason = ai.withheld_reasons[0];
   const why = meetsEdge(check)
     ? `${EDGE_SENTENCE}, so only ${numberWord(measured)} of the ${numberWord(scored)} scored crawlers could be measured.`
-    : `Only ${numberWord(measured)} of the ${numberWord(scored)} scored crawlers could be measured.`;
+    : measured >= scored && reason
+      ? `${AI_WAITING[reason]}.`
+      : `Only ${numberWord(measured)} of the ${numberWord(scored)} scored crawlers could be measured.`;
   const range = ai.access_range;
   return range ? `${why} Access is somewhere between ${range.min} and ${range.max} of 40.` : why;
 }

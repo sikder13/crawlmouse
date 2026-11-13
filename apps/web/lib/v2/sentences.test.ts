@@ -230,6 +230,26 @@ describe('the wording at each threshold and form', () => {
     expect(() => aiWithheldSummary(check, 4)).toThrow(/Not withheld/);
   });
 
+  it('with every scored crawler measured, gives the grade’s own reason and not a count that explains nothing', () => {
+    // The engine withholds for a part it could not measure too: all four crawlers read the site,
+    // and the grade waits for pages read in a browser.
+    const waiting = structuredClone(
+      findCheck(fixture('challenged-site'), CHECKS.challengedFirstAudit),
+    );
+    for (const c of waiting.crawlers) {
+      if (c.verdict === 'edge_blocks_automation') c.verdict = 'not_measured';
+    }
+    waiting.ai_readability!.withheld_reasons = ['readable_unmeasured'];
+    waiting.ai_readability!.access_range = null;
+    expect(aiWithheldSummary(waiting, 4)).toBe(
+      'AI readability is graded once each template has a page read in a browser.',
+    );
+    // Fewer measured than scored: the count is the reason, as before.
+    expect(aiWithheldSummary(waiting, 3)).toBe(
+      'Only three of the four scored crawlers could be measured.',
+    );
+  });
+
   it('names each thin template, in the plural for more than one', () => {
     expect(thinSentence(check)).toBe('Product pages are empty without JavaScript.');
     const two = variant((c) => {
