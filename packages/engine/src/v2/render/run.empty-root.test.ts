@@ -14,6 +14,8 @@ import {
   type RenderCheckInput,
   type RenderOutcome,
 } from './run.js';
+import { detectRendered } from '../detectors/rendered.js';
+import { renderedConfidence } from '../grade/outcomes.js';
 import type { RenderCandidate } from './sample.js';
 
 const PAGE = 2 * RESERVE_PER_RENDER_MS;
@@ -266,18 +268,22 @@ describe('under caps that bind, the graded phase is what it is with no empty-roo
     ]);
   });
 
-  it('a graded phase that refuses everything leaves the empty-root phase its own reservation', async () => {
-    const { daily, calls } = recordingBudget((n) => n > 1);
+  it('a graded phase today’s budget refused: the empty-root phase does not ask it again', async () => {
+    const { daily, calls } = recordingBudget(() => false);
     const out = await renderCheck(input({ daily }));
-    expect(out.pages.slice(0, 3).map((p) => !p.rendered && p.reason)).toEqual(
-      Array(3).fill('daily_cap'),
+    expect(out.pages.map((p) => !p.rendered && p.reason)).toEqual(Array(8).fill('daily_cap'));
+    expect(calls).toEqual([`reserve ${3 * PAGE}`]);
+  });
+
+  it('a graded phase whose budget threw: the empty-root phase does not ask it again', async () => {
+    const { daily, calls } = recordingBudget(() => {
+      throw new Error('store down');
+    });
+    const out = await renderCheck(input({ daily }));
+    expect(out.pages.map((p) => !p.rendered && p.reason)).toEqual(
+      Array(8).fill('daily_budget_unavailable'),
     );
-    expect(emptyRootPart(out).every((p) => p.rendered)).toBe(true);
-    expect(calls).toEqual([
-      `reserve ${3 * PAGE}`,
-      `reserve ${5 * PAGE}`,
-      `settle ${5 * PAGE} 10000`,
-    ]);
+    expect(calls).toEqual([`reserve ${3 * PAGE}`]);
   });
 });
 
@@ -297,5 +303,110 @@ describe('a throw out of a page', () => {
       ),
     ).rejects.toThrow('timer gone');
     expect(client.calls.some((c) => SHELLS.some((s) => s.url === c.url))).toBe(false);
+  });
+
+  it('r6: in the empty-root phase leaves that phase phase_threw, settles, and keeps the graded outcome', async () => {
+    const isShell = (url: string) => SHELLS.some((s) => s.url === url);
+    const make = () => {
+      const { daily, calls } = recordingBudget(() => true);
+      return {
+        calls,
+        over: {
+          daily,
+          client: fakeClient([...FIXTURES.values(), ...SHELLS], {
+            before: (_n: number, url: string) =>
+              isShell(url)
+                ? ({ ok: false, reason: 'rate_limited', retryAfterMs: 1, browserMs: 0 } as const)
+                : undefined,
+          }),
+          sleep: async () => {
+            throw new Error('timer gone');
+          },
+        },
+      };
+    };
+    const off = make();
+    const without = await renderCheck(input({ ...off.over, emptyRootCandidates: [] }));
+    const on = make();
+    const withPool = await renderCheck(input(on.over));
+    expect(gradedPart(withPool)).toEqual(gradedPart(without));
+    expect(emptyRootPart(withPool).map((p) => !p.rendered && p.reason)).toEqual(
+      Array(5).fill('phase_threw'),
+    );
+    expect(on.calls).toEqual([
+      `reserve ${3 * PAGE}`,
+      `settle ${3 * PAGE} ${GRADED_MS}`,
+      `reserve ${5 * PAGE}`,
+      `settle ${5 * PAGE} 0`,
+    ]);
+  });
+});
+
+describe('r5: a large site, where the graded phase takes the cap and the empty-root phase still renders', () => {
+  it('renders the shells of a template the graded phase skipped, and they do not decide its verdict', async () => {
+    const text = `<html><body><main><h1>x</h1><p>${'word '.repeat(80)}</p></main></body></html>`;
+    const empty = '<html><body><div id="root"></div></body></html>';
+    const t = (i: number) => `/t${String(i).padStart(2, '0')}`;
+    const replies: ReplyFixture[] = [
+      ...Array.from({ length: 30 }, (_, i) => ({
+        provenance: 'r5',
+        url: `https://s.example${t(i)}/a`,
+        static: { html: text, browser_ms: 1000 },
+        rendered: { html: text, browser_ms: 1000 },
+      })),
+      ...[1, 2].map((k) => ({
+        provenance: 'r5',
+        url: `https://s.example${t(29)}/shell${k}`,
+        static: { html: empty, browser_ms: 500 },
+        rendered: { html: text, browser_ms: 900 },
+      })),
+    ];
+    const candidates: RenderCandidate[] = Array.from({ length: 30 }, (_, i) => ({
+      url: `https://s.example${t(i)}/a`,
+      template_key: t(i),
+      kind: 'content',
+      status_code: 200,
+      is_html: true,
+      pagerank_share: 0.01,
+      fetched_under_our_robots: true,
+    }));
+    const ers: EmptyRootCandidate[] = [1, 2].map((k) => ({
+      url: `https://s.example${t(29)}/shell${k}`,
+      template_key: t(29),
+      kind: 'thin',
+      status_code: 200,
+      is_html: true,
+      pagerank_share: 0.001,
+      fetched_under_our_robots: true,
+      client_rendered: true,
+    }));
+    const out = await renderCheck(
+      input({
+        candidates,
+        client: fakeClient(replies),
+        caps: { perCheckMs: 2_250_000, perDayMs: 36_000_000 },
+        inFlight: 2,
+        emptyRootCandidates: ers,
+      }),
+    );
+    const er = emptyRootPart(out);
+    expect([out.pages.length - er.length, er.filter((p) => p.rendered).length]).toEqual([25, 2]);
+    const measured = new Map(
+      out.pages.flatMap((p) => (p.rendered ? [[p.url, p.without_js] as const] : [])),
+    );
+    const pages = [...candidates, ...ers].map((c) => ({
+      ...c,
+      without_js: measured.get(c.url) ?? null,
+    }));
+    const r = detectRendered(pages, { emptyRoots: new Set(ers.map((e) => e.url)) }).find(
+      (x) => x.template_key === t(29),
+    )!;
+    expect(r).toMatchObject({
+      state: 'indeterminate',
+      reason: 'not_rendered',
+      extent: { pages: 3, graded: 1, rendered: 0 },
+      affected_urls: [],
+    });
+    expect(renderedConfidence(r)).toBe('likely');
   });
 });
