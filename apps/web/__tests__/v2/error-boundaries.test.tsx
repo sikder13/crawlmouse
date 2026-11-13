@@ -2,8 +2,8 @@
 /**
  * The signed-in segments' error boundaries (CC-33 D5): each reports the error to Sentry, shows the
  * error screen with the event's id, retries by refreshing the route from the server and then
- * resetting the boundary, and links support with the mailto the builder makes from the page's path,
- * the ids in it, the event id and the error's digest.
+ * resetting the boundary inside one transition, and links support with the mailto the builder makes
+ * from the page's path, the ids in it, the event id and the error's digest.
  */
 import { act, type ComponentType } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -18,6 +18,18 @@ const captureException = vi.hoisted(() => vi.fn(() => sentry.id));
 const calls = vi.hoisted(() => [] as string[]);
 const refresh = vi.hoisted(() => vi.fn(() => void calls.push('refresh')));
 vi.mock('@sentry/nextjs', () => ({ captureException }));
+// React's own startTransition, with a mark in `calls` before and after the callback runs.
+vi.mock('react', async (importOriginal) => {
+  const real = await importOriginal<typeof import('react')>();
+  return {
+    ...real,
+    startTransition: (scope: () => void) => {
+      calls.push('transition:start');
+      real.startTransition(scope);
+      calls.push('transition:end');
+    },
+  };
+});
 vi.mock('next/navigation', () => ({ usePathname: () => nav.path, useRouter: () => ({ refresh }) }));
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -82,8 +94,10 @@ describe.each(BOUNDARIES)('app/%s/error.tsx', (_segment, path, load) => {
 
   // Next 15's `reset` only clears the boundary's state (next/dist/client/components/
   // error-boundary.js, `this.reset`), so a server component that threw would throw again from the
-  // payload the client holds; `router.refresh()` asks the server for the route again first.
-  it('retries by refreshing the route from the server, then resetting the boundary', async () => {
+  // payload the client holds; `router.refresh()` asks the server for the route again first. Both
+  // run inside one startTransition: outside it, `reset` is an update of the click's own lane and
+  // commits before the refreshed payload does.
+  it('retries by refreshing the route from the server, then resetting the boundary, in one transition', async () => {
     const { default: Boundary } = await load();
     sentry.id = EVENT;
     nav.path = path;
@@ -96,7 +110,7 @@ describe.each(BOUNDARIES)('app/%s/error.tsx', (_segment, path, load) => {
     act(() => retry.click());
     expect(refresh).toHaveBeenCalledTimes(1);
     expect(reset).toHaveBeenCalledTimes(1);
-    expect(calls).toEqual(['refresh', 'reset']);
+    expect(calls).toEqual(['transition:start', 'refresh', 'reset', 'transition:end']);
   });
 
   it('shows no reference while Sentry has given none', async () => {

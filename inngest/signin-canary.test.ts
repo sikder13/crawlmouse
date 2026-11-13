@@ -15,12 +15,15 @@ const config = (fn: unknown) =>
 const REQUESTED_AT = '2026-11-13T12:00:00.000Z';
 
 /**
- * A step tool that behaves as Inngest's does across invocations: a step that returned is recorded
- * (through JSON) and not run again, and a sleep is recorded once. A step that throws stands for one
- * that has used its retries: the handler gets the error, as Inngest's `StepError`, and a replay gets
- * the same error without running the step again.
+ * A fake step tool. A step that returns is recorded (through JSON) and not run again, and a sleep
+ * is recorded once. A step that throws is run again, up to `attempts` runs in all (one by default),
+ * standing for Inngest's retries of that step; each run is listed in `ran`. When its last run
+ * throws, the fake records that error and throws it to the handler, and a replay gets the same
+ * error without running the step again. The fake throws the step's own error; Inngest throws a
+ * `StepError` carrying its name and message (inngest 3.54.2, components/StepError.js), which the
+ * handler does not read.
  */
-function memoStep() {
+function memoStep({ attempts = 1 }: { attempts?: number } = {}) {
   const memo = new Map<string, { out: unknown } | { error: unknown }>();
   const ran: string[] = [];
   const slept: { id: string; duration: string }[] = [];
@@ -29,14 +32,17 @@ function memoStep() {
       const seen = memo.get(id);
       if (seen && 'error' in seen) throw seen.error;
       if (seen) return seen.out;
-      ran.push(id);
-      try {
-        const out = JSON.parse(JSON.stringify((await fn()) ?? null)) as unknown;
-        memo.set(id, { out });
-        return out;
-      } catch (error) {
-        memo.set(id, { error });
-        throw error;
+      for (let attempt = 1; ; attempt += 1) {
+        ran.push(id);
+        try {
+          const out = JSON.parse(JSON.stringify((await fn()) ?? null)) as unknown;
+          memo.set(id, { out });
+          return out;
+        } catch (error) {
+          if (attempt < attempts) continue;
+          memo.set(id, { error });
+          throw error;
+        }
       }
     },
     sleep: async (id: string, duration: string) => {
@@ -108,7 +114,8 @@ describe('the sign-in canary (D6)', () => {
 
   it('raises the signal once when nothing was delivered', async () => {
     const w = work({ delivered: async () => false });
-    const { out } = await run(w);
+    const { out, ran } = await run(w);
+    expect(ran).toEqual(['request', 'look', 'report-delivery']);
     expect(w.report).toHaveBeenCalledTimes(1);
     expect(w.report).toHaveBeenCalledWith('delivery');
     expect(out).toEqual({ requested: 'sent', delivered: false });
@@ -117,7 +124,7 @@ describe('the sign-in canary (D6)', () => {
   it('raises the signal at once, without waiting, when the request is refused', async () => {
     const w = work({ request: async () => 'refused' });
     const { out, ran, slept } = await run(w);
-    expect(ran).toEqual(['request']);
+    expect(ran).toEqual(['request', 'report-request']);
     expect(slept).toEqual([]);
     expect(w.delivered).not.toHaveBeenCalled();
     expect(w.report).toHaveBeenCalledTimes(1);
@@ -186,5 +193,59 @@ describe('the sign-in canary when it fails itself (D6)', () => {
     });
     const { first } = await failing(w);
     expect(first).toEqual(new Error('sentry down'));
+  });
+});
+
+describe('the sign-in canary when its report fails (D6)', () => {
+  /** A report that throws `failures` times, as `reportCanary` does while Sentry does not flush. */
+  function flaky(failures: number) {
+    let left = failures;
+    return async () => {
+      if (left > 0) {
+        left -= 1;
+        throw new Error('the canary signal was not flushed in time');
+      }
+    };
+  }
+
+  async function retried(w: ReturnType<typeof work>, attempts: number) {
+    const fn = createSigninCanaryFn(() => w) as unknown as {
+      fn: (ctx: unknown) => Promise<unknown>;
+    };
+    const s = memoStep({ attempts });
+    const out = await fn.fn({ step: s.step }).then(
+      (o) => o,
+      (e: unknown) => e,
+    );
+    return { out, ...s };
+  }
+
+  it('retries only the report of a refusal: the link is asked for once', async () => {
+    const w = work({ request: async () => 'refused', report: flaky(1) });
+    const { out, ran } = await retried(w, 3);
+    expect(w.request).toHaveBeenCalledTimes(1);
+    expect(ran).toEqual(['request', 'report-request', 'report-request']);
+    expect(w.report.mock.calls).toEqual([['request'], ['request']]);
+    expect(out).toEqual({ requested: 'refused', delivered: null });
+  });
+
+  it('retries only the report of a missing delivery: the link is asked for and looked for once', async () => {
+    const w = work({ delivered: async () => false, report: flaky(1) });
+    const { out, ran } = await retried(w, 3);
+    expect(w.request).toHaveBeenCalledTimes(1);
+    expect(w.delivered).toHaveBeenCalledTimes(1);
+    expect(ran).toEqual(['request', 'look', 'report-delivery', 'report-delivery']);
+    expect(w.report.mock.calls).toEqual([['delivery'], ['delivery']]);
+    expect(out).toEqual({ requested: 'sent', delivered: false });
+  });
+
+  it('fails the run with the report’s error past its retries, and reports no look_error', async () => {
+    const w = work({ delivered: async () => false, report: flaky(Infinity) });
+    const { out, ran } = await retried(w, 2);
+    expect(out).toEqual(new Error('the canary signal was not flushed in time'));
+    expect(w.request).toHaveBeenCalledTimes(1);
+    expect(w.delivered).toHaveBeenCalledTimes(1);
+    expect(ran).toEqual(['request', 'look', 'report-delivery', 'report-delivery']);
+    expect(w.report.mock.calls).toEqual([['delivery'], ['delivery']]);
   });
 });
