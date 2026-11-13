@@ -9,6 +9,7 @@
     "research/**/*.ts",
     "db/**/*.ts",
     "ops/**/*.ts",
+    "golive/**/*.ts",
     "../packages/engine/src/**/*"
   ]
 }
