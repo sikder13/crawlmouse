@@ -3,8 +3,9 @@
 v2 goes live by switching four flags on in order (`docs/ops/go-live.md`): step 2 `V2_PIPELINE`,
 step 3 `V2_ACCOUNT_DOOR`, step 4 `V2_CHECKS_PUBLIC`, step 5 `V2_BILLING`. A step is undone by an
 Instant Rollback to the deployment before it, which brings back that deployment's environment. So
-every change in this step is keyed on a flag: with the flags off a v1 URL, page or job behaves as it
-did before this step, and with them on a visitor does not land on a v1 dead end or v1's look.
+what a visitor meets is keyed on a flag: with the flags off a v1 URL or page behaves as it did before
+this step, and with them on a visitor does not land on a v1 dead end or v1's look. Two changes are
+not keyed on a flag, and each says why: D4's cleanup fix and the account backfill (D5).
 
 The inventory this step works from is `docs/ops/v1-inventory.json` (CC-V1AUDIT, measured at
 `ee11796d`; verified again on `b82a8e1f`, differences in "Verified" below).
@@ -40,7 +41,14 @@ each of its flags off in turn (passed on, as before this step).
   middleware rewrite (`next/dist/server/lib/router-utils/resolve-routes.js`, the rewrite branch), so
   the middleware returns the whole document; `cutover.test.ts` pins its colours to
   `styles/v2/tokens.css`.
-- **tRPC.** No component calls a tRPC hook; `app/layout.tsx` mounts the provider only.
+- **Caching.** Each row's answer carries `Cache-Control: no-store` (`middleware.test.ts` checks it
+  per row), so a browser does not keep a redirect or
+  a 410 past the rollback that undoes its row. Both `/compare` pages are `noindex` today.
+- **Spellings.** A row matches the path as sent and percent-decoded, with one trailing slash, and
+  without an `.rsc` suffix; a path that does not decode is read as sent. A redirect row's `:name`
+  takes `[A-Za-z0-9_-]+` (its value goes into the target); any other row's takes any characters.
+- **tRPC.** No page or component calls a tRPC hook (`grep -rn "trpc\." apps/web/app apps/web/components`
+  prints nothing); `app/layout.tsx` mounts the provider.
 - **Not rows:** `/`, `/dashboard` and `/r/:slug` are rewrites (`lib/v2/rewrites.ts`); `/audit/[id]`
   branches in its page (a v2 check goes to its own page, a v1 audit is served).
 
@@ -55,13 +63,62 @@ no rate-limit bucket is spent; Turnstile and the limits of `/api/checks` are unc
 - **Kept as v1:** `/api/audits/:id/stream`, `/export`, `/llms-txt`. The v1 audit page, still served
   for a v1 audit, reads all three (`app/audit/[id]/AuditView.tsx`, `AuditSurfaceView.tsx`,
   `components/ai/LlmsTxtGenerator.tsx`; `cutover.test.ts` checks each caller). So inventory finding
-  A-1 (the stream's unvalidated id and missing limit) is not closed by this step; A-11 (notify) is, at
-  step 4.
+  A-1 (the stream's unvalidated id and missing limit) is not closed by this step and goes to CC-37;
+  A-11 (notify) is, from step 4.
 - **The end date.** `API_ALIAS_LAST_DAY = '2027-02-15'`, 90 days after the earliest planned switch-on
-  (2026-11-17). `apiAliasesEnded(now)` is tested at injected dates; one test calls it with the real
-  clock and fails after that day, which is when the `gone-api` rows and the v1 handlers they shadow
-  are removed.
+  (2026-11-17). `cutover.test.ts` checks the predicate at injected dates, and one test reads the real
+  clock and fails after that day. Then the `gone-api` rows, the v1 handlers they shadow and their
+  inventory items are removed together: removing the rows alone fails the inventory-coverage test.
 
-## D3, D4, D5, D6
+## D4 — v1 jobs and v1 data: kept, not migrated, not dropped
 
-Filled in as each lands.
+- `auditFn` and `cleanupExpiredAuditsFn` stay registered, with their ids and crons. `auditFn` gets no
+  work once step 4 is on: `audit.requested` is sent by `/api/audits/start` and `/reaudit`
+  (`git grep -n "name: 'audit.requested'" apps/web -- ':!*.test.ts'`), and
+  both answer 410. A rollback finds both as it left them. The cleanup keeps calling
+  `prune_rate_limits` (B-F1).
+- **C-4.** `deleteExpiredAudits` (`inngest/billing-helpers.ts`) no longer deletes an expired audit
+  that a published report names (one neither taken down nor hidden). It pages by id after the last id
+  read, so kept audits do not block the batches after them (`billing.test.ts`, "kept audits that fill whole
+  batches…"), and reads each batch's ids twice (the report
+  read, the delete), 150 a batch. Tests: `inngest/billing.test.ts` and, on the migrated schema in
+  PGlite, `inngest/billing-ttl.db.test.ts`. Not keyed on a flag: it holds with v2 off too, and a
+  rollback to a deployment from before this step brings back the old cleanup.
+- **The race.** A report minted between a batch's report read and its delete loses its link to the
+  audit (the FK is `on delete set null`; the report keeps its snapshot). v1's mint reads an audit's
+  status and grade, not its expiry (`app/api/reports/mint/route.ts`), so an expired audit not yet
+  deleted can be minted. The window is one batch's two requests, once a day.
+- **/privacy.** An audit behind a published report now outlives the 30 days /privacy states; the
+  sentence needs an exception, which is the owner's legal text (questions.md Q13).
+- **No v1 table is dropped or altered here.** `audits`, `pages`, `links`, `findings`, `fixes`,
+  `sessions` and `benchmark_cohorts` are dropped by a later migration, no earlier than 30 days after
+  step 4 is switched on (with step 4 on 2026-11-17, not before 2026-12-17), together with the
+  `gone-api` rows, `auditFn` and `cleanupExpiredAuditsFn`.
+- **v1 audits are not converted into v2 checks**: a v1 grade is not a v2 grade, and a converted
+  record would claim evidence v2 never collected.
+
+## D5 — a v1 user's first v2 sign-in
+
+- **What the first sign-in does** (traced in questions.md Q12): it writes nothing to `audits`,
+  `public_reports` or `users.pro_until`. Without a v2 account, `runFirstLogin` answers `no_account`
+  and the dashboard shows its no-account state; the backfill below gives every existing user one.
+- **The line.** For a viewer whose own user id has completed, unexpired v1 audits, the v2 dashboard's
+  Sites card carries one closed disclosure, "Your earlier audits are still at their links", in its
+  empty and its sites state: up to 20, newest first, each with its host, date, the v1 grade labelled
+  as the earlier grade, and a link to `/audit/<id>`. Read through the service role keyed on the
+  signed-in viewer's own id (`app/dashboard/v2/earlier-audits.ts`), the rows the viewer's own session
+  could read: a v1 audit id is a capability URL, so another member of the account does not see it.
+- **The backfill** (ruling 1): filled in when it lands.
+
+## D3 — kept public pages in the v2 shell
+
+Filled in when it lands.
+
+## D6 — what each other cutover item is, and whose
+
+`notes/cc-35/for-cc-36.md` rows and the inventory findings this step owns, answered in PR.md and
+questions.md Q6–Q10: `cc36-v1-redirects` and `cc36-v1-pages` are built here (D1, D2, D3);
+`cc36-v1-crons` is answered by D4 (both functions stay; the row's two reasons hold); `cc36-v1-billing`
+is CC-38's and the owner's; `cc36-v1-accounts` is the backfill (D5). Findings: A-11 closes from step 4
+(D2), C-4 is fixed (D4), A-1 goes to CC-37, A-2 stays with the v1 export and llms-txt routes until the
+v1 drop.
