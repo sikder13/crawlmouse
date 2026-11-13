@@ -27,6 +27,9 @@ const h = vi.hoisted(() => ({
   objects: new Map<string, string>(),
   downloads: [] as string[],
   capture: vi.fn(async (..._a: unknown[]) => undefined),
+  /** Each rate-limit call's key and bound, and whether the address is past its bound. */
+  limits: [] as { key: string; limit: number; windowMs: number }[],
+  overLimit: false,
 }));
 
 class Redirect extends Error {
@@ -43,6 +46,12 @@ vi.mock('next/headers', () => ({
       h.cookies.has(name) ? { name, value: h.cookies.get(name)! } : undefined,
   }),
   headers: async () => new Headers(),
+}));
+vi.mock('@/lib/rate-limit', () => ({
+  checkRateLimit: async (key: string, limit: number, windowMs: number) => {
+    h.limits.push({ key, limit, windowMs });
+    return { allowed: !h.overLimit, remaining: 0, resetAt: new Date(Date.now() + 60_000) };
+  },
 }));
 vi.mock('next/navigation', () => ({
   notFound: () => {
@@ -236,6 +245,33 @@ describe('/s/view/[reportId]', () => {
     await expect(sharedPage(w.proof)).rejects.toBeInstanceOf(NotFound);
     expect(h.downloads).toEqual([]);
     expect(h.capture).not.toHaveBeenCalled();
+  });
+
+  it('is bounded for an address as the link is: past sixty an hour it is a 404, and nothing is read', async () => {
+    const w = await world();
+    h.cookies.set('cm_share', await link(w, w.proof));
+    h.limits.length = 0;
+    await sharedPage(w.proof);
+    expect(h.limits).toEqual([
+      {
+        key: expect.stringMatching(/^share-view:ip:[0-9a-f]{64}$/),
+        limit: 60,
+        windowMs: 3_600_000,
+      },
+    ]);
+    h.overLimit = true;
+    h.downloads.length = 0;
+    try {
+      await expect(sharedPage(w.proof)).rejects.toBeInstanceOf(NotFound);
+      expect(h.downloads).toEqual([]);
+    } finally {
+      h.overLimit = false;
+    }
+    // A request with no token is a 404 before the bound is counted.
+    h.cookies.delete('cm_share');
+    h.limits.length = 0;
+    await expect(sharedPage(w.proof)).rejects.toBeInstanceOf(NotFound);
+    expect(h.limits).toEqual([]);
   });
 
   it('is a 404 once the link is revoked, and once it has expired', async () => {
