@@ -24,9 +24,15 @@ with the value `1`. Then redeploy the deployment already serving production (Dep
 current production deployment → ⋯ → Redeploy, without the build cache option changed), not a newer
 commit: the step then changes the flag and nothing else, and its rollback returns to the same code
 (`docs/specs/v2/26b-dashboard-wiring.md:88`). A variable reaches only a deployment built after
-it is set; the running deployment keeps the environment it was built with. Then resync Inngest (the
-command below) and check that Inngest → Apps → crawlmouse lists the function count `golive:check`
-prints for the step after this one; after step 5 it is the count the step-5 sync row names.
+it is set; the running deployment keeps the environment it was built with. Then resync Inngest (the `curl -X PUT` under
+_Off_ below) and check that Inngest → Apps → crawlmouse lists the count for this step from:
+
+```bash
+pnpm --filter @crawlmouse/scripts exec tsx -e "import('./golive/inngest-sync.ts').then((m) => console.log(m.functionCountsByStep()))"
+```
+
+(failure handlers count as functions of their own; `apps/web/lib/v2/pipeline/golive-sync-count.test.ts`
+holds these counts to what the serve route registers).
 
 **Off, in a minute.** Vercel → Deployments → the production deployment from before the step → ⋯ →
 _Instant Rollback_. It serves that deployment with the environment it was built with, so the flag is
