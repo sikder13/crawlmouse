@@ -96,8 +96,13 @@ Which client makes each read of a site, check, fix, packet, alert, change or rep
 | A site's next check                                                         | `readNextChecks` (`lib/v2/account/sites-store.ts`)                        | service role                               | ids the dataset or `siteOfCaller` returned             |
 | Making and downloading a report                                             | `app/api/reports/route.ts`, `app/api/report-files/[id]/download/route.ts` | caller, then service role by the row's ids | `is_member_for_site`, `seat_may`, the `reports` policy |
 
-Each row is run as owner, account manager, developer in scope, developer out of scope, removed seat
-and stranger: `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-031-scope.test.ts __tests__/v2-031-scope-routes.test.ts __tests__/v2-031-scope-monitoring.test.ts`; the report routes in their own tests (`app/api/reports/route.test.ts`, `app/api/report-files/[id]/download/route.test.ts`).
+The rows are run as owner, account manager, developer in scope, developer out of scope, removed seat
+and stranger by `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-031-scope.test.ts __tests__/v2-031-scope-routes.test.ts __tests__/v2-031-scope-monitoring.test.ts`,
+except three: "Add a site" is run by role and by scope in `app/api/sites/route.test.ts`; `readNextChecks`
+is given the site ids its caller's own session read; and the report routes are run in their own tests
+(`app/api/reports/route.test.ts`, `app/api/report-files/[id]/download/route.test.ts`). The first of
+those three files also runs an account manager whose seat covers one client and a developer whose
+seat covers them all, so that the rule read is the scope and not the role.
 
 **Found open and closed here.**
 
@@ -171,10 +176,9 @@ a browser that runs no script shows. No element of it is orange. An account with
 "Personal account" or "Agency account", by its kind.
 `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2/account-switcher.test.tsx lib/v2/view/account-shell.agency.test.ts`
 
-The pages that pass the viewer's accounts to the frame: the dashboard, the site page, Settings and
-Settings › Plan, `/agency` and `/agency/clients/[siteId]`. A page that does not has no switcher in its
-rail (`ShellView.switcher` is null unless `accounts` is given):
-`grep -rlE "withSwitcher|accounts \}|accounts:" apps/web/app --include=page.tsx`.
+The pages that pass the viewer's accounts to the frame are the files this prints; a page that does
+not has no switcher in its rail (`ShellView.switcher` is null unless `accounts` is given):
+`grep -rlE "withSwitcher|\baccounts[,:]| accounts \}" apps/web/app --include=page.tsx`.
 
 **A page of an account that is not the one acted in.** The site page and the client page show the
 site's own account, whatever the cookie says. When that is not the account the caller acts in, the
@@ -458,7 +462,9 @@ before-and-after pairs, as strings.
 A `compare` names its earlier check as `previousCheckId`, the field the Reports screen posts. A
 `compare` with a `fixId` the named check did not verify is answered 409 `fix_not_verified` and writes
 no row (a fix of another site is a 404). The route's answers, in order, are in the comment on `POST`
-in `apps/web/app/api/reports/route.ts`, and each is a test in `route.test.ts` beside it.
+in `apps/web/app/api/reports/route.ts`, and `route.test.ts` beside it has a test for each but one:
+the 403 `role_refused`, which no request reaches today, since `seat_may` lets each role
+`export_report` (§3).
 
 The file is made inside the request and the row is written first: `create_report` writes it
 `pending`, `finish_report` marks it `stored` with its path and size, `fail_report` marks it `failed`
@@ -559,14 +565,17 @@ tests. Each of their fields is a column a member's own session may select:
 
 `pnpm --filter @crawlmouse/web exec vitest run lib/v2/reports/pdf.measure.test.ts` prints these: each
 file made three times, the median, with `--maxWorkers=2`, on the build machine on 2026-11-12. The
-sizes are the same on each run. The times are a machine's and moved with its load: the first column
-of times is one run at 16:28 with nothing else running; the second is the range of three runs of the
-final tree between 17:07 and 17:10, while other suites kept the load average near 15.
+sizes are those of a run at 21:11 on the tree of commit `bef557ef`; the two CSV sizes are one
+byte and ten bytes less than the table first held, since `e17c53d1` leaves `links_out` empty where a
+page's links were not read. The times are a machine's and moved with its load, and were not
+measured again after 17:10: the first column of times is one run at 16:28 with nothing else running;
+the second is the range of three runs between 17:07 and 17:10, while other suites kept the load
+average near 15.
 
 | Check                                                                         | `auditDoc` + `renderPdf`, quiet | under load    | PDF                   | CSV           | Edge list     | JSON            |
 | ----------------------------------------------------------------------------- | ------------------------------- | ------------- | --------------------- | ------------- | ------------- | --------------- |
-| the engine's recorded site (60 pages, 150 links, 400 crawler tests, 11 fixes) | 193 ms                          | 611 to 835 ms | 35,918 bytes, 4 pages | 20,800 bytes  | 16,468 bytes  | 1,309,952 bytes |
-| a generated check of 500 pages (1,359 links, 168 crawler tests, no fix)       | 114 ms                          | 442 to 458 ms | 31,504 bytes, 3 pages | 147,930 bytes | 124,319 bytes | 911,442 bytes   |
+| the engine's recorded site (60 pages, 150 links, 400 crawler tests, 11 fixes) | 193 ms                          | 611 to 835 ms | 35,918 bytes, 4 pages | 20,799 bytes  | 16,468 bytes  | 1,309,952 bytes |
+| a generated check of 500 pages (1,359 links, 168 crawler tests, no fix)       | 114 ms                          | 442 to 458 ms | 31,504 bytes, 3 pages | 147,920 bytes | 124,319 bytes | 911,442 bytes   |
 
 Each raw export took 7 ms or less in those runs. The audit document does not list pages, so its cost
 does not grow with them: the larger time is the recorded site's, which has fixes and more crawler
@@ -964,9 +973,8 @@ fix page's Pro wall (`lib/v2/view/fix.ts`), which are locked copy on the public 
 
 ### Events
 
-The events of `AGENCY_EVENTS` (`lib/v2/agency/events.ts`), the workstream that sends each, and where.
-On workstream C's branch one of them has a caller, `first_client_added`; the others are sent by the
-workstreams named, on their branches.
+The events of `AGENCY_EVENTS` (`lib/v2/agency/events.ts`), the workstream that built each sender, and
+where it is sent.
 
 | Event                      | Workstream | Sent by                                                                                                |
 | -------------------------- | ---------- | ------------------------------------------------------------------------------------------------------ |
