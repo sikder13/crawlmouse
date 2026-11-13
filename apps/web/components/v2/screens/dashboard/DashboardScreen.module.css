@@ -143,3 +143,29 @@
   padding-bottom: 3px;
   line-height: 1.3;
 }
+
+/* CC-36 D5: the viewer's earlier (v1) audits, a quiet line under the sites card's foot. */
+.earlier {
+  padding: 10px 16px 14px;
+  color: var(--v2-mut);
+  font-size: 12px;
+}
+
+.earlierLine {
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.earlierList {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow-wrap: anywhere;
+}
+
+.earlierList a {
+  color: var(--v2-fg);
+}

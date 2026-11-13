@@ -282,7 +282,29 @@ function Sites({ data }: Props) {
         />
       ) : null}
       {sites.foot ? <div className={shared.foot}>{sites.foot}</div> : null}
+      {data.earlier ? <Earlier earlier={data.earlier} /> : null}
     </Card>
+  );
+}
+
+/** The viewer's own v1 audits (CC-36 D5): one quiet line that opens their list. */
+function Earlier({ earlier }: { earlier: NonNullable<DashboardView['earlier']> }) {
+  return (
+    <details className={styles.earlier} data-v2-addition="" data-v2-earlier-audits="">
+      <summary className={styles.earlierLine}>{earlier.line}</summary>
+      <ul className={styles.earlierList} aria-label={earlier.label}>
+        {earlier.rows.map((r) => (
+          <li key={r.key}>
+            <a href={r.href} className={shared.mono}>
+              {r.host}
+            </a>{' '}
+            <span className={shared.muted}>
+              · {r.date} · {r.grade}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </details>
   );
 }
 
