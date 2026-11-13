@@ -19,3 +19,25 @@ product. It adds no customer feature and changes no grade.
 
 Test accounts for each tier, lifecycle mails, extending a trial from the console, session replay, the
 status-page vendor, switching any flag.
+
+## D3 and D6 as built
+
+- **Founder notice keys.** `entitlement:<event id>` (the id billing gives `entitlement.changed`; an id
+  not shaped `entitlement.changed:<account>:<source>` is refused and logged, questions Q10),
+  `signup:<user>`, `agency:<account>`, `cancel:<subscription>:<canceled_at>`. Each is claimed in
+  `founder_notices` (`claim_founder_notice`) before anything is mailed, and its mail's ledger key is
+  `founder_event:<key>`. A retried claim answers the decision stored for its key.
+- **The bound.** 20 instant notices an hour for customers' accounts and 20 for internal ones, counted
+  apart. The rest are held, and the hourly tick at :07 mails them as one "N more" notice, keyed
+  `founder_event:overflow:<UTC hour>`.
+- **Sign-ups** are announced once Supabase Auth shows the address confirmed. The sweep reads users
+  created in the 7 days before it runs (`apps/web/lib/v2/ops/founder.test.ts` asserts the window), so
+  a user still unconfirmed 7 days after signing up is not announced.
+- **The digest** is mailed at the first hourly tick at or after 08:00 New York time, keyed
+  `founder_digest:daily:<date>` and, on Mondays, `founder_digest:weekly:<Monday>`. Its figures are
+  `founder_digest_counts`'s, each labelled as it is computed; renewals are not recorded, so payments
+  read "first and returning payments".
+- **/status** (owner ruling on questions Q6): the page shows "Website: answering" from `/api/health`'s
+  own logic (`apps/web/lib/v2/ops/health.ts`), rendered on each request, with the deploy's version and
+  commit, and says that audits, email and billing are not monitored there. `app/status/page.test.tsx`
+  fails on a state word outside that line.
