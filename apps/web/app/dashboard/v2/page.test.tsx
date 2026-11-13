@@ -16,6 +16,8 @@ const h = vi.hoisted(() => ({
   dataset: null as unknown,
   nextRead: [] as string[][],
   nextAt: null as string | null,
+  earlierRead: [] as { userId: string; now: Date }[],
+  earlier: [] as unknown[],
 }));
 
 vi.mock('server-only', () => ({}));
@@ -32,6 +34,12 @@ vi.mock('@/lib/v2/account/sites-store', () => ({
   readNextChecks: async (_admin: unknown, ids: readonly string[]) => {
     h.nextRead.push([...ids]);
     return new Map(ids.map((id) => [id, h.nextAt]));
+  },
+}));
+vi.mock('./earlier-audits', () => ({
+  readEarlierAudits: async (_admin: unknown, userId: string, now: Date) => {
+    h.earlierRead.push({ userId, now });
+    return h.earlier;
   },
 }));
 vi.mock('@/lib/v2/account/pages', () => ({
@@ -80,6 +88,8 @@ beforeEach(() => {
   h.dataset = null;
   h.nextRead = [];
   h.nextAt = null;
+  h.earlierRead = [];
+  h.earlier = [];
 });
 afterEach(() => vi.unstubAllEnvs());
 
@@ -181,6 +191,37 @@ describe('/dashboard/v2', () => {
       .finally(() => vi.useRealTimers());
     expect(h.nextRead).toEqual([bad.sites.map((s) => s.id)]);
     expect(el.children.props.data.header.line).toContain('next check Fri 13 Nov around 06:37');
+  });
+
+  it('reads the earlier audits of the signed-in viewer’s own user id, not the account owner’s (CC-36 D5)', async () => {
+    vi.stubEnv('V2_CHECKS_PUBLIC', '1');
+    const bad = fixture('bad-site');
+    // The id readViewer gives the signed-in caller; the account and seat ids are other values.
+    const v = viewerOn(BAD, bad.seats[0]!.id);
+    h.viewer = { ...v, viewer: { ...v.viewer, userId: 'u-member-viewer' } };
+    h.dataset = bad;
+    type Earlier = { children: ReactElement<{ data: { earlier: { rows: unknown[] } | null } }> };
+    h.earlier = [
+      {
+        id: 'e0000000-0000-4000-8000-000000000001',
+        url: 'https://shop.example/',
+        grade: 'B',
+        completedAt: '2026-10-01T12:00:00.000Z',
+      },
+    ];
+    const el = (await render()).props as unknown as Earlier;
+    expect(h.earlierRead.map((r) => r.userId)).toEqual(['u-member-viewer']);
+    expect(el.children.props.data.earlier?.rows).toHaveLength(1);
+    h.earlier = [];
+    const none = (await render()).props as unknown as Earlier;
+    expect(none.children.props.data.earlier).toBeNull();
+  });
+
+  it.each(['no_account', 'ambiguous'])('a %s viewer reads no earlier audits', async (kind) => {
+    vi.stubEnv('V2_CHECKS_PUBLIC', '1');
+    h.viewer = { kind, userId: 'u1' };
+    await render();
+    expect(h.earlierRead).toEqual([]);
   });
 
   it('with the flag on, reads the viewer: signed out goes to /login', async () => {

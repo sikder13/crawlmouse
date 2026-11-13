@@ -12,7 +12,7 @@ import {
   type ShellView,
   type SwitcherAccount,
 } from '../../../../lib/v2/view/account-shell';
-import { dashboardView } from '../../../../lib/v2/view/dashboard';
+import { dashboardView, type EarlierAudit } from '../../../../lib/v2/view/dashboard';
 import { sitePage, siteView, type FirstCheckView } from '../../../../lib/v2/view/site';
 import type { FixtureDataset } from '@crawlmouse/types/v2';
 
@@ -143,6 +143,29 @@ export function noSiteDataset(): FixtureDataset {
 
 /** The dashboard of an account with no site, at bad-site's as_of. */
 export const noSitePreview = () => dashboardView(noSiteDataset(), ACCOUNT_VIEWERS.home());
+
+/**
+ * Two v1 audits of the viewer's own, newest first, as `readEarlierAudits` answers them (CC-36 D5):
+ * a stand-in, not a fixture record. One has no grade, as a v1 audit of a client-rendered site has.
+ */
+export const PREVIEW_EARLIER_AUDITS: EarlierAudit[] = [
+  {
+    id: 'e0000000-0000-4000-8000-000000000002',
+    url: 'https://example-outfitter.com/',
+    grade: 'C',
+    completedAt: '2026-10-12T14:20:00.000Z',
+  },
+  {
+    id: 'e0000000-0000-4000-8000-000000000001',
+    url: 'https://blog.example-outfitter.com/',
+    grade: null,
+    completedAt: '2026-06-03T09:05:00.000Z',
+  },
+];
+
+/** The no-site dashboard of a viewer who used v1: the earlier-audits line, closed as it first shows. */
+export const noSiteEarlierPreview = () =>
+  dashboardView(noSiteDataset(), ACCOUNT_VIEWERS.home(), undefined, PREVIEW_EARLIER_AUDITS);
 
 /** nahltech.com, bad-site's second site, halfway through its first check. */
 export const FIRST_CHECK_SITE = '50000000-0000-4000-8000-000000000002';

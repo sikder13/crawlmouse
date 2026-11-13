@@ -78,6 +78,12 @@ export const DASHBOARD_COPY = {
   noAccountTitle: 'No account to show',
   noAccountBody:
     'This sign-in is not a member of any account. If you were invited, open the invitation link from its email.',
+  /** CC-36 D5: a viewer whose own user id has v1 audits, in the sites card. */
+  earlierLine: 'Your earlier audits are still at their links',
+  earlierListLabel: 'Earlier audits',
+  /** A v1 audit's grade, named as the earlier grade: v1 grades are not v2 grades. */
+  earlierGrade: (grade: string | null) =>
+    grade === null ? 'not graded' : `earlier grade ${grade}`,
   ambiguousTitle: 'More than one account',
   /** `support` is the footer's address (SUPPORT_EMAIL in components/v2/footer-links.ts). */
   ambiguousBody: (support: string) =>
@@ -573,5 +579,10 @@ export const DASHBOARD_ADDITIONS: Addition[] = [
     screen: 'dashboard',
     what: 'On a live page, Email to my developer’s address field, and Copy fix copying the packet as a prompt with a status line',
     source: 'CC-26b follow-up (live fix actions)',
+  },
+  {
+    screen: 'dashboard',
+    what: 'For a viewer with v1 audits of their own: a line in the sites card that opens each one’s site, date, earlier grade and link',
+    source: 'CC-36 brief, D5',
   },
 ];

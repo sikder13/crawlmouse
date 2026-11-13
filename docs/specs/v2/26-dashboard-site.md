@@ -210,6 +210,7 @@ From `apps/web/lib/v2/view`, read through the TypeScript compiler. The screens r
 | `setup`             | `SetupView \| null`                                                                                                                                                                                                                       |                                                                                       |
 | `threeKinds`        | `{ lead: string; body: string; settings: ActionView; } \| null`                                                                                                                                                                           |                                                                                       |
 | `startPro`          | `{ title: string; body: string; start: ActionView; } \| null`                                                                                                                                                                             |                                                                                       |
+| `earlier`           | `EarlierAuditsView \| null`                                                                                                                                                                                                               | The viewer's own v1 audits, in the sites card; null when they have none (CC-36 D5).   |
 
 #### `HeaderView`
 
@@ -614,6 +615,7 @@ What the brief adds that no locked screen has, marked `data-v2-addition` where i
 | dashboard       | On a live page, the add-site form’s address field                                                                                                   | CC-26b plan revision R13                            |
 | dashboard       | A sign-in with no account, or several with none chosen: a plain page that says so                                                                   | CC-26b plan revision R22                            |
 | dashboard       | On a live page, Email to my developer’s address field, and Copy fix copying the packet as a prompt with a status line                               | CC-26b follow-up (live fix actions)                 |
+| dashboard       | For a viewer with v1 audits of their own: a line in the sites card that opens each one’s site, date, earlier grade and link                         | CC-36 brief, D5                                     |
 | site            | A crawler row read aloud in full ("Googlebot: allowed by robots.txt at all six checks"), and each glyph cell’s verdict in words, for screen readers | CC-26 brief, scope 6 (accessibility); FACTS row 223 |
 | site            | A site whose first check has not ended: its state, the pages read so far and a link to the check                                                    | CC-26b brief, D8                                    |
 | site            | A Mark done control on each fix row still to do, on a live page                                                                                     | CC-26b plan revision R13                            |

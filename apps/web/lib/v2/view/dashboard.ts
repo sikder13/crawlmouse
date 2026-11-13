@@ -57,6 +57,7 @@ import {
   type GradeCell,
 } from './checks';
 import { points, type DoorView } from './result';
+import { auditHref } from './audit-hrefs';
 import { nextCheckLine, type NextChecks } from './site';
 import { GRADES, PILL, SUBJECTS } from './segment/changes';
 import { effortText } from './segment/fixes';
@@ -224,6 +225,20 @@ export interface SetupView {
   foot: string | null;
 }
 
+/** A v1 audit of the viewer's own (CC-36 D5), as `app/dashboard/v2/earlier-audits.ts` reads it. */
+export interface EarlierAudit {
+  id: string;
+  url: string;
+  grade: string | null;
+  completedAt: string;
+}
+
+export interface EarlierAuditsView {
+  line: string;
+  label: string;
+  rows: { key: string; host: string; date: string; grade: string; href: string }[];
+}
+
 export interface DashboardView {
   shell: ShellView;
   /** One result per site and nothing to compare: the day-0 layout. */
@@ -241,6 +256,8 @@ export interface DashboardView {
   setup: SetupView | null;
   threeKinds: { lead: string; body: string; settings: ActionView } | null;
   startPro: { title: string; body: string; start: ActionView } | null;
+  /** The viewer's own v1 audits, in the sites card; null when they have none (CC-36 D5). */
+  earlier: EarlierAuditsView | null;
 }
 
 const HISTORY_CHECKS = 6;
@@ -782,7 +799,42 @@ function startPro(v: AccountView): DashboardView['startPro'] {
  * Day 0 before any site: the header asks for one, and nothing else is measured yet. A reader whose
  * seat cannot add a site is told who can instead.
  */
-function noSiteView(v: AccountView): DashboardView {
+/** "13 Jun 2026", in the account's zone: an earlier audit may be from another year. */
+function dayMonthYear(ts: string, zone: string): string {
+  return new Intl.DateTimeFormat('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    timeZone: zone,
+  }).format(new Date(ts));
+}
+
+/** The address as stored when it does not parse, rather than a dropped row. */
+function hostOf(url: string): string {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return url;
+  }
+}
+
+/** The earlier-audits line, in the order the reader gave; null with none to show. */
+function earlierView(audits: readonly EarlierAudit[], zone: string): EarlierAuditsView | null {
+  if (audits.length === 0) return null;
+  return {
+    line: COPY.earlierLine,
+    label: COPY.earlierListLabel,
+    rows: audits.map((a) => ({
+      key: a.id,
+      host: hostOf(a.url),
+      date: dayMonthYear(a.completedAt, zone),
+      grade: COPY.earlierGrade(a.grade),
+      href: auditHref(a.id),
+    })),
+  };
+}
+
+function noSiteView(v: AccountView, earlier: EarlierAuditsView | null): DashboardView {
   const zone = zoneOf(v);
   const adds = addsSites(v);
   const trial = v.account.state === 'pro_trial' || v.account.state === 'agency_trial';
@@ -816,17 +868,25 @@ function noSiteView(v: AccountView): DashboardView {
     setup: null,
     threeKinds: null,
     startPro: startPro(v),
+    earlier,
   };
 }
 
 /**
  * `next` is each site's `sites.next_check_at` as the live page reads it (`NextChecks`); a preview
- * passes none and the header keeps its weekly stand-in (`nextCheckLine`).
+ * passes none and the header keeps its weekly stand-in (`nextCheckLine`). `earlier` is the viewer's
+ * own v1 audits (`readEarlierAudits`), none by default.
  */
-export function dashboardView(d: AccountDataset, viewer: Viewer, next?: NextChecks): DashboardView {
+export function dashboardView(
+  d: AccountDataset,
+  viewer: Viewer,
+  next?: NextChecks,
+  earlier: readonly EarlierAudit[] = [],
+): DashboardView {
   const v = viewAt(d, viewer);
-  if (primarySites(v).length === 0) return noSiteView(v);
   const zone = zoneOf(v);
+  const earlierLine = earlierView(earlier, zone);
+  if (primarySites(v).length === 0) return noSiteView(v, earlierLine);
   const primary = primarySite(v);
   const result = latest(v, primary.id);
   const firstRun = isFirstRun(v);
@@ -1016,5 +1076,6 @@ export function dashboardView(d: AccountDataset, viewer: Viewer, next?: NextChec
           }
         : null,
     startPro: startPro(v),
+    earlier: earlierLine,
   };
 }

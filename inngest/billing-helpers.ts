@@ -43,7 +43,10 @@ export function deriveProUntil(subs: Stripe.Subscription[]): DerivedProUntil {
     .map((s) => subscriptionPeriodEnd(s))
     .filter((x): x is number => x != null);
   if (activeSubs.length > 0 && periodEnds.length === 0) return { skip: true };
-  return { skip: false, proUntil: periodEnds.length ? new Date(Math.max(...periodEnds) * 1000).toISOString() : null };
+  return {
+    skip: false,
+    proUntil: periodEnds.length ? new Date(Math.max(...periodEnds) * 1000).toISOString() : null,
+  };
 }
 
 /**
@@ -63,7 +66,11 @@ export async function reconcileCustomerChunk(
     if (!u.stripe_customer_id) continue;
     let subs: { data: Stripe.Subscription[] };
     try {
-      subs = await stripe.subscriptions.list({ customer: u.stripe_customer_id, status: 'all', limit: 100 });
+      subs = await stripe.subscriptions.list({
+        customer: u.stripe_customer_id,
+        status: 'all',
+        limit: 100,
+      });
     } catch (err) {
       if ((err as { code?: string })?.code === 'resource_missing') {
         console.error(`[reconcile] skipping deleted customer ${u.id} (${u.stripe_customer_id})`);
@@ -73,10 +80,17 @@ export async function reconcileCustomerChunk(
     }
     const derived = deriveProUntil(subs.data);
     if (derived.skip) continue;
-    const { data: row, error: readErr } = await sb.from('users').select('pro_until').eq('id', u.id).maybeSingle();
+    const { data: row, error: readErr } = await sb
+      .from('users')
+      .select('pro_until')
+      .eq('id', u.id)
+      .maybeSingle();
     if (readErr) throw readErr;
     if (!sameInstant(row?.pro_until ?? null, derived.proUntil)) {
-      const { error: writeErr } = await sb.from('users').update({ pro_until: derived.proUntil }).eq('id', u.id);
+      const { error: writeErr } = await sb
+        .from('users')
+        .update({ pro_until: derived.proUntil })
+        .eq('id', u.id);
       if (writeErr) throw writeErr;
       chunkRepaired++;
     }
@@ -86,7 +100,9 @@ export async function reconcileCustomerChunk(
 
 export class LivemodeMismatchError extends Error {
   constructor(expect: boolean, actual: boolean) {
-    super(`reconcile refused: expected Stripe livemode=${expect} but active key livemode=${actual}`);
+    super(
+      `reconcile refused: expected Stripe livemode=${expect} but active key livemode=${actual}`,
+    );
     this.name = 'LivemodeMismatchError';
   }
 }
@@ -179,7 +195,11 @@ export async function runReconcile(
       if (!u.stripe_customer_id) continue;
       let subs: { data: Stripe.Subscription[] };
       try {
-        subs = await stripe.subscriptions.list({ customer: u.stripe_customer_id, status: 'all', limit: 100 });
+        subs = await stripe.subscriptions.list({
+          customer: u.stripe_customer_id,
+          status: 'all',
+          limit: 100,
+        });
       } catch (err) {
         if ((err as { code?: string })?.code === 'resource_missing') continue;
         throw err;
@@ -189,14 +209,21 @@ export async function runReconcile(
       const { data: row } = await sb.from('users').select('pro_until').eq('id', u.id).maybeSingle();
       if (!sameInstant(row?.pro_until ?? null, derived.proUntil)) {
         wouldRepair++;
-        console.log(`[reconcile:dry-run] would set ${u.id} pro_until=${derived.proUntil ?? 'null'}`);
+        console.log(
+          `[reconcile:dry-run] would set ${u.id} pro_until=${derived.proUntil ?? 'null'}`,
+        );
       }
     }
     return { mode: opts.mode, checked: scoped.length, wouldRepair, repaired: 0 };
   }
 
   const { chunkRepaired } = await reconcileCustomerChunk(sb, stripe, scoped);
-  return { mode: opts.mode, checked: scoped.length, wouldRepair: chunkRepaired, repaired: chunkRepaired };
+  return {
+    mode: opts.mode,
+    checked: scoped.length,
+    wouldRepair: chunkRepaired,
+    repaired: chunkRepaired,
+  };
 }
 
 export interface DeleteExpiredOpts {
@@ -205,15 +232,29 @@ export interface DeleteExpiredOpts {
 }
 export interface DeleteExpiredResult {
   deleted: number;
+  /** Expired audits read this run and left in place because a public report names them (C-4). */
+  kept: number;
+  /** True when the run read the whole expired set; false when `maxIterations` stopped it first. */
   drained: boolean;
   iterations: number;
 }
 
 /**
- * Delete expired audits in bounded id-chunks instead of one unscoped statement. Selects up to
- * `batchSize` expired ids, deletes them by id, and loops until the set drains or `maxIterations`
- * is hit (a hard backstop so a clock/replication anomaly can't spin forever). `lte` matches a row
- * exactly at the expiry instant (complements listMine's `gt`).
+ * Delete expired audits in bounded id-chunks instead of one unscoped statement, keeping every
+ * expired audit that a `public_reports` row names (C-4: deleting it would set the report's
+ * `audit_id` null, through the FK's `on delete set null`, and cut the report's link to it).
+ *
+ * Each batch reads up to `batchSize` expired ids after the last id the batch before it read, in id
+ * order. The id is the primary key, so the order is total: a kept audit is read once per run and
+ * never fills the batches after it. The batch then reads which of those ids a report names and
+ * deletes the rest by id. The loop ends when a batch reads fewer than `batchSize` ids, or at
+ * `maxIterations` (a hard backstop so a clock/replication anomaly can't spin forever). `lte`
+ * matches a row exactly at the expiry instant (complements listMine's `gt`).
+ *
+ * A report minted between a batch's report read and its delete loses its link to the audit (the
+ * report keeps its snapshot). The window is open because the v1 mint route reads an audit's status
+ * and grade, not its expiry (`apps/web/app/api/reports/mint/route.ts`), so an expired audit the
+ * cleanup has not yet deleted can still be minted.
  */
 export async function deleteExpiredAudits(
   sb: SupabaseClient,
@@ -223,21 +264,34 @@ export async function deleteExpiredAudits(
   const batchSize = opts.batchSize ?? 500;
   const maxIterations = opts.maxIterations ?? 50;
   let deleted = 0;
+  let kept = 0;
+  let after: string | null = null;
   let iterations = 0;
   for (; iterations < maxIterations; iterations++) {
-    const { data, error } = await sb
-      .from('audits')
-      .select('id')
-      .lte('expires_at', nowIso)
-      .order('expires_at', { ascending: true })
+    const expired = sb.from('audits').select('id').lte('expires_at', nowIso);
+    const { data, error } = await (after === null ? expired : expired.gt('id', after))
+      .order('id', { ascending: true })
       .limit(batchSize);
     if (error) throw error;
-    const ids = (data ?? []).map((r: { id: string }) => r.id);
-    if (ids.length === 0) return { deleted, drained: true, iterations };
-    const { error: delErr } = await sb.from('audits').delete().in('id', ids);
-    if (delErr) throw delErr;
-    deleted += ids.length;
-    if (ids.length < batchSize) return { deleted, drained: true, iterations: iterations + 1 };
+    const ids: string[] = (data ?? []).map((r: { id: string }) => r.id);
+    if (ids.length === 0) return { deleted, kept, drained: true, iterations };
+    const reported = await reportedAmong(sb, ids);
+    const doomed = ids.filter((id) => !reported.has(id));
+    if (doomed.length > 0) {
+      const { error: delErr } = await sb.from('audits').delete().in('id', doomed);
+      if (delErr) throw delErr;
+    }
+    deleted += doomed.length;
+    kept += ids.length - doomed.length;
+    after = ids[ids.length - 1]!;
+    if (ids.length < batchSize) return { deleted, kept, drained: true, iterations: iterations + 1 };
   }
-  return { deleted, drained: false, iterations };
+  return { deleted, kept, drained: false, iterations };
+}
+
+/** The ids among `ids` that a public report names. */
+async function reportedAmong(sb: SupabaseClient, ids: readonly string[]): Promise<Set<string>> {
+  const { data, error } = await sb.from('public_reports').select('audit_id').in('audit_id', ids);
+  if (error) throw error;
+  return new Set((data ?? []).map((r: { audit_id: string }) => r.audit_id));
 }
