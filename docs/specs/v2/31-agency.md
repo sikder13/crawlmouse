@@ -1099,20 +1099,38 @@ entry for that address. So the link of an earlier mail answers after a later req
 confirmation link, and with the schedule removed. A request is not mailed without it: with no
 `EMAIL_LINK_SECRET` the confirmation is `unconfigured`, as a report is.
 
-A client is an account's host, whichever row holds it. What an address refused is read across
-each row of that account and host (`report_refusal`): the row removed, the row `add_site` made when
-the client was added again (which also starts with the removed row's list,
-`sites_carry_report_refusals`), and a row that became the client's when its host was kept from a
-public check. So removing a client and bringing it back, by either route, clears nothing, and the
-link of a mail sent before the removal stops what the live row was about to send. Another account
-that adds the same host holds none of it. Past `report_refusals_max()` entries on a row, the oldest
-that record no pause and no refusal go; an entry that records one is kept whatever the count.
+A client is an account's host, whichever row holds it. One SQL function says which rows those are
+(`report_client_sites`: the row asked about, and the other rows of the same account and host): the
+row removed, the row `add_site` made when the client was added again (which also starts with the
+removed row's list, `sites_carry_report_refusals`), and a row that became the client's when its host
+was kept from a public check. The read of what an address refused (`report_refusal`), the
+confirmation, the pause, the decline and the erasure's two triggers go by it
+(`grep -n 'report_client_sites(' infra/supabase/migrations/20261114000002_v2_031_agency.sql`). So
+removing a client and bringing it back, by either route, clears nothing. An address that declined is
+asked nothing on the row the client came back as. A pause's window is counted from the first request
+on that row. The link of a mail sent before the removal, the request's "Don't ask me again" or a
+report's pause link, stops what the live row was about to send. Another account that adds the same
+host holds none of it, and its requests and reports are not touched. Past `report_refusals_max()`
+entries on a row, the oldest that hold a link's hash and nothing else go; an entry that records a
+pause, a refusal or a request's time is kept whatever the count.
+
+Two tests hold this beside the function tests. A generated sequence of the account's and the
+recipient's actions, on a client whose rows come and go by both routes, is judged at each request,
+report and resume, and counts the refusals it meets so that a run that met none fails
+(`pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-031-b2-schedules.test.ts`). And on a
+real Postgres, with the product's own `add_site`, `remove_site` and `keep_check` and with two calls
+held open at once (`scripts/db/report-links-race.test.ts`, a step of CI's `db-cli-files` job).
 
 Left as it is. An address written another way (`name+tag@…`) is another address, and is asked as
-one. The recipient's functions lock the site's row and then its schedule, the order the account's
-own functions lock in, so a pause beside a save waits and does not deadlock; that is held by the
-order of the statements, and no test runs two connections against it. What a refusal leaves for the
-erasure is in §11.
+one. The functions that write a refusal or a schedule across a client's rows lock those rows in the
+order of their ids before they write (`lock_report_client`), and the account's own functions lock
+their one row and then its schedule, so two of them on one client wait for each other: the race test
+holds an old mail's link against the confirmation of a new one, in both orders of the two rows, and
+shows Postgres ending one as a deadlock with that lock taken out. The erasure's update of a contact
+is not ordered so: it holds the row it blanks before its trigger reaches the client's other rows. On
+a client with two rows, an erasure and a recipient's press at the same instant can be ended by
+Postgres as a deadlock, and the one ended has written nothing. What a refusal leaves for the erasure
+is in §11.
 
 Known gaps. The recipient's two link cookies are set for the whole site (`Path=/`, the convention of
 `lib/v2/account/link-cookie.ts`), since the page and the route that reads the token are under

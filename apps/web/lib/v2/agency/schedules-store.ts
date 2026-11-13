@@ -130,7 +130,7 @@ export interface SchedulesStore {
   readLink(token: string, now: Date): Promise<RecipientLinkView | null>;
   confirm(token: string, now: Date): Promise<'confirmed' | 'gone'>;
   pause(token: string, now: Date): Promise<'paused' | 'gone'>;
-  /** "Don't ask me again", with the confirmation link's token or the pause link's. */
+  /** "Don't ask me again", with the address's own token, the confirmation link's or the pause link's. */
   decline(token: string, now: Date): Promise<'declined' | 'gone'>;
 }
 

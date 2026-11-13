@@ -505,7 +505,8 @@ export const oneClickPause = (
 
 /**
  * POST /s/decline/[token]: the one-click unsubscribe of the mail that asks to confirm. Its token
- * is the confirmation link's, and what it records is "Don't ask me again". The same answers.
+ * is the address's own (lib/v2/mail/report-decline-token.ts), and what it records is "Don't ask me
+ * again". The same answers.
  */
 export const oneClickDecline = (
   deps: { store: SchedulesStore; now(): Date },

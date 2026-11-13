@@ -69,6 +69,14 @@ interface WithdrawnClaim {
 
 const WITHDRAWN: readonly WithdrawnClaim[] = [
   {
+    text: 'A site keeps at most `report_refusals_max()` entries',
+    withdrawnIn: 'docs/specs/v2/31-agency.md §10, CC-31 review rounds 6 and 7',
+    truth:
+      'An entry that records a pause, a refusal or a request’s time is kept whatever the count, so a ' +
+      'row can hold more; past the bound the oldest entries that hold a link’s hash alone go.',
+    allowedIn: [],
+  },
+  {
     text: 'The records the screen reads do not say which the account pays',
     withdrawnIn:
       'docs/specs/v2/22-audit-flow.md (the Seats foot’s registry entry), CC-31 review round 7',
