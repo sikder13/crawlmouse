@@ -684,9 +684,12 @@ Open and "Withdraw link" and no link form (`shareReport`, `lib/v2/reports/share.
 is not token-shaped, before the rate limit and any database call; a bound of 60 an hour for the
 address (429); a 404 for a token no link holds; **410** with a static HTML page for a link that has
 expired or was revoked. A link that opens is counted, then answered by format: a file is a 302 to
-a signed URL of the stored object that lives 60 seconds, and a proof page is a 303 to
-`/s/view/[reportId]` with the token in the HttpOnly cookie `cm_share`, scoped to that path for 600
-seconds. The token is therefore in one address, the link's own. A signed URL already handed out
+a signed URL of the stored object that lives 60 seconds and serves it as a download, and a proof
+page is a 303 to `/s/view/[reportId]` with the token in the HttpOnly cookie `cm_share`, scoped to
+that path for 600 seconds. The token is therefore in one address, the link's own. The page itself
+is bounded like the link, 60 an hour for the address, and past that bound it is a 404; a request
+with no token is a 404 before the bound is counted. A link of a client that was removed does not
+open (`open_share_link` and `read_share_link` ask `sites.removed_at`). A signed URL already handed out
 keeps working until its 60 seconds end, so a revoked link stops opening a file within a minute.
 Each answer after the flag check carries `Cache-Control: no-store`, `Referrer-Policy: no-referrer`
 and `X-Robots-Tag: noindex, nofollow`.
@@ -748,15 +751,22 @@ link is used within seven days of being issued and works once; issuing another r
 contact address that changes clears the confirmation, both links' hashes and the recipient's pause,
 in the statement that writes the site, whoever writes it: a trigger on `sites`
 (`sites_contact_changed`) does it, so the erasure's rule, which blanks the address directly, leaves
-no confirmation, pause or link hash of the erased contact on the schedule. A changed contact is asked to confirm when it is saved,
-within the account's bound of 20 confirmation requests a day; past that bound the save stands and
-the schedule's next run asks.
+no confirmation, pause or link hash of the erased contact on the schedule.
+
+**When a contact is asked to confirm, and what the answer says.** A contact that changed on a client
+that has a schedule is asked when it is saved; a contact saved before its schedule is asked when the
+schedule is saved, so the first run sends a report and not the confirmation; "Ask again" asks
+whenever the contact has not confirmed. Each of the three routes answers what became of it
+(`confirmation` in JSON, the notice for a form): `asked`; `waits`, for an account in its Agency
+trial whose contact is not its owner's own address, where nothing is mailed until the trial has
+become the plan and no bound is counted; `later`, past the account's 20 a day, where the save
+stands and the schedule's next run asks; `none`. The bound is also on the mail itself (below).
 
 **The recipient's links.** Each link's GET moves its token into an HttpOnly cookie and redirects
 to a page with no token in its address (`/s/confirm`, `/s/pause`); the page says what the button
 will do, and the button's POST reads the token from the cookie. A GET changes nothing. The pause
-link's address also takes a mail client's one-click POST, which carries no cookie, so for that one
-request the token is the path's. The pause link's token is derived, not random: an HMAC-SHA256 under
+link's address also takes a mail client's one-click POST, form-encoded or as multipart form data
+(RFC 8058 allows both), which carries no cookie, so for that one request the token is the path's. The pause link's token is derived, not random: an HMAC-SHA256 under
 `EMAIL_LINK_SECRET` of the site and the contact's address (`reportPauseToken`,
 `lib/v2/mail/report-pause-token.ts`), whose sha256 `issue_report_pause` stores when a report is
 sent. Each report to one contact therefore carries the same pause link, and the link in an earlier
@@ -866,9 +876,14 @@ in SQL") with a template in `lib/v2/mail/templates/` and a handler in `reportMai
 | `report_confirm` | `report.confirmation.requested {site_id, request_id}` | `report_confirm:<site>:<request_id>` | `report-confirm` | sent                |
 | `client_report`  | `report.send.requested {report_id}`                   | `client_report:<report>`             | `client-report`  | not sent            |
 
-- **The confirmation** says which agency asks to send reports about which site, links
+- **The confirmation** says that an agency asks to send reports about which site, links
   `/s/confirm/<token>`, and says that no report is sent unless the reader confirms and that they need
-  no account. `request_id` names one request: the same value again is answered `done`, and the next
+  no account. Its subject and first words are fixed and name the site; the agency's name, which its
+  owner typed, follows in quotation marks (an invitation's mail does the same with the account's
+  name). At most 20 confirmations are mailed for an account in any 24 hours and 3 to one address
+  (`CONFIRM_MAILS_PER_DAY`, `lib/v2/mail/handlers.ts`), counted from the ledger before another is
+  claimed (`report_confirm_mail_counts`), so the bound holds for the hourly run as for a route; past
+  it the handler answers `bounded` and claims nothing. `request_id` names one request: the same value again is answered `done`, and the next
   request is another mail. An empty one, or one longer than 100 characters, is `invalid_request`.
 - **The report** shows the report document's own title, lines and closing line
   (`ReportDoc.title`, `.lines`, `.footer.text`) as given, and links the report (`/s/<token>`) and the
@@ -908,7 +923,10 @@ confirmation, which carries no pause link, still goes.
 and `pnpm --filter @crawlmouse/inngest exec vitest run mail.test.ts`. The first of those runs both
 mails over the migrated schema, from the confirmation to a paused schedule.
 
-Known gaps. A contact whose address is under a suppression (a hard bounce or a complaint) is still
+Known gaps. The recipient's two link cookies are set for the whole site (`Path=/`, the convention of
+`lib/v2/account/link-cookie.ts`), since the page and the route that reads the token are under
+different paths. "Resume" starts a schedule its recipient paused with one press and asks for no new
+confirmation; the pause page says so to the recipient. A contact whose address is under a suppression (a hard bounce or a complaint) is still
 sent the confirmation, and a report to that address is then answered `suppressed` and not sent; no
 screen says so. The gap §6 states for an invitation's link holds for the confirmation's link and the
 report's share link: a failure between Resend's acceptance and the ledger's record makes the retry
