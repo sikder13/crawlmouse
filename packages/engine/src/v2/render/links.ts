@@ -1,80 +1,66 @@
 /**
- * The same-site link targets of a page's two renders, for `js_only_navigation`
- * (detectors/js-only-navigation.ts). One extractor reads both sides, so a target differs between them
- * only because the page's HTML differs, never because two readers differ.
+ * The links a page's script adds, for `js_only_navigation` (detectors/js-only-navigation.ts): the
+ * same-site link targets of the page's rendered side that its static side does not have. One extractor
+ * reads both sides, so a target differs between them only because the page's HTML differs, never
+ * because two readers differ.
  *
  * The extractor is the crawl's own: extract.ts `extractPage`, with non-content links (share actions,
  * media files) left out as the worker leaves them out (worker rows/links.ts), each target in
- * canonicalizeUrl's spelling, which the worker's edges carry. Then on the page's own site, by the crawl
- * planner's rule (`inSiteScope`: its host or its `www.` twin, on the default port); not the page itself,
- * once each and within the URL bound, as the worker builds edges (worker batch/crawl.ts `edgesFrom`,
- * which counts a target past its cap instead). A side keeps the longest prefix of its sorted targets
- * that holds at most MAX_RENDER_LINKS targets and MAX_RENDER_LINK_CHARS characters; when that leaves a
- * target out, or a target passed the URL bound, the side is `truncated`, and a truncated page is not
- * evidence of absence.
+ * canonicalizeUrl's spelling with no options, which is the spelling the worker's edges carry. A `www.`
+ * twin is therefore a target of its own, as it is a page of its own in the v2 crawl (the worker unifies
+ * no host): a static `/x` and a rendered `https://www.<host>/x` on a page at `<host>` are two targets.
+ * Then on the page's own site, by the crawl planner's rule (`inSiteScope`: its host or its `www.` twin,
+ * on the default port), and not the page itself. A target longer than MAX_URL_LENGTH is left out on
+ * both sides alike, as the worker leaves it out of its edges, so it is never JS-only.
  *
- * The lists live on the render outcome only (run.ts `RenderedPage`): they never enter
- * `PageResult.without_js`, whose stored shape holds four keys.
+ * Both sides are read whole, in memory, and the difference is taken over the whole sets: an empty
+ * difference is evidence that the script adds no same-site link. Only the difference is kept, bounded
+ * (MAX_RENDER_LINKS, MAX_RENDER_LINK_CHARS), with its whole count and whether the bound cut it. It lives
+ * on the render outcome only (run.ts `RenderedPage`), never in `PageResult.without_js`, whose stored
+ * shape holds four keys.
  */
 import { extractPage, inSiteScope } from '../../extract.js';
 import { canonicalizeUrl } from '../../url-canonical.js';
 import { MAX_URL_LENGTH } from '../batch-bounds.js';
 
-/** The most targets a side keeps. Our choice. */
+/** The most JS-only targets a page keeps. Our choice. */
 export const MAX_RENDER_LINKS = 200;
 
 /**
- * The most URL characters a side keeps, summed over its targets. Our choice: 32 KiB holds all
- * MAX_RENDER_LINKS targets while they average up to 163 characters (32768 / 200), so on such a page the
- * count decides; past that it holds what fits. It bounds what a page adds to the stored render
- * outcome at 64 KiB of URL characters for its two sides, where MAX_RENDER_LINKS targets of up to
- * MAX_URL_LENGTH characters allowed 800 KiB. A canonical URL is ASCII (the URL parser percent-encodes
- * the rest), so its characters are its bytes.
+ * The most URL characters the kept JS-only targets of a page hold, summed. Our choice: 32 KiB holds
+ * all MAX_RENDER_LINKS targets while they average up to 163 characters (32768 / 200), so on such a
+ * page the count decides; past that it holds what fits. So a rendered page adds at most 32 KiB of URL
+ * characters to the stored render outcome. A canonical URL is ASCII (the URL parser percent-encodes the
+ * rest), so its characters are its bytes.
  */
 export const MAX_RENDER_LINK_CHARS = 32 * 1024;
 
-/** A rendered page's same-site link targets, each side sorted. */
+/** What a rendered page's script adds to its same-site links. */
 export interface RenderLinks {
-  static: string[];
-  rendered: string[];
-  /** A side had more than its bounds keep (MAX_RENDER_LINKS, MAX_RENDER_LINK_CHARS), or one past the URL bound. */
+  /**
+   * The rendered side's same-site targets its static side does not have, sorted: the prefix within
+   * MAX_RENDER_LINKS targets and MAX_RENDER_LINK_CHARS characters.
+   */
+  js_only: string[];
+  /** How many there were before the bound. */
+  js_only_count: number;
+  /** The bound left some out. */
   truncated: boolean;
 }
 
 const byText = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
 
-/**
- * One side's targets: on the page's site, not the page, sorted; the prefix within MAX_RENDER_LINKS
- * targets and MAX_RENDER_LINK_CHARS characters.
- */
-export function sameSiteTargets(
-  html: string,
-  pageUrl: string,
-): { targets: string[]; truncated: boolean } {
+/** One side's same-site targets, whole: on the page's site, not the page, within the URL bound. */
+export function sameSiteTargets(html: string, pageUrl: string): Set<string> {
   const site = new URL(pageUrl);
   const self = canonicalizeUrl(pageUrl);
-  let truncated = false;
-  const seen = new Set<string>();
+  const out = new Set<string>();
   for (const { toUrl } of extractPage(html, pageUrl, { excludeNonContentLinks: true }).links) {
-    if (toUrl === self || !inSiteScope(new URL(toUrl), site)) continue;
-    if (toUrl.length > MAX_URL_LENGTH) {
-      truncated = true;
+    if (toUrl === self || toUrl.length > MAX_URL_LENGTH || !inSiteScope(new URL(toUrl), site))
       continue;
-    }
-    seen.add(toUrl);
+    out.add(toUrl);
   }
-  const sorted = [...seen].sort(byText);
-  const targets: string[] = [];
-  let chars = 0;
-  for (const t of sorted) {
-    if (targets.length === MAX_RENDER_LINKS || chars + t.length > MAX_RENDER_LINK_CHARS) {
-      truncated = true;
-      break;
-    }
-    targets.push(t);
-    chars += t.length;
-  }
-  return { targets, truncated };
+  return out;
 }
 
 export function renderLinks(
@@ -82,7 +68,16 @@ export function renderLinks(
   renderedHtml: string,
   pageUrl: string,
 ): RenderLinks {
-  const s = sameSiteTargets(staticHtml, pageUrl);
-  const r = sameSiteTargets(renderedHtml, pageUrl);
-  return { static: s.targets, rendered: r.targets, truncated: s.truncated || r.truncated };
+  const served = sameSiteTargets(staticHtml, pageUrl);
+  const added = [...sameSiteTargets(renderedHtml, pageUrl)]
+    .filter((t) => !served.has(t))
+    .sort(byText);
+  const js_only: string[] = [];
+  let chars = 0;
+  for (const t of added) {
+    if (js_only.length === MAX_RENDER_LINKS || chars + t.length > MAX_RENDER_LINK_CHARS) break;
+    js_only.push(t);
+    chars += t.length;
+  }
+  return { js_only, js_only_count: added.length, truncated: js_only.length < added.length };
 }

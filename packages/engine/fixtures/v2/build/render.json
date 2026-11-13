@@ -12,14 +12,8 @@
         "state": "readable"
       },
       "links": {
-        "static": [
-          "https://built-site.test",
-          "https://built-site.test/collections/camp-kitchen"
-        ],
-        "rendered": [
-          "https://built-site.test",
-          "https://built-site.test/collections/camp-kitchen"
-        ],
+        "js_only": [],
+        "js_only_count": 0,
         "truncated": false
       }
     },
@@ -35,14 +29,8 @@
         "state": "readable"
       },
       "links": {
-        "static": [
-          "https://built-site.test",
-          "https://built-site.test/blog/tent-care-guide-fr"
-        ],
-        "rendered": [
-          "https://built-site.test",
-          "https://built-site.test/blog/tent-care-guide-fr"
-        ],
+        "js_only": [],
+        "js_only_count": 0,
         "truncated": false
       }
     },
@@ -58,22 +46,8 @@
         "state": "readable"
       },
       "links": {
-        "static": [
-          "https://built-site.test",
-          "https://built-site.test/products/camp-kitchen-item-1",
-          "https://built-site.test/products/camp-kitchen-item-2",
-          "https://built-site.test/products/camp-kitchen-item-3",
-          "https://built-site.test/products/camp-kitchen-item-4",
-          "https://built-site.test/products/camp-kitchen-item-5"
-        ],
-        "rendered": [
-          "https://built-site.test",
-          "https://built-site.test/products/camp-kitchen-item-1",
-          "https://built-site.test/products/camp-kitchen-item-2",
-          "https://built-site.test/products/camp-kitchen-item-3",
-          "https://built-site.test/products/camp-kitchen-item-4",
-          "https://built-site.test/products/camp-kitchen-item-5"
-        ],
+        "js_only": [],
+        "js_only_count": 0,
         "truncated": false
       }
     },
@@ -89,14 +63,8 @@
         "state": "readable"
       },
       "links": {
-        "static": [
-          "https://built-site.test",
-          "https://built-site.test/journal/forged-steel-pegs"
-        ],
-        "rendered": [
-          "https://built-site.test",
-          "https://built-site.test/journal/forged-steel-pegs"
-        ],
+        "js_only": [],
+        "js_only_count": 0,
         "truncated": false
       }
     },
@@ -112,52 +80,8 @@
         "state": "readable"
       },
       "links": {
-        "static": [
-          "https://built-site.test/blog/camp-cooking-ideas",
-          "https://built-site.test/blog/campfire-safety-basics",
-          "https://built-site.test/blog/coming-soon-note",
-          "https://built-site.test/blog/first-night-outdoors",
-          "https://built-site.test/blog/how-to-pitch-a-tent",
-          "https://built-site.test/blog/layering-for-cold-nights",
-          "https://built-site.test/blog/leave-no-trace-rules",
-          "https://built-site.test/blog/packing-light-tips",
-          "https://built-site.test/blog/rainy-day-camping",
-          "https://built-site.test/blog/reading-a-trail-map",
-          "https://built-site.test/blog/tent-care-guide",
-          "https://built-site.test/blog/water-on-the-trail",
-          "https://built-site.test/collections/camp-kitchen",
-          "https://built-site.test/collections/camp-lighting",
-          "https://built-site.test/collections/camping-tents",
-          "https://built-site.test/collections/rain-jackets",
-          "https://built-site.test/collections/sleeping-bags",
-          "https://built-site.test/collections/trail-backpacks",
-          "https://built-site.test/guides/getting-started-camping",
-          "https://built-site.test/guides/packing-checklist",
-          "https://built-site.test/guides/winter-camping-basics"
-        ],
-        "rendered": [
-          "https://built-site.test/blog/camp-cooking-ideas",
-          "https://built-site.test/blog/campfire-safety-basics",
-          "https://built-site.test/blog/coming-soon-note",
-          "https://built-site.test/blog/first-night-outdoors",
-          "https://built-site.test/blog/how-to-pitch-a-tent",
-          "https://built-site.test/blog/layering-for-cold-nights",
-          "https://built-site.test/blog/leave-no-trace-rules",
-          "https://built-site.test/blog/packing-light-tips",
-          "https://built-site.test/blog/rainy-day-camping",
-          "https://built-site.test/blog/reading-a-trail-map",
-          "https://built-site.test/blog/tent-care-guide",
-          "https://built-site.test/blog/water-on-the-trail",
-          "https://built-site.test/collections/camp-kitchen",
-          "https://built-site.test/collections/camp-lighting",
-          "https://built-site.test/collections/camping-tents",
-          "https://built-site.test/collections/rain-jackets",
-          "https://built-site.test/collections/sleeping-bags",
-          "https://built-site.test/collections/trail-backpacks",
-          "https://built-site.test/guides/getting-started-camping",
-          "https://built-site.test/guides/packing-checklist",
-          "https://built-site.test/guides/winter-camping-basics"
-        ],
+        "js_only": [],
+        "js_only_count": 0,
         "truncated": false
       }
     },
@@ -173,22 +97,8 @@
         "state": "readable"
       },
       "links": {
-        "static": [
-          "https://built-site.test",
-          "https://built-site.test/products/camp-lighting-item-1",
-          "https://built-site.test/products/camp-lighting-item-2",
-          "https://built-site.test/products/camp-lighting-item-3",
-          "https://built-site.test/products/camp-lighting-item-4",
-          "https://built-site.test/products/camp-lighting-item-5"
-        ],
-        "rendered": [
-          "https://built-site.test",
-          "https://built-site.test/products/camp-lighting-item-1",
-          "https://built-site.test/products/camp-lighting-item-2",
-          "https://built-site.test/products/camp-lighting-item-3",
-          "https://built-site.test/products/camp-lighting-item-4",
-          "https://built-site.test/products/camp-lighting-item-5"
-        ],
+        "js_only": [],
+        "js_only_count": 0,
         "truncated": false
       }
     },
@@ -204,22 +114,8 @@
         "state": "readable"
       },
       "links": {
-        "static": [
-          "https://built-site.test",
-          "https://built-site.test/products/rain-jackets-item-1",
-          "https://built-site.test/products/rain-jackets-item-2",
-          "https://built-site.test/products/rain-jackets-item-3",
-          "https://built-site.test/products/rain-jackets-item-4",
-          "https://built-site.test/products/rain-jackets-item-5"
-        ],
-        "rendered": [
-          "https://built-site.test",
-          "https://built-site.test/products/rain-jackets-item-1",
-          "https://built-site.test/products/rain-jackets-item-2",
-          "https://built-site.test/products/rain-jackets-item-3",
-          "https://built-site.test/products/rain-jackets-item-4",
-          "https://built-site.test/products/rain-jackets-item-5"
-        ],
+        "js_only": [],
+        "js_only_count": 0,
         "truncated": false
       }
     },
@@ -235,22 +131,8 @@
         "state": "readable"
       },
       "links": {
-        "static": [
-          "https://built-site.test",
-          "https://built-site.test/products/sleeping-bags-item-1",
-          "https://built-site.test/products/sleeping-bags-item-2",
-          "https://built-site.test/products/sleeping-bags-item-3",
-          "https://built-site.test/products/sleeping-bags-item-4",
-          "https://built-site.test/products/sleeping-bags-item-5"
-        ],
-        "rendered": [
-          "https://built-site.test",
-          "https://built-site.test/products/sleeping-bags-item-1",
-          "https://built-site.test/products/sleeping-bags-item-2",
-          "https://built-site.test/products/sleeping-bags-item-3",
-          "https://built-site.test/products/sleeping-bags-item-4",
-          "https://built-site.test/products/sleeping-bags-item-5"
-        ],
+        "js_only": [],
+        "js_only_count": 0,
         "truncated": false
       }
     },
@@ -266,22 +148,8 @@
         "state": "readable"
       },
       "links": {
-        "static": [
-          "https://built-site.test",
-          "https://built-site.test/products/trail-backpacks-item-1",
-          "https://built-site.test/products/trail-backpacks-item-2",
-          "https://built-site.test/products/trail-backpacks-item-3",
-          "https://built-site.test/products/trail-backpacks-item-4",
-          "https://built-site.test/products/trail-backpacks-item-5"
-        ],
-        "rendered": [
-          "https://built-site.test",
-          "https://built-site.test/products/trail-backpacks-item-1",
-          "https://built-site.test/products/trail-backpacks-item-2",
-          "https://built-site.test/products/trail-backpacks-item-3",
-          "https://built-site.test/products/trail-backpacks-item-4",
-          "https://built-site.test/products/trail-backpacks-item-5"
-        ],
+        "js_only": [],
+        "js_only_count": 0,
         "truncated": false
       }
     },
@@ -297,26 +165,8 @@
         "state": "readable"
       },
       "links": {
-        "static": [
-          "https://built-site.test",
-          "https://built-site.test/collections/camping-tents?page=2",
-          "https://built-site.test/products/camping-tents-item-1",
-          "https://built-site.test/products/camping-tents-item-2",
-          "https://built-site.test/products/camping-tents-item-3",
-          "https://built-site.test/products/camping-tents-item-4",
-          "https://built-site.test/products/camping-tents-item-5",
-          "https://built-site.test/products/old-dome-tent"
-        ],
-        "rendered": [
-          "https://built-site.test",
-          "https://built-site.test/collections/camping-tents?page=2",
-          "https://built-site.test/products/camping-tents-item-1",
-          "https://built-site.test/products/camping-tents-item-2",
-          "https://built-site.test/products/camping-tents-item-3",
-          "https://built-site.test/products/camping-tents-item-4",
-          "https://built-site.test/products/camping-tents-item-5",
-          "https://built-site.test/products/old-dome-tent"
-        ],
+        "js_only": [],
+        "js_only_count": 0,
         "truncated": false
       }
     },
@@ -332,12 +182,8 @@
         "state": "readable"
       },
       "links": {
-        "static": [
-          "https://built-site.test"
-        ],
-        "rendered": [
-          "https://built-site.test"
-        ],
+        "js_only": [],
+        "js_only_count": 0,
         "truncated": false
       }
     },
@@ -353,12 +199,8 @@
         "state": "readable"
       },
       "links": {
-        "static": [
-          "https://built-site.test"
-        ],
-        "rendered": [
-          "https://built-site.test"
-        ],
+        "js_only": [],
+        "js_only_count": 0,
         "truncated": false
       }
     },
@@ -374,14 +216,8 @@
         "state": "readable"
       },
       "links": {
-        "static": [
-          "https://built-site.test",
-          "https://built-site.test/products/retired-tent"
-        ],
-        "rendered": [
-          "https://built-site.test",
-          "https://built-site.test/products/retired-tent"
-        ],
+        "js_only": [],
+        "js_only_count": 0,
         "truncated": false
       }
     },
@@ -397,14 +233,8 @@
         "state": "readable"
       },
       "links": {
-        "static": [
-          "https://built-site.test",
-          "https://built-site.test/blog/choosing-tent-pegs"
-        ],
-        "rendered": [
-          "https://built-site.test",
-          "https://built-site.test/blog/choosing-tent-pegs"
-        ],
+        "js_only": [],
+        "js_only_count": 0,
         "truncated": false
       }
     },
@@ -420,12 +250,8 @@
         "state": "readable"
       },
       "links": {
-        "static": [
-          "https://built-site.test"
-        ],
-        "rendered": [
-          "https://built-site.test"
-        ],
+        "js_only": [],
+        "js_only_count": 0,
         "truncated": false
       }
     },
@@ -441,12 +267,8 @@
         "state": "readable"
       },
       "links": {
-        "static": [
-          "https://built-site.test"
-        ],
-        "rendered": [
-          "https://built-site.test"
-        ],
+        "js_only": [],
+        "js_only_count": 0,
         "truncated": false
       }
     },
@@ -462,12 +284,8 @@
         "state": "readable"
       },
       "links": {
-        "static": [
-          "https://built-site.test"
-        ],
-        "rendered": [
-          "https://built-site.test"
-        ],
+        "js_only": [],
+        "js_only_count": 0,
         "truncated": false
       }
     },
@@ -483,12 +301,8 @@
         "state": "readable"
       },
       "links": {
-        "static": [
-          "https://built-site.test"
-        ],
-        "rendered": [
-          "https://built-site.test"
-        ],
+        "js_only": [],
+        "js_only_count": 0,
         "truncated": false
       }
     },
@@ -504,12 +318,8 @@
         "state": "readable"
       },
       "links": {
-        "static": [
-          "https://built-site.test"
-        ],
-        "rendered": [
-          "https://built-site.test"
-        ],
+        "js_only": [],
+        "js_only_count": 0,
         "truncated": false
       }
     },
@@ -525,12 +335,8 @@
         "state": "readable"
       },
       "links": {
-        "static": [
-          "https://built-site.test"
-        ],
-        "rendered": [
-          "https://built-site.test"
-        ],
+        "js_only": [],
+        "js_only_count": 0,
         "truncated": false
       }
     },
@@ -546,14 +352,8 @@
         "state": "readable"
       },
       "links": {
-        "static": [
-          "https://built-site.test",
-          "https://built-site.test/blog/tent-care-guide"
-        ],
-        "rendered": [
-          "https://built-site.test",
-          "https://built-site.test/blog/tent-care-guide"
-        ],
+        "js_only": [],
+        "js_only_count": 0,
         "truncated": false
       }
     },
@@ -569,14 +369,8 @@
         "state": "readable"
       },
       "links": {
-        "static": [
-          "https://built-site.test",
-          "https://built-site.test/journal/peg-materials-compared"
-        ],
-        "rendered": [
-          "https://built-site.test",
-          "https://built-site.test/journal/peg-materials-compared"
-        ],
+        "js_only": [],
+        "js_only_count": 0,
         "truncated": false
       }
     },
@@ -592,14 +386,8 @@
         "state": "readable"
       },
       "links": {
-        "static": [
-          "https://built-site.test",
-          "https://built-site.test/collections/camp-kitchen"
-        ],
-        "rendered": [
-          "https://built-site.test",
-          "https://built-site.test/collections/camp-kitchen"
-        ],
+        "js_only": [],
+        "js_only_count": 0,
         "truncated": false
       }
     },
@@ -615,14 +403,8 @@
         "state": "readable"
       },
       "links": {
-        "static": [
-          "https://built-site.test",
-          "https://built-site.test/collections/camp-kitchen"
-        ],
-        "rendered": [
-          "https://built-site.test",
-          "https://built-site.test/collections/camp-kitchen"
-        ],
+        "js_only": [],
+        "js_only_count": 0,
         "truncated": false
       }
     },
@@ -638,14 +420,8 @@
         "state": "readable"
       },
       "links": {
-        "static": [
-          "https://built-site.test",
-          "https://built-site.test/collections/camp-kitchen"
-        ],
-        "rendered": [
-          "https://built-site.test",
-          "https://built-site.test/collections/camp-kitchen"
-        ],
+        "js_only": [],
+        "js_only_count": 0,
         "truncated": false
       }
     }

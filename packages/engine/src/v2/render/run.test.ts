@@ -59,17 +59,12 @@ function input(over: Partial<RenderCheckInput> = {}): RenderCheckInput {
 }
 
 const urlOf = (name: string) => fixture(name).url;
-/** The three links each reply fixture's two sides carry (`/`, `/shop`, `/about`), by hand. */
-const SITE_LINKS = [
-  'https://site.example',
-  'https://site.example/about',
-  'https://site.example/shop',
-];
 
 describe('a check whose renders all succeed', () => {
   it('measures each sampled page from its two renders, in the order they were picked', async () => {
     const out = await renderCheck(input());
-    // One page per template, so each is a template pick, smallest key first among equal sizes.
+    // One page per template, so each is a template pick, smallest key first among equal sizes. Each
+    // reply fixture's two sides carry the same links (`/`, `/shop`, `/about`): none is JS-only.
     expect(out.pages).toEqual([
       {
         url: urlOf('partial'),
@@ -77,7 +72,7 @@ describe('a check whose renders all succeed', () => {
         picked_for: 'template',
         rendered: true,
         without_js: { raw_words: 50, rendered_words: 100, text_share: 0.5, state: 'partial' },
-        links: { static: SITE_LINKS, rendered: SITE_LINKS, truncated: false },
+        links: { js_only: [], js_only_count: 0, truncated: false },
       },
       {
         url: urlOf('server-rendered'),
@@ -85,7 +80,7 @@ describe('a check whose renders all succeed', () => {
         picked_for: 'template',
         rendered: true,
         without_js: { raw_words: 119, rendered_words: 119, text_share: 1, state: 'readable' },
-        links: { static: SITE_LINKS, rendered: SITE_LINKS, truncated: false },
+        links: { js_only: [], js_only_count: 0, truncated: false },
       },
       {
         url: urlOf('client-rendered'),
@@ -93,7 +88,7 @@ describe('a check whose renders all succeed', () => {
         picked_for: 'template',
         rendered: true,
         without_js: { raw_words: 0, rendered_words: 203, text_share: 0, state: 'empty_shell' },
-        links: { static: SITE_LINKS, rendered: SITE_LINKS, truncated: false },
+        links: { js_only: [], js_only_count: 0, truncated: false },
       },
     ]);
   });
