@@ -106,16 +106,14 @@ describe('the hourly run over the schedule functions', () => {
     const ready = await client('reader@client.example', true);
     const pending = await client('new@client.example', false);
     const paused = await client('paused@client.example', true);
-    const {
-      rows: [link],
-    } = await db.query<{ r: { token: string } }>(`select public.issue_report_pause($1, $2) r`, [
+    // The pause link's token is the mailer's; SQL holds its sha256.
+    const pauseHash = hashToken('p'.repeat(43));
+    await db.query(`select public.issue_report_pause($1, $2, $3)`, [
       paused.siteId,
+      pauseHash,
       SAVED,
     ]);
-    await db.query(`select public.pause_report_schedule($1, $2)`, [
-      hashToken(link!.r.token),
-      SAVED,
-    ]);
+    await db.query(`select public.pause_report_schedule($1, $2)`, [pauseHash, SAVED]);
     sent.length = 0;
 
     const counts = await run();

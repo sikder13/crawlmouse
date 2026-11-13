@@ -9,8 +9,9 @@
  * What is built, by the row's kind and format: `audit_pdf` is the audit document as a PDF; a
  * `compare` is its document as JSON (a baseline of one check, two checks before and after, or a
  * fix the later of two checks verified); a `raw_export` is the check's pages as CSV, its links as an
- * edge list, or its records as JSON. A comparison lists the changes of each check after the earlier
- * one up to the later one, read here for those checks.
+ * edge list, or its records as JSON; a `client_report` is a comparison's document as JSON, of the
+ * check it covers or of the two it covers (`write_client_report`). A comparison lists the changes of
+ * each check after the earlier one up to the later one, read here for those checks.
  *
  * A failure is recorded as one of `FAIL_REASONS`, a word of this file's own: what was thrown is not
  * stored, logged or returned, since a view's or a parser's message can quote what was crawled.
@@ -51,7 +52,7 @@ const ReportRow = z.object({
   id: z.uuid(),
   account_id: z.uuid(),
   site_id: z.uuid(),
-  kind: z.enum(['audit_pdf', 'compare', 'raw_export']),
+  kind: z.enum(['audit_pdf', 'compare', 'raw_export', 'client_report']),
   format: z.enum(['pdf', 'csv', 'json', 'edge_list', 'html']),
   covers_check_ids: z.array(z.uuid()).min(1).max(2),
   subject_fix_id: z.uuid().nullable(),
@@ -60,7 +61,9 @@ const ReportRow = z.object({
 export type ReportRow = z.infer<typeof ReportRow>;
 
 /** What a new report row holds beyond its file state. */
-export type NewReport = Omit<ReportRow, 'id' | 'file_state' | 'subject_fix_id'> & {
+export type NewReport = Omit<ReportRow, 'id' | 'file_state' | 'subject_fix_id' | 'kind'> & {
+  /** A client report's row is the schedule's to write (`write_client_report`), not a request's. */
+  kind: Exclude<ReportRow['kind'], 'client_report'>;
   subject_fix_id?: string;
   owner_seat_id?: string;
 };
@@ -165,7 +168,8 @@ async function build(read: CheckReader, row: ReportRow, options: DocOptions): Pr
   switch (made) {
     case 'audit_pdf pdf':
       return renderPdf(auditDoc(await recordsOf(read, checkId), options));
-    case 'compare html': {
+    case 'compare html':
+    case 'client_report html': {
       const doc: ReportDoc = await compareDocOf(read, row, options);
       return text(JSON.stringify(doc));
     }

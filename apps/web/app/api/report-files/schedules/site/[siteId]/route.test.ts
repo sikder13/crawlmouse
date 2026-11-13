@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import type { PGlite } from '@electric-sql/pglite';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { applyAllMigrations, freshDb } from '@/__tests__/helpers/pglite-migrations';
@@ -217,9 +217,23 @@ async function scheduled(w: World, contact = 'client@client.example') {
     }),
   ]);
 }
-const token = async (fn: 'issue_recipient_confirmation' | 'issue_report_pause', siteId: string) =>
-  (await h.db.query<{ r: { token: string } }>(`select public.${fn}($1, now()) r`, [siteId]))
-    .rows[0]!.r.token;
+/**
+ * A link's token: the confirmation's is minted in SQL; the pause link's is the mailer's, and SQL is
+ * given its sha256 (lib/v2/mail/report-pause-token.ts).
+ */
+const token = async (fn: 'issue_recipient_confirmation' | 'issue_report_pause', siteId: string) => {
+  if (fn === 'issue_recipient_confirmation') {
+    return (
+      await h.db.query<{ r: { token: string } }>(`select public.${fn}($1, now()) r`, [siteId])
+    ).rows[0]!.r.token;
+  }
+  const made = randomBytes(32).toString('base64url');
+  await h.db.query(`select public.issue_report_pause($1, $2, now())`, [
+    siteId,
+    createHash('sha256').update(made, 'utf8').digest('hex'),
+  ]);
+  return made;
+};
 
 /** A confirmed contact: the confirmation link issued and used, as SQL does both. */
 async function confirmedWorld(): Promise<World> {

@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import type { PGlite } from '@electric-sql/pglite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
@@ -42,7 +42,7 @@ const FUNCTIONS = [
   'public.issue_recipient_confirmation(uuid, timestamptz)',
   'public.read_report_link(text, timestamptz)',
   'public.confirm_report_recipient(text, timestamptz)',
-  'public.issue_report_pause(uuid, timestamptz)',
+  'public.issue_report_pause(uuid, text, timestamptz)',
   'public.pause_report_schedule(text, timestamptz)',
   'public.resume_report_schedule(uuid, uuid, timestamptz)',
   'public.due_report_schedules(timestamptz, integer)',
@@ -103,8 +103,17 @@ const readLink = (token: string, now = NOW) =>
   answer(`select public.read_report_link($1, $2) r`, [sha256(token), now]);
 const confirm = (token: string, now = NOW) =>
   answer(`select public.confirm_report_recipient($1, $2) r`, [sha256(token), now]);
-const issuePause = (siteId: string, now = NOW) =>
-  answer(`select public.issue_report_pause($1, $2) r`, [siteId, now]);
+/** A pause link's token as the mailer makes one: 43 base64url characters (report-pause-token.ts). */
+const pauseToken = () => randomBytes(32).toString('base64url');
+/** The mailer's call: SQL is given the token's sha256. The answer here carries the token as well. */
+const issuePause = async (siteId: string, now = NOW, token = pauseToken()) => {
+  const a = await answer(`select public.issue_report_pause($1, $2, $3) r`, [
+    siteId,
+    sha256(token),
+    now,
+  ]);
+  return a.outcome === 'issued' ? { ...a, token } : a;
+};
 const pause = (token: string, now = NOW) =>
   answer(`select public.pause_report_schedule($1, $2) r`, [sha256(token), now]);
 const resume = (siteId: string, accountId: string, now = NOW) =>
@@ -700,19 +709,47 @@ async function confirmedPending(): Promise<Client> {
 }
 
 describe('the pause link', () => {
-  it('issue returns a token once with the address, for a confirmed contact, and stores its sha256', async () => {
+  it('issue stores the sha256 it is given, for a confirmed contact, and answers the address, the site and the account’s name', async () => {
     const c = await confirmed('reader@client.example');
-    const issued = await issuePause(c.siteId);
-    expect(issued).toEqual({
+    const token = pauseToken();
+    expect(
+      await answer(`select public.issue_report_pause($1, $2, $3) r`, [
+        c.siteId,
+        sha256(token),
+        NOW,
+      ]),
+    ).toEqual({
       outcome: 'issued',
-      token: expect.stringMatching(/^[A-Za-z0-9_-]{43}$/),
       email: 'reader@client.example',
-    });
-    expect((await schedule(c.siteId))!.pause_token_hash).toBe(sha256(issued.token as string));
-    expect(await readLink(issued.token as string)).toMatchObject({
-      outcome: 'pause',
       host: c.host,
+      account_name: (
+        await db.query<{ name: string | null }>(`select name from public.accounts where id = $1`, [
+          c.accountId,
+        ])
+      ).rows[0]!.name,
     });
+    expect((await schedule(c.siteId))!.pause_token_hash).toBe(sha256(token));
+    expect(await readLink(token)).toMatchObject({ outcome: 'pause', host: c.host });
+  });
+
+  it('the same hash again changes nothing, so the link of an earlier report still pauses', async () => {
+    const c = await confirmed();
+    const token = pauseToken();
+    await issuePause(c.siteId, NOW, token);
+    const before = await schedule(c.siteId);
+    expect((await issuePause(c.siteId, at(7), token)).outcome).toBe('issued');
+    expect(await schedule(c.siteId)).toEqual(before);
+    expect(await pause(token, at(8))).toEqual({ outcome: 'paused' });
+  });
+
+  it('refuses a value that is not a sha256 in lowercase hex, and a null', async () => {
+    const c = await confirmed();
+    await expect(
+      answer(`select public.issue_report_pause($1, $2, $3) r`, [c.siteId, pauseToken(), NOW]),
+    ).rejects.toMatchObject({ constraint: 'report_schedules_link_hashes' });
+    await expect(
+      answer(`select public.issue_report_pause($1, $2, $3) r`, [c.siteId, null, NOW]),
+    ).rejects.toMatchObject({ code: '22004' });
   });
 
   it('issues none for a contact that has not confirmed, and for a paused schedule', async () => {
@@ -928,8 +965,8 @@ describe('write_client_report and mark_client_report_sent', () => {
     const again = await writeReport(c.siteId, SLOT, checkId, '2026-11-16T09:40:00.000Z');
     expect(again).toEqual({ outcome: 'exists', report_id: first.report_id, status: 'scheduled' });
     const { rows } = await db.query<Record<string, unknown>>(
-      `select kind, format, status, made_by, covers_check_ids, scheduled_for, sent_at, recipient_email,
-              owner_seat_id, storage_path, account_id
+      `select id, kind, format, status, made_by, covers_check_ids, scheduled_for, sent_at,
+              recipient_email, owner_seat_id, storage_path, file_state, account_id
          from public.reports where site_id = $1 and kind = 'client_report'`,
       [c.siteId],
     );
@@ -943,13 +980,42 @@ describe('write_client_report and mark_client_report_sent', () => {
       sent_at: null,
       recipient_email: 'reader@client.example',
       owner_seat_id: c.owner.seatId,
-      storage_path: null,
+      // Its document is a file like any report's: named from this write, stored when it is mailed.
+      storage_path: `${c.accountId}/${first.report_id}.doc.json`,
+      file_state: 'pending',
       account_id: c.accountId,
     });
     expect(iso(rows[0]!.scheduled_for)).toBe(SLOT);
     const nextSlot = await writeReport(c.siteId, '2026-11-23T09:00:00.000Z', checkId);
     expect(nextSlot.outcome).toBe('written');
     expect(nextSlot.report_id).not.toBe(first.report_id);
+  });
+
+  it('covers the check the last sent report ended on, before the new one; a report not sent, and the same check, add nothing', async () => {
+    const c = await confirmed();
+    const covers = async (reportId: unknown) =>
+      (
+        await db.query<{ covers_check_ids: string[] }>(
+          `select covers_check_ids from public.reports where id = $1`,
+          [reportId],
+        )
+      ).rows[0]!.covers_check_ids;
+    const first = await check(c.siteId);
+    const one = await writeReport(c.siteId, SLOT, first);
+    expect(await covers(one.report_id)).toEqual([first]);
+    // Not sent: the next report still has nothing to compare with.
+    const second = await check(c.siteId);
+    const two = await writeReport(c.siteId, '2026-11-23T09:00:00.000Z', second);
+    expect(await covers(two.report_id)).toEqual([second]);
+    await markSent(two.report_id, at(11));
+    // Sent: the one after it compares with the check it ended on.
+    const third = await check(c.siteId);
+    const three = await writeReport(c.siteId, '2026-11-30T09:00:00.000Z', third);
+    expect(await covers(three.report_id)).toEqual([second, third]);
+    await markSent(three.report_id, at(18));
+    // The same check again (nothing was checked since): one check, not a pair of itself.
+    const four = await writeReport(c.siteId, '2026-12-07T09:00:00.000Z', third);
+    expect(await covers(four.report_id)).toEqual([third]);
   });
 
   it('writes none without a contact, for another site’s check, and for a check that has not finished', async () => {
@@ -1024,7 +1090,7 @@ describe('grants', () => {
       `select public.set_client('${c.siteId}', '${c.accountId}', '{"client_name":"x"}')`,
       `select public.due_report_schedules(now(), 10)`,
       `select public.issue_recipient_confirmation('${c.siteId}', now())`,
-      `select public.issue_report_pause('${c.siteId}', now())`,
+      `select public.issue_report_pause('${c.siteId}', '${'a'.repeat(64)}', now())`,
       `select public.resume_report_schedule('${c.siteId}', '${c.accountId}', now())`,
     ]) {
       await expect(

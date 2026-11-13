@@ -1367,13 +1367,16 @@ begin
 end;
 $$;
 
--- The mailer's call when it sends a report of p_site's schedule: mints the pause link's token,
--- stores its sha256 and returns the token once with the address the report goes to. Calling it again
--- replaces the stored hash: the pause link that works is the one in the latest report sent.
--- Answers {outcome}: 'issued' with token and email; 'none' when the site has no schedule, its
--- contact has not confirmed, the schedule is paused, the site is removed, or its account is deleted
--- or marked for deletion.
-create or replace function public.issue_report_pause(p_site uuid, p_now timestamptz)
+-- The mailer's call when it sends a report of p_site's schedule: stores p_token_hash, the sha256 of
+-- the pause link's token, and returns the address the report goes to. The mailer derives the token
+-- from the site and that address (lib/v2/mail/report-links.ts), so each report sent to one contact
+-- carries the same pause link, and the link of an earlier report still pauses; a call with the hash
+-- already stored changes nothing. A change of contact clears the hash (set_client).
+-- Answers {outcome}: 'issued' with email, host and account_name; 'none' when the site has no
+-- schedule, its contact has not confirmed, the schedule is paused, the site is removed, or its
+-- account is deleted or marked for deletion.
+create or replace function public.issue_report_pause(
+  p_site uuid, p_token_hash text, p_now timestamptz)
 returns jsonb
 language plpgsql
 volatile
@@ -1382,12 +1385,13 @@ set search_path = pg_catalog, pg_temp
 as $$
 declare
   v_email text;
-  v_raw text;
+  v_host text;
+  v_name text;
 begin
-  if p_now is null then
-    raise exception 'issue_report_pause: p_now is null' using errcode = '22004';
+  if p_token_hash is null or p_now is null then
+    raise exception 'issue_report_pause: a required argument is null' using errcode = '22004';
   end if;
-  select st.client_contact_email into v_email
+  select st.client_contact_email, st.host, a.name into v_email, v_host, v_name
     from public.report_schedules rs
     join public.sites st on st.id = rs.site_id
     join public.accounts a on a.id = st.account_id
@@ -1402,12 +1406,11 @@ begin
   if not found then
     return pg_catalog.jsonb_build_object('outcome', 'none');
   end if;
-  v_raw := public.report_link_token();
   update public.report_schedules rs
-     set pause_token_hash =
-           pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(v_raw, 'UTF8')), 'hex')
-   where rs.site_id = p_site;
-  return pg_catalog.jsonb_build_object('outcome', 'issued', 'token', v_raw, 'email', v_email);
+     set pause_token_hash = p_token_hash
+   where rs.site_id = p_site and rs.pause_token_hash is distinct from p_token_hash;
+  return pg_catalog.jsonb_build_object(
+    'outcome', 'issued', 'email', v_email, 'host', v_host, 'account_name', v_name);
 end;
 $$;
 
@@ -1572,10 +1575,13 @@ end;
 $$;
 
 -- The client report of p_site's schedule for the run at p_slot: a reports row of kind
--- 'client_report' and status 'scheduled', made by the schedule, covering p_check, for the site's
--- contact address as it is now and its owning seat. One row a site and slot: a second call for the
--- same slot writes nothing and answers with the row the first wrote, so a run that is retried does
--- not send twice.
+-- 'client_report' and status 'scheduled', made by the schedule, for the site's contact address as it
+-- is now and its owning seat. It covers p_check, and before it the check the site's last sent client
+-- report covered when that is another finished or partial check of the site, so the report's
+-- document compares the two. Its document is a file like any report's: the row names its object
+-- from this write (report_file_path) with file_state 'pending', and the mailer stores the document
+-- when it sends (finish_report). One row a site and slot: a second call for the same slot writes
+-- nothing and answers with the row the first wrote, so a run that is retried does not send twice.
 -- Answers {outcome}: 'written' or 'exists', each with report_id and status; 'none' when the site has
 -- no contact address, or p_check is not a finished or partial check of it.
 create or replace function public.write_client_report(
@@ -1592,6 +1598,8 @@ declare
   v_owner uuid;
   v_report uuid;
   v_status text;
+  v_before uuid;
+  v_new constant uuid := pg_catalog.gen_random_uuid();
 begin
   if p_slot is null or p_now is null then
     raise exception 'write_client_report: a required argument is null' using errcode = '22004';
@@ -1613,12 +1621,25 @@ begin
   if found then
     return pg_catalog.jsonb_build_object('outcome', 'exists', 'report_id', v_report, 'status', v_status);
   end if;
-  insert into public.reports (account_id, site_id, kind, format, status, made_by, created_at,
-                              covers_check_ids, scheduled_for, recipient_email, owner_seat_id)
-  values (v_account, p_site, 'client_report', 'html', 'scheduled', 'report_schedule', p_now,
-          array[p_check], p_slot, v_email, v_owner)
-  returning id into v_report;
-  return pg_catalog.jsonb_build_object('outcome', 'written', 'report_id', v_report, 'status', 'scheduled');
+  -- The check the last report sent for this site ended on, when it is another check than p_check
+  -- and is still a finished or partial check of the site. An earlier report is not looked at: a
+  -- report on the check the last one covered is about one check, not last time's comparison again.
+  select c.id into v_before
+    from (select r.covers_check_ids[pg_catalog.array_upper(r.covers_check_ids, 1)] as check_id
+            from public.reports r
+           where r.site_id = p_site and r.kind = 'client_report' and r.status = 'sent'
+           order by r.sent_at desc, r.id desc
+           limit 1) last
+    join public.checks c on c.id = last.check_id
+   where c.site_id = p_site and c.status in ('finished', 'partial') and c.id <> p_check;
+  insert into public.reports (id, account_id, site_id, kind, format, status, made_by, created_at,
+                              covers_check_ids, scheduled_for, recipient_email, owner_seat_id,
+                              file_state, storage_path)
+  values (v_new, v_account, p_site, 'client_report', 'html', 'scheduled', 'report_schedule', p_now,
+          case when v_before is null then array[p_check] else array[v_before, p_check] end,
+          p_slot, v_email, v_owner, 'pending',
+          public.report_file_path(v_account, v_new, 'html'));
+  return pg_catalog.jsonb_build_object('outcome', 'written', 'report_id', v_new, 'status', 'scheduled');
 end;
 $$;
 
@@ -1672,7 +1693,7 @@ revoke all on function public.issue_recipient_confirmation(uuid, timestamptz)
 revoke all on function public.read_report_link(text, timestamptz) from public, anon, authenticated;
 revoke all on function public.confirm_report_recipient(text, timestamptz)
   from public, anon, authenticated;
-revoke all on function public.issue_report_pause(uuid, timestamptz) from public, anon, authenticated;
+revoke all on function public.issue_report_pause(uuid, text, timestamptz) from public, anon, authenticated;
 revoke all on function public.pause_report_schedule(text, timestamptz)
   from public, anon, authenticated;
 revoke all on function public.resume_report_schedule(uuid, uuid, timestamptz)
@@ -1694,7 +1715,7 @@ grant execute on function public.clear_report_schedule(uuid, uuid) to service_ro
 grant execute on function public.issue_recipient_confirmation(uuid, timestamptz) to service_role;
 grant execute on function public.read_report_link(text, timestamptz) to service_role;
 grant execute on function public.confirm_report_recipient(text, timestamptz) to service_role;
-grant execute on function public.issue_report_pause(uuid, timestamptz) to service_role;
+grant execute on function public.issue_report_pause(uuid, text, timestamptz) to service_role;
 grant execute on function public.pause_report_schedule(text, timestamptz) to service_role;
 grant execute on function public.resume_report_schedule(uuid, uuid, timestamptz) to service_role;
 grant execute on function public.due_report_schedules(timestamptz, integer) to service_role;

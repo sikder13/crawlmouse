@@ -72,7 +72,7 @@ drop function if exists public.mark_report_schedule_run(uuid, timestamptz);
 drop function if exists public.due_report_schedules(timestamptz, integer);
 drop function if exists public.resume_report_schedule(uuid, uuid, timestamptz);
 drop function if exists public.pause_report_schedule(text, timestamptz);
-drop function if exists public.issue_report_pause(uuid, timestamptz);
+drop function if exists public.issue_report_pause(uuid, text, timestamptz);
 drop function if exists public.confirm_report_recipient(text, timestamptz);
 drop function if exists public.read_report_link(text, timestamptz);
 drop function if exists public.issue_recipient_confirmation(uuid, timestamptz);

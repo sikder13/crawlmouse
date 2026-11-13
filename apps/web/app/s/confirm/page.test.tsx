@@ -1,3 +1,4 @@
+import { createHash, randomBytes } from 'node:crypto';
 import type { PGlite } from '@electric-sql/pglite';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -81,9 +82,23 @@ async function client() {
   ]);
   return site;
 }
-const issue = async (fn: 'issue_recipient_confirmation' | 'issue_report_pause', siteId: string) =>
-  (await h.db.query<{ r: { token: string } }>(`select public.${fn}($1, now()) r`, [siteId]))
-    .rows[0]!.r.token;
+/**
+ * A link's token: the confirmation's is minted in SQL; the pause link's is the mailer's, and SQL is
+ * given its sha256 (lib/v2/mail/report-pause-token.ts).
+ */
+const issue = async (fn: 'issue_recipient_confirmation' | 'issue_report_pause', siteId: string) => {
+  if (fn === 'issue_recipient_confirmation') {
+    return (
+      await h.db.query<{ r: { token: string } }>(`select public.${fn}($1, now()) r`, [siteId])
+    ).rows[0]!.r.token;
+  }
+  const made = randomBytes(32).toString('base64url');
+  await h.db.query(`select public.issue_report_pause($1, $2, now())`, [
+    siteId,
+    createHash('sha256').update(made, 'utf8').digest('hex'),
+  ]);
+  return made;
+};
 const row = async (siteId: string) =>
   (
     await h.db.query<{ recipient_confirmed_at: Date | null; paused_by_recipient_at: Date | null }>(
