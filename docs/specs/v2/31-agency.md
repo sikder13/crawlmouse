@@ -813,6 +813,8 @@ and `pause_token_hash`.
 | `GET /s/confirm/[token]`, `POST /api/report-files/confirm` | The recipient's confirmation link, and the press that confirms.                           |
 | `GET /s/pause/[token]`, `POST /api/report-files/pause`     | The recipient's pause link, and the press that pauses.                                    |
 | `POST /s/pause/[token]`                                    | A mail client's one-click unsubscribe (RFC 8058): the body `List-Unsubscribe=One-Click`.  |
+| `GET /s/decline/[token]`, `POST /api/report-files/decline` | "Don't ask me again": the link in the mail that asks to confirm, and the press.           |
+| `POST /s/decline/[token]`                                  | That mail's one-click unsubscribe (RFC 8058): it records the refusal.                     |
 
 The four account routes ask `is_member_for_site` (404), then `seat_may('schedule_report')` (403 for
 a developer), then the plan's `agencyBranding` gate (402). They sit under `schedules/site/` so that
@@ -828,15 +830,17 @@ no confirmation, pause or link hash of the erased contact on the schedule.
 
 **When a contact is asked to confirm, and what the answer says.** A contact that changed on a client
 that has a schedule is asked when it is saved; a contact saved before its schedule is asked when the
-schedule is saved, so a contact that confirms before the first run is sent a report at it; "Ask
-again" asks whenever the contact has not confirmed; a resume asks the recipient who paused. A
-schedule its recipient has paused is asked nothing by a save or by "Ask again" (409
-`nothing_to_confirm`): `issue_recipient_confirmation` issues none for it, and a pause withdraws a
-link that was waiting. The client, schedule and resume routes answer what became of the request
-(`confirmation` in JSON, the notice for a form): `asked`; `waits`, for an account in its Agency
-trial whose contact is not its owner's own address, where nothing is mailed until the trial has
-become the plan and no bound is counted; `later`, past the account's bound for the day
-(`CONFIRM_MAILS_PER_DAY.account`), where the save stands and the schedule's next run asks; `none`.
+schedule is saved, and not again by the first run; "Ask again" asks a contact that has not
+confirmed; a resume asks the recipient who paused. Three things come before any of them. A schedule
+its recipient has paused is asked nothing by a save or by "Ask again" (409 `nothing_to_confirm`):
+`issue_recipient_confirmation` issues none for it, and a pause withdraws a link that was waiting.
+A contact that answered "Don't ask me again" is asked by nothing (`declined`). A contact that paused
+and was asked since is not asked again inside the window (`recent`; "What a recipient refused",
+below). The client, schedule and resume routes answer what became of the request (`confirmation` in
+JSON, the notice for a form): `asked`; `waits`, for an account in its Agency trial whose contact is
+not its owner's own address, where nothing is mailed until the trial has become the plan and no
+bound is counted; `later`, past the account's bound for the day (`CONFIRM_MAILS_PER_DAY.account`),
+where the save stands and the schedule's next run asks; `declined`; `recent`; `none`.
 The confirm route answers `{ requested: true }`, or 409 or 429. `asked` and the notices that follow
 it state a request, not a delivery: the bound is also on the mail itself (below), and a request
 past the address's own bound sends nothing.
@@ -961,14 +965,19 @@ in SQL") with a template in `lib/v2/mail/templates/` and a handler in `reportMai
 
 - **The confirmation** says that an agency asks to send reports about which site, links
   `/s/confirm/<token>`, and says that no report is sent unless the reader confirms and that they need
-  no account. Its subject and first words are fixed and name the site; the agency's name, which its
+  no account. It says "You can stop these requests for good with one click." and links "Don't ask me
+  again" (`/s/decline/<token>`, the same token), which is also its `List-Unsubscribe` target with
+  `List-Unsubscribe-Post: List-Unsubscribe=One-Click`. Its subject and first words are fixed and name the site; the agency's name, which its
   owner typed, follows in quotation marks (an invitation's mail does the same with the account's
-  name); a name that holds what a mail client would link (a scheme, `www.`, an address, a dotted
-  name) is not shown, and the mail is the one of an account with no name (`accountNameText`). The
+  name); a name of a shape a mail client may link is not shown, and the mail is the one of an
+  account with no name (`accountNameText`, whose pattern also refuses an ordinary name with a dot
+  inside a word, an `@`, a colon or a slash:
+  `pnpm --filter @crawlmouse/web exec vitest run lib/v2/mail/templates/parts.test.ts`). The
   day's bounds (`CONFIRM_MAILS_PER_DAY`, `lib/v2/agency/confirm-bounds.ts`: for one account, and to
   one address whichever account asks) are counted from the ledger and then the mail is claimed
   (`report_confirm_mail_counts`), so they hold for the hourly run as for a route; past one the
-  handler answers `bounded` and claims nothing. The count and the claim are two calls, so the
+  handler answers `bounded` and claims nothing. The count leaves out the message that asks, so a
+  retry is not refused by its own earlier attempt. The count and the claim are two calls, so the
   function runs one confirmation at a time (`REPORT_CONFIRM_CONCURRENCY`, `inngest/mail.ts`): a
   count then sees each earlier claim. The address's bound is across accounts: an account whose
   request is refused by it learns that others asked that address that day, and frequent requests
@@ -1017,11 +1026,35 @@ A recipient's pause is final from the sender's side (owner ruling, 2026-11-12).
 the confirmation mail again from the bucket of the client and confirm routes
 (`report-confirm:account:`); reports start again when the recipient confirms. Past the day's bound
 the pause is still lifted and no mail is asked for (`confirmation: 'later'`); the next run asks. The
-pause page tells the recipient so. Each resume is one more request to a recipient who paused, within
-the address's bound for the day; the confirmation mail has no link that stops further requests
-(questions.md Q42). The account has no pause of its own in this step: it removes a schedule
-(`DELETE`) and saves one again, and the new schedule's contact is asked to confirm again.
-`pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-031-b2-schedules.test.ts __tests__/v2-031-report-mails.test.ts "app/api/report-files/schedules/site/[siteId]/route.test.ts"`
+pause page tells the recipient so. The account has no pause of its own in this step: it removes a
+schedule (`DELETE`) and saves one again, and the new schedule's contact is asked to confirm again,
+within what its recipient refused.
+
+**What a recipient refused** (owner rulings of 2026-11-12, questions.md Q42 and Q43). Two things a
+recipient does are remembered for the address and the site, on the site's row
+(`sites.report_refusals`, read by no client role), so removing the schedule and saving it again,
+or changing the contact away and back, clears neither:
+
+- **"Don't ask me again."** The mail that asks to confirm carries the link and offers it as its
+  one-click unsubscribe; the confirmation page and the pause page offer it as a second button. From
+  then on no resume, "Ask again", save or hourly run sends that address a request for that site,
+  and no report: a request that was waiting is withdrawn, and a schedule that was sending is
+  paused. The routes answer `declined` / 409 `contact_declined`, and the client's row reads
+  "declined". No function lifts it. A confirmation link is taken as a refusal whatever its age.
+- **A pause, after which the account may ask once.** A request issued to a recipient who paused
+  opens a window (`report_reask_window()`) in which no other request is issued to that address for
+  that site, whatever asks; the request that opened it is issued again if its own mail is retried
+  (`p_request`). A resume inside the window lifts nothing and answers 409 `asked_recently` with when
+  it may ask (`nextAllowedAt`; the row says the day). The recipient's own confirmation ends it.
+
+One function answers whether a site's contact may be asked, for the issue, the resume, the due list
+and the screen: `report_ask_refusals`. An entry holds the sha256 of the address and no address.
+`pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-031-b2-schedules.test.ts __tests__/v2-031-report-mails.test.ts "app/api/report-files/schedules/site/[siteId]/route.test.ts" app/s lib/v2/view/agency-reports.test.ts`
+
+Left as it is. An address written another way (`name+tag@…`) is another address, and is asked as
+one. A "Don't ask me again" link stops answering when its request is replaced by a later one (the
+later mail carries its own) or the schedule is removed; the pause link of a report keeps answering.
+What a refusal leaves for the erasure is in §11.
 
 Known gaps. The recipient's two link cookies are set for the whole site (`Path=/`, the convention of
 `lib/v2/account/link-cookie.ts`), since the page and the route that reads the token are under
@@ -1054,6 +1087,16 @@ address: rule 30 sets `client_contact_email` and no rule names the name. The tes
 `known gap, reported: the contact’s name stays beside the blanked address` pins this, so a rule that
 covers the name turns it red. The fix is one more column in rule 30's action, which restates
 `erase_rules()`.
+
+What a recipient refused (§10, `sites.report_refusals`) is keyed by the sha256 of the address. It
+goes with the address in two places, by triggers, since `erase_rules()` is not restated: when the
+erasure blanks `sites.client_contact_email` (rule 30; `set_client`, the account's own writer, keeps
+the entry so a refusal cannot be cleared by changing the contact away and back), and when it blanks
+a report's `recipient_email` (rule 29), which reaches a recipient who is no longer the site's
+contact. **Known gap:** the entry of a contact that declined, was never sent a report and was then
+replaced as the contact by the account is reached by neither rule: its hash stays on the site's row
+until the site or the account goes. Closing it is one rule more in `erase_rules()` (questions.md
+Q43). `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-031-b2-schedules.test.ts -t "the erasure"`
 
 An erased contact leaves nothing on the schedule either: blanking the address clears the
 schedule's confirmation, the recipient's pause and both link hashes (the pause link's hash is
