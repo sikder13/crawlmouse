@@ -270,3 +270,37 @@ export function environmentProblems(
   }
   return problems;
 }
+
+/**
+ * Environments that only one workflow may bind, by name (lower case) to that workflow's file. The
+ * environment holds a deploy token; a push-triggered workflow that named it would get the token, with
+ * no reviewer once the repository is private.
+ */
+export const CONFINED_ENVIRONMENTS: Readonly<Record<string, string>> = {
+  'worker-production': 'worker-production.yml',
+};
+
+/**
+ * Problems with where a workflow binds a confined environment; empty when there are none. The name
+ * is compared trimmed and lower-cased (GitHub's environment names are case-insensitive), in the
+ * string and the `{ name: ... }` form alike. A computed name (`${{ ... }}`) is a problem in any
+ * workflow, this file's own included, because it can evaluate to a confined name.
+ */
+export function confinedEnvironmentProblems(file: string, workflow: Workflow): string[] {
+  const problems: string[] = [];
+  for (const [name, job] of Object.entries(workflow.jobs ?? {})) {
+    const env = environmentName(job);
+    if (env === undefined) continue;
+    const text = String(env);
+    if (text.includes('${{')) {
+      problems.push(`${file} ${name}: computes its environment name`);
+      continue;
+    }
+    const key = text.trim().toLowerCase();
+    const owner = Object.hasOwn(CONFINED_ENVIRONMENTS, key)
+      ? CONFINED_ENVIRONMENTS[key]
+      : undefined;
+    if (owner !== undefined && owner !== file) problems.push(`${file} ${name}: binds ${key}`);
+  }
+  return problems;
+}

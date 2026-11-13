@@ -1,0 +1,276 @@
+# Deploys the crawl worker (packages/worker) to Fly production, app crawlmouse-worker, when the owner
+# dispatches it from main. Its one trigger is workflow_dispatch: a push or a merge does not start it
+# (scripts/db/worker-production-workflow.test.ts). The worker crawls every customer's site from one
+# fixed address, so it changes only when the owner says so.
+#
+#   authorize  no environment, no secret, no permission: refuses unless the run is a
+#              workflow_dispatch from main, dispatched and run by the repository owner. The same
+#              guard as db-apply-prod.yml (scripts/db/workflow-file.ts, GUARD_NAME).
+#   build      the worker's tests, typecheck and bundle, and the image built once here, as
+#              worker-staging.yml builds them. Holds no secret.
+#   deploy     bound to the `worker-production` environment, which holds FLY_API_TOKEN and the
+#              variable FLY_ORG. Runs the guard again as its first step, because a re-run of a failed
+#              job does not re-run a passed `authorize`, and on a private repository the environment
+#              has no required reviewer (docs/specs/v2/repo-private.md). Then the steps of
+#              worker-staging.yml's deploy job, with fly.production.toml, and the image labelled with
+#              the commit it was built from, which the go-live check reads.
+#
+# No env at the workflow level, nor on authorize or deploy (guardProblems refuses both): it would
+# reach the guard's process before its first line (scripts/db/production-workflows.test.ts, "threat,
+# documented"). So each step names the app itself.
+#
+# The worker's own secrets (WORKER_SIGNING_SECRET, WORKER_JWT_PUBLIC_KEY) are set on Fly by the owner
+# and never pass through here: docs/ops/worker-runbook.md, "Production". The logs are written as if
+# anyone can read them. The egress address is masked and never printed.
+name: worker-production
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One production deploy at a time, and none cancelled midway.
+concurrency:
+  group: worker-production
+  cancel-in-progress: false
+
+jobs:
+  authorize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Only the owner, dispatching from main
+        env:
+          EVENT: ${{ github.event_name }}
+          ACTOR: ${{ github.actor }}
+          TRIGGERING_ACTOR: ${{ github.triggering_actor }}
+          OWNER: ${{ github.repository_owner }}
+          REF: ${{ github.ref }}
+        run: |
+          set -euo pipefail
+          refuse() {
+            echo "::error::$1"
+            exit 1
+          }
+          [ -n "$OWNER" ] || refuse "the repository owner is empty"
+          [ "$EVENT" = workflow_dispatch ] || refuse "started by the event '$EVENT', not workflow_dispatch"
+          [ "$ACTOR" = "$OWNER" ] || refuse "dispatched by '$ACTOR', not the owner '$OWNER'"
+          [ "$TRIGGERING_ACTOR" = "$OWNER" ] || refuse "run or re-run by '$TRIGGERING_ACTOR', not the owner '$OWNER'"
+          [ "$REF" = refs/heads/main ] || refuse "dispatched from '$REF', not refs/heads/main"
+          echo "dispatched and run by the owner '$OWNER', from main"
+
+  build:
+    needs: authorize
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - run: pnpm --filter @crawlmouse/worker test
+      - run: pnpm --filter @crawlmouse/worker typecheck
+      - run: pnpm --filter @crawlmouse/worker build
+      # The image the deploy builds on Fly, built here first from the same context, so a file the
+      # Dockerfile copies that the context leaves out fails this job rather than the deploy.
+      - run: docker build --file packages/worker/Dockerfile packages/worker
+      # Both bundles, from one directory, so the artifact keeps them side by side in dist/.
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: worker-bundle
+          path: |
+            packages/worker/dist/main.mjs
+            packages/worker/dist/reader.mjs
+          retention-days: 7
+          if-no-files-found: error
+
+  deploy:
+    needs: [authorize, build]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    # Holds FLY_API_TOKEN and the variable FLY_ORG; deployment branches: main only.
+    environment: worker-production
+    timeout-minutes: 40
+    steps:
+      - name: Only the owner, dispatching from main
+        env:
+          EVENT: ${{ github.event_name }}
+          ACTOR: ${{ github.actor }}
+          TRIGGERING_ACTOR: ${{ github.triggering_actor }}
+          OWNER: ${{ github.repository_owner }}
+          REF: ${{ github.ref }}
+        run: |
+          set -euo pipefail
+          refuse() {
+            echo "::error::$1"
+            exit 1
+          }
+          [ -n "$OWNER" ] || refuse "the repository owner is empty"
+          [ "$EVENT" = workflow_dispatch ] || refuse "started by the event '$EVENT', not workflow_dispatch"
+          [ "$ACTOR" = "$OWNER" ] || refuse "dispatched by '$ACTOR', not the owner '$OWNER'"
+          [ "$TRIGGERING_ACTOR" = "$OWNER" ] || refuse "run or re-run by '$TRIGGERING_ACTOR', not the owner '$OWNER'"
+          [ "$REF" = refs/heads/main ] || refuse "dispatched from '$REF', not refs/heads/main"
+          echo "dispatched and run by the owner '$OWNER', from main"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # The bundles the build job tested are the ones that ship.
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: worker-bundle
+          path: packages/worker/dist
+      # The flyctl version worker-staging.yml pins (its FLYCTL_VERSION); the test holds them equal.
+      - uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1 # 1.6
+        with:
+          version: 0.4.116
+
+      # The blocks below are worker-staging.yml's, character for character, apart from the
+      # environment and the runbook section their errors name, and the deploy's config and image
+      # label (scripts/db/worker-production-workflow.test.ts holds them so). Each runs with errexit,
+      # nounset and pipefail and with tracing off, and reads flyctl's and jq's output into a
+      # variable before testing it.
+      - name: Create the app if it does not exist
+        env:
+          FLY_APP: crawlmouse-worker
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+          FLY_ORG: ${{ vars.FLY_ORG }}
+        run: |
+          set +x -euo pipefail
+          if [ -z "$FLY_API_TOKEN" ]; then
+            echo "::error::FLY_API_TOKEN is not set on the worker-production environment (worker-runbook.md, Production)"
+            exit 1
+          fi
+          if flyctl status --app "$FLY_APP" >/dev/null 2>&1; then exit 0; fi
+          if [ -z "$FLY_ORG" ]; then
+            echo "::error::set the FLY_ORG variable on the worker-production environment (worker-runbook.md, Production)"
+            exit 1
+          fi
+          flyctl apps create "$FLY_APP" --org "$FLY_ORG" >/dev/null
+
+      - name: Require the worker's secrets
+        env:
+          FLY_APP: crawlmouse-worker
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          set +x -euo pipefail
+          listed=$(flyctl secrets list --app "$FLY_APP" --json)
+          # An app with no secrets may list them as null.
+          names=$(jq -r '(. // [])[] | (.name // .Name)' <<< "$listed")
+          for secret in WORKER_SIGNING_SECRET WORKER_JWT_PUBLIC_KEY; do
+            if ! grep -qx "$secret" <<< "$names"; then
+              echo "::error::$secret is not set on $FLY_APP. See docs/ops/worker-runbook.md, Production."
+              exit 1
+            fi
+          done
+
+      # The image is labelled with the commit it was built from, so the image reference of the
+      # running machine names the commit it runs (the go-live check reads it).
+      - name: Deploy
+        env:
+          FLY_APP: crawlmouse-worker
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          set +x -euo pipefail
+          # One machine: batch records and nonces live in the process. --ha=false stops a second one.
+          # flyctl reads --config relative to the build directory it is given, so the path is absolute.
+          flyctl deploy packages/worker --app "$FLY_APP" --config "$GITHUB_WORKSPACE/packages/worker/fly.production.toml" --remote-only --ha=false --image-label "$GITHUB_SHA"
+
+      - name: Health check
+        env:
+          FLY_APP: crawlmouse-worker
+        run: curl -fsS --retry 6 --retry-delay 5 --retry-all-errors "https://$FLY_APP.fly.dev/healthz"
+
+      # After the first deploy, never before it: a first deploy that finds any address on the app,
+      # egress ones included, allocates no ingress address, and the app is unreachable. One pair
+      # (IPv4 and IPv6) in the app's region; skipped when the region already has an egress IPv4.
+      # A failed listing fails the step: allocating on a failed read would bill a second pair.
+      - name: Allocate the app's static egress addresses, once
+        env:
+          FLY_APP: crawlmouse-worker
+          FLY_REGION: iad
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          set +x -euo pipefail
+          ips=$(flyctl ips list --app "$FLY_APP" --json)
+          found=$(jq --arg r "$FLY_REGION" 'any(.[]; .Type == "egress_v4" and .Region == $r)' <<< "$ips")
+          if [ "$found" = true ]; then exit 0; fi
+          if [ "$found" != false ]; then
+            echo "::error::could not read the app's addresses from flyctl ips list"
+            exit 1
+          fi
+          flyctl ips allocate-egress --app "$FLY_APP" -r "$FLY_REGION" --yes >/dev/null
+
+      # The IPv4 address the world sees must be the app's egress IPv4, the same before and after a
+      # restart. Masked, never printed: the owner records it in the runbook (Production, Egress
+      # address). flyctl's stderr is kept, so a failure says why. The app's egress addresses are
+      # masked before the first reading, and each reading is masked as soon as it is taken.
+      - name: Egress is the app's own address, before and after a restart
+        env:
+          FLY_APP: crawlmouse-worker
+          FLY_REGION: iad
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          set +x -euo pipefail
+          machines=$(flyctl machines list --app "$FLY_APP" --json)
+          machine=$(jq -r '.[0].id' <<< "$machines")
+          ips=$(flyctl ips list --app "$FLY_APP" --json)
+          egress=$(jq -r --arg r "$FLY_REGION" '.[] | select(.Type == "egress_v4" and .Region == $r) | .Address' <<< "$ips")
+          if [ -z "$egress" ]; then
+            echo "::error::the app has no egress IPv4 in $FLY_REGION (worker-runbook.md, Production)"
+            exit 1
+          fi
+          for address in $egress; do echo "::add-mask::$address"; done
+          seen() {
+            flyctl ssh console --app "$FLY_APP" --machine "$machine" --quiet \
+              -C "node -e \"fetch('https://api.ipify.org',{signal:AbortSignal.timeout(15000)}).then(r=>r.text()).then(t=>process.stdout.write(t.trim()))\"" \
+              | tail -n 1
+          }
+          ipv4='^([0-9]{1,3}\.){3}[0-9]{1,3}$'
+          # A new egress address can take some minutes to apply (Fly says 5 to 10), and a read can fail
+          # on a fresh runner's tunnel; both are retried, for up to 15 attempts a minute apart.
+          before=''
+          readings=0
+          for attempt in $(seq 1 15); do
+            if reading=$(seen) && [[ "$reading" =~ $ipv4 ]]; then
+              echo "::add-mask::$reading"
+              readings=$((readings + 1))
+              if grep -qxF "$reading" <<< "$egress"; then
+                before=$reading
+                break
+              fi
+              echo "attempt $attempt: the address seen is not the egress IPv4 yet"
+            else
+              echo "attempt $attempt: could not read the address seen"
+            fi
+            sleep 60
+          done
+          if [ "$readings" -eq 0 ]; then
+            echo "::error::could not read the address seen in 15 attempts. See worker-runbook.md, Production."
+            exit 1
+          fi
+          if [ -z "$before" ]; then
+            echo "::error::after 15 attempts the address seen is not the app's egress IPv4. A new allocation may still be applying: re-run this job. Otherwise see worker-runbook.md, Production."
+            exit 1
+          fi
+          flyctl machine restart "$machine" --app "$FLY_APP" >/dev/null
+          curl -fsS --retry 6 --retry-delay 5 --retry-all-errors "https://$FLY_APP.fly.dev/healthz" >/dev/null
+          after=''
+          for attempt in $(seq 1 5); do
+            if reading=$(seen) && [[ "$reading" =~ $ipv4 ]]; then
+              echo "::add-mask::$reading"
+              after=$reading
+              break
+            fi
+            sleep 20
+          done
+          if [ -z "$after" ]; then
+            echo "::error::could not read the address seen after the restart"
+            exit 1
+          fi
+          if [ "$before" != "$after" ]; then
+            echo "::error::the egress address changed across a restart"
+            exit 1
+          fi
+          echo "egress: the app's own IPv4, the same before and after a restart"
