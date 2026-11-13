@@ -379,7 +379,7 @@ describe('the redactor masks secrets, not the words the check prints (review r1 
   it('masks a long file value whatever its name', async () => {
     const value = 'https://some-long-value.example/' + 'p'.repeat(8);
     const probes = allPass();
-    probes['vercel-env-1'] = async (d) => ({ status: 'fail', reason: `${d.env.CRAWL_WORKER_URL}` });
+    probes['vercel-env-1'] = async () => ({ status: 'fail', reason: value });
     const all = await mainWith(`CRAWL_WORKER_URL=${value}`, () => json({}), probes);
     expect(all).toContain(`vercel-env-step-1: fail (${MASK})`);
   });
@@ -436,5 +436,35 @@ describe('the header names the live commit and whether this checkout matches it 
     expect((await header({ code: 0, stdout: '' }, null))[1]).toMatch(
       /^checkout: unknown \(the live production commit is unknown /,
     );
+  });
+});
+
+describe('probes receive the token names only (review r2 N-d)', () => {
+  it('passes no other env-file value to any probe', async () => {
+    const signing = ['wss', 'x'.repeat(24)].join('_');
+    const vercel = fakeToken(['vcp']);
+    const seen: Record<string, string[]> = {};
+    const probes = allPass();
+    for (const id of Object.keys(probes) as ProbeId[]) {
+      probes[id] = async (d) => {
+        seen[id] = Object.keys(d.env).filter((k) => d.env[k] !== undefined);
+        return pass('ok');
+      };
+    }
+    await main([], {
+      processEnv: { FLY_READ_TOKEN: fakeToken(['fo1']) },
+      readFile: () =>
+        [`WORKER_SIGNING_SECRET=${signing}`, `VERCEL_TOKEN=${vercel}`, 'CRAWL_PAUSED=1'].join('\n'),
+      fetch: scriptedFetch(() => json({})).fetch,
+      now: () => new Date(Date.UTC(2026, 10, 13)),
+      git: scriptedGit({}),
+      out: () => {},
+      err: () => {},
+      probes,
+    });
+    expect(Object.keys(seen).sort()).toEqual(Object.keys(PROBES).sort());
+    for (const [id, keys] of Object.entries(seen)) {
+      expect(keys.sort(), id).toEqual(['FLY_READ_TOKEN', 'VERCEL_TOKEN']);
+    }
   });
 });

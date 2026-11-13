@@ -157,7 +157,10 @@ export function vocabulary(): Set<string> {
 }
 
 export interface CheckDeps {
-  /** The values loaded from the env file, merged with the TOKEN_ENV names of the process environment. */
+  /**
+   * The values loaded from the env file, merged with the TOKEN_ENV names of the process environment.
+   * runCheck hands probes the TOKEN_ENV names of it only.
+   */
   env: Record<string, string | undefined>;
   /** The network, before the guard; the check wraps it. */
   fetch: typeof fetch;
@@ -177,9 +180,12 @@ const line = (p: Precondition, r: ProbeResult | 'manual' | 'ticked'): string => 
 /** Runs every probe once and prints every row; returns the exit code. */
 export async function runCheck(args: Args, deps: CheckDeps, redactor: Redactor): Promise<number> {
   const out = (s: string) => deps.out(redactor.redact(s));
+  // A probe needs a token and nothing else from the file: the other values never reach one.
+  const tokens: Record<string, string | undefined> = {};
+  for (const name of TOKEN_ENV) tokens[name] = deps.env[name];
   const probeDeps: ProbeDeps = {
-    fetch: guardedFetch(deps.fetch, (v) => redactor.addReceived(v), deps.env),
-    env: deps.env,
+    fetch: guardedFetch(deps.fetch, (v) => redactor.addReceived(v), tokens),
+    env: tokens,
     now: deps.now,
     git: deps.git,
     ticked: args.ticked,
