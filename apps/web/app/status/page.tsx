@@ -1,7 +1,7 @@
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 import { Card } from '@/components/ui/Card';
-import { SUPPORT_EMAIL } from '@/components/v2/footer-links';
+import { SUPPORT_EMAIL } from '@/lib/v2/copy/support';
 import { ANSWERING, healthReport } from '@/lib/v2/ops/health';
 
 export const metadata = {
