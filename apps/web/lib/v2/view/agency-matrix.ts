@@ -143,6 +143,12 @@ export interface AgencyReader {
    * buy form only then, so only then does the matrix link to it. Left out, it is not linked.
    */
   billing?: boolean;
+  /**
+   * Whether the account has sent a client report, as the page's own read found: the records a
+   * page reads (`loadAccountDataset`) hold no client report. Left out (a preview), the dataset's
+   * own reports say.
+   */
+  reportSent?: boolean;
 }
 
 function reportCell(s: Site): string {
@@ -228,6 +234,7 @@ function nextStep(
   v: AccountView,
   rows: readonly ClientRowView[],
   adds: boolean,
+  sent: boolean,
 ): NextStepView | null {
   const role = readerRole(v);
   const S = COPY.steps;
@@ -253,7 +260,6 @@ function nextStep(
       action: { ...link('/seats', S.inviteAction), primary: true },
     };
   }
-  const sent = v.d.reports.some((r) => r.kind === 'client_report' && r.status === 'sent');
   if (v.d.seats.length > 1 && !sent && roleMay(role, 'schedule_report')) {
     return {
       step: 'report',
@@ -275,6 +281,7 @@ function matrixView(
   v: AccountView,
   shell: ShellView,
   billing: boolean,
+  reportSent: boolean | undefined,
 ): MatrixView {
   const zone = zoneOf(v);
   const clients = primarySites(v);
@@ -306,7 +313,12 @@ function matrixView(
   const adds = addsSites(v);
   const limit = v.account.limits.sites;
   const n = rows.length;
-  const next = nextStep(v, rows, adds);
+  const next = nextStep(
+    v,
+    rows,
+    adds,
+    reportSent ?? v.d.reports.some((r) => r.kind === 'client_report' && r.status === 'sent'),
+  );
   const role = readerRole(v);
   /** At the plan's limit, a reader who may buy is shown the way to the buy form (`/seats`). */
   const buys =
@@ -425,5 +437,6 @@ export function agencyHomeView(
     v,
     accountShellView(v, 'Clients', { role, accounts: reader.accounts ?? [] }),
     reader.billing === true,
+    reader.reportSent,
   );
 }

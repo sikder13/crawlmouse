@@ -322,6 +322,17 @@ describe('the matrix, first run: the next step is the first not done', () => {
     expect(step(oneSeat, { ...northwind, seatId: ALEX })?.step).toBe('invite');
   });
 
+  it('takes the page’s word for whether a report was sent over the dataset’s, which a live page’s records leave empty', () => {
+    const stepWith = (reportSent: boolean) => {
+      const v = agencyHomeView(d, northwind, { reportSent });
+      if (v.kind !== 'matrix') throw new Error(v.kind);
+      return v.next?.step ?? null;
+    };
+    // The fixture holds a sent client report; told that none was sent, the step is to send one.
+    expect(stepWith(false)).toBe('report');
+    expect(stepWith(true)).toBeNull();
+  });
+
   it('with a report sent, setup has no step left, and Add a client site is the orange element', () => {
     const v = matrix(d, northwind);
     expect(v.next).toBeNull();

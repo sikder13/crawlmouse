@@ -37,11 +37,25 @@ export default async function AgencyPage({
   if (r.kind === 'signed_out') redirect('/login');
   if (r.kind !== 'viewer') return <AccountStateScreen state={r.kind} />;
   const { account, seat, accounts, tier } = r.viewer;
-  const { d, viewer } = await readAccount(await supabaseServer(), account.id, seat.id, new Date());
+  const sb = await supabaseServer();
+  const { d, viewer } = await readAccount(sb, account.id, seat.id, new Date());
+  // Whether a client report was sent: the caller's own read, of the clients their seat covers.
+  const sent = await sb
+    .from('reports')
+    .select('id')
+    .eq('account_id', account.id)
+    .eq('kind', 'client_report')
+    .eq('status', 'sent')
+    .limit(1);
+  if (sent.error) throw new Error(`reports read failed: ${sent.error.message}`);
   return (
     <LiveActions>
       <MatrixScreen
-        data={agencyHomeView(d, viewer, { accounts, billing: billingV2Enabled() })}
+        data={agencyHomeView(d, viewer, {
+          accounts,
+          billing: billingV2Enabled(),
+          reportSent: (sent.data ?? []).length > 0,
+        })}
         // The form a plan's limit refuses here is the add-client form: its notice names the limit.
         notice={noticeLine(await searchParams, account.timezone, tier)}
       />

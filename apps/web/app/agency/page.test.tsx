@@ -5,10 +5,12 @@
  * two client sites, read as its owner, a developer whose seat covers the first site, a person whose
  * seat was removed, and a stranger.
  */
+import { randomUUID } from 'node:crypto';
 import type { PGlite } from '@electric-sql/pglite';
 import type { ReactElement } from 'react';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { applyAllMigrations, freshDb } from '../../__tests__/helpers/pglite-migrations';
+import { insertRow, ROWS } from '../../__tests__/helpers/v2-check-tables';
 import {
   addSeat,
   adminOver,
@@ -102,6 +104,26 @@ describe('/agency', () => {
     const data = await matrixOf(w.owner);
     expect(data.clients.rows.map((r) => r.key).sort()).toEqual([w.site1.id, w.site2.id].sort());
     expect(data.header.actions.map((a) => a.href)).toEqual(['/api/sites']);
+  });
+
+  it('asks for the first client report until one was sent, which it reads from the account’s own reports', async () => {
+    expect((await matrixOf(w.owner)).next?.step).toBe('report');
+    const sent = randomUUID();
+    await insertRow(h.db, 'reports', {
+      ...ROWS.reports(sent, w.accountId, w.site1.id, w.site1.check),
+      kind: 'client_report',
+      format: 'html',
+      made_by: 'report_schedule',
+      status: 'sent',
+      sent_at: '2026-11-10T09:00:00.000Z',
+      recipient_email: 'reader@client.example',
+      byte_count: null,
+    });
+    try {
+      expect((await matrixOf(w.owner)).next).toBeNull();
+    } finally {
+      await h.db.query(`delete from public.reports where id = $1`, [sent]);
+    }
   });
 
   it('a developer whose seat covers one client sees that client alone, and no form to add one', async () => {
