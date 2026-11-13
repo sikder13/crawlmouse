@@ -255,6 +255,36 @@ describe('POST /api/seats', () => {
     expect(JSON.stringify([h.send.mock.calls, h.capture.mock.calls])).not.toContain('dana');
   });
 
+  it('when the mail cannot be queued the seat stays and the caller is told: 503, and Resend then asks again', async () => {
+    const owner = await paidOwner();
+    as(owner);
+    h.send.mockRejectedValueOnce(new Error('the queue is down'));
+    const res = await invite({ email: 'late@example.com', role: 'developer', scope: 'all' });
+    expect(res.status).toBe(503);
+    const { code, seatId } = (await res.json()) as { code: string; seatId: string };
+    expect(code).toBe('invite_not_mailed');
+    expect(await seat(seatId)).toMatchObject({ status: 'invited', invite_seq: 1 });
+    // The same failure for a form goes back to Seats with the notice.
+    h.send.mockRejectedValueOnce(new Error('the queue is down'));
+    const again = await resend(seatId, FORM);
+    expect([again.status, again.headers.get('location')]).toEqual([
+      303,
+      '/seats?notice=invite_not_mailed',
+    ]);
+    // With the queue back, Resend asks for the mail of the seat's next invitation.
+    h.send.mockClear();
+    expect((await resend(seatId)).status).toBe(200);
+    expect(h.send.mock.calls).toEqual([
+      [
+        {
+          id: `seat_invite:${seatId}:3`,
+          name: 'seat.invite.requested',
+          data: { seat_id: seatId, seq: 3 },
+        },
+      ],
+    ]);
+  });
+
   it('a form names the clients it ticks, and is answered with a 303 back to Seats', async () => {
     const owner = await paidOwner();
     const [a, b] = [await keptSite(h.db, owner.accountId), await keptSite(h.db, owner.accountId)];

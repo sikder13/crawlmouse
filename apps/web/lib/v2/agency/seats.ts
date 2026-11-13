@@ -208,6 +208,24 @@ async function overLimit(
 }
 
 /**
+ * Asks for the invitation's mail. The seat's row is written by then (and, for a resend, the link
+ * sent before no longer works), so a request that cannot be queued is not thrown: the caller is
+ * told, and "Send a new invitation" on the seat's row asks again.
+ */
+async function mailAsked(deps: Pick<SeatDeps, 'mail'>, seatId: string, seq: number) {
+  try {
+    await deps.mail.request({ seatId, seq });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** 503 `invite_not_mailed` with the seat's id; a form is sent back to Seats with the notice. */
+const notMailed = (kind: Kind, seatId: string): Response =>
+  refuseTo(kind, SEATS_PAGE, 503, 'invite_not_mailed', { seatId });
+
+/**
  * POST /api/seats. 400 `invalid` for a body that is not `{email, role, scope}`; 402 `upgrade_required`
  * with gate `seats` on Free, before anything is counted or written; 429 `rate_limited` past either
  * bound on invitation mail; then `invite_seat`: 201 with the seat's id, 400 `invalid_scope`, 409
@@ -240,7 +258,7 @@ export async function inviteSeat(
         role: input.role,
         scoped: input.scope !== 'all',
       });
-      await deps.mail.request({ seatId: r.seatId, seq: r.seq });
+      if (!(await mailAsked(deps, r.seatId, r.seq))) return notMailed(kind, r.seatId);
       return done(kind, 'seat_invited', { seatId: r.seatId }, 201);
     case 'marked':
       return notFound();
@@ -311,7 +329,7 @@ export async function resendInvite(
   const r = await deps.store.resend(seatId, accountId);
   switch (r.outcome) {
     case 'resent':
-      await deps.mail.request({ seatId, seq: r.seq });
+      if (!(await mailAsked(deps, seatId, r.seq))) return notMailed(kind, seatId);
       return done(kind, 'seat_resent', { resent: true });
     case 'marked':
     case 'not_found':

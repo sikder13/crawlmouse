@@ -81,6 +81,8 @@ export const NOTICE_LINES: Record<NoticeCode, (at: string | null) => string> = {
     'Choose every client, or at least one client site of this account that is not a staging copy.',
   seat_owner: () => 'The owner’s seat cannot be changed or removed.',
   not_invited: () => 'That invitation was already accepted, so nothing was sent.',
+  invite_not_mailed: () =>
+    'The invitation is saved, but its email could not be sent just now. Use “Send a new invitation” on the seat’s row.',
   invite_gone: () =>
     'This invitation cannot be used: it was accepted, replaced, removed or has expired.',
   email_mismatch: () =>

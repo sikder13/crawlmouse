@@ -118,6 +118,7 @@ export const NOTICE_CODES = [
   // seats and invitations (CC-31)
   'seat_invited',
   'seat_resent',
+  'invite_not_mailed',
   'seat_changed',
   'seat_removed',
   'seat_exists',
