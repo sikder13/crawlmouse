@@ -7,11 +7,14 @@
  * it, a template of such pages gets no `client_rendered_template` record (detectors/rendered.ts).
  *
  * The pool is every crawled page; the crawl fetched each as our crawler under our robots.txt group.
- * The picks are the empty-root pages, ordered by template key, then PageRank (highest first), then
- * URL, taking at most EMPTY_ROOT_PER_TEMPLATE of a template and EMPTY_ROOT_MAX_RENDERS in all. A URL
+ * The picks are the empty-root pages of templates with no graded page in the pool (`isGraded`): the
+ * detector judges a template that has a graded page on its graded renders alone, so an empty-root
+ * render there would decide nothing. They are ordered by template key, then PageRank (highest first),
+ * then URL, taking at most EMPTY_ROOT_PER_TEMPLATE of a template and EMPTY_ROOT_MAX_RENDERS in all. A URL
  * the pool lists twice is taken once, by `oncePerUrl`'s rule, and not at all when any listing of it is
  * not an empty-root page. So the order the pool lists its pages in does not change the result.
  */
+import { isGraded } from '../grade/technical-seo.js';
 import { oncePerUrl, type RenderCandidate } from './sample.js';
 
 /** The most empty-root pages one check renders. */
@@ -47,7 +50,10 @@ export function selectEmptyRoots(
     throw new RangeError(`maxRenders must be a whole number of renders, got ${maxRenders}`);
   }
   const barred = new Set(pool.filter((p) => !emptyRoot(p)).map((p) => p.url));
-  const ordered = oncePerUrl(pool.filter((p) => !barred.has(p.url))).sort(
+  const gradedTemplates = new Set(pool.filter(isGraded).map((p) => p.template_key));
+  const ordered = oncePerUrl(
+    pool.filter((p) => !barred.has(p.url) && !gradedTemplates.has(p.template_key)),
+  ).sort(
     (a, b) =>
       order(a.template_key, b.template_key) ||
       (b.pagerank_share ?? -1) - (a.pagerank_share ?? -1) ||
