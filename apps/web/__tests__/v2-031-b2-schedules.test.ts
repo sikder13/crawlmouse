@@ -1,5 +1,6 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import type { PGlite } from '@electric-sql/pglite';
+import fc from 'fast-check';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   addSeat,
@@ -308,6 +309,83 @@ describe('report_schedule_next', () => {
     // it is Friday there, so the next is a week on.
     expect(await next('weekly', 4, '23:30', 'Pacific/Auckland', NOW)).toBe(
       '2026-11-19T10:30:00.000Z',
+    );
+  });
+
+  it('reads the day in the schedule’s zone where it is not the UTC day: a zone behind UTC, late in its evening', async () => {
+    // 02:00 UTC on Thursday 12 November is 21:00 on Wednesday the 11th in Indianapolis: Wednesday
+    // 23:00 there is still to come, at 04:00 UTC the same UTC day. Read in UTC it would be a week on.
+    expect(
+      await next('weekly', 3, '23:00', 'America/Indiana/Indianapolis', '2026-11-12T02:00:00Z'),
+    ).toBe('2026-11-12T04:00:00.000Z');
+    // 02:00 UTC on Monday 2 November is 21:00 on Sunday the 1st there, the month's first Sunday.
+    expect(
+      await next('monthly', 7, '23:00', 'America/Indiana/Indianapolis', '2026-11-02T02:00:00Z'),
+    ).toBe('2026-11-02T04:00:00.000Z');
+  });
+
+  it('property: the next run is after the moment given, on the weekday and at the time asked as the zone reads them, within a week for weekly and in the month’s first seven days for monthly', async () => {
+    // An independent reading of the answer: Intl, in the schedule's zone. Hours before 04:00 are
+    // left out: a clock time in a zone's spring-forward gap does not exist on that day.
+    const ZONES = [
+      'UTC',
+      'America/Indiana/Indianapolis',
+      'America/Los_Angeles',
+      'Europe/London',
+      'Asia/Kolkata',
+      'Pacific/Auckland',
+      'Pacific/Kiritimati',
+    ];
+    const read = (iso: string, zone: string) => {
+      const parts = Object.fromEntries(
+        new Intl.DateTimeFormat('en-US', {
+          timeZone: zone,
+          weekday: 'short',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          hourCycle: 'h23',
+        })
+          .formatToParts(new Date(iso))
+          .map((x) => [x.type, x.value]),
+      );
+      return {
+        weekday: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].indexOf(parts.weekday!) + 1,
+        day: Number(parts.day),
+        time: `${parts.hour}:${parts.minute}`,
+      };
+    };
+    const HOUR = 60 * 60 * 1000;
+    await fc.assert(
+      fc.asyncProperty(
+        fc.constantFrom('weekly', 'monthly'),
+        fc.integer({ min: 1, max: 7 }),
+        fc.integer({ min: 4, max: 23 }),
+        fc.integer({ min: 0, max: 59 }),
+        fc.constantFrom(...ZONES),
+        fc.integer({
+          min: Date.parse('2026-01-01T00:00:00Z'),
+          max: Date.parse('2028-12-31T00:00:00Z'),
+        }),
+        async (cadence, weekday, hour, minute, zone, afterMs) => {
+          const time = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+          const after = new Date(afterMs).toISOString();
+          const run = await next(cadence, weekday, time, zone, after);
+          const at = read(run, zone);
+          expect(
+            Date.parse(run),
+            `${cadence} ${weekday} ${time} ${zone} after ${after}`,
+          ).toBeGreaterThan(afterMs);
+          expect([at.weekday, at.time]).toEqual([weekday, time]);
+          if (cadence === 'weekly') {
+            // A week, and the hour a clock change can add.
+            expect(Date.parse(run) - afterMs).toBeLessThanOrEqual(7 * 24 * HOUR + HOUR);
+          } else {
+            expect(at.day).toBeLessThanOrEqual(7);
+          }
+        },
+      ),
+      { numRuns: 200 },
     );
   });
 
