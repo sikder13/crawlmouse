@@ -6,7 +6,7 @@
  *   stage 2 when the stage-1 rows show a difference.
  * - renderCandidates: what CC-14's renderCheck needs besides its client, caps and budget.
  *
- * `buildCheck` recomputes the sample and the render candidates from the same rows and refuses an access
+ * `buildCheck` recomputes the sample and the empty-root pages from the same rows and refuses an access
  * test or a render the planners would not have asked for.
  */
 import type { AccessTest, CrawlBatchResult, Fix, PageResult } from '@crawlmouse/types/v2';
@@ -14,6 +14,11 @@ import { inSiteScope } from '../../extract.js';
 import { MAX_TEMPLATE_KEY_LENGTH, MAX_URL_LENGTH } from '../batch-bounds.js';
 import { canonicalizeUrl } from '../../url-canonical.js';
 import { CRAWLER_REGISTRY_V2 } from '../crawler-registry.js';
+import {
+  EMPTY_ROOT_MAX_RENDERS,
+  emptyRoot,
+  type EmptyRootCandidate,
+} from '../render/empty-root.js';
 import { FREE_MAX_RENDERS, type RenderCandidate } from '../render/sample.js';
 import type { RenderCheckInput } from '../render/run.js';
 import type { JsTextState } from '../render/state.js';
@@ -263,15 +268,64 @@ function stage2Needed(
 export type RenderPlan = Pick<
   RenderCheckInput,
   'candidates' | 'openFixTemplates' | 'maxRenders' | 'previousStates'
->;
+> &
+  Required<Pick<RenderCheckInput, 'emptyRootCandidates' | 'maxEmptyRootRenders'>>;
 
 /**
- * The render step's input: the sampled pages (so every render candidate is a sampled page), the
- * templates of the site's client-rendered fixes still waiting on rendering, FREE_MAX_RENDERS, and the
- * pages' states in the previous check, which CC-20b reads from that check's PageResults.
+ * Every crawled page as a candidate for the empty-root phase (render/empty-root.ts), with its crawl
+ * row's `content_features.client_rendered` (false when the row has none). A page is a PageResult only
+ * when our crawler fetched it under our robots.txt group.
+ */
+export function emptyRootPool(
+  assembled: Pick<Assembled, 'pages' | 'content'>,
+): EmptyRootCandidate[] {
+  return assembled.pages.map((p) => ({
+    url: p.url,
+    template_key: p.template_key,
+    kind: p.kind,
+    status_code: p.status_code,
+    is_html: p.is_html,
+    pagerank_share: p.pagerank_share,
+    fetched_under_our_robots: true,
+    client_rendered: assembled.content.get(p.url)?.client_rendered === true,
+  }));
+}
+
+/** The URLs of the crawled pages `emptyRoot` holds for, the one rule the render, guard and detector read. */
+export const emptyRootUrls = (assembled: Pick<Assembled, 'pages' | 'content'>): Set<string> =>
+  new Set(
+    emptyRootPool(assembled)
+      .filter(emptyRoot)
+      .map((p) => p.url),
+  );
+
+/**
+ * The template keys the site's client-rendered fixes still waiting on rendering name
+ * (AWAITING_FIX_STATUSES), once each, sorted: what the graded phase renders first and what the
+ * detector gives a record to whether or not the template is present.
+ */
+export function awaitingShellTemplates(
+  fixes: readonly Pick<Fix, 'type' | 'status' | 'template_key'>[],
+): string[] {
+  return [
+    ...new Set(
+      fixes
+        .filter(
+          (f) => f.type === 'client_rendered_template' && AWAITING_FIX_STATUSES.includes(f.status),
+        )
+        .flatMap((f) => (f.template_key === null ? [] : [f.template_key])),
+    ),
+  ].sort();
+}
+
+/**
+ * The render step's input: the sampled pages (so every graded-phase candidate is a sampled page), the
+ * templates of the site's client-rendered fixes still waiting on rendering, FREE_MAX_RENDERS, the
+ * pages' states in the previous check, which CC-20b reads from that check's PageResults, and, for the
+ * empty-root phase, every crawled page with EMPTY_ROOT_MAX_RENDERS.
  */
 export function renderCandidates(
-  assembled: Pick<Assembled, 'pages'>,
+  assembled: Pick<Assembled, 'pages' | 'content'>,
   sampled: readonly SampledPage[],
   fixes: readonly Pick<Fix, 'type' | 'status' | 'template_key'>[],
   previousStates: ReadonlyMap<string, JsTextState>,
@@ -289,14 +343,13 @@ export function renderCandidates(
       // A page is a PageResult only when our crawler fetched it under our robots.txt group.
       fetched_under_our_robots: true,
     }));
-  const openFixTemplates = [
-    ...new Set(
-      fixes
-        .filter(
-          (f) => f.type === 'client_rendered_template' && AWAITING_FIX_STATUSES.includes(f.status),
-        )
-        .flatMap((f) => (f.template_key === null ? [] : [f.template_key])),
-    ),
-  ].sort();
-  return { candidates, openFixTemplates, maxRenders: FREE_MAX_RENDERS, previousStates };
+  const openFixTemplates = awaitingShellTemplates(fixes);
+  return {
+    candidates,
+    openFixTemplates,
+    maxRenders: FREE_MAX_RENDERS,
+    previousStates,
+    emptyRootCandidates: emptyRootPool(assembled),
+    maxEmptyRootRenders: EMPTY_ROOT_MAX_RENDERS,
+  };
 }

@@ -558,6 +558,8 @@ ${siteWideRedirect()} The refusal is v1's \`decideRefusal\` (SPEC 5.1a), with ${
       (Object.entries(COUNTERFACTUALS) as [FixType, string][]).map(([t, c]) => [code(t), c]),
     ),
     '',
+    'A `client_rendered_template` fix on a template of empty-root pages alone (CC-32 D2, `detectors/rendered.ts`) has no graded page to change, so its counterfactual moves no grade: its effect is 0 on both grades, or waits on what the grades wait on. The fix is still opened from what the render measured; the view prints such an effect as no measurable effect (CC-32 D4).',
+    '',
     "A structure fix takes its recommendation class from its type; the structure detectors read our own crawl, so its confidence is `likely`. A content fix takes its check's class and confidence (the content checks table).",
     '',
     table(

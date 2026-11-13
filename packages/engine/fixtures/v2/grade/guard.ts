@@ -179,8 +179,8 @@ export const NO_DESCRIPTION = '14-page blog: every page declares a title and no 
 /** The example site where no page declares a title, so every page is defective; SPEC 17 renders it. */
 export const NO_TITLE = '14-page blog: no page declares a title';
 
-/** The example sites, by name, and what the engine makes of each. */
-export function guardCases(): Record<string, ReturnType<typeof outcomeOf>> {
+/** The example sites, by name: the grade's input and the access detectors' records. */
+export function guardInputs(): Record<string, { input: GradeInput; access?: AccessDetection[] }> {
   const blog = blogSite(
     13,
     8,
@@ -263,21 +263,23 @@ export function guardCases(): Record<string, ReturnType<typeof outcomeOf>> {
     }),
   );
   return {
-    'blog: no post names its author, 6 of 13 lack a page description, no question headings':
-      outcomeOf({ ...thin.input, content }, thin.access),
-    '31 % of words served without JavaScript, every crawler served': outcomeOf(csrSite(0.31)),
-    'words without JavaScript not yet measured': outcomeOf(csrSite(null)),
-    'blog: a crawler blocked, one served thin, 8 openings without an answer, 2 orphans': outcomeOf(
-      blog.input,
-      blog.access,
-    ),
-    'blog: one scored crawler measured': outcomeOf(oneMeasured.input, oneMeasured.access),
-    'blog: one scored crawler measured, the other three disallowed by robots.txt': outcomeOf(
-      byChoice.input,
-      byChoice.access,
-    ),
-    [NO_DESCRIPTION]: outcomeOf(
-      {
+    'blog: no post names its author, 6 of 13 lack a page description, no question headings': {
+      input: { ...thin.input, content },
+      access: thin.access,
+    },
+    '31 % of words served without JavaScript, every crawler served': { input: csrSite(0.31) },
+    'words without JavaScript not yet measured': { input: csrSite(null) },
+    'blog: a crawler blocked, one served thin, 8 openings without an answer, 2 orphans': {
+      input: blog.input,
+      access: blog.access,
+    },
+    'blog: one scored crawler measured': { input: oneMeasured.input, access: oneMeasured.access },
+    'blog: one scored crawler measured, the other three disallowed by robots.txt': {
+      input: byChoice.input,
+      access: byChoice.access,
+    },
+    [NO_DESCRIPTION]: {
+      input: {
         ...undescribed.input,
         pages: undescribed.input.pages.map((p) => ({
           ...p,
@@ -285,10 +287,10 @@ export function guardCases(): Record<string, ReturnType<typeof outcomeOf>> {
           meta_description: { text: null, chars: 0, cut: false },
         })),
       },
-      undescribed.access,
-    ),
-    [NO_TITLE]: outcomeOf(
-      {
+      access: undescribed.access,
+    },
+    [NO_TITLE]: {
+      input: {
         ...undescribed.input,
         pages: undescribed.input.pages.map((p) => ({
           ...p,
@@ -296,17 +298,27 @@ export function guardCases(): Record<string, ReturnType<typeof outcomeOf>> {
           meta_description: { text: 'A post', chars: 6, cut: false },
         })),
       },
-      undescribed.access,
-    ),
+      access: undescribed.access,
+    },
     // the detectors find the chain themselves here: the records are theirs
-    [SITE_WIDE_REDIRECT_FOLLOWED]: outcomeOf(followed.input, followed.access),
-    [SITE_WIDE_REDIRECT]: outcomeOf(
-      { ...sitewide.input, structure: [...sitewide.input.structure, menuLink] },
-      sitewide.access,
-    ),
-    '45 pages: the second page of a paginated archive repeats the first': outcomeOf(
-      paginated.input,
-      paginated.access,
-    ),
+    [SITE_WIDE_REDIRECT_FOLLOWED]: { input: followed.input, access: followed.access },
+    [SITE_WIDE_REDIRECT]: {
+      input: { ...sitewide.input, structure: [...sitewide.input.structure, menuLink] },
+      access: sitewide.access,
+    },
+    '45 pages: the second page of a paginated archive repeats the first': {
+      input: paginated.input,
+      access: paginated.access,
+    },
   };
+}
+
+/** The example sites, by name, and what the engine makes of each. */
+export function guardCases(): Record<string, ReturnType<typeof outcomeOf>> {
+  return Object.fromEntries(
+    Object.entries(guardInputs()).map(([name, { input, access }]) => [
+      name,
+      outcomeOf(input, access),
+    ]),
+  );
 }

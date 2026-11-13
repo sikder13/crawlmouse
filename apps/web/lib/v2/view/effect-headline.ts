@@ -8,8 +8,12 @@
  * - A fix in crawler_access, without_js or content moves AI readability. While its AI effect is null
  *   it is headed by why it waits, from the first entry of `ai_readability_pending_on`: no Technical
  *   SEO figure and no "+0".
- * - A structure fix whose AI effect is null keeps its Technical SEO points, and waits when they are 0.
+ * - A structure fix whose AI effect is null keeps its Technical SEO points, and waits when they are 0
+ *   or less.
  * - Otherwise the fix is headed by its Technical SEO points, or says they are not estimated.
+ * - An effect at or below zero is never printed with a sign: `formatPoints` gives it no figure, so a
+ *   fix whose estimated effects are all 0 or less is headed `no_effect`, "No measurable effect on the
+ *   grade" (CC-32 D4). The engine keeps the number it computed.
  */
 import {
   WithheldReasonSchema,
@@ -21,9 +25,11 @@ import { listOf } from '../format';
 import { plural } from '../words';
 
 export type EffectHeadline =
-  | { kind: 'ai'; points: number }
-  | { kind: 'seo'; points: number }
+  /** `signed` is `formatPoints(points)`: "+3". */
+  | { kind: 'ai'; points: number; signed: string }
+  | { kind: 'seo'; points: number; signed: string }
   | { kind: 'seo_not_estimated' }
+  | { kind: 'no_effect' }
   /** `sentence` heads the card, the open fix and the fix page; `short` the table. */
   | { kind: 'waiting'; sentence: string; short: string };
 
@@ -50,6 +56,20 @@ export const AI_WAITING: Readonly<Record<WithheldReason, string>> = {
   crawler_too_few_pages: 'AI effect estimated once its crawler has two pages that decide its share',
   check_not_scored: 'AI effect estimated once its content check counts toward the grade',
 };
+
+/** What a view prints for an estimated effect at or below zero: the sentence, and the short form. */
+export const NO_EFFECT = 'No measurable effect on the grade';
+export const NO_EFFECT_SHORT = 'No measurable effect';
+
+/**
+ * One figure of a fix's effect as every view prints it: "+3" above zero; null at or below zero,
+ * which a view prints as no measurable effect, never with a minus sign.
+ */
+export const formatPoints = (n: number): string | null => (n > 0 ? `+${n}` : null);
+
+/** A group's points: each member's taken at 0 when below it, so a negative member lowers no sum. */
+export const groupSum = (points: readonly number[]): number =>
+  points.reduce((sum, n) => sum + Math.max(0, n), 0);
 
 const NOT_YET = 'AI not yet estimated';
 const REASONS: readonly string[] = WithheldReasonSchema.options;
@@ -99,7 +119,14 @@ export function effectHeadline(
   siteFixes: readonly Numbered[],
 ): EffectHeadline {
   const { ai_readability: ai, technical_seo: seo } = f.effect;
-  if (ai) return { kind: 'ai', points: ai };
-  if (ai === null && (AI_SECTIONS.has(f.section) || seo === 0)) return waiting(f, siteFixes);
-  return seo === null ? { kind: 'seo_not_estimated' } : { kind: 'seo', points: seo };
+  const aiSigned = ai === null ? null : formatPoints(ai);
+  if (aiSigned !== null) return { kind: 'ai', points: ai!, signed: aiSigned };
+  if (ai === null && (AI_SECTIONS.has(f.section) || (seo !== null && seo <= 0))) {
+    return waiting(f, siteFixes);
+  }
+  if (seo === null) return { kind: 'seo_not_estimated' };
+  const seoSigned = formatPoints(seo);
+  return seoSigned === null
+    ? { kind: 'no_effect' }
+    : { kind: 'seo', points: seo, signed: seoSigned };
 }

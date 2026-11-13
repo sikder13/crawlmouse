@@ -253,6 +253,8 @@ Technical SEO is null, waiting on `grade_refused`, when the grade is refused as 
 | `client_rendered_template`   | the `text_share` of every graded page of the template becomes 1, rendered this check or not; only Readable moves                                              |
 | `js_only_navigation`         | none: the fix type is not opened. The render step records word counts and no link of the rendered side, and `js_only` is written false on every page and edge |
 
+A `client_rendered_template` fix on a template of empty-root pages alone (CC-32 D2, `detectors/rendered.ts`) has no graded page to change, so its counterfactual moves no grade: its effect is 0 on both grades, or waits on what the grades wait on. The fix is still opened from what the render measured; the view prints such an effect as no measurable effect (CC-32 D4).
+
 A structure fix takes its recommendation class from its type; the structure detectors read our own crawl, so its confidence is `likely`. A content fix takes its check's class and confidence (the content checks table).
 
 | Structure fix          | Class                    |

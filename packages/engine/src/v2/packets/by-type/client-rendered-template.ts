@@ -26,6 +26,7 @@
  * give the audit's two counts and say which way the rough count differs.
  */
 import type { RenderedDetection, RenderedPage } from '../../detectors/rendered.js';
+import { EMPTY_ROOT_MAX_RENDERS } from '../../render/empty-root.js';
 import { EMPTY_SHELL_LEAVES_ABOVE, READABLE_FROM } from '../../render/state.js';
 import { userAgentOf, verifyCrawler } from '../crawler.js';
 import { readAt, servedAt } from '../served-at.js';
@@ -88,17 +89,34 @@ const renderedPages = (record: RenderedDetection): RenderedPage[] =>
   [...record.evidence.pages].sort(byUrl);
 
 /** How many of the template's graded pages were rendered, as a sentence. */
-function sample({ pages, rendered }: RenderedDetection['extent']): Safe {
-  if (pages === 1) return ours('The audit rendered its 1 graded page in a browser.');
+function sample({ pages, graded, rendered }: RenderedDetection['extent']): Safe {
+  if (graded === pages) {
+    if (pages === 1) return ours('The audit rendered its 1 graded page in a browser.');
+    return ours(
+      rendered === pages
+        ? `The audit rendered each of its ${pages} graded pages in a browser.`
+        : `The audit rendered ${rendered} of its ${pages} graded pages in a browser.`,
+    );
+  }
+  // A template with pages too thin to grade whose HTML response reads as a page the browser fills in
+  // (detectors/rendered.ts): they are counted, and said to be ungraded.
+  const ungraded = pages - graded;
+  const which = `${graded} graded and ${ungraded} whose HTML response held too little text to be graded`;
+  if (pages === 1) {
+    return ours(
+      'The audit rendered its 1 page in a browser; its HTML response held too little text to be graded.',
+    );
+  }
   return ours(
     rendered === pages
-      ? `The audit rendered each of its ${pages} graded pages in a browser.`
-      : `The audit rendered ${rendered} of its ${pages} graded pages in a browser.`,
+      ? `The audit rendered each of its ${pages} pages in a browser: ${which}.`
+      : `The audit rendered ${rendered} of its ${pages} pages in a browser: ${which}.`,
   );
 }
 
 function context(record: RenderedDetection, facts: PacketFacts): Line[] {
-  const { pages, rendered } = record.extent;
+  const { pages, graded, rendered } = record.extent;
+  const kind = graded === pages ? 'graded ' : '';
   const all = renderedPages(record);
   const shown = all.slice(0, PAGES_SHOWN);
   const rest = all.length - shown.length;
@@ -122,8 +140,8 @@ function context(record: RenderedDetection, facts: PacketFacts): Line[] {
   }
   lines.push(
     unrendered > 0
-      ? line`Measured by rendering ${count(rendered)} ${pagesOf(rendered)}. The other ${count(unrendered)} graded ${pagesOf(unrendered)} of the template ${ours(unrendered === 1 ? 'was' : 'were')} not rendered: the finding is for the template by this sample.`
-      : line`Measured by rendering ${count(rendered)} ${pagesOf(rendered)}: every graded page of the template.`,
+      ? line`Measured by rendering ${count(rendered)} ${pagesOf(rendered)}. The other ${count(unrendered)} ${ours(kind)}${pagesOf(unrendered)} of the template ${ours(unrendered === 1 ? 'was' : 'were')} not rendered: the finding is for the template by this sample.`
+      : line`Measured by rendering ${count(rendered)} ${pagesOf(rendered)}: every ${ours(kind)}page of the template.`,
     SCOPE,
   );
   if (verifyCrawler(facts) === null) {
@@ -135,10 +153,11 @@ function context(record: RenderedDetection, facts: PacketFacts): Line[] {
 }
 
 /**
- * The finding's scope, from how the audit works (render/sample.ts, detectors/rendered.ts): it is the
- * same for every record, and says what no record of this type can hold.
+ * The finding's scope, from how the audit works (render/sample.ts, render/empty-root.ts,
+ * detectors/rendered.ts): it is the same for every record, and says what no record of this type can
+ * hold.
  */
-const SCOPE = line`The audit renders only pages it grades. A route whose HTML response holds too little text to be graded is not rendered, so another template of the site can have the same fault unmeasured.`;
+const SCOPE = line`The audit renders pages it grades, and at most ${count(EMPTY_ROOT_MAX_RENDERS)} pages whose HTML response holds too little text to be graded and reads as a page the browser fills in. Any other page with too little text to be graded is not rendered, so another template of the site can have the same fault unmeasured.`;
 
 const KEEP: Line[] = [
   line`Keep every URL of the template as it is.`,

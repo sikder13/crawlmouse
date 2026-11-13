@@ -220,9 +220,9 @@ describe('sectionFixes: a row that groups several fixes', () => {
       }
     });
     const rest = sectionFixes(d, check, 'structure').pro.at(-1)!;
-    // their AI effects are estimated, at 0 on these fixtures, so that estimate is what shows
+    // their AI effects are estimated, at 0 on these fixtures: no measurable effect (CC-32 D4)
     expect(rest.points).toBe(
-      `+0 AI readability together; Technical SEO effect not estimated for ${rest.count}`,
+      `No measurable effect; Technical SEO effect not estimated for ${rest.count}`,
     );
   });
 });

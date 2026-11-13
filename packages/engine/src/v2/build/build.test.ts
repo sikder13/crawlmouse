@@ -43,6 +43,8 @@ import {
   recordedInput,
 } from '../../../fixtures/v2/build/recorded.js';
 import { CRAWLER_REGISTRY_V2 } from '../crawler-registry.js';
+import { fingerprintOf } from '../detectors/fingerprint.js';
+import { EMPTY_ROOT_MAX_RENDERS, emptyRoot } from '../render/empty-root.js';
 import { renderable } from '../render/sample.js';
 import { assemble } from './assemble.js';
 import { renderCandidates, sample } from './plan.js';
@@ -194,7 +196,7 @@ describe('the planted defects', () => {
     );
   });
 
-  it('a client-rendered template: read as an app shell, and (found by this fixture) classified thin, so never rendered', () => {
+  it('a client-rendered template: read as an app shell, and (found by this fixture) classified thin, so not graded; not rendered here, as the recording leaves the empty-root phase off', () => {
     const rows = readRecorded('batches').flatMap((b) => (b.kind === 'crawl' ? b.pages : []));
     for (const path of CLIENT_RENDERED) {
       expect(rows.find((r) => r.url === at(path))!.content_features!.client_rendered).toBe(true);
@@ -203,7 +205,13 @@ describe('the planted defects', () => {
     }
   });
 
-  it("offers the client-rendered pages to the render step: CC-14's renderable bars them, not this planner", () => {
+  it('the client-rendered template is present all the same: its record is indeterminate, not_rendered', () => {
+    const fingerprint = fingerprintOf('shell:/guides/{slug}');
+    expect(built.diff_inputs.indeterminate).toContain(fingerprint);
+    expect(built.fixes.map((f) => f.fingerprint)).not.toContain(fingerprint);
+  });
+
+  it("offers the client-rendered pages to the render step: the graded phase's renderable bars them, the empty-root phase takes them", () => {
     const input = recordedBuild();
     const a = assemble(
       input,
@@ -214,9 +222,12 @@ describe('the planted defects', () => {
     for (const path of CLIENT_RENDERED) {
       const c = plan.candidates.find((x) => x.url === at(path));
       expect(c, path).toMatchObject({ kind: 'thin', status_code: 200, is_html: true });
-      // render/sample.ts:62: a render candidate must be a content page.
+      // render/sample.ts: a graded-phase candidate must be a content page.
       expect(renderable(c!)).toBe(false);
+      const e = plan.emptyRootCandidates.find((x) => x.url === at(path));
+      expect(emptyRoot(e!), path).toBe(true);
     }
+    expect(plan.maxEmptyRootRenders).toBe(EMPTY_ROOT_MAX_RENDERS);
   });
 
   it('stage 2 of the sample, because a scored crawler is refused on the blog only', () => {
@@ -299,7 +310,7 @@ describe('what buildCheck refuses', () => {
   it('a render of a page the sample does not hold', () => {
     const unsampled = built.page_results.find((p) => !p.sampled)!;
     expect(() => buildCheck(edited((i) => (i.render!.pages[0]!.url = unsampled.url)))).toThrow(
-      /a render of .* the sample does not hold/,
+      /a render of .* which neither the sample nor the empty-root pages hold/,
     );
   });
 

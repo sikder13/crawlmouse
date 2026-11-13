@@ -54,9 +54,10 @@ export const RENDERED_CLASS: RecommendationClass = 'best_practice';
 
 /**
  * A browser measured the template's pages, and the detector opens a fix only when its rendered pages
- * agree. `confirmed` when PAGES_PER_FIX_TEMPLATE or more of the template's graded pages were rendered,
- * or when each of them was (a template of one graded page, rendered); `likely` otherwise. The render
- * planner renders up to PAGES_PER_FIX_TEMPLATE pages of an open fix's template on the next check.
+ * agree. `confirmed` when PAGES_PER_FIX_TEMPLATE or more of the template's present pages (graded or
+ * empty-root, detectors/rendered.ts) were rendered, or when each of them was (a template of one
+ * present page, rendered); `likely` otherwise. The graded phase renders up to PAGES_PER_FIX_TEMPLATE
+ * graded pages of an open fix's template on the next check.
  */
 export const renderedConfidence = ({ extent }: Pick<RenderedDetection, 'extent'>): Confidence =>
   extent.rendered >= Math.min(PAGES_PER_FIX_TEMPLATE, extent.pages) ? 'confirmed' : 'likely';
