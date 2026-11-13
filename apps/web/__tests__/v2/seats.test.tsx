@@ -183,14 +183,56 @@ describe('seatsView: an Agency account read by its owner (Northwind)', () => {
     ).toEqual(['all 1', 'none', '1 · harborlight.example', 'all 1']);
   });
 
-  it('takes the seat limit it is given over the account’s own, and leaves the buy form out with billing off', () => {
-    const p = SEATS_PREVIEWS[OWNER];
-    const full = seatsView(p.data(), p.viewer(), { seatLimit: 4, billing: false });
+  it('takes the seat limit it is given over the account’s own', () => {
+    const p = SEATS_PREVIEWS[PAID];
+    const full = seatsView(p.data(), p.viewer(), { seatLimit: 4 });
     expect(full.header.line).toMatch(/^4 of 4 used/);
     expect(full.people.foot).toBe('No seat free. Beyond five, $12 a seat a month.');
     expect(full.header.invite).toBeNull();
     expect(full.invite).toBeNull();
-    expect(full.buy).toBeNull();
+  });
+});
+
+describe('seatsView: who is offered the buy form, on an account where seats and sites are sold', () => {
+  // Northwind while its plan is paid: the state the purchase route changes. At the fixture's as_of
+  // the account is past due and no reader is offered the form, so the role and the switch are read
+  // here, where they are what decides.
+  const p = SEATS_PREVIEWS[PAID];
+  const d = p.data();
+  const seat = (name: string) => d.seats.find((s) => s.name === name)!;
+  const buyFor = (
+    seatId: string | undefined,
+    data: typeof d = d,
+    options: { billing?: boolean } = {},
+  ) => seatsView(data, { ...p.viewer(), ...(seatId ? { seatId } : {}) }, options).buy;
+
+  it('the owner is, by their own seat and as a preview reads', () => {
+    expect(seat('Alex').role).toBe('owner');
+    expect(buyFor(seat('Alex').id)).toMatchObject({ id: 'buy', action: '/api/billing/seats' });
+    expect(buyFor(undefined)).toEqual(buyFor(seat('Alex').id));
+  });
+
+  it('a developer and an account manager are not, whether the seat covers every client or some', () => {
+    expect([seat('Lee').role, seat('Lee').client_scope]).toEqual(['developer', 'all']);
+    expect(buyFor(seat('Lee').id)).toBeNull();
+    expect(seat('Priya').role).toBe('account_manager');
+    expect(seat('Priya').client_scope).not.toBe('all');
+    expect(buyFor(seat('Priya').id)).toBeNull();
+    // The same manager with every client: the scope is not what refuses them.
+    const everyClient = {
+      ...d,
+      seats: d.seats.map((s) =>
+        s.id === seat('Priya').id ? { ...s, client_scope: 'all' as const } : s,
+      ),
+    };
+    expect(buyFor(seat('Priya').id, everyClient)).toBeNull();
+    expect(buyFor(seat('Alex').id, everyClient)).not.toBeNull();
+  });
+
+  it('nobody is with billing switched off (V2_BILLING), the owner included', () => {
+    expect(buyFor(seat('Alex').id, d, { billing: false })).toBeNull();
+    expect(buyFor(undefined, d, { billing: false })).toBeNull();
+    expect(buyFor(seat('Alex').id, d, { billing: true })).not.toBeNull();
   });
 });
 
@@ -381,14 +423,23 @@ describe('the screens, as their previews render them', () => {
     ]);
   });
 
-  it('Seats, a member who is not the owner: no form', () => {
-    const html = renderToStaticMarkup(
-      <LiveActions>
-        <SeatsScreen data={seatsPreview(MEMBER)} />
-      </LiveActions>,
-    );
-    expect(forms(html.slice(html.indexOf('<main')))).toEqual([]);
-    expect(html).toContain('What each role can do');
+  it('Seats, a member who is not the owner: no form, past due and while the plan is paid', () => {
+    const paid = SEATS_PREVIEWS[PAID];
+    const lee = SEATS_PREVIEWS[MEMBER].viewer().seatId!;
+    for (const data of [
+      seatsPreview(MEMBER),
+      // Where the owner is drawn the buy form: the developer is drawn none.
+      seatsView(paid.data(), { ...paid.viewer(), seatId: lee }),
+    ]) {
+      const html = renderToStaticMarkup(
+        <LiveActions>
+          <SeatsScreen data={data} />
+        </LiveActions>,
+      );
+      expect(forms(html.slice(html.indexOf('<main')))).toEqual([]);
+      expect(html).not.toMatch(/<section[^>]* id="buy"/);
+      expect(html).toContain('What each role can do');
+    }
   });
 
   it('the invitation: signed in, a form that posts no field; signed out, a link to sign in and come back', () => {
