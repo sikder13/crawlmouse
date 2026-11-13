@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { REPO_ROOT } from './env-scan';
-import { functionCountAfter } from './inngest-sync';
+import { syncedFunctionCount } from './inngest-sync';
 import { PRECONDITIONS } from './preconditions';
 import { PROBES } from './probes/index';
 import { SENDING_DOMAIN } from './probes/resend';
@@ -155,12 +155,12 @@ describe('rows added in review round 1', () => {
 });
 
 describe('the expected Inngest function counts', () => {
-  it('grow as the flags turn on, from v1 alone', () => {
-    // v1 registers four functions (inngest/audit.ts and inngest/billing.ts' three), counted by hand.
-    expect(functionCountAfter(1)).toBe(4);
-    expect(functionCountAfter(2)).toBe(8);
-    const counts = STEPS.map(functionCountAfter);
-    expect([...counts].sort((a, b) => a - b)).toEqual(counts);
+  it('count synced functions, failure handlers included, from v1 alone', () => {
+    // Independent truth: apps/web/lib/v2/pipeline/functions.test.ts asserts the synced configs are
+    // (V2_PIPELINE ? 10 : 5) + …, because auditFn and checkFn each declare onFailure, and
+    // notes/cc-03/PR.md:180 lists v1's five: audit, audit-failure, stripe-reconcile,
+    // stripe-reconcile-manual, audits-ttl-cleanup. After steps 1–5: 5, 10, 10, 22, 24.
+    expect(STEPS.map(syncedFunctionCount)).toEqual([5, 10, 10, 22, 24]);
   });
 });
 

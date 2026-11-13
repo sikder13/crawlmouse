@@ -11,7 +11,7 @@
  * true before deploying (review r1 D-B1). An `auto` row is decided by a probe; a
  * `manual` row is a box the owner ticks in docs/ops/go-live.md and passes to the check as `--ticked`.
  */
-import { functionCountAfter } from './inngest-sync';
+import { syncedFunctionCount } from './inngest-sync';
 import { PAID_PLAN_TICK } from './probes/inngest';
 import type { ProbeId } from './probes/index';
 import type { Step } from './steps';
@@ -38,7 +38,7 @@ const syncRow = (step: 2 | 3 | 4 | 5): Precondition => {
   const before = (step - 1) as Step;
   return {
     id: `inngest-synced-before-step-${step}`,
-    mustBeTrue: `Inngest → Apps → crawlmouse (production) was synced after the last redeploy and lists ${functionCountAfter(before)} functions`,
+    mustBeTrue: `Inngest → Apps → crawlmouse (production) was synced after the last redeploy and lists ${syncedFunctionCount(before)} functions, failure handlers included`,
     why: 'Inngest keeps the function set from its last sync; a stale set fails each tick and still spends executions (plan review B8)',
     source: 'notes/cc-35/questions.md (Q4)',
     gates: step,

@@ -38,6 +38,11 @@ export interface FunctionRow {
   file: string;
   /** The Inngest function id. */
   id: string;
+  /**
+   * Whether its createFunction options declare `onFailure`. Inngest syncs that handler as a function
+   * of its own (`<id>-failure`), so it counts once more in the app's synced function list.
+   */
+  onFailure: boolean;
   registration: Registration;
   trigger: string;
   /** Cron runs a day; 0 for an event-triggered function. */
@@ -63,6 +68,7 @@ export const FUNCTIONS: readonly FunctionRow[] = [
   {
     file: 'inngest/audit.ts',
     id: 'crawlmouse.audit',
+    onFailure: true,
     callSites: 5,
     registration: 'v1',
     trigger: 'audit.requested',
@@ -73,6 +79,7 @@ export const FUNCTIONS: readonly FunctionRow[] = [
   {
     file: 'inngest/billing.ts',
     id: 'crawlmouse.stripe-reconcile',
+    onFailure: false,
     callSites: 2,
     registration: 'v1',
     trigger: "cron '0 3 * * *'",
@@ -83,6 +90,7 @@ export const FUNCTIONS: readonly FunctionRow[] = [
   {
     file: 'inngest/billing.ts',
     id: 'crawlmouse.stripe-reconcile-manual',
+    onFailure: false,
     callSites: 1,
     registration: 'v1',
     trigger: 'billing.reconcile.requested',
@@ -93,6 +101,7 @@ export const FUNCTIONS: readonly FunctionRow[] = [
   {
     file: 'inngest/billing.ts',
     id: 'crawlmouse.audits-ttl-cleanup',
+    onFailure: false,
     callSites: 2,
     registration: 'v1',
     trigger: "cron '0 4 * * *'",
@@ -104,6 +113,7 @@ export const FUNCTIONS: readonly FunctionRow[] = [
   {
     file: 'inngest/check.ts',
     id: 'crawlmouse.check.run',
+    onFailure: true,
     callSites: 11,
     registration: 'V2_PIPELINE',
     trigger: 'check.requested',
@@ -114,6 +124,7 @@ export const FUNCTIONS: readonly FunctionRow[] = [
   {
     file: 'inngest/check.ts',
     id: 'crawlmouse.check.cancelled',
+    onFailure: false,
     callSites: 2,
     registration: 'V2_PIPELINE',
     trigger: 'inngest/function.cancelled (checkFn)',
@@ -124,6 +135,7 @@ export const FUNCTIONS: readonly FunctionRow[] = [
   {
     file: 'inngest/check-reaper.ts',
     id: 'crawlmouse.check.reaper',
+    onFailure: false,
     callSites: 1,
     registration: 'V2_PIPELINE',
     trigger: "cron '*/10 * * * *'",
@@ -134,6 +146,7 @@ export const FUNCTIONS: readonly FunctionRow[] = [
   {
     file: 'inngest/check-expiry.ts',
     id: 'crawlmouse.check.expiry',
+    onFailure: false,
     callSites: 2,
     registration: 'V2_PIPELINE',
     trigger: "cron '17 5 * * *'",
@@ -145,6 +158,7 @@ export const FUNCTIONS: readonly FunctionRow[] = [
   {
     file: 'inngest/trial-lifecycle.ts',
     id: 'crawlmouse.trial.lifecycle',
+    onFailure: false,
     callSites: 6,
     registration: 'V2_BILLING',
     trigger: 'trial.started',
@@ -155,6 +169,7 @@ export const FUNCTIONS: readonly FunctionRow[] = [
   {
     file: 'inngest/past-due-sweep.ts',
     id: 'crawlmouse.billing.past-due-sweep',
+    onFailure: false,
     callSites: 4,
     registration: 'V2_BILLING',
     trigger: "cron '0 * * * *'",
@@ -166,6 +181,7 @@ export const FUNCTIONS: readonly FunctionRow[] = [
   {
     file: 'inngest/deletion.ts',
     id: 'crawlmouse.account.deletion-cancel',
+    onFailure: false,
     callSites: 1,
     registration: 'V2_CHECKS_PUBLIC',
     trigger: 'account.deletion_confirmed',
@@ -176,6 +192,7 @@ export const FUNCTIONS: readonly FunctionRow[] = [
   {
     file: 'inngest/deletion.ts',
     id: 'crawlmouse.account.deletion-resume',
+    onFailure: false,
     callSites: 1,
     registration: 'V2_CHECKS_PUBLIC',
     trigger: 'account.restored',
@@ -186,6 +203,7 @@ export const FUNCTIONS: readonly FunctionRow[] = [
   {
     file: 'inngest/deletion.ts',
     id: 'crawlmouse.account.purge-deleted',
+    onFailure: false,
     callSites: 4,
     registration: 'V2_CHECKS_PUBLIC',
     trigger: "cron '30 3 * * *'",
@@ -196,6 +214,7 @@ export const FUNCTIONS: readonly FunctionRow[] = [
   {
     file: 'inngest/mail.ts',
     id: 'crawlmouse.mail.account',
+    onFailure: false,
     callSites: 1,
     registration: 'V2_CHECKS_PUBLIC',
     trigger: 'email.requested',
@@ -206,6 +225,7 @@ export const FUNCTIONS: readonly FunctionRow[] = [
   {
     file: 'inngest/mail.ts',
     id: 'crawlmouse.mail.check-notify',
+    onFailure: false,
     callSites: 1,
     registration: 'V2_CHECKS_PUBLIC',
     trigger: 'check.notify_requested, check.finished, check.failed',
@@ -216,6 +236,7 @@ export const FUNCTIONS: readonly FunctionRow[] = [
   {
     file: 'inngest/mail.ts',
     id: 'crawlmouse.mail.fix-to-developer',
+    onFailure: false,
     callSites: 1,
     registration: 'V2_CHECKS_PUBLIC',
     trigger: 'fix.email_developer_requested',
@@ -226,6 +247,7 @@ export const FUNCTIONS: readonly FunctionRow[] = [
   {
     file: 'inngest/mail.ts',
     id: 'crawlmouse.events.check-finished',
+    onFailure: false,
     callSites: 1,
     registration: 'V2_CHECKS_PUBLIC',
     trigger: 'check.finished',
@@ -236,6 +258,7 @@ export const FUNCTIONS: readonly FunctionRow[] = [
   {
     file: 'inngest/mail.ts',
     id: 'crawlmouse.mail.contact-purge',
+    onFailure: false,
     callSites: 1,
     registration: 'V2_CHECKS_PUBLIC',
     trigger: "cron '43 5 * * *'",
@@ -247,6 +270,7 @@ export const FUNCTIONS: readonly FunctionRow[] = [
   {
     file: 'inngest/schedule.ts',
     id: 'crawlmouse.schedule.tick',
+    onFailure: false,
     callSites: 5,
     registration: 'V2_PIPELINE+V2_CHECKS_PUBLIC',
     trigger: "cron '0 * * * *'",
@@ -257,6 +281,7 @@ export const FUNCTIONS: readonly FunctionRow[] = [
   {
     file: 'inngest/alerts.ts',
     id: 'crawlmouse.alert.dispatch',
+    onFailure: false,
     callSites: 2,
     registration: 'V2_PIPELINE+V2_CHECKS_PUBLIC',
     trigger: 'check.finished',
@@ -267,6 +292,7 @@ export const FUNCTIONS: readonly FunctionRow[] = [
   {
     file: 'inngest/summary.ts',
     id: 'crawlmouse.summary.tick',
+    onFailure: false,
     callSites: 3,
     registration: 'V2_PIPELINE+V2_CHECKS_PUBLIC',
     trigger: "cron '11 * * * *'",
@@ -277,6 +303,7 @@ export const FUNCTIONS: readonly FunctionRow[] = [
   {
     file: 'inngest/summary.ts',
     id: 'crawlmouse.summary.send',
+    onFailure: false,
     callSites: 1,
     registration: 'V2_PIPELINE+V2_CHECKS_PUBLIC',
     trigger: 'summary.requested',

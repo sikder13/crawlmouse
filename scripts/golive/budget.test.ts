@@ -26,6 +26,8 @@ function code(source: string): string {
 
 const STEP_CALL = /\bstep\.(run|sleep|sleepUntil|waitForEvent|sendEvent|invoke)\(/g;
 const count = (text: string, re: RegExp): number => (text.match(re) ?? []).length;
+/** `onFailure` as an options key: property, method or shorthand. */
+const ON_FAILURE = /(?<![\w$])onFailure\s*(?::|\(|,|\})/g;
 
 const functionFiles = (): string[] =>
   readdirSync(INNGEST)
@@ -60,6 +62,36 @@ describe('the function rows against the code', () => {
       const literal = new RegExp(`id: '${f.id.replace(/\./g, '\\.')}'`);
       expect(constant.test(text) || literal.test(text), `${f.id} in ${f.file}`).toBe(true);
     }
+  });
+
+  it('marks onFailure on exactly the rows of each file that declare it', () => {
+    for (const file of functionFiles()) {
+      const declared = count(code(readFileSync(join(ROOT, file), 'utf8')), ON_FAILURE);
+      expect(FUNCTIONS.filter((f) => f.file === file && f.onFailure).length, file).toBe(declared);
+    }
+    // Independent of the regex: inngest/audit.ts:411 and inngest/check.ts:376 declare it, nothing else.
+    expect(
+      FUNCTIONS.filter((f) => f.onFailure)
+        .map((f) => f.id)
+        .sort(),
+    ).toEqual(['crawlmouse.audit', 'crawlmouse.check.run']);
+  });
+
+  it.each([
+    ['a property', 'createFunction({ id, onFailure: async () => {} }, t, h)'],
+    ['a property with a space', 'createFunction({ id, onFailure : handler }, t, h)'],
+    ['a method', 'createFunction({ id, async onFailure({ event }) {} }, t, h)'],
+    ['a plain method', 'createFunction({ id, onFailure() {} }, t, h)'],
+    ['shorthand', 'createFunction({ id, onFailure }, t, h)'],
+    ['shorthand mid-list', 'createFunction({ onFailure, id }, t, h)'],
+  ])('finds onFailure written as %s', (_label, text) => {
+    expect(count(code(text), ON_FAILURE)).toBe(1);
+  });
+
+  it('does not count onFailure in a comment, or a name that only contains it', () => {
+    expect(
+      count(code('// onFailure: x\n/* onFailure() */\nconst myOnFailureX = 1;'), ON_FAILURE),
+    ).toBe(0);
   });
 
   it('does not count a step named only in a comment', () => {

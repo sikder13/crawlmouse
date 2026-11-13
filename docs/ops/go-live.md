@@ -193,7 +193,7 @@ Step 1's exit check is part of this list: the rows that only the worker deploy m
 - [ ] `pipeline-rehearsal` (CTO): the check pipeline has run once end to end against a Supabase branch and an Inngest branch environment, the cancel event carrying checkId. Why: CC-20b's flag-on rehearsal; unit tests do not exercise the deployed function (OPERATING-RULES §6). Source: `notes/cc-20b/PR.md:344`.
 - [ ] `sentry-v2-alerts` (CTO): Sentry alert rules exist for the v2 signals each step's 30-minute watch reads. Why: a failing step must be seen within the watch, not reported by a user. Source: `docs/ops/security-baseline.md:39`.
 - [ ] `evidence-deletion` (CTO): a check's evidence objects are deleted when the check expires, its site is removed or its account is deleted. Why: CC-20b named it a precondition of V2_PIPELINE=1; CC-22b and CC-27b built parts of it since, and nothing records the whole. Source: `notes/cc-20b/PR.md:343`.
-- [ ] `inngest-synced-before-step-2` (owner): Inngest → Apps → crawlmouse (production) was synced after the last redeploy and lists 4 functions. Why: Inngest keeps the function set from its last sync; a stale set fails each tick and still spends executions (plan review B8). Source: `notes/cc-35/questions.md (Q4)`.
+- [ ] `inngest-synced-before-step-2` (owner): Inngest → Apps → crawlmouse (production) was synced after the last redeploy and lists 5 functions, failure handlers included. Why: Inngest keeps the function set from its last sync; a stale set fails each tick and still spends executions (plan review B8). Source: `notes/cc-35/questions.md (Q4)`.
 
 #### Before step 3: V2_ACCOUNT_DOOR=1
 
@@ -201,7 +201,7 @@ Step 1's exit check is part of this list: the rows that only the worker deploy m
 - [ ] `signin-canary` (CC-33): SIGNIN_CANARY_TO is unset, or it was set (an internal mailbox) only after the Supabase Auth email limit was raised by at least 6 an hour, with Resend subscribed to email.delivered. Why: the canary is optional (CC-33: "when wanted"); once set, its own links would use up the sign-in mail limit real users need (CC-33 Q4, Q16). Source: `notes/cc-33/PR.md:116`.
 - [ ] `cc36-v1-accounts` (CC-36): v1's users, the owner's Pro among them, have v2 accounts (the backfill), and users.pro_until's readers are moved before migration 009 drops it. Why: a user from before migration 001 has no v2 account until the backfill, so the door cannot attach their site (spec 25). Source: `docs/specs/v2/25-account-door.md:157`.
 - [ ] `edge-rate-limits` (CTO): infra/vercel/firewall.json is applied at the edge (magic-link, audits/start and claim limits), per docs/ops/edge-firewall.md. Why: the door opens sign-up to everyone; the edge limits are its first line (sec-baseline D9). Source: `docs/specs/v2/sec-baseline.md:388`.
-- [ ] `inngest-synced-before-step-3` (owner): Inngest → Apps → crawlmouse (production) was synced after the last redeploy and lists 8 functions. Why: Inngest keeps the function set from its last sync; a stale set fails each tick and still spends executions (plan review B8). Source: `notes/cc-35/questions.md (Q4)`.
+- [ ] `inngest-synced-before-step-3` (owner): Inngest → Apps → crawlmouse (production) was synced after the last redeploy and lists 10 functions, failure handlers included. Why: Inngest keeps the function set from its last sync; a stale set fails each tick and still spends executions (plan review B8). Source: `notes/cc-35/questions.md (Q4)`.
 
 #### Before step 4: V2_CHECKS_PUBLIC=1
 
@@ -218,7 +218,7 @@ Step 1's exit check is part of this list: the rows that only the worker deploy m
 - [ ] `cc36-v1-crons` (CC-36): v1's crons are moved: cleanupExpiredAuditsFn becomes crawlmouse.cleanup.daily, still calling prune_rate_limits, and auditFn is retired for checkFn. Why: rate_limits grows without the prune; two pipelines share one Inngest quota. Source: `docs/specs/v2/v1-audit.md:120`.
 - [ ] `footer-post-links` (owner): the v2 footer's post links are chosen from Search Console data. Why: CC-22b's switch-on list; the footer is on every public v2 page. Source: `notes/cc-22b/PR.md:57`.
 - [ ] `bot-page-copy` (owner): the owner has decided /bot's v1 text and whether v2 screens publish the crawler's IP addresses (CC-29 Q28). Why: v2 screens point readers at /bot to identify the crawler. Source: `notes/cc-29/PR.md:124`.
-- [ ] `inngest-synced-before-step-4` (owner): Inngest → Apps → crawlmouse (production) was synced after the last redeploy and lists 8 functions. Why: Inngest keeps the function set from its last sync; a stale set fails each tick and still spends executions (plan review B8). Source: `notes/cc-35/questions.md (Q4)`.
+- [ ] `inngest-synced-before-step-4` (owner): Inngest → Apps → crawlmouse (production) was synced after the last redeploy and lists 10 functions, failure handlers included. Why: Inngest keeps the function set from its last sync; a stale set fails each tick and still spends executions (plan review B8). Source: `notes/cc-35/questions.md (Q4)`.
 
 #### Before step 5: V2_BILLING=1
 
@@ -227,6 +227,6 @@ Step 1's exit check is part of this list: the rows that only the worker deploy m
 - [ ] `cc36-v1-billing` (CC-36): the owner's v1 Pro subscription (Nahl account) is carried to v2 before V2_BILLING moves v1's checkout and portal routes to the v2 handlers. Why: v1 and v2 share the stripe_events ledger, and the flag changes what the v1 routes do. Source: `docs/specs/v2/03-billing.md:4`.
 - [ ] `search-console-step-5` (owner): Search Console impressions and the indexed-URL list are recorded before the switch (and again after), and IndexNow is run only after the step's 30-minute watch passes. Why: step 5 rewrites /pricing and /developers and adds /agencies to the sitemap (OPERATING-RULES §13); a rollback inside the watch would leave submitted URLs answering 404. Source: `docs/OPERATING-RULES.md:440`.
 - [ ] `external-pen-test` (owner): an external penetration test has been done, or the owner has accepted billing without one. Why: sec-baseline lists it as due before the first paid agency. Source: `docs/specs/v2/sec-baseline.md:494`.
-- [ ] `inngest-synced-before-step-5` (owner): Inngest → Apps → crawlmouse (production) was synced after the last redeploy and lists 20 functions. Why: Inngest keeps the function set from its last sync; a stale set fails each tick and still spends executions (plan review B8). Source: `notes/cc-35/questions.md (Q4)`.
+- [ ] `inngest-synced-before-step-5` (owner): Inngest → Apps → crawlmouse (production) was synced after the last redeploy and lists 22 functions, failure handlers included. Why: Inngest keeps the function set from its last sync; a stale set fails each tick and still spends executions (plan review B8). Source: `notes/cc-35/questions.md (Q4)`.
 
 <!-- golive:manual:end -->
