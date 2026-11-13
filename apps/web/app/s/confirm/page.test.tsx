@@ -93,10 +93,11 @@ const issue = async (fn: 'issue_recipient_confirmation' | 'issue_report_pause', 
     ).rows[0]!.r.token;
   }
   const made = randomBytes(32).toString('base64url');
-  await h.db.query(`select public.issue_report_pause($1, $2, now())`, [
-    siteId,
-    createHash('sha256').update(made, 'utf8').digest('hex'),
-  ]);
+  await h.db.query(
+    `select public.issue_report_pause(
+       $1, (select client_contact_email from public.sites where id = $1), $2, now())`,
+    [siteId, createHash('sha256').update(made, 'utf8').digest('hex')],
+  );
   return made;
 };
 const row = async (siteId: string) =>

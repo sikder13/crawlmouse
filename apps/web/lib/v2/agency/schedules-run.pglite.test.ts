@@ -108,7 +108,7 @@ describe('the hourly run over the schedule functions', () => {
     const paused = await client('paused@client.example', true);
     // The pause link's token is the mailer's; SQL holds its sha256.
     const pauseHash = hashToken('p'.repeat(43));
-    await db.query(`select public.issue_report_pause($1, $2, $3)`, [
+    await db.query(`select public.issue_report_pause($1, 'paused@client.example', $2, $3)`, [
       paused.siteId,
       pauseHash,
       SAVED,

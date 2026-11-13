@@ -182,6 +182,23 @@ describe('runDueSchedules', () => {
     expect(f.mail.confirmation).not.toHaveBeenCalled();
   });
 
+  it('a trial account asks no outside address to confirm; its owner’s own address, unconfirmed, is asked', async () => {
+    const trial = { ...AGENCY, state: 'agency_trial' as const };
+    const unasked = { confirmed: false, confirmationRequested: false };
+    const [outside, own] = [
+      due({ account: trial, contactIsOwner: false, ...unasked }),
+      due({ account: trial, contactIsOwner: true, ...unasked }),
+    ];
+    expect(skipReason(outside, NOW)).toBe('trial');
+    const f = fakes([outside, own]);
+    expect(await runDueSchedules(f)).toMatchObject({
+      confirmations: 1,
+      skipped: { trial: 1, unconfirmed: 1 },
+    });
+    expect(f.mail.confirmation.mock.calls).toEqual([[{ siteId: own.siteId, key: SLOT }]]);
+    expect(f.mail.report).not.toHaveBeenCalled();
+  });
+
   it('sends nothing for an unchanged site, a site with no check, a client with no contact and a plan without client reports, and moves each on', async () => {
     const all = [
       due({ changed: false }),

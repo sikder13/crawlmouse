@@ -129,13 +129,19 @@ export function supabaseReportMailStore(deps: ReportMailStoreDeps): ReportMailSt
       if (deps.linkSecret === null) throw new Error('report mail store: no link secret');
       const row = await waiting(reportId);
       if (row === null) return null;
-      // First, whether there is still a schedule to send for: a contact that confirmed and has not
-      // paused, on a site and an account that are still there. The same call stores the pause
-      // link's hash, which is the same for each report to this contact.
+      // First, whether there is still a schedule to send for: the row's address still the site's
+      // contact, confirmed and not paused, on a site and an account that are still there. Only
+      // then does the same call store the pause link's hash, which is the same for each report to
+      // this contact.
       const pauseToken = reportPauseToken(deps.linkSecret, row.site_id, row.recipient_email);
       const pause = await rpc(
         'issue_report_pause',
-        { p_site: row.site_id, p_token_hash: hashToken(pauseToken), p_now: now.toISOString() },
+        {
+          p_site: row.site_id,
+          p_email: row.recipient_email,
+          p_token_hash: hashToken(pauseToken),
+          p_now: now.toISOString(),
+        },
         Pause,
       );
       if (pause.outcome !== 'issued') return null;

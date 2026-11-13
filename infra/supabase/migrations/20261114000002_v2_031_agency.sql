@@ -1076,8 +1076,8 @@ $$;
 -- client_contact_email and owner_seat_id: a key present is written (null clears it), a key absent is
 -- left, and any other key raises 22023, so sites.client_contact_name is not written here. The
 -- address is trimmed and put in lower case. A contact address that changes clears the schedule's
--- confirmation, its two link hashes and the recipient's pause in the same statement that writes the
--- site: the next report waits for the new address to confirm.
+-- confirmation, its two link hashes and the recipient's pause in the statement that writes the site
+-- (the trigger sites_contact_changed, below): the next report waits for the new address to confirm.
 -- Answers {outcome}: 'saved' with contact_changed; 'not_found' (no live site p_site of p_account
 -- that is not a staging copy, or the account is deleted or marked for deletion); 'invalid_owner'
 -- (owner_seat_id is not an active seat of the account that covers the site). Raises 22023 for an
@@ -1136,29 +1136,50 @@ begin
   end if;
   v_changed := v_new is distinct from pg_catalog.lower(v_old);
 
-  with site as (
-    update public.sites st
-       set client_name = case when p ? 'client_name'
-                              then nullif(pg_catalog.btrim(p ->> 'client_name'), '')
-                              else st.client_name end,
-           client_contact_email = v_new,
-           owner_seat_id = case when p ? 'owner_seat_id' then v_owner else st.owner_seat_id end,
-           updated_at = pg_catalog.now()
-     where st.id = p_site
-    returning st.id
-  )
-  update public.report_schedules rs
-     set recipient_confirm_hash = null,
-         recipient_confirm_sent_at = null,
-         recipient_confirmed_at = null,
-         pause_token_hash = null,
-         paused_by_recipient_at = null,
+  update public.sites st
+     set client_name = case when p ? 'client_name'
+                            then nullif(pg_catalog.btrim(p ->> 'client_name'), '')
+                            else st.client_name end,
+         client_contact_email = v_new,
+         owner_seat_id = case when p ? 'owner_seat_id' then v_owner else st.owner_seat_id end,
          updated_at = pg_catalog.now()
-    from site
-   where rs.site_id = site.id and v_changed;
+   where st.id = p_site;
   return pg_catalog.jsonb_build_object('outcome', 'saved', 'contact_changed', v_changed);
 end;
 $$;
+
+-- What a schedule holds about its contact goes when the contact's address does, whoever changes it:
+-- set_client above, and the erasure, whose rule blanks sites.client_contact_email directly
+-- (20261112000002, rule 30). The confirmation, both link hashes (the pause link's is derived from
+-- the address) and the recipient's pause are cleared in the statement that writes the site. Case
+-- alone is not a change. The function is a trigger's: no role is granted it.
+create or replace function public.sites_contact_changed()
+returns trigger
+language plpgsql
+security definer
+set search_path = pg_catalog, pg_temp
+as $$
+begin
+  if pg_catalog.lower(new.client_contact_email)
+       is distinct from pg_catalog.lower(old.client_contact_email) then
+    update public.report_schedules rs
+       set recipient_confirm_hash = null,
+           recipient_confirm_sent_at = null,
+           recipient_confirmed_at = null,
+           pause_token_hash = null,
+           paused_by_recipient_at = null,
+           updated_at = pg_catalog.now()
+     where rs.site_id = new.id;
+  end if;
+  return new;
+end;
+$$;
+alter function public.sites_contact_changed() owner to postgres;
+revoke all on function public.sites_contact_changed() from public, anon, authenticated, service_role;
+drop trigger if exists sites_contact_changed on public.sites;
+create trigger sites_contact_changed
+  after update of client_contact_email on public.sites
+  for each row execute function public.sites_contact_changed();
 
 -- Writes a client site's report schedule, one row a site. p holds cadence ('weekly' or 'monthly'),
 -- iso_weekday, time_local, timezone and send_when_unchanged, each required; any other key raises
@@ -1260,9 +1281,13 @@ $$;
 -- token, stores its sha256 with p_now as the time it was issued, and returns the token once with
 -- what the mail says and where it goes. Calling it again replaces the stored hash, so the link sent
 -- before stops working. The link is used within seven days of p_now (confirm_report_recipient).
+-- An account in its Agency trial sends to its owner's own address and no other (D8), and that holds
+-- for this mail as for a report: for such an account the contact must be the address of the
+-- account's owner. The rule is here, so the hourly run, a saved contact and "ask again" share it.
 -- Answers {outcome}: 'issued' with token, email, host and account_name; 'none' when the site has no
--- schedule or no contact address, the contact has confirmed, the site is removed, or its account is
--- deleted or marked for deletion.
+-- schedule or no contact address, the contact has confirmed, the account is in its Agency trial and
+-- the contact is not its owner's address, the site is removed, or its account is deleted or marked
+-- for deletion.
 create or replace function public.issue_recipient_confirmation(p_site uuid, p_now timestamptz)
 returns jsonb
 language plpgsql
@@ -1286,6 +1311,12 @@ begin
    where rs.site_id = p_site
      and rs.recipient_confirmed_at is null
      and st.client_contact_email is not null
+     and (a.state <> 'agency_trial'
+          or exists (select 1
+                       from public.seats o
+                       join public.users u on u.id = o.user_id
+                      where o.account_id = a.id and o.role = 'owner' and o.status = 'active'
+                        and pg_catalog.lower(u.email) = pg_catalog.lower(st.client_contact_email)))
      and st.removed_at is null
      and a.deleted_at is null
      and a.deletion_confirmed_at is null
@@ -1367,16 +1398,18 @@ begin
 end;
 $$;
 
--- The mailer's call when it sends a report of p_site's schedule: stores p_token_hash, the sha256 of
--- the pause link's token, and returns the address the report goes to. The mailer derives the token
--- from the site and that address (lib/v2/mail/report-links.ts), so each report sent to one contact
--- carries the same pause link, and the link of an earlier report still pauses; a call with the hash
--- already stored changes nothing. A change of contact clears the hash (set_client).
+-- The mailer's call when it sends a report of p_site's schedule to p_email: stores p_token_hash, the
+-- sha256 of the pause link's token, and returns the address the report goes to. The mailer derives
+-- the token from the site and that address (lib/v2/mail/report-pause-token.ts), so each report sent
+-- to one contact carries the same pause link, and the link of an earlier report still pauses; a call
+-- with the hash already stored changes nothing. A change of contact clears the hash
+-- (sites_contact_changed), and a call for an address that is no longer the site's contact (a report
+-- row written before the change, handled late) stores nothing.
 -- Answers {outcome}: 'issued' with email, host and account_name; 'none' when the site has no
--- schedule, its contact has not confirmed, the schedule is paused, the site is removed, or its
--- account is deleted or marked for deletion.
+-- schedule, p_email is not its contact, the contact has not confirmed, the schedule is paused, the
+-- site is removed, or its account is deleted or marked for deletion.
 create or replace function public.issue_report_pause(
-  p_site uuid, p_token_hash text, p_now timestamptz)
+  p_site uuid, p_email text, p_token_hash text, p_now timestamptz)
 returns jsonb
 language plpgsql
 volatile
@@ -1388,7 +1421,7 @@ declare
   v_host text;
   v_name text;
 begin
-  if p_token_hash is null or p_now is null then
+  if p_email is null or p_token_hash is null or p_now is null then
     raise exception 'issue_report_pause: a required argument is null' using errcode = '22004';
   end if;
   select st.client_contact_email, st.host, a.name into v_email, v_host, v_name
@@ -1398,7 +1431,7 @@ begin
    where rs.site_id = p_site
      and rs.recipient_confirmed_at is not null
      and rs.paused_by_recipient_at is null
-     and st.client_contact_email is not null
+     and pg_catalog.lower(st.client_contact_email) = pg_catalog.lower(pg_catalog.btrim(p_email))
      and st.removed_at is null
      and a.deleted_at is null
      and a.deletion_confirmed_at is null
@@ -1522,17 +1555,24 @@ as $$
                              where c.site_id = rs.site_id and c.status in ('finished', 'partial')
                              order by c.finished_at desc, c.id
                              limit 1),
+               -- Whether a check queued after the one the last sent report ended on found a change:
+               -- asked of what that report covered, not of when its mail went, so a change found
+               -- between the report's write and its mail is still one. True with no report sent.
                'changed', coalesce(
                  (select exists (select 1
                                    from public.changes ch
+                                   join public.checks cc on cc.id = ch.check_id
                                   where ch.site_id = rs.site_id
                                     and ch.kind <> 'baseline'
-                                    and ch.detected_at > last.sent_at)
-                    from (select pg_catalog.max(r.sent_at) as sent_at
+                                    and cc.queued_at > lc.queued_at)
+                    from (select r.covers_check_ids[
+                                   pg_catalog.array_upper(r.covers_check_ids, 1)] as check_id
                             from public.reports r
                            where r.site_id = rs.site_id and r.kind = 'client_report'
-                             and r.status = 'sent') last
-                   where last.sent_at is not null),
+                             and r.status = 'sent'
+                           order by r.sent_at desc, r.id desc
+                           limit 1) last
+                    join public.checks lc on lc.id = last.check_id),
                  true)) as o
         from public.report_schedules rs
         join public.sites st on st.id = rs.site_id
@@ -1604,6 +1644,11 @@ begin
   if p_slot is null or p_now is null then
     raise exception 'write_client_report: a required argument is null' using errcode = '22004';
   end if;
+  -- The account's row is locked before the site's, the order section A's functions take them in
+  -- (remove_seat, and apply_entitlement_transition before it): the insert below takes the
+  -- account's key through the report's foreign key.
+  select st.account_id into v_account from public.sites st where st.id = p_site;
+  perform 1 from public.accounts a where a.id = v_account for update;
   select st.account_id, st.client_contact_email, st.owner_seat_id into v_account, v_email, v_owner
     from public.sites st
    where st.id = p_site and st.account_id is not null and st.removed_at is null
@@ -1693,7 +1738,7 @@ revoke all on function public.issue_recipient_confirmation(uuid, timestamptz)
 revoke all on function public.read_report_link(text, timestamptz) from public, anon, authenticated;
 revoke all on function public.confirm_report_recipient(text, timestamptz)
   from public, anon, authenticated;
-revoke all on function public.issue_report_pause(uuid, text, timestamptz) from public, anon, authenticated;
+revoke all on function public.issue_report_pause(uuid, text, text, timestamptz) from public, anon, authenticated;
 revoke all on function public.pause_report_schedule(text, timestamptz)
   from public, anon, authenticated;
 revoke all on function public.resume_report_schedule(uuid, uuid, timestamptz)
@@ -1715,7 +1760,7 @@ grant execute on function public.clear_report_schedule(uuid, uuid) to service_ro
 grant execute on function public.issue_recipient_confirmation(uuid, timestamptz) to service_role;
 grant execute on function public.read_report_link(text, timestamptz) to service_role;
 grant execute on function public.confirm_report_recipient(text, timestamptz) to service_role;
-grant execute on function public.issue_report_pause(uuid, text, timestamptz) to service_role;
+grant execute on function public.issue_report_pause(uuid, text, text, timestamptz) to service_role;
 grant execute on function public.pause_report_schedule(text, timestamptz) to service_role;
 grant execute on function public.resume_report_schedule(uuid, uuid, timestamptz) to service_role;
 grant execute on function public.due_report_schedules(timestamptz, integer) to service_role;

@@ -4,8 +4,9 @@
  *
  * 1. the account's plan has no client reports now: nothing is sent;
  * 2. the client has no contact address: nothing is sent;
- * 3. the contact has not confirmed: the confirmation mail is asked for, once, and no report is sent;
- * 4. the account is in its Agency trial and the contact is not the owner's own address: nothing is sent;
+ * 3. the account is in its Agency trial and the contact is not the owner's own address: nothing is
+ *    sent, the confirmation mail included;
+ * 4. the contact has not confirmed: the confirmation mail is asked for, once, and no report is sent;
  * 5. the site has no finished check: nothing is sent;
  * 6. nothing changed since the last report sent and the schedule does not send unchanged: nothing is sent;
  * 7. otherwise the report's row is written for the slot and its mail is asked for; the row becomes
@@ -87,8 +88,10 @@ export type SkipReason = (typeof SKIP_REASONS)[number];
 export function skipReason(s: DueSchedule, now: Date): SkipReason | null {
   if (!GATES[effectiveTier(s.account, now)].agencyBranding) return 'plan';
   if (!s.hasContact) return 'no_contact';
-  if (!s.confirmed) return 'unconfirmed';
+  // Before the confirmation: in its Agency trial an account mails its owner's own address and no
+  // other, and the confirmation is a mail too (`issue_recipient_confirmation` holds the same rule).
   if (s.account.state === 'agency_trial' && !s.contactIsOwner) return 'trial';
+  if (!s.confirmed) return 'unconfirmed';
   if (s.checkId === null) return 'no_check';
   if (!s.changed && !s.sendWhenUnchanged) return 'unchanged';
   return null;

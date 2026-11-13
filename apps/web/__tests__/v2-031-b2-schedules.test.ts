@@ -42,7 +42,7 @@ const FUNCTIONS = [
   'public.issue_recipient_confirmation(uuid, timestamptz)',
   'public.read_report_link(text, timestamptz)',
   'public.confirm_report_recipient(text, timestamptz)',
-  'public.issue_report_pause(uuid, text, timestamptz)',
+  'public.issue_report_pause(uuid, text, text, timestamptz)',
   'public.pause_report_schedule(text, timestamptz)',
   'public.resume_report_schedule(uuid, uuid, timestamptz)',
   'public.due_report_schedules(timestamptz, integer)',
@@ -103,14 +103,23 @@ const readLink = (token: string, now = NOW) =>
   answer(`select public.read_report_link($1, $2) r`, [sha256(token), now]);
 const confirm = (token: string, now = NOW) =>
   answer(`select public.confirm_report_recipient($1, $2) r`, [sha256(token), now]);
+/** The site's contact address as it is now: the address the mailer names when it issues a pause link. */
+const contactOf = async (siteId: string) =>
+  (
+    await db.query<{ e: string | null }>(
+      `select client_contact_email e from public.sites where id = $1`,
+      [siteId],
+    )
+  ).rows[0]!.e;
 /** A pause link's token as the mailer makes one: 43 base64url characters (report-pause-token.ts). */
 const pauseToken = () => randomBytes(32).toString('base64url');
 /** The mailer's call: SQL is given the token's sha256. The answer here carries the token as well. */
 const issuePause = async (siteId: string, now = NOW, token = pauseToken()) => {
-  const a = await answer(`select public.issue_report_pause($1, $2, $3) r`, [
+  const a = await answer(`select public.issue_report_pause($1, $4, $2, $3) r`, [
     siteId,
     sha256(token),
     now,
+    await contactOf(siteId),
   ]);
   return a.outcome === 'issued' ? { ...a, token } : a;
 };
@@ -708,13 +717,55 @@ async function confirmedPending(): Promise<Client> {
   return c;
 }
 
+describe('the confirmation in an Agency trial (D8)', () => {
+  /** The account as an Agency trial with a card, as the entitlement step writes one. */
+  const inTrial = (accountId: string) =>
+    db.query(
+      `update public.accounts
+          set state = 'agency_trial', trial_variant = 'card_required', trial_used_at = now(),
+              trial_ends_at = now() + interval '5 days',
+              state_history = state_history || jsonb_build_array(
+                jsonb_build_object('state', 'agency_trial', 'since', now()::text))
+        where id = $1`,
+      [accountId],
+    );
+
+  it('issues none for a contact that is not the owner’s own address, and stores no link', async () => {
+    const c = await confirmedPending();
+    await inTrial(c.accountId);
+    expect(await issueConfirmation(c.siteId)).toEqual({ outcome: 'none' });
+    expect(await schedule(c.siteId)).toMatchObject({
+      recipient_confirm_hash: null,
+      recipient_confirm_sent_at: null,
+    });
+  });
+
+  it('issues one for the owner’s own address, whatever its case, and for any contact once the trial is over', async () => {
+    const own = await client();
+    await setClient(own.siteId, own.accountId, {
+      client_contact_email: own.owner.email.toUpperCase(),
+    });
+    await setSchedule(own.siteId, own.accountId);
+    await inTrial(own.accountId);
+    expect(await issueConfirmation(own.siteId)).toMatchObject({
+      outcome: 'issued',
+      email: own.owner.email.toLowerCase(),
+    });
+
+    const paid = await confirmedPending();
+    expect((await issueConfirmation(paid.siteId)).outcome).toBe('issued');
+  });
+});
+
 describe('the pause link', () => {
   it('issue stores the sha256 it is given, for a confirmed contact, and answers the address, the site and the account’s name', async () => {
     const c = await confirmed('reader@client.example');
     const token = pauseToken();
     expect(
-      await answer(`select public.issue_report_pause($1, $2, $3) r`, [
+      await answer(`select public.issue_report_pause($1, $2, $3, $4) r`, [
         c.siteId,
+        // The address as the mailer holds it, in whatever case and spacing.
+        ' Reader@Client.example ',
         sha256(token),
         NOW,
       ]),
@@ -742,13 +793,66 @@ describe('the pause link', () => {
     expect(await pause(token, at(8))).toEqual({ outcome: 'paused' });
   });
 
+  it('stores nothing for an address that is no longer the site’s contact: a report row of the contact before, handled late, does not replace the new contact’s link', async () => {
+    const c = await confirmed('first@client.example');
+    await setClient(c.siteId, c.accountId, { client_contact_email: 'second@client.example' });
+    const again = await issueConfirmation(c.siteId);
+    await confirm(again.token as string);
+    const mine = pauseToken();
+    await issuePause(c.siteId, NOW, mine);
+    // The mailer, late, for the address before.
+    expect(
+      await answer(`select public.issue_report_pause($1, $2, $3, $4) r`, [
+        c.siteId,
+        'first@client.example',
+        sha256(pauseToken()),
+        NOW,
+      ]),
+    ).toEqual({ outcome: 'none' });
+    expect((await schedule(c.siteId))!.pause_token_hash).toBe(sha256(mine));
+    expect(await pause(mine, at(1))).toEqual({ outcome: 'paused' });
+  });
+
+  it('a contact address blanked by any writer clears what the schedule holds about it, as set_client’s change does', async () => {
+    const c = await confirmed();
+    const token = pauseToken();
+    await issuePause(c.siteId, NOW, token);
+    await pause(token, at(1));
+    // The erasure's rule writes the column directly (20261112000002, rule 30).
+    await db.query(`update public.sites set client_contact_email = null where id = $1`, [c.siteId]);
+    expect(await schedule(c.siteId)).toMatchObject({
+      recipient_confirm_hash: null,
+      recipient_confirm_sent_at: null,
+      recipient_confirmed_at: null,
+      pause_token_hash: null,
+      paused_by_recipient_at: null,
+    });
+    // A write that leaves the address as it is, or changes its case alone, clears nothing.
+    const kept = await confirmed('kept@client.example');
+    await db.query(
+      `update public.sites set client_contact_email = upper(client_contact_email) where id = $1`,
+      [kept.siteId],
+    );
+    expect((await schedule(kept.siteId))!.recipient_confirmed_at).not.toBeNull();
+  });
+
   it('refuses a value that is not a sha256 in lowercase hex, and a null', async () => {
     const c = await confirmed();
     await expect(
-      answer(`select public.issue_report_pause($1, $2, $3) r`, [c.siteId, pauseToken(), NOW]),
+      answer(`select public.issue_report_pause($1, $4, $2, $3) r`, [
+        c.siteId,
+        pauseToken(),
+        NOW,
+        await contactOf(c.siteId),
+      ]),
     ).rejects.toMatchObject({ constraint: 'report_schedules_link_hashes' });
     await expect(
-      answer(`select public.issue_report_pause($1, $2, $3) r`, [c.siteId, null, NOW]),
+      answer(`select public.issue_report_pause($1, $4, $2, $3) r`, [
+        c.siteId,
+        null,
+        NOW,
+        await contactOf(c.siteId),
+      ]),
     ).rejects.toMatchObject({ code: '22004' });
   });
 
@@ -889,35 +993,49 @@ describe('due_report_schedules', () => {
     expect(mine(await due(LATER), c)[0]!.check_id).toBe(latest);
   });
 
-  it('changed: true before any report was sent; then only when a change that is not a baseline was detected after the last one sent', async () => {
+  it('changed: true before any report was sent; then only when a check queued after the one the last sent report ended on found a change that is not a baseline', async () => {
     const c = await confirmed();
-    const checkId = await check(c.siteId);
+    const covered = await check(c.siteId);
     const changed = async () => mine(await due(at(30)), c)[0]!.changed;
     expect(await changed()).toBe(true);
 
-    const report = await writeReport(c.siteId, LATER, checkId, LATER);
+    const report = await writeReport(c.siteId, LATER, covered, LATER);
     expect(await changed()).toBe(true);
+    // A check that finishes after the report's row was written and before its mail went. Under a
+    // rule that asked what was detected after the mail, its change would be in no report.
+    const between = randomUUID();
+    await insertRow(db, 'checks', {
+      ...ROWS.checks(between, c.siteId),
+      queued_at: '2026-11-01T06:00:00.000Z',
+      started_at: '2026-11-01T06:00:05.000Z',
+      finished_at: '2026-11-01T06:10:00.000Z',
+      tested_at: '2026-11-01T06:00:05.000Z',
+    });
     await markSent(report.report_id, LATER);
     expect(await changed()).toBe(false);
 
+    // A change of the check the report covered is in the report, whenever it was detected.
     await insertRow(db, 'changes', {
-      ...ROWS.changes(randomUUID(), c.siteId, checkId),
-      detected_at: '2026-11-16T08:00:00.000Z',
-      where: '/before-the-report',
+      ...ROWS.changes(randomUUID(), c.siteId, covered),
+      detected_at: at(20),
+      where: '/in-the-report',
     });
     expect(await changed()).toBe(false);
+    // A later check's baseline is no change.
     await insertRow(db, 'changes', {
-      ...ROWS.changes(randomUUID(), c.siteId, checkId),
-      detected_at: '2026-11-17T08:00:00.000Z',
+      ...ROWS.changes(randomUUID(), c.siteId, between),
+      detected_at: '2026-11-01T06:10:00.000Z',
       kind: 'baseline',
       severity: null,
     });
     expect(await changed()).toBe(false);
+    // A later check's change is one, though it was detected before the report's mail went.
     await insertRow(db, 'changes', {
-      ...ROWS.changes(randomUUID(), c.siteId, checkId),
-      detected_at: '2026-11-17T08:00:00.000Z',
-      where: '/after-the-report',
+      ...ROWS.changes(randomUUID(), c.siteId, between),
+      detected_at: '2026-11-01T06:10:00.000Z',
+      where: '/after-the-covered-check',
     });
+    expect(Date.parse('2026-11-01T06:10:00.000Z')).toBeLessThan(Date.parse(LATER));
     expect(await changed()).toBe(true);
   });
 
@@ -1090,7 +1208,7 @@ describe('grants', () => {
       `select public.set_client('${c.siteId}', '${c.accountId}', '{"client_name":"x"}')`,
       `select public.due_report_schedules(now(), 10)`,
       `select public.issue_recipient_confirmation('${c.siteId}', now())`,
-      `select public.issue_report_pause('${c.siteId}', '${'a'.repeat(64)}', now())`,
+      `select public.issue_report_pause('${c.siteId}', 'x@example.com', '${'a'.repeat(64)}', now())`,
       `select public.resume_report_schedule('${c.siteId}', '${c.accountId}', now())`,
     ]) {
       await expect(
