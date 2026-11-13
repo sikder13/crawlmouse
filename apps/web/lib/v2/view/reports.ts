@@ -59,7 +59,7 @@ export interface ReportsSide {
    * preview reads as the owner).
    */
   role?: Seat['role'];
-  /** A share link made a moment ago, shown once on its report's row. */
+  /** A share link made a moment ago, shown on its report's row while the page is handed it. */
   madeLink?: { reportId: string; url: string } | null;
 }
 
@@ -72,7 +72,7 @@ export interface MadeRowView {
   /** "Being made" or "Could not be made", for a report whose file is not stored. */
   state: string | null;
   actions: ActionView[];
-  /** A share link that works, where the reader is not offered a new one: "Link · until <date>". */
+  /** A share link that works: "Link · until <date>", as text beside the row's actions. */
   linkUntil: string | null;
   /** The address of a share link just made for this report. */
   madeLink: { label: string; url: string } | null;
@@ -261,8 +261,15 @@ export function reportsView(
             { context: ctx },
           );
     const until = sharedUntil(r);
+    // With a link that works, making one replaces it: the action says so, and the row states the
+    // expiry as text (`linkUntil`).
     const link = mayMake(r)
-      ? routeAction('reportShare', until ?? COPY.makeLink, { id: r.id }, { context: ctx })
+      ? routeAction(
+          'reportShare',
+          until === null ? COPY.makeLink : COPY.newLink,
+          { id: r.id },
+          { context: ctx },
+        )
       : null;
     const withdraw =
       mayShare && until !== null
@@ -335,7 +342,7 @@ export function reportsView(
         covers: coversOf(r),
         state: COPY.fileStates[stateOf(r) ?? 'stored'],
         actions: rowActions(r),
-        linkUntil: mayMake(r) ? null : sharedUntil(r),
+        linkUntil: sharedUntil(r),
         madeLink:
           side.madeLink?.reportId === r.id && hasFile(r)
             ? { label: COPY.madeLink, url: side.madeLink.url }

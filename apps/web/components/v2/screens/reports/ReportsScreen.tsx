@@ -131,7 +131,14 @@ export function ReportsScreen({
                   ) : null}
                   {r.madeLink ? (
                     <p className={styles.madeLink} data-v2-addition="">
-                      <span>{r.madeLink.label}</span> <code>{r.madeLink.url}</code>
+                      <span>{r.madeLink.label}</span>{' '}
+                      {/* A share link opens the report for whoever holds it. `ph-no-capture` is
+                          the recorder's class for an element it leaves out of a session recording
+                          and of autocapture; `data-ph-mask` is the selector this project's
+                          recorder masks (instrumentation-client.ts). */}
+                      <code className="ph-no-capture" data-ph-mask="">
+                        {r.madeLink.url}
+                      </code>
                     </p>
                   ) : null}
                 </div>,

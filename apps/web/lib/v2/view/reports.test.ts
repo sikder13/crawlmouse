@@ -99,8 +99,27 @@ describe('Reports made', () => {
         'example-outfitter.com',
         'CSV, all responses',
         'first audit',
-        ['Download · 310 KB', 'Link · until Tue 24 Nov', 'Withdraw link'],
+        ['Download · 310 KB', 'New link', 'Withdraw link'],
       ],
+    ]);
+  });
+
+  it('a report that has a link says until when as text; replacing the link and withdrawing it are the two actions', () => {
+    const [pdf, , csv] = home().made.rows;
+    // The status is not a control: no action is labelled with the expiry.
+    expect(csv!.linkUntil).toBe('Link · until Tue 24 Nov');
+    expect(csv!.actions.map((a) => [a.label, a.method, a.fields])).toEqual([
+      ['Download · 310 KB', 'get', {}],
+      ['New link', 'post', {}],
+      ['Withdraw link', 'post', { _method: 'DELETE' }],
+    ]);
+    for (const row of home().made.rows) {
+      expect(row.actions.map((a) => a.label).join(' ')).not.toContain('until');
+    }
+    // A report with no link has nothing to state, and its one share action makes the first.
+    expect([pdf!.linkUntil, pdf!.actions.map((a) => a.label)]).toEqual([
+      null,
+      ['Download · 1.2 MB', 'Link'],
     ]);
   });
 
@@ -125,7 +144,7 @@ describe('Reports made', () => {
       ],
     ]);
     for (const row of home().made.rows) {
-      expect([row.state, row.linkUntil, row.madeLink]).toEqual([null, null, null]);
+      expect([row.state, row.madeLink]).toEqual([null, null]);
     }
   });
 
@@ -275,7 +294,7 @@ describe('Reports, with what a live page knows', () => {
     expect([row(v, COMPARE).state, labels(v, COMPARE)]).toEqual(['Could not be made', []]);
     expect([row(v, CSV).state, labels(v, CSV)]).toEqual([
       null,
-      ['Download · 310 KB', 'Link · until Tue 24 Nov', 'Withdraw link'],
+      ['Download · 310 KB', 'New link', 'Withdraw link'],
     ]);
   });
 
@@ -324,7 +343,10 @@ describe('Reports, with what a live page knows', () => {
   it('shows a link just made on its own report’s row and no other', () => {
     const url = 'https://crawlmouse.com/s/kJ8sT2mQ9x_p4VnR7bWc-A';
     const v = live({ madeLink: { reportId: COMPARE, url } });
-    expect(row(v, COMPARE).madeLink).toEqual({ label: 'The link, shown once:', url });
+    expect(row(v, COMPARE).madeLink).toEqual({
+      label: 'The link, shown here for a short while:',
+      url,
+    });
     expect([row(v, PDF).madeLink, row(v, CSV).madeLink]).toEqual([null, null]);
     const pending = live({
       madeLink: { reportId: COMPARE, url },

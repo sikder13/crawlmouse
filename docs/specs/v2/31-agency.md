@@ -723,7 +723,15 @@ needs the plan's `exports` gate (402) and a stored file (409 `not_ready`), under
 hour for the account. The link is answered once: JSON gets `{url, expiresAt}`; a form gets a 303 to
 `/reports?notice=share_made` with the link in the HttpOnly cookie `cm_share_made`, scoped to
 `/reports`, which the page shows on the report's row. That cookie lasts 120 seconds and is not
-cleared sooner: a page cannot clear a cookie.
+cleared sooner: a page cannot clear a cookie; the notice and the row's label say the link is shown
+"for a short while". The element that holds the link carries the class `ph-no-capture`, which
+posthog-js's recorder blocks, and `data-ph-mask`, the selector this project's recorder masks
+(`instrumentation-client.ts`): `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2/reports.test.tsx -t 'a share link just made'`.
+It is the first element in the tree to carry either; not seen in a recording.
+
+A row whose report has a link that works says "Link · until <date>" as text. Its share actions are
+"New link", which replaces the link (the one before stops opening), and "Withdraw link"; a row with
+no link has "Link".
 
 The Reports screen says how long a link works from `SHARE_LINK_DAYS` (`lib/v2/copy/reports.ts`),
 which a test holds to the interval `create_share_link` adds, read from the migration's text:
