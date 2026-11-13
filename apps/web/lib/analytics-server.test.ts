@@ -5,6 +5,7 @@ import {
   posthogSend,
   type CaptureBody,
 } from './analytics-server';
+import type { InternalLookup } from './v2/ops/internal-marker';
 
 function recorder() {
   const sent: CaptureBody[] = [];
@@ -75,6 +76,59 @@ describe('captureServerEvent', () => {
     };
     await expect(captureServerEvent(null, EVENT, failing)).resolves.toBeUndefined();
     expect(logged).toEqual([['analytics: server capture of check_started failed']]);
+  });
+});
+
+describe('the internal marker (CC-33 D1)', () => {
+  const INTERNAL = 'a0000000-0000-4000-8000-000000000001';
+  const NORMAL = 'a0000000-0000-4000-8000-000000000002';
+  const lookup = () => vi.fn<InternalLookup>(async (s) => s.id === INTERNAL);
+
+  it('an event about an internal account carries internal: true', async () => {
+    const r = recorder();
+    const look = lookup();
+    await captureServerEvent(null, { ...EVENT, distinctId: `account:${INTERNAL}` }, r.send, look);
+    expect(r.sent[0]!.properties).toEqual({
+      trigger: 'manual',
+      internal: true,
+      $process_person_profile: false,
+      $geoip_disable: true,
+    });
+    expect(look).toHaveBeenCalledWith({ kind: 'account', id: INTERNAL });
+  });
+
+  it('so does one whose caller names the internal account, whatever its distinct id', async () => {
+    const r = recorder();
+    await captureServerEvent(null, { ...EVENT, accountId: INTERNAL }, r.send, lookup());
+    expect(r.sent[0]!.properties.internal).toBe(true);
+  });
+
+  it('an event about a normal account is sent as before', async () => {
+    const r = recorder();
+    await captureServerEvent(null, { ...EVENT, distinctId: `account:${NORMAL}` }, r.send, lookup());
+    expect(r.sent[0]!.properties).not.toHaveProperty('internal');
+  });
+
+  it('an event that names no account is sent as before, with nothing looked up', async () => {
+    const r = recorder();
+    const look = lookup();
+    await captureServerEvent(null, EVENT, r.send, look);
+    expect(r.sent[0]!.properties).not.toHaveProperty('internal');
+    expect(look).not.toHaveBeenCalled();
+  });
+
+  it('a caller cannot set internal itself', async () => {
+    const r = recorder();
+    await captureServerEvent(null, { ...EVENT, properties: { internal: true } }, r.send, lookup());
+    expect(r.sent[0]!.properties).not.toHaveProperty('internal');
+  });
+
+  it('nothing is looked up for an event consent stops', async () => {
+    const r = recorder();
+    const look = lookup();
+    await captureServerEvent('cm_consent=denied', { ...EVENT, accountId: INTERNAL }, r.send, look);
+    expect(r.sent).toEqual([]);
+    expect(look).not.toHaveBeenCalled();
   });
 });
 

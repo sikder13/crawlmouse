@@ -17,7 +17,13 @@ import { personalAccount, signUp } from './helpers/v2-check-tables';
 
 const MIGRATION = '20261115000001_v2_033_operations.sql';
 const ROLLBACK = '20261115000001_v2_033_operations.revert.sql';
-const FUNCTIONS = ['is_operator', 'operator_finish', 'operator_log', 'operator_request_check'];
+const FUNCTIONS = [
+  'is_internal_subject',
+  'is_operator',
+  'operator_finish',
+  'operator_log',
+  'operator_request_check',
+];
 
 let db: PGlite;
 beforeAll(async () => {
@@ -193,6 +199,54 @@ describe('accounts.internal', () => {
       accountId,
     ]);
     expect(rows).toEqual([{ internal: true }]);
+  });
+});
+
+describe('is_internal_subject', () => {
+  const ask = (kind: string, id: string) => call<boolean>('is_internal_subject', [kind, id]);
+
+  it("answers for an account, a seat's account, and a user's seats and default account", async () => {
+    const owner = await person();
+    const { accountId, seatId } = await personalAccount(db, owner);
+    const member = await person();
+    const { accountId: memberOwn } = await personalAccount(db, member);
+    await db.query(
+      `insert into public.seats (account_id, user_id, invited_email, role, status, accepted_at)
+       values ($1, $2, $3, 'developer', 'active', now())`,
+      [accountId, member, ['m', 'example.com'].join('@')],
+    );
+    expect(await ask('account', accountId)).toBe(false);
+    await db.query('update public.accounts set internal = true where id = $1', [accountId]);
+    expect(await ask('account', accountId)).toBe(true);
+    expect(await ask('seat', seatId)).toBe(true);
+    expect(await ask('any', accountId)).toBe(true);
+    expect(await ask('any', owner)).toBe(true);
+    expect(await ask('any', member)).toBe(true);
+    expect(await ask('account', memberOwn)).toBe(false);
+    expect(await ask('elsewhere', accountId)).toBe(false);
+    expect(await ask('any', randomUUID())).toBe(false);
+  });
+
+  it('a removed seat no longer makes its user internal', async () => {
+    const owner = await person();
+    const { accountId } = await personalAccount(db, owner);
+    await db.query('update public.accounts set internal = true where id = $1', [accountId]);
+    const member = await person();
+    await db.query(
+      `insert into public.seats (account_id, user_id, invited_email, role, status, accepted_at,
+                                 removed_at)
+       values ($1, $2, $3, 'developer', 'removed', now(), now())`,
+      [accountId, member, ['r', 'example.com'].join('@')],
+    );
+    expect(await ask('any', member)).toBe(false);
+  });
+
+  it.each(['anon', 'authenticated'] as const)('%s may not execute it', async (role) => {
+    await expect(
+      asRole(db, role, null, (tx) =>
+        tx.query(`select public.is_internal_subject('account', $1)`, [randomUUID()]),
+      ),
+    ).rejects.toThrow(/permission denied/);
   });
 });
 

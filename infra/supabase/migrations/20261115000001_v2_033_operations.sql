@@ -31,6 +31,41 @@ grant select, insert, delete on table public.operators to service_role;
 -- the service role holds every column already.
 alter table public.accounts add column if not exists internal boolean not null default false;
 
+-- ─── is_internal_subject ─────────────────────────────────────────────────────────────────────────
+-- Whether a server event is about an internal account (D1), for lib/analytics-server.ts: p_kind
+-- 'account' asks of the account p_id; 'seat' of the account of the seat p_id; 'any' of an id that may
+-- be an account's or a user's, true when it is an internal account, or a user whose active seats or
+-- default account include one. Any other p_kind answers false. Security invoker: service_role holds
+-- select on the three tables.
+
+create or replace function public.is_internal_subject(p_kind text, p_id uuid)
+returns boolean
+language sql
+stable
+security invoker
+set search_path = pg_catalog, pg_temp
+as $$
+  select case p_kind
+    when 'account' then exists (
+      select 1 from public.accounts a where a.id = p_id and a.internal)
+    when 'seat' then exists (
+      select 1 from public.seats s join public.accounts a on a.id = s.account_id
+       where s.id = p_id and a.internal)
+    when 'any' then exists (
+      select 1 from public.accounts a
+       where a.internal
+         and (a.id = p_id
+              or a.id in (select s.account_id from public.seats s
+                           where s.user_id = p_id and s.status = 'active')
+              or a.id in (select u.default_account_id from public.users u where u.id = p_id)))
+    else false
+  end;
+$$;
+
+revoke all on function public.is_internal_subject(text, uuid)
+  from public, anon, authenticated, service_role;
+grant execute on function public.is_internal_subject(text, uuid) to service_role;
+
 -- ─── is_operator ─────────────────────────────────────────────────────────────────────────────────
 -- Whether the caller's own session is an operator's. The console asks it with the caller's client
 -- (apps/web/lib/v2/ops/operator.ts) before it constructs a service-role client.

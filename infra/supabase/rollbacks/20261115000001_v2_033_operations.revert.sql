@@ -16,6 +16,7 @@ drop function if exists public.operator_request_check(uuid, uuid, text, jsonb, i
 drop function if exists public.operator_log(uuid, text, uuid, text, text, text);
 drop table if exists public.operator_actions;
 drop function if exists public.is_operator();
+drop function if exists public.is_internal_subject(text, uuid);
 alter table public.accounts drop column if exists internal;
 drop table if exists public.operators;
 

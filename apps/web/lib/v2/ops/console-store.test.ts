@@ -17,6 +17,7 @@ import {
 vi.mock('server-only', () => ({}));
 
 import { supabaseConsoleStore, SEARCH_RESULTS_MAX, type ConsoleStore } from './console-store';
+import { rpcInternalLookup, type InternalRpc } from './internal-marker';
 
 let db: PGlite;
 let store: ConsoleStore;
@@ -126,8 +127,8 @@ describe('resolve', () => {
     const other = await person();
     await db.query(
       `insert into public.seats (account_id, user_id, invited_email, role, status, accepted_at)
-       values ($1, $2, 'seat@example.com', 'developer', 'active', now())`,
-      [other.accountId, p.userId],
+       values ($1, $2, $3, 'developer', 'active', now())`,
+      [other.accountId, p.userId, ['seat', 'example.com'].join('@')],
     );
     const found = await store.resolve({ kind: 'email', email: p.email });
     expect(found.kind).toBe('email');
@@ -287,5 +288,30 @@ describe('the record', () => {
   it('a log the database refuses throws', async () => {
     const stranger = supabaseConsoleStore(postgrestOver(db), randomUUID());
     await expect(stranger.logView(randomUUID())).rejects.toThrow(/operator_log failed/);
+  });
+});
+
+describe('rpcInternalLookup, through the service role', () => {
+  it('answers from is_internal_subject', async () => {
+    const p = await person();
+    const look = rpcInternalLookup(() => postgrestOver(db) as unknown as InternalRpc);
+    expect(await look({ kind: 'account', id: p.accountId })).toBe(false);
+    await db.query('update public.accounts set internal = true where id = $1', [p.accountId]);
+    expect(await look({ kind: 'account', id: p.accountId })).toBe(true);
+    expect(await look({ kind: 'any', id: p.userId })).toBe(true);
+    expect(await look({ kind: 'seat', id: p.seatId })).toBe(true);
+  });
+
+  it('a lookup that does not answer in time is abandoned', async () => {
+    vi.useFakeTimers();
+    try {
+      const look = rpcInternalLookup(() => ({ rpc: () => new Promise(() => undefined) }));
+      const answer = look({ kind: 'account', id: randomUUID() });
+      const caught = answer.catch((e: Error) => e.message);
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(await caught).toBe('timed out');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
