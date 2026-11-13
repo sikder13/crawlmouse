@@ -107,15 +107,22 @@ export async function POST(req: Request) {
   if (entitlement === null) return notFound();
   if (!entitlement.gates.exports) return paywall('exports');
 
-  for (const [key, bound, windowMs] of [
-    [`reports:account:${site.account_id}`, PER_ACCOUNT_HOUR, HOUR_MS],
-    [`reports:account-day:${site.account_id}`, PER_ACCOUNT_DAY, DAY_MS],
-  ] as const) {
-    const limit = await checkRateLimit(key, bound, windowMs, { failClosed: true });
-    if (!limit.allowed) {
-      const seconds = Math.max(1, Math.ceil((limit.resetAt.getTime() - Date.now()) / 1000));
-      return refuse(429, 'rate_limited', {}, { 'retry-after': String(seconds) });
-    }
+  // Each bound is its own call, with its window written out: lib/rate-limit-callers.test.ts reads
+  // the window of each checkRateLimit call from the source.
+  const hour = await checkRateLimit(
+    `reports:account:${site.account_id}`,
+    PER_ACCOUNT_HOUR,
+    HOUR_MS,
+    { failClosed: true },
+  );
+  const limit = hour.allowed
+    ? await checkRateLimit(`reports:account-day:${site.account_id}`, PER_ACCOUNT_DAY, DAY_MS, {
+        failClosed: true,
+      })
+    : hour;
+  if (!limit.allowed) {
+    const seconds = Math.max(1, Math.ceil((limit.resetAt.getTime() - Date.now()) / 1000));
+    return refuse(429, 'rate_limited', {}, { 'retry-after': String(seconds) });
   }
 
   const admin = supabaseAdmin();
