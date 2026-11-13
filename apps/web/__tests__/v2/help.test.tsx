@@ -1,8 +1,11 @@
 /**
  * The help centre (CC-33 D4). Each page is rendered whole, shell and footer included:
- * - every run of digits it shows is a price, a limit or a figure the code that owns it holds, and
- *   built again against altered prices and GATES, the pages lose today's values (a typed figure
- *   stays, and fails);
+ * - every run of digits it shows is a price, a limit or a figure the code that owns it holds;
+ * - built again with each of those owners given another value, the pages show the new values and
+ *   none of today's (the describe block "the figures follow the modules that own them" names each
+ *   owner, the two quoted modules whose sentences it rewrites, and what it leaves unaltered);
+ * - each plan's feature lines follow its GATES, today's and with each switch turned the other way;
+ * - the delete article says what `deletionMoney` says for each subscription state;
  * - every capability it names carries its `CAPABILITIES` key, a coming one with its mark, and its
  *   title and description, which a search result shows with no mark, name no coming capability;
  * - each page has one h1, its own canonical, title and description, and no FAQPage markup;
@@ -20,11 +23,11 @@ import {
 } from '../../lib/auth/constants';
 import * as PRICES from '../../lib/billing/prices';
 import { TRIAL_DAYS, type SubscriptionStatus } from '../../lib/billing/state-machine';
-import { GATES } from '../../lib/entitlement-v2';
+import { GATES, type Tier, type TierGates } from '../../lib/entitlement-v2';
 import { MAGIC_LINK_PER_EMAIL_PER_HOUR } from '../../lib/limits';
 import { DELETE_COPY, deletionMoney, RESTORE_DAYS } from '../../lib/v2/copy/deletion';
 import { CANCEL_CLICKS } from '../../lib/v2/copy/settings';
-import { helpArticles } from '../../lib/v2/help/articles';
+import { helpArticles, type HelpBlock } from '../../lib/v2/help/articles';
 import { HELP_COPY } from '../../lib/v2/help/copy';
 import {
   AI_WEIGHTS,
@@ -36,7 +39,7 @@ import {
 import { HELP_QUESTIONS, HELP_SLUGS, helpPath } from '../../lib/v2/help/questions';
 import { helpArticleView, helpIndexView } from '../../lib/v2/help/view';
 import { ANONYMOUS_EXPIRY_HOURS } from '../../lib/v2/pipeline/limits';
-import { numberWord } from '../../lib/v2/words';
+import { count, numberWord } from '../../lib/v2/words';
 import { capabilitySweep, comingNamedIn } from '../helpers/capability-sweep';
 
 afterEach(() => {
@@ -140,32 +143,117 @@ describe('the numbers on the help pages', () => {
   });
 });
 
-// Built against prices and GATES no copy could contain, the pages must lose today's values, as
-// numerals and as words. A figure typed equal to today's would stay, and fail here.
-describe('the figures follow GATES and prices.ts, not the values typed today', () => {
+/** The help pages' text: the index and each article, in order. */
+async function allText(): Promise<string> {
+  const view = await import('@/lib/v2/help/view');
+  const screens = await import('@/components/v2/screens/help/HelpScreens');
+  const { HELP_SLUGS: slugs } = await import('@/lib/v2/help/questions');
+  return [
+    renderToStaticMarkup(<screens.HelpIndexScreen data={view.helpIndexView()} />),
+    ...slugs.map((s) =>
+      renderToStaticMarkup(<screens.HelpArticleScreen data={view.helpArticleView(s)} />),
+    ),
+  ]
+    .map(textOf)
+    .join('\n');
+}
+
+/** `n` is on the page as a numeral, or as its word when it has one. */
+const shows = (text: string, n: number) =>
+  new Set(numbersIn(text)).has(n) ||
+  (numberWord(n) !== count(n) && new RegExp(`\\b${numberWord(n)}\\b`, 'i').test(text));
+
+// Every figure the pages render is read from a module that owns it. The build below gives each of
+// those modules another value, one the pages do not show today, and then:
+// - each altered value is on the pages (as a numeral, or as the word the page spells it with);
+// - no value of today's is left, as a numeral, nor as a word, but for the words in `PROSE_WORDS`.
+// A figure typed into an article instead of read keeps today's value, and fails one or the other.
+// Owners altered: prices.ts; each GATES number the pages show; TRIAL_DAYS; the sign-in constants;
+// MAGIC_LINK_PER_EMAIL_PER_HOUR; ANONYMOUS_EXPIRY_HOURS; CANCEL_CLICKS; MIN_GRADEABLE_PAGES; the
+// re-check window (pinned.ts). Two modules' sentences are quoted whole, and are built when their
+// module loads, so the build rewrites their figure as that module would print it: the deletion
+// pages' restore window (copy/deletion.ts prints RESTORE_DAYS and spells it "seven") and the
+// crawlers AI_WAITING names ("two"). Not altered: the grade weights and the number of their parts,
+// which pinned.test.ts holds to the engine.
+describe('the figures follow the modules that own them, not the values typed today', () => {
+  const TODAY_RESTORE = RESTORE_DAYS;
   const ALTERED = {
-    free: { pagesPerCheck: 450, manualChecksPerSiteDay: 4 },
-    pro: {
-      sites: 11,
-      seats: 4,
-      competitorsPerSite: 6,
-      pagesPerCheck: 2300,
-      manualChecksPerSiteDay: 17,
+    gates: {
+      free: { sites: 6, fixesVisible: 8, pagesPerCheck: 450, manualChecksPerSiteDay: 43 },
+      pro: {
+        sites: 11,
+        seats: 12,
+        competitorsPerSite: 22,
+        pagesPerCheck: 2300,
+        manualChecksPerSiteDay: 27,
+      },
+      agency: {
+        sites: 37,
+        seats: 31,
+        competitorsPerSite: 29,
+        pagesPerCheck: 2700,
+        manualChecksPerSiteDay: 23,
+      },
     },
-    agency: {
-      sites: 37,
-      seats: 13,
-      competitorsPerSite: 7,
-      pagesPerCheck: 2300,
-      manualChecksPerSiteDay: 17,
-    },
-    prices: {
-      PRO_MONTHLY: 23,
-      PRO_YEARLY: 230,
-      AGENCY_MONTHLY: 123,
-      AGENCY_YEARLY: 1230,
-    },
+    prices: { PRO_MONTHLY: 21, PRO_YEARLY: 210, AGENCY_MONTHLY: 123, AGENCY_YEARLY: 1230 },
+    trialDays: 26,
+    auth: { AUTH_LINK_MINUTES: 45, RESEND_HINT_MINUTES: 33, TRIAL_REMINDER_DAYS_BEFORE_END: 9 },
+    magicLinkPerHour: 41,
+    anonymousHours: 36,
+    cancelClicks: 13,
+    minGradeablePages: 18,
+    recheckWindowHours: 28,
+    restoreDays: 16,
+    scoredCrawlers: 17,
   };
+
+  /** Today's value of each owner the build alters, beside its altered value. */
+  const PAIRS: [string, number, number][] = [
+    ...(['free', 'pro', 'agency'] as const).flatMap((tier) =>
+      Object.entries(ALTERED.gates[tier]).map(([k, v]): [string, number, number] => [
+        `GATES.${tier}.${k}`,
+        GATES[tier][k as keyof (typeof ALTERED.gates)[typeof tier]] as number,
+        v,
+      ]),
+    ),
+    ...Object.entries(ALTERED.prices).map(([k, v]): [string, number, number] => [
+      k,
+      PRICES[k as keyof typeof ALTERED.prices],
+      v,
+    ]),
+    ['TRIAL_DAYS', TRIAL_DAYS, ALTERED.trialDays],
+    ['AUTH_LINK_MINUTES', AUTH_LINK_MINUTES, ALTERED.auth.AUTH_LINK_MINUTES],
+    ['RESEND_HINT_MINUTES', RESEND_HINT_MINUTES, ALTERED.auth.RESEND_HINT_MINUTES],
+    [
+      'TRIAL_REMINDER_DAYS_BEFORE_END',
+      TRIAL_REMINDER_DAYS_BEFORE_END,
+      ALTERED.auth.TRIAL_REMINDER_DAYS_BEFORE_END,
+    ],
+    ['MAGIC_LINK_PER_EMAIL_PER_HOUR', MAGIC_LINK_PER_EMAIL_PER_HOUR, ALTERED.magicLinkPerHour],
+    ['ANONYMOUS_EXPIRY_HOURS', ANONYMOUS_EXPIRY_HOURS, ALTERED.anonymousHours],
+    ['CANCEL_CLICKS', CANCEL_CLICKS, ALTERED.cancelClicks],
+    ['MIN_GRADEABLE_PAGES', MIN_GRADEABLE_PAGES, ALTERED.minGradeablePages],
+    ['RECHECK_WINDOW_HOURS', RECHECK_WINDOW_HOURS, ALTERED.recheckWindowHours],
+    ['the restore window (copy/deletion.ts)', TODAY_RESTORE, ALTERED.restoreDays],
+    ['the scored crawlers AI_WAITING names', 2, ALTERED.scoredCrawlers],
+  ];
+
+  /**
+   * Words of today's values the pages also use for other things, so their presence proves nothing:
+   * "one" and "two" in prose ("for one email", "two grades"), and "two" and "four" counting the
+   * grades' parts, which stay.
+   */
+  const PROSE_WORDS = new Set(['one', 'two', 'four']);
+  /** Numerals that stay: the grade weights, the parts' counts, and the footer's year. */
+  const STAYS = new Set<number>([...numeric(AI_WEIGHTS), ...numeric(SEO_WEIGHTS)]);
+
+  const alterDays = (t: string) =>
+    t
+      .replaceAll(`${TODAY_RESTORE} days`, `${ALTERED.restoreDays} days`)
+      .replace(
+        new RegExp(`\\b${numberWord(TODAY_RESTORE)}\\b`, 'g'),
+        numberWord(ALTERED.restoreDays),
+      );
 
   async function alteredText(): Promise<string> {
     vi.resetModules();
@@ -174,9 +262,9 @@ describe('the figures follow GATES and prices.ts, not the values typed today', (
       return {
         ...real,
         GATES: {
-          free: { ...real.GATES.free, ...ALTERED.free },
-          pro: { ...real.GATES.pro, ...ALTERED.pro },
-          agency: { ...real.GATES.agency, ...ALTERED.agency },
+          free: { ...real.GATES.free, ...ALTERED.gates.free },
+          pro: { ...real.GATES.pro, ...ALTERED.gates.pro },
+          agency: { ...real.GATES.agency, ...ALTERED.gates.agency },
         },
       };
     });
@@ -184,71 +272,187 @@ describe('the figures follow GATES and prices.ts, not the values typed today', (
       ...(await importOriginal<typeof import('@/lib/billing/prices')>()),
       ...ALTERED.prices,
     }));
-    try {
-      const view = await import('@/lib/v2/help/view');
-      const screens = await import('@/components/v2/screens/help/HelpScreens');
-      const { HELP_SLUGS: slugs } = await import('@/lib/v2/help/questions');
-      return [
-        renderToStaticMarkup(<screens.HelpIndexScreen data={view.helpIndexView()} />),
-        ...slugs.map((s) =>
-          renderToStaticMarkup(<screens.HelpArticleScreen data={view.helpArticleView(s)} />),
+    vi.doMock('@/lib/billing/state-machine', async (importOriginal) => ({
+      ...(await importOriginal<typeof import('@/lib/billing/state-machine')>()),
+      TRIAL_DAYS: ALTERED.trialDays,
+    }));
+    vi.doMock('@/lib/auth/constants', async (importOriginal) => ({
+      ...(await importOriginal<typeof import('@/lib/auth/constants')>()),
+      ...ALTERED.auth,
+    }));
+    vi.doMock('@/lib/limits', async (importOriginal) => ({
+      ...(await importOriginal<typeof import('@/lib/limits')>()),
+      MAGIC_LINK_PER_EMAIL_PER_HOUR: ALTERED.magicLinkPerHour,
+    }));
+    vi.doMock('@/lib/v2/pipeline/limits', async (importOriginal) => ({
+      ...(await importOriginal<typeof import('@/lib/v2/pipeline/limits')>()),
+      ANONYMOUS_EXPIRY_HOURS: ALTERED.anonymousHours,
+    }));
+    vi.doMock('@/lib/v2/copy/settings', async (importOriginal) => ({
+      ...(await importOriginal<typeof import('@/lib/v2/copy/settings')>()),
+      CANCEL_CLICKS: ALTERED.cancelClicks,
+    }));
+    vi.doMock('@crawlmouse/types', async (importOriginal) => ({
+      ...(await importOriginal<typeof import('@crawlmouse/types')>()),
+      MIN_GRADEABLE_PAGES: ALTERED.minGradeablePages,
+    }));
+    vi.doMock('@/lib/v2/help/pinned', async (importOriginal) => ({
+      ...(await importOriginal<typeof import('@/lib/v2/help/pinned')>()),
+      RECHECK_WINDOW_HOURS: ALTERED.recheckWindowHours,
+    }));
+    vi.doMock('@/lib/v2/copy/deletion', async (importOriginal) => {
+      const real = await importOriginal<typeof import('@/lib/v2/copy/deletion')>();
+      return {
+        ...real,
+        DELETE_COPY: {
+          ...real.DELETE_COPY,
+          what: real.DELETE_COPY.what.map(alterDays),
+          moneyEnds: alterDays(real.DELETE_COPY.moneyEnds),
+          moneyNotCollected: alterDays(real.DELETE_COPY.moneyNotCollected),
+          money: real.DELETE_COPY.money.map(alterDays),
+        },
+        deletionMoney: (status: string | null) =>
+          real.deletionMoney(status)?.map(alterDays) ?? null,
+      };
+    });
+    vi.doMock('@/lib/v2/view/effect-headline', async (importOriginal) => {
+      const real = await importOriginal<typeof import('@/lib/v2/view/effect-headline')>();
+      return {
+        ...real,
+        AI_WAITING: Object.fromEntries(
+          Object.entries(real.AI_WAITING).map(([k, t]) => [
+            k,
+            t.replace(
+              /\btwo scored crawlers\b/,
+              `${numberWord(ALTERED.scoredCrawlers)} scored crawlers`,
+            ),
+          ]),
         ),
-      ]
-        .map(textOf)
-        .join('\n');
+      };
+    });
+    const mocked = [
+      '@/lib/entitlement-v2',
+      '@/lib/billing/prices',
+      '@/lib/billing/state-machine',
+      '@/lib/auth/constants',
+      '@/lib/limits',
+      '@/lib/v2/pipeline/limits',
+      '@/lib/v2/copy/settings',
+      '@crawlmouse/types',
+      '@/lib/v2/help/pinned',
+      '@/lib/v2/copy/deletion',
+      '@/lib/v2/view/effect-headline',
+    ];
+    try {
+      return await allText();
     } finally {
-      vi.doUnmock('@/lib/entitlement-v2');
-      vi.doUnmock('@/lib/billing/prices');
+      for (const m of mocked) vi.doUnmock(m);
       vi.resetModules();
     }
   }
 
-  const altered = new Set<number>(Object.values(ALTERED).flatMap(numeric));
-  /** Words the pages use for other figures, which stay whatever the prices and gates are. */
-  const otherWords = new Set(
-    [
-      MIN_GRADEABLE_PAGES,
-      TRIAL_REMINDER_DAYS_BEFORE_END,
-      CANCEL_CLICKS,
-      GATES.free.sites,
-      GATES.free.fixesVisible as number,
-    ].map(numberWord),
-  );
-  /** Figures the pages show that no alteration moves: today's value of one of them stays. */
-  const stays = new Set<number>([
-    TRIAL_DAYS,
-    ...numeric(AI_WEIGHTS),
-    ...numeric(SEO_WEIGHTS),
-    ANONYMOUS_EXPIRY_HOURS,
-    AUTH_LINK_MINUTES,
-    MAGIC_LINK_PER_EMAIL_PER_HOUR,
-    RESTORE_DAYS,
-  ]);
-  /** Today's values the alteration moves, but for one, two and the figures that stay. */
-  const moved = [
-    GATES.free.pagesPerCheck,
-    GATES.free.manualChecksPerSiteDay,
-    ...Object.keys(ALTERED.pro).map((k) => GATES.pro[k as keyof typeof ALTERED.pro]),
-    ...Object.keys(ALTERED.agency).map((k) => GATES.agency[k as keyof typeof ALTERED.agency]),
-    ...Object.keys(ALTERED.prices).map((k) => PRICES[k as keyof typeof ALTERED.prices]),
-  ].filter((n): n is number => typeof n === 'number' && n > 2 && !altered.has(n) && !stays.has(n));
+  it('no altered value is on today’s pages, so finding one later proves it was read', async () => {
+    const today = await allText();
+    expect(PAIRS.filter(([, , altered]) => shows(today, altered))).toEqual([]);
+    expect(new Set(PAIRS.map(([, , altered]) => altered)).size).toBe(PAIRS.length);
+    expect(PAIRS.filter(([, now]) => PAIRS.some(([, , altered]) => altered === now))).toEqual([]);
+  });
 
-  it('the altered values in, today’s out', async () => {
+  it('each altered value is on the altered pages', async () => {
     const text = await alteredText();
-    expect(text).toContain(PRICES.usd(ALTERED.prices.AGENCY_YEARLY));
-    expect(text).toContain(`${ALTERED.pro.sites} sites`);
-    expect(text).toContain(`${ALTERED.agency.pagesPerCheck.toLocaleString('en-US')} pages`);
-    expect(moved.length).toBeGreaterThan(8);
-    expect(moved).toEqual(expect.arrayContaining([GATES.free.pagesPerCheck, PRICES.PRO_MONTHLY]));
+    const missing = PAIRS.filter(([, , altered]) => !shows(text, altered)).map(([name]) => name);
+    expect(missing).toEqual([]);
+    expect(text).toContain(`${count(ALTERED.restoreDays)} days`);
+    expect(text).toMatch(new RegExp(`\\b${numberWord(ALTERED.restoreDays)} days\\b`));
+  });
+
+  it('no value of today’s is left on the altered pages', async () => {
+    const text = await alteredText();
     const numerals = new Set(numbersIn(text));
-    const left = moved.filter(
-      (n) =>
-        numerals.has(n) ||
-        (!otherWords.has(numberWord(n)) &&
-          numberWord(n) !== String(n) &&
-          new RegExp(`\\b${numberWord(n)}\\b`, 'i').test(text)),
-    );
+    const left = PAIRS.filter(([, now]) => {
+      if (!STAYS.has(now) && numerals.has(now)) return true;
+      const word = numberWord(now);
+      return (
+        word !== count(now) && !PROSE_WORDS.has(word) && new RegExp(`\\b${word}\\b`, 'i').test(text)
+      );
+    }).map(([name, now]) => `${name} (${now})`);
     expect(left).toEqual([]);
+  });
+});
+
+/** An article's plan section: the capability keys of the list under `heading`. */
+function planKeys(articles: { slug: string; blocks: HelpBlock[] }[], heading: string): string[][] {
+  const blocks = articles.find((a) => a.slug === 'plans')!.blocks;
+  const at = blocks.findIndex((b) => b.kind === 'heading' && b.text === heading);
+  const list = blocks.slice(at + 1).find((b) => b.kind === 'list');
+  if (list?.kind !== 'list') throw new Error(`no list under ${heading}`);
+  return list.items.map((i) => [...i.capabilities]);
+}
+
+/** The feature lines a tier's gates call for, beyond the four every plan has, by their keys. */
+function expectedFeatures(g: TierGates): string[][] {
+  return [
+    ...(g.slack ? [['change_emails', 'slack_alerts']] : []),
+    ...(g.seats > 1 ? [['seats']] : []),
+    ...(g.competitorsPerSite > 0 ? [['competitors']] : []),
+    ...(g.exports ? [['exports']] : []),
+    ...(g.agencyBranding ? [['client_reports', 'client_report_page']] : []),
+  ];
+}
+
+describe('each plan’s feature lines follow its GATES', () => {
+  const HEADINGS = { free: 'Free', pro: 'Pro', agency: 'Agency' } as const;
+  // Each switch the lines read, turned the other way on Free and on Agency.
+  const FLIPPED = {
+    free: { slack: true, seats: 3, competitorsPerSite: 2, exports: true, agencyBranding: true },
+    agency: {
+      slack: false,
+      seats: 1,
+      competitorsPerSite: 0,
+      exports: false,
+      agencyBranding: false,
+    },
+  };
+
+  const check = (
+    articles: { slug: string; blocks: HelpBlock[] }[],
+    gates: Record<Tier, TierGates>,
+  ) => {
+    for (const tier of ['free', 'pro', 'agency'] as const) {
+      const keys = planKeys(articles, HEADINGS[tier]);
+      expect(keys.slice(4), tier).toEqual(expectedFeatures(gates[tier]));
+      expect(keys).toHaveLength(4 + expectedFeatures(gates[tier]).length);
+    }
+  };
+
+  it('today’s GATES', () => {
+    check(helpArticles(), GATES);
+    expect(expectedFeatures(GATES.free)).toEqual([]);
+    expect(expectedFeatures(GATES.agency).length).toBeGreaterThan(3);
+  });
+
+  it('GATES with each switch turned the other way', async () => {
+    vi.resetModules();
+    vi.doMock('@/lib/entitlement-v2', async (importOriginal) => {
+      const real = await importOriginal<typeof import('@/lib/entitlement-v2')>();
+      return {
+        ...real,
+        GATES: {
+          free: { ...real.GATES.free, ...FLIPPED.free },
+          pro: real.GATES.pro,
+          agency: { ...real.GATES.agency, ...FLIPPED.agency },
+        },
+      };
+    });
+    try {
+      const { helpArticles: altered } = await import('@/lib/v2/help/articles');
+      const { GATES: flipped } = await import('@/lib/entitlement-v2');
+      expect(flipped.free.exports).toBe(true);
+      check(altered(), flipped);
+    } finally {
+      vi.doUnmock('@/lib/entitlement-v2');
+      vi.resetModules();
+    }
   });
 });
 
