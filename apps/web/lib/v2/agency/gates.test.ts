@@ -102,9 +102,14 @@ describe('sitesFullMessage', () => {
 });
 
 describe('the gate sentences other files say', () => {
-  // Each file below words a limit or a price for a reader. None may write the number itself: the
-  // sentence comes from gates.ts, or takes the number as a parameter.
-  const HAND_WRITTEN = /\$\s?\d|\b\d+\s+(?:sites?|seats?|clients?|fix(?:es)?)\b/;
+  // Each file below words a limit, a price or a length in days for a reader. None may write the
+  // number itself: the sentence comes from gates.ts, or takes the number as a parameter.
+  //
+  // What this does not see: a digit with neither a `$` before it nor one of the nouns after it; a
+  // length in another unit (NOTICE_LINES writes "the last 24 hours"); a number spelled out that
+  // SPELLED does not list; and what follows the slice read from a copy module, its lock
+  // corrections and additions (SEATS_ADDITIONS quotes "seven days").
+  const HAND_WRITTEN = /\$\s?\d|\b\d+\s+(?:sites?|seats?|clients?|fix(?:es)?|days?)\b/;
   const read = (path: string) => readFileSync(resolve(__dirname, path), 'utf8');
   /** The code without its comments, which quote examples ("Agency · $99 a month"). */
   const uncommented = (source: string) =>
@@ -114,6 +119,8 @@ describe('the gate sentences other files say', () => {
     expect('Agency is $99 a month').toMatch(HAND_WRITTEN);
     expect('keeps 25 sites').toMatch(HAND_WRITTEN);
     expect('has 5 seats').toMatch(HAND_WRITTEN);
+    expect('The trial lasts 14 days.').toMatch(HAND_WRITTEN);
+    expect('`The link works for ${days} days.`').not.toMatch(HAND_WRITTEN);
     expect('`${count(n)} sites`').not.toMatch(HAND_WRITTEN);
   });
 
@@ -139,7 +146,7 @@ describe('the gate sentences other files say', () => {
   // buy line are composed in the view, and each screen's copy module holds the sentences around
   // them. In these the number is a parameter or a constant's value, in digits or in words.
   const SPELLED =
-    /\b(?:two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|twenty|thirty)\b/i;
+    /\b(?:two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|twenty|thirty)\b/i;
   const whole = (path: string) => uncommented(read(path));
   const between = (path: string, from: string, to: string) => {
     const source = read(path);
@@ -151,6 +158,7 @@ describe('the gate sentences other files say', () => {
 
   it('finds a limit spelled out where there is one', () => {
     expect('Beyond five, a seat is more').toMatch(SPELLED);
+    expect('The trial lasts fourteen days.').toMatch(SPELLED);
     expect('`Beyond ${numberWord(GATES.agency.seats)}, `').not.toMatch(SPELLED);
   });
 

@@ -6,6 +6,10 @@
  * offers the plans instead. The site the card makes reports for is the page's `?site=`, by default
  * the primary site.
  *
+ * A reader whose seat covers some clients reads those clients' sites and reports (spec 31 §4). What
+ * the screen counts from them, or finds none of, it says of the seat's sites and not of the account:
+ * the header's site count, the count of reports to send, and the three lines for nothing there.
+ *
  * A live page hands the view what the records do not hold (`ReportsSide`): each report's file state,
  * whether the reader's role may share, and a link just made. With the file states given, a report is
  * offered for download, opening or sharing only when its file is stored; a pending one and a failed
@@ -29,6 +33,7 @@ import {
   primarySite,
   primarySites,
   readerRole,
+  readerSeat,
   resultChecks,
   viewAt,
   type AccountDataset,
@@ -155,11 +160,15 @@ export function reportsView(
     (a, b) => at(a.created_at) - at(b.created_at) || a.id.localeCompare(b.id),
   );
   const host = new Map(sites.map((s) => [s.id, s.host]));
+  const seat = readerSeat(v);
+  /** The reader's records are their seat's clients, not the account's. */
+  const scoped = v.seatId !== null && seat !== null && seat.client_scope !== 'all';
+  const ofSeat = (line: string) => (scoped ? COPY.ofSeat(line) : line);
 
   // ── the header ──
   const trial = v.account.state === 'pro_trial' || v.account.state === 'agency_trial';
   const line = [
-    COPY.sites(sites.length),
+    scoped ? COPY.sitesInSeat(sites.length) : COPY.sites(sites.length),
     v.gates.exports ? COPY.exportsOn(plan) : COPY.exportsAre(exportsPlan),
     ...(trial ? [COPY.daysLeft(calendarDays(v.now, v.account.trial_ends_at!, zone), plan)] : []),
   ].join(' · ');
@@ -296,7 +305,9 @@ export function reportsView(
         ? latest
           ? COPY.makeSub(chosen.host, when(latest.finished_at!))
           : COPY.makeNoCheck(chosen.host)
-        : COPY.noSites,
+        : scoped
+          ? COPY.noSitesInSeat
+          : COPY.noSites,
       gate: v.tier === 'agency' ? null : gateMessage('exports', v.tier),
       sites: sites.map((s) => ({ value: s.id, label: s.host })),
       selected: chosen?.id ?? '',
@@ -349,11 +360,11 @@ export function reportsView(
             : null,
       })),
       foot: COPY.madeFoot(SHARE_LINK_DAYS, exportsPlan),
-      empty: made.length ? null : COPY.madeEmpty,
+      empty: made.length ? null : scoped ? COPY.madeEmptyInSeat : COPY.madeEmpty,
     },
     scheduled: {
       title: COPY.scheduledTitle,
-      sub: scheduled.length ? COPY.toSend(scheduled.length) : COPY.none,
+      sub: ofSeat(scheduled.length ? COPY.toSend(scheduled.length) : COPY.none),
       rows: scheduled.map((r) => ({
         key: r.id,
         when: when(r.scheduled_for!),

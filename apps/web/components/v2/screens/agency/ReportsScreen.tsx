@@ -50,6 +50,7 @@ function Clients({ clients }: { clients: ClientReportsView['clients'] }) {
         <Table
           label={COPY.clientsLabel}
           rowHeader
+          className={shared.rowHeaded}
           columns={[
             { header: C.client },
             { header: C.contact },
@@ -117,6 +118,7 @@ function Sent({ sent }: { sent: ClientReportsView['sent'] }) {
         <Table
           label={COPY.sentLabel}
           rowHeader
+          className={shared.rowHeaded}
           columns={[
             { header: C.sent, muted: true },
             { header: C.client, mono: true },

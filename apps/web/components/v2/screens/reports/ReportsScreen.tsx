@@ -102,6 +102,7 @@ export function ReportsScreen({
           <Table
             label={T.made}
             rowHeader
+            className={shared.rowHeaded}
             columns={[
               { header: C.made },
               { header: C.site, mono: true },
@@ -158,6 +159,7 @@ export function ReportsScreen({
           <Table
             label={T.scheduled}
             rowHeader
+            className={shared.rowHeaded}
             columns={[
               { header: C.when },
               { header: C.site, mono: true },

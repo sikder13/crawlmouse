@@ -24,6 +24,7 @@ import { fixture } from '../fixtures';
 import type { Viewer } from './account';
 import { agencyClientView } from './agency-client';
 import { agencyGate, agencyHomeView, type MatrixView } from './agency-matrix';
+import { agencyReportsView } from './agency-reports';
 import { dashboardView } from './dashboard';
 
 const d = fixture('challenged-site');
@@ -168,6 +169,60 @@ describe('the client matrix', () => {
     expect(page.client.rows[1]!.value).toContain('paused by the recipient');
   });
 
+  it('says of a schedule in the Agency trial that it is not sent, unless its contact is the owner’s own address', () => {
+    // Kestrel is in its Agency trial; its one client is given a schedule and a contact.
+    const account = d.accounts.find((a) => a.id === KESTREL_ACCOUNT_ID)!;
+    expect([account.state, account.email]).toEqual(['agency_trial', 'jo@kestrel-creative.example']);
+    const weekly = d.sites.find((s) => s.id === GRANITEPEAK_SITE)!.client_report!;
+    const pinecrest = (over: Partial<FixtureDataset['sites'][number]>) =>
+      edit((x) => ({
+        sites: x.sites.map((s) =>
+          s.id === PINECREST ? { ...s, client_report: weekly, ...over } : s,
+        ),
+      }));
+    const cell = (data: FixtureDataset, viewer: Viewer = kestrel) =>
+      matrix(data, viewer)
+        .clients.rows.find((r) => r.key === PINECREST)!
+        .schedule.split(' · ')
+        .at(-1);
+    const outside = pinecrest({ client_contact_email: 'client@pinecrest.example' });
+    expect(cell(outside)).toBe('report weekly, Mon (not sent during the trial)');
+    // The owner's own address is sent to, whatever its capitals.
+    expect(cell(pinecrest({ client_contact_email: account.email }))).toBe('report weekly, Mon');
+    expect(cell(pinecrest({ client_contact_email: 'Jo@Kestrel-Creative.example' }))).toBe(
+      'report weekly, Mon',
+    );
+    // With no contact there is nobody the trial keeps it from.
+    expect(cell(pinecrest({ client_contact_email: null }))).toBe('report weekly, Mon (no contact)');
+    // The trial holds it whatever its recipient did before: nothing is sent either way.
+    expect(
+      cell(
+        pinecrest({
+          client_contact_email: 'client@pinecrest.example',
+          client_report: { ...weekly, paused_by_recipient_at: '2026-11-01T09:00:00Z' },
+        }),
+      ),
+    ).toBe('report weekly, Mon (not sent during the trial)');
+    // The same contact on an account that is on the plan is not held.
+    expect(matrix(d, northwind).clients.rows.map((r) => r.schedule.split(' · ').at(-1))).toEqual([
+      'report weekly, Mon',
+      'report monthly, first Mon',
+    ]);
+    // The client reports screen calls the same contact held by the trial, and the other two not.
+    const held = (data: FixtureDataset) => {
+      const page = agencyReportsView(data, kestrel, {}, '/agency/reports');
+      if (page.kind !== 'reports') throw new Error(`expected client reports, got ${page.kind}`);
+      return page.clients.rows.find((r) => r.key === PINECREST)!.contact.state === 'trial';
+    };
+    for (const data of [
+      outside,
+      pinecrest({ client_contact_email: account.email }),
+      pinecrest({ client_contact_email: 'Jo@Kestrel-Creative.example' }),
+    ]) {
+      expect(cell(data)!.includes('not sent during the trial')).toBe(held(data));
+    }
+  });
+
   it('leaves a staging copy out: it is not a client', () => {
     const copy = { ...d.sites[0]!, id: 'copy', host: 'staging.granitepeak.example' };
     const withCopy = edit((x) => ({
@@ -278,6 +333,16 @@ describe('the matrix, adding a client', () => {
       ),
     };
     expect(actions(trial, northwind, true)).toEqual([]);
+    // On the plan and paid, but the records do not say it renews (a subscription set to end, or
+    // none: `accountFromRow` writes `renews_at: null`): the purchase route refuses the change.
+    const ending = {
+      ...full,
+      accounts: full.accounts.map((a) =>
+        a.id === NORTHWIND_ACCOUNT_ID ? { ...a, renews_at: null } : a,
+      ),
+    };
+    expect(full.accounts.find((a) => a.id === NORTHWIND_ACCOUNT_ID)!.renews_at).not.toBeNull();
+    expect(actions(ending, paid, true)).toEqual([]);
     // Billing off: /seats draws no buy form, so there is nothing to link.
     expect(actions(full, paid, false)).toEqual([]);
     // A seat that is not the owner's may not buy: an account manager whose seat covers every

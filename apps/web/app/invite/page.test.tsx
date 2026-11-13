@@ -98,6 +98,18 @@ async function paidOwner(tier: 'pro' | 'agency'): Promise<Person> {
   return owner;
 }
 
+/** The subscription `makePaid` named on the account, as its row: one that renews, or one set to end. */
+async function subscription(accountId: string, cancelAtPeriodEnd: boolean) {
+  await h.db.query(
+    `insert into public.subscriptions (id, account_id, status, plan, interval, current_period_end,
+                                       cancel_at_period_end)
+     select current_subscription_id, id, 'active', 'agency', 'month', now() + interval '20 days', $2
+       from public.accounts where id = $1
+     on conflict (id) do update set cancel_at_period_end = excluded.cancel_at_period_end`,
+    [accountId, cancelAtPeriodEnd],
+  );
+}
+
 describe('/invite', () => {
   it('is a 404 with V2_CHECKS_PUBLIC unset', async () => {
     vi.stubEnv('V2_CHECKS_PUBLIC', '');
@@ -175,6 +187,34 @@ describe('/invite', () => {
     expect(html).not.toMatch(/<form/);
   });
 
+  it('after an acceptance refused for a link that is gone, says the link cannot be used and nothing else', async () => {
+    const owner = await paidOwner('agency');
+    const guest = await person(h.db, 'guest');
+    await invitation(owner, guest.email);
+    as(guest);
+    // POST /api/seats/accept cleared the cookie and sent the form back with the code.
+    const html = await invitePage({ notice: 'invite_gone' });
+    const card = /<section[\s\S]*<\/section>/.exec(html)![0];
+    expect(card).toContain('This invitation cannot be used');
+    expect(card).toContain('accepted, replaced by a newer one, removed, or it has expired');
+    expect(card).not.toContain('This page holds no invitation');
+    expect(card).not.toContain('Open the link in the invitation email again');
+    // One message: the notice's own sentence is not drawn beside the state's.
+    expect(card).not.toContain('accepted, replaced, removed or has expired');
+    expect(card.match(/<p[ >]/g)).toHaveLength(1);
+    expect(card).not.toMatch(/<form/);
+  });
+
+  it('after an acceptance refused for no token, says the page holds no invitation and nothing else', async () => {
+    as(await person(h.db, 'guest'));
+    const html = await invitePage({ notice: 'invite_no_link' });
+    const card = /<section[\s\S]*<\/section>/.exec(html)![0];
+    expect(card).toContain('This page holds no invitation');
+    expect(card).toContain('Open the link in the invitation email again.');
+    expect(card).not.toContain('cannot be used');
+    expect(card.match(/<p[ >]/g)).toHaveLength(1);
+  });
+
   it('shows the line of a refused acceptance', async () => {
     const owner = await paidOwner('agency');
     const guest = await person(h.db, 'guest');
@@ -204,6 +244,7 @@ describe('/seats', () => {
 
   it('the owner of an Agency account sees the people, the invite form and the plan’s extras', async () => {
     const owner = await paidOwner('agency');
+    await subscription(owner.accountId, false);
     const member = await person(h.db, 'member');
     const seatId = await addSeat(h.db, owner.accountId, member, 'developer');
     await invitation(owner, 'pending@example.com');
@@ -223,9 +264,33 @@ describe('/seats', () => {
   });
 
   it('with V2_BILLING unset the plan’s extras are not offered', async () => {
+    const owner = await paidOwner('agency');
+    await subscription(owner.accountId, false);
+    as(owner);
+    expect(await seatsPage()).toContain('/api/billing/seats');
     vi.stubEnv('V2_BILLING', '');
-    as(await paidOwner('agency'));
     expect(await seatsPage()).not.toContain('/api/billing/seats');
+  });
+
+  it('a plan set to end, or an account whose subscription has no row, is offered no extras: the purchase route would refuse', async () => {
+    const owner = await paidOwner('agency');
+    as(owner);
+    const page = async () => (await seatsPage()).replace(/^[\s\S]*<main/, '<main');
+    // No row for the subscription the account names.
+    const none = await page();
+    expect(none).not.toContain('/api/billing/seats');
+    expect(none).toContain('Four seats free.');
+    expect(none).not.toContain('a seat a month');
+    // The owner still invites.
+    expect(none).toMatch(/<form[^>]* action="\/api\/seats"/);
+    await subscription(owner.accountId, false);
+    const renewing = await page();
+    expect(renewing).toMatch(/<form[^>]* action="\/api\/billing\/seats"/);
+    expect(renewing).toContain('Four seats free. Beyond five, $12 a seat a month.');
+    await subscription(owner.accountId, true);
+    const ending = await page();
+    expect(ending).not.toContain('/api/billing/seats');
+    expect(ending).not.toContain('a seat a month');
   });
 
   it('a developer on the account sees the people and the role table, and no form', async () => {

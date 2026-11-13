@@ -13,7 +13,7 @@
  */
 import { instant, type Site } from '@crawlmouse/types/v2';
 import { GATES } from '../../entitlement-v2';
-import { extrasSold } from '../agency/extras-bounds';
+import { extrasOffered } from '../agency/extras-bounds';
 import { roleMay } from '../agency/guard';
 import { agencyGateMessage } from '../agency/gates';
 import { CLIENT_COPY, MATRIX_COPY as COPY } from '../copy/agency';
@@ -70,7 +70,10 @@ export interface ClientRowView {
   /** "Fri 6 Nov around 06:00", or "none scheduled". */
   nextCheck: string;
   lastCheck: string;
-  /** "weekly, Fri · report weekly, Mon", with what holds the report where something does. */
+  /**
+   * "weekly, Fri · report weekly, Mon", and after a report's schedule the one of three holds the
+   * account's records show (`reportCell`). A contact that has not confirmed is not among them.
+   */
   schedule: string;
 }
 
@@ -164,19 +167,30 @@ export interface AgencyReader {
 }
 
 /**
- * The report's schedule, and after it what keeps a report from going: its recipient paused it (the
- * client page's words), or the client has no contact to send to.
+ * The report's schedule, and after it what the account's own records show is keeping a report from
+ * going: the client has no contact to send to; the account is in its Agency trial and the contact
+ * is not its owner's own address (`due_report_schedules` sends to that address alone in a trial,
+ * comparing in lower case; `Account.email` is the owner's); or its recipient paused it (the client
+ * page's words). The trial is said before the pause, as the client reports screen says it: nothing
+ * is sent either way.
+ *
+ * Whether the contact has confirmed is not in these records. The client reports page reads it
+ * apart, so here a schedule that waits on a confirmation reads as one that sends.
  */
-function reportCell(s: Site): string {
+function reportCell(v: AccountView, s: Site): string {
   const r = s.client_report;
   if (!r) return COPY.noReport;
   const when = COPY.report(r.cadence, WEEKDAYS[r.iso_weekday]!);
+  const contact = s.client_contact_email;
   const held =
-    r.paused_by_recipient_at !== null
-      ? CLIENT_COPY.pausedByRecipient
-      : s.client_contact_email === null
-        ? COPY.noContact
-        : null;
+    contact === null
+      ? COPY.noContact
+      : v.account.state === 'agency_trial' &&
+          contact.toLowerCase() !== v.account.email.toLowerCase()
+        ? COPY.heldInTrial
+        : r.paused_by_recipient_at !== null
+          ? CLIENT_COPY.pausedByRecipient
+          : null;
   return held === null ? when : COPY.reportHeld(when, held);
 }
 
@@ -335,7 +349,7 @@ function matrixView(
         first: firstOf(d, viewer, s),
         nextCheck: nextCheck(s, v, (ts) => dayDate(ts, zone)) ?? COPY.noNextCheck,
         lastCheck: row.lastCheck,
-        schedule: `${row.schedule} · ${reportCell(s)}`,
+        schedule: `${row.schedule} · ${reportCell(v, s)}`,
       };
     })
     .sort(byProblem);
@@ -359,7 +373,7 @@ function matrixView(
     n >= limit &&
     limit < GATES.agency.maxSites &&
     // The link is to the buy form, which `/seats` draws for these accounts (lib/v2/view/seats.ts).
-    extrasSold(v.account.state, v.gates.agencyBranding) &&
+    extrasOffered(v.account, v.gates.agencyBranding) &&
     role !== null &&
     roleMay(role, 'buy_seats');
   const compared = clients.filter((s) => resultChecks(v, s.id).length > 1).length;

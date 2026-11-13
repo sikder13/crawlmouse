@@ -248,6 +248,78 @@ describe('Reports, on Northwind’s Agency account (challenged-site)', () => {
   });
 });
 
+describe('Reports, read by a seat that covers some of the account’s clients', () => {
+  const d = fixture('challenged-site');
+  const NORTHWIND = ACCOUNT_VIEWERS.withheld().accountId;
+  const seat = (name: string) => d.seats.find((s) => s.name === name)!;
+  const sam = seat('Sam');
+  const [harborlight] = sam.client_scope as string[];
+  /** What Sam's session reads of Northwind (spec 31 §4): his one client, and what is recorded of it. */
+  const samReads = (over: Partial<typeof d> = {}) => {
+    const checks = new Set(d.checks.filter((c) => c.site_id === harborlight).map((c) => c.id));
+    return {
+      ...d,
+      sites: d.sites.filter((s) => s.id === harborlight),
+      checks: d.checks.filter((c) => checks.has(c.id)),
+      fixes: d.fixes.filter((f) => f.site_id === harborlight),
+      fix_events: [],
+      changes: d.changes.filter((c) => checks.has(c.check_id)),
+      reports: d.reports.filter((r) => r.site_id === harborlight),
+      seats: d.seats.filter((s) => s.id === sam.id || s.role === 'owner'),
+      ...over,
+    };
+  };
+  const as = (seatId: string, data = samReads()) =>
+    reportsView(data, { ...ACCOUNT_VIEWERS.withheld(), seatId }, {}, BASE);
+
+  it('counts its sites as the seat’s, and its reports to send as theirs: the account has more of both', () => {
+    expect(sam.client_scope).toHaveLength(1);
+    const clients = d.sites.filter((s) => s.account_id === NORTHWIND);
+    expect(clients).toHaveLength(2);
+    const v = as(sam.id);
+    expect(v.header.line).toBe('1 site in your seat · exports and PDF on Agency');
+    expect(v.scheduled.rows.map((r) => r.site)).toEqual(['harborlight.example']);
+    expect(v.scheduled.sub).toBe('1 report to send for the sites in your seat');
+    // The account, as a seat that covers every client reads it.
+    const whole = reportsView(
+      d,
+      { ...ACCOUNT_VIEWERS.withheld(), seatId: seat('Lee').id },
+      {},
+      BASE,
+    );
+    expect([seat('Lee').role, seat('Lee').client_scope]).toEqual(['developer', 'all']);
+    expect(whole.header.line).toBe('2 sites · exports and PDF on Agency');
+    expect(whole.scheduled.sub).toBe('2 reports to send');
+    expect(as(seat('Alex').id, d).header.line).toBe(whole.header.line);
+  });
+
+  it('says of nothing made, nothing to send and no site that it is so for the seat’s sites', () => {
+    const empty = as(sam.id, samReads({ reports: [] }));
+    expect(empty.made.empty).toBe('No reports yet for the sites in your seat.');
+    expect(empty.scheduled.sub).toBe('None for the sites in your seat');
+    const noSite = as(
+      sam.id,
+      samReads({ sites: [], checks: [], fixes: [], changes: [], reports: [] }),
+    );
+    expect(noSite.header.line).toBe('0 sites in your seat · exports and PDF on Agency');
+    expect(noSite.make.sub).toBe(
+      'No site is in your seat yet: reports are made from a site’s checks.',
+    );
+    // The same records read by the owner are the account's, and are said of it.
+    const owner = as(seat('Alex').id, samReads({ reports: [] }));
+    expect(owner.made.empty).toBe('No reports yet.');
+    expect(owner.scheduled.sub).toBe('None');
+    expect(
+      as(seat('Alex').id, samReads({ sites: [], checks: [], fixes: [], changes: [], reports: [] }))
+        .make.sub,
+    ).toBe('No sites yet: reports are made from a site’s checks.');
+  });
+
+  it('a preview, which names no seat, reads as the owner', () => {
+    expect(northwind().header.line).toBe('2 sites · exports and PDF on Agency');
+  });
+});
+
 describe('Reports, on the stand-in Free account', () => {
   it('offers the plans instead of making anything', () => {
     const v = reportsView(fixture('clean-site'), CLEAN_VIEWER, {}, BASE);

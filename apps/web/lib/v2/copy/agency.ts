@@ -68,6 +68,8 @@ export const MATRIX_COPY = {
   /** After a schedule, what keeps its reports from going: "report weekly, Mon (no contact)". */
   reportHeld: (report: string, why: string) => `${report} (${why})`,
   noContact: 'no contact',
+  /** In the Agency trial, for a contact that is not the account owner's own address. */
+  heldInTrial: 'not sent during the trial',
   runFirst: 'Run the first check',
   /** Setup, one step at a time: each is the page's one next step while it is the first not done. */
   steps: {

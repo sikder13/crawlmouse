@@ -244,14 +244,14 @@ account with members and an invitation.
 
 **Routes** (each a 404 with `V2_CHECKS_PUBLIC` unset):
 
-| Route                                      | Who                                                                  | Answers                                                                                                                                                        |
-| ------------------------------------------ | -------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `POST /api/seats` `{email, role, scope}`   | `seat_may('invite_seat')`, in the account the caller acts in         | 201; 402 `upgrade_required` with gate `seats` and `canBuySeats` (Free, or no seat free); 409 `seat_exists`; 400 `invalid_scope`; 429 `rate_limited`            |
-| `PATCH /api/seats/id/[id]` `{role, scope}` | `seat_may('change_seat')`                                            | 200; 404; 409 `seat_owner`                                                                                                                                     |
-| `DELETE /api/seats/id/[id]`                | `seat_may('remove_seat')`                                            | 200; 404; 409 `seat_owner`                                                                                                                                     |
-| `POST /api/seats/id/[id]/resend`           | `seat_may('invite_seat')`                                            | 200; 404; 409 `not_invited`; 429                                                                                                                               |
-| `POST /api/seats/accept`                   | a signed-in user; the token is read from the `cm_link_invite` cookie | 200 or a 303 to `/dashboard`, with the switcher cookie set to the joined account; 410 `invite_gone`; 403 `email_mismatch`; 409 `invite_full`, `already_member` |
-| `GET /invite/[token]`                      | anyone holding the link                                              | moves the token into the cookie and answers 303 to `/invite`; changes nothing                                                                                  |
+| Route                                      | Who                                                                  | Answers                                                                                                                                                                                                     |
+| ------------------------------------------ | -------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST /api/seats` `{email, role, scope}`   | `seat_may('invite_seat')`, in the account the caller acts in         | 201; 402 `upgrade_required` with gate `seats` and `canBuySeats` (Free, or no seat free); 409 `seat_exists`; 400 `invalid_scope`; 429 `rate_limited`                                                         |
+| `PATCH /api/seats/id/[id]` `{role, scope}` | `seat_may('change_seat')`                                            | 200; 404; 409 `seat_owner`                                                                                                                                                                                  |
+| `DELETE /api/seats/id/[id]`                | `seat_may('remove_seat')`                                            | 200; 404; 409 `seat_owner`                                                                                                                                                                                  |
+| `POST /api/seats/id/[id]/resend`           | `seat_may('invite_seat')`                                            | 200; 404; 409 `not_invited`; 429                                                                                                                                                                            |
+| `POST /api/seats/accept`                   | a signed-in user; the token is read from the `cm_link_invite` cookie | 200 or a 303 to `/dashboard`, with the switcher cookie set to the joined account; 410 `invite_no_link` (no token in the cookie) or `invite_gone`; 403 `email_mismatch`; 409 `invite_full`, `already_member` |
+| `GET /invite/[token]`                      | anyone holding the link                                              | moves the token into the cookie and answers 303 to `/invite`; changes nothing                                                                                                                               |
 
 A seat's own routes are under `/api/seats/id/`: a seat id directly under `/api/seats` would also match
 `/api/seats/accept` and `/api/seats/switch`, and the route registry holds each path to one row
@@ -267,12 +267,26 @@ last ten minutes, because a reader who is not signed in leaves the page to sign 
 comes back to it.
 `pnpm --filter @crawlmouse/web exec vitest run lib/v2/account/link-cookie.test.ts app/invite/page.test.tsx`.
 
+A refused acceptance sends the form back to `/invite?notice=<code>`. Two codes are about the link:
+`invite_no_link`, for a post whose cookie held no token, and `invite_gone`, for a link
+`accept_seat_invite` refuses (the route then clears the cookie, except for an account marked for
+deletion). The page says each as one of the states above and draws no line beside it. With
+`invite_gone` and no token the state is "This invitation cannot be used": the route read the link
+and refused it, so the page does not say to open it again. A refusal that is not about the link,
+such as `email_mismatch`, is a line above what the page read.
+`pnpm --filter @crawlmouse/web exec vitest run __tests__/v2/seats.test.tsx app/invite/page.test.tsx app/api/seats/route.test.ts -t 'refus'`.
+
 **What a seat that covers some clients is told.** Its records hold its own clients (§4), so a
 sentence about the account is not built from them. On Seats the owner's Clients cell reads "all
 clients" with no count, the header and the People title give no count of seats, and the foot is
 left out. On `/agency/reports` the header's counts end ", of the client sites in your seat" and an
-empty Sent table says no report has been sent "to a client in your seat".
-`pnpm --filter @crawlmouse/web exec vitest run __tests__/v2/seats.test.tsx lib/v2/view/agency-reports.test.ts -t 'covers some clients'`.
+empty Sent table says no report has been sent "to a client in your seat". On `/reports` the header
+counts the sites "in your seat", and the count of reports to send, "None", "No reports yet" and the
+line for no site are each said "for the sites in your seat"; the page hands the view the caller's
+seat, which `readSettingsPage`'s viewer does not name.
+`pnpm --filter @crawlmouse/web exec vitest run __tests__/v2/seats.test.tsx lib/v2/view/agency-reports.test.ts -t 'covers some clients'`
+and
+`pnpm --filter @crawlmouse/web exec vitest run lib/v2/view/reports.test.ts app/reports/page.test.tsx -t 'seat'`.
 
 Invitation mail is bounded by the day for an account (`INVITE_MAIL_PER_DAY`, `lib/v2/agency/seats.ts`:
 fewer in a trial than on a paid plan) and at 10 an hour for a client address, an invite and a resend
@@ -370,13 +384,24 @@ later window, where Stripe would otherwise replay the decline for a day.
 back to Seats with the line "Seats and sites are bought once the trial has become the plan."
 (`extras_in_trial`), not the line of a plan that is ending or unpaid.
 
-**Where buying is offered** is one predicate, `extrasSold(state, gates.agencyBranding)`
-(`lib/v2/agency/extras-bounds.ts`): on Agency, and not in the Agency trial or past due, the two
-states whose subscription the route refuses. Seats draws its buy form by it (in a trial the foot
-says the price applies once the trial has become the plan), the matrix its link to buying sites,
-and `POST /api/seats` its `canBuySeats` in the 402 at the seat limit.
+**Where buying is offered.** The state is asked first: `extrasSold(state, gates.agencyBranding)`
+(`lib/v2/agency/extras-bounds.ts`) holds on Agency outside the Agency trial and past due, the two
+states whose subscription the route refuses. `POST /api/seats` answers it as `canBuySeats` in the
+402 at the seat limit; its viewer holds the state and no subscription. Seats, for its buy form, and
+the matrix, for its link to buying sites, ask `extrasOffered(account, gates.agencyBranding)`: the
+same, on a plan the reader's records say renews. `renews_at` is null in those records for an
+account with no subscription and for one whose subscription is set to end (`accountFromRow`,
+`lib/v2/account/rows.ts`), and the route refuses both (409 `no_subscription`,
+`subscription_ending`). So an account whose plan is set to end is drawn no buy form and no link,
+while the 402 at its seat limit still says `canBuySeats: true`, and a purchase it then posts is
+answered 409.
+
+The foot under the People table follows the form. On a plan that renews it prices a seat beyond the
+plan's; in the Agency trial it adds "once the trial has become the plan" and past due "once the
+plan’s last payment has gone through"; on a plan the records do not say renews it gives no price.
 `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2/seats.test.tsx lib/v2/view/agency-matrix.test.ts app/api/seats/route.test.ts`
-runs an account on the plan, in its trial and past due through each of the three.
+runs an account on the plan, in its trial and past due through the form, the link and the 402, and
+a plan that does not renew through the form, the foot and the link.
 
 `pnpm --filter @crawlmouse/web exec vitest run lib/v2/agency/extras.test.ts app/api/billing/seats/route.test.ts`
 runs these against a Stripe subscription in memory and CC-03's fake catalog, and reads each
@@ -402,9 +427,13 @@ lists those. A staging copy has no row. A row's grades, pills, last check and sc
 dashboard's own site row (`dashboardView`), so a withheld grade reads "withheld" as it does there.
 Rows with a problem opened since the site's previous check come first, then by host. The columns are
 Site, Client, Technical SEO, AI readability, Since last check, Next check, Last check, and Schedule ·
-report; Next check is an addition to the artboard. The report's part of the last column says what
-holds a schedule's reports where something does: "(paused by the recipient)", the client page's
-words, or "(no contact)".
+report; Next check is an addition to the artboard. The report's part of the last column says which
+of three things holds a schedule's reports, read from the account's own records: "(no contact)";
+"(not sent during the trial)" for an account in its Agency trial whose client's contact is not the
+owner's own address (§10, "Sending"); or "(paused by the recipient)", the client page's words. A
+contact that has not confirmed holds a report too (§10), and is not in those records
+(`/agency/reports` reads it apart), so on the matrix such a schedule reads as one that sends.
+`pnpm --filter @crawlmouse/web exec vitest run lib/v2/view/agency-matrix.test.ts -t 'says of a schedule'`.
 
 The header counts the clients against the account's site limit; for a seat that covers some clients
 it says how many are in the seat. The strip is absent until a client has two results. It then gives
@@ -470,6 +499,13 @@ site's account, which need not be the one the caller acts in: the gate's switch 
 is of <that account>", and the rail says which account the caller acts in
 (`agencyGate`'s `actingIn`).
 
+The document title is "Client" whichever client it is, so two client tabs read alike in the tab
+bar. It is the page's static `metadata`: a title that named the host would come from
+`generateMetadata`, which Next runs apart from the page, and it would read the site a second time
+for a caller the page reads once. The page's header gives the client's host, under its name where
+it has one.
+`pnpm --filter @crawlmouse/web exec vitest run 'app/agency/clients/[siteId]/page.test.tsx' -t 'document title'`.
+
 Left out, each a `ruling` row: the "What to tell … this week" paragraph (no view renders its
 sentences from the data) with its two buttons, "Client portal", the line under the fixes about whose
 name a packet carries, the report row's sender, and the seat row's alert channels.
@@ -511,11 +547,15 @@ in `apps/web/app/api/reports/route.ts`, and `route.test.ts` beside it has a test
 the 403 `role_refused`, which no request reaches today, since `seat_may` lets each role
 `export_report` (§3).
 
-The Reports screen's forms post to this route. A form refused with 400, 402, 409 or 429 is answered
-with a 303 to `/reports?notice=<code>` and the page says the code's line (`NOTICE_LINES`,
-`lib/v2/copy/notices.ts`): `invalid`, `upgrade_required`, `fix_not_verified`, and `reports_capped`
-with the time the bound that refused it ends. JSON gets the status and code as before
-(429 `rate_limited`). A form's 401 and 404 are JSON too.
+The Reports screen's forms post to this route. A form refused with 400, 402, 403, 409 or 429 is
+answered with a 303 to `/reports?notice=<code>` and the page says the code's line (`NOTICE_LINES`,
+`lib/v2/copy/notices.ts`): `invalid`, `upgrade_required`, `role_refused`, `fix_not_verified`, and
+`reports_capped` with the time the bound that refused it ends. The route has two 400s, and a form
+is sent back for both: a body that is not one of the requests, and a comparison with no earlier
+check to compare with (the one named is the later check itself, or the fix's check was compared
+with none). The 403 is the answer no request reaches today (above), so it is the one of the five
+with no form test. JSON gets the status and code as before (429 `rate_limited`). A form's 401 and
+404 are JSON too.
 `pnpm --filter @crawlmouse/web exec vitest run app/api/reports/route.test.ts -t 'a refused form'`.
 
 The file is made inside the request and the row is written first: `create_report` writes it
@@ -1120,16 +1160,20 @@ digit (`gates.test.ts`, "has no digit in its code").
 | `/agency` and `/agency/clients/[siteId]` on an account below Agency                                                    | `agencyGateMessage()`                                                                                                   |
 | the dashboard and `/agency`, after an add was refused because the plan's sites are in use (`?notice=upgrade_required`) | `sitesFullMessage(tier)`: the sites gate below Agency, and on Agency what a site beyond the plan's costs (`EXTRA_SITE`) |
 
-`gates.test.ts` also reads other files for a price or a limit written by hand: a `$` before a digit,
-or a digit before "site", "seat", "client" or "fix". It reads the matrix and client copy
+`gates.test.ts` also reads other files for a price, a limit or a length in days written by hand: a
+`$` before a digit, or a digit before "site", "seat", "client", "fix" or "day". It reads the matrix
+and client copy
 (`lib/v2/copy/agency.ts`), `NOTICE_LINES` (`lib/v2/copy/notices.ts`), `OWN_ACCOUNT_COPY`
 (`lib/v2/copy/settings-notices.ts`), the words of Seats, client reports and Reports
 (`lib/v2/copy/seats.ts`, `client-reports.ts`, `reports.ts`, each up to its lock corrections), and
 the views that compose a sentence from numbers: `lib/v2/view/seats.ts` (the foot and the buy line),
 `agency-matrix.ts`, `agency-client.ts`, `agency-reports.ts` and `reports.ts`. In those, apart from
-the two Reports files (whose copy says "two checks"), it also fails on a number from two to twelve,
+the two Reports files (whose copy says "two checks"), it also fails on a number from two to fifteen,
 twenty or thirty spelled out. It does not see a bare digit with neither a `$` nor one of those nouns
-beside it.
+beside it, a length in another unit (`NOTICE_LINES` writes "the last 24 hours"), or what follows the
+slice it reads from a copy module: the lock corrections and the additions, where `SEATS_ADDITIONS`
+quotes the Seats note with "seven days" written out.
+`pnpm --filter @crawlmouse/web exec vitest run lib/v2/agency/gates.test.ts -t 'other files say'`.
 
 `gateMessage('fixes', …)` has no caller: the fix list's and the fix page's Pro lines are locked copy
 (next paragraph), so D10's line for the fix limit is on no screen.
@@ -1222,15 +1266,20 @@ on a link minted again on a retry, §9 on the prospect's one-pager, §10 on a cl
 - **Invitation mail is bounded by the day, lower in a trial** (`INVITE_MAIL_PER_DAY`,
   `lib/v2/agency/seats.ts`): an invitation names the account, a string its owner chose, to an address
   the owner chose. An invitation and a resend count into one bucket.
-- **Text inside a `data-v2-addition` marker is compared with no artboard.** The lock comparison
-  leaves a marked element out (`__tests__/v2/_lib/lock.ts`), on every screen of the product. For
-  Seats, the matrix, the client page and client reports a test holds each text node inside a marker,
-  on each preview and as a live page draws it, to a string of the screen's view or of the step's
-  copy modules, so a sentence typed into a component there fails:
-  `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2/agency-additions.test.tsx`. It does
-  not see a sentence added to a copy module or composed in a view, an attribute, a state no preview
-  renders, or a marker on another screen (Reports among them). Tying each marker to a registry row
-  by a key is a change to the harness every screen uses, and is not made here.
+- **Text inside a `data-v2-addition` marker is compared with no artboard, and so is a preview that
+  is not an artboard's.** The lock comparison reads the preview that draws a locked artboard and
+  leaves a marked element out (`__tests__/v2/_lib/lock.ts`). For Seats, the matrix, the client page
+  and client reports a test reads the text nodes inside a marker and those of the page's `<main>`,
+  on the previews of those screens and again as a live page draws them, and fails on one that is not
+  a string of the screen's view, of the step's copy modules or of a shared component (a status
+  pill's spoken word, a withheld grade), or such strings joined by " · ". A sentence typed into a
+  component there fails:
+  `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2/agency-additions.test.tsx`.
+  What it does not see: a sentence added to a copy module or composed in a view; a string of the
+  copy drawn where the data does not hold it (one case is held: `seats.test.tsx` counts the
+  "Invited" pill against the view's rows, `-t 'Invited'`); an attribute; a state no preview
+  renders; the rail outside a marker; and any other screen, Reports among them. Tying each marker
+  to a registry row by a key is a change to the harness every screen uses, and is not made here.
 - **The PDF's not-measured list has no heading.** The proof page titles the list "Not measured"
   (`lib/v2/copy/proof.ts`); the PDF draws the same sentences after a rule with no title
   (`drawDoc`, `lib/v2/reports/pdf-layout.ts`). A title would be a string the document does not hold,

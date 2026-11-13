@@ -17,6 +17,7 @@ import { GATES } from '../../lib/entitlement-v2';
 import { gateMessage } from '../../lib/v2/agency/gates';
 import { SEAT_GUARD } from '../../lib/v2/agency/guard';
 import { INVITE_LINK_DAYS } from '../../lib/v2/agency/seats';
+import { NOTICE_LINES } from '../../lib/v2/copy/notices';
 import { ROLE_ROWS } from '../../lib/v2/copy/seats';
 import { inviteView, seatsView } from '../../lib/v2/view/seats';
 import { numberWord } from '../../lib/v2/words';
@@ -84,8 +85,9 @@ describe('seatsView: an Agency account read by its owner (Northwind)', () => {
   });
 
   it('prices a seat beyond the plan from prices.ts, not from the artboard', () => {
-    expect(v.people.foot).toBe(`One seat free. Beyond five, ${usd(EXTRA_SEAT)} a seat a month.`);
-    expect(v.people.foot).toBe('One seat free. Beyond five, $12 a seat a month.');
+    const paid = seatsPreview(PAID).people.foot;
+    expect(paid).toBe(`One seat free. Beyond five, ${usd(EXTRA_SEAT)} a seat a month.`);
+    expect(paid).toBe('One seat free. Beyond five, $12 a seat a month.');
     expect(seatsPreview(PAID).buy!.line).toBe(
       `${usd(EXTRA_SEAT)} a month for each seat beyond five, ${usd(EXTRA_SITE)} a month for each site beyond ${GATES.agency.sites}, up to ${GATES.agency.maxSites} sites.`,
     );
@@ -100,9 +102,13 @@ describe('seatsView: an Agency account read by its owner (Northwind)', () => {
     };
     expect([state(PAID), seatsPreview(PAID).buy === null]).toEqual(['agency', false]);
     expect([state(OWNER), seatsPreview(OWNER).buy === null]).toEqual(['past_due', true]);
-    // Past due, the owner still invites, and reads the same people and the same price of a seat.
+    // Past due, the owner still invites and reads the same people; the foot says what the price of
+    // a seat waits for, which is why no form is drawn.
     expect(seatsPreview(OWNER).invite).not.toBeNull();
-    expect(seatsPreview(OWNER).people.foot).toBe(seatsPreview(PAID).people.foot);
+    expect(seatsPreview(OWNER).people.rows).toEqual(seatsPreview(PAID).people.rows);
+    expect(seatsPreview(OWNER).people.foot).toBe(
+      'One seat free. Beyond five, $12 a seat a month, once the plan’s last payment has gone through.',
+    );
   });
 
   it('says what an invitation is: one email with a link, for as many days as the link works', () => {
@@ -183,14 +189,77 @@ describe('seatsView: an Agency account read by its owner (Northwind)', () => {
     ).toEqual(['all 1', 'none', '1 · harborlight.example', 'all 1']);
   });
 
-  it('takes the seat limit it is given over the account’s own, and leaves the buy form out with billing off', () => {
-    const p = SEATS_PREVIEWS[OWNER];
-    const full = seatsView(p.data(), p.viewer(), { seatLimit: 4, billing: false });
+  it('takes the seat limit it is given over the account’s own', () => {
+    const p = SEATS_PREVIEWS[PAID];
+    const full = seatsView(p.data(), p.viewer(), { seatLimit: 4 });
     expect(full.header.line).toMatch(/^4 of 4 used/);
     expect(full.people.foot).toBe('No seat free. Beyond five, $12 a seat a month.');
     expect(full.header.invite).toBeNull();
     expect(full.invite).toBeNull();
-    expect(full.buy).toBeNull();
+  });
+});
+
+describe('seatsView: who is offered the buy form, on an account where seats and sites are sold', () => {
+  // Northwind while its plan is paid: the state the purchase route changes. At the fixture's as_of
+  // the account is past due and no reader is offered the form, so the role and the switch are read
+  // here, where they are what decides.
+  const p = SEATS_PREVIEWS[PAID];
+  const d = p.data();
+  const seat = (name: string) => d.seats.find((s) => s.name === name)!;
+  const buyFor = (
+    seatId: string | undefined,
+    data: typeof d = d,
+    options: { billing?: boolean } = {},
+  ) => seatsView(data, { ...p.viewer(), ...(seatId ? { seatId } : {}) }, options).buy;
+
+  it('the owner is, by their own seat and as a preview reads', () => {
+    expect(seat('Alex').role).toBe('owner');
+    expect(buyFor(seat('Alex').id)).toMatchObject({ id: 'buy', action: '/api/billing/seats' });
+    expect(buyFor(undefined)).toEqual(buyFor(seat('Alex').id));
+  });
+
+  it('a developer and an account manager are not, whether the seat covers every client or some', () => {
+    expect([seat('Lee').role, seat('Lee').client_scope]).toEqual(['developer', 'all']);
+    expect(buyFor(seat('Lee').id)).toBeNull();
+    expect(seat('Priya').role).toBe('account_manager');
+    expect(seat('Priya').client_scope).not.toBe('all');
+    expect(buyFor(seat('Priya').id)).toBeNull();
+    // The same manager with every client: the scope is not what refuses them.
+    const everyClient = {
+      ...d,
+      seats: d.seats.map((s) =>
+        s.id === seat('Priya').id ? { ...s, client_scope: 'all' as const } : s,
+      ),
+    };
+    expect(buyFor(seat('Priya').id, everyClient)).toBeNull();
+    expect(buyFor(seat('Alex').id, everyClient)).not.toBeNull();
+  });
+
+  it('nobody is with billing switched off (V2_BILLING), the owner included', () => {
+    expect(buyFor(seat('Alex').id, d, { billing: false })).toBeNull();
+    expect(buyFor(undefined, d, { billing: false })).toBeNull();
+    expect(buyFor(seat('Alex').id, d, { billing: true })).not.toBeNull();
+  });
+
+  it('nobody is on a plan the records do not say renews: one set to end, or with no subscription', () => {
+    // `accountFromRow` writes `renews_at: null` for both, and the purchase route refuses both (409
+    // `subscription_ending`, `no_subscription`). The state stays `agency`.
+    const account = d.accounts.find((a) => a.id === p.viewer().accountId)!;
+    expect(account.renews_at).not.toBeNull();
+    const ending = {
+      ...d,
+      accounts: d.accounts.map((a) => (a.id === account.id ? { ...a, renews_at: null } : a)),
+    };
+    expect(buyFor(seat('Alex').id, ending)).toBeNull();
+    expect(buyFor(undefined, ending)).toBeNull();
+    // The owner still invites: an invitation changes no subscription.
+    expect(seatsView(ending, p.viewer()).invite).not.toBeNull();
+    // The foot counts the free seats and prices none: the records do not say which of the two it
+    // is, so it names no cause.
+    expect(seatsView(ending, p.viewer()).people.foot).toBe('One seat free.');
+    expect(seatsView(d, p.viewer()).people.foot).toBe(
+      'One seat free. Beyond five, $12 a seat a month.',
+    );
   });
 });
 
@@ -322,6 +391,23 @@ describe('the screens, as their previews render them', () => {
     expect(pastDue).not.toMatch(/<section[^>]* id="buy"/);
   });
 
+  it('Seats: the “Invited” pill is on the rows the view marks as invitations, and on no other', () => {
+    const drawn = (path: keyof typeof SEATS_PREVIEWS) => {
+      const html = renderToStaticMarkup(CC31_SEAT_ELEMENTS[path]!());
+      const table = /<table[^>]*aria-label="Seats"[\s\S]*?<\/table>/.exec(html)![0];
+      return [...table.matchAll(/<tr[^>]*>[\s\S]*?<\/tr>/g)]
+        .slice(1)
+        .map(([row]) => row.includes('Invited, not yet accepted'));
+    };
+    const paths = Object.keys(SEATS_PREVIEWS) as (keyof typeof SEATS_PREVIEWS)[];
+    for (const path of paths) {
+      expect(drawn(path), path).toEqual(seatsPreview(path).people.rows.map((r) => r.invited));
+    }
+    // Both kinds of row are among them: an invitation, and seats that were accepted.
+    expect(drawn(PRO_FULL)).toEqual([false, true]);
+    expect(drawn(PAID)).toEqual([false, false, false, false]);
+  });
+
   it('Seats, live: a change, a removal and, for an invitation, a resend, for each seat but the owner’s', () => {
     const live = (path: keyof typeof SEATS_PREVIEWS) =>
       renderToStaticMarkup(
@@ -381,14 +467,23 @@ describe('the screens, as their previews render them', () => {
     ]);
   });
 
-  it('Seats, a member who is not the owner: no form', () => {
-    const html = renderToStaticMarkup(
-      <LiveActions>
-        <SeatsScreen data={seatsPreview(MEMBER)} />
-      </LiveActions>,
-    );
-    expect(forms(html.slice(html.indexOf('<main')))).toEqual([]);
-    expect(html).toContain('What each role can do');
+  it('Seats, a member who is not the owner: no form, past due and while the plan is paid', () => {
+    const paid = SEATS_PREVIEWS[PAID];
+    const lee = SEATS_PREVIEWS[MEMBER].viewer().seatId!;
+    for (const data of [
+      seatsPreview(MEMBER),
+      // Where the owner is drawn the buy form: the developer is drawn none.
+      seatsView(paid.data(), { ...paid.viewer(), seatId: lee }),
+    ]) {
+      const html = renderToStaticMarkup(
+        <LiveActions>
+          <SeatsScreen data={data} />
+        </LiveActions>,
+      );
+      expect(forms(html.slice(html.indexOf('<main')))).toEqual([]);
+      expect(html).not.toMatch(/<section[^>]* id="buy"/);
+      expect(html).toContain('What each role can do');
+    }
   });
 
   it('the invitation: signed in, a form that posts no field; signed out, a link to sign in and come back', () => {
@@ -442,26 +537,58 @@ describe('inviteView', () => {
     });
   });
 
-  it('a link that cannot be used offers nothing, and keeps the notice it came back with', () => {
-    expect(inviteView(null, true, 'gone')).toEqual({
-      state: 'gone',
-      title: 'This invitation cannot be used',
-      lines: [
-        'It was accepted, replaced by a newer one, removed, or it has expired. The account’s owner can send another.',
-      ],
-      notice: 'gone',
-    });
+  const GONE = {
+    state: 'gone',
+    title: 'This invitation cannot be used',
+    lines: [
+      'It was accepted, replaced by a newer one, removed, or it has expired. The account’s owner can send another.',
+    ],
+    notice: null,
+  };
+  const NO_LINK = {
+    state: 'no_link',
+    title: 'This page holds no invitation',
+    lines: [
+      'A page keeps an invitation for a short while after its link is opened, in the browser that opened it. Open the link in the invitation email again.',
+    ],
+    notice: null,
+  };
+  const noticeOf = (code: 'invite_gone' | 'invite_no_link' | 'email_mismatch') => ({
+    code,
+    text: NOTICE_LINES[code](null),
+  });
+
+  it('a link that cannot be used offers nothing', () => {
+    expect(inviteView(null, true)).toEqual(GONE);
   });
 
   it('a page that holds no link names none of those causes: it says to open the mailed link again', () => {
-    expect(inviteView('no_link', false)).toEqual({
-      state: 'no_link',
-      title: 'This page holds no invitation',
-      lines: [
-        'A page keeps an invitation for a short while after its link is opened, in the browser that opened it. Open the link in the invitation email again.',
-      ],
-      notice: null,
+    expect(inviteView('no_link', false)).toEqual(NO_LINK);
+  });
+
+  it('a refused acceptance comes back to one message: the state says what the notice would', () => {
+    // The accept route cleared the cookie of a link that is gone, so the page holds no token: it
+    // says the link cannot be used, and not to open that link again.
+    expect(inviteView('no_link', true, noticeOf('invite_gone'))).toEqual(GONE);
+    // A link the page read as gone (the cookie was kept: an account marked for deletion).
+    expect(inviteView(null, true, noticeOf('invite_gone'))).toEqual(GONE);
+    // No token when the form was posted (the cookie ran out with the page open): nothing is said
+    // of the invitation, which was not read.
+    expect(inviteView('no_link', true, noticeOf('invite_no_link'))).toEqual(NO_LINK);
+    // An invitation the page has just read is not called unusable by a notice left in the address.
+    for (const stale of ['invite_gone', 'invite_no_link'] as const) {
+      expect(inviteView(invitation, true, noticeOf(stale))).toEqual(inviteView(invitation, true));
+    }
+  });
+
+  it('a refusal that is not about the link is said above the invitation it left as it was', () => {
+    const mismatch = noticeOf('email_mismatch');
+    expect(inviteView(invitation, true, mismatch)).toEqual({
+      ...inviteView(invitation, true),
+      notice:
+        'This invitation was sent to another address. Sign in with the address it was sent to.',
     });
+    expect(inviteView('no_link', true, mismatch)).toEqual({ ...NO_LINK, notice: mismatch.text });
   });
 });
 

@@ -11,13 +11,14 @@
  *
  * What a reader is offered follows `roleMay`: the invite, change, remove and resend forms for a role
  * that may invite (the owner), the buy form for a role that may buy on an account the purchase route
- * would not refuse for its state (`extrasSold`). Any other member sees the people and the role
- * table. The routes ask `seat_may` again.
+ * would not refuse for its state or for a plan that does not renew (`extrasOffered`). Any other
+ * member sees the people and the role table. The routes ask `seat_may` again.
  */
 import type { Seat, SeatRole, Site } from '@crawlmouse/types/v2';
 import { EXTRA_SEAT, EXTRA_SITE, usd } from '../../billing/prices';
 import { GATES } from '../../entitlement-v2';
-import { extrasSold, MAX_EXTRA_SEATS } from '../agency/extras-bounds';
+import type { NoticeCode } from '../account/route';
+import { extrasOffered, MAX_EXTRA_SEATS } from '../agency/extras-bounds';
 import { gateMessage } from '../agency/gates';
 import { roleMay } from '../agency/guard';
 import { INVITE_LINK_DAYS } from '../agency/seats';
@@ -97,8 +98,9 @@ export interface SeatsView {
     sub: string;
     rows: SeatRowView[];
     /**
-     * "One seat free. Beyond five, $12 a seat a month.", or the plan's gate message; null for a
-     * reader who is not shown every seat.
+     * "One seat free. Beyond five, $12 a seat a month.", with what the price waits for in an Agency
+     * trial and past due, and without the price on a plan that does not renew; below Agency the
+     * plan's gate message; null for a reader who is not shown every seat.
      */
     foot: string | null;
     mailNote: string;
@@ -111,8 +113,8 @@ export interface SeatsView {
   /** Null when the reader may not invite, or no seat is free. */
   invite: { id: string; action: string; fields: SeatFields } | null;
   /**
-   * Null unless the reader may buy and the account is sold seats and sites beyond the plan's
-   * (`extrasSold`: not in its Agency trial, and not past due).
+   * Null unless the reader may buy and the account is offered seats and sites beyond the plan's
+   * (`extrasOffered`: not in its Agency trial, not past due, and on a plan that renews).
    */
   buy: {
     id: string;
@@ -239,12 +241,23 @@ export function seatsView(
   });
 
   const freeLine = `${capitalise(free === 0 ? 'no' : numberWord(free))} ${free > 1 ? 'seats' : 'seat'} free.`;
-  // In its Agency trial an account cannot buy yet: a trialing subscription's limits do not follow
-  // its extras (lib/v2/agency/extras.ts `CHANGEABLE`).
-  const inTrial = v.account.state === 'agency_trial';
+  // On Agency the foot prices a seat beyond the plan's while the plan renews. In the two states the
+  // purchase route refuses (lib/v2/agency/extras.ts `CHANGEABLE`) it says what ends the refusal: a
+  // trialing subscription's limits do not follow its extras, and a past-due one's last payment
+  // failed. For a plan the records do not say renews (`extrasOffered`) it gives no price.
+  const waits =
+    v.account.state === 'agency_trial'
+      ? COPY.onceTrialEnds
+      : v.account.state === 'past_due'
+        ? COPY.oncePaid
+        : '';
+  const priced =
+    v.account.renews_at === null
+      ? freeLine
+      : `${freeLine} Beyond ${numberWord(GATES.agency.seats)}, ${usd(EXTRA_SEAT)} a seat a month${waits}.`;
   const foot =
     v.tier === 'agency'
-      ? `${freeLine} Beyond ${numberWord(GATES.agency.seats)}, ${usd(EXTRA_SEAT)} a seat a month${inTrial ? COPY.onceTrialEnds : ''}.`
+      ? priced
       : v.tier === 'free' || free === 0
         ? gateMessage('seats', v.tier)!
         : freeLine;
@@ -286,7 +299,7 @@ export function seatsView(
         ? { id: INVITE_ANCHOR, action: '/api/seats', fields: fields(sites, 'developer', 'all') }
         : null,
     buy:
-      mayBuy && billing && extrasSold(v.account.state, v.gates.agencyBranding)
+      mayBuy && billing && extrasOffered(v.account, v.gates.agencyBranding)
         ? {
             id: BUY_ANCHOR,
             action: '/api/billing/seats',
@@ -314,11 +327,27 @@ export type InviteView =
         | { kind: 'sign_in'; href: string; label: string; note: string };
     };
 
+/** A refused acceptance's notice, as the page read it from its address. */
+export interface InviteNotice {
+  code: NoticeCode;
+  text: string;
+}
+
+/**
+ * The two refusals that are about the link itself. The page says each as its state, from its own
+ * read of the cookie and the invitation, so neither is drawn as a line beside that state.
+ */
+const LINK_NOTICES: readonly NoticeCode[] = ['invite_gone', 'invite_no_link'];
+
 /**
  * What `/invite` shows, for a reader who is signed in or not: the invitation its cookie's token
  * opens, read through `read_seat_invite`; null for a token that function refuses; `'no_link'` when
- * the cookie holds no token, which says nothing about the invitation itself. `notice` is the line of
- * a refused acceptance the form was sent back with.
+ * the cookie holds no token, which says nothing about the invitation itself.
+ *
+ * `notice` is what a refused acceptance sent the form back with. `invite_gone` with no token is a
+ * link the accept route refused and whose cookie it cleared: the page says the link cannot be used,
+ * not that the mailed link should be opened again. Any other refusal is said above what the page
+ * read.
  */
 export function inviteView(
   invitation:
@@ -330,18 +359,19 @@ export function inviteView(
     | null
     | 'no_link',
   signedIn: boolean,
-  notice: string | null = null,
+  notice: InviteNotice | null = null,
 ): InviteView {
+  const line = notice === null || LINK_NOTICES.includes(notice.code) ? null : notice.text;
+  if (invitation === null || (invitation === 'no_link' && notice?.code === 'invite_gone')) {
+    return { state: 'gone', title: INVITE_COPY.goneTitle, lines: [INVITE_COPY.gone], notice: line };
+  }
   if (invitation === 'no_link') {
     return {
       state: 'no_link',
       title: INVITE_COPY.noLinkTitle,
       lines: [INVITE_COPY.noLink],
-      notice,
+      notice: line,
     };
-  }
-  if (invitation === null) {
-    return { state: 'gone', title: INVITE_COPY.goneTitle, lines: [INVITE_COPY.gone], notice };
   }
   return {
     state: 'invite',
@@ -350,7 +380,7 @@ export function inviteView(
       INVITE_COPY.role[invitation.role],
       invitation.everyClient ? INVITE_COPY.everyClient : INVITE_COPY.someClients,
     ],
-    notice,
+    notice: line,
     act: signedIn
       ? { kind: 'accept', action: '/api/seats/accept', label: INVITE_COPY.accept }
       : {

@@ -59,7 +59,9 @@ export function ClientScreen({
             <Table
               label={COPY.fixesLabel}
               headersHidden
-              rowHeader
+              // The fix names its row; the rank before it does not.
+              rowHeader={1}
+              className={shared.rowHeaded}
               columns={[
                 { header: F.number, mono: true, muted: true },
                 { header: F.fix },
@@ -100,6 +102,7 @@ export function ClientScreen({
             label={COPY.clientLabel}
             headersHidden
             rowHeader
+            className={shared.rowHeaded}
             columns={[
               { header: S.setting },
               { header: S.value },
