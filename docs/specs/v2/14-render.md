@@ -201,6 +201,24 @@ pages alone reads `not_rendered`. An empty-root page's `without_js` is written t
 page: a template with a graded page is judged on its graded renders alone, as before. It reaches
 neither the site estimate nor Readable, which read graded pages only.
 
+## The links of a rendered page
+
+A measured page's outcome also carries `links`: the same-site link targets of its static side and of
+its rendered side (`links.ts`, CC-32 D6). One extractor reads both sides, the crawl's own (extract.ts
+`extractPage`, share actions and media files left out), so each target is in `canonicalizeUrl`'s
+spelling. A target is kept when it is on the page's own site by the crawl planner's rule
+(`inSiteScope`: the page's host or its `www.` twin, on the default port), is not the page itself, and
+is at most 2048 characters. Each side keeps at most 200 targets
+(`MAX_RENDER_LINKS`), the first in sorted order, once each. `truncated` is set when either side had
+more, or had a target past the URL bound.
+
+The lists stay on the render outcome, which the pipeline keeps as evidence; they are never written to
+`PageResult.without_js`, whose stored shape holds the four keys above. A page whose links cannot be read
+keeps its measurement and carries no `links`, and so does every page of an outcome stored before this.
+The `js_only_navigation` detector (detectors/js-only-navigation.ts) reads them: a page's JS-only targets
+are its rendered side's less its static side's, and a page with a truncated side, or with no `links`, is
+not evidence. A record keeps at most 20 of a page's targets.
+
 ## The site estimate
 
 ```text

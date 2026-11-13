@@ -673,6 +673,10 @@ const INVENTORY: [entry: string, why: string][] = [
     'ARRAY slice of the record’s rendered pages (`RenderedPage[]`), to bound how many a packet lists; the line counts the rest. No string is cut (CC-30).',
   ],
   [
+    'packages/engine/src/v2/detectors/js-only-navigation.ts :: js_only_targets: targets.slice(0, MAX_JS_ONLY_TARGETS),',
+    'ARRAY slice of a page’s JS-only link targets (`string[]`), to bound how many a record keeps; `js_only_count` keeps the whole count. No string is cut (CC-32 D6).',
+  ],
+  [
     'packages/engine/src/v2/render/links.ts :: return { targets: sorted.slice(0, MAX_RENDER_LINKS), truncated };',
     'ARRAY slice of one render side’s sorted link targets (`string[]`), to bound how many the render outcome keeps; `truncated` says when it cut. No string is cut (CC-32 D6).',
   ],

@@ -19,6 +19,7 @@ import { FIX_SECTION } from '../diff/subjects.js';
 import type { DetectorOutcome, FixDraft } from '../diff/types.js';
 import { namesOnePage, templateNoun } from '../build/template-noun.js';
 import { subjectOfKey } from '../detectors/fingerprint.js';
+import type { RenderedRecord } from '../detectors/js-only-navigation.js';
 import type { RenderedDetection } from '../detectors/rendered.js';
 import type { Detection } from '../detectors/types.js';
 import { clean } from '../clean-text.js';
@@ -82,6 +83,7 @@ export const TITLES: Readonly<Partial<Record<FixType, (subject: string) => strin
   hreflang_gap: (s) => `Complete the hreflang annotations of ${s}`,
   edge_rule_blocks_crawler: (s) => `Let ${s} through the user-agent rule`,
   client_rendered_template: (k) => `Serve the text of ${templateNoun(k)} without JavaScript`,
+  js_only_navigation: (k) => `Put the links of ${templateNoun(k)} in the HTML`,
   quotable_opening: (k) => `Open ${templateNoun(k)} with a direct answer`,
   missing_author_date: (k) => `Show an author and a date on ${templateNoun(k)}`,
   specs_as_images: (k) => `Give the specifications on ${templateNoun(k)} as text`,
@@ -194,7 +196,7 @@ export function detectorOutcomes(
   grades: Grades,
   access: readonly AccessDetection[],
   structure: readonly Detection[],
-  rendered: readonly RenderedDetection[],
+  rendered: readonly RenderedRecord[],
   written: WriteFix,
 ): Outcomes {
   const records: FixRecord[] = [

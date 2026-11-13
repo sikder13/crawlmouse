@@ -8,7 +8,8 @@
 import type { AccessTest, Check, Fix, FixType, LinkEdge, PageResult } from '@crawlmouse/types/v2';
 import type { AccessDetection, AccessFixType, CrawlerAccess } from '../access/types.js';
 import type { ContentDetection, ContentFixType } from '../content/aggregate.js';
-import type { RenderedDetection, RenderedFixType } from '../detectors/rendered.js';
+import type { JsOnlyDetection } from '../detectors/js-only-navigation.js';
+import type { RenderedDetection } from '../detectors/rendered.js';
 import type { Detection } from '../detectors/types.js';
 import type { Command } from './shell.js';
 import type { Line } from './text.js';
@@ -37,9 +38,11 @@ export type RecordOf<T extends FixType> = T extends AccessFixType
   ? AccessDetection
   : T extends ContentFixType
     ? ContentDetection
-    : T extends RenderedFixType
+    : T extends 'client_rendered_template'
       ? RenderedDetection
-      : Detection;
+      : T extends 'js_only_navigation'
+        ? JsOnlyDetection
+        : Detection;
 
 /** A framework a packet can be written for besides `generic`. */
 export type StackFramework = Exclude<PacketFramework, 'generic'>;

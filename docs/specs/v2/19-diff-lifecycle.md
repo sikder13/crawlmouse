@@ -67,7 +67,7 @@ From `FIX_SECTION`, `FIX_SUBJECT` and `COVERAGE_DEPENDENCE` in `subjects.ts`. Th
 | `deep_pages`                 | `structure`      | `structure`       | `page_cap`             |
 | `specs_as_images`            | `content`        | `content`         | `page_cap`             |
 | `missing_author_date`        | `content`        | `content`         | `page_cap`             |
-| `js_only_navigation`         | `structure`      | `structure`       | `page_cap`             |
+| `js_only_navigation`         | `structure`      | `structure`       | `sample`               |
 | `redirect_chain`             | `structure`      | `structure`       | `page_cap`             |
 | `duplicate_pagination`       | `structure`      | `structure`       | `page_cap`             |
 | `canonical_mismatch`         | `structure`      | `structure`       | `page_cap`             |

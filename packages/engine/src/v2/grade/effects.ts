@@ -45,7 +45,7 @@ import type { AccessDetection } from '../access/types.js';
 import type { ContentDetection } from '../content/aggregate.js';
 import { CONTENT_CHECKS } from '../content/checks.js';
 import { subjectOfKey } from '../detectors/fingerprint.js';
-import type { RenderedDetection } from '../detectors/rendered.js';
+import type { JsOnlyDetection, RenderedRecord } from '../detectors/js-only-navigation.js';
 import type { Detection } from '../detectors/types.js';
 import { accessScore, crawlerShare, type CrawlerTally } from './access.js';
 import { aiReadability } from './ai-readability.js';
@@ -62,7 +62,7 @@ export type FixRecord =
   | { family: 'structure'; record: Detection }
   | { family: 'access'; record: AccessDetection }
   | { family: 'content'; record: ContentDetection }
-  | { family: 'rendered'; record: RenderedDetection };
+  | { family: 'rendered'; record: RenderedRecord };
 
 interface Inputs {
   seo: TechnicalSeoInput;
@@ -168,6 +168,21 @@ function linkedStraight(seo: TechnicalSeoInput, url: string): TechnicalSeoInput 
   return { ...seo, pages, edges: unique, homepage_url: to(seo.homepage_url) };
 }
 
+/**
+ * The JS-only navigation fix: each evidence page links in its HTML to the JS-only targets its record
+ * keeps (at most MAX_JS_ONLY_TARGETS a page), through `addEdge`, so anchor diversity leaves the links
+ * out. Only targets the crawl holds as pages are linked: a target it never fetched is not a node of
+ * the graph, and the counterfactual adds none.
+ */
+function linkedInHtml(seo: TechnicalSeoInput, record: JsOnlyDetection): TechnicalSeoInput {
+  const crawled = new Set(seo.pages.map((p) => p.url));
+  let next = seo;
+  for (const page of record.evidence.pages)
+    for (const target of page.js_only_targets)
+      if (crawled.has(target)) next = addEdge(next, page.url, target);
+  return next;
+}
+
 const cleared = (seo: TechnicalSeoInput, fingerprint: string): TechnicalSeoInput => ({
   ...seo,
   detections: seo.detections.map((d) =>
@@ -239,11 +254,9 @@ export function applyFix(
     return { seo, ai: { ...ai, quotable: { checks } } };
   }
   if (f.family === 'rendered') {
-    // The render step keeps no link, so only the client-rendered template has a counterfactual: the
-    // template's graded pages serve their words without JavaScript, rendered this check or not.
-    if (f.record.type !== 'client_rendered_template') {
-      throw new Error(`effects: no counterfactual for ${f.record.type}`);
-    }
+    if (f.record.type === 'js_only_navigation') return { seo: linkedInHtml(seo, f.record), ai };
+    // The client-rendered template: its graded pages serve their words without JavaScript, rendered
+    // this check or not.
     const template = f.record.template_key;
     return {
       seo,
