@@ -26,9 +26,15 @@ export const dynamic = 'force-dynamic';
 // A report is made inside the request (docs/specs/v2/31-agency.md §9 has the measured times).
 export const maxDuration = 60;
 
-/** Reports an account may ask for in an hour, failing closed. */
+/**
+ * Reports an account may ask for in an hour and in a day, both failing closed. Each report is a file
+ * kept in the bucket (nothing expires one: docs/specs/v2/31-agency.md §13), so the day's bound is
+ * what holds how fast an account's files grow; a seat of any role spends the account's bounds.
+ */
 const PER_ACCOUNT_HOUR = 30;
 const HOUR_MS = 60 * 60 * 1000;
+const PER_ACCOUNT_DAY = 100;
+const DAY_MS = 24 * HOUR_MS;
 /**
  * A report still pending this long after it was asked for was left by a request that has ended
  * (`maxDuration` above is a minute): the account's next request marks it failed.
@@ -101,15 +107,15 @@ export async function POST(req: Request) {
   if (entitlement === null) return notFound();
   if (!entitlement.gates.exports) return paywall('exports');
 
-  const limit = await checkRateLimit(
-    `reports:account:${site.account_id}`,
-    PER_ACCOUNT_HOUR,
-    HOUR_MS,
-    { failClosed: true },
-  );
-  if (!limit.allowed) {
-    const seconds = Math.max(1, Math.ceil((limit.resetAt.getTime() - Date.now()) / 1000));
-    return refuse(429, 'rate_limited', {}, { 'retry-after': String(seconds) });
+  for (const [key, bound, windowMs] of [
+    [`reports:account:${site.account_id}`, PER_ACCOUNT_HOUR, HOUR_MS],
+    [`reports:account-day:${site.account_id}`, PER_ACCOUNT_DAY, DAY_MS],
+  ] as const) {
+    const limit = await checkRateLimit(key, bound, windowMs, { failClosed: true });
+    if (!limit.allowed) {
+      const seconds = Math.max(1, Math.ceil((limit.resetAt.getTime() - Date.now()) / 1000));
+      return refuse(429, 'rate_limited', {}, { 'retry-after': String(seconds) });
+    }
   }
 
   const admin = supabaseAdmin();

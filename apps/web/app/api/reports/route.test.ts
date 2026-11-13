@@ -84,7 +84,7 @@ beforeEach(async () => {
   h.user = null;
   h.bucket = memoryReportBucket();
   vi.stubEnv('V2_CHECKS_PUBLIC', '1');
-  await h.db.query(`delete from public.rate_limits where bucket_key like 'reports:account:%'`);
+  await h.db.query(`delete from public.rate_limits where bucket_key like 'reports:account%'`);
 });
 afterEach(() => vi.unstubAllEnvs());
 
@@ -487,20 +487,37 @@ describe('POST /api/reports: the answer', () => {
     expect(h.bucket.objects.size).toBe(0);
   });
 
-  it('past the account’s hourly bound: 429 with Retry-After, and nothing written', async () => {
-    as(w.owner);
-    const hour = 60 * 60 * 1000;
-    await h.db.query(
-      `insert into public.rate_limits (bucket_key, window_start, request_count) values ($1, $2, 30)`,
-      [`reports:account:${w.accountId}`, rateLimitWindowStart(Date.now(), hour).toISOString()],
-    );
-    const before = await countReports();
-    const res = await post(audit());
-    expect(await answer(res)).toEqual([429, { code: 'rate_limited' }]);
-    expect(Number(res.headers.get('retry-after'))).toBeGreaterThan(0);
-    expect(await countReports()).toBe(before);
-    expect(h.bucket.objects.size).toBe(0);
-  });
+  it.each([
+    ['hourly', 'reports:account:', 60 * 60 * 1000, 30],
+    ['daily', 'reports:account-day:', 24 * 60 * 60 * 1000, 100],
+  ] as const)(
+    'past the account’s %s bound: 429 with Retry-After, and nothing written',
+    async (_name, prefix, windowMs, bound) => {
+      as(w.owner);
+      const fill = (count: number) =>
+        h.db.query(
+          `insert into public.rate_limits (bucket_key, window_start, request_count)
+           values ($1, $2, $3)
+           on conflict (bucket_key, window_start) do update set request_count = excluded.request_count`,
+          [
+            `${prefix}${w.accountId}`,
+            rateLimitWindowStart(Date.now(), windowMs).toISOString(),
+            count,
+          ],
+        );
+      // One below the bound, a report is made; at it, none is.
+      await fill(bound - 1);
+      expect((await post(audit())).status).toBe(201);
+      await fill(bound);
+      const before = await countReports();
+      const objects = h.bucket.objects.size;
+      const res = await post(audit());
+      expect(await answer(res)).toEqual([429, { code: 'rate_limited' }]);
+      expect(Number(res.headers.get('retry-after'))).toBeGreaterThan(0);
+      expect(await countReports()).toBe(before);
+      expect(h.bucket.objects.size).toBe(objects);
+    },
+  );
 
   it('marks failed a report of the account left pending by a request that ended', async () => {
     const pending = async (age: string) =>
