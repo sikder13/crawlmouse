@@ -255,9 +255,35 @@ describe('who may use the schedule routes', () => {
       ['POST resume', () => resume(w.siteId)],
     ] as const;
 
-  it('each answers 404 with the flag off and 401 signed out, before any service-role client', async () => {
+  /** The two routes' form handlers, which are their own exports. */
+  const formCalls = (w: World) =>
+    [
+      [
+        'POST schedule (a form)',
+        () =>
+          SCHEDULE_FORM(
+            request(
+              base(w.siteId),
+              'POST',
+              '_method=PUT&cadence=weekly&isoWeekday=3&timeLocal=08%3A30&timezone=UTC',
+              FORM,
+            ),
+            ctx(w.siteId),
+          ),
+      ],
+      [
+        'POST client (a form)',
+        () =>
+          CLIENT_FORM(
+            request(`${base(w.siteId)}/client`, 'POST', 'clientName=X', FORM),
+            ctx(w.siteId),
+          ),
+      ],
+    ] as const;
+
+  it('each answers 404 with the flag off and 401 signed out, before any service-role client; so does each form handler', async () => {
     const w = await world();
-    for (const [name, call] of calls(w)) {
+    for (const [name, call] of [...calls(w), ...formCalls(w)]) {
       as(null);
       expect((await call()).status, name).toBe(401);
       as(w.owner);
@@ -645,6 +671,20 @@ describe('the recipient’s pause link, and POST …/resume', () => {
       { params: Promise.resolve({ token: t }) },
     );
   const paused = async (w: World) => (await schedule(w.siteId))!.paused_by_recipient_at;
+
+  it('with the flag off the pause link changes nothing: its GET, a mail client’s one-click POST and the page’s POST are each a 404', async () => {
+    const w = await confirmedWorld();
+    const t = await token('issue_report_pause', w.siteId);
+    vi.stubEnv('V2_CHECKS_PUBLIC', '');
+    expect((await land(t)).status).toBe(404);
+    expect((await oneClick(t)).status).toBe(404);
+    expect((await use(`cm_link_report_pause=${t}`)).status).toBe(404);
+    expect(await paused(w)).toBeNull();
+    // With it on, the same one-click POST pauses.
+    vi.stubEnv('V2_CHECKS_PUBLIC', '1');
+    expect((await oneClick(t)).status).toBeLessThan(400);
+    expect(await paused(w)).not.toBeNull();
+  });
 
   it('a GET of the link pauses nothing: it moves the token into a cookie', async () => {
     const w = await confirmedWorld();

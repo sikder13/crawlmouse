@@ -33,6 +33,8 @@ const h = vi.hoisted(() => ({
     typeof import('@/lib/v2/reports/generate-test-support').memoryReportBucket
   >,
   events: [] as { event: string; distinctId: string; properties: unknown }[],
+  /** A rate-limit bucket's prefix whose limiter call fails, or null. */
+  limiterDownFor: null as string | null,
 }));
 
 vi.mock('server-only', () => ({}));
@@ -45,7 +47,20 @@ vi.mock('@/lib/supabase/server', () => ({
 vi.mock('@/lib/supabase/admin', () => ({
   supabaseAdmin: () => {
     h.log.push('supabaseAdmin');
-    return adminOver(h.db);
+    const admin = adminOver(h.db);
+    if (h.limiterDownFor === null) return admin;
+    // The rate limiter's own call fails for the bucket named: what the bound does then is the
+    // route's `failClosed`.
+    const down = h.limiterDownFor;
+    return new Proxy(admin, {
+      get(target, key, receiver) {
+        if (key !== 'rpc') return Reflect.get(target, key, receiver) as unknown;
+        return (fn: string, args: { p_bucket_key?: string }) =>
+          fn === 'increment_rate_limit' && args.p_bucket_key?.startsWith(down)
+            ? Promise.resolve({ data: null, error: { message: 'the limiter is down' } })
+            : target.rpc(fn, args);
+      },
+    });
   },
 }));
 vi.mock('@/lib/v2/pipeline/load', async (original) => {
@@ -82,6 +97,7 @@ beforeEach(async () => {
   h.log.length = 0;
   h.events.length = 0;
   h.user = null;
+  h.limiterDownFor = null;
   h.bucket = memoryReportBucket();
   vi.stubEnv('V2_CHECKS_PUBLIC', '1');
   await h.db.query(`delete from public.rate_limits where bucket_key like 'reports:account%'`);
@@ -495,6 +511,22 @@ describe('POST /api/reports: the answer', () => {
     });
     expect(verified.status).toBe(201);
   });
+
+  it.each([
+    ['hourly', 'reports:account:'],
+    ['daily', 'reports:account-day:'],
+  ] as const)(
+    'the %s bound fails closed: with its limiter down no report is made',
+    async (_name, prefix) => {
+      as(w.owner);
+      h.limiterDownFor = prefix;
+      const before = await countReports();
+      const res = await post(audit());
+      expect(await answer(res)).toEqual([429, { code: 'rate_limited' }]);
+      expect(await countReports()).toBe(before);
+      expect(h.bucket.objects.size).toBe(0);
+    },
+  );
 
   it.each([
     ['hourly', 'reports:account:', 60 * 60 * 1000, 30],

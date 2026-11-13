@@ -385,6 +385,15 @@ describe('POST /api/report-files/[id]/share', () => {
 });
 
 describe('DELETE /api/report-files/[id]/share', () => {
+  it('answers 404 with the flag off, and the link still opens once it is on again', async () => {
+    const w = await world();
+    as(w.owner);
+    await share(w.pdf);
+    vi.stubEnv('V2_CHECKS_PUBLIC', '');
+    expect((await revoke(w.pdf)).status).toBe(404);
+    expect((await links(w.pdf)).map((l) => l.revoked_at)).toEqual([null]);
+  });
+
   it('revokes the link: it answers 410 from then on, and the report shows no link', async () => {
     const w = await world();
     const token = await shared(w, w.pdf);

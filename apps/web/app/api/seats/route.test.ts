@@ -445,26 +445,30 @@ describe('POST /api/seats', () => {
     ]);
   });
 
-  it('holds an account in a trial to 3 invitation mails a day, for an invitation and for a resend', async () => {
-    const owner = await paidOwner();
-    await h.db.query(
-      `update public.accounts
-          set state = 'agency_trial', trial_variant = 'card_required',
-              trial_ends_at = now() + interval '5 days', trial_used_at = now(),
-              state_history = state_history || jsonb_build_array(
-                jsonb_build_object('state', 'agency_trial', 'since', now()::text))
-        where id = $1`,
-      [owner.accountId],
-    );
-    as(owner);
-    const res = await invite({ email: 'trial@example.com', role: 'developer', scope: 'all' });
-    expect(res.status).toBe(201);
-    const { seatId } = (await res.json()) as { seatId: string };
-    await resend(seatId);
-    const perAccount = h.limits.filter((l) => l.key.startsWith('seat-invite:account:'));
-    expect(perAccount.map((l) => l.limit)).toEqual([3, 3]);
-    expect(perAccount.every((l) => l.failClosed)).toBe(true);
-  });
+  it.each(['pro_trial', 'agency_trial'] as const)(
+    'holds an account in a %s to 3 invitation mails a day, for an invitation and for a resend',
+    async (state) => {
+      const owner = await paidOwner();
+      await h.db.query(
+        `update public.accounts
+            set state = $2, tier = case when $2 = 'pro_trial' then 'pro' else 'agency' end,
+                trial_variant = 'card_required',
+                trial_ends_at = now() + interval '5 days', trial_used_at = now(),
+                state_history = state_history || jsonb_build_array(
+                  jsonb_build_object('state', $2::text, 'since', now()::text))
+          where id = $1`,
+        [owner.accountId, state],
+      );
+      as(owner);
+      const res = await invite({ email: 'trial@example.com', role: 'developer', scope: 'all' });
+      expect(res.status).toBe(201);
+      const { seatId } = (await res.json()) as { seatId: string };
+      await resend(seatId);
+      const perAccount = h.limits.filter((l) => l.key.startsWith('seat-invite:account:'));
+      expect(perAccount.map((l) => l.limit)).toEqual([3, 3]);
+      expect(perAccount.every((l) => l.failClosed)).toBe(true);
+    },
+  );
 
   it.each(['account', 'ip'])(
     'past the %s bound: 429 with Retry-After, nothing written',
