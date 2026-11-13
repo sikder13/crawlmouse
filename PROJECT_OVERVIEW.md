@@ -128,7 +128,9 @@ JSON on the public JSON routes (415), before the route runs. Security headers an
 `lib/security/headers.mjs` through `next.config.mjs` `headers()`. What is enforced, report-only and advisory,
 with the command beside each: `docs/ops/security-baseline.md`.
 `operator` (CC-33) is the support console's staff-only routes under `app/api/internal`: `requireOperator()`
-answers before any read, and the route builds no client of its own (`lib/security/route-policy.ts`; checked by
+answers before any read, and the route's own source neither calls `supabaseAdmin()` or `createClient()` nor
+imports `@/lib/supabase/admin` (through `@/` or a relative path) or `@supabase/supabase-js`, whatever name the
+import binds (`lib/security/route-policy.ts`; checked by
 `pnpm --filter @crawlmouse/web exec vitest run __tests__/security/route-policy.test.ts`).
 
 **Health (`GET /api/health`):** returns `{ ok: true, version, commit }` — `version` from
