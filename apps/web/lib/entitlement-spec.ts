@@ -593,7 +593,7 @@ unchanged.
 \`handle_new_user\` runs on every \`auth.users\` insert. It inserts the \`users\` row as v1 does, then, in
 the same transaction and only when that row has no default account: a personal account in state
 \`free\` with the Free limits and a one-entry history, the active \`owner\` seat for the user, and
-\`users.default_account_id\`. If any of these fails, the sign-up fails. The account starts \`free\`;
+\`users.default_account_id\` (since \`20261116000002\`, through \`provision_default_account\`, which the backfill of pre-001 users also ran). If any of these fails, the sign-up fails. The account starts \`free\`;
 a trial is the \`trial_started\` event, applied once CC-04's ledger rules allow it. The tests are the
 \`handle_new_user: …\` group in \`apps/web/__tests__/v2-001-entitlement-tables.test.ts\`.
 `;
@@ -608,7 +608,7 @@ The contract (\`packages/types/src/v2\`) wins where it and a document disagree.
 - \`accounts.entitlement_version\` is new: \`apply_entitlement_transition\` refuses a write based on a stale read, and \`assert_entitlement_version\` refuses an ignore decided on one.
 - \`accounts.current_subscription_id\` and \`entitlement_changed_at\` are new (owner ruling, 2026-11-01): the subscription the entitlement follows, and when it last changed. See the two rules under States and transitions.
 - \`trial_ledger.account_id\` is \`on delete set null\`, so deleting an account keeps its trial history.
-- \`users.email_normalized\` is nullable: CC-04 defines the normaliser and CC-05 backfills and sets \`not null\`.
+- \`users.email_normalized\` is nullable: \`public.normalize_email\` (027b) is the normaliser, migration \`20261116000002\` fills the rows that existed when it ran, and a sign-up still leaves it null, so it is not \`not null\`.
 - No client \`UPDATE\` on \`users.default_account_id\` (ARCH-2 §2.3 grants one): migration \`20260602000013\` revoked client \`UPDATE\` on \`users\`, and a route handler sets it.
 - Not in this migration, though ARCH-2 §6.1 lists them in 001: \`seat_sites\` (it references \`sites\`, created in 003), \`consent_log\` and \`account_events\` (with the step that writes them, CC-03 and CC-04).
 - Transitions ARCH-2 §3.2 leaves open: a card-required Pro trial whose payment fails goes to \`past_due\`, as J3 rules for \`agency_trial\`; a dispute in any state marks the account and makes it Free, and each dispute alerts the founder; \`invoice.payment_failed\` and a \`past_due\` subscription update both enter \`past_due\`, and the second records only its time, when it is later than the last change (the grace clock does not restart); a Free account starts the one-click trial of DECISION-LOG H5 with \`trial_started\`; a checkout on any account makes its subscription the current one.
@@ -629,7 +629,7 @@ const FOLLOW_UPS = `## Follow-ups
 
 - CC-03 passes Stripe's \`event.created\` as \`at\` (refusing any event stamped beyond a clock-skew margin in the future, a no-op revoke included: \`entitlement_changed_at\` only moves forward, so one future stamp would make every later grant stale) and the event's subscription id, writes the \`subscriptions\` mirror, and runs the daily reconcile, which is the backstop for any drift the two rules leave.
 - CC-04 adds a sweep that applies \`trial_expired\` to no-card trials past \`trial_ends_at\` (the gates already read them as Free), and hashes \`trial_ledger\` values with a server pepper (SECURITY-DESIGN §5.3).
-- CC-05's backfill takes the same \`for update\` lock on \`users\` and keys on \`default_account_id\`, so a sign-up during the backfill cannot get two accounts.
+- The backfill (migration \`20261116000002\`, CC-36) runs \`provision_default_account\`, the account part \`handle_new_user\` now calls: the same \`for update\` lock on \`users\`, keyed on \`default_account_id\`, so a sign-up during the backfill cannot get two accounts (\`scripts/db/account-backfill-race.test.ts\`).
 - The invite step checks the seat limit when a seat is accepted: \`apply_entitlement_transition\` counts active seats only.
 - \`users.default_account_id\` is navigation, not authorisation: it is not repointed when a seat is removed, so every read goes through \`is_member\`.
 - \`docs/deploy/spec51a-stage6-frontier-functions-runbook.md\` still expects zero client-executable routines; after 001 its query returns \`is_member\` and \`member_role\` (step 5 below).
@@ -675,7 +675,7 @@ The migration changes \`handle_new_user\`, which runs inside every live sign-up.
      select count(*) from public.users where default_account_id is null and created_at > '<apply time>';
      \`\`\`
      Expect 0.
-6. **Revert, if needed.** \`infra/supabase/rollbacks/20261101000001_v2_001_entitlement_tables.revert.sql\`, tested on PGlite and in step 2. It drops the five tables with their rows (before CC-05 these are only the accounts made by sign-ups since the apply) and restores \`handle_new_user\` to its v1 body; the test \`the revert returns the catalog to the state before 001\` compares, before and after, the relations, columns, constraints, indexes, policies and functions of \`public\` and the non-internal triggers. Take the dump first.
+6. **Revert, if needed.** \`infra/supabase/rollbacks/20261101000001_v2_001_entitlement_tables.revert.sql\`, tested on PGlite and in step 2. It drops the five tables with their rows (before \`20261116000002\` these are only the accounts made by sign-ups since the apply) and restores \`handle_new_user\` to its v1 body; the test \`the revert returns the catalog to the state before 001\` compares, before and after, the relations, columns, constraints, indexes, policies and functions of \`public\` and the non-internal triggers. Take the dump first.
 `;
 
 export function renderAccountsSpec(inputs: SpecInputs): string {
