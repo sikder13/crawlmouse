@@ -216,7 +216,7 @@ describe('only the badge is frameable: /embed/<domain>', () => {
 
 // CC-37 F5: PostHog lazy-loads scripts such as surveys.js from its assets host (Sentry CRAWLMOUSE-M).
 describe("PostHog's assets host in script-src", () => {
-  const directive = (policy: string | null, name: string) =>
+  const directive = (policy: string | null | undefined, name: string) =>
     (policy ?? '').split('; ').find((d) => d.split(' ')[0] === name) ?? null;
 
   it.each(['/', '/embed/example.com'])(
