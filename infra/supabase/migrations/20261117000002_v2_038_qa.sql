@@ -23,7 +23,9 @@ create table if not exists public.qa_accounts (
 );
 
 alter table public.qa_accounts enable row level security;
-revoke all on table public.qa_accounts from public, anon, authenticated;
+-- Supabase's default privileges give service_role every privilege on a new table; it keeps select and
+-- insert only (the seed's two calls).
+revoke all on table public.qa_accounts from public, anon, authenticated, service_role;
 grant select, insert on table public.qa_accounts to service_role;
 
 create or replace function public.qa_reset(p_account uuid)

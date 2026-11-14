@@ -71,6 +71,8 @@ const READ_SCOPE: Record<string, ReadScope> = {
   slack_sends: 'none',
   // 029: the Agency Plus contact form. Service only.
   contact_requests: 'none',
+  // CC-38: the accounts qa:seed made, read by qa_reset. Service only.
+  qa_accounts: 'none',
 };
 
 let db: PGlite;
