@@ -4,6 +4,17 @@
  * rows to the disk and to the code; access-matrix.render.ts writes docs/ops/access-matrix.md from them.
  */
 
+/**
+ * The directories whose non-test sources the matrix reads for service-role clients (here, not in
+ * access-surface.ts, so the renderer can name them without loading the walker).
+ */
+export const ADMIN_ROOTS = [
+  'apps/web/app',
+  'apps/web/lib',
+  'apps/web/components',
+  'inngest',
+] as const;
+
 /** What decides who may make the read or write. */
 export type GateKind =
   /** `is_member_for_site`: the caller's seat covers the client site. */
@@ -22,21 +33,41 @@ export type GateKind =
   | 'signature'
   /** Nothing is private: public data, or a request with nothing to authorise. */
   | 'public'
-  /** A module that trusts its callers; `callers` lists them and each is a row or a caller-gated module. */
+  /**
+   * A module that trusts its callers; `callers` lists its importers, and every chain of importers
+   * from it must end at a row whose gate is neither `caller` nor `public`.
+   */
   | 'caller';
 
 export interface Check {
   /** Repo-relative file where the check runs. It must be the row's own file or one it imports. */
   readonly file: string;
-  /** The identifier or string literal that is the check (`is_member_for_site`, `verifyWebhook`). */
+  /**
+   * The check: a function or method called by that name (`verifyWebhook`, `isOperator`), or the
+   * RPC `.rpc('<marker>')`. Its result must be used (access-surface.ts `markerCalls`).
+   */
   readonly marker: string;
+  /**
+   * When set, the string the call's first argument must be: `{ marker: 'eq', arg: 'audit_id' }` is
+   * the capability filter `.eq('audit_id', …)`.
+   */
+  readonly arg?: string;
 }
 
 export interface Proof {
-  /** Repo-relative test file. */
+  /** Repo-relative test file. Its import closure must reach the row's file or its check's file. */
   readonly file: string;
-  /** Text of the title of the `it`/`test`/`describe` that fails when the check is removed. */
+  /**
+   * The whole title of one `it`/`test` in that file that runs (not `describe`, `.skip`, `.todo`,
+   * `.fails`, `.only`), as `it.each` renders it. Which tests fail when a check's refusal branch is
+   * removed is measured by the mutation sweep (notes `sweep-A.md`), not by this field.
+   */
   readonly test: string;
+  /**
+   * `'caller-check'`: the proof is the matrix's own caller check (a `caller` row alone), which holds
+   * that every chain of importers ends at a gated row. Such a proof is exempt from the closure rule.
+   */
+  readonly via?: 'caller-check';
 }
 
 export interface AccessRow {
@@ -60,4 +91,10 @@ export interface AccessRow {
   readonly calls?: number;
   /** An access hole found by CC-37 and not yet closed: the id in `KNOWN_OPEN`. */
   readonly hole?: string;
+  /**
+   * For `caller`: why a `public` row is an acceptable end of a chain of importers from this module.
+   * Without it, a chain that ends at a public row fails the matrix; with it, the matrix also
+   * requires that some chain does end at one, so a reason cannot outlive its need.
+   */
+  readonly publicCallers?: string;
 }

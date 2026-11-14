@@ -128,7 +128,7 @@ function byPerson(page: string) {
       ['stranger', w.stranger],
     ] as const;
 
-  it('a developer sees the client their seat covers alone, and a stranger neither', async () => {
+  it(`${page}: a developer sees the client their seat covers alone, and a stranger neither`, async () => {
     for (const [who, p] of people()) {
       const r = await read(page, p);
       expect(r.rendered, `${page} ${who}`).toBe(true);

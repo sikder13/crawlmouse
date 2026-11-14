@@ -14,7 +14,8 @@ import type { AccessRow, Check, GateKind, Proof } from './access-matrix.types';
 export const KNOWN_OPEN: readonly string[] = [];
 
 const web = (p: string) => `apps/web/${p}`;
-const at = (file: string, marker: string): Check => ({ file: web(file), marker });
+const at = (file: string, marker: string, arg?: string): Check =>
+  arg === undefined ? { file: web(file), marker } : { file: web(file), marker, arg };
 const by = (file: string, test: string): Proof => ({ file: web(file), test });
 const repo = (file: string, test: string): Proof => ({ file, test });
 
@@ -31,6 +32,7 @@ interface Spec {
   /** Service-role clients the file opens; set, the file also has a service-client row. */
   readonly calls?: number;
   readonly hole?: string;
+  readonly publicCallers?: string;
 }
 
 // The proofs most rows share.
@@ -44,7 +46,8 @@ const S_PAGES_TEST = 'app/s/confirm/page.test.tsx';
 const V1_ROUTES_TEST = '__tests__/security/access-proof-v1.test.ts';
 const PAGES_TEST = '__tests__/security/access-proof-pages.test.ts';
 const MATRIX_TEST = '__tests__/security/access-matrix.test.ts';
-const CALLERS_ARE_ROWS = 'a caller row names each file that imports it, and each is a row';
+const PUBLIC_TEST = '__tests__/security/access-proof-public.test.ts';
+const CALLERS_ARE_ROWS = 'every chain of importers from a caller row ends at a gated row';
 
 /** A link-landing route: it moves the token into a cookie and reads nothing. */
 const landing = (path: string, proof: Proof): Spec => ({
@@ -94,8 +97,9 @@ const ROUTES: readonly Spec[] = [
     v2: true,
     identity: 'signed-in seat covering the site, any role',
     gate: 'member_for_site',
-    detail: 'Starts a re-check of the site once `is_member_for_site` holds.',
-    check: at('app/api/sites/[id]/checks/route.ts', 'is_member_for_site'),
+    detail:
+      'Starts a re-check of the site. The check is `readSite` through the session: row security (`is_member_for_site`) hides the site from a seat outside it, and the route answers 404. The explicit `is_member_for_site` call before it refuses the same seats (sweep: removing it alone reddens nothing).',
+    check: at('app/api/sites/[id]/checks/route.ts', 'readSite'),
     proof: by(
       'app/api/sites/[id]/checks/route.test.ts',
       'a developer may re-check; a scoped seat outside the site is 404',
@@ -107,11 +111,12 @@ const ROUTES: readonly Spec[] = [
     v2: true,
     identity: 'signed-in seat covering the site, any role',
     gate: 'member_for_site',
-    detail: 'Sets the site’s alert override, keyed by the account and site the session proved.',
-    check: at('app/api/sites/[id]/alert-rules/route.ts', 'is_member_for_site'),
+    detail:
+      'Sets the site’s alert override. The check is `readSite` through the session: row security (`is_member_for_site`) hides the site from a seat outside it, and the route answers 404. The explicit `is_member_for_site` call before it refuses the same seats (sweep: removing it alone reddens nothing).',
+    check: at('app/api/sites/[id]/alert-rules/route.ts', 'readSite'),
     proof: by(
       'app/api/sites/[id]/alert-rules/route.test.ts',
-      'answers 404 to a seat whose client scope leaves the site out',
+      'answers 404 to a seat whose client scope leaves the site out, and writes on the site it covers (N1)',
     ),
     calls: 1,
   },
@@ -126,7 +131,7 @@ const ROUTES: readonly Spec[] = [
     check: at('app/api/alert-rules/route.ts', 'seat_may'),
     proof: by(
       'app/api/alert-rules/route.test.ts',
-      'a developer seat is 403 role_refused and nothing is written',
+      'a developer seat is 403 role_refused and nothing is written; an account manager may set it',
     ),
     calls: 1,
   },
@@ -140,7 +145,10 @@ const ROUTES: readonly Spec[] = [
     detail:
       'Invites a seat; `invite_seat` keeps the role and the client scope to the proved account.',
     check: at('app/api/seats/route.ts', 'seat_may'),
-    proof: by(SEATS_TEST, 'may not invite: 403, no service-role client, nothing written'),
+    proof: by(
+      SEATS_TEST,
+      'a seat of role developer may not invite: 403, no service-role client, nothing written',
+    ),
     calls: 1,
   },
   {
@@ -152,7 +160,10 @@ const ROUTES: readonly Spec[] = [
     detail:
       'Changes or removes a seat; the RPCs filter on the proved account and refuse the owner’s seat.',
     check: at('app/api/seats/id/[id]/route.ts', 'seat_may'),
-    proof: by(SEATS_TEST, 'may neither change nor remove a seat: 403, no service-role call'),
+    proof: by(
+      SEATS_TEST,
+      'a seat of role developer may neither change nor remove a seat: 403, no service-role call',
+    ),
     calls: 1,
   },
   {
@@ -211,7 +222,7 @@ const ROUTES: readonly Spec[] = [
     check: at('app/api/billing/seats/route.ts', 'seat_may'),
     proof: by(
       'app/api/billing/seats/route.test.ts',
-      'may not buy: 403 for the account it names, with no service-role client',
+      'a seat of role developer may not buy: 403 for the account it names, with no service-role client',
     ),
     calls: 1,
   },
@@ -223,7 +234,10 @@ const ROUTES: readonly Spec[] = [
     detail:
       'Opens a Checkout for the account once `member_role` answers owner on it (v1, flag off: the caller’s own users row).',
     check: at('app/api/billing/checkout/route.ts', 'member_role'),
-    proof: by('app/api/billing/checkout/route.test.ts', '403 not_owner for'),
+    proof: by(
+      'app/api/billing/checkout/route.test.ts',
+      '403 not_owner for not a member of the account the request names',
+    ),
     calls: 1,
   },
   {
@@ -344,7 +358,10 @@ const ROUTES: readonly Spec[] = [
     gate: 'capability',
     detail: 'Restores the link’s account through `restore_account(hash)`.',
     check: at('lib/v2/account/deletion.ts', 'hashToken'),
-    proof: by(DELETION_TEST, 'a restore token in the confirm cookie’s place is not read'),
+    proof: by(
+      DELETION_TEST,
+      'a restore token in the confirm cookie’s place is not read: each flow takes its own cookie only',
+    ),
     calls: 1,
   },
   landing(
@@ -382,8 +399,8 @@ const ROUTES: readonly Spec[] = [
     identity: 'signed-in seat covering the site, any role',
     gate: 'member_for_site',
     detail:
-      'Generates a report file from the site’s checks: `is_member_for_site`, the fix by `is_member_for_fix`, the checks read through the session.',
-    check: at('app/api/reports/route.ts', 'is_member_for_site'),
+      'Generates a report file from the site’s checks. The check is `readResultChecks` through the session: row security on `checks` (`is_member_for_site`) returns nothing to a seat outside the site, and the route answers 404. The explicit `is_member_for_site` call and the session `readSite` before it refuse the same seats (sweep: removing both reddens nothing); the fix by `is_member_for_fix`.',
+    check: at('app/api/reports/route.ts', 'readResultChecks'),
     proof: by(
       'app/api/reports/route.test.ts',
       'a developer whose seat does not cover the site: 404, never 403',
@@ -396,8 +413,8 @@ const ROUTES: readonly Spec[] = [
     identity: 'signed-in seat covering the report’s site, any role',
     gate: 'member_for_site',
     detail:
-      'Signs a download URL for a report read through the session, then `is_member_for_site` on its site.',
-    check: at('app/api/report-files/[id]/download/route.ts', 'is_member_for_site'),
+      'Signs a download URL for a report. The check is the session’s read of `reports`: row security (`is_member_for_site`) returns no row to a seat outside the report’s site, and the route answers 404. The explicit `is_member_for_site` call after it refuses the same seats (sweep: removing it alone reddens nothing).',
+    check: at('app/api/report-files/[id]/download/route.ts', 'from', 'reports'),
     proof: by(
       'app/api/report-files/[id]/download/route.test.ts',
       'a report of a site the caller’s seat does not cover: 404',
@@ -520,7 +537,10 @@ const ROUTES: readonly Spec[] = [
     gate: 'capability',
     detail: 'Records the recipient’s refusal for the token hash the cookie holds.',
     check: at('lib/v2/agency/schedules-store.ts', 'hashToken'),
-    proof: by(SCHEDULES_TEST, 'refuses a field it does not know'),
+    proof: by(
+      SCHEDULES_TEST,
+      'refuses a field it does not know, a `from` that is not a page, and a token in the body: 400, nothing recorded',
+    ),
     calls: 1,
   },
   landing(
@@ -551,7 +571,7 @@ const ROUTES: readonly Spec[] = [
     check: at('lib/v2/agency/schedules-store.ts', 'hashToken'),
     proof: by(
       SCHEDULES_TEST,
-      'a mail client’s one-click POST records the refusal with the token in the path and no cookie',
+      'a mail client’s one-click POST records the refusal with the token in the path and no cookie; any other body records nothing',
     ),
     calls: 1,
   },
@@ -634,7 +654,7 @@ const ROUTES: readonly Spec[] = [
     detail: 'Starts a check of a public site; returns only the new check’s id.',
     proof: by(
       'app/api/checks/route.test.ts',
-      'not to be stored, with one site, one check and one event',
+      '200 {checkId}, not to be stored, with one site, one check and one event',
     ),
   },
   {
@@ -657,10 +677,7 @@ const ROUTES: readonly Spec[] = [
     gate: 'own_rows',
     detail: 'Keeps an unkept check into the caller’s account; another account’s check is a 404.',
     check: at('app/api/checks/[id]/claim/route.ts', 'getUser'),
-    proof: by(
-      '__tests__/v2/account-door-claim.test.ts',
-      "a check of another account's site is a 404",
-    ),
+    proof: by('app/api/checks/[id]/claim/route.test.ts', 'is a 401 without a session'),
   },
   {
     path: 'api/checks/[id]/notify',
@@ -734,7 +751,7 @@ const ROUTES: readonly Spec[] = [
     check: at('app/api/reports/[slug]/claim/route.ts', 'isDomainVerifiedForUser'),
     proof: by(
       'app/api/reports/[slug]/claim/route.test.ts',
-      '403 verification_required when the user has NOT verified the report domain',
+      '403 verification_required when the user has NOT verified the report domain — no write',
     ),
     calls: 1,
   },
@@ -747,7 +764,7 @@ const ROUTES: readonly Spec[] = [
     check: at('app/api/reports/[slug]/logo/route.ts', 'isDomainVerifiedForUser'),
     proof: by(
       'app/api/reports/[slug]/logo/route.test.ts',
-      '403 when the caller has not verified the report domain',
+      '403 when the caller has not verified the report domain — no upload',
     ),
     calls: 1,
   },
@@ -758,7 +775,10 @@ const ROUTES: readonly Spec[] = [
     gate: 'own_rows',
     detail: 'Answers whether the caller owns the report, by `isDomainVerifiedForUser`.',
     check: at('app/api/reports/[slug]/mine/route.ts', 'isDomainVerifiedForUser'),
-    proof: by('app/api/reports/[slug]/mine/route.test.ts', 'signed-in NON-owner'),
+    proof: by(
+      'app/api/reports/[slug]/mine/route.test.ts',
+      'signed-in NON-owner → {owned:false} (deny-by-default)',
+    ),
     calls: 1,
   },
   {
@@ -770,7 +790,7 @@ const ROUTES: readonly Spec[] = [
     check: at('app/api/reports/[slug]/visibility/route.ts', 'isDomainVerifiedForUser'),
     proof: by(
       'app/api/reports/[slug]/visibility/route.test.ts',
-      '403 when the caller has not verified the report domain',
+      '403 when the caller has not verified the report domain — no write',
     ),
     calls: 1,
   },
@@ -784,7 +804,7 @@ const ROUTES: readonly Spec[] = [
     check: at('app/api/reports/[slug]/white-label/route.ts', 'isDomainVerifiedForUser'),
     proof: by(
       'app/api/reports/[slug]/white-label/route.test.ts',
-      '403 when the caller has not verified the report domain',
+      '403 when the caller has not verified the report domain — no write',
     ),
     calls: 1,
   },
@@ -796,7 +816,7 @@ const ROUTES: readonly Spec[] = [
     detail: 'Counts a view of a live report: a per-IP bucket and an event, nothing read back.',
     proof: by(
       'app/api/reports/[slug]/view/route.test.ts',
-      'a live v2 report: 204 and one report_viewed',
+      'a live v2 report: 204 and one report_viewed {kind: v2}, keyed by the report',
     ),
   },
   {
@@ -806,8 +826,11 @@ const ROUTES: readonly Spec[] = [
     gate: 'capability',
     detail:
       'Hides the public report of the audit the id names; the update is filtered by `audit_id`, which v2 rows do not carry.',
-    check: at('app/api/reports/hide/route.ts', 'audit_id'),
-    proof: by('app/api/reports/hide/route.test.ts', '404 when no report exists for that audit'),
+    check: at('app/api/reports/hide/route.ts', 'eq', 'audit_id'),
+    proof: by(
+      'app/api/reports/hide/route.test.ts',
+      '404 when no report exists for that audit (0-row update AND no existing row)',
+    ),
     calls: 1,
   },
   // v1 audits
@@ -819,7 +842,7 @@ const ROUTES: readonly Spec[] = [
     detail: 'Starts an audit of a public site; returns the new audit id.',
     proof: by(
       'app/api/audits/start/route.test.ts',
-      'is rejected WITHOUT consuming the domain bucket',
+      'a bad/exhausted Turnstile token (IP exhausted) is rejected WITHOUT consuming the domain bucket',
     ),
     calls: 1,
   },
@@ -856,7 +879,7 @@ const ROUTES: readonly Spec[] = [
     check: at('app/api/audits/[id]/llms-txt/route.ts', 'getUser'),
     proof: by(
       'app/api/audits/[id]/llms-txt/route.test.ts',
-      '404 when the audit is not owned by the caller',
+      '404 when the audit is not owned by the caller (same as missing — no id enumeration)',
     ),
     calls: 1,
   },
@@ -867,7 +890,7 @@ const ROUTES: readonly Spec[] = [
     gate: 'capability',
     detail:
       'Sets the completion-mail address of a running audit, filtered by its id; per-IP and per-address limits.',
-    check: at('app/api/audits/[id]/notify/route.ts', 'id'),
+    check: at('app/api/audits/[id]/notify/route.ts', 'eq', 'id'),
     proof: by('app/api/audits/[id]/notify/route.test.ts', 'rejects a non-UUID audit id with 400'),
     calls: 1,
   },
@@ -880,7 +903,7 @@ const ROUTES: readonly Spec[] = [
     check: at('app/api/audits/[id]/reaudit/route.ts', 'authorizeReaudit'),
     proof: by(
       'app/api/audits/[id]/reaudit/route.test.ts',
-      '404 (not 403) when signed in but not the owner',
+      '404 (not 403) when signed in but not the owner — no existence leak',
     ),
     calls: 1,
   },
@@ -904,7 +927,7 @@ const ROUTES: readonly Spec[] = [
     identity: 'signed-in person',
     gate: 'own_rows',
     detail: 'Creates or returns the caller’s verification of a domain, keyed by their user id.',
-    check: at('app/api/verify/start/route.ts', 'user_id'),
+    check: at('app/api/verify/start/route.ts', 'eq', 'user_id'),
     proof: by(
       V1_ROUTES_TEST,
       'verify/start: reads and writes the verification keyed by the caller’s user id',
@@ -918,7 +941,7 @@ const ROUTES: readonly Spec[] = [
     gate: 'own_rows',
     detail:
       'Checks the caller’s own verification row (filtered by their user id) against DNS or the page.',
-    check: at('app/api/verify/check/[id]/route.ts', 'user_id'),
+    check: at('app/api/verify/check/[id]/route.ts', 'eq', 'user_id'),
     proof: by(
       V1_ROUTES_TEST,
       'verify/check: another person’s verification is a 404, and nothing is fetched',
@@ -959,7 +982,7 @@ const ROUTES: readonly Spec[] = [
     check: at('app/api/admin/takedown/process/route.ts', 'authorized'),
     proof: by(
       'app/api/admin/takedown/process/route.test.ts',
-      '401 on a wrong token of the SAME length',
+      '401 on a wrong token of the SAME length (timing-safe compare rejects it)',
     ),
     calls: 1,
   },
@@ -983,7 +1006,7 @@ const ROUTES: readonly Spec[] = [
     detail: 'Sends a sign-in link and sets the browser’s binding cookie; reads no account.',
     proof: by(
       'app/api/auth/magic-link/route.test.ts',
-      'does NOT set the cookie for an off-origin / absolute next',
+      'does NOT set the cookie for an off-origin / absolute next (no open redirect)',
     ),
   },
   {
@@ -992,7 +1015,10 @@ const ROUTES: readonly Spec[] = [
     identity: 'the caller’s own browser',
     gate: 'public',
     detail: 'Expires the caller’s own session cookies.',
-    proof: by('app/api/auth/logout/route.test.ts', 'expires every sb-*-auth-token cookie'),
+    proof: by(
+      'app/api/auth/logout/route.test.ts',
+      'expires every sb-*-auth-token cookie (the real session invalidation) and leaves others alone',
+    ),
   },
   {
     path: 'login/verify',
@@ -1050,10 +1076,7 @@ const ROUTES: readonly Spec[] = [
     gate: 'signature',
     detail: 'Runs the background functions; `serve` checks Inngest’s signing key on every call.',
     check: at('app/api/webhooks/inngest/route.ts', 'serve'),
-    proof: by(
-      '__tests__/security/route-policy.test.ts',
-      'webhook (inngest): every export is handled by serve() from inngest/next',
-    ),
+    proof: by(PUBLIC_TEST, 'the Inngest route refuses an unsigned call when a signing key is set'),
   },
   {
     path: 'api/trpc/[trpc]',
@@ -1063,8 +1086,8 @@ const ROUTES: readonly Spec[] = [
     detail:
       'Queries only, through the caller’s own client, so row security decides; opens no service-role client.',
     proof: by(
-      '__tests__/security/route-policy.test.ts',
-      "the tRPC router defines queries and no mutation, as trpc/[trpc]'s reason says",
+      PUBLIC_TEST,
+      'the tRPC route runs no procedure on a POST: the router has no mutation',
     ),
   },
   {
@@ -1073,7 +1096,10 @@ const ROUTES: readonly Spec[] = [
     identity: 'nobody',
     gate: 'public',
     detail: 'Liveness: the version and commit, no database or network read.',
-    proof: by('app/api/health/route.test.ts', 'calls no fetch'),
+    proof: by(
+      'app/api/health/route.test.ts',
+      'depends on next/server and package.json only, and calls no fetch (a liveness probe must not reach Supabase or the network)',
+    ),
   },
   {
     path: 'embed/[domain]',
@@ -1081,10 +1107,7 @@ const ROUTES: readonly Spec[] = [
     identity: 'anyone',
     gate: 'public',
     detail: 'The badge of the domain’s latest visible public report, and a view count.',
-    proof: by(
-      '__tests__/spec04-hide-honored-guard.test.ts',
-      'the embed badge resolves a VISIBLE report (excludes hidden) via readLatestVisibleReport',
-    ),
+    proof: by(PUBLIC_TEST, 'the embed badge of a domain with no visible report shows no grade'),
     calls: 1,
   },
   {
@@ -1101,7 +1124,10 @@ const ROUTES: readonly Spec[] = [
     identity: 'anyone',
     gate: 'public',
     detail: 'Static text.',
-    proof: by('__tests__/llms-txt-route-guard.test.ts', 'llms'),
+    proof: by(
+      '__tests__/llms-txt-route-guard.test.ts',
+      'opens with the H1 and carries the four sections in order',
+    ),
   },
   {
     path: 'robots.txt',
@@ -1109,7 +1135,7 @@ const ROUTES: readonly Spec[] = [
     identity: 'anyone',
     gate: 'public',
     detail: 'Static text.',
-    proof: by('lib/robots-txt.test.ts', 'robots'),
+    proof: by(PUBLIC_TEST, 'robots.txt serves the document lib/robots-txt.ts builds, as text'),
   },
 ];
 
@@ -1131,7 +1157,7 @@ const ENTRIES: readonly Spec[] = [
     gate: 'member',
     detail: 'Settings › Plan; `member_role` decides, a manager and a developer are a 404.',
     check: at('lib/v2/account/settings-pages.ts', 'member_role'),
-    proof: by(SETTINGS_TEST, 'is a 404 for an account manager and a developer'),
+    proof: by(SETTINGS_TEST, 'the plan page is a 404 for an account manager and a developer'),
   },
   {
     path: 'apps/web/app/(account)/settings/delete/page.tsx',
@@ -1140,7 +1166,7 @@ const ENTRIES: readonly Spec[] = [
     gate: 'member',
     detail: 'Settings › Delete with the erasure plan; `member_role` decides, others are a 404.',
     check: at('lib/v2/account/settings-pages.ts', 'member_role'),
-    proof: by(SETTINGS_TEST, 'is a 404 for an account manager and a developer'),
+    proof: by(SETTINGS_TEST, 'the delete page is a 404 for an account manager and a developer'),
     calls: 1,
   },
   {
@@ -1152,8 +1178,8 @@ const ENTRIES: readonly Spec[] = [
       'The trial-end page for every role; the card’s last four for the owner alone, “Managed by the account owner” for the rest.',
     check: at('lib/v2/account/settings-pages.ts', 'member_role'),
     proof: by(
-      '__tests__/security/card-by-role.test.ts',
-      'no role but the owner is given a digit of the card, at any depth of either dataset',
+      SETTINGS_TEST,
+      'offers the owner the checkout, and the manager neither it nor a link to Settings › Plan',
     ),
   },
   {
@@ -1163,7 +1189,10 @@ const ENTRIES: readonly Spec[] = [
     gate: 'capability',
     detail: 'Reads the deletion link whose token hash the cookie holds.',
     check: at('lib/v2/account/deletion-link.ts', 'hashToken'),
-    proof: by(DELETION_TEST, 'readDeletionLink'),
+    proof: by(
+      DELETION_TEST,
+      'reads nothing for a value that is not a token, and passes on no id of the person',
+    ),
     calls: 1,
   },
   {
@@ -1173,7 +1202,10 @@ const ENTRIES: readonly Spec[] = [
     gate: 'capability',
     detail: 'Reads the restore link whose token hash the cookie holds.',
     check: at('lib/v2/account/deletion-link.ts', 'hashToken'),
-    proof: by(DELETION_TEST, 'readDeletionLink'),
+    proof: by(
+      DELETION_TEST,
+      'reads nothing for a value that is not a token, and passes on no id of the person',
+    ),
     calls: 1,
   },
   {
@@ -1211,7 +1243,10 @@ const ENTRIES: readonly Spec[] = [
     detail:
       'The account home: the sites the seat’s scope covers, read by `sitesInScope` through the session.',
     check: at('lib/v2/account/dataset.ts', 'sitesInScope'),
-    proof: by(PAGES_TEST, '/dashboard/v2, read as each person'),
+    proof: by(
+      PAGES_TEST,
+      '/dashboard/v2: a developer sees the client their seat covers alone, and a stranger neither',
+    ),
     calls: 1,
   },
   {
@@ -1221,7 +1256,10 @@ const ENTRIES: readonly Spec[] = [
     gate: 'member_for_site',
     detail: 'Alerts of the sites the seat covers; the Slack destination only as a boolean.',
     check: at('lib/v2/account/dataset.ts', 'sitesInScope'),
-    proof: by(PAGES_TEST, '/alerts, read as each person'),
+    proof: by(
+      PAGES_TEST,
+      '/alerts: a developer sees the client their seat covers alone, and a stranger neither',
+    ),
     calls: 2,
   },
   {
@@ -1231,7 +1269,10 @@ const ENTRIES: readonly Spec[] = [
     gate: 'member_for_site',
     detail: 'Changes on the sites the seat covers.',
     check: at('lib/v2/account/dataset.ts', 'sitesInScope'),
-    proof: by(PAGES_TEST, '/changes, read as each person'),
+    proof: by(
+      PAGES_TEST,
+      '/changes: a developer sees the client their seat covers alone, and a stranger neither',
+    ),
   },
   {
     path: 'apps/web/app/seats/page.tsx',
@@ -1240,7 +1281,10 @@ const ENTRIES: readonly Spec[] = [
     gate: 'member_for_site',
     detail: 'The account’s people and the role table; the invite form by role.',
     check: at('lib/v2/account/dataset.ts', 'sitesInScope'),
-    proof: by(PAGES_TEST, '/seats, read as each person'),
+    proof: by(
+      PAGES_TEST,
+      '/seats: a developer sees the client their seat covers alone, and a stranger neither',
+    ),
   },
   {
     path: 'apps/web/app/sites/[id]/page.tsx',
@@ -1252,7 +1296,7 @@ const ENTRIES: readonly Spec[] = [
     check: at('app/sites/[id]/page.tsx', 'siteOfCaller'),
     proof: by(
       'app/sites/[id]/page.test.tsx',
-      'another account’s site, a removed site, a missing site and a malformed id are each',
+      'another account’s site, a removed site, a missing site and a malformed id are each a 404',
     ),
     calls: 3,
   },
@@ -1278,7 +1322,7 @@ const ENTRIES: readonly Spec[] = [
     check: at('app/agency/clients/[siteId]/page.tsx', 'siteOfCaller'),
     proof: by(
       'app/agency/clients/[siteId]/page.test.tsx',
-      'a client the developer’s seat does not cover is a 404',
+      'a client the developer’s seat does not cover is a 404, as a site that does not exist is',
     ),
     calls: 1,
   },
@@ -1396,7 +1440,10 @@ const ENTRIES: readonly Spec[] = [
     detail:
       'The Agency-trial offer; billing is offered only on the Agency accounts `agencyStanding` finds the caller owns, from their own seats read through the session.',
     check: at('app/agency-trial/page.tsx', 'agencyStanding'),
-    proof: by(PAGES_TEST, '/agency-trial, read as each person'),
+    proof: by(
+      PAGES_TEST,
+      'the owner is offered the account’s billing; a manager, the developers and a stranger are not',
+    ),
     calls: 1,
   },
   {
@@ -1417,10 +1464,7 @@ const ENTRIES: readonly Spec[] = [
     identity: 'anyone',
     gate: 'public',
     detail: 'A minted public v2 report: the snapshot taken at mint, nothing private.',
-    proof: by(
-      'app/r/[slug]/page.v2-row.test.tsx',
-      'with the flag on it is live, and the v2 route renders it',
-    ),
+    proof: by('app/v2-report/[slug]/page.test.tsx', 'a hidden or taken-down v2 report is a 404'),
   },
   ...(
     [
@@ -1492,7 +1536,7 @@ const ENTRIES: readonly Spec[] = [
     identity: 'signed-in person',
     gate: 'own_rows',
     detail: 'The caller’s own verification row, filtered by their user id.',
-    check: at('app/verify/[id]/page.tsx', 'user_id'),
+    check: at('app/verify/[id]/page.tsx', 'eq', 'user_id'),
     proof: by(V1_ROUTES_TEST, 'verify page: another person’s verification is a 404'),
   },
   {
@@ -1512,10 +1556,7 @@ const ENTRIES: readonly Spec[] = [
     identity: 'anyone',
     gate: 'public',
     detail: 'The public report’s card; a hidden or taken-down report gets the placeholder.',
-    proof: by(
-      '__tests__/spec04-hide-honored-guard.test.ts',
-      'the OG card gates its placeholder on isReportGone',
-    ),
+    proof: by('app/r/[slug]/opengraph-image.test.tsx', 'a hidden v2 report is the placeholder'),
   },
   {
     path: 'apps/web/app/sitemap.ts',
@@ -1525,7 +1566,7 @@ const ENTRIES: readonly Spec[] = [
     detail: 'Public URLs and the claimed, indexable reports.',
     proof: by(
       '__tests__/sitemap-report-urls.test.ts',
-      'includes NO /r/ URL when there are no indexable reports',
+      'includes NO /r/ URL when there are no indexable reports (unclaimed mints never leak in)',
     ),
     calls: 1,
   },
@@ -1536,15 +1577,18 @@ const ENTRIES: readonly Spec[] = [
     gate: 'public',
     detail: 'The leaderboard of visible, claimed reports.',
     proof: by(
-      '__tests__/spec04-hide-honored-guard.test.ts',
-      'the leaderboard (page + indexability count) excludes hidden AND unclaimed reports',
+      '__tests__/leaderboard-noindex-metadata.test.ts',
+      'noindex + no description when the board is empty',
     ),
     calls: 2,
   },
 ];
 
 const PIPELINE_FUNCTIONS = 'apps/web/lib/v2/pipeline/functions.ts';
-const callerProof = repo(`apps/web/${MATRIX_TEST}`, CALLERS_ARE_ROWS);
+const callerProof: Proof = {
+  ...repo(`apps/web/${MATRIX_TEST}`, CALLERS_ARE_ROWS),
+  via: 'caller-check',
+};
 
 const LIBS: readonly Spec[] = [
   // v2
@@ -1557,8 +1601,8 @@ const LIBS: readonly Spec[] = [
       'The viewer: the account the switcher names only where the caller holds an active seat; the service role reads their own default.',
     check: at('lib/v2/account/viewer.ts', 'readViewer'),
     proof: by(
-      'lib/v2/account/viewer.test.ts',
-      'a stranger sees no account and no string of another account, even with a forged default',
+      PAGES_TEST,
+      '/dashboard/v2: a developer sees the client their seat covers alone, and a stranger neither',
     ),
     calls: 1,
   },
@@ -1584,10 +1628,7 @@ const LIBS: readonly Spec[] = [
     detail:
       'The settings pages’ dataset by `member_role`; the card’s last four read with the service role after `member_role`, for the owner alone.',
     check: at('lib/v2/account/settings-pages.ts', 'member_role'),
-    proof: by(
-      'lib/v2/account/settings-dataset.test.ts',
-      'reads another account as nothing: row security hides it',
-    ),
+    proof: by(SETTINGS_TEST, 'is a 404 for a developer'),
     calls: 1,
   },
   {
@@ -1646,6 +1687,8 @@ const LIBS: readonly Spec[] = [
     gate: 'caller',
     detail: 'The check start’s dependencies: creates the site and check rows of a public check.',
     callers: ['apps/web/app/api/checks/route.ts'],
+    publicCallers:
+      'its one caller, POST /api/checks, starts a check for anyone; it writes a new site and check, and reads no existing row a person owns',
     proof: callerProof,
     calls: 1,
   },
@@ -1720,6 +1763,7 @@ const LIBS: readonly Spec[] = [
     identity: 'its callers',
     gate: 'caller',
     detail: 'Counts rate-limit buckets by key; reads and writes no other table.',
+    publicCallers: 'it counts requests by a key and reads or writes no person’s data',
     callers: [
       'apps/web/app/api/admin/takedown/process/route.ts',
       'apps/web/app/api/agency-trial/route.ts',
@@ -1762,7 +1806,10 @@ const LIBS: readonly Spec[] = [
       'apps/web/lib/v2/account/email-change-ports.ts',
       'apps/web/lib/v2/reports/mint-deps.ts',
     ],
-    proof: by('lib/rate-limit.test.ts', 'fails CLOSED on an RPC error'),
+    proof: by(
+      'lib/rate-limit.test.ts',
+      'fails CLOSED on an RPC error when { failClosed: true } — the global cost ceiling must never uncap',
+    ),
     calls: 1,
   },
   {
@@ -1771,6 +1818,7 @@ const LIBS: readonly Spec[] = [
     identity: 'its callers',
     gate: 'caller',
     detail: 'Reads public reports by slug, without `minted_by`.',
+    publicCallers: 'it reads minted public reports, which anyone may read, and never `minted_by`',
     callers: [
       'apps/web/app/api/reports/[slug]/claim/route.ts',
       'apps/web/app/api/reports/[slug]/logo/route.ts',
@@ -1784,7 +1832,10 @@ const LIBS: readonly Spec[] = [
       'apps/web/app/v2-report/[slug]/page.tsx',
       'apps/web/lib/takedown.ts',
     ],
-    proof: by('lib/reports.test.ts', 'NEVER selects minted_by in either column set'),
+    proof: by(
+      'lib/reports.test.ts',
+      'NEVER selects minted_by in either column set; the extended set carries the render columns',
+    ),
     calls: 1,
   },
   {
@@ -1793,6 +1844,8 @@ const LIBS: readonly Spec[] = [
     identity: 'its callers',
     gate: 'caller',
     detail: 'The service-role client factory; each file that calls it has its own row here.',
+    publicCallers:
+      'it is the factory: each importer is a row here that states its own gate, a public one included',
     callers: [
       'apps/web/app/(account)/account/delete/page.tsx',
       'apps/web/app/(account)/account/email-undo/page.tsx',
