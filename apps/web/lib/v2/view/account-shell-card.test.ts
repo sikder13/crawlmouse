@@ -1,0 +1,68 @@
+/**
+ * A Checkout trial whose card's last four digits were never recorded (CC-39 ruling 1, walk-findings
+ * item 7): its subscription is `trialing` and renews at the trial's end, so neither Settings › Plan nor
+ * the rail's trial card says "No card on file" or that the account stays on Free, and the rail offers
+ * no Keep. Example Outfitter (bad-site) is on a Pro trial ending Sat 7 Nov in Indianapolis; as the
+ * fixture has it, it is a trial with no card and no subscription.
+ */
+import { describe, expect, it } from 'vitest';
+import { ACCOUNT_VIEWERS } from '../../../app/(v2-preview)/v2-preview/_preview/accounts';
+import { fixture } from '../fixtures';
+import { deleteStepView, settingsView } from './settings';
+import { trialEndView, trialEndViewer } from './trial-end';
+
+const plain = fixture('bad-site');
+const viewer = ACCOUNT_VIEWERS.home();
+const day0 = ACCOUNT_VIEWERS.day0();
+
+/** The same account with a trialing subscription: `renews_at` is its period end, the trial's end. */
+const checkoutTrial = {
+  ...plain,
+  accounts: plain.accounts.map((a) =>
+    a.id === viewer.accountId ? { ...a, card_last4: null, renews_at: a.trial_ends_at } : a,
+  ),
+};
+
+const FALSE = /No card on file|stays on Free|Then Free/;
+
+describe('a Checkout trial with no recorded card', () => {
+  it('the rail, after its first run: the card is charged at the end, and no Keep', () => {
+    const card = deleteStepView(checkoutTrial, viewer, { role: 'owner' }).shell.trial!;
+    expect(card.note).toBe('The card on file is charged on Sat 7 Nov unless you cancel.');
+    expect(card.keep).toBeNull();
+  });
+
+  it('the rail, on its first run: the same, not "No card on file"', () => {
+    const card = deleteStepView(checkoutTrial, day0, { role: 'owner' }).shell.trial!;
+    expect(card.note).not.toMatch(FALSE);
+    expect(card.note).toBe('The card on file is charged on Sat 7 Nov unless you cancel.');
+  });
+
+  it('the card on the page that carries the plan (Trial ending)', () => {
+    const accountId = viewer.accountId;
+    const card = trialEndView(checkoutTrial, trialEndViewer(checkoutTrial, accountId), {
+      role: 'owner',
+    }).shell.trial!;
+    expect(card.note).not.toMatch(FALSE);
+    expect(card.note).toContain('The card on file is charged on');
+  });
+
+  it('Settings › Plan, read with the subscription’s status', () => {
+    const p = settingsView(checkoutTrial, viewer, {
+      role: 'owner',
+      subscriptionStatus: 'trialing',
+    }).plan;
+    expect(p.note).not.toMatch(FALSE);
+  });
+});
+
+describe('the control: a trial with no card and no subscription is unchanged', () => {
+  it('the rail still says there is no card, and offers Keep after the first run', () => {
+    const card = deleteStepView(plain, viewer, { role: 'owner' }).shell.trial!;
+    expect(card.note).toMatch(/^Then Free:/);
+    expect(card.keep).toMatchObject({ href: '/api/billing/checkout' });
+    expect(deleteStepView(plain, day0, { role: 'owner' }).shell.trial!.note).toMatch(
+      /^No card on file\. When it ends/,
+    );
+  });
+});

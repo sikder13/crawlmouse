@@ -7,6 +7,8 @@ import { numberWord, plural } from '../words';
 /** The Pro trial's length (FACTS: "one email … starts 14 days of Pro"). */
 export const TRIAL_DAYS = 14;
 
+const cardName = (last4: string | null) => (last4 === null ? 'on file' : `ending ${last4}`);
+
 export const ACCOUNT_COPY = {
   /** The first run: FACTS A6, short form. */
   trialFirstRun: (schedule: string) =>
@@ -26,8 +28,9 @@ export const ACCOUNT_COPY = {
   noCard: 'No card on file.',
   /** Where the page carries the plan (the Trial-ending screen), the card says only what the card on file means. */
   nothingCharged: 'Nothing is charged unless you choose Pro.',
-  cardNotCharged: (last4: string, date: string) =>
-    `The trial ends on ${date} and the card ending ${last4} is not charged.`,
-  cardCharged: (last4: string, date: string) =>
-    `The card ending ${last4} is charged on ${date} unless you cancel.`,
+  /** A card taken at Checkout whose last four digits were not recorded is named without them. */
+  cardNotCharged: (last4: string | null, date: string) =>
+    `The trial ends on ${date} and the card ${cardName(last4)} is not charged.`,
+  cardCharged: (last4: string | null, date: string) =>
+    `The card ${cardName(last4)} is charged on ${date} unless you cancel.`,
 };

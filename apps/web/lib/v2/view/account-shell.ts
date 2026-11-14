@@ -146,6 +146,10 @@ function trialCard(
   const end = a.trial_ends_at!;
   const days = calendarDays(v.now, end, zone);
   const tier: Tier = a.state === 'pro_trial' ? 'pro' : 'agency';
+  // A trial whose subscription renews at its end charges the card Checkout took (CC-39 D1, ruling 1).
+  // `renews_at` is the period end of a subscription not set to cancel (lib/v2/account/rows.ts), and a
+  // trial with no card has no subscription; the card's last four digits are not recorded yet.
+  const charges = a.renews_at !== null;
   const freeSchedule = FREE_SCHEDULE[GATES.free.schedule];
   const price = tier === 'pro' ? PRO_MONTHLY : AGENCY_MONTHLY;
   const title = `${PLAN_NAMES[tier]}, trial · ends ${dayDate(end, zone)}`;
@@ -158,7 +162,7 @@ function trialCard(
       title,
       left,
       note:
-        a.card_last4 === null
+        a.card_last4 === null && !charges
           ? `${COPY.noCard} ${COPY.nothingCharged}`
           : billingEnd !== null
             ? COPY.cardNotCharged(a.card_last4, dayDate(end, zone))
@@ -173,18 +177,21 @@ function trialCard(
   return {
     title,
     left,
-    note: firstRun
-      ? `${a.card_last4 === null ? `${COPY.noCard} ` : ''}${COPY.trialFirstRun(freeSchedule)}`
-      : COPY.trialLater(
-          primarySite(v).host,
-          freeSchedule,
-          primarySites(v).length - 1,
-          reminderDue ? null : TRIAL_REMINDER_DAYS_BEFORE_END,
-        ),
+    note: charges
+      ? COPY.cardCharged(a.card_last4, dayDate(end, zone))
+      : firstRun
+        ? `${a.card_last4 === null ? `${COPY.noCard} ` : ''}${COPY.trialFirstRun(freeSchedule)}`
+        : COPY.trialLater(
+            primarySite(v).host,
+            freeSchedule,
+            primarySites(v).length - 1,
+            reminderDue ? null : TRIAL_REMINDER_DAYS_BEFORE_END,
+          ),
     // Billing and Keep are the owner's: Settings › Plan and the checkout refuse anyone else.
     billing: owner && firstRun ? action('plan', 'Billing') : null,
+    // A trial that charges its card becomes the plan at its end: there is nothing to keep it by.
     keep:
-      !owner || firstRun
+      !owner || firstRun || charges
         ? null
         : action(
             'keepPlan',
