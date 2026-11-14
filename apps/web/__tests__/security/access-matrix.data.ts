@@ -628,7 +628,7 @@ const ROUTES: readonly Spec[] = [
     check: at('app/api/fixes/[id]/packet/route.ts', 'is_member_for_fix'),
     proof: by(
       'app/api/fixes/[id]/packet/route.test.ts',
-      'a developer seat scoped to another site gets the 404',
+      'the same 404 for another account’s fix, no such fix and a malformed id, with no service-role client',
     ),
     calls: 1,
   },
