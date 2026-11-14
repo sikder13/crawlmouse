@@ -151,6 +151,8 @@ describe('each row is proved by a test that exists', () => {
 });
 
 describe('holes', () => {
+  it('no hole is open', () => expect(KNOWN_OPEN).toEqual([]));
+
   it('a row marked open names a hole in KNOWN_OPEN, and each open hole has a row', () => {
     const marked = new Set(ACCESS_ROWS.flatMap((r) => (r.hole ? [r.hole] : [])));
     expect([...marked].filter((h) => !KNOWN_OPEN.includes(h))).toEqual([]);

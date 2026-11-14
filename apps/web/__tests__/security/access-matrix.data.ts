@@ -11,7 +11,7 @@
 import type { AccessRow, Check, GateKind, Proof } from './access-matrix.types';
 
 /** Holes found by CC-37 and not yet closed. Each is a `hole` on at least one row. */
-export const KNOWN_OPEN: readonly string[] = ['Q25'];
+export const KNOWN_OPEN: readonly string[] = [];
 
 const web = (p: string) => `apps/web/${p}`;
 const at = (file: string, marker: string): Check => ({ file: web(file), marker });
@@ -1148,13 +1148,13 @@ const ENTRIES: readonly Spec[] = [
     v2: true,
     identity: 'signed-in seat of the account, any role',
     gate: 'member',
-    detail: 'The trial-end page for every role; it shows the card’s last four to each of them.',
+    detail:
+      'The trial-end page for every role; the card’s last four for the owner alone, “Managed by the account owner” for the rest.',
     check: at('lib/v2/account/settings-pages.ts', 'member_role'),
     proof: by(
-      SETTINGS_TEST,
-      'offers the owner the checkout, and the manager neither it nor a link to Settings › Plan',
+      '__tests__/security/card-by-role.test.ts',
+      'no role but the owner is given a digit of the card, at any depth of either dataset',
     ),
-    hole: 'Q25',
   },
   {
     path: 'apps/web/app/(account)/account/delete/page.tsx',
@@ -1567,14 +1567,13 @@ const LIBS: readonly Spec[] = [
     identity: 'a seat of the account its caller proved',
     gate: 'member_for_site',
     detail:
-      'The account pages’ dataset: sites by `sitesInScope`; the account row, card’s last four included, read through the session for every role.',
+      'The account pages’ dataset: sites by `sitesInScope`; the card’s last four read with the service role after `member_role`, for the owner alone.',
     check: at('lib/v2/account/dataset.ts', 'sitesInScope'),
     proof: by(
       '__tests__/v2-031-scope.test.ts',
       'the developer’s dataset holds no string of site2 at any depth, and names site1',
     ),
     calls: 1,
-    hole: 'Q25',
   },
   {
     path: 'apps/web/lib/v2/account/settings-pages.ts',
@@ -1582,14 +1581,13 @@ const LIBS: readonly Spec[] = [
     identity: 'a seat of the viewer account',
     gate: 'member',
     detail:
-      'The settings pages’ dataset by `member_role`; the account row, card’s last four included, read through the session for every role.',
+      'The settings pages’ dataset by `member_role`; the card’s last four read with the service role after `member_role`, for the owner alone.',
     check: at('lib/v2/account/settings-pages.ts', 'member_role'),
     proof: by(
       'lib/v2/account/settings-dataset.test.ts',
       'reads another account as nothing: row security hides it',
     ),
     calls: 1,
-    hole: 'Q25',
   },
   {
     path: 'apps/web/lib/v2/account/deletion-ports.ts',
