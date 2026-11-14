@@ -315,6 +315,28 @@ describe('qa:seed part (a)', () => {
   );
 
   withMarker(
+    `while crawls are paused it adds no site and requests no first audit, and says why`,
+    async () => {
+      const w = await world(base);
+      w.pause(true);
+      const steps = await seed(w.deps);
+      // No check is requested. The agency accounts' first sites are CC-29's
+      // start_agency_trial_account's, which requests no audit; add_site adds no other.
+      const checks = await w.db.query<{ n: number }>(`select count(*)::int n from public.checks`);
+      expect(checks.rows[0]?.n).toBe(0);
+      const added = await w.db.query<{ n: number }>(
+        `select count(*)::int n from public.sites s join public.accounts a on a.id = s.account_id
+          where a.kind = 'personal'`,
+      );
+      expect(added.rows[0]?.n).toBe(0);
+      expect(w.sent).toEqual([]);
+      const site = steps.find((s) => s.key === 'free' && s.step === 'site');
+      expect(site?.detail).toMatch(/^nahltech\.com: crawls are paused \(CRAWL_PAUSED\)/);
+    },
+    PGLITE_TIMEOUT,
+  );
+
+  withMarker(
     `a capped first site stops the account's list, so the next host does not become its first`,
     async () => {
       const w = await world(base);

@@ -49,7 +49,7 @@ export interface QaAuth {
 /** add_site's answer, with the time a capped add fits again (`unsent`: see `QaStore.addSite`). */
 export type AddResult =
   | { outcome: 'created'; unsent?: string }
-  | { outcome: 'exists' | 'full' | 'capacity' }
+  | { outcome: 'exists' | 'full' | 'capacity' | 'paused' }
   | { outcome: 'adds_capped' | 'domain_capped'; nextAllowedAt: string };
 /** The door's first-audit answer (lib/v2/pipeline/first-audit.ts), or `no_site`. */
 export type FirstAuditResult =

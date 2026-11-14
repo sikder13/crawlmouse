@@ -237,6 +237,8 @@ export function qaStore(sb: SupabaseClient, deps: QaStoreDeps): QaStore {
     hosts,
 
     async addSite(seat, host, userId): Promise<AddResult> {
+      // As POST /api/sites answers 503 while crawls are paused: adding a site requests its first audit.
+      if (deps.paused()) return { outcome: 'paused' };
       if (!(await deps.admit(host)))
         throw new Error(`qa:seed: ${host} is refused by the SSRF guard`);
       const now = deps.now();

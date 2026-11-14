@@ -18,6 +18,9 @@ const base = {
   STRIPE_ACCOUNT_SECRET_KEY: testKey,
 };
 
+// stripeAccount (apps/web/lib/billing/stripe-account.ts) keeps the first client it builds for the
+// process, so a case that builds one successfully runs last in this describe: before the refusals, its
+// cached client would turn them red even with correct code (never green with wrong code).
 describe('qa wiring: --billing over the production database', () => {
   it('refuses a test key when only SUPABASE_URL names the production project', () => {
     const wired = wire({ ...base, SUPABASE_URL: PROD }, () => {});

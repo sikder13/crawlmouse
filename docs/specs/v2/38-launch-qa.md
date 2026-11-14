@@ -48,6 +48,9 @@ Measured against the code; the reasoning for each is in `notes/cc-38/questions.m
 - **`--billing` refuses a QA account whose plan is past due or cancelled** (the app's own checkout
   refusal; exit 1). Such an account's plan is put back through its own Checkout in the app, not by the
   script.
+- **The pause the scripts read is the operator's shell's.** `qa:seed` and `qa:reset` add no site and
+  request no first audit while `CRAWL_PAUSED=1` is set where they run; a pause set in Vercel only is
+  not seen by them, and the deployed worker still refuses to claim a check while it is paused there.
 - **About three resets an hour.** A Free account's first audit counts against its host's hourly bucket
   (five an hour, `DOMAIN_AUDITS_PER_HOUR`), and `crawlmouse.com` and `nahltech.com` are sites of more
   than one QA account; a reset past the bound is refused with the time it fits, and exits 1.

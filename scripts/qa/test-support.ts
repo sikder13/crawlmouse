@@ -71,10 +71,13 @@ export interface World {
   answer: { typed: string | null };
   /** A user made by someone else, as a person signing up at a QA address would be. */
   signUp(email: string): Promise<string>;
+  /** Turns CRAWL_PAUSED on or off for the store's next calls. */
+  pause(on: boolean): void;
 }
 
 /** The world over a clone of `base` (see `migratedBase`), or over a database built here. */
 export async function world(base?: PGlite): Promise<World> {
+  let pausedNow = false;
   const db = base ? ((await base.clone()) as PGlite) : await migratedBase();
   const sb = postgrestOver(db);
   const users = new Map<string, { id: string; qaKey: QaKey | null }>();
@@ -120,7 +123,8 @@ export async function world(base?: PGlite): Promise<World> {
         },
       },
       now: () => new Date(),
-      paused: () => false,
+      // CRAWL_PAUSED as the operator's shell holds it; a test turns it on through `world.pause`.
+      paused: () => pausedNow,
     }),
     async markInternal(accountId) {
       // What CC-33's runInternal does: PATCH accounts set internal = true, by id.
@@ -147,6 +151,9 @@ export async function world(base?: PGlite): Promise<World> {
     asked,
     answer,
     signUp: (e) => insertUser(e, null),
+    pause: (on: boolean) => {
+      pausedNow = on;
+    },
   };
 }
 
