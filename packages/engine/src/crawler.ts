@@ -588,9 +588,8 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
           ...(input.extraHeaders ?? {}),
         };
         if (input.basicAuth) {
-          const token = Buffer.from(
-            `${input.basicAuth.username}:${input.basicAuth.password}`,
-          ).toString('base64');
+          const credentials = `${input.basicAuth.username}:${input.basicAuth.password}`;
+          const token = Buffer.from(credentials).toString('base64');
           gotOptions.headers['Authorization'] = `Basic ${token}`;
         }
         // Politeness is now enforced by BOUNDED CONCURRENCY (maxConcurrency below),

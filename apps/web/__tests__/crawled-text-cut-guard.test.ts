@@ -610,7 +610,7 @@ const INVENTORY: [entry: string, why: string][] = [
     'cut at a space index, which can never fall inside a surrogate pair',
   ],
   [
-    "packages/engine/src/crawler.ts :: const token = Buffer.from(`${input.basicAuth.username}:${input.basicAuth.password}`).toString('base64');",
+    "packages/engine/src/crawler.ts :: const token = Buffer.from(credentials).toString('base64');",
     'ASCII/structural — base64 encode of operator-supplied basic-auth, not crawled text',
   ],
   [
