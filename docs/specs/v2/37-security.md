@@ -39,7 +39,12 @@ the browser's device (CC-06c D9, pinned).
 - An account with `accounts.internal = true` takes no ledger lock, is refused by no row and writes none;
   `trial_ledger_refusals` does not count rows of an internal account (rows of a deleted account still count).
 - `start_agency_trial_account` answers `trial_used` for a person who has held an owner seat, of any status, on an agency
-  account whose trial was used and that is not internal.
+  account whose trial was used and that is not internal. A used internal account is not returned as `existing` either,
+  so each start by its owner creates another agency account (one per test run, by design, Q9).
+- `20261117000001` adds `accounts.internal` with CC-33's own statement while `20261115000001` is not applied. Its revert
+  drops the column unless the migration history records `20261115000001`, so the rollbacks give back the fingerprint
+  they found; reverted that way, any mark set by hand is lost. Production's history table needs the one-time repair in
+  `docs/ops/db-migrations.md` §5 before that check means anything there.
 - Tests: `apps/web/__tests__/v2-037-security.test.ts`; race: `scripts/db/agency-trial-repeat-race.test.ts`.
 
 ## D4 — SSRF guard
@@ -51,8 +56,9 @@ case, before a request. Tests: `crawler-headers.test.ts`, `ssrf-guard.c2.test.ts
 
 - Q16: `seat_may` holds `mint_report` for owner and account manager; `lib/v2/reports/mint.ts` asks it through the
   caller's session (`__tests__/security/mint-by-role.test.ts`).
-- Q25: `card_last4` is revoked from `authenticated`; `lib/v2/account/card.ts` reads it with the service role after
-  `member_role`, digits for the owner, `card_on_file` for every role.
+- Q25: `20261118000001` revokes `card_last4` from `authenticated`; `lib/v2/account/card.ts` reads it with the service
+  role after `member_role`: the digits for the owner, `onFile` for every role, carried beside the account dataset as
+  `cardsOnFile` and to the views as `AccountView.cardOnFile` (`__tests__/v2-037-card-grant.test.ts`).
 - Q43: `erase_rules()` rules 18 (`sites.report_refusals pruned`) and 19 (`sites.client_contact_name nulled`).
 
 ## D6 — the small findings
@@ -63,5 +69,12 @@ row `stripe-reconcile-livemode-true`. C-5 was already the auto row `vercel-env-s
 
 ## Deploy order
 
-The app change that stops reading `card_last4` through the session ships before the owner applies `20261117000001`;
-applied first, the account and Settings reads fail. `20261115000001` (CC-33) is applied before it.
+Three stages, in this order; the owner applies the migrations (`__tests__/v2-037-card-grant.test.ts` walks the stages):
+
+1. `20261115000001` (CC-33), when it is on `main`, then `20261117000001`. The shipped app needs both: the mint asks
+   `seat_may(…, 'mint_report')`, which raises before `20261117000001`, and Pricing and the Agency trial page read
+   `accounts.internal`, which `20261117000001` adds when CC-33's file has not. The app still live reads `card_last4`
+   through the session, which still works.
+2. Deploy the app.
+3. `20261118000001`: `authenticated` loses `card_last4`. Applied before the deploy, the live app's account and
+   Settings reads fail.

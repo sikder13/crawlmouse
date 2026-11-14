@@ -485,6 +485,13 @@ const WITHDRAWN: readonly WithdrawnClaim[] = [
     allowedIn: [],
   },
   {
+    text: '`card_on_file` for every role',
+    withdrawnIn: 'docs/specs/v2/37-security.md D5, CC-37 review round 1 (correctness m2; Q13)',
+    truth:
+      'card.ts returns onFile; the dataset carries cardsOnFile and the views AccountView.cardOnFile.',
+    allowedIn: [],
+  },
+  {
     text: 'Nothing a visitor reads changes',
     withdrawnIn: 'docs/ops/go-live.md step 2, CC-35 review round 1 (Tier B)',
     truth:
