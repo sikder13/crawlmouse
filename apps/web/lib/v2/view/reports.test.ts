@@ -414,17 +414,31 @@ describe('Reports, with what a live page knows', () => {
 
   it('shows a link just made on its own report’s row and no other', () => {
     const url = 'https://crawlmouse.com/s/kJ8sT2mQ9x_p4VnR7bWc-A';
-    const v = live({ madeLink: { reportId: COMPARE, url } });
-    expect(row(v, COMPARE).madeLink).toEqual({
+    // The CSV is the row with a link that works, as a link just made has (create_share_link sets
+    // the report's expiry).
+    const v = live({ madeLink: { reportId: CSV, url } });
+    expect(row(v, CSV).madeLink).toEqual({
       label: 'The link, shown here for a short while:',
       url,
     });
-    expect([row(v, PDF).madeLink, row(v, CSV).madeLink]).toEqual([null, null]);
+    expect([row(v, PDF).madeLink, row(v, COMPARE).madeLink]).toEqual([null, null]);
     const pending = live({
-      madeLink: { reportId: COMPARE, url },
-      fileStates: new Map([[COMPARE, 'pending']]),
+      madeLink: { reportId: CSV, url },
+      fileStates: new Map([[CSV, 'pending']]),
     });
-    expect(row(pending, COMPARE).madeLink).toBeNull();
+    expect(row(pending, CSV).madeLink).toBeNull();
+  });
+
+  it('shows no address on the row of a link withdrawn while the share cookie lasts (CC-39 F11)', () => {
+    const url = 'https://crawlmouse.com/s/kJ8sT2mQ9x_p4VnR7bWc-A';
+    // Withdrawing a link nulls the report's expiry (revoke_share_links); the cookie still names it.
+    const d = structuredClone(bad);
+    d.reports.find((r) => r.id === CSV)!.share_expires_at = null;
+    const withdrawn = reportsView(d, ACCOUNT_VIEWERS.home(), {}, BASE, {
+      madeLink: { reportId: CSV, url },
+    });
+    expect(row(withdrawn, CSV).madeLink).toBeNull();
+    expect(row(withdrawn, CSV).linkUntil).toBeNull();
   });
 });
 

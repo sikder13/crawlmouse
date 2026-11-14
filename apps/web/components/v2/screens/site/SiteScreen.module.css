@@ -87,6 +87,30 @@
   outline-offset: 3px;
 }
 
+/*
+ * The settings card beside the alerts card (CC-39 F10). Below 1300px it is too narrow for a row of
+ * controls, so the two cards stack up to there, not only up to the shared 1100px (doubled to outweigh
+ * `.two` whatever order the stylesheets load in). Off a phone a control's fields wrap within their
+ * cell, and the explanation keeps a width it can be read at.
+ */
+@media (max-width: 1300px) {
+  .panels.panels {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (min-width: 761px) {
+  .settings td:last-child form {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    row-gap: 6px;
+  }
+
+  .settings td:nth-child(2) {
+    min-width: 12em;
+  }
+}
+
 /* DESIGN-LOCK §7.7: tables of settings stack on a phone, label left and control right. */
 @media (max-width: 760px) {
   .half {
