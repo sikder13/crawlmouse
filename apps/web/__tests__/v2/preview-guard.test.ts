@@ -316,6 +316,8 @@ describe('v2 stays out of live pages', () => {
       'app/(account)/settings/delete/page.tsx',
       'app/(account)/settings/page.tsx',
       'app/(account)/settings/pages.test.tsx',
+      'app/(account)/settings/plan/cancel-flow.test.ts',
+      'app/(account)/settings/plan/page.test.tsx',
       'app/(account)/settings/plan/page.tsx',
       'app/(account)/signup/page.tsx',
       'app/(account)/trial-ended/page.tsx',

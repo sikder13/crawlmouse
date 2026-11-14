@@ -241,7 +241,8 @@ describe('the other Result variants and states', () => {
     expect(Object.fromEntries(RESULT_NAMES.map((n) => [n, headerActions(n)]))).toEqual({
       'bad-site': [share('26 Oct, 02:34 UTC'), 'Re-run, free', 'Log in'],
       clean: [share('28 Oct, 15:31 UTC'), 'Re-run, free', 'Log in'],
-      challenged: ['Share', 'Re-run, free', 'Log in'],
+      // A kept result is read only by a member: Sites in place of Log in (CC-39 D2).
+      challenged: ['Share', 'Re-run, free', 'Sites'],
       loading: ['Log in'],
       empty: ['Log in'],
       error: ['Log in'],
