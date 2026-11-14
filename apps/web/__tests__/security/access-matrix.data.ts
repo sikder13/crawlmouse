@@ -888,7 +888,8 @@ const ROUTES: readonly Spec[] = [
     v2: false,
     identity: 'whoever holds the audit id; the owner for the gated fields',
     gate: 'capability',
-    detail: 'Streams the audit the id names; the Pro fields go to the signed-in owner alone.',
+    detail:
+      'Streams the audit the id names, within a per-IP limit; the Pro fields go to the signed-in owner alone.',
     check: at('app/api/audits/[id]/stream/route.ts', 'getUser'),
     proof: by(
       'app/api/audits/[id]/stream/stream-conversion.test.ts',
@@ -1724,6 +1725,7 @@ const LIBS: readonly Spec[] = [
       'apps/web/app/api/agency-trial/route.ts',
       'apps/web/app/api/audits/[id]/notify/route.ts',
       'apps/web/app/api/audits/[id]/reaudit/route.ts',
+      'apps/web/app/api/audits/[id]/stream/route.ts',
       'apps/web/app/api/audits/start/route.ts',
       'apps/web/app/api/auth/magic-link/route.ts',
       'apps/web/app/api/checks/[id]/_lib/limits.ts',
