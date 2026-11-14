@@ -16,6 +16,7 @@ import { count, numberWord, plural } from '../words';
 import { freeFixes, type FixPlan } from './free-fixes';
 import { noPacketLine } from './no-packet';
 import { noPacketReason } from './packet-reason';
+import { action } from './account-actions';
 import { keptUntilOf, points } from './result';
 import {
   effectOf,
@@ -146,9 +147,9 @@ export interface OpenFixPage extends FixBase {
   /** The framework switch, one option per body in their order; null for a packet with one body. */
   switcher: { heading: string; detected: string; options: FrameworkOption[] } | null;
   /**
-   * What happens once the fix ships, with the ask that opens the keep bar; null on a kept audit,
-   * whose account action the preview does not have, and on a page that cannot re-check
-   * (`FixOptions.rerun`).
+   * What happens once the fix ships: on an audit nobody keeps, the ask that opens the keep bar, and
+   * null on a page that cannot re-check (`FixOptions.rerun`); on a kept audit, a link to its site's
+   * page, where the fix is marked done.
    */
   shipped: { heading: string; body: string; action: SegmentLink } | null;
 }
@@ -542,14 +543,25 @@ export function fixView(
 
   const p = fix.packet;
   const pages = bare.affected_pages > 1 ? `the ${count(bare.affected_pages)} pages` : 'the page';
+  const shippedBody = `Mark it done and we re-crawl ${pages} now, about ${RECHECK_MINUTES} minutes. With an account the before and after is kept in Changes; without one the new result replaces this audit. If the number does not move, the fix stays open and the packet says what we saw.`;
+  // A kept audit's fix is marked done on its site's page, where the account's Mark done is.
   const shipped =
-    keptUntil === null || !rerun
-      ? null
-      : {
+    keptUntil === null
+      ? {
           heading: "When you've shipped it",
-          body: `Mark it done and we re-crawl ${pages} now, about ${RECHECK_MINUTES} minutes. With an account the before and after is kept in Changes; without one the new result replaces this audit. If the number does not move, the fix stays open and the packet says what we saw.`,
-          action: { label: 'Mark done and re-check now', href: keepHref },
-        };
+          body: shippedBody,
+          action: {
+            label: 'Mark it done on the site page',
+            href: action('sitePage', '', { id: check.site_id }).href,
+          },
+        }
+      : !rerun
+        ? null
+        : {
+            heading: "When you've shipped it",
+            body: shippedBody,
+            action: { label: 'Mark done and re-check now', href: keepHref },
+          };
   if (!p) {
     return {
       kind: 'open',

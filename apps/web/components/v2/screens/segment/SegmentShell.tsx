@@ -25,7 +25,12 @@ export function SegmentShell({
 }) {
   const last = frame.key === 'changes';
   return (
-    <ResultShell share={{ keptUntil: frame.keptUntil }} rerun mainClassName={styles.main}>
+    <ResultShell
+      share={{ keptUntil: frame.keptUntil }}
+      signedIn={frame.keptUntil === null}
+      rerun
+      mainClassName={styles.main}
+    >
       <div className={`${layout.row} ${styles.crumbRow}`}>
         <div className={`${layout.row} ${styles.crumb}`}>
           <a href={frame.tabs[0]!.href}>{frame.domain}</a>

@@ -75,7 +75,12 @@ export function FixScreen({ data }: { data: FixView }) {
   const keepPrimary = Boolean(data.keep?.primary);
   const nextPrimary = !copies && !keepPrimary && data.kind === 'open' && frame.next !== null;
   return (
-    <ResultShell share={{ keptUntil: frame.keptUntil }} rerun mainClassName={segment.main}>
+    <ResultShell
+      share={{ keptUntil: frame.keptUntil }}
+      signedIn={frame.keptUntil === null}
+      rerun
+      mainClassName={segment.main}
+    >
       <div className={`${layout.row} ${segment.crumbRow}`}>
         <div className={`${layout.row} ${segment.crumb}`}>
           <a href={frame.overview}>{frame.domain}</a>

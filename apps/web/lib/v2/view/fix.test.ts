@@ -185,8 +185,12 @@ describe('fixView: the Pro wall', () => {
     expect(v.wall.action).toBeNull();
     expect(v.wall.body).toContain('Pro opens every fix, with its packet.');
     expect(v.wall.body).not.toContain('Keeping this audit');
+    // Marking it done is the site page's (CC-39 D2): the card links there rather than to a keep bar.
     const free = open(view(2, { asFirstSeen: false }));
-    expect(free.shipped).toBeNull();
+    expect(free.shipped?.action).toEqual({
+      label: 'Mark it done on the site page',
+      href: '/sites/50000000-0000-4000-8000-000000000001',
+    });
   });
 
   it('names the first fixes in the audit’s order, not by an effect the rule does not measure', () => {
