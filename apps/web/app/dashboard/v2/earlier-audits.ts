@@ -5,8 +5,8 @@
  * owner's: a v1 audit id is a capability URL (`/audit/<id>`), so the list may only show audits that
  * are already the viewer's. The filter on `user_id` is the one row security applies to the
  * viewer's own session (`audits_owner_read`), so this reads no row that session could not.
- * Completed audits only, newest first (by id among equal times), at most `EARLIER_AUDITS_LIMIT`, and none whose expiry has
- * passed: the expiry clause is the one v1's own list sends (`lib/audits.ts`), with `now` given.
+ * Completed audits only, newest first (by id, descending, among equal times), at most
+ * `EARLIER_AUDITS_LIMIT`, and none whose expiry has passed: the expiry clause is the one v1's own list sends (`lib/audits.ts`), with `now` given.
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { EarlierAudit } from '@/lib/v2/view/dashboard';

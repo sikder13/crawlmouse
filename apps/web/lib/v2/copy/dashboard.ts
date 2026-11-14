@@ -84,7 +84,10 @@ export const DASHBOARD_COPY = {
   /** A v1 audit's grade, named as the earlier grade: v1 grades are not v2 grades. */
   earlierGrade: (grade: string | null) =>
     grade === null ? 'not graded' : `earlier grade ${grade}`,
-  /** A row's link name: the host alone repeats when a site was audited more than once. */
+  /**
+   * A row's link name. The host alone repeats when a site was audited more than once; with the date
+   * and grade it repeats only for two audits of one site on one day with one grade.
+   */
   earlierLinkName: (host: string, date: string, grade: string) => `${host}, ${date}, ${grade}`,
   ambiguousTitle: 'More than one account',
   /** `support` is the footer's address (SUPPORT_EMAIL in components/v2/footer-links.ts). */

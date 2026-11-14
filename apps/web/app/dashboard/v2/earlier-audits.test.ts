@@ -128,7 +128,7 @@ describe('readEarlierAudits', () => {
     expect(got.at(-1)?.id).toBe('a006');
   });
 
-  it('orders audits finished at the same instant by id, newest id first', async () => {
+  it('orders audits finished at the same instant by id, descending', async () => {
     const at = '2026-10-05T00:00:00.000Z';
     const { admin } = fakeAdmin([
       row(1, { completed_at: at }),
