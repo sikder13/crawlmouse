@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
 
 // The ops scripts are mostly I/O harnesses, but the backtest's pure diff helpers (backtest-diff.ts)
@@ -6,6 +7,11 @@ import { defineConfig } from 'vitest/config';
 // collected, as are those under ops/, golive/ and qa/ — the harness entrypoints (which read .env.local + hit Supabase at import) are never
 // imported by a test.
 export default defineConfig({
+  // The app's billing modules import `server-only`, which Next resolves and Node cannot; the QA tests
+  // import them (qa/server-only-stub.ts says why).
+  resolve: {
+    alias: { 'server-only': fileURLToPath(new URL('./qa/server-only-stub.ts', import.meta.url)) },
+  },
   test: {
     passWithNoTests: true,
     environment: 'node',
