@@ -11,6 +11,8 @@
 
 const TURNSTILE = 'https://challenges.cloudflare.com';
 const POSTHOG_TOOLBAR = 'https://us.posthog.com';
+/** PostHog lazy-loads scripts (surveys.js and others) from here, not through the `/ingest` proxy. */
+const POSTHOG_ASSETS = 'https://us-assets.i.posthog.com';
 const STRIPE_FORM_TARGETS = 'https://checkout.stripe.com https://billing.stripe.com';
 
 /** Every response but the badge's: `/embed`, `/embed/` and deeper paths are pages like any other. */
@@ -89,7 +91,7 @@ function reportOnlyPolicy(frameAncestors, sentry, connect, dev) {
   return [
     "default-src 'self'",
     // 'unsafe-eval' only under next dev, whose React Refresh needs it.
-    `script-src 'self' 'unsafe-inline'${dev ? " 'unsafe-eval'" : ''} ${TURNSTILE}`,
+    `script-src 'self' 'unsafe-inline'${dev ? " 'unsafe-eval'" : ''} ${TURNSTILE} ${POSTHOG_ASSETS}`,
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob: https:",
     "font-src 'self'",

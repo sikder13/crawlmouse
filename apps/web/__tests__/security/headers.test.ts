@@ -19,7 +19,7 @@ const enforced = (fa: string, withSentry: boolean) =>
 const reportOnly = (fa: string, withSentry: boolean) =>
   [
     "default-src 'self'",
-    "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com",
+    "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com https://us-assets.i.posthog.com",
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob: https:",
     "font-src 'self'",
@@ -214,6 +214,32 @@ describe('only the badge is frameable: /embed/<domain>', () => {
   );
 });
 
+// CC-37 F5: PostHog lazy-loads scripts such as surveys.js from its assets host (Sentry CRAWLMOUSE-M).
+describe("PostHog's assets host in script-src", () => {
+  const directive = (policy: string | null, name: string) =>
+    (policy ?? '').split('; ').find((d) => d.split(' ')[0] === name) ?? null;
+
+  it.each(['/', '/embed/example.com'])(
+    'the report-only script-src on %s lists https://us-assets.i.posthog.com',
+    async (path) => {
+      const ro = (await headersFor(path))['content-security-policy-report-only'];
+      expect(directive(ro, 'script-src')?.split(' ')).toContain('https://us-assets.i.posthog.com');
+    },
+  );
+
+  it.each(['/', '/embed/example.com'])(
+    'the enforced policy on %s lists no script sources (no script-src, script-src-elem or default-src)',
+    async (path) => {
+      const enforcedCsp = (await headersFor(path))['content-security-policy'];
+      expect(enforcedCsp).not.toBeNull();
+      for (const name of ['script-src', 'script-src-elem', 'script-src-attr', 'default-src']) {
+        expect(directive(enforcedCsp, name)).toBeNull();
+      }
+      expect(enforcedCsp).not.toContain('posthog');
+    },
+  );
+});
+
 describe('next.config sends no X-Powered-By header', () => {
   it('poweredByHeader is off', () => {
     expect((nextConfig as { poweredByHeader?: boolean }).poweredByHeader).toBe(false);
@@ -224,7 +250,7 @@ describe('next dev allows eval for React Refresh, and only next dev', () => {
   it("'unsafe-eval' is in the report-only script-src under development and absent otherwise", async () => {
     vi.stubEnv('NODE_ENV', 'development');
     expect((await headersFor('/'))['content-security-policy-report-only']).toContain(
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com https://us-assets.i.posthog.com",
     );
     vi.stubEnv('NODE_ENV', 'production');
     expect((await headersFor('/'))['content-security-policy-report-only']).not.toContain(
