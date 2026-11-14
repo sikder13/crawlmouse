@@ -188,14 +188,21 @@ function countTests(suite: ReportSuite, counts: Counts): void {
   for (const child of asArray(suite.suites)) countTests(child as ReportSuite, counts);
 }
 
+const SHA = /^[0-9a-f]{40}$/;
+
+export interface WalkResults {
+  started: string | null;
+  /** The commit the walk ran on: `config.metadata.commit`, set by tests/e2e/playwright.config.ts. */
+  commit: string | null;
+  files: Map<string, Counts>;
+}
+
 /**
  * The walk's results: per spec file (as the report names it, relative to the suite's root) the count
- * of its tests by status, and the run's start time. A string when the text is not a Playwright JSON
- * report.
+ * of its tests by status, the run's start time and its commit. A string when the text is not a
+ * Playwright JSON report.
  */
-export function readWalkResults(
-  text: string,
-): { started: string | null; files: Map<string, Counts> } | string {
+export function readWalkResults(text: string): WalkResults | string {
   let report: unknown;
   try {
     report = JSON.parse(text);
@@ -212,7 +219,13 @@ export function readWalkResults(
     files.set(suite.file, counts);
   }
   const started = (report as { stats?: { startTime?: unknown } }).stats?.startTime;
-  return { started: typeof started === 'string' ? started : null, files };
+  const commit = (report as { config?: { metadata?: { commit?: unknown } } }).config?.metadata
+    ?.commit;
+  return {
+    started: typeof started === 'string' ? started : null,
+    commit: typeof commit === 'string' && SHA.test(commit) ? commit : null,
+    files,
+  };
 }
 
 /** A spec's state from its tests' counts: failed, flaky, skipped, passed, or empty. */
@@ -238,6 +251,22 @@ export interface GoNoGoInputs {
   step: (s: Step) => { ready: true } | { ready: false; blocking: number };
   /** The text of `tests/e2e/results.json`, or null when there is none. */
   walkResults: string | null;
+  /** The live production commit, when the check knows it. */
+  live: string | null;
+  /** This checkout's HEAD, when git gives it. */
+  head: string | null;
+}
+
+/**
+ * Why the walk's results are not this release's, or undefined when they are (or cannot be compared).
+ * The walk is compared with the live production commit when that is known, else with HEAD.
+ */
+function staleness(walk: WalkResults, inputs: GoNoGoInputs): string | undefined {
+  if (walk.commit === null) return 'the report names no commit';
+  const [against, name] =
+    inputs.live !== null ? [inputs.live, 'the live commit'] : [inputs.head, 'HEAD'];
+  if (against === null || walk.commit === against) return undefined;
+  return `walked on ${walk.commit.slice(0, 12)}, ${name} is ${against.slice(0, 12)}`;
 }
 
 const STEP_OF_GATE = new Map<string, Step>(STEPS.map((s) => [`golive-step-${s}`, s]));
@@ -248,10 +277,20 @@ export function goNoGoLines(inputs: GoNoGoInputs, gates: readonly Gate[] = GATES
   const lines = ['go/no-go (docs/ops/go-no-go.md):'];
   if (walk === null) lines.push(`  walk: not run (no ${WALK_RESULTS})`);
   else if (typeof walk === 'string') lines.push(`  walk: unknown (${walk})`);
-  else
+  const stale = walk === null || typeof walk === 'string' ? undefined : staleness(walk, inputs);
+  if (walk !== null && typeof walk !== 'string') {
+    const compared =
+      walk.commit === null
+        ? 'on a commit it does not name'
+        : `on ${walk.commit.slice(0, 12)}${
+            inputs.live === null && inputs.head === null
+              ? ' (not compared: neither the live commit nor HEAD is known)'
+              : ''
+          }`;
     lines.push(
-      `  walk: ${WALK_RESULTS}, run started ${walk.started ?? 'at a time it does not give'}`,
+      `  walk: ${WALK_RESULTS}, run started ${walk.started ?? 'at a time it does not give'}, ${compared}`,
     );
+  }
   for (const g of gates) {
     let state: string;
     if (g.how === 'walk') {
@@ -260,6 +299,7 @@ export function goNoGoLines(inputs: GoNoGoInputs, gates: readonly Gate[] = GATES
       else {
         const counts = countsOf(walk.files, g.ref);
         state = counts === undefined ? `not in ${WALK_RESULTS}` : walkState(counts);
+        if (stale !== undefined) state = `stale (${stale}; ${state})`;
       }
     } else if (g.how === 'golive-step') {
       const s = STEP_OF_GATE.get(g.id)!;
@@ -290,7 +330,7 @@ const HOW_TITLE: Readonly<Record<How, string>> = {
 };
 
 const HOW_STATE: Readonly<Record<How, string>> = {
-  walk: `the spec's tests in \`${WALK_RESULTS}\` (the Playwright JSON reporter's output), counted by Playwright's statuses (expected, unexpected, flaky, skipped): \`failed\` with an unexpected one, else \`flaky\` with a flaky one, else \`skipped\` with skipped tests only, else \`passed\`; \`not run\` without the file. The walk runs on a production build against the local stand-in with the four flags on, locally, not in CI`,
+  walk: `the spec's tests in \`${WALK_RESULTS}\` (the Playwright JSON reporter's output), counted by Playwright's statuses (expected, unexpected, flaky, skipped): \`failed\` with an unexpected one, else \`flaky\` with a flaky one, else \`skipped\` with skipped tests only, else \`passed\`; \`not run\` without the file. A state is prefixed \`stale\` when the report's commit (\`config.metadata.commit\`, set by \`tests/e2e/playwright.config.ts\`) is not the live production commit, or HEAD when the live one is unknown, or when the report names none. The walk runs on a production build against the local stand-in with the four flags on, locally, not in CI`,
   'golive-step':
     '`pass` when the rows gating that step and the steps before it pass in the same run, as `--step N` decides it',
   ci: '"check the release SHA\'s run": the check does not read GitHub',

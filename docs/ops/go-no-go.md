@@ -18,7 +18,7 @@ The lines are pinned by `pnpm --filter @crawlmouse/scripts exec vitest run goliv
 
 ## The end-to-end walk
 
-State: the spec's tests in `tests/e2e/results.json` (the Playwright JSON reporter's output), counted by Playwright's statuses (expected, unexpected, flaky, skipped): `failed` with an unexpected one, else `flaky` with a flaky one, else `skipped` with skipped tests only, else `passed`; `not run` without the file. The walk runs on a production build against the local stand-in with the four flags on, locally, not in CI.
+State: the spec's tests in `tests/e2e/results.json` (the Playwright JSON reporter's output), counted by Playwright's statuses (expected, unexpected, flaky, skipped): `failed` with an unexpected one, else `flaky` with a flaky one, else `skipped` with skipped tests only, else `passed`; `not run` without the file. A state is prefixed `stale` when the report's commit (`config.metadata.commit`, set by `tests/e2e/playwright.config.ts`) is not the live production commit, or HEAD when the live one is unknown, or when the report names none. The walk runs on a production build against the local stand-in with the four flags on, locally, not in CI.
 
 | Id                 | Gate                                                                                                                                         | Where                           | Detail                                                                                    |
 | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- | ----------------------------------------------------------------------------------------- |

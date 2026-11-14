@@ -1,6 +1,8 @@
 import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { main, parseArgs } from './check';
+import { REPO_ROOT } from './env-scan';
 import {
   DOC_PATH,
   GATES,
@@ -81,10 +83,16 @@ describe('the gates', () => {
 });
 
 /** A Playwright JSON report (playwright/types/testReporter.d.ts `JSONReport`) with the given tests. */
-const report = (files: Record<string, string[]>, nested = false) => {
+const WALKED = 'a'.repeat(40);
+
+const report = (
+  files: Record<string, string[]>,
+  nested = false,
+  metadata: Record<string, unknown> = { commit: WALKED },
+) => {
   const test = (status: string) => ({ status, projectName: 'chromium', results: [] });
   return JSON.stringify({
-    config: { rootDir: '/repo/tests/e2e' },
+    config: { rootDir: '/repo/tests/e2e', metadata },
     stats: { startTime: '2026-11-14T06:00:00.000Z', duration: 1, expected: 0 },
     errors: [],
     suites: Object.entries(files).map(([file, statuses]) => {
@@ -97,6 +105,8 @@ const report = (files: Record<string, string[]>, nested = false) => {
 };
 
 const ALL_READY = () => ({ ready: true as const });
+/** The inputs of a run on the walked commit. */
+const ON_WALKED = { live: null, head: WALKED };
 
 const stateOf = (lines: string[], id: string): string => {
   const line = lines.find((l) => l.startsWith(`  ${id} [`));
@@ -106,7 +116,7 @@ const stateOf = (lines: string[], id: string): string => {
 
 describe('the walk states', () => {
   it('are "not run" for every spec when there is no results file', () => {
-    const lines = goNoGoLines({ step: ALL_READY, walkResults: null });
+    const lines = goNoGoLines({ step: ALL_READY, walkResults: null, ...ON_WALKED });
     expect(lines).toContain('  walk: not run (no tests/e2e/results.json)');
     for (const g of GATES.filter((x) => x.how === 'walk'))
       expect(stateOf(lines, g.id)).toBe('not run');
@@ -116,6 +126,7 @@ describe('the walk states', () => {
     for (const nested of [false, true]) {
       const lines = goNoGoLines({
         step: ALL_READY,
+        ...ON_WALKED,
         walkResults: report(
           {
             '1-anonymous.spec.ts': ['expected', 'expected', 'skipped'],
@@ -129,7 +140,7 @@ describe('the walk states', () => {
         ),
       });
       expect(lines).toContain(
-        '  walk: tests/e2e/results.json, run started 2026-11-14T06:00:00.000Z',
+        '  walk: tests/e2e/results.json, run started 2026-11-14T06:00:00.000Z, on aaaaaaaaaaaa',
       );
       expect(stateOf(lines, 'walk-1-anonymous')).toBe('passed (2 expected, 1 skipped)');
       expect(stateOf(lines, 'walk-2-free')).toBe('failed (1 expected, 1 unexpected)');
@@ -141,7 +152,7 @@ describe('the walk states', () => {
 
   it('are "unknown" when the file is not a Playwright JSON report', () => {
     for (const text of ['not json', '{"tests": []}']) {
-      const lines = goNoGoLines({ step: ALL_READY, walkResults: text });
+      const lines = goNoGoLines({ step: ALL_READY, walkResults: text, ...ON_WALKED });
       expect(lines[1]).toMatch(/^ {2}walk: unknown \(tests\/e2e\/results\.json is not/);
       expect(stateOf(lines, 'walk-1-anonymous')).toBe('unknown');
     }
@@ -149,9 +160,68 @@ describe('the walk states', () => {
   });
 });
 
+describe("the walk's commit", () => {
+  const passing = { '7-support.spec.ts': ['expected'] };
+  const lines = (walkResults: string, live: string | null, head: string | null) =>
+    goNoGoLines({ step: ALL_READY, walkResults, live, head });
+
+  it("is set by the walk's Playwright config, from git's HEAD", () => {
+    const config = readFileSync(join(REPO_ROOT, 'tests/e2e/playwright.config.ts'), 'utf8');
+    expect(config).toMatch(
+      /metadata:\s*\{\s*commit:\s*execFileSync\(\s*'git',\s*\[\s*'rev-parse',\s*'HEAD'\s*\]/,
+    );
+  });
+
+  it('is read from config.metadata.commit, and a walk on HEAD is not stale', () => {
+    const out = lines(report(passing), null, WALKED);
+    expect(out[1]).toBe(
+      '  walk: tests/e2e/results.json, run started 2026-11-14T06:00:00.000Z, on aaaaaaaaaaaa',
+    );
+    expect(stateOf(out, 'walk-7-support')).toBe('passed (1 expected)');
+  });
+
+  it('is compared with the live commit when it is known, before HEAD', () => {
+    const live = 'b'.repeat(40);
+    expect(stateOf(lines(report(passing), live, WALKED), 'walk-7-support')).toBe(
+      'stale (walked on aaaaaaaaaaaa, the live commit is bbbbbbbbbbbb; passed (1 expected))',
+    );
+    expect(stateOf(lines(report(passing), WALKED, live), 'walk-7-support')).toBe(
+      'passed (1 expected)',
+    );
+  });
+
+  it('marks the walk stale against HEAD when the live commit is unknown', () => {
+    expect(stateOf(lines(report(passing), null, 'c'.repeat(40)), 'walk-7-support')).toBe(
+      'stale (walked on aaaaaaaaaaaa, HEAD is cccccccccccc; passed (1 expected))',
+    );
+    // A spec not in the report is stale too: the report is not this release's either way.
+    expect(stateOf(lines(report(passing), null, 'c'.repeat(40)), 'walk-1-anonymous')).toBe(
+      'stale (walked on aaaaaaaaaaaa, HEAD is cccccccccccc; not in tests/e2e/results.json)',
+    );
+  });
+
+  it('marks the walk stale when the report names no commit, or one that is not a sha', () => {
+    for (const metadata of [{}, { commit: 'main' }, { commit: 7 }]) {
+      const out = lines(report(passing, false, metadata), null, WALKED);
+      expect(out[1]).toMatch(/, on a commit it does not name$/);
+      expect(stateOf(out, 'walk-7-support')).toBe(
+        'stale (the report names no commit; passed (1 expected))',
+      );
+    }
+  });
+
+  it('says it was not compared when neither the live commit nor HEAD is known', () => {
+    const out = lines(report(passing), null, null);
+    expect(out[1]).toMatch(
+      /, on aaaaaaaaaaaa \(not compared: neither the live commit nor HEAD is known\)$/,
+    );
+    expect(stateOf(out, 'walk-7-support')).toBe('passed (1 expected)');
+  });
+});
+
 describe('the other states', () => {
   it('are fixed words for CI and the owner rows', () => {
-    const lines = goNoGoLines({ step: ALL_READY, walkResults: null });
+    const lines = goNoGoLines({ step: ALL_READY, walkResults: null, ...ON_WALKED });
     expect(stateOf(lines, 'ci-release-sha')).toBe("check the release SHA's run");
     for (const g of GATES.filter((x) => x.how === 'owner'))
       expect(stateOf(lines, g.id)).toBe('owner-ticked');
@@ -161,6 +231,7 @@ describe('the other states', () => {
     const lines = goNoGoLines({
       step: (s) => (s < 3 ? { ready: true } : { ready: false, blocking: s }),
       walkResults: null,
+      ...ON_WALKED,
     });
     expect(stateOf(lines, 'golive-step-2')).toBe('pass');
     expect(stateOf(lines, 'golive-step-4')).toBe(
@@ -186,7 +257,7 @@ const ALL_MANUAL = PRECONDITIONS.filter((p) => p.check.kind === 'manual').map((p
 async function run(
   argv: string[],
   probes: Record<ProbeId, Probe>,
-  opts: { walk?: string | null; live?: string } = {},
+  opts: { walk?: string | null; live?: string; head?: string; liveInClone?: boolean } = {},
 ) {
   const out: string[] = [];
   const err: string[] = [];
@@ -203,7 +274,8 @@ async function run(
     ).fetch,
     now: () => new Date(Date.UTC(2026, 10, 14)),
     git: scriptedGit({
-      'cat-file': { code: 0, stdout: '' },
+      'cat-file': { code: opts.liveInClone === false ? 1 : 0, stdout: '' },
+      'rev-parse': { code: 0, stdout: `${opts.head ?? WALKED}\n` },
       // A diff that names a file: the checkout's inputs differ from the live commit's.
       diff: { code: 0, stdout: opts.live === undefined ? '' : 'scripts/golive/check.ts\n' },
     }),
@@ -239,7 +311,8 @@ describe('pnpm golive:check -- --go-no-go', () => {
     const probes = probesWith({ 'resend-domain': { status: 'fail', reason: 'x' } });
     const argv = ['--step', '3', '--ticked', ALL_MANUAL.join(','), '--go-no-go'];
     const { code, out } = await run(argv, probes, {
-      walk: report({ '7-support.spec.ts': ['expected'] }),
+      // Walked on the live commit (run's default), so not stale.
+      walk: report({ '7-support.spec.ts': ['expected'] }, false, { commit: 'c'.repeat(40) }),
     });
     for (const g of GATES)
       expect(
@@ -261,6 +334,30 @@ describe('pnpm golive:check -- --go-no-go', () => {
     expect(out.at(-1)).toMatch(/^ready for step 3/);
     const without = await run(argv.slice(0, -1), probes);
     expect(without.code).toBe(code);
+  });
+
+  it("compares the walk with the live commit the check reads, else with git's HEAD", async () => {
+    const walk = report({ '7-support.spec.ts': ['expected'] });
+    const argv = ['--ticked', ALL_MANUAL.join(','), '--go-no-go'];
+    // The live commit is the walked one: not stale, whatever HEAD is.
+    const onLive = await run(argv, allPass(), { walk, live: WALKED, head: 'e'.repeat(40) });
+    expect(stateOf(onLive.out, 'walk-7-support')).toBe('passed (1 expected)');
+    // The live commit is another (run's default, cccc…), though HEAD is the walked one.
+    const offLive = await run(argv, allPass(), { walk });
+    expect(stateOf(offLive.out, 'walk-7-support')).toBe(
+      'stale (walked on aaaaaaaaaaaa, the live commit is cccccccccccc; passed (1 expected))',
+    );
+    // The live commit is not in the local clone, so unknown: HEAD decides.
+    const noLive = { walk, liveInClone: false };
+    expect(stateOf((await run(argv, allPass(), noLive)).out, 'walk-7-support')).toBe(
+      'passed (1 expected)',
+    );
+    expect(
+      stateOf(
+        (await run(argv, allPass(), { ...noLive, head: 'e'.repeat(40) })).out,
+        'walk-7-support',
+      ),
+    ).toBe('stale (walked on aaaaaaaaaaaa, HEAD is eeeeeeeeeeee; passed (1 expected))');
   });
 
   it('counts a manual row that is not ticked against its step and the later ones', async () => {
