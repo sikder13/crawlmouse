@@ -11,9 +11,6 @@
 -- the fingerprint after the rollbacks with production's). Dropped, the marks it held go with it.
 --   pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-037-security.test.ts -t "the revert"
 
--- ─── E ────────────────────────────────────────────────────────────────────────────────────────────
-grant select (card_last4) on public.accounts to authenticated;
-
 -- ─── D ────────────────────────────────────────────────────────────────────────────────────────────
 create or replace function public.erase_rules()
 returns table (ord integer, kind text, key text, target text, action text, pred text)

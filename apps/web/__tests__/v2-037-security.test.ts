@@ -1,8 +1,9 @@
 /**
  * Migration 20261117000001 (CC-37): internal accounts and the trial ledger (§A), one Agency trial a
- * person (§B), `mint_report` in `seat_may` (§C), two erasure rules (§D) and the card's last four
- * (§E), on PGlite with every migration applied. PGlite has one backend, so two calls racing in real
- * transactions are scripts/db/agency-trial-repeat-race.test.ts.
+ * person (§B), `mint_report` in `seat_may` (§C) and two erasure rules (§D), on PGlite with every
+ * migration applied. The card's last four are 20261118000001's (v2-037-card-grant.test.ts). PGlite
+ * has one backend, so two calls racing in real transactions are
+ * scripts/db/agency-trial-repeat-race.test.ts.
  *
  * No test reads the clock: ledger rows and `p_now` are fixed instants, and the trial transition is
  * built at a fixed instant after every account's history in this file.
@@ -616,44 +617,6 @@ describe('§D the erasure of a client contact (deletion)', () => {
   });
 });
 
-// ═══ §E ═══════════════════════════════════════════════════════════════════════════════════════════
-
-describe('§E accounts.card_last4', () => {
-  it.each(['owner', 'account_manager', 'developer'] as const)(
-    'an authenticated %s cannot select it, and still reads the row’s other columns',
-    async (role) => {
-      const owner = await newPerson('card-owner');
-      const { account_id } = await startAgency(owner.id);
-      const who = role === 'owner' ? owner : await newPerson(role);
-      if (role !== 'owner') await seatOn(account_id!, who, role);
-      await expect(
-        asRole(db, 'authenticated', who.id, (tx) =>
-          tx.query('select card_last4 from public.accounts where id = $1', [account_id]),
-        ),
-      ).rejects.toThrow(/permission denied/);
-      const { rows } = await asRole(db, 'authenticated', who.id, (tx) =>
-        tx.query<{ id: string }>('select id, tier from public.accounts where id = $1', [
-          account_id,
-        ]),
-      );
-      expect(rows.map((r) => r.id)).toEqual([account_id]);
-    },
-  );
-
-  it('the service role reads it', async () => {
-    const owner = await newPerson('card-svc');
-    await db.query(`update public.accounts set card_last4 = $2 where id = $1`, [
-      owner.accountId,
-      ['42', '42'].join(''),
-    ]);
-    expect(
-      await svc<{ card_last4: string }>('select card_last4 from public.accounts where id = $1', [
-        owner.accountId,
-      ]),
-    ).toEqual([{ card_last4: '4242' }]);
-  });
-});
-
 // ═══ The catalog, the re-run and the revert ═══════════════════════════════════════════════════════
 
 const FUNCTIONS = [
@@ -740,13 +703,6 @@ const definitions = async (d: PGlite) =>
     )
   ).rows.map((r) => r.def);
 
-const cardGrant = async (d: PGlite) =>
-  (
-    await d.query<{ can: boolean }>(
-      `select has_column_privilege('authenticated', 'public.accounts', 'card_last4', 'SELECT') can`,
-    )
-  ).rows[0]!.can;
-
 /** Columns of accounts authenticated may select, by name. */
 const readable = async (d: PGlite) =>
   (
@@ -780,7 +736,7 @@ describe('the catalog, the re-run and the revert', () => {
     await own?.close();
   });
 
-  it('pins each restated function before and after; narrows one column grant; applies twice; the revert gives back the schema, twice, and the migration applies again', async () => {
+  it('pins each restated function before and after; leaves the column grants as they were; applies twice; the revert gives back the schema, twice, and the migration applies again', async () => {
     const pre = {
       pins: await pins(own),
       defs: await definitions(own),
@@ -788,15 +744,14 @@ describe('the catalog, the re-run and the revert', () => {
     };
     const columnsBefore = await readable(own);
     expect(pre.pins).toEqual(EXPECTED_PINS);
-    expect(await cardGrant(own)).toBe(true);
     // The baseline's column is the one this file adds, in the same words.
     expect(readMigration(MIGRATION)).toContain(`\n${CC33_INTERNAL}\n`);
 
     await own.exec(readMigration(MIGRATION));
     const applied = await fingerprint(own);
     expect(await pins(own)).toEqual(EXPECTED_PINS);
-    expect(await cardGrant(own)).toBe(false);
-    expect(await readable(own)).toEqual(columnsBefore.filter((c) => c !== 'card_last4'));
+    // The column it adds is not granted, and no grant changes: card_last4 is 20261118000001's.
+    expect(await readable(own)).toEqual(columnsBefore);
     // Every body changed: the comparison below is of something.
     const defs = await definitions(own);
     for (const [i, d] of defs.entries()) expect(d, FUNCTIONS[i]).not.toBe(pre.defs[i]);
@@ -808,7 +763,7 @@ describe('the catalog, the re-run and the revert', () => {
       await own.exec(readRollback(ROLLBACK));
       expect(await definitions(own)).toEqual(pre.defs);
       expect(await pins(own)).toEqual(EXPECTED_PINS);
-      expect(await cardGrant(own)).toBe(true);
+      expect(await readable(own)).toEqual(columnsBefore);
       expect(differing(pre.print, await fingerprint(own))).toEqual([]);
     }
 
@@ -860,5 +815,151 @@ describe('the catalog, the re-run and the revert', () => {
     expect(await has()).toBe(0);
     await own.exec(readMigration(MIGRATION));
     expect(await has()).toBe(1);
+  });
+});
+
+// ═══ The text: each body against the one it replaces, and nothing in auth ═════════════════════════
+
+/** `create or replace function public.<name>(` to its closing `$$;`, as lines. */
+function statementOf(file: string, name: string): string[] {
+  const text = readMigration(file);
+  const from = text.indexOf(`create or replace function public.${name}(`);
+  const to = text.indexOf('\n$$;', from);
+  if (from < 0 || to < 0) throw new Error(`${name} is not defined in ${file}`);
+  return text.slice(from, to).split('\n');
+}
+
+/** The lines of `a` not in a longest common subsequence with `b`, and the lines of `b` not in it. */
+function lineDiff(a: string[], b: string[]) {
+  const n = a.length;
+  const m = b.length;
+  const l: number[][] = Array.from({ length: n + 1 }, () => new Array<number>(m + 1).fill(0));
+  for (let i = n - 1; i >= 0; i--)
+    for (let j = m - 1; j >= 0; j--)
+      l[i]![j] = a[i] === b[j] ? l[i + 1]![j + 1]! + 1 : Math.max(l[i + 1]![j]!, l[i]![j + 1]!);
+  const removed: string[] = [];
+  const added: string[] = [];
+  let i = 0;
+  let j = 0;
+  while (i < n && j < m) {
+    if (a[i] === b[j]) {
+      i++;
+      j++;
+    } else if (l[i + 1]![j]! >= l[i]![j + 1]!) removed.push(a[i++]!);
+    else added.push(b[j++]!);
+  }
+  return { removed: [...removed, ...a.slice(i)], added: [...added, ...b.slice(j)] };
+}
+
+const PREDECESSOR = {
+  trial_ledger_refusals: '20261108000001_v2_006c_trial_function_and_checks.sql',
+  start_trial_with_ledger: '20261108000001_v2_006c_trial_function_and_checks.sql',
+  start_agency_trial_account: '20261114000001_v2_029_public_pages.sql',
+  seat_may: '20261114000002_v2_031_agency.sql',
+} as const;
+
+/** What each body changes against the one it replaces, written out. */
+const EXPECTED_DIFF: Record<keyof typeof PREDECESSOR, { removed: string[]; added: string[] }> = {
+  trial_ledger_refusals: {
+    removed: [],
+    added: [
+      '      left join public.accounts a on a.id = l.account_id',
+      '       -- A row of an internal account is not counted; one whose account went (null) is.',
+      '       and a.internal is not true',
+    ],
+  },
+  start_trial_with_ledger: {
+    removed: [
+      "set search_path = ''",
+      '  select a.state, a.trial_used_at into v_state, v_trial_used_at',
+      '  perform public.trial_ledger_lock(p_hashes);',
+      '  v_hits := public.trial_ledger_refusals(p_hashes, pg_catalog.now());',
+      '  if pg_catalog.cardinality(v_hits) > 0 then',
+      "    return pg_catalog.jsonb_build_object('outcome', 'refused', 'hits', pg_catalog.to_jsonb(v_hits));",
+      '  insert into public.trial_ledger (kind, value_hash, account_id, trial_kind)',
+      "  select e ->> 'kind', e ->> 'value_hash', p_account_id, 'pro'",
+      '    from pg_catalog.jsonb_array_elements(p_hashes) as e;',
+    ],
+    added: [
+      'set search_path = pg_catalog, pg_temp',
+      '  v_internal pg_catalog.bool;',
+      '  select a.state, a.trial_used_at, a.internal into v_state, v_trial_used_at, v_internal',
+      '  -- An internal account (20261115000001) takes no hash lock, is refused by no row, and writes none.',
+      '  if not v_internal then',
+      '    perform public.trial_ledger_lock(p_hashes);',
+      '    v_hits := public.trial_ledger_refusals(p_hashes, pg_catalog.now());',
+      '    if pg_catalog.cardinality(v_hits) > 0 then',
+      "      return pg_catalog.jsonb_build_object('outcome', 'refused', 'hits', pg_catalog.to_jsonb(v_hits));",
+      '    end if;',
+      '  if not v_internal then',
+      '    insert into public.trial_ledger (kind, value_hash, account_id, trial_kind)',
+      "    select e ->> 'kind', e ->> 'value_hash', p_account_id, 'pro'",
+      '      from pg_catalog.jsonb_array_elements(p_hashes) as e;',
+      '  end if;',
+    ],
+  },
+  start_agency_trial_account: {
+    removed: [
+      "   where s.user_id = p_user and s.role = 'owner' and s.status = 'active'",
+      "     and a.kind = 'agency' and a.trial_used_at is not null;",
+    ],
+    added: [
+      '  -- An owner seat of any status: a removed seat, or one on a deleted account, still counts. An',
+      "  -- internal account's trial does not.",
+      "   where s.user_id = p_user and s.role = 'owner'",
+      "     and a.kind = 'agency' and a.trial_used_at is not null and not a.internal;",
+    ],
+  },
+  seat_may: {
+    removed: [],
+    added: ["      ('owner', 'mint_report'),", "      ('account_manager', 'mint_report'),"],
+  },
+};
+
+describe('the text of 20261117000001', () => {
+  it.each(Object.keys(PREDECESSOR) as (keyof typeof PREDECESSOR)[])(
+    '%s is the body it replaces with exactly the lines its section names',
+    (name) => {
+      const diff = lineDiff(statementOf(PREDECESSOR[name], name), statementOf(MIGRATION, name));
+      expect({ removed: [...diff.removed].sort(), added: [...diff.added].sort() }).toEqual({
+        removed: [...EXPECTED_DIFF[name].removed].sort(),
+        added: [...EXPECTED_DIFF[name].added].sort(),
+      });
+    },
+  );
+
+  it('erase_rules is 028’s with one block added: rules 18 and 19 and their comment', () => {
+    const before = statementOf(MIGRATION_028, 'erase_rules');
+    const after = statementOf(MIGRATION, 'erase_rules');
+    const diff = lineDiff(before, after);
+    expect(diff.removed).toEqual([]);
+    const at = after.indexOf(diff.added[0]!);
+    expect(after.slice(at, at + diff.added.length)).toEqual(diff.added);
+    expect(diff.added[0]).toMatch(/^ {6}-- CC-37: /);
+    expect(diff.added.filter((l) => /^ {6}\((\d+), 'change'/.test(l))).toEqual([
+      "      (18, 'change', 'sites.report_refusals pruned', 'public.sites x',",
+      "      (19, 'change', 'sites.client_contact_name nulled', 'public.sites x',",
+    ]);
+  });
+
+  it('names nothing in auth and no cascade outside comments, but what erase_rules repeats from 028', () => {
+    const names = (text: string) => [...text.matchAll(/\bauth\.\w+/g)].map((m) => m[0]).sort();
+    const code = (text: string) =>
+      text
+        .split('\n')
+        .filter((line) => !/^\s*--/.test(line))
+        .join('\n');
+    const here = names(code(readMigration(MIGRATION)));
+    // 028's erase_rules names auth.users and auth.audit_log_entries in two rows and its filter; the
+    // §D test above holds those rows byte for byte. They are data the erasure functions run, not
+    // statements this file runs.
+    const repeated = names(code(statementOf(MIGRATION_028, 'erase_rules').join('\n')));
+    expect(repeated.length).toBeGreaterThan(0);
+    expect(here).toEqual(repeated);
+    expect(code(readMigration(MIGRATION))).not.toMatch(/\bcascade\b/i);
+    // The probe: one statement more on auth is seen.
+    expect(
+      names(`${code(readMigration(MIGRATION))}\nalter table auth.users add column x int;`),
+    ).toHaveLength(here.length + 1);
   });
 });

@@ -19,7 +19,7 @@ const THROUGH_001 = (f: string) => f.slice(0, 14) <= '20261101000001';
 const files = listMigrations().filter((f) => f.version <= '20261103000001');
 // Check 08 asserts the client grants as 20261106000002 (P2) left them, check 09 the definer
 // functions' search_path as 20261108000002 left it, and check 01 the v2 column grants as
-// 20261117000001 left them (accounts.card_last4 revoked); this fixture predates all three: its v1
+// 20261118000001 left them (accounts.card_last4 revoked); this fixture predates all three: its v1
 // tables carry the broad grants production had then, and authenticated still selects card_last4.
 // The fixture of production before P1 and P2, below, has every file pending and runs every check.
 const V2_SET_CHECKS = listChecks().filter(

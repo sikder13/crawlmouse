@@ -71,7 +71,7 @@ describe('the check files', () => {
     expect(failed(results)).toBe(false);
   });
 
-  it('all but 01, 08 and 09 pass on a database migrated through 001 only; they fail there, as they predate 20261117000001, 20261106000002 and 20261108000002', async () => {
+  it('all but 01, 08 and 09 pass on a database migrated through 001 only; they fail there, as they predate 20261118000001, 20261106000002 and 20261108000002', async () => {
     const early = await migratedDb((f) => f <= '20261101000001_v2_001_entitlement_tables.sql');
     const results = await runChecks(pgliteDb(early));
     const [first, ...later] = results.filter((r) =>
@@ -85,7 +85,7 @@ describe('the check files', () => {
     expect(formatResults(results.filter((r) => r !== first && !later.includes(r)))).not.toContain(
       'FAIL',
     );
-    // 001 granted the card's last four to authenticated; 20261117000001 revokes it. Nothing else.
+    // 001 granted the card's last four to authenticated; 20261118000001 revokes it. Nothing else.
     expect(first!.findings.map((row) => Object.values(row).join(': '))).toEqual([
       'public.accounts.card_last4: authenticated holds SELECT on the column; not declared',
     ]);

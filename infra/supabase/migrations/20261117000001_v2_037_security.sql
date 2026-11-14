@@ -1,16 +1,18 @@
 -- v2 security (CC-37): internal accounts leave the trial ledger alone, one Agency trial a person,
 -- who may publish a client's report, the erasure of a replaced client contact and of the contact's
--- name, and the card's last four read by the owner only. Spec: docs/specs/v2/37-security.md.
+-- name. Spec: docs/specs/v2/37-security.md. The card's last four (Q25) are revoked by
+-- 20261118000001, applied after the app that reads them with the service role is deployed.
 --
 -- Not additive. Five functions are restated, each from its latest definition, with its owner,
 -- security, search_path and grants as they were: trial_ledger_refusals and start_trial_with_ledger
 -- (20261108000001, the latter with 20261108000002's search_path), start_agency_trial_account
--- (20261114000001), seat_may (20261114000002) and erase_rules (20261113000001). One column grant is
--- narrowed: authenticated no longer reads accounts.card_last4. erase_rules repeats two existing rows
--- that name tables in `auth`, byte for byte; nothing in `auth` is created, altered or written by this
--- file, and no cascade is added. It reads accounts.internal, which CC-33's 20261115000001 adds; until
--- that file is on main this one adds the column with the same statement (questions Q6), so either
--- order leaves one column. The revert drops it unless the migration history records 20261115000001.
+-- (20261114000001), seat_may (20261114000002) and erase_rules (20261113000001). The test pins each
+-- body's line diff against the one it replaces. erase_rules repeats, byte for byte, 028's two rows
+-- and filter that name tables in `auth`; outside them and comments the file names no `auth`
+-- object and no cascade (the test's "names nothing in auth"). It reads accounts.internal,
+-- which CC-33's 20261115000001 adds; until that file is on main this one adds the column with the
+-- same statement (questions Q6), so either order leaves one column. The revert drops it unless the
+-- migration history records 20261115000001.
 --
 -- The statements are re-runnable (the tests apply the file twice).
 -- The revert is infra/supabase/rollbacks/20261117000001_v2_037_security.revert.sql.
@@ -235,7 +237,9 @@ grant execute on function public.start_trial_with_ledger(uuid, jsonb, jsonb) to 
 -- their seat's status now (before, only an active seat counted, so an owner who removed themself
 -- could start a second trial). The seat must be an owner's: a person who was only ever an account
 -- manager or a developer on such an account is not refused. An internal account's trial does not
--- count (section A). The route answers trial_used as before (app/api/agency-trial/_lib/start.ts), and
+-- count (section A), and a used internal account is not the `existing` one either, so each start by
+-- its owner after that creates another agency account: one per test run, by design (questions Q9).
+-- The route answers trial_used as before (app/api/agency-trial/_lib/start.ts), and
 -- lib/v2/pricing/used-trial.ts reads the same rule for the Agency trial page and Pricing.
 
 create or replace function public.start_agency_trial_account(p_user uuid, p_name text, p_host text)
@@ -503,11 +507,3 @@ $$;
 revoke all on function public.erase_rules() from public, anon, authenticated, service_role;
 
 -- ═══ end D ═══════════════════════════════════════════════════════════════════════════════════════
-
--- ═══ E: the card's last four, for the owner only (D5, Q25) ═══════════════════════════════════════
--- 20261101000001 granted authenticated this column with the rest of the row, so any member, a
--- developer too, could read it through their own session. It is read with the service role, after
--- the caller's role on the account is found to be the owner's. Nothing else in the grant changes.
-revoke select (card_last4) on public.accounts from authenticated;
-
--- ═══ end E ═══════════════════════════════════════════════════════════════════════════════════════
