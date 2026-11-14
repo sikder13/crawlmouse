@@ -179,6 +179,9 @@ describe('the backfill', () => {
       expect(got.accounts.map(shape)).toEqual(fresh.accounts.map(shape));
       expect(got.seats.map(seat)).toEqual(fresh.seats.map(seat));
     }
+    // CC-33's accounts.internal (20261115000001) is left to its default: a backfilled account is a
+    // customer's, not one of ours.
+    expect(got.accounts[0]!.internal).toBe(false);
     expect(got.accounts[0]).toMatchObject({
       state: 'free',
       tier: 'free',

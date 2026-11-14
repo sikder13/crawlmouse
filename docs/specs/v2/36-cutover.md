@@ -132,7 +132,8 @@ no rate-limit bucket is spent; Turnstile and the limits of `/api/checks` are unc
 default_account_id is null and exists (select 1 from public.seats s where s.user_id = u.id)` is 0;
     `select count(*) from pg_proc where proname = 'provision_default_account'` is 0;
   - after: `select count(*) from public.users where default_account_id is null` is 0; each backfilled
-    user holds one active owner seat on a `free` account; the `trial_ledger` and `email_sends` row
+    user holds one active owner seat on a `free` account with `internal` false (CC-33's column, left
+    to its default); the `trial_ledger` and `email_sends` row
     counts are what they were before; one test sign-up gets one account.
 
 ## D3 — kept public pages in the v2 shell
