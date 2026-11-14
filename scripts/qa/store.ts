@@ -6,17 +6,23 @@ import { TRIAL_OUTCOMES } from '../../apps/web/lib/auth/first-login';
 import { effectiveTier, type Tier } from '../../apps/web/lib/entitlement-v2';
 import { supabaseSeatsStore } from '../../apps/web/lib/v2/agency/seats-store';
 import { startProTrial } from '../../apps/web/lib/v2/account/pro-trial';
-import { supabaseAddSite } from '../../apps/web/lib/v2/account/sites-store';
+import { editSite, supabaseAddSite } from '../../apps/web/lib/v2/account/sites-store';
+import { firstAuditRequester } from '../../apps/web/lib/v2/pipeline/first-audit';
+import { supabaseKeepStore } from '../../apps/web/lib/v2/pipeline/keep-store';
 import type { RequestDeps } from '../../apps/web/lib/v2/pipeline/request';
+import { supabasePipelineStore } from '../../apps/web/lib/v2/pipeline/store';
+import { DOMAIN_AUDITS_PER_HOUR, GLOBAL_AUDITS_PER_DAY } from '../../apps/web/lib/limits';
+import { rateLimitWindowStart } from '../../apps/web/lib/rate-limit-window';
 import { snapshotFromRow, type AccountRow } from '../../apps/web/lib/billing/state-machine-apply';
 import type { BillingAccounts } from './billing';
 import type { ResetStore } from './reset';
-import type { AddOutcome, QaStore, SeatResult, TrialResult } from './seed';
+import type { AddResult, FirstAuditResult, QaStore, SeatResult, TrialResult } from './seed';
 
 /**
  * The seed's store (./seed.ts `QaStore`) over a service-role Supabase client, through the app's own
  * modules wherever the app has one: `supabaseAddSite` (CC-26b), `supabaseSeatsStore` (CC-31),
- * `start_agency_trial_account` (CC-29), `startProTrial` (CC-26b, the account door's decision). The
+ * `start_agency_trial_account` (CC-29), `startProTrial` (CC-26b, the account door's decision),
+ * `firstAuditRequester` (CC-22b D7) and `editSite` (CC-26b) for an agency account's first site. The
  * reads it adds are of rows, and the only table it writes itself is `qa_accounts` (D2's marker).
  */
 
@@ -28,6 +34,31 @@ export interface QaStoreDeps {
   /** The trial decision's dependencies other than the two stores, which are built here. */
   trial: Omit<FirstLoginDeps, 'store' | 'entitlement'> & Pick<FirstLoginDeps, 'entitlement'>;
   now(): Date;
+  /** `isCrawlPaused` (lib/crawl-pause.ts): no first audit is requested while crawls are paused. */
+  paused(): boolean;
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+const HOUR_MS = 60 * 60 * 1000;
+
+/**
+ * The two buckets a kept site's first audit counts against (`startLimits`, app/api/checks/_lib/
+ * start-limits.ts), through the same `increment_rate_limit` as lib/rate-limit.ts's `checkRateLimit`,
+ * over this client: the day's ceiling fails closed, the domain's hour fails open, as there.
+ */
+function firstAuditLimits(sb: SupabaseClient) {
+  async function count(key: string, limit: number, windowMs: number, failClosed: boolean) {
+    const { data, error } = await sb.rpc('increment_rate_limit', {
+      p_bucket_key: key,
+      p_window_start: rateLimitWindowStart(Date.now(), windowMs).toISOString(),
+    });
+    if (error) return !failClosed;
+    return (data as number) <= limit;
+  }
+  return {
+    global: () => count('global:audits:day', GLOBAL_AUDITS_PER_DAY, DAY_MS, true),
+    domain: (domain: string) => count(`domain:${domain}`, DOMAIN_AUDITS_PER_HOUR, HOUR_MS, false),
+  };
 }
 
 function fail(what: string, error: { message: string }): never {
@@ -62,6 +93,30 @@ interface LimitsRow {
   timezone: string;
 }
 
+async function limitsOf(sb: SupabaseClient, accountId: string, now: Date) {
+  const a = await sb
+    .from('accounts')
+    .select(
+      'state, tier, trial_variant, trial_ends_at, past_due_tier, past_due_since, site_limit, timezone',
+    )
+    .eq('id', accountId)
+    .maybeSingle();
+  if (a.error) fail('accounts read', a.error);
+  const row = a.data as LimitsRow;
+  const tier = effectiveTier(
+    {
+      state: row.state as never,
+      tier: row.tier,
+      trialVariant: row.trial_variant,
+      trialEndsAt: row.trial_ends_at === null ? null : new Date(row.trial_ends_at),
+      pastDueTier: row.past_due_tier,
+      pastDueSince: row.past_due_since === null ? null : new Date(row.past_due_since),
+    },
+    now,
+  );
+  return { tier, siteLimit: row.site_limit, timezone: row.timezone };
+}
+
 export function qaStore(sb: SupabaseClient, deps: QaStoreDeps): QaStore {
   const seats = supabaseSeatsStore(sb);
   // A send that throws after add_site's insert would leave the site added and the seed stopped; it
@@ -76,6 +131,25 @@ export function qaStore(sb: SupabaseClient, deps: QaStoreDeps): QaStore {
     }
   });
   const door = supabaseDoorStore(sb);
+  const keep = supabaseKeepStore(sb);
+  // The door's first audit (lib/auth/door-deps.ts), over this client, with the same send as addSite.
+  const requestFirstAudit = firstAuditRequester({
+    request: {
+      store: supabasePipelineStore(sb),
+      send: async (event) => {
+        try {
+          return await deps.send(event);
+        } catch (e) {
+          unsent = e instanceof Error ? e.message : String(e);
+          return undefined;
+        }
+      },
+      now: () => deps.now().getTime(),
+    },
+    hasLiveOrGradedCheck: (siteId) => keep.hasLiveOrGradedCheck(siteId),
+    limits: firstAuditLimits(sb),
+    paused: () => deps.paused(),
+  });
 
   async function hosts(accountId: string): Promise<string[]> {
     const r = await sb
@@ -162,30 +236,11 @@ export function qaStore(sb: SupabaseClient, deps: QaStoreDeps): QaStore {
 
     hosts,
 
-    async addSite(seat, host, userId): Promise<{ outcome: AddOutcome; unsent?: string }> {
+    async addSite(seat, host, userId): Promise<AddResult> {
       if (!(await deps.admit(host)))
         throw new Error(`qa:seed: ${host} is refused by the SSRF guard`);
-      const a = await sb
-        .from('accounts')
-        .select(
-          'state, tier, trial_variant, trial_ends_at, past_due_tier, past_due_since, site_limit, timezone',
-        )
-        .eq('id', seat.accountId)
-        .maybeSingle();
-      if (a.error) fail('accounts read', a.error);
-      const row = a.data as LimitsRow;
       const now = deps.now();
-      const tier = effectiveTier(
-        {
-          state: row.state as never,
-          tier: row.tier,
-          trialVariant: row.trial_variant,
-          trialEndsAt: row.trial_ends_at === null ? null : new Date(row.trial_ends_at),
-          pastDueTier: row.past_due_tier,
-          pastDueSince: row.past_due_since === null ? null : new Date(row.past_due_since),
-        },
-        now,
-      );
+      const { tier, siteLimit, timezone } = await limitsOf(sb, seat.accountId, now);
       const first = (await hosts(seat.accountId)).length === 0;
       unsent = undefined;
       // As POST /api/sites calls it (app/api/sites/route.ts).
@@ -193,20 +248,50 @@ export function qaStore(sb: SupabaseClient, deps: QaStoreDeps): QaStore {
         accountId: seat.accountId,
         ownerSeatId: seat.ownerSeatId,
         host,
-        schedule: scheduleFor(tier, first, now, row.timezone),
-        limit: row.site_limit,
+        schedule: scheduleFor(tier, first, now, timezone),
+        limit: siteLimit,
         perDomain: tier === 'free',
         requestedByUserId: userId,
       });
       switch (r.outcome) {
         case 'created':
           return unsent === undefined ? { outcome: 'created' } : { outcome: 'created', unsent };
-        case 'exists':
-        case 'full':
-          return { outcome: r.outcome };
+        case 'adds_capped':
+        case 'domain_capped':
+          return { outcome: r.outcome, nextAllowedAt: r.nextAllowedAt };
         default:
-          return { outcome: 'capped' };
+          return { outcome: r.outcome };
       }
+    },
+
+    async firstAudit(seat, host, userId): Promise<FirstAuditResult> {
+      const s = await sb
+        .from('sites')
+        .select('id, schedule_cadence')
+        .eq('account_id', seat.accountId)
+        .eq('host', host)
+        .is('removed_at', null)
+        .is('staging_of_site_id', null)
+        .maybeSingle();
+      if (s.error) fail('sites read', s.error);
+      const site = s.data as { id: string; schedule_cadence: string | null } | null;
+      if (site === null) return { outcome: 'no_site' };
+      // Any check at all, read here as rows: the requester's own read counts with `head`, and a run
+      // that finds one must send nothing, so this one is the seed's.
+      const c = await sb.from('checks').select('id').eq('site_id', site.id).limit(1);
+      if (c.error) fail('checks read', c.error);
+      if ((c.data ?? []).length > 0) return { outcome: 'has_check' };
+      unsent = undefined;
+      const answer = await requestFirstAudit({ siteId: site.id, host, userId });
+      if (answer !== 'requested') return { outcome: answer };
+      // add_site stores a first site's schedule with it; start_agency_trial_account stores none.
+      if (site.schedule_cadence === null) {
+        const now = deps.now();
+        const { tier, timezone } = await limitsOf(sb, seat.accountId, now);
+        const schedule = scheduleFor(tier, true, now, timezone);
+        if (schedule !== null) await editSite(sb, site.id, { schedule });
+      }
+      return unsent === undefined ? { outcome: 'requested' } : { outcome: 'requested', unsent };
     },
 
     async developerSeat(seat, email, userId): Promise<SeatResult> {

@@ -26,6 +26,9 @@ export const QA_HOSTS = {
   appShell: 'app-shell.lab.nahltech.com',
   cfBlocked: 'cf-blocked.lab.nahltech.com',
   clients: [1, 2, 3, 4, 5, 6].map((n) => `client-${n}.lab.nahltech.com`),
+  // The Agency trial's client has a host of its own: a Free account's first audit counts against
+  // its host's hourly bucket, which qa+agency's first client would otherwise share on every reset.
+  trialClient: 'trial-client-1.lab.nahltech.com',
   demo: [1, 2, 3].map((n) => `demo-${n}.lab.nahltech.com`),
 } as const;
 
@@ -100,7 +103,7 @@ export const QA_ACCOUNTS: readonly QaAccount[] = [
     key: 'agencytrial',
     state: 'Agency trial, card on file',
     home: { kind: 'agency', name: 'QA Agency Trial' },
-    sites: [QA_HOSTS.clients[0]!],
+    sites: [QA_HOSTS.trialClient],
     proTrial: false,
     billing: { plan: 'agency', interval: 'month', trial: true },
   },
