@@ -156,6 +156,18 @@
   text-decoration: underline;
 }
 
+/* The ring v2 gives a link (PageShell.module.css); the browser's own is 1px. */
+.earlierLine:focus-visible {
+  outline: 2px solid var(--v2-fg);
+  outline-offset: 2px;
+}
+
+/* Closed, the list is not drawn, as the browser draws a closed <details>; said in the CSS too, so a
+   reader of computed styles does not take its rows for text clipped by the card. */
+.earlier:not([open]) > .earlierList {
+  display: none;
+}
+
 .earlierList {
   margin: 8px 0 0;
   padding: 0;
