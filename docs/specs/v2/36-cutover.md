@@ -126,7 +126,35 @@ no rate-limit bucket is spent; Turnstile and the limits of `/api/checks` are unc
 
 ## D3 — kept public pages in the v2 shell
 
-Filled in when it lands.
+With `V2_CHECKS_PUBLIC` on, each kept public page that draws v1's header and footer is rewritten
+(`V2_REWRITES`, one `checksPublic` row each) to a hidden target under `app/(v2-kept)/v2-kept/`, which
+calls v1's own page function, takes v1's `Header` and `Footer` out of what it returns
+(`app/(v2-kept)/_lib/v1-chrome.ts`, which throws unless it removed one of each), and draws the rest in
+v2's `PageShell` with the marketing nav (`KeptShell.tsx`). Each target exports v1's metadata, static
+params and segment literals, and is a 404 with the flag off or by direct request. A v1-minted
+`/r/<slug>` is drawn the same way by `app/v2-report/[slug]`. The pages: `/ai-readiness-checker`,
+`/authors/[slug]`, `/blog`, `/blog/research`, `/blog/[slug]`, `/bot`, `/guides`, `/login`, `/status`,
+`/takedown`, `/verify/[id]`, `/privacy`, `/terms`, `/aup`, `/subprocessors`, `/audit/[id]` (a v1
+audit) and v1 `/r/[slug]`.
+
+- **Why not a body module per page:** it would have broken source-reading guards and the sha256 pin on
+  `app/r/[slug]/page.tsx` (questions.md Q21). Three of the 17 v1 page files changed:
+  `/ai-readiness-checker` (its content moved to `AiReadinessChecker.tsx`), and `/login` and
+  `/takedown` (the chrome moved from the client form to the page); `git diff --stat b82a8e1f -- <file>`
+  per page lists them.
+- **Flag off is main's.** Measured on production builds of main `b82a8e1f` and the branch
+  (`apps/web/scripts/kept-pages-proof.mjs`, 31 kept URLs): 0 pages differ in the stylesheets they link,
+  and 0 in title, canonical, robots, OG/Twitter, JSON-LD, `<h1>` or `<main>`.
+- **Flag on keeps the head.** Flag off vs on, the 18 `/blog/<slug>` pages differ in their share-image
+  tags only: the URL lacks the content-hash query Next appends to a colocated image, and the tags are
+  ordered differently; the image is the same (questions.md Q22).
+- **`/ai-readiness-checker`** under the flag uses v2's start form, since v1's posts to a route that
+  answers 410 (questions.md Q4); `kept-guard.test.ts` fails if a target reaches a 410 route's caller.
+- **Not covered by the build proof:** the pages that read data (`/audit/<id>`, `/verify/<id>`, a v1
+  `/r/<slug>`), proven by the unit tests only. Printing a v1 report under the flag includes v2's header
+  and footer (follow-up).
+- Tests: `pnpm --filter @crawlmouse/web exec vitest run 'app/(v2-kept)'` and the middleware's rewrite
+  rows.
 
 ## D6 — what each other cutover item is, and whose
 
