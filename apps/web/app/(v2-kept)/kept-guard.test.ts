@@ -1,5 +1,5 @@
 /**
- * CC-36 D3, by scan rather than by a list:
+ * CC-36 D3 (the first and third by scan; the second over the named callers below):
  * - every v1 page still served once V2_CHECKS_PUBLIC is on (not answered by a `V1_CUTOVER` row)
  *   whose imports reach v1's header or footer has a `V2_REWRITES` row, and that row's target is a
  *   page on disk, so no such page is drawn with v1's chrome under the flag;
@@ -114,19 +114,29 @@ describe('every served v1 page that draws v1’s chrome has a rewrite to a v2-sh
 });
 
 describe('no kept target reaches a module that calls a route the cutover retires', () => {
-  /** Modules whose request goes to a `V1_CUTOVER` route (`/api/audits/start`, `…/notify`, `…/reaudit`). */
+  /**
+   * The modules whose request goes to a `V1_CUTOVER` route (`/api/audits/start`, `…/cancel`,
+   * `…/notify`, `…/reaudit`), listed by hand: `grep -rn "/api/audits/" apps/web/app apps/web/components
+   * apps/web/lib --include=*.ts --include=*.tsx | grep -v test` finds them, beside the stream,
+   * export and llms-txt calls, which stay v1 (docs/specs/v2/36-cutover.md D2).
+   */
   const CALLS_RETIRED = [
     'lib/submit-audit.ts',
     'lib/notify-submit.ts',
     'components/dashboard/ReauditButton.tsx',
     'components/share/CompareForm.tsx',
+    'app/audit/[id]/AuditView.tsx',
   ];
   /**
-   * The v1 audit page's "email me when it is done" (components/audit/EmailWhenDone.tsx) is drawn
-   * only while a v1 audit is running, and no v1 audit starts once `/api/audits/start` answers 410.
+   * The v1 audit page's "email me when it is done" (components/audit/EmailWhenDone.tsx) and its
+   * Cancel (AuditView.tsx) are drawn only while a v1 audit is running, and no v1 audit starts once
+   * `/api/audits/start` answers 410 (questions.md Q14).
    */
   const ALLOWED: Record<string, string[]> = {
-    'app/(v2-kept)/v2-kept/audit/[id]/page.tsx': ['lib/notify-submit.ts'],
+    'app/(v2-kept)/v2-kept/audit/[id]/page.tsx': [
+      'lib/notify-submit.ts',
+      'app/audit/[id]/AuditView.tsx',
+    ],
   };
   const targets = pagesOnDisk()
     .filter((p) => V2_REWRITES.some((r) => r.to === p.url && r.flag === 'checksPublic'))

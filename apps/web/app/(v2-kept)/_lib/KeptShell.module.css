@@ -1,0 +1,12 @@
+/* What v1 hid from print (`.no-print` around its header and footer), the shell hides too: a kept
+   page printed, a v1 report's "Download PDF" among them, carries its own content only. */
+.kept {
+  display: contents;
+}
+
+@media print {
+  .kept > [data-v2-shell] > header,
+  .kept > [data-v2-shell] > [data-v2-footer] {
+    display: none;
+  }
+}

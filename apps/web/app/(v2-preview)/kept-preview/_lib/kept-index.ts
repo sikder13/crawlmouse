@@ -18,7 +18,7 @@ export const KEPT_PREVIEW_INDEX: readonly KeptPreview[] = [
   { slug: 'blog', name: 'Blog', v1: '/blog' },
   { slug: 'blog-research', name: 'Research', v1: '/blog/research' },
   { slug: 'blog-post', name: 'Blog post', v1: '/blog/orphan-pages' },
-  { slug: 'bot', name: 'Bot', v1: '/bot' },
+  { slug: 'bot', name: 'Our crawler', v1: '/bot' },
   { slug: 'guides', name: 'Guides', v1: '/guides' },
   { slug: 'login', name: 'Log in', v1: '/login' },
   { slug: 'status', name: 'Status', v1: '/status' },
