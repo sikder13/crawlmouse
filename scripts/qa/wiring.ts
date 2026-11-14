@@ -96,7 +96,8 @@ export interface Wired {
  * A question on the terminal. An input that ends with no answer (a closed stdin: cron, CI, a pipe)
  * answers the empty string, which matches no phrase, so the step it guards is refused and the run
  * exits non-zero; `rl.question` alone would wait on a promise that never settles, and the process
- * would end with exit 0 having done nothing.
+ * would end with exit 0 having done nothing. One question per process: a second question on an input
+ * that has ended never settles; the cli asks at most one before it stops on a refusal.
  */
 export function asker(input: NodeJS.ReadableStream, output: NodeJS.WritableStream) {
   return (prompt: string): Promise<string> =>

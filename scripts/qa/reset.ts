@@ -25,6 +25,16 @@ const isQaKey = (k: string): k is QaKey => (QA_KEYS as readonly string[]).includ
 
 export async function reset(deps: ResetDeps): Promise<Step[]> {
   const steps: Step[] = [];
+  // The restore adds sites, which waits while crawls are paused: refused before anything is deleted,
+  // so a paused reset does not leave the set empty until the next run.
+  if (deps.store.paused()) {
+    noter(steps, deps.print, 'run')(
+      'reset',
+      'refused',
+      'crawls are paused (CRAWL_PAUSED); nothing was reset',
+    );
+    return steps;
+  }
   for (const row of await deps.reset.marked()) {
     const note = noter(steps, deps.print, isQaKey(row.key) ? row.key : 'run');
     const r = await deps.reset.reset(row.accountId);

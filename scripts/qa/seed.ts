@@ -61,6 +61,8 @@ export type TrialResult =
 export type SeatResult = 'accepted' | 'already_member' | 'full' | 'refused';
 
 export interface QaStore {
+  /** CRAWL_PAUSED where the script runs (`isCrawlPaused`). */
+  paused(): boolean;
   /** The user's own account and their owner seat on it (handle_new_user's). */
   personal(userId: string): Promise<Seat | null>;
   /** An agency account the user owns, of this name; null when there is none. */

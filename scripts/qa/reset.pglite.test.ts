@@ -5,6 +5,7 @@ import {
   readMigration,
   readRollback,
 } from '../../apps/web/__tests__/helpers/pglite-migrations';
+import { rateLimitWindowStart } from '../../apps/web/lib/rate-limit-window';
 import { reset } from './reset';
 import { exitCode, seed } from './seed';
 import { qaResetStore } from './store';
@@ -222,6 +223,45 @@ describe('qa_reset: a deleted account', () => {
 });
 
 describe('qa:reset', () => {
+  withMarker(
+    'while crawls are paused it resets nothing, so the set is not left empty',
+    async () => {
+      const w = await seeded();
+      const before = await shape(w.db);
+      w.pause(true);
+      const steps = await reset(w.resetDeps);
+      expect(steps).toEqual([
+        {
+          key: 'run',
+          step: 'reset',
+          outcome: 'refused',
+          detail: 'crawls are paused (CRAWL_PAUSED); nothing was reset',
+        },
+      ]);
+      expect(await shape(w.db)).toEqual(before);
+    },
+    PGLITE_TIMEOUT,
+  );
+
+  withMarker(
+    'a capped first client in a reset asks for no first audit of a site it did not add',
+    async () => {
+      const w = await seeded();
+      const windowStart = rateLimitWindowStart(Date.now(), 60 * 60 * 1000).toISOString();
+      for (let i = 0; i < 5; i++) {
+        await w.db.query(`select public.increment_rate_limit($1, $2::timestamptz)`, [
+          'domain:client-1.lab.nahltech.com',
+          windowStart,
+        ]);
+      }
+      const steps = await reset(w.resetDeps);
+      const agency = steps.filter((s) => s.key === 'agency');
+      expect(agency.find((s) => s.step === 'site')?.outcome).toBe('refused');
+      expect(agency.filter((s) => s.step === 'first audit')).toEqual([]);
+    },
+    PGLITE_TIMEOUT,
+  );
+
   withMarker(
     'three resets in a row refuse nothing, and each leaves a fresh seed’s set',
     async () => {

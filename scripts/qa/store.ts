@@ -163,6 +163,7 @@ export function qaStore(sb: SupabaseClient, deps: QaStoreDeps): QaStore {
   }
 
   return {
+    paused: () => deps.paused(),
     async personal(userId) {
       const member = await door.loadMember(userId);
       return member === null
