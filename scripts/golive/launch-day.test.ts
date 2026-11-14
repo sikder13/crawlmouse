@@ -4,10 +4,20 @@
  * command): a `signal` tag set from a literal is listed by its name, one set from a value by its
  * file. A tag added, removed or renamed in the code fails this until the page says the same.
  */
+import { PGlite } from '@electric-sql/pglite';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { FAILURE_REASONS } from '../../inngest/check-events';
 import { REPO_ROOT } from './env-scan';
+import {
+  CHECK_FAILURE_FLOOR,
+  CHECK_FAILURE_LINE,
+  COUNTED_REASONS,
+  REASON_COUNTED,
+  checkFailureSql,
+  withCheckFailure,
+} from './launch-day';
 import { sentrySignals, signalsInSource, type Signals } from './signals';
 
 const PAGE = join(REPO_ROOT, 'docs/ops/launch-day.md');
@@ -72,6 +82,92 @@ describe('docs/ops/launch-day.md, the Sentry signals', () => {
     expect({ literal: into.literal.sort(), fromValue: into.fromValue.sort() }).toEqual({
       literal: ['five', 'four', 'one-two', 'three', 'wrapped-name'],
       fromValue: ['c.ts', 'd.ts', 'e.ts'],
+    });
+  });
+});
+
+describe('docs/ops/launch-day.md, the check-failure line', () => {
+  it('holds the render of launch-day.ts between its markers', () => {
+    const page = readFileSync(PAGE, 'utf8');
+    expect(withCheckFailure(page)).toBe(page);
+  });
+
+  it("marks each of the pipeline's failure reasons, and only those", () => {
+    expect(Object.keys(REASON_COUNTED).sort()).toEqual([...FAILURE_REASONS].sort());
+    // A site's own second check and the owner's pause are not counted; every other reason is.
+    expect(FAILURE_REASONS.filter((r) => !COUNTED_REASONS.includes(r))).toEqual([
+      'paused',
+      'site_busy',
+    ]);
+    expect(CHECK_FAILURE_FLOOR).toBe(20);
+    expect(CHECK_FAILURE_LINE).toBe(20);
+  });
+
+  describe('the query, on Postgres', () => {
+    let db: PGlite;
+    beforeAll(async () => {
+      db = new PGlite();
+      // The columns the query reads, with the constraint that sets finished_at for an ended check.
+      await db.exec(`
+        create table public.checks (
+          id serial primary key,
+          status text not null,
+          failure_reason text,
+          finished_at timestamptz
+        );`);
+    }, 60_000);
+    afterAll(async () => {
+      await db?.close();
+    });
+
+    /** The query's answer over `rows` ended `ago` minutes back (a reason marks a failed check). */
+    async function run(rows: { reason?: string; ago?: number }[]) {
+      await db.exec('truncate public.checks');
+      for (const r of rows)
+        await db.query(
+          `insert into public.checks (status, failure_reason, finished_at)
+           values ($1, $2, now() - make_interval(mins => $3))`,
+          [r.reason === undefined ? 'finished' : 'failed', r.reason ?? null, r.ago ?? 5],
+        );
+      const { rows: out } = await db.query<{
+        failed_ours: number;
+        failed_any: number;
+        ended: number;
+        failed_pct: string | null;
+        abort: boolean;
+      }>(checkFailureSql());
+      return out[0]!;
+    }
+    const of = (n: number, row: { reason?: string; ago?: number } = {}) =>
+      Array.from({ length: n }, () => ({ ...row }));
+
+    it('crosses the line over 20% of at least 20 ended checks', async () => {
+      // 5 of 20 failed: 25%.
+      expect(await run([...of(15), ...of(5, { reason: 'internal' })])).toMatchObject({
+        failed_ours: 5,
+        ended: 20,
+        abort: true,
+      });
+      // 4 of 20: exactly 20%, not over it.
+      expect((await run([...of(16), ...of(4, { reason: 'internal' })])).abort).toBe(false);
+    });
+
+    it('does not read the rate below the floor', async () => {
+      // 19 ended, every one failed.
+      expect(await run(of(19, { reason: 'internal' }))).toMatchObject({ ended: 19, abort: false });
+      expect(await run([])).toMatchObject({ ended: 0, abort: false, failed_pct: null });
+    });
+
+    it("counts only the reasons marked ours, and only the hour's checks", async () => {
+      const answer = await run([
+        ...of(14),
+        ...of(6, { reason: 'site_busy' }),
+        ...of(6, { reason: 'paused' }),
+        ...of(9, { reason: 'internal', ago: 90 }),
+      ]);
+      expect(answer).toMatchObject({ failed_ours: 0, failed_any: 12, ended: 26, abort: false });
+      for (const reason of COUNTED_REASONS)
+        expect((await run([...of(15), ...of(5, { reason })])).abort, reason).toBe(true);
     });
   });
 });
