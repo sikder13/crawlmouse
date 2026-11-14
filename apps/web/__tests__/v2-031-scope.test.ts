@@ -342,7 +342,7 @@ describe('what a seat reads of the account itself, whatever its scope', () => {
   });
 
   // CC-37 Q25: the card's last four is no member's to read through the session, the owner's
-  // included (20261117000001 revokes the column); the account pages read it with the service role
+  // included (20261118000001 revokes the column); the account pages read it with the service role
   // for the owner alone (lib/v2/account/card.ts).
   it.each(['owner', 'manager', 'developer'] as const)(
     '%s cannot read the card’s last four through the session (Q25)',

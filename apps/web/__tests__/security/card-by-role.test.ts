@@ -3,7 +3,7 @@
  * pages' two loaders (`readAccount` for the account pages, `readSettingsPage`'s dataset for Settings,
  * Settings › Plan and Trial ending) read for each person of `scopeWorld`, plus a developer whose seat
  * covers the second client. The owner reads the digits; every other role reads that a card is on file
- * and no digit of it; the session is never asked for the column, which 20261117000001 revokes.
+ * and no digit of it; the session is never asked for the column, which 20261118000001 revokes.
  */
 import type { PGlite } from '@electric-sql/pglite';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';

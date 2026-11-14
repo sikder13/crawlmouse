@@ -121,7 +121,7 @@ clients their seat covers: `subscriptions`; `agency_brands`; the account's own r
 event counts across the account's clients, which `is_member` gates (migration `20261103000001`). So
 the rail's owner-only billing (§5) is presentation: a seat of any role can read the card's last four
 with its own token, except the card's last four: CC-37 revoked `card_last4` from `authenticated`
-(migration `20261117000001`), and the owner reads it through the service role after a role check. The test below reads the account's row, its subscription and its
+(migration `20261118000001`), and the owner reads it through the service role after a role check. The test below reads the account's row, its subscription and its
 account-wide alert rules as the owner, an account manager and a developer scoped to one client, and
 as a removed seat and a stranger:
 

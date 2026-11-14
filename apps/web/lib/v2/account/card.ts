@@ -1,6 +1,6 @@
 /**
  * The card on the account pages (CC-37 Q25): its last four are the owner's to see. Migration
- * 20261117000001 revokes `accounts.card_last4` from `authenticated`, so the session cannot read it;
+ * 20261118000001 revokes `accounts.card_last4` from `authenticated`, so the session cannot read it;
  * it is read here with the service role, after `member_role` through the caller's own session has
  * answered. The owner gets the digits; every other role gets `last4: null` and `onFile`, so what
  * depends on a card being on file (a card trial's actions) holds for them too, and no digit leaves
