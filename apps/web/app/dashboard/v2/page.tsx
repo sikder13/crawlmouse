@@ -1,4 +1,5 @@
 import '../../../styles/v2/tokens.css';
+import * as Sentry from '@sentry/nextjs';
 import { notFound, redirect } from 'next/navigation';
 import { checksPublicEnabled } from '@/lib/auth/flags';
 import { AccountStateScreen } from '@/components/v2/screens/account/AccountStateScreen';
@@ -44,14 +45,20 @@ export default async function V2Dashboard({
   const { account, seat, accounts, tier, userId } = r.viewer;
   const now = new Date();
   const { d, viewer } = await readAccount(await supabaseServer(), account.id, seat.id, now);
-  // The scheduler's own column (CC-28 D8), for the sites the caller's session read.
-  const next = await readNextChecks(
-    supabaseAdmin(),
-    d.sites.map((s) => s.id),
-  );
-  // The signed-in viewer's own v1 audits (CC-36 D5): their id, not the account owner's, since a v1
-  // audit id is a capability URL.
-  const earlier = await readEarlierAudits(supabaseAdmin(), userId, now);
+  const [next, earlier] = await Promise.all([
+    // The scheduler's own column (CC-28 D8), for the sites the caller's session read.
+    readNextChecks(
+      supabaseAdmin(),
+      d.sites.map((s) => s.id),
+    ),
+    // The signed-in viewer's own v1 audits (CC-36 D5): their id, not the account owner's, since a
+    // v1 audit id is a capability URL. A failed read is reported and the line left out: it is not
+    // worth the dashboard.
+    readEarlierAudits(supabaseAdmin(), userId, now).catch((cause: unknown) => {
+      Sentry.captureException(cause);
+      return [];
+    }),
+  ]);
   return (
     <LiveActions>
       <DashboardScreen

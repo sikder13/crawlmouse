@@ -236,7 +236,7 @@ export interface EarlierAudit {
 export interface EarlierAuditsView {
   line: string;
   label: string;
-  rows: { key: string; host: string; date: string; grade: string; href: string }[];
+  rows: { key: string; host: string; date: string; grade: string; href: string; name: string }[];
 }
 
 export interface DashboardView {
@@ -824,13 +824,19 @@ function earlierView(audits: readonly EarlierAudit[], zone: string): EarlierAudi
   return {
     line: COPY.earlierLine,
     label: COPY.earlierListLabel,
-    rows: audits.map((a) => ({
-      key: a.id,
-      host: hostOf(a.url),
-      date: dayMonthYear(a.completedAt, zone),
-      grade: COPY.earlierGrade(a.grade),
-      href: auditHref(a.id),
-    })),
+    rows: audits.map((a) => {
+      const host = hostOf(a.url);
+      const date = dayMonthYear(a.completedAt, zone);
+      const grade = COPY.earlierGrade(a.grade);
+      return {
+        key: a.id,
+        host,
+        date,
+        grade,
+        href: auditHref(a.id),
+        name: COPY.earlierLinkName(host, date, grade),
+      };
+    }),
   };
 }
 

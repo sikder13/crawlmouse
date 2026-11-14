@@ -23,6 +23,7 @@ function fakeAdmin(rows: Row[], fail?: { message: string }) {
     from(table: string) {
       calls.push(['from', table]);
       let out = rows.slice();
+      const keys: [keyof Row, boolean][] = [];
       let limit = Infinity;
       const chain = {
         select(cols: string) {
@@ -42,11 +43,16 @@ function fakeAdmin(rows: Row[], fail?: { message: string }) {
           out = out.filter((r) => r.expires_at === null || Date.parse(r.expires_at) > at);
           return chain;
         },
+        // Each call adds a key after the ones before it, as PostgREST's `order` does.
         order(col: keyof Row, o: { ascending: boolean }) {
           calls.push(['order', col, o]);
+          keys.push([col, o.ascending]);
           out.sort((a, b) => {
-            const d = String(a[col]).localeCompare(String(b[col]));
-            return o.ascending ? d : -d;
+            for (const [k, asc] of keys) {
+              const d = String(a[k]).localeCompare(String(b[k]));
+              if (d !== 0) return asc ? d : -d;
+            }
+            return 0;
           });
           return chain;
         },
@@ -120,6 +126,20 @@ describe('readEarlierAudits', () => {
       completedAt: '2026-10-26T00:00:00.000Z',
     });
     expect(got.at(-1)?.id).toBe('a006');
+  });
+
+  it('orders audits finished at the same instant by id, newest id first', async () => {
+    const at = '2026-10-05T00:00:00.000Z';
+    const { admin } = fakeAdmin([
+      row(1, { completed_at: at }),
+      row(3, { completed_at: at }),
+      row(2, { completed_at: at }),
+    ]);
+    expect((await readEarlierAudits(admin, VIEWER, NOW)).map((a) => a.id)).toEqual([
+      'a003',
+      'a002',
+      'a001',
+    ]);
   });
 
   it('throws a read error rather than answering none', async () => {

@@ -37,9 +37,16 @@ describe('the earlier-audits line on the dashboard', () => {
     );
     expect(details.querySelector('ul')?.getAttribute('aria-label')).toBe('Earlier audits');
     expect([...details.querySelectorAll('li')].map((li) => li.textContent)).toEqual([
-      // 14:20Z on 12 Oct and 09:05Z on 3 Jun are the same dates in Indiana (UTC−4).
+      // 10:00Z on 19 Oct, 14:20Z on 12 Oct and 09:05Z on 3 Jun are the same dates in Indiana (UTC−4).
+      'example-outfitter.com · 19 Oct 2026 · earlier grade B',
       'example-outfitter.com · 12 Oct 2026 · earlier grade C',
       'blog.example-outfitter.com · 3 Jun 2026 · not graded',
+    ]);
+    // A host audited twice keeps two link names: the date and grade are in each.
+    expect([...details.querySelectorAll('a')].map((a) => a.getAttribute('aria-label'))).toEqual([
+      'example-outfitter.com, 19 Oct 2026, earlier grade B',
+      'example-outfitter.com, 12 Oct 2026, earlier grade C',
+      'blog.example-outfitter.com, 3 Jun 2026, not graded',
     ]);
     expect([...details.querySelectorAll('a')].map((a) => a.getAttribute('href'))).toEqual(
       PREVIEW_EARLIER_AUDITS.map((a) => `/audit/${a.id}`),

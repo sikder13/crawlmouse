@@ -146,9 +146,16 @@ export const noSitePreview = () => dashboardView(noSiteDataset(), ACCOUNT_VIEWER
 
 /**
  * Two v1 audits of the viewer's own, newest first, as `readEarlierAudits` answers them (CC-36 D5):
- * a stand-in, not a fixture record. One has no grade, as a v1 audit of a client-rendered site has.
+ * a stand-in, not a fixture record. One has no grade, as a v1 audit of a client-rendered site has,
+ * and one host is audited twice, as v1's re-audit made, so the link-name guard reads repeated hosts.
  */
 export const PREVIEW_EARLIER_AUDITS: EarlierAudit[] = [
+  {
+    id: 'e0000000-0000-4000-8000-000000000003',
+    url: 'https://example-outfitter.com/',
+    grade: 'B',
+    completedAt: '2026-10-19T10:00:00.000Z',
+  },
   {
     id: 'e0000000-0000-4000-8000-000000000002',
     url: 'https://example-outfitter.com/',

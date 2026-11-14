@@ -5,7 +5,7 @@
  * owner's: a v1 audit id is a capability URL (`/audit/<id>`), so the list may only show audits that
  * are already the viewer's. The filter on `user_id` is the one row security applies to the
  * viewer's own session (`audits_owner_read`), so this reads no row that session could not.
- * Completed audits only, newest first, at most `EARLIER_AUDITS_LIMIT`, and none whose expiry has
+ * Completed audits only, newest first (by id among equal times), at most `EARLIER_AUDITS_LIMIT`, and none whose expiry has
  * passed: the expiry clause is the one v1's own list sends (`lib/audits.ts`), with `now` given.
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -25,6 +25,7 @@ export async function readEarlierAudits(
     .eq('status', 'completed')
     .or(`expires_at.is.null,expires_at.gt.${now.toISOString()}`)
     .order('completed_at', { ascending: false })
+    .order('id', { ascending: false })
     .limit(EARLIER_AUDITS_LIMIT);
   if (error) throw new Error(`earlier audits: read failed: ${error.message}`);
   return (data ?? []).map(

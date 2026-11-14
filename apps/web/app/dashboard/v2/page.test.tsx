@@ -18,6 +18,8 @@ const h = vi.hoisted(() => ({
   nextAt: null as string | null,
   earlierRead: [] as { userId: string; now: Date }[],
   earlier: [] as unknown[],
+  earlierFails: false,
+  reported: [] as unknown[],
 }));
 
 vi.mock('server-only', () => ({}));
@@ -39,8 +41,12 @@ vi.mock('@/lib/v2/account/sites-store', () => ({
 vi.mock('./earlier-audits', () => ({
   readEarlierAudits: async (_admin: unknown, userId: string, now: Date) => {
     h.earlierRead.push({ userId, now });
+    if (h.earlierFails) throw new Error('earlier audits: read failed: down');
     return h.earlier;
   },
+}));
+vi.mock('@sentry/nextjs', () => ({
+  captureException: (e: unknown) => void h.reported.push(e),
 }));
 vi.mock('@/lib/v2/account/pages', () => ({
   readAccount: async (_s: unknown, accountId: string, seatId: string, now: Date) => ({
@@ -83,6 +89,8 @@ const MAIN_SHA256 = '3c564084adaf59952d38a962ecd91a3ac87f54c710f482d4b3c084e2df4
 
 beforeEach(() => {
   h.viewerRead = 0;
+  h.earlierFails = false;
+  h.reported = [];
   h.rewritten = true;
   h.viewer = { kind: 'signed_out' };
   h.dataset = null;
@@ -215,6 +223,18 @@ describe('/dashboard/v2', () => {
     h.earlier = [];
     const none = (await render()).props as unknown as Earlier;
     expect(none.children.props.data.earlier).toBeNull();
+  });
+
+  it('a failed earlier-audits read is reported and leaves the line out; the dashboard still renders', async () => {
+    vi.stubEnv('V2_CHECKS_PUBLIC', '1');
+    const bad = fixture('bad-site');
+    h.viewer = viewerOn(BAD, bad.seats[0]!.id);
+    h.dataset = bad;
+    h.earlierFails = true;
+    type Earlier = { children: ReactElement<{ data: { earlier: unknown } }> };
+    const el = (await render()).props as unknown as Earlier;
+    expect(el.children.props.data.earlier).toBeNull();
+    expect(h.reported).toHaveLength(1);
   });
 
   it.each(['no_account', 'ambiguous'])('a %s viewer reads no earlier audits', async (kind) => {

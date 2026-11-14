@@ -47,6 +47,7 @@ describe('the earlier-audits line', () => {
           date: '13 Jun 2026',
           grade: 'earlier grade B',
           href: '/audit/c0000000-0000-4000-8000-000000000002',
+          name: 'www.shop.example, 13 Jun 2026, earlier grade B',
         },
         {
           key: 'c0000000-0000-4000-8000-000000000001',
@@ -54,6 +55,7 @@ describe('the earlier-audits line', () => {
           date: '2 Nov 2026',
           grade: 'not graded',
           href: '/audit/c0000000-0000-4000-8000-000000000001',
+          name: 'blog.example, 2 Nov 2026, not graded',
         },
       ],
     });

@@ -295,7 +295,7 @@ function Earlier({ earlier }: { earlier: NonNullable<DashboardView['earlier']> }
       <ul className={styles.earlierList} aria-label={earlier.label}>
         {earlier.rows.map((r) => (
           <li key={r.key}>
-            <a href={r.href} className={shared.mono}>
+            <a href={r.href} className={shared.mono} aria-label={r.name}>
               {r.host}
             </a>{' '}
             <span className={shared.muted}>
