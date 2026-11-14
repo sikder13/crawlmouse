@@ -16,6 +16,7 @@ import {
   decideAuditSurface,
   type AuditSnapshotLite,
   type AuditSurfaceDescriptor,
+  type StreamStop,
 } from '@/lib/audit-view-state';
 import { asClientAuditV2 } from '@/lib/audit-v2';
 import type { CrawlActivityEvent } from '@crawlmouse/types';
@@ -77,17 +78,20 @@ export function AuditSurfaceView({
   snapshot,
   done,
   deps,
+  stop = null,
 }: {
   snapshot: AuditSnapshotForView | null;
   done: boolean;
   deps: AuditSurfaceDeps;
+  /** Why the stream ended before any snapshot, when it did (lib/audit-view-state.ts). */
+  stop?: StreamStop | null;
 }) {
   // The `done` payload alone carries orphanCount/avgDepth — gate the numeric stats behind their
   // PRESENCE (not merely `done`) so neither the completed-but-pre-done window NOR a `done`-via-`error`
   // snapshot (which kept a prior tick's grade+score but has no stats) can render a 0/0 GradeCard.
   const hasResults = snapshot?.orphanCount != null && snapshot?.avgDepth != null;
   const state = deriveAuditViewState(snapshot, done, hasResults);
-  const descriptor = decideAuditSurface(state, snapshot, asClientAuditV2(snapshot));
+  const descriptor = decideAuditSurface(state, snapshot, asClientAuditV2(snapshot), stop);
   return <AuditSurfaceMap descriptor={descriptor} deps={deps} />;
 }
 

@@ -76,7 +76,7 @@ vi.mock('@/components/audit/LinkGraph', () => ({ LinkGraph: () => null }));
 // ── The stubbed database the REAL route reads ────────────────────────────────
 // Only the DB is stubbed. Everything between it and the wire — AUDIT_COLS, projectAuditForClient,
 // buildDone, the entitlement gate, the emission order — is the shipped code.
-let auditRow: Record<string, unknown>;
+let auditRow: Record<string, unknown> | null;
 let convRow: Record<string, unknown> | null;
 let findingsThrow = false;
 /** Zero-page rows must read as genuinely empty, not as the canned 2-page result set. */
@@ -194,11 +194,10 @@ vi.mock('@/lib/supabase/admin', () => ({
     },
   }),
 }));
-// The stream spends a per-IP bucket (A-1); these requests carry no client IP, so it is never asked.
+// The stream spends a per-IP bucket (A-1). Most requests here carry no client IP, so it is never
+// asked; the rate-limit case sends one and has the bucket answer "over the limit".
 vi.mock('@/lib/rate-limit', () => ({
-  checkRateLimit: async () => {
-    throw new Error('no client IP here: the limiter is not reached');
-  },
+  checkRateLimit: async () => ({ allowed: false, remaining: 0, resetAt: new Date(0) }),
 }));
 vi.mock('@/lib/supabase/server', () => ({
   supabaseServer: () =>
@@ -234,8 +233,11 @@ interface Emission {
  * Run the REAL SSE route and return the events it emitted, in order, with payloads exactly as
  * serialized. This is the producer; everything below replays what it says.
  */
-async function captureFromRoute(id = '7c1d2e3f-4a5b-4c6d-8e7f-90a1b2c3d4e5'): Promise<Emission[]> {
-  const res = await GET(new NextRequest(`http://localhost/api/audits/${id}/stream`), {
+async function captureFromRoute(
+  id = '7c1d2e3f-4a5b-4c6d-8e7f-90a1b2c3d4e5',
+  headers: Record<string, string> = {},
+): Promise<Emission[]> {
+  const res = await GET(new NextRequest(`http://localhost/api/audits/${id}/stream`, { headers }), {
     params: Promise.resolve({ id }),
   });
   const raw = await res.text();
@@ -722,4 +724,43 @@ describe('AuditView — replaying the real stream the route produces', () => {
     // state is `pending` → the progress UI, which is what a fresh audit must render.
     expect(html(), 'B rendered a state derived from A’s snapshot').toContain('Cancel audit');
   }, 60_000);
+});
+
+// F-C 1 and 2 (CC-37 review r1): a stream that ends before its first snapshot. Before, the limit was a
+// JSON 429 that EventSource never reads and a missing row polled for 250 s, so the page stayed on the
+// "running" view with nothing coming. Now each is a named `error` the wiring makes terminal.
+describe('AuditView — a stream that stops before any snapshot', () => {
+  it('rate limited: the page leaves the running view and says why, and the stream is closed', async () => {
+    const seq = await captureFromRoute(undefined, { 'x-forwarded-for': '198.51.100.77' });
+    expect(seq.map((s) => s.event)).toEqual(['error']);
+    const { es, html } = await mount();
+    // The control: with nothing received, this is the view a stopped stream used to leave in place.
+    expect(html()).toContain('Cancel audit');
+    for (const { event, data } of seq) await act(async () => es.emitRaw(event, data));
+    expect(html()).toContain('Too many live views');
+    expect(html()).not.toContain('Computing your grade');
+    expect(html()).not.toContain('Cancel audit');
+    expect(html()).not.toContain(COULD_NOT_GRADE);
+    expect(es.closed).toBe(true);
+  });
+
+  it('no such audit: the page says so instead of polling', async () => {
+    auditRow = null;
+    const seq = await captureFromRoute();
+    expect(seq.map((s) => s.event)).toEqual(['error']);
+    const { es, html } = await replay(seq);
+    expect(html()).toContain('Audit not found');
+    expect(html()).not.toContain('Cancel audit');
+    expect(html()).not.toContain(COULD_NOT_GRADE);
+    expect(es.closed).toBe(true);
+  });
+
+  it('a failed result build keeps its old terminal card (no code, no stop copy)', async () => {
+    const { es, html } = await mount();
+    await act(async () =>
+      es.emitRaw('error', JSON.stringify({ message: 'Could not load results.' })),
+    );
+    expect(html()).toContain(COULD_NOT_GRADE);
+    expect(html()).not.toContain('Too many live views');
+  });
 });

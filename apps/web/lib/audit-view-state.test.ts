@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   deriveAuditViewState,
   decideAuditSurface,
+  streamStopOf,
   type AuditViewState,
   type AuditSnapshotLite,
 } from './audit-view-state';
@@ -538,5 +539,48 @@ describe('refused is gated on hasResults, exactly as graded is', () => {
       expect(s1.refused, `refused at hasResults=${hasResults}`).toBe(hasResults);
       expect(s2.graded, `graded at hasResults=${hasResults}`).toBe(hasResults);
     }
+  });
+});
+
+// CC-37 F-C 1/2: a stream that stopped before its first snapshot names why, and only then.
+describe('decideAuditSurface — a stream stopped before any snapshot', () => {
+  const st = (over: Partial<AuditViewState> = {}): AuditViewState => ({
+    running: false,
+    awaitingResults: false,
+    graded: false,
+    refused: false,
+    failed: false,
+    gradeFailed: false,
+    failureCategory: null,
+    canceled: false,
+    ...over,
+  });
+
+  it.each([
+    ['rate_limited', 'Too many live views'],
+    ['not_found', 'Audit not found'],
+  ] as const)(
+    '%s with no snapshot is its own error card, over the couldn’t-grade catch-all',
+    (stop, title) => {
+      const d = decideAuditSurface(st({ gradeFailed: true }), null, null, stop);
+      expect(d).toMatchObject({ kind: 'error', copy: { title } });
+    },
+  );
+
+  it('a stop after a snapshot changes nothing: the snapshot decides', () => {
+    const snap = { status: 'running' } as AuditSnapshotLite;
+    expect(decideAuditSurface(st({ running: true }), snap, null, 'rate_limited')).toEqual({
+      kind: 'running',
+    });
+  });
+
+  it('reads the code from the payload, and nothing else', () => {
+    expect(streamStopOf({ code: 'rate_limited', message: 'x' })).toBe('rate_limited');
+    expect(streamStopOf({ code: 'not_found' })).toBe('not_found');
+    expect(streamStopOf({ message: 'Could not load results.' })).toBeNull();
+    expect(streamStopOf({ code: 'other' })).toBeNull();
+    expect(streamStopOf(JSON.parse('{"__proto__": {"code": "rate_limited"}}'))).toBeNull();
+    expect(streamStopOf(undefined)).toBeNull();
+    expect(streamStopOf('rate_limited')).toBeNull();
   });
 });

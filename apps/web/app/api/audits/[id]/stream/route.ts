@@ -66,13 +66,27 @@ export const dynamic = 'force-dynamic';
 // constant trips "can't recognize the exported `config` field" at build. Keep it == SSE_MAX_DURATION_S.
 export const maxDuration = 300;
 
+const SSE_HEADERS = {
+  'Content-Type': 'text/event-stream',
+  // `private`: the body depends on the viewer (owner-scoped gating), so no shared cache keeps it.
+  'Cache-Control': 'private, no-cache, no-transform',
+  Connection: 'keep-alive',
+} as const;
+
+/** A stream of one named `error` event, then the end: the page shows it and does not reconnect. */
+function streamStop(payload: { code: 'rate_limited'; message: string }): Response {
+  return new Response(`event: error\ndata: ${JSON.stringify(payload)}\n\n`, {
+    headers: SSE_HEADERS,
+  });
+}
+
 /** The extended row (post-Runbook-A); the fields are absent when the fallback engaged. */
 type AuditRowWithProgress = AuditRow & { crawl_activity?: unknown };
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  // A-1 (CC-37): an audit id is a UUID. Anything else is refused before any database read, so a
-  // garbage id cannot hold a function open polling for a row that cannot exist.
+  // A-1 (CC-37): an audit id is a UUID. Anything else is refused with 400 before any database read.
+  // A well-formed id with no row is ended after the first read (below).
   if (!isUuid(id)) return NextResponse.json({ error: 'invalid id' }, { status: 400 });
   // Per-IP, before the first read: each stream polls the database until it closes. The hourly read
   // limit the report-view route uses (the v1 audit routes' own limits are daily start/notify caps,
@@ -84,7 +98,14 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       REPORT_VIEWS_PER_IP_PER_HOUR,
       60 * 60 * 1000,
     );
-    if (!rl.allowed) return NextResponse.json({ error: 'rate_limited' }, { status: 429 });
+    // An event stream, not a 429: EventSource never reads a non-200 body and gives up silently, so
+    // the page would wait forever. The named `error` is terminal in lib/audit-stream-wiring.ts.
+    if (!rl.allowed) {
+      return streamStop({
+        code: 'rate_limited',
+        message: 'Too many live views from this network. Reload the page in a few minutes.',
+      });
+    }
   }
   const admin = supabaseAdmin();
   const sbAuth = await supabaseServer();
@@ -358,15 +379,23 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         .eq('id', id)
         .maybeSingle<AuditRowWithProgress>();
       let initial = firstRead.data;
+      let readError = firstRead.error;
       // Fall back to the legacy column set ONLY on an undefined-column error (the pre-Runbook-A
       // state) — a transient DB blip must NOT permanently downgrade this connection to no-activity.
       if (isUndefinedColumnError(firstRead.error)) {
         cols = AUDIT_COLS;
-        ({ data: initial } = await admin
+        ({ data: initial, error: readError } = await admin
           .from('audits')
           .select(cols)
           .eq('id', id)
           .maybeSingle<AuditRowWithProgress>());
+      }
+      // A read that succeeded and found no row: the audit does not exist (or has expired). End the
+      // stream now rather than poll until self-close. A failed read is not that, and keeps polling.
+      if (!initial && !readError) {
+        send('error', { code: 'not_found', message: 'This audit does not exist or has expired.' });
+        finish();
+        return;
       }
       if (initial) {
         send('snapshot', projectAuditForClient(initial));
@@ -426,12 +455,5 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     },
   });
 
-  return new Response(stream, {
-    headers: {
-      'Content-Type': 'text/event-stream',
-      // `private`: the body depends on the viewer (owner-scoped gating), so no shared cache keeps it.
-      'Cache-Control': 'private, no-cache, no-transform',
-      Connection: 'keep-alive',
-    },
-  });
+  return new Response(stream, { headers: SSE_HEADERS });
 }

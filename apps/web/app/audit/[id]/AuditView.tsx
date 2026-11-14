@@ -5,6 +5,7 @@ import { FREE_PAGE_CAP } from '@/lib/limits';
 import { AuditSurfaceView } from './AuditSurfaceView';
 import { asClientAuditV2 } from '@/lib/audit-v2';
 import { wireAuditStream } from '@/lib/audit-stream-wiring';
+import { streamStopOf, type StreamStop } from '@/lib/audit-view-state';
 import {
   reduceActivity,
   isStalled,
@@ -60,6 +61,8 @@ interface Snapshot {
 export function AuditView({ auditId, resultView }: { auditId: string; resultView?: 'ai' }) {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [done, setDone] = useState(false);
+  // Why the stream ended before its first snapshot (rate limit, no such audit), when it did.
+  const [stop, setStop] = useState<StreamStop | null>(null);
   const [canceling, setCanceling] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
   // SPEC 04 §2 — activity state, folded exclusively from real `activity` SSE events.
@@ -78,6 +81,7 @@ export function AuditView({ auditId, resultView }: { auditId: string; resultView
     // feed/snapshot or drops B's low-seq events against A's stale watermark.
     setSnapshot(null);
     setDone(false);
+    setStop(null);
     setActivity(undefined);
     firstActivityFired.current = false;
     const es = new EventSource(`/api/audits/${auditId}/stream`);
@@ -87,7 +91,10 @@ export function AuditView({ auditId, resultView }: { auditId: string; resultView
     wireAuditStream(es, {
       onSnapshot: (payload) => setSnapshot(payload as Snapshot),
       onDone: () => setDone(true),
-      onTerminalError: () => setDone(true),
+      onTerminalError: (payload) => {
+        setStop(streamStopOf(payload));
+        setDone(true);
+      },
       onActivity: (payload) =>
         setActivity((s) => reduceActivity(s, payload as CrawlActivityEvent[])),
     });
@@ -145,6 +152,7 @@ export function AuditView({ auditId, resultView }: { auditId: string; resultView
       <AuditSurfaceView
         snapshot={snapshot}
         done={done}
+        stop={stop}
         deps={{
           auditId,
           pageCount: snapshot?.page_count ?? 0,

@@ -185,11 +185,40 @@ const COULD_NOT_GRADE = {
   body: 'The crawl finished but we couldn’t compute a grade — usually a site that blocks crawlers or has no crawlable pages. Try again or contact support.',
 };
 
+/**
+ * Why the stream ended before sending any snapshot (`app/api/audits/[id]/stream/route.ts`): the
+ * per-IP limit, or no such audit. Read from the named `error` event's `code`.
+ */
+export type StreamStop = 'rate_limited' | 'not_found';
+
+const STREAM_STOP_COPY: Record<StreamStop, { title: string; body: string }> = {
+  rate_limited: {
+    title: 'Too many live views',
+    body: 'This network has opened the live audit view too often in the last hour. Reload the page in a few minutes.',
+  },
+  not_found: {
+    title: 'Audit not found',
+    body: 'This audit does not exist or has expired. Free audits are kept for 30 days.',
+  },
+};
+
+/** The stop a terminal `error` payload names, or null for any other payload. */
+export function streamStopOf(payload: unknown): StreamStop | null {
+  if (payload === null || typeof payload !== 'object' || !Object.hasOwn(payload, 'code'))
+    return null;
+  const code = (payload as { code: unknown }).code;
+  return code === 'rate_limited' || code === 'not_found' ? code : null;
+}
+
 export function decideAuditSurface(
   state: AuditViewState,
   snapshot: AuditSnapshotLite | null,
   v2: ClientAuditV2 | null,
+  stop: StreamStop | null = null,
 ): AuditSurfaceDescriptor {
+  // The stream ended before its first snapshot: nothing is known about the audit, so say why the
+  // stream stopped rather than fall through to "running" or the couldn't-grade card.
+  if (stop !== null && snapshot === null) return { kind: 'error', copy: STREAM_STOP_COPY[stop] };
   if (state.canceled) return { kind: 'canceled' };
   if (state.running) return { kind: 'running' };
   if (state.awaitingResults) return { kind: 'awaiting' };

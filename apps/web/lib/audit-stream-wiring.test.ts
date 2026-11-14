@@ -72,7 +72,21 @@ describe('wireAuditStream', () => {
     dispatch('error', JSON.stringify({ message: 'Could not load results.' }));
 
     expect(onTerminalError).toHaveBeenCalledTimes(1);
+    expect(onTerminalError).toHaveBeenCalledWith({ message: 'Could not load results.' });
     expect(isClosed()).toBe(true);
+  });
+
+  it('passes the parsed `error` data on, and undefined when it is not JSON (CC-37 F-C 1)', () => {
+    const onTerminalError = vi.fn();
+    const a = fakeEs();
+    wireAuditStream(a.es, { onSnapshot: vi.fn(), onDone: vi.fn(), onTerminalError });
+    a.dispatch('error', JSON.stringify({ code: 'rate_limited', message: 'x' }));
+    expect(onTerminalError).toHaveBeenLastCalledWith({ code: 'rate_limited', message: 'x' });
+    const b = fakeEs();
+    wireAuditStream(b.es, { onSnapshot: vi.fn(), onDone: vi.fn(), onTerminalError });
+    b.dispatch('error', 'not json');
+    expect(onTerminalError).toHaveBeenLastCalledWith(undefined);
+    expect(b.isClosed()).toBe(true);
   });
 
   it('on a NATIVE transport `error` (NO data): NOT terminal — does not close, lets EventSource reconnect', () => {
