@@ -29,15 +29,18 @@ describe('docs/specs/v2/01-accounts.md', () => {
       member_role: ['authenticated', 'service_role'],
     });
     const byTable = Object.fromEntries(catalog.tables.map((t) => [t.name, t.grants]));
-    // 027b adds the deletion mark, and CC-29 the agency trial's Checkout and consent, which no client reads.
+    // 027b adds the deletion mark, and CC-29 the agency trial's Checkout and consent, which no client
+    // reads; CC-37 (20261117000001) revokes card_last4 and adds CC-33's internal mark ungranted.
     expect(byTable.accounts!.hiddenColumns).toEqual([
       'stripe_customer_id',
+      'card_last4',
       'deletion_confirmed_at',
       'purge_after',
       'agency_checkout_url',
       'agency_checkout_at',
       'agency_checkout_interval',
       'agency_trial_consent_at',
+      'internal',
     ]);
     // 031 adds the invitation's expiry and number, which no client reads.
     expect(byTable.seats!.hiddenColumns).toEqual([

@@ -445,6 +445,7 @@ The contract (`packages/types/src/v2`) wins where it and a document disagree.
 - The invite step checks the seat limit when a seat is accepted: `apply_entitlement_transition` counts active seats only.
 - `users.default_account_id` is navigation, not authorisation: it is not repointed when a seat is removed, so every read goes through `is_member`.
 - `docs/deploy/spec51a-stage6-frontier-functions-runbook.md` still expects zero client-executable routines; after 001 its query returns `is_member` and `member_role` (step 5 below).
+- CC-37's `20261117000001` narrows the `accounts` grant this file writes: `authenticated` no longer selects `card_last4`, which the owner's views read through the service role. The grants table above is 001's.
 
 ### v1 entitlement readers, and when each moves to the gates
 
