@@ -9,6 +9,7 @@
  * the homepage links the planted orphan, so the first check's orphan fix resolves: the before/after.
  * No site is fetched. NOT part of the product.
  */
+import { randomUUID } from 'node:crypto';
 import type { PGlite } from '@electric-sql/pglite';
 import type { BatchResult } from '@crawlmouse/types/v2';
 import { buildCheck, checkMap } from '../../../packages/engine/src/v2/pipeline-surface';
@@ -46,20 +47,30 @@ const evidence: EvidenceStore = {
   },
 };
 
-/** The recorded batches as this check's: the recorded check and site ids and host replaced. */
+const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g;
+
+/**
+ * The recorded batches as this check's: the recorded check and site ids and host replaced, and every
+ * other id in them (an access test's, a page's) given a fresh one, the same one wherever it recurs,
+ * so two checks built from the one recording do not share a row's key.
+ */
 function batchesFor(
   batches: BatchResult[],
   from: string,
   to: { checkId: string; siteId: string; host: string },
 ): BatchResult[] {
-  const { checkId, siteId, host } = to;
-  return JSON.parse(
-    JSON.stringify(batches)
-      .replaceAll(from, checkId)
-      .replaceAll(SITE_ID, siteId)
-      .replaceAll(HOST, `https://${host}`)
-      .replaceAll('built-site.test', host),
-  ) as BatchResult[];
+  const fresh = new Map<string, string>([
+    [from, to.checkId],
+    [SITE_ID, to.siteId],
+  ]);
+  const text = JSON.stringify(batches)
+    .replace(UUID, (id) => {
+      if (!fresh.has(id)) fresh.set(id, randomUUID());
+      return fresh.get(id)!;
+    })
+    .replaceAll(HOST, `https://${to.host}`)
+    .replaceAll('built-site.test', to.host);
+  return JSON.parse(text) as BatchResult[];
 }
 
 /** Finishes the site's oldest queued check from the recorded crawl; its id. */
