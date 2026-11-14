@@ -47,6 +47,8 @@ export interface World {
   /** Auth users the fake admin API made, by address. */
   users: Map<string, { id: string; qaKey: QaKey | null }>;
   sent: unknown[];
+  /** While set, the pipeline's event send throws this message, as Inngest without its key does. */
+  sendFails: { message: string | null };
   dispatched: unknown[];
   reports: { message: string; ctx: unknown }[];
   lines: string[];
@@ -60,6 +62,7 @@ export async function world(): Promise<World> {
   const sb = postgrestOver(db);
   const users = new Map<string, { id: string; qaKey: QaKey | null }>();
   const sent: unknown[] = [];
+  const sendFails: { message: string | null } = { message: null };
   const dispatched: unknown[] = [];
   const reports: { message: string; ctx: unknown }[] = [];
   const lines: string[] = [];
@@ -82,6 +85,7 @@ export async function world(): Promise<World> {
     auth,
     store: qaStore(sb, {
       send: async (event) => {
+        if (sendFails.message !== null) throw new Error(sendFails.message);
         sent.push(event);
         return { ids: ['evt'] } as never;
       },
@@ -111,6 +115,7 @@ export async function world(): Promise<World> {
     deps,
     users,
     sent,
+    sendFails,
     dispatched,
     reports,
     lines,

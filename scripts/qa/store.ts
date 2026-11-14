@@ -61,7 +61,17 @@ interface LimitsRow {
 
 export function qaStore(sb: SupabaseClient, deps: QaStoreDeps): QaStore {
   const seats = supabaseSeatsStore(sb);
-  const addSite = supabaseAddSite(sb, deps.send);
+  // A send that throws after add_site's insert would leave the site added and the seed stopped; it
+  // is caught here and reported with the site instead, as the queued check is the reaper's to fail.
+  let unsent: string | undefined;
+  const addSite = supabaseAddSite(sb, async (event) => {
+    try {
+      return await deps.send(event);
+    } catch (e) {
+      unsent = e instanceof Error ? e.message : String(e);
+      return undefined;
+    }
+  });
   const door = supabaseDoorStore(sb);
 
   async function hosts(accountId: string): Promise<string[]> {
@@ -149,7 +159,7 @@ export function qaStore(sb: SupabaseClient, deps: QaStoreDeps): QaStore {
 
     hosts,
 
-    async addSite(seat, host, userId): Promise<AddOutcome> {
+    async addSite(seat, host, userId): Promise<{ outcome: AddOutcome; unsent?: string }> {
       if (!(await deps.admit(host)))
         throw new Error(`qa:seed: ${host} is refused by the SSRF guard`);
       const a = await sb
@@ -174,6 +184,7 @@ export function qaStore(sb: SupabaseClient, deps: QaStoreDeps): QaStore {
         now,
       );
       const first = (await hosts(seat.accountId)).length === 0;
+      unsent = undefined;
       // As POST /api/sites calls it (app/api/sites/route.ts).
       const r = await addSite({
         accountId: seat.accountId,
@@ -186,11 +197,12 @@ export function qaStore(sb: SupabaseClient, deps: QaStoreDeps): QaStore {
       });
       switch (r.outcome) {
         case 'created':
+          return unsent === undefined ? { outcome: 'created' } : { outcome: 'created', unsent };
         case 'exists':
         case 'full':
-          return r.outcome;
+          return { outcome: r.outcome };
         default:
-          return 'capped';
+          return { outcome: 'capped' };
       }
     },
 
@@ -270,3 +282,4 @@ export function qaStore(sb: SupabaseClient, deps: QaStoreDeps): QaStore {
     },
   };
 }
+

@@ -135,4 +135,24 @@ describe('qa:seed part (a)', () => {
       expect(exitCode(steps)).toBe(1);
     },
   );
+
+  withMarker(
+    `a first audit whose send fails is reported with its site, and the run goes on`,
+    async () => {
+      const w = await world();
+      w.sendFails.message = 'INNGEST_EVENT_KEY unset';
+      const steps = await seed(w.deps);
+      const site = steps.find((s) => s.key === 'free' && s.step === 'site');
+      expect(site?.outcome).toBe('done');
+      expect(site?.detail).toMatch(
+        /nahltech\.com; its first audit was not sent \(INNGEST_EVENT_KEY unset\)/,
+      );
+      expect(exitCode(steps)).toBe(0);
+      const queued = await w.db.query<{ host: string; status: string }>(
+        `select s.host, c.status from public.sites s join public.checks c on c.site_id = s.id
+           join public.qa_accounts q on q.account_id = s.account_id where q.qa_key = 'free'`,
+      );
+      expect(queued.rows).toEqual([{ host: 'nahltech.com', status: 'queued' }]);
+    },
+  );
 });
