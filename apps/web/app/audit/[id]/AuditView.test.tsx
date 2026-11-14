@@ -67,7 +67,8 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { NextRequest } from 'next/server';
 
-vi.mock('@/lib/analytics', () => ({ track: () => {}, trackRaw: () => {} }));
+const analytics = vi.hoisted(() => ({ track: vi.fn() }));
+vi.mock('@/lib/analytics', () => ({ track: analytics.track, trackRaw: () => {} }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: () => {}, refresh: () => {} }) }));
 // The graph canvas is dynamically imported by LinkGraphSlot AFTER mount. Under jsdom that import
 // would really pull in react-force-graph-2d and a canvas backend; the slot's own tests cover it.
@@ -752,6 +753,24 @@ describe('AuditView — a stream that stops before any snapshot', () => {
     expect(html()).toContain('Audit not found');
     expect(html()).not.toContain('Cancel audit');
     expect(html()).not.toContain(COULD_NOT_GRADE);
+    expect(es.closed).toBe(true);
+  });
+
+  // review r2 N1: the stream self-closes mid-crawl and the reconnect is rate limited.
+  it('rate limited on a reconnect mid-crawl: the stop message, no couldn’t-grade copy, no audit-completed', async () => {
+    const stop = await captureFromRoute(undefined, { 'x-forwarded-for': '198.51.100.78' });
+    expect(stop.map((s) => s.event)).toEqual(['error']);
+    analytics.track.mockClear();
+    const { es, html } = await mount();
+    await act(async () =>
+      es.emitRaw('snapshot', JSON.stringify({ ...RUNNING_ROW, status: 'crawling' })),
+    );
+    expect(html()).toContain('Cancel audit');
+    for (const { event, data } of stop) await act(async () => es.emitRaw(event, data));
+    expect(html()).toContain('Too many live views');
+    expect(html()).not.toContain(COULD_NOT_GRADE);
+    expect(html()).not.toContain('The crawl finished');
+    expect(analytics.track.mock.calls.map((c) => c[0])).not.toContain('audit-completed');
     expect(es.closed).toBe(true);
   });
 

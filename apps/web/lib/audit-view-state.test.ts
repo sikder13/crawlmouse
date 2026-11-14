@@ -567,11 +567,43 @@ describe('decideAuditSurface — a stream stopped before any snapshot', () => {
     },
   );
 
-  it('a stop after a snapshot changes nothing: the snapshot decides', () => {
-    const snap = { status: 'running' } as AuditSnapshotLite;
-    expect(decideAuditSurface(st({ running: true }), snap, null, 'rate_limited')).toEqual({
-      kind: 'running',
+  // review r2 N1: a rate-limited reconnect mid-crawl. The snapshot is not terminal, so the stop is
+  // said; the couldn't-grade card ("the crawl finished") would be false.
+  it.each(['pending', 'queued', 'crawling', 'running'])(
+    'a stop after a non-terminal %s snapshot is the stop card, not the couldn’t-grade card',
+    (status) => {
+      const snap = { status } as AuditSnapshotLite;
+      const state = deriveAuditViewState(snap, true);
+      expect(state.gradeFailed).toBe(true);
+      expect(decideAuditSurface(state, snap, null, 'rate_limited')).toMatchObject({
+        kind: 'error',
+        copy: { title: 'Too many live views' },
+      });
+    },
+  );
+
+  it('a stop after a terminal snapshot changes nothing: the snapshot decides', () => {
+    const canceled = { status: 'canceled' } as AuditSnapshotLite;
+    expect(decideAuditSurface(st({ canceled: true }), canceled, null, 'rate_limited')).toEqual({
+      kind: 'canceled',
     });
+    const failed = { status: 'failed' } as AuditSnapshotLite;
+    expect(
+      decideAuditSurface(
+        st({ failed: true, failureCategory: 'timeout' }),
+        failed,
+        null,
+        'not_found',
+      ),
+    ).toMatchObject({ kind: 'error' });
+    expect(
+      decideAuditSurface(
+        st({ failed: true, failureCategory: 'timeout' }),
+        failed,
+        null,
+        'not_found',
+      ),
+    ).not.toMatchObject({ copy: { title: 'Audit not found' } });
   });
 
   it('reads the code from the payload, and nothing else', () => {

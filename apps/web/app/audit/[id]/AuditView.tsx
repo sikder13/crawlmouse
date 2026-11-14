@@ -118,8 +118,10 @@ export function AuditView({ auditId, resultView }: { auditId: string; resultView
   // Fire `audit-completed` exactly once when the stream terminates. `onSnapshot` runs before
   // `onDone` in the same `done` event (see wireAuditStream), so `snapshot` is current here.
   // Keyed on the `done` edge only (reading the latest snapshot is intentional, not a dep).
+  // A stream stop (rate limit, no such audit) also sets `done`, but the audit did not complete:
+  // no event then (CC-37 review r2 N1), so Activation does not count a stopped stream.
   useEffect(() => {
-    if (!done || !snapshot) return;
+    if (!done || !snapshot || stop !== null) return;
     track('audit-completed', auditCompletedProps(snapshot));
     // Conversion-spine event — now in SPEC 02's typed funnel (FUNNEL_EVENTS).
     const v2 = asClientAuditV2(snapshot);

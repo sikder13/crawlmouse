@@ -202,6 +202,9 @@ const STREAM_STOP_COPY: Record<StreamStop, { title: string; body: string }> = {
   },
 };
 
+const isTerminalStatus = (status: string | undefined): boolean =>
+  status === 'completed' || status === 'failed' || status === 'canceled';
+
 /** The stop a terminal `error` payload names, or null for any other payload. */
 export function streamStopOf(payload: unknown): StreamStop | null {
   if (payload === null || typeof payload !== 'object' || !Object.hasOwn(payload, 'code'))
@@ -216,9 +219,13 @@ export function decideAuditSurface(
   v2: ClientAuditV2 | null,
   stop: StreamStop | null = null,
 ): AuditSurfaceDescriptor {
-  // The stream ended before its first snapshot: nothing is known about the audit, so say why the
-  // stream stopped rather than fall through to "running" or the couldn't-grade card.
-  if (stop !== null && snapshot === null) return { kind: 'error', copy: STREAM_STOP_COPY[stop] };
+  // The stream stopped (rate limit, no such audit) while the audit was not known to be finished:
+  // before its first snapshot, or on a reconnect mid-crawl. Say why the stream stopped rather than
+  // fall through to "running" or the couldn't-grade card, whose "the crawl finished" would be false.
+  // A terminal snapshot still decides on its own.
+  if (stop !== null && !isTerminalStatus(snapshot?.status)) {
+    return { kind: 'error', copy: STREAM_STOP_COPY[stop] };
+  }
   if (state.canceled) return { kind: 'canceled' };
   if (state.running) return { kind: 'running' };
   if (state.awaitingResults) return { kind: 'awaiting' };
