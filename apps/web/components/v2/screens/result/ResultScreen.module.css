@@ -157,6 +157,19 @@
   border-bottom: 1px solid var(--v2-line);
 }
 
+/*
+ * A fix title can hold a long URL, one token as wide as the track. Broken anywhere, it no longer sets
+ * the table's minimum width, so the table fits beside the Pro panel and the action column is not
+ * clipped; the action keeps its button on one line (CC-39 F3).
+ */
+.fixes td:first-child {
+  overflow-wrap: anywhere;
+}
+
+.fixes td:last-child {
+  white-space: nowrap;
+}
+
 .gain {
   color: var(--v2-ok);
 }
