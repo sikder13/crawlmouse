@@ -43,6 +43,27 @@ export const V2_REWRITES: readonly V2Rewrite[] = [
   { from: '/pricing', to: '/v2-pricing', flag: 'billing' },
   { from: '/developers', to: '/v2-developers', flag: 'billing' },
   { from: '/r/:slug', to: '/v2-report/:slug', flag: 'checksPublic' },
+  // CC-36 D3: the kept v1 public pages, in the v2 shell. Each target, under app/(v2-kept), renders
+  // its v1 page's own output with v1's header and footer replaced by v2's, so v1's file is main's.
+  // `/blog/research` comes before `/blog/:slug`, which would also match it.
+  ...[
+    '/ai-readiness-checker',
+    '/audit/:id',
+    '/authors/:slug',
+    '/blog',
+    '/blog/research',
+    '/blog/:slug',
+    '/bot',
+    '/guides',
+    '/login',
+    '/status',
+    '/takedown',
+    '/verify/:id',
+    '/privacy',
+    '/terms',
+    '/aup',
+    '/subprocessors',
+  ].map((from): V2Rewrite => ({ from, to: `/v2-kept${from}`, flag: 'checksPublic' })),
 ];
 
 const PARAM = /^:([a-z]+)$/;

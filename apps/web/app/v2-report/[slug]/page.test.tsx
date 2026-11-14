@@ -32,13 +32,25 @@ vi.mock('@/lib/supabase/server', () => ({
   supabaseServer: async () => ({ from: refuse, rpc: refuse }),
 }));
 vi.mock('@/components/analytics/ReferralCapture', () => ({ ReferralCapture: () => null }));
-vi.mock('../../r/[slug]/page', () => ({
-  default: async ({ params }: { params: unknown }) => {
-    store.v1Params.push(params);
-    return <p>v1 report page</p>;
-  },
-  generateMetadata: async () => ({ title: 'Crawlmouse Report' }),
-}));
+vi.mock('@/components/layout/Header', () => ({ Header: () => <header>v1 header</header> }));
+vi.mock('@/components/layout/Footer', () => ({ Footer: () => <footer>v1 footer</footer> }));
+vi.mock('../../r/[slug]/page', async () => {
+  const { Header } = await import('@/components/layout/Header');
+  const { Footer } = await import('@/components/layout/Footer');
+  return {
+    default: async ({ params }: { params: unknown }) => {
+      store.v1Params.push(params);
+      return (
+        <>
+          <Header />
+          <p>v1 report page</p>
+          <Footer />
+        </>
+      );
+    },
+    generateMetadata: async () => ({ title: 'Crawlmouse Report' }),
+  };
+});
 
 const route = await import('./page');
 
@@ -138,11 +150,19 @@ describe('app/v2-report/[slug]', () => {
     expect(markup.match(/<h1/g)).toHaveLength(1);
   });
 
-  it('hands a v1 row, and a missing one, to v1’s page with the same params', async () => {
+  it('hands a v1 row, and a missing one, to v1’s page with the same params, in the v2 shell', async () => {
+    /** The page's content, between the v2 shell's header and footer; v1's own are not drawn. */
+    const content = (markup: string) => {
+      const { document } = new JSDOM(`<body>${markup}</body>`).window;
+      expect(document.querySelector('[data-v2-shell]')).not.toBeNull();
+      expect(markup).not.toContain('v1 header');
+      expect(markup).not.toContain('v1 footer');
+      return document.querySelector('[data-v2-shell] > [data-v1-content]')!.innerHTML;
+    };
     store.row = rowWith({ version: 1, domain: 'ex.com' }, { grade: 'B' });
-    expect(await render('v1slug')).toBe('<p>v1 report page</p>');
+    expect(content(await render('v1slug'))).toBe('<p>v1 report page</p>');
     store.row = null;
-    expect(await render('nope')).toBe('<p>v1 report page</p>');
+    expect(content(await render('nope'))).toBe('<p>v1 report page</p>');
     expect(await Promise.all(store.v1Params.map((p) => p))).toEqual([
       { slug: 'v1slug' },
       { slug: 'nope' },

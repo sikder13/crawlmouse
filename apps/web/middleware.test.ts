@@ -646,7 +646,7 @@ describe('the / row of the v2 rewrite table (CC-22b, carried onto lib/v2/rewrite
     expect(res.headers.get('x-middleware-request-x-from-test')).toBe('kept');
   });
 
-  it.each(['/pricing', '/blog', '/dashboards', '/audit/abc', '//', '/index'])(
+  it.each(['/pricing', '/blogs', '/dashboards', '/audit/abc/overview', '//', '/index'])(
     'with the flag on, %s is not rewritten: a row matches its own path only',
     async (path) => {
       flag(true);
@@ -685,6 +685,78 @@ describe('the / row of the v2 rewrite table (CC-22b, carried onto lib/v2/rewrite
       expect(matches(row.to), row.to).toBe(true);
       expect(matches(`${row.to}/`), row.to).toBe(true);
     }
+  });
+});
+
+describe('the kept v1 public pages (CC-36 D3): each row follows V2_CHECKS_PUBLIC', () => {
+  const at = (path: string) => new NextRequest(new Request(`https://crawlmouse.com${path}`));
+  const rewrittenTo = (res: NextResponse) => {
+    const to = res.headers.get('x-middleware-rewrite');
+    return to === null ? null : new URL(to).pathname + new URL(to).search;
+  };
+  const refresh = (req: NextRequest) => Promise.resolve(NextResponse.next({ request: req }));
+  const KEPT = V2_REWRITES.filter((r) => r.to.startsWith('/v2-kept/'));
+  /** A path the row matches, each `:name` filled with a value of a slug's characters. */
+  const example = (from: string) => from.replace(/:[a-z]+/g, 'a1-b2');
+  afterEach(() => vi.unstubAllEnvs());
+
+  it('has a row for each kept page', () => {
+    expect(KEPT.map((r) => r.from)).toEqual([
+      '/ai-readiness-checker',
+      '/audit/:id',
+      '/authors/:slug',
+      '/blog',
+      '/blog/research',
+      '/blog/:slug',
+      '/bot',
+      '/guides',
+      '/login',
+      '/status',
+      '/takedown',
+      '/verify/:id',
+      '/privacy',
+      '/terms',
+      '/aup',
+      '/subprocessors',
+    ]);
+  });
+
+  it.each(KEPT.map((r) => [r.from, r.to] as const))(
+    'with the flag on, %s is served by its target, with the query string',
+    async (from, to) => {
+      vi.stubEnv('V2_CHECKS_PUBLIC', '1');
+      expect(rewrittenTo(await handleEdge(at(`${example(from)}?ref=x&view=ai`), refresh))).toBe(
+        `${example(to)}?ref=x&view=ai`,
+      );
+    },
+  );
+
+  it.each(KEPT.map((r) => r.from))(
+    'with the flag off, %s is not rewritten and is served as main serves it',
+    async (from) => {
+      vi.stubEnv('V2_CHECKS_PUBLIC', '');
+      vi.stubEnv('V2_BILLING', '1');
+      vi.stubEnv('V2_PIPELINE', '1');
+      const res = await handleEdge(at(example(from)), refresh);
+      expect(rewrittenTo(res)).toBeNull();
+      expect(res.status).toBe(200);
+    },
+  );
+
+  describe.each(['1', ''])('with V2_CHECKS_PUBLIC=%j', (flag) => {
+    it.each(
+      KEPT.flatMap((r) => {
+        const to = example(r.to);
+        return [to, `${to}/`, `${to}.rsc`, to.replace('/v2-kept/', '/v%32-kept/')];
+      }),
+    )('a direct request for %s is a 404 and is not refreshed', async (path) => {
+      vi.stubEnv('V2_CHECKS_PUBLIC', flag);
+      const spy = vi.fn(refresh);
+      const res = await handleEdge(at(path), spy);
+      expect(res.status).toBe(404);
+      expect(rewrittenTo(res)).toBeNull();
+      expect(spy).not.toHaveBeenCalled();
+    });
   });
 });
 
