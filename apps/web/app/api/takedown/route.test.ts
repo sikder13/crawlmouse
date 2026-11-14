@@ -120,3 +120,28 @@ describe('POST /api/takedown — per-domain bucket after the report lookup (A-5)
     expect(h.inserts).toHaveLength(0);
   });
 });
+
+// CC-37 review r1 m4: with no known client IP there is no per-IP bucket, so after A-5 such a post for
+// a domain with no report would reach the lookup unbounded. For that case the per-domain bucket is
+// spent before the lookup, once.
+describe('POST /api/takedown — no known client IP', () => {
+  it('posts for a domain with no report are bounded by the domain bucket before the lookup', async () => {
+    for (let i = 0; i < TAKEDOWN_PER_DOMAIN_PER_DAY; i++) {
+      expect((await post('no-report.example', 'unknown')).status).toBe(404);
+    }
+    const res = await post('no-report.example', 'unknown');
+    expect(res.status).toBe(429);
+    expect(await res.json()).toEqual({ error: 'rate_limited' });
+    expect(h.buckets.has('takedown:ip:unknown')).toBe(false);
+  });
+
+  it('a post for a domain with a report spends the domain bucket once', async () => {
+    expect((await post('has-report.example', 'unknown')).status).toBe(200);
+    expect(domainBucket('has-report.example')).toBe(1);
+    for (let i = 1; i < TAKEDOWN_PER_DOMAIN_PER_DAY; i++) {
+      expect((await post('has-report.example', 'unknown')).status).toBe(200);
+    }
+    expect((await post('has-report.example', 'unknown')).status).toBe(429);
+    expect(h.inserts).toHaveLength(TAKEDOWN_PER_DOMAIN_PER_DAY);
+  });
+});
