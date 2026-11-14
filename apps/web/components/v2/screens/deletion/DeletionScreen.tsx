@@ -21,7 +21,7 @@ const DATE = new Intl.DateTimeFormat('en-GB', {
  * in no URL or HTML. With no usable link, or after the button was pressed, it says which.
  */
 export function DeletionScreen({ flow, view }: { flow: DeletionFlow; view: DeletionLinkView }) {
-  const copy = flow === 'deleteConfirm' ? DELETE_COPY : RESTORE_COPY;
+  const deleting = flow === 'deleteConfirm';
   return (
     <PageShell header="app" footer={false}>
       <main className={`${layout.wrap} ${styles.main}`}>
@@ -29,15 +29,17 @@ export function DeletionScreen({ flow, view }: { flow: DeletionFlow; view: Delet
           {view.ok ? (
             <>
               <Heading level={1} size="m">
-                {copy.title}
+                {deleting ? DELETE_COPY.title : RESTORE_COPY.title}
               </Heading>
-              <p className={styles.lead}>{copy.lead}</p>
+              <p className={styles.lead}>
+                {deleting ? DELETE_COPY.lead(view.accounts.length) : RESTORE_COPY.lead}
+              </p>
               <Card className={styles.card}>
                 <ul className={styles.cardBody}>
                   {view.accounts.map((a) => {
                     // What happens to this account's plan, by its state (`deletionMoney`); nothing
                     // for an account with no plan, or with a plan in any state it does not name.
-                    const money = flow === 'deleteConfirm' ? deletionMoney(a.subscription) : null;
+                    const money = deleting ? deletionMoney(a.subscription) : null;
                     return (
                       <li key={a.id} data-account={a.id}>
                         <span className={styles.monoStrong}>{a.host}</span>
@@ -53,9 +55,9 @@ export function DeletionScreen({ flow, view }: { flow: DeletionFlow; view: Delet
                   })}
                 </ul>
               </Card>
-              {flow === 'deleteConfirm' ? (
+              {deleting ? (
                 <>
-                  {DELETE_COPY.what.map((line) => (
+                  {DELETE_COPY.what(view.accounts.length).map((line) => (
                     <p key={line} className={styles.cardBody}>
                       {line}
                     </p>
@@ -73,7 +75,7 @@ export function DeletionScreen({ flow, view }: { flow: DeletionFlow; view: Delet
               )}
               <form method="post" action={LINK_FLOWS[flow].api} className={styles.actions}>
                 <Button type="submit" variant="primary">
-                  {copy.button}
+                  {deleting ? DELETE_COPY.button(view.accounts.length) : RESTORE_COPY.button}
                 </Button>
               </form>
             </>

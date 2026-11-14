@@ -16,10 +16,16 @@ const MONEY_ENDS =
 
 export const DELETE_COPY = {
   title: 'Delete your account',
-  lead: 'Pressing the button deletes these accounts and everything in them:',
-  what: [
+  /** The lead, the restore line and the button follow how many accounts the link names (CC-39 D4). */
+  lead: (n: number) =>
+    n === 1
+      ? 'Pressing the button deletes this account and everything in it:'
+      : 'Pressing the button deletes these accounts and everything in them:',
+  what: (n: number) => [
     'Signing in stops at once, on every device.',
-    `For ${RESTORE_DAYS} days the restore link in the same email undoes it. After that the accounts, their sites, checks and reports, and your sign-in are erased.`,
+    `For ${RESTORE_DAYS} days the restore link in the same email undoes it. After that ${
+      n === 1 ? 'the account, its' : 'the accounts, their'
+    } sites, checks and reports, and your sign-in are erased.`,
     'A few things are kept: one-way fingerprints that stop a second free trial, any takedown request of yours that is still open, and public reports you published, which no longer name you.',
   ],
   /**
@@ -35,7 +41,7 @@ export const DELETE_COPY = {
    */
   moneyNotCollected:
     'A plan whose payments are overdue or on hold is not set to end when you confirm. It is cancelled when the account is erased, after the seven days.',
-  button: 'Delete these accounts',
+  button: (n: number) => (n === 1 ? 'Delete this account' : 'Delete these accounts'),
   /** The account named by its sign-in address has no site. */
   noSite: 'no site yet',
 } as const;

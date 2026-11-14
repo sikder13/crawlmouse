@@ -153,7 +153,7 @@ describe('the pages', () => {
       /<form (?=[^>]*method="post")(?=[^>]*action="\/api\/account\/delete\/confirm")/,
     );
     expect(html).not.toMatch(/<input/);
-    expect(html).toContain(DELETE_COPY.button);
+    expect(html).toContain(DELETE_COPY.button(1));
     expect(renderToStaticMarkup(<>{REFUND_POLICY}</>)).toBe(
       renderToStaticMarkup(<>{DELETE_COPY.money[1]}</>),
     );

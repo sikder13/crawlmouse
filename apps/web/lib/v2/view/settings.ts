@@ -37,10 +37,12 @@ import { FREE_SCHEDULE, accountShellView, type ShellView } from './account-shell
 import { FREE_FIXES } from './free-fixes';
 import { DELETE_COPY, deletionMoney } from '../copy/deletion';
 import {
+  DELETE_BLOCKED_SENTENCES,
   OWN_ACCOUNT_COPY as OWN,
   REFUSAL_SENTENCES,
   SETTINGS_NOTICES as NOTICES,
 } from '../copy/settings-notices';
+import { EMAIL_UNDO_DAYS } from '../account/email-change-page';
 import type { SeatRole } from '../account/profile';
 
 export const CC27B_ROUTES = {
@@ -696,9 +698,11 @@ export function deleteStepView(
     blocked:
       blocked === null
         ? null
-        : Object.hasOwn(REFUSAL_SENTENCES, blocked)
-          ? REFUSAL_SENTENCES[blocked]!
-          : NOTICES.unknown,
+        : blocked === 'email_change_pending'
+          ? DELETE_BLOCKED_SENTENCES.email_change_pending(EMAIL_UNDO_DAYS)
+          : Object.hasOwn(REFUSAL_SENTENCES, blocked)
+            ? REFUSAL_SENTENCES[blocked]!
+            : NOTICES.unknown,
     submit:
       role === 'owner' && blocked === null
         ? routeAction('deleteAccount', COPY.sendDeleteLink)
