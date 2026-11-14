@@ -46,7 +46,15 @@ export interface QaAuth {
   create(email: string, key: QaKey): Promise<string>;
 }
 
-export type AddOutcome = 'created' | 'exists' | 'full' | 'capped';
+/** add_site's answer, with the time a capped add fits again (`unsent`: see `QaStore.addSite`). */
+export type AddResult =
+  | { outcome: 'created'; unsent?: string }
+  | { outcome: 'exists' | 'full' | 'capacity' }
+  | { outcome: 'adds_capped' | 'domain_capped'; nextAllowedAt: string };
+/** The door's first-audit answer (lib/v2/pipeline/first-audit.ts), or `no_site`. */
+export type FirstAuditResult =
+  | { outcome: 'requested'; unsent?: string }
+  | { outcome: 'has_check' | 'capacity' | 'domain_limit' | 'paused' | 'no_site' };
 export type TrialResult =
   | { outcome: 'started' | 'not_eligible' }
   | { outcome: 'refused'; reason: string };
@@ -65,11 +73,13 @@ export interface QaStore {
   isInternal(accountId: string): Promise<boolean>;
   hosts(accountId: string): Promise<string[]>;
   /** `unsent`: the site was added, and its first audit's event was not sent (the message why). */
-  addSite(
-    seat: Seat,
-    host: string,
-    userId: string,
-  ): Promise<{ outcome: AddOutcome; unsent?: string }>;
+  addSite(seat: Seat, host: string, userId: string): Promise<AddResult>;
+  /**
+   * The first audit of the account's site at `host`, through the door's requester, and the schedule
+   * add_site would have stored with it: for the first site `start_agency_trial_account` stores with
+   * neither, so a fresh seed and qa:reset leave the same checks and schedules (questions Q15).
+   */
+  firstAudit(seat: Seat, host: string, userId: string): Promise<FirstAuditResult>;
   /** Invites `email` as a developer scoped to the account's first client, then accepts as `userId`. */
   developerSeat(seat: Seat, email: string, userId: string): Promise<SeatResult>;
   memberRole(accountId: string, userId: string): Promise<string | null>;
@@ -82,6 +92,8 @@ export interface SeedDeps {
   /** CC-33's `ops:internal` (scripts/ops/internal.ts `runInternal`). */
   markInternal(accountId: string): Promise<void>;
   inbox: { local: string; domain: string };
+  /** Asks the operator, and answers what they typed. */
+  confirm(prompt: string): Promise<string>;
   print(line: string): void;
 }
 
@@ -108,9 +120,18 @@ export function noter(
   };
 }
 
+/** What the operator types before qa:seed creates users. */
+export const createPhrase = (n: number, domain: string): string => `create ${n} users at ${domain}`;
+
 export async function seed(deps: SeedDeps, opts: SeedOptions = {}): Promise<Step[]> {
   const restore = opts.only === 'sites-and-seats';
   const steps: Step[] = [];
+  // A mistyped QA_INBOX would make confirmed users at someone else's domain: the addresses are
+  // printed and confirmed first. The restore creates no user, so it asks nothing.
+  if (!restore && !(await confirmNewUsers(deps))) {
+    noter(steps, deps.print, 'run')('stopped', 'refused', 'the confirmation was not typed');
+    return steps;
+  }
   const homes = new Map<QaKey, Seat>();
   for (const account of QA_ACCOUNTS) {
     const note = noter(steps, deps.print, account.key);
@@ -122,6 +143,20 @@ export async function seed(deps: SeedDeps, opts: SeedOptions = {}): Promise<Step
     }
   }
   return steps;
+}
+
+/** Prints the users a run would create and asks for the phrase; true when there are none. */
+async function confirmNewUsers(deps: SeedDeps): Promise<boolean> {
+  const missing: string[] = [];
+  for (const a of QA_ACCOUNTS) {
+    const email = qaAddress(deps.inbox, a.key);
+    if ((await deps.auth.find(email)) === null) missing.push(email);
+  }
+  if (missing.length === 0) return true;
+  deps.print(`qa:seed will create ${missing.length} confirmed users:`);
+  for (const email of missing) deps.print(`  ${email}`);
+  const phrase = createPhrase(missing.length, deps.inbox.domain);
+  return (await deps.confirm(`Type "${phrase}" to go on: `)) === phrase;
 }
 
 export type Note = (step: string, outcome: Outcome, detail?: string) => void;
@@ -140,6 +175,9 @@ async function seedOne(run: Run, account: QaAccount, homes: Map<QaKey, Seat>): P
   const home = account.home;
 
   if (home.kind === 'seat') {
+    // The developer's own account is ours too, as an agency user's is: marked and internal.
+    const own = await personalOf(deps, userId);
+    await internal(run, own.accountId, await mark(run, account.key, own.accountId));
     const on = homes.get(home.on);
     if (!on) throw new Refused(`${home.on} was not seeded in this run, so no seat is put on it`);
     if ((await deps.store.memberRole(on.accountId, userId)) !== null) {
@@ -153,11 +191,12 @@ async function seedOne(run: Run, account: QaAccount, homes: Map<QaKey, Seat>): P
     return;
   }
 
-  const seat = await accountOf(run, account, userId);
-  await internal(run, seat.accountId);
+  const { seat, markedNow } = await accountOf(run, account, userId);
+  await internal(run, seat.accountId, markedNow);
   // Only an account that passed every check above is one a seat may be put on.
   homes.set(account.key, seat);
   await sites(run, account, seat, userId);
+  if (home.kind === 'agency') await firstAudit(run, account, seat, userId);
   if (account.proTrial && !run.restore) {
     const t = await deps.store.proTrial(seat, userId, email);
     if (t.outcome === 'refused') note('pro trial', 'refused', t.reason);
@@ -181,72 +220,119 @@ async function user({ deps, note, restore }: Run, key: QaKey, email: string): Pr
   return found.id;
 }
 
-async function accountOf(run: Run, account: QaAccount, userId: string): Promise<Seat> {
-  const { deps, note } = run;
-  const home = account.home;
-  if (home.kind === 'personal') {
-    const seat = await deps.store.personal(userId);
-    if (seat === null) throw new Refused('the user has no account: handle_new_user did not run');
-    await mark(run, account.key, seat.accountId);
-    return seat;
-  }
-  if (home.kind !== 'agency') throw new Error('unreachable');
-  // The agency user's own account is ours too: marked and internal, so nothing they do counts.
-  const own = await deps.store.personal(userId);
-  if (own === null) throw new Refused('the user has no account: handle_new_user did not run');
-  await mark(run, account.key, own.accountId);
-  await internal(run, own.accountId);
-  const existing = await deps.store.agency(userId, home.name);
-  if (existing !== null) {
-    await mark(run, account.key, existing.accountId);
-    return existing;
-  }
-  if (run.restore) throw new Refused(`no agency account ${home.name}: run qa:seed first`);
-  const first = account.sites[0];
-  if (!first) throw new Error(`${account.key} has no first site`);
-  const seat = await deps.store.startAgency(userId, home.name, first);
-  note('agency', 'done', home.name);
-  await mark(run, account.key, seat.accountId, true);
+async function personalOf(deps: SeedDeps, userId: string): Promise<Seat> {
+  const seat = await deps.store.personal(userId);
+  if (seat === null) throw new Refused('the user has no account: handle_new_user did not run');
   return seat;
 }
 
-/** D2's marker: written once, for an account this run made or one whose user this seed made. */
+/** The account the key's work lives on, and whether this run wrote its marker. */
+async function accountOf(
+  run: Run,
+  account: QaAccount,
+  userId: string,
+): Promise<{ seat: Seat; markedNow: boolean }> {
+  const { deps, note } = run;
+  const home = account.home;
+  if (home.kind === 'personal') {
+    const seat = await personalOf(deps, userId);
+    return { seat, markedNow: await mark(run, account.key, seat.accountId) };
+  }
+  if (home.kind !== 'agency') throw new Error('unreachable');
+  // The agency user's own account is ours too: marked and internal, so nothing they do counts.
+  const own = await personalOf(deps, userId);
+  await internal(run, own.accountId, await mark(run, account.key, own.accountId));
+  const first = account.sites[0];
+  if (!first) throw new Error(`${account.key} has no first site`);
+  const existing = await deps.store.agency(userId, home.name);
+  if (existing !== null) {
+    // An agency account holding only its first QA site is the one start_agency_trial_account made
+    // for this user: a run stopped before its marker was written adopts it on the next run.
+    const markedNow = await mark(run, account.key, existing.accountId, { firstHost: first });
+    return { seat: existing, markedNow };
+  }
+  if (run.restore) throw new Refused(`no agency account ${home.name}: run qa:seed first`);
+  const seat = await deps.store.startAgency(userId, home.name, first);
+  note('agency', 'done', home.name);
+  return { seat, markedNow: await mark(run, account.key, seat.accountId, { made: true }) };
+}
+
+/**
+ * D2's marker: written once, for an account this run made or one whose user this seed made and that
+ * holds nothing the seed did not add. True when this run wrote it.
+ */
 async function mark(
   { deps, note, restore }: Run,
   key: QaKey,
   accountId: string,
-  made = false,
-): Promise<void> {
+  how: { made?: boolean; firstHost?: string } = {},
+): Promise<boolean> {
   const held = await deps.store.marker(accountId);
   if (held === key) {
     note('marker', 'unchanged');
-    return;
+    return false;
   }
   if (held !== null) throw new Refused(`the account is marked for ${held}`);
   if (restore) throw new Refused('the account has no qa_accounts row; it is left alone');
-  if (!made && !(await isFresh(deps, accountId))) {
+  if (!how.made && !(await isFresh(deps, accountId, how.firstHost))) {
     throw new Refused('the account holds sites the seed did not add; it is left alone');
   }
   await deps.store.addMarker(accountId, key);
   note('marker', 'done');
+  return true;
 }
 
-/** An account with no site yet: the one handle_new_user just gave a user this seed made. */
-async function isFresh(deps: SeedDeps, accountId: string): Promise<boolean> {
-  return (await deps.store.hosts(accountId)).length === 0;
+/**
+ * An account with no site yet (the one handle_new_user just gave a user this seed made), or, given
+ * `firstHost`, an agency account whose one live site is that host.
+ */
+async function isFresh(deps: SeedDeps, accountId: string, firstHost?: string): Promise<boolean> {
+  const held = await deps.store.hosts(accountId);
+  return (
+    held.length === 0 || (firstHost !== undefined && held.length === 1 && held[0] === firstHost)
+  );
 }
 
-async function internal({ deps, note, restore }: Run, accountId: string): Promise<void> {
+/**
+ * `accounts.internal`, set through ops:internal only for an account this run marked. An account
+ * marked earlier whose flag is false had it turned off by someone (D1): it is refused, not set again.
+ */
+async function internal(
+  { deps, note, restore }: Run,
+  accountId: string,
+  markedNow: boolean,
+): Promise<void> {
   if (await deps.store.isInternal(accountId)) {
     note('internal', 'unchanged');
     return;
   }
-  if (restore) throw new Refused('accounts.internal is false; it is left alone');
+  if (restore || !markedNow) {
+    throw new Refused(
+      `accounts.internal is false; it is left alone (pnpm ops:internal ${accountId} sets it)`,
+    );
+  }
   await deps.markInternal(accountId);
   if (!(await deps.store.isInternal(accountId))) {
     throw new Refused('ops:internal answered, but accounts.internal is still false');
   }
   note('internal', 'done');
+}
+
+/** Why add_site or the first audit was refused, as the operator reads it. */
+function capped(r: { outcome: string; nextAllowedAt?: string }): string {
+  switch (r.outcome) {
+    case 'domain_capped':
+    case 'domain_limit':
+      return `the host's hourly first-audit bound is reached${r.nextAllowedAt ? `; run again after ${r.nextAllowedAt}` : '; run again in an hour'}`;
+    case 'adds_capped':
+      return `the account's daily bound on added sites is reached; run again after ${r.nextAllowedAt}`;
+    case 'capacity':
+      return "the platform's daily check ceiling is reached; run again tomorrow";
+    case 'paused':
+      return 'crawls are paused (CRAWL_PAUSED)';
+    default:
+      return r.outcome;
+  }
 }
 
 async function sites(
@@ -262,14 +348,36 @@ async function sites(
       note(`site`, 'unchanged', host);
       continue;
     }
-    const { outcome: r, unsent } = await deps.store.addSite(seat, host, userId);
-    if (r === 'created' && unsent !== undefined) {
-      note('site', 'done', `${host}; its first audit was not sent (${unsent}), so it stays queued`);
-    } else if (r === 'created' || r === 'exists')
-      note('site', r === 'created' ? 'done' : 'unchanged', host);
-    else if (r === 'full') note('site', 'waits_for_plan', `${host}: no room on the current plan`);
-    else note('site', 'refused', `${host}: today's first-audit bound is reached; run again later`);
+    const r = await deps.store.addSite(seat, host, userId);
+    if (r.outcome === 'created' && r.unsent !== undefined) {
+      note(
+        'site',
+        'done',
+        `${host}; its first audit was not sent (${r.unsent}), so it stays queued`,
+      );
+    } else if (r.outcome === 'created' || r.outcome === 'exists')
+      note('site', r.outcome === 'created' ? 'done' : 'unchanged', host);
+    else if (r.outcome === 'full')
+      note('site', 'waits_for_plan', `${host}: no room on the current plan`);
+    else note('site', 'refused', `${host}: ${capped(r)}`);
   }
+}
+
+/** An agency account's first site has its first audit, as a site add_site stores does. */
+async function firstAudit(
+  { deps, note }: Run,
+  account: QaAccount,
+  seat: Seat,
+  userId: string,
+): Promise<void> {
+  const host = account.sites[0]!;
+  const r = await deps.store.firstAudit(seat, host, userId);
+  if (r.outcome === 'requested' && r.unsent !== undefined) {
+    note('first audit', 'done', `${host}; not sent (${r.unsent}), so it stays queued`);
+  } else if (r.outcome === 'requested') note('first audit', 'done', host);
+  else if (r.outcome === 'has_check') note('first audit', 'unchanged', host);
+  else if (r.outcome === 'no_site') note('first audit', 'refused', `${host}: the site is missing`);
+  else note('first audit', 'refused', `${host}: ${capped(r)}`);
 }
 
 /** Non-zero when a step was refused; a step that waits for the plan is expected before --billing. */
