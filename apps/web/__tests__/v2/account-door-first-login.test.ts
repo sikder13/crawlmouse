@@ -18,6 +18,7 @@ import {
   type FirstLoginDeps,
   type FirstLoginInput,
 } from '../../lib/auth/first-login';
+import { readMigration } from '../helpers/pglite-migrations';
 import {
   accountOf,
   count,
@@ -193,12 +194,40 @@ describe('runFirstLogin', () => {
     expect((await accountOf(db, i.userId)).state).toBe('free');
   });
 
-  it('does nothing for a user without a v2 account (the eleven pre-001 users)', async () => {
+  it('does nothing for a user without a v2 account (pre-001, before 20261116000002 runs)', async () => {
     const i = await input('old@example.com');
     await db.query(`update public.users set default_account_id = null where id = $1`, [i.userId]);
     const r = await runFirstLogin(deps(), i);
     expect(r).toEqual({ trial: 'no_account', siteId: null, events: [] });
     expect(await count(db, `select 1 from public.trial_ledger`)).toBe(0);
+  });
+
+  it('a pre-001 user given an account by 20261116000002 gets no trial at their first v2 sign-in', async () => {
+    // As production holds them: an auth row and a users row from before 001, the trigger held off.
+    const userId = '9e1b2c3d-4e5f-4a6b-8c7d-0e1f2a3b4c5d';
+    await db.exec(`alter table auth.users disable trigger on_auth_user_created`);
+    await db.query(`insert into auth.users (id, email) values ($1, 'v1-user@example.com')`, [
+      userId,
+    ]);
+    await db.query(`insert into public.users (id, email) values ($1, 'v1-user@example.com')`, [
+      userId,
+    ]);
+    await db.exec(`alter table auth.users enable trigger on_auth_user_created`);
+    await db.exec(readMigration('20261116000002_v2_036_account_backfill.sql'));
+    const { id: accountId } = await accountOf(db, userId);
+    // Confirmed at the v1 sign-up, months before this sign-in.
+    const r = await runFirstLogin(deps(), {
+      userId,
+      email: 'v1-user@example.com',
+      emailConfirmedAt: '2026-06-20T09:00:00Z',
+      lastSignInAt: '2026-11-05T11:59:59Z',
+      device: 'dev-v1-user',
+      ip: '203.0.113.7',
+      signup: null,
+    });
+    expect(r).toEqual({ trial: 'not_first', siteId: null, events: [] });
+    expect((await accountOf(db, userId)).state).toBe('free');
+    expect(await ledgerRows(accountId)).toBe(0);
   });
 
   it('without a pepper: no ledger read or write, no trial, a Sentry signal with ids only', async () => {
