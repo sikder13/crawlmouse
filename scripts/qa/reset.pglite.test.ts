@@ -114,8 +114,11 @@ describe('qa_reset: refusals, inside the function', () => {
     expect(await qaResetError(w.db, theirs)).toBe('42501');
     expect(await rowsOf(w.db, theirs)).toBe(before);
 
-    // Through qa:reset: that row is reported refused, its account untouched, the rest reset.
+    // Through qa:reset: that row is reported refused and its account untouched; and, qa:seed never
+    // having run here, the restore half makes no user of its own.
+    const users = await w.db.query('select id from auth.users order by id');
     const steps = await reset({ ...w.deps, reset: qaResetStore(w.sb) });
+    expect((await w.db.query('select id from auth.users order by id')).rows).toEqual(users.rows);
     expect(steps).toContainEqual(
       expect.objectContaining({ key: 'free', step: 'reset', outcome: 'refused' }),
     );
@@ -209,6 +212,45 @@ describe('qa:reset', () => {
       expect(ofPro).toContainEqual(['stopped', 'refused']);
       expect(ofPro.filter(([, o]) => o === 'done')).toEqual([]);
       expect(await rowsOf(w.db, pro)).toBe(before);
+    },
+  );
+
+  withMarker('makes no agency account when the one it looks for is not found', async () => {
+    const w = await seeded();
+    // The demo user's agency account no longer goes by the set's name, so the restore cannot find it.
+    await w.db.query(
+      `update public.accounts a set name = 'Renamed' from public.qa_accounts q
+        where q.account_id = a.id and q.qa_key = 'demo' and a.kind = 'agency'`,
+    );
+    const accounts = await w.db.query('select id from public.accounts order by id');
+    const steps = await reset(w.resetDeps);
+    expect(steps).toContainEqual(
+      expect.objectContaining({ key: 'demo', step: 'stopped', outcome: 'refused' }),
+    );
+    expect((await w.db.query('select id from public.accounts order by id')).rows).toEqual(
+      accounts.rows,
+    );
+  });
+
+  withMarker(
+    'writes no qa_accounts row: an account whose row is gone stays without one',
+    async () => {
+      const w = await seeded();
+      // The agency user's personal account holds no site, so the seed itself would adopt it again.
+      const gone = await w.db.query<{ account_id: string }>(
+        `delete from public.qa_accounts q using public.accounts a
+        where a.id = q.account_id and q.qa_key = 'agency' and a.kind = 'personal'
+        returning q.account_id`,
+      );
+      expect(gone.rows).toHaveLength(1);
+      const steps = await reset(w.resetDeps);
+      expect(steps).toContainEqual(
+        expect.objectContaining({ key: 'agency', step: 'stopped', outcome: 'refused' }),
+      );
+      const row = await w.db.query('select 1 from public.qa_accounts where account_id = $1', [
+        gone.rows[0]!.account_id,
+      ]);
+      expect(row.rows).toEqual([]);
     },
   );
 
