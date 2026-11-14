@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { PACE } from '@crawlmouse/inngest/check';
 import { DOC_PATH, renderBudget } from './budget-doc';
 import {
+  canaryMonthly,
   FUNCTIONS,
   HOBBY_HEADROOM_LINE,
   SHAPES,
@@ -76,12 +77,19 @@ describe('the function rows against the code', () => {
       const declared = count(code(readFileSync(join(ROOT, file), 'utf8')), ON_FAILURE);
       expect(FUNCTIONS.filter((f) => f.file === file && f.onFailure).length, file).toBe(declared);
     }
-    // Independent of the regex: inngest/audit.ts:411 and inngest/check.ts:376 declare it, nothing else.
+    // Independent of the regex: inngest/audit.ts:411, inngest/check.ts:376 and CC-33's three in
+    // inngest/founder.ts (66, 92, 105) declare it, nothing else.
     expect(
       FUNCTIONS.filter((f) => f.onFailure)
         .map((f) => f.id)
         .sort(),
-    ).toEqual(['crawlmouse.audit', 'crawlmouse.check.run']);
+    ).toEqual([
+      'crawlmouse.audit',
+      'crawlmouse.check.run',
+      'crawlmouse.founder.digest',
+      'crawlmouse.founder.entitlement',
+      'crawlmouse.founder.sweep',
+    ]);
   });
 
   it.each([
@@ -147,6 +155,8 @@ describe('the function rows against the code', () => {
     'inngest/schedule.ts': 5, // 98 104 113 122 139
     'inngest/alerts.ts': 2, // 51 57
     'inngest/summary.ts': 4, // 52 57 61 88
+    'inngest/founder.ts': 4, // 71 95 109 110 (CC-33)
+    'inngest/signin-canary.ts': 4, // 54 62 74 77 (CC-33)
   };
   it.each(Object.entries(HAND))('counts %s step call sites as a hand count does', (file, hand) => {
     expect(count(code(readFileSync(join(ROOT, file), 'utf8')), STEP_CALL)).toBe(hand);
@@ -334,11 +344,24 @@ describe('a check against a worker that answers busy, runs long or loses a batch
 describe('the month', () => {
   it('computes the floor from the cron rows: runs a day × (1 + idle steps) × 31', () => {
     // Independent sum: reaper 144×2, three hourly ticks and the sweep 24×3 each, the hourly report
-    // schedules 24×2 (CC-31), five dailies.
+    // schedules 24×2 (CC-31), five dailies, and CC-33's founder sweep 288×2 and digest tick 24×3.
+    // CC-33's sign-in canary is in no flag's floor: it runs once SIGNIN_CANARY_TO is set.
     const hand =
-      (144 * 2 + 24 * 3 * 3 + 24 * 2 + (2 + 1) + (2 + 1) + (1 + 2) + (1 + 2) + (1 + 1)) * 31;
+      (144 * 2 +
+        24 * 3 * 3 +
+        24 * 2 +
+        (2 + 1) +
+        (2 + 1) +
+        (1 + 2) +
+        (1 + 2) +
+        (1 + 1) +
+        288 * 2 +
+        24 * 3) *
+      31;
     expect(monthlyFloor()).toBe(hand);
-    expect(FUNCTIONS.filter((f) => f.runsPerDay > 0).map(cronPerDay)).toHaveLength(10);
+    expect(FUNCTIONS.filter((f) => f.runsPerDay > 0).map(cronPerDay)).toHaveLength(13);
+    // The canary, idle: 144 runs a day of request, wait and look.
+    expect(canaryMonthly()).toBe(144 * (1 + 3) * 31);
   });
 
   it('counts a finished check as starting three functions of two executions each', () => {
@@ -365,8 +388,8 @@ describe('the floor by switch-on step', () => {
     expect(pipeline!.floor).toBe((3 + 3 + 288 + 3) * 31);
     expect(door!.floor).toBe(pipeline!.floor);
     // V2_CHECKS_PUBLIC adds the purge 3, the contact purge 2, the schedule and summary ticks 72 each,
-    // and CC-31's report schedules 48.
-    expect(checks!.floor).toBe(door!.floor + (3 + 2 + 72 + 72 + 48) * 31);
+    // CC-31's report schedules 48, and CC-33's founder sweep 576 and digest tick 72 (either flag).
+    expect(checks!.floor).toBe(door!.floor + (3 + 2 + 72 + 72 + 48 + 576 + 72) * 31);
     // V2_BILLING adds the past-due sweep, 72 a day.
     expect(billing!.floor).toBe(checks!.floor + 72 * 31);
     expect(billing!.floor).toBe(monthlyFloor());
