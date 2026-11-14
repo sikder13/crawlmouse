@@ -75,7 +75,6 @@ const ROUTES = [
   ['checkout', () => import('../../app/api/billing/checkout/route'), BODY],
   ['portal', () => import('../../app/api/billing/portal/route'), BODY],
   ['cancel', () => import('../../app/api/billing/cancel/route'), BODY],
-  ['agency-trial', () => import('../../app/api/billing/agency-trial/route'), BODY],
   ['seats', () => import('../../app/api/billing/seats/route'), SEATS_BODY],
 ] as const;
 

@@ -6,7 +6,8 @@
   "scripts": {
     "smoke": "tsx smoke-crawl.ts",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "golive:check": "tsx golive/check.ts"
   },
   "dependencies": {
     "@crawlmouse/engine": "workspace:*",

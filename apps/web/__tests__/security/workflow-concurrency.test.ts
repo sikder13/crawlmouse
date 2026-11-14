@@ -39,6 +39,11 @@ const EXPECTED: Record<string, { group: string; cancel: boolean; why: string }> 
     cancel: false,
     why: 'a cancelled clean-up leaves the Supabase branch it was deleting',
   },
+  'worker-production.yml': {
+    group: 'worker-production',
+    cancel: false,
+    why: 'a production deploy and its egress check; the owner dispatches it (CC-35 D1)',
+  },
   'worker-staging.yml': {
     group: 'worker-staging',
     cancel: false,

@@ -402,7 +402,6 @@ describe('cross-site refusal covers every state change a session or a visitor ca
       'api/audits/[id]/cancel',
       'api/audits/[id]/reaudit',
       'api/auth/logout',
-      'api/billing/agency-trial',
       'api/billing/cancel',
       'api/billing/checkout',
       'api/billing/portal',

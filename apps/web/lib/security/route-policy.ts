@@ -127,12 +127,6 @@ export const ROUTE_POLICIES: readonly RoutePolicy[] = [
     origin: 'lenient',
     jsonBody: true,
   },
-  {
-    route: 'api/billing/agency-trial',
-    methods: ['POST'],
-    class: 'member',
-    origin: 'strict',
-  },
   { route: 'api/billing/cancel', methods: ['POST'], class: 'member', origin: 'strict' },
   { route: 'api/billing/checkout', methods: ['POST'], class: 'member', origin: 'strict' },
   { route: 'api/billing/portal', methods: ['POST'], class: 'member', origin: 'strict' },
