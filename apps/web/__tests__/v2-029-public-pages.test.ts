@@ -227,11 +227,15 @@ describe('readUsedAgencyTrial agrees with start_agency_trial_account', () => {
     if (read !== null) expect(read).toMatchObject({ accountId: account, deleted: c.deleted });
   });
 
-  it('the sweep reaches both answers, a deleted account among the used', () => {
-    const counted = cases.filter(
-      (c) => c.kind === 'agency' && c.used && c.role === 'owner' && !c.removed,
-    );
-    expect(counted.map((c) => c.deleted)).toEqual([false, true]);
+  // CC-37 (20261117000001): an owner seat counts whatever its status, so a removed one is used too.
+  it('the sweep reaches both answers, a deleted account and a removed seat among the used', () => {
+    const counted = cases.filter((c) => c.kind === 'agency' && c.used && c.role === 'owner');
+    expect(counted.map((c) => [c.deleted, c.removed])).toEqual([
+      [false, false],
+      [false, true],
+      [true, false],
+      [true, true],
+    ]);
   });
 });
 
