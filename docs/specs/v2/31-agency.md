@@ -68,8 +68,8 @@ the route (`app/api/sites/route.ts`), since a manager scoped to some clients cou
 site they added.
 
 Actions of other steps this table does not hold: a site's own alert switch (a seat that covers the
-site, CC-28) and minting a public report (CC-29's route asks `is_member_for_site` and no role;
-questions.md Q16).
+site, CC-28). Minting a public report is `mint_report` (owner and account manager), added by CC-37
+(`docs/specs/v2/37-security.md`, migration `20261117000001`).
 
 A seat that does not cover a site gets 404 for it. A seat that covers the site and whose role the
 table refuses gets 403 `role_refused`.
@@ -120,8 +120,8 @@ clients their seat covers: `subscriptions`; `agency_brands`; the account's own r
 `accounts_member_read`); the account-wide `alert_rules`; and `usage_counts(account)`, the monthly
 event counts across the account's clients, which `is_member` gates (migration `20261103000001`). So
 the rail's owner-only billing (§5) is presentation: a seat of any role can read the card's last four
-with its own token. Moving `card_last4` out of the client grant is a change to 001's grants for a
-later step (questions.md Q25). The test below reads the account's row, its subscription and its
+with its own token, except the card's last four: CC-37 revoked `card_last4` from `authenticated`
+(migration `20261117000001`), and the owner reads it through the service role after a role check. The test below reads the account's row, its subscription and its
 account-wide alert rules as the owner, an account manager and a developer scoped to one client, and
 as a removed seat and a stranger:
 
@@ -1166,11 +1166,8 @@ the erasure removes or blanks them, and a plan read again by address counts none
 | owning an agency with invited seats, stored reports, share links and a client contact                 | both of the person's accounts (rule 32) with their seats, sites, reports, schedules and share links; each stored report's file is in the plan's storage list and is removed before `apply`                             |
 | the client contact and report recipient of another account, with an account of their own or with none | `sites.client_contact_email` (rule 30) and `reports.recipient_email` (rule 29) are set null; the rows stay                                                                                                             |
 
-**Known gap, reported and not fixed here.** `sites.client_contact_name` is left beside the blanked
-address: rule 30 sets `client_contact_email` and no rule names the name. The test
-`known gap, reported: the contact’s name stays beside the blanked address` pins this, so a rule that
-covers the name turns it red. The fix is one more column in rule 30's action, which restates
-`erase_rules()`.
+`sites.client_contact_name` goes with the blanked address: CC-37's rule 19 sets it null before rule
+30 blanks the address (test `the contact’s name goes with the blanked address (rule 19, CC-37)`).
 
 What a recipient refused (§10, `sites.report_refusals`) is keyed by the sha256 of the address. It
 goes with the address in two places, by triggers, since `erase_rules()` is not restated: when the
@@ -1178,11 +1175,9 @@ erasure blanks `sites.client_contact_email` (rule 30; `set_client`, the account'
 the entry so a refusal cannot be cleared by changing the contact away and back), and when it blanks
 a report's `recipient_email` (rule 29), which reaches a recipient who is no longer the site's
 contact; both reach every row of the client, the removed one and the one it was added again as.
-**Known gap:** the entry of a contact that was never sent a report and that the account then
-replaced or took away (through `set_client`, which keeps entries) is reached by neither rule: its
-entry, an unsalted sha256 of the address and the hash of its link's token, stays on the site's row
-until the site or the account goes. Closing it is one rule more in `erase_rules()` (questions.md
-Q43). The two tests write rules 29 and 30 as the erasure does; the erasure's own function was run
+The entry of a contact that was never sent a report and that the account then replaced or took away
+(through `set_client`, which keeps entries) is reached by neither trigger; CC-37's rule 18
+(`sites.report_refusals pruned`) removes it (`apps/web/__tests__/v2-037-security.test.ts`). The two tests write rules 29 and 30 as the erasure does; the erasure's own function was run
 against them by a reviewer (review-r5-scoped.md), not by a test in the tree. `pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-031-b2-schedules.test.ts -t "the erasure"`
 
 An erased contact leaves nothing on the schedule either: blanking the address clears the
