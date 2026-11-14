@@ -3,14 +3,15 @@
  * request goes through `guardedFetch` (GET to fixed hosts, plus Supabase's read-only query), and the
  * git commands it runs read the local clone.
  *
- *   pnpm golive:check -- [--step N] [--ticked id,id] [--env-file path]
+ *   pnpm golive:check -- [--step N] [--ticked id,id] [--env-file path] [--go-no-go]
  *
  * Prints whether this checkout's inputs equal the live production commit's (probes/live.ts), then
  * every precondition, grouped by the step it gates, as `pass`, `fail`, `unknown (reason)` or
  * `manual`; exits 1 when a row gating step N or an earlier one is not `pass` (a manual row passes only
  * when its id is in `--ticked`), 0 when none is, 2 when the arguments cannot be used. `--step`
  * defaults to 1: which steps are done cannot be read without reading the flags' values, which the
- * check never requests.
+ * check never requests. `--go-no-go` also prints the launch gates of go-no-go.ts with each one's
+ * state, before the last line; the exit code is the same.
  *
  * Tokens come from `scripts/.env.local` of this checkout (or `--env-file`), and from the process
  * environment for the names in `TOKEN_ENV`. Tokens, the file's values and the strings a response
@@ -34,6 +35,7 @@ import {
 } from './env-classes';
 import { REPO_ROOT } from './env-scan';
 import { PRODUCTION_REF } from '../db/target';
+import { WALK_RESULTS_PATH, goNoGoLines } from './go-no-go';
 import { ALLOWED_HOSTS, guardedFetch } from './http';
 import { PRECONDITIONS, type Precondition } from './preconditions';
 import { PAID_PLAN_TICK } from './probes/inngest';
@@ -56,22 +58,28 @@ function readIfPresent(path: string): string | null {
   }
 }
 
-export const USAGE = 'usage: pnpm golive:check -- [--step 1-5] [--ticked id,id] [--env-file path]';
+export const USAGE =
+  'usage: pnpm golive:check -- [--step 1-5] [--ticked id,id] [--env-file path] [--go-no-go]';
 export const DEFAULT_ENV_FILE = join(REPO_ROOT, 'scripts/.env.local');
 
 export interface Args {
   step: Step;
   ticked: Set<string>;
   envFile: string;
+  goNoGo: boolean;
 }
 
 /** The arguments, or a message saying what is wrong with them. */
 export function parseArgs(argv: readonly string[]): Args | string {
-  const args: Args = { step: 1, ticked: new Set(), envFile: DEFAULT_ENV_FILE };
+  const args: Args = { step: 1, ticked: new Set(), envFile: DEFAULT_ENV_FILE, goNoGo: false };
   for (let i = 0; i < argv.length; i += 1) {
     const flag = argv[i];
     const value = argv[i + 1];
     if (flag === '--') continue;
+    if (flag === '--go-no-go') {
+      args.goNoGo = true;
+      continue;
+    }
     if (flag !== '--step' && flag !== '--ticked' && flag !== '--env-file')
       return `unknown argument ${flag}`;
     if (value === undefined) return `${flag} needs a value`;
@@ -169,6 +177,8 @@ export interface CheckDeps {
   out: (line: string) => void;
   err: (line: string) => void;
   probes?: Readonly<Record<ProbeId, Probe>>;
+  /** Reads a file, null when there is none; `--go-no-go` reads the walk's results with it. */
+  readFile?: (path: string) => string | null;
 }
 
 const line = (p: Precondition, r: ProbeResult | 'manual' | 'ticked'): string => {
@@ -217,6 +227,8 @@ export async function runCheck(args: Args, deps: CheckDeps, redactor: Redactor):
   // The rows themselves are this checkout's: a checkout that is not production's gates nothing truly,
   // so it blocks every step, step 1's manual rows included.
   if (!match.ok) blocking.push('checkout');
+  // Each row that does not pass, by the step it gates, for the go/no-go section's step lines.
+  const failing: Step[] = [];
   for (const step of STEPS) {
     out('');
     out(`step ${step}: ${STEP_TITLE[step]}`);
@@ -231,9 +243,21 @@ export async function runCheck(args: Args, deps: CheckDeps, redactor: Redactor):
         out(line(p, r));
       }
       if (step <= args.step && !passed) blocking.push(p.id);
+      if (!passed) failing.push(step);
     }
   }
   out('');
+  if (args.goNoGo) {
+    const lines = goNoGoLines({
+      step: (s) => {
+        const n = failing.filter((g) => g <= s).length + (match.ok ? 0 : 1);
+        return n === 0 ? { ready: true } : { ready: false, blocking: n };
+      },
+      walkResults: (deps.readFile ?? readIfPresent)(WALK_RESULTS_PATH),
+    });
+    for (const l of lines) out(l);
+    out('');
+  }
   const through = args.step === 1 ? 'step 1' : `steps 1–${args.step}`;
   if (blocking.length === 0) {
     out(`ready for step ${args.step}: every row gating ${through} passes`);
