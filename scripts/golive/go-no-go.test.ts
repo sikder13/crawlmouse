@@ -268,7 +268,11 @@ describe('the other states', () => {
       step: (s) =>
         s < 3
           ? { ready: true }
-          : { ready: false, blocking: { 3: 1, 4: 4, 5: 0 }[s]!, checkout: s === 5 },
+          : {
+              ready: false,
+              blocking: ({ 3: 1, 4: 4, 5: 0 } as Record<number, number>)[s]!,
+              checkout: s === 5,
+            },
       walkResults: null,
       ...ON_WALKED,
     });
