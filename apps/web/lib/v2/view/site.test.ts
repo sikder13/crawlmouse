@@ -114,6 +114,17 @@ describe('Site page, example-outfitter.com at as_of', () => {
   });
 });
 
+describe('Site page: the depth part (CC-39 F5)', () => {
+  it('gives the average click depth to one decimal, as the engine stores a float', () => {
+    const d = structuredClone(bad);
+    for (const c of d.checks) {
+      if (c.site_id === OUTFITTER && c.structure) c.structure.avg_click_depth = 1.6851851851851851;
+    }
+    const [seo] = siteView(d, { accountId: BAD_ACCOUNT, now: d.as_of }, OUTFITTER).grades.cards;
+    expect(seo!.parts).toBe('Structure 74 · Orphans 7 · Depth 1.7');
+  });
+});
+
 describe('Site: a rule the site overrides (CC-28 D8)', () => {
   it('shows the site’s own row of a kind in place of the account’s, once, and switches that one', () => {
     const d = structuredClone(bad);
