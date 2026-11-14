@@ -85,7 +85,7 @@ describe('the registry', () => {
       gates: 5,
       owner: 'owner',
       check: { kind: 'manual' },
-      source: 'inngest/billing-helpers.ts:108',
+      source: 'inngest/billing-helpers.ts:127',
     });
     expect(at('stripe-reconcile-livemode-true')?.mustBeTrue).toMatch(
       /STRIPE_RECONCILE_LIVEMODE=true/,

@@ -434,7 +434,7 @@ export const PRECONDITIONS: readonly Precondition[] = [
     id: 'stripe-reconcile-livemode-true',
     mustBeTrue: 'Vercel Production has STRIPE_RECONCILE_LIVEMODE=true',
     why: "unset, the reconcile's livemode guard does not run (v1 inventory C-7); 'false' with the live key refuses every reconcile. vercel-env-step-5 sees the name only: its probe reads no value",
-    source: 'inngest/billing-helpers.ts:108',
+    source: 'inngest/billing-helpers.ts:127',
     gates: 5,
     owner: 'owner',
     check: manual,
