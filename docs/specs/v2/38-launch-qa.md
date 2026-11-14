@@ -15,9 +15,26 @@ v2 goes live for everyone, with no beta (owner, 2026-11-13). Before the switch t
 
 ## What differed from the brief
 
-<!-- Lead: F1–F6 as measured on the final tree (questions.md Q1–Q10). -->
+Measured against the code; the reasoning for each is in `notes/cc-38/questions.md`.
 
-- _(to fill)_
+- **The internal marker (F1) arrives with CC-33.** On `d8402ec0` there was no `accounts.internal` and no
+  `scripts/ops/internal.ts`. The seed takes the marker as a port; the tests that need the column are
+  `todo` until CC-33's migration is on the tree (Q1).
+- **D1(b) opens a Checkout per paid account instead of making a subscription (Q2).** The webhook grants
+  a plan on `checkout.session.completed`: a subscription made through the API is recorded and not
+  applied (`apps/web/lib/billing/stripe-normalise.ts`, `customer.subscription.created`). The session's
+  parameters are the app's own (`startCheckout`), plus the coupon and, outside the trial,
+  `payment_method_collection: 'if_required'`; `scripts/qa/billing.test.ts` holds the two equal.
+- **Stripe's coupons offer no restriction by customer metadata (Q3).** `INTERNAL-QA` has no promotion
+  code to type; the script applies it by id, to a customer it has checked.
+- **The marker is a table, `qa_accounts`, not account metadata (Q4).** `accounts` has no metadata
+  column, and reading `auth.users` from SQL would touch `auth`.
+- **The QA sites are the owner's domains and subdomains of `lab.nahltech.com` (Q7)**, listed in
+  `scripts/qa/accounts.ts` `QA_HOSTS`, so a production seed checks no third party's site.
+- **The walk needed a stand-in of its own.** The proof harnesses F4 names live in the notes folder, not
+  the repo. `tests/e2e/harness/` builds on the repo's PGlite PostgREST helper and adds resource
+  embedding, Supabase Auth's endpoints, a Stripe stand-in and a worker that finishes requested checks
+  from the engine's recorded crawl.
 
 ## Known gaps
 
@@ -27,7 +44,7 @@ v2 goes live for everyone, with no beta (owner, 2026-11-13). Before the switch t
 - **`demo` has no read-only mode.** There is no mechanism for one; `demo` is an ordinary Agency
   account kept for showing.
 - **The paid plans arrive through a Checkout the owner completes (Q2).** The webhook grants a plan
-  only on `checkout.session.completed`, so `qa:seed --billing` opens a Checkout Session per paid account
+  on `checkout.session.completed` (above), so `qa:seed --billing` opens a Checkout Session per paid account
   with the `INTERNAL-QA` coupon and prints its URL; the owner completes each once.
 - **Client-side PostHog events of a QA session are not marked `internal` (Q10).** There is no identify
   call to carry it.
@@ -39,9 +56,27 @@ v2 goes live for everyone, with no beta (owner, 2026-11-13). Before the switch t
   `smoke.js`: the first posts v1 audits (`/api/audits/start`), the second reads `/` and `/status`;
   the go/no-go gate `load-staging` needs a check script written first.
 
+## The walk
+
+`bash tests/e2e/run.sh` builds `apps/web` with the four flags on, starts the stand-in seeded by
+`qa:seed`'s own `seed()`, starts `next start`, runs the journeys and stops both servers. Screenshots go
+to `$WALK_SHOTS` when it is set. What the walk found is in PR.md; the defects it found are not fixed
+in this step.
+
+## Owner drills (the go/no-go list's owner lines)
+
+- **Restore drill.** Create a Supabase branch from last night's backup of `ezspnfeyzwsisymytssm`, and
+  read three known rows on it: the oldest `accounts` row's `id`, one `public_reports` row by slug, one
+  `checks` row by id, each compared with production.
+- **2FA.** Turn it on, and confirm it is on, for GitHub, Vercel, Supabase, Stripe, Cloudflare, Sentry,
+  Namecheap and Google (launch-readiness §6).
+
 ## Owner steps, in order
 
-<!-- Lead: the PR.md list (QA_INBOX; qa:seed part (a) on production; --billing --live once Stripe live is
-ready; the drills; the live purchases and refunds), with each command. -->
-
-- _(to fill)_
+1. Set `QA_INBOX` to a mailbox that takes plus-addressing, in the shell that runs the scripts.
+2. Point the hosts in `scripts/qa/accounts.ts` `QA_HOSTS` at the lab zones, or edit the list (Q7).
+3. `pnpm qa:seed` against production (part a). Steps that wait for a plan say so.
+4. Once Stripe live mode is ready: `pnpm qa:seed --billing --live`, type the phrase it asks for, open
+   each printed Checkout URL and complete it, then `pnpm qa:seed` again to add what waited for the plan.
+5. The drills above, the k6 run once its check script exists, and the self-audit.
+6. A real-card purchase of Pro and of Agency, each refunded.
