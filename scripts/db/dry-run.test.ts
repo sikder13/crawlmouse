@@ -17,12 +17,16 @@ const THROUGH_001 = (f: string) => f.slice(0, 14) <= '20261101000001';
 // cannot restore a database that lacked what P1 adds. The fixture of production before P1 and P2,
 // below, is the one where they and every later file are pending.
 const files = listMigrations().filter((f) => f.version <= '20261103000001');
-// Check 08 asserts the client grants as 20261106000002 (P2) left them, and check 09 the definer
-// functions' search_path as 20261108000002 left it; this fixture predates both: its v1 tables carry
-// the broad grants production had then. The fixture of production before P1 and P2, below, runs
-// every check.
+// Check 08 asserts the client grants as 20261106000002 (P2) left them, check 09 the definer
+// functions' search_path as 20261108000002 left it, and check 01 the v2 column grants as
+// 20261117000001 left them (accounts.card_last4 revoked); this fixture predates all three: its v1
+// tables carry the broad grants production had then, and authenticated still selects card_last4.
+// The fixture of production before P1 and P2, below, has every file pending and runs every check.
 const V2_SET_CHECKS = listChecks().filter(
-  (c) => c.file !== '08-v1-client-grants.sql' && c.file !== '09-definer-search-path.sql',
+  (c) =>
+    c.file !== '01-client-table-privileges.sql' &&
+    c.file !== '08-v1-client-grants.sql' &&
+    c.file !== '09-definer-search-path.sql',
 );
 
 describe('the fixture of production before P1 and P2 holds what was measured there', () => {
@@ -47,9 +51,8 @@ describe('the fixture of production before P1 and P2 holds what was measured the
 });
 
 describe('the v2-set fixture', () => {
-  it('runs checks 01 to 07, every check but 08 and 09', () => {
+  it('runs checks 02 to 07, every check but 01, 08 and 09', () => {
     expect(V2_SET_CHECKS.map((c) => c.file)).toEqual([
-      '01-client-table-privileges.sql',
       '02-partitions-rls-owner-only.sql',
       '03-worker-roles-no-login.sql',
       '04-private-schemas.sql',
