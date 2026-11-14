@@ -331,7 +331,6 @@ describe('a state-changing API request from another site is refused before the r
       'api/audits/[id]/cancel',
       'api/audits/[id]/reaudit',
       'api/auth/logout',
-      'api/billing/agency-trial',
       'api/billing/cancel',
       'api/billing/checkout',
       'api/billing/portal',

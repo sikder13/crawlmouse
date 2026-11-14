@@ -443,6 +443,54 @@ const WITHDRAWN: readonly WithdrawnClaim[] = [
       'the file is served unchanged.',
     allowedIn: [],
   },
+  {
+    text: "the constants' bound",
+    withdrawnIn: 'docs/ops/inngest-budget.md (the worst check), CC-35 review round 1 (Tier B B3)',
+    truth:
+      'The heaviest of the shapes searched is not a bound: batches that differ from one another are not tried (scripts/golive/budget.ts).',
+    allowedIn: [],
+  },
+  {
+    text: 'with the flags off over the same rows',
+    withdrawnIn: 'docs/ops/go-live.md (After a rollback), CC-35 review round 1 (Tier B)',
+    truth:
+      'Each phase of the rollback proof seeded a fresh stand-in the same way; the ids differ between the two logs.',
+    allowedIn: [],
+  },
+  {
+    text: 'shows the same sites and checks',
+    withdrawnIn: 'docs/ops/go-live.md (After a rollback), CC-35 review round 1 (Tier B)',
+    truth:
+      'The proof did not switch the flags on again over the same rows; a rollback changes the deployment, not the database.',
+    allowedIn: [],
+  },
+  {
+    text: 'which records the consent, is the one way to start one',
+    withdrawnIn: 'docs/specs/v2/35-go-live.md D5, CC-35 review round 1 (Tier B)',
+    truth:
+      "The test pins CC-29's route as the starter's one importer and the starter as the one source of trialDays.",
+    allowedIn: [],
+  },
+  {
+    text: 'lists 4 functions',
+    withdrawnIn: 'docs/ops/go-live.md (sync boxes), CC-35 review round 1 (Tier B B2)',
+    truth:
+      'Inngest syncs an onFailure handler as a function of its own: the counts functionCountsByStep() prints, which golive-sync-count.test.ts holds to the serve route.',
+    allowedIn: [],
+  },
+  {
+    text: 'the function count `golive:check` lists',
+    withdrawnIn: 'docs/ops/go-live.md, CC-35 review round 2 (deploy safety R2-1, Tier B)',
+    truth: 'golive:check prints no function count; functionCountsByStep() does, after each step.',
+    allowedIn: [],
+  },
+  {
+    text: 'Nothing a visitor reads changes',
+    withdrawnIn: 'docs/ops/go-live.md step 2, CC-35 review round 1 (Tier B)',
+    truth:
+      'Step 2 serves no route a visitor can use: each route reading V2_PIPELINE answers 404 first while V2_CHECKS_PUBLIC is off.',
+    allowedIn: [],
+  },
 ];
 
 /**
