@@ -1,5 +1,5 @@
 import type Stripe from 'stripe';
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { fakeCatalog } from '../../apps/web/lib/billing/catalog.fake';
 import { agencyTrial } from '../../apps/web/lib/billing/agency-trial';
 import { checkoutV2, type CheckoutDeps } from '../../apps/web/lib/billing/checkout-v2';
@@ -18,7 +18,14 @@ import {
 } from './billing';
 import { exitCode, seed } from './seed';
 import { qaBillingAccounts } from './store';
-import { withMarker, world } from './test-support';
+import type { PGlite } from '@electric-sql/pglite';
+import {
+  HAS_INTERNAL_MARKER,
+  migratedBase,
+  PGLITE_TIMEOUT,
+  withMarker,
+  world,
+} from './test-support';
 
 /**
  * CC-38 D1(b), `qa:seed --billing`: its refusals, a second run, parity with the app's own Checkout
@@ -27,10 +34,17 @@ import { withMarker, world } from './test-support';
  *   pnpm --filter @crawlmouse/scripts exec vitest run qa/billing.test.ts
  */
 
+let base: PGlite;
+beforeAll(async () => {
+  if (HAS_INTERNAL_MARKER) base = await migratedBase();
+}, 300_000);
+
 const NOW = new Date('2026-11-14T12:00:00.000Z');
 const ORIGIN = 'https://crawlmouse.test';
 const BILLED = QA_ACCOUNTS.filter((a) => a.billing !== null).map((a) => a.key);
 const catalog = fakeCatalog();
+/** The Stripe product a fake price sells: one per plan. */
+const productOf = (plan: string) => `prod_crawlmouse_${plan}`;
 
 interface FakeSession {
   id: string;
@@ -49,10 +63,30 @@ class BillingStripeFake implements BillingStripe {
   readonly byKey = new Map<string, string>();
   readonly sessions: FakeSession[] = [];
 
+  /** Promotion codes by coupon id. */
+  readonly promoCodes = new Map<string, string[]>();
+
   balance = {
     retrieve: async () => {
       this.calls.push('balance.retrieve');
       return { livemode: this.livemode };
+    },
+  };
+
+  prices = {
+    retrieve: async (id: string) => {
+      this.calls.push('prices.retrieve');
+      const sold = await catalog.planOfPrice(id);
+      if (!sold) throw new Error(`no price ${id}`);
+      return { product: productOf(sold.plan) };
+    },
+  };
+
+  promotionCodes = {
+    list: async (params: { coupon: string; limit: number }) => {
+      this.calls.push('promotionCodes.list');
+      const ids = (this.promoCodes.get(params.coupon) ?? []).slice(0, params.limit);
+      return { data: ids.map((id) => ({ id })) };
     },
   };
 
@@ -96,6 +130,14 @@ class BillingStripeFake implements BillingStripe {
       this.customersHeld.set(id, { id, metadata: { ...(params.metadata as Stripe.Metadata) } });
       this.byKey.set(options.idempotencyKey, id);
       return { id };
+    },
+    search: async (params: { query: string }) => {
+      this.calls.push('customers.search');
+      const want = /^metadata\['account_id'\]:'([0-9a-f-]+)'$/.exec(params.query)?.[1];
+      if (want === undefined) throw new Error(`unexpected query ${params.query}`);
+      return {
+        data: [...this.customersHeld.values()].filter((c) => c.metadata.account_id === want),
+      };
     },
   };
 
@@ -318,7 +360,7 @@ describe('qa:seed --billing: refusals', () => {
 });
 
 describe('qa:seed --billing: the coupon and a second run', () => {
-  it('creates INTERNAL-QA when it is missing, 100% off forever with no promotion code', async () => {
+  it('creates INTERNAL-QA when it is missing, 100% off forever, for the billed products only', async () => {
     const u = unit();
     await seedBilling(u.deps, { live: false });
     expect([...u.stripe.couponsHeld.values()]).toEqual([
@@ -326,22 +368,69 @@ describe('qa:seed --billing: the coupon and a second run', () => {
         id: COUPON_ID,
         percent_off: 100,
         duration: 'forever',
+        applies_to: { products: [productOf('agency'), productOf('pro')] },
         metadata: { internal: 'true' },
         valid: true,
       },
     ]);
-    // The port has no promotion-code call at all; this pins that none was made under another name.
+    // Promotion codes are not even listed for a coupon this run made, and none is ever created.
     expect(new Set(u.stripe.calls)).toEqual(
       new Set([
         'balance.retrieve',
         'coupons.retrieve',
+        'prices.retrieve',
         'coupons.create',
+        'customers.search',
         'customers.create',
         'sessions.list',
         'sessions.create',
       ]),
     );
     for (const s of u.stripe.sessions) expect(s.params.discounts).toEqual([{ coupon: COUPON_ID }]);
+  });
+
+  it('refuses an INTERNAL-QA that has a promotion code, active or not, and opens nothing', async () => {
+    const u = unit();
+    u.stripe.couponsHeld.set(COUPON_ID, {
+      id: COUPON_ID,
+      percent_off: 100,
+      duration: 'forever',
+      valid: true,
+    });
+    u.stripe.promoCodes.set(COUPON_ID, ['promo_qa1']);
+    const steps = await seedBilling(u.deps, { live: false });
+    expect(steps.at(-1)).toEqual(
+      expect.objectContaining({ key: 'run', step: 'stopped', outcome: 'refused' }),
+    );
+    expect(steps.at(-1)!.detail).toMatch(/promo_qa1/);
+    expect(writes(u.stripe)).toEqual([]);
+    expect(u.stripe.calls).toContain('promotionCodes.list');
+  });
+
+  it('a run after the idempotency key expired finds the customer it made, and makes none', async () => {
+    const u = unit();
+    await seedBilling(u.deps, { live: false });
+    const made = [...u.stripe.customersHeld.keys()];
+    // Stripe forgets an idempotency key after 24 hours; the webhook has bound no customer yet.
+    u.stripe.byKey.clear();
+    const steps = await seedBilling(u.deps, { live: false });
+    expect([...u.stripe.customersHeld.keys()]).toEqual(made);
+    expect(u.stripe.calls.filter((c) => c === 'customers.create')).toHaveLength(BILLED.length);
+    expect(steps.filter((s) => s.step === 'customer').map((s) => s.outcome)).toEqual(
+      BILLED.map(() => 'unchanged'),
+    );
+    expect(new Set(u.stripe.open().map((s) => s.customer))).toEqual(new Set(made));
+  });
+
+  it('refuses a customer Stripe holds for the account without internal=true', async () => {
+    const u = unit();
+    u.stripe.customersHeld.set('cus_found', {
+      id: 'cus_found',
+      metadata: { account_id: accountIdOf('agency') },
+    });
+    const steps = await seedBilling(u.deps, { live: false });
+    expect(steps.filter((s) => s.outcome === 'refused').map((s) => s.key)).toEqual(['agency']);
+    expect(u.stripe.sessions.some((s) => s.customer === 'cus_found')).toBe(false);
   });
 
   it('a second run before any checkout is completed: same customers, one open session each', async () => {
@@ -532,7 +621,7 @@ describe('qa:seed --billing on PGlite: the real webhook carries the plan', () =>
   withMarker(
     'each completed session leaves its account on its plan, and a second run opens nothing',
     async () => {
-      const w = await world();
+      const w = await world(base);
       await seed(w.deps);
       const stripe = new BillingStripeFake();
       const deps = billingOver(w, stripe);
@@ -564,22 +653,30 @@ describe('qa:seed --billing on PGlite: the real webhook carries the plan', () =>
         BILLED.map((k) => [k, 'checkout', 'unchanged']),
       );
     },
+    PGLITE_TIMEOUT,
   );
 
-  withMarker('refuses through the real store: a missing row, and internal false', async () => {
-    const w = await world();
-    await seed(w.deps);
-    await w.db.query(
-      `delete from public.qa_accounts q using public.accounts a
+  withMarker(
+    'refuses through the real store: a missing row, and internal false',
+    async () => {
+      const w = await world(base);
+      await seed(w.deps);
+      await w.db.query(
+        `delete from public.qa_accounts q using public.accounts a
         where a.id = q.account_id and q.qa_key = 'pro' and a.kind = 'personal'`,
-    );
-    await w.db.query(
-      `update public.accounts a set internal = false from public.qa_accounts q
+      );
+      await w.db.query(
+        `update public.accounts a set internal = false from public.qa_accounts q
         where a.id = q.account_id and q.qa_key = 'demo' and a.kind = 'agency'`,
-    );
-    const stripe = new BillingStripeFake();
-    const steps = await seedBilling(billingOver(w, stripe), { live: false });
-    expect(steps.filter((s) => s.outcome === 'refused').map((s) => s.key)).toEqual(['pro', 'demo']);
-    expect(stripe.open()).toHaveLength(2);
-  });
+      );
+      const stripe = new BillingStripeFake();
+      const steps = await seedBilling(billingOver(w, stripe), { live: false });
+      expect(steps.filter((s) => s.outcome === 'refused').map((s) => s.key)).toEqual([
+        'pro',
+        'demo',
+      ]);
+      expect(stripe.open()).toHaveLength(2);
+    },
+    PGLITE_TIMEOUT,
+  );
 });
