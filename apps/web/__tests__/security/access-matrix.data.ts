@@ -11,7 +11,7 @@
 import type { AccessRow, Check, GateKind, Proof } from './access-matrix.types';
 
 /** Holes found by CC-37 and not yet closed. Each is a `hole` on at least one row. */
-export const KNOWN_OPEN: readonly string[] = ['Q16', 'Q25'];
+export const KNOWN_OPEN: readonly string[] = ['Q25'];
 
 const web = (p: string) => `apps/web/${p}`;
 const at = (file: string, marker: string): Check => ({ file: web(file), marker });
@@ -558,17 +558,18 @@ const ROUTES: readonly Spec[] = [
   {
     path: 'api/reports/mint',
     v2: true,
-    identity: 'v2: signed-in seat covering the site; v1: whoever holds the audit id',
-    gate: 'member_for_site',
+    identity:
+      'v2: signed-in owner or account manager covering the site; v1: whoever holds the audit id',
+    gate: 'seat_may',
+    action: 'mint_report',
     detail:
-      'v2: mints a public report of a check read through the session, after `is_member_for_site` and no role check. v1: the audit id is the capability.',
-    check: at('lib/v2/reports/mint-deps.ts', 'is_member_for_site'),
+      'v2: mints a public report of a check read through the session, after `is_member_for_site` and `seat_may(mint_report)` on the site’s account, both through the session. v1: the audit id is the capability.',
+    check: at('lib/v2/reports/mint-deps.ts', 'seat_may'),
     proof: by(
-      'app/api/reports/mint/route.v2.test.ts',
-      'another account’s check is 404, read through the caller’s session, the service role untouched',
+      '__tests__/security/mint-by-role.test.ts',
+      'a developer whose seat covers the site is refused before any service-role read, and nothing is minted',
     ),
     calls: 2,
-    hole: 'Q16',
   },
   // v2: fixes
   {
