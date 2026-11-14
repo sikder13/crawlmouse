@@ -123,6 +123,17 @@ no rate-limit bucket is spent; Turnstile and the limits of `/api/checks` are unc
   backfilled user's first v2 sign-in is `not_first`: no trial). A pre-001 user who never
   confirmed their email (2 on production, 2026-11-13) has never signed in; their first sign-in is a
   sign-up's and gets a sign-up's trial (questions.md Q19; the same test file pins it).
+- **Applying it** (owner, before step 3; the `golive:check` row `cc36-account-backfill`): only after
+  `20261115000001` is recorded on production, from a dry run taken after it, since the CLI's push
+  refuses an older version once a newer one is applied. The dry run's branch holds no production
+  rows, so the data step is proven by these read-only checks on production:
+  - before: `select count(*) from public.users where email_normalized is null and email !~ '@'` is 0
+    (`normalize_email` raises on such an address); `select count(*) from public.users u where
+default_account_id is null and exists (select 1 from public.seats s where s.user_id = u.id)` is 0;
+    `select count(*) from pg_proc where proname = 'provision_default_account'` is 0;
+  - after: `select count(*) from public.users where default_account_id is null` is 0; each backfilled
+    user holds one active owner seat on a `free` account; the `trial_ledger` and `email_sends` row
+    counts are what they were before; one test sign-up gets one account.
 
 ## D3 — kept public pages in the v2 shell
 

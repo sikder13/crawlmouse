@@ -229,6 +229,16 @@ export const PRECONDITIONS: readonly Precondition[] = [
     check: manual,
   },
   {
+    id: 'cc36-account-backfill',
+    mustBeTrue:
+      'migration 20261116000002 (the v1 account backfill) is applied to production, after 20261115000001, with the pre- and post-checks in docs/specs/v2/36-cutover.md: no public.users row is left without default_account_id',
+    why: "without it, 11 of production's 12 users (measured 2026-11-13) meet the v2 dashboard's no-account state at their first v2 sign-in (owner ruling 1 of CC-36)",
+    source: 'docs/specs/v2/36-cutover.md:126',
+    gates: 3,
+    owner: 'CC-36',
+    check: manual,
+  },
+  {
     id: 'edge-rate-limits',
     mustBeTrue:
       'infra/vercel/firewall.json is applied at the edge (magic-link, audits/start and claim limits), per docs/ops/edge-firewall.md',
