@@ -41,7 +41,7 @@ vi.mock('@/lib/analytics-server', () => ({ captureServerEvent: async () => undef
 
 import { POST as mint } from '@/app/api/reports/mint/route';
 
-type Who = 'owner' | 'manager' | 'developer' | 'developer2' | 'stranger' | 'anonymous';
+type Who = 'owner' | 'manager' | 'developer' | 'developer2' | 'removed' | 'stranger' | 'anonymous';
 const OK = 200;
 const REFUSED = '403 {"error":"role_refused"}';
 const NOT_FOUND = '404 {"error":"not_found"}';
@@ -53,6 +53,7 @@ const EXPECTED: Record<Who, [number | string, number | string]> = {
   manager: [OK, OK],
   developer: [REFUSED, NOT_FOUND],
   developer2: [NOT_FOUND, REFUSED],
+  removed: [NOT_FOUND, NOT_FOUND],
   stranger: [NOT_FOUND, NOT_FOUND],
   anonymous: [SIGNED_OUT, SIGNED_OUT],
 };
@@ -104,6 +105,13 @@ async function said(who: Who, checkId: string): Promise<number | string> {
 describe('POST /api/reports/mint {checkId}, as each person, for each client site', () => {
   it.each(CASES)('mint as %s for %s: %s', async (who, site, expected) => {
     expect(await said(who, w[site].check)).toBe(expected);
+    // A 200 wrote the report row, minted by the caller; any refusal wrote none.
+    const { rows } = await h.db.query<{ minted_by: string }>(
+      'select minted_by from public.public_reports where check_id = $1',
+      [w[site].check],
+    );
+    const p = personOf(who);
+    expect(rows).toEqual(expected === OK && p ? [{ minted_by: p.id }] : []);
   });
 
   it('a developer whose seat covers the site is refused before any service-role read, and nothing is minted', async () => {

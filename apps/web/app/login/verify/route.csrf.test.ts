@@ -82,6 +82,10 @@ import {
   signUp,
 } from '../../../__tests__/v2/_lib/door-pglite';
 
+// Addresses built from parts, as the brief asks of sample data.
+const ATTACKER = ['attacker', 'example.net'].join('@');
+const VICTIM = ['victim', 'example.com'].join('@');
+
 const ORIGIN = 'https://crawlmouse.com';
 const PEPPER = 'k'.repeat(40);
 const VICTIM_DEVICE = 'victim-browser-device';
@@ -94,11 +98,11 @@ const cleared = vi.fn();
 beforeEach(async () => {
   h.db = await doorDb();
   process.env.V2_ACCOUNT_DOOR = '1';
-  attackerId = await signUp(h.db, 'attacker@example.net');
+  attackerId = await signUp(h.db, ATTACKER);
   const now = h.now.toISOString();
   h.user = {
     id: attackerId,
-    email: 'attacker@example.net',
+    email: ATTACKER,
     email_confirmed_at: now,
     last_sign_in_at: now,
   };
@@ -157,7 +161,7 @@ const auditOwner = async () =>
 
 describe("a sign-in link for another address, opened in a browser bound to the victim's (D9)", () => {
   it("records no device row for the victim's browser and claims none of its audits", async () => {
-    await openInVictimBrowser(emailBinding('victim@example.com'));
+    await openInVictimBrowser(emailBinding(VICTIM));
     const account = await accountOf(h.db!, attackerId);
     // The attacker's sign-in itself goes ahead: the trial starts on the email and the network.
     expect(account.state).toBe('pro_trial');
@@ -178,7 +182,7 @@ describe("a sign-in link for another address, opened in a browser bound to the v
   });
 
   it('control: with the binding of the address the link verified, the device is recorded and the audit claimed', async () => {
-    await openInVictimBrowser(emailBinding('attacker@example.net'));
+    await openInVictimBrowser(emailBinding(ATTACKER));
     expect(await deviceRows()).toBe(1);
     expect(await auditOwner()).toBe(attackerId);
     expect(cleared).toHaveBeenCalledTimes(1);
@@ -210,14 +214,14 @@ describe("door ON: the victim's Keep and the attacker's link (CC-37 D2)", () => 
   it("does not claim the victim's v2 check and answers with the Signed-in-as state for the attacker", async () => {
     const keep = await victimKeep();
     const expiresBefore = await checkExpiry(keep.checkId);
-    const res = await openInVictimBrowser(emailBinding('victim@example.com'), {
+    const res = await openInVictimBrowser(emailBinding(VICTIM), {
       next: keep.next,
       json: true,
     });
     expect(res.status).toBe(200);
     const body = (await res.json()) as { next: string; email?: string };
     // The Continue page's "Signed in as <address>." reads this field (25-account-door.md, login CSRF).
-    expect(body.email).toBe('attacker@example.net');
+    expect(body.email).toBe(ATTACKER);
     // Not a claim's landing: neither the claim target, nor a refused claim's /dashboard?claim=<code>.
     expect(body.next).toBe('/dashboard');
     expect(body.next).not.toContain('/api/checks/');
@@ -230,7 +234,7 @@ describe("door ON: the victim's Keep and the attacker's link (CC-37 D2)", () => 
 
   it('control: the same Keep with the binding of the address the link verified is claimed', async () => {
     const keep = await victimKeep();
-    const res = await openInVictimBrowser(emailBinding('attacker@example.net'), {
+    const res = await openInVictimBrowser(emailBinding(ATTACKER), {
       next: keep.next,
       json: true,
     });
@@ -262,7 +266,7 @@ describe('door OFF (V2_ACCOUNT_DOOR unset): the same attacker link (CC-37 D2)', 
   });
 
   it("a foreign binding claims none of the victim's audits", async () => {
-    await openInVictimBrowser(emailBinding('victim@example.com'));
+    await openInVictimBrowser(emailBinding(VICTIM));
     expect(await auditOwner()).toBeNull();
     expect(cleared).not.toHaveBeenCalled();
     // The door is off: no first-login hook, so no account moved to a trial and no ledger row.
@@ -278,17 +282,17 @@ describe('door OFF (V2_ACCOUNT_DOOR unset): the same attacker link (CC-37 D2)', 
 
   it("the victim's Keep is not claimed and the landing is the plain dashboard", async () => {
     const keep = await victimKeep();
-    const res = await openInVictimBrowser(emailBinding('victim@example.com'), {
+    const res = await openInVictimBrowser(emailBinding(VICTIM), {
       next: keep.next,
       json: true,
     });
     const body = (await res.json()) as { next: string; email?: string };
-    expect(body).toMatchObject({ next: '/dashboard', email: 'attacker@example.net' });
+    expect(body).toMatchObject({ next: '/dashboard', email: ATTACKER });
     expect(await siteOwner(keep.siteId)).toEqual({ a: null, s: null });
   });
 
   it('control: with the binding of the address the link verified, the audit is claimed', async () => {
-    await openInVictimBrowser(emailBinding('attacker@example.net'));
+    await openInVictimBrowser(emailBinding(ATTACKER));
     expect(await auditOwner()).toBe(attackerId);
     expect(cleared).toHaveBeenCalledTimes(1);
   });

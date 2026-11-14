@@ -101,6 +101,18 @@ describe('the card’s last four on the account pages, as each role', () => {
     }
   });
 
+  it('a removed seat is given no dataset of the account at all', async () => {
+    for (const loader of ['account', 'settings'] as const) {
+      const p = w.removed;
+      const session = sessionOver(db, { id: p.id, email: p.email });
+      const admin = adminOver(db);
+      await expect(
+        LOADERS[loader]({ session, admin, records: supabaseCheckReader(admin) }, w.accountId, NOW),
+        loader,
+      ).rejects.toThrow(/no account/);
+    }
+  });
+
   it('the session is never asked for card_last4, by either dataset, for any role', async () => {
     for (const loader of ['account', 'settings'] as const) {
       for (const who of Object.keys(EXPECTED) as Who[]) {

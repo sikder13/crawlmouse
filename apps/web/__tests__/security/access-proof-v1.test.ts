@@ -291,7 +291,7 @@ describe('billing', () => {
 describe('api/takedown', () => {
   const form = {
     domain: 'client.example',
-    requesterEmail: 'owner@client.example',
+    requesterEmail: ['owner', 'client.example'].join('@'),
     reason: 'This report is about my site and I want it removed.',
   };
 
