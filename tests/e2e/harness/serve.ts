@@ -10,6 +10,7 @@
  *   updated  {subscription}  `customer.subscription.updated` for it as it stands, delivered
  *   renew    {subscription}  the billing portal's Renew: the cancellation withdrawn, then `updated`
  *   session  {email}         a signed-in session cookie for that user
+ *   user     {email}         a confirmed user at that address, made as a sign-up makes one
  *   sessions {}              the open and finished Checkout Sessions, as the app opened them
  */
 import { supabaseEntitlementStore } from '../../../apps/web/lib/billing/state-machine-apply';
@@ -50,6 +51,7 @@ const standin: Standin = await startStandin(PORT, {
     updated: async (b) => stripe.updated(String(b.subscription)),
     renew: async (b) => stripe.renew(String(b.subscription)),
     session: async (b) => ({ name: 'sb-127-auth-token', value: cookieOf(String(b.email)) }),
+    user: async (b) => ({ id: (await standin.auth.create(String(b.email))).id }),
     sessions: async () => [...stripe.sessions.values()],
   },
 });
