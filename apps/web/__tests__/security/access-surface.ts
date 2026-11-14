@@ -634,7 +634,9 @@ function titleMatchers(
  * How many `it`/`test` declarations in the file have the title `title`, after `it.each` rendering is
  * accounted for. Counted: a call rooted at `it` or `test` (through `.each`, `.for`, `.concurrent`,
  * `.sequential`), with a literal title and a function after it. Not counted: `describe`, `.skip`,
- * `.todo`, `.fails`, `.only`, `.skipIf`, `.runIf`, or a title that merely contains `title`.
+ * `.todo`, `.fails`, `.only`, `.skipIf`, `.runIf`, a test inside a `describe` or `suite` carrying one
+ * of those (at any depth), or a title that merely contains `title`. A describe body passed by name
+ * is walked only where it is written, not where it is passed.
  */
 export function testsTitled(sf: ts.SourceFile, title: string): number {
   let n = 0;
@@ -658,21 +660,25 @@ export function testsTitled(sf: ts.SourceFile, title: string): number {
     if (ts.isCallExpression(e)) return chain(e.expression, mods);
     return null;
   };
-  const visit = (node: ts.Node) => {
+  // `notRun`: under a `describe`/`suite` that does not run (`.skip`, `.todo`, `.skipIf`, …), at any depth.
+  const visit = (node: ts.Node, notRun: boolean) => {
+    let under = notRun;
     if (ts.isCallExpression(node)) {
       const mods: string[] = [];
       const root = chain(node.expression, mods);
+      const stops = mods.some((m) => NOT_RUN.has(m));
+      if (root === 'describe' || root === 'suite') under = notRun || stops;
       const body = node.arguments
         .slice(1)
         .some((a) => ts.isArrowFunction(a) || ts.isFunctionExpression(a) || ts.isIdentifier(a));
-      if ((root === 'it' || root === 'test') && body && !mods.some((m) => NOT_RUN.has(m))) {
+      if ((root === 'it' || root === 'test') && body && !stops && !notRun) {
         const res = titleMatchers(node.arguments[0], eachTable(node.expression));
         if (res && res.some((re) => re.test(title))) n++;
       }
     }
-    ts.forEachChild(node, visit);
+    ts.forEachChild(node, (c) => visit(c, under));
   };
-  visit(sf);
+  visit(sf, false);
   return n;
 }
 

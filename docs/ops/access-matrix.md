@@ -17,8 +17,9 @@ when:
   `(await …).error`); a string is a check only as `.rpc('<name>')`, or as the filter the row names
   (`.eq('audit_id', …)`);
 - a row's proof is not one running `it`/`test` of that whole title (no `describe`, `.skip`,
-  `.todo`, `.fails`, `.only`), in a test file that imports the row's file or its check's file; a
-  `caller` row's proof is the matrix's caller check instead;
+  `.todo`, `.fails`, `.only`, `.skipIf`, `.runIf`, nor a test inside a `describe` or `suite`
+  carrying one), in a test file that imports the row's file or its check's file; a `caller` row's
+  proof is the matrix's caller check instead;
 - a chain of importers from a `caller` row does not end at a row with another gate (a `public` row
   ends one only where the row says why, under "public callers"), or loops;
 - or this file differs from the render.
