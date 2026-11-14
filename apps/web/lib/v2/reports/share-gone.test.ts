@@ -68,7 +68,10 @@ describe('the constants written out for the server graph (CC-39 review r1, secur
 
   it('the module imports nothing a server component may not', () => {
     const source = readFileSync(resolve(__dirname, 'share-gone.ts'), 'utf8');
-    const imports = source.split('\n').filter((l) => /^import\b/.test(l));
-    expect(imports.filter((l) => /react-dom\/server|components\//.test(l))).toEqual([]);
+    // Every module specifier the file names, however its import statement is wrapped.
+    const specifiers = [
+      ...source.matchAll(/\bfrom\s+['"]([^'"]+)['"]|\bimport\s*\(?\s*['"]([^'"]+)['"]/g),
+    ].map((m) => m[1] ?? m[2]);
+    expect(specifiers.filter((s) => /react-dom\/server|components\//.test(s!))).toEqual([]);
   });
 });
