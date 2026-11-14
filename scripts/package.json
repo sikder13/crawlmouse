@@ -11,7 +11,9 @@
   },
   "dependencies": {
     "@crawlmouse/engine": "workspace:*",
-    "@crawlmouse/inngest": "workspace:*"
+    "@crawlmouse/inngest": "workspace:*",
+    "@supabase/supabase-js": "^2.45.0",
+    "stripe": "^22.2.0"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.4",

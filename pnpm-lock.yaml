@@ -307,6 +307,12 @@ importers:
       '@crawlmouse/inngest':
         specifier: workspace:*
         version: link:../inngest
+      '@supabase/supabase-js':
+        specifier: ^2.45.0
+        version: 2.106.1
+      stripe:
+        specifier: ^22.2.0
+        version: 22.2.0(@types/node@22.19.19)
     devDependencies:
       '@electric-sql/pglite':
         specifier: ^0.5.4
