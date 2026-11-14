@@ -25,8 +25,9 @@ Measured against the code; the reasoning for each is in `notes/cc-38/questions.m
   applied (`apps/web/lib/billing/stripe-normalise.ts`, `customer.subscription.created`). The session's
   parameters are the app's own (`startCheckout`), plus the coupon and, outside the trial,
   `payment_method_collection: 'if_required'`; `scripts/qa/billing.test.ts` holds the two equal.
-- **Stripe's coupons offer no restriction by customer metadata (Q3).** `INTERNAL-QA` has no promotion
-  code to type; the script applies it by id, to a customer it has checked.
+- **Stripe's coupons offer no restriction by customer metadata (Q3).** The script applies `INTERNAL-QA`
+  by id, to a customer it has checked; it refuses the coupon when it has a promotion code, and
+  creates it applying to the products of the base prices it bills (Q15).
 - **The marker is a table, `qa_accounts`, not account metadata (Q4).** `accounts` has no metadata
   column, and reading `auth.users` from SQL would touch `auth`.
 - **The QA sites are the owner's domains and subdomains of `lab.nahltech.com` (Q7)**, listed in
@@ -41,6 +42,12 @@ Measured against the code; the reasoning for each is in `notes/cc-38/questions.m
 - **`qa:reset` leaves storage evidence and `usage_events` behind.** It deletes the QA accounts' sites,
   and the cascades take the rest of the rows (plan-revision.md item 5); the stored evidence objects and
   the usage rows stay. _(lead: the measured counts after a reset)_
+- **`qa_reset` clears a QA site's public report links.** Deleting a site sets `public_reports.site_id`
+  and `check_id` to null through migration v2_005's foreign keys (`on delete set null`), on QA
+  accounts' rows only; the minted snapshot itself is not touched.
+- **`--billing` refuses a QA account whose plan is past due or cancelled** (the app's own checkout
+  refusal; exit 1). Such an account's plan is put back through its own Checkout in the app, not by the
+  script.
 - **`demo` has no read-only mode.** There is no mechanism for one; `demo` is an ordinary Agency
   account kept for showing.
 - **The paid plans arrive through a Checkout the owner completes (Q2).** The webhook grants a plan
@@ -75,7 +82,8 @@ in this step.
 
 1. Set `QA_INBOX` to a mailbox that takes plus-addressing, in the shell that runs the scripts.
 2. Point the hosts in `scripts/qa/accounts.ts` `QA_HOSTS` at the lab zones, or edit the list (Q7).
-3. `pnpm qa:seed` against production (part a). Steps that wait for a plan say so.
+3. `pnpm qa:seed` against production (part a). It prints the addresses it will create and asks for
+   `create <n> users at <domain>` first. Steps that wait for a plan say so.
 4. Once Stripe live mode is ready: `pnpm qa:seed --billing --live`, type the phrase it asks for, open
    each printed Checkout URL and complete it, then `pnpm qa:seed` again to add what waited for the plan.
 5. The drills above, the k6 run once its check script exists, and the self-audit.
