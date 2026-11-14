@@ -410,6 +410,7 @@ export async function startStandin(
     void (async () => {
       const url = new URL(req.url ?? '/', `http://127.0.0.1:${port}`);
       const who = callerOf(req);
+      if (process.env.STANDIN_LOG) console.error(`standin: ${req.method} ${url.pathname}`);
       try {
         if (url.pathname === '/__harness/link') {
           const hash = a.lastLink.get((url.searchParams.get('email') ?? '').toLowerCase());

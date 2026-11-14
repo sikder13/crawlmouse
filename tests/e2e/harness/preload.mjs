@@ -1,7 +1,7 @@
 /**
  * Loaded into `next start` by the walk (NODE_OPTIONS=--import), never by the product. Two things:
- * the Stripe SDK's requests to api.stripe.com go to the stand-in's Stripe (./stripe.ts) over plain
- * HTTP on 127.0.0.1, and the walk's site names resolve (below). run.sh sets WALK_STRIPE_PORT.
+ * the Stripe SDK's requests to api.stripe.com, by `https.request` or by `fetch`, go to the stand-in's
+ * Stripe (./stripe.ts) over plain HTTP on 127.0.0.1, and the walk's site names resolve (below). run.sh sets WALK_STRIPE_PORT.
  */
 import dns from 'node:dns';
 import http from 'node:http';
@@ -21,10 +21,23 @@ https.request = function request(options, callback) {
   delete rest.agent;
   delete rest.ciphers;
   delete rest.protocol;
-  return http.request(
+  const req = http.request(
     { ...rest, host: '127.0.0.1', hostname: '127.0.0.1', port, path: `/stripe${options.path}` },
     callback,
   );
+  // The SDK writes the request once its socket says the TLS handshake is done; a plain socket says
+  // `connect` only, so it is told the other as well.
+  req.once('socket', (socket) => socket.once('connect', () => socket.emit('secureConnect')));
+  return req;
+};
+
+// The SDK's fetch-based client (the build may bundle that one) goes the same way.
+const originalFetch = globalThis.fetch;
+globalThis.fetch = function walkFetch(input, init) {
+  const url = new URL(typeof input === 'string' || input instanceof URL ? input : input.url);
+  if (url.hostname !== 'api.stripe.com') return originalFetch(input, init);
+  const target = `http://127.0.0.1:${port}/stripe${url.pathname}${url.search}`;
+  return input instanceof Request ? originalFetch(new Request(target, input), init) : originalFetch(target, init);
 };
 
 /**

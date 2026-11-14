@@ -8,6 +8,7 @@
  *   finish   {siteId}        the site's oldest queued check, finished from the recorded crawl
  *   complete {sessionId}     Stripe's side of a finished Checkout, delivered to the webhook
  *   updated  {subscription}  `customer.subscription.updated` for it as it stands, delivered
+ *   renew    {subscription}  the billing portal's Renew: the cancellation withdrawn, then `updated`
  *   session  {email}         a signed-in session cookie for that user
  *   sessions {}              the open and finished Checkout Sessions, as the app opened them
  */
@@ -47,6 +48,7 @@ const standin: Standin = await startStandin(PORT, {
     finish: async (b, db) => ({ checkId: await finishCheck(db, String(b.siteId)) }),
     complete: async (b) => stripe.complete(String(b.sessionId)),
     updated: async (b) => stripe.updated(String(b.subscription)),
+    renew: async (b) => stripe.renew(String(b.subscription)),
     session: async (b) => ({ name: 'sb-127-auth-token', value: cookieOf(String(b.email)) }),
     sessions: async () => [...stripe.sessions.values()],
   },

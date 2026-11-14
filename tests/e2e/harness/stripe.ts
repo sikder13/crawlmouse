@@ -100,7 +100,7 @@ export class WalkStripe {
       return json(200, {
         id,
         object: 'checkout.session',
-        url: `https://checkout.stripe.test/c/pay/${id}`,
+        url: `https://checkout.stripe.com/c/pay/${id}`,
       });
     }
     if (path === 'checkout/sessions' && req.method === 'GET') {
@@ -140,7 +140,7 @@ export class WalkStripe {
       return json(200, {
         id: this.id('bps'),
         object: 'billing_portal.session',
-        url: 'https://billing.stripe.test/p/session',
+        url: 'https://billing.stripe.com/p/session/walk',
       });
     }
     return json(404, {
@@ -191,6 +191,12 @@ export class WalkStripe {
       )),
       subscription,
     };
+  }
+
+  /** What the billing portal's "Renew" does: the cancellation withdrawn, and Stripe's update sent. */
+  renew(subscription: string) {
+    this.fake.update(subscription, { cancelAtPeriodEnd: false });
+    return this.updated(subscription);
   }
 
   /** A `customer.subscription.updated` for the subscription as it now stands. */
