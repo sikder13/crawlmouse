@@ -196,12 +196,11 @@ describe('Trial ending, the card decides, not the plan', () => {
     ...d,
     accounts: d.accounts.map((a) => (a.id === id ? { ...a, card_last4: card } : a)),
   });
-  /** A card on file, read by a seat that is not the owner: no digits, `card_on_file` (Q25). */
+  /** A card on file, read by a seat that is not the owner: no digits, named in `cardsOnFile` (Q25). */
   const withheld = (d: ReturnType<typeof fixture>, id: string) => ({
     ...d,
-    accounts: d.accounts.map((a) =>
-      a.id === id ? { ...a, card_last4: null, card_on_file: true } : a,
-    ),
+    accounts: d.accounts.map((a) => (a.id === id ? { ...a, card_last4: null } : a)),
+    cardsOnFile: [id],
   });
 
   it('a Pro trial with a card: no checkout, a cancel, “If you do nothing”', () => {

@@ -4,7 +4,7 @@
  * it is read here with the service role, after `member_role` through the caller's own session has
  * answered. The owner gets the digits; every other role gets `last4: null` and `onFile`, so what
  * depends on a card being on file (a card trial's actions) holds for them too, and no digit leaves
- * the server for them. The views read presence through `cardOnFile`.
+ * the server for them. The views read presence from `AccountView.cardOnFile`.
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
 
@@ -26,6 +26,10 @@ export async function cardFor(
   return { last4: role.data === 'owner' ? last4 : null, onFile: last4 !== null };
 }
 
-/** Whether the account has a card on file, whether or not this reader may see its digits. */
-export const cardOnFile = (a: { card_last4: string | null; card_on_file?: boolean }): boolean =>
-  a.card_last4 !== null || a.card_on_file === true;
+/**
+ * Beside an account dataset: the accounts with a card on file, whether or not this reader may see
+ * its digits (the account record's `card_last4` is null for every role but the owner).
+ */
+export interface CardsOnFile {
+  cardsOnFile?: readonly string[];
+}

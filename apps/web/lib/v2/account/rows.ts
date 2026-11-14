@@ -87,7 +87,6 @@ export function accountFromRow(rows: AccountRows): Account {
     state_history: history,
     trial_ends_at: instantOrNull(a.trial_ends_at),
     card_last4: a.card_last4,
-    ...(a.card_on_file === undefined ? {} : { card_on_file: a.card_on_file }),
     renews_at:
       sub === null || sub.cancel_at_period_end === true
         ? null

@@ -35,7 +35,6 @@ import {
 import { action, type ActionView, type RouteSpec } from './account-actions';
 import { FREE_SCHEDULE, accountShellView, type ShellView } from './account-shell';
 import { FREE_FIXES } from './free-fixes';
-import { cardOnFile } from '../account/card';
 import { ACCOUNT_COPY } from '../copy/account';
 import { DELETE_COPY, deletionMoney } from '../copy/deletion';
 import {
@@ -370,7 +369,7 @@ export function settingsView(
   const paid = v.tier !== 'free';
   const ending = paid && billingEnd !== null ? billingEnd : null;
   const card = a.card_last4;
-  const onFile = cardOnFile(a);
+  const onFile = v.cardOnFile;
   const cardTrial = trial && onFile;
   const pastDue = a.state === 'past_due';
   const yearly = v.tier === 'agency' ? AGENCY_YEARLY : PRO_YEARLY;

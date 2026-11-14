@@ -93,7 +93,6 @@ export async function loadAccountDataset(
   // Not in ACCOUNT_COLUMNS: the session may not read it (Q25); `cardFor` gives the owner alone the digits.
   const card = await cardFor(session, admin, accountId);
   accountRow.card_last4 = card.last4;
-  accountRow.card_on_file = card.onFile;
 
   const [seatRows, scopeRows, keyRows, brand, siteIds, accountRules] = await Promise.all([
     rows(
@@ -182,6 +181,8 @@ export async function loadAccountDataset(
   const asOf = now.toISOString();
   return {
     provenance: 'measured',
+    // The account's card, on file whatever this reader's role (its digits are the owner's alone).
+    cardsOnFile: card.onFile ? [accountId] : [],
     as_of: asOf,
     description: `Account ${accountId}: ${siteIds.length} live sites, read at ${asOf}.`,
     engine_derived: [],

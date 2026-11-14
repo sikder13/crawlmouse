@@ -69,8 +69,13 @@ async function load(loader: keyof typeof LOADERS, who: Who) {
     NOW,
   );
   // The settings loader wraps its records in `d`; the account loader returns them.
-  const accounts = 'd' in d ? d.d.accounts : d.accounts;
-  return { d, accounts, asked: JSON.stringify(asked) };
+  const records = 'd' in d ? d.d : d;
+  return {
+    d,
+    accounts: records.accounts,
+    onFile: records.cardsOnFile ?? [],
+    asked: JSON.stringify(asked),
+  };
 }
 
 describe('the card’s last four on the account pages, as each role', () => {
@@ -79,9 +84,11 @@ describe('the card’s last four on the account pages, as each role', () => {
       (Object.keys(EXPECTED) as Who[]).map((who) => [loader, who, EXPECTED[who]] as const),
     ),
   )('the %s dataset as %s: %o', async (loader, who, expected) => {
-    const { accounts } = await load(loader, who);
+    const { accounts, onFile } = await load(loader, who);
     const a = accounts.find((x) => x.id === w.accountId)!;
-    expect({ card_last4: a.card_last4, card_on_file: a.card_on_file }).toEqual(expected);
+    expect({ card_last4: a.card_last4, card_on_file: onFile.includes(w.accountId) }).toEqual(
+      expected,
+    );
   });
 
   it('no role but the owner is given a digit of the card, at any depth of either dataset', async () => {

@@ -11,7 +11,6 @@ import { TRIAL_REMINDER_DAYS_BEFORE_END } from '../../auth/constants';
 import { AGENCY_MONTHLY, AGENCY_YEARLY, PRO_MONTHLY, PRO_YEARLY } from '../../billing/prices';
 import { GATES } from '../../entitlement-v2';
 import { CANCEL_CLICKS, EVIDENCE_CONDENSED_AFTER_DAYS } from '../copy/settings';
-import { cardOnFile } from '../account/card';
 import { ACCOUNT_COPY } from '../copy/account';
 import { TRIAL_END_COPY as COPY } from '../copy/trial-end';
 import { fixesAsOf } from '../fixtures';
@@ -120,7 +119,7 @@ export function trialEndView(
   const price = v.tier === 'agency' ? AGENCY_MONTHLY : PRO_MONTHLY;
   const yearly = v.tier === 'agency' ? AGENCY_YEARLY : PRO_YEARLY;
   const card = a.card_last4;
-  const onFile = cardOnFile(a);
+  const onFile = v.cardOnFile;
   // A card trial set to cancel at its end is not charged: it ends as a trial with no card does.
   const cancelled = onFile && billingEnd !== null;
   const owner = role === 'owner';

@@ -172,12 +172,11 @@ describe('Settings, the card decides, not the plan (the matcher keys on card_las
     ...d,
     accounts: d.accounts.map((a) => (a.id === id ? { ...a, card_last4: card } : a)),
   });
-  /** A card on file, read by a seat that is not the owner: no digits, `card_on_file` (Q25). */
+  /** A card on file, read by a seat that is not the owner: no digits, named in `cardsOnFile` (Q25). */
   const withheld = (d: ReturnType<typeof fixture>, id: string) => ({
     ...d,
-    accounts: d.accounts.map((a) =>
-      a.id === id ? { ...a, card_last4: null, card_on_file: true } : a,
-    ),
+    accounts: d.accounts.map((a) => (a.id === id ? { ...a, card_last4: null } : a)),
+    cardsOnFile: [id],
   });
   const BAD = 'a0000000-0000-4000-8000-000000000001';
   const KESTREL = 'a0000000-0000-4000-8000-0000000000ca';
