@@ -1,4 +1,5 @@
 import { expect, test, type Page } from './pw';
+import { QA_HOSTS } from '../../scripts/qa/accounts';
 import { control, events, NEEDS_SEED, qa, SEEDED, shot, signIn, sql } from './walk';
 
 /**
@@ -9,6 +10,8 @@ import { control, events, NEEDS_SEED, qa, SEEDED, shot, signIn, sql } from './wa
  */
 const J = '4-agency';
 const DEV = 'developer@walk.example';
+/** The Agency trial's first client, as qa:seed adds it (scripts/qa/accounts.ts QA_HOSTS). */
+const FIRST_CLIENT = QA_HOSTS.trialClient;
 const CLIENTS = [2, 3, 4, 5, 6].map((n) => `client-${n}.walk.crawlmouse.com`);
 
 test.skip(!SEEDED, NEEDS_SEED);
@@ -40,7 +43,9 @@ test('the Agency trial starts through Checkout and the webhook', async ({ page, 
   const asked = page.waitForResponse(
     (r) => r.request().method() === 'POST' && r.url().includes('/api/agency-trial'),
   );
-  // The seeded first client is a lab host; the walk's names are the ones its preload resolves.
+  // The form names the seeded first client; the agency's account already holds it, with its first
+  // audit (qa:seed), so start_agency_trial_account keeps it whatever is typed here. The walk types a
+  // name its preload resolves, so the route's SSRF admission passes.
   await page.getByLabel(/First client site/).fill('client-1.walk.crawlmouse.com');
   await page.getByRole('checkbox', { name: /I agree that after 14 days/ }).check();
   await page.getByRole('button', { name: 'Start a 14-day trial' }).click();
@@ -80,7 +85,7 @@ test('the Agency trial starts through Checkout and the webhook', async ({ page, 
     `select host from public.sites where account_id = $1 and removed_at is null order by host`,
     [(await agency()).id],
   );
-  expect(six.map((s) => s.host)).toEqual(['client-1.walk.crawlmouse.com', ...CLIENTS].sort());
+  expect(six.map((s) => s.host)).toEqual([FIRST_CLIENT, ...CLIENTS].sort());
   await shot(page, J, 'six-clients');
 });
 
@@ -126,15 +131,13 @@ test('a developer invited to one client sees that client and no other', async ({
   await devPage.goto('/agency');
   await shot(devPage, J, 'developer-matrix');
   await expect(devPage.getByText(CLIENTS[1]!).first()).toBeVisible();
-  for (const other of [
-    'client-1.walk.crawlmouse.com',
-    ...CLIENTS.filter((c) => c !== CLIENTS[1]),
-  ]) {
+  for (const other of [FIRST_CLIENT, ...CLIENTS.filter((c) => c !== CLIENTS[1])]) {
     await expect(devPage.getByText(other)).toHaveCount(0);
   }
   // Not listed is not enough: another client's site page, opened by its address, is refused.
   const [other] = await sql<{ id: string }>(
-    `select id from public.sites where host = 'client-1.walk.crawlmouse.com' and removed_at is null`,
+    `select id from public.sites where host = $1 and removed_at is null`,
+    [FIRST_CLIENT],
   );
   const refused = await devPage.goto(`/sites/${other!.id}`);
   expect(refused?.status()).toBe(404);
