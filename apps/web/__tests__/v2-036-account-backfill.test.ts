@@ -289,6 +289,20 @@ describe('provision_default_account', () => {
     expect(rows).toEqual([{ definer: true, config: ['search_path=pg_catalog, public, pg_temp'] }]);
   });
 
+  it('answers null and writes nothing for a user who already has a default account', async () => {
+    // The key the lock re-reads after a wait: a sign-up that committed first leaves a default account.
+    const db = await clone();
+    await migrate(db);
+    const id = await signUp(db, 'twice@example.com');
+    const before = await written(db);
+    const { rows } = await db.query<{ account: string | null }>(
+      `select public.provision_default_account($1, 'twice@example.com') as account`,
+      [id],
+    );
+    expect(rows).toEqual([{ account: null }]);
+    expect(await written(db)).toEqual(before);
+  });
+
   it('no role may execute it, service_role included', async () => {
     const db = await clone();
     await migrate(db);
