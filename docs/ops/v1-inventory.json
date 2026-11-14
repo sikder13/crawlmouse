@@ -1444,7 +1444,7 @@
       "items": ["app/api/audits/[id]/stream/route.ts"],
       "evidence": "apps/web/app/api/audits/[id]/stream/route.ts:253; apps/web/app/api/audits/[id]/stream/route.ts:309",
       "what": "the id is not validated and the stream has no rate limit: a garbage id polls the database every 2.5 s until the 250 s self-close; its no-cache header lacks private.",
-      "owner": "lead follow-up (retired at cutover)"
+      "owner": "CC-37 (CC-36 ruling 1): the v1 audit page still reads this route under the cutover flags, so CC-36 keeps it (docs/specs/v2/36-cutover.md D2)"
     },
     {
       "id": "A-2",
@@ -1452,7 +1452,7 @@
       "items": ["app/api/audits/[id]/export/route.ts", "app/api/audits/[id]/llms-txt/route.ts"],
       "evidence": "apps/web/app/api/audits/[id]/export/route.ts:85; apps/web/app/api/audits/[id]/llms-txt/route.ts:43",
       "what": "owner-only bodies with no Cache-Control; dynamic, not CDN-cached, so hardening.",
-      "owner": "lead follow-up (retired at cutover)"
+      "owner": "lead follow-up: the v1 audit page still reads export and llms-txt under the cutover flags; they go with the v1 drop (docs/specs/v2/36-cutover.md D2, D4)"
     },
     {
       "id": "A-3",
@@ -1560,7 +1560,7 @@
       "items": ["inngest/billing.ts#cleanupExpiredAuditsFn"],
       "evidence": "inngest/billing-helpers.ts:228",
       "what": "the TTL cleanup does not exempt an audit behind a minted report; the report keeps its snapshot (FK on delete set null). One 2026-06-14 report has neither snapshot nor audit and renders through the legacy fallback (apps/web/app/r/[slug]/page.tsx:68).",
-      "owner": "lead follow-up"
+      "fixedIn": "6883cbc3"
     },
     {
       "id": "C-5",
@@ -1608,7 +1608,7 @@
       "items": ["app/api/audits/[id]/notify/route.ts"],
       "evidence": "apps/web/app/api/audits/[id]/notify/route.ts:36; inngest/notify.ts:43",
       "what": "anyone holding an audit id can replace notify_email on a running audit: the owner's address is overwritten and an arbitrary address gets a mail with the /audit/<id> link. Capped at 10 per IP and 5 per address a day.",
-      "owner": "lead follow-up (retired at cutover)"
+      "owner": "closed from go-live step 4: with V2_CHECKS_PUBLIC and V2_PIPELINE on, the middleware answers this route 410 before it runs (apps/web/lib/v2/cutover.ts, CC-36 D2); open while those flags are off"
     },
     {
       "id": "C-7",
