@@ -104,5 +104,6 @@ off until later go-live steps: the v2 mint asks `seat_may(…, 'mint_report')`, 
 (`V2_CHECKS_PUBLIC`, step 4), and Pricing and the Agency trial page read `accounts.internal`, which that file adds
 (`V2_BILLING`, step 5; both pages are a 404 with it off). The go-live row `migrations-applied` gates step 2, so both
 flags stay off until every file is applied. The account and Settings pages read `card_last4` with the service role,
-so `20261118000001` cannot break them, and inside the apply it runs after `20261117000001`.
+so `20261118000001` cannot break them, and inside the apply it runs after `20261117000001`. If the apply runs before the new deployment is Ready, the app still serving reads `card_last4` through the session
+only on pages that are a 404 while `V2_CHECKS_PUBLIC` is off (review r3 n-a).
 `__tests__/v2-037-card-grant.test.ts` walks the schema through these stages.

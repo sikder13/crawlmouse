@@ -485,6 +485,13 @@ const WITHDRAWN: readonly WithdrawnClaim[] = [
     allowedIn: [],
   },
   {
+    text: 'Three stages, in this order; the owner applies the migrations',
+    withdrawnIn: 'docs/specs/v2/37-security.md "Deploy order", CC-37 review round 2 (N2)',
+    truth:
+      'Merging deploys the app and db-apply-prod then applies every pending file in one push, in name order; the reads that need 20261117000001 sit behind V2_CHECKS_PUBLIC and V2_BILLING.',
+    allowedIn: [],
+  },
+  {
     text: '`card_on_file` for every role',
     withdrawnIn: 'docs/specs/v2/37-security.md D5, CC-37 review round 1 (correctness m2; Q13)',
     truth:

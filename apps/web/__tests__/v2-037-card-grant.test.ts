@@ -123,14 +123,14 @@ describe('the deploy order, stage by stage', () => {
     await db?.close();
   });
 
-  it('before 20261117000001 the shipped app cannot run: the mint raises and the used-trial read fails', async () => {
+  it('before 20261117000001 the shipped app’s flag-gated reads fail: the mint raises and the used-trial read fails', async () => {
     await expect(mayMint(db, w, w.people.owner)).rejects.toThrow(/mint_report is not an action/);
     await expect(readUsedAgencyTrial(adminOver(db) as never, w.people.owner.id)).rejects.toThrow(
       /internal/,
     );
   });
 
-  it('after 20261117000001, before the deploy: the app still live reads the card through the session', async () => {
+  it('after 20261117000001 and before 20261118000001, a session still reads the card', async () => {
     await db.exec(readMigration(SECURITY));
     for (const p of Object.values(w.people)) expect(await sessionCard(db, w, p)).toBe(LAST4);
   });
