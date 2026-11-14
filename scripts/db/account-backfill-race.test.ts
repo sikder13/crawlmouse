@@ -15,6 +15,11 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
  * against a database built with provision_default_account's `for update` taken out: that is the
  * mutation check, run whenever the file runs. Without the lock the sign-up-first order makes two
  * accounts; the backfill-first order makes one, for the reason its case states.
+ *
+ * The shared row is constructed: in production a users row always has its auth.users row
+ * (`users_id_auth_fkey`), so a real sign-up's row is either committed with its account before the
+ * backfill reads, or not visible to it. What this proves is the lock's behaviour if the two ever meet
+ * on one row; that production does not reach that state is the first guard.
  */
 
 const URL_ENV = process.env.TRIAL_RACE_DB_URL;

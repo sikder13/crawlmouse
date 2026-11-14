@@ -132,8 +132,9 @@ describe('a sign-up is what it was before 20261116000002', () => {
     const after = await clone();
     await migrate(after);
     const id = randomUUID();
-    await signUp(before, 'same@example.com', id);
-    await signUp(after, 'same@example.com', id);
+    // Mixed case, so a path that changed the address on its way to the seat would show.
+    await signUp(before, 'Same.Case@Example.com', id);
+    await signUp(after, 'Same.Case@Example.com', id);
     const a = await provisioned(before, id);
     const b = await provisioned(after, id);
     // The comparison is of something: one account and one seat, linked.

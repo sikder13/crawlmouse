@@ -13,7 +13,7 @@
 -- users.pro_until, audits or public_reports. A backfilled account starts 'free' with the one-entry
 -- history a sign-up gets. No foreign key or cascade is added.
 --
--- Every statement is re-runnable: a second run finds no user without a default account and no null
+-- Running the file again changes nothing: a second run finds no user without a default account and no null
 -- email_normalized it can fill, and changes nothing. The tests apply the file twice:
 --   pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-036-account-backfill.test.ts
 -- The race with a sign-up is scripts/db/account-backfill-race.test.ts.
