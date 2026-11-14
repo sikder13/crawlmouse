@@ -18,7 +18,7 @@ The lines are pinned by `pnpm --filter @crawlmouse/scripts exec vitest run goliv
 
 ## The end-to-end walk
 
-State: the spec's tests in `tests/e2e/results.json` (the Playwright JSON reporter's output), counted by Playwright's statuses (expected, unexpected, flaky, skipped): `failed` with an unexpected one, else `flaky` with a flaky one, else `skipped` with skipped tests only, else `incomplete` with a skipped test beside passing ones, else `passed`; `not run` without the file. A state is prefixed `stale` when the report's commit (`config.metadata.commit`, set by `tests/e2e/playwright.config.ts`) is not the live production commit, or HEAD when the live one is unknown, or when the report names none. The walk runs on a production build against the local stand-in with the four flags on, locally, not in CI.
+State: the spec's tests in `tests/e2e/results.json` (the Playwright JSON reporter's output), counted by Playwright's statuses (expected, unexpected, flaky, skipped); the first of these that holds is the state: `failed` with an unexpected test, then `flaky` with a flaky test, then `skipped` with skipped tests only, then `no tests in the report` with no test at all under the spec, then `incomplete` with a skipped test beside passing ones, then `passed` with passing tests only. `not run` when there is no `tests/e2e/results.json`; `unknown` when the file is not a Playwright JSON report; `not in tests/e2e/results.json` when the report holds no file for the spec. A state is prefixed `stale` when the report's commit (`config.metadata.commit`, set by `tests/e2e/playwright.config.ts`) is not the live production commit, or HEAD when the live one is unknown, or when the report names none. The walk runs on a production build against the local stand-in with the four flags on, locally, not in CI.
 
 | Id                 | Gate                                                                                                                                         | Where                           | Detail                                                                                    |
 | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- | ----------------------------------------------------------------------------------------- |
@@ -32,7 +32,7 @@ State: the spec's tests in `tests/e2e/results.json` (the Playwright JSON reporte
 
 ## The go-live check, by step
 
-State: `pass` when the rows gating that step and the steps before it pass in the same run, as `--step N` decides it.
+State: `pass` when the rows gating that step and the steps before it pass in the same run and the checkout matches the live commit, as `--step N` decides it; otherwise `not ready`, with the count of rows that do not pass.
 
 | Id              | Gate                                                                                                       | Where                     | Detail                                                                       |
 | --------------- | ---------------------------------------------------------------------------------------------------------- | ------------------------- | ---------------------------------------------------------------------------- |

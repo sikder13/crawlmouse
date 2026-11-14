@@ -7,9 +7,13 @@ import {
   DOC_PATH,
   GATES,
   WALK_RESULTS_PATH,
+  COUNT_STATES,
+  STALE,
+  WALK_FILE_STATES,
   goNoGoLines,
   readWalkResults,
   renderGoNoGo,
+  walkState,
 } from './go-no-go';
 import { PRECONDITIONS } from './preconditions';
 import { PROBES, type ProbeId } from './probes/index';
@@ -21,6 +25,17 @@ import { fakeToken, json, scriptedFetch, scriptedGit } from './test-support';
 describe('docs/ops/go-no-go.md', () => {
   it('is the render of GATES, byte for byte', async () => {
     expect(readFileSync(DOC_PATH, 'utf8')).toBe(await renderGoNoGo());
+  });
+
+  it("names each walk state the code gives, from the code's lists", async () => {
+    const doc = await renderGoNoGo();
+    const states = [
+      ...COUNT_STATES.map((x) => x.state),
+      ...Object.values(WALK_FILE_STATES).map((x) => x.state),
+      STALE,
+    ];
+    for (const state of states) expect(doc, state).toContain(`\`${state}\``);
+    expect(doc).toContain('`no tests in the report` with no test at all under the spec');
   });
 
   it('lists each gate id once', async () => {
@@ -154,6 +169,23 @@ describe('the walk states', () => {
     }
   });
 
+  it('are only the states COUNT_STATES lists, each one reached, over 0–2 tests of each status', () => {
+    const reached = new Set<string>();
+    const n = [0, 1, 2];
+    for (const expected of n)
+      for (const unexpected of n)
+        for (const flaky of n)
+          for (const skipped of n) {
+            const got = walkState({ expected, unexpected, flaky, skipped });
+            const s = COUNT_STATES.find((x) =>
+              x.bare ? got === x.state : got.startsWith(`${x.state} (`),
+            );
+            expect(s, got).toBeDefined();
+            reached.add(s!.state);
+          }
+    expect([...reached].sort()).toEqual(COUNT_STATES.map((x) => x.state).sort());
+  });
+
   it('are "unknown" when the file is not a Playwright JSON report', () => {
     for (const text of ['not json', '{"tests": []}']) {
       const lines = goNoGoLines({ step: ALL_READY, walkResults: text, ...ON_WALKED });
@@ -233,13 +265,31 @@ describe('the other states', () => {
 
   it("are a step's readiness as the input gives it", () => {
     const lines = goNoGoLines({
-      step: (s) => (s < 3 ? { ready: true } : { ready: false, blocking: s }),
+      step: (s) =>
+        s < 3
+          ? { ready: true }
+          : { ready: false, blocking: { 3: 1, 4: 4, 5: 0 }[s]!, checkout: s === 5 },
       walkResults: null,
       ...ON_WALKED,
     });
     expect(stateOf(lines, 'golive-step-2')).toBe('pass');
+    expect(stateOf(lines, 'golive-step-3')).toBe(
+      'not ready (1 row gating steps 1–3 does not pass, listed above)',
+    );
     expect(stateOf(lines, 'golive-step-4')).toBe(
       'not ready (4 rows gating steps 1–4 do not pass, listed above)',
+    );
+    // The checkout is not counted as a row.
+    expect(stateOf(lines, 'golive-step-5')).toBe(
+      'not ready (the checkout is not shown to match the live commit, as its line above says)',
+    );
+    const both = goNoGoLines({
+      step: () => ({ ready: false, blocking: 2, checkout: true }),
+      walkResults: null,
+      ...ON_WALKED,
+    });
+    expect(stateOf(both, 'golive-step-1')).toBe(
+      'not ready (the checkout is not shown to match the live commit, as its line above says; 2 rows gating step 1 do not pass, listed above)',
     );
   });
 });
@@ -326,10 +376,10 @@ describe('pnpm golive:check -- --go-no-go', () => {
     expect(stateOf(out, 'golive-step-1')).toBe('pass');
     expect(stateOf(out, 'golive-step-3')).toBe('pass');
     expect(stateOf(out, 'golive-step-4')).toBe(
-      'not ready (1 rows gating steps 1–4 do not pass, listed above)',
+      'not ready (1 row gating steps 1–4 does not pass, listed above)',
     );
     expect(stateOf(out, 'golive-step-5')).toBe(
-      'not ready (1 rows gating steps 1–5 do not pass, listed above)',
+      'not ready (1 row gating steps 1–5 does not pass, listed above)',
     );
     expect(stateOf(out, 'walk-7-support')).toBe('passed (1 expected)');
     expect(stateOf(out, 'walk-1-anonymous')).toBe('not in tests/e2e/results.json');
@@ -371,7 +421,7 @@ describe('pnpm golive:check -- --go-no-go', () => {
     expect(stateOf(out, 'golive-step-1')).toBe('pass');
     for (const s of [2, 3, 4, 5])
       expect(stateOf(out, `golive-step-${s}`)).toBe(
-        `not ready (1 rows gating steps 1–${s} do not pass, listed above)`,
+        `not ready (1 row gating steps 1–${s} does not pass, listed above)`,
       );
   });
 
@@ -379,6 +429,10 @@ describe('pnpm golive:check -- --go-no-go', () => {
     const { out } = await run(['--ticked', ALL_MANUAL.join(','), '--go-no-go'], allPass(), {
       live: 'd'.repeat(40),
     });
-    for (const s of STEPS) expect(stateOf(out, `golive-step-${s}`)).toMatch(/^not ready /);
+    // Every row passes: the checkout alone holds each step, and it is not counted as a row.
+    for (const s of STEPS)
+      expect(stateOf(out, `golive-step-${s}`)).toBe(
+        'not ready (the checkout is not shown to match the live commit, as its line above says)',
+      );
   });
 });
