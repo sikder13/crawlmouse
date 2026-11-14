@@ -50,6 +50,11 @@ const POSTURE: Record<
         'agency_checkout_at',
         'agency_checkout_interval',
         'agency_trial_consent_at',
+        // CC-37 (20261118000001): the card's last four, read for the owner through the service role.
+        'card_last4',
+        // CC-33's mark of an internal account (20261115000001, added by 20261117000001 until that
+        // file is applied), read by the trial functions and the operators' scripts only.
+        'internal',
       ],
     },
   },

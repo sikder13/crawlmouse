@@ -9,7 +9,9 @@ function fakeEs() {
   let closed = false;
   const es: EventSourceLike = {
     addEventListener: (type, fn) => listeners.set(type, fn as (e: Event) => void),
-    close: () => { closed = true; },
+    close: () => {
+      closed = true;
+    },
   };
   const dispatch = (type: string, data?: string) => {
     const fn = listeners.get(type);
@@ -38,9 +40,26 @@ describe('wireAuditStream', () => {
     const { es, dispatch, isClosed } = fakeEs();
     wireAuditStream(es, { onSnapshot, onDone, onTerminalError: vi.fn() });
 
-    dispatch('done', JSON.stringify({ id: 'a', status: 'completed', grade: 'A', score: 92, orphanCount: 3, avgDepth: 2.1 }));
+    dispatch(
+      'done',
+      JSON.stringify({
+        id: 'a',
+        status: 'completed',
+        grade: 'A',
+        score: 92,
+        orphanCount: 3,
+        avgDepth: 2.1,
+      }),
+    );
 
-    expect(onSnapshot).toHaveBeenCalledWith({ id: 'a', status: 'completed', grade: 'A', score: 92, orphanCount: 3, avgDepth: 2.1 });
+    expect(onSnapshot).toHaveBeenCalledWith({
+      id: 'a',
+      status: 'completed',
+      grade: 'A',
+      score: 92,
+      orphanCount: 3,
+      avgDepth: 2.1,
+    });
     expect(onDone).toHaveBeenCalledTimes(1);
     expect(isClosed()).toBe(true);
   });
@@ -53,7 +72,21 @@ describe('wireAuditStream', () => {
     dispatch('error', JSON.stringify({ message: 'Could not load results.' }));
 
     expect(onTerminalError).toHaveBeenCalledTimes(1);
+    expect(onTerminalError).toHaveBeenCalledWith({ message: 'Could not load results.' });
     expect(isClosed()).toBe(true);
+  });
+
+  it('passes the parsed `error` data on, and undefined when it is not JSON (CC-37 F-C 1)', () => {
+    const onTerminalError = vi.fn();
+    const a = fakeEs();
+    wireAuditStream(a.es, { onSnapshot: vi.fn(), onDone: vi.fn(), onTerminalError });
+    a.dispatch('error', JSON.stringify({ code: 'rate_limited', message: 'x' }));
+    expect(onTerminalError).toHaveBeenLastCalledWith({ code: 'rate_limited', message: 'x' });
+    const b = fakeEs();
+    wireAuditStream(b.es, { onSnapshot: vi.fn(), onDone: vi.fn(), onTerminalError });
+    b.dispatch('error', 'not json');
+    expect(onTerminalError).toHaveBeenLastCalledWith(undefined);
+    expect(b.isClosed()).toBe(true);
   });
 
   it('on a NATIVE transport `error` (NO data): NOT terminal — does not close, lets EventSource reconnect', () => {

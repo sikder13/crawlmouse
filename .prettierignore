@@ -18,3 +18,7 @@ packages/**/fixtures/**/*.html
 # The check builder's recorded fixture: the worker's results as recorded, and the BuiltCheck the
 # golden test compares byte-for-byte with what serialiseBuilt gives (packages/engine/src/v2/build).
 packages/engine/fixtures/v2/build/**/*.json
+
+# Rendered from apps/web/__tests__/security/access-matrix.data.ts; the access-matrix test compares it
+# byte-for-byte with the render.
+docs/ops/access-matrix.md

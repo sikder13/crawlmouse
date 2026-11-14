@@ -23,7 +23,9 @@ const FINGERPRINT = readFileSync(resolve(MIGRATIONS_DIR, '../checks/fingerprint.
 let db: PGlite;
 beforeAll(async () => {
   db = await freshDb();
-  await applyAllMigrations(db, undefined, (f) => f !== MIGRATION);
+  // The migrations before it, as production had them when it was applied: a later one that restates
+  // one of its functions (20261117000001's seat_may) is not part of the state its revert gives back.
+  await applyAllMigrations(db, undefined, (f) => f < MIGRATION);
 }, 600_000);
 afterAll(async () => db?.close());
 

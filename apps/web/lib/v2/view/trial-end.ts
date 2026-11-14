@@ -11,6 +11,7 @@ import { TRIAL_REMINDER_DAYS_BEFORE_END } from '../../auth/constants';
 import { AGENCY_MONTHLY, AGENCY_YEARLY, PRO_MONTHLY, PRO_YEARLY } from '../../billing/prices';
 import { GATES } from '../../entitlement-v2';
 import { CANCEL_CLICKS, EVIDENCE_CONDENSED_AFTER_DAYS } from '../copy/settings';
+import { ACCOUNT_COPY } from '../copy/account';
 import { TRIAL_END_COPY as COPY } from '../copy/trial-end';
 import { fixesAsOf } from '../fixtures';
 import {
@@ -118,8 +119,9 @@ export function trialEndView(
   const price = v.tier === 'agency' ? AGENCY_MONTHLY : PRO_MONTHLY;
   const yearly = v.tier === 'agency' ? AGENCY_YEARLY : PRO_YEARLY;
   const card = a.card_last4;
+  const onFile = v.cardOnFile;
   // A card trial set to cancel at its end is not charged: it ends as a trial with no card does.
-  const cancelled = card !== null && billingEnd !== null;
+  const cancelled = onFile && billingEnd !== null;
   const owner = role === 'owner';
   const hostOf = new Map(v.d.sites.map((s) => [s.id, s.host]));
   const checkSite = new Map(v.d.checks.map((c) => [c.id, c.site_id]));
@@ -148,9 +150,10 @@ export function trialEndView(
     a.email_prefs.trial_reminder && (at(reminder) >= at(v.now) || sameDay(reminder, v.now, zone))
       ? COPY.reminderDue(dayDate(reminder, zone))
       : null;
-  const cardLine =
-    card === null
-      ? COPY.noCard
+  const cardLine = !onFile
+    ? COPY.noCard
+    : card === null
+      ? ACCOUNT_COPY.cardManagedByOwner
       : cancelled
         ? COPY.cardCancelled(card, dayDate(end, zone))
         : COPY.card(card, dayDate(end, zone));
@@ -227,7 +230,7 @@ export function trialEndView(
       title: COPY.bannerTitle(plan, dayDate(end, zone)),
       sub: [reminderLine, cardLine].filter(Boolean).join(' '),
       keep:
-        owner && card === null
+        owner && !onFile
           ? action(
               'keepPlan',
               COPY.keepNoCard(plan, price),
@@ -240,7 +243,7 @@ export function trialEndView(
           : null,
       end: !owner
         ? null
-        : card === null || cancelled
+        : !onFile || cancelled
           ? {
               label: COPY.letItEnd(dayDate(end, zone)),
               route: dashboard.href,
@@ -311,23 +314,25 @@ export function trialEndView(
         },
       ],
     },
-    keepTitle: card === null ? COPY.keepTitle(plan) : COPY.doNothingTitle,
+    keepTitle: !onFile ? COPY.keepTitle(plan) : COPY.doNothingTitle,
     keepText: [
-      card === null
+      !onFile
         ? COPY.keepNoCardText(price, yearly)
-        : cancelled
-          ? COPY.cancelledKeepText(card, dayDate(end, zone))
-          : COPY.keepCardText(
-              card,
-              a.billing_period_months === 12 ? yearly : price,
-              dayDate(end, zone),
-              a.billing_period_months === 12 ? 'year' : 'month',
-            ),
+        : card === null
+          ? ACCOUNT_COPY.cardManagedByOwner
+          : cancelled
+            ? COPY.cancelledKeepText(card, dayDate(end, zone))
+            : COPY.keepCardText(
+                card,
+                a.billing_period_months === 12 ? yearly : price,
+                dayDate(end, zone),
+                a.billing_period_months === 12 ? 'year' : 'month',
+              ),
       COPY.terms(CANCEL_CLICKS, EVIDENCE_CONDENSED_AFTER_DAYS),
     ].join(' '),
-    endTitle: card === null || cancelled ? COPY.endTitle : COPY.cancelTitle,
+    endTitle: !onFile || cancelled ? COPY.endTitle : COPY.cancelTitle,
     endText: [
-      card === null || cancelled
+      !onFile || cancelled
         ? COPY.endNothing(dayDate(end, zone))
         : COPY.endCancel(dayDate(end, zone), CANCEL_CLICKS),
       COPY.endKeeps(site.host, free, freeThree.length, others.length, staging.length > 0, plan),

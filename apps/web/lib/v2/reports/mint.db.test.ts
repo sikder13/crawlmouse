@@ -79,6 +79,15 @@ function deps(caller: string, w: World, edit: Partial<MintV2Deps> = {}): MintV2D
         );
         return rows[0]!.ok === true;
       }),
+    mayMint: (siteId) =>
+      asRole(db, 'authenticated', caller, async (tx) => {
+        const { rows } = await tx.query<{ ok: boolean }>(
+          `select public.seat_may(s.account_id, 'mint_report') as ok
+             from public.sites s where s.id = $1`,
+          [siteId],
+        );
+        return rows[0]?.ok === true;
+      }),
     rateLimit: async () => ({ allowed: true }),
     verifyTurnstile: async () => true,
     slugForCheck: (checkId) =>

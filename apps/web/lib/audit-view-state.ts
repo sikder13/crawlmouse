@@ -42,9 +42,9 @@ export interface AuditSnapshotLite {
 }
 
 export interface AuditViewState {
-  running: boolean;          // crawl in progress
-  awaitingResults: boolean;  // terminal=completed but done payload not yet received → skeleton
-  graded: boolean;           // safe to render GradeCard with REAL numbers (stats present)
+  running: boolean; // crawl in progress
+  awaitingResults: boolean; // terminal=completed but done payload not yet received → skeleton
+  graded: boolean; // safe to render GradeCard with REAL numbers (stats present)
   /**
    * SPEC 5.1a §4 — the engine DECLINED to assert a letter. A distinct terminal state: not graded,
    * not failed, and emphatically not `gradeFailed` — nothing went wrong, we simply hold too little
@@ -52,11 +52,11 @@ export interface AuditViewState {
    */
   refused: boolean;
   failed: boolean;
-  gradeFailed: boolean;      // terminal (done) but not graded — catch-all so a missing/failed/
-                             // stats-less done payload always reaches the "couldn't grade" card,
-                             // never a blank render and never a misleading 0-orphans/0.0-depth card
+  gradeFailed: boolean; // terminal (done) but not graded — catch-all so a missing/failed/
+  // stats-less done payload always reaches the "couldn't grade" card,
+  // never a blank render and never a misleading 0-orphans/0.0-depth card
   failureCategory: FailureCategory | null; // which failure copy to show — set ONLY when failed
-  canceled: boolean;         // user stopped the audit — a distinct terminal state (never failed/alert)
+  canceled: boolean; // user stopped the audit — a distinct terminal state (never failed/alert)
 }
 
 /**
@@ -112,7 +112,16 @@ export function deriveAuditViewState(
   // running/graded/gradeFailed states. A failed audit always has a category server-side; default
   // to 'internal' defensively so the copy is never blank.
   const failureCategory = failed ? (snapshot?.failureCategory ?? 'internal') : null;
-  return { running, awaitingResults, graded, refused, failed, gradeFailed, failureCategory, canceled };
+  return {
+    running,
+    awaitingResults,
+    graded,
+    refused,
+    failed,
+    gradeFailed,
+    failureCategory,
+    canceled,
+  };
 }
 
 /**
@@ -176,16 +185,54 @@ const COULD_NOT_GRADE = {
   body: 'The crawl finished but we couldn’t compute a grade — usually a site that blocks crawlers or has no crawlable pages. Try again or contact support.',
 };
 
+/**
+ * Why the stream ended before sending any snapshot (`app/api/audits/[id]/stream/route.ts`): the
+ * per-IP limit, or no such audit. Read from the named `error` event's `code`.
+ */
+export type StreamStop = 'rate_limited' | 'not_found';
+
+const STREAM_STOP_COPY: Record<StreamStop, { title: string; body: string }> = {
+  rate_limited: {
+    title: 'Too many live views',
+    body: 'This network has opened the live audit view too often in the last hour. Reload the page in a few minutes.',
+  },
+  not_found: {
+    title: 'Audit not found',
+    body: 'This audit does not exist or has expired. Free audits are kept for 30 days.',
+  },
+};
+
+const isTerminalStatus = (status: string | undefined): boolean =>
+  status === 'completed' || status === 'failed' || status === 'canceled';
+
+/** The stop a terminal `error` payload names, or null for any other payload. */
+export function streamStopOf(payload: unknown): StreamStop | null {
+  if (payload === null || typeof payload !== 'object' || !Object.hasOwn(payload, 'code'))
+    return null;
+  const code = (payload as { code: unknown }).code;
+  return code === 'rate_limited' || code === 'not_found' ? code : null;
+}
+
 export function decideAuditSurface(
   state: AuditViewState,
   snapshot: AuditSnapshotLite | null,
   v2: ClientAuditV2 | null,
+  stop: StreamStop | null = null,
 ): AuditSurfaceDescriptor {
+  // The stream stopped (rate limit, no such audit) while the audit was not known to be finished:
+  // before its first snapshot, or on a reconnect mid-crawl. Say why the stream stopped rather than
+  // fall through to "running" or the couldn't-grade card, whose "the crawl finished" would be false.
+  // A terminal snapshot still decides on its own.
+  if (stop !== null && !isTerminalStatus(snapshot?.status)) {
+    return { kind: 'error', copy: STREAM_STOP_COPY[stop] };
+  }
   if (state.canceled) return { kind: 'canceled' };
   if (state.running) return { kind: 'running' };
   if (state.awaitingResults) return { kind: 'awaiting' };
   if (state.refused) {
-    return v2 ? { kind: 'result', verdict: 'refused', audit: v2 } : { kind: 'error', copy: COULD_NOT_GRADE };
+    return v2
+      ? { kind: 'result', verdict: 'refused', audit: v2 }
+      : { kind: 'error', copy: COULD_NOT_GRADE };
   }
   if (state.graded) {
     if (v2) return { kind: 'result', verdict: 'graded', audit: v2 };
@@ -200,7 +247,8 @@ export function decideAuditSurface(
       viewerIsPro: snapshot?.viewerIsPro ?? false,
     };
   }
-  if (state.failed) return { kind: 'error', copy: FAILURE_COPY[state.failureCategory ?? 'internal'] };
+  if (state.failed)
+    return { kind: 'error', copy: FAILURE_COPY[state.failureCategory ?? 'internal'] };
   if (state.gradeFailed) return { kind: 'error', copy: COULD_NOT_GRADE };
   return { kind: 'none' };
 }

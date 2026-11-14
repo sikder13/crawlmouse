@@ -3,7 +3,8 @@ import postgres from 'postgres';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 /**
- * Two real transactions racing in `start_trial_with_ledger` (migration 006c), on a real Postgres:
+ * Two real transactions racing in `start_trial_with_ledger` (migration 006c, as 20261117000001
+ * restates it), on a real Postgres:
  * CI's `db-cli-files` job runs this against its Postgres service with TRIAL_RACE_DB_URL set (and
  * TRIAL_RACE_REQUIRED=1, so a missing URL fails the job rather than skipping). Elsewhere it is
  * skipped: PGlite has one backend and cannot hold two transactions open at once.
@@ -24,9 +25,20 @@ if (URL_ENV && !['localhost', '127.0.0.1', '[::1]'].includes(new URL(URL_ENV).ho
   throw new Error('TRIAL_RACE_DB_URL must name a local Postgres (localhost, 127.0.0.1 or [::1])');
 }
 
-const MIGRATION = '20261108000001_v2_006c_trial_function_and_checks.sql';
-const LOCK_CALL = '  perform public.trial_ledger_lock(p_hashes);\n';
+/** The migration that defines start_trial_with_ledger last: the mutations edit its body. */
+const MIGRATION = '20261117000001_v2_037_security.sql';
+const LOCK_CALL = '    perform public.trial_ledger_lock(p_hashes);\n';
 const ROW_LOCK = '     for update;\n';
+
+/** `text` with `from` replaced by `to` once, inside start_trial_with_ledger's definition only. */
+function inTrialFunction(text: string, from: string, to: string): string {
+  const start = text.indexOf('create or replace function public.start_trial_with_ledger(');
+  const end = text.indexOf('\n$$;', start);
+  const body = start < 0 || end < 0 ? '' : text.slice(start, end);
+  if (!body.includes(from))
+    throw new Error(`${JSON.stringify(from)} is not in ${MIGRATION}'s start_trial_with_ledger`);
+  return text.slice(0, start) + body.replace(from, to) + text.slice(end);
+}
 /** How long to watch for B waiting. Below the function's 3 s lock_timeout, so B never times out. */
 const WAIT_WATCH_MS = 2000;
 
@@ -40,7 +52,7 @@ function urlFor(base: string, database: string): string {
   return u.toString();
 }
 
-/** A fresh database with the Supabase stand-ins and every migration, the 006c text edited by `edit`. */
+/** A fresh database with the Supabase stand-ins and every migration, MIGRATION's text edited by `edit`. */
 async function migrated(admin: Sql, name: string, edit: (sql: string) => string = (s) => s) {
   const { PLATFORM_SHIM, migrationFiles, readMigration } =
     await import('../../apps/web/__tests__/helpers/pglite-migrations');
@@ -163,14 +175,12 @@ describe.skipIf(!URL_ENV)('start_trial_with_ledger under two real transactions',
   beforeAll(async () => {
     admin = postgres(URL_ENV!, { max: 1, onnotice: () => {} });
     real = await migrated(admin, names.real);
-    unlocked = await migrated(admin, names.unlocked, (text) => {
-      if (!text.includes(LOCK_CALL)) throw new Error('the lock call to remove is not in 006c');
-      return text.replace(LOCK_CALL, '');
-    });
-    keyShare = await migrated(admin, names.keyShare, (text) => {
-      if (!text.includes(ROW_LOCK)) throw new Error('the row lock to weaken is not in 006c');
-      return text.replace(ROW_LOCK, '     for key share;\n');
-    });
+    unlocked = await migrated(admin, names.unlocked, (text) =>
+      inTrialFunction(text, LOCK_CALL, ''),
+    );
+    keyShare = await migrated(admin, names.keyShare, (text) =>
+      inTrialFunction(text, ROW_LOCK, '     for key share;\n'),
+    );
   }, 120_000);
 
   afterAll(async () => {

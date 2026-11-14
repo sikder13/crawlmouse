@@ -5,13 +5,18 @@ import { FREE_PAGE_CAP } from '@/lib/limits';
 import { AuditSurfaceView } from './AuditSurfaceView';
 import { asClientAuditV2 } from '@/lib/audit-v2';
 import { wireAuditStream } from '@/lib/audit-stream-wiring';
-import { reduceActivity, isStalled, shouldShowStall, type ActivityState } from '@/lib/audit-activity';
+import { streamStopOf, type StreamStop } from '@/lib/audit-view-state';
+import {
+  reduceActivity,
+  isStalled,
+  shouldShowStall,
+  type ActivityState,
+} from '@/lib/audit-activity';
 import type { CrawlActivityEvent } from '@crawlmouse/types';
 import { track } from '@/lib/analytics';
 import { auditCompletedProps } from '@/lib/audit-completed-event';
 import type { FindingGroup } from '@/lib/findings';
 import type { FailureCategory } from '@/lib/failure-classification';
-
 
 interface Snapshot {
   id: string;
@@ -27,7 +32,12 @@ interface Snapshot {
   orphanCount?: number;
   avgDepth?: number;
   failureCategory?: FailureCategory | null; // coarse failure bucket (server-classified); drives the failure copy
-  crawlHealth?: { confidence: string; coveragePct: number; blockRate: number; partial: boolean } | null; // §6/§10 (v2)
+  crawlHealth?: {
+    confidence: string;
+    coveragePct: number;
+    blockRate: number;
+    partial: boolean;
+  } | null; // §6/§10 (v2)
   /**
    * SPEC 5.1a §4 — the persisted refusal decision, emitted by the SSE route (`AUDIT_COLS` ->
    * `projectAuditForClient`). DECLARED HERE DELIBERATELY (gate 4, R1-NB6 / R3-NB3): it reached the
@@ -51,6 +61,8 @@ interface Snapshot {
 export function AuditView({ auditId, resultView }: { auditId: string; resultView?: 'ai' }) {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [done, setDone] = useState(false);
+  // Why the stream ended before its first snapshot (rate limit, no such audit), when it did.
+  const [stop, setStop] = useState<StreamStop | null>(null);
   const [canceling, setCanceling] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
   // SPEC 04 §2 — activity state, folded exclusively from real `activity` SSE events.
@@ -69,6 +81,7 @@ export function AuditView({ auditId, resultView }: { auditId: string; resultView
     // feed/snapshot or drops B's low-seq events against A's stale watermark.
     setSnapshot(null);
     setDone(false);
+    setStop(null);
     setActivity(undefined);
     firstActivityFired.current = false;
     const es = new EventSource(`/api/audits/${auditId}/stream`);
@@ -78,8 +91,12 @@ export function AuditView({ auditId, resultView }: { auditId: string; resultView
     wireAuditStream(es, {
       onSnapshot: (payload) => setSnapshot(payload as Snapshot),
       onDone: () => setDone(true),
-      onTerminalError: () => setDone(true),
-      onActivity: (payload) => setActivity((s) => reduceActivity(s, payload as CrawlActivityEvent[])),
+      onTerminalError: (payload) => {
+        setStop(streamStopOf(payload));
+        setDone(true);
+      },
+      onActivity: (payload) =>
+        setActivity((s) => reduceActivity(s, payload as CrawlActivityEvent[])),
     });
     return () => es.close();
   }, [auditId]);
@@ -101,14 +118,15 @@ export function AuditView({ auditId, resultView }: { auditId: string; resultView
   // Fire `audit-completed` exactly once when the stream terminates. `onSnapshot` runs before
   // `onDone` in the same `done` event (see wireAuditStream), so `snapshot` is current here.
   // Keyed on the `done` edge only (reading the latest snapshot is intentional, not a dep).
+  // A stream stop (rate limit, no such audit) also sets `done`, but the audit did not complete:
+  // no event then (CC-37 review r2 N1), so Activation does not count a stopped stream.
   useEffect(() => {
-    if (!done || !snapshot) return;
+    if (!done || !snapshot || stop !== null) return;
     track('audit-completed', auditCompletedProps(snapshot));
     // Conversion-spine event — now in SPEC 02's typed funnel (FUNNEL_EVENTS).
     const v2 = asClientAuditV2(snapshot);
     if (v2 && v2.grade != null) track('grade_revealed', { grade: v2.grade });
   }, [done]);
-
 
   async function cancelAudit() {
     setCanceling(true);
@@ -136,6 +154,7 @@ export function AuditView({ auditId, resultView }: { auditId: string; resultView
       <AuditSurfaceView
         snapshot={snapshot}
         done={done}
+        stop={stop}
         deps={{
           auditId,
           pageCount: snapshot?.page_count ?? 0,

@@ -35,6 +35,7 @@ import {
   siteFromRow,
 } from '../pipeline/rows';
 import type { CheckReader } from '../pipeline/types';
+import { cardFor, type CardsOnFile } from './card';
 import { sitesInScope } from '../agency/guard';
 import { agencyTrialConsentAt } from './trial-consent';
 import { accountFromRow, seatsFromRows } from './rows';
@@ -53,7 +54,9 @@ export interface SettingsDatasetDeps {
  * take a FixtureDataset, whose provenance can only be "fixture"; CC-26b's `AccountDataset` widens it
  * to "measured". Until the merge, `viewInput` hands these records to the views.
  */
-export type AccountRecords = Omit<FixtureDataset, 'provenance'> & { provenance: 'measured' };
+export type AccountRecords = Omit<FixtureDataset, 'provenance'> & {
+  provenance: 'measured';
+} & CardsOnFile;
 
 /** The records as the views on this base type their input (see AccountRecords); goes at the merge. */
 export const viewInput = (d: AccountRecords): FixtureDataset => d as unknown as FixtureDataset;
@@ -72,7 +75,7 @@ export interface SettingsDataset {
 type Row = Record<string, unknown>;
 
 const ACCOUNT_COLUMNS =
-  'id, name, state, tier, state_history, trial_ends_at, card_last4, timezone, site_limit, ' +
+  'id, name, state, tier, state_history, trial_ends_at, timezone, site_limit, ' +
   'seat_limit, competitor_limit, email_change_notes, email_trial_reminder, current_subscription_id';
 const SEAT_COLUMNS =
   'id, account_id, user_id, invited_email, name, role, status, alert_channels, theme, ' +
@@ -133,6 +136,9 @@ export async function loadSettingsDataset(
     session.from('accounts').select(ACCOUNT_COLUMNS).eq('id', accountId).maybeSingle(),
   );
   if (accountRow === null) throw new Error(`loadSettingsDataset: no account ${accountId}`);
+  // Not in ACCOUNT_COLUMNS: the session may not read it (Q25); `cardFor` gives the owner alone the digits.
+  const card = await cardFor(session, admin, accountId);
+  accountRow.card_last4 = card.last4;
 
   const [seatRows, scopeRows, siteIds, accountRules] = await Promise.all([
     rows(
@@ -212,6 +218,8 @@ export async function loadSettingsDataset(
   const asOf = now.toISOString();
   const d: AccountRecords = {
     provenance: 'measured',
+    // The account's card, on file whatever this reader's role (its digits are the owner's alone).
+    cardsOnFile: card.onFile ? [accountId] : [],
     as_of: asOf,
     description: `Account ${accountId}: ${siteIds.length} live sites, read at ${asOf} for Settings and Trial ending.`,
     engine_derived: [],

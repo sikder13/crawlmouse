@@ -80,6 +80,16 @@ describe('the registry', () => {
     expect(at('resend-domain')).toMatchObject({ gates: 4 });
     expect(at('resend-webhook')).toMatchObject({ gates: 4 });
     expect(at('inngest-plan')).toMatchObject({ gates: 2 });
+    // CC-37 C-7: the value, which the Vercel probe cannot read, is the owner's box.
+    expect(at('stripe-reconcile-livemode-true')).toMatchObject({
+      gates: 5,
+      owner: 'owner',
+      check: { kind: 'manual' },
+      source: 'inngest/billing-helpers.ts:127',
+    });
+    expect(at('stripe-reconcile-livemode-true')?.mustBeTrue).toMatch(
+      /STRIPE_RECONCILE_LIVEMODE=true/,
+    );
     for (const id of [
       'cc36-v1-accounts',
       'cc36-v1-pages',

@@ -1,0 +1,13 @@
+-- v2 security (CC-37 D5, Q25): the card's last four, for the owner only. Spec:
+-- docs/specs/v2/37-security.md, "Deploy order".
+--
+-- Not additive: one column grant is narrowed. 20261101000001 granted authenticated
+-- accounts.card_last4 with the rest of the row, so any member, a developer too, could read it
+-- through their own session. The account pages read it with the service role once the caller's
+-- role is the owner's (apps/web/lib/v2/account/card.ts). Apply this file only after that app is
+-- deployed: the app before it reads the column through the session, and those reads would fail.
+-- Nothing else in the grant changes; nothing in `auth` and no cascade.
+--
+-- Re-runnable. The revert is infra/supabase/rollbacks/20261118000001_v2_037_card_grant.revert.sql.
+-- Tests: apps/web/__tests__/v2-037-card-grant.test.ts.
+revoke select (card_last4) on public.accounts from authenticated;

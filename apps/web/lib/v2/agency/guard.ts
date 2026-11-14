@@ -2,7 +2,8 @@
  * Who may do what, and which sites a seat reads (CC-31 D2).
  *
  * `SEAT_GUARD` is the Guard column of docs/specs/v2/31-agency.md §3 for the screens: which buttons a
- * role is shown. The rule a route enforces is SQL's `seat_may` (migration 20261114000002, section S),
+ * role is shown. The rule a route enforces is SQL's `seat_may` (migration 20261114000002, section S;
+ * `mint_report` from 20261117000001, section C),
  * asked as the caller; `__tests__/v2-031-seam.test.ts` asks SQL every role and action and compares
  * the answers with this table and with a table written out in the test.
  *
@@ -25,6 +26,7 @@ export const SEAT_ACTIONS = [
   'remove_seat',
   'buy_seats',
   'edit_account_alerts',
+  'mint_report',
 ] as const;
 
 export type SeatAction = (typeof SEAT_ACTIONS)[number];
@@ -38,6 +40,7 @@ const MANAGER: readonly SeatAction[] = [
   'edit_site',
   'remove_site',
   'edit_account_alerts',
+  'mint_report',
 ];
 
 export const SEAT_GUARD: Readonly<Record<SeatRole, readonly SeatAction[]>> = {

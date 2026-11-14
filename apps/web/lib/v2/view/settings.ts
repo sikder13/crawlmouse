@@ -35,6 +35,7 @@ import {
 import { action, type ActionView, type RouteSpec } from './account-actions';
 import { FREE_SCHEDULE, accountShellView, type ShellView } from './account-shell';
 import { FREE_FIXES } from './free-fixes';
+import { ACCOUNT_COPY } from '../copy/account';
 import { DELETE_COPY, deletionMoney } from '../copy/deletion';
 import {
   OWN_ACCOUNT_COPY as OWN,
@@ -368,7 +369,8 @@ export function settingsView(
   const paid = v.tier !== 'free';
   const ending = paid && billingEnd !== null ? billingEnd : null;
   const card = a.card_last4;
-  const cardTrial = trial && card !== null;
+  const onFile = v.cardOnFile;
+  const cardTrial = trial && onFile;
   const pastDue = a.state === 'past_due';
   const yearly = v.tier === 'agency' ? AGENCY_YEARLY : PRO_YEARLY;
   const date = (ts: string) => dayDate(ts, zone);
@@ -470,10 +472,16 @@ export function settingsView(
       // A plan set to end is said first: a card trial set to cancel is not charged.
       note:
         cardTrial && ending !== null
-          ? COPY.trialCancelling(plan, date(ending), card)
+          ? card === null
+            ? `${COPY.trialCancellingWithheld(plan, date(ending))} ${ACCOUNT_COPY.cardManagedByOwner}`
+            : COPY.trialCancelling(plan, date(ending), card)
           : trial
             ? `${COPY.ends(date(a.trial_ends_at!))} ${
-                card === null ? COPY.noCardTerms(plan) : COPY.cardTerms(card)
+                !onFile
+                  ? COPY.noCardTerms(plan)
+                  : card === null
+                    ? ACCOUNT_COPY.cardManagedByOwner
+                    : COPY.cardTerms(card)
               }`
             : pastDue
               ? v.tier === 'free'
@@ -541,7 +549,7 @@ export function settingsView(
                     }
                   : { label: COPY.cancel, text: COPY.cancelFree, action: null },
         // A card on file means a Stripe customer, whose receipts the portal lists.
-        card === null
+        !onFile
           ? { label: COPY.receipts, text: COPY.noReceipts, action: null }
           : { label: COPY.receipts, text: COPY.receiptsText, action: portal },
       ],

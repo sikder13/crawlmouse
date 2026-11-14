@@ -11,7 +11,13 @@ import { Button, buttonClasses } from '@/components/ui/Button';
 import { GradeCardSkeleton } from '@/components/ui/GradeCardSkeleton';
 import { ResultView } from '@/components/audit/ResultView';
 import { track } from '@/lib/analytics';
-import { deriveAuditViewState, decideAuditSurface, type AuditSnapshotLite, type AuditSurfaceDescriptor } from '@/lib/audit-view-state';
+import {
+  deriveAuditViewState,
+  decideAuditSurface,
+  type AuditSnapshotLite,
+  type AuditSurfaceDescriptor,
+  type StreamStop,
+} from '@/lib/audit-view-state';
 import { asClientAuditV2 } from '@/lib/audit-v2';
 import type { CrawlActivityEvent } from '@crawlmouse/types';
 
@@ -63,23 +69,29 @@ export interface AuditSurfaceDeps {
  * stream state (`snapshot`, `done`) through. That remaining hop is no longer unexecuted either:
  * `AuditView.test.tsx` mounts the component and replays real captured streams through it.
  */
-export type AuditSnapshotForView = AuditSnapshotLite & { page_count?: number | null; crawlHealth?: unknown };
+export type AuditSnapshotForView = AuditSnapshotLite & {
+  page_count?: number | null;
+  crawlHealth?: unknown;
+};
 
 export function AuditSurfaceView({
   snapshot,
   done,
   deps,
+  stop = null,
 }: {
   snapshot: AuditSnapshotForView | null;
   done: boolean;
   deps: AuditSurfaceDeps;
+  /** Why the stream ended before any snapshot, when it did (lib/audit-view-state.ts). */
+  stop?: StreamStop | null;
 }) {
   // The `done` payload alone carries orphanCount/avgDepth — gate the numeric stats behind their
   // PRESENCE (not merely `done`) so neither the completed-but-pre-done window NOR a `done`-via-`error`
   // snapshot (which kept a prior tick's grade+score but has no stats) can render a 0/0 GradeCard.
   const hasResults = snapshot?.orphanCount != null && snapshot?.avgDepth != null;
   const state = deriveAuditViewState(snapshot, done, hasResults);
-  const descriptor = decideAuditSurface(state, snapshot, asClientAuditV2(snapshot));
+  const descriptor = decideAuditSurface(state, snapshot, asClientAuditV2(snapshot), stop);
   return <AuditSurfaceMap descriptor={descriptor} deps={deps} />;
 }
 
@@ -111,7 +123,9 @@ export function AuditSurfaceMap({
             <Button variant="secondary" onClick={deps.onCancel} disabled={deps.canceling}>
               {deps.canceling ? 'Canceling…' : 'Cancel audit'}
             </Button>
-            {deps.cancelError ? <span className="text-warning text-sm">{deps.cancelError}</span> : null}
+            {deps.cancelError ? (
+              <span className="text-warning text-sm">{deps.cancelError}</span>
+            ) : null}
           </div>
         </>
       );
@@ -146,7 +160,10 @@ export function AuditSurfaceMap({
               Download CSV
             </a>
           ) : (
-            <UpgradeCard headline="Export every finding + page as CSV." sub="Sortable spreadsheet of your whole site." />
+            <UpgradeCard
+              headline="Export every finding + page as CSV."
+              sub="Sortable spreadsheet of your whole site."
+            />
           )}
         </>
       );
@@ -164,7 +181,11 @@ export function AuditSurfaceMap({
         <Card>
           <h2 className="font-display font-bold text-2xl">Audit canceled</h2>
           <p className="mt-2 text-ink/70">
-            You stopped this audit before it finished. <a href="/" className="text-peach underline">Run another</a>.
+            You stopped this audit before it finished.{' '}
+            <a href="/" className="text-peach underline">
+              Run another
+            </a>
+            .
           </p>
         </Card>
       );

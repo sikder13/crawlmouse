@@ -187,6 +187,19 @@ describe('/s/pause', () => {
     expect((await row(site.id)).paused_by_recipient_at).toBeNull();
   });
 
+  it('says the pause link cannot be used for no cookie, a value that is not a token, and a confirmation link’s token', async () => {
+    const site = await client();
+    const confirmation = await issue('issue_recipient_confirmation', site.id);
+    expect(await pausePage()).toContain('This link can no longer be used');
+    h.cookies.set('cm_link_report_pause', 'short');
+    expect(await pausePage()).toContain('This link can no longer be used');
+    h.cookies.set('cm_link_report_pause', confirmation);
+    const html = await pausePage();
+    expect(html).toContain('This link can no longer be used');
+    expect(html).not.toContain(site.host);
+    expect(html).not.toMatch(/<form/);
+  });
+
   it('after the form’s answer says the reports are stopped', async () => {
     const html = await pausePage({ notice: 'report_paused' });
     expect(html).toContain(

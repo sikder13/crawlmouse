@@ -15,11 +15,13 @@ vi.mock('@/lib/rate-limit', () => ({ checkRateLimit }));
 // version is enough to drive the throttle (returns the x-forwarded-for IP or 'unknown').
 vi.mock('@/lib/client-ip', () => ({
   getClientIp: (req: Request) =>
-    req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || req.headers.get('x-real-ip') || 'unknown',
+    req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+    req.headers.get('x-real-ip') ||
+    'unknown',
 }));
-vi.mock('@/lib/limits', () => ({ ADMIN_TAKEDOWN_PER_IP_PER_HOUR: 30 }));
 
 import { POST } from './route';
+import { ADMIN_TAKEDOWN_PER_IP_PER_HOUR } from '@/lib/limits';
 
 const SECRET = 'a-long-random-admin-secret-value';
 
@@ -139,9 +141,75 @@ describe('POST /api/admin/takedown/process', () => {
     expect(processTakedown).not.toHaveBeenCalled();
   });
 
-  it('does NOT consult the rate limiter for an unauthorized request (auth fails first)', async () => {
+  // CC-37 A-10: the throttle runs before the secret check, so it counts wrong-secret guesses.
+  it('consults the per-IP limiter before the secret check, for an unauthorized request too', async () => {
+    process.env.ADMIN_SECRET = SECRET;
+    const r = new Request('http://localhost/api/admin/takedown/process', {
+      method: 'POST',
+      headers: { authorization: 'Bearer wrong', 'x-forwarded-for': '203.0.113.8' },
+      body: JSON.stringify({ slug: 'abc123' }),
+    });
+    expect((await POST(r)).status).toBe(401);
+    expect(checkRateLimit).toHaveBeenCalledWith(
+      'admin-takedown:ip:203.0.113.8',
+      ADMIN_TAKEDOWN_PER_IP_PER_HOUR,
+      60 * 60 * 1000,
+    );
+  });
+});
+
+describe('POST /api/admin/takedown/process — wrong-secret guesses are throttled per IP (A-10)', () => {
+  const buckets = new Map<string, number>();
+  let errorLog: ReturnType<typeof vi.spyOn>;
+  beforeEach(() => {
+    buckets.clear();
+    processTakedown.mockReset();
+    processTakedown.mockResolvedValue(undefined);
+    checkRateLimit.mockReset();
+    checkRateLimit.mockImplementation(async (key: string, limit: number) => {
+      const n = (buckets.get(key) ?? 0) + 1;
+      buckets.set(key, n);
+      return { allowed: n <= limit, remaining: Math.max(0, limit - n), resetAt: new Date(0) };
+    });
+    errorLog = vi.spyOn(console, 'error').mockImplementation(() => {});
+    process.env.ADMIN_SECRET = SECRET;
+  });
+  afterEach(() => {
+    errorLog.mockRestore();
     delete process.env.ADMIN_SECRET;
-    await POST(req({ token: 'anything' }));
-    expect(checkRateLimit).not.toHaveBeenCalled();
+  });
+
+  const from = (ip: string, token: string) =>
+    POST(
+      new Request('http://localhost/api/admin/takedown/process', {
+        method: 'POST',
+        headers: { authorization: `Bearer ${token}`, 'x-forwarded-for': ip },
+        body: JSON.stringify({ slug: 'abc123' }),
+      }),
+    );
+
+  it(`a wrong secret ${ADMIN_TAKEDOWN_PER_IP_PER_HOUR + 1} times from one IP is a 429 on the last, each earlier one a logged 401`, async () => {
+    const wrong = 'Y'.repeat(SECRET.length);
+    for (let i = 0; i < ADMIN_TAKEDOWN_PER_IP_PER_HOUR; i++) {
+      expect((await from('203.0.113.50', wrong)).status).toBe(401);
+    }
+    const unauthorizedLogs = () =>
+      errorLog.mock.calls.filter((c) =>
+        String(c[0]).includes('unauthorized attempt from ip=203.0.113.50'),
+      ).length;
+    expect(unauthorizedLogs()).toBe(ADMIN_TAKEDOWN_PER_IP_PER_HOUR);
+    const res = await from('203.0.113.50', wrong);
+    expect(res.status).toBe(429);
+    expect(await res.json()).toEqual({ error: 'rate_limited' });
+    // Even the right secret waits out the window from that address.
+    expect((await from('203.0.113.50', SECRET)).status).toBe(429);
+    expect(processTakedown).not.toHaveBeenCalled();
+  });
+
+  it('the right secret from a fresh IP still works after another IP is throttled', async () => {
+    for (let i = 0; i <= ADMIN_TAKEDOWN_PER_IP_PER_HOUR; i++) await from('203.0.113.51', 'nope');
+    const res = await from('203.0.113.52', SECRET);
+    expect(res.status).toBe(200);
+    expect(processTakedown).toHaveBeenCalledTimes(1);
   });
 });
