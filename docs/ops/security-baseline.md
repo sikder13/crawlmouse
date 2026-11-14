@@ -21,10 +21,9 @@ command that shows it holds. Run the `pnpm` commands from the repository root; r
 
 ## Report-only
 
-| Control                                                                                                                                                                                                                                                                                                          | Where the reports go                                                                      | Next step                                                                                                                                                                                                        |
-| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| The full CSP (`Content-Security-Policy-Report-Only`)                                                                                                                                                                                                                                                             | Sentry project `crawlmouse`, as security reports (`report-uri` and `Reporting-Endpoints`) | After seven days of reports, CC-SEC-2 enforces it                                                                                                                                                                |
-| 2026-11-14 (CC-37): `https://us-assets.i.posthog.com` added to the report-only `script-src`, for PostHog's lazy-loaded scripts (Sentry `CRAWLMOUSE-M`, `surveys.js`); the enforced policy has no script directive and is unchanged (`__tests__/security/headers.test.ts`, "PostHog's assets host in script-src") | same                                                                                      | Plan to enforce the full policy: first, the report-only `script-src` reports in Sentry show no remaining violation for seven consecutive days after this change is deployed. Owner: the owner. Not done in CC-37 |
+| Control                                              | Where the reports go                                                                      | Next step                                         |
+| ---------------------------------------------------- | ----------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| The full CSP (`Content-Security-Policy-Report-Only`) | Sentry project `crawlmouse`, as security reports (`report-uri` and `Reporting-Endpoints`) | After seven days of reports, CC-SEC-2 enforces it |
 
 ## Advisory
 
@@ -83,3 +82,9 @@ scripts do not fill the CSP reports.
 ## Known gaps (and who closes them)
 
 The spec's "Known gaps and follow-ups" section is the list, each with its owner.
+
+## CSP enforcement plan
+
+| Date       | Change                                                                                                                                                                                                                    | What must hold before the full policy is enforced                                                                                   | Owner     | Status            |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | --------- | ----------------- |
+| 2026-11-14 | `https://us-assets.i.posthog.com` added to the report-only `script-src`, for PostHog's lazy-loaded scripts (Sentry `CRAWLMOUSE-M`, `surveys.js`). The enforced policy has no script directive and is unchanged (CC-37 F5) | the report-only `script-src` reports in Sentry show no remaining violation for seven consecutive days after this change is deployed | the owner | not done in CC-37 |
