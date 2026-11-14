@@ -38,11 +38,13 @@ Look at each row at the times in the last column. A row that crosses an abort li
 
 ### The Sentry signals
 
-A signal is the `signal` tag on a Sentry event; an alert rule matches it. The tags set in this tree,
-listed by:
+A signal is the `signal` tag on a Sentry event; an alert rule matches it. The tags set in this tree
+(each `signal` property of a `tags` object literal in the non-test source of `apps/web`, `inngest`
+and `packages`, read with the TypeScript parser, so a tag written over several lines counts), listed
+by:
 
 ```bash
-git grep -nE "tags: \{[^}]*signal" -- apps/web inngest packages ':!*.test.ts' ':!*.test.tsx'
+pnpm --filter @crawlmouse/scripts exec tsx golive/signals.ts
 ```
 
 <!-- launch-day:signals:start -->
@@ -69,7 +71,7 @@ Set from a value, so the name is read from the file:
 
 <!-- launch-day:signals:end -->
 
-The list between the markers is pinned to that grep by
+The list between the markers is pinned to that reading by
 `pnpm --filter @crawlmouse/scripts exec vitest run golive/launch-day.test.ts`. CC-33 adds
 `signin-canary` and `founder-notice-failed` (`docs/ops/uptime.md` on its branch); the test fails
 until they are listed here, once CC-33 is on `origin/main`.
