@@ -104,7 +104,7 @@ const WALKED = 'a'.repeat(40);
 const report = (
   files: Record<string, string[]>,
   nested = false,
-  metadata: Record<string, unknown> = { commit: WALKED },
+  metadata: Record<string, unknown> = { commit: WALKED, dirty: false },
 ) => {
   const test = (status: string) => ({ status, projectName: 'chromium', results: [] });
   return JSON.stringify({
@@ -204,7 +204,7 @@ describe("the walk's commit", () => {
   it("is set by the walk's Playwright config, from git's HEAD", () => {
     const config = readFileSync(join(REPO_ROOT, 'tests/e2e/playwright.config.ts'), 'utf8');
     expect(config).toMatch(
-      /metadata:\s*\{\s*commit:\s*execFileSync\(\s*'git',\s*\[\s*'rev-parse',\s*'HEAD'\s*\]/,
+      /metadata:\s*\{\s*commit:\s*execFileSync\(\s*'git',\s*\[\s*'rev-parse',\s*'HEAD'\s*\][\s\S]*?dirty:\s*execFileSync\(\s*'git',\s*\[\s*'status',\s*'--porcelain'\s*\]/s,
     );
   });
 
@@ -234,6 +234,14 @@ describe("the walk's commit", () => {
     expect(stateOf(lines(report(passing), null, 'c'.repeat(40)), 'walk-1-anonymous')).toBe(
       'stale (walked on aaaaaaaaaaaa, HEAD is cccccccccccc; not in tests/e2e/results.json)',
     );
+  });
+
+  it('marks the walk stale when it ran on uncommitted changes, or does not say', () => {
+    for (const metadata of [{ commit: WALKED, dirty: true }, { commit: WALKED }]) {
+      expect(stateOf(lines(report(passing, false, metadata), null, WALKED), 'walk-7-support')).toBe(
+        'stale (walked on aaaaaaaaaaaa with uncommitted changes; passed (1 expected))',
+      );
+    }
   });
 
   it('marks the walk stale when the report names no commit, or one that is not a sha', () => {
@@ -370,7 +378,10 @@ describe('pnpm golive:check -- --go-no-go', () => {
     const argv = ['--step', '3', '--ticked', ALL_MANUAL.join(','), '--go-no-go'];
     const { code, out } = await run(argv, probes, {
       // Walked on the live commit (run's default), so not stale.
-      walk: report({ '7-support.spec.ts': ['expected'] }, false, { commit: 'c'.repeat(40) }),
+      walk: report({ '7-support.spec.ts': ['expected'] }, false, {
+        commit: 'c'.repeat(40),
+        dirty: false,
+      }),
     });
     for (const g of GATES)
       expect(

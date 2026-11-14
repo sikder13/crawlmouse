@@ -51,6 +51,7 @@ Measured against the code; the reasoning for each is in `notes/cc-38/questions.m
 - **The pause the scripts read is the operator's shell's.** `qa:seed` and `qa:reset` add no site and
   request no first audit while `CRAWL_PAUSED=1` is set where they run; a pause set in Vercel only is
   not seen by them, and the deployed worker still refuses to claim a check while it is paused there.
+- **`tests/e2e/**`is not typechecked or linted in CI.** The walk is run by hand (D4); a drift in the`apps/web`modules it imports shows when it is next run.`pnpm exec eslint tests/e2e` is clean today.
 - **About three resets an hour.** A Free account's first audit counts against its host's hourly bucket
   (five an hour, `DOMAIN_AUDITS_PER_HOUR`), and `crawlmouse.com` and `nahltech.com` are sites of more
   than one QA account; a reset past the bound is refused with the time it fits, and exits 1.

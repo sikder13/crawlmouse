@@ -97,7 +97,10 @@ dns.promises.lookup = async function walkLookup(hostname, options) {
 /** Every TCP connect this process makes: by address, and by name once its lookup answers. */
 const connect = net.Socket.prototype.connect;
 net.Socket.prototype.connect = function walkConnect(...args) {
-  const target = typeof args[0] === 'object' && args[0] !== null ? args[0] : { host: args[1] };
+  // `net.connect` and undici pass Node's normalized form, `[[options, callback]]`; a direct call passes
+  // `(options)` or `(port, host)`.
+  const first = Array.isArray(args[0]) ? args[0][0] : args[0];
+  const target = typeof first === 'object' && first !== null ? first : { host: args[1] };
   const host = String(target.host ?? '');
   if (host.endsWith(WALK) || answered.has(host)) {
     throw new Error(`walk preload: a connection to ${host} was refused (the walk reaches no site)`);

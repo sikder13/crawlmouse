@@ -17,7 +17,11 @@ export default defineConfig({
   expect: { timeout: 20_000 },
   outputDir: '../../apps/web/test-results/e2e',
   reporter: [['list'], ['json', { outputFile: 'results.json' }]],
-  metadata: { commit: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim() },
+  // The commit walked, and whether the tree held changes it does not name (a walk on those is stale).
+  metadata: {
+    commit: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(),
+    dirty: execFileSync('git', ['status', '--porcelain'], { encoding: 'utf8' }).trim() !== '',
+  },
   use: {
     baseURL: process.env.WALK_BASE ?? 'http://localhost:3238',
     viewport: { width: 1280, height: 900 },

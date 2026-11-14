@@ -204,6 +204,11 @@ export interface WalkResults {
   started: string | null;
   /** The commit the walk ran on: `config.metadata.commit`, set by tests/e2e/playwright.config.ts. */
   commit: string | null;
+  /**
+   * Whether the tree walked held uncommitted changes (`config.metadata.dirty`); true when the report
+   * does not say, since the commit alone does not then name what was walked.
+   */
+  dirty: boolean;
   files: Map<string, Counts>;
 }
 
@@ -229,11 +234,13 @@ export function readWalkResults(text: string): WalkResults | string {
     files.set(suite.file, counts);
   }
   const started = (report as { stats?: { startTime?: unknown } }).stats?.startTime;
-  const commit = (report as { config?: { metadata?: { commit?: unknown } } }).config?.metadata
-    ?.commit;
+  const metadata = (report as { config?: { metadata?: { commit?: unknown; dirty?: unknown } } })
+    .config?.metadata;
+  const commit = metadata?.commit;
   return {
     started: typeof started === 'string' ? started : null,
     commit: typeof commit === 'string' && SHA.test(commit) ? commit : null,
+    dirty: metadata?.dirty !== false,
     files,
   };
 }
@@ -313,6 +320,7 @@ export interface GoNoGoInputs {
  */
 function staleness(walk: WalkResults, inputs: GoNoGoInputs): string | undefined {
   if (walk.commit === null) return 'the report names no commit';
+  if (walk.dirty) return `walked on ${walk.commit.slice(0, 12)} with uncommitted changes`;
   const [against, name] =
     inputs.live !== null ? [inputs.live, 'the live commit'] : [inputs.head, 'HEAD'];
   if (against === null || walk.commit === against) return undefined;
