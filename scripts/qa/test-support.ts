@@ -1,16 +1,11 @@
-import { existsSync } from 'node:fs';
-import { join } from 'node:path';
 import type { PGlite } from '@electric-sql/pglite';
-import { it } from 'vitest';
+import { it, type TestContext } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import {
-  applyAllMigrations,
-  freshDb,
-  MIGRATIONS_DIR,
-} from '../../apps/web/__tests__/helpers/pglite-migrations';
+import { applyAllMigrations, freshDb } from '../../apps/web/__tests__/helpers/pglite-migrations';
 import { postgrestOver } from '../../apps/web/__tests__/helpers/postgrest-pglite';
 import { supabaseEntitlementStore } from '../../apps/web/lib/billing/state-machine-apply';
 import type { QaKey } from './accounts';
+import { migrationsAddInternal } from './marker-gate';
 import type { QaAuth, SeedDeps } from './seed';
 import { qaStore } from './store';
 
@@ -23,18 +18,37 @@ import { qaStore } from './store';
  */
 
 /**
- * CC-33's migration adds `accounts.internal`. Until `origin/main` carries it (CC-38 questions Q1)
- * the tests that need the column are `todo`; they run as soon as the file is on the tree.
+ * Whether a migration adds `accounts.internal` (./marker-gate.ts). Until `origin/main` carries one
+ * (CC-38 questions Q1) the tests that need the column are `todo`; they run as soon as one is on the
+ * tree, whatever its file is called.
  */
-export const HAS_INTERNAL_MARKER = existsSync(
-  join(MIGRATIONS_DIR, '20261115000001_v2_033_operations.sql'),
-);
+export const HAS_INTERNAL_MARKER = migrationsAddInternal();
 const NEEDS_CC33 = 'needs accounts.internal from CC-33 (PR #83), not yet on origin/main';
 
-/** `it` once CC-33's migration is on the tree; until then `it.todo`, its name carrying the reason. */
-export function withMarker(name: string, fn: () => Promise<void>): void {
-  if (HAS_INTERNAL_MARKER) it(name, fn);
+/** The time a PGlite test may take: each builds a database with every migration, 5-7 s under load. */
+export const PGLITE_TIMEOUT = 60_000;
+
+/**
+ * `it` once a migration adds `accounts.internal`; until then `it.todo`, its name carrying the reason.
+ * The timeout is required: vitest's 5 s default is shorter than a seeded PGlite test under load.
+ */
+export function withMarker(
+  name: string,
+  fn: (ctx: TestContext) => Promise<void>,
+  timeout: number,
+): void {
+  if (HAS_INTERNAL_MARKER) it(name, fn, timeout);
   else it.todo(`${name} (${NEEDS_CC33})`);
+}
+
+/**
+ * Every migration applied once, for a file's `beforeAll`: each test then takes a `clone()` of it, so
+ * no two tests share rows and none pays for the migrations again.
+ */
+export async function migratedBase(): Promise<PGlite> {
+  const db = await freshDb();
+  await applyAllMigrations(db);
+  return db;
 }
 
 /** A sample pepper, built from parts (the ledger needs 32 characters). */
@@ -52,13 +66,16 @@ export interface World {
   dispatched: unknown[];
   reports: { message: string; ctx: unknown }[];
   lines: string[];
+  /** The prompts the seed asked; the fake answers each with the phrase it names, unless `answer`. */
+  asked: string[];
+  answer: { typed: string | null };
   /** A user made by someone else, as a person signing up at a QA address would be. */
   signUp(email: string): Promise<string>;
 }
 
-export async function world(): Promise<World> {
-  const db = await freshDb();
-  await applyAllMigrations(db);
+/** The world over a clone of `base` (see `migratedBase`), or over a database built here. */
+export async function world(base?: PGlite): Promise<World> {
+  const db = base ? ((await base.clone()) as PGlite) : await migratedBase();
   const sb = postgrestOver(db);
   const users = new Map<string, { id: string; qaKey: QaKey | null }>();
   const sent: unknown[] = [];
@@ -66,6 +83,8 @@ export async function world(): Promise<World> {
   const dispatched: unknown[] = [];
   const reports: { message: string; ctx: unknown }[] = [];
   const lines: string[] = [];
+  const asked: string[] = [];
+  const answer: { typed: string | null } = { typed: null };
 
   const insertUser = async (email: string, qaKey: QaKey | null) => {
     const id = crypto.randomUUID();
@@ -101,12 +120,18 @@ export async function world(): Promise<World> {
         },
       },
       now: () => new Date(),
+      paused: () => false,
     }),
     async markInternal(accountId) {
       // What CC-33's runInternal does: PATCH accounts set internal = true, by id.
       await db.query('update public.accounts set internal = true where id = $1', [accountId]);
     },
     inbox: { local: 'qa', domain: 'example.test' },
+    async confirm(prompt) {
+      asked.push(prompt);
+      lines.push('<asked>');
+      return answer.typed ?? /"([^"]+)"/.exec(prompt)?.[1] ?? '';
+    },
     print: (l) => lines.push(l),
   };
   return {
@@ -119,6 +144,8 @@ export async function world(): Promise<World> {
     dispatched,
     reports,
     lines,
+    asked,
+    answer,
     signUp: (e) => insertUser(e, null),
   };
 }

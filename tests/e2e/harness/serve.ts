@@ -16,8 +16,8 @@
 import { supabaseEntitlementStore } from '../../../apps/web/lib/billing/state-machine-apply';
 import { postgrestOver } from '../../../apps/web/__tests__/helpers/postgrest-pglite';
 import { seed } from '../../../scripts/qa/seed';
+import { migrationsAddInternal } from '../../../scripts/qa/marker-gate';
 import { qaStore } from '../../../scripts/qa/store';
-import { existsSync } from 'node:fs';
 import { finishCheck } from './checks';
 import { startStandin, type Standin } from './standin';
 import { WalkStripe } from './stripe';
@@ -28,12 +28,7 @@ export const QA_INBOX = { local: 'qa', domain: 'walk.example' };
 /** The walk's ledger pepper, built from parts; run.sh gives the build the same value. */
 const PEPPER = process.env.TRIAL_LEDGER_PEPPER ?? '';
 /** CC-33's `accounts.internal`: the set is seeded once its migration is on the tree (questions Q1). */
-const HAS_INTERNAL_MARKER = existsSync(
-  new URL(
-    '../../../infra/supabase/migrations/20261115000001_v2_033_operations.sql',
-    import.meta.url,
-  ),
-);
+const HAS_INTERNAL_MARKER = migrationsAddInternal();
 
 const stripe = new WalkStripe(() => `${WEB}/api/webhooks/stripe-account`);
 
@@ -90,6 +85,7 @@ if (HAS_INTERNAL_MARKER) {
         },
       },
       now: () => new Date(),
+      paused: () => false,
     }),
     async markInternal(accountId) {
       // CC-33's ops:internal, as it writes: accounts.internal by id, with the service role.
@@ -98,6 +94,8 @@ if (HAS_INTERNAL_MARKER) {
       ]);
     },
     inbox: QA_INBOX,
+    // The walk's inbox is its own test domain: the phrase the seed asks for is answered as typed.
+    confirm: async (prompt) => /"([^"]+)"/.exec(prompt)?.[1] ?? '',
     print: (l) => console.error(`seed: ${l}`),
   });
 }
