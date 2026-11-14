@@ -196,6 +196,13 @@ describe('Trial ending, the card decides, not the plan', () => {
     ...d,
     accounts: d.accounts.map((a) => (a.id === id ? { ...a, card_last4: card } : a)),
   });
+  /** A card on file, read by a seat that is not the owner: no digits, `card_on_file` (Q25). */
+  const withheld = (d: ReturnType<typeof fixture>, id: string) => ({
+    ...d,
+    accounts: d.accounts.map((a) =>
+      a.id === id ? { ...a, card_last4: null, card_on_file: true } : a,
+    ),
+  });
 
   it('a Pro trial with a card: no checkout, a cancel, “If you do nothing”', () => {
     const d = withCard(bad, BAD, '4242');
@@ -209,6 +216,15 @@ describe('Trial ending, the card decides, not the plan', () => {
     expect(t.keepText).toMatch(
       /^The card ending 4242 is charged \$19 on Sat 7 Nov, then each month\. /,
     );
+  });
+
+  it('a card trial read by a seat that is not the owner: the card trial’s actions, and the owner manages the card (Q25)', () => {
+    const d = withheld(bad, BAD);
+    const t = trialEndView(d, trialEndViewer(d, BAD));
+    expect(t.banner.keep).toBeNull();
+    expect([t.keepTitle, t.endTitle]).toEqual(['If you do nothing', 'If you cancel']);
+    expect(t.keepText).toMatch(/^Managed by the account owner\. /);
+    expect(JSON.stringify(t)).not.toMatch(/card ending/);
   });
 
   it('an Agency trial with no card: the checkout, and letting it end', () => {

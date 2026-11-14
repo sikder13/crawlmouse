@@ -35,6 +35,8 @@ import {
 import { action, type ActionView, type RouteSpec } from './account-actions';
 import { FREE_SCHEDULE, accountShellView, type ShellView } from './account-shell';
 import { FREE_FIXES } from './free-fixes';
+import { cardOnFile } from '../account/card';
+import { ACCOUNT_COPY } from '../copy/account';
 import { DELETE_COPY, deletionMoney } from '../copy/deletion';
 import {
   OWN_ACCOUNT_COPY as OWN,
@@ -368,7 +370,8 @@ export function settingsView(
   const paid = v.tier !== 'free';
   const ending = paid && billingEnd !== null ? billingEnd : null;
   const card = a.card_last4;
-  const cardTrial = trial && card !== null;
+  const onFile = cardOnFile(a);
+  const cardTrial = trial && onFile;
   const pastDue = a.state === 'past_due';
   const yearly = v.tier === 'agency' ? AGENCY_YEARLY : PRO_YEARLY;
   const date = (ts: string) => dayDate(ts, zone);
@@ -469,21 +472,27 @@ export function settingsView(
       left: days === null ? null : COPY.daysLeft(days),
       // A plan set to end is said first: a card trial set to cancel is not charged.
       note:
-        cardTrial && ending !== null
-          ? COPY.trialCancelling(plan, date(ending), card)
-          : trial
-            ? `${COPY.ends(date(a.trial_ends_at!))} ${
-                card === null ? COPY.noCardTerms(plan) : COPY.cardTerms(card)
-              }`
-            : pastDue
-              ? v.tier === 'free'
-                ? COPY.pastDueEnded(date(pastDueSince), date(graceEnds))
-                : COPY.pastDue(date(pastDueSince), date(graceEnds), plan)
-              : ending !== null
-                ? COPY.cancelling(plan, date(ending))
-                : paid
-                  ? null
-                  : COPY.freeNote(FREE_SCHEDULE[GATES.free.schedule], FREE_FIXES),
+        cardTrial && card === null
+          ? `${COPY.ends(date(a.trial_ends_at!))} ${ACCOUNT_COPY.cardManagedByOwner}`
+          : cardTrial && ending !== null
+            ? COPY.trialCancelling(plan, date(ending), card!)
+            : trial
+              ? `${COPY.ends(date(a.trial_ends_at!))} ${
+                  !onFile
+                    ? COPY.noCardTerms(plan)
+                    : card === null
+                      ? ACCOUNT_COPY.cardManagedByOwner
+                      : COPY.cardTerms(card)
+                }`
+              : pastDue
+                ? v.tier === 'free'
+                  ? COPY.pastDueEnded(date(pastDueSince), date(graceEnds))
+                  : COPY.pastDue(date(pastDueSince), date(graceEnds), plan)
+                : ending !== null
+                  ? COPY.cancelling(plan, date(ending))
+                  : paid
+                    ? null
+                    : COPY.freeNote(FREE_SCHEDULE[GATES.free.schedule], FREE_FIXES),
       usageLabel: COPY.tables.usage,
       usage: [
         [COPY.sitesUsed, COPY.of(primarySites(v).length, a.limits.sites)],
@@ -541,7 +550,7 @@ export function settingsView(
                     }
                   : { label: COPY.cancel, text: COPY.cancelFree, action: null },
         // A card on file means a Stripe customer, whose receipts the portal lists.
-        card === null
+        !onFile
           ? { label: COPY.receipts, text: COPY.noReceipts, action: null }
           : { label: COPY.receipts, text: COPY.receiptsText, action: portal },
       ],

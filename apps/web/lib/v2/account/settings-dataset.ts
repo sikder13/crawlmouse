@@ -35,6 +35,7 @@ import {
   siteFromRow,
 } from '../pipeline/rows';
 import type { CheckReader } from '../pipeline/types';
+import { cardFor } from './card';
 import { sitesInScope } from '../agency/guard';
 import { agencyTrialConsentAt } from './trial-consent';
 import { accountFromRow, seatsFromRows } from './rows';
@@ -72,7 +73,7 @@ export interface SettingsDataset {
 type Row = Record<string, unknown>;
 
 const ACCOUNT_COLUMNS =
-  'id, name, state, tier, state_history, trial_ends_at, card_last4, timezone, site_limit, ' +
+  'id, name, state, tier, state_history, trial_ends_at, timezone, site_limit, ' +
   'seat_limit, competitor_limit, email_change_notes, email_trial_reminder, current_subscription_id';
 const SEAT_COLUMNS =
   'id, account_id, user_id, invited_email, name, role, status, alert_channels, theme, ' +
@@ -133,6 +134,10 @@ export async function loadSettingsDataset(
     session.from('accounts').select(ACCOUNT_COLUMNS).eq('id', accountId).maybeSingle(),
   );
   if (accountRow === null) throw new Error(`loadSettingsDataset: no account ${accountId}`);
+  // Not in ACCOUNT_COLUMNS: the session may not read it (Q25); `cardFor` gives the owner alone the digits.
+  const card = await cardFor(session, admin, accountId);
+  accountRow.card_last4 = card.last4;
+  accountRow.card_on_file = card.onFile;
 
   const [seatRows, scopeRows, siteIds, accountRules] = await Promise.all([
     rows(

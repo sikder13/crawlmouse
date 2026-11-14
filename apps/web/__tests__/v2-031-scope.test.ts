@@ -309,10 +309,7 @@ describe('what a seat reads of the account itself, whatever its scope', () => {
   const reads = async (who: Who) => {
     const sb = sessionOf(w[who]);
     const [account, subscriptions, rules] = await Promise.all([
-      sb
-        .from('accounts')
-        .select('card_last4, current_subscription_id, state_history')
-        .eq('id', w.accountId),
+      sb.from('accounts').select('current_subscription_id, state_history').eq('id', w.accountId),
       sb.from('subscriptions').select('id').eq('account_id', w.accountId),
       sb.from('alert_rules').select('id').eq('account_id', w.accountId).is('site_id', null),
     ]);
@@ -343,6 +340,17 @@ describe('what a seat reads of the account itself, whatever its scope', () => {
     expect(await reads('developer')).toEqual(owner);
     expect(await reads('manager')).toEqual(owner);
   });
+
+  // CC-37 Q25: the card's last four is no member's to read through the session, the owner's
+  // included (20261117000001 revokes the column); the account pages read it with the service role
+  // for the owner alone (lib/v2/account/card.ts).
+  it.each(['owner', 'manager', 'developer'] as const)(
+    '%s cannot read the card’s last four through the session (Q25)',
+    async (who) => {
+      const r = await sessionOf(w[who]).from('accounts').select('card_last4').eq('id', w.accountId);
+      expect(r.error?.message ?? '').toMatch(/permission denied/);
+    },
+  );
 
   it.each(['removed', 'stranger'] as const)('%s reads none of them', async (who) => {
     expect(await reads(who)).toEqual({ account: 0, subscriptions: 0, accountRules: 0 });

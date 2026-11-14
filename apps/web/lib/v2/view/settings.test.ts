@@ -172,6 +172,13 @@ describe('Settings, the card decides, not the plan (the matcher keys on card_las
     ...d,
     accounts: d.accounts.map((a) => (a.id === id ? { ...a, card_last4: card } : a)),
   });
+  /** A card on file, read by a seat that is not the owner: no digits, `card_on_file` (Q25). */
+  const withheld = (d: ReturnType<typeof fixture>, id: string) => ({
+    ...d,
+    accounts: d.accounts.map((a) =>
+      a.id === id ? { ...a, card_last4: null, card_on_file: true } : a,
+    ),
+  });
   const BAD = 'a0000000-0000-4000-8000-000000000001';
   const KESTREL = 'a0000000-0000-4000-8000-0000000000ca';
 
@@ -185,6 +192,13 @@ describe('Settings, the card decides, not the plan (the matcher keys on card_las
     expect(p.other).toBe(
       'Pro is $19 a month, or $190 a year. Agency, $99 a month: 25 sites, 5 seats, reports under your brand.',
     );
+  });
+
+  it('a card trial read by a seat that is not the owner: the owner manages the card, no digits (Q25)', () => {
+    const p = settingsView(withheld(bad, BAD), ACCOUNT_VIEWERS.home()).plan;
+    expect(p.keep).toBeNull();
+    expect(p.note).toMatch(/Managed by the account owner\.$/);
+    expect(JSON.stringify(p)).not.toMatch(/card ending/);
   });
 
   it('an Agency trial with no card: its Keep, no cancel, no portal', () => {

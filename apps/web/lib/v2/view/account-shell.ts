@@ -11,6 +11,7 @@ import { instant, type Change, type Site } from '@crawlmouse/types/v2';
 import { TRIAL_REMINDER_DAYS_BEFORE_END } from '../../auth/constants';
 import { AGENCY_MONTHLY, AGENCY_YEARLY, PRO_MONTHLY, usd } from '../../billing/prices';
 import { GATES, type Tier } from '../../entitlement-v2';
+import { cardOnFile } from '../account/card';
 import { ACCOUNT_COPY as COPY } from '../copy/account';
 import { AGENCY_RAIL_COPY as AGENCY } from '../copy/agency';
 import { calendarDays, dayDate, dayMonth, daysBefore, hourMinute } from '../format';
@@ -157,9 +158,10 @@ function trialCard(
     return {
       title,
       left,
-      note:
-        a.card_last4 === null
-          ? `${COPY.noCard} ${COPY.nothingCharged}`
+      note: !cardOnFile(a)
+        ? `${COPY.noCard} ${COPY.nothingCharged}`
+        : a.card_last4 === null
+          ? COPY.cardManagedByOwner
           : billingEnd !== null
             ? COPY.cardNotCharged(a.card_last4, dayDate(end, zone))
             : COPY.cardCharged(a.card_last4, dayDate(end, zone)),
@@ -174,7 +176,7 @@ function trialCard(
     title,
     left,
     note: firstRun
-      ? `${a.card_last4 === null ? `${COPY.noCard} ` : ''}${COPY.trialFirstRun(freeSchedule)}`
+      ? `${!cardOnFile(a) ? `${COPY.noCard} ` : ''}${COPY.trialFirstRun(freeSchedule)}`
       : COPY.trialLater(
           primarySite(v).host,
           freeSchedule,

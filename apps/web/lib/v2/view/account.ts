@@ -3,6 +3,7 @@
  * fixture. `viewAt` keeps the viewer's own records and drops everything recorded after `now`, so a
  * screen viewed on day 0 cannot show a check, change or fix that did not exist yet (D1, D2).
  */
+import { cardOnFile } from '../account/card';
 import {
   instant,
   type Account,
@@ -133,8 +134,7 @@ function clockOf(a: Account): EntitlementClock {
     tier: pastDueTier ?? TIER_OF_STATE[a.state as keyof typeof TIER_OF_STATE] ?? 'free',
     pastDueTier,
     pastDueSince: pastDue ? new Date(last.since) : null,
-    trialVariant:
-      a.state === 'pro_trial' ? (a.card_last4 === null ? 'no_card' : 'card_required') : null,
+    trialVariant: a.state === 'pro_trial' ? (cardOnFile(a) ? 'card_required' : 'no_card') : null,
     trialEndsAt: a.trial_ends_at ? new Date(a.trial_ends_at) : null,
   };
 }
