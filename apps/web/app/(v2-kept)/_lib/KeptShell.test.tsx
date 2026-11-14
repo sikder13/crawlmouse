@@ -9,7 +9,7 @@ describe('the kept shell in print', () => {
   const css = readFileSync(join(__dirname, 'KeptShell.module.css'), 'utf8');
   const print = css.slice(css.indexOf('@media print'));
 
-  it("hides the shell's header and footer, as v1 hid its own", () => {
+  it("hides the shell's header and footer, as v1's report hid its own", () => {
     expect(print).toMatch(/\.kept > \[data-v2-shell\] > header/);
     expect(print).toMatch(/\.kept > \[data-v2-shell\] > \[data-v2-footer\]/);
     expect(print).toMatch(/display:\s*none/);

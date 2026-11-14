@@ -1,5 +1,6 @@
-/* What v1 hid from print (`.no-print` around its header and footer), the shell hides too: a kept
-   page printed, a v1 report's "Download PDF" among them, carries its own content only. */
+/* v1's report hid its header and footer from print (`.no-print`), for "Download PDF". The shell's
+   header and footer are hidden from print on every kept page, so a printed report carries its own
+   content only; on the other kept pages, which printed v1's chrome, the shell's is left out too. */
 .kept {
   display: contents;
 }

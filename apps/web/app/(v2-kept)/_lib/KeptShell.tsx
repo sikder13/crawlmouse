@@ -11,7 +11,7 @@ import styles from './KeptShell.module.css';
  * Log in button as the v2 home, and v2's footer, around the page's own output. That output sits on
  * the canvas v1's root layout gives it (`app/layout.tsx`: `bg-cream text-ink font-sans
  * antialiased`), so its colours read as they do on v1 in either colour scheme of the shell. In
- * print the shell's header and footer are hidden, as v1's were (`KeptShell.module.css`).
+ * print the shell's header and footer are hidden (`KeptShell.module.css`), as v1's report hid its own.
  */
 export function KeptShell({ children }: { children: ReactNode }) {
   return (
