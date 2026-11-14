@@ -29,15 +29,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'invalid input' }, { status: 400 });
   }
 
-  // Throttle the unauthenticated form: per IP and per domain. (RLS no longer lets the
-  // anon key insert directly — this route, on the service role, is the only path in.)
+  // Throttle the unauthenticated form per IP here, and per domain once a report is found below.
+  // (RLS no longer lets the anon key insert directly — this route, on the service role, is the only
+  // path in.)
   const ip = getClientIp(req);
   if (ip !== 'unknown') {
     const ipCheck = await checkRateLimit(`takedown:ip:${ip}`, TAKEDOWN_PER_IP_PER_DAY, DAY_MS);
     if (!ipCheck.allowed) return NextResponse.json({ error: 'rate_limited' }, { status: 429 });
   }
-  const domainCheck = await checkRateLimit(`takedown:domain:${domain}`, TAKEDOWN_PER_DOMAIN_PER_DAY, DAY_MS);
-  if (!domainCheck.allowed) return NextResponse.json({ error: 'rate_limited' }, { status: 429 });
 
   // Turnstile is verified when a token is supplied (forward-compatible); the form
   // widget itself is wired in launch readiness. In dev (no secret) this is a no-op.
@@ -59,6 +58,15 @@ export async function POST(req: Request) {
     .limit(1)
     .maybeSingle();
   if (!report) return NextResponse.json({ error: 'no_report_for_domain' }, { status: 404 });
+
+  // The per-domain bucket is spent only for a domain that has a report (A-5): posts for a domain we
+  // never published cannot use up the limit of one that is published later.
+  const domainCheck = await checkRateLimit(
+    `takedown:domain:${domain}`,
+    TAKEDOWN_PER_DOMAIN_PER_DAY,
+    DAY_MS,
+  );
+  if (!domainCheck.allowed) return NextResponse.json({ error: 'rate_limited' }, { status: 429 });
 
   const { error } = await sb.from('takedown_requests').insert({
     public_report_slug: report.slug,

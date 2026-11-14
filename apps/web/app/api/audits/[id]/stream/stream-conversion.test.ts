@@ -11,8 +11,24 @@ let userResult: { data: { user: { id: string } | null } };
 let ownerProUntil: string | null;
 let pagesSelectArg = '';
 
-const cannedFindings = [{ category: 'orphan', severity: 'critical', pages: { url: 'https://x.com/o' } }];
-const aiSig = (over = {}) => ({ pageClass: 'readable', mainTextChars: 400, title: 'Fixture Title', excerpt: 'x', csrSignals: [], frameworkMarker: null, hasTitle: true, hasMetaDescription: true, h1Count: 1, headingLevelsSkipped: false, hasMainLandmark: true, jsonLd: { present: true, valid: true, types: ['Organization'], hasEntityType: true }, ...over });
+const cannedFindings = [
+  { category: 'orphan', severity: 'critical', pages: { url: 'https://x.com/o' } },
+];
+const aiSig = (over = {}) => ({
+  pageClass: 'readable',
+  mainTextChars: 400,
+  title: 'Fixture Title',
+  excerpt: 'x',
+  csrSignals: [],
+  frameworkMarker: null,
+  hasTitle: true,
+  hasMetaDescription: true,
+  h1Count: 1,
+  headingLevelsSkipped: false,
+  hasMainLandmark: true,
+  jsonLd: { present: true, valid: true, types: ['Organization'], hasEntityType: true },
+  ...over,
+});
 // Non-overlapping markers (neither a substring of the other) so the security assertions can't tautologize.
 const HOME_VIEW_MARKER = 'HOMEVIEW_ALPHA_MARK';
 const BLOCKED_VIEW_MARKER = 'BLOCKED_INTERSTITIAL_MARKER';
@@ -20,35 +36,128 @@ const NONHOME_VIEW_MARKER = 'OTHERPAGE_BRAVO_MARK';
 // The homepage PAGE url is canonical ('https://x.com', no slash); auditRow.url is the raw 'https://x.com/'
 // — so the route must resolve homepageView through the depth-0 fallback, end to end.
 const cannedPages = [
-  { id: 'p1', url: 'https://x.com', title: 'Home', depth: 0, is_orphan: false, pagerank: 0.9, in_degree: 2, out_degree: 1, excluded_from_grade: false, ai_signals: aiSig({ excerpt: HOME_VIEW_MARKER }) },
-  { id: 'p2', url: 'https://x.com/o', title: 'Orphan', depth: 1, is_orphan: true, pagerank: 0.1, in_degree: 1, out_degree: 0, excluded_from_grade: false, ai_signals: aiSig({ pageClass: 'js_blind', mainTextChars: 4, title: 'Fixture Title', excerpt: NONHOME_VIEW_MARKER }) },
+  {
+    id: 'p1',
+    url: 'https://x.com',
+    title: 'Home',
+    depth: 0,
+    is_orphan: false,
+    pagerank: 0.9,
+    in_degree: 2,
+    out_degree: 1,
+    excluded_from_grade: false,
+    ai_signals: aiSig({ excerpt: HOME_VIEW_MARKER }),
+  },
+  {
+    id: 'p2',
+    url: 'https://x.com/o',
+    title: 'Orphan',
+    depth: 1,
+    is_orphan: true,
+    pagerank: 0.1,
+    in_degree: 1,
+    out_degree: 0,
+    excluded_from_grade: false,
+    ai_signals: aiSig({
+      pageClass: 'js_blind',
+      mainTextChars: 4,
+      title: 'Fixture Title',
+      excerpt: NONHOME_VIEW_MARKER,
+    }),
+  },
   // A BLOCKED page: carries aiSignals (every crawled page does) and classifies js_blind — severity
   // rank 0, so worst-first would put it FIRST in the Pro simulator, displacing the content pages the
   // customer is paying to see. Present so the route's exclusion predicate is exercised at the route
   // boundary: extracting the filter made it testable, but nothing pinned that the route USES it.
-  { id: 'p3', url: 'https://x.com/blocked', title: 'Blocked', depth: null, is_orphan: false, pagerank: 0, in_degree: 0, out_degree: 0, excluded_from_grade: true, ai_signals: aiSig({ pageClass: 'js_blind', mainTextChars: 2, title: 'Fixture Title', excerpt: BLOCKED_VIEW_MARKER }) },
+  {
+    id: 'p3',
+    url: 'https://x.com/blocked',
+    title: 'Blocked',
+    depth: null,
+    is_orphan: false,
+    pagerank: 0,
+    in_degree: 0,
+    out_degree: 0,
+    excluded_from_grade: true,
+    ai_signals: aiSig({
+      pageClass: 'js_blind',
+      mainTextChars: 2,
+      title: 'Fixture Title',
+      excerpt: BLOCKED_VIEW_MARKER,
+    }),
+  },
 ];
 const cannedAiScore = {
-  score: 50, band: 'partial',
-  components: { access: { score: 1, weight: 25 }, contentWithoutJs: { score: 0.5, weight: 40 }, machineLegibility: { score: 0.6, weight: 20 }, retrievalPath: { score: 0.5, weight: 15 } },
-  confidence: 'high', isEstimate: false,
+  score: 50,
+  band: 'partial',
+  components: {
+    access: { score: 1, weight: 25 },
+    contentWithoutJs: { score: 0.5, weight: 40 },
+    machineLegibility: { score: 0.6, weight: 20 },
+    retrievalPath: { score: 0.5, weight: 15 },
+  },
+  confidence: 'high',
+  isEstimate: false,
   basis: { pagesAnalyzed: 2, siteJsRendered: false, retrievalPathBasis: 'full' },
-  findings: [{ id: 'ai-1', kind: 'js_blind_page', severity: 'high', targetUrl: 'https://x.com/o', targetTitle: 'Orphan', plainLanguage: 'renders with JS', evidence: 'strong' }],
+  findings: [
+    {
+      id: 'ai-1',
+      kind: 'js_blind_page',
+      severity: 'high',
+      targetUrl: 'https://x.com/o',
+      targetTitle: 'Orphan',
+      plainLanguage: 'renders with JS',
+      evidence: 'strong',
+    },
+  ],
   accessMatrix: { bots: [], robotsTxtFound: true, wafDetected: false, wafNote: null },
-  llmsTxt: { present: false, parseable: false, note: 'n/a' }, asOf: '2026-07-01',
+  llmsTxt: { present: false, parseable: false, note: 'n/a' },
+  asOf: '2026-07-01',
 };
 const PACKET_BODY_SIGNATURE = 'Rewrite this page so its main content';
 const cannedLinks = [{ from_page_id: 'p1', to_page_id: 'p2' }];
-const freeFixRow = { fix_id: 'orphan:https://x.com/o', category: 'orphan', target_url: 'https://x.com/o', target_title: 'Orphan', marginal_delta: 5, effort: 'low', rationale: 'no inbound', rank: 1, is_free_fix: true, suggested_links: [{ fromUrl: 'https://x.com/', fromTitle: 'Home', anchorText: 'the orphan', relevanceScore: 0.8 }], action_packet_body: 'FREE TASTE BODY' };
-const gatedFixRow = { fix_id: 'deep:https://x.com/d', category: 'deep_page', target_url: 'https://x.com/d', target_title: 'Deep', marginal_delta: 2, effort: 'medium', rationale: 'too deep', rank: 2, is_free_fix: false, suggested_links: [{ fromUrl: 'https://x.com/', fromTitle: 'Home', anchorText: 'deep', relevanceScore: 0.5 }], action_packet_body: 'GATED CURE BODY' };
+const freeFixRow = {
+  fix_id: 'orphan:https://x.com/o',
+  category: 'orphan',
+  target_url: 'https://x.com/o',
+  target_title: 'Orphan',
+  marginal_delta: 5,
+  effort: 'low',
+  rationale: 'no inbound',
+  rank: 1,
+  is_free_fix: true,
+  suggested_links: [
+    { fromUrl: 'https://x.com/', fromTitle: 'Home', anchorText: 'the orphan', relevanceScore: 0.8 },
+  ],
+  action_packet_body: 'FREE TASTE BODY',
+};
+const gatedFixRow = {
+  fix_id: 'deep:https://x.com/d',
+  category: 'deep_page',
+  target_url: 'https://x.com/d',
+  target_title: 'Deep',
+  marginal_delta: 2,
+  effort: 'medium',
+  rationale: 'too deep',
+  rank: 2,
+  is_free_fix: false,
+  suggested_links: [
+    { fromUrl: 'https://x.com/', fromTitle: 'Home', anchorText: 'deep', relevanceScore: 0.5 },
+  ],
+  action_packet_body: 'GATED CURE BODY',
+};
 
 vi.mock('@/lib/supabase/fetch-all', () => ({
   POSTGREST_PAGE: 1000,
   fetchAll: (_c: unknown, table: string, cols: string) => {
     if (table === 'findings') return Promise.resolve(cannedFindings);
-    if (table === 'pages') { pagesSelectArg = cols; return Promise.resolve(cannedPages); }
+    if (table === 'pages') {
+      pagesSelectArg = cols;
+      return Promise.resolve(cannedPages);
+    }
     if (table === 'links') return Promise.resolve(cannedLinks);
-    if (table === 'fixes') return Promise.resolve(cols === 'fix_id' ? [] : [freeFixRow, gatedFixRow]);
+    if (table === 'fixes')
+      return Promise.resolve(cols === 'fix_id' ? [] : [freeFixRow, gatedFixRow]);
     return Promise.resolve([]);
   },
 }));
@@ -57,12 +166,17 @@ vi.mock('@/lib/supabase/admin', () => ({
     from: (table: string) => {
       let selectCols = '';
       const chain = {
-        select: (cols: string) => { selectCols = cols; return chain; },
+        select: (cols: string) => {
+          selectCols = cols;
+          return chain;
+        },
         eq: () => chain,
         maybeSingle: () => {
           if (table === 'audits') {
-            if (selectCols.includes('confidence_band')) return Promise.resolve({ data: convRow, error: null });
-            if (selectCols.includes('failure_reason')) return Promise.resolve({ data: auditRow, error: null }); // initial read
+            if (selectCols.includes('confidence_band'))
+              return Promise.resolve({ data: convRow, error: null });
+            if (selectCols.includes('failure_reason'))
+              return Promise.resolve({ data: auditRow, error: null }); // initial read
             return Promise.resolve({ data: null, error: null }); // a predecessor (none in these fixtures)
           }
           return Promise.resolve({ data: null, error: null });
@@ -73,20 +187,34 @@ vi.mock('@/lib/supabase/admin', () => ({
     },
   }),
 }));
+// The stream spends a per-IP bucket (A-1); these requests carry no client IP, so it is never asked.
+vi.mock('@/lib/rate-limit', () => ({
+  checkRateLimit: async () => {
+    throw new Error('no client IP here: the limiter is not reached');
+  },
+}));
 vi.mock('@/lib/supabase/server', () => ({
-  supabaseServer: () => Promise.resolve({
-    auth: { getUser: () => Promise.resolve(userResult) },
-    from: () => {
-      const chain = { select: () => chain, eq: () => chain, maybeSingle: () => Promise.resolve({ data: { pro_until: ownerProUntil }, error: null }) };
-      return chain;
-    },
-  }),
+  supabaseServer: () =>
+    Promise.resolve({
+      auth: { getUser: () => Promise.resolve(userResult) },
+      from: () => {
+        const chain = {
+          select: () => chain,
+          eq: () => chain,
+          maybeSingle: () => Promise.resolve({ data: { pro_until: ownerProUntil }, error: null }),
+        };
+        return chain;
+      },
+    }),
 }));
 
 import { GET } from './route';
 
 async function runDone() {
-  const res = await GET(new NextRequest('http://localhost/api/audits/aud-1/stream'), { params: Promise.resolve({ id: 'aud-1' }) });
+  const res = await GET(
+    new NextRequest('http://localhost/api/audits/7c1d2e3f-4a5b-4c6d-8e7f-90a1b2c3d4e5/stream'),
+    { params: Promise.resolve({ id: '7c1d2e3f-4a5b-4c6d-8e7f-90a1b2c3d4e5' }) },
+  );
   const raw = await res.text();
   const doneBlock = raw.split('\n\n').find((b) => b.startsWith('event: done'))!;
   const data = JSON.parse(doneBlock.slice(doneBlock.indexOf('data: ') + 6));
@@ -95,8 +223,39 @@ async function runDone() {
 
 beforeEach(() => {
   // a completed v2 audit (confidence set = v2) owned by owner-1
-  auditRow = { id: 'aud-1', url: 'https://x.com/', status: 'completed', grade: 'B-', score: '72.00', page_count: 2, link_count: 1, cms_detected: 'custom', user_id: 'owner-1', settings: { pageCap: 500 }, failure_reason: null, confidence: 'high', coverage_pct: '0.95', block_rate: '0', partial: false };
-  convRow = { confidence_band: { pointEstimate: 72, grade: 'B-', lower: 70, upper: 74, confidence: 'high', basis: { crawled: 2, estimatedTotal: 2, method: 'sitemap' }, isEstimate: false }, projected_score: '88.00', projected_grade: 'A-', previous_audit_id: null, completed_at: '2026-06-29T00:00:00Z', ai_readiness: cannedAiScore };
+  auditRow = {
+    id: '7c1d2e3f-4a5b-4c6d-8e7f-90a1b2c3d4e5',
+    url: 'https://x.com/',
+    status: 'completed',
+    grade: 'B-',
+    score: '72.00',
+    page_count: 2,
+    link_count: 1,
+    cms_detected: 'custom',
+    user_id: 'owner-1',
+    settings: { pageCap: 500 },
+    failure_reason: null,
+    confidence: 'high',
+    coverage_pct: '0.95',
+    block_rate: '0',
+    partial: false,
+  };
+  convRow = {
+    confidence_band: {
+      pointEstimate: 72,
+      grade: 'B-',
+      lower: 70,
+      upper: 74,
+      confidence: 'high',
+      basis: { crawled: 2, estimatedTotal: 2, method: 'sitemap' },
+      isEstimate: false,
+    },
+    projected_score: '88.00',
+    projected_grade: 'A-',
+    previous_audit_id: null,
+    completed_at: '2026-06-29T00:00:00Z',
+    ai_readiness: cannedAiScore,
+  };
   userResult = { data: { user: { id: 'owner-1' } } };
   ownerProUntil = FUTURE;
   pagesSelectArg = '';
@@ -191,6 +350,8 @@ describe('SSE route — non-gradeable pages never reach any AI surface', () => {
     expect(raw).toContain(NONHOME_VIEW_MARKER); // …while a gradeable js_blind page still appears
     // …and it is absent from the honest page total too, so the count matches basis.pagesAnalyzed.
     expect(data.aiReadiness.whatAiSeesTotalPages).toBe(2);
-    expect(data.aiReadiness.whatAiSees.map((p: { url: string }) => p.url)).not.toContain('https://x.com/blocked');
+    expect(data.aiReadiness.whatAiSees.map((p: { url: string }) => p.url)).not.toContain(
+      'https://x.com/blocked',
+    );
   });
 });

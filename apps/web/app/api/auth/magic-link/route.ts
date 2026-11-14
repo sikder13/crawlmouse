@@ -28,8 +28,12 @@ import {
 import { hostFromSiteInput } from '@/lib/auth/site-host';
 import { requestCookie } from '@/lib/auth/request-cookie';
 
+// RFC 5321's limit on a forward path: a longer address is refused here, with the other malformed
+// ones, before any bucket is spent or any check made (A-4).
+const MAX_EMAIL = 254;
+
 const schema = z.object({
-  email: z.string().email(),
+  email: z.string().max(MAX_EMAIL).email(),
   turnstileToken: z.string().optional(),
   // R1 fold-in — a return target (e.g. the report being claimed). Validated to a same-origin relative
   // path by safeNextPath before it is ever stored/used (no open redirect).

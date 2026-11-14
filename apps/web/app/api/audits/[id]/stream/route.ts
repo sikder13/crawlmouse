@@ -1,4 +1,4 @@
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabase/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { deriveTier, entitlementFor } from '@/lib/entitlement';
@@ -6,13 +6,34 @@ import { groupAndCapFindings, mapFindingRows, type FindingRow } from '@/lib/find
 import { fetchAll } from '@/lib/supabase/fetch-all';
 import { asNumber } from '@/lib/numeric';
 import { aggregateGraphStats } from '@/lib/audit-stats';
-import { assembleGraph, FREE_GRAPH_NODE_CAP, PRO_GRAPH_NODE_CAP, type RawGraphEdge } from '@/lib/graph-assembly';
+import {
+  assembleGraph,
+  FREE_GRAPH_NODE_CAP,
+  PRO_GRAPH_NODE_CAP,
+  type RawGraphEdge,
+} from '@/lib/graph-assembly';
 import { reconstructConversion, type FixDbRow } from '@/lib/conversion-from-fixes';
 import { computeMonitoringDelta } from '@/lib/dashboard';
-import { projectAuditForClient, type AuditRow, type ConversionProjectionInput } from '@/lib/audit-stream-projection';
+import {
+  projectAuditForClient,
+  type AuditRow,
+  type ConversionProjectionInput,
+} from '@/lib/audit-stream-projection';
 import { extractNewActivity, isUndefinedColumnError } from '@/lib/audit-activity';
-import { SSE_POLL_MS, SSE_SELF_CLOSE_MS } from '@/lib/limits';
-import type { GraphData, ConfidenceBand, ProjectedGrade, FreeFix, FixPrescription, MonitoringDelta, AiReadinessScore, PageAiSignals } from '@crawlmouse/types';
+import { REPORT_VIEWS_PER_IP_PER_HOUR, SSE_POLL_MS, SSE_SELF_CLOSE_MS } from '@/lib/limits';
+import { checkRateLimit } from '@/lib/rate-limit';
+import { getClientIp } from '@/lib/client-ip';
+import { isUuid } from '@/lib/uuid';
+import type {
+  GraphData,
+  ConfidenceBand,
+  ProjectedGrade,
+  FreeFix,
+  FixPrescription,
+  MonitoringDelta,
+  AiReadinessScore,
+  PageAiSignals,
+} from '@crawlmouse/types';
 import type { AiSignalsPage } from '@/lib/ai-readiness-packets';
 import { selectAiSignalPages } from '@/lib/ai-readiness-packets';
 // The select lists live in lib/ so the route-level tests can import the REAL value rather than
@@ -45,12 +66,26 @@ export const dynamic = 'force-dynamic';
 // constant trips "can't recognize the exported `config` field" at build. Keep it == SSE_MAX_DURATION_S.
 export const maxDuration = 300;
 
-
 /** The extended row (post-Runbook-A); the fields are absent when the fallback engaged. */
 type AuditRowWithProgress = AuditRow & { crawl_activity?: unknown };
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  // A-1 (CC-37): an audit id is a UUID. Anything else is refused before any database read, so a
+  // garbage id cannot hold a function open polling for a row that cannot exist.
+  if (!isUuid(id)) return NextResponse.json({ error: 'invalid id' }, { status: 400 });
+  // Per-IP, before the first read: each stream polls the database until it closes. The hourly read
+  // limit the report-view route uses (the v1 audit routes' own limits are daily start/notify caps,
+  // which a viewer's reconnects would exhaust). No known IP is not bucketed, as on audits/start.
+  const ip = getClientIp(req);
+  if (ip !== 'unknown') {
+    const rl = await checkRateLimit(
+      `audit-stream:ip:${ip}`,
+      REPORT_VIEWS_PER_IP_PER_HOUR,
+      60 * 60 * 1000,
+    );
+    if (!rl.allowed) return NextResponse.json({ error: 'rate_limited' }, { status: 429 });
+  }
   const admin = supabaseAdmin();
   const sbAuth = await supabaseServer();
 
@@ -72,7 +107,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       ? 'id, url, title, depth, is_orphan, pagerank, in_degree, out_degree, excluded_from_grade, ai_signals'
       : 'is_orphan, depth';
     // Independent reads — run them together (fires once per audit at the terminal poll).
-    const [findings, pages, { data: { user } }] = await Promise.all([
+    const [
+      findings,
+      pages,
+      {
+        data: { user },
+      },
+    ] = await Promise.all([
       fetchAll<FindingRow>(admin, 'findings', 'category, severity, pages(url)', id),
       fetchAll<GraphPageRow>(admin, 'pages', pagesSelect, id),
       sbAuth.auth.getUser(),
@@ -80,9 +121,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     // §7 entitlement — OWNER-SCOPED, derived SERVER-SIDE. A non-owner viewer (even another Pro) gets
     // the free view; the owner's tier comes from their own users row (RLS permits self-read).
     const isOwner = !!(user && user.id === row.user_id);
-    const ownerRow = isOwner && user
-      ? (await sbAuth.from('users').select('pro_until').eq('id', user.id).maybeSingle()).data
-      : null;
+    const ownerRow =
+      isOwner && user
+        ? (await sbAuth.from('users').select('pro_until').eq('id', user.id).maybeSingle()).data
+        : null;
     const tier = deriveTier(ownerRow);
     const entitlement = entitlementFor(tier, ownerRow?.pro_until ?? null);
     const viewerIsPro = tier === 'pro' || tier === 'agency'; // legacy key (owner-scoped: ownerRow is null for non-owners)
@@ -103,10 +145,32 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       // — read together at the terminal event. (The graph reads all link rows once; a bounded subgraph
       // query is a future perf optimization for very dense Pro sites — output stays capped regardless.)
       const [links, fixes, convRes] = await Promise.all([
-        fetchAll<{ from_page_id: string; to_page_id: string }>(admin, 'links', 'from_page_id, to_page_id', id),
-        fetchAll<FixDbRow>(admin, 'fixes', 'fix_id, category, target_url, target_title, marginal_delta, effort, rationale, rank, is_free_fix, suggested_links, action_packet_body', id),
-        admin.from('audits').select('confidence_band, projected_score, projected_grade, previous_audit_id, completed_at, ai_readiness').eq('id', id)
-          .maybeSingle<{ confidence_band: unknown; projected_score: number | string | null; projected_grade: string | null; previous_audit_id: string | null; completed_at: string | null; ai_readiness: AiReadinessScore | null }>(),
+        fetchAll<{ from_page_id: string; to_page_id: string }>(
+          admin,
+          'links',
+          'from_page_id, to_page_id',
+          id,
+        ),
+        fetchAll<FixDbRow>(
+          admin,
+          'fixes',
+          'fix_id, category, target_url, target_title, marginal_delta, effort, rationale, rank, is_free_fix, suggested_links, action_packet_body',
+          id,
+        ),
+        admin
+          .from('audits')
+          .select(
+            'confidence_band, projected_score, projected_grade, previous_audit_id, completed_at, ai_readiness',
+          )
+          .eq('id', id)
+          .maybeSingle<{
+            confidence_band: unknown;
+            projected_score: number | string | null;
+            projected_grade: string | null;
+            previous_audit_id: string | null;
+            completed_at: string | null;
+            ai_readiness: AiReadinessScore | null;
+          }>(),
       ]);
       const conv = convRes.data;
       confidenceBand = (conv?.confidence_band as ConfidenceBand | null) ?? null;
@@ -117,9 +181,20 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       const idToUrl = new Map(pages.map((p) => [p.id, p.url]));
       const rawNodes = pages
         .filter((p) => !p.excluded_from_grade)
-        .map((p) => ({ url: p.url, title: p.title ?? null, depth: p.depth, isOrphan: p.is_orphan, pagerank: p.pagerank ?? 0, inboundCount: p.in_degree ?? 0, outboundCount: p.out_degree ?? 0 }));
+        .map((p) => ({
+          url: p.url,
+          title: p.title ?? null,
+          depth: p.depth,
+          isOrphan: p.is_orphan,
+          pagerank: p.pagerank ?? 0,
+          inboundCount: p.in_degree ?? 0,
+          outboundCount: p.out_degree ?? 0,
+        }));
       const rawEdges: RawGraphEdge[] = links
-        .map((l) => ({ fromUrl: idToUrl.get(l.from_page_id) ?? '', toUrl: idToUrl.get(l.to_page_id) ?? '' }))
+        .map((l) => ({
+          fromUrl: idToUrl.get(l.from_page_id) ?? '',
+          toUrl: idToUrl.get(l.to_page_id) ?? '',
+        }))
         .filter((e) => e.fromUrl && e.toUrl);
       graph = assembleGraph(rawNodes, rawEdges, {
         homepageUrl: row.url,
@@ -144,10 +219,23 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
       // §8 monitoring delta (GATED): computed only for the entitled OWNER of a re-audit (previous_audit_id).
       if (isOwner && viewerIsPro && conv?.previous_audit_id) {
-        const { data: prev } = await admin.from('audits').select('id, grade, score, completed_at').eq('id', conv.previous_audit_id)
-          .maybeSingle<{ id: string; grade: string | null; score: number | string | null; completed_at: string | null }>();
+        const { data: prev } = await admin
+          .from('audits')
+          .select('id, grade, score, completed_at')
+          .eq('id', conv.previous_audit_id)
+          .maybeSingle<{
+            id: string;
+            grade: string | null;
+            score: number | string | null;
+            completed_at: string | null;
+          }>();
         if (prev) {
-          const prevFixes = await fetchAll<{ fix_id: string }>(admin, 'fixes', 'fix_id', conv.previous_audit_id);
+          const prevFixes = await fetchAll<{ fix_id: string }>(
+            admin,
+            'fixes',
+            'fix_id',
+            conv.previous_audit_id,
+          );
           // NO COERCION — gate 5 / R1-NB1. This passed `grade ?? ''` and `score ?? 0` on BOTH sides,
           // undoing at the call site exactly what `computeMonitoringDelta` was hardened to provide.
           // Measured on the route's own expressions: a refused current audit yielded
@@ -157,8 +245,18 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
           // visible — but the standard here is byte-level proof at the SERIALIZATION boundary, and a
           // value that is correct only because no one reads it does not meet it.
           monitoring = computeMonitoringDelta(
-            { id: row.id, grade: row.grade, score: asNumber(row.score), completedAt: conv?.completed_at ?? '' },
-            { id: prev.id, grade: prev.grade, score: asNumber(prev.score), completedAt: prev.completed_at ?? '' },
+            {
+              id: row.id,
+              grade: row.grade,
+              score: asNumber(row.score),
+              completedAt: conv?.completed_at ?? '',
+            },
+            {
+              id: prev.id,
+              grade: prev.grade,
+              score: asNumber(prev.score),
+              completedAt: prev.completed_at ?? '',
+            },
             fixes.map((f) => f.fix_id),
             prevFixes.map((f) => f.fix_id),
           );
@@ -199,14 +297,18 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       const send = (event: string, payload: unknown) => {
         if (closed) return;
         try {
-          controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`));
+          controller.enqueue(
+            encoder.encode(`event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`),
+          );
         } catch {
           closed = true;
         }
       };
       const finish = () => {
         closed = true;
-        try { controller.close(); } catch {}
+        try {
+          controller.close();
+        } catch {}
       };
       // When we self-terminate before the function's maxDuration (see the interval below), emit a
       // `retry:` hint so the client's EventSource reconnects promptly (3s) and resumes polling,
@@ -250,13 +352,21 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         if (events.length > 0) send('activity', events);
       };
 
-      const firstRead = await admin.from('audits').select(cols).eq('id', id).maybeSingle<AuditRowWithProgress>();
+      const firstRead = await admin
+        .from('audits')
+        .select(cols)
+        .eq('id', id)
+        .maybeSingle<AuditRowWithProgress>();
       let initial = firstRead.data;
       // Fall back to the legacy column set ONLY on an undefined-column error (the pre-Runbook-A
       // state) — a transient DB blip must NOT permanently downgrade this connection to no-activity.
       if (isUndefinedColumnError(firstRead.error)) {
         cols = AUDIT_COLS;
-        ({ data: initial } = await admin.from('audits').select(cols).eq('id', id).maybeSingle<AuditRowWithProgress>());
+        ({ data: initial } = await admin
+          .from('audits')
+          .select(cols)
+          .eq('id', id)
+          .maybeSingle<AuditRowWithProgress>());
       }
       if (initial) {
         send('snapshot', projectAuditForClient(initial));
@@ -264,7 +374,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       }
 
       // Short-circuit: audit already finished at load → emit done immediately, never start polling.
-      if (initial && (initial.status === 'completed' || initial.status === 'failed' || initial.status === 'canceled')) {
+      if (
+        initial &&
+        (initial.status === 'completed' ||
+          initial.status === 'failed' ||
+          initial.status === 'canceled')
+      ) {
         await emitDoneAndFinish(initial);
         return;
       }
@@ -283,11 +398,19 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         if (inFlight) return; // guard against overlapping ticks (a slow tick + the next)
         inFlight = true;
         try {
-          const { data } = await admin.from('audits').select(cols).eq('id', id).maybeSingle<AuditRowWithProgress>();
+          const { data } = await admin
+            .from('audits')
+            .select(cols)
+            .eq('id', id)
+            .maybeSingle<AuditRowWithProgress>();
           if (!data || closed) return;
           send('progress', projectAuditForClient(data));
           sendNewActivity(data);
-          if (data.status === 'completed' || data.status === 'failed' || data.status === 'canceled') {
+          if (
+            data.status === 'completed' ||
+            data.status === 'failed' ||
+            data.status === 'canceled'
+          ) {
             clearInterval(interval);
             await emitDoneAndFinish(data);
           }
@@ -306,7 +429,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   return new Response(stream, {
     headers: {
       'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache, no-transform',
+      // `private`: the body depends on the viewer (owner-scoped gating), so no shared cache keeps it.
+      'Cache-Control': 'private, no-cache, no-transform',
       Connection: 'keep-alive',
     },
   });

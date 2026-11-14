@@ -82,3 +82,9 @@ scripts do not fill the CSP reports.
 ## Known gaps (and who closes them)
 
 The spec's "Known gaps and follow-ups" section is the list, each with its owner.
+
+## CSP enforcement plan
+
+| Date       | Change                                                                                                                                                                                                                    | What must hold before the full policy is enforced                                                                                   | Owner     | Status            |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | --------- | ----------------- |
+| 2026-11-14 | `https://us-assets.i.posthog.com` added to the report-only `script-src`, for PostHog's lazy-loaded scripts (Sentry `CRAWLMOUSE-M`, `surveys.js`). The enforced policy has no script directive and is unchanged (CC-37 F5) | the report-only `script-src` reports in Sentry show no remaining violation for seven consecutive days after this change is deployed | the owner | not done in CC-37 |

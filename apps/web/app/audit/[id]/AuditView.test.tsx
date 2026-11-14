@@ -86,18 +86,63 @@ let pollRows: Array<Record<string, unknown>> | null = null;
 let readCount = 0;
 
 const aiSig = () => ({
-  pageClass: 'readable', mainTextChars: 400, title: 'T', excerpt: 'x', csrSignals: [], frameworkMarker: null,
-  hasTitle: true, hasMetaDescription: true, h1Count: 1, headingLevelsSkipped: false, hasMainLandmark: true,
+  pageClass: 'readable',
+  mainTextChars: 400,
+  title: 'T',
+  excerpt: 'x',
+  csrSignals: [],
+  frameworkMarker: null,
+  hasTitle: true,
+  hasMetaDescription: true,
+  h1Count: 1,
+  headingLevelsSkipped: false,
+  hasMainLandmark: true,
   jsonLd: { present: true, valid: true, types: ['Organization'], hasEntityType: true },
 });
 const cannedPages = [
-  { id: 'p1', url: 'https://x.com', title: 'Home', depth: 0, is_orphan: false, pagerank: 0.9, in_degree: 2, out_degree: 1, excluded_from_grade: false, ai_signals: aiSig() },
-  { id: 'p2', url: 'https://x.com/o', title: 'Orphan', depth: 1, is_orphan: true, pagerank: 0.1, in_degree: 1, out_degree: 0, excluded_from_grade: false, ai_signals: aiSig() },
+  {
+    id: 'p1',
+    url: 'https://x.com',
+    title: 'Home',
+    depth: 0,
+    is_orphan: false,
+    pagerank: 0.9,
+    in_degree: 2,
+    out_degree: 1,
+    excluded_from_grade: false,
+    ai_signals: aiSig(),
+  },
+  {
+    id: 'p2',
+    url: 'https://x.com/o',
+    title: 'Orphan',
+    depth: 1,
+    is_orphan: true,
+    pagerank: 0.1,
+    in_degree: 1,
+    out_degree: 0,
+    excluded_from_grade: false,
+    ai_signals: aiSig(),
+  },
 ];
 const freeFixRow = {
-  fix_id: 'orphan:https://x.com/o', category: 'orphan', target_url: 'https://x.com/o', target_title: 'Orphan',
-  marginal_delta: 5, effort: 'low', rationale: 'no inbound', rank: 1, is_free_fix: true,
-  suggested_links: [{ fromUrl: 'https://x.com/', fromTitle: 'Home', anchorText: 'the orphaned page', relevanceScore: 0.8 }],
+  fix_id: 'orphan:https://x.com/o',
+  category: 'orphan',
+  target_url: 'https://x.com/o',
+  target_title: 'Orphan',
+  marginal_delta: 5,
+  effort: 'low',
+  rationale: 'no inbound',
+  rank: 1,
+  is_free_fix: true,
+  suggested_links: [
+    {
+      fromUrl: 'https://x.com/',
+      fromTitle: 'Home',
+      anchorText: 'the orphaned page',
+      relevanceScore: 0.8,
+    },
+  ],
   action_packet_body: 'FREE TASTE BODY',
 };
 
@@ -106,9 +151,13 @@ vi.mock('@/lib/supabase/fetch-all', () => ({
   fetchAll: (_c: unknown, table: string) => {
     // Models `buildDone` throwing mid-assembly — the path that makes the route emit a NAMED `error`
     // instead of `done`, leaving the client holding the BASE payload (gate 7 / B4).
-    if (table === 'findings' && findingsThrow) return Promise.reject(new Error('results read failed'));
+    if (table === 'findings' && findingsThrow)
+      return Promise.reject(new Error('results read failed'));
     if (emptyResults) return Promise.resolve([]);
-    if (table === 'findings') return Promise.resolve([{ category: 'orphan', severity: 'critical', pages: { url: 'https://x.com/o' } }]);
+    if (table === 'findings')
+      return Promise.resolve([
+        { category: 'orphan', severity: 'critical', pages: { url: 'https://x.com/o' } },
+      ]);
     if (table === 'pages') return Promise.resolve(cannedPages);
     if (table === 'links') return Promise.resolve([{ from_page_id: 'p1', to_page_id: 'p2' }]);
     if (table === 'fixes') return Promise.resolve([freeFixRow]);
@@ -120,13 +169,19 @@ vi.mock('@/lib/supabase/admin', () => ({
     from: (table: string) => {
       let selectCols = '';
       const chain = {
-        select: (cols: string) => { selectCols = cols; return chain; },
+        select: (cols: string) => {
+          selectCols = cols;
+          return chain;
+        },
         eq: () => chain,
         maybeSingle: () => {
           if (table === 'audits') {
-            if (selectCols.includes('confidence_band')) return Promise.resolve({ data: convRow, error: null });
+            if (selectCols.includes('confidence_band'))
+              return Promise.resolve({ data: convRow, error: null });
             if (selectCols.includes('failure_reason')) {
-              const row = pollRows ? (pollRows[readCount] ?? pollRows[pollRows.length - 1]) : auditRow;
+              const row = pollRows
+                ? (pollRows[readCount] ?? pollRows[pollRows.length - 1])
+                : auditRow;
               readCount += 1;
               return Promise.resolve({ data: row, error: null });
             }
@@ -139,11 +194,25 @@ vi.mock('@/lib/supabase/admin', () => ({
     },
   }),
 }));
+// The stream spends a per-IP bucket (A-1); these requests carry no client IP, so it is never asked.
+vi.mock('@/lib/rate-limit', () => ({
+  checkRateLimit: async () => {
+    throw new Error('no client IP here: the limiter is not reached');
+  },
+}));
 vi.mock('@/lib/supabase/server', () => ({
-  supabaseServer: () => Promise.resolve({
-    auth: { getUser: () => Promise.resolve({ data: { user: null } }) },
-    from: () => { const c = { select: () => c, eq: () => c, maybeSingle: () => Promise.resolve({ data: null, error: null }) }; return c; },
-  }),
+  supabaseServer: () =>
+    Promise.resolve({
+      auth: { getUser: () => Promise.resolve({ data: { user: null } }) },
+      from: () => {
+        const c = {
+          select: () => c,
+          eq: () => c,
+          maybeSingle: () => Promise.resolve({ data: null, error: null }),
+        };
+        return c;
+      },
+    }),
 }));
 
 import { GET } from '@/app/api/audits/[id]/stream/route';
@@ -156,14 +225,19 @@ const COULD_NOT_GRADE = 'Couldn’t grade this site';
 /** Uniquely `ResultView`'s free-cure card: on the v2 arc, absent from the legacy GradeCard. */
 const V2_ARC_MARKER = 'the orphaned page';
 
-interface Emission { event: string; data: string }
+interface Emission {
+  event: string;
+  data: string;
+}
 
 /**
  * Run the REAL SSE route and return the events it emitted, in order, with payloads exactly as
  * serialized. This is the producer; everything below replays what it says.
  */
-async function captureFromRoute(id = 'aud-1'): Promise<Emission[]> {
-  const res = await GET(new NextRequest(`http://localhost/api/audits/${id}/stream`), { params: Promise.resolve({ id }) });
+async function captureFromRoute(id = '7c1d2e3f-4a5b-4c6d-8e7f-90a1b2c3d4e5'): Promise<Emission[]> {
+  const res = await GET(new NextRequest(`http://localhost/api/audits/${id}/stream`), {
+    params: Promise.resolve({ id }),
+  });
   const raw = await res.text();
   return raw
     .split('\n\n')
@@ -173,15 +247,49 @@ async function captureFromRoute(id = 'aud-1'): Promise<Emission[]> {
 
 // ── Row fixtures. Only the DB rows are hand-written; every wire payload is produced. ─────────────
 const REFUSED_ROW = {
-  id: 'aud-1', url: 'https://x.com/', status: 'completed', grade: null, score: null, page_count: 2, link_count: 1,
-  cms_detected: 'custom', user_id: null, settings: { pageCap: 500 }, failure_reason: null,
-  confidence: 'high', coverage_pct: '1', block_rate: '0', partial: false,
-  refusal: { refused: true, triggers: ['site_too_small_to_measure'], confidenceCapped: false, unevaluable: [] },
-  coverage: { fetched: 3, gradeable: 3, excluded: [], sitemapDeclared: null, sitemapRobotsExcluded: null, estimatedTotal: 3, estimateSource: 'frontier', coverageRatio: 1 },
-  discovered_count: 3, blocked_count: 0,
+  id: '7c1d2e3f-4a5b-4c6d-8e7f-90a1b2c3d4e5',
+  url: 'https://x.com/',
+  status: 'completed',
+  grade: null,
+  score: null,
+  page_count: 2,
+  link_count: 1,
+  cms_detected: 'custom',
+  user_id: null,
+  settings: { pageCap: 500 },
+  failure_reason: null,
+  confidence: 'high',
+  coverage_pct: '1',
+  block_rate: '0',
+  partial: false,
+  refusal: {
+    refused: true,
+    triggers: ['site_too_small_to_measure'],
+    confidenceCapped: false,
+    unevaluable: [],
+  },
+  coverage: {
+    fetched: 3,
+    gradeable: 3,
+    excluded: [],
+    sitemapDeclared: null,
+    sitemapRobotsExcluded: null,
+    estimatedTotal: 3,
+    estimateSource: 'frontier',
+    coverageRatio: 1,
+  },
+  discovered_count: 3,
+  blocked_count: 0,
 };
 const GRADED_ROW = { ...REFUSED_ROW, grade: 'C', score: '64.00', refusal: null, coverage: null };
-const RUNNING_ROW = { ...REFUSED_ROW, status: 'running', grade: null, score: null, refusal: null, coverage: null };
+const RUNNING_ROW = {
+  ...REFUSED_ROW,
+  status: 'running',
+  grade: null,
+  score: null,
+  refusal: null,
+  coverage: null,
+};
 
 // ── THE ROW-SHAPE MATRIX ─────────────────────────────────────────────────────
 // GATE 9 / NB-1. The stream was the producer's, but the ROW SHAPE was one hand-picked singleton
@@ -211,10 +319,25 @@ const refusedRowAt = (confidence: string, partial: boolean) => ({
 /** The zero-page refusal: nothing was read at all. No pages, no links, no findings. */
 const NOTHING_READ_ROW = {
   ...REFUSED_ROW,
-  page_count: 0, link_count: 0, confidence: 'low', coverage_pct: '0', block_rate: '1', partial: true,
+  page_count: 0,
+  link_count: 0,
+  confidence: 'low',
+  coverage_pct: '0',
+  block_rate: '1',
+  partial: true,
   refusal: { refused: true, triggers: ['nothing_read'], confidenceCapped: true, unevaluable: [] },
-  coverage: { fetched: 0, gradeable: 0, excluded: [], sitemapDeclared: null, sitemapRobotsExcluded: null, estimatedTotal: 0, estimateSource: 'none', coverageRatio: 0 },
-  discovered_count: 0, blocked_count: 0,
+  coverage: {
+    fetched: 0,
+    gradeable: 0,
+    excluded: [],
+    sitemapDeclared: null,
+    sitemapRobotsExcluded: null,
+    estimatedTotal: 0,
+    estimateSource: 'none',
+    coverageRatio: 0,
+  },
+  discovered_count: 0,
+  blocked_count: 0,
 };
 
 /**
@@ -225,13 +348,29 @@ const NOTHING_READ_ROW = {
  */
 const EXCLUSION_REFUSED_ROW = {
   ...REFUSED_ROW,
-  page_count: 214, link_count: 3978, partial: false, confidence: 'high',
-  refusal: { refused: true, triggers: ['too_few_gradeable_after_exclusion'], confidenceCapped: false, unevaluable: [] },
+  page_count: 214,
+  link_count: 3978,
+  partial: false,
+  confidence: 'high',
+  refusal: {
+    refused: true,
+    triggers: ['too_few_gradeable_after_exclusion'],
+    confidenceCapped: false,
+    unevaluable: [],
+  },
   coverage: {
-    fetched: 214, gradeable: 1,
-    excluded: [{ kind: 'pagination', count: 152 }, { kind: 'archive', count: 60 }, { kind: 'auth', count: 1 }],
-    sitemapDeclared: null, sitemapRobotsExcluded: null, estimatedTotal: 214,
-    estimateSource: 'none', coverageRatio: null,
+    fetched: 214,
+    gradeable: 1,
+    excluded: [
+      { kind: 'pagination', count: 152 },
+      { kind: 'archive', count: 60 },
+      { kind: 'auth', count: 1 },
+    ],
+    sitemapDeclared: null,
+    sitemapRobotsExcluded: null,
+    estimatedTotal: 214,
+    estimateSource: 'none',
+    coverageRatio: null,
   },
 };
 
@@ -239,13 +378,28 @@ const EXCLUSION_REFUSED_ROW = {
 const ACTIVITY_LABEL = '/pages/activity-marker';
 const RUNNING_WITH_ACTIVITY = {
   ...RUNNING_ROW,
-  pages_crawled: 2, crawl_estimated_total: 10, crawl_phase: 'crawling',
+  pages_crawled: 2,
+  crawl_estimated_total: 10,
+  crawl_phase: 'crawling',
   crawl_activity: [
-    { seq: 1, kind: 'fetch_ok', label: ACTIVITY_LABEL, at: '2026-06-29T00:00:01Z', pagesFetched: 1 },
+    {
+      seq: 1,
+      kind: 'fetch_ok',
+      label: ACTIVITY_LABEL,
+      at: '2026-06-29T00:00:01Z',
+      pagesFetched: 1,
+    },
     { seq: 2, kind: 'sitemap_seeded', label: '/sitemap.xml', at: '2026-06-29T00:00:02Z' },
   ],
 };
-const CONV_NONE = { confidence_band: null, projected_score: null, projected_grade: null, previous_audit_id: null, completed_at: '2026-06-29T00:00:00Z', ai_readiness: null };
+const CONV_NONE = {
+  confidence_band: null,
+  projected_score: null,
+  projected_grade: null,
+  previous_audit_id: null,
+  completed_at: '2026-06-29T00:00:00Z',
+  ai_readiness: null,
+};
 const CONV_GRADED = { ...CONV_NONE, projected_score: '88.00', projected_grade: 'A-' };
 
 /** The slice of EventSource `wireAuditStream` uses. jsdom ships none, so this is a stand-in. */
@@ -254,11 +408,15 @@ class FakeEventSource {
   readonly listeners = new Map<string, ((e: Event) => void)[]>();
   closed = false;
 
-  constructor(readonly url: string) { FakeEventSource.instances.push(this); }
+  constructor(readonly url: string) {
+    FakeEventSource.instances.push(this);
+  }
   addEventListener(type: string, fn: (e: Event) => void): void {
     this.listeners.set(type, [...(this.listeners.get(type) ?? []), fn]);
   }
-  close(): void { this.closed = true; }
+  close(): void {
+    this.closed = true;
+  }
   /** Deliver a payload EXACTLY as the route serialized it — no re-encoding. */
   emitRaw(type: string, data: string): void {
     const e = { data } as MessageEvent;
@@ -291,18 +449,20 @@ afterEach(async () => {
   container = null;
 });
 
-async function mount(auditId = 'aud-1') {
+async function mount(auditId = '7c1d2e3f-4a5b-4c6d-8e7f-90a1b2c3d4e5') {
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
-  await act(async () => { root!.render(<AuditView auditId={auditId} />); });
+  await act(async () => {
+    root!.render(<AuditView auditId={auditId} />);
+  });
   const es = FakeEventSource.instances.at(-1);
   if (!es) throw new Error('AuditView did not open a stream');
   return { es, html: () => container!.innerHTML };
 }
 
 /** Mount, then replay the producer's emissions in order. Returns the rendered HTML. */
-async function replay(seq: Emission[], auditId = 'aud-1') {
+async function replay(seq: Emission[], auditId = '7c1d2e3f-4a5b-4c6d-8e7f-90a1b2c3d4e5') {
   const { es, html } = await mount(auditId);
   for (const { event, data } of seq) {
     await act(async () => es.emitRaw(event, data));
@@ -319,10 +479,10 @@ describe('AuditView — replaying the real stream the route produces', () => {
     expect(seq.map((s) => s.event)).toEqual(['snapshot', 'done']);
     const base = JSON.parse(seq[0]!.data);
     const done = JSON.parse(seq[1]!.data);
-    expect(base.refusal?.refused).toBe(true);          // the decision is on the FIRST payload…
-    expect(base.findings).toBeUndefined();             // …but the results are not
+    expect(base.refusal?.refused).toBe(true); // the decision is on the FIRST payload…
+    expect(base.findings).toBeUndefined(); // …but the results are not
     expect(base.orphanCount).toBeUndefined();
-    expect(Array.isArray(done.findings)).toBe(true);   // only the terminal payload completes it
+    expect(Array.isArray(done.findings)).toBe(true); // only the terminal payload completes it
     expect(done.orphanCount).not.toBeUndefined();
   }, 60_000);
 
@@ -358,7 +518,9 @@ describe('AuditView — replaying the real stream the route produces', () => {
         const seq = await captureFromRoute();
         // The shape really did reach the wire — otherwise this asserts nothing about that shape.
         const done = JSON.parse(seq[seq.length - 1]!.data);
-        expect(done.crawlHealth?.confidence, 'the row shape did not survive to the payload').toBe(confidence);
+        expect(done.crawlHealth?.confidence, 'the row shape did not survive to the payload').toBe(
+          confidence,
+        );
         expect(done.crawlHealth?.partial).toBe(partial);
 
         const { html } = await replay(seq);
@@ -376,7 +538,9 @@ describe('AuditView — replaying the real stream the route produces', () => {
     auditRow = { ...EXCLUSION_REFUSED_ROW };
     const seq = await captureFromRoute();
     const done = JSON.parse(seq[seq.length - 1]!.data);
-    expect(done.refusal?.triggers, 'the row shape did not survive to the payload').toContain('too_few_gradeable_after_exclusion');
+    expect(done.refusal?.triggers, 'the row shape did not survive to the payload').toContain(
+      'too_few_gradeable_after_exclusion',
+    );
     expect(done.coverage?.fetched).toBe(214);
 
     const { html } = await replay(seq);
@@ -421,12 +585,18 @@ describe('AuditView — replaying the real stream the route produces', () => {
     // Terminates on the second read, so the route closes instead of polling to self-close.
     pollRows = [{ ...RUNNING_WITH_ACTIVITY }, { ...REFUSED_ROW }];
     const seq = await captureFromRoute();
-    expect(seq.map((s) => s.event), 'the route emitted no activity event').toContain('activity');
+    expect(
+      seq.map((s) => s.event),
+      'the route emitted no activity event',
+    ).toContain('activity');
 
     // Measured order: ["snapshot","activity","progress","done"]. Replay the RUNNING window — up to the
     // first `progress`, which is the tick reporting the crawl finished. The feed only exists while the
     // crawl runs, and that window is exactly what `onActivity` serves.
-    const running = seq.slice(0, seq.findIndex((e) => e.event === 'progress'));
+    const running = seq.slice(
+      0,
+      seq.findIndex((e) => e.event === 'progress'),
+    );
     expect(running.map((e) => e.event)).toEqual(['snapshot', 'activity']);
     const { html } = await replay(running);
     expect(html(), 'the activity feed rendered no event').toContain(ACTIVITY_LABEL);
@@ -445,13 +615,19 @@ describe('AuditView — replaying the real stream the route produces', () => {
   }, 60_000);
 
   it('a v1 audit (no crawl-health) renders the legacy card — the same hop, from the other side', async () => {
-    auditRow = { ...GRADED_ROW, confidence: null, coverage_pct: null, block_rate: null, partial: null };
+    auditRow = {
+      ...GRADED_ROW,
+      confidence: null,
+      coverage_pct: null,
+      block_rate: null,
+      partial: null,
+    };
     convRow = null;
     const seq = await captureFromRoute();
     expect(JSON.parse(seq[1]!.data).crawlHealth).toBeNull(); // v1 by construction, from the producer
     const { html } = await replay(seq);
     expect(html()).toContain('64');
-    expect(html()).not.toContain(V2_ARC_MARKER);            // no v2 arc without crawl-health
+    expect(html()).not.toContain(V2_ARC_MARKER); // no v2 arc without crawl-health
     expect(html()).not.toContain(INVENTED_CAUSE);
   }, 60_000);
 
@@ -491,7 +667,9 @@ describe('AuditView — replaying the real stream the route produces', () => {
     // survive: with the snapshot withheld until `done`, this window renders the live-crawl UI — a
     // "Cancel audit" button on an audit that has already finished — and nothing noticed. Name the
     // screen that must be here.
-    expect(awaiting.html(), 'the completed-but-pre-done window is not the skeleton').toContain('Computing your grade');
+    expect(awaiting.html(), 'the completed-but-pre-done window is not the skeleton').toContain(
+      'Computing your grade',
+    );
     expect(awaiting.html()).not.toContain('Cancel audit');
     expect(awaiting.html()).not.toContain(NO_GRADE_LABEL);
     expect(awaiting.html()).not.toContain(INVENTED_CAUSE);
@@ -527,7 +705,9 @@ describe('AuditView — replaying the real stream the route produces', () => {
     const { es: esA, html } = await replay(seq, 'aud-A');
     expect(html()).toContain(V2_ARC_MARKER);
 
-    await act(async () => { root!.render(<AuditView auditId="aud-B" />); });
+    await act(async () => {
+      root!.render(<AuditView auditId="aud-B" />);
+    });
     const esB = FakeEventSource.instances.at(-1)!;
     expect(esB.url).toBe('/api/audits/aud-B/stream');
     expect(esA.closed).toBe(true);
