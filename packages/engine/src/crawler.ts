@@ -1,6 +1,7 @@
 import { CheerioCrawler, Configuration, log, LogLevel, type CheerioCrawlerOptions } from 'crawlee';
 import type { CrawlActivity, CrawlFingerprint } from '@crawlmouse/types';
 import { validateUrlOrThrow, createSafeLookup } from './ssrf-guard.js';
+import { refuseForbiddenHeaders } from './safe-fetch.js';
 import { classifyFetchOutcome } from './crawl-health.js';
 import { canonicalizeUrl, hashUrl } from './url-canonical.js';
 import { isCrawlTrap } from './crawl-traps.js';
@@ -440,6 +441,8 @@ function activityPath(u: string): string {
 }
 
 export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
+  // C-6: the same refusal safeFetch applies, before any request. Allowed names are sent as given.
+  refuseForbiddenHeaders(input.extraHeaders);
   ensureCrawleeMemoryHint();
 
   const pages = new Map<string, CrawledPage>();
