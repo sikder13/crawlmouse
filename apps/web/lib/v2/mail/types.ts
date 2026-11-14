@@ -1,9 +1,9 @@
 /**
  * The mailer's shared types (CC-28 D1, D2). Every v2 email is one of `MAIL_KINDS`; the list is the
- * `email_sends.kind` check as migration 20261114000001 leaves it (CC-29 adds `agency_plus_contact`)
- * with the kinds migration 20261114000002's section C adds after it. send.test.ts ("the kinds")
- * reads both files, and __tests__/v2-031-m-mail-kinds.test.ts reads the list from a migrated
- * database.
+ * `email_sends.kind` check as migration 20261115000001's section K sets it last: CC-28's kinds, CC-29's
+ * `agency_plus_contact`, CC-31's three (20261114000002) and CC-33's two founder kinds. send.test.ts
+ * ("the kinds") reads the migrations, and __tests__/v2-033-mail-kinds.test.ts reads the list from a
+ * database with every migration applied.
  */
 
 export const MAIL_KINDS = [
@@ -20,6 +20,9 @@ export const MAIL_KINDS = [
   'seat_invite',
   'report_confirm',
   'client_report',
+  // CC-33: the founder's instant notices and digests.
+  'founder_event',
+  'founder_digest',
 ] as const;
 export type MailKind = (typeof MAIL_KINDS)[number];
 
@@ -28,6 +31,8 @@ export type MailKind = (typeof MAIL_KINDS)[number];
  * does not stop it. The others are what `email_kind_suppressible` in the migration answers true for.
  * CC-31 adds two that a suppression does not stop either: a seat's invitation, which is the one way
  * into the seat, and the confirmation asked of a client's contact before any report is sent to it.
+ * CC-33's founder notices and digest are in this class too (questions Q1): the founder sender
+ * (lib/v2/ops/founder.ts) mails them to FOUNDER_NOTIFY_TO and to no other address.
  */
 export const ACCOUNT_KINDS: ReadonlySet<MailKind> = new Set<MailKind>([
   'trial_reminder',
@@ -36,6 +41,8 @@ export const ACCOUNT_KINDS: ReadonlySet<MailKind> = new Set<MailKind>([
   'account_delete',
   'seat_invite',
   'report_confirm',
+  'founder_event',
+  'founder_digest',
 ]);
 
 /**

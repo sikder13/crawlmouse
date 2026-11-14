@@ -36,6 +36,8 @@ const CC28_KINDS = [
 ];
 const ADDED = ['seat_invite', 'report_confirm', 'client_report'];
 const ADDED_SUPPRESSIBLE = ['client_report'];
+/** The kinds a migration after this one adds (CC-33's section K). */
+const LATER_KINDS: readonly string[] = ['founder_event', 'founder_digest'];
 
 /** The text of the migration's section C, and of the revert's block for it. */
 const SECTION_C = /-- ═══ C: [^\n]*\n([\s\S]*?)-- ═══ end C /.exec(readMigration(MIGRATION))![1]!;
@@ -155,13 +157,16 @@ describe('after section C', () => {
     }
   });
 
-  it('the database’s lists are the code’s: MAIL_KINDS, and the kinds that are neither account mail nor mail to our own inbox', async () => {
+  it('the database’s lists are the code’s, less what later migrations add: MAIL_KINDS, and the kinds that are neither account mail nor mail to our own inbox', async () => {
+    // This file applies the migrations up to 031; CC-33's 20261115000001 adds its two founder kinds
+    // after it (__tests__/v2-033-mail-kinds.test.ts reads the list after every migration).
+    const code = MAIL_KINDS.filter((k) => !LATER_KINDS.includes(k));
     const kinds = await listedKinds();
-    expect([...kinds].sort()).toEqual([...MAIL_KINDS].sort());
+    expect([...kinds].sort()).toEqual([...code].sort());
     const answers = await Promise.all(kinds.map(suppressibleAnswer));
     expect(kinds.filter((_, i) => answers[i]).sort()).toEqual(
       // Neither account mail nor mail to our own inbox (CC-29's kind, which 031's block keeps).
-      MAIL_KINDS.filter((k) => !ACCOUNT_KINDS.has(k) && !OWN_INBOX_KINDS.has(k)).sort(),
+      code.filter((k) => !ACCOUNT_KINDS.has(k) && !OWN_INBOX_KINDS.has(k)).sort(),
     );
   });
 

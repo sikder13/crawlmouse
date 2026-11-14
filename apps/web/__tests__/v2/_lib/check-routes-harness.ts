@@ -57,6 +57,8 @@ export function harness(db: PGlite) {
   const denied = new Set<string>();
   const counted = new Map<string, number>();
   const captured: CaptureBody[] = [];
+  /** The account each `check_finished` capture was handed (null for a check no account keeps). */
+  const finishedAccounts: (string | null)[] = [];
   const sent: { id?: string; name: string; data: unknown }[] = [];
   const pipeline = sqlPipelineStore(db);
   const stream = sqlStreamStore(db);
@@ -102,10 +104,15 @@ export function harness(db: PGlite) {
       },
     },
     limits,
-    captureFinished: (req, checkId, properties) =>
-      capturePublicEvent(req, 'check_finished', checkId, properties, async (body) => {
-        captured.push(body);
-      }),
+    captureFinished: (req, checkId, properties, accountId) => {
+      finishedAccounts.push(accountId);
+      return capturePublicEvent(req, 'check_finished', checkId, properties, accountId, {
+        send: async (body) => {
+          captured.push(body);
+        },
+        lookup: async () => false,
+      });
+    },
     async send(event) {
       sent.push(event);
     },
@@ -125,6 +132,7 @@ export function harness(db: PGlite) {
     denied,
     limits: keysCounted,
     captured,
+    finishedAccounts,
     sent,
     gets,
     pipeline,

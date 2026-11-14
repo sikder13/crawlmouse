@@ -118,3 +118,16 @@
   border-color: var(--v2-badline);
   background: var(--v2-badbg);
 }
+
+/* "Email support" under the cards (CC-33 D5). */
+.support {
+  margin: 0;
+  font-size: var(--v2-text-small);
+  color: var(--v2-mut);
+}
+
+.support a {
+  color: var(--v2-fg);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}

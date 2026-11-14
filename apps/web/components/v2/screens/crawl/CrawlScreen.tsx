@@ -17,7 +17,7 @@ import { PageShell } from '../../PageShell';
 import { Glyph } from '../../StatusPill';
 import { VerdictCell } from '../../VerdictCell';
 import { VisuallyHidden } from '../../VisuallyHidden';
-import { LOG_IN } from '../../footer-links';
+import { CLOSED_FOOTER_GATES, LOG_IN } from '../../footer-links';
 import { LiveMap } from '../../map/LiveMap';
 import type { Point } from '../../../../lib/v2/map-layout';
 import { MOTION } from '../../../../lib/v2/motion';
@@ -149,6 +149,9 @@ function CrawlBody({
   return (
     <PageShell
       header="app"
+      // A client screen cannot read the server's flags: its footer shows each gated link as text,
+      // the same on the server and in the browser.
+      footerGates={CLOSED_FOOTER_GATES}
       actions={
         <>
           {/*

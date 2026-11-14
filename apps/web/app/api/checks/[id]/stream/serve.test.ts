@@ -3,7 +3,7 @@ import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { recordedBuild } from '../../../../../../../packages/engine/fixtures/v2/build/recorded';
 import { buildCheck } from '@crawlmouse/engine/v2/pipeline';
 import type { BatchResult, CrawlPage } from '@crawlmouse/types/v2';
-import { doorDb, signUp } from '../../../../../__tests__/v2/_lib/door-pglite';
+import { accountOf, doorDb, signUp } from '../../../../../__tests__/v2/_lib/door-pglite';
 import {
   pageVantage,
   persistBuiltCheck,
@@ -118,6 +118,18 @@ describe('the stream of a check anyone with its id may read', () => {
     expect(JSON.stringify(body)).not.toContain(ids.checkId);
     expect(h.limits.join(' ')).not.toContain(ids.checkId);
     expect(h.limits.filter((k) => k.startsWith('event:check_finished:'))).toHaveLength(2);
+  });
+
+  it('check_finished is handed the account of a kept check, and none for a check no account keeps', async () => {
+    const h = harness(db);
+    const loose = await running(db, h, 'finished-loose.example');
+    h.betweenPolls.push(cancelled(h, loose));
+    await (await open(h, loose)).text();
+    const kept = await running(db, h, 'finished-kept.example');
+    await keep(db, kept, owner);
+    h.betweenPolls.push(cancelled(h, kept));
+    await (await open(h, kept, { userId: owner })).text();
+    expect(h.finishedAccounts).toEqual([null, (await accountOf(db, owner)).id]);
   });
 
   it('check_finished carries the row’s page count, whatever counts the Last-Event-ID names', async () => {

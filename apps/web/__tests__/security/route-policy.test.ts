@@ -177,6 +177,118 @@ describe('the mechanism checks fail on the code they guard against', () => {
     expect(check(other, 'webhook', 'serve')).toEqual(['does not import serve from inngest/next']);
   });
 
+  it('operator: requireOperator runs before any service-role client or body read', () => {
+    const ok = `export async function POST(req) { const proof = await requireOperator(await supabaseServer()); if (!proof) return notFound(); const body = await readBody(req); consoleStore(proof); }`;
+    const late = `export async function POST(req) { const s = consoleStore(p); const a = supabaseAdmin(); const b = consoleAdmin(p); await requireOperator(sb); }`;
+    const bodyFirst = `export async function POST(req) { const body = await readBody(req); const f = await req.formData(); await requireOperator(sb); }`;
+    const none = `export async function POST(req) { const a = supabaseAdmin(); }`;
+    const commented = `// requireOperator(sb)\nexport async function POST() { consoleStore(p); }`;
+    expect(check(ok, 'operator')).toEqual([]);
+    expect(check(late, 'operator')).toEqual([
+      'calls supabaseAdmin(), consoleAdmin() or consoleStore() before requireOperator() (3 calls)',
+      'builds a client with supabaseAdmin() or createClient() (1 call); an operator route reaches the service role through consoleAdmin() or consoleStore()',
+    ]);
+    expect(check(bodyFirst, 'operator')).toEqual([
+      'reads the request body before requireOperator() (2 reads)',
+    ]);
+    expect(check(none, 'operator')).toEqual(['never calls requireOperator()']);
+    expect(check(commented, 'operator')).toEqual(['never calls requireOperator()']);
+  });
+
+  it('operator: a client built by the route itself is refused, before or after requireOperator', () => {
+    const gate = `const proof = await requireOperator(await supabaseServer()); if (!proof) return notFound();`;
+    const variants = {
+      admin: `${gate} const admin = supabaseAdmin();`,
+      created: `${gate} const s = supabaseConsoleStore(createClient(url, key), proof.userId);`,
+      member: `${gate} const s = supabase.createClient(url, key);`,
+      discarded: `await requireOperator(await supabaseServer()); const c = createClient(url, key); const a = supabaseAdmin();`,
+    };
+    const problem = (n: number) =>
+      `builds a client with supabaseAdmin() or createClient() (${n} call${n === 1 ? '' : 's'}); an operator route reaches the service role through consoleAdmin() or consoleStore()`;
+    for (const [name, body] of Object.entries(variants)) {
+      expect(check(`export async function POST(req) { ${body} }`, 'operator'), name).toEqual([
+        problem(name === 'discarded' ? 2 : 1),
+      ]);
+    }
+  });
+
+  it('operator: an import from the service-role modules is refused, whatever name it binds (review SEC-2)', () => {
+    const file = 'api/internal/checks/[id]/rerun/route.ts';
+    const gated = (imports: string, body = '') =>
+      mechanismProblems(
+        parseSource(
+          `${imports}\nexport async function POST(req) { const proof = await requireOperator(await supabaseServer()); if (!proof) return notFound(); ${body} }`,
+          file,
+        ),
+        'operator',
+      );
+    const problem = (specs: string[]) =>
+      `imports from @/lib/supabase/admin or @supabase/supabase-js (${specs.join(', ')}); an operator route reaches the service role through consoleAdmin() or consoleStore()`;
+    // The reviewer's probe: both modules, aliased, so no call is named supabaseAdmin or createClient.
+    expect(
+      gated(
+        `import { supabaseAdmin as sa } from '@/lib/supabase/admin';\nimport { createClient as cc } from '@supabase/supabase-js';`,
+        `sa(); supabaseConsoleStore(cc(url, key), 'x');`,
+      ),
+    ).toEqual([problem(['@/lib/supabase/admin', '@supabase/supabase-js'])]);
+    const refused: Record<string, [string, string]> = {
+      namespace: [`import * as admin from '@/lib/supabase/admin';`, '@/lib/supabase/admin'],
+      default: [`import sb from '@supabase/supabase-js';`, '@supabase/supabase-js'],
+      typeOnly: [
+        `import type { SupabaseClient } from '@supabase/supabase-js';`,
+        '@supabase/supabase-js',
+      ],
+      sideEffect: [`import '@/lib/supabase/admin';`, '@/lib/supabase/admin'],
+      extension: [
+        `import { supabaseAdmin as a } from '@/lib/supabase/admin.ts';`,
+        '@/lib/supabase/admin.ts',
+      ],
+      index: [
+        `import { supabaseAdmin as a } from '@/lib/supabase/admin/index';`,
+        '@/lib/supabase/admin/index',
+      ],
+      relative: [
+        `import { supabaseAdmin as a } from '../../../../../../lib/supabase/admin';`,
+        '../../../../../../lib/supabase/admin',
+      ],
+      relativeDotted: [
+        `import { supabaseAdmin as a } from './../../../../../../lib/supabase/../supabase/admin.js';`,
+        './../../../../../../lib/supabase/../supabase/admin.js',
+      ],
+      aliasDotted: [
+        `import { supabaseAdmin as a } from '@/lib/supabase/../supabase/admin';`,
+        '@/lib/supabase/../supabase/admin',
+      ],
+      subpath: [
+        `import { createClient as c } from '@supabase/supabase-js/dist/module/index.js';`,
+        '@supabase/supabase-js/dist/module/index.js',
+      ],
+      reExport: [
+        `export { supabaseAdmin as a } from '@/lib/supabase/admin';`,
+        '@/lib/supabase/admin',
+      ],
+      dynamic: ['', '@/lib/supabase/admin'],
+      required: ['', '@supabase/supabase-js'],
+    };
+    const bodies: Record<string, string> = {
+      dynamic: `const m = await import('@/lib/supabase/admin');`,
+      required: `const m = require('@supabase/supabase-js');`,
+    };
+    for (const [name, [imports, spec]] of Object.entries(refused)) {
+      expect(gated(imports, bodies[name]), name).toEqual([problem([spec])]);
+    }
+    // Neighbouring modules, and a relative path that resolves elsewhere, pass.
+    const allowed = [
+      `import { supabaseServer } from '@/lib/supabase/server';`,
+      `import { createServerClient } from '@supabase/ssr';`,
+      `import { supabaseAdmin } from '@/lib/supabase/administrator';`,
+      `import { x } from '@supabase/supabase-jsx';`,
+      `import { supabaseAdmin } from '../../../../../lib/supabase/admin';`,
+      `import { consoleAdmin } from '@/lib/v2/ops/operator';`,
+    ];
+    for (const imports of allowed) expect(gated(imports), imports).toEqual([]);
+  });
+
   it('service: the credential is checked before any service-role call', () => {
     const ok = `export async function POST(req) { if (!timingSafeEqual(a, b)) return; supabaseAdmin(); }`;
     const late = `export async function POST(req) { supabaseAdmin(); timingSafeEqual(a, b); }`;
@@ -263,10 +375,10 @@ describe('the registry finds the row a request path reaches', () => {
 });
 
 describe('cross-site refusal covers every state change a session or a visitor can be made to send', () => {
-  it('every state-changing user or member route takes the strict rule', () => {
+  it('every state-changing user, member or operator route takes the strict rule', () => {
     const open = ROUTE_POLICIES.filter(
       (p) =>
-        (p.class === 'user' || p.class === 'member') &&
+        (p.class === 'user' || p.class === 'member' || p.class === 'operator') &&
         p.methods.some(isStateChanging) &&
         p.origin !== 'strict',
     );
@@ -299,6 +411,9 @@ describe('cross-site refusal covers every state change a session or a visitor ca
       'api/checks/[id]/claim',
       'api/fixes/[id]/done',
       'api/fixes/[id]/email-developer',
+      'api/internal/accounts/[id]/sign-in-link',
+      'api/internal/checks/[id]/rerun',
+      'api/internal/search',
       'api/me',
       'api/report-files/[id]/share',
       'api/report-files/confirm',

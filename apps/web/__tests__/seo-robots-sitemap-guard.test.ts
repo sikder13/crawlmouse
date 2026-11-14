@@ -157,7 +157,25 @@ describe('sitemap.ts', () => {
 describe('sitemap.ts — the flag-gated pages (CC-29 D9)', () => {
   const GATED = {
     V2_BILLING: ['/agencies'],
-    V2_CHECKS_PUBLIC: ['/check/gptbot', '/check/javascript', '/check/robots-ai'],
+    V2_CHECKS_PUBLIC: [
+      '/check/gptbot',
+      '/check/javascript',
+      '/check/robots-ai',
+      // CC-33 D4: the help centre.
+      '/help',
+      '/help/what-an-audit-measures',
+      '/help/how-grades-are-calculated',
+      '/help/crawler-shown-as-blocked',
+      '/help/fix-still-open',
+      '/help/audit-expired',
+      '/help/sign-in-email',
+      '/help/trials',
+      '/help/cancel-and-refunds',
+      '/help/other-tools-scores',
+      '/help/how-we-crawl',
+      '/help/plans',
+      '/help/delete-account',
+    ],
   } as const;
   const ALL = Object.values(GATED).flat();
   afterEach(() => vi.unstubAllEnvs());
@@ -169,7 +187,11 @@ describe('sitemap.ts — the flag-gated pages (CC-29 D9)', () => {
 
   it('lists no flag-gated page while both flags are off', async () => {
     const listed = await paths({ V2_BILLING: '', V2_CHECKS_PUBLIC: '' });
-    expect(listed.filter((p) => ALL.includes(p as never) || p.startsWith('/check'))).toEqual([]);
+    expect(
+      listed.filter(
+        (p) => ALL.includes(p as never) || p.startsWith('/check') || p.startsWith('/help'),
+      ),
+    ).toEqual([]);
     expect(listed).toEqual(expect.arrayContaining(['/pricing', '/developers']));
   });
 
