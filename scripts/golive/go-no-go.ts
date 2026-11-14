@@ -410,7 +410,8 @@ const HOW_STATE: Readonly<Record<How, string>> = {
 };
 
 export async function renderGoNoGo(gates: readonly Gate[] = GATES): Promise<string> {
-  const cell = (s: string) => s.replace(/\|/g, '\\|');
+  // A Markdown table cell: the backslash first, so a value ending in one cannot escape the pipe after it.
+  const cell = (s: string) => s.replace(/\\/g, '\\\\').replace(/\|/g, '\\|');
   const lines: string[] = [
     '# Go / no-go',
     '',

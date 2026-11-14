@@ -440,3 +440,15 @@ describe('pnpm golive:check -- --go-no-go', () => {
       );
   });
 });
+
+describe('go/no-go doc: table cells', () => {
+  it('escapes a backslash before a pipe, so a value cannot end its cell early', async () => {
+    const doc = await renderGoNoGo([
+      { id: 'probe', gate: 'a \\| b', how: 'owner', ref: 'x.md', detail: 'ends in \\' },
+    ]);
+    const row = doc.split('\n').find((l) => l.includes('probe'))!;
+    // Unescaped, `\|` would read as a literal pipe and `\` at the end would swallow the cell's border.
+    expect(row).toContain('a \\\\\\| b');
+    expect(row).toContain('ends in \\\\');
+  });
+});
