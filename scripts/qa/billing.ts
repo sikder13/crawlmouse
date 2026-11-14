@@ -25,7 +25,9 @@ import { noter, type Note, type QaAuth, type QaStore, type Step } from './seed';
  *
  * Refused before any account is read: a live key without `--live`; `--live` with a test key; a key
  * whose prefix and the API's `livemode` disagree; in live mode, a confirmation that is not the exact
- * phrase, asked after the accounts are printed; a coupon of that id that is not 100% off forever.
+ * phrase, asked after the accounts are printed; a coupon of that id that is not 100% off forever,
+ * or that has a promotion code (active or not), which a customer could type. A coupon this script
+ * creates applies only to the products of the catalog's base prices it bills.
  * Refused per account: no user made by qa:seed, no `qa_accounts` row for it, `internal` false, a
  * stored customer without `metadata.internal = 'true'`, and what the app's checkout itself refuses.
  */
@@ -35,9 +37,13 @@ export const COUPON_ID = 'INTERNAL-QA';
 /** startCheckout's `SESSION_LIFETIME_S` (checkout-v2.ts); the parity test fails if they differ. */
 const SESSION_LIFETIME_S = 31 * 60;
 
-/** The Stripe calls `--billing` makes. A promotion code is never among them. */
+/** The Stripe calls `--billing` makes. Promotion codes are listed only, never created. */
 export interface BillingStripe {
   balance: { retrieve(): PromiseLike<{ livemode: boolean }> };
+  prices: { retrieve(id: string): PromiseLike<{ product: string | { id: string } }> };
+  promotionCodes: {
+    list(params: { coupon: string; limit: number }): PromiseLike<{ data: { id: string }[] }>;
+  };
   coupons: {
     retrieve(
       id: string,
@@ -52,6 +58,10 @@ export interface BillingStripe {
       params: Stripe.CustomerCreateParams,
       options: { idempotencyKey: string },
     ): PromiseLike<{ id: string }>;
+    /** Stripe's customer search; it lists no deleted customer. */
+    search(params: {
+      query: string;
+    }): PromiseLike<{ data: { id: string; metadata?: Stripe.Metadata | null }[] }>;
   };
   checkout: {
     sessions: {
@@ -153,6 +163,18 @@ function isMissing(err: unknown): boolean {
   return (err as { code?: unknown } | null)?.code === 'resource_missing';
 }
 
+/** The products of the base prices `--billing` charges, sorted: the coupon's `applies_to`. */
+async function billedProducts(deps: BillingDeps): Promise<string[]> {
+  const products = new Set<string>();
+  for (const a of BILLED) {
+    const price = await deps.stripe.prices.retrieve(
+      await deps.priceFor(a.billing.plan, a.billing.interval),
+    );
+    products.add(typeof price.product === 'string' ? price.product : price.product.id);
+  }
+  return [...products].sort();
+}
+
 async function ensureCoupon(deps: BillingDeps, run: Note): Promise<void> {
   let coupon: Awaited<ReturnType<BillingStripe['coupons']['retrieve']>>;
   try {
@@ -163,6 +185,7 @@ async function ensureCoupon(deps: BillingDeps, run: Note): Promise<void> {
       id: COUPON_ID,
       percent_off: 100,
       duration: 'forever',
+      applies_to: { products: await billedProducts(deps) },
       metadata: { internal: 'true' },
     });
     run('coupon', 'done', `${COUPON_ID} created`);
@@ -170,6 +193,13 @@ async function ensureCoupon(deps: BillingDeps, run: Note): Promise<void> {
   }
   if (coupon.percent_off !== 100 || coupon.duration !== 'forever' || !coupon.valid) {
     throw new Refused(`${COUPON_ID} exists and is not a valid 100%-off-forever coupon`);
+  }
+  const codes = await deps.stripe.promotionCodes.list({ coupon: COUPON_ID, limit: 1 });
+  const code = codes.data[0];
+  if (code !== undefined) {
+    throw new Refused(
+      `${COUPON_ID} has a promotion code (${code.id}), so a customer could type it`,
+    );
   }
   run('coupon', 'unchanged', COUPON_ID);
 }
@@ -217,8 +247,13 @@ async function billOne(deps: BillingDeps, account: Billed, note: Note): Promise<
   if (refusal !== null) throw new Refused(`the app's checkout refuses it: ${refusal}`);
 
   const price = await deps.priceFor(b.plan, b.interval);
-  const customer = await customerFor(deps, accountId, email, held.stripeCustomerId);
-  note('customer', held.stripeCustomerId === null ? 'done' : 'unchanged', customer);
+  const { id: customer, created } = await customerFor(
+    deps,
+    accountId,
+    email,
+    held.stripeCustomerId,
+  );
+  note('customer', created ? 'done' : 'unchanged', customer);
   const open: string[] = [];
   for await (const s of deps.stripe.checkout.sessions.list({
     customer,
@@ -236,29 +271,47 @@ async function billOne(deps: BillingDeps, account: Billed, note: Note): Promise<
   note('checkout', 'done', `${b.plan}${b.trial ? ' trial' : ''}: ${session.url}`);
 }
 
+/** A customer of the account's must carry `internal`, or it is not one this script may bill. */
+function mustBeInternal(c: { id: string; deleted?: boolean; metadata?: Stripe.Metadata | null }) {
+  if (c.deleted || c.metadata?.internal !== 'true') {
+    throw new Refused(`the account's customer ${c.id} does not carry internal=true`);
+  }
+}
+
 /**
- * The stored customer, which must carry `internal`; else one created as startCheckout creates it,
- * under its idempotency key, with `internal` added. It is not stored here: the webhook binds it.
+ * The stored customer, which must carry `internal`; else the one Stripe holds with the account's id
+ * (a customer an earlier run made, not yet bound by the webhook, after its idempotency key expired);
+ * else one created as startCheckout creates it, under its idempotency key, with `internal` added.
+ * It is not stored here: the webhook binds it.
  */
 async function customerFor(
   deps: BillingDeps,
   accountId: string,
   email: string,
   stored: string | null,
-): Promise<string> {
+): Promise<{ id: string; created: boolean }> {
   if (stored !== null) {
-    const c = await deps.stripe.customers.retrieve(stored);
-    if (c.deleted || c.metadata?.internal !== 'true') {
-      throw new Refused(`the account's customer ${stored} does not carry internal=true`);
-    }
-    return stored;
+    mustBeInternal(await deps.stripe.customers.retrieve(stored));
+    return { id: stored, created: false };
+  }
+  // accountId is a uuid (the accounts row's id), so it needs no escaping inside the quotes.
+  const found = await deps.stripe.customers.search({
+    query: `metadata['account_id']:'${accountId}'`,
+  });
+  if (found.data.length > 1) {
+    throw new Refused(`Stripe holds ${found.data.length} customers for ${accountId}`);
+  }
+  const hit = found.data[0];
+  if (hit !== undefined) {
+    mustBeInternal(hit);
+    return { id: hit.id, created: false };
   }
   try {
     const created = await deps.stripe.customers.create(
       { email, metadata: { account_id: accountId, internal: 'true' } },
       { idempotencyKey: `customer:${accountId}` },
     );
-    return created.id;
+    return { id: created.id, created: true };
   } catch (err) {
     if (!isIdempotencyError(err)) throw err;
     throw new Refused(
