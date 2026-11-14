@@ -108,7 +108,19 @@ no rate-limit bucket is spent; Turnstile and the limits of `/api/checks` are unc
   as the earlier grade, and a link to `/audit/<id>`. Read through the service role keyed on the
   signed-in viewer's own id (`app/dashboard/v2/earlier-audits.ts`), the rows the viewer's own session
   could read: a v1 audit id is a capability URL, so another member of the account does not see it.
-- **The backfill** (ruling 1): filled in when it lands.
+- **The backfill** (owner ruling 1, 2026-11-13): migration `20261116000002_v2_036_account_backfill`
+  gives each `public.users` row whose `default_account_id` is null what a sign-up gets: a personal
+  Free account, its owner seat and `default_account_id`, through `public.provision_default_account`,
+  the part of `handle_new_user` it was extracted from (same statements, same `for update` on the
+  users row). It fills `users.email_normalized` where it is null. It starts no trial and writes no
+  ledger row or mail, and touches nothing in `auth.*`, `users.pro_until`, `audits` or
+  `public_reports`. A second run changes nothing. The revert restores `handle_new_user`'s prior text
+  and drops the function; it keeps the backfilled accounts, which hold a user's v2 data once they
+  sign in. Measured on production 2026-11-13: 11 of 12 users have no account; 3 users hold v1 audits.
+  Applied by the owner before step 3. Tests: `apps/web/__tests__/v2-036-account-backfill.test.ts`
+  (PGlite, every migration), `scripts/db/account-backfill-race.test.ts` (two transactions on
+  Postgres, its own CI step), and `apps/web/__tests__/v2/account-door-first-login.test.ts` (a
+  backfilled user's first v2 sign-in is `not_first`: no trial).
 
 ## D3 — kept public pages in the v2 shell
 
