@@ -124,6 +124,9 @@ export const SETTINGS_COPY = {
     `The trial ends ${date} and the card is charged unless you cancel: ${numberWord(clicks)} clicks, effective when the trial ends. Nothing you can see is deleted; evidence older than ${days} days is condensed to headers and the parts of pages that changed.`,
   cancelPaid: (clicks: number, days: number, period: 'month' | 'year') =>
     `${capitalise(numberWord(clicks))} clicks, effective at the end of the paid ${period}. Nothing you can see is deleted; evidence older than ${days} days is condensed to headers and the parts of pages that changed.`,
+  /** A plan whose payment failed is cancelled at once (lib/billing/cancel.ts, `AT_ONCE`). */
+  cancelAtOnce: (clicks: number, days: number) =>
+    `${capitalise(numberWord(clicks))} clicks, effective at once. Nothing you can see is deleted; evidence older than ${days} days is condensed to headers and the parts of pages that changed.`,
   cancelAction: 'Cancel, back to Free',
   /**
    * Cancel's second click (CC-39 D1): what ends and when, as lib/billing/cancel.ts ends it — a paid

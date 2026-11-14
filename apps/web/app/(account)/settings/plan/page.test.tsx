@@ -24,12 +24,17 @@ import { fixture } from '@/lib/v2/fixtures';
 import PlanPage from './page';
 
 const accountId = ACCOUNT_VIEWERS.withheld().accountId;
+const withoutCard = (d: ReturnType<typeof fixture>) => ({
+  ...d,
+  accounts: d.accounts.map((a) => (a.id === accountId ? { ...a, card_last4: null } : a)),
+});
 const read = (role: string) => ({
   kind: 'account',
   userId: 'u1',
   seatId: 's1',
   role,
-  d: fixture('challenged-site'),
+  // The card is left unrecorded, as on every live account (F8): the portal follows the subscription.
+  d: withoutCard(fixture('challenged-site')),
   viewer: { accountId, now: '2026-10-31T12:00:00Z' },
   billingEnd: null,
   subscriptionStatus: 'active',

@@ -14,6 +14,7 @@ import {
   TRIAL_REMINDER_DAYS_BEFORE_END,
   type EmailKind,
 } from '../../auth/constants';
+import { AT_ONCE } from '../../billing/cancel';
 import { AGENCY_MONTHLY, AGENCY_YEARLY, PRO_MONTHLY, PRO_YEARLY } from '../../billing/prices';
 import { GATES, PAST_DUE_GRACE_DAYS } from '../../entitlement-v2';
 import { TRIAL_DAYS } from '../copy/account';
@@ -126,9 +127,6 @@ export const CC27B_ROUTES = {
 } as const satisfies Record<string, RouteSpec>;
 
 export type Cc27bKey = keyof typeof CC27B_ROUTES;
-
-/** The subscription states lib/billing/cancel.ts cancels at once rather than at the period's end. */
-const CANCELS_AT_ONCE: ReadonlySet<string> = new Set(['past_due', 'unpaid', 'paused']);
 
 /**
  * The step the cancel route sends a form back to Settings › Plan with after the first click
@@ -440,7 +438,7 @@ export function settingsView(
     card !== null || (subscriptionStatus !== undefined && subscriptionStatus !== null);
   // A cancel ends at once where lib/billing/cancel.ts cancels at once (`AT_ONCE`: past due, unpaid,
   // paused), the account's own past-due state included; otherwise at the trial's or period's end.
-  const atOnce = pastDue || (subscriptionStatus != null && CANCELS_AT_ONCE.has(subscriptionStatus));
+  const atOnce = pastDue || (subscriptionStatus != null && AT_ONCE.has(subscriptionStatus));
   // The Cancel row offers the first click on a card trial and on a paid plan not already ending.
   const offersCancel = ending === null && (cardTrial || (!trial && paid));
   // After the first click the confirm step stands in the Cancel row's place, so the page carries
@@ -576,11 +574,13 @@ export function settingsView(
                   }
                 : paid
                   ? cancelRow(
-                      COPY.cancelPaid(
-                        CANCEL_CLICKS,
-                        EVIDENCE_CONDENSED_AFTER_DAYS,
-                        a.billing_period_months === 12 ? 'year' : 'month',
-                      ),
+                      atOnce
+                        ? COPY.cancelAtOnce(CANCEL_CLICKS, EVIDENCE_CONDENSED_AFTER_DAYS)
+                        : COPY.cancelPaid(
+                            CANCEL_CLICKS,
+                            EVIDENCE_CONDENSED_AFTER_DAYS,
+                            a.billing_period_months === 12 ? 'year' : 'month',
+                          ),
                     )
                   : { label: COPY.cancel, text: COPY.cancelFree, action: null },
         customer

@@ -15,7 +15,8 @@ import type { BillingRefusal } from './checkout-v2';
 import { refuse, seeOther, type BodyKind, type RequestBody } from './request-body';
 import type { SubscriptionStatus } from './state-machine';
 
-const AT_ONCE: ReadonlySet<string> = new Set(['past_due', 'unpaid', 'paused']);
+/** The subscription states a cancel ends at once rather than at the period's end. */
+export const AT_ONCE: ReadonlySet<string> = new Set(['past_due', 'unpaid', 'paused']);
 const AT_PERIOD_END: ReadonlySet<string> = new Set(['active', 'trialing']);
 
 export interface Mirror {

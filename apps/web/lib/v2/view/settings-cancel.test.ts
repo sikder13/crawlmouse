@@ -67,6 +67,23 @@ describe('Cancel, the second click (D1)', () => {
     }
   });
 
+  it('an account past due: the Cancel row and its confirm both say it ends at once (review r1, item 2)', () => {
+    // Northwind went past due on 1 Nov (state_history); on 2 Nov it is in its grace days.
+    const pastDue = { accountId: onAgency.accountId, now: '2026-11-02T12:00:00Z' };
+    const first = settingsView(agency, pastDue, {
+      role: 'owner',
+      subscriptionStatus: 'past_due',
+    }).plan;
+    expect(first.terms[0]!.text).toMatch(/^Two clicks, effective at once\./);
+    expect(first.terms[0]!.action).toMatchObject({ href: '/api/billing/cancel' });
+    const p = settingsView(agency, pastDue, {
+      role: 'owner',
+      subscriptionStatus: 'past_due',
+      cancelStep: 'confirm',
+    }).plan;
+    expect(p.confirm!.text).toBe('Agency ends now, and the account is on Free.');
+  });
+
   it('is the owner’s alone', () => {
     for (const role of ['account_manager', 'developer'] as const)
       expect(

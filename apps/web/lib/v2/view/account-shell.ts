@@ -162,7 +162,7 @@ function trialCard(
       title,
       left,
       note:
-        a.card_last4 === null && !charges
+        a.card_last4 === null && !charges && billingEnd === null
           ? `${COPY.noCard} ${COPY.nothingCharged}`
           : billingEnd !== null
             ? COPY.cardNotCharged(a.card_last4, dayDate(end, zone))

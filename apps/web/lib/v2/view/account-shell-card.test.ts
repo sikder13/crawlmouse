@@ -56,6 +56,38 @@ describe('a Checkout trial with no recorded card', () => {
   });
 });
 
+describe('a Checkout trial set to cancel, with no recorded card (review r1, item 1)', () => {
+  // Set to cancel: the subscription is still trialing, renews_at is null, and billingEnd is the end.
+  const cancelling = {
+    ...plain,
+    accounts: plain.accounts.map((a) =>
+      a.id === viewer.accountId ? { ...a, card_last4: null, renews_at: null } : a,
+    ),
+  };
+  const end = plain.accounts.find((a) => a.id === viewer.accountId)!.trial_ends_at!;
+  const NOT_CHARGED = 'The trial ends on Sat 7 Nov and the card on file is not charged.';
+
+  it('Settings › Plan: the trial card agrees with the plan card that the card is not charged', () => {
+    const v = settingsView(cancelling, viewer, {
+      role: 'owner',
+      subscriptionStatus: 'trialing',
+      billingEnd: end,
+    });
+    expect(v.shell.trial!.note).toBe(NOT_CHARGED);
+    expect(v.plan.note).toBe(
+      'Pro trial until Sat 7 Nov, then Free. The card on file is not charged.',
+    );
+  });
+
+  it('Trial ending: the same', () => {
+    const card = trialEndView(cancelling, trialEndViewer(cancelling, viewer.accountId), {
+      role: 'owner',
+      billingEnd: end,
+    }).shell.trial!;
+    expect(card.note).toBe(NOT_CHARGED);
+  });
+});
+
 describe('the control: a trial with no card and no subscription is unchanged', () => {
   it('the rail still says there is no card, and offers Keep after the first run', () => {
     const card = deleteStepView(plain, viewer, { role: 'owner' }).shell.trial!;

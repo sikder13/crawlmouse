@@ -27,6 +27,15 @@ at processing time, a write to the account, and handling for a card changed in t
 Residual until it lands: a Checkout trial already set to cancel, with no recorded card, reads
 "No card on file" on the rail. Its "stays on Free" is then true.
 
+**The portal for an account Stripe knows but the page cannot tell.** The page offers the portal for
+a card on file or a subscription; it does not read `stripe_customer_id`. An account whose
+subscription has ended and whose card was never recorded (F8) gets no portal and reads "there has
+been no charge yet", which is false once it has paid.
+
+**Keep on a Checkout trial set to cancel.** The rail offers Keep for a trial that does not charge its
+card, and a trial set to cancel does not; its checkout answers 409 `subscription_open` while the
+subscription is open.
+
 **A signed-in reader on an audit nobody keeps** still sees Log in: the audit pages hand the screens
 the check, not the session.
 
