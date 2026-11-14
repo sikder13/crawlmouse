@@ -121,9 +121,18 @@ export class WalkStripe {
       return json(200, await this.fake.retrieveSubscription(parts[1]));
     }
     if (parts[0] === 'subscriptions' && parts[1] && req.method === 'POST') {
-      if (form.cancel_at_period_end !== undefined) {
-        this.fake.update(parts[1], { cancelAtPeriodEnd: form.cancel_at_period_end === 'true' });
+      // Only the cancellation flag is modelled; any other change is refused rather than ignored.
+      const fields = Object.keys(form).filter(
+        (k) => k !== 'cancel_at_period_end' && k !== 'expand',
+      );
+      if (fields.length > 0 || form.cancel_at_period_end === undefined) {
+        return json(404, {
+          error: {
+            message: `walk stripe: subscription update of ${fields.join(', ') || 'nothing'} is not modelled`,
+          },
+        });
       }
+      this.fake.update(parts[1], { cancelAtPeriodEnd: form.cancel_at_period_end === 'true' });
       return json(200, stripeSubscription(this.fake.get(parts[1])));
     }
     if (path === 'subscriptions' && req.method === 'GET') {

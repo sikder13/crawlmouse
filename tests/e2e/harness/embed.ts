@@ -8,7 +8,8 @@
  * one is one-to-many (an array). A `!hint` names the constraint or the column to use. `!inner` drops
  * the rows with nothing to embed. Embeds nest. The embedded rows are read through the same client, so
  * row security applies to them as it does to the table's. What it does not model: filters on an
- * embedded resource's columns (`rel.col=eq.x`), embedding through a join table, computed relations.
+ * embedded resource's columns (`rel.col=eq.x`), embedding through a join table, computed relations,
+ * and `!inner` with a `limit` (the rows are dropped after the limit, where PostgREST drops them before).
  */
 import type { PGlite } from '@electric-sql/pglite';
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -105,8 +106,14 @@ async function relationOf(db: PGlite, table: string, e: Embed) {
   const fits = (k: ForeignKey) =>
     e.hint === null || k.name === e.hint || k.childCols.includes(e.hint);
   const toOne = all.filter((k) => k.child === table && k.parent === e.table && fits(k));
-  if (toOne[0]) return { many: false, local: toOne[0].childCols, remote: toOne[0].parentCols };
   const toMany = all.filter((k) => k.child === e.table && k.parent === table && fits(k));
+  // PostgREST refuses an embed that more than one foreign key could mean (PGRST201).
+  if (toOne.length + toMany.length > 1) {
+    throw new Error(
+      `standin: PGRST201, ${table} to ${e.table} is ambiguous; name the key with !hint`,
+    );
+  }
+  if (toOne[0]) return { many: false, local: toOne[0].childCols, remote: toOne[0].parentCols };
   if (toMany[0]) return { many: true, local: toMany[0].parentCols, remote: toMany[0].childCols };
   throw new Error(`standin: no relation from ${table} to ${e.table}${e.hint ? `!${e.hint}` : ''}`);
 }

@@ -132,6 +132,13 @@ test('a developer invited to one client sees that client and no other', async ({
   ]) {
     await expect(devPage.getByText(other)).toHaveCount(0);
   }
+  // Not listed is not enough: another client's site page, opened by its address, is refused.
+  const [other] = await sql<{ id: string }>(
+    `select id from public.sites where host = 'client-1.walk.crawlmouse.com' and removed_at is null`,
+  );
+  const refused = await devPage.goto(`/sites/${other!.id}`);
+  expect(refused?.status()).toBe(404);
+  await shot(devPage, J, 'developer-other-client');
   await dev.close();
 });
 

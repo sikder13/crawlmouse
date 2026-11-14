@@ -153,6 +153,29 @@ async function rest(client: SupabaseClient, req: IncomingMessage, res: ServerRes
     throw new Error(`standin: ${req.method} on ${path} is not modelled`);
   }
   for (const [key, value] of q) if (!RESERVED.has(key)) chain = filter(chain, key, value);
+  // `Prefer: count=exact` (supabase-js's `{ count: 'exact' }`): the rows the filters match, before any
+  // range, as PostgREST reports them in Content-Range. A HEAD request answers with the count alone.
+  let total: number | null = null;
+  if (/count=exact/.test(prefer)) {
+    if (req.method !== 'GET' && req.method !== 'HEAD') {
+      throw new Error(`standin: a count on ${req.method} ${path} is not modelled`);
+    }
+    let counted = client.from(path).select('*') as unknown as Chain;
+    for (const [key, value] of q) if (!RESERVED.has(key)) counted = filter(counted, key, value);
+    const all = (await (counted as unknown as PromiseLike<{
+      data: unknown[] | null;
+      error: unknown;
+    }>)) as {
+      data: unknown[] | null;
+      error: { code?: string } | null;
+    };
+    if (all.error) return send(res, 400, all.error);
+    total = (all.data ?? []).length;
+    if (req.method === 'HEAD') {
+      res.writeHead(200, { 'content-range': `*/${total}` });
+      return res.end();
+    }
+  }
   for (const term of (q.get('order') ?? '').split(',').filter(Boolean)) {
     const [column, direction] = term.split('.');
     chain = chain.order(column!, { ascending: direction !== 'desc' });
@@ -172,11 +195,17 @@ async function rest(client: SupabaseClient, req: IncomingMessage, res: ServerRes
   if (wantsObject && data === null) {
     return send(res, 406, { code: 'PGRST116', message: 'no rows', details: null, hint: null });
   }
-  return send(
-    res,
-    req.method === 'POST' ? 201 : 200,
-    asPostgrest(path, data ?? (wantsObject ? null : [])),
-  );
+  const body = asPostgrest(path, data ?? (wantsObject ? null : []));
+  if (total !== null) {
+    const n = Array.isArray(body) ? body.length : body === null ? 0 : 1;
+    const from = offset ?? (range ? Number(range[1]) : 0);
+    res.writeHead(200, {
+      'content-type': 'application/json',
+      'content-range': n === 0 ? `*/${total}` : `${from}-${from + n - 1}/${total}`,
+    });
+    return res.end(JSON.stringify(body));
+  }
+  return send(res, req.method === 'POST' ? 201 : 200, body);
 }
 
 // ─── Auth ────────────────────────────────────────────────────────────────────────────────────────
@@ -261,7 +290,11 @@ async function auth(a: Auth, req: IncomingMessage, res: ServerResponse, url: URL
     return send(res, 200, {});
   }
   if (path === 'verify' && req.method === 'POST') {
-    const { token_hash } = (await jsonOf(req)) as { token_hash?: string };
+    const { token_hash, type } = (await jsonOf(req)) as { token_hash?: string; type?: string };
+    // The links `otp` records are email sign-in links; GoTrue refuses one verified as another type.
+    if (type !== 'email' && type !== 'magiclink') {
+      return send(res, 403, { code: 'otp_expired', msg: 'Token has expired or is invalid' });
+    }
     const email = token_hash ? a.links.get(token_hash) : undefined;
     if (!email)
       return send(res, 403, { code: 'otp_expired', msg: 'Token has expired or is invalid' });

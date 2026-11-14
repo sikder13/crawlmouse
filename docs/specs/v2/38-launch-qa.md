@@ -40,7 +40,7 @@ Measured against the code; the reasoning for each is in `notes/cc-38/questions.m
 
 - **`qa:reset` leaves storage evidence and `usage_events` behind.** It deletes the QA accounts' sites,
   and the cascades take the rest of the rows (plan-revision.md item 5); the stored evidence objects and
-  the usage rows stay. _(lead: the measured counts after a reset)_
+  the usage rows stay.
 - **`demo` has no read-only mode.** There is no mechanism for one; `demo` is an ordinary Agency
   account kept for showing.
 - **The paid plans arrive through a Checkout the owner completes (Q2).** The webhook grants a plan
@@ -49,7 +49,7 @@ Measured against the code; the reasoning for each is in `notes/cc-38/questions.m
 - **Client-side PostHog events of a QA session are not marked `internal` (Q10).** There is no identify
   call to carry it.
 - **`report_viewed` names no account** on CC-33's tree, so a view of a QA account's report is not
-  marked until its route passes `accountId` (`notes/cc-38/d3-survey.md` §2). _(lead: fixed or not)_
+  marked until its route passes `accountId` (`notes/cc-38/d3-survey.md` §2). It is passed at the CC-33 merge (questions Q15).
 - **QA runs spend the Inngest quota.** The budget is a model and counts no usage; a QA account's
   checks, crons and mails run on the production app and its quota like a customer's (d3-survey.md §4).
 - **The k6 run at 20 concurrent checks has no script.** `ls tests/load` lists `audit-submit.js` and
@@ -62,6 +62,11 @@ Measured against the code; the reasoning for each is in `notes/cc-38/questions.m
 `qa:seed`'s own `seed()`, starts `next start`, runs the journeys and stops both servers. Screenshots go
 to `$WALK_SHOTS` when it is set. What the walk found is in PR.md; the defects it found are not fixed
 in this step.
+
+What it walks is a Vercel **preview**'s configuration (`VERCEL_ENV=preview` in `run.sh`): Turnstile's
+permissive path (`apps/web/lib/turnstile-policy.ts`) and the test-mode branch of
+`apps/web/lib/billing/stripe-account.ts`, not production's fail-closed ones. What the stand-in models,
+and what it refuses as unmodelled, is in the header of each file under `tests/e2e/harness/`.
 
 ## Owner drills (the go/no-go list's owner lines)
 
