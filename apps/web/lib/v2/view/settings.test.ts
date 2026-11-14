@@ -206,7 +206,9 @@ describe('Settings, the card decides, not the plan (the matcher keys on card_las
       billingEnd: ends,
       role: 'account_manager',
     });
-    expect(v.plan.note).toBe('Ends Sat 7 Nov. Managed by the account owner.');
+    expect(v.plan.note).toBe(
+      'Pro trial until Sat 7 Nov, then Free. The card is not charged. Managed by the account owner.',
+    );
     expect(v.plan.terms[0]).toMatchObject({ label: 'Cancel', action: null });
     expect(JSON.stringify(v)).not.toMatch(/card ending|charged (then|on)|unless you cancel/);
   });

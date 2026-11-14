@@ -471,27 +471,27 @@ export function settingsView(
       left: days === null ? null : COPY.daysLeft(days),
       // A plan set to end is said first: a card trial set to cancel is not charged.
       note:
-        cardTrial && card === null
-          ? `${COPY.ends(date(a.trial_ends_at!))} ${ACCOUNT_COPY.cardManagedByOwner}`
-          : cardTrial && ending !== null
-            ? COPY.trialCancelling(plan, date(ending), card!)
-            : trial
-              ? `${COPY.ends(date(a.trial_ends_at!))} ${
-                  !onFile
-                    ? COPY.noCardTerms(plan)
-                    : card === null
-                      ? ACCOUNT_COPY.cardManagedByOwner
-                      : COPY.cardTerms(card)
-                }`
-              : pastDue
-                ? v.tier === 'free'
-                  ? COPY.pastDueEnded(date(pastDueSince), date(graceEnds))
-                  : COPY.pastDue(date(pastDueSince), date(graceEnds), plan)
-                : ending !== null
-                  ? COPY.cancelling(plan, date(ending))
-                  : paid
-                    ? null
-                    : COPY.freeNote(FREE_SCHEDULE[GATES.free.schedule], FREE_FIXES),
+        cardTrial && ending !== null
+          ? card === null
+            ? `${COPY.trialCancellingWithheld(plan, date(ending))} ${ACCOUNT_COPY.cardManagedByOwner}`
+            : COPY.trialCancelling(plan, date(ending), card)
+          : trial
+            ? `${COPY.ends(date(a.trial_ends_at!))} ${
+                !onFile
+                  ? COPY.noCardTerms(plan)
+                  : card === null
+                    ? ACCOUNT_COPY.cardManagedByOwner
+                    : COPY.cardTerms(card)
+              }`
+            : pastDue
+              ? v.tier === 'free'
+                ? COPY.pastDueEnded(date(pastDueSince), date(graceEnds))
+                : COPY.pastDue(date(pastDueSince), date(graceEnds), plan)
+              : ending !== null
+                ? COPY.cancelling(plan, date(ending))
+                : paid
+                  ? null
+                  : COPY.freeNote(FREE_SCHEDULE[GATES.free.schedule], FREE_FIXES),
       usageLabel: COPY.tables.usage,
       usage: [
         [COPY.sitesUsed, COPY.of(primarySites(v).length, a.limits.sites)],
