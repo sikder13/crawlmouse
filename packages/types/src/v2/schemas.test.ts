@@ -2145,3 +2145,18 @@ describe('CC-17 contract additions', () => {
     }
   });
 });
+
+describe('AccountSchema.card_on_file (CC-37 Q25) is additive', () => {
+  it('a record without it parses to the same record, and one with it keeps it', () => {
+    const a = northwind();
+    expect('card_on_file' in a).toBe(false);
+    expect(AccountSchema.parse(a)).toEqual(a);
+    expect(AccountSchema.parse({ ...a, card_last4: null, card_on_file: true }).card_on_file).toBe(
+      true,
+    );
+  });
+
+  it('refuses a value that is not a boolean', () => {
+    expect(AccountSchema.safeParse({ ...northwind(), card_on_file: 'yes' }).success).toBe(false);
+  });
+});

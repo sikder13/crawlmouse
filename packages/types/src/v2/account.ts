@@ -72,6 +72,12 @@ export const AccountSchema = z
       .string()
       .regex(/^\d{4}$/)
       .nullable(),
+    /**
+     * Whether a card is on file, for a reader `card_last4` is withheld from (CC-37 Q25: the digits
+     * are the owner's; every other role reads `card_last4` null and this true). Optional, so a record
+     * written before it parses unchanged.
+     */
+    card_on_file: z.boolean().optional(),
     renews_at: TimestampSchema.nullable(),
     /** 1 for monthly, 12 for annual; null until there is a subscription. */
     billing_period_months: z
