@@ -206,6 +206,19 @@ describe('what is sent', () => {
     expect(sent['accept']).toContain('text/html');
   });
 
+  // C-6: the worker has no header path of its own; an identity carrying a framing or credential
+  // header is refused by safeFetch before any request, in any spelling of the name.
+  it.each(['Host', 'cookie', 'AUTHORIZATION', 'Proxy-Authorization', 'transfer-encoding'])(
+    'refuses an identity header named %s before sending anything',
+    async (name) => {
+      const before = server.requests.length;
+      const identity = { ...CRAWL, headers: [...CRAWL.headers, [name, 'x'] as [string, string]] };
+      const r = await pastGuard(`${server.base}/ok`, identity, limits);
+      expect(r.error).toBe('network');
+      expect(server.requests.length).toBe(before);
+    },
+  );
+
   it('returns a redirect as it is, without following it', async () => {
     const r = await pastGuard(`${server.base}/loop`, CRAWL, limits);
     expect(r.status).toBe(302);
