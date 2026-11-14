@@ -122,8 +122,8 @@ describe('the walk states', () => {
             '2-free.spec.ts': ['expected', 'unexpected'],
             '3-pro-trial.spec.ts': ['flaky', 'expected'],
             '4-agency.spec.ts': ['skipped', 'skipped'],
-            // Another file with a name the suffix match must not take for a journey.
-            'x5-settings.spec.ts': ['expected'],
+            // A file whose name ends journey 5's, which the match must not take for it.
+            'settings.spec.ts': ['expected'],
           },
           nested,
         ),
