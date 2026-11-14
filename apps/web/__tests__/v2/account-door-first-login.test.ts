@@ -230,6 +230,35 @@ describe('runFirstLogin', () => {
     expect(await ledgerRows(accountId)).toBe(0);
   });
 
+  // Questions Q19: a pre-001 user who never confirmed their email has never signed in. Their first
+  // confirmed sign-in is a sign-up's in every respect the door reads, so it gets a sign-up's trial.
+  it('a pre-001 user who never confirmed, given an account by 20261116000002, gets the trial a sign-up gets', async () => {
+    const userId = '9e1b2c3d-4e5f-4a6b-8c7d-0e1f2a3b4c5e';
+    await db.exec(`alter table auth.users disable trigger on_auth_user_created`);
+    await db.query(`insert into auth.users (id, email) values ($1, 'v1-unconfirmed@example.com')`, [
+      userId,
+    ]);
+    await db.query(
+      `insert into public.users (id, email) values ($1, 'v1-unconfirmed@example.com')`,
+      [userId],
+    );
+    await db.exec(`alter table auth.users enable trigger on_auth_user_created`);
+    await db.exec(readMigration('20261116000002_v2_036_account_backfill.sql'));
+    const { id: accountId } = await accountOf(db, userId);
+    // The magic link confirms the address and signs in at once.
+    const r = await runFirstLogin(deps(), {
+      userId,
+      email: 'v1-unconfirmed@example.com',
+      emailConfirmedAt: '2026-11-17T12:00:00Z',
+      lastSignInAt: '2026-11-17T12:00:00Z',
+      device: 'dev-v1-unconfirmed',
+      ip: '203.0.113.8',
+      signup: null,
+    });
+    expect(r.trial).toBe('started');
+    expect(await ledgerRows(accountId)).toBeGreaterThan(0);
+  });
+
   it('without a pepper: no ledger read or write, no trial, a Sentry signal with ids only', async () => {
     const i = await input('nopepper@example.com');
     const store = pgliteDoorStore(db);

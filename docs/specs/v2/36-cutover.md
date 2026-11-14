@@ -120,7 +120,9 @@ no rate-limit bucket is spent; Turnstile and the limits of `/api/checks` are unc
   Applied by the owner before step 3. Tests: `apps/web/__tests__/v2-036-account-backfill.test.ts`
   (PGlite, every migration), `scripts/db/account-backfill-race.test.ts` (two transactions on
   Postgres, its own CI step), and `apps/web/__tests__/v2/account-door-first-login.test.ts` (a
-  backfilled user's first v2 sign-in is `not_first`: no trial).
+  backfilled user's first v2 sign-in is `not_first`: no trial). A pre-001 user who never
+  confirmed their email (2 on production, 2026-11-13) has never signed in; their first sign-in is a
+  sign-up's and gets a sign-up's trial (questions.md Q19; the same test file pins it).
 
 ## D3 — kept public pages in the v2 shell
 
