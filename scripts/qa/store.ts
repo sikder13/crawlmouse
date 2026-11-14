@@ -8,6 +8,7 @@ import { supabaseSeatsStore } from '../../apps/web/lib/v2/agency/seats-store';
 import { startProTrial } from '../../apps/web/lib/v2/account/pro-trial';
 import { supabaseAddSite } from '../../apps/web/lib/v2/account/sites-store';
 import type { RequestDeps } from '../../apps/web/lib/v2/pipeline/request';
+import type { ResetStore } from './reset';
 import type { AddOutcome, QaStore, SeatResult, TrialResult } from './seed';
 
 /**
@@ -283,3 +284,30 @@ export function qaStore(sb: SupabaseClient, deps: QaStoreDeps): QaStore {
   };
 }
 
+/** qa:reset's port: D2's table, and its guarded function (migration 20261117000002). */
+export function qaResetStore(sb: SupabaseClient): ResetStore {
+  return {
+    async marked() {
+      const r = await sb
+        .from('qa_accounts')
+        .select('account_id, qa_key')
+        .order('created_at', { ascending: true })
+        .order('account_id', { ascending: true });
+      if (r.error) fail('qa_accounts read', r.error);
+      return ((r.data ?? []) as { account_id: string; qa_key: string }[]).map((x) => ({
+        accountId: x.account_id,
+        key: x.qa_key,
+      }));
+    },
+    async reset(accountId) {
+      const { data, error } = await sb.rpc('qa_reset', { p_account: accountId });
+      if (error) {
+        // 42501: the function's own refusal (no qa_accounts row, or the account is not internal).
+        if (error.code === '42501') return { refused: error.message };
+        fail('qa_reset', error);
+      }
+      const n = data as { sites: number; seats: number };
+      return { sites: n.sites, seats: n.seats };
+    },
+  };
+}
