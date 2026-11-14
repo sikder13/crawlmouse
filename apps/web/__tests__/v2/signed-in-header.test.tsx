@@ -46,13 +46,14 @@ describe('the audit pages’ header', () => {
   const check = FIRST_AUDIT['bad-site'];
   const fixId = d.fixes.find((f) => f.number === 2 && f.site_id === d.sites[0]!.id)!.id;
 
-  it('the fix page of a kept audit is a signed-in page, and links Mark done to its site', () => {
+  it('the fix page of a kept audit is a signed-in page, and links Mark done to Sites', () => {
     const v = fixView(d, check, fixId, { rerun: false });
     const html = renderToStaticMarkup(<FixScreen data={v} />);
     expect(headerLinks(html)).toContainEqual(SITES);
     expect(headerLinks(html)).not.toContainEqual(LOG_IN);
-    expect(html).toContain(`href="/sites/${d.sites[0]!.id}"`);
-    expect(html).toContain('Mark it done on the site page');
+    expect(html).toMatch(/<a [^>]*href="\/dashboard"[^>]*>Mark it done from Sites</);
+    // The audit pages carry no site id (real-data.test.tsx), this link included.
+    expect(html).not.toContain(d.sites[0]!.id);
   });
 
   it('the fix page of an audit nobody keeps still offers Log in', () => {

@@ -16,7 +16,7 @@ import { count, numberWord, plural } from '../words';
 import { freeFixes, type FixPlan } from './free-fixes';
 import { noPacketLine } from './no-packet';
 import { noPacketReason } from './packet-reason';
-import { action } from './account-actions';
+import { ACCOUNT_NAV } from './account-actions';
 import { keptUntilOf, points } from './result';
 import {
   effectOf,
@@ -148,8 +148,8 @@ export interface OpenFixPage extends FixBase {
   switcher: { heading: string; detected: string; options: FrameworkOption[] } | null;
   /**
    * What happens once the fix ships: on an audit nobody keeps, the ask that opens the keep bar, and
-   * null on a page that cannot re-check (`FixOptions.rerun`); on a kept audit, a link to its site's
-   * page, where the fix is marked done.
+   * null on a page that cannot re-check (`FixOptions.rerun`); on a kept audit, a link to Sites, from
+   * which the site's page marks the fix done.
    */
   shipped: { heading: string; body: string; action: SegmentLink } | null;
 }
@@ -544,16 +544,14 @@ export function fixView(
   const p = fix.packet;
   const pages = bare.affected_pages > 1 ? `the ${count(bare.affected_pages)} pages` : 'the page';
   const shippedBody = `Mark it done and we re-crawl ${pages} now, about ${RECHECK_MINUTES} minutes. With an account the before and after is kept in Changes; without one the new result replaces this audit. If the number does not move, the fix stays open and the packet says what we saw.`;
-  // A kept audit's fix is marked done on its site's page, where the account's Mark done is.
+  // A kept audit's fix is marked done on its site's page, reached from Sites: the audit pages carry
+  // no site id (app/audit/[id]/_lib/real-data.test.tsx, "nothing internal goes on the wire").
   const shipped =
     keptUntil === null
       ? {
           heading: "When you've shipped it",
           body: shippedBody,
-          action: {
-            label: 'Mark it done on the site page',
-            href: action('sitePage', '', { id: check.site_id }).href,
-          },
+          action: { label: 'Mark it done from Sites', href: ACCOUNT_NAV[0].href },
         }
       : !rerun
         ? null
