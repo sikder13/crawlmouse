@@ -47,12 +47,13 @@ describe('a Checkout trial with no recorded card', () => {
     expect(card.note).toContain('The card on file is charged on');
   });
 
-  it('Settings › Plan, read with the subscription’s status', () => {
-    const p = settingsView(checkoutTrial, viewer, {
+  it('Settings › Plan, read with the subscription’s status: the plan card and its rail card', () => {
+    const v = settingsView(checkoutTrial, viewer, {
       role: 'owner',
       subscriptionStatus: 'trialing',
-    }).plan;
-    expect(p.note).not.toMatch(FALSE);
+    });
+    expect(v.plan.note).not.toMatch(FALSE);
+    expect(v.shell.trial!.note).not.toMatch(FALSE);
   });
 });
 

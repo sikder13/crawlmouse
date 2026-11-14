@@ -84,6 +84,17 @@ describe('Cancel, the second click (D1)', () => {
     expect(p.confirm!.text).toBe('Agency ends now, and the account is on Free.');
   });
 
+  it('an account past due, read with no subscription status: still at once (review r1 tests, item 1)', () => {
+    // The account's own state decides where the page has no mirror to read, as in a preview.
+    const pastDue = { accountId: onAgency.accountId, now: '2026-11-02T12:00:00Z' };
+    expect(settingsView(agency, pastDue, { role: 'owner' }).plan.terms[0]!.text).toMatch(
+      /^Two clicks, effective at once\./,
+    );
+    expect(
+      settingsView(agency, pastDue, { role: 'owner', cancelStep: 'confirm' }).plan.confirm!.text,
+    ).toBe('Agency ends now, and the account is on Free.');
+  });
+
   it('is the owner’s alone', () => {
     for (const role of ['account_manager', 'developer'] as const)
       expect(
@@ -134,7 +145,7 @@ describe('a Checkout trial whose card was never recorded (F8; plan review findin
   });
 });
 
-describe('the billing portal, for every owner of an account Stripe knows (D1)', () => {
+describe('the billing portal, for an owner whose account has a card on file or a subscription (D1)', () => {
   const portalOf = (p: ReturnType<typeof settingsView>['plan']) => p.terms[1]!.action;
   const bare = withoutCard(agency, onAgency.accountId);
 
