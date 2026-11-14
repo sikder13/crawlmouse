@@ -1,6 +1,7 @@
 import { Button } from '../../Button';
 import { Card } from '../../Card';
 import { Heading } from '../../Heading';
+import { SUPPORT_COPY } from '../../../../lib/v2/copy/support';
 import type { FixView } from '../../../../lib/v2/view/fix';
 import { ResultShell } from '../result/ResultScreen';
 import { KeepBar } from '../result/KeepBar';
@@ -67,9 +68,10 @@ function WallCard({
 
 /**
  * The fix page (Final-Fix): the fix's verdict and estimated effect, then, as the plan allows, its
- * packet or the ask that opens it, the before and after, and the keep bar.
+ * packet or the ask that opens it, the before and after, and the keep bar. `support` is the live
+ * page's support link (CC-33 D5); a preview passes none and shows none.
  */
-export function FixScreen({ data }: { data: FixView }) {
+export function FixScreen({ data, support }: { data: FixView; support?: string }) {
   const { frame, head } = data;
   const copies = data.kind === 'open' && data.packet !== null;
   const keepPrimary = Boolean(data.keep?.primary);
@@ -199,6 +201,11 @@ export function FixScreen({ data }: { data: FixView }) {
 
       {data.keep && frame.keptUntil ? (
         <KeepBar domain={frame.domain} expires={frame.keptUntil} inline={data.keep} />
+      ) : null}
+      {support ? (
+        <p className={styles.support} data-v2-addition="">
+          {SUPPORT_COPY.fix.lead} <a href={support}>{SUPPORT_COPY.fix.link}</a>
+        </p>
       ) : null}
       <div className={`${layout.row} ${segment.nav}`}>
         <Button variant="quiet" href={frame.back.href}>

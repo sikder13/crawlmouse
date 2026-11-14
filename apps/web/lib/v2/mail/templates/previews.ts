@@ -16,6 +16,8 @@ import { alertTemplate } from './alert';
 import { checkNotify } from './check-notify';
 import { clientReport } from './client-report';
 import { fixToDeveloper } from './fix-to-developer';
+import { DIGEST_FIGURES, founderDigest, type DigestCounts } from './founder-digest';
+import { founderEvent, founderOverflow } from './founder-event';
 import { reportConfirm } from './report-confirm';
 import { seatInvite } from './seat-invite';
 import { trialReminder } from './trial-reminder';
@@ -80,6 +82,12 @@ const summaryWeek = () => {
     until: new Date((Math.floor(Math.max(...days) / day) + 1) * day).toISOString(),
   };
 };
+/** A digest's figures: stand-in numbers, each figure's own. */
+const digestCounts = (base: number): DigestCounts =>
+  Object.fromEntries(DIGEST_FIGURES.map(([k], i) => [k, base + i])) as DigestCounts;
+/** Stand-in account ids: the shape the console links, naming no account. */
+const ACCOUNT_ID = (n: number) => `a0000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
+
 /** What one alert lists: that check's changes. */
 const alertChanges = () => siteChanges().filter((c) => c.check_id === alertCheck().id);
 /**
@@ -157,6 +165,36 @@ const RENDERS: Record<MailPreviewSlug, (opts?: PreviewOptions) => RenderedMail> 
       ...reportSample(),
       shareToken: SHARE,
       pauseToken: PAUSE,
+    }),
+  'founder-event': () =>
+    founderEvent({
+      kind: 'payment',
+      internal: false,
+      accountId: ACCOUNT_ID(1),
+      plan: 'pro',
+      payment: 'first',
+      amount: { minor: 1900, currency: 'usd', status: 'paid' },
+      host: badHost(),
+      ownerEmail: ['owner', 'shop.example'].join('@'),
+      occurredAt: '2026-11-13T14:59:00.000Z',
+    }),
+  'founder-overflow': () =>
+    founderOverflow({
+      total: 4,
+      rows: [
+        { kind: 'signup', accountId: ACCOUNT_ID(2), internal: false },
+        { kind: 'trial_started', accountId: ACCOUNT_ID(3), internal: false },
+        { kind: 'signup', accountId: ACCOUNT_ID(4), internal: true },
+      ],
+    }),
+  'founder-digest-daily': () =>
+    founderDigest({ variant: 'daily', date: '2026-11-12', counts: digestCounts(1) }),
+  'founder-digest-weekly': () =>
+    founderDigest({
+      variant: 'weekly',
+      monday: '2026-11-02',
+      week: digestCounts(7),
+      previous: digestCounts(5),
     }),
 };
 

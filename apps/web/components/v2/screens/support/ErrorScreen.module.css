@@ -1,0 +1,40 @@
+/* The error screen: one column, as the account door's pages lay theirs out. Tokens only. */
+
+.main {
+  padding-top: 96px;
+  padding-bottom: 120px;
+  display: flex;
+  justify-content: center;
+}
+
+.column {
+  max-width: 520px;
+  width: 100%;
+}
+
+.what {
+  margin: 12px 0 0;
+  font-size: var(--v2-text-body);
+  line-height: var(--v2-line-body);
+  color: var(--v2-fg2);
+}
+
+.actions {
+  margin-top: 28px;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.support {
+  color: var(--v2-fg);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.reference {
+  margin: 24px 0 0;
+  font-family: var(--v2-font-mono);
+  font-size: var(--v2-text-small);
+  color: var(--v2-mut);
+  overflow-wrap: anywhere;
+}

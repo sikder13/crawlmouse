@@ -2,9 +2,16 @@
  * What each route class requires of a route's source, as a list of problems (empty when it holds).
  * The checks read call positions from the AST, so code order counts and comments do not.
  */
+import { posix } from 'node:path';
 import ts from 'typescript';
 import type { RouteClass } from '../../lib/security/route-policy';
-import { callPositions, exportedMethods, importSource, statusPositions } from './route-source';
+import {
+  callPositions,
+  exportedMethods,
+  importedModules,
+  importSource,
+  statusPositions,
+} from './route-source';
 
 const MEMBERSHIP_FUNCTIONS = new Set([
   'is_member',
@@ -75,6 +82,68 @@ function sessionFirst(sf: ts.SourceFile): string[] {
   if (getUser === Infinity) return ['never calls getUser()'];
   const early = callPositions(sf, 'supabaseAdmin').filter((p) => p < getUser);
   return early.length ? [`calls supabaseAdmin() before getUser() (${early.length} call)`] : [];
+}
+
+/**
+ * True when a module specifier in the route file `fileName` (relative to app/, as `readRoute` names it)
+ * names `@supabase/supabase-js` (or a path inside it) or apps/web's `lib/supabase/admin`: through `@/`
+ * or a relative path, with or without an extension or a trailing `/index`.
+ */
+function isServiceRoleModule(spec: string, fileName: string): boolean {
+  if (spec === '@supabase/supabase-js' || spec.startsWith('@supabase/supabase-js/')) return true;
+  let path: string;
+  if (spec.startsWith('@/')) path = posix.normalize(spec.slice(2));
+  else if (spec.startsWith('./') || spec.startsWith('../'))
+    path = posix.join('app', posix.dirname(fileName), spec);
+  else return false;
+  path = path
+    .replace(/\/$/, '')
+    .replace(/\.(ts|tsx|js|jsx|mjs|cjs)$/, '')
+    .replace(/\/index$/, '');
+  return path === 'lib/supabase/admin';
+}
+
+/**
+ * The support console's routes (CC-33): `requireOperator()` answers before the route makes a
+ * service-role client (`supabaseAdmin`, `consoleAdmin`, or the store built on it, `consoleStore`) and
+ * before it reads the request body, so a caller who is not an operator is answered with nothing read.
+ * The route builds no client itself: a `supabaseAdmin()` or `createClient()` call anywhere in it is a
+ * problem, and so is an import of `@/lib/supabase/admin` or `@supabase/supabase-js` in a spelling
+ * `isServiceRoleModule` recognises, whatever name the import binds. Its service-role client is
+ * `consoleAdmin(proof)`'s, which throws on a proof `requireOperator` did not issue
+ * (lib/v2/ops/operator.ts).
+ */
+function operatorFirst(sf: ts.SourceFile): string[] {
+  const at = first(callPositions(sf, 'requireOperator'));
+  if (at === Infinity) return ['never calls requireOperator()'];
+  const problems: string[] = [];
+  const admin = ['supabaseAdmin', 'consoleAdmin', 'consoleStore']
+    .flatMap((n) => callPositions(sf, n))
+    .filter((p) => p < at);
+  if (admin.length) {
+    problems.push(
+      `calls supabaseAdmin(), consoleAdmin() or consoleStore() before requireOperator() (${admin.length} call${admin.length === 1 ? '' : 's'})`,
+    );
+  }
+  const body = [...bodyReads(sf), ...callPositions(sf, 'readBody')].filter((p) => p < at);
+  if (body.length) {
+    problems.push(
+      `reads the request body before requireOperator() (${body.length} read${body.length === 1 ? '' : 's'})`,
+    );
+  }
+  const built = ['supabaseAdmin', 'createClient'].flatMap((n) => callPositions(sf, n));
+  if (built.length) {
+    problems.push(
+      `builds a client with supabaseAdmin() or createClient() (${built.length} call${built.length === 1 ? '' : 's'}); an operator route reaches the service role through consoleAdmin() or consoleStore()`,
+    );
+  }
+  const modules = importedModules(sf).filter((m) => isServiceRoleModule(m, sf.fileName));
+  if (modules.length) {
+    problems.push(
+      `imports from @/lib/supabase/admin or @supabase/supabase-js (${modules.join(', ')}); an operator route reaches the service role through consoleAdmin() or consoleStore()`,
+    );
+  }
+  return problems;
 }
 
 /** Every method the route exports is destructured from `serve()` of `inngest/next`. */
@@ -206,6 +275,8 @@ export function mechanismProblems(
     case 'webhook':
       if (!verifier) return ['no verifier named'];
       return verifier === 'serve' ? servedByInngest(sf) : verifiedFirst(sf, verifier);
+    case 'operator':
+      return operatorFirst(sf);
     case 'public':
       return [];
   }

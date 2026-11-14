@@ -58,6 +58,8 @@ export const OPTIONAL_ENV: Why = {
   CRAWL_PAUSED: 'the global crawl pause, set only to pause (PROJECT_OVERVIEW §6)',
   CRAWL_WALL_CLOCK_MS: "engine budget override; unset uses the engine's default",
   ENGINE_V2: 'engine switch; unset keeps the default engine path',
+  FOUNDER_NOTIFY_TO:
+    'unset, no founder notice or digest is sent and each run logs founder.unconfigured (CC-33 D3)',
   HOMEPAGE_FETCH_TIMEOUT_MS: "engine timeout override; unset uses the engine's default",
   INNGEST_AUDIT_CONCURRENCY:
     'unset is PLAN_CONCURRENCY_CAP; any value is clamped to it (inngest/concurrency.ts)',
@@ -67,6 +69,8 @@ export const OPTIONAL_ENV: Why = {
   INNGEST_SUMMARY_CONCURRENCY: "unset uses inngest/summary.ts's default",
   NEXT_PUBLIC_POSTHOG_HOST: 'unset uses the /ingest proxy default',
   SENTRY_AUTH_TOKEN: 'build-time source-map upload; unset ships without source maps',
+  SIGNIN_CANARY_TO:
+    'unset, the sign-in canary is not registered; set, it runs every 10 minutes (CC-33 D6, docs/ops/uptime.md)',
   RENDER_MAX_BROWSER_SECONDS_PER_CHECK:
     'rendering stays off until the owner sets the caps (spec 14)',
   RENDER_MAX_BROWSER_SECONDS_PER_DAY: 'rendering stays off until the owner sets the caps (spec 14)',

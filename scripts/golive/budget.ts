@@ -27,13 +27,20 @@ export const HOBBY_HEADROOM_LINE = 40_000;
 /** The month the totals are computed over: the longest, so the floor is not understated. */
 export const DAYS_PER_MONTH = 31;
 
-/** Which flag a function is registered under (apps/web/lib/v2/pipeline/functions.ts). */
+/**
+ * Which flags a function is registered under (apps/web/lib/v2/pipeline/functions.ts): `+` joins flags
+ * that must all be set, `|` flags of which one is enough. `SIGNIN_CANARY_TO` is no flag: CC-33's
+ * sign-in canary is registered when the owner sets that variable, so no switch-on step starts it and
+ * its cost is stated apart from the floor (`canaryMonthly`).
+ */
 export type Registration =
   | 'v1'
   | 'V2_PIPELINE'
   | 'V2_BILLING'
   | 'V2_CHECKS_PUBLIC'
-  | 'V2_PIPELINE+V2_CHECKS_PUBLIC';
+  | 'V2_PIPELINE+V2_CHECKS_PUBLIC'
+  | 'V2_BILLING|V2_CHECKS_PUBLIC'
+  | 'SIGNIN_CANARY_TO';
 
 export interface FunctionRow {
   /** The file that calls createFunction for it. */
@@ -380,6 +387,47 @@ const ROWS: readonly RowInput[] = [
     stepsHow: 'send',
     stepAt: [88],
   },
+  {
+    file: 'inngest/founder.ts',
+    id: 'crawlmouse.founder.entitlement',
+    onFailure: true,
+    callSites: 1,
+    registration: 'V2_BILLING|V2_CHECKS_PUBLIC',
+    trigger: 'entitlement.changed',
+    steps: 1,
+    stepsHow: 'notify',
+    stepAt: [71],
+  },
+  {
+    file: 'inngest/founder.ts',
+    id: 'crawlmouse.founder.sweep',
+    onFailure: true,
+    callSites: 1,
+    registration: 'V2_BILLING|V2_CHECKS_PUBLIC',
+    cron: '*/5 * * * *',
+    steps: 1,
+    stepsHow: 'sweep: sign-ups, agency accounts and cancellations, read and noticed in one step',
+  },
+  {
+    file: 'inngest/founder.ts',
+    id: 'crawlmouse.founder.digest',
+    onFailure: true,
+    callSites: 2,
+    registration: 'V2_BILLING|V2_CHECKS_PUBLIC',
+    cron: '7 * * * *',
+    steps: 2,
+    stepsHow: 'clock, digest: the daily and weekly digests and the "N more" notice, in one step',
+  },
+  {
+    file: 'inngest/signin-canary.ts',
+    id: 'crawlmouse.ops.signin-canary',
+    onFailure: false,
+    callSites: 4,
+    registration: 'SIGNIN_CANARY_TO',
+    cron: '*/10 * * * *',
+    steps: 3,
+    stepsHow: 'request, wait (a sleep), look; then report-{stage} when it raises its signal',
+  },
 ];
 
 export const FUNCTIONS: readonly FunctionRow[] = ROWS.map((r): FunctionRow => {
@@ -396,7 +444,9 @@ export const FUNCTIONS: readonly FunctionRow[] = ROWS.map((r): FunctionRow => {
 export const cronPerDay = (f: FunctionRow): number => f.runsPerDay * (1 + f.steps);
 
 /** The fixed monthly floor: every cron registered once all four flags are on, nothing due. */
-export function monthlyFloor(rows: readonly FunctionRow[] = FUNCTIONS): number {
+export function monthlyFloor(
+  rows: readonly FunctionRow[] = FUNCTIONS.filter((f) => registered(f, new Set<Flag>(SWITCH_ON))),
+): number {
   return rows.reduce((sum, f) => sum + cronPerDay(f), 0) * DAYS_PER_MONTH;
 }
 
@@ -411,8 +461,16 @@ export type Flag = (typeof SWITCH_ON)[number];
 
 /** Whether a row is registered when exactly `on` are set. */
 export function registered(f: FunctionRow, on: ReadonlySet<Flag>): boolean {
-  return f.registration === 'v1' || f.registration.split('+').every((flag) => on.has(flag as Flag));
+  if (f.registration === 'v1') return true;
+  if (f.registration === 'SIGNIN_CANARY_TO') return false;
+  if (f.registration.includes('|'))
+    return f.registration.split('|').some((flag) => on.has(flag as Flag));
+  return f.registration.split('+').every((flag) => on.has(flag as Flag));
 }
+
+/** The sign-in canary's month, idle, once SIGNIN_CANARY_TO is set: apart from the flags' floor. */
+export const canaryMonthly = (): number =>
+  monthlyFloor(FUNCTIONS.filter((f) => f.registration === 'SIGNIN_CANARY_TO'));
 
 /** The monthly floor after each switch-on step: the flags of that step and every step before it. */
 export function floorBySwitchOn(): { flags: readonly Flag[]; floor: number }[] {

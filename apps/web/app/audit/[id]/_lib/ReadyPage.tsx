@@ -13,6 +13,7 @@ import { NoJsScreen } from '../../../../components/v2/screens/segment/NoJsScreen
 import { SignalsScreen } from '../../../../components/v2/screens/segment/SignalsScreen';
 import { StructureScreen } from '../../../../components/v2/screens/segment/StructureScreen';
 import { findCheck } from '../../../../lib/v2/fixtures';
+import { supportMailto } from '../../../../lib/v2/support/mailto';
 import { fixView } from '../../../../lib/v2/view/fix';
 import { isFreeFix } from '../../../../lib/v2/view/free-fixes';
 import { linkMapView } from '../../../../lib/v2/view/link-map';
@@ -70,15 +71,28 @@ export async function SegmentPage({ id, segment }: { id: string; segment: Segmen
   return <SegmentBody read={await readyAudit(id)} segment={segment} />;
 }
 
-/** The fix page's view; null when the id names no fix this check's site had by this check. */
+/**
+ * The fix page's view, and its support link with the fix's ids (CC-33 D5); null when the id names
+ * no fix this check's site had by this check.
+ */
 export function fixOf(read: ReadyCheck, fixId: string) {
   const fix = read.dataset.fixes.find((f) => f.id === fixId);
   if (!fix) return null;
   const check = findCheck(read.dataset, read.checkId);
+  const site = read.dataset.sites.find((s) => s.id === check.site_id);
   return {
     view: fixView(read.dataset, read.checkId, fixId, viewOptions(read)),
     type: fix.type,
     free: isFreeFix(read.dataset, check, fix),
+    support: supportMailto({
+      topic: 'fix',
+      path: auditHrefs(read.checkId).fix(fixId),
+      accountId: site?.account_id,
+      siteId: check.site_id,
+      checkId: read.checkId,
+      fixId,
+      fixType: fix.type,
+    }),
   };
 }
 
@@ -97,7 +111,7 @@ export function FixBody({
         event="fix_opened"
         props={{ type: found.type, free: found.free, check_ref: page.checkRef }}
       />
-      <FixScreen data={found.view} />
+      <FixScreen data={found.view} support={found.support} />
     </AuditPageProvider>
   );
 }

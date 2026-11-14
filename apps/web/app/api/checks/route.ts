@@ -70,9 +70,14 @@ export async function POST(req: Request) {
 
   if (outcome.created) {
     const { checkId } = outcome;
-    await capturePublicEventAfterResponse(req, 'check_started', checkId, {
-      trigger: 'first_audit',
-    });
+    // A check this route creates is of a site no account keeps (`insertUnkeptSite`): no account.
+    await capturePublicEventAfterResponse(
+      req,
+      'check_started',
+      checkId,
+      { trigger: 'first_audit' },
+      null,
+    );
   }
   return answer({ checkId: outcome.checkId }, 200);
 }

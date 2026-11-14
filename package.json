@@ -13,6 +13,8 @@
     "backtest": "tsx scripts/backtest-engine.ts",
     "golive:check": "pnpm --filter @crawlmouse/scripts golive:check --",
     "indexnow": "node scripts/indexnow-ping.mjs",
+    "ops:operator": "tsx scripts/ops/operator.ts",
+    "ops:internal": "tsx scripts/ops/internal.ts",
     "research:build-panel": "tsx scripts/research/cf-panel/build-panel.ts",
     "research:snapshot": "tsx scripts/research/cf-panel/snapshot.ts",
     "research:diff": "tsx scripts/research/cf-panel/report.ts",

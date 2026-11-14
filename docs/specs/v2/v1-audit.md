@@ -81,13 +81,13 @@ show up through the items that use them (A-7, B-F8).
 <!-- v1-inventory:counts -->
 | kind | keep | retire | delete | total |
 | --- | ---: | ---: | ---: | ---: |
-| page | 18 | 6 | 0 | 24 |
-| metadata | 10 | 0 | 0 | 10 |
-| route | 25 | 9 | 0 | 34 |
+| page | 20 | 6 | 0 | 26 |
+| metadata | 15 | 0 | 0 | 15 |
+| route | 28 | 9 | 0 | 37 |
 | inngest | 2 | 2 | 0 | 4 |
 | cron | 1 | 1 | 0 | 2 |
 | table | 11 | 7 | 0 | 18 |
-| **all** | 67 | 25 | 0 | 92 |
+| **all** | 77 | 25 | 0 | 102 |
 <!-- /v1-inventory:counts -->
 <!-- prettier-ignore-end -->
 
@@ -168,6 +168,10 @@ rows that matter here are reproduced below so this repository holds the basis of
 | metadata | `app/not-found.tsx` | keep | site 404 page | apps/web/app/not-found.tsx:1 |
 | metadata | `app/audit/[id]/overview/not-found.tsx` | keep | 404 of a v2 check's overview (CC-22b): the site 404 page while V2_CHECKS_PUBLIC is off, and with it on the wording for an audit that does not exist or has expired | apps/web/app/audit/[id]/overview/not-found.tsx:17 |
 | metadata | `app/global-error.tsx` | keep | root error boundary (reports to Sentry) | apps/web/app/global-error.tsx:1 |
+| metadata | `app/alerts/error.tsx` | keep | error boundary of the Alerts page (CC-33 D5): the v2 error screen with a retry, the support link and the Sentry event id | apps/web/app/alerts/error.tsx:1 |
+| metadata | `app/changes/error.tsx` | keep | error boundary of the changes log (CC-33 D5): the v2 error screen with a retry, the support link and the Sentry event id | apps/web/app/changes/error.tsx:1 |
+| metadata | `app/dashboard/v2/error.tsx` | keep | error boundary of the v2 dashboard (CC-33 D5): the v2 error screen with a retry, the support link and the Sentry event id | apps/web/app/dashboard/v2/error.tsx:1 |
+| metadata | `app/sites/error.tsx` | keep | error boundary of a site's page (CC-33 D5): the v2 error screen with a retry, the support link and the Sentry event id | apps/web/app/sites/error.tsx:1 |
 | metadata | `app/sitemap.ts` | keep | sitemap; outside this step's allowed paths (§13) | ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md "6.2 URLs") |
 | route | `app/api/admin/takedown/process/route.ts` | keep | takedown processing; legal obligation | apps/web/lib/security/route-policy.ts:37 |
 | route | `app/api/audits/[id]/cancel/route.ts` | retire | v1 audit API, replaced by the checks API | ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md "6.2 URLs") |
@@ -227,6 +231,12 @@ rows that matter here are reproduced below so this repository holds the basis of
 | table | `public.waitlist` | keep | kept unchanged | ARCH-2 §2 legacy-table table and §6.1 migration 009 (~/crawlmouse-plan/ARCH-2.md) |
 | table | `public.frontier` | keep | kept; audit_id becomes check_id | ARCH-2 §2 legacy-table table and §6.1 migration 009 (~/crawlmouse-plan/ARCH-2.md) |
 | table | `public.frontier_politeness` | keep | kept; audit_id becomes check_id | ARCH-2 §2 legacy-table table and §6.1 migration 009 (~/crawlmouse-plan/ARCH-2.md) |
+| page | `/internal` (`app/internal/page.tsx`) | keep | the support console's search (CC-33 D2); flag-free, staff only | docs/specs/v2/33-operations.md (CC-33 D2: the support console, staff only) |
+| page | `/internal/accounts/[id]` (`app/internal/accounts/[id]/page.tsx`) | keep | one account in the support console (CC-33 D2); flag-free, staff only | docs/specs/v2/33-operations.md (CC-33 D2: the support console, staff only) |
+| metadata | `app/internal/layout.tsx` | keep | the support console's layout: v2 tokens, noindex, force-dynamic (CC-33 D2) | apps/web/app/internal/layout.tsx:1 |
+| route | `app/api/internal/search/route.ts` | keep | the support console's search (CC-33 D2): a POST so the query is in no URL | apps/web/lib/security/route-policy.ts:171 |
+| route | `app/api/internal/checks/[id]/rerun/route.ts` | keep | the support console's re-run of a failed check (CC-33 D2) | apps/web/lib/security/route-policy.ts:173 |
+| route | `app/api/internal/accounts/[id]/sign-in-link/route.ts` | keep | the support console's re-send of a sign-in link (CC-33 D2) | apps/web/lib/security/route-policy.ts:179 |
 <!-- /v1-inventory:rulings -->
 <!-- prettier-ignore-end -->
 
@@ -268,6 +278,10 @@ is the verdict word; the full verdict with its evidence is the entry's `checks` 
 | `app/blog/[slug]/opengraph-image.tsx` | keep | pass | pass | pass | n/a | n/a | pass | n/a |
 | `app/r/[slug]/opengraph-image.tsx` | keep | pass | pass | pass | n/a | n/a | pass | n/a |
 | `app/global-error.tsx` | keep | n/a | pass | n/a | n/a | pass | n/a | n/a |
+| `app/alerts/error.tsx` | keep | n/a | pass | n/a | n/a | pass | pass | n/a |
+| `app/changes/error.tsx` | keep | n/a | pass | n/a | n/a | pass | pass | n/a |
+| `app/dashboard/v2/error.tsx` | keep | n/a | pass | n/a | n/a | pass | pass | n/a |
+| `app/sites/error.tsx` | keep | n/a | pass | n/a | n/a | pass | pass | n/a |
 | `app/api/admin/takedown/process/route.ts` | keep | pass | pass | pass | n/a | pass | n/a | finding |
 | `app/api/audits/[id]/cancel/route.ts` | retire | pass | pass | pass | n/a | pass | n/a | pass |
 | `app/api/audits/[id]/export/route.ts` | retire | pass | pass | finding | n/a | pass | pass | n/a |
@@ -302,6 +316,12 @@ is the verdict word; the full verdict with its evidence is the entry's `checks` 
 | `app/llms.txt/route.ts` | keep | n/a | pass | pass | n/a | n/a | n/a | n/a |
 | `app/login/verify/route.ts` | keep | pass | pass | pass | pass | pass | n/a | finding |
 | `app/robots.txt/route.ts` | keep | n/a | pass | pass | n/a | n/a | n/a | n/a |
+| `/internal` (`app/internal/page.tsx`) | keep | pass | pass | pass | n/a | n/a | pass | n/a |
+| `/internal/accounts/[id]` (`app/internal/accounts/[id]/page.tsx`) | keep | pass | pass | pass | n/a | pass | pass | n/a |
+| `app/internal/layout.tsx` | keep | n/a | pass | pass | n/a | n/a | n/a | n/a |
+| `app/api/internal/search/route.ts` | keep | pass | pass | pass | pass | pass | n/a | pass |
+| `app/api/internal/checks/[id]/rerun/route.ts` | keep | pass | pass | pass | pass | pass | n/a | pass |
+| `app/api/internal/accounts/[id]/sign-in-link/route.ts` | keep | pass | pass | pass | pass | pass | n/a | pass |
 <!-- /v1-inventory:checks -->
 <!-- prettier-ignore-end -->
 

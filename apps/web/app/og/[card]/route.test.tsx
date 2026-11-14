@@ -32,6 +32,8 @@ const { CARD_TOKENS, SOCIAL_CARDS, socialCardPath, socialCardResponse } =
 const { AGENCIES_COPY } = await import('@/lib/v2/copy/agencies');
 const { CHECK_COPY } = await import('@/lib/v2/copy/check-pages');
 const { DEVELOPERS_COPY } = await import('@/lib/v2/copy/developers');
+const { HELP_COPY } = await import('@/lib/v2/help/copy');
+const { helpArticles } = await import('@/lib/v2/help/articles');
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -57,6 +59,12 @@ describe('GET /og/<card>', () => {
     ['check-gptbot', CHECK_COPY.gptbot.title, 'V2_CHECKS_PUBLIC'],
     ['check-javascript', CHECK_COPY.javascript.title, 'V2_CHECKS_PUBLIC'],
     ['check-robots-ai', CHECK_COPY['robots-ai'].title, 'V2_CHECKS_PUBLIC'],
+    ['help', HELP_COPY.title, 'V2_CHECKS_PUBLIC'],
+    ...helpArticles().map((a): [string, string, string] => [
+      `help-${a.slug}`,
+      a.question,
+      'V2_CHECKS_PUBLIC',
+    ]),
   ];
 
   it('has a card for each of those pages and no other', () => {

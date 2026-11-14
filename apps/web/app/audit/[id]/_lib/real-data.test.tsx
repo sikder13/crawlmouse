@@ -14,6 +14,7 @@ import { FAILURE_REASONS } from '../../../../../../inngest/check-events';
 import { accountOf, doorDb, signUp } from '../../../../__tests__/v2/_lib/door-pglite';
 import { loadCheckFor } from '../../../../lib/v2/pipeline/load-for';
 import { checkRef, type CheckRead } from '../../../../lib/v2/pipeline/public';
+import { supportMailto } from '../../../../lib/v2/support/mailto';
 import {
   FIRST,
   SECOND,
@@ -542,6 +543,29 @@ describe('/audit/[id]/fix/[fixId]', () => {
         expect(markup).toContain(escaped(fix.packet.verify.command));
       }
     }
+  });
+
+  it('links support with the fix’s, its type’s, the check’s, the site’s and the account’s ids (CC-33 D5)', () => {
+    const fix = one.dataset.fixes.find((f) => f.id === live()[0]!.id)!;
+    const check = one.dataset.checks.find((c) => c.id === one.checkId)!;
+    const site = one.dataset.sites.find((s) => s.id === check.site_id)!;
+    const found = fixOf(one, fix.id)!;
+    const expected = supportMailto({
+      topic: 'fix',
+      path: `/audit/${one.checkId}/fix/${fix.id}`,
+      accountId: site.account_id,
+      siteId: site.id,
+      checkId: one.checkId,
+      fixId: fix.id,
+      fixType: fix.type,
+    });
+    expect(found.support).toBe(expected);
+    const body = decodeURIComponent(expected);
+    for (const line of [`Fix: ${fix.id}`, `Fix type: ${fix.type}`, `Check: ${one.checkId}`])
+      expect(body).toContain(line);
+    expect(html(<FixBody read={one} found={found} />)).toContain(
+      `href="${expected.replace(/&/g, '&amp;')}"`,
+    );
   });
 
   it('the sentence gives the engine’s reason for a fix type it writes no packet for, and names the last check otherwise', () => {

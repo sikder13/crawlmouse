@@ -448,4 +448,9 @@ export const PREVIEWS: PreviewEntry[] = [
     name: 'Public report, withheld',
     kind: 'screen',
   },
+  // CC-33: the help centre asks nothing of the reader, so nothing on it is orange; the error
+  // screen's orange element is "Try again".
+  { path: '/v2-preview/screens/help', name: 'Help', kind: 'screen', orange: 0 },
+  { path: '/v2-preview/screens/help-article', name: 'Help article', kind: 'screen', orange: 0 },
+  { path: '/v2-preview/screens/error', name: 'Error screen', kind: 'screen' },
 ];
