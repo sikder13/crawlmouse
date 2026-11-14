@@ -48,6 +48,9 @@ Measured against the code; the reasoning for each is in `notes/cc-38/questions.m
 - **`--billing` refuses a QA account whose plan is past due or cancelled** (the app's own checkout
   refusal; exit 1). Such an account's plan is put back through its own Checkout in the app, not by the
   script.
+- **About three resets an hour.** A Free account's first audit counts against its host's hourly bucket
+  (five an hour, `DOMAIN_AUDITS_PER_HOUR`), and `crawlmouse.com` and `nahltech.com` are sites of more
+  than one QA account; a reset past the bound is refused with the time it fits, and exits 1.
 - **`demo` has no read-only mode.** There is no mechanism for one; `demo` is an ordinary Agency
   account kept for showing.
 - **The paid plans arrive through a Checkout the owner completes (Q2).** The webhook grants a plan

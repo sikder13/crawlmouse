@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { wire, WiringError } from './wiring';
+import { PassThrough, Readable } from 'node:stream';
+import { asker, wire, WiringError } from './wiring';
 
 /**
  * The QA wiring's refusals that come before any network call (CC-38 D1(b)): `--billing` takes the
@@ -37,5 +38,17 @@ describe('qa wiring: --billing over the production database', () => {
   it('builds the deps for a test key over another project', () => {
     const wired = wire({ ...base, SUPABASE_URL: 'http://127.0.0.1:54321' }, () => {});
     expect(wired.billing().keyLive).toBe(false);
+  });
+});
+
+describe('qa wiring: the terminal question', () => {
+  it('answers the empty string when the input ends unanswered (cron, CI, a pipe)', async () => {
+    const answer = await asker(Readable.from([]), new PassThrough())('Type "x" to go on: ');
+    expect(answer).toBe('');
+  });
+
+  it('answers what was typed', async () => {
+    const answer = await asker(Readable.from(['open 4 live checkouts\n']), new PassThrough())('? ');
+    expect(answer).toBe('open 4 live checkouts');
   });
 });

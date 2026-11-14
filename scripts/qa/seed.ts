@@ -195,8 +195,8 @@ async function seedOne(run: Run, account: QaAccount, homes: Map<QaKey, Seat>): P
   await internal(run, seat.accountId, markedNow);
   // Only an account that passed every check above is one a seat may be put on.
   homes.set(account.key, seat);
-  await sites(run, account, seat, userId);
-  if (home.kind === 'agency') await firstAudit(run, account, seat, userId);
+  const firstHeld = await sites(run, account, seat, userId);
+  if (home.kind === 'agency' && firstHeld) await firstAudit(run, account, seat, userId);
   if (account.proTrial && !run.restore) {
     const t = await deps.store.proTrial(seat, userId, email);
     if (t.outcome === 'refused') note('pro trial', 'refused', t.reason);
@@ -335,13 +335,19 @@ function capped(r: { outcome: string; nextAllowedAt?: string }): string {
   }
 }
 
+/**
+ * The account's sites, in the set's order; whether it holds its first one afterwards. An add refused
+ * by a bound stops the account's list there: the next host would otherwise take the free slot, and
+ * the account's first site would change from one run to the next.
+ */
 async function sites(
   { deps, note }: Run,
   account: QaAccount,
   seat: Seat,
   userId: string,
-): Promise<void> {
+): Promise<boolean> {
   const have = new Set(await deps.store.hosts(seat.accountId));
+  const first = account.sites[0];
   for (const host of account.sites) {
     // add_site answers `exists` for a held host too; looking first skips its SSRF lookup.
     if (have.has(host)) {
@@ -349,6 +355,7 @@ async function sites(
       continue;
     }
     const r = await deps.store.addSite(seat, host, userId);
+    if (r.outcome === 'created' || r.outcome === 'exists') have.add(host);
     if (r.outcome === 'created' && r.unsent !== undefined) {
       note(
         'site',
@@ -359,8 +366,16 @@ async function sites(
       note('site', r.outcome === 'created' ? 'done' : 'unchanged', host);
     else if (r.outcome === 'full')
       note('site', 'waits_for_plan', `${host}: no room on the current plan`);
-    else note('site', 'refused', `${host}: ${capped(r)}`);
+    else {
+      note(
+        'site',
+        'refused',
+        `${host}: ${capped(r)}; the account's other sites wait for the next run`,
+      );
+      break;
+    }
   }
+  return first !== undefined && have.has(first);
 }
 
 /** An agency account's first site has its first audit, as a site add_site stores does. */

@@ -308,8 +308,33 @@ describe('qa:seed part (a)', () => {
       expect(site?.detail).toBe(
         `nahltech.com: the host's hourly first-audit bound is reached; run again after ${new Date(
           Date.parse(windowStart) + 60 * 60 * 1000,
-        ).toISOString()}`,
+        ).toISOString()}; the account's other sites wait for the next run`,
       );
+    },
+    PGLITE_TIMEOUT,
+  );
+
+  withMarker(
+    `a capped first site stops the account's list, so the next host does not become its first`,
+    async () => {
+      const w = await world(base);
+      // qa+pro's first site is crawlmouse.com; on Free its one slot must not go to nahltech.com.
+      const windowStart = rateLimitWindowStart(Date.now(), 60 * 60 * 1000).toISOString();
+      for (let i = 0; i < 5; i++) {
+        await w.db.query(`select public.increment_rate_limit($1, $2::timestamptz)`, [
+          'domain:crawlmouse.com',
+          windowStart,
+        ]);
+      }
+      const steps = await seed(w.deps);
+      const pro = await w.db.query<{ host: string }>(
+        `select s.host from public.sites s join public.qa_accounts q on q.account_id = s.account_id
+          where q.qa_key = 'pro' and s.removed_at is null`,
+      );
+      expect(pro.rows).toEqual([]);
+      expect(
+        steps.filter((s) => s.key === 'pro' && s.step === 'site').map((s) => s.outcome),
+      ).toEqual(['refused']);
     },
     PGLITE_TIMEOUT,
   );

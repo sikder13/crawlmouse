@@ -92,14 +92,29 @@ export interface Wired {
   billing(): BillingDeps;
 }
 
-async function ask(prompt: string): Promise<string> {
-  const rl = createInterface({ input: stdin, output: stdout });
-  try {
-    return await rl.question(prompt);
-  } finally {
-    rl.close();
-  }
+/**
+ * A question on the terminal. An input that ends with no answer (a closed stdin: cron, CI, a pipe)
+ * answers the empty string, which matches no phrase, so the step it guards is refused and the run
+ * exits non-zero; `rl.question` alone would wait on a promise that never settles, and the process
+ * would end with exit 0 having done nothing.
+ */
+export function asker(input: NodeJS.ReadableStream, output: NodeJS.WritableStream) {
+  return (prompt: string): Promise<string> =>
+    new Promise<string>((resolve) => {
+      const rl = createInterface({ input, output });
+      // Deferred one turn: an answer read just before the input closed settles first.
+      rl.once('close', () => setImmediate(() => resolve('')));
+      rl.question(prompt).then(
+        (answer) => {
+          resolve(answer);
+          rl.close();
+        },
+        () => resolve(''),
+      );
+    });
 }
+
+const ask = asker(stdin, stdout);
 
 export function wire(env: Env, print: (line: string) => void): Wired {
   const inbox = qaInbox(env);
