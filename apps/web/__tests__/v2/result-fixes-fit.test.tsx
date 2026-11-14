@@ -3,10 +3,10 @@
  * the Pro panel in the right one. A fix title holding a long URL (one unbreakable token as wide as
  * the track) made the table wider than its track, so the scroll region clipped the last column
  * ("Open" read "Ope") under the panel's edge. The title cell now breaks anywhere and the action
- * cell keeps its button on one line, so the table's min-content fits the track at 1024–1920.
+ * cell keeps its button on one line, so a long URL no longer sets the table's min-content width.
  *
  * This reads the rule and the markup it keys on; it does not measure layout. The geometry check is
- * the lead's, at /v2-preview/screens/result (CC-39 report-D3.md).
+ * the lead's, on a live result with long-URL titles (CC-39 report-D3.md).
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';

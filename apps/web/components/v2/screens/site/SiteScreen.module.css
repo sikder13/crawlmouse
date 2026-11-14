@@ -88,10 +88,10 @@
 }
 
 /*
- * The settings card beside the alerts card (CC-39 F10). Below 1300px it is too narrow for a row of
- * controls, so the two cards stack up to there, not only up to the shared 1100px (doubled to outweigh
- * `.two` whatever order the stylesheets load in). Off a phone a control's fields wrap within their
- * cell, and the explanation keeps a width it can be read at.
+ * The settings card beside the alerts card (CC-39 F10). At 1280px, side by side, it clipped its
+ * controls (CC-38's walk), so the two cards stack up to 1300px, not only up to the shared 1100px
+ * (doubled to outweigh `.two` whatever order the stylesheets load in). Off a phone a control's fields
+ * wrap within their cell, and the explanation cell keeps a 12em minimum.
  */
 @media (max-width: 1300px) {
   .panels.panels {

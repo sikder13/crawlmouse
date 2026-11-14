@@ -26,8 +26,9 @@ const SIGNED_IN_ENTRY = ACCOUNT_NAV[0];
 
 /**
  * The Result page's frame. Its header offers what the state can do: `share` a finished result,
- * `rerun` a finished, failed or expired audit. A signed-in reader is offered their Sites, anyone
- * else Log in.
+ * `rerun` a finished, failed or expired audit. Its caller passes `signedIn` for a kept audit's
+ * result, fix, map and segment pages, which then offer Sites in place of Log in; the waiting,
+ * failed, refused and expired states pass nothing and offer Log in.
  */
 export function ResultShell({
   children,
