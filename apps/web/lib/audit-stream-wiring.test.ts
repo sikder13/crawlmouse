@@ -9,7 +9,9 @@ function fakeEs() {
   let closed = false;
   const es: EventSourceLike = {
     addEventListener: (type, fn) => listeners.set(type, fn as (e: Event) => void),
-    close: () => { closed = true; },
+    close: () => {
+      closed = true;
+    },
   };
   const dispatch = (type: string, data?: string) => {
     const fn = listeners.get(type);
@@ -38,9 +40,26 @@ describe('wireAuditStream', () => {
     const { es, dispatch, isClosed } = fakeEs();
     wireAuditStream(es, { onSnapshot, onDone, onTerminalError: vi.fn() });
 
-    dispatch('done', JSON.stringify({ id: 'a', status: 'completed', grade: 'A', score: 92, orphanCount: 3, avgDepth: 2.1 }));
+    dispatch(
+      'done',
+      JSON.stringify({
+        id: 'a',
+        status: 'completed',
+        grade: 'A',
+        score: 92,
+        orphanCount: 3,
+        avgDepth: 2.1,
+      }),
+    );
 
-    expect(onSnapshot).toHaveBeenCalledWith({ id: 'a', status: 'completed', grade: 'A', score: 92, orphanCount: 3, avgDepth: 2.1 });
+    expect(onSnapshot).toHaveBeenCalledWith({
+      id: 'a',
+      status: 'completed',
+      grade: 'A',
+      score: 92,
+      orphanCount: 3,
+      avgDepth: 2.1,
+    });
     expect(onDone).toHaveBeenCalledTimes(1);
     expect(isClosed()).toBe(true);
   });

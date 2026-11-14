@@ -42,9 +42,9 @@ export interface AuditSnapshotLite {
 }
 
 export interface AuditViewState {
-  running: boolean;          // crawl in progress
-  awaitingResults: boolean;  // terminal=completed but done payload not yet received → skeleton
-  graded: boolean;           // safe to render GradeCard with REAL numbers (stats present)
+  running: boolean; // crawl in progress
+  awaitingResults: boolean; // terminal=completed but done payload not yet received → skeleton
+  graded: boolean; // safe to render GradeCard with REAL numbers (stats present)
   /**
    * SPEC 5.1a §4 — the engine DECLINED to assert a letter. A distinct terminal state: not graded,
    * not failed, and emphatically not `gradeFailed` — nothing went wrong, we simply hold too little
@@ -52,11 +52,11 @@ export interface AuditViewState {
    */
   refused: boolean;
   failed: boolean;
-  gradeFailed: boolean;      // terminal (done) but not graded — catch-all so a missing/failed/
-                             // stats-less done payload always reaches the "couldn't grade" card,
-                             // never a blank render and never a misleading 0-orphans/0.0-depth card
+  gradeFailed: boolean; // terminal (done) but not graded — catch-all so a missing/failed/
+  // stats-less done payload always reaches the "couldn't grade" card,
+  // never a blank render and never a misleading 0-orphans/0.0-depth card
   failureCategory: FailureCategory | null; // which failure copy to show — set ONLY when failed
-  canceled: boolean;         // user stopped the audit — a distinct terminal state (never failed/alert)
+  canceled: boolean; // user stopped the audit — a distinct terminal state (never failed/alert)
 }
 
 /**
@@ -112,7 +112,16 @@ export function deriveAuditViewState(
   // running/graded/gradeFailed states. A failed audit always has a category server-side; default
   // to 'internal' defensively so the copy is never blank.
   const failureCategory = failed ? (snapshot?.failureCategory ?? 'internal') : null;
-  return { running, awaitingResults, graded, refused, failed, gradeFailed, failureCategory, canceled };
+  return {
+    running,
+    awaitingResults,
+    graded,
+    refused,
+    failed,
+    gradeFailed,
+    failureCategory,
+    canceled,
+  };
 }
 
 /**
@@ -185,7 +194,9 @@ export function decideAuditSurface(
   if (state.running) return { kind: 'running' };
   if (state.awaitingResults) return { kind: 'awaiting' };
   if (state.refused) {
-    return v2 ? { kind: 'result', verdict: 'refused', audit: v2 } : { kind: 'error', copy: COULD_NOT_GRADE };
+    return v2
+      ? { kind: 'result', verdict: 'refused', audit: v2 }
+      : { kind: 'error', copy: COULD_NOT_GRADE };
   }
   if (state.graded) {
     if (v2) return { kind: 'result', verdict: 'graded', audit: v2 };
@@ -200,7 +211,8 @@ export function decideAuditSurface(
       viewerIsPro: snapshot?.viewerIsPro ?? false,
     };
   }
-  if (state.failed) return { kind: 'error', copy: FAILURE_COPY[state.failureCategory ?? 'internal'] };
+  if (state.failed)
+    return { kind: 'error', copy: FAILURE_COPY[state.failureCategory ?? 'internal'] };
   if (state.gradeFailed) return { kind: 'error', copy: COULD_NOT_GRADE };
   return { kind: 'none' };
 }
