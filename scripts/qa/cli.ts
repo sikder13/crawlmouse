@@ -36,33 +36,52 @@ export function parseArgs(argv: readonly string[]): Command {
   return { command: 'seed', billing, live };
 }
 
-async function main(argv: readonly string[]): Promise<number> {
+type Wire = (typeof import('./wiring'))['wire'];
+
+export interface MainDeps {
+  env: Readonly<Record<string, string | undefined>>;
+  print(line: string): void;
+  error(line: string): void;
+  /** The wiring; ./wiring's `wire` unless a test gives another. */
+  wire?: Wire;
+}
+
+export async function main(argv: readonly string[], deps: MainDeps): Promise<number> {
   const cmd = parseArgs(argv);
   if ('error' in cmd) {
-    console.error(cmd.error);
+    deps.error(cmd.error);
     return 2;
   }
-  const print = (line: string) => console.log(line);
   // Imported here, not above: the wiring loads the app's Stripe and Inngest modules, which parsing
   // the arguments (and the argument test) needs none of.
-  const { wire, WiringError } = await import('./wiring');
-  let wired: ReturnType<typeof wire>;
+  const { wire: realWire, WiringError } = await import('./wiring');
+  const wire = deps.wire ?? realWire;
+  let wired: ReturnType<Wire>;
+  let billing: ReturnType<ReturnType<Wire>['billing']> | null = null;
   try {
-    wired = wire(process.env, print);
+    wired = wire(deps.env, deps.print);
+    // --billing's Stripe key, mode and database are checked before part (a) writes anything.
+    if (cmd.command === 'seed' && cmd.billing) billing = wired.billing();
   } catch (e) {
     if (!(e instanceof QaInboxError || e instanceof WiringError)) throw e;
-    console.error(e.message);
+    deps.error(e.message);
     return 2;
   }
   if (cmd.command === 'reset') return exitCode(await reset(wired.reset));
   const steps = await seed(wired.seed);
-  if (!cmd.billing) return exitCode(steps);
-  const billed = await seedBilling(wired.billing(), { live: cmd.live });
+  if (billing === null) return exitCode(steps);
+  // Part (a) refused to create its users: nothing to bill.
+  if (steps.some((s) => s.key === 'run' && s.outcome === 'refused')) return exitCode(steps);
+  const billed = await seedBilling(billing, { live: cmd.live });
   return exitCode([...steps, ...billed]);
 }
 
 if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  main(process.argv.slice(2)).then(
+  main(process.argv.slice(2), {
+    env: process.env,
+    print: (line) => console.log(line),
+    error: (line) => console.error(line),
+  }).then(
     (code) => process.exit(code),
     (e: unknown) => {
       console.error(e);

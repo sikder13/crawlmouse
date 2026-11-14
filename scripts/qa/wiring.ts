@@ -10,6 +10,7 @@ import {
   type PlannedEffect,
 } from '../../apps/web/lib/billing/effects';
 import { billingV2Enabled } from '../../apps/web/lib/billing/flags';
+import { isCrawlPaused } from '../../apps/web/lib/crawl-pause';
 import { supabaseEntitlementStore } from '../../apps/web/lib/billing/state-machine-apply';
 import { stripeAccount } from '../../apps/web/lib/billing/stripe-account';
 import { stripeCatalog } from '../../apps/web/lib/billing/stripe-catalog';
@@ -23,7 +24,8 @@ import { qaBillingAccounts, qaResetStore, qaStore } from './store';
 /**
  * The QA scripts' production wiring, and the only file under scripts/qa that reads the environment
  * or makes a network client: the service-role Supabase client, Supabase Auth's admin API, the
- * Crawlmouse Stripe account and Inngest. Not imported by any test.
+ * Crawlmouse Stripe account and Inngest. wiring.test.ts imports it for the refusals it makes before
+ * any network call, and no other test does.
  *
  * Environment: QA_INBOX; SUPABASE_URL (or NEXT_PUBLIC_SUPABASE_URL) and SUPABASE_SERVICE_ROLE_KEY;
  * TRIAL_LEDGER_PEPPER for qa+protrial's trial; INNGEST_EVENT_KEY for the trial's events and the
@@ -83,17 +85,28 @@ function adminAuth(sb: SupabaseClient): QaAuth {
 export interface Wired {
   seed: SeedDeps;
   reset: ResetDeps;
-  /** Built on first use: part (a) and qa:reset need no Stripe key. */
+  /**
+   * Built on first use: part (a) and qa:reset need no Stripe key. A key, mode or database the app's
+   * `stripeAccount` refuses throws `WiringError`, so the cli builds it before part (a) writes.
+   */
   billing(): BillingDeps;
+}
+
+async function ask(prompt: string): Promise<string> {
+  const rl = createInterface({ input: stdin, output: stdout });
+  try {
+    return await rl.question(prompt);
+  } finally {
+    rl.close();
+  }
 }
 
 export function wire(env: Env, print: (line: string) => void): Wired {
   const inbox = qaInbox(env);
-  const sb = createClient(
-    need(env, 'SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_URL'),
-    need(env, 'SUPABASE_SERVICE_ROLE_KEY'),
-    { auth: { persistSession: false, autoRefreshToken: false } },
-  );
+  const url = need(env, 'SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_URL');
+  const sb = createClient(url, need(env, 'SUPABASE_SERVICE_ROLE_KEY'), {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
   const auth = adminAuth(sb);
 
   const hasEventKey = Boolean(env.INNGEST_EVENT_KEY?.trim());
@@ -136,6 +149,7 @@ export function wire(env: Env, print: (line: string) => void): Wired {
       dispatch,
     },
     now,
+    paused: () => isCrawlPaused(env),
   });
 
   const seed: SeedDeps = {
@@ -146,6 +160,7 @@ export function wire(env: Env, print: (line: string) => void): Wired {
       throw new Error('qa:seed needs CC-33 (scripts/ops/internal.ts); questions Q1');
     },
     inbox,
+    confirm: ask,
     print,
   };
 
@@ -153,10 +168,20 @@ export function wire(env: Env, print: (line: string) => void): Wired {
     seed,
     reset: { ...seed, reset: qaResetStore(sb) },
     billing() {
-      const stripe = stripeAccount(env);
+      // stripeAccount's production-database guard reads NEXT_PUBLIC_SUPABASE_URL: it is given the
+      // URL this run writes to, which SUPABASE_URL may have named instead.
+      let stripe: ReturnType<typeof stripeAccount>;
+      try {
+        stripe = stripeAccount({ ...env, NEXT_PUBLIC_SUPABASE_URL: url });
+      } catch (e) {
+        throw new WiringError(e instanceof Error ? e.message : String(e));
+      }
+      const keyLive = /^(sk|rk)_live_/.test(need(env, 'STRIPE_ACCOUNT_SECRET_KEY'));
       const catalog = stripeCatalog(stripe);
       const port: BillingStripe = {
         balance: { retrieve: () => stripe.balance.retrieve() },
+        prices: { retrieve: (id) => stripe.prices.retrieve(id) },
+        promotionCodes: { list: (params) => stripe.promotionCodes.list(params) },
         coupons: {
           retrieve: (id) => stripe.coupons.retrieve(id),
           create: (params) => stripe.coupons.create(params),
@@ -167,6 +192,7 @@ export function wire(env: Env, print: (line: string) => void): Wired {
             return c.deleted ? { id: c.id, deleted: true } : { id: c.id, metadata: c.metadata };
           },
           create: (params, options) => stripe.customers.create(params, options),
+          search: (params) => stripe.customers.search(params),
         },
         checkout: {
           sessions: {
@@ -181,19 +207,12 @@ export function wire(env: Env, print: (line: string) => void): Wired {
         store,
         accounts: qaBillingAccounts(sb),
         stripe: port,
-        keyLive: /^(sk|rk)_live_/.test(need(env, 'STRIPE_ACCOUNT_SECRET_KEY')),
+        keyLive,
         priceFor: (plan, interval) => catalog.priceFor(plan, interval, 'base'),
         origin: env.QA_ORIGIN?.trim() || 'https://crawlmouse.com',
         inbox,
         now,
-        async confirm(prompt) {
-          const rl = createInterface({ input: stdin, output: stdout });
-          try {
-            return await rl.question(prompt);
-          } finally {
-            rl.close();
-          }
-        },
+        confirm: ask,
         print,
       };
     },
