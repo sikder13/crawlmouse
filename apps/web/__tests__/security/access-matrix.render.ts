@@ -71,9 +71,11 @@ when:
   service-role client is counted by binding: a call of anything imported from
   \`apps/web/lib/supabase/admin\` (under any name, or through a namespace), or a \`createClient\` given
   \`SUPABASE_SERVICE_ROLE_KEY\` directly, by \`process.env['…']\` or through a local variable;
-- a row's check is not a call in its file or a file it imports, or its result is not used (a bare
-  statement, \`void\`, a binding never read); a string is a check only as \`.rpc('<name>')\`, or as the
-  filter the row names (\`.eq('audit_id', …)\`);
+- a row's check is not a call in its file or a file it imports, or its answer is not read: a bare
+  statement, \`void\`, a binding whose name is not read elsewhere in the file, or a result of which
+  only the \`error\` is read (\`{ data: allowed, error }\` with \`allowed\` unread, \`res.error\`,
+  \`(await …).error\`); a string is a check only as \`.rpc('<name>')\`, or as the filter the row names
+  (\`.eq('audit_id', …)\`);
 - a row's proof is not one running \`it\`/\`test\` of that whole title (no \`describe\`, \`.skip\`,
   \`.todo\`, \`.fails\`, \`.only\`), in a test file that imports the row's file or its check's file; a
   \`caller\` row's proof is the matrix's caller check instead;

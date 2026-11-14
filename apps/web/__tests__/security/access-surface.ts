@@ -354,8 +354,32 @@ const WRAPPERS = new Set([
   ts.SyntaxKind.SatisfiesExpression,
 ]);
 
-/** Whether an identifier of this name is read somewhere in the file other than under `void`. */
-function isRead(sf: ts.SourceFile, name: ts.Identifier): boolean {
+/** Whether `p` reads the `error` of `n` (`n.error`, `n['error']`): the failure, not the check's answer. */
+function readsError(p: ts.Node, n: ts.Node): boolean {
+  return (
+    (ts.isPropertyAccessExpression(p) && p.expression === n && p.name.text === 'error') ||
+    (ts.isElementAccessExpression(p) &&
+      p.expression === n &&
+      stringText(p.argumentExpression) === 'error')
+  );
+}
+
+/** The outermost node of `n` through `await`, parentheses and type assertions. */
+function outerOf(n: ts.Node): ts.Node {
+  while (WRAPPERS.has(n.parent.kind)) n = n.parent;
+  return n;
+}
+
+// How many bindings deep `const r = …; const { data } = r;` is followed before a read is assumed.
+const REBIND_DEPTH = 4;
+
+/**
+ * Whether the answer held by this binding is read somewhere in the file: an identifier of its name
+ * that is not a property name, not under `void` and not `x.error` / `x['error']`. An identifier that
+ * is itself the initializer of another binding is a read only if that binding's answer is
+ * (`bindingUsed`), to `REBIND_DEPTH`. The match is by name, not by scope.
+ */
+function answerRead(sf: ts.SourceFile, name: ts.Identifier, depth: number): boolean {
   let read = false;
   const visit = (node: ts.Node, underVoid: boolean) => {
     if (read) return;
@@ -366,7 +390,11 @@ function isRead(sf: ts.SourceFile, name: ts.Identifier): boolean {
         (ts.isPropertyAccessExpression(p) && p.name === node) ||
         (ts.isPropertyAssignment(p) && p.name === node) ||
         (ts.isBindingElement(p) && p.propertyName === node);
-      if (!propName) read = true;
+      if (propName || readsError(p, node)) return;
+      const o = outerOf(node);
+      if (ts.isVariableDeclaration(o.parent) && o.parent.initializer === o)
+        read = depth >= REBIND_DEPTH || bindingUsed(o.parent, depth + 1);
+      else read = true;
       return;
     }
     ts.forEachChild(node, (c) => visit(c, underVoid || ts.isVoidExpression(node)));
@@ -376,16 +404,49 @@ function isRead(sf: ts.SourceFile, name: ts.Identifier): boolean {
 }
 
 /**
+ * Whether a variable binding of a check's result reads its answer. An exported binding is read by
+ * whoever imports it. Otherwise each name it binds is looked for (`answerRead`), except a top-level
+ * `error` of a destructuring (`{ data: allowed, error: guardError }` binds `guardError` to the
+ * failure, so reading it alone is not using the check).
+ */
+function bindingUsed(p: ts.VariableDeclaration, depth: number): boolean {
+  // An exported binding (`export const { GET, POST } = serve(…)`) is read by whoever imports it.
+  const stmt = p.parent.parent;
+  if (
+    ts.isVariableStatement(stmt) &&
+    (ts.getModifiers(stmt) ?? []).some((m) => m.kind === ts.SyntaxKind.ExportKeyword)
+  )
+    return true;
+  const names: ts.Identifier[] = [];
+  const bind = (b: ts.BindingName, top: boolean) => {
+    if (ts.isIdentifier(b)) names.push(b);
+    else
+      for (const el of b.elements) {
+        if (ts.isOmittedExpression(el)) continue;
+        const key = el.propertyName ?? (ts.isIdentifier(el.name) ? el.name : undefined);
+        const keyText = key && (ts.isIdentifier(key) ? key.text : stringText(key));
+        if (top && ts.isObjectBindingPattern(b) && !el.dotDotDotToken && keyText === 'error')
+          continue;
+        bind(el.name, false);
+      }
+  };
+  bind(p.name, true);
+  return names.some((id) => answerRead(p.getSourceFile(), id, depth));
+}
+
+/**
  * Whether a call's result is used, as far as the AST can say. Walk out through `await`, parentheses,
- * type assertions, chained methods (`.rpc(…).single()`) and property reads (`.success`). Not used:
- * the result of a bare expression statement, of `void`, or of the left side of a comma, or a
- * variable binding (destructured or not) that is never read but under `void`.
+ * type assertions, chained methods (`.rpc(…).single()`) and property reads (`.data`). Not used:
+ * the result of a bare expression statement, of `void`, or of the left side of a comma; a read of
+ * its `error` alone (`(await …).error`); or a variable binding (destructured or not) whose answer is
+ * never read but under `void` or as its `error` (`bindingUsed`).
  */
 function resultUsed(call: ts.CallExpression): boolean {
   let n: ts.Node = call;
   for (;;) {
     const p = n.parent;
     if (WRAPPERS.has(p.kind)) n = p;
+    else if (readsError(p, n)) return false;
     else if (
       (ts.isPropertyAccessExpression(p) || ts.isElementAccessExpression(p)) &&
       p.expression === n
@@ -397,23 +458,7 @@ function resultUsed(call: ts.CallExpression): boolean {
   if (ts.isExpressionStatement(p) || ts.isVoidExpression(p)) return false;
   if (ts.isBinaryExpression(p) && p.operatorToken.kind === ts.SyntaxKind.CommaToken && p.left === n)
     return false;
-  if (ts.isVariableDeclaration(p) && p.initializer === n) {
-    // An exported binding (`export const { GET, POST } = serve(…)`) is read by whoever imports it.
-    const stmt = p.parent.parent;
-    if (
-      ts.isVariableStatement(stmt) &&
-      (ts.getModifiers(stmt) ?? []).some((m) => m.kind === ts.SyntaxKind.ExportKeyword)
-    )
-      return true;
-    const sf = call.getSourceFile();
-    const names: ts.Identifier[] = [];
-    const bind = (b: ts.BindingName) => {
-      if (ts.isIdentifier(b)) names.push(b);
-      else for (const el of b.elements) if (!ts.isOmittedExpression(el)) bind(el.name);
-    };
-    bind(p.name);
-    return names.some((id) => isRead(sf, id));
-  }
+  if (ts.isVariableDeclaration(p) && p.initializer === n) return bindingUsed(p, 0);
   return true;
 }
 
