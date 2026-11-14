@@ -94,7 +94,10 @@ if (mode === 'capture') {
   const cssCache = new Map();
   const pages = {};
   for (const path of await pathsOf(base)) pages[path] = await capture(base, path, cssCache);
-  writeFileSync(out, JSON.stringify({ base, capturedAt: new Date().toISOString(), pages }, null, 1));
+  writeFileSync(
+    out,
+    JSON.stringify({ base, capturedAt: new Date().toISOString(), pages }, null, 1),
+  );
   console.log(`captured ${Object.keys(pages).length} pages from ${base} into ${out}`);
 } else if (mode === 'compare') {
   const [a, b, what] = args;
@@ -102,7 +105,19 @@ if (mode === 'capture') {
   const fields =
     what === 'css'
       ? ['stylesheets']
-      : ['status', 'location', 'title', 'canonical', 'robots', 'og', 'twitter', 'jsonLd', 'h1', 'mainCount', 'main'];
+      : [
+          'status',
+          'location',
+          'title',
+          'canonical',
+          'robots',
+          'og',
+          'twitter',
+          'jsonLd',
+          'h1',
+          'mainCount',
+          'main',
+        ];
   let differ = 0;
   for (const path of [...new Set([...Object.keys(A), ...Object.keys(B)])]) {
     if (!A[path] || !B[path]) {
@@ -113,9 +128,13 @@ if (mode === 'capture') {
     const bad = fields.filter((f) => JSON.stringify(A[path][f]) !== JSON.stringify(B[path][f]));
     if (bad.length) differ += 1;
     const n = what === 'css' ? ` (${A[path].stylesheets.length} stylesheets)` : '';
-    console.log(`${bad.length ? 'DIFFERS' : 'same   '} ${path}${n}${bad.length ? `: ${bad.join(', ')}` : ''}`);
+    console.log(
+      `${bad.length ? 'DIFFERS' : 'same   '} ${path}${n}${bad.length ? `: ${bad.join(', ')}` : ''}`,
+    );
   }
-  console.log(`${differ} of ${new Set([...Object.keys(A), ...Object.keys(B)]).size} pages differ (${what})`);
+  console.log(
+    `${differ} of ${new Set([...Object.keys(A), ...Object.keys(B)]).size} pages differ (${what})`,
+  );
   process.exit(differ ? 1 : 0);
 } else {
   console.error('usage: capture <base-url> <out.json> | compare <a.json> <b.json> css|page');
