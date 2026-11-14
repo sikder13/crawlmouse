@@ -57,7 +57,7 @@ describe('the gates', () => {
     }
   });
 
-  it("are the brief's owner-ticked items, and the 2FA row names the launch-readiness providers", () => {
+  it("are the brief's owner-ticked items, and the 2FA row names launch readiness's providers and five more", () => {
     expect(GATES.filter((g) => g.how === 'owner').map((g) => g.id)).toEqual([
       'restore-drill',
       'load-staging',
@@ -67,11 +67,12 @@ describe('the gates', () => {
       'provider-2fa',
     ]);
     const twoFactor = GATES.find((g) => g.id === 'provider-2fa')!;
-    // Launch readiness §6, as written there.
-    for (const p of 'GitHub, Vercel, Supabase, Stripe, Cloudflare, Sentry, Namecheap, Google'.split(
-      ', ',
-    ))
-      expect(twoFactor.detail).toContain(p);
+    // Launch readiness §6, as written there, then the providers that hold production access or send
+    // as us: the worker's host, the functions' runner, the mail sender, the analytics, the status page.
+    expect(twoFactor.detail.split(', ')).toEqual([
+      ...'GitHub, Vercel, Supabase, Stripe, Cloudflare, Sentry, Namecheap, Google'.split(', '),
+      ...'Fly, Inngest, Resend, PostHog, Better Stack'.split(', '),
+    ]);
     expect(GATES.find((g) => g.id === 'self-audit')!.gate).toContain(
       'crawlmouse.com and nahltech.com',
     );

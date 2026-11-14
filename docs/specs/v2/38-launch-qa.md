@@ -68,8 +68,9 @@ in this step.
 - **Restore drill.** Create a Supabase branch from last night's backup of `ezspnfeyzwsisymytssm`, and
   read three known rows on it: the oldest `accounts` row's `id`, one `public_reports` row by slug, one
   `checks` row by id, each compared with production.
-- **2FA.** Turn it on, and confirm it is on, for GitHub, Vercel, Supabase, Stripe, Cloudflare, Sentry,
-  Namecheap and Google (launch-readiness §6).
+- **2FA.** Turn it on, and confirm it is on, for each provider the `provider-2fa` row of
+  `docs/ops/go-no-go.md` names (rendered from `TWO_FACTOR_PROVIDERS` in `scripts/golive/go-no-go.ts`:
+  launch-readiness §6's list and the providers that hold production access or send as us).
 
 ## Owner steps, in order
 

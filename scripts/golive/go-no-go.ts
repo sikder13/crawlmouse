@@ -69,7 +69,12 @@ type Journey = (typeof JOURNEYS)[number];
 
 export const specOf = (j: Journey): string => `tests/e2e/${j.n}-${j.name}.spec.ts`;
 
-/** The providers whose accounts must have 2FA on (launch readiness §6, owner actions). */
+/**
+ * The providers whose accounts must have 2FA on: launch readiness §6's owner actions, and the
+ * providers that hold production access or send as us besides (review r1: Fly runs the worker,
+ * Inngest runs the functions, Resend sends our mail, PostHog holds the product data, Better Stack
+ * watches the status page).
+ */
 export const TWO_FACTOR_PROVIDERS = [
   'GitHub',
   'Vercel',
@@ -79,6 +84,11 @@ export const TWO_FACTOR_PROVIDERS = [
   'Sentry',
   'Namecheap',
   'Google',
+  'Fly',
+  'Inngest',
+  'Resend',
+  'PostHog',
+  'Better Stack',
 ] as const;
 
 /** The production sites self-audited on the staging worker. */
