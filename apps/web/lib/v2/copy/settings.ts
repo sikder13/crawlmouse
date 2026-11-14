@@ -91,7 +91,9 @@ export const SETTINGS_COPY = {
   ends: (date: string) => `Ends ${date}.`,
   noCardTerms: (plan: string) =>
     `No card on file; nothing is charged unless you add one and choose ${plan}.`,
-  cardTerms: (last4: string) => `The card ending ${last4} is charged then unless you cancel.`,
+  /** A card taken at Checkout whose last four digits were not recorded is named without them. */
+  cardTerms: (last4: string | null) =>
+    `The card ${last4 === null ? 'on file' : `ending ${last4}`} is charged then unless you cancel.`,
   freeNote: (schedule: string, fixes: number) =>
     `One site, ${schedule} checks, the ${numberWord(fixes)} largest fixes of each audit.`,
   sitesUsed: 'Sites',
@@ -123,12 +125,22 @@ export const SETTINGS_COPY = {
   cancelPaid: (clicks: number, days: number, period: 'month' | 'year') =>
     `${capitalise(numberWord(clicks))} clicks, effective at the end of the paid ${period}. Nothing you can see is deleted; evidence older than ${days} days is condensed to headers and the parts of pages that changed.`,
   cancelAction: 'Cancel, back to Free',
+  /**
+   * Cancel's second click (CC-39 D1): what ends and when, as lib/billing/cancel.ts ends it — a paid
+   * plan at its period's end, a trial with a card at the trial's end, a past-due plan at once.
+   */
+  confirmPeriodEnd: (plan: string, date: string | null) =>
+    `${plan} runs ${date === null ? 'to the end of the paid period' : `until ${date}`}, then the account is on Free and nothing more is charged.`,
+  confirmTrial: (plan: string, date: string) =>
+    `The ${plan} trial runs until ${date}, then the account is on Free and the card is not charged.`,
+  confirmNow: (plan: string) => `${plan} ends now, and the account is on Free.`,
+  confirmAction: (plan: string) => `Yes, cancel ${plan}`,
   /** A paid plan set to end at its period's end is shown until then (spec 27 "Cancel"). */
   cancelling: (plan: string, date: string) =>
     `${plan} until ${date}, then Free. Nothing more is charged.`,
   /** A trial with a card set to cancel at its end: the card is not charged. */
-  trialCancelling: (plan: string, date: string, last4: string) =>
-    `${plan} trial until ${date}, then Free. The card ending ${last4} is not charged.`,
+  trialCancelling: (plan: string, date: string, last4: string | null) =>
+    `${plan} trial until ${date}, then Free. The card ${last4 === null ? 'on file' : `ending ${last4}`} is not charged.`,
   trialCancelled: (date: string) =>
     `Cancelled; the trial ends ${date} and the card is not charged.`,
   cancelled: (date: string, days: number) =>

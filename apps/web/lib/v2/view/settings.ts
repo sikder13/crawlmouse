@@ -125,6 +125,21 @@ export const CC27B_ROUTES = {
 
 export type Cc27bKey = keyof typeof CC27B_ROUTES;
 
+/** The subscription states lib/billing/cancel.ts cancels at once rather than at the period's end. */
+const CANCELS_AT_ONCE: ReadonlySet<string> = new Set(['past_due', 'unpaid', 'paused']);
+
+/**
+ * The step the cancel route sends a form back to Settings › Plan with after the first click
+ * (`?cancel=confirm`). Its `?cancel=done` is not read: the page shows a cancel once the webhook has
+ * written it, never from the address alone.
+ */
+export type CancelStep = 'confirm';
+
+/** The `cancel` search parameter as a step; null for anything else, a repeated one included. */
+export function cancelStepFrom(value: string | string[] | undefined): CancelStep | null {
+  return value === 'confirm' ? value : null;
+}
+
 /**
  * What CC-27b must hold beyond the routes, each with where it is decided. SPEC 27 lists these with
  * the route table; nothing in the previews enforces them.
@@ -267,6 +282,11 @@ export interface SettingsView {
     termsLabel: string;
     /** Cancel and Receipts, each with its control where the account has one to use. */
     terms: { label: string; text: string; action: ActionView | null }[];
+    /**
+     * Cancel's second click: what ends and when, and the form that sends `confirm`. Shown after the
+     * first click (`cancelStep: 'confirm'`) where the Cancel row offers one; null otherwise.
+     */
+    confirm: { text: string; action: ActionView } | null;
   };
   columns: typeof COPY.columns;
 }
@@ -293,7 +313,13 @@ export function settingsView(
     subscriptionStatus,
     notOwnAccount,
     undeliverable = null,
+    cancelStep = null,
   }: {
+    /**
+     * `confirm` after Cancel's first click (the `cancel` search parameter), when the card offers the
+     * second; null otherwise.
+     */
+    cancelStep?: CancelStep | null;
     /**
      * Set where the account shown is not the reader's own personal account (an agency's, or one
      * they hold a seat on): their sign-in address and their deletion belong to their own account
@@ -368,7 +394,10 @@ export function settingsView(
   const paid = v.tier !== 'free';
   const ending = paid && billingEnd !== null ? billingEnd : null;
   const card = a.card_last4;
-  const cardTrial = trial && card !== null;
+  // A trial whose subscription is `trialing` came through Checkout, which takes a card
+  // (checkout-v2.ts, `payment_method_collection: 'always'`), whether or not its last four digits
+  // were recorded: the card is charged at the trial's end unless it is cancelled.
+  const cardTrial = trial && (card !== null || subscriptionStatus === 'trialing');
   const pastDue = a.state === 'past_due';
   const yearly = v.tier === 'agency' ? AGENCY_YEARLY : PRO_YEARLY;
   const date = (ts: string) => dayDate(ts, zone);
@@ -404,6 +433,22 @@ export function settingsView(
   const billing = { fields: { accountId: v.account.id } };
   const cancel = owner ? routeAction('cancelPlan', COPY.cancelAction, {}, billing) : null;
   const portal = owner ? routeAction('billingPortal', COPY.portalAction, {}, billing) : null;
+  // A card on file or a subscription means a Stripe customer, which the portal opens for.
+  const customer =
+    card !== null || (subscriptionStatus !== undefined && subscriptionStatus !== null);
+  // A cancel ends at once where lib/billing/cancel.ts cancels at once (`AT_ONCE`: past due, unpaid,
+  // paused), the account's own past-due state included; otherwise at the trial's or period's end.
+  const atOnce = pastDue || (subscriptionStatus != null && CANCELS_AT_ONCE.has(subscriptionStatus));
+  // The Cancel row offers the first click on a card trial and on a paid plan not already ending.
+  const offersCancel = ending === null && (cardTrial || (!trial && paid));
+  // After the first click the confirm step stands in the Cancel row's place, so the page carries
+  // one cancel form at a time.
+  const confirming = cancelStep === 'confirm' && cancel !== null && offersCancel;
+  const cancelRow = (text: string) => ({
+    label: COPY.cancel,
+    text,
+    action: confirming ? null : cancel,
+  });
 
   return {
     // The plan card carries the plan's terms and its Keep, so the rail's trial card leaves them out.
@@ -473,7 +518,7 @@ export function settingsView(
           ? COPY.trialCancelling(plan, date(ending), card)
           : trial
             ? `${COPY.ends(date(a.trial_ends_at!))} ${
-                card === null ? COPY.noCardTerms(plan) : COPY.cardTerms(card)
+                cardTrial ? COPY.cardTerms(card) : COPY.noCardTerms(plan)
               }`
             : pastDue
               ? v.tier === 'free'
@@ -508,15 +553,13 @@ export function settingsView(
         cardTrial && ending !== null
           ? { label: COPY.cancel, text: COPY.trialCancelled(date(ending)), action: null }
           : cardTrial
-            ? {
-                label: COPY.cancel,
-                text: COPY.cancelCardTrial(
+            ? cancelRow(
+                COPY.cancelCardTrial(
                   date(a.trial_ends_at!),
                   CANCEL_CLICKS,
                   EVIDENCE_CONDENSED_AFTER_DAYS,
                 ),
-                action: cancel,
-              }
+              )
             : trial
               ? {
                   label: COPY.cancel,
@@ -530,21 +573,35 @@ export function settingsView(
                     action: null,
                   }
                 : paid
-                  ? {
-                      label: COPY.cancel,
-                      text: COPY.cancelPaid(
+                  ? cancelRow(
+                      COPY.cancelPaid(
                         CANCEL_CLICKS,
                         EVIDENCE_CONDENSED_AFTER_DAYS,
                         a.billing_period_months === 12 ? 'year' : 'month',
                       ),
-                      action: cancel,
-                    }
+                    )
                   : { label: COPY.cancel, text: COPY.cancelFree, action: null },
-        // A card on file means a Stripe customer, whose receipts the portal lists.
-        card === null
-          ? { label: COPY.receipts, text: COPY.noReceipts, action: null }
-          : { label: COPY.receipts, text: COPY.receiptsText, action: portal },
+        customer
+          ? { label: COPY.receipts, text: COPY.receiptsText, action: portal }
+          : { label: COPY.receipts, text: COPY.noReceipts, action: null },
       ],
+      confirm: confirming
+        ? {
+            text: atOnce
+              ? COPY.confirmNow(plan)
+              : cardTrial
+                ? COPY.confirmTrial(plan, date(a.trial_ends_at!))
+                : COPY.confirmPeriodEnd(plan, a.renews_at === null ? null : date(a.renews_at)),
+            action: routeAction(
+              'cancelPlan',
+              COPY.confirmAction(plan),
+              {},
+              {
+                fields: { accountId: v.account.id, confirm: 'true' },
+              },
+            ),
+          }
+        : null,
     },
     columns: COPY.columns,
   };
