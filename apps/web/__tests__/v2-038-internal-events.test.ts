@@ -6,220 +6,45 @@
  * the subject, call by call: each call that can fire about an account or a user names one in a form
  * `subjectsOf` reads.
  *
- * The calls are found with the TypeScript type checker over apps/web's source (inngest's comes in
- * through its imports): every call whose resolved signature is `captureServerEvent`'s, which takes in
- * a call through a value typed `typeof captureServerEvent` (pricing/events.ts, account-events.ts).
- * A call whose distinct id is a parameter of the function around it makes that function a wrapper;
- * the calls of the wrapper's signature are then read the same way, at any depth.
+ * The reading is `helpers/server-event-subjects.ts` (its header states the rules). In short: a
+ * reference to `captureServerEvent` is accepted as a call, an import, a `typeof`, or the value of a
+ * binding typed `typeof captureServerEvent` whose own references are read the same way; any other
+ * reference (a structural alias, `.call`, `.bind`, an argument) is refused, because a call made
+ * through it is not seen. The calls are then read for their subject; an `accountId` that can only
+ * be null or undefined names no account.
  *
- * A subject is accepted when:
- * - the event object passes an `accountId` (its value is not followed: a caller passing a null it
- *   could have filled is not seen here);
- * - the distinct id is a template starting `account:` or `seat:`;
- * - the distinct id is `x === null ? <no account> : <accepted>` (or `!== null` the other way round),
- *   the branch for a null account naming none.
- * Anything else fails, `check:` and `report:` included, which name something an account can own.
+ * What it cannot see: whether a nullable `accountId` is filled when it could be; a sender other than
+ * `captureServerEvent` (`lib/security/refusal-event.ts` is the other one, and names no account).
  *
  * The property needs CC-33's derivation, and fails on this tree without it (the check events name
  * `check:<ref>` and the ServerEvent type has no `accountId`); it runs once
- * lib/v2/ops/internal-marker.ts exists. The enumeration runs on any tree.
+ * lib/v2/ops/internal-marker.ts exists. The enumeration, the reference rule and the fixtures run on
+ * any tree.
  */
 import { execFileSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
-import { join, relative, resolve } from 'node:path';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import ts from 'typescript';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import {
+  enumerate,
+  hasCc33,
+  webProgram,
+  webTree,
+  type Call,
+  type Tree,
+} from './helpers/server-event-subjects';
 
 const WEB = resolve(__dirname, '..');
 const REPO = resolve(WEB, '../..');
-const SENDER = join(WEB, 'lib/analytics-server.ts');
-const CC33 = existsSync(join(WEB, 'lib/v2/ops/internal-marker.ts'));
-
-const isSource = (f: string) =>
-  !f.includes('/node_modules/') &&
-  !/\.test\.tsx?$/.test(f) &&
-  !f.includes('/__tests__/') &&
-  (f.startsWith(`${WEB}/`) || f.startsWith(`${REPO}/inngest/`));
-
-function program(): ts.Program {
-  const config = ts.getParsedCommandLineOfConfigFile(
-    join(WEB, 'tsconfig.json'),
-    {},
-    {
-      ...ts.sys,
-      onUnRecoverableConfigFileDiagnostic: (d) => {
-        throw new Error(ts.flattenDiagnosticMessageText(d.messageText, '\n'));
-      },
-    },
-  )!;
-  const roots = config.fileNames.filter(isSource);
-  return ts.createProgram(roots, { ...config.options, noEmit: true, incremental: false });
-}
-
-interface Call {
-  /** `file:line` of the call, relative to the repository. */
-  at: string;
-  /** For a call of a wrapper: the `captureServerEvent` call inside the wrapper. */
-  via?: string;
-  /** How the subject was read, or why it was not accepted. */
-  subject: string;
-  ok: boolean;
-}
-
-function walk(node: ts.Node, visit: (n: ts.Node) => void): void {
-  visit(node);
-  ts.forEachChild(node, (c) => walk(c, visit));
-}
-
-const where = (n: ts.Node): string => {
-  const sf = n.getSourceFile();
-  return `${relative(REPO, sf.fileName)}:${sf.getLineAndCharacterOfPosition(n.getStart()).line + 1}`;
-};
-
-/** The declaration a call resolves to, or undefined. */
-function calleeOf(checker: ts.TypeChecker, call: ts.CallExpression): ts.Declaration | undefined {
-  return checker.getResolvedSignature(call)?.getDeclaration() ?? undefined;
-}
-
-/** The function a node sits in, if any. */
-function enclosingFunction(n: ts.Node): ts.SignatureDeclaration | undefined {
-  for (let p = n.parent; p; p = p.parent) {
-    if (ts.isArrowFunction(p) || ts.isFunctionExpression(p) || ts.isFunctionDeclaration(p))
-      return p;
-    if (ts.isMethodDeclaration(p)) return p;
-  }
-  return undefined;
-}
-
-/**
- * The signature a wrapper's callers resolve to: the type it is written against (a `Sender`, a
- * `CaptureEvent`) when it has one, else its own declaration.
- */
-function wrapperSignature(
-  checker: ts.TypeChecker,
-  fn: ts.SignatureDeclaration,
-): ts.Declaration | undefined {
-  if (ts.isArrowFunction(fn) || ts.isFunctionExpression(fn)) {
-    const contextual = checker.getContextualType(fn);
-    const decl = contextual?.getCallSignatures()[0]?.getDeclaration();
-    if (decl) return decl;
-  }
-  return fn;
-}
-
-function enumerate(p: ts.Program): Call[] {
-  const checker = p.getTypeChecker();
-  const sources = p.getSourceFiles().filter((sf) => isSource(sf.fileName));
-  const calls: ts.CallExpression[] = [];
-  for (const sf of sources) walk(sf, (n) => ts.isCallExpression(n) && calls.push(n));
-
-  const senderDecl = calls
-    .map((c) => calleeOf(checker, c))
-    .find(
-      (d) =>
-        d !== undefined &&
-        d.getSourceFile().fileName === SENDER &&
-        ts.isFunctionDeclaration(d) &&
-        d.name?.text === 'captureServerEvent',
-    );
-  if (senderDecl === undefined) throw new Error('no call resolves to captureServerEvent');
-
-  const out: Call[] = [];
-  const seen = new Set<ts.Declaration>();
-
-  /** Reads one distinct-id expression; a parameter of the surrounding function recurses. */
-  const subject = (expr: ts.Expression, at: ts.Node): { ok: boolean; subject: string }[] => {
-    const e = ts.isParenthesizedExpression(expr) ? expr.expression : expr;
-    if (ts.isTemplateExpression(e) || ts.isNoSubstitutionTemplateLiteral(e)) {
-      const head = ts.isTemplateExpression(e) ? e.head.text : e.text;
-      const ok = /^(account|seat):$/.test(head);
-      return [{ ok, subject: `\`${head}…\`` }];
-    }
-    if (ts.isConditionalExpression(e) && ts.isBinaryExpression(e.condition)) {
-      const op = e.condition.operatorToken.kind;
-      const nullSide = e.condition.right.kind === ts.SyntaxKind.NullKeyword;
-      if (
-        nullSide &&
-        (op === ts.SyntaxKind.EqualsEqualsEqualsToken ||
-          op === ts.SyntaxKind.ExclamationEqualsEqualsToken)
-      ) {
-        const [whenNull, whenSet] =
-          op === ts.SyntaxKind.EqualsEqualsEqualsToken
-            ? [e.whenTrue, e.whenFalse]
-            : [e.whenFalse, e.whenTrue];
-        const tested = e.condition.left.getText();
-        const set = subject(whenSet, at);
-        const named =
-          (ts.isTemplateExpression(whenSet) &&
-            whenSet.templateSpans.some((s) => s.expression.getText() === tested)) ||
-          false;
-        return set.map((r) => ({
-          ok: r.ok && named,
-          subject: `${tested} === null ? ${whenNull.getText()} : ${r.subject}`,
-        }));
-      }
-    }
-    if (ts.isIdentifier(e)) {
-      const fn = enclosingFunction(at);
-      const index = fn?.parameters.findIndex(
-        (prm) => ts.isIdentifier(prm.name) && prm.name.text === e.text,
-      );
-      if (fn && index !== undefined && index >= 0) {
-        const sig = wrapperSignature(checker, fn);
-        if (sig === undefined)
-          return [{ ok: false, subject: `parameter ${e.text} of an unreadable wrapper` }];
-        if (seen.has(sig)) return [];
-        seen.add(sig);
-        const callers = calls.filter((c) => calleeOf(checker, c) === sig);
-        if (callers.length === 0)
-          return [{ ok: false, subject: `parameter ${e.text}: no caller found` }];
-        for (const c of callers) {
-          const arg = c.arguments[index];
-          const results =
-            arg === undefined ? [{ ok: false, subject: 'no argument' }] : subject(arg, c);
-          for (const r of results) out.push({ at: where(c), via: where(at), ...r });
-        }
-        return [];
-      }
-    }
-    return [{ ok: false, subject: `unread: ${e.getText()}` }];
-  };
-
-  for (const c of calls) {
-    if (calleeOf(checker, c) !== senderDecl) continue;
-    const event = c.arguments[1];
-    if (event === undefined || !ts.isObjectLiteralExpression(event)) {
-      out.push({ at: where(c), ok: false, subject: 'the event is not an object literal' });
-      continue;
-    }
-    const prop = (name: string) =>
-      event.properties.find((p) => p.name && ts.isIdentifier(p.name) && p.name.text === name);
-    if (prop('accountId')) {
-      out.push({ at: where(c), ok: true, subject: 'accountId' });
-      continue;
-    }
-    const id = prop('distinctId');
-    const expr =
-      id === undefined
-        ? undefined
-        : ts.isPropertyAssignment(id)
-          ? id.initializer
-          : ts.isShorthandPropertyAssignment(id)
-            ? id.name
-            : undefined;
-    if (expr === undefined) {
-      out.push({ at: where(c), ok: false, subject: 'no distinctId' });
-      continue;
-    }
-    for (const r of subject(expr, c)) out.push({ at: where(c), ...r });
-  }
-  return out;
-}
+const CC33 = hasCc33(WEB);
 
 describe('CC-38 D3: the server events name the subject internal is derived from', () => {
   let calls: Call[] = [];
   beforeAll(() => {
-    calls = enumerate(program());
+    const tree = webTree(WEB);
+    calls = enumerate(webProgram(tree), tree);
   }, 180_000);
 
   it('finds the direct calls a text search finds, and the calls through a typed alias', () => {
@@ -254,6 +79,10 @@ describe('CC-38 D3: the server events name the subject internal is derived from'
     expect(calls.some((c) => c.at.startsWith('apps/web/lib/v2/pipeline/persist.ts:'))).toBe(true);
   });
 
+  it('finds no reference to captureServerEvent other than a call, an import, a typeof or a typed binding', () => {
+    expect(calls.filter((c) => c.subject.startsWith('escape:'))).toEqual([]);
+  });
+
   it.runIf(CC33)('accepts no call whose subject internal cannot be derived from', () => {
     const refused = calls.filter((c) => !c.ok).map((c) => `${c.at} ${c.subject}`);
     expect(refused).toEqual([]);
@@ -265,4 +94,162 @@ describe('CC-38 D3: the server events name the subject internal is derived from'
       expect(calls.some((c) => !c.ok)).toBe(true);
     },
   );
+});
+
+/**
+ * Fixture programs, written to a temporary directory: a sender with CC-33's event shape, and probes
+ * of the reading's rules. Each probe file but the last names one way to send without a readable
+ * subject; `accepted.ts` holds the forms the reading accepts.
+ */
+const FIXTURE_SENDER = `
+export interface ServerEvent {
+  event: string;
+  distinctId: string;
+  accountId?: string | null;
+  properties?: Record<string, unknown>;
+}
+export async function captureServerEvent(cookie: string | null, e: ServerEvent): Promise<void> {
+  void cookie;
+  void e;
+}
+`;
+
+const PROBES: Record<string, string> = {
+  // The review's alias probe: a binding typed by the function's shape, not by `typeof`.
+  'structural-alias.ts': `
+import { captureServerEvent, type ServerEvent } from './lib/analytics-server';
+const send: (cookie: string | null, e: ServerEvent) => Promise<void> = captureServerEvent;
+export const viewed = (slug: string) => send(null, { event: 'report_viewed', distinctId: \`report:\${slug}\` });
+`,
+  'call.ts': `
+import { captureServerEvent } from './lib/analytics-server';
+export const viewed = (slug: string) =>
+  captureServerEvent.call(undefined, null, { event: 'report_viewed', distinctId: \`report:\${slug}\` });
+`,
+  'bind.ts': `
+import { captureServerEvent } from './lib/analytics-server';
+const anonymous = captureServerEvent.bind(undefined, null);
+export const viewed = (slug: string) => anonymous({ event: 'report_viewed', distinctId: \`report:\${slug}\` });
+`,
+  'argument.ts': `
+import { captureServerEvent, type ServerEvent } from './lib/analytics-server';
+const run = (f: (c: string | null, e: ServerEvent) => Promise<void>, slug: string) =>
+  f(null, { event: 'report_viewed', distinctId: \`report:\${slug}\` });
+export const viewed = (slug: string) => run(captureServerEvent, slug);
+`,
+  'renamed-property.ts': `
+import { captureServerEvent as cse } from './lib/analytics-server';
+export const senders = { cse };
+`,
+  'namespace-bind.ts': `
+import * as analytics from './lib/analytics-server';
+export const anonymous = analytics.captureServerEvent.bind(undefined, null);
+`,
+  'typed-binding-escapes.ts': `
+import { captureServerEvent } from './lib/analytics-server';
+export function viewed(slug: string, capture: typeof captureServerEvent = captureServerEvent) {
+  const later = capture.bind(undefined, null);
+  return later({ event: 'report_viewed', distinctId: \`report:\${slug}\` });
+}
+`,
+  're-export.ts': `
+export { captureServerEvent as send } from './lib/analytics-server';
+`,
+  'null-account.ts': `
+import { captureServerEvent } from './lib/analytics-server';
+export const a = (ref: string) =>
+  captureServerEvent(null, { event: 'x', distinctId: \`check:\${ref}\`, accountId: null });
+export const b = (ref: string) =>
+  captureServerEvent(null, { event: 'x', distinctId: \`check:\${ref}\`, accountId: undefined });
+const none = null;
+export const c = (ref: string) =>
+  captureServerEvent(null, { event: 'x', distinctId: \`check:\${ref}\`, accountId: none });
+export const d = (ref: string) =>
+  captureServerEvent(null, { event: 'x', distinctId: \`check:\${ref}\`, accountId: null as null });
+export const e = (id: string) =>
+  captureServerEvent(null, { event: 'x', distinctId: \`account:\${id}\`, accountId: null });
+`,
+  'accepted.ts': `
+import { captureServerEvent } from './lib/analytics-server';
+import * as analytics from './lib/analytics-server';
+export const direct = (id: string) =>
+  captureServerEvent(null, { event: 'x', distinctId: \`account:\${id}\` });
+export const viaNamespace = (id: string) =>
+  analytics.captureServerEvent(null, { event: 'x', distinctId: \`seat:\${id}\` });
+export function typed(id: string, capture: typeof captureServerEvent = captureServerEvent) {
+  return capture(null, { event: 'x', distinctId: \`account:\${id}\` });
+}
+export const kept = (ref: string, accountId: string | null) =>
+  captureServerEvent(null, { event: 'x', distinctId: \`check:\${ref}\`, accountId });
+export const named = (ref: string, id: string) =>
+  captureServerEvent(null, { event: 'x', distinctId: \`check:\${ref}\`, accountId: id });
+`,
+};
+
+describe('CC-38 D3: the reading refuses a send it cannot follow (fixture programs)', () => {
+  let dir = '';
+  let calls: Call[] = [];
+  const at = (file: string) => calls.filter((c) => c.at.startsWith(`${file}:`));
+
+  beforeAll(() => {
+    dir = mkdtempSync(join(tmpdir(), 'cc38-d3-'));
+    const sender = join(dir, 'lib/analytics-server.ts');
+    mkdirSync(join(dir, 'lib'));
+    writeFileSync(sender, FIXTURE_SENDER);
+    for (const [name, text] of Object.entries(PROBES)) writeFileSync(join(dir, name), text);
+    const tree: Tree = { web: dir, repo: dir, sender, isSource: (f) => f.startsWith(`${dir}/`) };
+    const program = ts.createProgram([sender, ...Object.keys(PROBES).map((n) => join(dir, n))], {
+      strict: true,
+      noEmit: true,
+      target: ts.ScriptTarget.ES2022,
+      module: ts.ModuleKind.ESNext,
+      moduleResolution: ts.ModuleResolutionKind.Bundler,
+      types: [],
+    });
+    // The probes are valid programs: a refusal is the reading's, not a type error's.
+    const errors = ts
+      .getPreEmitDiagnostics(program)
+      .map((d) => ts.flattenDiagnosticMessageText(d.messageText, '\n'));
+    expect(errors).toEqual([]);
+    calls = enumerate(program, tree);
+  }, 60_000);
+
+  afterAll(() => {
+    if (dir) rmSync(dir, { recursive: true, force: true });
+  });
+
+  it.each([
+    ['structural-alias.ts', 3],
+    ['call.ts', 4],
+    ['bind.ts', 3],
+    ['argument.ts', 5],
+    ['renamed-property.ts', 3],
+    ['namespace-bind.ts', 3],
+    ['typed-binding-escapes.ts', 4],
+    ['re-export.ts', 2],
+  ])('%s: the escaping reference is refused at line %i', (file, line) => {
+    const refused = at(file).filter((c) => !c.ok && c.subject.startsWith('escape:'));
+    expect(refused.map((c) => c.at)).toEqual([`${file}:${line}`]);
+  });
+
+  it('null-account.ts: a literal null, a literal undefined and a null-typed accountId are refused', () => {
+    expect(at('null-account.ts').map((c) => [c.at, c.ok, c.subject])).toEqual([
+      ['null-account.ts:4', false, 'accountId is a literal null; `check:…`'],
+      ['null-account.ts:6', false, 'accountId is a literal undefined; `check:…`'],
+      ['null-account.ts:9', false, "accountId's type is null; `check:…`"],
+      ['null-account.ts:11', false, 'accountId is a literal null; `check:…`'],
+      // A null accountId beside an account distinct id: the distinct id names the account.
+      ['null-account.ts:13', true, 'accountId is a literal null; `account:…`'],
+    ]);
+  });
+
+  it('accepted.ts: a direct call, a namespace call, a typed binding and an accountId pass', () => {
+    expect(at('accepted.ts')).toEqual([
+      { at: 'accepted.ts:5', ok: true, subject: '`account:…`' },
+      { at: 'accepted.ts:7', ok: true, subject: '`seat:…`' },
+      { at: 'accepted.ts:9', ok: true, subject: '`account:…`' },
+      { at: 'accepted.ts:12', ok: true, subject: 'accountId' },
+      { at: 'accepted.ts:14', ok: true, subject: 'accountId' },
+    ]);
+  });
 });

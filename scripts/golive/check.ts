@@ -40,7 +40,7 @@ import { ALLOWED_HOSTS, guardedFetch } from './http';
 import { PRECONDITIONS, type Precondition } from './preconditions';
 import { PAID_PLAN_TICK } from './probes/inngest';
 import { PROBES, type ProbeId } from './probes/index';
-import { checkoutMatchesLive } from './probes/live';
+import { checkoutMatchesLive, liveCommit } from './probes/live';
 import { SENDING_DOMAIN } from './probes/resend';
 import type { GitResult, Probe, ProbeDeps, ProbeResult } from './probes/types';
 import { VERCEL_PROJECT_ID, VERCEL_TEAM_ID } from './probes/vercel-env';
@@ -250,10 +250,19 @@ export async function runCheck(args: Args, deps: CheckDeps, redactor: Redactor):
   if (args.goNoGo) {
     const lines = goNoGoLines({
       step: (s) => {
-        const n = failing.filter((g) => g <= s).length + (match.ok ? 0 : 1);
-        return n === 0 ? { ready: true } : { ready: false, blocking: n };
+        // The checkout is not a row: it is said apart from the count.
+        const n = failing.filter((g) => g <= s).length;
+        return n === 0 && match.ok
+          ? { ready: true }
+          : { ready: false, blocking: n, checkout: !match.ok };
       },
       walkResults: (deps.readFile ?? readIfPresent)(WALK_RESULTS_PATH),
+      live: await liveCommit(probeDeps).then((l) => (l.ok ? l.sha : null)),
+      head: await deps
+        .git(['rev-parse', 'HEAD'])
+        .then((r) =>
+          r.code === 0 && /^[0-9a-f]{40}$/.test(r.stdout.trim()) ? r.stdout.trim() : null,
+        ),
     });
     for (const l of lines) out(l);
     out('');

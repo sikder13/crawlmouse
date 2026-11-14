@@ -38,11 +38,13 @@ Look at each row at the times in the last column. A row that crosses an abort li
 
 ### The Sentry signals
 
-A signal is the `signal` tag on a Sentry event; an alert rule matches it. The tags set in this tree,
-listed by:
+A signal is the `signal` tag on a Sentry event; an alert rule matches it. The tags set in this tree
+(each `signal` property of a `tags` object literal in the non-test source of `apps/web`, `inngest`
+and `packages`, read with the TypeScript parser, so a tag written over several lines counts), listed
+by:
 
 ```bash
-git grep -nE "tags: \{[^}]*signal" -- apps/web inngest packages ':!*.test.ts' ':!*.test.tsx'
+pnpm --filter @crawlmouse/scripts exec tsx golive/signals.ts
 ```
 
 <!-- launch-day:signals:start -->
@@ -69,28 +71,59 @@ Set from a value, so the name is read from the file:
 
 <!-- launch-day:signals:end -->
 
-The list between the markers is pinned to that grep by
+The list between the markers is pinned to that reading by
 `pnpm --filter @crawlmouse/scripts exec vitest run golive/launch-day.test.ts`. CC-33 adds
 `signin-canary` and `founder-notice-failed` (`docs/ops/uptime.md` on its branch); the test fails
 until they are listed here, once CC-33 is on `origin/main`.
 
 ### Check failure rate
 
-Supabase → SQL editor, production, read-only:
+Supabase → SQL editor, production, read-only. The block between the markers is rendered from
+`scripts/golive/launch-day.ts` and pinned by
+`pnpm --filter @crawlmouse/scripts exec vitest run golive/launch-day.test.ts`:
+
+<!-- launch-day:check-failure:start -->
 
 ```sql
-select count(*) filter (where status = 'failed') as failed,
+with ended as (
+  select checks.status = 'failed' as failed,
+         checks.status = 'failed' and checks.failure_reason in (
+           'canceled', 'stalled', 'not_started', 'worker_redeployed', 'worker_unavailable', 'build_failed', 'persist_failed', 'internal'
+         ) as ours
+  from public.checks
+  where checks.finished_at > now() - interval '1 hour'
+)
+select count(*) filter (where ours) as failed_ours,
+       count(*) filter (where failed) as failed_any,
        count(*) as ended,
-       round(100.0 * count(*) filter (where status = 'failed') / nullif(count(*), 0), 1) as failed_pct
-from public.checks
-where finished_at > now() - interval '1 hour';
+       round(100.0 * count(*) filter (where ours) / nullif(count(*), 0), 1) as failed_pct,
+       count(*) >= 20 and coalesce(100.0 * count(*) filter (where ours) / nullif(count(*), 0) > 20, false) as abort
+from ended;
 ```
+
+`abort` is true when at least 20 checks ended in the hour and more than 20% of them failed with a reason counted below. Below the floor the rate is not read; the other rows of the watch still are.
+
+The reasons a check fails with, each with what the result page tells its visitor:
+
+- `paused`, not counted: audits were paused on our side when this one was due to run; a pause is the owner setting `CRAWL_PAUSED`, a decision already taken, not a fault
+- `site_busy`, not counted: another audit of this site was still running; a second check of a site asked for while its first still ran, refused by design
+- `canceled`, counted: the audit was cancelled, or ran past its time limit
+- `stalled`, counted: the audit stopped responding part-way through and was ended
+- `not_started`, counted: the audit was queued and never began
+- `worker_redeployed`, counted: our crawler was updated part-way through, so its results could not be combined
+- `worker_unavailable`, counted: our crawler could not be reached
+- `build_failed`, counted: the pages were crawled, and grading them failed on our side
+- `persist_failed`, counted: the audit was graded, and saving the result failed on our side
+- `internal`, counted: something failed on our side
+
+<!-- launch-day:check-failure:end -->
 
 A check's `finished_at` is set when its status is `finished`, `partial` or `failed`, and only then
 (the table's constraint: `sed -n 187,188p infra/supabase/migrations/20261102000001_v2_003_sites_checks.sql`),
 so the count is of the checks that ended in the hour. Once CC-33 is on `origin/main`, leave the internal accounts'
 checks out by adding `left join public.sites s on s.id = checks.site_id left join public.accounts a
-on a.id = s.account_id` and `and coalesce(a.internal, false) = false`.
+on a.id = s.account_id` after `from public.checks`, and `and coalesce(a.internal, false) = false` to
+the `where`.
 
 ## Abort lines
 
@@ -104,7 +137,7 @@ made the same way.
 | Line                                   | How it is seen                                                                                                                                                                                                                                                         | Rollback                                                                                                                                                                    | Who decides                                                                       |
 | -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
 | Sign-in canary red for 10 minutes      | `signal:signin-canary` in Sentry. The canary is CC-33's, on cron `*/10 * * * *` (`grep -n cron inngest/signin-canary.ts` once CC-33 is on `origin/main`), so 10 minutes is one failed run. With `SIGNIN_CANARY_TO` unset there is no canary: sign in by hand each hour | the step before                                                                                                                                                             | owner                                                                             |
-| Check failure rate over 20% in an hour | `failed_pct` above 20 in the [query](#check-failure-rate)                                                                                                                                                                                                              | the step before                                                                                                                                                             | owner                                                                             |
+| Check failure rate over 20% in an hour | `abort` true in the [query](#check-failure-rate), whose floor, rate and counted reasons are listed with it                                                                                                                                                             | the step before                                                                                                                                                             | owner                                                                             |
 | Any 5xx spike                          | Vercel Observability, 5xx against the hour before step 2; a Sentry issue whose events climb                                                                                                                                                                            | the step before                                                                                                                                                             | owner                                                                             |
 | Any wrong-account data view            | a user's report or a support mail, an operator's own sight, or a Sentry event naming two accounts                                                                                                                                                                      | at once, to the step-3 deployment (before `V2_CHECKS_PUBLIC`, which serves the v2 dashboard and reports), then resync Inngest and unset `V2_CHECKS_PUBLIC` and `V2_BILLING` | whoever sees it rolls back first and tells the other; the owner decides what next |
 
