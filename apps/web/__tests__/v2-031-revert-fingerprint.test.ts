@@ -23,7 +23,7 @@ const FINGERPRINT = readFileSync(resolve(MIGRATIONS_DIR, '../checks/fingerprint.
 let db: PGlite;
 beforeAll(async () => {
   db = await freshDb();
-  await applyAllMigrations(db, undefined, (f) => f !== MIGRATION);
+  await applyAllMigrations(db, undefined, (f) => f < MIGRATION);
 }, 600_000);
 afterAll(async () => db?.close());
 

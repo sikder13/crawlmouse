@@ -5,14 +5,26 @@
  * (`apps/web/app/terms/page.tsx`, "Billing"), and say no more than it does.
  */
 
+import { numberWord } from '../words';
+import { RESTORE_DAYS } from './restore-window';
+
+/** The window a restore link has, in days: restore-window.ts's, the window's one owner. */
+export { RESTORE_DAYS };
+
 /** The Terms' refund sentence, as the Terms page publishes it. */
 export const REFUND_POLICY = 'We don’t refund partial periods except where the law requires it.';
 
-/** The window a restore link has, in days (confirm_account_deletion's `purge_after`). */
-export const RESTORE_DAYS = 7;
+const MONEY_ENDS = `A plan, or a trial with a card, is set to end when its current period ends, and nothing more is charged. If that comes after the ${numberWord(RESTORE_DAYS)} days, it is cancelled when the account is erased.`;
 
-const MONEY_ENDS =
-  'A plan, or a trial with a card, is set to end when its current period ends, and nothing more is charged. If that comes after the seven days, it is cancelled when the account is erased.';
+function whatFor(n: number): string[] {
+  return [
+    'Signing in stops at once, on every device.',
+    `For ${RESTORE_DAYS} days the restore link in the same email undoes it. After that ${
+      n === 1 ? 'the account, its' : 'the accounts, their'
+    } sites, checks and reports, and your sign-in are erased.`,
+    'A few things are kept: one-way fingerprints that stop a second free trial, any takedown request of yours that is still open, and public reports you published, which no longer name you.',
+  ];
+}
 
 export const DELETE_COPY = {
   title: 'Delete your account',
@@ -21,13 +33,10 @@ export const DELETE_COPY = {
     n === 1
       ? 'Pressing the button deletes this account and everything in it:'
       : 'Pressing the button deletes these accounts and everything in them:',
-  what: (n: number) => [
-    'Signing in stops at once, on every device.',
-    `For ${RESTORE_DAYS} days the restore link in the same email undoes it. After that ${
-      n === 1 ? 'the account, its' : 'the accounts, their'
-    } sites, checks and reports, and your sign-in are erased.`,
-    'A few things are kept: one-way fingerprints that stop a second free trial, any takedown request of yours that is still open, and public reports you published, which no longer name you.',
-  ],
+  /** What deleting does, for any number of accounts (the help article quotes it). */
+  what: whatFor(2),
+  /** The same, for the number of accounts the link names. */
+  whatFor,
   /**
    * A plan the confirm sets to end (`active`, or `trialing` with a card): true of a trial, which has
    * paid for nothing yet, as of a paid period.
@@ -39,8 +48,7 @@ export const DELETE_COPY = {
    * A plan the confirm does not set to end, which the purge cancels at once (C3b): `past_due` and
    * `unpaid` (overdue) and `paused` (on hold), so the sentence names no failure a pause has not had.
    */
-  moneyNotCollected:
-    'A plan whose payments are overdue or on hold is not set to end when you confirm. It is cancelled when the account is erased, after the seven days.',
+  moneyNotCollected: `A plan whose payments are overdue or on hold is not set to end when you confirm. It is cancelled when the account is erased, after the ${numberWord(RESTORE_DAYS)} days.`,
   button: (n: number) => (n === 1 ? 'Delete this account' : 'Delete these accounts'),
   /** The account named by its sign-in address has no site. */
   noSite: 'no site yet',

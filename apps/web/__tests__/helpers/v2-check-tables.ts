@@ -407,6 +407,23 @@ export const ROWS = {
   // 029: the Agency Plus contact form's row. It names no account; the world seeds one per account so
   // the cross-account test shows no client reads either.
   contact_requests: (email: string): Row => ({ email, sites: 100, note: null }),
+  // 033: an operator and a line of the console's record. Neither references an account or a user;
+  // the world seeds one of each per account so the cross-account test shows no client reads either.
+  operators: (userId: string): Row => ({ user_id: userId }),
+  operator_actions: (operatorId: string, accountId: string): Row => ({
+    operator_id: operatorId,
+    action: 'view_account',
+    account_id: accountId,
+    target: accountId,
+  }),
+  // CC-33: a founder notice. It names an account and holds no foreign key; service only.
+  founder_notices: (key: string, accountId: string): Row => ({
+    event_key: key,
+    kind: 'signup',
+    account_id: accountId,
+    occurred_at: T1,
+    state: 'send',
+  }),
   account_slack_destinations: (accountId: string, secretId: string): Row => ({
     account_id: accountId,
     vault_secret_id: secretId,
@@ -542,6 +559,8 @@ export const TABLES_027B: readonly NewTable[] = [
 export const TABLES_028: readonly NewTable[] = ['email_sends', 'email_suppressions', 'slack_sends'];
 /** The public tables 029 creates. */
 export const TABLES_029: readonly NewTable[] = ['contact_requests'];
+/** The public tables 033 creates. */
+export const TABLES_033: readonly NewTable[] = ['operators', 'operator_actions', 'founder_notices'];
 /** The tables 003 creates. */
 export const NEW_TABLES = (Object.keys(ROWS) as NewTable[])
   .filter(
@@ -551,10 +570,11 @@ export const NEW_TABLES = (Object.keys(ROWS) as NewTable[])
       !TABLES_026B.includes(t) &&
       !TABLES_027B.includes(t) &&
       !TABLES_028.includes(t) &&
-      !TABLES_029.includes(t),
+      !TABLES_029.includes(t) &&
+      !TABLES_033.includes(t),
   )
   .sort();
-/** Every public table 003, 006b, 008, 026b, 027b, 028 and 029 create. */
+/** Every public table 003, 006b, 008, 026b, 027b, 028, 029 and 033 create. */
 export const ALL_NEW_TABLES = (Object.keys(ROWS) as NewTable[]).sort();
 
 /** Where a seeded row belongs: one of the account's two sites, or the account as a whole. */
@@ -614,6 +634,11 @@ export async function seedWorld(db: Db, tag: string): Promise<World> {
     `select to_regclass('public.contact_requests')::text as t`,
   );
   const with029 = contacts[0]!.t !== null;
+  // Nor, migrated before 033, operators.
+  const { rows: operators } = await db.query<{ t: string | null }>(
+    `select to_regclass('public.operators')::text as t`,
+  );
+  const with033 = operators[0]!.t !== null;
   // A database migrated before 006d (the revert tests of 003 to 006c) has no identity columns.
   const { rows: identity } = await db.query<{ n: number }>(
     `select count(*)::int as n from pg_attribute
@@ -810,6 +835,26 @@ export async function seedWorld(db: Db, tag: string): Promise<World> {
       'contact_requests',
       { id, ...ROWS.contact_requests(`${tag}${n}@example.com`) },
       { id },
+      'account',
+    );
+  }
+  if (with033) {
+    const operatorId = randomUUID();
+    await put('operators', ROWS.operators(operatorId), { user_id: operatorId }, 'account');
+    // The identity column takes no value from the insert, so the key is the one it returns.
+    const { rows: action } = await db.query<{ id: number }>(
+      `insert into public.operator_actions (operator_id, action, account_id, target)
+       values ($1, $2, $3, $4) returning id`,
+      Object.values(ROWS.operator_actions(operatorId, accountId)),
+    );
+    seeded.operator_actions.push({ pk: { id: action[0]!.id }, scope: 'account' });
+  }
+  if (with033) {
+    const key = `signup:${tag}-${n}`;
+    await put(
+      'founder_notices',
+      ROWS.founder_notices(key, accountId),
+      { event_key: key },
       'account',
     );
   }

@@ -483,12 +483,18 @@ describe('the kinds', () => {
     const list = lastMatch(
       /create table if not exists public\.email_sends \([^;]*?kind text not null check \(kind in \(([^)]*)\)\)|constraint email_sends_kind_check\s+check \(kind in \(([^)]*)\)\)/g,
     );
-    // 031's section C writes no list: it adds to each of the two the kinds its arrays name, after
-    // what is there. What the database holds after every migration is read in
-    // __tests__/v2-031-m-mail-kinds.test.ts.
-    const added = readFileSync(resolve(MIGRATIONS, '20261114000002_v2_031_agency.sql'), 'utf8');
+    // 031's section C and 033's section K write no list: each adds to the two the kinds its arrays
+    // name, after what is there, in migration order. What the database holds after every migration
+    // is read in __tests__/v2-031-m-mail-kinds.test.ts and __tests__/v2-033-mail-kinds.test.ts.
+    const ADDING = ['20261114000002_v2_031_agency.sql', '20261115000001_v2_033_operations.sql'];
     const array = (name: string) =>
-      quoted(new RegExp(`${name} constant text\\[\\] := array\\[([^\\]]*)\\]`).exec(added)![1]!);
+      ADDING.flatMap((f) =>
+        quoted(
+          new RegExp(`${name} constant text\\[\\] := array\\[([^\\]]*)\\]`).exec(
+            readFileSync(resolve(MIGRATIONS, f), 'utf8'),
+          )![1]!,
+        ),
+      );
     expect([...quoted(list), ...array('v_added')]).toEqual([...MAIL_KINDS]);
     const supp = lastMatch(/select p_kind in \(([^)]*)\)/g);
     expect([...quoted(supp), ...array('v_added_suppressible')].sort()).toEqual(

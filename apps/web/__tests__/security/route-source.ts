@@ -109,6 +109,35 @@ export function importSource(sf: ts.SourceFile, name: string): string | undefine
   return undefined;
 }
 
+/**
+ * Every module the source names, in source order: `import … from`, a bare `import '…'`, `export … from`,
+ * and the string argument of an `import('…')` or `require('…')` call.
+ */
+export function importedModules(sf: ts.SourceFile): string[] {
+  const out: string[] = [];
+  const visit = (node: ts.Node) => {
+    if (
+      (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) &&
+      node.moduleSpecifier &&
+      ts.isStringLiteral(node.moduleSpecifier)
+    ) {
+      out.push(node.moduleSpecifier.text);
+    }
+    if (
+      ts.isCallExpression(node) &&
+      (node.expression.kind === ts.SyntaxKind.ImportKeyword ||
+        (ts.isIdentifier(node.expression) && node.expression.text === 'require')) &&
+      node.arguments[0] &&
+      ts.isStringLiteralLike(node.arguments[0])
+    ) {
+      out.push(node.arguments[0].text);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sf);
+  return out;
+}
+
 /** Offsets of every `status: <n>` property in an object literal, e.g. `{ status: 401 }`. */
 export function statusPositions(sf: ts.SourceFile, status: number): number[] {
   const out: number[] = [];

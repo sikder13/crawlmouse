@@ -120,4 +120,9 @@ export const FIX_ADDITIONS: Addition[] = [
     what: 'A packet with a readable command (`verify.see`): under Verify, “See it” with that command and what it prints today and after the fix, then “Exact check” with the strict command on one line that scrolls sideways; the last line then says “We run the exact check …”. No contract fixture’s packet has one, so the locked comparison’s page has neither heading',
     source: 'CC-30 owner ruling 1 (rulings.md) and Q8 (rulings-2.md)',
   },
+  {
+    screen: 'fix',
+    what: 'A line above the back and next links, “Something wrong with this fix? Tell us”: a mailto to the support address whose body carries the page’s path and the fix’s, its type’s, the check’s and the site’s ids, and the account’s for a kept site',
+    source: 'CC-33 D5 (lib/v2/support/mailto.ts)',
+  },
 ];

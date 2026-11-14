@@ -140,6 +140,11 @@ const INVENTORY: [entry: string, why: string][] = [
       '(CC-20b). Not crawled text.',
   ],
   [
+    'apps/web/lib/v2/ops/digest-clock.ts :: const overflowKey = `overflow:${now.toISOString().slice(0, 13)}`;',
+    "The date and UTC hour of an ISO instant the code just made, as the founder overflow notice's " +
+      'ledger key (CC-33). Not crawled text, and nothing is rendered from it.',
+  ],
+  [
     'packages/engine/src/sitemap.ts :: return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === date',
     'The date part of an ISO instant the code just made, compared with the date a sitemap wrote to ' +
       'refuse a date that does not exist (CC-20b). Nothing is kept from it.',

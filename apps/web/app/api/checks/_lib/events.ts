@@ -12,6 +12,7 @@
 import { after } from 'next/server';
 import type { Check } from '@crawlmouse/types/v2';
 import { captureServerEvent, type SendCapture } from '../../../../lib/analytics-server';
+import type { InternalLookup } from '../../../../lib/v2/ops/internal-marker';
 import { checkRef } from '../../../../lib/v2/pipeline/public';
 
 export interface PublicServerEvents {
@@ -31,18 +32,31 @@ export interface PublicServerEvents {
 
 export type PublicServerEvent = keyof PublicServerEvents;
 
+/** The sender and the internal-account lookup, for a test to replace. */
+export interface CaptureWith {
+  send?: SendCapture;
+  lookup?: InternalLookup;
+}
+
+/**
+ * `accountId` is the account that keeps the check's site, or null for a check no account keeps. The
+ * distinct id names no account, so it is what `captureServerEvent` reads to mark an event about an
+ * internal account (CC-33 D1).
+ */
 export async function capturePublicEvent<E extends PublicServerEvent>(
   req: Request,
   event: E,
   checkId: string,
   properties: PublicServerEvents[E],
-  send?: SendCapture,
+  accountId: string | null,
+  { send, lookup }: CaptureWith = {},
 ): Promise<void> {
   const ref = checkRef(checkId);
   await captureServerEvent(
     req.headers.get('cookie'),
-    { event, distinctId: `check:${ref}`, properties: { ...properties, check_ref: ref } },
+    { event, distinctId: `check:${ref}`, accountId, properties: { ...properties, check_ref: ref } },
     send,
+    lookup,
   );
 }
 
@@ -56,8 +70,9 @@ export async function capturePublicEventAfterResponse<E extends PublicServerEven
   event: E,
   checkId: string,
   properties: PublicServerEvents[E],
+  accountId: string | null,
 ): Promise<void> {
-  const capture = () => capturePublicEvent(req, event, checkId, properties);
+  const capture = () => capturePublicEvent(req, event, checkId, properties, accountId);
   try {
     after(capture);
   } catch {

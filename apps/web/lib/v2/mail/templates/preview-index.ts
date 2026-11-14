@@ -34,6 +34,10 @@ export const MAIL_PREVIEW_INDEX = [
   },
   { slug: 'report-confirm', name: 'Client report, confirm the address', kind: 'report_confirm' },
   { slug: 'client-report', name: 'Client report', kind: 'client_report' },
+  { slug: 'founder-event', name: 'Founder notice, first payment', kind: 'founder_event' },
+  { slug: 'founder-overflow', name: 'Founder notice, N more', kind: 'founder_event' },
+  { slug: 'founder-digest-daily', name: 'Founder digest, daily', kind: 'founder_digest' },
+  { slug: 'founder-digest-weekly', name: 'Founder digest, weekly', kind: 'founder_digest' },
 ] as const satisfies readonly { slug: string; name: string; kind: MailKind }[];
 
 export type MailPreviewSlug = (typeof MAIL_PREVIEW_INDEX)[number]['slug'];

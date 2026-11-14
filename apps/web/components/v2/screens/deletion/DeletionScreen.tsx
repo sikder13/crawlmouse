@@ -57,7 +57,7 @@ export function DeletionScreen({ flow, view }: { flow: DeletionFlow; view: Delet
               </Card>
               {deleting ? (
                 <>
-                  {DELETE_COPY.what(view.accounts.length).map((line) => (
+                  {DELETE_COPY.whatFor(view.accounts.length).map((line) => (
                     <p key={line} className={styles.cardBody}>
                       {line}
                     </p>

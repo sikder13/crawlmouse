@@ -38,21 +38,29 @@ describe('GET /api/health', () => {
     expect(await res.json()).toEqual({ ok: true, version: expectedVersion, commit: null });
   });
 
-  it('depends on next/server and package.json only, and calls no fetch (a liveness probe must not reach Supabase or the network)', () => {
-    // Collect the literal module specifiers in the file (static import, side-effect import, export-from,
-    // import(), require(); any quote style) and compare them against an allow-list. A computed
-    // import()/require() argument fails outright, since its target cannot be read. Comments are NOT
-    // stripped: a stripper can eat code that follows a `//` inside a string, and a specifier or fetch
-    // mentioned in a comment only makes this test stricter.
-    const code = readFileSync(new URL('./route.ts', import.meta.url), 'utf8');
-    const q = '[\'"`]';
-    const specifiers = [
-      ...code.matchAll(new RegExp(`\\bfrom\\s*${q}([^'"\`]+)${q}`, 'g')),
-      ...code.matchAll(new RegExp(`\\bimport\\s*${q}([^'"\`]+)${q}`, 'g')),
-      ...code.matchAll(new RegExp(`\\b(?:import|require)\\s*\\(\\s*${q}([^'"\`]+)${q}`, 'g')),
-    ].map((m) => m[1]);
-    expect(new Set(specifiers)).toEqual(new Set(['next/server', '../../../package.json']));
-    expect(code).not.toMatch(/\b(?:import|require)\s*\(\s*[^'"`\s]/);
-    expect(code).not.toMatch(/\bfetch\s*\(/);
+  it('depends on next/server and the health module only, which depends on package.json only, and neither calls fetch (a liveness probe must not reach Supabase or the network)', () => {
+    // Collect the literal module specifiers in each file (static import, side-effect import,
+    // export-from, import(), require(); any quote style) and compare them against an allow-list. A
+    // computed import()/require() argument fails outright, since its target cannot be read. Comments
+    // are NOT stripped: a stripper can eat code that follows a `//` inside a string, and a specifier
+    // or fetch mentioned in a comment only makes this test stricter.
+    const specifiersOf = (code: string) => {
+      const q = '[\'"`]';
+      return new Set(
+        [
+          ...code.matchAll(new RegExp(`\\bfrom\\s*${q}([^'"\`]+)${q}`, 'g')),
+          ...code.matchAll(new RegExp(`\\bimport\\s*${q}([^'"\`]+)${q}`, 'g')),
+          ...code.matchAll(new RegExp(`\\b(?:import|require)\\s*\\(\\s*${q}([^'"\`]+)${q}`, 'g')),
+        ].map((m) => m[1]),
+      );
+    };
+    const route = readFileSync(new URL('./route.ts', import.meta.url), 'utf8');
+    const health = readFileSync(new URL('../../../lib/v2/ops/health.ts', import.meta.url), 'utf8');
+    expect(specifiersOf(route)).toEqual(new Set(['next/server', '../../../lib/v2/ops/health']));
+    expect(specifiersOf(health)).toEqual(new Set(['../../../package.json']));
+    for (const code of [route, health]) {
+      expect(code).not.toMatch(/\b(?:import|require)\s*\(\s*[^'"`\s]/);
+      expect(code).not.toMatch(/\bfetch\s*\(/);
+    }
   });
 });

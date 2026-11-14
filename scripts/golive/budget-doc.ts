@@ -14,6 +14,7 @@ import {
   HOBBY_HEADROOM_LINE,
   HOBBY_MONTHLY_EXECUTIONS,
   alertFiring,
+  canaryMonthly,
   allShapes,
   checkExecutions,
   cronPerDay,
@@ -36,7 +37,11 @@ const n = (x: number): string => x.toLocaleString('en-US');
 const CHECK_COUNTS = [100, 1_000, 5_000] as const;
 
 export async function renderBudget(): Promise<string> {
-  const crons = FUNCTIONS.filter((f) => f.runsPerDay > 0);
+  // The canary is no flag's (SIGNIN_CANARY_TO): stated under the floor, outside its table.
+  const crons = FUNCTIONS.filter((f) => f.runsPerDay > 0 && f.registration !== 'SIGNIN_CANARY_TO');
+  const canary = FUNCTIONS.filter((f) => f.registration === 'SIGNIN_CANARY_TO');
+  // `|` (one flag of the two is enough) would end a table cell: written as "or".
+  const reg = (f: (typeof FUNCTIONS)[number]) => f.registration.split('|').join(' or ');
   const events = FUNCTIONS.filter((f) => f.runsPerDay === 0);
   const verdict = await hobbyVerdict();
   const lines: string[] = [
@@ -64,11 +69,16 @@ export async function renderBudget(): Promise<string> {
     '| --- | --- | --- | --- | --- | --- |',
     ...crons.map(
       (f) =>
-        `| \`${f.id}\` | \`${f.file}\` | ${f.registration} | ${f.trigger} | ${f.steps} (${f.stepsHow}) | ${n(cronPerDay(f))} |`,
+        `| \`${f.id}\` | \`${f.file}\` | ${reg(f)} | ${f.trigger} | ${f.steps} (${f.stepsHow}) | ${n(cronPerDay(f))} |`,
     ),
     '',
     `**Floor: ${n(monthlyFloor())} executions a month.** v1's own crons are ${n(v1Floor())} of it, counted as`,
     "they run with V2_BILLING on (the reconcile's second step); with every flag off they are one step fewer a day.",
+    '',
+    ...canary.map(
+      (f) =>
+        `Not in the floor: \`${f.id}\` (\`${f.file}\`, ${f.trigger}, ${f.steps} steps idle: ${f.stepsHow}) runs once \`SIGNIN_CANARY_TO\` is set, whatever the flags, and adds ${n(canaryMonthly())} executions a month.`,
+    ),
     '',
     '### The floor after each switch-on step',
     '',
@@ -84,7 +94,7 @@ export async function renderBudget(): Promise<string> {
     '| --- | --- | --- | --- | --- | --- |',
     ...events.map(
       (f) =>
-        `| \`${f.id}\` | \`${f.file}\` | ${f.registration} | ${f.trigger} | ${f.id === 'crawlmouse.check.run' ? 'see the check shapes' : `${f.steps} (${f.stepsHow})`} | ${(f.stepAt ?? []).map((l) => `\`${f.file}:${l}\``).join(', ') || 'measured'} |`,
+        `| \`${f.id}\` | \`${f.file}\` | ${reg(f)} | ${f.trigger} | ${f.id === 'crawlmouse.check.run' ? 'see the check shapes' : `${f.steps} (${f.stepsHow})`} | ${(f.stepAt ?? []).map((l) => `\`${f.file}:${l}\``).join(', ') || 'measured'} |`,
     ),
     '',
     `A finished check starts three of them (the alert planner, the notify mail, the capture): ${finishedFanOut()} executions.`,
