@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { addsInternalColumn } from './marker-gate';
+import { PGLITE_TIMEOUT, withMarker } from './test-support';
 
 /**
  * The gate that turns the `accounts.internal` tests on (CC-38 questions Q1), and the guard that the
@@ -47,4 +48,16 @@ describe('CC-33 binds ops:internal into the wiring', () => {
       /import\s*\{[^}]*\brunInternal\b[^}]*\}\s*from\s*['"]\.\.\/ops\/internal(?:\.ts)?['"]/,
     );
   });
+});
+
+describe('withMarker', () => {
+  // Longer than vitest's 5 s default, which is what a seeded PGlite test under load took: it passes
+  // only because withMarker hands its timeout to the test.
+  withMarker(
+    'gives the test the timeout it was handed',
+    async () => {
+      await new Promise((r) => setTimeout(r, 5_500));
+    },
+    PGLITE_TIMEOUT,
+  );
 });
