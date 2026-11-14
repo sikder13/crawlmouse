@@ -194,6 +194,12 @@ vi.mock('@/lib/supabase/admin', () => ({
     },
   }),
 }));
+// The stream spends a per-IP bucket (A-1); these requests carry no client IP, so it is never asked.
+vi.mock('@/lib/rate-limit', () => ({
+  checkRateLimit: async () => {
+    throw new Error('no client IP here: the limiter is not reached');
+  },
+}));
 vi.mock('@/lib/supabase/server', () => ({
   supabaseServer: () =>
     Promise.resolve({
@@ -228,7 +234,7 @@ interface Emission {
  * Run the REAL SSE route and return the events it emitted, in order, with payloads exactly as
  * serialized. This is the producer; everything below replays what it says.
  */
-async function captureFromRoute(id = 'aud-1'): Promise<Emission[]> {
+async function captureFromRoute(id = '7c1d2e3f-4a5b-4c6d-8e7f-90a1b2c3d4e5'): Promise<Emission[]> {
   const res = await GET(new NextRequest(`http://localhost/api/audits/${id}/stream`), {
     params: Promise.resolve({ id }),
   });
@@ -241,7 +247,7 @@ async function captureFromRoute(id = 'aud-1'): Promise<Emission[]> {
 
 // ── Row fixtures. Only the DB rows are hand-written; every wire payload is produced. ─────────────
 const REFUSED_ROW = {
-  id: 'aud-1',
+  id: '7c1d2e3f-4a5b-4c6d-8e7f-90a1b2c3d4e5',
   url: 'https://x.com/',
   status: 'completed',
   grade: null,
@@ -443,7 +449,7 @@ afterEach(async () => {
   container = null;
 });
 
-async function mount(auditId = 'aud-1') {
+async function mount(auditId = '7c1d2e3f-4a5b-4c6d-8e7f-90a1b2c3d4e5') {
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
@@ -456,7 +462,7 @@ async function mount(auditId = 'aud-1') {
 }
 
 /** Mount, then replay the producer's emissions in order. Returns the rendered HTML. */
-async function replay(seq: Emission[], auditId = 'aud-1') {
+async function replay(seq: Emission[], auditId = '7c1d2e3f-4a5b-4c6d-8e7f-90a1b2c3d4e5') {
   const { es, html } = await mount(auditId);
   for (const { event, data } of seq) {
     await act(async () => es.emitRaw(event, data));

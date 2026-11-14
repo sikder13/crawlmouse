@@ -1,4 +1,4 @@
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabase/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { deriveTier, entitlementFor } from '@/lib/entitlement';
@@ -20,7 +20,10 @@ import {
   type ConversionProjectionInput,
 } from '@/lib/audit-stream-projection';
 import { extractNewActivity, isUndefinedColumnError } from '@/lib/audit-activity';
-import { SSE_POLL_MS, SSE_SELF_CLOSE_MS } from '@/lib/limits';
+import { REPORT_VIEWS_PER_IP_PER_HOUR, SSE_POLL_MS, SSE_SELF_CLOSE_MS } from '@/lib/limits';
+import { checkRateLimit } from '@/lib/rate-limit';
+import { getClientIp } from '@/lib/client-ip';
+import { isUuid } from '@/lib/uuid';
 import type {
   GraphData,
   ConfidenceBand,
@@ -68,6 +71,21 @@ type AuditRowWithProgress = AuditRow & { crawl_activity?: unknown };
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  // A-1 (CC-37): an audit id is a UUID. Anything else is refused before any database read, so a
+  // garbage id cannot hold a function open polling for a row that cannot exist.
+  if (!isUuid(id)) return NextResponse.json({ error: 'invalid id' }, { status: 400 });
+  // Per-IP, before the first read: each stream polls the database until it closes. The hourly read
+  // limit the report-view route uses (the v1 audit routes' own limits are daily start/notify caps,
+  // which a viewer's reconnects would exhaust). No known IP is not bucketed, as on audits/start.
+  const ip = getClientIp(req);
+  if (ip !== 'unknown') {
+    const rl = await checkRateLimit(
+      `audit-stream:ip:${ip}`,
+      REPORT_VIEWS_PER_IP_PER_HOUR,
+      60 * 60 * 1000,
+    );
+    if (!rl.allowed) return NextResponse.json({ error: 'rate_limited' }, { status: 429 });
+  }
   const admin = supabaseAdmin();
   const sbAuth = await supabaseServer();
 
@@ -411,7 +429,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   return new Response(stream, {
     headers: {
       'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache, no-transform',
+      // `private`: the body depends on the viewer (owner-scoped gating), so no shared cache keeps it.
+      'Cache-Control': 'private, no-cache, no-transform',
       Connection: 'keep-alive',
     },
   });

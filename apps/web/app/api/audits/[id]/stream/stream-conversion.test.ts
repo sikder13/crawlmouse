@@ -187,6 +187,12 @@ vi.mock('@/lib/supabase/admin', () => ({
     },
   }),
 }));
+// The stream spends a per-IP bucket (A-1); these requests carry no client IP, so it is never asked.
+vi.mock('@/lib/rate-limit', () => ({
+  checkRateLimit: async () => {
+    throw new Error('no client IP here: the limiter is not reached');
+  },
+}));
 vi.mock('@/lib/supabase/server', () => ({
   supabaseServer: () =>
     Promise.resolve({
@@ -205,9 +211,10 @@ vi.mock('@/lib/supabase/server', () => ({
 import { GET } from './route';
 
 async function runDone() {
-  const res = await GET(new NextRequest('http://localhost/api/audits/aud-1/stream'), {
-    params: Promise.resolve({ id: 'aud-1' }),
-  });
+  const res = await GET(
+    new NextRequest('http://localhost/api/audits/7c1d2e3f-4a5b-4c6d-8e7f-90a1b2c3d4e5/stream'),
+    { params: Promise.resolve({ id: '7c1d2e3f-4a5b-4c6d-8e7f-90a1b2c3d4e5' }) },
+  );
   const raw = await res.text();
   const doneBlock = raw.split('\n\n').find((b) => b.startsWith('event: done'))!;
   const data = JSON.parse(doneBlock.slice(doneBlock.indexOf('data: ') + 6));
@@ -217,7 +224,7 @@ async function runDone() {
 beforeEach(() => {
   // a completed v2 audit (confidence set = v2) owned by owner-1
   auditRow = {
-    id: 'aud-1',
+    id: '7c1d2e3f-4a5b-4c6d-8e7f-90a1b2c3d4e5',
     url: 'https://x.com/',
     status: 'completed',
     grade: 'B-',
