@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('server-only', () => ({}));
 
-import { agencyTrial, parseAgencyTrial } from './agency-trial';
+import { agencyTrial } from './agency-trial';
 import type { BillingAccount, CheckoutDeps } from './checkout-v2';
 import { FREE_START, type EntitlementSnapshot } from './state-machine';
 
@@ -79,29 +79,6 @@ beforeEach(() => {
 
 const start = (interval: 'month' | 'year' = 'month') =>
   agencyTrial(deps(), { accountId: ACCOUNT, email: 'owner@example.com', interval });
-
-describe('parseAgencyTrial', () => {
-  it.each(['form', 'json'] as const)(
-    'reads a %s body with the interval and the account',
-    (kind) => {
-      expect(parseAgencyTrial({ kind, fields: { interval: 'year', accountId: ACCOUNT } })).toEqual({
-        interval: 'year',
-        accountId: ACCOUNT,
-      });
-    },
-  );
-
-  it.each([
-    ['no account (an Agency trial names the account it bills)', { interval: 'month' }],
-    ['an account id that is not a uuid', { interval: 'month', accountId: 'nope' }],
-    ['no interval', { accountId: ACCOUNT }],
-    ['an interval that is not sold', { interval: 'day', accountId: ACCOUNT }],
-    ['a plan', { interval: 'month', accountId: ACCOUNT, plan: 'agency' }],
-    ['a price id', { interval: 'month', accountId: ACCOUNT, priceId: 'price_agency_month' }],
-  ])('refuses %s', (_, fields) => {
-    expect(parseAgencyTrial({ kind: 'json', fields })).toBeNull();
-  });
-});
 
 describe('agencyTrial refusals: what the webhook would ignore, before any Stripe call', () => {
   it.each<[string, EntitlementSnapshot]>([

@@ -11,6 +11,7 @@
     "typecheck": "turbo run typecheck",
     "smoke": "tsx scripts/smoke-crawl.ts",
     "backtest": "tsx scripts/backtest-engine.ts",
+    "golive:check": "pnpm --filter @crawlmouse/scripts golive:check --",
     "indexnow": "node scripts/indexnow-ping.mjs",
     "research:build-panel": "tsx scripts/research/cf-panel/build-panel.ts",
     "research:snapshot": "tsx scripts/research/cf-panel/snapshot.ts",
@@ -31,5 +32,10 @@
   },
   "engines": {
     "node": ">=22"
+  },
+  "pnpm": {
+    "overrides": {
+      "@opentelemetry/instrumentation-http@<0.222.0": "0.222.0"
+    }
   }
 }

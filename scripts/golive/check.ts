@@ -1,0 +1,344 @@
+/**
+ * `pnpm golive:check` (CC-35 D3): whether production is ready for a switch-on step. Read-only: every
+ * request goes through `guardedFetch` (GET to fixed hosts, plus Supabase's read-only query), and the
+ * git commands it runs read the local clone.
+ *
+ *   pnpm golive:check -- [--step N] [--ticked id,id] [--env-file path]
+ *
+ * Prints whether this checkout's inputs equal the live production commit's (probes/live.ts), then
+ * every precondition, grouped by the step it gates, as `pass`, `fail`, `unknown (reason)` or
+ * `manual`; exits 1 when a row gating step N or an earlier one is not `pass` (a manual row passes only
+ * when its id is in `--ticked`), 0 when none is, 2 when the arguments cannot be used. `--step`
+ * defaults to 1: which steps are done cannot be read without reading the flags' values, which the
+ * check never requests.
+ *
+ * Tokens come from `scripts/.env.local` of this checkout (or `--env-file`), and from the process
+ * environment for the names in `TOKEN_ENV`. Tokens, the file's values and the strings a response
+ * carried are redacted from everything the command writes, by the rules in redact.ts.
+ */
+import { execFile } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { isAbsolute, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { CATALOG } from '../../apps/web/lib/billing/catalog';
+import { listMigrations } from '../db/files';
+import {
+  FORBIDDEN_ENV,
+  OPTIONAL_ENV,
+  PLATFORM_ENV,
+  READ_BY_LIBRARIES,
+  REQUIRED_ENV,
+  SWITCH_FLAGS,
+  TEST_ONLY_ENV,
+  WORKER_FLY_ENV,
+} from './env-classes';
+import { REPO_ROOT } from './env-scan';
+import { PRODUCTION_REF } from '../db/target';
+import { ALLOWED_HOSTS, guardedFetch } from './http';
+import { PRECONDITIONS, type Precondition } from './preconditions';
+import { PAID_PLAN_TICK } from './probes/inngest';
+import { PROBES, type ProbeId } from './probes/index';
+import { checkoutMatchesLive } from './probes/live';
+import { SENDING_DOMAIN } from './probes/resend';
+import type { GitResult, Probe, ProbeDeps, ProbeResult } from './probes/types';
+import { VERCEL_PROJECT_ID, VERCEL_TEAM_ID } from './probes/vercel-env';
+import { WORKER_APP, WORKER_URL } from './probes/worker';
+import { Redactor, TOKEN_ENV } from './redact';
+import { STEPS, STEP_TITLE, isStep, type Step } from './steps';
+
+/** The file's text, or null when there is none: one read, not a check then a read. */
+function readIfPresent(path: string): string | null {
+  try {
+    return readFileSync(path, 'utf8');
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
+    throw error;
+  }
+}
+
+export const USAGE = 'usage: pnpm golive:check -- [--step 1-5] [--ticked id,id] [--env-file path]';
+export const DEFAULT_ENV_FILE = join(REPO_ROOT, 'scripts/.env.local');
+
+export interface Args {
+  step: Step;
+  ticked: Set<string>;
+  envFile: string;
+}
+
+/** The arguments, or a message saying what is wrong with them. */
+export function parseArgs(argv: readonly string[]): Args | string {
+  const args: Args = { step: 1, ticked: new Set(), envFile: DEFAULT_ENV_FILE };
+  for (let i = 0; i < argv.length; i += 1) {
+    const flag = argv[i];
+    const value = argv[i + 1];
+    if (flag === '--') continue;
+    if (flag !== '--step' && flag !== '--ticked' && flag !== '--env-file')
+      return `unknown argument ${flag}`;
+    if (value === undefined) return `${flag} needs a value`;
+    i += 1;
+    if (flag === '--step') {
+      const n = Number(value);
+      if (!isStep(n)) return '--step is a step from 1 to 5';
+      args.step = n;
+    } else if (flag === '--ticked') {
+      for (const id of value
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean)) {
+        if (!PRECONDITIONS.some((p) => p.id === id) && id !== PAID_PLAN_TICK)
+          return `--ticked names no row: ${id}`;
+        args.ticked.add(id);
+      }
+    } else {
+      args.envFile = value;
+    }
+  }
+  return args;
+}
+
+/**
+ * The env file's path. pnpm runs the script with `scripts/` as its working directory and names the
+ * caller's directory in `INIT_CWD`, so a relative `--env-file` is resolved against that.
+ */
+export function resolveEnvFile(path: string, initCwd: string | undefined): string {
+  if (isAbsolute(path)) return path;
+  return resolve(initCwd || process.cwd(), path);
+}
+
+/** `KEY=value` lines; blanks and `#` comments skipped, one pair of surrounding quotes removed. */
+export function parseEnvFile(text: string): Record<string, string> {
+  const env: Record<string, string> = {};
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line || line.startsWith('#')) continue;
+    const m = /^(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/.exec(line);
+    if (!m) continue;
+    let v = m[2]!;
+    if (v.length >= 2 && (v[0] === '"' || v[0] === "'") && v.endsWith(v[0]!)) v = v.slice(1, -1);
+    env[m[1]!] = v;
+  }
+  return env;
+}
+
+/** The names the check itself prints: code constants, so a response repeating one is not redacted. */
+export function vocabulary(): Set<string> {
+  const envNames = [
+    ...STEPS.flatMap((s) => Object.keys(REQUIRED_ENV[s])),
+    ...[
+      OPTIONAL_ENV,
+      SWITCH_FLAGS,
+      PLATFORM_ENV,
+      TEST_ONLY_ENV,
+      WORKER_FLY_ENV,
+      READ_BY_LIBRARIES,
+      FORBIDDEN_ENV,
+    ].flatMap((c) => Object.keys(c)),
+  ];
+  let versions: string[] = [];
+  try {
+    versions = listMigrations().flatMap((m) => [m.version, m.name]);
+  } catch {
+    // Without the directory the migrations probe reports it; the vocabulary is only narrower.
+  }
+  return new Set([
+    ...envNames,
+    ...Object.keys(CATALOG),
+    ...versions,
+    ...ALLOWED_HOSTS,
+    ...PRECONDITIONS.map((p) => p.id),
+    WORKER_APP,
+    WORKER_URL,
+    VERCEL_PROJECT_ID,
+    VERCEL_TEAM_ID,
+    PRODUCTION_REF,
+    SENDING_DOMAIN,
+    'production',
+  ]);
+}
+
+export interface CheckDeps {
+  /**
+   * The values loaded from the env file, merged with the TOKEN_ENV names of the process environment.
+   * runCheck hands probes the TOKEN_ENV names of it only.
+   */
+  env: Record<string, string | undefined>;
+  /** The network, before the guard; the check wraps it. */
+  fetch: typeof fetch;
+  now: () => Date;
+  git: (args: readonly string[]) => Promise<GitResult>;
+  out: (line: string) => void;
+  err: (line: string) => void;
+  probes?: Readonly<Record<ProbeId, Probe>>;
+}
+
+const line = (p: Precondition, r: ProbeResult | 'manual' | 'ticked'): string => {
+  if (r === 'manual') return `  ${p.id}: manual — tick in docs/ops/go-live.md`;
+  if (r === 'ticked') return `  ${p.id}: pass (ticked)`;
+  return `  ${p.id}: ${r.status} (${r.reason})`;
+};
+
+/** Runs every probe once and prints every row; returns the exit code. */
+export async function runCheck(args: Args, deps: CheckDeps, redactor: Redactor): Promise<number> {
+  const out = (s: string) => deps.out(redactor.redact(s));
+  // A probe needs a token and nothing else from the file: the other values never reach one.
+  const tokens: Record<string, string | undefined> = {};
+  for (const name of TOKEN_ENV) tokens[name] = deps.env[name];
+  const probeDeps: ProbeDeps = {
+    fetch: guardedFetch(deps.fetch, (v) => redactor.addReceived(v), tokens),
+    env: tokens,
+    now: deps.now,
+    git: deps.git,
+    ticked: args.ticked,
+  };
+  const probes = deps.probes ?? PROBES;
+  const results = new Map<ProbeId, ProbeResult>();
+  for (const p of PRECONDITIONS) {
+    if (p.check.kind !== 'auto' || results.has(p.check.probe)) continue;
+    let r: ProbeResult;
+    try {
+      r = await probes[p.check.probe](probeDeps);
+    } catch (e) {
+      // Not the message: an error from a fetch or a library can quote what it was sent or received.
+      r = {
+        status: 'unknown',
+        reason: `the probe failed (${e instanceof Error ? e.name : 'error'})`,
+      };
+    }
+    results.set(p.check.probe, r);
+  }
+  const blocking: string[] = [];
+  out(`golive:check — gating step ${args.step} (${STEP_TITLE[args.step]})`);
+  const match = await checkoutMatchesLive(probeDeps);
+  out(
+    match.ok
+      ? `checkout: matches the live production commit ${match.sha.slice(0, 12)} in the check's inputs`
+      : `checkout: unknown (${match.result.reason})`,
+  );
+  // The rows themselves are this checkout's: a checkout that is not production's gates nothing truly,
+  // so it blocks every step, step 1's manual rows included.
+  if (!match.ok) blocking.push('checkout');
+  for (const step of STEPS) {
+    out('');
+    out(`step ${step}: ${STEP_TITLE[step]}`);
+    for (const p of PRECONDITIONS.filter((x) => x.gates === step)) {
+      let passed: boolean;
+      if (p.check.kind === 'manual') {
+        passed = args.ticked.has(p.id);
+        out(line(p, passed ? 'ticked' : 'manual'));
+      } else {
+        const r = results.get(p.check.probe)!;
+        passed = r.status === 'pass';
+        out(line(p, r));
+      }
+      if (step <= args.step && !passed) blocking.push(p.id);
+    }
+  }
+  out('');
+  const through = args.step === 1 ? 'step 1' : `steps 1–${args.step}`;
+  if (blocking.length === 0) {
+    out(`ready for step ${args.step}: every row gating ${through} passes`);
+    return 0;
+  }
+  out(
+    `not ready for step ${args.step}: ${blocking.length} rows gating ${through} do not pass: ${blocking.join(', ')}`,
+  );
+  return 1;
+}
+
+/** Parses the arguments, loads the env file and runs the check. Never throws: a failure is one line on err. */
+export async function main(
+  argv: readonly string[],
+  deps: Omit<CheckDeps, 'env'> & {
+    processEnv: Record<string, string | undefined>;
+    readFile?: (path: string) => string | null;
+  },
+): Promise<number> {
+  const redactor = new Redactor(vocabulary());
+  const err = (s: string) => deps.err(redactor.redact(s));
+  try {
+    const args = parseArgs(argv);
+    if (typeof args === 'string') {
+      err(args);
+      err(USAGE);
+      return 2;
+    }
+    const read = deps.readFile ?? readIfPresent;
+    args.envFile = resolveEnvFile(args.envFile, deps.processEnv.INIT_CWD);
+    const text = read(args.envFile);
+    const fileEnv = text === null ? {} : parseEnvFile(text);
+    const env: Record<string, string | undefined> = {};
+    for (const name of TOKEN_ENV) env[name] = deps.processEnv[name];
+    Object.assign(env, fileEnv);
+    for (const [k, v] of Object.entries(fileEnv)) redactor.addFileValue(k, v);
+    for (const name of TOKEN_ENV) redactor.addSecret(env[name]);
+    if (text === null) err(`no env file at ${args.envFile}: every token row answers unknown`);
+    return await runCheck(args, { ...deps, env }, redactor);
+  } catch (e) {
+    err(
+      `golive:check failed: ${redactor.redact(e instanceof Error ? `${e.name}: ${e.message}` : 'error')}`,
+    );
+    return 2;
+  }
+}
+
+/**
+ * The redactor installed on stdout and stderr before main runs: the process environment's tokens and
+ * the env file's values, from the file `--env-file` names (resolved as main resolves it) or the
+ * default one.
+ */
+export function earlyRedactor(
+  argv: readonly string[],
+  processEnv: Record<string, string | undefined>,
+  read: (path: string) => string | null,
+): Redactor {
+  const early = new Redactor(vocabulary());
+  for (const name of TOKEN_ENV) early.addSecret(processEnv[name]);
+  const args = parseArgs(argv);
+  const path = typeof args === 'string' ? DEFAULT_ENV_FILE : args.envFile;
+  try {
+    const text = read(resolveEnvFile(path, processEnv.INIT_CWD));
+    if (text !== null)
+      for (const [k, v] of Object.entries(parseEnvFile(text))) early.addFileValue(k, v);
+  } catch {
+    // main reports an unreadable file.
+  }
+  return early;
+}
+
+function gitRunner(args: readonly string[]): Promise<GitResult> {
+  return new Promise((resolve) => {
+    execFile('git', [...args], { cwd: REPO_ROOT }, (error, stdout) => {
+      const code = error ? (typeof error.code === 'number' ? error.code : 128) : 0;
+      resolve({ code, stdout: String(stdout) });
+    });
+  });
+}
+
+if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+  // Anything written outside main (a library's warning, an unhandled rejection) passes the same
+  // redaction: the token values are registered before any probe runs.
+  const early = earlyRedactor(process.argv.slice(2), process.env, (p) => readIfPresent(p));
+  for (const stream of [process.stdout, process.stderr]) {
+    const write = stream.write.bind(stream) as (chunk: unknown, ...rest: unknown[]) => boolean;
+    stream.write = ((chunk: unknown, ...rest: unknown[]) =>
+      write(
+        typeof chunk === 'string' || Buffer.isBuffer(chunk) ? early.redact(String(chunk)) : chunk,
+        ...rest,
+      )) as typeof stream.write;
+  }
+  const fatal = () => {
+    process.stderr.write('golive:check failed outside a probe\n');
+    process.exit(2);
+  };
+  process.on('uncaughtException', fatal);
+  process.on('unhandledRejection', fatal);
+  const code = await main(process.argv.slice(2), {
+    processEnv: process.env,
+    fetch,
+    now: () => new Date(),
+    git: gitRunner,
+    out: (s) => console.log(s),
+    err: (s) => console.error(s),
+  });
+  process.exit(code);
+}

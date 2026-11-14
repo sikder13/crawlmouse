@@ -320,6 +320,131 @@ applying (Fly says 5 to 10 minutes): re-run the job. If it ends with "could not 
 seen", read the error lines: the token may not be allowed to open an SSH console (take the reading
 above by hand with an organisation token), or the machine may not be running.
 
+## Production
+
+The production worker is the Fly app `crawlmouse-worker` (region `iad`, one machine), configured by
+`packages/worker/fly.production.toml`: `fly.toml` with the app's name changed and nothing else
+(`pnpm --filter @crawlmouse/worker exec vitest run src/fly-production.test.ts` fails on any other
+difference). It is deployed by `.github/workflows/worker-production.yml`, which starts only when the
+owner dispatches it from `main`: a push or a merge does not deploy it, and the workflow refuses a
+run dispatched or re-run by anyone else, or from another ref
+(`pnpm --filter @crawlmouse/scripts exec vitest run db/worker-production-workflow.test.ts`).
+
+The staging sections above apply to production with `--app crawlmouse-worker` and
+`--config packages/worker/fly.production.toml` in place of the staging app and `fly.toml`. The
+differences are below.
+
+### Before the first deploy (owner, once)
+
+- **Fly token.** Create an organisation token, `flyctl tokens create org --org <slug>`, and add it as
+  the secret `FLY_API_TOKEN` to a new GitHub environment named `worker-production` (Settings,
+  Environments). Once the app exists, replace it with a deploy token for the app alone
+  (`flyctl tokens create deploy --app crawlmouse-worker`) if that token can open the SSH console the
+  egress check uses; if it cannot, keep the organisation token and record why here. An organisation
+  token can also deploy or destroy every other app in the organisation, staging included.
+- **Fly organisation.** Set the variable (not a secret) `FLY_ORG` on `worker-production` to the
+  organisation's slug. The workflow refuses to create the app without it.
+- **Branch restriction.** Restrict `worker-production`'s deployment branches to `main`. Once the
+  repository is private, the environment has no required reviewer
+  (`docs/specs/v2/repo-private.md`), so what holds the token back is that restriction, the owner
+  check the workflow runs before anything else, and the rule that no other workflow names the
+  environment (`confinedEnvironmentProblems` in `scripts/db/workflow-file.ts`).
+
+### First deploy
+
+1. Generate a signing secret and a JWT key pair for production, as in "First deploy" step 1 above.
+   Do not reuse staging's: a value shared by the two would let a batch signed for one be accepted
+   by the other.
+2. Create the app, so its secrets can be set before the first deploy:
+
+   ```bash
+   flyctl apps create crawlmouse-worker --org <slug>
+   ```
+
+3. Set the two secrets, read from the terminal and passed on standard input, so neither lands in
+   shell history or on a command line:
+
+   ```bash
+   read -rs SIGNING && read -rs PUBLIC && printf 'WORKER_SIGNING_SECRET=%s\nWORKER_JWT_PUBLIC_KEY=%s\n' "$SIGNING" "$PUBLIC" | flyctl secrets import --stage --app crawlmouse-worker; unset SIGNING PUBLIC
+   ```
+
+   Check the names, never the values: `flyctl secrets list --app crawlmouse-worker`.
+
+4. Dispatch the workflow from `main`: Actions, `worker-production`, Run workflow, branch `main`; or
+   `gh workflow run worker-production.yml --ref main` while logged in as the owner. `authorize`
+   checks who dispatched it and from where; `build` runs the worker's tests, typecheck and bundle;
+   `deploy` checks again, deploys that bundle with the image labelled with the commit
+   (`--image-label`), checks `/healthz`, allocates the egress pair if the region has no egress IPv4,
+   and checks the egress address before and after a restart, masked. A deploy restarts the machine
+   twice. If a step fails and you re-run the failed job, re-run it yourself: the owner check reads
+   who re-ran it.
+5. Record the egress address (below), then set the app's variables (below).
+
+### Egress address (production)
+
+Sites see production's requests from this pair. A site owner who allow-lists crawlers by address
+needs it, so it is recorded here once the first deploy has allocated it. Take the readings as in
+"Egress address" above, with `--app crawlmouse-worker`, before and after a
+`flyctl machine restart <id> --app crawlmouse-worker`.
+
+| Family | Address      | Before restart | After restart | Recorded |
+| ------ | ------------ | -------------- | ------------- | -------- |
+| IPv4   | not recorded |                |               |          |
+| IPv6   | not recorded |                |               |          |
+
+### The app's variables
+
+In Vercel, production environment, set:
+
+- `CRAWL_WORKER_URL` to `https://crawlmouse-worker.fly.dev`;
+- `WORKER_SIGNING_SECRET` to the value set on the worker;
+- `WORKER_JWT_PRIVATE_KEY_PKCS8_B64` to the private half of the worker's `WORKER_JWT_PUBLIC_KEY`,
+  as base64 of its PKCS8 DER bytes on one line ("Where the three values live", above).
+
+A variable takes effect at the app's next deployment, not on the one already running.
+
+### A read-only token for the go-live check
+
+`pnpm golive:check` reads which image the production machine runs. Give it a token that can read
+and not deploy:
+
+```bash
+flyctl tokens create readonly --org <slug>
+```
+
+Put it in `scripts/.env.local` as `FLY_READ_TOKEN` (the file git ignores; `chmod 600
+scripts/.env.local`). Not the deploy token: the check needs to read and nothing more.
+
+### Deploy
+
+Only by dispatch, as in step 4. Merging to `main` changes nothing in the production worker, but Vercel
+deploys the app on the same merge: after merging a change to a worker input (the paths
+`worker-staging.yml` lists), dispatch `worker-production`, or make the change work with the running
+worker first. `pnpm golive:check` reports the two apart. Every dispatch deploys `main`'s head.
+
+### Roll back
+
+List the releases with their images, then deploy the previous one:
+
+```bash
+flyctl releases --app crawlmouse-worker --image
+```
+
+```bash
+flyctl deploy --app crawlmouse-worker --config packages/worker/fly.production.toml --image <image of the previous release> --ha=false
+```
+
+For a release the workflow deployed, the image reference ends with the commit it was built from,
+the label it gave the image. Then fix or revert the change on `main` before the next dispatch, which
+deploys `main`'s head again.
+
+What a rollback does to checks in flight: the deploy restarts the machine, so batches running at
+that moment are lost, and the check sends each one again once. A check that already took a batch
+from the release before the rollback and then reads one from the rolled-back release fails with
+`worker_redeployed`: `take` in `inngest/check.ts` refuses a batch whose worker release differs
+from the first one the check read. The same holds for any production deploy. Those checks have to
+be run again.
+
 ## Browser Run: the render token, limits and cost
 
 The render step (CC-14, `docs/specs/v2/14-render.md`) calls Cloudflare Browser Run's REST `/content`
