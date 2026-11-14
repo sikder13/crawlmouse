@@ -8,7 +8,9 @@
 -- (20261114000001), seat_may (20261114000002) and erase_rules (20261113000001). One column grant is
 -- narrowed: authenticated no longer reads accounts.card_last4. erase_rules repeats two existing rows
 -- that name tables in `auth`, byte for byte; nothing in `auth` is created, altered or written by this
--- file, and no cascade is added. It reads accounts.internal, which 20261115000001 adds.
+-- file, and no cascade is added. It reads accounts.internal, which CC-33's 20261115000001 adds; until
+-- that file is on main this one adds the column with the same statement (questions Q6), so either
+-- order leaves one column. The revert drops it unless the migration history records 20261115000001.
 --
 -- The statements are re-runnable (the tests apply the file twice).
 -- The revert is infra/supabase/rollbacks/20261117000001_v2_037_security.revert.sql.
@@ -17,7 +19,10 @@
 -- scripts/db/trial-race.test.ts.
 
 -- ═══ A: internal accounts and the trial ledger (D3a) ═════════════════════════════════════════════
--- The owner's own test accounts are marked internal (scripts/ops/internal.ts) so they can be reset
+-- CC-33's statement, word for word (20261115000001 §A): a no-op once that file has run.
+alter table public.accounts add column if not exists internal boolean not null default false;
+
+-- The owner's own test accounts are marked internal (CC-33's operator script) so they can be reset
 -- and trialled again. An account is marked only after its first login, whose Pro trial wrote ledger
 -- rows for the email, the device and the network, and those rows would refuse the next test
 -- sign-up. So: a ledger row of an internal account refuses nothing (trial_ledger_refusals), and an

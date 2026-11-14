@@ -5,7 +5,10 @@
 -- start_trial_with_ledger as 20261108000001 with 20261108000002's search_path on the latter. Owners
 -- and grants are restated as those migrations left them. No row is changed: entries the erasure
 -- pruned and names it blanked stay gone, and ledger rows an internal account did not write stay
--- unwritten.
+-- unwritten. accounts.internal is CC-33's column (20261115000001), which the migration adds only
+-- while that file is not applied: the last block drops it unless the migration history records
+-- 20261115000001, so the revert gives back the schema it found either way (the dry run compares
+-- the fingerprint after the rollbacks with production's). Dropped, the marks it held go with it.
 --   pnpm --filter @crawlmouse/web exec vitest run __tests__/v2-037-security.test.ts -t "the revert"
 
 -- ─── E ────────────────────────────────────────────────────────────────────────────────────────────
@@ -423,3 +426,17 @@ revoke all on function public.start_trial_with_ledger(uuid, jsonb, jsonb)
   from public, anon, authenticated, service_role;
 grant execute on function public.start_trial_with_ledger(uuid, jsonb, jsonb) to service_role;
 alter function public.start_trial_with_ledger(uuid, jsonb, jsonb) set search_path = pg_catalog, pg_temp;
+
+-- ─── A: CC-33's column, when this file added it ───────────────────────────────────────────────────
+do $$
+declare
+  v_cc33 boolean := false;
+begin
+  if pg_catalog.to_regclass('supabase_migrations.schema_migrations') is not null then
+    execute 'select exists (select 1 from supabase_migrations.schema_migrations where version = $1)'
+      into v_cc33 using '20261115000001';
+  end if;
+  if not v_cc33 then
+    alter table public.accounts drop column if exists internal;
+  end if;
+end $$;

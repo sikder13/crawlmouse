@@ -37,6 +37,9 @@ vi.mock('server-only', () => ({}));
 const MIGRATION = '20261117000001_v2_037_security.sql';
 const ROLLBACK = '20261117000001_v2_037_security.revert.sql';
 const MIGRATION_028 = '20261113000001_v2_028_monitoring.sql';
+/** CC-33's statement (20261115000001 §A), written out: this file adds the column with it. */
+const CC33_INTERNAL =
+  'alter table public.accounts add column if not exists internal boolean not null default false;';
 const FINGERPRINT = readFileSync(resolve(MIGRATIONS_DIR, '../checks/fingerprint.sql'), 'utf8');
 
 /** An address built from its parts. */
@@ -769,6 +772,8 @@ describe('the catalog, the re-run and the revert', () => {
   let own: PGlite;
   beforeAll(async () => {
     own = await freshDb();
+    // No migration history here, so 20261115000001 is not recorded: the revert drops the column
+    // this file added (questions Q6, QB9). The case where it is recorded is the test after this one.
     await applyAllMigrations(own, undefined, (f) => f < MIGRATION);
   }, 300_000);
   afterAll(async () => {
@@ -784,6 +789,8 @@ describe('the catalog, the re-run and the revert', () => {
     const columnsBefore = await readable(own);
     expect(pre.pins).toEqual(EXPECTED_PINS);
     expect(await cardGrant(own)).toBe(true);
+    // The baseline's column is the one this file adds, in the same words.
+    expect(readMigration(MIGRATION)).toContain(`\n${CC33_INTERNAL}\n`);
 
     await own.exec(readMigration(MIGRATION));
     const applied = await fingerprint(own);
@@ -808,4 +815,50 @@ describe('the catalog, the re-run and the revert', () => {
     await own.exec(readMigration(MIGRATION));
     expect(differing(applied, await fingerprint(own))).toEqual([]);
   }, 300_000);
+
+  it('with 20261115000001 recorded in the migration history, the revert leaves CC-33’s column and its marks', async () => {
+    const d = await freshDb();
+    try {
+      await applyAllMigrations(d, undefined, (f) => f < MIGRATION);
+      await d.exec(CC33_INTERNAL);
+      await d.exec(`create schema if not exists supabase_migrations;
+        create table supabase_migrations.schema_migrations (version text primary key);
+        insert into supabase_migrations.schema_migrations values ('20261115000001');`);
+      const owner = (
+        await d.query<{ id: string }>(
+          `insert into public.accounts (kind, state, tier, seat_limit, site_limit, competitor_limit,
+                                        state_history, internal)
+           values ('personal', 'free', 'free', 1, 1, 0,
+                   '[{"state":"free","since":"2030-01-01T00:00:00.000Z"}]', true)
+           returning id`,
+        )
+      ).rows[0]!.id;
+      const pre = await fingerprint(d);
+      await d.exec(readMigration(MIGRATION));
+      await d.exec(readRollback(ROLLBACK));
+      expect(differing(pre, await fingerprint(d))).toEqual([]);
+      const { rows } = await d.query<{ internal: boolean }>(
+        'select internal from public.accounts where id = $1',
+        [owner],
+      );
+      expect(rows).toEqual([{ internal: true }]);
+    } finally {
+      await d.close();
+    }
+  }, 300_000);
+
+  it('without it recorded, the revert drops the column the migration added', async () => {
+    const has = async () =>
+      (
+        await own.query<{ n: number }>(
+          `select count(*)::int n from pg_attribute
+            where attrelid = 'public.accounts'::regclass and attname = 'internal' and not attisdropped`,
+        )
+      ).rows[0]!.n;
+    expect(await has()).toBe(1);
+    await own.exec(readRollback(ROLLBACK));
+    expect(await has()).toBe(0);
+    await own.exec(readMigration(MIGRATION));
+    expect(await has()).toBe(1);
+  });
 });
