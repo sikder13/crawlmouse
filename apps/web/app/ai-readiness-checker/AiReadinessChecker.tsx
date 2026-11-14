@@ -67,6 +67,9 @@ export function AiReadinessCheckerLd() {
  * its v2 target (app/(v2-kept)) gives it v2's, because v1's posts to a route the cutover retires.
  */
 export function AiReadinessCheckerMain({ form }: { form: ReactNode }) {
+  // The JSX as main had it in page.tsx. Prettier's wrap turns a space at a line's end into {' '},
+  // which renders as its own text node and changes the HTML from main's (measured on next build).
+  // prettier-ignore
   return (
     <main className="max-w-6xl mx-auto px-6 pt-16 pb-24 sm:pt-24 sm:pb-32">
       <TrackView event="landing-view" />
@@ -77,39 +80,36 @@ export function AiReadinessCheckerMain({ form }: { form: ReactNode }) {
           AI Readiness Checker
         </h1>
         <p className="mt-4 sm:mt-5 text-lg text-ink/70">
-          Test whether AI can actually see your website. Paste your URL and Crawlmouse crawls your
-          whole site the way AI crawlers do &mdash; no JavaScript, no mercy &mdash; then returns a
-          0&ndash;100 AI-Readiness score with the exact reasons behind it and what to fix. Free, no
-          signup, and the same site gets the same score every time.
+          Test whether AI can actually see your website. Paste your URL and Crawlmouse crawls your whole
+          site the way AI crawlers do &mdash; no JavaScript, no mercy &mdash; then returns a 0&ndash;100
+          AI-Readiness score with the exact reasons behind it and what to fix. Free, no signup, and the
+          same site gets the same score every time.
         </p>
         <div className="mt-8 sm:mt-10 flex justify-center">{form}</div>
       </section>
 
       <section className="mt-20 sm:mt-28 max-w-3xl mx-auto">
-        <h2 className="font-display font-bold text-3xl sm:text-4xl tracking-tight text-ink">
-          How it works
-        </h2>
+        <h2 className="font-display font-bold text-3xl sm:text-4xl tracking-tight text-ink">How it works</h2>
         <ol className="mt-6 space-y-4 list-decimal pl-6 text-ink/70 leading-relaxed">
           <li>
-            <strong className="text-ink">Enter your URL.</strong> No account, no email. The check
-            starts immediately.
+            <strong className="text-ink">Enter your URL.</strong> No account, no email. The check starts
+            immediately.
           </li>
           <li>
-            <strong className="text-ink">We crawl your whole site &mdash; not one page.</strong> The
-            crawler reads your site the way the bots behind ChatGPT, Claude, and Perplexity do: raw
-            pages, no JavaScript, following your internal links to see what&rsquo;s actually
-            reachable.
+            <strong className="text-ink">We crawl your whole site &mdash; not one page.</strong> The crawler
+            reads your site the way the bots behind ChatGPT, Claude, and Perplexity do: raw pages, no
+            JavaScript, following your internal links to see what&rsquo;s actually reachable.
           </li>
           <li>
-            <strong className="text-ink">You get a score with reasons, not just a number.</strong>{' '}
-            The 0&ndash;100 AI readiness score, what&rsquo;s holding it down, page by page, and a
-            complete fix in plain language.
+            <strong className="text-ink">You get a score with reasons, not just a number.</strong> The
+            0&ndash;100 AI readiness score, what&rsquo;s holding it down, page by page, and a complete fix
+            in plain language.
           </li>
         </ol>
         <p className="mt-6 text-ink/70 leading-relaxed">
-          Most AI readiness tests scan a single URL against a checklist. A single page can pass
-          every check while half the site sits unreachable or unreadable behind it &mdash;
-          whole-site is the difference between a spot check and an answer.
+          Most AI readiness tests scan a single URL against a checklist. A single page can pass every check
+          while half the site sits unreachable or unreadable behind it &mdash; whole-site is the difference
+          between a spot check and an answer.
         </p>
       </section>
 
@@ -118,34 +118,28 @@ export function AiReadinessCheckerMain({ form }: { form: ReactNode }) {
           What the check measures
         </h2>
         <p className="mt-6 text-ink/70 leading-relaxed">
-          Your score is built from four measured components, each weighted by how much it actually
-          affects whether AI systems can use your site:
+          Your score is built from four measured components, each weighted by how much it actually affects
+          whether AI systems can use your site:
         </p>
         <p className="mt-6 text-ink/70 leading-relaxed">
-          <strong className="text-ink">
-            Can AI read your content without JavaScript? (40% of the score.)
-          </strong>{' '}
+          <strong className="text-ink">Can AI read your content without JavaScript? (40% of the score.)</strong>{' '}
           The crawlers behind ChatGPT, Claude, and Perplexity don&rsquo;t run JavaScript &mdash; a
-          Vercel/MERJ study of more than 500 million crawler visits found zero cases of it. If your
-          pages only fill in after the browser does its work, AI sees a blank shell. This is the
-          single biggest reason sites that rank fine on Google are{' '}
-          <Link
-            href={'/blog/can-ai-crawlers-see-javascript' as Route}
-            className="text-peach underline"
-          >
+          Vercel/MERJ study of more than 500 million crawler visits found zero cases of it. If your pages
+          only fill in after the browser does its work, AI sees a blank shell. This is the single biggest
+          reason sites that rank fine on Google are{' '}
+          <Link href={'/blog/can-ai-crawlers-see-javascript' as Route} className="text-peach underline">
             invisible to AI
           </Link>
           , and it&rsquo;s why it carries the most weight.
         </p>
         <p className="mt-6 text-ink/70 leading-relaxed">
-          <strong className="text-ink">Are AI crawlers allowed in? (25%.)</strong> We read your
-          served robots.txt and build a per-crawler access matrix across the AI bots that matter
-          &mdash; GPTBot, ClaudeBot, PerplexityBot, Google-Extended, Applebot-Extended,
-          Meta&rsquo;s, Amazon&rsquo;s, and Common Crawl&rsquo;s &mdash; separating the crawlers
-          that fetch pages to answer live questions from the ones that collect training data. We
-          also tell you when an edge or CDN layer is detected that could override whatever
-          robots.txt says: across the sites audited on Crawlmouse, roughly one in three has one.
-          That layer became a lot more important when{' '}
+          <strong className="text-ink">Are AI crawlers allowed in? (25%.)</strong> We read your served
+          robots.txt and build a per-crawler access matrix across the AI bots that matter &mdash; GPTBot,
+          ClaudeBot, PerplexityBot, Google-Extended, Applebot-Extended, Meta&rsquo;s, Amazon&rsquo;s, and
+          Common Crawl&rsquo;s &mdash; separating the crawlers that fetch pages to answer live questions
+          from the ones that collect training data. We also tell you when an edge or CDN layer is detected
+          that could override whatever robots.txt says: across the sites audited on Crawlmouse, roughly one
+          in three has one. That layer became a lot more important when{' '}
           <Link
             href={'/blog/cloudflare-ai-crawler-defaults-september-15' as Route}
             className="text-peach underline"
@@ -155,20 +149,19 @@ export function AiReadinessCheckerMain({ form }: { form: ReactNode }) {
           .
         </p>
         <p className="mt-6 text-ink/70 leading-relaxed">
-          <strong className="text-ink">Is your content structured for machines? (20%.)</strong>{' '}
-          Titles, headings, metadata, structured data &mdash; whether a machine reading the raw page
-          can tell what it&rsquo;s about.
+          <strong className="text-ink">Is your content structured for machines? (20%.)</strong> Titles,
+          headings, metadata, structured data &mdash; whether a machine reading the raw page can tell what
+          it&rsquo;s about.
         </p>
         <p className="mt-6 text-ink/70 leading-relaxed">
-          <strong className="text-ink">Can readable pages actually be reached? (15%.)</strong> A
-          readable page that nothing links to might as well not exist. The checker follows your
-          internal links the way a crawler does and scores whether your content is reachable, not
-          just present.
+          <strong className="text-ink">Can readable pages actually be reached? (15%.)</strong> A readable
+          page that nothing links to might as well not exist. The checker follows your internal links the
+          way a crawler does and scores whether your content is reachable, not just present.
         </p>
         <p className="mt-6 text-ink/70 leading-relaxed">
           On top of the score, the report checks whether you serve an llms.txt file and shows you{' '}
-          <strong className="text-ink">What AI Sees</strong> &mdash; your page stripped to the raw
-          text an AI crawler actually gets. That view tends to end arguments quickly.
+          <strong className="text-ink">What AI Sees</strong> &mdash; your page stripped to the raw text an
+          AI crawler actually gets. That view tends to end arguments quickly.
         </p>
       </section>
 
@@ -178,16 +171,16 @@ export function AiReadinessCheckerMain({ form }: { form: ReactNode }) {
         </h2>
         <p className="mt-6 text-ink/70 leading-relaxed">
           Every other AI readiness test we&rsquo;ve found scans one page at a time, or asks chatbots
-          &ldquo;was this brand mentioned?&rdquo; over and over. Page checkers are fast but
-          can&rsquo;t see your site&rsquo;s structure &mdash; and structure is where content goes
-          missing. Mention trackers measure the outcome, give a different answer every run, and
-          can&rsquo;t tell you <em>why</em> you&rsquo;re not being read.
+          &ldquo;was this brand mentioned?&rdquo; over and over. Page checkers are fast but can&rsquo;t see
+          your site&rsquo;s structure &mdash; and structure is where content goes missing. Mention trackers
+          measure the outcome, give a different answer every run, and can&rsquo;t tell you <em>why</em>
+          {' '}you&rsquo;re not being read.
         </p>
         <p className="mt-6 text-ink/70 leading-relaxed">
-          Crawlmouse checks the whole site, returns the same score for the same site every time, and
-          tells you the specific reason a page can&rsquo;t be found or read &mdash; then points at
-          the fix. It measures discoverability honestly: no tool can promise you AI
-          &ldquo;rankings,&rdquo; and this one doesn&rsquo;t pretend to.
+          Crawlmouse checks the whole site, returns the same score for the same site every time, and tells
+          you the specific reason a page can&rsquo;t be found or read &mdash; then points at the fix. It
+          measures discoverability honestly: no tool can promise you AI &ldquo;rankings,&rdquo; and this one
+          doesn&rsquo;t pretend to.
         </p>
       </section>
 
@@ -196,14 +189,14 @@ export function AiReadinessCheckerMain({ form }: { form: ReactNode }) {
           What you get, free
         </h2>
         <p className="mt-6 text-ink/70 leading-relaxed">
-          The full crawl, the AI-Readiness score with all four components, the per-crawler access
-          matrix, What AI Sees for your homepage, and one complete fix written in plain language.{' '}
+          The full crawl, the AI-Readiness score with all four components, the per-crawler access matrix,
+          What AI Sees for your homepage, and one complete fix written in plain language.{' '}
           <Link href={'/pricing' as Route} className="text-peach underline">
             Pro
           </Link>{' '}
-          adds every fix, the whole-site What AI Sees simulator, copy-paste fix packets, the
-          llms.txt generator, CSV export, and reports you can put your own brand on &mdash; most
-          useful if you&rsquo;re checking client sites.
+          adds every fix, the whole-site What AI Sees simulator, copy-paste fix packets, the llms.txt
+          generator, CSV export, and reports you can put your own brand on &mdash; most useful if
+          you&rsquo;re checking client sites.
         </p>
       </section>
 
