@@ -228,7 +228,7 @@ export function readWalkResults(text: string): WalkResults | string {
   };
 }
 
-/** A spec's state from its tests' counts: failed, flaky, skipped, passed, or empty. */
+/** A spec's state from its tests' counts: failed, flaky, skipped, empty, incomplete or passed. */
 export function walkState(c: Counts): string {
   const shown = TEST_STATUSES.filter((s) => c[s] > 0)
     .map((s) => `${c[s]} ${s}`)
@@ -237,6 +237,8 @@ export function walkState(c: Counts): string {
   if (c.flaky > 0) return `flaky (${shown})`;
   if (c.expected === 0 && c.skipped > 0) return `skipped (${shown})`;
   if (c.expected === 0) return 'no tests in the report';
+  // A skipped test beside passing ones is a part of the journey not walked.
+  if (c.skipped > 0) return `incomplete (${shown})`;
   return `passed (${shown})`;
 }
 
@@ -330,7 +332,7 @@ const HOW_TITLE: Readonly<Record<How, string>> = {
 };
 
 const HOW_STATE: Readonly<Record<How, string>> = {
-  walk: `the spec's tests in \`${WALK_RESULTS}\` (the Playwright JSON reporter's output), counted by Playwright's statuses (expected, unexpected, flaky, skipped): \`failed\` with an unexpected one, else \`flaky\` with a flaky one, else \`skipped\` with skipped tests only, else \`passed\`; \`not run\` without the file. A state is prefixed \`stale\` when the report's commit (\`config.metadata.commit\`, set by \`tests/e2e/playwright.config.ts\`) is not the live production commit, or HEAD when the live one is unknown, or when the report names none. The walk runs on a production build against the local stand-in with the four flags on, locally, not in CI`,
+  walk: `the spec's tests in \`${WALK_RESULTS}\` (the Playwright JSON reporter's output), counted by Playwright's statuses (expected, unexpected, flaky, skipped): \`failed\` with an unexpected one, else \`flaky\` with a flaky one, else \`skipped\` with skipped tests only, else \`incomplete\` with a skipped test beside passing ones, else \`passed\`; \`not run\` without the file. A state is prefixed \`stale\` when the report's commit (\`config.metadata.commit\`, set by \`tests/e2e/playwright.config.ts\`) is not the live production commit, or HEAD when the live one is unknown, or when the report names none. The walk runs on a production build against the local stand-in with the four flags on, locally, not in CI`,
   'golive-step':
     '`pass` when the rows gating that step and the steps before it pass in the same run, as `--step N` decides it',
   ci: '"check the release SHA\'s run": the check does not read GitHub',

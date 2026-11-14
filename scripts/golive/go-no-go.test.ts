@@ -133,6 +133,7 @@ describe('the walk states', () => {
             '2-free.spec.ts': ['expected', 'unexpected'],
             '3-pro-trial.spec.ts': ['flaky', 'expected'],
             '4-agency.spec.ts': ['skipped', 'skipped'],
+            '6-v1-urls.spec.ts': ['expected', 'expected'],
             // A file whose name ends journey 5's, which the match must not take for it.
             'settings.spec.ts': ['expected'],
           },
@@ -142,11 +143,13 @@ describe('the walk states', () => {
       expect(lines).toContain(
         '  walk: tests/e2e/results.json, run started 2026-11-14T06:00:00.000Z, on aaaaaaaaaaaa',
       );
-      expect(stateOf(lines, 'walk-1-anonymous')).toBe('passed (2 expected, 1 skipped)');
+      // A skipped test beside passing ones: the journey was not walked whole.
+      expect(stateOf(lines, 'walk-1-anonymous')).toBe('incomplete (2 expected, 1 skipped)');
       expect(stateOf(lines, 'walk-2-free')).toBe('failed (1 expected, 1 unexpected)');
       expect(stateOf(lines, 'walk-3-pro-trial')).toBe('flaky (1 expected, 1 flaky)');
       expect(stateOf(lines, 'walk-4-agency')).toBe('skipped (2 skipped)');
       expect(stateOf(lines, 'walk-5-settings')).toBe('not in tests/e2e/results.json');
+      expect(stateOf(lines, 'walk-6-v1-urls')).toBe('passed (2 expected)');
     }
   });
 
