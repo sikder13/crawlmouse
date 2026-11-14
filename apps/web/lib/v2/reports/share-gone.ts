@@ -1,8 +1,3 @@
-import { createElement } from 'react';
-import { renderToStaticMarkup } from 'react-dom/server';
-import { CrawlmouseMark } from '../../../components/icons/CrawlmouseMark';
-import { SUPPORT_EMAIL } from '../../../components/v2/footer-links';
-
 /**
  * The page a share link that no longer opens answers with (410), drawn as the v2 door's message
  * screens are (Check email, Continue): the app header with the brand, then a centred column with a
@@ -60,7 +55,16 @@ const STYLE = [
   `@media (max-width:760px){.bar,main{padding-left:20px;padding-right:20px}main{padding-top:56px;padding-bottom:72px}h1{font-size:22px}}`,
 ].join('\n');
 
-const MARK = renderToStaticMarkup(createElement(CrawlmouseMark, { size: 24, className: 'mark' }));
+/**
+ * The brand mark as `CrawlmouseMark` renders it at 24px with the class `mark`, written out: this
+ * module is reached from server components and route handlers, where `react-dom/server` cannot be
+ * imported. `share-gone.test.ts` renders the component and checks the two are equal.
+ */
+export const GONE_MARK =
+  '<svg width="24" height="22" viewBox="0 0 48 44" fill="none" class="mark" xmlns="http://www.w3.org/2000/svg"><line x1="12" y1="10" x2="24" y2="26" stroke="#1a1a18" stroke-width="2.2" stroke-linecap="round"></line><line x1="36" y1="10" x2="24" y2="26" stroke="#1a1a18" stroke-width="2.2" stroke-linecap="round"></line><path d="M 32 31 Q 42 33, 45 42" stroke="#1a1a18" stroke-width="2.2" stroke-linecap="round" fill="none"></path><circle cx="12" cy="10" r="5" fill="#ff7849"></circle><circle cx="36" cy="10" r="5" fill="#ff7849"></circle><circle cx="24" cy="26" r="9" fill="#ff7849"></circle><circle cx="20.5" cy="24" r="1.3" fill="#fdfaf5"></circle><circle cx="27.5" cy="24" r="1.3" fill="#fdfaf5"></circle></svg>';
+
+/** The support address, as `components/v2/footer-links.ts` names it (`share-gone.test.ts` checks). */
+export const GONE_SUPPORT = 'support@crawlmouse.com';
 
 /** Static: nothing of the request or the link is in it. */
 export const GONE_PAGE = `<!doctype html>
@@ -76,11 +80,11 @@ ${STYLE}
 </style>
 </head>
 <body>
-<header><div class="bar"><a class="brand" href="/" aria-label="Crawlmouse home">${MARK}<span class="wordmark">crawl<span>mouse</span></span></a></div></header>
+<header><div class="bar"><a class="brand" href="/" aria-label="Crawlmouse home">${GONE_MARK}<span class="wordmark">crawl<span>mouse</span></span></a></div></header>
 <main><section>
 <h1>This link no longer opens</h1>
 <p>It has expired or was withdrawn by the person who shared it. Ask them for a new link.</p>
-<p>Something else: write to <a href="mailto:${SUPPORT_EMAIL}">${SUPPORT_EMAIL}</a>.</p>
+<p>Something else: write to <a href="mailto:${GONE_SUPPORT}">${GONE_SUPPORT}</a>.</p>
 </section></main>
 </body>
 </html>

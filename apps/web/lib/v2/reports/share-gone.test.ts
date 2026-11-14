@@ -4,7 +4,10 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { SUPPORT_EMAIL } from '../../../components/v2/footer-links';
 import { GONE_PAGE } from './share';
-import { GONE_TOKENS } from './share-gone';
+import { GONE_MARK, GONE_SUPPORT, GONE_TOKENS } from './share-gone';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { CrawlmouseMark } from '../../../components/icons/CrawlmouseMark';
 
 const TOKENS = readFileSync(resolve(__dirname, '../../../styles/v2/tokens.css'), 'utf8');
 
@@ -49,5 +52,23 @@ describe('the gone page, in the v2 design', () => {
       'It has expired or was withdrawn by the person who shared it. Ask them for a new link.',
       `Something else: write to <a href="mailto:${SUPPORT_EMAIL}">${SUPPORT_EMAIL}</a>.`,
     ]);
+  });
+});
+
+describe('the constants written out for the server graph (CC-39 review r1, security)', () => {
+  it('the mark is the one CrawlmouseMark renders at 24px', () => {
+    expect(GONE_MARK).toBe(
+      renderToStaticMarkup(createElement(CrawlmouseMark, { size: 24, className: 'mark' })),
+    );
+  });
+
+  it('the support address is the footer’s', () => {
+    expect(GONE_SUPPORT).toBe(SUPPORT_EMAIL);
+  });
+
+  it('the module imports nothing a server component may not', () => {
+    const source = readFileSync(resolve(__dirname, 'share-gone.ts'), 'utf8');
+    const imports = source.split('\n').filter((l) => /^import\b/.test(l));
+    expect(imports.filter((l) => /react-dom\/server|components\//.test(l))).toEqual([]);
   });
 });
