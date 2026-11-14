@@ -8,6 +8,8 @@ import { supabaseSeatsStore } from '../../apps/web/lib/v2/agency/seats-store';
 import { startProTrial } from '../../apps/web/lib/v2/account/pro-trial';
 import { supabaseAddSite } from '../../apps/web/lib/v2/account/sites-store';
 import type { RequestDeps } from '../../apps/web/lib/v2/pipeline/request';
+import { snapshotFromRow, type AccountRow } from '../../apps/web/lib/billing/state-machine-apply';
+import type { BillingAccounts } from './billing';
 import type { ResetStore } from './reset';
 import type { AddOutcome, QaStore, SeatResult, TrialResult } from './seed';
 
@@ -280,6 +282,19 @@ export function qaStore(sb: SupabaseClient, deps: QaStoreDeps): QaStore {
       if (answer.outcome === 'started') return { outcome: 'started' };
       if (answer.outcome === 'not_eligible') return { outcome: 'not_eligible' };
       return { outcome: 'refused', reason: `${answer.outcome}: ${TRIAL_OUTCOMES[answer.outcome]}` };
+    },
+  };
+}
+
+/** `--billing`'s read of an account: its entitlement as the checkout route reads it, and its customer. */
+export function qaBillingAccounts(sb: SupabaseClient): BillingAccounts {
+  return {
+    async read(accountId) {
+      const r = await sb.from('accounts').select('*').eq('id', accountId).maybeSingle();
+      if (r.error) fail('accounts read', r.error);
+      if (!r.data) return null;
+      const row = r.data as AccountRow & { stripe_customer_id: string | null };
+      return { snapshot: snapshotFromRow(row).snapshot, stripeCustomerId: row.stripe_customer_id };
     },
   };
 }
