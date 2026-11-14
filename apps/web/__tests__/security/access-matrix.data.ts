@@ -1440,11 +1440,12 @@ const ENTRIES: readonly Spec[] = [
       v2: true,
       identity: 'holder of an unkept check’s id, or a member of the account that keeps it',
       gate: 'capability',
-      detail: 'A result tab of the check `readableCheck` lets the caller read.',
-      check: at('app/audit/[id]/_lib/access.ts', 'readableCheck'),
+      detail:
+        'A result tab: `ReadyPage` reads the check through `readAudit` → `loadCheckFor`, which asks `readableCheck` first.',
+      check: at('lib/v2/pipeline/load-for.ts', 'readableCheck'),
       proof: by(
-        'app/audit/[id]/_lib/access.test.ts',
-        'is false for a kept check read by a visitor, and asks membership for a signed-in reader',
+        '__tests__/security/audit-read-by-role.test.ts',
+        'a visitor holding the id, another account’s member, a removed seat and a developer on the other client read nothing',
       ),
     }),
   ),
