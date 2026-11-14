@@ -1,5 +1,5 @@
 import { expect, test } from './pw';
-import { control, NEEDS_SEED, qa, SEEDED, shot, signIn, sql } from './walk';
+import { control, holdStripe, NEEDS_SEED, qa, SEEDED, shot, signIn, sql } from './walk';
 
 /**
  * Journey 3 (CC-38 D4): `qa+protrial`, on the no-card Pro trial qa:seed started, upgrades. The walk
@@ -31,17 +31,10 @@ test('Pro trial → upgrade (the redirect, then the webhook) → Pro', async ({ 
   await page.goto('/settings/plan');
   await shot(page, J, 'plan-trial');
 
-  // Up to Checkout's redirect: the request the app makes, and where it sends the browser.
-  const checkout = page.waitForResponse(
-    (r) => r.request().method() === 'POST' && r.url().includes('/api/billing/checkout'),
-  );
-  // Stripe's page is answered here, so the browser leaves nothing for Stripe's real host.
-  await page.route('https://checkout.stripe.com/**', (route) =>
-    route.fulfill({ status: 200, contentType: 'text/html', body: '<h1>Stripe Checkout</h1>' }),
-  );
+  // Up to Checkout's redirect: where the app sends the browser, held here (walk.ts holdStripe).
+  const stripe = await holdStripe(page);
   await page.getByRole('button', { name: /Pro/ }).first().click();
-  expect((await checkout).status()).toBe(303);
-  await page.waitForURL(/^https:\/\/checkout\.stripe\.com\/c\/pay\//);
+  await expect.poll(() => stripe.at(-1)).toMatch(/^https:\/\/checkout\.stripe\.com\/c\/pay\//);
   await shot(page, J, 'checkout-redirect');
 
   const sessions =
@@ -100,15 +93,9 @@ test('Pro: cancel (two clicks), then restore through the billing portal', async 
   await shot(page, J, 'plan-cancelled');
 
   // Restore: the billing portal (Stripe's page) renews it, and Stripe's update comes back.
-  await page.route('https://billing.stripe.com/**', (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: 'text/html',
-      body: '<h1>Stripe billing portal</h1>',
-    }),
-  );
+  const portal = await holdStripe(page);
   await page.getByRole('button', { name: 'Billing portal' }).click();
-  await page.waitForURL(/^https:\/\/billing\.stripe\.com\//);
+  await expect.poll(() => portal.at(-1)).toMatch(/^https:\/\/billing\.stripe\.com\//);
   const renewed = await control<{ status: number }>('renew', { subscription });
   expect(renewed.status).toBe(200);
   await page.goto('/settings/plan');

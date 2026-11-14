@@ -50,3 +50,41 @@ export async function shot(page: Page, journey: string, name: string): Promise<v
     fullPage: true,
   });
 }
+
+/**
+ * Stripe's pages stay unvisited. A form POST the app answers with a 303 to Stripe (Checkout, the
+ * billing portal) is answered here without following the redirect — Playwright's routes do not see
+ * a request a redirect makes — and its `Location` is recorded; a navigation to a stripe.com host (a
+ * JSON answer the page follows with `location.assign`) is fulfilled here. Returns where the app sent
+ * the browser, newest last.
+ */
+export async function holdStripe(page: Page): Promise<string[]> {
+  const sent: string[] = [];
+  const page_ = (where: string) =>
+    `<!doctype html><title>Stripe (walk)</title><h1>Stripe, not visited</h1><p>${where}</p>`;
+  for (const path of ['**/api/billing/checkout', '**/api/billing/portal']) {
+    await page.route(path, async (route) => {
+      const response = await route.fetch({ maxRedirects: 0 });
+      const location = response.headers()['location'];
+      if (
+        response.status() === 303 &&
+        location &&
+        /^https:\/\/[a-z.]*stripe\.com\//.test(location)
+      ) {
+        sent.push(location);
+        await route.fulfill({ status: 200, contentType: 'text/html', body: page_(location) });
+      } else {
+        await route.fulfill({ response });
+      }
+    });
+  }
+  await page.route(/^https:\/\/([a-z-]+\.)*stripe\.com\//, async (route) => {
+    sent.push(route.request().url());
+    await route.fulfill({
+      status: 200,
+      contentType: 'text/html',
+      body: page_(route.request().url()),
+    });
+  });
+  return sent;
+}

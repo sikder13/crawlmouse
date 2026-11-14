@@ -1,6 +1,6 @@
 import { expect, test, type Page } from './pw';
 import { QA_HOSTS } from '../../scripts/qa/accounts';
-import { control, events, NEEDS_SEED, qa, SEEDED, shot, signIn, sql } from './walk';
+import { control, events, holdStripe, NEEDS_SEED, qa, SEEDED, shot, signIn, sql } from './walk';
 
 /**
  * Journey 4 (CC-38 D4): `qa+agencytrial` starts the Agency trial (card taken at Checkout, then the
@@ -37,9 +37,8 @@ test('the Agency trial starts through Checkout and the webhook', async ({ page, 
   expect((await agency()).state).toBe('free');
   await page.goto('/agency-trial');
   await shot(page, J, 'agency-trial');
-  await page.route('https://checkout.stripe.com/**', (route) =>
-    route.fulfill({ status: 200, contentType: 'text/html', body: '<h1>Stripe Checkout</h1>' }),
-  );
+  // Stripe's page stays unvisited (walk.ts holdStripe).
+  const stripe = await holdStripe(page);
   const asked = page.waitForResponse(
     (r) => r.request().method() === 'POST' && r.url().includes('/api/agency-trial'),
   );
@@ -50,7 +49,8 @@ test('the Agency trial starts through Checkout and the webhook', async ({ page, 
   await page.getByRole('checkbox', { name: /I agree that after 14 days/ }).check();
   await page.getByRole('button', { name: 'Start a 14-day trial' }).click();
   expect((await asked).status()).toBeLessThan(400);
-  await page.waitForURL(/^https:\/\/checkout\.stripe\.com\/c\/pay\//);
+  await expect.poll(() => stripe.at(-1)).toMatch(/^https:\/\/checkout\.stripe\.com\/c\/pay\//);
+  await shot(page, J, 'checkout-redirect');
 
   const sessions =
     await control<{ id: string; params: Record<string, unknown>; status: string }[]>('sessions');
