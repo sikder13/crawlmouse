@@ -10,7 +10,8 @@
  * reference to `captureServerEvent` is accepted as a call, an import, a `typeof`, or the value of a
  * binding typed `typeof captureServerEvent` whose own references are read the same way; any other
  * reference (a structural alias, `.call`, `.bind`, an argument) is refused, because a call made
- * through it is not seen. The calls are then read for their subject.
+ * through it is not seen. The calls are then read for their subject; an `accountId` that can only
+ * be null or undefined names no account.
  *
  * What it cannot see: whether a nullable `accountId` is filled when it could be; a sender other than
  * `captureServerEvent` (`lib/security/refusal-event.ts` is the other one, and names no account).
@@ -154,6 +155,20 @@ export function viewed(slug: string, capture: typeof captureServerEvent = captur
   're-export.ts': `
 export { captureServerEvent as send } from './lib/analytics-server';
 `,
+  'null-account.ts': `
+import { captureServerEvent } from './lib/analytics-server';
+export const a = (ref: string) =>
+  captureServerEvent(null, { event: 'x', distinctId: \`check:\${ref}\`, accountId: null });
+export const b = (ref: string) =>
+  captureServerEvent(null, { event: 'x', distinctId: \`check:\${ref}\`, accountId: undefined });
+const none = null;
+export const c = (ref: string) =>
+  captureServerEvent(null, { event: 'x', distinctId: \`check:\${ref}\`, accountId: none });
+export const d = (ref: string) =>
+  captureServerEvent(null, { event: 'x', distinctId: \`check:\${ref}\`, accountId: null as null });
+export const e = (id: string) =>
+  captureServerEvent(null, { event: 'x', distinctId: \`account:\${id}\`, accountId: null });
+`,
   'accepted.ts': `
 import { captureServerEvent } from './lib/analytics-server';
 import * as analytics from './lib/analytics-server';
@@ -215,6 +230,17 @@ describe('CC-38 D3: the reading refuses a send it cannot follow (fixture program
   ])('%s: the escaping reference is refused at line %i', (file, line) => {
     const refused = at(file).filter((c) => !c.ok && c.subject.startsWith('escape:'));
     expect(refused.map((c) => c.at)).toEqual([`${file}:${line}`]);
+  });
+
+  it('null-account.ts: a literal null, a literal undefined and a null-typed accountId are refused', () => {
+    expect(at('null-account.ts').map((c) => [c.at, c.ok, c.subject])).toEqual([
+      ['null-account.ts:4', false, 'accountId is a literal null; `check:…`'],
+      ['null-account.ts:6', false, 'accountId is a literal undefined; `check:…`'],
+      ['null-account.ts:9', false, "accountId's type is null; `check:…`"],
+      ['null-account.ts:11', false, 'accountId is a literal null; `check:…`'],
+      // A null accountId beside an account distinct id: the distinct id names the account.
+      ['null-account.ts:13', true, 'accountId is a literal null; `account:…`'],
+    ]);
   });
 
   it('accepted.ts: a direct call, a namespace call, a typed binding and an accountId pass', () => {

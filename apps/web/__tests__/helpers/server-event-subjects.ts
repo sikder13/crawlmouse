@@ -16,7 +16,9 @@
  *    `captureServerEvent`'s signature, so pass 2 would not see it; pass 1 is what catches it.
  * 2. Calls. Every call whose resolved signature is `captureServerEvent`'s declaration (a direct call,
  *    or one through a binding typed `typeof captureServerEvent`). Its event object is read:
- *    - `accountId` present is accepted (its value is not read);
+ *    - `accountId` is accepted unless it is a literal `null`, `undefined` or `void …`, or its type has
+ *      nothing but null / undefined in it. A nullable `string | null` is accepted: a check no account
+ *      keeps has none to name (Q17). A refused `accountId` falls through to the distinct id.
  *    - the distinct id: a template starting `account:` or `seat:`; `x === null ? <none> : <accepted>`
  *      (or `!==` the other way round), the set branch interpolating `x`; a parameter of the function
  *      around the call makes it a wrapper, whose callers are read at that argument, at any depth.
@@ -115,6 +117,36 @@ function wrapperSignature(
     if (decl) return decl;
   }
   return fn;
+}
+
+/** Parentheses, `as`, `satisfies`, `!` and `<T>x` removed. */
+function bare(e: ts.Expression): ts.Expression {
+  for (;;) {
+    if (
+      ts.isParenthesizedExpression(e) ||
+      ts.isAsExpression(e) ||
+      ts.isSatisfiesExpression(e) ||
+      ts.isNonNullExpression(e) ||
+      ts.isTypeAssertionExpression(e)
+    )
+      e = e.expression;
+    else return e;
+  }
+}
+
+const NOTHING = ts.TypeFlags.Null | ts.TypeFlags.Undefined | ts.TypeFlags.Void | ts.TypeFlags.Never;
+
+/** Why an `accountId` expression names no account, or undefined when it can name one. */
+function emptyAccountId(checker: ts.TypeChecker, expr: ts.Expression): string | undefined {
+  const e = bare(expr);
+  if (e.kind === ts.SyntaxKind.NullKeyword) return 'accountId is a literal null';
+  if (ts.isIdentifier(e) && e.text === 'undefined') return 'accountId is a literal undefined';
+  if (ts.isVoidExpression(e)) return 'accountId is void';
+  const type = checker.getTypeAtLocation(e);
+  const parts = type.isUnion() ? type.types : [type];
+  if (parts.every((t) => (t.flags & NOTHING) !== 0))
+    return `accountId's type is ${checker.typeToString(type)}`;
+  return undefined;
 }
 
 export function enumerate(p: ts.Program, tree: Tree): Call[] {
@@ -303,16 +335,23 @@ export function enumerate(p: ts.Program, tree: Tree): Call[] {
           : ts.isShorthandPropertyAssignment(p)
             ? p.name
             : undefined;
-    if (valueOf(prop('accountId')) !== undefined) {
+    const account = valueOf(prop('accountId'));
+    const emptyAccount = account === undefined ? undefined : emptyAccountId(checker, account);
+    if (account !== undefined && emptyAccount === undefined) {
       out.push({ at: where(c), ok: true, subject: 'accountId' });
       continue;
     }
     const expr = valueOf(prop('distinctId'));
     if (expr === undefined) {
-      out.push({ at: where(c), ok: false, subject: 'no distinctId' });
+      out.push({ at: where(c), ok: false, subject: emptyAccount ?? 'no distinctId' });
       continue;
     }
-    for (const r of subject(expr, c)) out.push({ at: where(c), ...r });
+    for (const r of subject(expr, c))
+      out.push({
+        at: where(c),
+        ok: r.ok,
+        subject: emptyAccount ? `${emptyAccount}; ${r.subject}` : r.subject,
+      });
   }
   return out;
 }
