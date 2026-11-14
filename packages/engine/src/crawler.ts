@@ -210,7 +210,10 @@ function isRobotsRefusal(err: unknown): boolean {
  * `request.noRetry` is the layer that actually works: Crawlee consults the flag on the request AFTER
  * the errorHandler runs, so it is unaffected by got having replaced the error's class.
  */
-function markNoRetryOnRobotsRefusal(ctx: { request: { noRetry?: boolean } }, error: unknown): boolean {
+function markNoRetryOnRobotsRefusal(
+  ctx: { request: { noRetry?: boolean } },
+  error: unknown,
+): boolean {
   if (!isRobotsRefusal(error)) return false;
   ctx.request.noRetry = true;
   return true;
@@ -233,8 +236,18 @@ function markNoRetryOnRobotsRefusal(ctx: { request: { noRetry?: boolean } }, err
  */
 function isTimeoutFailure(err: unknown): boolean {
   for (let e: unknown = err, hops = 0; e && hops < 5; hops++) {
-    const o = e as { constructor?: { name?: string }; name?: string; code?: string; cause?: unknown };
-    if (o.constructor?.name === 'TimeoutError' || o.name === 'TimeoutError' || o.code === 'ETIMEDOUT') return true;
+    const o = e as {
+      constructor?: { name?: string };
+      name?: string;
+      code?: string;
+      cause?: unknown;
+    };
+    if (
+      o.constructor?.name === 'TimeoutError' ||
+      o.name === 'TimeoutError' ||
+      o.code === 'ETIMEDOUT'
+    )
+      return true;
     e = o.cause;
   }
   return false;
@@ -337,10 +350,13 @@ export function ensureCrawleeMemoryHint(platform: string = process.platform): vo
   if (platform !== 'linux') return;
   // globalThis.process.env is the real Node env the externalized crawlee reads (proven live: writing
   // only the bundle-local process.env did NOT stop the `ps` spawn; writing through globalThis did).
-  const realEnv = (globalThis as typeof globalThis & { process?: { env?: Record<string, string | undefined> } })
-    .process?.env;
-  if (realEnv && !realEnv.AWS_LAMBDA_FUNCTION_MEMORY_SIZE) realEnv.AWS_LAMBDA_FUNCTION_MEMORY_SIZE = '3008';
-  if (!process.env.AWS_LAMBDA_FUNCTION_MEMORY_SIZE) process.env.AWS_LAMBDA_FUNCTION_MEMORY_SIZE = '3008';
+  const realEnv = (
+    globalThis as typeof globalThis & { process?: { env?: Record<string, string | undefined> } }
+  ).process?.env;
+  if (realEnv && !realEnv.AWS_LAMBDA_FUNCTION_MEMORY_SIZE)
+    realEnv.AWS_LAMBDA_FUNCTION_MEMORY_SIZE = '3008';
+  if (!process.env.AWS_LAMBDA_FUNCTION_MEMORY_SIZE)
+    process.env.AWS_LAMBDA_FUNCTION_MEMORY_SIZE = '3008';
 }
 
 /**
@@ -475,8 +491,11 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
   const crawlDelaySec = input.robots ? getCrawlDelay(input.robots, ROBOTS_UA) : undefined;
   // A declared robots crawl-delay means "crawl me serially with this gap": honor it as a floor
   // (cap 1 + sameDomainDelaySecs) instead of running the adaptive ramp.
-  const honorCrawlDelay = input.politeCrawl === true && typeof crawlDelaySec === 'number' && crawlDelaySec > 0;
-  const aimdCeiling = honorCrawlDelay ? 1 : Math.min(AIMD_CEILING_CONCURRENCY, input.perHostConcurrency);
+  const honorCrawlDelay =
+    input.politeCrawl === true && typeof crawlDelaySec === 'number' && crawlDelaySec > 0;
+  const aimdCeiling = honorCrawlDelay
+    ? 1
+    : Math.min(AIMD_CEILING_CONCURRENCY, input.perHostConcurrency);
   const aimdStart = Math.min(AIMD_START_CONCURRENCY, aimdCeiling);
   const aimdFloor = Math.min(AIMD_MIN_CONCURRENCY, aimdCeiling);
   // Honor a declared crawl-delay as a minimum inter-request gap, enforced in the preNavigationHook
@@ -496,12 +515,19 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
   // there; it nets future no-budget callers (e.g. the v1.2 CLI) and the backtest's negative-budget edge.
   const usesV2CrawlPath = input.politeCrawl === true || input.deterministicFrontier === true;
   const noBudgetFloorMs =
-    input.crawlMsFloorForTesting && input.crawlMsFloorForTesting > 0 ? input.crawlMsFloorForTesting : V2_NO_BUDGET_FLOOR_MS;
+    input.crawlMsFloorForTesting && input.crawlMsFloorForTesting > 0
+      ? input.crawlMsFloorForTesting
+      : V2_NO_BUDGET_FLOOR_MS;
   const effectiveMaxCrawlMs =
-    input.maxCrawlMs && input.maxCrawlMs > 0 ? input.maxCrawlMs : usesV2CrawlPath ? noBudgetFloorMs : input.maxCrawlMs;
+    input.maxCrawlMs && input.maxCrawlMs > 0
+      ? input.maxCrawlMs
+      : usesV2CrawlPath
+        ? noBudgetFloorMs
+        : input.maxCrawlMs;
   // The crawl deadline bounds every backoff (a hostile Retry-After can't hang a slot) and is the
   // point the crawl stops gracefully under politeCrawl.
-  const crawlDeadline = effectiveMaxCrawlMs && effectiveMaxCrawlMs > 0 ? Date.now() + effectiveMaxCrawlMs : Infinity;
+  const crawlDeadline =
+    effectiveMaxCrawlMs && effectiveMaxCrawlMs > 0 ? Date.now() + effectiveMaxCrawlMs : Infinity;
   // AIMD controller, created lazily once Crawlee's autoscaled pool exists (after run() starts). Under
   // the deterministic frontier (T4) the crawl re-runs once PER LEVEL and Crawlee recreates the pool on
   // each run(), so re-bind the controller to the live pool whenever it changes. On the legacy single-run
@@ -512,7 +538,12 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
     if (!input.politeCrawl) return;
     const pool = c.autoscaledPool;
     if (!pool || pool === aimdPool) return;
-    aimd = new AimdController(pool, { start: aimdStart, ceiling: aimdCeiling, floor: aimdFloor, successStep: AIMD_SUCCESS_STEP });
+    aimd = new AimdController(pool, {
+      start: aimdStart,
+      ceiling: aimdCeiling,
+      floor: aimdFloor,
+      successStep: AIMD_SUCCESS_STEP,
+    });
     aimdPool = pool;
   };
 
@@ -542,7 +573,9 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
         if (crawlDelayMs > 0) {
           const now = Date.now();
           const budgetRemaining =
-            crawlDeadline === Infinity ? Infinity : Math.max(0, crawlDeadline - now - BACKOFF_BUDGET_SLACK_MS);
+            crawlDeadline === Infinity
+              ? Infinity
+              : Math.max(0, crawlDeadline - now - BACKOFF_BUDGET_SLACK_MS);
           const wait = Math.min(Math.max(0, nextAllowedStart - now), budgetRemaining);
           nextAllowedStart = now + wait + crawlDelayMs;
           if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
@@ -552,7 +585,9 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
           ...(input.extraHeaders ?? {}),
         };
         if (input.basicAuth) {
-          const token = Buffer.from(`${input.basicAuth.username}:${input.basicAuth.password}`).toString('base64');
+          const token = Buffer.from(
+            `${input.basicAuth.username}:${input.basicAuth.password}`,
+          ).toString('base64');
           gotOptions.headers['Authorization'] = `Basic ${token}`;
         }
         // Politeness is now enforced by BOUNDED CONCURRENCY (maxConcurrency below),
@@ -596,12 +631,15 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
       // SPEC 02 (v2): a same-host request that 302-redirected to a DIFFERENT host (Jetpack share
       // endpoints, /out?url= shorteners, affiliate links) has left the site — don't record it or
       // follow its links. SSRF/safe-fetch unchanged: this gates what we RECORD, not what we validate.
-      if (input.excludeCrossHost && !sameHostIgnoringWww(new URL(loadedUrl), new URL(request.url))) return;
+      if (input.excludeCrossHost && !sameHostIgnoringWww(new URL(loadedUrl), new URL(request.url)))
+        return;
       // Single-parse: Crawlee already parsed the response body into `$` (a cheerio
       // root). Pass that object straight to extractPage instead of re-serializing it
       // with `$.html()` and letting extractPage re-run `cheerio.load` — that
       // double-parse roughly doubled the per-page CPU cost for no behavioral gain.
-      const extracted = extractPage($, loadedUrl, { excludeNonContentLinks: input.excludeCrossHost });
+      const extracted = extractPage($, loadedUrl, {
+        excludeNonContentLinks: input.excludeCrossHost,
+      });
       // §2 rel=canonical (v2): store a canonicalised-away page under its declared canonical identity
       // (same-host only — enforced in extractPage) so it is not counted as a separate node. v1 and
       // self-canonical pages keep their own loaded URL as the identity.
@@ -610,7 +648,9 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
       // `pages`, in the findings and on the public report. Same harm, reached without a request. When
       // the declared canonical is disallowed we keep the page's own URL.
       const canonicalOk =
-        input.respectRelCanonical && extracted.canonicalUrl && isUrlAllowed(robots, extracted.canonicalUrl);
+        input.respectRelCanonical &&
+        extracted.canonicalUrl &&
+        isUrlAllowed(robots, extracted.canonicalUrl);
       const identitySource = canonicalOk ? extracted.canonicalUrl! : loadedUrl;
       const pageUrl = pin(identitySource);
       const statusCode = response.statusCode ?? 0;
@@ -634,14 +674,20 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
       if (input.onActivity) {
         const outcome = classifyFetchOutcome(statusCode);
         emit({
-          kind: outcome === 'ok' ? 'fetch_ok' : outcome === 'blocked' ? 'fetch_blocked' : 'fetch_dead',
+          kind:
+            outcome === 'ok' ? 'fetch_ok' : outcome === 'blocked' ? 'fetch_blocked' : 'fetch_dead',
           label: activityPath(pageUrl),
           pagesFetched: pages.size,
         });
       }
 
       for (const link of extracted.links) {
-        links.push({ fromUrl: pageUrl, toUrl: pin(link.toUrl), anchorText: link.anchorText, isGenericAnchor: link.isGenericAnchor });
+        links.push({
+          fromUrl: pageUrl,
+          toUrl: pin(link.toUrl),
+          anchorText: link.anchorText,
+          isGenericAnchor: link.isGenericAnchor,
+        });
       }
 
       // Enqueue links the site's robots.txt does not disallow. extractPage has already
@@ -670,7 +716,8 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
       const url = pin(request.url);
       if (!pages.has(url)) {
         pages.set(url, { url, urlHash: hashUrl(url), statusCode: 0 });
-        if (input.onActivity) emit({ kind: 'fetch_dead', label: activityPath(url), pagesFetched: pages.size });
+        if (input.onActivity)
+          emit({ kind: 'fetch_dead', label: activityPath(url), pagesFetched: pages.size });
       }
     },
   };
@@ -683,7 +730,10 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
     crawlerOptions.additionalHttpErrorStatusCodes = [...BLOCKED_RETRY_STATUS_CODES];
     // AIMD-driven concurrency: start at `aimdStart`; the controller raises the cap toward the
     // (tier-clamped) ceiling and halves it on a throttle. Replaces the static v1 maxConcurrency.
-    crawlerOptions.autoscaledPoolOptions = politeAutoscaledPoolOptions({ start: aimdStart, floor: aimdFloor });
+    crawlerOptions.autoscaledPoolOptions = politeAutoscaledPoolOptions({
+      start: aimdStart,
+      floor: aimdFloor,
+    });
     // (A declared robots crawl-delay is honored as a serialized inter-request gap in the
     // preNavigationHook above — not via Crawlee's IP-skipping sameDomainDelaySecs.)
     // Reactive backoff lives ONLY here — off the navigation hot path, throttle-only — so it never
@@ -717,7 +767,10 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
     crawlerOptions.maxConcurrency = input.perHostConcurrency;
   }
 
-  const crawler = new CheerioCrawler(crawlerOptions, new Configuration({ persistStorage: false, purgeOnStart: true }));
+  const crawler = new CheerioCrawler(
+    crawlerOptions,
+    new Configuration({ persistStorage: false, purgeOnStart: true }),
+  );
 
   // T4 deterministic frontier (v2): drain the crawl in strict (depth ASC, canonicalUrl ASC) order by
   // fetching one BFS level at a time, so the page cap always selects the same subset run-to-run. Each
@@ -798,7 +851,10 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
       const batchDepth = Math.min(...selection.selected.map((id) => everDiscovered.get(id) ?? 0));
       frontierBuffer.length = 0; // the requestHandler fills this with THIS batch's children
       const remainingMs = crawlDeadline === Infinity ? undefined : crawlDeadline - Date.now();
-      if (remainingMs !== undefined && remainingMs <= 0) { budgetHitFingerprint(); return true; }
+      if (remainingMs !== undefined && remainingMs <= 0) {
+        budgetHitFingerprint();
+        return true;
+      }
       // ROUND CLOCK. The batch bound limits how many URLs a round CONSUMES; this limits how much time
       // it SPENDS, and neither can do the other's job — the cost of a stalled URL is per URL, so a
       // round of dead paths burns the whole crawl no matter how the batch is sized (measured: 25 URLs,
@@ -808,7 +864,9 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
       // expiry would surface as a crawl FAILURE, which is the opposite of what bounding a round is for.
       const roundBudgetMs = input.frontierRoundBudgetMsForTesting ?? FRONTIER_ROUND_BUDGET_MS;
       const roundMs =
-        input.politeCrawl && remainingMs !== undefined ? Math.min(remainingMs, roundBudgetMs) : remainingMs;
+        input.politeCrawl && remainingMs !== undefined
+          ? Math.min(remainingMs, roundBudgetMs)
+          : remainingMs;
       const hitRoundBudget = await runWithWallClock(crawler, batch, roundMs, input.politeCrawl);
       for (const child of frontierBuffer) discover(child, batchDepth + 1);
       if (hitRoundBudget) {
@@ -819,7 +877,10 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
         // A ROUND expiry is not the end of the crawl: re-select and spend what is left on the rest of
         // the frontier. Only the GLOBAL clock ends it — which is also the case when the round clock WAS
         // the global one, compared directly so a millisecond of drift cannot misclassify it.
-        if (roundMs === remainingMs || (crawlDeadline !== Infinity && Date.now() >= crawlDeadline)) {
+        if (
+          roundMs === remainingMs ||
+          (crawlDeadline !== Infinity && Date.now() >= crawlDeadline)
+        ) {
           budgetHitFingerprint();
           return true;
         }
