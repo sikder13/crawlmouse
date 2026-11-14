@@ -29,9 +29,12 @@ role (owner, account manager, developer) may do; anonymous reads go through capa
 - A service-role client is counted by binding (`adminCalls`): anything imported from `lib/supabase/admin`, under any
   name or through a namespace, and `createClient` given `SUPABASE_SERVICE_ROLE_KEY` directly, by element access or
   through a local variable. A module that opens its own client counts as a data source for the entry-file walk.
-- A row's check is an AST call whose result is used (`markerCalls`): a bare statement, `void` or a binding never read
-  does not count, and a string counts only as `.rpc('<name>')` or the filter the row names (`.eq('audit_id', …)`).
-- A row's proof is one `it`/`test` that runs, matched by its whole title (`it.each` rendered from a literal table), in
+- A row's check is an AST call whose answer is read (`markerCalls`): a bare statement, `void`, a binding whose name is
+  not read elsewhere in the file, or a result of which only the `error` is read (`{ data: allowed, error }` with
+  `allowed` unread, `res.error`, `(await …).error`) does not count, and a string counts only as `.rpc('<name>')` or the
+  filter the row names (`.eq('audit_id', …)`).
+- A row's proof is one `it`/`test` that runs (not one inside a `describe`/`suite` marked `.skip`, `.todo`, `.only`,
+  `.skipIf` or `.runIf`), matched by its whole title (`it.each` rendered from a literal table), in
   a file whose imports reach the row's file or its check's file. A `caller` row is proved by the matrix's caller
   check, which follows each chain of importers to a row with another gate and refuses a cycle; a `public` end counts
   only where the row states why (`publicCallers`).
