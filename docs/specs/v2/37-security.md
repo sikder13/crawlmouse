@@ -83,14 +83,23 @@ A-4 `app/api/auth/magic-link/route.ts`; A-5 `app/api/takedown/route.ts`; A-10 `a
 A-1 `app/api/audits/[id]/stream/route.ts`; CSP `lib/security/headers.mjs` (report-only `script-src`); C-7 the go-live
 row `stripe-reconcile-livemode-true`. C-5 was already the auto row `vercel-env-step-1`.
 
+A-5's order holds for a request with a known client IP. With no client IP, the per-domain bucket is spent once, before
+the lookup, so such posts are bounded per domain but not across domains; on Vercel every request carries the client
+IP, so that case is not reached in production (review r2 n2).
+
 ## Deploy order
 
-Three stages, in this order; the owner applies the migrations (`__tests__/v2-037-card-grant.test.ts` walks the stages):
+As the repo's pipeline runs it (`docs/ops/db-migrations.md`): merging deploys the app, and `db-apply-prod.yml` then
+applies every pending file in one push, in name order, after the owner approves it
+(`scripts/db/production.ts` `manifestProblems`). So:
 
-1. `20261115000001` (CC-33), when it is on `main`, then `20261117000001`. The shipped app needs both: the mint asks
-   `seat_may(…, 'mint_report')`, which raises before `20261117000001`, and Pricing and the Agency trial page read
-   `accounts.internal`, which `20261117000001` adds when CC-33's file has not. The app still live reads `card_last4`
-   through the session, which still works.
-2. Deploy the app.
-3. `20261118000001`: `authenticated` loses `card_last4`. Applied before the deploy, the live app's account and
-   Settings reads fail.
+1. Merge. Vercel deploys the app.
+2. One apply of every pending file: `20261115000001` (CC-33, once it is on `main`), `20261117000001`, `20261118000001`.
+
+Between 1 and 2 the new app runs on the old schema. The two reads that need `20261117000001` sit behind flags that are
+off until later go-live steps: the v2 mint asks `seat_may(…, 'mint_report')`, which raises before that file
+(`V2_CHECKS_PUBLIC`, step 4), and Pricing and the Agency trial page read `accounts.internal`, which that file adds
+(`V2_BILLING`, step 5; both pages are a 404 with it off). The go-live row `migrations-applied` gates step 2, so both
+flags stay off until every file is applied. The account and Settings pages read `card_last4` with the service role,
+so `20261118000001` cannot break them, and inside the apply it runs after `20261117000001`.
+`__tests__/v2-037-card-grant.test.ts` walks the schema through these stages.
