@@ -12,6 +12,8 @@
     "smoke": "tsx scripts/smoke-crawl.ts",
     "backtest": "tsx scripts/backtest-engine.ts",
     "golive:check": "pnpm --filter @crawlmouse/scripts golive:check --",
+    "qa:seed": "pnpm --filter @crawlmouse/scripts qa:seed --",
+    "qa:reset": "pnpm --filter @crawlmouse/scripts qa:reset --",
     "indexnow": "node scripts/indexnow-ping.mjs",
     "research:build-panel": "tsx scripts/research/cf-panel/build-panel.ts",
     "research:snapshot": "tsx scripts/research/cf-panel/snapshot.ts",

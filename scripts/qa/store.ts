@@ -8,6 +8,9 @@ import { supabaseSeatsStore } from '../../apps/web/lib/v2/agency/seats-store';
 import { startProTrial } from '../../apps/web/lib/v2/account/pro-trial';
 import { supabaseAddSite } from '../../apps/web/lib/v2/account/sites-store';
 import type { RequestDeps } from '../../apps/web/lib/v2/pipeline/request';
+import { snapshotFromRow, type AccountRow } from '../../apps/web/lib/billing/state-machine-apply';
+import type { BillingAccounts } from './billing';
+import type { ResetStore } from './reset';
 import type { AddOutcome, QaStore, SeatResult, TrialResult } from './seed';
 
 /**
@@ -61,7 +64,17 @@ interface LimitsRow {
 
 export function qaStore(sb: SupabaseClient, deps: QaStoreDeps): QaStore {
   const seats = supabaseSeatsStore(sb);
-  const addSite = supabaseAddSite(sb, deps.send);
+  // A send that throws after add_site's insert would leave the site added and the seed stopped; it
+  // is caught here and reported with the site instead, as the queued check is the reaper's to fail.
+  let unsent: string | undefined;
+  const addSite = supabaseAddSite(sb, async (event) => {
+    try {
+      return await deps.send(event);
+    } catch (e) {
+      unsent = e instanceof Error ? e.message : String(e);
+      return undefined;
+    }
+  });
   const door = supabaseDoorStore(sb);
 
   async function hosts(accountId: string): Promise<string[]> {
@@ -149,7 +162,7 @@ export function qaStore(sb: SupabaseClient, deps: QaStoreDeps): QaStore {
 
     hosts,
 
-    async addSite(seat, host, userId): Promise<AddOutcome> {
+    async addSite(seat, host, userId): Promise<{ outcome: AddOutcome; unsent?: string }> {
       if (!(await deps.admit(host)))
         throw new Error(`qa:seed: ${host} is refused by the SSRF guard`);
       const a = await sb
@@ -174,6 +187,7 @@ export function qaStore(sb: SupabaseClient, deps: QaStoreDeps): QaStore {
         now,
       );
       const first = (await hosts(seat.accountId)).length === 0;
+      unsent = undefined;
       // As POST /api/sites calls it (app/api/sites/route.ts).
       const r = await addSite({
         accountId: seat.accountId,
@@ -186,11 +200,12 @@ export function qaStore(sb: SupabaseClient, deps: QaStoreDeps): QaStore {
       });
       switch (r.outcome) {
         case 'created':
+          return unsent === undefined ? { outcome: 'created' } : { outcome: 'created', unsent };
         case 'exists':
         case 'full':
-          return r.outcome;
+          return { outcome: r.outcome };
         default:
-          return 'capped';
+          return { outcome: 'capped' };
       }
     },
 
@@ -267,6 +282,47 @@ export function qaStore(sb: SupabaseClient, deps: QaStoreDeps): QaStore {
       if (answer.outcome === 'started') return { outcome: 'started' };
       if (answer.outcome === 'not_eligible') return { outcome: 'not_eligible' };
       return { outcome: 'refused', reason: `${answer.outcome}: ${TRIAL_OUTCOMES[answer.outcome]}` };
+    },
+  };
+}
+
+/** `--billing`'s read of an account: its entitlement as the checkout route reads it, and its customer. */
+export function qaBillingAccounts(sb: SupabaseClient): BillingAccounts {
+  return {
+    async read(accountId) {
+      const r = await sb.from('accounts').select('*').eq('id', accountId).maybeSingle();
+      if (r.error) fail('accounts read', r.error);
+      if (!r.data) return null;
+      const row = r.data as AccountRow & { stripe_customer_id: string | null };
+      return { snapshot: snapshotFromRow(row).snapshot, stripeCustomerId: row.stripe_customer_id };
+    },
+  };
+}
+
+/** qa:reset's port: D2's table, and its guarded function (migration 20261117000002). */
+export function qaResetStore(sb: SupabaseClient): ResetStore {
+  return {
+    async marked() {
+      const r = await sb
+        .from('qa_accounts')
+        .select('account_id, qa_key')
+        .order('created_at', { ascending: true })
+        .order('account_id', { ascending: true });
+      if (r.error) fail('qa_accounts read', r.error);
+      return ((r.data ?? []) as { account_id: string; qa_key: string }[]).map((x) => ({
+        accountId: x.account_id,
+        key: x.qa_key,
+      }));
+    },
+    async reset(accountId) {
+      const { data, error } = await sb.rpc('qa_reset', { p_account: accountId });
+      if (error) {
+        // 42501: the function's own refusal (no qa_accounts row, or the account is not internal).
+        if (error.code === '42501') return { refused: error.message };
+        fail('qa_reset', error);
+      }
+      const n = data as { sites: number; seats: number };
+      return { sites: n.sites, seats: n.seats };
     },
   };
 }

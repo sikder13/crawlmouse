@@ -7,7 +7,9 @@
     "smoke": "tsx smoke-crawl.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "golive:check": "tsx golive/check.ts"
+    "golive:check": "tsx golive/check.ts",
+    "qa:seed": "tsx --import ./qa/server-only-hook.mjs qa/cli.ts seed",
+    "qa:reset": "tsx --import ./qa/server-only-hook.mjs qa/cli.ts reset"
   },
   "dependencies": {
     "@crawlmouse/engine": "workspace:*",
