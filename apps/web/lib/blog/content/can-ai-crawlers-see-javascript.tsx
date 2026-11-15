@@ -2,6 +2,7 @@ import Link from 'next/link';
 import type { Route } from 'next';
 import { JsonLd, faqLd } from '../../seo/jsonld';
 import type { FaqItem } from '../../seo/faq';
+import { PostSource } from '../post-source';
 
 const FAQ: readonly FaqItem[] = [
   {
@@ -70,8 +71,9 @@ export function CanAiCrawlersSeeJavascriptBody() {
         which analyzed hundreds of millions of fetches across Vercel&rsquo;s network and found that
         none of the major AI crawlers rendered JavaScript. They <em>download</em> JavaScript files
         &mdash; GPTBot fetched JS on about 11.5% of requests, Claude on about 24% &mdash; but they
-        never <em>execute</em> them. We re-verified each bot&rsquo;s documented behavior for this
-        update. Here&rsquo;s the full picture:
+        never <em>execute</em> them.
+        <PostSource k="vercel-merj-ai-crawlers" /> We re-verified each bot&rsquo;s documented
+        behavior for this update. Here&rsquo;s the full picture:
       </p>
       <table className="w-full border-collapse text-sm">
         <thead>

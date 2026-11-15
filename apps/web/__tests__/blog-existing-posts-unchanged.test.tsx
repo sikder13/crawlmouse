@@ -5,6 +5,7 @@ import { renderToString } from 'react-dom/server';
 import BlogIndex from '../app/blog/page';
 import { POSTS_BY_SLUG, allPostSlugs } from '../lib/blog/posts';
 import { addedQuestions, addedSummary, postAbstract } from '../lib/blog/answers';
+import { POST_SOURCES } from '../lib/blog/post-source';
 import {
   parse,
   renderIndexHtml,
@@ -112,6 +113,7 @@ describe('every existing post renders as it did at the baseline, plus the listed
         'p.post-summary': addedSummary(slug) ? 1 : 0,
         'section.post-questions': addedQuestions(slug).length > 0 ? 1 : 0,
         '.post-author-role': 0,
+        'sup.post-source': Object.values(POST_SOURCES).filter((x) => x.slug === slug).length,
       });
       expect(clusters).toBeLessThanOrEqual(1);
       dropUpdatedDate(now);

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { POSTS, POSTS_BY_SLUG, allPostSlugs } from '../lib/blog/posts';
 import { addedQuestions, addedSummary, bodyGainedAnswers, postAbstract } from '../lib/blog/answers';
 import { getDataset } from '../lib/blog/datasets';
+import { POST_SOURCES } from '../lib/blog/post-source';
 import { AUTHORS } from '../lib/blog/authors';
 import { schemaProblems } from '../lib/seo/schema-required';
 import { renderPostPage } from './helpers/blog-render';
@@ -112,6 +113,18 @@ describe.each(SLUGS)('%s', (slug) => {
       size: data.size.text,
     });
     expect(ds[0]).not.toHaveProperty('license');
+  });
+
+  it('renders exactly its listed inline sources, each an https link', async () => {
+    const { doc } = await page(slug);
+    const rendered = [...doc.querySelectorAll('sup.post-source a')].map((a) =>
+      a.getAttribute('href'),
+    );
+    const listed = Object.values(POST_SOURCES)
+      .filter((x) => x.slug === slug)
+      .map((x) => x.url);
+    expect(rendered).toEqual(listed);
+    for (const u of rendered) expect(u).toMatch(/^https:\/\//);
   });
 
   it('emits the nodes this layer adds or extends with every property the site requires', async () => {
