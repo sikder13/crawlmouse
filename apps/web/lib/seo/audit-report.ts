@@ -8,7 +8,14 @@ import { isNoindex } from './audit-run';
 import { attributeQueries, type AttributablePage } from './attribution';
 import { skippedHeadings } from './page-facts';
 import { schemaProblems } from './schema-required';
-import { EXPORTED_AT, INDEXED, INDEXED_AS_OF, PAGES, QUERIES } from './search-console';
+import {
+  EXPORTED_AT,
+  INDEXED,
+  INDEXED_AS_OF,
+  NOT_INDEXED_REASONS,
+  PAGES,
+  QUERIES,
+} from './search-console';
 
 export interface PostTerms {
   slug: string;
@@ -236,6 +243,19 @@ function notIndexed(input: ReportInput): string[] {
   return out;
 }
 
+/** Search Console's own reasons, which the export counts but does not list by URL. */
+function reasons(): string[] {
+  const total = NOT_INDEXED_REASONS.reduce((n, r) => n + r[2], 0);
+  return [
+    `Search Console's reasons for the ${total} URLs it does not index (counts only; the export names no URL per reason, so which reason covers which post above is not in the data):`,
+    '',
+    '| Reason | Source | URLs |',
+    '| --- | --- | ---: |',
+    ...NOT_INDEXED_REASONS.map(([r, src, n]) => `| ${cell(r)} | ${src} | ${n} |`),
+    '',
+  ];
+}
+
 function surfaceCell(s: AuditRun['surfaces'][number]): string {
   if (s.status >= 300 && s.status < 400) return `${s.status} → ${s.location ?? '?'}`;
   if (s.status === 200)
@@ -304,6 +324,7 @@ export function renderReport(input: ReportInput): string {
     '## Indexing: posts not in the indexed list',
     '',
     ...notIndexed(input),
+    ...reasons(),
     '## App surfaces',
     '',
     ...surfaces(input),

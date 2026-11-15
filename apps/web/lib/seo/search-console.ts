@@ -447,3 +447,21 @@ export function earnsImpressions(path: string): boolean {
     AI_FEATURE_PAGES.some((r) => r[0] === path && r[1] > 0)
   );
 }
+
+/**
+ * Indexing → Pages, why pages are not indexed: [reason, source, pages]. The export gives counts
+ * only, no URL per reason.
+ */
+export const NOT_INDEXED_REASONS: readonly (readonly [
+  reason: string,
+  source: string,
+  pages: number,
+])[] = [
+  ['Page with redirect', 'Website', 6],
+  ['Alternate page with proper canonical tag', 'Website', 3],
+  ['Excluded by ‘noindex’ tag', 'Website', 1],
+  ['Not found (404)', 'Website', 1],
+  ['Blocked by robots.txt', 'Website', 1],
+  ['Crawled - currently not indexed', 'Google systems', 8],
+  ['Discovered - currently not indexed', 'Google systems', 1],
+];
