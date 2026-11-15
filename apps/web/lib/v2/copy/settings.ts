@@ -146,8 +146,12 @@ export const SETTINGS_COPY = {
   cancelling: (plan: string, date: string) =>
     `${plan} until ${date}, then Free. Nothing more is charged.`,
   /** A trial with a card set to cancel at its end: the card is not charged. */
+  /** Null digits: a card taken at Checkout whose last four were not recorded (CC-39 F8). */
   trialCancelling: (plan: string, date: string, last4: string | null) =>
     `${plan} trial until ${date}, then Free. The card ${last4 === null ? 'on file' : `ending ${last4}`} is not charged.`,
+  /** The same, for a reader the card's digits are withheld from (CC-37 Q25). */
+  trialCancellingWithheld: (plan: string, date: string) =>
+    `${plan} trial until ${date}, then Free. The card is not charged.`,
   trialCancelled: (date: string) =>
     `Cancelled; the trial ends ${date} and the card is not charged.`,
   cancelled: (date: string, days: number) =>

@@ -3,6 +3,7 @@
  * fixture. `viewAt` keeps the viewer's own records and drops everything recorded after `now`, so a
  * screen viewed on day 0 cannot show a check, change or fix that did not exist yet (D1, D2).
  */
+import type { CardsOnFile } from '../account/card';
 import {
   instant,
   type Account,
@@ -27,7 +28,7 @@ import { TRIAL_DAYS } from '../copy/account';
  */
 export type AccountDataset = Omit<FixtureDataset, 'provenance'> & {
   provenance: 'fixture' | 'measured';
-};
+} & CardsOnFile;
 
 export interface Viewer {
   /** The account whose screens these are. */
@@ -94,6 +95,11 @@ export interface AccountView {
   tier: Tier;
   gates: Readonly<TierGates>;
   inFlight: InFlight[];
+  /**
+   * Whether the account has a card on file. True where `account.card_last4` holds the digits, and
+   * where the dataset's `cardsOnFile` names the account for a reader the digits are withheld from.
+   */
+  cardOnFile: boolean;
 }
 
 export const PLAN_NAMES: Record<Tier, string> = { free: 'Free', pro: 'Pro', agency: 'Agency' };
@@ -121,7 +127,7 @@ function accountOf(d: AccountDataset, viewer: Pick<Viewer, 'accountId' | 'accoun
  * past_due account's tier is the state it was in before, and a Pro trial with no card on file is
  * the no-card variant (ARCH-2 §3.1); the contract records no other sign of the variant.
  */
-function clockOf(a: Account): EntitlementClock {
+function clockOf(a: Account, cardOnFile: boolean): EntitlementClock {
   const last = a.state_history.at(-1)!;
   const before = a.state_history.filter((h) => h.state !== 'past_due').at(-1);
   const pastDue = a.state === 'past_due';
@@ -133,8 +139,7 @@ function clockOf(a: Account): EntitlementClock {
     tier: pastDueTier ?? TIER_OF_STATE[a.state as keyof typeof TIER_OF_STATE] ?? 'free',
     pastDueTier,
     pastDueSince: pastDue ? new Date(last.since) : null,
-    trialVariant:
-      a.state === 'pro_trial' ? (a.card_last4 === null ? 'no_card' : 'card_required') : null,
+    trialVariant: a.state === 'pro_trial' ? (cardOnFile ? 'card_required' : 'no_card') : null,
     trialEndsAt: a.trial_ends_at ? new Date(a.trial_ends_at) : null,
   };
 }
@@ -299,7 +304,9 @@ export function viewAt(d: AccountDataset, viewer: Viewer): AccountView {
     withheld: d.withheld.filter((w) => checkIds.has(w.check_id)),
   };
 
-  const tier = effectiveTier(clockOf(account), new Date(t));
+  // A card on file, whether or not this reader is given its digits (CC-37 Q25).
+  const cardOnFile = account.card_last4 !== null || (d.cardsOnFile ?? []).includes(account.id);
+  const tier = effectiveTier(clockOf(account, cardOnFile), new Date(t));
   return {
     d: scoped as FixtureDataset,
     account,
@@ -308,6 +315,7 @@ export function viewAt(d: AccountDataset, viewer: Viewer): AccountView {
     tier,
     gates: GATES[tier],
     inFlight,
+    cardOnFile,
   };
 }
 

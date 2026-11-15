@@ -16,6 +16,7 @@ let state: {
   user: { id: string } | null;
   check: { siteId: string; status: string } | null;
   member: boolean;
+  mayMint: boolean;
   capAllowed: boolean;
   turnstileOk: boolean;
   existing: (string | null)[];
@@ -38,6 +39,7 @@ function deps(): MintV2Deps {
     user: log('user', async () => state.user),
     checkAsCaller: log('checkAsCaller', async () => state.check),
     isMemberForSite: log('isMemberForSite', async () => state.member),
+    mayMint: log('mayMint', async () => state.mayMint),
     rateLimit: log('rateLimit', async (key: string) => {
       limits.push([key]);
       return { allowed: state.capAllowed };
@@ -70,6 +72,7 @@ beforeEach(() => {
     user: { id: 'u-1' },
     check: { siteId: SITE, status: 'finished' },
     member: true,
+    mayMint: true,
     capAllowed: true,
     turnstileOk: true,
     existing: [],
@@ -127,6 +130,21 @@ describe('mintV2', () => {
     const member = calls.indexOf('isMemberForSite');
     expect(member).toBeGreaterThan(-1);
     for (const name of SERVICE_ROLE) expect(calls.indexOf(name)).toBeGreaterThan(member);
+  });
+
+  it('a seat whose role may not mint is 403 role_refused, asked after membership, and nothing is read with the service role (Q16)', async () => {
+    state.mayMint = false;
+    expect(await mint()).toEqual({ status: 403, body: { error: 'role_refused' } });
+    expect(calls.indexOf('mayMint')).toBeGreaterThan(calls.indexOf('isMemberForSite'));
+    expect(calls.filter((c) => SERVICE_ROLE.includes(c))).toEqual([]);
+    expect(inserted).toEqual([]);
+  });
+
+  it('a non-member is not asked the role: the 404 comes first (Q16)', async () => {
+    state.member = false;
+    state.mayMint = false;
+    expect(await mint()).toEqual({ status: 404, body: { error: 'not_found' } });
+    expect(calls).not.toContain('mayMint');
   });
 
   it('a partial check is 409 check_partial; one not finished is 409 check_not_finished', async () => {

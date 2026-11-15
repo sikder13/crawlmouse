@@ -36,6 +36,7 @@ import {
 import { ACCOUNT_ACTIONS, action, type ActionView, type RouteSpec } from './account-actions';
 import { FREE_SCHEDULE, accountShellView, type ShellView } from './account-shell';
 import { FREE_FIXES } from './free-fixes';
+import { ACCOUNT_COPY } from '../copy/account';
 import { DELETE_COPY, deletionMoney } from '../copy/deletion';
 import {
   DELETE_BLOCKED_SENTENCES,
@@ -398,10 +399,14 @@ export function settingsView(
   const paid = v.tier !== 'free';
   const ending = paid && billingEnd !== null ? billingEnd : null;
   const card = a.card_last4;
+  // A card on file, whether or not this reader is given its digits (CC-37 Q25); `withheld` is a card
+  // on file whose digits this reader is not given.
+  const onFile = v.cardOnFile;
+  const withheld = onFile && card === null;
   // A trial whose subscription is `trialing` came through Checkout, which takes a card
   // (checkout-v2.ts, `payment_method_collection: 'always'`), whether or not its last four digits
-  // were recorded: the card is charged at the trial's end unless it is cancelled.
-  const cardTrial = trial && (card !== null || subscriptionStatus === 'trialing');
+  // were recorded (CC-39 F8): the card is charged at the trial's end unless it is cancelled.
+  const cardTrial = trial && (onFile || subscriptionStatus === 'trialing');
   const pastDue = a.state === 'past_due';
   const yearly = v.tier === 'agency' ? AGENCY_YEARLY : PRO_YEARLY;
   const date = (ts: string) => dayDate(ts, zone);
@@ -438,8 +443,7 @@ export function settingsView(
   const cancel = owner ? routeAction('cancelPlan', COPY.cancelAction, {}, billing) : null;
   const portal = owner ? routeAction('billingPortal', COPY.portalAction, {}, billing) : null;
   // A card on file or a subscription means a Stripe customer, which the portal opens for.
-  const customer =
-    card !== null || (subscriptionStatus !== undefined && subscriptionStatus !== null);
+  const customer = onFile || (subscriptionStatus !== undefined && subscriptionStatus !== null);
   // A cancel ends at once where lib/billing/cancel.ts cancels at once (`AT_ONCE`: past due, unpaid,
   // paused), the account's own past-due state included; otherwise at the trial's or period's end.
   const atOnce = pastDue || (subscriptionStatus != null && AT_ONCE.has(subscriptionStatus));
@@ -519,10 +523,16 @@ export function settingsView(
       // A plan set to end is said first: a card trial set to cancel is not charged.
       note:
         cardTrial && ending !== null
-          ? COPY.trialCancelling(plan, date(ending), card)
+          ? withheld
+            ? `${COPY.trialCancellingWithheld(plan, date(ending))} ${ACCOUNT_COPY.cardManagedByOwner}`
+            : COPY.trialCancelling(plan, date(ending), card)
           : trial
             ? `${COPY.ends(date(a.trial_ends_at!))} ${
-                cardTrial ? COPY.cardTerms(card) : COPY.noCardTerms(plan)
+                !cardTrial
+                  ? COPY.noCardTerms(plan)
+                  : withheld
+                    ? ACCOUNT_COPY.cardManagedByOwner
+                    : COPY.cardTerms(card)
               }`
             : pastDue
               ? v.tier === 'free'

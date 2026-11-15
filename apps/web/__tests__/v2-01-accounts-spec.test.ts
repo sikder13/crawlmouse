@@ -30,9 +30,10 @@ describe('docs/specs/v2/01-accounts.md', () => {
     });
     const byTable = Object.fromEntries(catalog.tables.map((t) => [t.name, t.grants]));
     // 027b adds the deletion mark, CC-29 the agency trial's Checkout and consent, and CC-33 the internal
-    // marker, which no client reads.
+    // marker, which no client reads; CC-37 revokes card_last4 (20261118000001).
     expect(byTable.accounts!.hiddenColumns).toEqual([
       'stripe_customer_id',
+      'card_last4',
       'deletion_confirmed_at',
       'purge_after',
       'agency_checkout_url',

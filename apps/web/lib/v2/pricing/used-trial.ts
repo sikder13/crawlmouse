@@ -1,7 +1,8 @@
 /**
  * Whether a person's agency trial is used, by the rule `start_agency_trial_account` (migration
- * 20261114000001) answers `trial_used` with: they hold an active owner seat on an agency account
- * whose trial was used. A deleted account counts, so deleting one does not give a second trial.
+ * 20261117000001) answers `trial_used` with: they hold an owner seat, of any status, on an agency
+ * account whose trial was used and that is not internal. A deleted account and a removed seat count,
+ * so deleting the account or leaving it does not give a second trial.
  *
  * Read with the service role, for the caller's own id only: a deleted account is not
  * member-readable (`is_member` leaves it out), so the caller's own client cannot see it.
@@ -38,8 +39,7 @@ export async function readUsedAgencyTrial(
     .from('seats')
     .select('account_id')
     .eq('user_id', userId)
-    .eq('role', 'owner')
-    .eq('status', 'active');
+    .eq('role', 'owner');
   if (seats.error) failed('seats read', seats.error);
   const ids = z
     .array(z.object({ account_id: z.string() }))
@@ -52,6 +52,7 @@ export async function readUsedAgencyTrial(
     .select('id, trial_used_at, deleted_at')
     .in('id', ids)
     .eq('kind', 'agency')
+    .eq('internal', false)
     .not('trial_used_at', 'is', null)
     .order('trial_used_at');
   if (accounts.error) failed('accounts read', accounts.error);

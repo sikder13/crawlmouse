@@ -150,6 +150,8 @@ function trialCard(
   // `renews_at` is the period end of a subscription not set to cancel (lib/v2/account/rows.ts), and a
   // trial with no card has no subscription; the card's last four digits are not recorded yet.
   const charges = a.renews_at !== null;
+  // A card on file whose digits this reader is not given (CC-37 Q25).
+  const withheld = v.cardOnFile && a.card_last4 === null;
   const freeSchedule = FREE_SCHEDULE[GATES.free.schedule];
   const price = tier === 'pro' ? PRO_MONTHLY : AGENCY_MONTHLY;
   const title = `${PLAN_NAMES[tier]}, trial · ends ${dayDate(end, zone)}`;
@@ -162,11 +164,13 @@ function trialCard(
       title,
       left,
       note:
-        a.card_last4 === null && !charges && billingEnd === null
+        !v.cardOnFile && !charges && billingEnd === null
           ? `${COPY.noCard} ${COPY.nothingCharged}`
-          : billingEnd !== null
-            ? COPY.cardNotCharged(a.card_last4, dayDate(end, zone))
-            : COPY.cardCharged(a.card_last4, dayDate(end, zone)),
+          : withheld
+            ? COPY.cardManagedByOwner
+            : billingEnd !== null
+              ? COPY.cardNotCharged(a.card_last4, dayDate(end, zone))
+              : COPY.cardCharged(a.card_last4, dayDate(end, zone)),
       billing: null,
       keep: null,
     };
@@ -178,9 +182,11 @@ function trialCard(
     title,
     left,
     note: charges
-      ? COPY.cardCharged(a.card_last4, dayDate(end, zone))
+      ? withheld
+        ? COPY.cardManagedByOwner
+        : COPY.cardCharged(a.card_last4, dayDate(end, zone))
       : firstRun
-        ? `${a.card_last4 === null ? `${COPY.noCard} ` : ''}${COPY.trialFirstRun(freeSchedule)}`
+        ? `${!v.cardOnFile ? `${COPY.noCard} ` : ''}${COPY.trialFirstRun(freeSchedule)}`
         : COPY.trialLater(
             primarySite(v).host,
             freeSchedule,

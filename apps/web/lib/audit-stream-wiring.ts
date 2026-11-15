@@ -14,8 +14,12 @@ export interface AuditStreamHandlers {
   onSnapshot(payload: unknown): void;
   /** The terminal `done` event landed (results are final). */
   onDone(): void;
-  /** A NAMED stream `error` event (server-side result finalization failed) landed — terminal. */
-  onTerminalError(): void;
+  /**
+   * A NAMED stream `error` event landed — terminal. `payload` is its parsed data (undefined when it
+   * is not JSON): `{ code: 'rate_limited' | 'not_found', message }` when the stream refused to start,
+   * `{ message }` when result finalization failed.
+   */
+  onTerminalError(payload?: unknown): void;
   /**
    * SPEC 04 §2 (additive, optional): a batch of new CrawlActivityEvents arrived. Registered only
    * when supplied, so every existing 3-handler consumer is byte-compatible.
@@ -27,7 +31,7 @@ export interface AuditStreamHandlers {
  * Register the audit-stream listeners on `es`:
  *  - `snapshot` / `progress` → onSnapshot(parsed)
  *  - `done` → onSnapshot(parsed), onDone(), then close (results are final)
- *  - `error` WITH data → a server-emitted terminal error: onTerminalError(), then close
+ *  - `error` WITH data → a server-emitted terminal error: onTerminalError(parsed data), then close
  *  - `error` WITHOUT data → a native transport error: IGNORED so EventSource can reconnect to a
  *    still-running crawl (closing here would abort a recoverable connection)
  */
@@ -45,8 +49,15 @@ export function wireAuditStream(es: EventSourceLike, handlers: AuditStreamHandle
     es.close();
   });
   es.addEventListener('error', (e) => {
-    if ((e as MessageEvent).data) {
-      handlers.onTerminalError();
+    const data = (e as MessageEvent).data;
+    if (data) {
+      let payload: unknown;
+      try {
+        payload = JSON.parse(data);
+      } catch {
+        payload = undefined;
+      }
+      handlers.onTerminalError(payload);
       es.close();
     }
   });

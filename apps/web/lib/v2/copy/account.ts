@@ -26,6 +26,8 @@ export const ACCOUNT_COPY = {
       reminderDays === null ? '' : ` We'll email you ${numberWord(reminderDays)} days before.`
     }`,
   noCard: 'No card on file.',
+  /** In place of the card on file for every role but the owner (CC-37 Q25). */
+  cardManagedByOwner: 'Managed by the account owner.',
   /** Where the page carries the plan (the Trial-ending screen), the card says only what the card on file means. */
   nothingCharged: 'Nothing is charged unless you choose Pro.',
   /** A card taken at Checkout whose last four digits were not recorded is named without them. */

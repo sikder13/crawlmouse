@@ -1,48 +1,79 @@
 import { describe, it, expect } from 'vitest';
-import { deriveAuditViewState, decideAuditSurface, type AuditViewState, type AuditSnapshotLite } from './audit-view-state';
+import {
+  deriveAuditViewState,
+  decideAuditSurface,
+  streamStopOf,
+  type AuditViewState,
+  type AuditSnapshotLite,
+} from './audit-view-state';
 import type { FailureCategory } from './failure-classification';
 
 // `refusal: null` is DEFAULTED, not omitted: the field is required on AuditSnapshotLite (gate 7 / B1)
 // because the SSE projection emits it on every payload, so a fixture that leaves it out is describing
 // a snapshot the route cannot send. Cases that need a refusal override it.
 const snap = (
-  o: Partial<{ status: string; grade: string | null; score: number | null; failureCategory: FailureCategory | null ; refusal: { refused?: boolean } | null }>,
+  o: Partial<{
+    status: string;
+    grade: string | null;
+    score: number | null;
+    failureCategory: FailureCategory | null;
+    refusal: { refused?: boolean } | null;
+  }>,
 ) => ({ id: 'x', status: 'pending', grade: null, score: null, refusal: null, ...o });
 
 // deriveAuditViewState(snapshot, done, hasResults). `hasResults` = the done payload's numeric
 // stats (orphanCount/avgDepth) are present. The default-true keeps the existing happy-path cases
 // terse; the dedicated suite below pins the hasResults=false guard.
-const derive = (
-  s: ReturnType<typeof snap> | null,
-  done: boolean,
-  hasResults = true,
-) => deriveAuditViewState(s, done, hasResults);
+const derive = (s: ReturnType<typeof snap> | null, done: boolean, hasResults = true) =>
+  deriveAuditViewState(s, done, hasResults);
 
 describe('deriveAuditViewState', () => {
   it('running while not terminal and done not received', () => {
-    expect(derive(snap({ status: 'crawling' }), false))
-      .toMatchObject({ running: true, awaitingResults: false, graded: false, failed: false });
+    expect(derive(snap({ status: 'crawling' }), false)).toMatchObject({
+      running: true,
+      awaitingResults: false,
+      graded: false,
+      failed: false,
+    });
   });
 
   it('awaitingResults when status=completed but the done payload has NOT arrived', () => {
     // This is the flash window: completed + grade present, but done=false.
-    expect(derive(snap({ status: 'completed', grade: 'A', score: 92 }), false))
-      .toMatchObject({ running: false, awaitingResults: true, graded: false });
+    expect(derive(snap({ status: 'completed', grade: 'A', score: 92 }), false)).toMatchObject({
+      running: false,
+      awaitingResults: true,
+      graded: false,
+    });
   });
 
   it('graded only once done=true AND grade+score present', () => {
-    expect(derive(snap({ status: 'completed', grade: 'A', score: 92 }), true))
-      .toMatchObject({ graded: true, awaitingResults: false, running: false });
+    expect(derive(snap({ status: 'completed', grade: 'A', score: 92 }), true)).toMatchObject({
+      graded: true,
+      awaitingResults: false,
+      running: false,
+    });
   });
 
   it('failed status is terminal and never awaitingResults', () => {
-    expect(derive(snap({ status: 'failed' }), false))
-      .toMatchObject({ failed: true, running: false, awaitingResults: false, graded: false });
+    expect(derive(snap({ status: 'failed' }), false)).toMatchObject({
+      failed: true,
+      running: false,
+      awaitingResults: false,
+      graded: false,
+    });
   });
 
   it('completed-but-ungradable (done, no grade) is neither graded nor awaiting', () => {
-    expect(derive(snap({ status: 'completed', grade: null, score: null }), true))
-      .toEqual({ running: false, awaitingResults: false, graded: false, failed: false, gradeFailed: true, refused: false, failureCategory: null, canceled: false });
+    expect(derive(snap({ status: 'completed', grade: null, score: null }), true)).toEqual({
+      running: false,
+      awaitingResults: false,
+      graded: false,
+      failed: false,
+      gradeFailed: true,
+      refused: false,
+      failureCategory: null,
+      canceled: false,
+    });
   });
 
   it('null snapshot is treated as running', () => {
@@ -52,52 +83,124 @@ describe('deriveAuditViewState', () => {
   // The flash window with grade STILL null (completed arrived before the grade column was
   // populated): must stay awaitingResults, NOT prematurely render the "couldn't grade" card.
   it('completed with grade still null and done=false stays awaitingResults', () => {
-    expect(derive(snap({ status: 'completed', grade: null, score: null }), false))
-      .toEqual({ running: false, awaitingResults: true, graded: false, failed: false, gradeFailed: false, refused: false, failureCategory: null, canceled: false });
+    expect(derive(snap({ status: 'completed', grade: null, score: null }), false)).toEqual({
+      running: false,
+      awaitingResults: true,
+      graded: false,
+      failed: false,
+      gradeFailed: false,
+      refused: false,
+      failureCategory: null,
+      canceled: false,
+    });
   });
 
   // Each state has exactly one `true` flag — pin the full object so a stray flag is caught.
   it('running asserts every flag exhaustively (only running true)', () => {
-    expect(derive(snap({ status: 'crawling' }), false))
-      .toEqual({ running: true, awaitingResults: false, graded: false, failed: false, gradeFailed: false, refused: false, failureCategory: null, canceled: false });
+    expect(derive(snap({ status: 'crawling' }), false)).toEqual({
+      running: true,
+      awaitingResults: false,
+      graded: false,
+      failed: false,
+      gradeFailed: false,
+      refused: false,
+      failureCategory: null,
+      canceled: false,
+    });
   });
 
   it('awaitingResults asserts every flag exhaustively (only awaitingResults true)', () => {
-    expect(derive(snap({ status: 'completed', grade: 'A', score: 92 }), false))
-      .toEqual({ running: false, awaitingResults: true, graded: false, failed: false, gradeFailed: false, refused: false, failureCategory: null, canceled: false });
+    expect(derive(snap({ status: 'completed', grade: 'A', score: 92 }), false)).toEqual({
+      running: false,
+      awaitingResults: true,
+      graded: false,
+      failed: false,
+      gradeFailed: false,
+      refused: false,
+      failureCategory: null,
+      canceled: false,
+    });
   });
 
   it('graded asserts every flag exhaustively (only graded true)', () => {
-    expect(derive(snap({ status: 'completed', grade: 'A', score: 92 }), true))
-      .toEqual({ running: false, awaitingResults: false, graded: true, failed: false, gradeFailed: false, refused: false, failureCategory: null, canceled: false });
+    expect(derive(snap({ status: 'completed', grade: 'A', score: 92 }), true)).toEqual({
+      running: false,
+      awaitingResults: false,
+      graded: true,
+      failed: false,
+      gradeFailed: false,
+      refused: false,
+      failureCategory: null,
+      canceled: false,
+    });
   });
 
   it('failed asserts every flag exhaustively (only failed true)', () => {
-    expect(derive(snap({ status: 'failed' }), false))
-      .toEqual({ running: false, awaitingResults: false, graded: false, failed: true, gradeFailed: false, refused: false, failureCategory: 'internal', canceled: false });
+    expect(derive(snap({ status: 'failed' }), false)).toEqual({
+      running: false,
+      awaitingResults: false,
+      graded: false,
+      failed: true,
+      gradeFailed: false,
+      refused: false,
+      failureCategory: 'internal',
+      canceled: false,
+    });
   });
 
   // Dead-state guard: a terminal `done` (e.g. a named stream `error` event sets done=true
   // while the last snapshot is non-terminal) must NEVER render a blank screen — it falls back
   // to gradeFailed so the "couldn't grade / try again" card is always reachable.
   it('done=true with a non-terminal status falls back to gradeFailed (no blank render)', () => {
-    expect(derive(snap({ status: 'crawling' }), true))
-      .toEqual({ running: false, awaitingResults: false, graded: false, failed: false, gradeFailed: true, refused: false, failureCategory: null, canceled: false });
+    expect(derive(snap({ status: 'crawling' }), true)).toEqual({
+      running: false,
+      awaitingResults: false,
+      graded: false,
+      failed: false,
+      gradeFailed: true,
+      refused: false,
+      failureCategory: null,
+      canceled: false,
+    });
   });
 
   it('failed wins over done (a failed crawl is never gradeFailed)', () => {
-    expect(derive(snap({ status: 'failed' }), true))
-      .toEqual({ running: false, awaitingResults: false, graded: false, failed: true, gradeFailed: false, refused: false, failureCategory: 'internal', canceled: false });
+    expect(derive(snap({ status: 'failed' }), true)).toEqual({
+      running: false,
+      awaitingResults: false,
+      graded: false,
+      failed: true,
+      gradeFailed: false,
+      refused: false,
+      failureCategory: 'internal',
+      canceled: false,
+    });
   });
 
   it('canceled is a distinct terminal state — only `canceled` true, never running/failed/gradeFailed', () => {
-    expect(derive(snap({ status: 'canceled' }), false))
-      .toEqual({ running: false, awaitingResults: false, graded: false, failed: false, gradeFailed: false, refused: false, failureCategory: null, canceled: true });
+    expect(derive(snap({ status: 'canceled' }), false)).toEqual({
+      running: false,
+      awaitingResults: false,
+      graded: false,
+      failed: false,
+      gradeFailed: false,
+      refused: false,
+      failureCategory: null,
+      canceled: true,
+    });
   });
 
   it('canceled stays canceled once done arrives (never falls back to gradeFailed)', () => {
-    expect(derive(snap({ status: 'canceled' }), true))
-      .toEqual({ running: false, awaitingResults: false, graded: false, failed: false, gradeFailed: false, refused: false, failureCategory: null, canceled: true });
+    expect(derive(snap({ status: 'canceled' }), true)).toEqual({
+      running: false,
+      awaitingResults: false,
+      graded: false,
+      failed: false,
+      gradeFailed: false,
+      refused: false,
+      failureCategory: null,
+      canceled: true,
+    });
   });
 });
 
@@ -109,18 +212,48 @@ describe('deriveAuditViewState', () => {
 // carrying grade but no stats is gradeFailed (couldn't-grade card), never a 0/0 GradeCard.
 describe('deriveAuditViewState — results-presence gate', () => {
   it('completed + grade + done but stats ABSENT renders the couldn’t-grade card, not a 0/0 GradeCard', () => {
-    expect(deriveAuditViewState(snap({ status: 'completed', grade: 'A', score: 92 }), true, false))
-      .toEqual({ running: false, awaitingResults: false, graded: false, failed: false, gradeFailed: true, refused: false, failureCategory: null, canceled: false });
+    expect(
+      deriveAuditViewState(snap({ status: 'completed', grade: 'A', score: 92 }), true, false),
+    ).toEqual({
+      running: false,
+      awaitingResults: false,
+      graded: false,
+      failed: false,
+      gradeFailed: true,
+      refused: false,
+      failureCategory: null,
+      canceled: false,
+    });
   });
 
   it('completed + grade + done WITH stats present is graded (the real done path)', () => {
-    expect(deriveAuditViewState(snap({ status: 'completed', grade: 'A', score: 92 }), true, true))
-      .toEqual({ running: false, awaitingResults: false, graded: true, failed: false, gradeFailed: false, refused: false, failureCategory: null, canceled: false });
+    expect(
+      deriveAuditViewState(snap({ status: 'completed', grade: 'A', score: 92 }), true, true),
+    ).toEqual({
+      running: false,
+      awaitingResults: false,
+      graded: true,
+      failed: false,
+      gradeFailed: false,
+      refused: false,
+      failureCategory: null,
+      canceled: false,
+    });
   });
 
   it('completed + grade, done=false, stats absent is still just awaitingResults (no premature gradeFailed)', () => {
-    expect(deriveAuditViewState(snap({ status: 'completed', grade: 'A', score: 92 }), false, false))
-      .toEqual({ running: false, awaitingResults: true, graded: false, failed: false, gradeFailed: false, refused: false, failureCategory: null, canceled: false });
+    expect(
+      deriveAuditViewState(snap({ status: 'completed', grade: 'A', score: 92 }), false, false),
+    ).toEqual({
+      running: false,
+      awaitingResults: true,
+      graded: false,
+      failed: false,
+      gradeFailed: false,
+      refused: false,
+      failureCategory: null,
+      canceled: false,
+    });
   });
 });
 
@@ -129,20 +262,32 @@ describe('deriveAuditViewState — results-presence gate', () => {
 // specific copy, and nulls it everywhere else so a stray value can't leak failure copy elsewhere.
 describe('deriveAuditViewState — failure category', () => {
   it('surfaces the snapshot’s failureCategory on a failed audit', () => {
-    expect(derive(snap({ status: 'failed', failureCategory: 'dns' }), false))
-      .toMatchObject({ failed: true, failureCategory: 'dns' });
-    expect(derive(snap({ status: 'failed', failureCategory: 'timeout' }), true))
-      .toMatchObject({ failed: true, failureCategory: 'timeout' });
+    expect(derive(snap({ status: 'failed', failureCategory: 'dns' }), false)).toMatchObject({
+      failed: true,
+      failureCategory: 'dns',
+    });
+    expect(derive(snap({ status: 'failed', failureCategory: 'timeout' }), true)).toMatchObject({
+      failed: true,
+      failureCategory: 'timeout',
+    });
   });
 
   it('defaults a failed audit with no category to internal (defensive)', () => {
-    expect(derive(snap({ status: 'failed' }), false))
-      .toMatchObject({ failed: true, failureCategory: 'internal', canceled: false });
+    expect(derive(snap({ status: 'failed' }), false)).toMatchObject({
+      failed: true,
+      failureCategory: 'internal',
+      canceled: false,
+    });
   });
 
   it('never surfaces a failureCategory on a non-failed audit (even a stray one)', () => {
-    expect(derive(snap({ status: 'completed', grade: 'A', score: 92, failureCategory: 'blocked' }), true).failureCategory).toBe(null);
-    expect(derive(snap({ status: 'crawling', failureCategory: 'blocked' }), false).failureCategory).toBe(null);
+    expect(
+      derive(snap({ status: 'completed', grade: 'A', score: 92, failureCategory: 'blocked' }), true)
+        .failureCategory,
+    ).toBe(null);
+    expect(
+      derive(snap({ status: 'crawling', failureCategory: 'blocked' }), false).failureCategory,
+    ).toBe(null);
   });
 });
 
@@ -177,13 +322,21 @@ describe('a REFUSED audit is its own terminal state', () => {
   });
 
   it('refused:false in the payload is not a refusal', () => {
-    const st = derive(snap({ status: 'completed', grade: null, score: null, refusal: { refused: false } }), true, true);
+    const st = derive(
+      snap({ status: 'completed', grade: null, score: null, refusal: { refused: false } }),
+      true,
+      true,
+    );
     expect(st.refused).toBe(false);
     expect(st.gradeFailed).toBe(true);
   });
 
   it('takes precedence over graded, so a stray grade beside a refusal cannot render a letter', () => {
-    const st = derive(snap({ status: 'completed', grade: 'B+', score: 81.39, refusal: { refused: true } }), true, true);
+    const st = derive(
+      snap({ status: 'completed', grade: 'B+', score: 81.39, refusal: { refused: true } }),
+      true,
+      true,
+    );
     expect(st.refused).toBe(true);
     expect(st.graded).toBe(false);
   });
@@ -205,26 +358,50 @@ describe('a REFUSED audit is its own terminal state', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 describe('decideAuditSurface — the full state matrix', () => {
   const st = (over: Partial<AuditViewState> = {}): AuditViewState => ({
-    running: false, awaitingResults: false, graded: false, refused: false,
-    failed: false, gradeFailed: false, failureCategory: null, canceled: false,
+    running: false,
+    awaitingResults: false,
+    graded: false,
+    refused: false,
+    failed: false,
+    gradeFailed: false,
+    failureCategory: null,
+    canceled: false,
     ...over,
   });
   const V2 = { grade: 'B', score: 81 } as never;
-  const LEGACY = { status: 'completed', grade: 'B', score: 81.39, orphanCount: 3, avgDepth: 2.4, viewerIsPro: false, refusal: null };
+  const LEGACY = {
+    status: 'completed',
+    grade: 'B',
+    score: 81.39,
+    orphanCount: 3,
+    avgDepth: 2.4,
+    viewerIsPro: false,
+    refusal: null,
+  };
 
   it('draws the RESULT arc for a refused audit, and records WHY', () => {
-    expect(decideAuditSurface(st({ refused: true }), null, V2)).toEqual({ kind: 'result', verdict: 'refused', audit: V2 });
+    expect(decideAuditSurface(st({ refused: true }), null, V2)).toEqual({
+      kind: 'result',
+      verdict: 'refused',
+      audit: V2,
+    });
   });
 
   it('puts refused AHEAD of gradeFailed — the gate-3 blocker, as a precedence rule', () => {
     // The catch-all used to swallow every refusal and show "usually a site that blocks crawlers".
-    expect(decideAuditSurface(st({ refused: true, gradeFailed: true }), null, V2))
-      .toEqual({ kind: 'result', verdict: 'refused', audit: V2 });
+    expect(decideAuditSurface(st({ refused: true, gradeFailed: true }), null, V2)).toEqual({
+      kind: 'result',
+      verdict: 'refused',
+      audit: V2,
+    });
   });
 
   it('puts refused AHEAD of graded — a withheld verdict never renders a letter', () => {
-    expect(decideAuditSurface(st({ refused: true, graded: true }), null, V2))
-      .toEqual({ kind: 'result', verdict: 'refused', audit: V2 });
+    expect(decideAuditSurface(st({ refused: true, graded: true }), null, V2)).toEqual({
+      kind: 'result',
+      verdict: 'refused',
+      audit: V2,
+    });
   });
 
   it('falls back to the error card when a refusal arrives with NO v2 payload', () => {
@@ -236,7 +413,10 @@ describe('decideAuditSurface — the full state matrix', () => {
 
   it('routes a null verdict with NO refusal to the error card, never to the Stage 4 copy', () => {
     const d = decideAuditSurface(st({ gradeFailed: true }), null, V2);
-    expect(d).toEqual({ kind: 'error', copy: { title: expect.stringContaining('Couldn’t grade'), body: expect.any(String) } });
+    expect(d).toEqual({
+      kind: 'error',
+      copy: { title: expect.stringContaining('Couldn’t grade'), body: expect.any(String) },
+    });
   });
 
   it('carries the CLASSIFIED failure copy for a genuinely failed audit', () => {
@@ -250,21 +430,36 @@ describe('decideAuditSurface — the full state matrix', () => {
   });
 
   it('draws the graded arc from v2, and the legacy payload without one', () => {
-    expect(decideAuditSurface(st({ graded: true }), LEGACY, V2)).toEqual({ kind: 'result', verdict: 'graded', audit: V2 });
+    expect(decideAuditSurface(st({ graded: true }), LEGACY, V2)).toEqual({
+      kind: 'result',
+      verdict: 'graded',
+      audit: V2,
+    });
     expect(decideAuditSurface(st({ graded: true }), LEGACY, null)).toEqual({
-      kind: 'graded-legacy', grade: 'B', score: 81.39, orphanCount: 3, avgDepth: 2.4,
-      findingGroups: null, viewerIsPro: false,
+      kind: 'graded-legacy',
+      grade: 'B',
+      score: 81.39,
+      orphanCount: 3,
+      avgDepth: 2.4,
+      findingGroups: null,
+      viewerIsPro: false,
     });
   });
 
   it('canceled outranks everything — the user stopped it, and that is not a failure', () => {
-    expect(decideAuditSurface(st({ canceled: true, gradeFailed: true }), null, V2)).toEqual({ kind: 'canceled' });
-    expect(decideAuditSurface(st({ canceled: true, running: true }), null, V2)).toEqual({ kind: 'canceled' });
+    expect(decideAuditSurface(st({ canceled: true, gradeFailed: true }), null, V2)).toEqual({
+      kind: 'canceled',
+    });
+    expect(decideAuditSurface(st({ canceled: true, running: true }), null, V2)).toEqual({
+      kind: 'canceled',
+    });
   });
 
   it('draws running and awaiting before any terminal surface', () => {
     expect(decideAuditSurface(st({ running: true }), null, V2)).toEqual({ kind: 'running' });
-    expect(decideAuditSurface(st({ awaitingResults: true }), null, V2)).toEqual({ kind: 'awaiting' });
+    expect(decideAuditSurface(st({ awaitingResults: true }), null, V2)).toEqual({
+      kind: 'awaiting',
+    });
   });
 
   it('draws nothing for a state that is neither running nor terminal', () => {
@@ -289,7 +484,11 @@ describe('decideAuditSurface — the full state matrix', () => {
       [null, false, false],
       [{ status: 'pending', refusal: null }, false, false],
       [{ status: 'completed', grade: 'B', score: 81, refusal: null }, false, false],
-      [{ status: 'completed', grade: 'B', score: 81, orphanCount: 1, avgDepth: 2, refusal: null }, true, true],
+      [
+        { status: 'completed', grade: 'B', score: 81, orphanCount: 1, avgDepth: 2, refusal: null },
+        true,
+        true,
+      ],
       [{ status: 'completed', grade: null, score: null, refusal: { refused: true } }, true, true],
       [{ status: 'completed', grade: null, score: null, refusal: null }, true, false],
       [{ status: 'failed', failureCategory: 'dns', refusal: null }, true, false],
@@ -297,7 +496,11 @@ describe('decideAuditSurface — the full state matrix', () => {
     ];
     for (const [snap, done, hasResults] of rows) {
       const state = deriveAuditViewState(snap, done, hasResults);
-      const d = decideAuditSurface(state, snap, snap?.grade ? ({ grade: snap.grade } as never) : null);
+      const d = decideAuditSurface(
+        state,
+        snap,
+        snap?.grade ? ({ grade: snap.grade } as never) : null,
+      );
       expect(d.kind, `state ${JSON.stringify(snap)} produced no surface`).not.toBe('none');
     }
   });
@@ -328,9 +531,88 @@ describe('refused is gated on hasResults, exactly as graded is', () => {
   it('holds refused to the SAME condition as graded — a property, not two examples', () => {
     for (const hasResults of [false, true]) {
       const s1 = deriveAuditViewState(refusedSnap, true, hasResults);
-      const s2 = deriveAuditViewState({ status: 'completed', grade: 'B', score: 81, refusal: null }, true, hasResults);
+      const s2 = deriveAuditViewState(
+        { status: 'completed', grade: 'B', score: 81, refusal: null },
+        true,
+        hasResults,
+      );
       expect(s1.refused, `refused at hasResults=${hasResults}`).toBe(hasResults);
       expect(s2.graded, `graded at hasResults=${hasResults}`).toBe(hasResults);
     }
+  });
+});
+
+// CC-37 F-C 1/2: a stream that stopped before its first snapshot names why, and only then.
+describe('decideAuditSurface — a stream stopped before any snapshot', () => {
+  const st = (over: Partial<AuditViewState> = {}): AuditViewState => ({
+    running: false,
+    awaitingResults: false,
+    graded: false,
+    refused: false,
+    failed: false,
+    gradeFailed: false,
+    failureCategory: null,
+    canceled: false,
+    ...over,
+  });
+
+  it.each([
+    ['rate_limited', 'Too many live views'],
+    ['not_found', 'Audit not found'],
+  ] as const)(
+    '%s with no snapshot is its own error card, over the couldn’t-grade catch-all',
+    (stop, title) => {
+      const d = decideAuditSurface(st({ gradeFailed: true }), null, null, stop);
+      expect(d).toMatchObject({ kind: 'error', copy: { title } });
+    },
+  );
+
+  // review r2 N1: a rate-limited reconnect mid-crawl. The snapshot is not terminal, so the stop is
+  // said; the couldn't-grade card ("the crawl finished") would be false.
+  it.each(['pending', 'queued', 'crawling', 'running'])(
+    'a stop after a non-terminal %s snapshot is the stop card, not the couldn’t-grade card',
+    (status) => {
+      const snap = { status } as AuditSnapshotLite;
+      const state = deriveAuditViewState(snap, true);
+      expect(state.gradeFailed).toBe(true);
+      expect(decideAuditSurface(state, snap, null, 'rate_limited')).toMatchObject({
+        kind: 'error',
+        copy: { title: 'Too many live views' },
+      });
+    },
+  );
+
+  it('a stop after a terminal snapshot changes nothing: the snapshot decides', () => {
+    const canceled = { status: 'canceled' } as AuditSnapshotLite;
+    expect(decideAuditSurface(st({ canceled: true }), canceled, null, 'rate_limited')).toEqual({
+      kind: 'canceled',
+    });
+    const failed = { status: 'failed' } as AuditSnapshotLite;
+    expect(
+      decideAuditSurface(
+        st({ failed: true, failureCategory: 'timeout' }),
+        failed,
+        null,
+        'not_found',
+      ),
+    ).toMatchObject({ kind: 'error' });
+    expect(
+      decideAuditSurface(
+        st({ failed: true, failureCategory: 'timeout' }),
+        failed,
+        null,
+        'not_found',
+      ),
+    ).not.toMatchObject({ copy: { title: 'Audit not found' } });
+  });
+
+  it('reads the code from the payload, and nothing else', () => {
+    expect(streamStopOf({ code: 'rate_limited', message: 'x' })).toBe('rate_limited');
+    expect(streamStopOf({ code: 'not_found' })).toBe('not_found');
+    expect(streamStopOf({ message: 'Could not load results.' })).toBeNull();
+    expect(streamStopOf({ code: 'other' })).toBeNull();
+    expect(streamStopOf(JSON.parse('{"__proto__": {"code": "rate_limited"}}'))).toBeNull();
+    expect(streamStopOf(undefined)).toBeNull();
+    expect(streamStopOf('rate_limited')).toBeNull();
   });
 });
