@@ -18,7 +18,9 @@ describe('JSON-LD builders', () => {
       expect(String(ld.url)).toMatch(/^https:\/\/crawlmouse\.com/);
     }
     const app = softwareApplicationLd();
-    expect(app.offers.price).toBe('0'); // honest free tier
+    // With the v2 flags off (as here) v1's single free Offer; flags on, every plan at its price
+    // (lib/seo/site-copy.test.tsx).
+    expect(Array.isArray(app.offers) ? null : app.offers.price).toBe('0'); // honest free tier
     expect('aggregateRating' in app).toBe(false); // never fabricate ratings
   });
 
