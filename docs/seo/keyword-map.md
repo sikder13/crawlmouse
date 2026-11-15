@@ -4,7 +4,7 @@ Rendered by `pnpm seo:keywords` (`scripts/seo/keyword-map.ts`, `apps/web/lib/seo
 
 The export has no page × query table, so a query is attributed to the page whose slug, title and keywords cover most of its words (`apps/web/lib/seo/attribution.ts`). A page with no attributed query takes its first keyword from `lib/blog/posts.ts` when it is a post. Impressions and position are the page’s own, from the export’s Pages table.
 
-185 of 316 queries in the export are attributed to no page.
+143 of 274 queries in the export are attributed to no page.
 
 ## Primary and secondary queries
 

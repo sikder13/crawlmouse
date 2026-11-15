@@ -111,7 +111,7 @@ flags on: 21 app surfaces — noindex 5; not found 3; a redirect 12; an error (5
 
 ## www
 
-`https://www.crawlmouse.com/` answered one 308 to https://crawlmouse.com/: not separately indexable (read 2026-11-15T15:42:30.220Z).
+`https://www.crawlmouse.com/` answered one 308 to https://crawlmouse.com/: not separately indexable (read 2026-11-15T16:01:57.809Z).
 
 ## Pages, flags off
 
