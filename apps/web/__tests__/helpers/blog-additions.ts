@@ -8,6 +8,7 @@ import { V2_EDITS } from '../../lib/blog/v2-edits';
 //   p.post-summary             D4 (a): the direct answer under the H1 (components/blog/ArticleLayout.tsx)
 //   section.post-questions     D4 (b): "Questions this answers" and its FAQPage JSON-LD
 //   .post-author-role          D4 (e): the role and LinkedIn link the byline gains on an authored post
+//   span.post-byline           ruling 2: the byline (author link, role, separator) a post gains once it names an author
 //   sup.post-source            D4 (d): an inline source for a number (lib/blog/post-source.tsx)
 //   nav[aria-label="More on this topic"]   D6: the cluster links (components/blog/ClusterLinks.tsx, per the CC-40 plan)
 //
@@ -19,6 +20,7 @@ export const ADDITION_SELECTORS = [
   'p.post-summary',
   'section.post-questions',
   '.post-author-role',
+  'span.post-byline',
   'sup.post-source',
   'nav[aria-label="More on this topic"]',
 ] as const;

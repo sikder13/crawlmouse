@@ -46,7 +46,7 @@ export function ArticleLayout({
             </h1>
             <div className="mt-4 text-sm text-ink/50">
               {author && (
-                <>
+                <span className="post-byline">
                   <span>
                     By{' '}
                     <Link
@@ -65,7 +65,7 @@ export function ArticleLayout({
                     </span>
                   </span>
                   <span className="mx-2">·</span>
-                </>
+                </span>
               )}
               <time dateTime={meta.publishedAt}>{formatPostDate(meta.publishedAt)}</time>
               {meta.updatedAt && meta.updatedAt !== meta.publishedAt && (

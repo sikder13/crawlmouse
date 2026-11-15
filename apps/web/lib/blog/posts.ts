@@ -73,6 +73,7 @@ export const POSTS: readonly BlogPostMeta[] = [
     publishedAt: '2026-09-06',
     updatedAt: '2026-11-15',
     readingMinutes: 9,
+    author: 'samia-zaman',
   },
   {
     slug: 'screaming-frog-vs-lumar-deepcrawl',
@@ -93,6 +94,7 @@ export const POSTS: readonly BlogPostMeta[] = [
     publishedAt: '2026-08-18',
     updatedAt: '2026-08-18',
     readingMinutes: 9,
+    author: 'samia-zaman',
   },
   {
     slug: 'find-orphan-pages-squarespace',
@@ -111,6 +113,7 @@ export const POSTS: readonly BlogPostMeta[] = [
     publishedAt: '2026-08-18',
     updatedAt: '2026-08-18',
     readingMinutes: 8,
+    author: 'samia-zaman',
   },
   {
     slug: 'block-ai-crawlers-robots-txt',
@@ -131,6 +134,7 @@ export const POSTS: readonly BlogPostMeta[] = [
     publishedAt: '2026-08-18',
     updatedAt: '2026-09-06',
     readingMinutes: 9,
+    author: 'samia-zaman',
   },
   {
     slug: 'sitebulb-vs-jetoctopus-vs-oncrawl',
@@ -150,6 +154,7 @@ export const POSTS: readonly BlogPostMeta[] = [
     publishedAt: '2026-07-22',
     updatedAt: '2026-08-18',
     readingMinutes: 10,
+    author: 'samia-zaman',
   },
   {
     slug: 'can-ai-crawlers-see-javascript',
@@ -171,6 +176,7 @@ export const POSTS: readonly BlogPostMeta[] = [
     publishedAt: '2026-07-06',
     updatedAt: '2026-08-18',
     readingMinutes: 11,
+    author: 'samia-zaman',
   },
   {
     slug: 'sitebulb-vs-screaming-frog',
@@ -192,6 +198,7 @@ export const POSTS: readonly BlogPostMeta[] = [
     publishedAt: '2026-07-06',
     updatedAt: '2026-07-22',
     readingMinutes: 10,
+    author: 'samia-zaman',
   },
   {
     slug: 'find-orphan-pages-webflow',
@@ -211,6 +218,7 @@ export const POSTS: readonly BlogPostMeta[] = [
     publishedAt: '2026-07-06',
     updatedAt: '2026-07-06',
     readingMinutes: 8,
+    author: 'samia-zaman',
   },
   {
     slug: 'sitebulb-alternative',
@@ -235,6 +243,7 @@ export const POSTS: readonly BlogPostMeta[] = [
     publishedAt: '2026-07-04',
     updatedAt: '2026-09-07',
     readingMinutes: 10,
+    author: 'samia-zaman',
   },
   {
     slug: 'discovered-currently-not-indexed',
@@ -256,6 +265,7 @@ export const POSTS: readonly BlogPostMeta[] = [
     publishedAt: '2026-07-04',
     updatedAt: '2026-07-04',
     readingMinutes: 9,
+    author: 'samia-zaman',
   },
   {
     slug: 'find-orphan-pages-shopify',
@@ -276,6 +286,7 @@ export const POSTS: readonly BlogPostMeta[] = [
     publishedAt: '2026-07-04',
     updatedAt: '2026-07-04',
     readingMinutes: 8,
+    author: 'samia-zaman',
   },
   {
     slug: 'find-orphan-pages-wordpress',
@@ -295,6 +306,7 @@ export const POSTS: readonly BlogPostMeta[] = [
     publishedAt: '2026-07-02',
     updatedAt: '2026-07-02',
     readingMinutes: 8,
+    author: 'samia-zaman',
   },
   {
     slug: 'screaming-frog-alternative',
@@ -317,6 +329,7 @@ export const POSTS: readonly BlogPostMeta[] = [
     publishedAt: '2026-07-02',
     updatedAt: '2026-11-15',
     readingMinutes: 8,
+    author: 'samia-zaman',
   },
   {
     slug: 'how-deep-is-too-deep-crawl-depth',
@@ -337,6 +350,7 @@ export const POSTS: readonly BlogPostMeta[] = [
     publishedAt: '2026-06-30',
     updatedAt: '2026-11-15',
     readingMinutes: 8,
+    author: 'samia-zaman',
   },
   {
     slug: 'free-internal-link-audit',
@@ -357,6 +371,7 @@ export const POSTS: readonly BlogPostMeta[] = [
     publishedAt: '2026-06-12',
     updatedAt: '2026-07-02',
     readingMinutes: 8,
+    author: 'samia-zaman',
   },
   {
     slug: 'orphan-pages',
@@ -378,6 +393,7 @@ export const POSTS: readonly BlogPostMeta[] = [
     publishedAt: '2026-06-12',
     updatedAt: '2026-07-02',
     readingMinutes: 9,
+    author: 'samia-zaman',
   },
   {
     slug: 'crawl-depth-site-architecture',
@@ -390,6 +406,7 @@ export const POSTS: readonly BlogPostMeta[] = [
     publishedAt: '2026-06-12',
     updatedAt: '2026-11-15',
     readingMinutes: 9,
+    author: 'samia-zaman',
   },
 ] as const;
 

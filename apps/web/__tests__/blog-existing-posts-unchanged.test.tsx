@@ -5,6 +5,7 @@ import { renderToString } from 'react-dom/server';
 import BlogIndex from '../app/blog/page';
 import { POSTS_BY_SLUG, allPostSlugs } from '../lib/blog/posts';
 import { RULED_CHANGES } from '../lib/blog/ruled-copy';
+import { getAuthor, personLd } from '../lib/blog/authors';
 import { addedQuestions, addedSummary, postAbstract } from '../lib/blog/answers';
 import { POST_SOURCES } from '../lib/blog/post-source';
 import {
@@ -144,7 +145,9 @@ describe('every existing post renders as it did at the baseline, plus the listed
       expect(mine).toEqual({
         'p.post-summary': addedSummary(slug) ? 1 : 0,
         'section.post-questions': addedQuestions(slug).length > 0 ? 1 : 0,
-        '.post-author-role': 0,
+        // Ruling 2: each post names an author, so its byline and role are additions too.
+        '.post-author-role': POSTS_BY_SLUG.get(slug)!.author ? 1 : 0,
+        'span.post-byline': POSTS_BY_SLUG.get(slug)!.author ? 1 : 0,
         'sup.post-source': Object.values(POST_SOURCES).filter((x) => x.slug === slug).length,
       });
       expect(clusters).toBe(0);
@@ -170,7 +173,7 @@ describe('every existing post renders as it did at the baseline, plus the listed
   );
 
   it.each(BASELINE_SLUGS)(
-    '%s: JSON-LD is the baseline outside the additions, but dateModified, an added abstract and ruling 3',
+    '%s: JSON-LD is the baseline outside the additions, but dateModified, an added abstract, the author and ruling 3',
     async (slug) => {
       const { doc } = await renderPostPage(slug);
       stripAdditions(doc);
@@ -184,6 +187,12 @@ describe('every existing post renders as it did at the baseline, plus the listed
             if (n['@type'] === 'Article' && ruledDescription) {
               expect(n.description).toBe(ruledDescription.before);
               n.description = ruledDescription.after;
+            }
+            // Ruling 2: a post that now names an author has that Person in place of the Organization.
+            const author = getAuthor(POSTS_BY_SLUG.get(slug)!.author ?? '');
+            if (n['@type'] === 'Article' && author) {
+              expect(n.author).toEqual({ '@type': 'Organization', name: 'Crawlmouse' });
+              n.author = personLd(author);
             }
           }
           return b;
