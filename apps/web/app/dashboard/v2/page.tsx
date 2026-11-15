@@ -1,4 +1,5 @@
 import '../../../styles/v2/tokens.css';
+import * as Sentry from '@sentry/nextjs';
 import { notFound, redirect } from 'next/navigation';
 import { checksPublicEnabled } from '@/lib/auth/flags';
 import { AccountStateScreen } from '@/components/v2/screens/account/AccountStateScreen';
@@ -13,6 +14,7 @@ import { reachedByRewrite } from '@/lib/v2/rewrite-target';
 import { withSwitcher } from '@/lib/v2/view/account-shell';
 import { dashboardView } from '@/lib/v2/view/dashboard';
 import { noticeLine } from '@/lib/v2/copy/notices';
+import { readEarlierAudits } from './earlier-audits';
 
 // Read per request: a build with the flag off would otherwise prerender this page as its 404.
 export const dynamic = 'force-dynamic';
@@ -40,17 +42,27 @@ export default async function V2Dashboard({
   const r = await loadViewer();
   if (r.kind === 'signed_out') redirect('/login');
   if (r.kind !== 'viewer') return <AccountStateScreen state={r.kind} />;
-  const { account, seat, accounts, tier } = r.viewer;
-  const { d, viewer } = await readAccount(await supabaseServer(), account.id, seat.id, new Date());
-  // The scheduler's own column (CC-28 D8), for the sites the caller's session read.
-  const next = await readNextChecks(
-    supabaseAdmin(),
-    d.sites.map((s) => s.id),
-  );
+  const { account, seat, accounts, tier, userId } = r.viewer;
+  const now = new Date();
+  const { d, viewer } = await readAccount(await supabaseServer(), account.id, seat.id, now);
+  const [next, earlier] = await Promise.all([
+    // The scheduler's own column (CC-28 D8), for the sites the caller's session read.
+    readNextChecks(
+      supabaseAdmin(),
+      d.sites.map((s) => s.id),
+    ),
+    // The signed-in viewer's own v1 audits (CC-36 D5): their id, not the account owner's, since a
+    // v1 audit id is a capability URL. A failed read is reported and the line left out: it is not
+    // worth the dashboard.
+    readEarlierAudits(supabaseAdmin(), userId, now).catch((cause: unknown) => {
+      Sentry.captureException(cause);
+      return [];
+    }),
+  ]);
   return (
     <LiveActions>
       <DashboardScreen
-        data={withSwitcher(dashboardView(d, viewer, next), accounts, account.id)}
+        data={withSwitcher(dashboardView(d, viewer, next, earlier), accounts, account.id)}
         // The form a plan's limit refuses here is the add-site form: its notice names the limit.
         notice={noticeLine(await searchParams, account.timezone, tier)}
       />

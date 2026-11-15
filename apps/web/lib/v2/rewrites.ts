@@ -43,6 +43,27 @@ export const V2_REWRITES: readonly V2Rewrite[] = [
   { from: '/pricing', to: '/v2-pricing', flag: 'billing' },
   { from: '/developers', to: '/v2-developers', flag: 'billing' },
   { from: '/r/:slug', to: '/v2-report/:slug', flag: 'checksPublic' },
+  // CC-36 D3: the kept v1 public pages, in the v2 shell. Each target, under app/(v2-kept), renders
+  // its v1 page's own output with v1's header and footer replaced by v2's, so v1's file is main's.
+  // `/blog/research` comes before `/blog/:slug`, which would also match it.
+  ...[
+    '/ai-readiness-checker',
+    '/audit/:id',
+    '/authors/:slug',
+    '/blog',
+    '/blog/research',
+    '/blog/:slug',
+    '/bot',
+    '/guides',
+    '/login',
+    '/status',
+    '/takedown',
+    '/verify/:id',
+    '/privacy',
+    '/terms',
+    '/aup',
+    '/subprocessors',
+  ].map((from): V2Rewrite => ({ from, to: `/v2-kept${from}`, flag: 'checksPublic' })),
 ];
 
 const PARAM = /^:([a-z]+)$/;
@@ -73,7 +94,7 @@ const targetRoot = (to: string): string => to.split('/:')[0]!;
 export const REWRITE_HEADER = 'x-crawlmouse-v2-rewrite';
 
 /** `path` without one trailing slash; `/` and `//` keep theirs, so neither is read as the other. */
-const withoutSlash = (path: string): string =>
+export const withoutSlash = (path: string): string =>
   path.length > 2 && path.endsWith('/') ? path.slice(0, -1) : path;
 
 /**
@@ -82,7 +103,7 @@ const withoutSlash = (path: string): string =>
  * `/dashboard/v2` there), and with `withRsc` each also without the `.rsc` suffix of a React Server
  * Components request. Null when the path does not decode.
  */
-function spellings(pathname: string, withRsc: boolean): string[] | null {
+export function spellings(pathname: string, withRsc: boolean): string[] | null {
   let decoded: string;
   try {
     decoded = decodeURIComponent(pathname);

@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import V1ReportPage, { generateMetadata as v1Metadata } from '../../r/[slug]/page';
+import { keptPage } from '@/app/(v2-kept)/_lib/KeptShell';
 import { LivePublicReport } from '@/components/v2/screens/public-report/LivePublicReport';
 import { ReportViewBeacon } from '@/components/v2/screens/public-report/ReportViewBeacon';
 import { checksPublicEnabled } from '@/lib/auth/flags';
@@ -12,7 +13,8 @@ import { publicReportTitle, reportPageOf } from '@/lib/v2/view/public-report';
  * The shared report while V2_CHECKS_PUBLIC is on (CC-29 D1, D6): `/r/<slug>` is rewritten here
  * (`V2_REWRITES`, lib/v2/rewrites.ts), and the middleware answers a request for this path itself as
  * not found. A row holding a v2 snapshot renders the v2 report from that snapshot alone; every other
- * row, a missing one included, is v1's page, rendered by v1's own module with the same params.
+ * row, a missing one included, is v1's page, rendered by v1's own module with the same params, in
+ * the v2 shell (CC-36 D3).
  * With the flag off it is a 404 (the rewrite is not applied then, and `/r/<slug>` is v1's files).
  *
  * Cached as v1's page is, so it reads no request header; a view of either kind is counted by a
@@ -48,12 +50,13 @@ export default async function V2ReportPage({ params }: Props) {
   const { slug } = await params;
   const page = reportPageOf(await getPublicReport(slug));
   // v1's page answers 404 itself for a row that is gone; the beacon renders only beside a report.
+  // v1's report is drawn in the v2 shell, its own header and footer taken out (CC-36 D3).
   if (page.kind === 'v1')
-    return (
+    return keptPage(
       <>
         <ReportViewBeacon slug={slug} />
         {await V1ReportPage({ params })}
-      </>
+      </>,
     );
   if (page.kind === 'gone') notFound();
   return <LivePublicReport slug={slug} view={page.view} />;

@@ -13,6 +13,7 @@ import { AccountStateScreen } from '../../../components/v2/screens/account/Accou
 import {
   dashboardPreview,
   firstCheckPreview,
+  noSiteEarlierPreview,
   noSitePreview,
   shellPreview,
   sitePreview,
@@ -126,6 +127,8 @@ export const ACCOUNT_ELEMENTS: Record<string, () => React.ReactElement> = {
   ),
   // CC-26b: the states a live account reaches that no fixture moment holds.
   '/v2-preview/screens/dashboard/no-site': () => <DashboardScreen data={noSitePreview()} />,
+  // CC-36 D5: a viewer who used v1.
+  '/v2-preview/screens/dashboard/earlier': () => <DashboardScreen data={noSiteEarlierPreview()} />,
   '/v2-preview/screens/site/first-check': () => <FirstCheckScreen data={firstCheckPreview()} />,
   '/v2-preview/screens/dashboard/no-account': () => <AccountStateScreen state="no_account" />,
   '/v2-preview/screens/dashboard/ambiguous': () => <AccountStateScreen state="ambiguous" />,

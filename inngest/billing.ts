@@ -108,6 +108,7 @@ export const reconcileBillingManualFn = inngest.createFunction(
 );
 
 // Daily TTL cleanup — bounded/batched delete of expired free audits (cascades to pages/links/findings),
+// keeping an expired audit a public report names (C-4, deleteExpiredAudits),
 // then the rate_limits rows whose window has ended (B-F1, rate-limit-retention.ts), each its own step.
 export const cleanupExpiredAuditsFn = inngest.createFunction(
   { id: 'crawlmouse.audits-ttl-cleanup' },
