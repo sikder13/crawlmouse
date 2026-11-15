@@ -32,6 +32,10 @@ const CAUGHT: Readonly<Record<string, readonly string[]>> = {
   robust: ['A robust crawler.', 'It is robust.', 'Robustly built.'],
   elevate: ['Elevate your SEO.', 'elevating the site'],
   empower: ['We empower agencies.', 'empowering teams'],
+  'high-leverage': [
+    'the cheapest, highest-leverage fix you have.',
+    'Fix the cheap, high-leverage problems first.',
+  ],
   'leverage (verb)': [
     'Leverage your internal links.',
     'You can leverage the sitemap.',
@@ -89,6 +93,7 @@ const CAUGHT: Readonly<Record<string, readonly string[]>> = {
 
 // The other side of each narrowed entry, and of the negation rule: sentences it must not catch.
 const NOT_CAUGHT: Readonly<Record<string, readonly string[]>> = {
+  'high-leverage': ['The leverage a hub page gives is real.', 'Leverage your links.'],
   'leverage (verb)': [
     'the cheapest, highest-leverage fix you have.',
     'Fix the cheap, high-leverage problems first.',

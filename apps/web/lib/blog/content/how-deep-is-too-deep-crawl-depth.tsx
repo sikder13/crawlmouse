@@ -136,7 +136,7 @@ export function HowDeepIsTooDeepBody() {
         <li>
           <strong>Link to it from a shallow, relevant page.</strong> A single contextual link from your
           homepage, a hub page, or a popular article can lift a page several levels in one move. This is
-          the cheapest, highest-leverage fix you have.
+          the cheapest, highest-impact fix you have.
         </li>
         <li>
           <strong>Strengthen your hub and category pages</strong> so they actually link down to the

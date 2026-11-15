@@ -71,6 +71,13 @@ export const BANNED_PHRASES: readonly BannedPhrase[] = [
       `|\\b(?:to|can|could|will|would|should|must|might|may|we|i|they|you${APOS}ll|let${APOS}s|helps?|and) leverage\\b` +
       '|(?<!\\b(?:the|a|of|more|less|some|no|any|much|your|our|their|its)[- ])(?<![\\w-])leverage (?:your|the|our|their|its|this|that|these|those|existing|it|them|every|each|all)\\b',
   ),
+  // The compound adjective, which the verb entry above does not catch: CTO ruling 2 named both of
+  // the site's uses of it for replacement.
+  phrase(
+    'high-leverage',
+    '\\bhigh(?:est|er)?[- ]leverage\\b',
+    'consultant jargon for "the most effective"; ruling 2 asked for the plain word',
+  ),
   phrase('holistic', '\\bholistic(?:ally)?\\b'),
   phrase('synergy', '\\bsynerg(?:y|ies|istic)\\b'),
   phrase('paradigm', '\\bparadigms?\\b'),

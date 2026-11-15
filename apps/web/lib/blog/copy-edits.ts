@@ -18,6 +18,8 @@ export interface CopyEdit extends V2Edit {
 
 const content = (slug: string) => `lib/blog/content/${slug}.tsx`;
 const CLOUDFLARE = 'cloudflare-ai-crawler-defaults-september-15';
+const HOW_DEEP = 'how-deep-is-too-deep-crawl-depth';
+const FREE_AUDIT = 'free-internal-link-audit';
 
 export const COPY_EDITS: readonly CopyEdit[] = [
   {
@@ -38,6 +40,36 @@ export const COPY_EDITS: readonly CopyEdit[] = [
         'This isn’t a rare setup: many sites sit behind an edge or CDN layer whose rules can override whatever robots.txt declares.',
     },
     why: 'The repository holds no count behind it, and none can be made here without querying production: `audits.ai_readiness` records `accessMatrix.wafDetected` per audit, which counts recent audits (free audits expire after 30 days), not distinct sites. Owner: a measured number can replace "many".',
+  },
+  {
+    slug: HOW_DEEP,
+    file: content(HOW_DEEP),
+    line: 139,
+    reason: 'banned-phrase',
+    source: {
+      before: 'the cheapest, highest-leverage fix you have.',
+      after: 'the cheapest, highest-impact fix you have.',
+    },
+    html: {
+      before: 'the cheapest, highest-leverage fix you have.',
+      after: 'the cheapest, highest-impact fix you have.',
+    },
+    why: 'Ruling 2 named this "leverage" for the plainest word that keeps the meaning.',
+  },
+  {
+    slug: FREE_AUDIT,
+    file: content(FREE_AUDIT),
+    line: 107,
+    reason: 'banned-phrase',
+    source: {
+      before: '<strong>Fix the cheap, high-leverage problems first.</strong>',
+      after: '<strong>Fix the cheap, high-impact problems first.</strong>',
+    },
+    html: {
+      before: '<strong>Fix the cheap, high-leverage problems first.</strong>',
+      after: '<strong>Fix the cheap, high-impact problems first.</strong>',
+    },
+    why: 'Ruling 2 named this "leverage" for the plainest word that keeps the meaning.',
   },
 ];
 
