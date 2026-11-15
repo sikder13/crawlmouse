@@ -7,7 +7,9 @@
  *
  * - `subscription_started` — an applied checkout (`trial: false`), or an applied Agency or
  *   card-required trial start (`trial: true`).
- * - `trial_converted` — the transition carries the machine's `trial.converted`.
+ * - `trial_converted` — the transition carries the machine's `trial.converted` (a no-card trial's
+ *   paying checkout), or an applied subscription update takes a trial state to a paid one (a card
+ *   trial's subscription turning active).
  * - `plan_changed` — an applied `subscription_updated` that moves between the two paid tiers.
  * - `subscription_canceled` — an update to the followed subscription that turns
  *   `cancel_at_period_end` from false to true (`at_period_end: true`), or an applied deletion whose
@@ -94,9 +96,14 @@ export function paymentEvents(i: PaymentEventInput): PaymentEvent[] {
     });
   }
 
-  const converted = transition.effects.some(
-    (x) => x.kind === 'event' && x.name === 'trial.converted',
-  );
+  // The machine marks a no-card trial's paying checkout. A card trial converts when its own
+  // subscription turns active: an applied update that takes a trial state to a paid one.
+  const converted =
+    transition.effects.some((x) => x.kind === 'event' && x.name === 'trial.converted') ||
+    (applied &&
+      e.type === 'subscription_updated' &&
+      (before.state === 'pro_trial' || before.state === 'agency_trial') &&
+      (after.state === 'pro' || after.state === 'agency'));
   if (converted && after.tier !== 'free') {
     out.push({ event: 'trial_converted', properties: { plan: after.tier } });
   }

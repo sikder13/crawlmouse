@@ -201,6 +201,28 @@ describe('paymentEvents: subscription_started', () => {
     ]);
   });
 
+  it('an Agency trial whose subscription turns active converts: trial_converted, no plan_changed', () => {
+    const started = next(FREE_START, {
+      type: 'agency_trial_started',
+      at: new Date(AT.getTime() - 14 * DAY),
+      trialEnd: new Date(AT.getTime() - DAY),
+      subscriptionId: 'sub_1',
+      subscriptionStatus: 'trialing',
+    });
+    if (started.outcome !== 'applied') throw new Error('the trial did not start');
+    expect(started.state.state).toBe('agency_trial');
+    const stripe = stripeEvent('customer.subscription.updated', subscriptionObject(false), {
+      status: 'trialing',
+    });
+    expect(
+      paymentEvents(input(started.state, updated('agency'), stripe, mirror('agency'))),
+    ).toEqual([{ event: 'trial_converted', properties: { plan: 'agency' } }]);
+    // A paid account's update that changes nothing converts nothing.
+    expect(
+      paymentEvents(input(paid('agency'), updated('agency'), stripe, mirror('agency'))),
+    ).toEqual([]);
+  });
+
   it('an Agency trial that starts: trial true, the amount the session charged now', () => {
     const e: EntitlementEvent = {
       type: 'agency_trial_started',
