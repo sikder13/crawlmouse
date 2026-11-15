@@ -7,6 +7,8 @@ const h = vi.hoisted(() => ({
   capture: vi.fn(),
   flush: vi.fn(async (_ms: number) => true),
   client: { name: 'client' } as unknown,
+  posthog: vi.fn(async (_body: unknown) => undefined),
+  internal: vi.fn(async (_distinctId: string, _accountId: unknown) => false),
 }));
 
 vi.mock('server-only', () => ({}));
@@ -16,6 +18,12 @@ vi.mock('@sentry/nextjs', () => ({
   flush: h.flush,
   getClient: () => h.client,
 }));
+// The real captureServerEvent runs; PostHog's endpoint and the internal-account lookup are fakes.
+vi.mock('../analytics-server', async (original) => ({
+  ...(await original<typeof import('../analytics-server')>()),
+  posthogSend: h.posthog,
+}));
+vi.mock('../v2/ops/internal-marker', () => ({ isInternalEvent: h.internal }));
 vi.mock('./stripe-account', () => ({
   stripeAccount: () => ({ subscriptions: { retrieve: h.retrieve, cancel: h.cancel } }),
 }));
@@ -27,6 +35,7 @@ beforeEach(() => {
   h.client = { name: 'client' };
   h.flush.mockResolvedValue(true);
   h.retrieve.mockResolvedValue({ status: 'active' });
+  h.internal.mockResolvedValue(false);
 });
 
 describe('productionSinks', () => {
@@ -88,6 +97,54 @@ describe('productionSinks', () => {
       'evt_1',
     );
     log.mockRestore();
+  });
+});
+
+describe('productionSinks capture', () => {
+  const capture = {
+    kind: 'capture' as const,
+    uuid: 'f81a0237-f9f2-55b2-8a80-e46dd9bad046',
+    event: 'payment_failed' as const,
+    distinctId: 'user-1',
+    accountId: 'acct-1',
+    timestamp: '2099-01-01T00:00:00.000Z',
+    properties: { plan: 'pro' as const, attempt: 2 },
+  };
+
+  it('posts the planned body: the owner, the planned uuid and time, account_id, no person profile', async () => {
+    await productionSinks().capture!(capture);
+    expect(h.posthog.mock.calls).toEqual([
+      [
+        {
+          event: 'payment_failed',
+          distinct_id: 'user-1',
+          uuid: 'f81a0237-f9f2-55b2-8a80-e46dd9bad046',
+          timestamp: '2099-01-01T00:00:00.000Z',
+          properties: {
+            plan: 'pro',
+            attempt: 2,
+            account_id: 'acct-1',
+            $process_person_profile: false,
+            $geoip_disable: true,
+          },
+        },
+      ],
+    ]);
+    expect(h.internal.mock.calls.map((c) => c.slice(0, 2))).toEqual([['user-1', 'acct-1']]);
+  });
+
+  it('posts the same body for the same planned capture', async () => {
+    await productionSinks().capture!(capture);
+    await productionSinks().capture!(capture);
+    expect(JSON.stringify(h.posthog.mock.calls[1])).toBe(JSON.stringify(h.posthog.mock.calls[0]));
+  });
+
+  it("marks an internal account's event", async () => {
+    h.internal.mockResolvedValue(true);
+    await productionSinks().capture!(capture);
+    expect((h.posthog.mock.calls[0]![0] as { properties: object }).properties).toMatchObject({
+      internal: true,
+    });
   });
 });
 

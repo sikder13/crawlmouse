@@ -38,6 +38,10 @@ export interface CaptureBody {
   event: FunnelEvent;
   distinct_id: string;
   properties: Record<string, unknown>;
+  /** The event's own id, for a sender that sends one event more than once (lib/billing/effect-sinks.ts). */
+  uuid?: string;
+  /** When the event happened, as ISO, where that is not when it is sent. */
+  timestamp?: string;
 }
 
 export type SendCapture = (body: CaptureBody) => Promise<void>;
