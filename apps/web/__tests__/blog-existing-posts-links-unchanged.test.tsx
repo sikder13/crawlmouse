@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { POSTS, postsWithTag } from '../lib/blog/posts';
 import { renderPostPage } from './helpers/blog-render';
+import { stripAdditions } from './helpers/blog-additions';
 
 // Owner ruling before merging C-01: every post that existed before it keeps exactly the internal
 // links it had, in the same order, on the whole page (header, breadcrumbs, body, the call to action,
@@ -10,14 +11,21 @@ import { renderPostPage } from './helpers/blog-render';
 // show the two newest posts. The fixture is every internal href (starting with "/") on each post
 // page as main served it at `capturedFrom`, captured in a worktree of that commit with
 // __tests__/helpers/blog-render.tsx.
+//
+// CC-40 (owner brief of 2026-11-15) adds links to these pages in named containers only (D6's cluster
+// links; helpers/blog-additions.ts lists the containers). The comparison is "baseline plus listed
+// additions only": the links outside those containers must be the baseline's, in order. The
+// research-post rule is checked on the whole page, additions included.
 
 const fixture = JSON.parse(
   readFileSync(resolve(__dirname, '__fixtures__/blog-baseline-links.json'), 'utf8'),
 ) as { capturedFrom: string; posts: Record<string, string[]> };
 const SLUGS = Object.keys(fixture.posts);
 
-async function internalLinks(slug: string): Promise<string[]> {
+/** The page's internal links, outside the addition containers unless `withAdditions`. */
+async function internalLinks(slug: string, withAdditions = false): Promise<string[]> {
   const { doc } = await renderPostPage(slug);
+  if (!withAdditions) stripAdditions(doc);
   return [...doc.querySelectorAll('a[href]')]
     .map((a) => a.getAttribute('href')!)
     .filter((h) => h.startsWith('/'));
@@ -46,12 +54,12 @@ describe('the links fixture is what it claims to be', () => {
   });
 });
 
-describe('every existing post keeps exactly its internal links', () => {
+describe('every existing post keeps exactly its internal links, outside the listed additions', () => {
   it.each(SLUGS)('%s: same internal links, same order', async (slug) => {
     expect(await internalLinks(slug)).toEqual(fixture.posts[slug]);
   });
 
-  it('the inbound link count of every target, over the 17 pages, is unchanged', async () => {
+  it('the inbound link count of every target, over the 17 pages and outside the additions, is unchanged', async () => {
     const now: Record<string, string[]> = {};
     for (const slug of SLUGS) now[slug] = await internalLinks(slug);
     expect(inbound(now)).toEqual(inbound(fixture.posts));
@@ -61,7 +69,7 @@ describe('every existing post keeps exactly its internal links', () => {
     const research = postsWithTag('research').map((p) => `/blog/${p.slug}`);
     expect(research.length).toBeGreaterThan(0);
     for (const slug of SLUGS) {
-      const links = await internalLinks(slug);
+      const links = await internalLinks(slug, true);
       expect(
         links.filter((h) => research.includes(h)),
         slug,

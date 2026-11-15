@@ -6,6 +6,8 @@ import { Footer } from '@/components/layout/Footer';
 import type { BlogPostMeta } from '@/lib/blog/posts';
 import { formatPostDate } from '@/lib/blog/format';
 import { authorPath, getAuthor } from '@/lib/blog/authors';
+import { addedQuestions, addedSummary } from '@/lib/blog/answers';
+import { JsonLd, faqLd } from '@/lib/seo/jsonld';
 
 export function ArticleLayout({
   meta,
@@ -18,6 +20,10 @@ export function ArticleLayout({
 }) {
   // A post that names no author, or a slug not in the map, renders exactly as before: no byline.
   const author = meta.author ? getAuthor(meta.author) : null;
+  // The answer layer (lib/blog/answers.ts). Each piece renders in its own named container, which
+  // __tests__/blog-existing-posts-unchanged.test.tsx sets aside before comparing with the baseline.
+  const summary = addedSummary(meta.slug);
+  const questions = addedQuestions(meta.slug);
   return (
     <>
       <Header />
@@ -49,6 +55,13 @@ export function ArticleLayout({
                     >
                       {author.name}
                     </Link>
+                    <span className="post-author-role">
+                      , {author.role} (
+                      <a href={author.linkedin} className="hover:text-peach">
+                        LinkedIn
+                      </a>
+                      )
+                    </span>
                   </span>
                   <span className="mx-2">·</span>
                 </>
@@ -57,14 +70,38 @@ export function ArticleLayout({
               {meta.updatedAt && meta.updatedAt !== meta.publishedAt && (
                 <>
                   <span className="mx-2">·</span>
-                  <time dateTime={meta.updatedAt}>Updated {formatPostDate(meta.updatedAt)}</time>
+                  <time dateTime={meta.updatedAt}>
+                    Last updated {formatPostDate(meta.updatedAt)}
+                  </time>
                 </>
               )}
               <span className="mx-2">·</span>
               <span>{meta.readingMinutes} min read</span>
             </div>
+            {summary && (
+              <p className="post-summary mt-6 text-lg text-ink/80 leading-relaxed">{summary}</p>
+            )}
           </header>
           <div className="article-prose">{children}</div>
+          {questions.length > 0 && (
+            <section className="post-questions mt-16" aria-labelledby="questions-this-answers">
+              <h2
+                id="questions-this-answers"
+                className="font-display font-semibold text-2xl text-ink"
+              >
+                Questions this answers
+              </h2>
+              {questions.map((q) => (
+                <div key={q.question} className="mt-6">
+                  <h3 className="font-display font-semibold text-lg text-ink">{q.question}</h3>
+                  <p className="mt-2 text-ink/70 leading-relaxed">{q.text}</p>
+                </div>
+              ))}
+              <JsonLd
+                data={faqLd(questions.map((q) => ({ question: q.question, answer: q.text })))}
+              />
+            </section>
+          )}
         </article>
 
         <aside className="mt-16 rounded-2xl border border-oat bg-white p-8 text-center">

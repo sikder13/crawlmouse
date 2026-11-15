@@ -3,15 +3,22 @@ import type { Metadata } from 'next';
 import { getPost } from '@/lib/blog/registry';
 import { allPostSlugs, postsNewestFirst } from '@/lib/blog/posts';
 import { ArticleLayout } from '@/components/blog/ArticleLayout';
-import { JsonLd, articleLd, breadcrumbLd } from '@/lib/seo/jsonld';
+import { JsonLd, articleLd, breadcrumbLd, datasetLd } from '@/lib/seo/jsonld';
 import { siteUrl } from '@/lib/site-url';
 import { getAuthor, personLd } from '@/lib/blog/authors';
 import type { BlogPostMeta } from '@/lib/blog/posts';
+import { getDataset } from '@/lib/blog/datasets';
 
 /** The Article node, with a named author as a Person in place of the Organization. */
 function articleNode(meta: BlogPostMeta) {
   const author = meta.author ? getAuthor(meta.author) : null;
   return author ? { ...articleLd(meta), author: personLd(author) } : articleLd(meta);
+}
+
+/** A research post's Dataset node, created by the post's author, or none. */
+function datasetNodes(meta: BlogPostMeta) {
+  const data = getDataset(meta.slug);
+  return data ? [datasetLd(meta, data, articleNode(meta).author)] : [];
 }
 
 export function generateStaticParams() {
@@ -66,6 +73,7 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
             { name: 'Blog', path: '/blog' },
             { name: meta.title, path: `/blog/${meta.slug}` },
           ]),
+          ...datasetNodes(meta),
         ]}
       />
       <ArticleLayout meta={meta} related={related}>

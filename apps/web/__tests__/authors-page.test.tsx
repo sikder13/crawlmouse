@@ -107,7 +107,7 @@ describe('the sitemap lists published author pages', () => {
       newest(postsByAuthor('udaay-sikder').map((p) => p.slug)),
     );
     expect(at('/blog/research')).toBe(newest(postsWithTag('research').map((p) => p.slug)));
-    // Independent of the helpers: the one research post's own date.
-    expect(at('/blog/research')).toBe(new Date('2026-10-28').getTime());
+    // Independent of the helpers: the one research post's own updatedAt (CC-40 D4 moved it).
+    expect(at('/blog/research')).toBe(new Date('2026-11-15').getTime());
   });
 });
