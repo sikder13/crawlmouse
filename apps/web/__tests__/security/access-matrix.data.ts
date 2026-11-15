@@ -815,11 +815,13 @@ const ROUTES: readonly Spec[] = [
     v2: false,
     identity: 'anyone',
     gate: 'public',
-    detail: 'Counts a view of a live report: a per-IP bucket and an event, nothing read back.',
+    detail:
+      'Counts a view of a live report: a per-IP bucket and an event, nothing read back. The service-role read is the report’s `account_id` by slug, so the event can be marked internal.',
     proof: by(
       'app/api/reports/[slug]/view/route.test.ts',
       'a live v2 report: 204 and one report_viewed {kind: v2}, keyed by the report',
     ),
+    calls: 1,
   },
   {
     path: 'api/reports/hide',
@@ -2011,6 +2013,7 @@ const LIBS: readonly Spec[] = [
       'apps/web/app/api/reports/[slug]/claim/route.ts',
       'apps/web/app/api/reports/[slug]/logo/route.ts',
       'apps/web/app/api/reports/[slug]/mine/route.ts',
+      'apps/web/app/api/reports/[slug]/view/route.ts',
       'apps/web/app/api/reports/[slug]/visibility/route.ts',
       'apps/web/app/api/reports/[slug]/white-label/route.ts',
       'apps/web/app/api/reports/hide/route.ts',

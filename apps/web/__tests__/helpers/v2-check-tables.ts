@@ -424,6 +424,9 @@ export const ROWS = {
     occurred_at: T1,
     state: 'send',
   }),
+  // CC-38: the record of an account qa:seed made. It names an account and holds no foreign key;
+  // service only.
+  qa_accounts: (accountId: string): Row => ({ account_id: accountId, qa_key: 'free' }),
   account_slack_destinations: (accountId: string, secretId: string): Row => ({
     account_id: accountId,
     vault_secret_id: secretId,
@@ -561,6 +564,8 @@ export const TABLES_028: readonly NewTable[] = ['email_sends', 'email_suppressio
 export const TABLES_029: readonly NewTable[] = ['contact_requests'];
 /** The public tables 033 creates. */
 export const TABLES_033: readonly NewTable[] = ['operators', 'operator_actions', 'founder_notices'];
+/** The public tables CC-38's migration creates. */
+export const TABLES_038: readonly NewTable[] = ['qa_accounts'];
 /** The tables 003 creates. */
 export const NEW_TABLES = (Object.keys(ROWS) as NewTable[])
   .filter(
@@ -571,10 +576,11 @@ export const NEW_TABLES = (Object.keys(ROWS) as NewTable[])
       !TABLES_027B.includes(t) &&
       !TABLES_028.includes(t) &&
       !TABLES_029.includes(t) &&
-      !TABLES_033.includes(t),
+      !TABLES_033.includes(t) &&
+      !TABLES_038.includes(t),
   )
   .sort();
-/** Every public table 003, 006b, 008, 026b, 027b, 028, 029 and 033 create. */
+/** Every public table 003, 006b, 008, 026b, 027b, 028, 029, 033 and CC-38's migration create. */
 export const ALL_NEW_TABLES = (Object.keys(ROWS) as NewTable[]).sort();
 
 /** Where a seeded row belongs: one of the account's two sites, or the account as a whole. */
@@ -639,6 +645,11 @@ export async function seedWorld(db: Db, tag: string): Promise<World> {
     `select to_regclass('public.operators')::text as t`,
   );
   const with033 = operators[0]!.t !== null;
+  // Nor, migrated before CC-38's migration, qa_accounts.
+  const { rows: qa } = await db.query<{ t: string | null }>(
+    `select to_regclass('public.qa_accounts')::text as t`,
+  );
+  const with038 = qa[0]!.t !== null;
   // A database migrated before 006d (the revert tests of 003 to 006c) has no identity columns.
   const { rows: identity } = await db.query<{ n: number }>(
     `select count(*)::int as n from pg_attribute
@@ -857,6 +868,9 @@ export async function seedWorld(db: Db, tag: string): Promise<World> {
       { event_key: key },
       'account',
     );
+  }
+  if (with038) {
+    await put('qa_accounts', ROWS.qa_accounts(accountId), { account_id: accountId }, 'account');
   }
   await put(
     'seat_sites',
