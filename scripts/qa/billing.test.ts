@@ -19,13 +19,7 @@ import {
 import { exitCode, seed } from './seed';
 import { qaBillingAccounts } from './store';
 import type { PGlite } from '@electric-sql/pglite';
-import {
-  HAS_INTERNAL_MARKER,
-  migratedBase,
-  PGLITE_TIMEOUT,
-  withMarker,
-  world,
-} from './test-support';
+import { migratedBase, PGLITE_TIMEOUT, pgliteTest, world } from './test-support';
 
 /**
  * CC-38 D1(b), `qa:seed --billing`: its refusals, a second run, parity with the app's own Checkout
@@ -36,7 +30,7 @@ import {
 
 let base: PGlite;
 beforeAll(async () => {
-  if (HAS_INTERNAL_MARKER) base = await migratedBase();
+  base = await migratedBase();
 }, 300_000);
 
 const NOW = new Date('2026-11-14T12:00:00.000Z');
@@ -618,7 +612,7 @@ describe('qa:seed --billing on PGlite: the real webhook carries the plan', () =>
     };
   }
 
-  withMarker(
+  pgliteTest(
     'each completed session leaves its account on its plan, and a second run opens nothing',
     async () => {
       const w = await world(base);
@@ -656,7 +650,7 @@ describe('qa:seed --billing on PGlite: the real webhook carries the plan', () =>
     PGLITE_TIMEOUT,
   );
 
-  withMarker(
+  pgliteTest(
     'refuses through the real store: a missing row, and internal false',
     async () => {
       const w = await world(base);

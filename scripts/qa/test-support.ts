@@ -7,6 +7,8 @@ import { supabaseEntitlementStore } from '../../apps/web/lib/billing/state-machi
 import type { QaKey } from './accounts';
 import { migrationsAddInternal } from './marker-gate';
 import type { QaAuth, SeedDeps } from './seed';
+import { runInternal } from '../ops/internal';
+import { restClient } from '../ops/supabase-rest';
 import { qaStore } from './store';
 
 /**
@@ -18,27 +20,28 @@ import { qaStore } from './store';
  */
 
 /**
- * Whether a migration adds `accounts.internal` (./marker-gate.ts). Until `origin/main` carries one
- * (CC-38 questions Q1) the tests that need the column are `todo`; they run as soon as one is on the
- * tree, whatever its file is called.
+ * The tests below need `accounts.internal` (CC-33's migration, on the tree since the CC-33 merge). Its
+ * absence is a failure, not a reason to skip: a renamed or reverted migration turns these red.
  */
-export const HAS_INTERNAL_MARKER = migrationsAddInternal();
-const NEEDS_CC33 = 'needs accounts.internal from CC-33 (PR #83), not yet on origin/main';
+if (!migrationsAddInternal()) {
+  throw new Error(
+    'no migration adds accounts.internal: CC-33 (20261115000001) is missing from the tree',
+  );
+}
 
 /** The time a PGlite test may take: each builds a database with every migration, 5-7 s under load. */
 export const PGLITE_TIMEOUT = 60_000;
 
 /**
- * `it` once a migration adds `accounts.internal`; until then `it.todo`, its name carrying the reason.
- * The timeout is required: vitest's 5 s default is shorter than a seeded PGlite test under load.
+ * `it` for a test over PGlite with every migration. The timeout is required: vitest's 5 s default is
+ * shorter than a seeded PGlite test under load.
  */
-export function withMarker(
+export function pgliteTest(
   name: string,
   fn: (ctx: TestContext) => Promise<void>,
   timeout: number,
 ): void {
-  if (HAS_INTERNAL_MARKER) it(name, fn, timeout);
-  else it.todo(`${name} (${NEEDS_CC33})`);
+  it(name, fn, timeout);
 }
 
 /**
@@ -126,10 +129,13 @@ export async function world(base?: PGlite): Promise<World> {
       // CRAWL_PAUSED as the operator's shell holds it; a test turns it on through `world.pause`.
       paused: () => pausedNow,
     }),
-    async markInternal(accountId) {
-      // What CC-33's runInternal does: PATCH accounts set internal = true, by id.
-      await db.query('update public.accounts set internal = true where id = $1', [accountId]);
-    },
+    // CC-33's ops:internal module itself, over its REST client, answered by the PostgREST stand-in.
+    markInternal: (accountId) =>
+      runInternal(
+        [accountId],
+        restClient({ url: 'http://pglite', key: 'service', fetch: pgliteFetch(sb) }),
+        () => {},
+      ),
     inbox: { local: 'qa', domain: 'example.test' },
     async confirm(prompt) {
       asked.push(prompt);
@@ -154,6 +160,28 @@ export async function world(base?: PGlite): Promise<World> {
     pause: (on: boolean) => {
       pausedNow = on;
     },
+  };
+}
+
+/**
+ * A `fetch` for CC-33's REST client (scripts/ops/supabase-rest.ts) answered by the PostgREST stand-in
+ * over PGlite: `PATCH /rest/v1/<table>?<col>=eq.<v>&select=<cols>` with `return=representation`, the one
+ * request `runInternal` makes. Anything else is refused, so a new request shows here first.
+ */
+function pgliteFetch(sb: SupabaseClient) {
+  return async (input: string | URL, init?: RequestInit): Promise<Response> => {
+    const url = new URL(String(input));
+    const table = url.pathname.replace('/rest/v1/', '');
+    if (init?.method !== 'PATCH') throw new Error(`pgliteFetch: ${init?.method} is not modelled`);
+    let q = sb.from(table).update(JSON.parse(String(init.body)));
+    for (const [k, v] of url.searchParams) {
+      if (k === 'select') continue;
+      if (!v.startsWith('eq.')) throw new Error(`pgliteFetch: filter ${k}=${v} is not modelled`);
+      q = q.eq(k, v.slice(3));
+    }
+    const { data, error } = await q.select(url.searchParams.get('select') ?? '*');
+    if (error) return new Response(JSON.stringify(error), { status: 400 });
+    return new Response(JSON.stringify(data), { status: 200 });
   };
 }
 

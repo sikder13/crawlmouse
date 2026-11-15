@@ -1,3 +1,5 @@
+import { runInternal } from '../ops/internal';
+import { restClient } from '../ops/supabase-rest';
 import { stdin, stdout } from 'node:process';
 import { createInterface } from 'node:readline/promises';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
@@ -120,7 +122,8 @@ const ask = asker(stdin, stdout);
 export function wire(env: Env, print: (line: string) => void): Wired {
   const inbox = qaInbox(env);
   const url = need(env, 'SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_URL');
-  const sb = createClient(url, need(env, 'SUPABASE_SERVICE_ROLE_KEY'), {
+  const serviceKey = need(env, 'SUPABASE_SERVICE_ROLE_KEY');
+  const sb = createClient(url, serviceKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
   const auth = adminAuth(sb);
@@ -168,13 +171,13 @@ export function wire(env: Env, print: (line: string) => void): Wired {
     paused: () => isCrawlPaused(env),
   });
 
+  const internalRest = restClient({ url, key: serviceKey });
+
   const seed: SeedDeps = {
     auth,
     store,
-    // CC-33's runInternal (scripts/ops/internal.ts) is not on this tree; the merge binds it here.
-    markInternal: async () => {
-      throw new Error('qa:seed needs CC-33 (scripts/ops/internal.ts); questions Q1');
-    },
+    // CC-33's `pnpm ops:internal` module, as its CLI calls it: the account's id, over its REST client.
+    markInternal: (accountId) => runInternal([accountId], internalRest, print),
     inbox,
     confirm: ask,
     print,

@@ -53,9 +53,11 @@ Set as a literal:
 
 - `audit-failed`
 - `crawl-degraded`
+- `founder-notice-failed`
 - `landing-failed`
 - `reconcile-drift`
 - `schedule-claim`
+- `signin-canary`
 - `stripe-account-webhook`
 - `stripe-account-webhook-sig-fail`
 - `stripe-webhook-sig-fail`

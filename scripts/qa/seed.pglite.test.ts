@@ -7,11 +7,10 @@ import { normalizeEmail } from '../../apps/web/lib/auth/normalize-email';
 import type { PGlite } from '@electric-sql/pglite';
 import {
   dump,
-  HAS_INTERNAL_MARKER,
   migratedBase,
   PGLITE_TIMEOUT,
   SAMPLE_PEPPER,
-  withMarker,
+  pgliteTest,
   world,
 } from './test-support';
 
@@ -23,11 +22,11 @@ import {
 
 let base: PGlite;
 beforeAll(async () => {
-  if (HAS_INTERNAL_MARKER) base = await migratedBase();
+  base = await migratedBase();
 }, 300_000);
 
 describe('qa:seed part (a)', () => {
-  withMarker(
+  pgliteTest(
     `makes the set: a user and an internal, marked account for each key`,
     async () => {
       const w = await world(base);
@@ -56,7 +55,7 @@ describe('qa:seed part (a)', () => {
     PGLITE_TIMEOUT,
   );
 
-  withMarker(
+  pgliteTest(
     `a second run changes no row and says every step is unchanged`,
     async () => {
       const w = await world(base);
@@ -71,7 +70,7 @@ describe('qa:seed part (a)', () => {
     PGLITE_TIMEOUT,
   );
 
-  withMarker(
+  pgliteTest(
     `starts qa+protrial's no-card Pro trial through the door's decision`,
     async () => {
       const w = await world(base);
@@ -87,7 +86,7 @@ describe('qa:seed part (a)', () => {
     PGLITE_TIMEOUT,
   );
 
-  withMarker(
+  pgliteTest(
     `a step the plan does not allow yet waits for it, and nothing else is refused`,
     async () => {
       const w = await world(base);
@@ -101,7 +100,7 @@ describe('qa:seed part (a)', () => {
     PGLITE_TIMEOUT,
   );
 
-  withMarker(
+  pgliteTest(
     `refuses a QA address someone else signed up with, and touches its account not at all`,
     async () => {
       const w = await world(base);
@@ -122,7 +121,7 @@ describe('qa:seed part (a)', () => {
     PGLITE_TIMEOUT,
   );
 
-  withMarker(
+  pgliteTest(
     `refuses an account whose user it made but whose marker is missing`,
     async () => {
       const w = await world(base);
@@ -136,7 +135,7 @@ describe('qa:seed part (a)', () => {
     PGLITE_TIMEOUT,
   );
 
-  withMarker(
+  pgliteTest(
     `refuses when ops:internal leaves accounts.internal false`,
     async () => {
       const w = await world(base);
@@ -152,11 +151,11 @@ describe('qa:seed part (a)', () => {
     PGLITE_TIMEOUT,
   );
 
-  withMarker(
-    `the ledger's refusal of the trial is reported as refused, with its outcome named`,
+  pgliteTest(
+    `the inbox owner's earlier trial does not refuse qa+protrial's, and it writes no ledger row (CC-37 D3a)`,
     async () => {
-      // F3: until CC-37 skips the plus-stripping for internal accounts, qa+protrial's address hashes as
-      // the bare inbox does, so a trial the inbox's owner took refuses it.
+      // qa+protrial's address hashes as the bare inbox does; since CC-37 an internal account's trial is
+      // refused by no ledger row and writes none (migration 20261117000001, section A).
       const w = await world(base);
       const hash = hashLedgerValue(
         SAMPLE_PEPPER,
@@ -169,14 +168,17 @@ describe('qa:seed part (a)', () => {
       );
       const steps = await seed(w.deps);
       const trial = steps.find((s) => s.key === 'protrial' && s.step === 'pro trial');
-      expect(trial?.outcome).toBe('refused');
-      expect(trial?.detail).toMatch(/^denied: /);
-      expect(exitCode(steps)).toBe(1);
+      expect(trial?.outcome).toBe('done');
+      expect(exitCode(steps)).toBe(0);
+      const rows = await w.db.query<{ n: number }>(
+        `select count(*)::int n from public.trial_ledger`,
+      );
+      expect(rows.rows[0]?.n).toBe(1);
     },
     PGLITE_TIMEOUT,
   );
 
-  withMarker(
+  pgliteTest(
     `a first audit whose send fails is reported with its site, and the run goes on`,
     async () => {
       const w = await world(base);
@@ -197,7 +199,7 @@ describe('qa:seed part (a)', () => {
     PGLITE_TIMEOUT,
   );
 
-  withMarker(
+  pgliteTest(
     `prints the addresses it will create, and creates none unless the phrase is typed`,
     async () => {
       for (const typed of [
@@ -228,7 +230,7 @@ describe('qa:seed part (a)', () => {
     PGLITE_TIMEOUT,
   );
 
-  withMarker(
+  pgliteTest(
     `asks for the users it is missing only, and asks nothing once every user exists`,
     async () => {
       const w = await world(base);
@@ -249,7 +251,7 @@ describe('qa:seed part (a)', () => {
     PGLITE_TIMEOUT,
   );
 
-  withMarker(
+  pgliteTest(
     `an agency account's first site gets its first audit and schedule, as add_site gives one`,
     async () => {
       const w = await world(base);
@@ -291,7 +293,7 @@ describe('qa:seed part (a)', () => {
     PGLITE_TIMEOUT,
   );
 
-  withMarker(
+  pgliteTest(
     `a site add over the host's hourly bucket is refused with that reason and the time it fits`,
     async () => {
       const w = await world(base);
@@ -314,7 +316,7 @@ describe('qa:seed part (a)', () => {
     PGLITE_TIMEOUT,
   );
 
-  withMarker(
+  pgliteTest(
     `while crawls are paused it adds no site and requests no first audit, and says why`,
     async () => {
       const w = await world(base);
@@ -336,7 +338,7 @@ describe('qa:seed part (a)', () => {
     PGLITE_TIMEOUT,
   );
 
-  withMarker(
+  pgliteTest(
     `a capped first site stops the account's list, so the next host does not become its first`,
     async () => {
       const w = await world(base);
@@ -361,7 +363,7 @@ describe('qa:seed part (a)', () => {
     PGLITE_TIMEOUT,
   );
 
-  withMarker(
+  pgliteTest(
     `refuses an account it marked earlier whose internal flag was turned off, and leaves it off`,
     async () => {
       const w = await world(base);
@@ -389,7 +391,7 @@ describe('qa:seed part (a)', () => {
     PGLITE_TIMEOUT,
   );
 
-  withMarker(
+  pgliteTest(
     `a run stopped between the agency account and its marker is finished by the next run`,
     async () => {
       const w = await world(base);
