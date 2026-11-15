@@ -308,18 +308,29 @@ function surfaceCell(s: AuditRun['surfaces'][number]): string {
   return String(s.status);
 }
 
+/** What kind of answer a surface gave: the categories the surfaces sentence counts. */
+export function surfaceKind(s: AuditRun['surfaces'][number]): string {
+  if (s.status === 200) return isNoindex(s.robots) ? 'noindex' : 'INDEXABLE';
+  if (s.status >= 300 && s.status < 400) return 'a redirect';
+  if (s.status === 404 || s.status === 410) return 'not found';
+  return `an error (${s.status})`;
+}
+
 function surfaces(input: ReportInput): string[] {
   const on = new Map(input.on.surfaces.map((s) => [s.path, s]));
-  const indexable = [input.off, input.on].flatMap((r) =>
-    r.surfaces
-      .filter((s) => s.status === 200 && !isNoindex(s.robots))
-      .map((s) => `${s.path} (${r.label})`),
-  );
+  const sentences = [input.off, input.on].map((r) => {
+    const kinds = new Map<string, string[]>();
+    for (const s of r.surfaces)
+      kinds.set(surfaceKind(s), [...(kinds.get(surfaceKind(s)) ?? []), s.path]);
+    const parts = [...kinds].map(([k, paths]) =>
+      k === 'INDEXABLE' || k.startsWith('an error')
+        ? `${k}: ${paths.join(', ')}`
+        : `${k} ${paths.length}`,
+    );
+    return `${r.label}: ${r.surfaces.length} app surfaces — ${parts.join('; ')}.`;
+  });
   return [
-    indexable.length === 0
-      ? 'No app surface answers an indexable page in either build: each is noindex, a redirect, or not found.'
-      : `App surfaces answering an indexable page: ${indexable.join(', ')}.`,
-    '',
+    ...sentences.flatMap((x) => [x, '']),
     '| Path | flags off | flags on |',
     '| --- | --- | --- |',
     ...input.off.surfaces.map(

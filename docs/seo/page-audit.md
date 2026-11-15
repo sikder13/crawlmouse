@@ -78,7 +78,9 @@ Not measured in these runs: they were saved before the audit read visible prices
 
 ## App surfaces
 
-No app surface answers an indexable page in either build: each is noindex, a redirect, or not found.
+flags off: 21 app surfaces — noindex 1; not found 17; a redirect 3.
+
+flags on: 21 app surfaces — noindex 5; not found 3; a redirect 12; an error (500): /audit/00000000-0000-4000-8000-000000000000.
 
 | Path                                         | flags off            | flags on               |
 | -------------------------------------------- | -------------------- | ---------------------- |
@@ -106,7 +108,7 @@ No app surface answers an indexable page in either build: each is noindex, a red
 
 ## www
 
-`https://www.crawlmouse.com/` answered one 308 to https://crawlmouse.com/: not separately indexable (read 2026-11-15T13:26:55.566Z).
+`https://www.crawlmouse.com/` answered one 308 to https://crawlmouse.com/: not separately indexable (read 2026-11-15T13:46:41.054Z).
 
 ## Pages, flags off
 

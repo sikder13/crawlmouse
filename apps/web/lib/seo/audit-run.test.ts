@@ -65,9 +65,11 @@ describe('auditBuild', () => {
       commands: ['x'],
     });
     // /signup answered an indexable 200: the report names it rather than claiming all are noindex
-    expect(md).toContain(
-      'App surfaces answering an indexable page: /signup (flags off), /signup (flags on).',
-    );
+    // /signup answered an indexable 200: the sentence names it rather than claiming all are noindex
+    expect(md).toMatch(/flags off: \d+ app surfaces — .*INDEXABLE: \/signup/);
+    for (const part of ['noindex 1', 'a redirect 1', 'INDEXABLE: /signup', /not found \d+/]) {
+      expect(md).toMatch(part);
+    }
     expect(md).toContain('| /dashboard | 307 → /login | 307 → /login |');
     expect(md).toContain('answered one 308 to https://crawlmouse.com/: not separately indexable');
     // canonical of /blog/b and /blog/c point at /blog/a: counted as not self
@@ -159,5 +161,16 @@ describe('prices', () => {
     });
     expect(md).toContain('1 page where the visible prices and the structured data disagree.');
     expect(md).toContain('| flags on | / | $0, $99 | $69 | $69 | $99 |');
+  });
+});
+
+describe('surfaceKind', () => {
+  it('names an error status as an error, not as not found', async () => {
+    const { surfaceKind } = await import('./audit-report');
+    expect(surfaceKind({ path: '/a', status: 500, location: null, robots: [] })).toBe(
+      'an error (500)',
+    );
+    expect(surfaceKind({ path: '/a', status: 404, location: null, robots: [] })).toBe('not found');
+    expect(surfaceKind({ path: '/a', status: 308, location: '/b', robots: [] })).toBe('a redirect');
   });
 });
