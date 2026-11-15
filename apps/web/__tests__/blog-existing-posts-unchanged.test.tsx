@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { renderToString } from 'react-dom/server';
 import BlogIndex from '../app/blog/page';
 import { POSTS_BY_SLUG, allPostSlugs } from '../lib/blog/posts';
+import { RULED_CHANGES } from '../lib/blog/ruled-copy';
 import { addedQuestions, addedSummary, postAbstract } from '../lib/blog/answers';
 import { POST_SOURCES } from '../lib/blog/post-source';
 import {
@@ -45,6 +46,30 @@ interface ArticleNode {
 const articleNode = (s: PostSnapshot): ArticleNode | undefined =>
   (s.jsonLd.flat() as ArticleNode[]).find((n) => n['@type'] === 'Article');
 
+/**
+ * The baseline's metadata with ruling 3's recorded changes applied (lib/blog/ruled-copy.ts): a
+ * `seoTitle` replaces the <title>, Open Graph and Twitter titles; a description replaces all three
+ * descriptions. Each change's `before` must be what the baseline holds, so a stale record fails.
+ */
+function ruled(slug: string, metadata: Record<string, unknown>): Record<string, unknown> {
+  const m = JSON.parse(JSON.stringify(metadata)) as {
+    title: { absolute: string };
+    description: string;
+    openGraph: { title: string; description: string };
+    twitter: { title: string; description: string };
+  };
+  for (const c of RULED_CHANGES.filter((x) => x.slug === slug)) {
+    if (c.field === 'seoTitle') {
+      expect(m.title.absolute, `${slug} seoTitle before`).toBe(c.before);
+      m.title.absolute = m.openGraph.title = m.twitter.title = c.after;
+    } else {
+      expect(m.description, `${slug} description before`).toBe(c.before);
+      m.description = m.openGraph.description = m.twitter.description = c.after;
+    }
+  }
+  return m;
+}
+
 describe('the baseline fixture is what it claims to be', () => {
   it('was captured from main at 90ea7d9 and holds the 17 posts published then', () => {
     expect(fixture.capturedFrom).toBe('90ea7d9699f0469f6c95c86bb0f3f72b00e877c3');
@@ -55,8 +80,13 @@ describe('the baseline fixture is what it claims to be', () => {
     const meta = POSTS_BY_SLUG.get(slug);
     expect(meta, `${slug} is still published`).toBeDefined();
     const s = fixture.posts[slug]!;
+    // The fixture predates ruling 3: its title is the post's H1, and its description is the ruling's
+    // `before` where the ruling changed it.
     expect(s.metadata.title).toEqual({ absolute: meta!.title });
-    expect(s.metadata.description).toBe(meta!.description);
+    const ruledDescription = RULED_CHANGES.find(
+      (c) => c.slug === slug && c.field === 'description',
+    );
+    expect(s.metadata.description).toBe(ruledDescription?.before ?? meta!.description);
     expect(s.metadata.alternates).toEqual({ canonical: `/blog/${slug}` });
     expect(s.h1).toBe(meta!.title);
     expect(s.h1Count).toBe(1);
@@ -80,11 +110,13 @@ describe('every existing post renders as it did at the baseline, plus the listed
   });
 
   it.each(BASELINE_SLUGS)(
-    '%s: metadata, H1 and canonical unchanged; modifiedTime is updatedAt',
+    '%s: metadata, H1 and canonical unchanged but for ruling 3; modifiedTime is updatedAt',
     async (slug) => {
       const now = await snapshotPost(slug);
       const then = fixture.posts[slug]!;
-      expect(withoutModifiedTime(now.metadata)).toEqual(withoutModifiedTime(then.metadata));
+      expect(withoutModifiedTime(now.metadata)).toEqual(
+        withoutModifiedTime(ruled(slug, then.metadata)),
+      );
       expect((now.metadata.openGraph as { modifiedTime?: string }).modifiedTime).toBe(
         POSTS_BY_SLUG.get(slug)!.updatedAt,
       );
@@ -138,12 +170,25 @@ describe('every existing post renders as it did at the baseline, plus the listed
   );
 
   it.each(BASELINE_SLUGS)(
-    '%s: JSON-LD is the baseline outside the additions, but dateModified and an added abstract',
+    '%s: JSON-LD is the baseline outside the additions, but dateModified, an added abstract and ruling 3',
     async (slug) => {
       const { doc } = await renderPostPage(slug);
       stripAdditions(doc);
       const now = jsonLdBlocks(doc);
-      const then = fixture.posts[slug]!.jsonLd;
+      const ruledDescription = RULED_CHANGES.find(
+        (c) => c.slug === slug && c.field === 'description',
+      );
+      const then = (JSON.parse(JSON.stringify(fixture.posts[slug]!.jsonLd)) as unknown[]).map(
+        (b) => {
+          for (const n of [b].flat() as Record<string, unknown>[]) {
+            if (n['@type'] === 'Article' && ruledDescription) {
+              expect(n.description).toBe(ruledDescription.before);
+              n.description = ruledDescription.after;
+            }
+          }
+          return b;
+        },
+      );
       const article = (now.flat() as Record<string, unknown>[]).find(
         (n) => n['@type'] === 'Article',
       )!;

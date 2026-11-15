@@ -20,7 +20,7 @@ const BOTH: readonly Build[] = ['off', 'on'];
 
 const OUTSIDE = "owner: outside CC-40's paths";
 const POST_DESCRIPTION =
-  'owner: the description of a post that earns impressions is proposed in copy-proposals.md (D2), not changed here';
+  'owner: a post under 100 impressions, outside the rows ruling 3 rewrote (lib/blog/ruled-copy.ts)';
 const LAYOUT_DESCRIPTION = `${OUTSIDE}; the page sets no description of its own, so it carries the root layout's`;
 const HELP_COPY = `${OUTSIDE}; help copy is lib/v2/help, and an article's title is its question and its H1`;
 
@@ -44,12 +44,7 @@ export const PAGE_EXCEPTIONS: readonly PageException[] = [
       reason: LAYOUT_DESCRIPTION,
     }),
   ),
-  ...[
-    '/blog/can-ai-crawlers-see-javascript',
-    '/blog/find-orphan-pages-squarespace',
-    '/blog/free-internal-link-audit',
-    '/blog/screaming-frog-alternative',
-  ].map(
+  ...['/blog/find-orphan-pages-squarespace', '/blog/free-internal-link-audit'].map(
     (path): PageException => ({
       path,
       rule: 'description-length',
@@ -62,7 +57,7 @@ export const PAGE_EXCEPTIONS: readonly PageException[] = [
     rule: 'title-length',
     builds: BOTH,
     reason:
-      "owner: a post's title is also its H1 (lib/blog/posts.ts); a new one is the owner's call",
+      'owner: the title is also the H1; a shorter search-result title is a `seoTitle` the owner has not ruled',
   },
   {
     path: '/developers',

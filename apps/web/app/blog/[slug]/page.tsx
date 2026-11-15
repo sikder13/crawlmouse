@@ -35,20 +35,22 @@ export async function generateMetadata({
   if (!post) return {};
   const { meta } = post;
   const url = siteUrl(`/blog/${meta.slug}`);
+  // The search-result title; the H1 and the Article headline keep `meta.title`.
+  const title = meta.seoTitle ?? meta.title;
   return {
-    title: { absolute: meta.title },
+    title: { absolute: title },
     description: meta.description,
     keywords: meta.keywords,
     alternates: { canonical: `/blog/${meta.slug}` },
     openGraph: {
       type: 'article',
-      title: meta.title,
+      title,
       description: meta.description,
       url,
       publishedTime: meta.publishedAt,
       modifiedTime: meta.updatedAt,
     },
-    twitter: { card: 'summary_large_image', title: meta.title, description: meta.description },
+    twitter: { card: 'summary_large_image', title, description: meta.description },
   };
 }
 

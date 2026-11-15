@@ -58,8 +58,14 @@ describe('flags off: what D2 changes is what main served', () => {
     expect(ld.softwareApplicationLd()).toEqual(fixture.softwareApplicationLd);
   });
 
-  it('/llms.txt, byte for byte', async () => {
+  it('/llms.txt, byte for byte, but for the post descriptions ruling 3 changed', async () => {
+    const { RULED_DESCRIPTIONS } = await import('../blog/ruled-copy');
+    let expected: string = fixture.llmsTxt;
+    for (const [before, after] of RULED_DESCRIPTIONS) {
+      expect(expected.split(`): ${before}\n`).length - 1, before).toBe(1);
+      expected = expected.replace(`): ${before}\n`, `): ${after}\n`);
+    }
     const { GET } = await import('../../app/llms.txt/route');
-    expect(await GET().text()).toBe(fixture.llmsTxt);
+    expect(await GET().text()).toBe(expected);
   });
 });
