@@ -19,6 +19,9 @@
  * Whether it is about one is read from its distinct id and its `accountId`, when the caller passes
  * one (`isInternalEvent`, lib/v2/ops/internal-marker.ts), only for an event consent lets through.
  * The property is this module's: a caller's own `internal` is dropped.
+ *
+ * The account axis (CC-41 D1). An event whose caller passes `accountId` carries it as `account_id`;
+ * that property is this module's too, so a caller's own `account_id` is dropped.
  */
 import type { FunnelEvent } from './analytics-events';
 import { serverCaptureAllowed } from './consent';
@@ -63,6 +66,38 @@ export const posthogSend: SendCapture = async (body) => {
   if (!res.ok) throw new Error(`capture answered ${res.status}`);
 };
 
+/** Properties only this module sets. */
+const OWNED_PROPERTIES: ReadonlySet<string> = new Set(['internal', 'account_id']);
+
+/** What a browser's PostHog distinct id may be, here: at most 200 of these characters. */
+const BROWSER_DISTINCT_ID = /^[A-Za-z0-9._:@-]{1,200}$/;
+
+/**
+ * The visitor's browser PostHog distinct id, from the `ph_<project key>_posthog` cookie in this
+ * `Cookie` header (URL-encoded JSON, key `distinct_id`), or null. Null as well when consent stops a
+ * server capture for this header, when there is no project key, and when the value is not 1-200
+ * characters of `[A-Za-z0-9._:@-]`.
+ */
+export function browserDistinctId(cookieHeader: string | null): string | null {
+  const key = process.env.NEXT_PUBLIC_POSTHOG_KEY;
+  if (!key || !cookieHeader || !serverCaptureAllowed(cookieHeader)) return null;
+  const name = `ph_${key}_posthog=`;
+  const pair = cookieHeader
+    .split(';')
+    .map((p) => p.trim())
+    .find((p) => p.startsWith(name));
+  if (pair === undefined) return null;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(decodeURIComponent(pair.slice(name.length)));
+  } catch {
+    return null;
+  }
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return null;
+  const id: unknown = (parsed as Record<string, unknown>).distinct_id;
+  return typeof id === 'string' && BROWSER_DISTINCT_ID.test(id) ? id : null;
+}
+
 export async function captureServerEvent(
   cookieHeader: string | null,
   { event, distinctId, accountId, properties = {} }: ServerEvent,
@@ -70,7 +105,9 @@ export async function captureServerEvent(
   lookup?: InternalLookup,
 ): Promise<void> {
   if (!serverCaptureAllowed(cookieHeader)) return;
-  const own = Object.fromEntries(Object.entries(properties).filter(([k]) => k !== 'internal'));
+  const own = Object.fromEntries(
+    Object.entries(properties).filter(([k]) => !OWNED_PROPERTIES.has(k)),
+  );
   const internal = await isInternalEvent(distinctId, accountId, lookup);
   try {
     await send({
@@ -78,6 +115,7 @@ export async function captureServerEvent(
       distinct_id: distinctId,
       properties: {
         ...own,
+        ...(typeof accountId === 'string' ? { account_id: accountId } : {}),
         ...(internal ? { internal: true } : {}),
         $process_person_profile: false,
         $geoip_disable: true,

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   CAPTURE_TIMEOUT_MS,
+  browserDistinctId,
   captureServerEvent,
   posthogSend,
   type CaptureBody,
@@ -188,5 +189,85 @@ describe('posthogSend', () => {
     bound.abort();
     await capture;
     expect(logged).toEqual([['analytics: server capture of check_started failed']]);
+  });
+});
+
+describe('account_id (CC-41 D1)', () => {
+  const ACCOUNT = 'a0000000-0000-4000-8000-000000000003';
+
+  it('an event with an accountId carries it as account_id', async () => {
+    const r = recorder();
+    await captureServerEvent(null, { ...EVENT, accountId: ACCOUNT }, r.send, async () => false);
+    expect(r.sent[0]!.properties).toEqual({
+      trigger: 'manual',
+      account_id: ACCOUNT,
+      $process_person_profile: false,
+      $geoip_disable: true,
+    });
+  });
+
+  it("a caller's own account_id is dropped, with or without an accountId", async () => {
+    const r = recorder();
+    const own = { ...EVENT, properties: { account_id: 'forged' } };
+    await captureServerEvent(null, own, r.send, async () => false);
+    await captureServerEvent(null, { ...own, accountId: ACCOUNT }, r.send, async () => false);
+    expect(r.sent.map((b) => b.properties.account_id)).toEqual([undefined, ACCOUNT]);
+    expect(r.sent[0]!.properties).not.toHaveProperty('account_id');
+  });
+});
+
+describe('browserDistinctId (CC-41 D1)', () => {
+  const KEY = 'phc_testkey';
+  const cookieOf = (value: unknown) =>
+    `ph_${KEY}_posthog=${encodeURIComponent(JSON.stringify(value))}`;
+
+  it('reads distinct_id from the PostHog cookie of this project', () => {
+    vi.stubEnv('NEXT_PUBLIC_POSTHOG_KEY', KEY);
+    const id = '019a1b2c-3d4e-7f00-8000-0000000000aa';
+    expect(browserDistinctId(`a=1; ${cookieOf({ distinct_id: id, $sesid: [1] })}; b=2`)).toBe(id);
+  });
+
+  it('reads nothing when consent stops the server capture', () => {
+    vi.stubEnv('NEXT_PUBLIC_POSTHOG_KEY', KEY);
+    const ok = cookieOf({ distinct_id: 'abc' });
+    expect(browserDistinctId(ok)).toBe('abc');
+    expect(browserDistinctId(`${ok}; cm_consent=denied`)).toBeNull();
+    expect(browserDistinctId(`${ok}; cm_consent_required=1`)).toBeNull();
+    expect(browserDistinctId(`${ok}; cm_consent_required=1; cm_consent=granted`)).toBe('abc');
+  });
+
+  it('reads nothing without a project key, or from another project', () => {
+    vi.stubEnv('NEXT_PUBLIC_POSTHOG_KEY', '');
+    expect(browserDistinctId(cookieOf({ distinct_id: 'abc' }))).toBeNull();
+    vi.stubEnv('NEXT_PUBLIC_POSTHOG_KEY', 'phc_other');
+    expect(browserDistinctId(cookieOf({ distinct_id: 'abc' }))).toBeNull();
+  });
+
+  it.each([
+    ['no header', null],
+    ['no cookie', 'a=1'],
+    ['not JSON', `ph_${KEY}_posthog=%7Bnot-json`],
+    ['bad encoding', `ph_${KEY}_posthog=%E0%A4%A`],
+    ['no distinct_id', cookieOf({ other: 'abc' })],
+    ['a number', cookieOf({ distinct_id: 42 })],
+    ['empty', cookieOf({ distinct_id: '' })],
+    ['201 characters', cookieOf({ distinct_id: 'a'.repeat(201) })],
+    ['a space', cookieOf({ distinct_id: 'a b' })],
+    ['a quote', cookieOf({ distinct_id: 'a"b' })],
+    ['a slash', cookieOf({ distinct_id: 'a/b' })],
+    ['markup', cookieOf({ distinct_id: '<script>' })],
+    ['a newline', cookieOf({ distinct_id: 'a\nb' })],
+    ['unicode', cookieOf({ distinct_id: 'ä' })],
+    ['an array', cookieOf([{ distinct_id: 'abc' }])],
+  ])('reads nothing from %s', (_name, header) => {
+    vi.stubEnv('NEXT_PUBLIC_POSTHOG_KEY', KEY);
+    expect(browserDistinctId(header)).toBeNull();
+  });
+
+  it('accepts 200 characters of the allowed class', () => {
+    vi.stubEnv('NEXT_PUBLIC_POSTHOG_KEY', KEY);
+    const id = `${'A-z0.9_:@'.repeat(22)}ab`;
+    expect(id).toHaveLength(200);
+    expect(browserDistinctId(cookieOf({ distinct_id: id }))).toBe(id);
   });
 });
