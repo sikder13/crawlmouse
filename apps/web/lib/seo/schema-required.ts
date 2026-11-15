@@ -34,10 +34,22 @@ export interface SchemaProblem {
   missing: string;
 }
 
-/** What each typed node in a JSON-LD value lacks. Empty when every node carries its required set. */
+/**
+ * A node reference: `@type` and `@id` and nothing else, naming an entity rather than describing it
+ * (an Article's `mainEntityOfPage: { "@type": "WebPage", "@id": <url> }`). It carries no properties
+ * to check, so it is not checked.
+ */
+export const isNodeReference = (node: Record<string, unknown>) =>
+  Object.hasOwn(node, '@id') && Object.keys(node).every((k) => k === '@type' || k === '@id');
+
+/**
+ * What each typed node in a JSON-LD value lacks, node references aside. Empty when every node
+ * carries its required set.
+ */
 export function schemaProblems(value: unknown): SchemaProblem[] {
   const out: SchemaProblem[] = [];
   for (const node of typedNodes(value)) {
+    if (isNodeReference(node)) continue;
     for (const type of typesOf(node)) {
       const required = Object.hasOwn(REQUIRED, type) ? REQUIRED[type] : undefined;
       if (!required) {
