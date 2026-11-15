@@ -1,7 +1,7 @@
 {
   "label": "flags off",
-  "sha": "467a2923eda93545739bc1a562a03ab19c5e95bc",
-  "takenAt": "2026-11-15T14:16:17.836Z",
+  "sha": "7cb4c3ec4d11069963c0a71f6bb136f2b406d149",
+  "takenAt": "2026-11-15T15:42:19.337Z",
   "sitemap": [
     "/",
     "/pricing",
@@ -855,7 +855,7 @@
     {
       "path": "/status",
       "status": 200,
-      "title": null,
+      "title": "Status · Crawlmouse",
       "descriptions": [
         "Free, no-install internal-linking grader for any website. Find orphan pages, weak hubs, and pages buried too deep — and get a clear A–F grade in seconds."
       ],
