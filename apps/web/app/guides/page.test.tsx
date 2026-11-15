@@ -28,6 +28,6 @@ describe('/guides', () => {
 
   // Captured before the move; updated once, deliberately, when each section gained its id.
   it('draws the same <main> as before the clusters moved', async () => {
-    await expect(main()).toMatchFileSnapshot('./__snapshots__/guides-main.html');
+    await expect(main()).toMatchFileSnapshot('./__snapshots__/guides-main.snap');
   });
 });
