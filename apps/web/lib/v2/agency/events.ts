@@ -2,14 +2,21 @@
  * The product events the agency's workspace sends from the server (CC-31 D10). Each name is in
  * `FUNNEL_EVENTS` (`AGENCY_EVENTS` is checked against it by the compiler).
  *
- * What is sent: the distinct id is the account's id, and the properties are the typed ones below
+ * What is sent: the distinct id is the acting person's `users.id`, a link holder's browser PostHog
+ * id, or `account:<id>` for an event no person caused (CC-41 D1, `distinctIdFor`), with the account
+ * as `account_id`; and the properties are the typed ones below
  * (a role, a report's kind and format, counts), which hold no address, host or token. They go through
  * `captureServerEvent` (lib/analytics-server.ts), which reads the visitor's consent from the
  * request's cookie header and drops a send that fails.
  */
 import type { Report } from '@crawlmouse/types/v2';
 import type { FunnelEvent } from '../../analytics-events';
-import { captureServerEvent, type SendCapture } from '../../analytics-server';
+import {
+  captureServerEvent,
+  distinctIdFor,
+  type EventKey,
+  type SendCapture,
+} from '../../analytics-server';
 
 export const AGENCY_EVENTS = [
   'seat_invited',
@@ -46,22 +53,26 @@ export interface AgencyEvents extends Record<AgencyEventName, object> {
 }
 
 export interface AgencyCapture {
-  <E extends AgencyEventName>(
-    event: E,
-    accountId: string,
-    properties: AgencyEvents[E],
-  ): Promise<void>;
+  <E extends AgencyEventName>(event: E, key: EventKey, properties: AgencyEvents[E]): Promise<void>;
 }
 
 /** The capture for one request: the product's sender, given the request's cookie header. */
 export function agencyCaptureFor(req: Request, send?: SendCapture): AgencyCapture {
   const cookie = req.headers.get('cookie');
-  return (event, accountId, properties) =>
-    captureServerEvent(cookie, { event, distinctId: `account:${accountId}`, properties }, send);
+  return (event, key, properties) =>
+    captureServerEvent(
+      cookie,
+      { event, distinctId: distinctIdFor(cookie, key), accountId: key.accountId, properties },
+      send,
+    );
 }
 
 /** The capture for a step with no request (a scheduled send): there is no cookie header to read. */
 export function agencyCaptureWithoutRequest(send?: SendCapture): AgencyCapture {
-  return (event, accountId, properties) =>
-    captureServerEvent(null, { event, distinctId: `account:${accountId}`, properties }, send);
+  return (event, key, properties) =>
+    captureServerEvent(
+      null,
+      { event, distinctId: distinctIdFor(null, key), accountId: key.accountId, properties },
+      send,
+    );
 }

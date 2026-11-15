@@ -188,10 +188,11 @@ describe('the owner', () => {
     expect(transition).toMatchObject({ event: 'trial_started' });
     expect(h.dispatch).toHaveBeenCalledTimes(1);
     expect(h.capture).toHaveBeenCalledTimes(1);
-    expect(h.capture).toHaveBeenCalledWith('trial_started', ACCOUNT, {
-      kind: 'pro',
-      variant: 'no_card',
-    });
+    expect(h.capture).toHaveBeenCalledWith(
+      'trial_started',
+      { accountId: ACCOUNT, userId: 'u1' },
+      { kind: 'pro', variant: 'no_card' },
+    );
   });
 
   it('a JSON request gets the dashboard’s url', async () => {

@@ -75,6 +75,7 @@ export async function POST(req: Request) {
     },
     {
       accountId: account.id,
+      actorUserId: viewer.viewer.userId,
       tier,
       seatLimit: limits.seats,
       // False in an Agency trial and past due, where the purchase route refuses the change.

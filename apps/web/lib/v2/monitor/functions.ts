@@ -55,6 +55,7 @@ export function alertDeps(env: Env): AlertDeps {
       captureServerEvent(null, {
         event: 'alert_sent',
         distinctId: `account:${accountId}`,
+        accountId,
         properties,
       }),
     log,
@@ -73,6 +74,7 @@ export function summaryDeps(env: Env): SummaryDeps {
       captureServerEvent(null, {
         event: 'summary_sent',
         distinctId: `account:${accountId}`,
+        accountId,
         properties,
       }),
     log,

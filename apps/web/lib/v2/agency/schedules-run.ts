@@ -118,7 +118,8 @@ async function sendReport(
   if (report.status === 'sent') return 'sent';
   if ((await deps.mail.report({ reportId: report.reportId })) === 'queued') return 'queued';
   const marked = await deps.store.markSent(report.reportId, deps.now());
-  if (marked?.first) await deps.capture('first_client_report_sent', marked.accountId, {});
+  if (marked?.first)
+    await deps.capture('first_client_report_sent', { accountId: marked.accountId }, {});
   return 'sent';
 }
 

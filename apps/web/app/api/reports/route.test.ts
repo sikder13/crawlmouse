@@ -75,7 +75,8 @@ vi.mock('@/lib/v2/reports/generate-run', async (original) => ({
   ...(await original<typeof import('@/lib/v2/reports/generate-run')>()),
   supabaseReportBucket: () => h.bucket.bucket,
 }));
-vi.mock('@/lib/analytics-server', () => ({
+vi.mock('@/lib/analytics-server', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/analytics-server')>()),
   captureServerEvent: async (_cookie: unknown, event: (typeof h.events)[number]) => {
     h.events.push(event);
   },
@@ -587,7 +588,8 @@ describe('POST /api/reports: the answer', () => {
     expect(h.events).toEqual([
       {
         event: 'report_generated',
-        distinctId: `account:${w.accountId}`,
+        distinctId: w.owner.id,
+        accountId: w.accountId,
         properties: { kind: 'raw_export', format: 'json' },
       },
     ]);

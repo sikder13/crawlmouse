@@ -24,6 +24,10 @@
  * insert a no-op. With `firstAudit` given (door-deps.ts, under V2_CHECKS_PUBLIC with V2_PIPELINE;
  * CC-22b D7), a site this call attached gets its first audit requested; a failure there is reported
  * as `first-audit-failed` and the sign-in goes on with the site attached.
+ *
+ * First-touch attribution (CC-41 D2): at the first login, the browser's `cm_ft` record, when the
+ * route passes one, is written once for the account (`recordAttribution`). A failure is reported as
+ * `attribution-write-failed` with the account id and the sign-in goes on.
  */
 import { planEffects, type PlannedEffect } from '../billing/effects';
 import { next, type EntitlementSnapshot, type Transition } from '../billing/state-machine';
@@ -31,6 +35,7 @@ import { toTransitionParams, type EntitlementStore } from '../billing/state-mach
 import { effectiveTier } from '../entitlement-v2';
 import type { FunnelEvent } from '../analytics-events';
 import { TimeZoneSchema } from '@crawlmouse/types/v2';
+import type { FirstTouch } from '../analytics/first-touch';
 import type { DoorStore, FirstAudit, LedgerHash, MemberAccount, Report } from './door-store';
 import { hashLedgerValue, ledgerValues } from './ledger';
 import { scheduleFor } from './schedule';
@@ -69,6 +74,8 @@ export interface FirstLoginInput {
   /** `getClientIp`'s value; 'unknown' when the platform gave none. */
   ip: string;
   signup: SignupIntent | null;
+  /** The browser's `cm_ft` record, re-checked; null or absent when there is none to write. */
+  firstTouch?: FirstTouch | null;
 }
 
 export interface FirstLoginDeps {
@@ -134,6 +141,7 @@ export async function runFirstLogin(
       await deps.store.setTimezone(account.accountId, asked);
       zone = asked;
     }
+    if (input.firstTouch) await recordFirstTouch(deps, account.accountId, input.firstTouch);
     const decided = await decideTrial(deps, input, account);
     trial = decided.outcome;
     if (trial === 'started') {
@@ -149,6 +157,19 @@ export async function runFirstLogin(
     await requestFirstAudit(deps, account, added, input.userId);
   }
   return { trial, siteId: added?.siteId ?? null, events };
+}
+
+/** The account's first-touch row; a failure is reported, not raised. */
+async function recordFirstTouch(
+  deps: FirstLoginDeps,
+  accountId: string,
+  record: FirstTouch,
+): Promise<void> {
+  try {
+    await deps.store.recordAttribution(accountId, record);
+  } catch {
+    deps.report('attribution-write-failed', { accountId });
+  }
 }
 
 /** The attached site's first audit; a failure is reported, not raised. */

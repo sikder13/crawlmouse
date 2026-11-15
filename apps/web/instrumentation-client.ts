@@ -2,7 +2,12 @@ import posthog from 'posthog-js';
 import * as Sentry from '@sentry/nextjs';
 import { beforeSendSampler } from '@/lib/analytics';
 import { sentryBrowserOptions } from '@/lib/auth/sentry-scrub';
-import { consentRequiredFromCookie, CONSENT_DECISION_STORAGE_KEY } from '@/lib/consent';
+import { rememberFirstTouch } from '@/lib/analytics/first-touch';
+import {
+  consentRequiredFromCookie,
+  CONSENT_DECISION_STORAGE_KEY,
+  CONSENT_GRANTED_EVENT,
+} from '@/lib/consent';
 
 // Sentry (client) — moved here from sentry.client.config.ts per @sentry/nextjs v8+ guidance.
 // With no DSN set (local/build), Sentry.init is a safe no-op.
@@ -41,6 +46,8 @@ if (
     capture_pageview: true,
     capture_pageleave: true,
     opt_out_capturing_by_default: optOutByDefault,
+    // posthog-js skips surveys for an opted-out visitor only in cookieless mode, which this is not.
+    disable_surveys: optOutByDefault,
     disable_session_recording: true, // do not record by default
     session_recording: { maskAllInputs: true, maskTextSelector: '[data-ph-mask]' },
     before_send: beforeSendSampler,
@@ -58,4 +65,21 @@ if (
   };
   window.addEventListener('error', startReplay, { once: true });
   window.addEventListener('unhandledrejection', startReplay, { once: true });
+
+  // First-touch attribution (lib/analytics/first-touch.ts): the `cm_ft` cookie, written once, for
+  // the page this load landed on, now when capture is not opted out, or on the consent banner's grant.
+  const landing = {
+    href: window.location.href,
+    referrer: document.referrer,
+    ownHost: window.location.hostname,
+  };
+  const firstTouch = () =>
+    rememberFirstTouch({
+      document,
+      optedOut: () => posthog.has_opted_out_capturing(),
+      page: landing,
+      now: () => new Date(),
+    });
+  firstTouch();
+  window.addEventListener(CONSENT_GRANTED_EVENT, firstTouch);
 }

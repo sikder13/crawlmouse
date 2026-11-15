@@ -219,7 +219,9 @@ describe('the purge', () => {
     expect(await n(`select count(*) from auth.users where id = $1`, [d.userId])).toBe(0);
     expect(await n(`select count(*) from public.accounts where id = $1`, [d.accountId])).toBe(0);
     expect(await queued(d.userId)).toBe(0);
-    expect(captured).toEqual([['account_purged', d.accountId, { counts: out.counts }]]);
+    expect(captured).toEqual([
+      ['account_purged', { accountId: d.accountId }, { counts: out.counts }],
+    ]);
   });
 
   it('the Auth delete fails once: the queue row stays, and the next run finishes with nothing left', async () => {

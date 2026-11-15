@@ -164,6 +164,7 @@ describe('a site named on Sign-up gets its first audit', () => {
         signup: { site: 'throws.example' },
         device: 'dev-throws',
         ip: '203.0.113.7',
+        firstTouch: null,
       },
     );
     expect(landing.events.map((e) => e.name)).toEqual(['trial_started', 'site_added']);

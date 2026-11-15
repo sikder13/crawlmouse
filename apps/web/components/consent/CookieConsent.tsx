@@ -6,6 +6,8 @@ import {
   consentDecisionCookie,
   consentDecisionFromCookie,
   CONSENT_DECISION_STORAGE_KEY,
+  CONSENT_DENIED_EVENT,
+  CONSENT_GRANTED_EVENT,
   CONSENT_OPEN_EVENT,
 } from '@/lib/consent';
 
@@ -44,8 +46,15 @@ export function CookieConsent() {
       const decision = granted ? 'granted' : 'denied';
       localStorage.setItem(CONSENT_DECISION_STORAGE_KEY, decision);
       document.cookie = consentDecisionCookie(decision);
-      if (granted) posthog.opt_in_capturing();
-      else posthog.opt_out_capturing();
+      if (granted) {
+        posthog.opt_in_capturing();
+        window.dispatchEvent(new Event(CONSENT_GRANTED_EVENT));
+      } else {
+        posthog.opt_out_capturing();
+        // Surveys skip an opted-out visitor only in cookieless mode, so they are switched off here.
+        posthog.set_config({ disable_surveys: true });
+        window.dispatchEvent(new Event(CONSENT_DENIED_EVENT));
+      }
     } catch {
       /* noop */
     }

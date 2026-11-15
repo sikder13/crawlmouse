@@ -107,6 +107,8 @@ export interface FixRowView {
   packet: ActionView;
   /** Mark done, for a fix still to do that the tier opens; a live page shows it. */
   markDone: ActionView | null;
+  /** The fix's type, which Mark done's browser event names (`fix_done_confirmed`, CC-41 D8). */
+  fixType: Fix['type'];
 }
 
 export interface SiteView {
@@ -332,6 +334,7 @@ function fixRow(v: AccountView, result: Check, f: Fix, all: readonly Fix[]): Fix
       todo(f) && (v.gates.fixesVisible === 'all' || !pro)
         ? action('markDone', SITE_COPY.markDone, { id: f.id }, { context: `fix ${f.number}` })
         : null,
+    fixType: f.type,
   };
 }
 

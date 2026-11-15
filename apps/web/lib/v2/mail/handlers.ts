@@ -48,11 +48,15 @@ import { seatInvite } from './templates/seat-invite';
 import { trialReminder } from './templates/trial-reminder';
 import type { RenderedMail } from './types';
 
-/** Sends a product event with no request (no cookie header): `captureServerEvent(null, …)`. */
+/**
+ * Sends a product event with no request (no cookie header): `captureServerEvent(null, …)`, with the
+ * account the event is about, or null for a check no account keeps.
+ */
 export type CaptureEvent = (
   event: 'check_finished',
   distinctId: string,
   properties: Readonly<Record<string, unknown>>,
+  accountId: string | null,
 ) => Promise<void>;
 
 export interface MailHandlerDeps {
@@ -227,6 +231,7 @@ export function mailHandlers(d: MailHandlerDeps): MailHandlers {
         'check_finished',
         c.accountId === null ? `check:${ref}` : `account:${c.accountId}`,
         { trigger: c.trigger, status: c.status, check_ref: ref, source: 'pipeline' },
+        c.accountId,
       );
       return 'captured';
     },
@@ -382,7 +387,9 @@ export function reportMailHandlers(d: ReportMailHandlerDeps): ReportMailHandlers
         const marked = await store.markClientReportSent(reportId, mail.now()).catch(() => {
           throw new MailRetry('mark_sent_failed');
         });
-        if (marked?.first) await capture('first_client_report_sent', marked.accountId, {});
+        if (marked?.first) {
+          await capture('first_client_report_sent', { accountId: marked.accountId }, {});
+        }
       }
       return outcome;
     },

@@ -283,7 +283,7 @@ describe('a check whose build read the mark', () => {
         type: marked.type,
         checks_to_close: 1,
       });
-      expect(r.capture).toHaveBeenCalledWith('fix_closed', `account:${accountId}`, {
+      expect(r.capture).toHaveBeenCalledWith('fix_closed', accountId, {
         type: marked.type,
         checksToClose: 1,
       });

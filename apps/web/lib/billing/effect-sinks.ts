@@ -18,7 +18,7 @@ const ALERT_FLUSH_MS = 2000;
  * Where effects go in production: Inngest for events, the Crawlmouse Stripe account for
  * cancellations, Sentry for founder alerts, PostHog for payment events. A capture goes through
  * `captureServerEvent` with no cookie (a webhook has no visitor), its planned `uuid` and `timestamp`
- * added to the body, and the account as `account_id`. An alert resolves once Sentry's client has flushed its
+ * added to the body, and its `accountId`, which the sender sends as `account_id`. An alert resolves once Sentry's client has flushed its
  * queue, because a Vercel function can freeze as soon as it answers and the caller marks the plan done
  * after it; a flush that times out fails the dispatch. A flush that empties the queue succeeds whether
  * or not Sentry accepted the event (a 429, a network error, an event the SDK dropped), so an alert can
@@ -59,10 +59,8 @@ export function productionSinks(): EffectSinks {
         throw new Error('the founder alert was not flushed in time');
     },
     async capture({ uuid, event, distinctId, accountId, timestamp, properties }) {
-      await captureServerEvent(
-        null,
-        { event, distinctId, accountId, properties: { ...properties, account_id: accountId } },
-        (body) => posthogSend({ ...body, uuid, timestamp }),
+      await captureServerEvent(null, { event, distinctId, accountId, properties }, (body) =>
+        posthogSend({ ...body, uuid, timestamp }),
       );
     },
   };

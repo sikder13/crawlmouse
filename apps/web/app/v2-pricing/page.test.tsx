@@ -12,6 +12,7 @@ const h = vi.hoisted(() => ({
   rewritten: true,
   reads: 0,
   viewer: { kind: 'signed_out' } as Record<string, unknown>,
+  userId: null as string | null,
   cookie: null as string | null,
   captured: [] as unknown[][],
   after: [] as (() => unknown)[],
@@ -20,9 +21,9 @@ const h = vi.hoisted(() => ({
 vi.mock('server-only', () => ({}));
 vi.mock('@/lib/v2/rewrite-target', () => ({ reachedByRewrite: async () => h.rewritten }));
 vi.mock('@/lib/v2/pricing/read', () => ({
-  readPricingViewer: async () => {
+  readPricingVisit: async () => {
     h.reads += 1;
-    return h.viewer;
+    return { viewer: h.viewer, userId: h.userId };
   },
 }));
 vi.mock('next/headers', () => ({
@@ -33,6 +34,8 @@ vi.mock('@/lib/analytics-server', () => ({
   captureServerEvent: async (...args: unknown[]) => {
     h.captured.push(args);
   },
+  visitorDistinctId: (_cookie: string | null, userId: string | null, fallback: string) =>
+    userId ?? `visitor-or-${fallback.split(':')[0]}`,
 }));
 
 import { FREE_START } from '@/lib/billing/state-machine';
@@ -45,6 +48,7 @@ beforeEach(() => {
   h.rewritten = true;
   h.reads = 0;
   h.viewer = { kind: 'signed_out' };
+  h.userId = null;
   h.cookie = null;
   h.captured = [];
   h.after = [];
@@ -96,8 +100,9 @@ describe('/v2-pricing', () => {
     expect(html.split('href="/login"').length - 1).toBe(login);
   });
 
-  it('sends pricing_viewed after the response, with the request’s cookie header', async () => {
+  it('sends pricing_viewed after the response, with the request’s cookie header, keyed by the person', async () => {
     h.cookie = 'cm_consent=granted';
+    h.userId = 'user-1';
     h.viewer = {
       kind: 'signed_in',
       account: { id: 'acct-1', owner: true, tier: 'free', snapshot: FREE_START, customer: null },
@@ -112,10 +117,17 @@ describe('/v2-pricing', () => {
         'cm_consent=granted',
         {
           event: 'pricing_viewed',
-          distinctId: 'account:acct-1',
+          distinctId: 'user-1',
+          accountId: 'acct-1',
           properties: { interval: 'month', signedIn: true },
         },
       ],
     ]);
+  });
+
+  it('a signed-out view is keyed by the visitor', async () => {
+    await render();
+    await h.after[0]!();
+    expect(h.captured[0]![1]).toMatchObject({ distinctId: 'visitor-or-anon', accountId: null });
   });
 });

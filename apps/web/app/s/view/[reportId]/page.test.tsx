@@ -223,7 +223,9 @@ describe('/s/view/[reportId]', () => {
     );
     expect(h.downloads).toEqual([`reports/${w.owner.accountId}/${w.proof}.doc.json`]);
     expect(await views(w.proof)).toBe(0);
-    expect(h.capture.mock.calls).toEqual([['proof_viewed', w.owner.accountId, { via: 'share' }]]);
+    expect(h.capture.mock.calls).toEqual([
+      ['proof_viewed', { accountId: w.owner.accountId, visitor: true }, { via: 'share' }],
+    ]);
   });
 
   it('holds neither the token nor its hash', async () => {
@@ -349,8 +351,12 @@ describe('/reports/[id]', () => {
       expect(html).toContain('Checked with Crawlmouse · Fri 30 Oct');
     }
     expect(h.capture.mock.calls).toEqual([
-      ['proof_viewed', w.owner.accountId, { via: 'account' }],
-      ['proof_viewed', w.owner.accountId, { via: 'account' }],
+      ['proof_viewed', { accountId: w.owner.accountId, userId: w.owner.id }, { via: 'account' }],
+      [
+        'proof_viewed',
+        { accountId: w.owner.accountId, userId: w.developer.id },
+        { via: 'account' },
+      ],
     ]);
   });
 

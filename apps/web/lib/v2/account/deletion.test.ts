@@ -1,3 +1,4 @@
+import type { EventKey } from '../../analytics-server';
 import type { PGlite } from '@electric-sql/pglite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { applyAllMigrations, freshDb } from '../../../__tests__/helpers/pglite-migrations';
@@ -40,7 +41,7 @@ function recorder(over: Partial<DeletionPorts> = {}) {
   const log: string[] = [];
   const events: DeletionEvent[] = [];
   const emails: AccountEmailEvent[] = [];
-  const captured: Array<[string, string, unknown]> = [];
+  const captured: Array<[string, EventKey, unknown]> = [];
   const reported: Array<[string, string]> = [];
   let now = new Date();
   const ports: DeletionPorts = {
@@ -66,8 +67,8 @@ function recorder(over: Partial<DeletionPorts> = {}) {
       log.push('email');
       emails.push(...e);
     },
-    async capture(event, accountId, properties) {
-      captured.push([event, accountId, properties]);
+    async capture(event, key, properties) {
+      captured.push([event, key, properties]);
     },
     rateLimit: async () => true,
     report: (error, userId) => reported.push([String(error), userId]),
@@ -143,7 +144,13 @@ describe('requestAccountDeletion', () => {
     );
     expect(rec.emails[0]!.data.tokenId).toBe(confirmRow.rows[0]!.id);
     expect(JSON.stringify(rec.emails)).not.toMatch(/@|[A-Za-z0-9_-]{43}/);
-    expect(rec.captured).toEqual([['account_deletion_requested', o.accountId, { tier: 'free' }]]);
+    expect(rec.captured).toEqual([
+      [
+        'account_deletion_requested',
+        { accountId: o.accountId, userId: o.userId },
+        { tier: 'free' },
+      ],
+    ]);
     const l = await links(rec.emails[0]!);
     expect(Object.keys(l).sort()).toEqual(['delete_confirm', 'delete_restore']);
   });
@@ -225,7 +232,11 @@ describe('confirmDeletion', () => {
       { name: 'account.deletion_confirmed', data: { userId: o.userId, accountId: o.accountId } },
     ]);
     expect(rec.captured).toEqual([
-      ['account_deletion_confirmed', o.accountId, { tier: 'free', accounts: 1 }],
+      [
+        'account_deletion_confirmed',
+        { accountId: o.accountId, userId: o.userId },
+        { tier: 'free', accounts: 1 },
+      ],
     ]);
     expect(await marked(o.accountId)).toBe(true);
     expect(await confirmDeletion(recorder().ports, delete_confirm)).toEqual({
@@ -491,7 +502,9 @@ describe('restoreAccount', () => {
     expect(rec.events).toEqual([
       { name: 'account.restored', data: { userId: o.userId, subscriptionIds: ['sub_ours'] } },
     ]);
-    expect(rec.captured).toEqual([['account_restored', o.accountId, { tier: 'free' }]]);
+    expect(rec.captured).toEqual([
+      ['account_restored', { accountId: o.accountId, userId: o.userId }, { tier: 'free' }],
+    ]);
     expect(await marked(o.accountId)).toBe(false);
     expect(banned.has(o.userId)).toBe(false);
   });

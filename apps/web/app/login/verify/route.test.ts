@@ -379,6 +379,38 @@ describe('POST /login/verify verifies', () => {
     expect(setCookies(res).find((c) => c.startsWith('cm_auth_for='))).toMatch(/Max-Age=0/);
   });
 
+  describe('the first-touch cookie (CC-41 D2)', () => {
+    const ft = {
+      utm_source: 'linkedin',
+      landing_path: '/blog/x',
+      first_seen_at: '2026-11-01T10:00:00Z',
+    };
+
+    it('is passed to the hook, re-checked', async () => {
+      process.env.V2_ACCOUNT_DOOR = '1';
+      await POST(post({ cm_auth_otp: otp(), cm_ft: JSON.stringify({ ...ft, utm_term: '<x>' }) }));
+      expect(afterSignIn.mock.calls[0]![1]).toMatchObject({ firstTouch: ft });
+    });
+
+    it.each([
+      ['consent was denied', { cm_consent: 'denied' }],
+      ['consent is required and not given', { cm_consent_required: '1' }],
+    ])('is not read when %s', async (_n, jar) => {
+      process.env.V2_ACCOUNT_DOOR = '1';
+      await POST(post({ cm_auth_otp: otp(), cm_ft: JSON.stringify(ft), ...jar }));
+      expect(afterSignIn.mock.calls[0]![1]).toMatchObject({ firstTouch: null });
+    });
+
+    it('is null when absent or unreadable', async () => {
+      process.env.V2_ACCOUNT_DOOR = '1';
+      await POST(post({ cm_auth_otp: otp() }));
+      await POST(post({ cm_auth_otp: otp(), cm_ft: '{nope' }));
+      expect(
+        afterSignIn.mock.calls.map((c) => (c[1] as { firstTouch: unknown }).firstTouch),
+      ).toEqual([null, null]);
+    });
+  });
+
   it('a hook that throws does not fail the sign-in', async () => {
     process.env.V2_ACCOUNT_DOOR = '1';
     afterSignIn.mockRejectedValue(new Error('db down'));

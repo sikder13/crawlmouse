@@ -155,11 +155,26 @@ async function pricingAccount(admin: SupabaseClient, id: string): Promise<Pricin
   };
 }
 
-/** The person as the Pricing page's buttons need them. */
-export async function readPricingViewer(now: Date): Promise<PricingViewer> {
+/** The visit as the Pricing page needs it: the viewer for its buttons, and who it is for its event. */
+export interface PricingVisit {
+  viewer: PricingViewer;
+  /** The signed-in person's `users.id`; null when signed out. */
+  userId: string | null;
+}
+
+export async function readPricingVisit(now: Date): Promise<PricingVisit> {
   const r = await loadViewer();
-  if (r.kind === 'signed_out') return { kind: 'signed_out' };
+  if (r.kind === 'signed_out') return { viewer: { kind: 'signed_out' }, userId: null };
   const userId = r.kind === 'viewer' ? r.viewer.userId : r.userId;
+  return { viewer: await pricingViewer(r, userId, now), userId };
+}
+
+/** The person as the Pricing page's buttons need them. */
+async function pricingViewer(
+  r: Exclude<Awaited<ReturnType<typeof loadViewer>>, { kind: 'signed_out' }>,
+  userId: string,
+  now: Date,
+): Promise<PricingViewer> {
   const admin = supabaseAdmin();
   const used = await readUsedAgencyTrial(admin, userId);
   const standing = agencyStanding(

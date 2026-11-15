@@ -58,8 +58,8 @@ export function productionMailHandlers(env: Env): MailHandlers {
     mail: mailDeps(env, sb),
     store: supabaseMailStore(sb),
     // A step has no request, so no cookie header: serverCaptureAllowed reads none (CC-26b's known gap).
-    capture: (event, distinctId, properties) =>
-      captureServerEvent(null, { event, distinctId, properties }),
+    capture: (event, distinctId, properties, accountId) =>
+      captureServerEvent(null, { event, distinctId, accountId, properties }),
   });
 }
 

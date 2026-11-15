@@ -161,21 +161,21 @@ describe('supabaseMintDeps', () => {
     ]);
   });
 
-  it('sends report_minted {kind: v2} keyed by the account when the visitor’s consent allows', async () => {
+  it('sends report_minted {kind: v2} keyed by the person who minted, with the account, when the visitor’s consent allows', async () => {
     const quiet = client('x', { data: null, error: null });
-    await supabaseMintDeps(quiet, quiet, 'cm_consent=granted').reportMinted('acct-1');
+    await supabaseMintDeps(quiet, quiet, 'cm_consent=granted').reportMinted('acct-1', 'u-1');
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     expect(JSON.parse(String(init.body))).toMatchObject({
       event: 'report_minted',
-      distinct_id: 'account:acct-1',
-      properties: { kind: 'v2' },
+      distinct_id: 'u-1',
+      properties: { kind: 'v2', account_id: 'acct-1' },
     });
   });
 
   it('sends nothing when the visitor declined', async () => {
     const quiet = client('x', { data: null, error: null });
-    await supabaseMintDeps(quiet, quiet, 'cm_consent=denied').reportMinted('acct-1');
+    await supabaseMintDeps(quiet, quiet, 'cm_consent=denied').reportMinted('acct-1', 'u-1');
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });

@@ -251,7 +251,11 @@ describe('POST /api/seats', () => {
       ],
     ]);
     expect(h.capture.mock.calls).toEqual([
-      ['seat_invited', owner.accountId, { role: 'account_manager', scoped: false }],
+      [
+        'seat_invited',
+        { accountId: owner.accountId, userId: owner.id },
+        { role: 'account_manager', scoped: false },
+      ],
     ]);
     expect(JSON.stringify([h.send.mock.calls, h.capture.mock.calls])).not.toContain('dana');
   });
@@ -308,7 +312,11 @@ describe('POST /api/seats', () => {
     expect(row!.client_scope_all).toBe(false);
     expect(await scopeOf(row!.id)).toEqual([a.id, b.id].sort());
     expect(h.capture.mock.calls).toEqual([
-      ['seat_invited', owner.accountId, { role: 'developer', scoped: true }],
+      [
+        'seat_invited',
+        { accountId: owner.accountId, userId: owner.id },
+        { role: 'developer', scoped: true },
+      ],
     ]);
   });
 
@@ -818,7 +826,11 @@ describe('POST /api/seats/accept', () => {
       invite_token_hash: null,
     });
     expect(h.capture.mock.calls).toEqual([
-      ['seat_accepted', owner.accountId, { role: 'account_manager' }],
+      [
+        'seat_accepted',
+        { accountId: owner.accountId, userId: guest.id },
+        { role: 'account_manager' },
+      ],
     ]);
 
     // Used: the same link, even for the same person, is gone, and its cookie is cleared.

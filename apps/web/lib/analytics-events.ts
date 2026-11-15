@@ -64,15 +64,15 @@ export const FUNNEL_EVENTS = [
   'fix_marked_done',
   'fix_closed',
   // CC-27b — the account's identity and exit. Sent from the server (lib/v2/account/account-events.ts),
-  // keyed by the account's id, with no address: the email change applied, and a deletion requested,
-  // confirmed, restored and purged.
+  // keyed by the person (the purge: by the account; CC-41 D1), with no address: the email change
+  // applied, and a deletion requested, confirmed, restored and purged.
   'account_email_changed',
   'account_deletion_requested',
   'account_deletion_confirmed',
   'account_restored',
   'account_purged',
   // CC-31 — the agency's workspace (lib/v2/agency/events.ts), sent from the server and keyed by the
-  // account's id, with no address and no host. ARCH-2 §8 names `seat_invited`, `report_generated`
+  // person who acted, a link holder's browser or the account (CC-41 D1), with no address and no host. ARCH-2 §8 names `seat_invited`, `report_generated`
   // and `share_link_opened`; the other seven are this step's.
   'seat_invited',
   'seat_accepted',
@@ -106,7 +106,8 @@ export const FUNNEL_EVENTS = [
   // CC-41 D3 — payment events, sent from the server by the v2 Stripe webhook (lib/billing/
   // payment-events.ts), keyed by the account owner's users.id with an `account_id` property, with
   // amounts read from the Stripe event: `subscription_started {plan, interval, trial, amount_cents,
-  // currency}`, `trial_converted {plan}`, `plan_changed {from, to}`, `subscription_canceled {plan,
+  // currency}`, `trial_converted {plan}` (a no-card trial's paying checkout, or a card trial's
+  // subscription turning active), `plan_changed {from, to}`, `subscription_canceled {plan,
   // at_period_end}`, `subscription_ended {plan}` and `payment_failed {plan, attempt}`.
   'subscription_started',
   'trial_converted',
@@ -114,6 +115,10 @@ export const FUNNEL_EVENTS = [
   'subscription_canceled',
   'subscription_ended',
   'payment_failed',
+  // CC-41 D8 — a survey trigger only, never counted in a dashboard: the browser's `fix_done_confirmed
+  // {type}` once Mark done's answer says the mark stands (components/v2/screens/site/MarkDone.tsx).
+  // A mark is counted by the server's `fix_marked_done`.
+  'fix_done_confirmed',
 ] as const;
 
 export type FunnelEvent = (typeof FUNNEL_EVENTS)[number];

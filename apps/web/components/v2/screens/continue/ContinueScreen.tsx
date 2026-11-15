@@ -5,6 +5,7 @@ import { track } from '@/lib/analytics';
 import type { DoorEvent } from '@/lib/auth/first-login';
 import { AUTH_LINK_MINUTES } from '@/lib/auth/constants';
 import { safeNextPath } from '@/lib/safe-next-path';
+import { SignOutForm } from '../../../auth/SignOutForm';
 import { Button } from '../../Button';
 import { Field } from '../../Field';
 import { Heading } from '../../Heading';
@@ -107,10 +108,10 @@ function SignedIn({ email, next }: { email: string; next: string }) {
           Continue
         </Button>
       </div>
-      <form method="post" action="/api/auth/logout" className={styles.actions}>
+      <SignOutForm className={styles.actions}>
         <p className={styles.message}>Not you?</p>
         <Button type="submit">Sign out</Button>
-      </form>
+      </SignOutForm>
     </>
   );
 }

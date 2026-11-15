@@ -20,6 +20,7 @@ import {
   encodeOtp,
   type OtpCarry,
 } from '@/lib/auth/continue-intent';
+import { consentedFirstTouch } from '@/lib/analytics/first-touch';
 import { afterSignIn } from '@/lib/auth/landing';
 import { doorDeps } from '@/lib/auth/door-deps';
 import { sentryReport } from '@/lib/auth/stores';
@@ -158,6 +159,7 @@ export async function POST(request: Request) {
             signup: decodeSignup(req.cookies.get(COOKIES.signup)?.value),
             device: req.cookies.get(COOKIES.device)?.value ?? null,
             ip: getClientIp(request),
+            firstTouch: consentedFirstTouch(request.headers.get('cookie')),
           },
         );
         if (landing.dest !== null) dest = landing.dest;

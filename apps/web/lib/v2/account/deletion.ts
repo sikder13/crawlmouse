@@ -103,7 +103,11 @@ export async function requestAccountDeletion(
   );
   if (!r.ok) return refusal(r.code);
   await ports.sendEmails([accountEmail(input.accountId, 'account_delete', r.confirmTokenId)]);
-  await ports.capture('account_deletion_requested', input.accountId, { tier: r.tier });
+  await ports.capture(
+    'account_deletion_requested',
+    { accountId: input.accountId, userId: input.userId },
+    { tier: r.tier },
+  );
   return { ok: true };
 }
 
@@ -128,10 +132,14 @@ export async function confirmDeletion(
       })),
     ),
   );
-  await ports.capture('account_deletion_confirmed', r.accountId, {
-    tier: r.tier,
-    accounts: r.accounts.length,
-  });
+  await ports.capture(
+    'account_deletion_confirmed',
+    { accountId: r.accountId, userId: r.userId },
+    {
+      tier: r.tier,
+      accounts: r.accounts.length,
+    },
+  );
   return { ok: true };
 }
 
@@ -226,6 +234,10 @@ export async function restoreAccount(ports: DeletionPorts, token: string): Promi
       ports.report(error, link.userId);
     }
   }
-  await ports.capture('account_restored', r.accountId, { tier: r.tier });
+  await ports.capture(
+    'account_restored',
+    { accountId: r.accountId, userId: link.userId },
+    { tier: r.tier },
+  );
   return { ok: true };
 }

@@ -66,6 +66,10 @@ export async function POST(req: Request) {
     },
   );
   if (answer.outcome !== 'started') return refuseTo(req, BACK, answer.status, answer.code);
-  await captureFor(req)('trial_started', accountId, { kind: 'pro', variant: answer.variant });
+  await captureFor(req)(
+    'trial_started',
+    { accountId, userId: user.id },
+    { kind: 'pro', variant: answer.variant },
+  );
   return respond(body.kind, '/dashboard');
 }

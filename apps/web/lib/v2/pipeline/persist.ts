@@ -231,7 +231,7 @@ export async function persistBuiltCheck(
         type: v.type,
         checksToClose: v.checks_to_close,
       };
-      await send(FIX_CLOSED, `account:${accountId}`, properties).catch(() => undefined);
+      await send(FIX_CLOSED, accountId, properties).catch(() => undefined);
     }
   }
   return outcome;

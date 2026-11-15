@@ -189,10 +189,14 @@ export async function POST(req: Request) {
     reportId,
   );
   if (made.outcome === 'stored') {
-    await agencyCaptureFor(req)('report_generated', site.account_id, {
-      kind: request.kind,
-      format,
-    });
+    await agencyCaptureFor(req)(
+      'report_generated',
+      { accountId: site.account_id, userId: user.id },
+      {
+        kind: request.kind,
+        format,
+      },
+    );
   }
   if (body.kind === 'form') return seeOther('/reports');
   return made.outcome === 'stored'

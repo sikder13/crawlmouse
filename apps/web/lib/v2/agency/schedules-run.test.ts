@@ -264,7 +264,9 @@ describe('runDueSchedules', () => {
   it('sends first_client_report_sent once for the account, with no property', async () => {
     const f = fakes([due(), due(), due()]);
     await runDueSchedules(f);
-    expect(f.capture.mock.calls).toEqual([['first_client_report_sent', ACCOUNT, {}]]);
+    expect(f.capture.mock.calls).toEqual([
+      ['first_client_report_sent', { accountId: ACCOUNT }, {}],
+    ]);
   });
 
   it('counts a slot whose row could not be written, and sends nothing for it', async () => {

@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { BrandLink } from './BrandLink';
+import { FeedbackButton } from './FeedbackButton';
 import { StatusPill } from './StatusPill';
 import shell from './PageShell.module.css';
 import styles from './AccountShell.module.css';
@@ -89,6 +90,8 @@ export function AccountShell({
         </nav>
         {card ? <div className={styles.card}>{card}</div> : null}
         {theme ? <div className={styles.theme}>{theme}</div> : null}
+        {/* Last in the rail, so it moves no earlier child's place (and so no id React gives one). */}
+        <FeedbackButton className={styles.feedback} />
       </header>
       <main id="account-main" className={styles.main}>
         {children}

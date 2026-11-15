@@ -8,9 +8,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 
-const { signOut, deleted } = vi.hoisted(() => ({
+const { signOut, deleted, reset } = vi.hoisted(() => ({
   signOut: vi.fn(async (_opts?: unknown) => ({ error: null })),
   deleted: [] as string[],
+  reset: vi.fn(),
 }));
 vi.mock('@/lib/supabase/server', () => ({ supabaseServer: async () => ({ auth: { signOut } }) }));
 vi.mock('next/headers', () => ({
@@ -19,7 +20,7 @@ vi.mock('next/headers', () => ({
     delete: (name: string) => deleted.push(name),
   }),
 }));
-vi.mock('posthog-js', () => ({ default: { capture: () => {} } }));
+vi.mock('posthog-js', () => ({ default: { capture: () => {}, __loaded: true, reset } }));
 
 import { ContinueScreen } from '../../components/v2/screens/continue/ContinueScreen';
 import { POST as logout } from '../../app/api/auth/logout/route';
@@ -102,6 +103,17 @@ describe('the Continue page after sign-in (Q3)', () => {
     )!;
     expect(form.getAttribute('method')).toBe('post');
     expect(form.getAttribute('action')).toBe('/api/auth/logout');
+
+    // Submitting it resets PostHog first (CC-41 D1) and does not stop the POST.
+    let prevented: boolean | null = null;
+    const record = (e: Event) => {
+      prevented = e.defaultPrevented;
+      e.preventDefault();
+    };
+    window.addEventListener('submit', record);
+    act(() => form.requestSubmit());
+    window.removeEventListener('submit', record);
+    expect([reset.mock.calls.length, prevented]).toEqual([1, false]);
 
     // The form's target, run: one revoke, scoped to this browser's session, and its cookies cleared.
     const res = await logout(

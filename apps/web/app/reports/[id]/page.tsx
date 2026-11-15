@@ -40,6 +40,6 @@ export default async function ReportProofPage({ params }: { params: Promise<{ id
   if (proof === null) return notFound();
   await (
     await pageCapture()
-  )('proof_viewed', proof.accountId, { via: 'account' });
+  )('proof_viewed', { accountId: proof.accountId, userId: user.id }, { via: 'account' });
   return <ProofScreen data={proofView(proof.doc)} />;
 }
