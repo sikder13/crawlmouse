@@ -72,19 +72,19 @@ Additions live in named containers (`p.post-summary`, `section.post-questions`, 
 existing-post guard reverses each one and requires the baseline markup. The table below is
 `v2EditsMarkdown()`'s output; `__tests__/spec-40-d5-table.test.ts` fails when it differs.
 
+<!-- prettier-ignore-start -->
 <!-- d5-table:start -->
-
 5 sentences changed (D5):
 
-| Where                                                          | Before                                                                                                                              | After                                                                                                                              | Why                                                                                                                                |
-| -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `apps/web/components/blog/ArticleLayout.tsx:112`               | Crawlmouse crawls your site, maps every internal link, and gives you an A–F grade in under two minutes. Free, no install.           | Crawlmouse crawls your site, maps every internal link, and grades what it finds. Free, no install.                                 | An A–F internal-linking grade is v1’s result; v2 grades AI readability and Technical SEO, and gives its time as about two minutes. |
-| `apps/web/lib/blog/content/screaming-frog-alternative.tsx:89`  | get an A–F internal-linking grade and a 0–100 <a href="/ai-readiness-checker">AI-readiness score</a> for the whole site, with fixes | get grades for the whole site’s structure and for <a href="/ai-readiness-checker">how well AI crawlers can read it</a>, with fixes | The A–F internal-linking grade and the 0–100 AI-readiness score are v1’s; v2 grades AI readability and Technical SEO.              |
-| `apps/web/lib/blog/content/screaming-frog-alternative.tsx:109` | <strong>Price:</strong> free; Pro at $19/month for every fix, CSV export, and white-label reports.                                  | <strong>Price:</strong> free; paid plans from $19/month.                                                                           | In v2, white-label reports are on Agency, not Pro; Pro is still $19 a month in both builds.                                        |
-| `apps/web/lib/blog/content/free-internal-link-audit.tsx:98`    | and returns a single A–F grade plus the specific problems                                                                           | and returns a grade for its structure plus the specific problems                                                                   | A single A–F internal-linking grade is v1’s result; v2 returns two grades.                                                         |
-| `apps/web/lib/blog/content/sitebulb-alternative.tsx:161`       | returns a single A–F grade plus the specific problems behind it                                                                     | returns a grade for its structure plus the specific problems behind it                                                             | A single A–F internal-linking grade is v1’s result; v2 returns two grades.                                                         |
-
+| Where | Before | After | Why |
+| --- | --- | --- | --- |
+| `apps/web/components/blog/ArticleLayout.tsx:112` | Crawlmouse crawls your site, maps every internal link, and gives you an A–F grade in under two minutes. Free, no install. | Crawlmouse crawls your site, maps every internal link, and grades what it finds. Free, no install. | An A–F internal-linking grade is v1’s result; v2 grades AI readability and Technical SEO, and gives its time as about two minutes. |
+| `apps/web/lib/blog/content/screaming-frog-alternative.tsx:89` | get an A–F internal-linking grade and a 0–100 <a href="/ai-readiness-checker">AI-readiness score</a> for the whole site, with fixes | get grades for the whole site’s structure and for <a href="/ai-readiness-checker">how well AI crawlers can read it</a>, with fixes | The A–F internal-linking grade and the 0–100 AI-readiness score are v1’s; v2 grades AI readability and Technical SEO. |
+| `apps/web/lib/blog/content/screaming-frog-alternative.tsx:109` | <strong>Price:</strong> free; Pro at $19/month for every fix, CSV export, and white-label reports. | <strong>Price:</strong> free; paid plans from $19/month. | In v2, white-label reports are on Agency, not Pro; Pro is still $19 a month in both builds. |
+| `apps/web/lib/blog/content/free-internal-link-audit.tsx:98` | and returns a single A–F grade plus the specific problems | and returns a grade for its structure plus the specific problems | A single A–F internal-linking grade is v1’s result; v2 returns two grades. |
+| `apps/web/lib/blog/content/sitebulb-alternative.tsx:161` | returns a single A–F grade plus the specific problems behind it | returns a grade for its structure plus the specific problems behind it | A single A–F internal-linking grade is v1’s result; v2 returns two grades. |
 <!-- d5-table:end -->
+<!-- prettier-ignore-end -->
 
 **D6 — Keyword map, clusters and internal links.** See subagent A's section (below, completed at merge).
 
