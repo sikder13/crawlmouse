@@ -387,7 +387,7 @@ export function qaBillingAccounts(sb: SupabaseClient): BillingAccounts {
   };
 }
 
-/** qa:reset's port: D2's table, and its guarded function (migration 20261117000002). */
+/** qa:reset's port: D2's table, and its guarded function (migration 20261119000001). */
 export function qaResetStore(sb: SupabaseClient): ResetStore {
   return {
     async marked() {

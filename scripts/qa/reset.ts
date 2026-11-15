@@ -5,7 +5,7 @@ import { noter, seed, type SeedDeps, type Step } from './seed';
  * `pnpm qa:reset` (CC-38 D2): every account in `qa_accounts` back to its starting sites, checks,
  * fixes and seats. The deleting is `qa_reset(p_account)`'s, a service-role SQL function that refuses
  * an account without its `qa_accounts` row or with `accounts.internal` false (migration
- * 20261117000002); this script holds no such check of its own, so nothing here can widen it. The
+ * 20261119000001); this script holds no such check of its own, so nothing here can widen it. The
  * seed's sites and seat steps then put the starting set back (./seed.ts `only: 'sites-and-seats'`).
  * The plan, Stripe and the account row are not touched.
  */

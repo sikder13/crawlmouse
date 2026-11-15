@@ -29,8 +29,8 @@ beforeAll(async () => {
   if (HAS_INTERNAL_MARKER) base = await migratedBase();
 }, 300_000);
 
-const MIGRATION = '20261117000002_v2_038_qa.sql';
-const ROLLBACK = '20261117000002_v2_038_qa.revert.sql';
+const MIGRATION = '20261119000001_v2_038_qa.sql';
+const ROLLBACK = '20261119000001_v2_038_qa.revert.sql';
 
 /** The seeded set with `qa+agency` given its plan's limits, as the webhook leaves them, and seeded again. */
 async function seeded(): Promise<World & { resetDeps: Parameters<typeof reset>[0] }> {
@@ -480,7 +480,7 @@ describe('qa:reset', () => {
   );
 });
 
-describe('migration 20261117000002', () => {
+describe('migration 20261119000001', () => {
   withMarker(
     'its rollback applies, and the migration applies again after it',
     async () => {

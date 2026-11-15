@@ -14,7 +14,7 @@
 -- checks' evidence objects in storage, and usage_events rows (docs/specs/v2/38-launch-qa.md, gaps).
 -- It never writes accounts, subscriptions or any stripe_* table; the plan is the webhook's alone.
 --
--- Rollback: infra/supabase/rollbacks/20261117000002_v2_038_qa.revert.sql
+-- Rollback: infra/supabase/rollbacks/20261119000001_v2_038_qa.revert.sql
 
 create table if not exists public.qa_accounts (
   account_id uuid primary key,
