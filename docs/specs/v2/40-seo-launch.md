@@ -199,6 +199,13 @@ below is `copyEditsMarkdown()`'s output.
 <!-- d8-table:end -->
 <!-- prettier-ignore-end -->
 
+**Ruling 4 (CTO) — metadata in `<head>` for every agent.** Next 15 streams a per-request page's
+metadata into `<body>` for any user agent not on its HTML-limited bot list, so a crawler that runs no
+JavaScript (GPTBot, ClaudeBot) found no `<title>`, description or canonical in the `<head>` of
+`/status`, v2 `/pricing` or a `/r/` report. `apps/web/next.config.mjs` sets `htmlLimitedBots: /.*/`;
+`__tests__/next-config-html-limited-bots.test.ts` holds it to six named agents. Titles, descriptions,
+headings and canonicals are unchanged; their place in the document moved, in both builds.
+
 ## Questions and smaller options taken
 
 Q1–Q8 in the step's notes (`questions.md`): the pinned-guard rewrite (Q1), attributed queries (Q2), the
