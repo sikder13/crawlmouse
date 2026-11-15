@@ -147,11 +147,15 @@ describe('the consent banner', () => {
     return { click, done: () => (act(() => root.unmount()), host.remove()) };
   }
 
-  it('on decline opts out and switches surveys off', async () => {
+  it('on decline opts out, switches surveys off and announces the decline', async () => {
+    const heard = vi.fn();
+    window.addEventListener('cm:consent-denied', heard);
     const b = await banner();
     b.click('Decline');
     expect(ph.opt_out_capturing).toHaveBeenCalledTimes(1);
     expect(ph.set_config).toHaveBeenCalledWith({ disable_surveys: true });
+    expect(heard).toHaveBeenCalledTimes(1);
+    window.removeEventListener('cm:consent-denied', heard);
     b.done();
   });
 

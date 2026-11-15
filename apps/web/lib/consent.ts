@@ -39,6 +39,12 @@ export const CONSENT_OPEN_EVENT = 'cm:open-consent';
  */
 export const CONSENT_GRANTED_EVENT = 'cm:consent-granted';
 
+/**
+ * Window event the CookieConsent banner dispatches once a visitor has declined and capture is opted
+ * out: the account shell's Feedback button leaves the page then.
+ */
+export const CONSENT_DENIED_EVENT = 'cm:consent-denied';
+
 // EU-27 + EEA (Iceland, Liechtenstein, Norway) + United Kingdom. ISO 3166-1 alpha-2 codes, matching
 // what Vercel's `x-vercel-ip-country` header returns. (Greece is GR in ISO, not the EU's "EL".)
 const CONSENT_REQUIRED_COUNTRIES: ReadonlySet<string> = new Set([
