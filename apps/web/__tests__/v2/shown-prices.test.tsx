@@ -49,6 +49,7 @@ const TYPED_PRICE =
  */
 const NOT_OUR_PRICES: Readonly<Record<string, string>> = {
   $329: 'a crawled product page quoted as evidence (lib/v2/copy/segment-content.ts)',
+  $100: 'the Terms’ liability cap, "USD $100" (app/terms/page.tsx), not a plan’s price',
 };
 
 const unknownPrices = (text: string) =>
@@ -57,12 +58,16 @@ const unknownPrices = (text: string) =>
     .filter((d) => !SHOWN_PRICES.has(d) && !Object.hasOwn(NOT_OUR_PRICES, d));
 
 /**
- * v1 files held byte-identical to main by another test, so they cannot read prices.ts. Each names
- * that test; the prices they type are Pro's, which prices.ts also holds (checked below).
+ * v1 files left as they are, each with why. They type Pro's prices, which prices.ts also holds
+ * (checked below), so none of them shows a price prices.ts does not.
  */
 const PINNED_V1: Readonly<Record<string, string>> = {
   'app/pricing/page.tsx':
     '__tests__/v2/public-pages.test.tsx ("app/pricing/page.tsx is the file main has", CC-29 D1); /pricing is served by the v2 page while V2_BILLING is on',
+  'components/billing/PricingCards.tsx':
+    'rendered only by the v1 /pricing page above; the file was never formatted, so any edit reflows all of it under the CI Prettier check',
+  'app/terms/page.tsx':
+    'the legal Terms: never formatted, so an edit reflows the whole page, and a JSX reflow can change the legal text’s whitespace (CC-39 ruling 4, Q9)',
 };
 
 function sourceFiles(dir: string): string[] {
