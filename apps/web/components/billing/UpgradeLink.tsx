@@ -4,11 +4,18 @@ import Link from 'next/link';
 import { track } from '@/lib/analytics';
 import { buttonClasses } from '@/components/ui/Button';
 import { stashReturnTo } from './post-upgrade-return';
+import { PRO_MONTHLY, usd } from '@/lib/billing/prices';
 
 // The upgrade CTA. Uses a plain <Link> (SSR-safe, no router context needed) + an onClick that stashes
 // the return target (so the just-paid user lands back on the cure) and fires the upgrade_clicked
 // spine event. `returnTo` is optional — generic paywalls just go to /pricing.
-export function UpgradeLink({ returnTo, label = 'Unlock Pro · $19 →' }: { returnTo?: string; label?: string }) {
+export function UpgradeLink({
+  returnTo,
+  label = `Unlock Pro · ${usd(PRO_MONTHLY)} →`,
+}: {
+  returnTo?: string;
+  label?: string;
+}) {
   function onClick() {
     if (returnTo) stashReturnTo(returnTo);
     track('upgrade_clicked', returnTo ? { returnTo } : {});
