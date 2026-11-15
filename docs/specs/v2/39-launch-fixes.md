@@ -19,20 +19,27 @@ nothing else.
 
 The owner decision of 2026-11-03 (D-2026-11-03-2) set Agency at $99 a month ($990 a year) and an
 extra seat at $12. Two places a customer sees still said $69. Every shown price now reads
-`apps/web/lib/billing/prices.ts` through `formatPlanPrice(plan, interval)` and `formatExtraPrice`
-(`apps/web/lib/v2/copy/plan-price.ts`). `__tests__/v2/shown-prices.test.tsx` fails on a typed price, and
-on a shown price `prices.ts` does not hold, in the source, in the copy modules and registry, and on the
-rendered v2 screens.
+`apps/web/lib/billing/prices.ts`, through `formatPlanPrice(plan, interval)` and `formatExtraPrice(item,
+interval)` (`apps/web/lib/v2/copy/plan-price.ts`) or `usd()` on its constants.
+`__tests__/v2/shown-prices.test.tsx` holds this. It fails on a typed price in the source, whole dollars,
+spaced or with cents, outside the exemptions it names. It fails on any price `prices.ts` does not hold
+in the copy modules, the registry's `rendered` and the rendered v2 screens it lists. Where those name a
+plan with its price, it fails unless the price is that plan's. In the blog, it fails if Pro's price is
+not Pro's. Its header lists what it does not check: the dashboard at its site limit is not rendered, and
+its Agency line is held by the source check.
 
-| Where                                                                             | Before                               | After                                                               |
-| --------------------------------------------------------------------------------- | ------------------------------------ | ------------------------------------------------------------------- |
-| `components/v2/screens/home/HomeScreen.tsx:35` (Agency card)                      | `'$69'`                              | `formatPlanPrice('agency')`, $99                                    |
-| `components/v2/screens/result/ResultScreen.tsx:306` (Pro panel)                   | "…your own brand, $69 a month."      | `{formatPlanPrice('agency')} a month`, $99                          |
-| `HomeScreen.tsx:19,27,31` (Free, Pro)                                             | `'$0'`, `'$19'`, "$19 a month" typed | `formatPlanPrice('free' \| 'pro')`                                  |
-| `lib/v2/copy-registry.ts:97,223`                                                  | (none)                               | `home` and `result` entries: the artboard's $69 → the decided price |
-| `lib/v2/copy/account-door.ts:79`, `agency.ts:150`, `settings.ts:288` (`rendered`) | `'$99 a month'` etc., typed          | `formatPlanPrice('agency')`                                         |
-| `lib/v2/copy/pricing.ts:36` (Agency Plus)                                         | `fromMonthly: 249`                   | `AGENCY_PLUS_FROM_MONTHLY` in `prices.ts:22`, same $249             |
-| `components/billing/UpgradeLink.tsx:14`, `lib/seo/faq.ts:17`                      | "$19" typed                          | `usd(PRO_MONTHLY)`                                                  |
+| Where                                                                             | Before                                  | After                                                               |
+| --------------------------------------------------------------------------------- | --------------------------------------- | ------------------------------------------------------------------- |
+| `components/v2/screens/home/HomeScreen.tsx:35` (Agency card)                      | `'$69'`                                 | `formatPlanPrice('agency')`, $99                                    |
+| `components/v2/screens/result/ResultScreen.tsx:306` (Pro panel)                   | "…your own brand, $69 a month."         | `{formatPlanPrice('agency')} a month`, $99                          |
+| `HomeScreen.tsx:19,27,31` (Free, Pro)                                             | `'$0'`, `'$19'`, "$19 a month" typed    | `formatPlanPrice('free' \| 'pro')`                                  |
+| `lib/v2/copy-registry.ts:97,223`                                                  | (none)                                  | `home` and `result` entries: the artboard's $69 → the decided price |
+| `lib/v2/copy/account-door.ts:79`, `agency.ts:150`, `settings.ts:288` (`rendered`) | `'$99 a month'` etc., typed             | `formatPlanPrice('agency')`                                         |
+| `lib/v2/copy/pricing.ts:36` (Agency Plus)                                         | `fromMonthly: 249`                      | `AGENCY_PLUS_FROM_MONTHLY` in `prices.ts:22`, same $249             |
+| `components/billing/UpgradeLink.tsx:14`, `lib/seo/faq.ts:17`                      | "$19" typed                             | `usd(PRO_MONTHLY)`                                                  |
+| `lib/v2/view/dashboard.ts:1046` (the at-limit Agency line)                        | `$${AGENCY_MONTHLY}`, formatted by hand | `formatPlanPrice('agency')`                                         |
+| `lib/v2/copy/seats.ts:177` (`rendered`)                                           | `usd(EXTRA_SEAT)`                       | `formatExtraPrice('seat')`                                          |
+| `lib/entitlement-spec.ts:111` (the gates table's label)                           | "$12 seats" typed                       | `usd(EXTRA_SEAT)`                                                   |
 
 The five copy-module lines the ruling named at `account-door.ts:77`, `agency.ts:148`, `dashboard.ts:465`,
 `settings.ts:271` (now `:286`) and `seats.ts:175` are `locked:` entries: the artboard's text as drawn,
@@ -47,7 +54,10 @@ holds (Pro's $19 and $190):
   `/pricing` is the v2 page while `V2_BILLING` is on;
 - `components/billing/PricingCards.tsx`, which only that v1 page renders;
 - `app/terms/page.tsx`. Neither of these two files was ever formatted, so any edit reflows the whole
-  file under CI's Prettier check, and in the Terms that would mean the legal text.
+  file under CI's Prettier check, and in the Terms that would mean the legal text;
+- `lib/blog/content/screaming-frog-alternative.tsx`, which gives Pro's price twice ("Pro $19/mo",
+  "Pro at $19/month"): never formatted either, and a published article. The blog check holds that
+  price to Pro's.
 
 The screenshots that move (Home's Agency card, and the Result's Pro panel on an audit nobody keeps)
 are re-drawn by the PR's visual shards and accepted there; there is no separate dispatch.
