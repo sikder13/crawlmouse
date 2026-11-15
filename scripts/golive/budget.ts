@@ -201,7 +201,7 @@ const ROWS: readonly RowInput[] = [
     trigger: 'check.finished',
     steps: 1,
     stepsHow: 'write',
-    stepAt: [37],
+    stepAt: [39],
   },
   {
     file: 'inngest/ledger.ts',
@@ -721,12 +721,16 @@ const row = (id: string): FunctionRow => {
 };
 const perRun = (id: string): number => 1 + row(id).steps;
 
-/** The functions one finished check starts: the alert planner, the notify mail, the capture, the ledger. */
+/** The functions one finished check starts, each on `check.finished`. */
+export const FINISHED_FAN_OUT = [
+  'crawlmouse.alert.dispatch',
+  'crawlmouse.mail.check-notify',
+  'crawlmouse.events.check-finished',
+  'crawlmouse.ledger.write',
+] as const;
+/** The executions one finished check's fan-out costs: each function's run and its steps. */
 export const finishedFanOut = (): number =>
-  perRun('crawlmouse.alert.dispatch') +
-  perRun('crawlmouse.mail.check-notify') +
-  perRun('crawlmouse.events.check-finished') +
-  perRun('crawlmouse.ledger.write');
+  FINISHED_FAN_OUT.reduce((sum, id) => sum + perRun(id), 0);
 
 /** One alert that fires on both channels: the run, its plan, and a step per channel. */
 export const alertFiring = (): number => perRun('crawlmouse.alert.dispatch') + 2;

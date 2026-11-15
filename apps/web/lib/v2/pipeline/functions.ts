@@ -1,7 +1,7 @@
 /**
  * The functions the Inngest serve route registers (D3): v1's four, in today's order; and checkFn, its
  * cancel handler, the reaper, the daily expiry (CC-22b D8) and the research ledger's writer and
- * hourly backfill (CC-41 D4) only when V2_PIPELINE=1 in the environment the route module loads with. CC-03's two billing functions follow, only when
+ * six-hourly backfill (CC-41 D4) only when V2_PIPELINE=1 in the environment the route module loads with. CC-03's two billing functions follow, only when
  * V2_BILLING=1, then CC-27b's three deletion functions, the mail functions (CC-28's four, CC-31's
  * three and CC-29's deletion of Agency Plus requests: lib/v2/mail/functions.ts) and CC-31's client
  * report schedules, only when V2_CHECKS_PUBLIC=1. CC-28's scheduler tick, alert and summary
@@ -149,7 +149,7 @@ export function inngestFunctions(
       expireUnkept: () => expireUnkept(wiring.expiry(env)),
       settleKept: () => settleKept(wiring.expiry(env)),
     }),
-    // CC-41 D4: the research ledger's writer, after each check, and its hourly backfill.
+    // CC-41 D4: the research ledger's writer, after each check, and its six-hourly backfill.
     createLedgerWriteFn(() => ledgerWorkFromEnv(env)),
     createLedgerBackfillFn(() => ledgerWorkFromEnv(env)),
     ...billing,
