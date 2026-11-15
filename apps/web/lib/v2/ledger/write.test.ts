@@ -331,7 +331,16 @@ describe('backfillLedger', () => {
     expect(await draftsOf(c)).toBe(1);
   });
 
-  it('drops the draft of a check the retry finds already linked or without a lineage', async () => {
+  it('drops the draft of a check the retry finds not ended', async () => {
+    const now = new Date('2026-11-23T12:41:00Z');
+    const queued = await endedCheck({ status: 'queued' });
+    await at(queued, '2026-11-23T08:00:00Z');
+    const r = await backfillLedger({ store, secret: SECRET, onFailure: () => {} }, now);
+    expect(r.outcomes).toEqual({ not_ended: 1 });
+    expect(await draftsOf(queued)).toBe(0);
+  });
+
+  it('drops the draft of a check the retry finds already linked', async () => {
     const now = new Date('2026-11-22T12:41:00Z');
     const linked = await endedCheck();
     await writeLedger({ store, secret: SECRET }, linked);
