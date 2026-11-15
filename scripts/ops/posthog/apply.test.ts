@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { applySpec, formatPlan, runApply, type PlanRow } from './apply';
-import { POSTHOG_HOST, postHogClient, type Fetch, type Kind, type Remote } from './client';
+import {
+  MAX_PAGES,
+  POSTHOG_HOST,
+  postHogClient,
+  type Fetch,
+  type Kind,
+  type Remote,
+} from './client';
 import { PREFIX, SPEC, type PostHogSpec } from './spec';
 
 /**
@@ -288,6 +295,16 @@ describe('the client', () => {
     const off: Fetch = async () =>
       new Response(JSON.stringify({ results: [], next: 'https://elsewhere.example/api/x' }));
     await expect(clientOf(off).list('action')).rejects.toThrow(/next link/);
+  });
+
+  it('stops after MAX_PAGES pages of a list that never ends', async () => {
+    let calls = 0;
+    const endless: Fetch = async (url) => {
+      calls++;
+      return new Response(JSON.stringify({ results: [], next: url }));
+    };
+    await expect(clientOf(endless).list('action')).rejects.toThrow(/pages/);
+    expect(calls).toBe(MAX_PAGES);
   });
 
   it('carries no key in an error', async () => {

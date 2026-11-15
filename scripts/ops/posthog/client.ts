@@ -33,6 +33,9 @@ export const REQUIRED_SCOPES: readonly string[] = (['project', ...KINDS] as cons
   `${k}:write`,
 ]);
 
+/** The most pages a list reads (200 objects a page): a longer list is refused, not read forever. */
+export const MAX_PAGES = 50;
+
 export type Fetch = (input: string, init?: RequestInit) => Promise<Response>;
 
 export interface Credentials {
@@ -125,13 +128,14 @@ export function postHogClient({
     async list(kind) {
       const out: Remote[] = [];
       let url: string | null = `${base}${PATHS[kind]}/?limit=200`;
-      while (url !== null) {
+      for (let page = 0; url !== null; page++) {
+        if (page === MAX_PAGES) throw new Error(`${kind}: more than ${MAX_PAGES} pages`);
         // A `next` link is followed only within this project's API, so the key goes nowhere else.
         if (!url.startsWith(base))
           throw new Error(`${kind}: refusing to follow a next link off ${base}`);
-        const page = (await call('GET', url)) as { results: Remote[]; next: string | null };
-        out.push(...page.results.filter((r) => r.deleted !== true));
-        url = page.next;
+        const answer = (await call('GET', url)) as { results: Remote[]; next: string | null };
+        out.push(...answer.results.filter((r) => r.deleted !== true));
+        url = answer.next;
       }
       return out;
     },
