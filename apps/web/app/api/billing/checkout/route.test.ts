@@ -174,6 +174,12 @@ describe('POST /api/billing/checkout, V2_BILLING=1', () => {
       line_items: [{ price: 'price_pro_month', quantity: 1 }],
       success_url: `${SITE}/settings/plan?checkout=done`,
     });
+    // The signed-in user, not the account, is PostHog's person (CC-41 D3).
+    const metadata = { account_id: ACCOUNT, posthog_person_distinct_id: 'u1' };
+    expect(h.sessionsCreate.mock.calls[0]![0]).toMatchObject({
+      metadata,
+      subscription_data: { metadata },
+    });
   });
 
   it('answers JSON with {url}', async () => {
