@@ -107,7 +107,7 @@ export const PlannedEffectSchema = z.union([
       .regex(/^[a-z]{3}$/)
       .nullable(),
   }),
-  captureOf('trial_converted', { plan: PAID }),
+  captureOf('trial_converted', { plan: PAID, via: z.enum(['checkout', 'subscription']) }),
   captureOf('plan_changed', { from: PAID, to: PAID }),
   captureOf('subscription_canceled', { plan: PAID, at_period_end: z.boolean() }),
   captureOf('subscription_ended', { plan: PAID }),

@@ -320,7 +320,7 @@ export const EVENT_REGISTRY: Record<EventName, EventEntry> = {
       ]),
     ],
   },
-  trial_converted: { senders: [server(PAYMENT, OWNER, 'no_request', ['plan'])] },
+  trial_converted: { senders: [server(PAYMENT, OWNER, 'no_request', ['plan', 'via'])] },
   plan_changed: { senders: [server(PAYMENT, OWNER, 'no_request', ['from', 'to'])] },
   subscription_canceled: {
     senders: [server(PAYMENT, OWNER, 'no_request', ['plan', 'at_period_end'])],

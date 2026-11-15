@@ -197,7 +197,7 @@ describe('paymentEvents: subscription_started', () => {
           currency: 'usd',
         },
       },
-      { event: 'trial_converted', properties: { plan: 'pro' } },
+      { event: 'trial_converted', properties: { plan: 'pro', via: 'checkout' } },
     ]);
   });
 
@@ -216,7 +216,7 @@ describe('paymentEvents: subscription_started', () => {
     });
     expect(
       paymentEvents(input(started.state, updated('agency'), stripe, mirror('agency'))),
-    ).toEqual([{ event: 'trial_converted', properties: { plan: 'agency' } }]);
+    ).toEqual([{ event: 'trial_converted', properties: { plan: 'agency', via: 'subscription' } }]);
     // A paid account's update that changes nothing converts nothing.
     expect(
       paymentEvents(input(paid('agency'), updated('agency'), stripe, mirror('agency'))),
