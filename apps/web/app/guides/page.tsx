@@ -3,6 +3,7 @@ import type { Route } from 'next';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 import { Card } from '@/components/ui/Card';
+import { CLUSTERS } from '@/lib/blog/clusters';
 import { POSTS_BY_SLUG } from '@/lib/blog/posts';
 
 export const metadata = {
@@ -12,53 +13,23 @@ export const metadata = {
   alternates: { canonical: '/guides' },
 };
 
-// Curated topic clusters. Each post appears once, in its primary cluster.
-// When a new post ships, add its slug to the relevant cluster here.
-const CLUSTERS: ReadonlyArray<{ title: string; blurb: string; slugs: readonly string[] }> = [
-  {
-    title: 'Internal linking, start here',
-    blurb: 'What internal linking is, how to audit it, and the orphan pages that quietly waste your work.',
-    slugs: ['free-internal-link-audit', 'orphan-pages'],
-  },
-  {
-    title: 'Crawl depth & site architecture',
-    blurb: 'How far your pages sit from the homepage, why it matters, and how to pull the important ones up.',
-    slugs: ['crawl-depth-site-architecture', 'how-deep-is-too-deep-crawl-depth'],
-  },
-  {
-    title: 'Orphan pages by platform',
-    blurb: 'The platform-specific traps that strand pages — and how to find every orphan on WordPress, Shopify, Webflow, and Squarespace.',
-    slugs: ['find-orphan-pages-wordpress', 'find-orphan-pages-shopify', 'find-orphan-pages-webflow', 'find-orphan-pages-squarespace'],
-  },
-  {
-    title: 'Free tool alternatives',
-    blurb: 'When a paid desktop crawler is more than you need for an internal-linking read — and what to use instead.',
-    slugs: ['screaming-frog-alternative', 'sitebulb-alternative', 'sitebulb-vs-screaming-frog', 'sitebulb-vs-jetoctopus-vs-oncrawl', 'screaming-frog-vs-lumar-deepcrawl'],
-  },
-  {
-    title: 'Indexing & getting found',
-    blurb: 'Why Google skips your pages, and the internal-linking fixes that get them crawled and indexed.',
-    slugs: [
-      'discovered-currently-not-indexed',
-      'can-ai-crawlers-see-javascript',
-      'block-ai-crawlers-robots-txt',
-      'cloudflare-ai-crawler-defaults-september-15',
-    ],
-  },
-];
-
 /** /guides — the pillar hub. Links from the homepage + header nav; links down to every guide. */
 export default function GuidesPage() {
   return (
     <>
       <Header />
       <main className="max-w-3xl mx-auto px-6 pt-16 pb-32 sm:pt-20">
-        <h1 className="font-display font-bold text-4xl sm:text-5xl tracking-tight text-ink">Guides</h1>
+        <h1 className="font-display font-bold text-4xl sm:text-5xl tracking-tight text-ink">
+          Guides
+        </h1>
         <p className="mt-4 text-lg text-ink/70 leading-relaxed">
-          Everything we&rsquo;ve written about internal linking, orphan pages, crawl depth, and getting your
-          pages found &mdash; grouped by what you&rsquo;re trying to do. Plain, honest, and free. When
-          you&rsquo;re ready, <Link href={{ pathname: '/' }} className="text-peach underline">grade your own
-          site</Link>.
+          Everything we&rsquo;ve written about internal linking, orphan pages, crawl depth, and
+          getting your pages found &mdash; grouped by what you&rsquo;re trying to do. Plain, honest,
+          and free. When you&rsquo;re ready,{' '}
+          <Link href={{ pathname: '/' }} className="text-peach underline">
+            grade your own site
+          </Link>
+          .
         </p>
 
         {CLUSTERS.map((cluster) => {
@@ -74,7 +45,9 @@ export default function GuidesPage() {
                 {posts.map((post) => (
                   <Link key={post.slug} href={`/blog/${post.slug}` as Route} className="block">
                     <Card interactive>
-                      <div className="font-display font-semibold text-lg text-ink">{post.title}</div>
+                      <div className="font-display font-semibold text-lg text-ink">
+                        {post.title}
+                      </div>
                       <div className="mt-1 text-ink/60 leading-relaxed">{post.description}</div>
                     </Card>
                   </Link>
@@ -85,8 +58,12 @@ export default function GuidesPage() {
         })}
 
         <div className="mt-16 border-t border-oat pt-10 text-center">
-          <p className="font-display font-semibold text-xl text-ink">See where your own site stands</p>
-          <p className="mt-2 text-ink/60">A free grade in under two minutes &mdash; no account, no install.</p>
+          <p className="font-display font-semibold text-xl text-ink">
+            See where your own site stands
+          </p>
+          <p className="mt-2 text-ink/60">
+            A free grade in under two minutes &mdash; no account, no install.
+          </p>
           <div className="mt-5">
             <Link
               href={{ pathname: '/' }}
