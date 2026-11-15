@@ -93,6 +93,9 @@ const SUMMARY: readonly [label: string, count: (run: AuditRun, origin: string) =
       return r.pages.filter((p) => p.descriptions.some((d) => seen.get(d)! > 1)).length;
     },
   ],
+  // Next streams a per-request page's metadata into <body> for a user agent it does not list as an
+  // HTML-limited bot; the audit fetches with Node's agent, so it reads the page as such a crawler does.
+  ['no <title> in <head>', (r) => r.pages.filter((p) => p.title === null).length],
   ['title over 60 characters', (r) => r.pages.filter((p) => (p.title ?? '').length > 60).length],
   ['an image without alt', (r) => r.pages.filter((p) => p.imagesWithoutAlt.length > 0).length],
   ['noindex', (r) => r.pages.filter((p) => isNoindex(p.robots)).length],

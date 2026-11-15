@@ -74,6 +74,7 @@ describe('auditBuild', () => {
     expect(md).toContain('answered one 308 to https://crawlmouse.com/: not separately indexable');
     // canonical of /blog/b and /blog/c point at /blog/a: counted as not self
     expect(md).toMatch(/\| canonical not the page itself \| 2 \| 2 \|/);
+    expect(md).toMatch(/\| no <title> in <head> \| 0 \| 0 \|/);
     // /blog/a has no in-link from another page; b has one (from a); c none
     expect(md).toMatch(/\| no internal link to it from another sitemap page \| 2 \| 2 \|/);
   });
