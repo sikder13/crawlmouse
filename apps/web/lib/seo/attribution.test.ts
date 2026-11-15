@@ -39,3 +39,16 @@ describe('attribution', () => {
     expect(got.get('/sb2')!.map((r) => r[0])).toEqual(['sitebulb vs screaming frog']);
   });
 });
+
+describe('the Search Console data', () => {
+  it('holds every query row whole: a string and three finite numbers', async () => {
+    const { QUERIES } = await import('./search-console');
+    for (const r of QUERIES) {
+      expect(typeof r[0]).toBe('string');
+      for (const n of r.slice(1)) expect(Number.isFinite(n), r[0]).toBe(true);
+    }
+    // The export's Queries tab, counted with a CSV parser, where a multi-line quoted cell is one row:
+    // python3 -c "import csv;print(len(list(csv.reader(open('Queries.csv',newline='')))[1:]))" → 274.
+    expect(QUERIES.length).toBe(274);
+  });
+});
