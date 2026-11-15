@@ -1,23 +1,24 @@
 /**
  * What the site says about itself once v2 is public (CC-40 D2), served only while V2_CHECKS_PUBLIC
- * is on; with it off every caller serves its v1 text unchanged. The three owner strings are option 1
- * of the proposals in the CC-40 notes (`copy-proposals.md`); choosing option 2 is changing one
- * constant here. `site-copy.test.tsx` holds each to the length its decision names.
+ * is on; with it off every caller serves its v1 text unchanged. The home title, description and
+ * llms descriptor are the CTO's ruling 3 of 2026-11-15 (owner-delegated), each one constant here.
+ * `site-copy.test.tsx` holds the title and description to the lengths their decision names.
  */
 
 /** The v2 home's `<title>`, absolute (no " · Crawlmouse" suffix). Owner string; at most 60 characters. */
-export const V2_HOME_TITLE = 'Crawlmouse — Can ChatGPT, Claude and Google read your site?';
+export const V2_HOME_TITLE = 'Crawlmouse — Free AI Crawler & SEO Checker for Any Website';
 
 /** The v2 home's meta description, also its Open Graph and Twitter text. Owner string; 120–155 characters. */
 export const V2_HOME_DESCRIPTION =
-  'Crawlmouse checks what Googlebot, GPTBot, ClaudeBot and PerplexityBot get from your site: ' +
-  'robots.txt, JavaScript, links. Free, re-checked monthly.';
+  'See what Googlebot, GPTBot, ClaudeBot and PerplexityBot actually get from your site, and how to ' +
+  'fix what blocks them. Free check, nothing to install.';
 
-/** The `/llms.txt` descriptor. Owner string. */
+/** The `/llms.txt` descriptor. The plans and prices that follow it are generated (lib/seo/llms-v2.ts). */
 export const V2_LLMS_DESCRIPTOR =
-  'Crawlmouse checks whether search engines and AI crawlers can read a website. Paste a URL: it ' +
-  'fetches the site as Googlebot, GPTBot, ClaudeBot and PerplexityBot, shows what each got back, ' +
-  'grades SEO and AI readability, and keeps checking. Free for one site, no install.';
+  'Crawlmouse (by Nahl Technologies) checks whether search engines and AI crawlers can read a ' +
+  'website. It fetches the site as Googlebot, GPTBot, ClaudeBot and PerplexityBot, shows what each ' +
+  'one received, grades SEO and AI readability, and gives the fix for each problem it finds. Free ' +
+  'for one site, no install.';
 
 /**
  * The root share card's words: the v2 home's H1 question without its "actually"

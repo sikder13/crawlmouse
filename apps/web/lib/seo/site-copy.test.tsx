@@ -26,9 +26,12 @@ describe('the owner strings', () => {
     expect(V2_HOME_DESCRIPTION.length).toBeGreaterThanOrEqual(120);
     expect(V2_HOME_DESCRIPTION.length).toBeLessThanOrEqual(155);
   });
-  it('each keeps the brand the home earns its impressions on, and none promises the v1 grade', () => {
+  it('the title and the llms descriptor lead with the brand the home earns its clicks on', () => {
+    expect(V2_HOME_TITLE.startsWith('Crawlmouse')).toBe(true);
+    expect(V2_LLMS_DESCRIPTOR.startsWith('Crawlmouse')).toBe(true);
+  });
+  it('none promises the v1 grade', () => {
     for (const s of [V2_HOME_TITLE, V2_HOME_DESCRIPTION, V2_LLMS_DESCRIPTOR]) {
-      expect(s).toContain('Crawlmouse');
       expect(s).not.toMatch(/A–F|internal-link(ing)? grade|one complete fix/i);
     }
   });
@@ -72,6 +75,12 @@ describe('flags on', () => {
     expect(offers.map((o) => o.name)).toEqual(['Free', 'Pro, monthly', 'Pro, yearly']);
   });
 
+  it('with V2_BILLING off, llms.txt lists the plans on sale without Agency', async () => {
+    vi.stubEnv('V2_BILLING', '');
+    const { GET } = await import('../../app/llms.txt/route');
+    expect(await GET().text()).toContain('\nPlans: Free; Pro $19/month or $190/year.\n');
+  });
+
   it('Organization names the parent company and its city, and no street address', async () => {
     const { organizationLd } = await import('./jsonld');
     const org = organizationLd() as Record<string, unknown>;
@@ -99,7 +108,9 @@ describe('flags on', () => {
   it('/llms.txt: v2 descriptor, each key page with its own description, every post, no v1 promise', async () => {
     const { GET } = await import('../../app/llms.txt/route');
     const body = await GET().text();
-    expect(body).toContain(`> ${V2_LLMS_DESCRIPTOR}\n`);
+    expect(body).toContain(
+      `> ${V2_LLMS_DESCRIPTOR}\n\nPlans: Free; Pro $19/month or $190/year; Agency $99/month or $990/year.\n`,
+    );
     expect(body).not.toMatch(/A–F|one complete fix|CLI, GitHub Action/);
     const { CHECK_COPY } = await import('../v2/copy/check-pages');
     for (const [path, description] of [

@@ -1,7 +1,7 @@
 import { postsNewestFirst } from '@/lib/blog/posts';
 import { siteUrl } from '@/lib/site-url';
 import { checksPublicEnabled } from '@/lib/auth/flags';
-import { v2KeyPages } from '@/lib/seo/llms-v2';
+import { plansLine, v2KeyPages } from '@/lib/seo/llms-v2';
 import { V2_LLMS_DESCRIPTOR } from '@/lib/seo/site-copy';
 
 // Served at /llms.txt (the folder name `llms.txt` is a literal path segment, so this
@@ -66,6 +66,7 @@ export function GET() {
     '# Crawlmouse',
     '',
     `> ${v2 ? V2_LLMS_DESCRIPTOR : DESCRIPTOR}`,
+    ...(v2 ? ['', plansLine()] : []),
     '',
     '## Key pages',
     '',

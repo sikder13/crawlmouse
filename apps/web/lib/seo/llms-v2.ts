@@ -6,6 +6,7 @@
  */
 import type { Metadata } from 'next';
 import { billingV2Enabled } from '../billing/flags';
+import { AGENCY_MONTHLY, AGENCY_YEARLY, PRO_MONTHLY, PRO_YEARLY, usd } from '../billing/prices';
 import { PRICING_COPY } from '../v2/copy/pricing';
 import { CHECK_COPY, CHECK_QUESTIONS, checkPath } from '../v2/copy/check-pages';
 import { HELP_COPY } from '../v2/help/copy';
@@ -57,4 +58,19 @@ export function v2KeyPages(): KeyPage[] {
     fromMetadata('/guides', guides),
     fromMetadata('/bot', bot),
   ];
+}
+
+/**
+ * The plans on sale and their prices, one line, from lib/billing/prices.ts: the plans
+ * SoftwareApplication offers (Agency while V2_BILLING sells it).
+ */
+export function plansLine(): string {
+  const plans = [
+    'Free',
+    `Pro ${usd(PRO_MONTHLY)}/month or ${usd(PRO_YEARLY)}/year`,
+    ...(billingV2Enabled()
+      ? [`Agency ${usd(AGENCY_MONTHLY)}/month or ${usd(AGENCY_YEARLY)}/year`]
+      : []),
+  ];
+  return `Plans: ${plans.join('; ')}.`;
 }
