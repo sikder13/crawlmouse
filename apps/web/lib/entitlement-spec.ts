@@ -7,6 +7,7 @@
  * Written by `apps/web/__tests__/helpers/write-01-accounts-spec.ts`; checked by
  * `apps/web/__tests__/v2-01-accounts-spec.test.ts`.
  */
+import { EXTRA_SEAT, usd } from './billing/prices';
 import { GATES, type TierGates } from './entitlement-v2';
 import {
   FREE_START,
@@ -106,7 +107,10 @@ export const V1_READER_PLAN: Readonly<Record<string, string>> = Object.freeze({
 const GATE_ROWS: Readonly<Record<keyof TierGates, { label: string; source: string }>> = {
   sites: { label: 'Primary sites in the plan', source: 'ARCH-2 §3.1' },
   maxSites: { label: 'Primary sites with paid extras', source: 'ARCH-2 §3.1' },
-  seats: { label: 'Seats in the plan (Agency adds $12 seats)', source: 'ARCH-2 §3.1' },
+  seats: {
+    label: `Seats in the plan (Agency adds ${usd(EXTRA_SEAT)} seats)`,
+    source: 'ARCH-2 §3.1',
+  },
   schedule: { label: 'Scheduled checks', source: 'ARCH-2 §3.1' },
   fixesVisible: { label: 'Fixes visible', source: 'ARCH-2 §3.1' },
   packets: { label: 'Fix packets', source: 'ARCH-2 §3.1' },
