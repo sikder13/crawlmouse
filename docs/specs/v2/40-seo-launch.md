@@ -90,6 +90,32 @@ existing-post guard reverses each one and requires the baseline markup. The tabl
 
 **D7 — Proof.** Lighthouse, the final D1 run and the §13 command set are recorded in the PR description.
 
+**D8 — No AI-cliché wording on public pages.** The phrases are `apps/web/lib/seo/banned-phrases.ts`, each a
+case-insensitive pattern with its reason; `lib/seo/banned-phrases.test.ts` gives each a sentence it catches,
+and the four narrowed ones (`leverage` as a verb, `robust` in prose, "best … tool" said of ourselves,
+"100%" as a promise) and the negation rule ("guaranteed", "100%") sentences they must not catch.
+`__tests__/seo-banned-phrases.test.tsx` reads every sitemap page of both builds through the D3 walk
+(`__tests__/helpers/public-pages.ts`), plus the root layout's metadata and Organization block and
+`/llms.txt`, and fails on a match not in `lib/seo/banned-phrase-exceptions.ts` or on an exception that
+no longer fires; its header says what it cannot see. On this tree it finds no match in either build, so
+the exception list is empty. "high-leverage" and "highest-leverage" (`free-internal-link-audit`,
+`how-deep-is-too-deep-crawl-depth`) are the noun, not the verb, and are not changed.
+
+The cloudflare post's "roughly one in three" figure is not in the repository's data, so the sentence
+names no number now. Each such edit is data in `apps/web/lib/blog/copy-edits.ts`, reversed by the
+existing-post guard like D5's; `__tests__/blog-copy-edits.test.ts` checks each and that the table
+below is `copyEditsMarkdown()`'s output.
+
+<!-- prettier-ignore-start -->
+<!-- d8-table:start -->
+1 sentences changed (D8 and the unsourced figure):
+
+| Where | Reason | Before | After | Why |
+| --- | --- | --- | --- | --- |
+| `apps/web/lib/blog/content/cloudflare-ai-crawler-defaults-september-15.tsx:158` | unsourced-figure | This isn’t a rare setup. Across the sites audited on Crawlmouse, roughly one in three sits behind a detected edge or CDN layer whose rules can override whatever robots.txt declares. | This isn’t a rare setup: many sites sit behind an edge or CDN layer whose rules can override whatever robots.txt declares. | The repository holds no count behind it, and none can be made here without querying production: `audits.ai_readiness` records `accessMatrix.wafDetected` per audit, which counts recent audits (free audits expire after 30 days), not distinct sites. Owner: a measured number can replace "many". |
+<!-- d8-table:end -->
+<!-- prettier-ignore-end -->
+
 ## Questions and smaller options taken
 
 Q1–Q8 in the step's notes (`questions.md`): the pinned-guard rewrite (Q1), attributed queries (Q2), the

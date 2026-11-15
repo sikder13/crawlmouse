@@ -155,10 +155,9 @@ export function CloudflareAiCrawlerDefaultsBody() {
         .
       </p>
       <p>
-        This isn&rsquo;t a rare setup. Across the sites audited on Crawlmouse, roughly one in three
-        sits behind a detected edge or CDN layer whose rules can override whatever robots.txt
-        declares. For those sites, reading robots.txt tells you the site&rsquo;s stated policy
-        &mdash; not its behavior.
+        This isn&rsquo;t a rare setup: many sites sit behind an edge or CDN layer whose rules can
+        override whatever robots.txt declares. For those sites, reading robots.txt tells you the
+        site&rsquo;s stated policy &mdash; not its behavior.
       </p>
       <p>So the outside check has three parts:</p>
       <ol>
