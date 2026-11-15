@@ -5,6 +5,7 @@ import { Footer } from '@/components/layout/Footer';
 import { Card } from '@/components/ui/Card';
 import { CLUSTERS } from '@/lib/blog/clusters';
 import { POSTS_BY_SLUG } from '@/lib/blog/posts';
+import { JsonLd, breadcrumbLd } from '@/lib/seo/jsonld';
 
 export const metadata = {
   title: 'Guides — Internal Linking, Crawl Depth & Getting Found',
@@ -17,6 +18,12 @@ export const metadata = {
 export default function GuidesPage() {
   return (
     <>
+      <JsonLd
+        data={breadcrumbLd([
+          { name: 'Home', path: '/' },
+          { name: 'Guides', path: '/guides' },
+        ])}
+      />
       <Header />
       <main className="max-w-3xl mx-auto px-6 pt-16 pb-32 sm:pt-20">
         <h1 className="font-display font-bold text-4xl sm:text-5xl tracking-tight text-ink">
@@ -38,7 +45,7 @@ export default function GuidesPage() {
             .filter((p): p is NonNullable<typeof p> => Boolean(p));
           if (posts.length === 0) return null;
           return (
-            <section key={cluster.title} className="mt-14">
+            <section key={cluster.id} id={cluster.id} className="mt-14">
               <h2 className="font-display font-semibold text-2xl text-ink">{cluster.title}</h2>
               <p className="mt-2 text-ink/60 leading-relaxed">{cluster.blurb}</p>
               <div className="mt-5 space-y-3">

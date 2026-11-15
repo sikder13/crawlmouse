@@ -5,6 +5,7 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { JSDOM } from 'jsdom';
 import { describe, expect, it, vi } from 'vitest';
+import { CLUSTERS } from '@/lib/blog/clusters';
 import GuidesPage from './page';
 
 vi.mock('next/navigation', async (actual) => ({
@@ -18,6 +19,14 @@ const main = () =>
   new JSDOM(renderToStaticMarkup(GuidesPage())).window.document.querySelector('main')!.outerHTML;
 
 describe('/guides', () => {
+  it('gives each cluster section the anchor its hub link names', () => {
+    const doc = new JSDOM(renderToStaticMarkup(GuidesPage())).window.document;
+    expect([...doc.querySelectorAll('main section')].map((s) => s.id)).toEqual(
+      CLUSTERS.map((c) => c.id),
+    );
+  });
+
+  // Captured before the move; updated once, deliberately, when each section gained its id.
   it('draws the same <main> as before the clusters moved', async () => {
     await expect(main()).toMatchFileSnapshot('./__snapshots__/guides-main.html');
   });

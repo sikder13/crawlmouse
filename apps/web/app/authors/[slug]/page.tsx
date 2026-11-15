@@ -5,7 +5,7 @@ import { Footer } from '@/components/layout/Footer';
 import { authorPath, getAuthor, personLd, publishedAuthors, type Author } from '@/lib/blog/authors';
 import { postsByAuthor } from '@/lib/blog/posts';
 import { PostCard } from '@/lib/blog/post-card';
-import { JsonLd } from '@/lib/seo/jsonld';
+import { JsonLd, breadcrumbLd } from '@/lib/seo/jsonld';
 import { siteUrl } from '@/lib/site-url';
 
 // /authors/<slug>: one page per author that at least one post names. An author with no posts yet
@@ -50,6 +50,13 @@ export default async function AuthorPage({ params }: { params: Promise<{ slug: s
   return (
     <>
       <JsonLd data={{ '@context': 'https://schema.org', ...personLd(author) }} />
+      <JsonLd
+        data={breadcrumbLd([
+          { name: 'Home', path: '/' },
+          { name: 'Blog', path: '/blog' },
+          { name: author.name, path: authorPath(author.slug) },
+        ])}
+      />
       <Header />
       <main className="max-w-3xl mx-auto px-6 pt-16 pb-24">
         <header className="text-center mb-14">
