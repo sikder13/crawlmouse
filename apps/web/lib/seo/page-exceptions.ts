@@ -27,17 +27,6 @@ const CHECK_COPY =
   'lead: the strings are in lib/v2/copy/check-pages.ts, which the brief allows changing while the pages are not indexed';
 
 export const PAGE_EXCEPTIONS: readonly PageException[] = [
-  // No in-link from another sitemap page with the flags on. The /check pages get theirs from the
-  // posts that explain them once ClusterLinks is drawn in ArticleLayout (CC-40 D6, the lead's line);
-  // these three entries then stop firing and are removed.
-  ...['/check/gptbot', '/check/javascript', '/check/robots-ai'].map(
-    (path): PageException => ({
-      path,
-      rule: 'no-in-link',
-      builds: ['on'],
-      reason: 'lead: <ClusterLinks> in components/blog/ArticleLayout.tsx links each from its posts',
-    }),
-  ),
   {
     path: '/agencies',
     rule: 'no-in-link',

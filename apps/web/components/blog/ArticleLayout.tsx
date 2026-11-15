@@ -8,6 +8,7 @@ import { formatPostDate } from '@/lib/blog/format';
 import { authorPath, getAuthor } from '@/lib/blog/authors';
 import { addedQuestions, addedSummary } from '@/lib/blog/answers';
 import { JsonLd, faqLd } from '@/lib/seo/jsonld';
+import { ClusterLinks } from './ClusterLinks';
 
 export function ArticleLayout({
   meta,
@@ -138,6 +139,7 @@ export function ArticleLayout({
             </ul>
           </section>
         )}
+        <ClusterLinks slug={meta.slug} />
       </main>
       <Footer />
     </>
