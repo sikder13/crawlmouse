@@ -269,28 +269,34 @@ function prices(input: ReportInput): string[] {
       .filter((p) => offerPrices(p).length > 0)
       .map((p) => {
         const stated = offerPrices(p);
+        // A run saved before the audit read visible prices has none to compare.
+        const measured = p.visiblePrices !== undefined;
         const shown = p.visiblePrices ?? [];
         return {
           label: input[k].label,
           path: p.path,
           stated,
           shown,
+          measured,
           notStated: shown.filter((x) => !stated.includes(x)),
-          notShown: stated.filter((x) => x !== 0 && !shown.includes(x)),
+          notShown: measured ? stated.filter((x) => x !== 0 && !shown.includes(x)) : [],
         };
       }),
   );
   const bad = rows.filter((r) => r.notStated.length > 0 || r.notShown.length > 0);
+  const unmeasured = rows.filter((r) => !r.measured).length;
   return [
-    bad.length === 0
-      ? 'Each page with an Offer shows only prices its structured data states, and states only prices it shows (a $0 Offer need not be shown).'
-      : `${bad.length} page${bad.length === 1 ? '' : 's'} where the visible prices and the structured data disagree.`,
+    unmeasured > 0
+      ? `Not measured in ${unmeasured === rows.length ? 'these runs' : `${unmeasured} of these rows`}: they were saved before the audit read visible prices.`
+      : bad.length === 0
+        ? 'Each page with an Offer shows only prices its structured data states, and states only prices it shows (a $0 Offer need not be shown).'
+        : `${bad.length} page${bad.length === 1 ? '' : 's'} where the visible prices and the structured data disagree.`,
     '',
     '| Build | Page | Offer prices | Prices shown | Shown, not in an Offer | In an Offer, not shown |',
     '| --- | --- | --- | --- | --- | --- |',
     ...rows.map(
       (r) =>
-        `| ${r.label} | ${r.path} | ${usdList(r.stated)} | ${usdList(r.shown)} | ${usdList(r.notStated)} | ${usdList(r.notShown)} |`,
+        `| ${r.label} | ${r.path} | ${usdList(r.stated)} | ${r.measured ? usdList(r.shown) : 'not measured'} | ${r.measured ? usdList(r.notStated) : '—'} | ${r.measured ? usdList(r.notShown) : '—'} |`,
     ),
   ];
 }

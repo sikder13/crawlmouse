@@ -5,7 +5,8 @@
  *
  *   pnpm seo:keywords -- --off=docs/seo/audit-data/before-off.json --on=docs/seo/audit-data/before-on.json
  */
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
+import { writeFormatted } from './write-formatted';
 import type { AuditRun } from '../../apps/web/lib/seo/audit-run';
 import { renderKeywordMap } from '../../apps/web/lib/seo/keyword-map';
 import { EXPORTED_AT, PAGES, QUERIES } from '../../apps/web/lib/seo/search-console';
@@ -33,5 +34,5 @@ const md = renderKeywordMap({
   pairs: [['/blog/screaming-frog-alternative', '/blog/sitebulb-vs-screaming-frog']],
 });
 const out = arg('md') ?? 'docs/seo/keyword-map.md';
-writeFileSync(out, md);
+await writeFormatted(out, md);
 console.log(`${pages.size} pages → ${out}`);

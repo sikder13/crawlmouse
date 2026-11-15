@@ -10,11 +10,12 @@
  * `--www` asks production for `https://www.crawlmouse.com/` (one GET, redirects not followed).
  */
 import { execFileSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { auditBuild, type AuditRun } from '../../apps/web/lib/seo/audit-run';
 import { renderReport } from '../../apps/web/lib/seo/audit-report';
 import { POSTS } from '../../apps/web/lib/blog/posts';
+import { writeFormatted } from './write-formatted';
 
 // jsdom is apps/web's dependency; resolve it from there.
 const { JSDOM } = createRequire(new URL('../../apps/web/package.json', import.meta.url))(
@@ -54,7 +55,7 @@ async function main() {
         'pnpm seo:audit -- --render --off=docs/seo/audit-data/off.json --on=docs/seo/audit-data/on.json --www',
       ],
     });
-    writeFileSync(arg('md') ?? 'docs/seo/page-audit.md', md);
+    await writeFormatted(arg('md') ?? 'docs/seo/page-audit.md', md);
     return;
   }
   const base = arg('base');
@@ -67,7 +68,7 @@ async function main() {
     fetch: (url, init) => fetch(url, init),
     parse: (html) => new JSDOM(html).window.document,
   });
-  writeFileSync(arg('out')!, `${JSON.stringify(run, null, 1)}\n`);
+  await writeFormatted(arg('out')!, JSON.stringify(run));
   console.log(
     `${run.label}: ${run.pages.length} pages, ${run.surfaces.length} app surfaces → ${arg('out')}`,
   );
