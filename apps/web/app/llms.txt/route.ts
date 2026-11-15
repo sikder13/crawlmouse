@@ -46,9 +46,9 @@ const KEY_PAGES: readonly (readonly [label: string, path: string, description: s
 
 /**
  * The file. While V2_CHECKS_PUBLIC is on (read at build: the route is static), the descriptor and the
- * key pages are v2's: each key page is listed with its own title and meta description, read from the
- * page's metadata (lib/seo/llms-v2.ts), so this file cannot describe a page differently from how the
- * page describes itself. With the flag off the file is v1's, byte for byte
+ * key pages are v2's: each key page is listed with the title and meta description its metadata reads,
+ * taken from the same copy module or page export (lib/seo/llms-v2.ts); site-copy.test.tsx checks the
+ * home and /check lines against their page copy. With the flag off the file is v1's, byte for byte
  * (lib/seo/flags-off-v1.test.tsx). The guides list and the maker line are the same in both.
  */
 export function GET() {

@@ -261,7 +261,7 @@ const INVENTORY: [entry: string, why: string][] = [
     'a word already split on [^a-z0-9], so ASCII only; the audit report is not persisted \u2014 cannot split a surrogate pair',
   ],
   [
-    "apps/web/lib/seo/audit-report.ts :: const run = (r: AuditRun) => `${r.label}: commit \\`${r.sha.slice(0, 8)}\\`, read ${r.takenAt}`;",
+    'apps/web/lib/seo/audit-report.ts :: const run = (r: AuditRun) => `${r.label}: commit \\`${r.sha.slice(0, 8)}\\`, read ${r.takenAt}`;',
     'a git commit SHA, hex only \u2014 cannot split a surrogate pair',
   ],
   [
@@ -275,6 +275,18 @@ const INVENTORY: [entry: string, why: string][] = [
   [
     'apps/web/lib/seo/page-facts.ts :: level: Number(h.tagName.slice(1)),',
     'an element tag name (H1\u2013H6), ASCII only \u2014 cannot split a surrogate pair',
+  ],
+  [
+    'apps/web/lib/seo/keyword-map.ts :: .slice(0, 3)',
+    'array slice (a page\u2019s top three attributed query rows) \u2014 cannot split a surrogate pair',
+  ],
+  [
+    'apps/web/lib/seo/keyword-map.ts :: secondary: post.keywords.slice(1, 1 + SECONDARIES),',
+    'array slice (a post\u2019s keyword list) \u2014 cannot split a surrogate pair',
+  ],
+  [
+    'apps/web/lib/seo/keyword-map.ts :: secondary: rows.slice(1, 1 + SECONDARIES).map((r) => `${r[0]} (${r[2]})`),',
+    'array slice (attributed query rows) \u2014 cannot split a surrogate pair',
   ],
   [
     'apps/web/lib/v2/account/deletion-ports.ts :: const { error } = await sb.storage.from(bucket).remove(names.slice(i, i + REMOVE_BATCH));',

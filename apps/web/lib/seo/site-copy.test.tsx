@@ -108,9 +108,7 @@ describe('flags on', () => {
       ['/check/javascript', CHECK_COPY.javascript.description],
       ['/check/robots-ai', CHECK_COPY['robots-ai'].description],
     ] as const) {
-      expect(body).toContain(
-        `](https://crawlmouse.com${path}): ${description}\n`,
-      );
+      expect(body).toContain(`](https://crawlmouse.com${path}): ${description}\n`);
     }
     for (const path of [
       '/pricing',

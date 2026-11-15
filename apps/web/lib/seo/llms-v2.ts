@@ -1,6 +1,6 @@
 /**
- * /llms.txt's key pages while V2_CHECKS_PUBLIC is on: [label, path, description] for each public
- * page that build serves, the label and description being the page's own title and meta description,
+ * /llms.txt's key pages while V2_CHECKS_PUBLIC is on: [label, path, description] for the public
+ * pages listed below, the label and description being the page's own title and meta description,
  * read from where its metadata reads them. A page behind V2_BILLING is listed only while that flag is
  * on; with it off, /pricing and /developers are v1's pages and are listed with v1's own metadata.
  */

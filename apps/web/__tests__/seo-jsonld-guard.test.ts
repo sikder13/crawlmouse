@@ -12,7 +12,9 @@ import { POSTS } from '../lib/blog/posts';
 
 describe('JSON-LD builders', () => {
   it('Organization / WebSite / SoftwareApplication are valid schema.org with no fabricated fields', () => {
-    for (const ld of [organizationLd(), websiteLd(), softwareApplicationLd()] as Array<Record<string, unknown>>) {
+    for (const ld of [organizationLd(), websiteLd(), softwareApplicationLd()] as Array<
+      Record<string, unknown>
+    >) {
       expect(ld['@context']).toBe('https://schema.org');
       expect(typeof ld['@type']).toBe('string');
       expect(String(ld.url)).toMatch(/^https:\/\/crawlmouse\.com/);
