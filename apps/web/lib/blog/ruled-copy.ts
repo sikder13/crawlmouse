@@ -7,6 +7,7 @@
 // match exactly, so a metadata change not listed here fails it; ruled-copy.test.ts checks each
 // `after` against posts.ts and each `before` against the baseline fixture.
 
+import { markdownCell } from '../seo/markdown-cell';
 export interface RuledChange {
   slug: string;
   field: 'seoTitle' | 'description';
@@ -167,7 +168,6 @@ export const RULED_DESCRIPTIONS: readonly (readonly [before: string, after: stri
 
 /** The changes as a Markdown table for the spec and PR (OPERATING-RULES §10: rendered from data). */
 export function ruledChangesMarkdown(changes: readonly RuledChange[] = RULED_CHANGES): string {
-  const cell = (s: string) => s.replace(/\|/g, '\\|');
   return [
     `${changes.length} changes (ruling 3): ${changes.filter((c) => c.field === 'seoTitle').length} search-result titles, ${changes.filter((c) => c.field === 'description').length} meta descriptions.`,
     '',
@@ -175,7 +175,7 @@ export function ruledChangesMarkdown(changes: readonly RuledChange[] = RULED_CHA
     '| --- | --- | --- | --- | --- |',
     ...changes.map(
       (c) =>
-        `| /blog/${c.slug} | ${c.field === 'seoTitle' ? '<title>' : 'description'} | ${cell(c.before)} (${c.before.length}) | ${cell(c.after)} (${c.after.length}) | ${cell(c.basis)} |`,
+        `| /blog/${c.slug} | ${c.field === 'seoTitle' ? '<title>' : 'description'} | ${markdownCell(c.before)} (${c.before.length}) | ${markdownCell(c.after)} (${c.after.length}) | ${markdownCell(c.basis)} |`,
     ),
   ].join('\n');
 }

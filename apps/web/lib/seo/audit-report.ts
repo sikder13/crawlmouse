@@ -8,6 +8,7 @@ import { isNoindex } from './audit-run';
 import { attributeQueries, pageTerms, type AttributablePage } from './attribution';
 import { skippedHeadings, typedNodes, typesOf } from './page-facts';
 import { schemaProblems } from './schema-required';
+import { markdownCell } from './markdown-cell';
 import {
   EXPORTED_AT,
   INDEXED,
@@ -37,7 +38,6 @@ export interface ReportInput {
   commands: readonly string[];
 }
 
-const cell = (s: string) => s.replace(/\|/g, '\\|').replace(/\n/g, ' ');
 const isPost = (path: string) => /^\/blog\/[^/]+$/.test(path) && path !== '/blog/research';
 
 export function canonicalIsSelf(page: SavedPage, origin: string): boolean {
@@ -176,7 +176,7 @@ function pageTable(input: ReportInput, run: AuditRun): string[] {
         g ? g[3] : '—',
         (queries.get(p.path) ?? []).join('; ') || '—',
       ]
-        .map((v) => cell(String(v)))
+        .map((v) => markdownCell(String(v)))
         .join(' | ')
         .replace(/^/, '| ')
         .concat(' |');
@@ -190,7 +190,7 @@ function textTable(run: AuditRun): string[] {
     '| --- | --- | --- | --- |',
     ...run.pages.map(
       (p) =>
-        `| ${cell(p.path)} | ${cell(p.title ?? '—')} | ${cell(p.descriptions.join(' ‖ ') || '—')} | ${cell(p.h1.join(' ‖ ') || '—')} |`,
+        `| ${markdownCell(p.path)} | ${markdownCell(p.title ?? '—')} | ${markdownCell(p.descriptions.join(' ‖ ') || '—')} | ${markdownCell(p.h1.join(' ‖ ') || '—')} |`,
     ),
   ];
 }
@@ -234,7 +234,7 @@ function notIndexed(input: ReportInput): string[] {
         (p.nearest?.jaccard ?? 0) > Math.max(...sims) && `more alike to ${p.nearest!.path}`,
       ].filter(Boolean);
       out.push(
-        `| ${p.path} | ${published.get(p.path) ?? '—'} | ${canonicalIsSelf(p, input.origin) ? 'self' : cell(p.canonicals.join(' '))} | ${from.length} (${cell(from.join(', '))}) | ${p.wordCount} | ${p.nearest ? `${p.nearest.path} (${p.nearest.jaccard})` : '—'} | ${flags.join('; ') || 'none of the measured factors'} |`,
+        `| ${p.path} | ${published.get(p.path) ?? '—'} | ${canonicalIsSelf(p, input.origin) ? 'self' : markdownCell(p.canonicals.join(' '))} | ${from.length} (${markdownCell(from.join(', '))}) | ${p.wordCount} | ${p.nearest ? `${p.nearest.path} (${p.nearest.jaccard})` : '—'} | ${flags.join('; ') || 'none of the measured factors'} |`,
       );
     }
     out.push('');
@@ -250,7 +250,7 @@ function reasons(): string[] {
     '',
     '| Reason | Source | URLs |',
     '| --- | --- | ---: |',
-    ...NOT_INDEXED_REASONS.map(([r, src, n]) => `| ${cell(r)} | ${src} | ${n} |`),
+    ...NOT_INDEXED_REASONS.map(([r, src, n]) => `| ${markdownCell(r)} | ${src} | ${n} |`),
     '',
   ];
 }
@@ -338,7 +338,7 @@ function surfaces(input: ReportInput): string[] {
     '| --- | --- | --- |',
     ...input.off.surfaces.map(
       (s) =>
-        `| ${s.path} | ${cell(surfaceCell(s))} | ${cell(on.has(s.path) ? surfaceCell(on.get(s.path)!) : '—')} |`,
+        `| ${s.path} | ${markdownCell(surfaceCell(s))} | ${markdownCell(on.has(s.path) ? surfaceCell(on.get(s.path)!) : '—')} |`,
     ),
   ];
 }

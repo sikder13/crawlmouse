@@ -10,6 +10,7 @@
 // __tests__/blog-copy-edits.test.ts checks each against its reason and its file; the spec's D8 table
 // is `copyEditsMarkdown()`. `updatedAt` does not move for these edits.
 import type { V2Edit } from './v2-edits';
+import { markdownCell } from '../seo/markdown-cell';
 
 export interface CopyEdit extends V2Edit {
   slug: string;
@@ -75,10 +76,9 @@ export const COPY_EDITS: readonly CopyEdit[] = [
 
 /** The edits as a Markdown table, for the spec and PR.md (OPERATING-RULES §10: rendered from data). */
 export function copyEditsMarkdown(edits: readonly CopyEdit[] = COPY_EDITS): string {
-  const cell = (s: string) => s.replace(/\s*\n\s*/g, ' ').replace(/\|/g, '\\|');
   const rows = edits.map(
     (e) =>
-      `| \`apps/web/${e.file}:${e.line}\` | ${e.reason} | ${cell(e.html.before)} | ${cell(e.html.after)} | ${cell(e.why)} |`,
+      `| \`apps/web/${e.file}:${e.line}\` | ${e.reason} | ${markdownCell(e.html.before)} | ${markdownCell(e.html.after)} | ${markdownCell(e.why)} |`,
   );
   return [
     `${edits.length} sentences changed (D8 and the unsourced figure):`,

@@ -7,6 +7,7 @@
  */
 import { attributeQueries, pageTerms, type AttributablePage } from './attribution';
 import type { PageRow, QueryRow } from './search-console';
+import { markdownCell } from './markdown-cell';
 
 export interface KeywordMapInput {
   exportedAt: string;
@@ -118,7 +119,6 @@ export function sharedImpressions(pairs: readonly CannibalPair[]) {
   return [...by.values()].sort((a, b) => b.impressions - a.impressions);
 }
 
-const cell = (s: string) => s.replace(/\|/g, '\\|');
 const code = (p: string) => `\`${p}\``;
 
 export function renderKeywordMap(input: KeywordMapInput): string {
@@ -149,7 +149,7 @@ export function renderKeywordMap(input: KeywordMapInput): string {
     '| --- | --- | --- | --- | --- |',
     ...rows.map(
       (r) =>
-        `| ${code(r.path)} | ${r.impressions} | ${r.position ?? '—'} | ${cell(primary(r))} | ${cell(r.secondary.join('; ') || '—')} |`,
+        `| ${code(r.path)} | ${r.impressions} | ${r.position ?? '—'} | ${markdownCell(primary(r))} | ${markdownCell(r.secondary.join('; ') || '—')} |`,
     ),
     '',
     '## Queries attributed to more than one page',
@@ -164,7 +164,7 @@ export function renderKeywordMap(input: KeywordMapInput): string {
       '| --- | --- | --- | --- |',
       ...pairs.map(
         (p) =>
-          `| ${cell(p.query)} | ${p.impressions} | ${p.position} | ${p.pages.map(code).join(', ')} |`,
+          `| ${markdownCell(p.query)} | ${p.impressions} | ${p.position} | ${p.pages.map(code).join(', ')} |`,
       ),
     );
   out.push('', '## For the owner', '');
