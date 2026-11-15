@@ -250,6 +250,7 @@ async function billOne(deps: BillingDeps, account: Billed, note: Note): Promise<
   const { id: customer, created } = await customerFor(
     deps,
     accountId,
+    user.id,
     email,
     held.stripeCustomerId,
   );
@@ -265,7 +266,15 @@ async function billOne(deps: BillingDeps, account: Billed, note: Note): Promise<
   for (const id of open) await deps.stripe.checkout.sessions.expire(id);
 
   const session = await deps.stripe.checkout.sessions.create(
-    sessionParams({ accountId, customer, price, billing: b, origin: deps.origin, now: deps.now() }),
+    sessionParams({
+      accountId,
+      userId: user.id,
+      customer,
+      price,
+      billing: b,
+      origin: deps.origin,
+      now: deps.now(),
+    }),
   );
   if (!session.url) throw new Error('the Checkout Session has no url');
   note('checkout', 'done', `${b.plan}${b.trial ? ' trial' : ''}: ${session.url}`);
@@ -287,6 +296,7 @@ function mustBeInternal(c: { id: string; deleted?: boolean; metadata?: Stripe.Me
 async function customerFor(
   deps: BillingDeps,
   accountId: string,
+  userId: string,
   email: string,
   stored: string | null,
 ): Promise<{ id: string; created: boolean }> {
@@ -308,7 +318,10 @@ async function customerFor(
   }
   try {
     const created = await deps.stripe.customers.create(
-      { email, metadata: { account_id: accountId, internal: 'true' } },
+      {
+        email,
+        metadata: { account_id: accountId, posthog_person_distinct_id: userId, internal: 'true' },
+      },
       { idempotencyKey: `customer:${accountId}` },
     );
     return { id: created.id, created: true };
@@ -322,6 +335,8 @@ async function customerFor(
 
 export interface SessionInput {
   accountId: string;
+  /** The account owner's `users.id`, which startCheckout puts in the metadata for PostHog. */
+  userId: string;
   customer: string;
   price: string;
   billing: Billed['billing'];
@@ -331,7 +346,7 @@ export interface SessionInput {
 
 /** startCheckout's session for this plan (checkoutV2's terms, or agencyTrial's), with the coupon. */
 export function sessionParams(i: SessionInput): Stripe.Checkout.SessionCreateParams {
-  const metadata = { account_id: i.accountId };
+  const metadata = { account_id: i.accountId, posthog_person_distinct_id: i.userId };
   const trial = i.billing.trial;
   return {
     mode: 'subscription',
