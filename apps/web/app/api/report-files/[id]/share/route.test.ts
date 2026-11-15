@@ -283,7 +283,11 @@ describe('POST /api/report-files/[id]/share', () => {
     );
     expect(dump.rows.some((r) => r.t.includes(token))).toBe(false);
     expect(h.capture.mock.calls).toEqual([
-      ['report_shared', w.owner.accountId, { kind: 'audit_pdf', format: 'pdf' }],
+      [
+        'report_shared',
+        { accountId: w.owner.accountId, userId: w.owner.id },
+        { kind: 'audit_pdf', format: 'pdf' },
+      ],
     ]);
   });
 
@@ -476,7 +480,8 @@ describe('GET /s/[token]', () => {
     expect((await links(w.pdf))[0]!.view_count).toBe(2);
     expect(h.capture.mock.calls[0]).toEqual([
       'share_link_opened',
-      w.owner.accountId,
+      // The link holder is a visitor: keyed by their browser's id when it has one.
+      { accountId: w.owner.accountId, visitor: true },
       { kind: 'audit_pdf', format: 'pdf' },
     ]);
     expect(h.limits[0]).toEqual({

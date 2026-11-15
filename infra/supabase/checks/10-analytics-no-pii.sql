@@ -13,10 +13,11 @@
 -- The allowlist, and why each entry is safe (CC-41 rulings, Q5):
 --   `analytics.account_attribution.referrer_host`: a hostname only, lowercased, at most 253 characters
 --     of letters, digits, hyphens and dots; never a scheme, path or query.
---   `analytics.account_attribution.landing_path`: a pathname of our own site only, at most 200
---     characters of `[A-Za-z0-9/._~-]`; never a query or fragment.
--- Both bounds are enforced where the value is written (`apps/web/lib/analytics/first-touch.ts`) and by
--- the table's CHECKs (migration 20261120000001).
+--   `analytics.account_attribution.landing_path`: a path of our own site as a shape, at most 200
+--     characters of `[A-Za-z0-9/._~-]`, never a query or fragment; a segment that is not a lowercase
+--     slug (an id, a host, anything encoded) is written `~` (`landingShape`).
+-- Both are enforced where the value is written and read back (`apps/web/lib/analytics/first-touch.ts`);
+-- the table's CHECKs (migration 20261120000001) enforce each one's alphabet and length, not the shape.
 with
 allowed(rel, col) as (
   values ('analytics.account_attribution', 'referrer_host'),

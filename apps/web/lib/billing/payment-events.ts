@@ -7,9 +7,11 @@
  *
  * - `subscription_started` — an applied checkout (`trial: false`), or an applied Agency or
  *   card-required trial start (`trial: true`).
- * - `trial_converted` — the transition carries the machine's `trial.converted` (a no-card trial's
- *   paying checkout), or an applied subscription update takes a trial state to a paid one (a card
- *   trial's subscription turning active).
+ * - `trial_converted {plan, via}` — `via: checkout` when the transition carries the machine's
+ *   `trial.converted` (a no-card trial's paying checkout, which also sends `subscription_started`);
+ *   `via: subscription` when an applied subscription update takes a trial state to a paid one (a card
+ *   trial's subscription turning active). A count of paying subscriptions counts
+ *   `subscription_started {trial: false}` and `trial_converted {via: subscription}`, each once.
  * - `plan_changed` — an applied `subscription_updated` that moves between the two paid tiers.
  * - `subscription_canceled` — an update to the followed subscription that turns
  *   `cancel_at_period_end` from false to true (`at_period_end: true`), or an applied deletion whose
@@ -96,16 +98,23 @@ export function paymentEvents(i: PaymentEventInput): PaymentEvent[] {
     });
   }
 
-  // The machine marks a no-card trial's paying checkout. A card trial converts when its own
-  // subscription turns active: an applied update that takes a trial state to a paid one.
-  const converted =
-    transition.effects.some((x) => x.kind === 'event' && x.name === 'trial.converted') ||
-    (applied &&
-      e.type === 'subscription_updated' &&
-      (before.state === 'pro_trial' || before.state === 'agency_trial') &&
-      (after.state === 'pro' || after.state === 'agency'));
+  // The machine marks a no-card trial's paying checkout (`via: checkout`, which also sends
+  // subscription_started). A card trial converts when its own subscription turns active: an applied
+  // update that takes a trial state to a paid one (`via: subscription`, the only event it sends).
+  const byCheckout = transition.effects.some(
+    (x) => x.kind === 'event' && x.name === 'trial.converted',
+  );
+  const bySubscription =
+    applied &&
+    e.type === 'subscription_updated' &&
+    (before.state === 'pro_trial' || before.state === 'agency_trial') &&
+    (after.state === 'pro' || after.state === 'agency');
+  const converted = byCheckout || bySubscription;
   if (converted && after.tier !== 'free') {
-    out.push({ event: 'trial_converted', properties: { plan: after.tier } });
+    out.push({
+      event: 'trial_converted',
+      properties: { plan: after.tier, via: byCheckout ? 'checkout' : 'subscription' },
+    });
   }
 
   // An ignored transition keeps the snapshot, so a tier that moved was applied.

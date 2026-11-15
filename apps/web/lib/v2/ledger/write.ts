@@ -14,8 +14,9 @@
  * month: the run is the draft's fields, the site key, its version, the check's lineage and month.
  *
  * `backfillLedger` is the one retry: the backfill runs every BACKFILL_EVERY_HOURS hours and writes the
- * checks whose draft was stored in the BACKFILL_EVERY_HOURS hours that ended one hour before its run,
- * so each draft falls in exactly one run's window.
+ * checks whose draft was stored in the BACKFILL_EVERY_HOURS hours that ended one hour before its
+ * slot. The slots' windows meet edge to edge, so a draft is in one slot's window; a slot whose run
+ * Inngest skips is not run again, and its drafts are not retried.
  */
 import { LedgerDraftSchema, type LedgerDraft, type Observation } from './draft';
 import { SITE_KEY_VERSION, siteKeyFor, siteKeySecretOk } from './site-key';
@@ -97,9 +98,22 @@ export async function writeLedger(deps: WriterDeps, checkId: string): Promise<Le
 
 /** The most checks one backfill run writes. */
 export const BACKFILL_LIMIT = 200;
-/** The backfill's period, which inngest/ledger.ts's cron repeats, and so the length of its window. */
+/**
+ * The backfill's schedule, which inngest/ledger.ts's cron repeats (`41 *\/6 * * *`): every
+ * BACKFILL_EVERY_HOURS hours, BACKFILL_MINUTE minutes past. Its window is read from the slot a run
+ * belongs to, not from the moment it starts, so a run that starts late reads the same window, and
+ * consecutive slots' windows meet edge to edge.
+ */
 export const BACKFILL_EVERY_HOURS = 6;
+export const BACKFILL_MINUTE = 41;
 const HOUR_MS = 60 * 60 * 1000;
+const PERIOD_MS = BACKFILL_EVERY_HOURS * HOUR_MS;
+const OFFSET_MS = BACKFILL_MINUTE * 60 * 1000;
+
+/** The scheduled time of the slot `now` falls in: the latest one at or before it. */
+export function backfillSlot(now: Date): Date {
+  return new Date(Math.floor((now.getTime() - OFFSET_MS) / PERIOD_MS) * PERIOD_MS + OFFSET_MS);
+}
 
 export interface BackfillResult {
   outcomes: Partial<Record<LedgerOutcome, number>>;
@@ -108,25 +122,35 @@ export interface BackfillResult {
   bounded: boolean;
 }
 
-/** Writes the checks drafted in the BACKFILL_EVERY_HOURS hours ending one hour before `now`, bounded. */
+/** Outcomes that leave a draft no later run would write; the backfill deletes it. */
+const SPENT: ReadonlySet<LedgerOutcome> = new Set(['already_linked', 'not_ended', 'no_lineage']);
+
+/**
+ * Writes the checks drafted in the BACKFILL_EVERY_HOURS hours that ended one hour before the slot
+ * `now` falls in, bounded. This is a draft's one retry: a draft the retry does not write (it failed
+ * again, or the check has no lineage or is already linked) is deleted, so none is kept for good.
+ */
 export async function backfillLedger(
   deps: WriterDeps & { onFailure: (checkId: string, error: unknown) => void },
   now: Date,
   limit = BACKFILL_LIMIT,
 ): Promise<BackfillResult> {
   const result: BackfillResult = { outcomes: {}, failed: 0, bounded: false };
-  const to = new Date(now.getTime() - HOUR_MS);
-  const from = new Date(to.getTime() - BACKFILL_EVERY_HOURS * HOUR_MS);
+  const to = new Date(backfillSlot(now).getTime() - HOUR_MS);
+  const from = new Date(to.getTime() - PERIOD_MS);
   const ids = await deps.store.draftedBetween(from, to, limit + 1);
   result.bounded = ids.length > limit;
   for (const checkId of ids.slice(0, limit)) {
+    let spent = true;
     try {
       const outcome = await writeLedger(deps, checkId);
       result.outcomes[outcome] = (result.outcomes[outcome] ?? 0) + 1;
+      spent = SPENT.has(outcome);
     } catch (error) {
       result.failed += 1;
       deps.onFailure(checkId, error);
     }
+    if (spent) await deps.store.dropDraft(checkId).catch(() => undefined);
   }
   return result;
 }

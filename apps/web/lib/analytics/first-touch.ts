@@ -4,8 +4,9 @@
  * (lib/auth/first-login.ts).
  *
  * What it holds: utm_source, utm_medium, utm_campaign, utm_content and utm_term, the referrer's
- * hostname (never its path or query), the landing page's pathname (never its query or fragment),
- * `ref`, and the first-seen time to the second. A field outside its bound is dropped, and the bounds
+ * hostname (never its path or query), the landing page's path as a shape (`landingShape`: never its
+ * query or fragment, and a segment that could name something, such as a check's id or a site's host,
+ * is written `~`), `ref`, and the first-seen time to the second, between 2020 and 2100. A field outside its bound is dropped, and the bounds
  * are the strings migration 20261120000001's CHECKs on `account_attribution` use
  * (first-touch.test.ts compares them with the migration's text and runs them in Postgres).
  *
@@ -60,7 +61,8 @@ export const FIRST_TOUCH_FIELD_LABELS: Record<(typeof FIRST_TOUCH_FIELDS)[number
   utm_content: 'utm_content',
   utm_term: 'utm_term',
   referrer_host: 'the hostname of the site that sent you (not the address of its page)',
-  landing_path: 'the path of the page you landed on (not its query)',
+  landing_path:
+    'the path of the page you landed on, with any part that names something (an id, an address) left out, and not its query',
   ref: 'a referral code (ref)',
   first_seen_at: 'the time of the visit',
 };
@@ -78,6 +80,34 @@ const HOST = new RegExp(FIRST_TOUCH_BOUNDS.referrer_host);
 const PATH = new RegExp(FIRST_TOUCH_BOUNDS.landing_path);
 const REF = new RegExp(FIRST_TOUCH_BOUNDS.ref);
 const SECOND = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
+/** The first-seen times kept: a time outside them is no first visit, and Postgres refuses year 0. */
+const EARLIEST = Date.parse('2020-01-01T00:00:00Z');
+const LATEST = Date.parse('2100-01-01T00:00:00Z');
+
+/** A path segment kept as written: a lowercase slug, like a blog post's or a page's name. */
+const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const UUID_LIKE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+/** Eight or more digits in a row, or sixteen or more hex characters: an id, not a name. */
+const ID_LIKE = /\d{8,}|^[0-9a-f]{16,}$/;
+const MAX_SEGMENT = 64;
+
+/**
+ * The landing path as a shape: each segment that is a lowercase slug of at most MAX_SEGMENT
+ * characters, and not a uuid or another id, is kept; every other segment is written `~`. So
+ * `/blog/ai-crawler-access-test-2026` stays as it is, and `/audit/<check id>` reads `/audit/~` and
+ * `/compare/acme.com/rival.co.uk` reads `/compare/~/~`: a check's id is the capability to read it,
+ * and a host in a path is someone else's site.
+ */
+export function landingShape(pathname: string): string {
+  const segments = pathname.split('/').slice(1);
+  const shaped = segments.map((seg) =>
+    seg === '' ||
+    (seg.length <= MAX_SEGMENT && SLUG.test(seg) && !UUID_LIKE.test(seg) && !ID_LIKE.test(seg))
+      ? seg
+      : '~',
+  );
+  return `/${shaped.join('/')}`;
+}
 
 const FIELD_TESTS: Record<Exclude<keyof FirstTouch, 'first_seen_at'>, (v: string) => boolean> = {
   utm_source: (v) => UTM.test(v),
@@ -86,7 +116,7 @@ const FIELD_TESTS: Record<Exclude<keyof FirstTouch, 'first_seen_at'>, (v: string
   utm_content: (v) => UTM.test(v),
   utm_term: (v) => UTM.test(v),
   referrer_host: (v) => v.length <= MAX_HOST_LENGTH && HOST.test(v),
-  landing_path: (v) => PATH.test(v),
+  landing_path: (v) => PATH.test(v) && landingShape(v) === v,
   ref: (v) => REF.test(v),
 };
 
@@ -120,7 +150,7 @@ export function readFirstTouch(landing: Landing, now: Date): FirstTouch {
   if (page !== null) {
     for (const field of UTM_FIELDS) out[field] = page.searchParams.get(field) ?? '';
     out.ref = page.searchParams.get('ref') ?? '';
-    out.landing_path = page.pathname;
+    out.landing_path = landingShape(page.pathname);
   }
   const from = parseUrl(landing.referrer);
   if (
@@ -177,6 +207,7 @@ export function parseFirstTouch(raw: string): FirstTouch | null {
   if (typeof seen !== 'string' || !SECOND.test(seen)) return null;
   const time = new Date(seen);
   if (Number.isNaN(time.getTime()) || toSecond(time) !== seen) return null;
+  if (time.getTime() < EARLIEST || time.getTime() >= LATEST) return null;
   return { ...kept(obj), first_seen_at: seen };
 }
 

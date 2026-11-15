@@ -316,10 +316,11 @@ const actions: readonly ActionSpec[] = [
   },
   {
     name: PAID,
-    description: 'A first paying subscription, or a trial that converted.',
+    description:
+      "A paying subscription, counted once: a checkout that charged (subscription_started, trial false, which a no-card trial's paying checkout sends too), or a card trial's subscription turning active (trial_converted via subscription).",
     steps: [
       { event: 'subscription_started', filters: [prop('trial', 'exact', ['false'])] },
-      { event: 'trial_converted' },
+      { event: 'trial_converted', filters: [prop('via', 'exact', ['subscription'])] },
     ],
   },
 ];

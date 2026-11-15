@@ -192,7 +192,8 @@ describe('PlannedEffectsSchema', () => {
         currency: null,
       },
     ],
-    ['trial_converted', { plan: 'pro' }],
+    ['trial_converted', { plan: 'pro', via: 'checkout' }],
+    ['trial_converted', { plan: 'agency', via: 'subscription' }],
     ['plan_changed', { from: 'pro', to: 'agency' }],
     ['subscription_canceled', { plan: 'pro', at_period_end: true }],
     ['subscription_ended', { plan: 'agency' }],
@@ -208,7 +209,7 @@ describe('PlannedEffectsSchema', () => {
     ['another event’s properties', { event: 'trial_converted' }],
     [
       'a property too many',
-      { event: 'trial_converted', properties: { plan: 'pro', amount_cents: 1 } },
+      { event: 'trial_converted', properties: { plan: 'pro', via: 'checkout', amount_cents: 1 } },
     ],
     ['a free plan', { event: 'subscription_ended', properties: { plan: 'free' } }],
     ['a uuid that is not one', { uuid: 'evt_1:subscription_started' }],
@@ -315,7 +316,7 @@ describe('dispatchPlanned', () => {
 
   const captured = [
     capture(),
-    capture({ event: 'trial_converted', properties: { plan: 'pro' } }),
+    capture({ event: 'trial_converted', properties: { plan: 'pro', via: 'checkout' } }),
   ] as PlannedEffect[];
 
   it('sends each capture after every other effect, in the plan’s order, as planned', async () => {

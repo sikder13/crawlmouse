@@ -217,3 +217,45 @@ describe('the PostHog spec', () => {
     ]);
   });
 });
+
+describe('[cm] Paid counts one paying subscription once, on each path', () => {
+  type Sent = { event: string; properties: Record<string, unknown> };
+  const paid = SPEC.actions.find((a) => a.name === '[cm] Paid')!;
+  /** A step matches an event of its name whose properties pass every `exact` filter, as strings. */
+  const matches = (e: Sent) =>
+    paid.steps.some(
+      (step) =>
+        step.event === e.event &&
+        (step.filters ?? []).every(
+          (f) =>
+            f.type === 'event' &&
+            f.operator === 'exact' &&
+            Array.isArray(f.value) &&
+            f.value.map(String).includes(String(e.properties[f.key])),
+        ),
+    );
+  // What lib/billing/payment-events.ts sends on each path, as payment-events.test.ts pins it.
+  it.each<[string, Sent[]]>([
+    [
+      "a no-card trial's paying checkout",
+      [
+        { event: 'subscription_started', properties: { plan: 'pro', trial: false } },
+        { event: 'trial_converted', properties: { plan: 'pro', via: 'checkout' } },
+      ],
+    ],
+    [
+      "a card trial's subscription turning active",
+      [{ event: 'trial_converted', properties: { plan: 'agency', via: 'subscription' } }],
+    ],
+    [
+      'a direct purchase',
+      [{ event: 'subscription_started', properties: { plan: 'pro', trial: false } }],
+    ],
+    [
+      'a card trial starting',
+      [{ event: 'subscription_started', properties: { plan: 'agency', trial: true } }],
+    ],
+  ])('%s', (label, sent) => {
+    expect(sent.filter(matches).length, label).toBe(label === 'a card trial starting' ? 0 : 1);
+  });
+});

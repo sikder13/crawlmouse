@@ -7,6 +7,7 @@ import {
   consentRequiredFromCookie,
   CONSENT_DECISION_STORAGE_KEY,
   CONSENT_GRANTED_EVENT,
+  surveysOffAtStart,
 } from '@/lib/consent';
 
 // Sentry (client) — moved here from sentry.client.config.ts per @sentry/nextjs v8+ guidance.
@@ -47,7 +48,7 @@ if (
     capture_pageleave: true,
     opt_out_capturing_by_default: optOutByDefault,
     // posthog-js skips surveys for an opted-out visitor only in cookieless mode, which this is not.
-    disable_surveys: optOutByDefault,
+    disable_surveys: surveysOffAtStart(consentRequired, decision),
     disable_session_recording: true, // do not record by default
     session_recording: { maskAllInputs: true, maskTextSelector: '[data-ph-mask]' },
     before_send: beforeSendSampler,

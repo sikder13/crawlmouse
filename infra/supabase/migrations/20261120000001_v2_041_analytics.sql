@@ -17,7 +17,11 @@
 --    (the 006b guard reads pg_depend).
 -- 3. Schema `analytics`: views with no email, name, host, URL, IP or token column, except the two
 --    attribution columns named in infra/supabase/checks/10-analytics-no-pii.sql. Each view lists its
---    columns. They are owned by the migration's role and so read through RLS, as a service read does.
+--    columns. They are owned by the migration's role, so they read with its rights and RLS does not
+--    filter them: what a view exposes is decided by its column list. A check's id is the capability
+--    to read, cancel and claim a check nobody keeps (lib/v2/pipeline/public.ts readableCheck), so no
+--    view exposes the id of such a check: `checks.id` is null for it, and the fix views hold only the
+--    fixes of kept sites.
 -- 4. Role analytics_reader: LOGIN with no password (the owner sets one through the runbook),
 --    connection limit 3, statement_timeout 30s; USAGE on `analytics` and SELECT on its views, nothing
 --    else.
@@ -39,7 +43,8 @@ create table if not exists public.account_attribution (
   referrer_host text check (
     referrer_host ~ '^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*$'
     and length(referrer_host) <= 253),
-  -- A pathname on our own site only: no query, no fragment.
+  -- A path on our own site, as a shape: no query or fragment, and a segment that could name something
+  -- (an id, a host) is written `~` (first-touch.ts landingShape; this CHECK bounds its alphabet).
   landing_path text check (landing_path ~ '^/[A-Za-z0-9/._~-]{0,199}$'),
   ref text check (ref ~ '^[A-Za-z0-9_-]{1,64}$'),
   first_seen_at timestamptz not null,
@@ -165,8 +170,10 @@ select s.id, s.account_id, s.plan, s.interval, s.status, s.seat_quantity, s.extr
 
 -- A failure reason is shown only in the shape the pipeline writes (a snake_case code); anything else
 -- reads as 'other', so free text cannot reach this view.
+-- `id` is null for a check whose site no account keeps: that id is the check's capability.
 create or replace view analytics.checks as
-select c.id, s.account_id, c.trigger, c.status, c.queued_at, c.started_at, c.finished_at,
+select case when s.account_id is null then null else c.id end as id, s.account_id, c.trigger,
+       c.status, c.queued_at, c.started_at, c.finished_at,
        extract(epoch from (c.finished_at - c.started_at))::numeric(12, 3) as duration_seconds,
        (c.technical_seo->>'score')::numeric as technical_seo_score, c.technical_seo_status,
        (c.ai_readability->>'score')::numeric as ai_readability_score, c.ai_readability_status,
@@ -179,17 +186,20 @@ select c.id, s.account_id, c.trigger, c.status, c.queued_at, c.started_at, c.fin
   join public.sites s on s.id = c.site_id
   left join public.measurement_lineages l on l.id = c.lineage_id;
 
+-- Kept sites only: a fix names checks, and an unkept site's check ids are capabilities.
 create or replace view analytics.fixes as
 select f.id, s.account_id, f.type, f.section, f.recommendation_class, f.status, f.confidence,
        f.affected_pages, f.rank, f.first_seen_check_id, f.last_measured_check_id
   from public.site_fixes f
-  join public.sites s on s.id = f.site_id;
+  join public.sites s on s.id = f.site_id
+ where s.account_id is not null;
 
 create or replace view analytics.fix_events as
 select e.id, e.fix_id, s.account_id, e.at, e.kind, e.check_id
   from public.fix_events e
   join public.site_fixes f on f.id = e.fix_id
-  join public.sites s on s.id = f.site_id;
+  join public.sites s on s.id = f.site_id
+ where s.account_id is not null;
 
 create or replace view analytics.seats as
 select account_id, role, status, count(*)::bigint as seats

@@ -7,8 +7,8 @@
  *
  * The answer this test pins is the one measured: the survey shown before the call is still on the
  * page after it. A visitor who declines therefore keeps a survey already open until they dismiss it
- * or leave the page; the next page load starts PostHog with `disable_surveys: optOutByDefault`
- * (instrumentation-client.ts, __tests__/first-touch-consent.dom.test.tsx), so none is loaded then.
+ * or leave the page; the next page load starts PostHog with surveys off after a decline, in any region
+ * (`surveysOffAtStart`, lib/consent.ts, used by instrumentation-client.ts), so none is loaded then.
  */
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 

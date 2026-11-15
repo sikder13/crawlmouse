@@ -4,11 +4,13 @@ import { PGlite } from '@electric-sql/pglite';
 import fc from 'fast-check';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
+  landingShape,
   FIRST_TOUCH_BOUNDS,
   FIRST_TOUCH_COOKIE,
   FIRST_TOUCH_MAX_AGE_S,
   firstTouchCookie,
   firstTouchFromCookies,
+  parseFirstTouch,
   readFirstTouch,
   rememberFirstTouch,
   type FirstTouch,
@@ -90,16 +92,45 @@ describe('readFirstTouch', () => {
   });
 
   it.each([
-    ['a percent-encoded character', 'https://crawlmouse.com/caf%C3%A9'],
-    ['201 characters', `https://crawlmouse.com/${'a'.repeat(200)}`],
-    ['a colon', 'https://crawlmouse.com/a:b'],
-  ])('drops a landing path with %s', (_n, href) => {
-    expect(at(href)).not.toHaveProperty('landing_path');
+    ['a blog post', '/blog/ai-crawler-access-test-2026', '/blog/ai-crawler-access-test-2026'],
+    ['the home page', '/', '/'],
+    ['a trailing slash', '/pricing/', '/pricing/'],
+    ['a check id', '/audit/3f1c2a7e-0000-4000-8000-000000000001', '/audit/~'],
+    // No eight digits in a row: only the uuid rule catches it.
+    ['a check id of mostly letters', '/audit/3fbcaa7e-ab4c-4def-8abc-def012345abc', '/audit/~'],
+    ['a result tab of a check', '/audit/3f1c2a7e-0000-4000-8000-000000000001/map', '/audit/~/map'],
+    ['two hosts', '/compare/acme-shop.com/rival.co.uk', '/compare/~/~'],
+    ['a host', '/check/www.example.com', '/check/~'],
+    ['a long number', '/r/123456789', '/r/~'],
+    ['a hex token', '/s/0123456789abcdef0123', '/s/~'],
+    ['a percent-encoded character', '/caf%C3%A9', '/~'],
+    ['a colon', '/a:b', '/~'],
+    ['an upper-case segment', '/Blog/Post', '/~/~'],
+    ['a 65-character segment', `/${'a'.repeat(65)}`, '/~'],
+  ])('records %s as its shape', (_n, path, shape) => {
+    expect(landingShape(path)).toBe(shape);
+    expect(at(`https://crawlmouse.com${path}?x=1#y`).landing_path).toBe(shape);
   });
 
-  it('keeps a landing path of 200 characters, and never its query or fragment', () => {
-    const path = `/${'a'.repeat(199)}`;
-    expect(at(`https://crawlmouse.com${path}?x=1#y`).landing_path).toBe(path);
+  it('drops a landing path longer than 200 characters even as a shape', () => {
+    const path = `/${Array.from({ length: 40 }, () => 'abcde').join('/')}`;
+    expect(path.length).toBeGreaterThan(200);
+    expect(at(`https://crawlmouse.com${path}`)).not.toHaveProperty('landing_path');
+  });
+
+  it('property: a recorded landing path keeps no dot, no uuid and no long number', () => {
+    fc.assert(
+      fc.property(fc.webPath(), (path) => {
+        const shape = landingShape(path);
+        for (const seg of shape.split('/')) {
+          expect(seg).not.toMatch(/\./);
+          expect(seg).not.toMatch(/\d{8,}/);
+          expect(seg).not.toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-/);
+        }
+        expect(landingShape(shape)).toBe(shape);
+      }),
+      { numRuns: 500 },
+    );
   });
 
   it.each([
@@ -181,6 +212,43 @@ describe('the cm_ft cookie', () => {
     const read = firstTouchFromCookies(`cm_ft=${encodeURIComponent(json)}`);
     expect(read).toEqual({ first_seen_at: '2026-11-15T15:04:05Z' });
     expect(Object.getPrototypeOf(read)).toBe(Object.prototype);
+  });
+});
+
+describe('parseFirstTouch refuses what a hand-made cookie could carry', () => {
+  const cookie = (o: Record<string, unknown>) => encodeURIComponent(JSON.stringify(o));
+
+  it('drops a landing path that is not a shape', () => {
+    const r = parseFirstTouch(
+      cookie({
+        landing_path: '/audit/3f1c2a7e-0000-4000-8000-000000000001',
+        utm_source: 'linkedin',
+        first_seen_at: '2026-11-15T15:04:05Z',
+      }),
+    );
+    expect(r).toEqual({ utm_source: 'linkedin', first_seen_at: '2026-11-15T15:04:05Z' });
+  });
+
+  it.each([
+    '0000-01-01T00:00:00Z',
+    '1999-12-31T23:59:59Z',
+    '2100-01-01T00:00:00Z',
+    '9999-12-31T23:59:59Z',
+  ])('refuses a first-seen time of %s', (at) => {
+    expect(parseFirstTouch(cookie({ utm_source: 'x', first_seen_at: at }))).toBeNull();
+  });
+
+  it('the earliest and the latest times it keeps are ones Postgres stores', async () => {
+    const pg = await PGlite.create();
+    try {
+      for (const at of ['2020-01-01T00:00:00Z', '2099-12-31T23:59:59Z']) {
+        expect(parseFirstTouch(cookie({ first_seen_at: at }))?.first_seen_at).toBe(at);
+        const { rows } = await pg.query<{ t: string }>(`select $1::timestamptz::text as t`, [at]);
+        expect(rows.length).toBe(1);
+      }
+    } finally {
+      await pg.close();
+    }
   });
 });
 

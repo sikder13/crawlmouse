@@ -5,6 +5,8 @@
  * window. The draft's own rules are draft.test.ts's.
  */
 import { randomUUID } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import type { PGlite } from '@electric-sql/pglite';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { applyAllMigrations, freshDb } from '../../../__tests__/helpers/pglite-migrations';
@@ -19,7 +21,14 @@ import {
 } from '../../../__tests__/helpers/v2-check-tables';
 import type { LedgerDraft } from './draft';
 import { putLedgerDraft, supabaseLedgerStore } from './store';
-import { backfillLedger, writeLedger, type LedgerStore } from './write';
+import {
+  BACKFILL_EVERY_HOURS,
+  BACKFILL_MINUTE,
+  backfillLedger,
+  backfillSlot,
+  writeLedger,
+  type LedgerStore,
+} from './write';
 
 const SECRET = '00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff';
 const HOST = 'shop.distinctive-client-name.co.uk';
@@ -253,16 +262,34 @@ describe('backfillLedger', () => {
       iso,
     ]);
 
-  it('writes the drafts stored in the six hours that ended an hour ago, and no others', async () => {
-    const now = new Date('2026-11-20T12:00:00Z');
+  it('the slot is the latest scheduled run at or before now, and the cron is that schedule', () => {
+    expect(backfillSlot(new Date('2026-11-20T12:41:00Z')).toISOString()).toBe(
+      '2026-11-20T12:41:00.000Z',
+    );
+    expect(backfillSlot(new Date('2026-11-20T12:40:59Z')).toISOString()).toBe(
+      '2026-11-20T06:41:00.000Z',
+    );
+    expect(backfillSlot(new Date('2026-11-20T18:40:00Z')).toISOString()).toBe(
+      '2026-11-20T12:41:00.000Z',
+    );
+    expect(backfillSlot(new Date('2026-11-21T00:41:00Z')).toISOString()).toBe(
+      '2026-11-21T00:41:00.000Z',
+    );
+    const fn = readFileSync(join(__dirname, '../../../../../inngest/ledger.ts'), 'utf8');
+    expect(fn).toContain(`{ cron: '${BACKFILL_MINUTE} */${BACKFILL_EVERY_HOURS} * * *' }`);
+  });
+
+  it('writes the drafts stored in the six hours that ended an hour before its slot, even when it starts late', async () => {
+    // Slot 12:41: the window is [05:41, 11:41). The run starts 40 minutes late.
+    const now = new Date('2026-11-20T13:21:00Z');
     const inside = await endedCheck();
     const tooNew = await endedCheck();
     const tooOld = await endedCheck();
     const edge = await endedCheck();
     await at(inside, '2026-11-20T10:30:00Z');
-    await at(tooNew, '2026-11-20T11:00:00Z');
-    await at(tooOld, '2026-11-20T04:59:59Z');
-    await at(edge, '2026-11-20T05:00:00Z');
+    await at(tooNew, '2026-11-20T11:41:00Z');
+    await at(tooOld, '2026-11-20T05:40:59Z');
+    await at(edge, '2026-11-20T05:41:00Z');
     const failures: string[] = [];
     const r = await backfillLedger(
       { store, secret: SECRET, onFailure: (id) => failures.push(id) },
@@ -276,8 +303,8 @@ describe('backfillLedger', () => {
     expect(await draftsOf(tooOld)).toBe(1);
   });
 
-  it('says when the window held more drafts than its bound, and counts a failure without stopping', async () => {
-    const now = new Date('2026-11-21T12:00:00Z');
+  it('counts a failure without stopping, says when the window held more than its bound, and drops a spent draft', async () => {
+    const now = new Date('2026-11-21T12:41:00Z');
     const a = await endedCheck();
     const b = await endedCheck();
     const c = await endedCheck();
@@ -299,5 +326,19 @@ describe('backfillLedger', () => {
     );
     expect(r).toEqual({ outcomes: { written: 1 }, failed: 1, bounded: true });
     expect(failures).toEqual([a]);
+    // The failed retry was the one retry: its draft goes. The one past the bound stays.
+    expect(await draftsOf(a)).toBe(0);
+    expect(await draftsOf(c)).toBe(1);
+  });
+
+  it('drops the draft of a check the retry finds already linked or without a lineage', async () => {
+    const now = new Date('2026-11-22T12:41:00Z');
+    const linked = await endedCheck();
+    await writeLedger({ store, secret: SECRET }, linked);
+    await putLedgerDraft(postgrestOver(db), linked, DRAFT);
+    await at(linked, '2026-11-22T08:00:00Z');
+    const r = await backfillLedger({ store, secret: SECRET, onFailure: () => {} }, now);
+    expect(r.outcomes).toEqual({ already_linked: 1 });
+    expect(await draftsOf(linked)).toBe(0);
   });
 });

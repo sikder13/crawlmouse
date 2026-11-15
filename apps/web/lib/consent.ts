@@ -132,3 +132,13 @@ export function serverCaptureAllowed(cookieHeader?: string | null): boolean {
   if (decision !== null) return decision === 'granted';
   return !consentRequiredFromCookie(cookieHeader);
 }
+
+/**
+ * Whether PostHog starts with surveys off (CC-41 D8): when capture starts opted out (a region that
+ * needs prior consent, with no grant), and whenever the visitor's recorded decision is a decline,
+ * in any region. posthog-js skips surveys for an opted-out visitor only in its cookieless mode, so
+ * this is what keeps a declined visitor's later pages free of surveys.
+ */
+export function surveysOffAtStart(consentRequired: boolean, decision: string | null): boolean {
+  return (consentRequired && decision !== 'granted') || decision === 'denied';
+}

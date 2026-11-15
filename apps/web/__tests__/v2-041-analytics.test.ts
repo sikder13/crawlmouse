@@ -435,6 +435,81 @@ describe('the analytics read path', () => {
   });
 });
 
+describe('no view exposes a check id that is a capability', () => {
+  it('checks.id is null for a check nobody keeps, and the id for a kept one', async () => {
+    const anonSite = randomUUID();
+    const keptSite = randomUUID();
+    const anon = randomUUID();
+    const kept = randomUUID();
+    await insertRow(db, 'sites', ROWS.sites(anonSite, null, `cap-${anonSite.slice(0, 8)}.example`));
+    await insertRow(db, 'sites', ROWS.sites(keptSite, world.accountId, `cap-${keptSite.slice(0, 8)}.example`));
+    await insertRow(db, 'checks', ROWS.checks(anon, anonSite));
+    await insertRow(db, 'checks', ROWS.checks(kept, keptSite));
+    const { rows } = await asReader(db, (tx) =>
+      tx.query<{ id: string | null; account_id: string | null }>(
+        `select id, account_id from analytics.checks where id = $1 or (id is null and account_id is null)`,
+        [kept],
+      ),
+    );
+    expect(rows.some((r) => r.id === kept)).toBe(true);
+    expect(rows.filter((r) => r.account_id === null).every((r) => r.id === null)).toBe(true);
+    const anyAnon = await asReader(db, (tx) =>
+      tx.query(`select 1 from analytics.checks where id = $1`, [anon]),
+    );
+    expect(anyAnon.rows).toEqual([]);
+  });
+
+  it('the fix views hold no fix of a site nobody keeps', async () => {
+    const site = randomUUID();
+    const check = randomUUID();
+    const fix = randomUUID();
+    await insertRow(db, 'sites', ROWS.sites(site, null, `fx-${site.slice(0, 8)}.example`));
+    await insertRow(db, 'checks', ROWS.checks(check, site));
+    await insertRow(db, 'site_fixes', ROWS.site_fixes(fix, site, check, 1));
+    await insertRow(db, 'fix_events', ROWS.fix_events(randomUUID(), fix, check));
+    const { rows } = await asReader(db, (tx) =>
+      tx.query<{ n: number }>(
+        `select (select count(*)::int from analytics.fixes where account_id is null) +
+                (select count(*)::int from analytics.fix_events where account_id is null) as n`,
+      ),
+    );
+    expect(rows[0]!.n).toBe(0);
+    const { rows: unkept } = await db.query<{ n: number }>(
+      `select count(*)::int as n from public.site_fixes f join public.sites s on s.id = f.site_id
+        where s.account_id is null`,
+    );
+    // Anti-vacuity: the database holds fixes of unkept sites for the views to leave out.
+    expect(unkept[0]!.n).toBeGreaterThan(0);
+  });
+});
+
+describe('the revert as Supabase runs it', () => {
+  it('drops no role with DROP OWNED, and a non-superuser that created the role can drop it', async () => {
+    const statements = readRollback(REVERT)
+      .split('\n')
+      .filter((l) => !l.trimStart().startsWith('--'))
+      .join('\n');
+    expect(statements).not.toMatch(/drop\s+owned/i);
+    expect(statements).toMatch(/drop role if exists analytics_reader/);
+    const d = await freshDb();
+    await d.exec(`create role creator login createrole noinherit`);
+    await d.exec(`set role creator; create role made_by_creator login; reset role`);
+    const owned = await d
+      .exec(`set role creator; drop owned by made_by_creator; reset role`)
+      .then(
+        () => 'dropped',
+        (e: { code?: string }) => e.code,
+      );
+    await d.exec(`reset role`);
+    // Since PG16 a CREATEROLE role holds only ADMIN on a role it made: DROP OWNED is refused…
+    expect(owned).toBe('42501');
+    // …and DROP ROLE is not.
+    await d.exec(`set role creator; drop role made_by_creator; reset role`);
+    const { rows } = await d.query(`select 1 from pg_roles where rolname = 'made_by_creator'`);
+    expect(rows).toEqual([]);
+  });
+});
+
 describe('10-analytics-no-pii', () => {
   it('passes on the migrated database', async () => {
     expect(await check10(db)).toEqual([]);
