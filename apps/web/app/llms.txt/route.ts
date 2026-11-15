@@ -1,5 +1,8 @@
 import { postsNewestFirst } from '@/lib/blog/posts';
 import { siteUrl } from '@/lib/site-url';
+import { checksPublicEnabled } from '@/lib/auth/flags';
+import { v2KeyPages } from '@/lib/seo/llms-v2';
+import { V2_LLMS_DESCRIPTOR } from '@/lib/seo/site-copy';
 
 // Served at /llms.txt (the folder name `llms.txt` is a literal path segment, so this
 // Route Handler resolves at that exact path). It's the llms.txt convention: a plain-text,
@@ -24,7 +27,11 @@ const MAKER =
 // their own — they inherit the site-wide one from app/layout.tsx — which is why their own on-page
 // copy is used rather than repeating the home line three times.
 const KEY_PAGES: readonly (readonly [label: string, path: string, description: string])[] = [
-  ["Grade your site's internal linking", '/', 'Free A–F grade in under two minutes — no account, no install.'],
+  [
+    "Grade your site's internal linking",
+    '/',
+    'Free A–F grade in under two minutes — no account, no install.',
+  ],
   ['Pricing', '/pricing', 'Free is genuinely free — a real grade and one complete fix.'],
   ['Crawlmouse for developers', '/developers', 'CLI, GitHub Action & webhooks.'],
   [
@@ -37,8 +44,17 @@ const KEY_PAGES: readonly (readonly [label: string, path: string, description: s
   ['About CrawlmouseBot', '/bot', 'How our crawler behaves and how to control it.'],
 ];
 
+/**
+ * The file. While V2_CHECKS_PUBLIC is on (read at build: the route is static), the descriptor and the
+ * key pages are v2's: each key page is listed with its own title and meta description, read from the
+ * page's metadata (lib/seo/llms-v2.ts), so this file cannot describe a page differently from how the
+ * page describes itself. With the flag off the file is v1's, byte for byte
+ * (lib/seo/flags-off-v1.test.tsx). The guides list and the maker line are the same in both.
+ */
 export function GET() {
-  const keyPageLines = KEY_PAGES.map(
+  const v2 = checksPublicEnabled();
+  const keyPages = v2 ? v2KeyPages() : KEY_PAGES;
+  const keyPageLines = keyPages.map(
     ([label, path, description]) => `- [${label}](${siteUrl(path)}): ${description}`,
   );
 
@@ -49,7 +65,7 @@ export function GET() {
   const body = `${[
     '# Crawlmouse',
     '',
-    `> ${DESCRIPTOR}`,
+    `> ${v2 ? V2_LLMS_DESCRIPTOR : DESCRIPTOR}`,
     '',
     '## Key pages',
     '',

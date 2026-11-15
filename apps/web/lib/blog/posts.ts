@@ -44,7 +44,7 @@ export const POSTS: readonly BlogPostMeta[] = [
       'ai crawler research 2026',
     ],
     publishedAt: '2026-10-28',
-    updatedAt: '2026-10-28',
+    updatedAt: '2026-11-15',
     readingMinutes: 11,
     author: 'udaay-sikder',
     tags: ['research'],
@@ -65,7 +65,7 @@ export const POSTS: readonly BlogPostMeta[] = [
       'check cloudflare ai bot settings',
     ],
     publishedAt: '2026-09-06',
-    updatedAt: '2026-09-06',
+    updatedAt: '2026-11-15',
     readingMinutes: 9,
   },
   {
@@ -305,7 +305,7 @@ export const POSTS: readonly BlogPostMeta[] = [
       'screaming frog vs sitebulb',
     ],
     publishedAt: '2026-07-02',
-    updatedAt: '2026-09-07',
+    updatedAt: '2026-11-15',
     readingMinutes: 8,
   },
   {
@@ -324,7 +324,7 @@ export const POSTS: readonly BlogPostMeta[] = [
       'click depth',
     ],
     publishedAt: '2026-06-30',
-    updatedAt: '2026-06-30',
+    updatedAt: '2026-11-15',
     readingMinutes: 8,
   },
   {
@@ -377,7 +377,7 @@ export const POSTS: readonly BlogPostMeta[] = [
       'A page buried eight clicks deep gets crawled less, earns less internal authority, and ranks worse than the same content three clicks from home. Here is why, and what to do.',
     keywords: ['crawl depth', 'click depth seo', 'site architecture seo', 'page depth seo'],
     publishedAt: '2026-06-12',
-    updatedAt: '2026-06-12',
+    updatedAt: '2026-11-15',
     readingMinutes: 9,
   },
 ] as const;

@@ -1,0 +1,60 @@
+/**
+ * /llms.txt's key pages while V2_CHECKS_PUBLIC is on: [label, path, description] for each public
+ * page that build serves, the label and description being the page's own title and meta description,
+ * read from where its metadata reads them. A page behind V2_BILLING is listed only while that flag is
+ * on; with it off, /pricing and /developers are v1's pages and are listed with v1's own metadata.
+ */
+import type { Metadata } from 'next';
+import { billingV2Enabled } from '../billing/flags';
+import { PRICING_COPY } from '../v2/copy/pricing';
+import { CHECK_COPY, CHECK_QUESTIONS, checkPath } from '../v2/copy/check-pages';
+import { HELP_COPY } from '../v2/help/copy';
+import { agenciesView } from '../v2/view/agencies';
+import { developersView } from '../v2/view/developers';
+import { metadata as v1Pricing } from '../../app/pricing/page';
+import { metadata as v1Developers } from '../../app/developers/page';
+import { metadata as blog } from '../../app/blog/page';
+import { metadata as guides } from '../../app/guides/page';
+import { metadata as bot } from '../../app/bot/page';
+import { metadata as aiReadiness } from '../../app/ai-readiness-checker/AiReadinessChecker';
+import { V2_HOME_DESCRIPTION, V2_HOME_TITLE } from './site-copy';
+
+export type KeyPage = readonly [label: string, path: string, description: string];
+
+/** A page's title as text: `title.absolute`, or the plain string. */
+function titleOf(m: Pick<Metadata, 'title'>): string {
+  const t = m.title;
+  if (typeof t === 'string') return t;
+  if (t && typeof t === 'object' && 'absolute' in t && typeof t.absolute === 'string')
+    return t.absolute;
+  throw new Error('a key page needs a title');
+}
+
+function fromMetadata(path: string, m: Pick<Metadata, 'title' | 'description'>): KeyPage {
+  if (typeof m.description !== 'string') throw new Error(`${path} needs a description`);
+  return [titleOf(m), path, m.description];
+}
+
+export function v2KeyPages(): KeyPage[] {
+  const billing = billingV2Enabled();
+  const agencies = agenciesView();
+  const developers = developersView();
+  return [
+    [V2_HOME_TITLE, '/', V2_HOME_DESCRIPTION],
+    billing
+      ? [PRICING_COPY.pageTitle, '/pricing', PRICING_COPY.description()]
+      : fromMetadata('/pricing', v1Pricing),
+    ...(billing ? [[agencies.title, '/agencies', agencies.description] as const] : []),
+    billing
+      ? [developers.title, '/developers', developers.description]
+      : fromMetadata('/developers', v1Developers),
+    ...CHECK_QUESTIONS.map(
+      (q): KeyPage => [CHECK_COPY[q].title, checkPath(q), CHECK_COPY[q].description],
+    ),
+    [HELP_COPY.title, '/help', HELP_COPY.description],
+    fromMetadata('/ai-readiness-checker', aiReadiness),
+    fromMetadata('/blog', blog),
+    fromMetadata('/guides', guides),
+    fromMetadata('/bot', bot),
+  ];
+}
