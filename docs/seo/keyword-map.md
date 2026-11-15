@@ -8,123 +8,123 @@ The export has no page × query table, so a query is attributed to the page whos
 
 ## Primary and secondary queries
 
-| Page | Impr. | Pos. | Primary query | Secondary queries |
-| --- | --- | --- | --- | --- |
-| `/` | 86 | 2.02 | crawlmouse (17, attributed) | — |
-| `/pricing` | 12 | 16.5 | — | — |
-| `/ai-readiness-checker` | 116 | 34.35 | ai readiness checker (37, attributed) | — |
-| `/blog` | 241 | 63.04 | crawlmouse (17, attributed) | — |
-| `/guides` | 108 | 67.9 | crawl depth (113, attributed) | what is crawl depth (20); what is crawl depth? (1) |
-| `/developers` | 14 | 7.21 | crawlmouse (17, attributed) | — |
-| `/bot` | 41 | 2.29 | — | — |
-| `/status` | 2 | 33 | — | — |
-| `/privacy` | 19 | 2.58 | — | — |
-| `/terms` | 0 | — | — | — |
-| `/aup` | 17 | 2.35 | — | — |
-| `/subprocessors` | 6 | 22.33 | — | — |
-| `/takedown` | 2 | 10 | — | — |
-| `/blog/ai-crawler-access-test-2026` | 0 | — | robots.txt ai bots (18, attributed) | robots.txt for ai bots (10); ai+crawler+robots.txt+rules (2); how+to+allow+ai+bots+in+robots.txt? (2); robots.txt for agents (2) |
-| `/blog/cloudflare-ai-crawler-defaults-september-15` | 123 | 9.27 | ai crawler blocking (57, attributed) | block ai training bots (7); how+to+detect+ai+crawler+blocking? (3); block ai agents (2); cloudflare+blocking+ai+crawlers+issue (2) |
-| `/blog/screaming-frog-vs-lumar-deepcrawl` | 449 | 20.06 | screaming frog vs deepcrawl (297, attributed) | deepcrawl vs screaming frog (90); deepcrawl (47); what is deepcrawl (2); tools like screaming frog (1) |
-| `/blog/find-orphan-pages-squarespace` | 25 | 43.16 | how to find orphan pages (5, attributed) | orphan page (3); what is an orphan page (1) |
-| `/blog/block-ai-crawlers-robots-txt` | 1030 | 74.63 | gptbot robots.txt (57, attributed) | which ai crawlers should i allow in robots.txt (23); robots.txt block crawlers (4); robots block (4); block robots (3) |
-| `/blog/sitebulb-vs-jetoctopus-vs-oncrawl` | 153 | 22.14 | sitebulb vs oncrawl (89, attributed) | sitebulb vs jetoctopus (32); alternative to jetoctopus (5); jetoctopus alternatives (4); sitebulb alternative (344) |
-| `/blog/can-ai-crawlers-see-javascript` | 1088 | 23.94 | can ai crawlers execute javascript (87, attributed) | ai search javascript rendering (32); do ai crawlers render javascript (23); render javascript website crawler (18); gptbot javascript rendering crawl (2) |
-| `/blog/sitebulb-vs-screaming-frog` | 466 | 31.25 | sitebulb vs screaming frog (289, attributed) | screaming frog vs sitebulb (112); sitebulb pricing (17); screaming frog vs semrush (10); semrush vs screaming frog (6) |
-| `/blog/find-orphan-pages-webflow` | 8 | 17.75 | how to find orphan pages (5, attributed) | orphan page (3); what is an orphan page (1) |
-| `/blog/sitebulb-alternative` | 535 | 47.02 | sitebulb pricing official 2026 (1, attributed) | sitebulb alternative (344); sitebulb pricing (17); sitebulb (1); sitebulb alternatives (1) |
-| `/blog/discovered-currently-not-indexed` | 592 | 81.67 | discovered currently not indexed (208, attributed) | discovered - currently not indexed (148); fix+discovered+currently+not+indexed (8); fix discovered currently not indexed (3); page is not indexed: discovered - currently not indexed (3) |
-| `/blog/find-orphan-pages-shopify` | 7 | 5.71 | how to find orphan pages (5, attributed) | orphan page (3); what is an orphan page (1) |
-| `/blog/find-orphan-pages-wordpress` | 12 | 35.33 | how to find orphan pages (5, attributed) | orphan page (3); what is an orphan page (1) |
-| `/blog/screaming-frog-alternative` | 1658 | 56.96 | screaming frog free alternative (19, attributed) | free screaming frog alternative (10); free alternative to screaming frog (9); screaming frog alternative free (4); screaming frog alternatives free (1) |
-| `/blog/how-deep-is-too-deep-crawl-depth` | 594 | 65.39 | deep crawl (24, attributed) | crawl depth (113); crawl depth seo (105); what is crawl depth (20); click depth (14) |
-| `/blog/free-internal-link-audit` | 4 | 48.75 | internal link checker (post keyword) | internal link audit; free internal link audit; check internal links; internal linking audit |
-| `/blog/orphan-pages` | 4 | 73.5 | how to find orphan pages on a website (1, attributed) | how to find orphan pages (5); orphan page (3); what is an orphan page (1) |
-| `/blog/crawl-depth-site-architecture` | 1 | 85 | crawl depth (113, attributed) | crawl depth seo (105); what is crawl depth (20); click depth (14); page depth (10) |
-| `/blog/research` | 3 | 3 | — | — |
-| `/authors/udaay-sikder` | 2 | 8 | — | — |
-| `/agencies` | 0 | — | — | — |
-| `/check/gptbot` | 0 | — | — | — |
-| `/check/javascript` | 0 | — | can ai read javascript (3, attributed) | can google read javascript (3); can ai crawl javascript (4); do ai crawlers run javascript (2); crawler javascript (1) |
-| `/check/robots-ai` | 0 | — | ai crawlers robots.txt (20, attributed) | robots.txt ai crawler (14); robots.txt for ai (10); robots.txt ai crawlers (7); how to allow ai crawlers in robots.txt (5) |
-| `/help` | 0 | — | — | — |
-| `/help/what-an-audit-measures` | 0 | — | crawlmouse (17, attributed) | — |
-| `/help/how-grades-are-calculated` | 0 | — | — | — |
-| `/help/crawler-shown-as-blocked` | 0 | — | — | — |
-| `/help/fix-still-open` | 0 | — | — | — |
-| `/help/audit-expired` | 0 | — | — | — |
-| `/help/sign-in-email` | 0 | — | — | — |
-| `/help/trials` | 0 | — | — | — |
-| `/help/cancel-and-refunds` | 0 | — | — | — |
-| `/help/other-tools-scores` | 0 | — | — | — |
-| `/help/how-we-crawl` | 0 | — | crawlmouse (17, attributed) | — |
-| `/help/plans` | 0 | — | — | — |
-| `/help/delete-account` | 0 | — | — | — |
+| Page                                                | Impr. | Pos.  | Primary query                                         | Secondary queries                                                                                                                                                                         |
+| --------------------------------------------------- | ----- | ----- | ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/`                                                 | 86    | 2.02  | crawlmouse (17, attributed)                           | —                                                                                                                                                                                         |
+| `/pricing`                                          | 12    | 16.5  | —                                                     | —                                                                                                                                                                                         |
+| `/ai-readiness-checker`                             | 116   | 34.35 | ai readiness checker (37, attributed)                 | —                                                                                                                                                                                         |
+| `/blog`                                             | 241   | 63.04 | crawlmouse (17, attributed)                           | —                                                                                                                                                                                         |
+| `/guides`                                           | 108   | 67.9  | crawl depth (113, attributed)                         | what is crawl depth (20); what is crawl depth? (1)                                                                                                                                        |
+| `/developers`                                       | 14    | 7.21  | crawlmouse (17, attributed)                           | —                                                                                                                                                                                         |
+| `/bot`                                              | 41    | 2.29  | —                                                     | —                                                                                                                                                                                         |
+| `/status`                                           | 2     | 33    | —                                                     | —                                                                                                                                                                                         |
+| `/privacy`                                          | 19    | 2.58  | —                                                     | —                                                                                                                                                                                         |
+| `/terms`                                            | 0     | —     | —                                                     | —                                                                                                                                                                                         |
+| `/aup`                                              | 17    | 2.35  | —                                                     | —                                                                                                                                                                                         |
+| `/subprocessors`                                    | 6     | 22.33 | —                                                     | —                                                                                                                                                                                         |
+| `/takedown`                                         | 2     | 10    | —                                                     | —                                                                                                                                                                                         |
+| `/blog/ai-crawler-access-test-2026`                 | 0     | —     | robots.txt ai bots (18, attributed)                   | robots.txt for ai bots (10); ai+crawler+robots.txt+rules (2); how+to+allow+ai+bots+in+robots.txt? (2); robots.txt for agents (2)                                                          |
+| `/blog/cloudflare-ai-crawler-defaults-september-15` | 123   | 9.27  | ai crawler blocking (57, attributed)                  | block ai training bots (7); how+to+detect+ai+crawler+blocking? (3); block ai agents (2); cloudflare+blocking+ai+crawlers+issue (2)                                                        |
+| `/blog/screaming-frog-vs-lumar-deepcrawl`           | 449   | 20.06 | screaming frog vs deepcrawl (297, attributed)         | deepcrawl vs screaming frog (90); deepcrawl (47); what is deepcrawl (2); tools like screaming frog (1)                                                                                    |
+| `/blog/find-orphan-pages-squarespace`               | 25    | 43.16 | how to find orphan pages (5, attributed)              | orphan page (3); what is an orphan page (1)                                                                                                                                               |
+| `/blog/block-ai-crawlers-robots-txt`                | 1030  | 74.63 | gptbot robots.txt (57, attributed)                    | which ai crawlers should i allow in robots.txt (23); robots.txt block crawlers (4); robots block (4); block robots (3)                                                                    |
+| `/blog/sitebulb-vs-jetoctopus-vs-oncrawl`           | 153   | 22.14 | sitebulb vs oncrawl (89, attributed)                  | sitebulb vs jetoctopus (32); alternative to jetoctopus (5); jetoctopus alternatives (4); sitebulb alternative (344)                                                                       |
+| `/blog/can-ai-crawlers-see-javascript`              | 1088  | 23.94 | can ai crawlers execute javascript (87, attributed)   | ai search javascript rendering (32); do ai crawlers render javascript (23); render javascript website crawler (18); gptbot javascript rendering crawl (2)                                 |
+| `/blog/sitebulb-vs-screaming-frog`                  | 466   | 31.25 | sitebulb vs screaming frog (289, attributed)          | screaming frog vs sitebulb (112); sitebulb pricing (17); screaming frog vs semrush (10); semrush vs screaming frog (6)                                                                    |
+| `/blog/find-orphan-pages-webflow`                   | 8     | 17.75 | how to find orphan pages (5, attributed)              | orphan page (3); what is an orphan page (1)                                                                                                                                               |
+| `/blog/sitebulb-alternative`                        | 535   | 47.02 | sitebulb pricing official 2026 (1, attributed)        | sitebulb alternative (344); sitebulb pricing (17); sitebulb (1); sitebulb alternatives (1)                                                                                                |
+| `/blog/discovered-currently-not-indexed`            | 592   | 81.67 | discovered currently not indexed (208, attributed)    | discovered - currently not indexed (148); fix+discovered+currently+not+indexed (8); fix discovered currently not indexed (3); page is not indexed: discovered - currently not indexed (3) |
+| `/blog/find-orphan-pages-shopify`                   | 7     | 5.71  | how to find orphan pages (5, attributed)              | orphan page (3); what is an orphan page (1)                                                                                                                                               |
+| `/blog/find-orphan-pages-wordpress`                 | 12    | 35.33 | how to find orphan pages (5, attributed)              | orphan page (3); what is an orphan page (1)                                                                                                                                               |
+| `/blog/screaming-frog-alternative`                  | 1658  | 56.96 | screaming frog free alternative (19, attributed)      | free screaming frog alternative (10); free alternative to screaming frog (9); screaming frog alternative free (4); screaming frog alternatives free (1)                                   |
+| `/blog/how-deep-is-too-deep-crawl-depth`            | 594   | 65.39 | deep crawl (24, attributed)                           | crawl depth (113); crawl depth seo (105); what is crawl depth (20); click depth (14)                                                                                                      |
+| `/blog/free-internal-link-audit`                    | 4     | 48.75 | internal link checker (post keyword)                  | internal link audit; free internal link audit; check internal links; internal linking audit                                                                                               |
+| `/blog/orphan-pages`                                | 4     | 73.5  | how to find orphan pages on a website (1, attributed) | how to find orphan pages (5); orphan page (3); what is an orphan page (1)                                                                                                                 |
+| `/blog/crawl-depth-site-architecture`               | 1     | 85    | crawl depth (113, attributed)                         | crawl depth seo (105); what is crawl depth (20); click depth (14); page depth (10)                                                                                                        |
+| `/blog/research`                                    | 3     | 3     | —                                                     | —                                                                                                                                                                                         |
+| `/authors/udaay-sikder`                             | 2     | 8     | —                                                     | —                                                                                                                                                                                         |
+| `/agencies`                                         | 0     | —     | —                                                     | —                                                                                                                                                                                         |
+| `/check/gptbot`                                     | 0     | —     | —                                                     | —                                                                                                                                                                                         |
+| `/check/javascript`                                 | 0     | —     | can ai read javascript (3, attributed)                | can google read javascript (3); can ai crawl javascript (4); do ai crawlers run javascript (2); crawler javascript (1)                                                                    |
+| `/check/robots-ai`                                  | 0     | —     | ai crawlers robots.txt (20, attributed)               | robots.txt ai crawler (14); robots.txt for ai (10); robots.txt ai crawlers (7); how to allow ai crawlers in robots.txt (5)                                                                |
+| `/help`                                             | 0     | —     | —                                                     | —                                                                                                                                                                                         |
+| `/help/what-an-audit-measures`                      | 0     | —     | crawlmouse (17, attributed)                           | —                                                                                                                                                                                         |
+| `/help/how-grades-are-calculated`                   | 0     | —     | —                                                     | —                                                                                                                                                                                         |
+| `/help/crawler-shown-as-blocked`                    | 0     | —     | —                                                     | —                                                                                                                                                                                         |
+| `/help/fix-still-open`                              | 0     | —     | —                                                     | —                                                                                                                                                                                         |
+| `/help/audit-expired`                               | 0     | —     | —                                                     | —                                                                                                                                                                                         |
+| `/help/sign-in-email`                               | 0     | —     | —                                                     | —                                                                                                                                                                                         |
+| `/help/trials`                                      | 0     | —     | —                                                     | —                                                                                                                                                                                         |
+| `/help/cancel-and-refunds`                          | 0     | —     | —                                                     | —                                                                                                                                                                                         |
+| `/help/other-tools-scores`                          | 0     | —     | —                                                     | —                                                                                                                                                                                         |
+| `/help/how-we-crawl`                                | 0     | —     | crawlmouse (17, attributed)                           | —                                                                                                                                                                                         |
+| `/help/plans`                                       | 0     | —     | —                                                     | —                                                                                                                                                                                         |
+| `/help/delete-account`                              | 0     | —     | —                                                     | —                                                                                                                                                                                         |
 
 ## Queries attributed to more than one page
 
 Possible cannibal pairs. Merging, moving or retitling either page is the owner’s call and is not done in CC-40.
 
-| Query | Impr. | Pos. | Pages |
-| --- | --- | --- | --- |
-| screaming frog alternative | 828 | 67.16 | `/blog/screaming-frog-vs-lumar-deepcrawl`, `/blog/screaming-frog-alternative` |
-| sitebulb alternative | 344 | 46.32 | `/blog/sitebulb-vs-jetoctopus-vs-oncrawl`, `/blog/sitebulb-alternative`, `/blog/screaming-frog-alternative` |
-| sitebulb vs screaming frog | 289 | 19.5 | `/blog/sitebulb-vs-screaming-frog`, `/blog/screaming-frog-alternative` |
-| crawl depth | 113 | 89.65 | `/guides`, `/blog/how-deep-is-too-deep-crawl-depth`, `/blog/crawl-depth-site-architecture` |
-| screaming frog vs sitebulb | 112 | 65.68 | `/blog/sitebulb-vs-screaming-frog`, `/blog/screaming-frog-alternative` |
-| crawl depth seo | 105 | 97.65 | `/blog/how-deep-is-too-deep-crawl-depth`, `/blog/crawl-depth-site-architecture` |
-| screaming frog alternatives | 49 | 41.67 | `/blog/screaming-frog-vs-lumar-deepcrawl`, `/blog/screaming-frog-alternative` |
-| block ai crawlers | 47 | 82.38 | `/blog/cloudflare-ai-crawler-defaults-september-15`, `/blog/block-ai-crawlers-robots-txt` |
-| block ai bots robots txt | 45 | 77.24 | `/blog/ai-crawler-access-test-2026`, `/blog/block-ai-crawlers-robots-txt` |
-| alternative to screaming frog | 26 | 25.77 | `/blog/screaming-frog-vs-lumar-deepcrawl`, `/blog/screaming-frog-alternative` |
-| alternatives to screaming frog | 22 | 25.64 | `/blog/screaming-frog-vs-lumar-deepcrawl`, `/blog/screaming-frog-alternative` |
-| what is crawl depth | 20 | 35.3 | `/guides`, `/blog/how-deep-is-too-deep-crawl-depth`, `/blog/crawl-depth-site-architecture` |
-| ai crawlers robots.txt | 20 | 78.85 | `/blog/ai-crawler-access-test-2026`, `/blog/block-ai-crawlers-robots-txt`, `/check/robots-ai` |
-| crawlmouse | 17 | 1 | `/`, `/blog`, `/developers`, `/help/what-an-audit-measures`, `/help/how-we-crawl` |
-| alternatives screaming frog | 17 | 21.94 | `/blog/screaming-frog-vs-lumar-deepcrawl`, `/blog/screaming-frog-alternative` |
-| sitebulb pricing | 17 | 67.82 | `/blog/sitebulb-vs-screaming-frog`, `/blog/sitebulb-alternative` |
-| robots.txt ai crawler | 14 | 81.93 | `/blog/ai-crawler-access-test-2026`, `/blog/block-ai-crawlers-robots-txt`, `/check/robots-ai` |
-| click depth | 14 | 89 | `/blog/how-deep-is-too-deep-crawl-depth`, `/blog/crawl-depth-site-architecture` |
-| screaming frog vs semrush | 10 | 73.7 | `/blog/screaming-frog-vs-lumar-deepcrawl`, `/blog/sitebulb-vs-screaming-frog`, `/blog/screaming-frog-alternative` |
-| robots.txt for ai | 10 | 86.3 | `/blog/ai-crawler-access-test-2026`, `/blog/block-ai-crawlers-robots-txt`, `/check/robots-ai` |
-| page depth | 10 | 88.6 | `/blog/how-deep-is-too-deep-crawl-depth`, `/blog/crawl-depth-site-architecture` |
-| robots.txt ai crawlers | 7 | 82.57 | `/blog/ai-crawler-access-test-2026`, `/blog/block-ai-crawlers-robots-txt`, `/check/robots-ai` |
-| semrush vs screaming frog | 6 | 64 | `/blog/screaming-frog-vs-lumar-deepcrawl`, `/blog/sitebulb-vs-screaming-frog`, `/blog/screaming-frog-alternative` |
-| block ai crawlers wordpress | 6 | 82 | `/blog/cloudflare-ai-crawler-defaults-september-15`, `/blog/block-ai-crawlers-robots-txt` |
-| best screaming frog alternatives | 5 | 55.6 | `/blog/screaming-frog-vs-lumar-deepcrawl`, `/blog/sitebulb-vs-screaming-frog`, `/blog/screaming-frog-alternative` |
-| how to allow ai crawlers in robots.txt | 5 | 78.2 | `/blog/ai-crawler-access-test-2026`, `/blog/block-ai-crawlers-robots-txt`, `/check/robots-ai` |
-| robots.txt for ai crawlers | 5 | 79 | `/blog/ai-crawler-access-test-2026`, `/blog/block-ai-crawlers-robots-txt`, `/check/robots-ai` |
-| how to find orphan pages | 5 | 81 | `/blog/find-orphan-pages-squarespace`, `/blog/find-orphan-pages-webflow`, `/blog/find-orphan-pages-shopify`, `/blog/find-orphan-pages-wordpress`, `/blog/orphan-pages` |
-| click depth seo | 5 | 94.4 | `/blog/how-deep-is-too-deep-crawl-depth`, `/blog/crawl-depth-site-architecture` |
-| can ai crawl javascript | 4 | 39.75 | `/blog/can-ai-crawlers-see-javascript`, `/check/javascript` |
-| alternative screaming frog | 4 | 53.75 | `/blog/screaming-frog-vs-lumar-deepcrawl`, `/blog/screaming-frog-alternative` |
-| ai crawlers robots txt | 4 | 80.25 | `/blog/ai-crawler-access-test-2026`, `/blog/block-ai-crawlers-robots-txt`, `/check/robots-ai` |
-| ai+crawler+blocking+robots.txt | 4 | 81.25 | `/blog/ai-crawler-access-test-2026`, `/blog/block-ai-crawlers-robots-txt`, `/check/robots-ai` |
-| orphan page | 3 | 17 | `/blog/find-orphan-pages-squarespace`, `/blog/find-orphan-pages-webflow`, `/blog/find-orphan-pages-shopify`, `/blog/find-orphan-pages-wordpress`, `/blog/orphan-pages` |
-| what is oai-searchbot? | 3 | 75 | `/blog/block-ai-crawlers-robots-txt`, `/blog/can-ai-crawlers-see-javascript` |
-| robots txt ai | 3 | 77 | `/blog/ai-crawler-access-test-2026`, `/blog/block-ai-crawlers-robots-txt`, `/check/robots-ai` |
-| robots.txt disallow ai | 3 | 84 | `/blog/ai-crawler-access-test-2026`, `/blog/block-ai-crawlers-robots-txt`, `/check/robots-ai` |
-| block crawlers | 3 | 86 | `/blog/cloudflare-ai-crawler-defaults-september-15`, `/blog/block-ai-crawlers-robots-txt` |
-| do ai crawlers run javascript | 2 | 6 | `/blog/can-ai-crawlers-see-javascript`, `/check/javascript` |
-| verifiedtalent.ai robots.txt | 2 | 52 | `/blog/ai-crawler-access-test-2026`, `/blog/block-ai-crawlers-robots-txt`, `/check/robots-ai` |
-| block crawler | 2 | 91 | `/blog/cloudflare-ai-crawler-defaults-september-15`, `/blog/block-ai-crawlers-robots-txt` |
-| crawler javascript | 1 | 8 | `/blog/can-ai-crawlers-see-javascript`, `/check/javascript` |
-| sitebulb | 1 | 10 | `/blog/sitebulb-vs-jetoctopus-vs-oncrawl`, `/blog/sitebulb-vs-screaming-frog`, `/blog/sitebulb-alternative`, `/blog/screaming-frog-alternative` |
-| what is an orphan page | 1 | 16 | `/blog/find-orphan-pages-squarespace`, `/blog/find-orphan-pages-webflow`, `/blog/find-orphan-pages-shopify`, `/blog/find-orphan-pages-wordpress`, `/blog/orphan-pages` |
-| sitebulb alternatives | 1 | 29 | `/blog/sitebulb-vs-jetoctopus-vs-oncrawl`, `/blog/sitebulb-alternative`, `/blog/screaming-frog-alternative` |
-| screaming frog vs moz | 1 | 60 | `/blog/screaming-frog-vs-lumar-deepcrawl`, `/blog/sitebulb-vs-screaming-frog`, `/blog/screaming-frog-alternative` |
-| what is oai-searchbot | 1 | 60 | `/blog/block-ai-crawlers-robots-txt`, `/blog/can-ai-crawlers-see-javascript` |
-| claude.ai robots.txt | 1 | 63 | `/blog/ai-crawler-access-test-2026`, `/blog/block-ai-crawlers-robots-txt`, `/check/robots-ai` |
-| screaming frog alternative online | 1 | 70 | `/blog/screaming-frog-vs-lumar-deepcrawl`, `/blog/screaming-frog-alternative` |
-| ai robots txt | 1 | 73 | `/blog/ai-crawler-access-test-2026`, `/blog/block-ai-crawlers-robots-txt`, `/check/robots-ai` |
-| block bots robots txt | 1 | 79 | `/blog/ai-crawler-access-test-2026`, `/blog/block-ai-crawlers-robots-txt` |
-| ai crawler robots txt | 1 | 81 | `/blog/ai-crawler-access-test-2026`, `/blog/block-ai-crawlers-robots-txt`, `/check/robots-ai` |
-| robots txt for ai | 1 | 84 | `/blog/ai-crawler-access-test-2026`, `/blog/block-ai-crawlers-robots-txt`, `/check/robots-ai` |
-| how to block ai crawlers | 1 | 86 | `/blog/cloudflare-ai-crawler-defaults-september-15`, `/blog/block-ai-crawlers-robots-txt` |
-| what is oai searchbot | 1 | 89 | `/blog/block-ai-crawlers-robots-txt`, `/blog/can-ai-crawlers-see-javascript` |
-| do ai crawlers respect robots txt | 1 | 92 | `/blog/ai-crawler-access-test-2026`, `/blog/block-ai-crawlers-robots-txt`, `/check/robots-ai` |
-| what is crawl depth? | 1 | 97 | `/guides`, `/blog/how-deep-is-too-deep-crawl-depth`, `/blog/crawl-depth-site-architecture` |
-| crawl depth in seo | 1 | 100 | `/blog/how-deep-is-too-deep-crawl-depth`, `/blog/crawl-depth-site-architecture` |
+| Query                                  | Impr. | Pos.  | Pages                                                                                                                                                                  |
+| -------------------------------------- | ----- | ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| screaming frog alternative             | 828   | 67.16 | `/blog/screaming-frog-vs-lumar-deepcrawl`, `/blog/screaming-frog-alternative`                                                                                          |
+| sitebulb alternative                   | 344   | 46.32 | `/blog/sitebulb-vs-jetoctopus-vs-oncrawl`, `/blog/sitebulb-alternative`, `/blog/screaming-frog-alternative`                                                            |
+| sitebulb vs screaming frog             | 289   | 19.5  | `/blog/sitebulb-vs-screaming-frog`, `/blog/screaming-frog-alternative`                                                                                                 |
+| crawl depth                            | 113   | 89.65 | `/guides`, `/blog/how-deep-is-too-deep-crawl-depth`, `/blog/crawl-depth-site-architecture`                                                                             |
+| screaming frog vs sitebulb             | 112   | 65.68 | `/blog/sitebulb-vs-screaming-frog`, `/blog/screaming-frog-alternative`                                                                                                 |
+| crawl depth seo                        | 105   | 97.65 | `/blog/how-deep-is-too-deep-crawl-depth`, `/blog/crawl-depth-site-architecture`                                                                                        |
+| screaming frog alternatives            | 49    | 41.67 | `/blog/screaming-frog-vs-lumar-deepcrawl`, `/blog/screaming-frog-alternative`                                                                                          |
+| block ai crawlers                      | 47    | 82.38 | `/blog/cloudflare-ai-crawler-defaults-september-15`, `/blog/block-ai-crawlers-robots-txt`                                                                              |
+| block ai bots robots txt               | 45    | 77.24 | `/blog/ai-crawler-access-test-2026`, `/blog/block-ai-crawlers-robots-txt`                                                                                              |
+| alternative to screaming frog          | 26    | 25.77 | `/blog/screaming-frog-vs-lumar-deepcrawl`, `/blog/screaming-frog-alternative`                                                                                          |
+| alternatives to screaming frog         | 22    | 25.64 | `/blog/screaming-frog-vs-lumar-deepcrawl`, `/blog/screaming-frog-alternative`                                                                                          |
+| what is crawl depth                    | 20    | 35.3  | `/guides`, `/blog/how-deep-is-too-deep-crawl-depth`, `/blog/crawl-depth-site-architecture`                                                                             |
+| ai crawlers robots.txt                 | 20    | 78.85 | `/blog/ai-crawler-access-test-2026`, `/blog/block-ai-crawlers-robots-txt`, `/check/robots-ai`                                                                          |
+| crawlmouse                             | 17    | 1     | `/`, `/blog`, `/developers`, `/help/what-an-audit-measures`, `/help/how-we-crawl`                                                                                      |
+| alternatives screaming frog            | 17    | 21.94 | `/blog/screaming-frog-vs-lumar-deepcrawl`, `/blog/screaming-frog-alternative`                                                                                          |
+| sitebulb pricing                       | 17    | 67.82 | `/blog/sitebulb-vs-screaming-frog`, `/blog/sitebulb-alternative`                                                                                                       |
+| robots.txt ai crawler                  | 14    | 81.93 | `/blog/ai-crawler-access-test-2026`, `/blog/block-ai-crawlers-robots-txt`, `/check/robots-ai`                                                                          |
+| click depth                            | 14    | 89    | `/blog/how-deep-is-too-deep-crawl-depth`, `/blog/crawl-depth-site-architecture`                                                                                        |
+| screaming frog vs semrush              | 10    | 73.7  | `/blog/screaming-frog-vs-lumar-deepcrawl`, `/blog/sitebulb-vs-screaming-frog`, `/blog/screaming-frog-alternative`                                                      |
+| robots.txt for ai                      | 10    | 86.3  | `/blog/ai-crawler-access-test-2026`, `/blog/block-ai-crawlers-robots-txt`, `/check/robots-ai`                                                                          |
+| page depth                             | 10    | 88.6  | `/blog/how-deep-is-too-deep-crawl-depth`, `/blog/crawl-depth-site-architecture`                                                                                        |
+| robots.txt ai crawlers                 | 7     | 82.57 | `/blog/ai-crawler-access-test-2026`, `/blog/block-ai-crawlers-robots-txt`, `/check/robots-ai`                                                                          |
+| semrush vs screaming frog              | 6     | 64    | `/blog/screaming-frog-vs-lumar-deepcrawl`, `/blog/sitebulb-vs-screaming-frog`, `/blog/screaming-frog-alternative`                                                      |
+| block ai crawlers wordpress            | 6     | 82    | `/blog/cloudflare-ai-crawler-defaults-september-15`, `/blog/block-ai-crawlers-robots-txt`                                                                              |
+| best screaming frog alternatives       | 5     | 55.6  | `/blog/screaming-frog-vs-lumar-deepcrawl`, `/blog/sitebulb-vs-screaming-frog`, `/blog/screaming-frog-alternative`                                                      |
+| how to allow ai crawlers in robots.txt | 5     | 78.2  | `/blog/ai-crawler-access-test-2026`, `/blog/block-ai-crawlers-robots-txt`, `/check/robots-ai`                                                                          |
+| robots.txt for ai crawlers             | 5     | 79    | `/blog/ai-crawler-access-test-2026`, `/blog/block-ai-crawlers-robots-txt`, `/check/robots-ai`                                                                          |
+| how to find orphan pages               | 5     | 81    | `/blog/find-orphan-pages-squarespace`, `/blog/find-orphan-pages-webflow`, `/blog/find-orphan-pages-shopify`, `/blog/find-orphan-pages-wordpress`, `/blog/orphan-pages` |
+| click depth seo                        | 5     | 94.4  | `/blog/how-deep-is-too-deep-crawl-depth`, `/blog/crawl-depth-site-architecture`                                                                                        |
+| can ai crawl javascript                | 4     | 39.75 | `/blog/can-ai-crawlers-see-javascript`, `/check/javascript`                                                                                                            |
+| alternative screaming frog             | 4     | 53.75 | `/blog/screaming-frog-vs-lumar-deepcrawl`, `/blog/screaming-frog-alternative`                                                                                          |
+| ai crawlers robots txt                 | 4     | 80.25 | `/blog/ai-crawler-access-test-2026`, `/blog/block-ai-crawlers-robots-txt`, `/check/robots-ai`                                                                          |
+| ai+crawler+blocking+robots.txt         | 4     | 81.25 | `/blog/ai-crawler-access-test-2026`, `/blog/block-ai-crawlers-robots-txt`, `/check/robots-ai`                                                                          |
+| orphan page                            | 3     | 17    | `/blog/find-orphan-pages-squarespace`, `/blog/find-orphan-pages-webflow`, `/blog/find-orphan-pages-shopify`, `/blog/find-orphan-pages-wordpress`, `/blog/orphan-pages` |
+| what is oai-searchbot?                 | 3     | 75    | `/blog/block-ai-crawlers-robots-txt`, `/blog/can-ai-crawlers-see-javascript`                                                                                           |
+| robots txt ai                          | 3     | 77    | `/blog/ai-crawler-access-test-2026`, `/blog/block-ai-crawlers-robots-txt`, `/check/robots-ai`                                                                          |
+| robots.txt disallow ai                 | 3     | 84    | `/blog/ai-crawler-access-test-2026`, `/blog/block-ai-crawlers-robots-txt`, `/check/robots-ai`                                                                          |
+| block crawlers                         | 3     | 86    | `/blog/cloudflare-ai-crawler-defaults-september-15`, `/blog/block-ai-crawlers-robots-txt`                                                                              |
+| do ai crawlers run javascript          | 2     | 6     | `/blog/can-ai-crawlers-see-javascript`, `/check/javascript`                                                                                                            |
+| verifiedtalent.ai robots.txt           | 2     | 52    | `/blog/ai-crawler-access-test-2026`, `/blog/block-ai-crawlers-robots-txt`, `/check/robots-ai`                                                                          |
+| block crawler                          | 2     | 91    | `/blog/cloudflare-ai-crawler-defaults-september-15`, `/blog/block-ai-crawlers-robots-txt`                                                                              |
+| crawler javascript                     | 1     | 8     | `/blog/can-ai-crawlers-see-javascript`, `/check/javascript`                                                                                                            |
+| sitebulb                               | 1     | 10    | `/blog/sitebulb-vs-jetoctopus-vs-oncrawl`, `/blog/sitebulb-vs-screaming-frog`, `/blog/sitebulb-alternative`, `/blog/screaming-frog-alternative`                        |
+| what is an orphan page                 | 1     | 16    | `/blog/find-orphan-pages-squarespace`, `/blog/find-orphan-pages-webflow`, `/blog/find-orphan-pages-shopify`, `/blog/find-orphan-pages-wordpress`, `/blog/orphan-pages` |
+| sitebulb alternatives                  | 1     | 29    | `/blog/sitebulb-vs-jetoctopus-vs-oncrawl`, `/blog/sitebulb-alternative`, `/blog/screaming-frog-alternative`                                                            |
+| screaming frog vs moz                  | 1     | 60    | `/blog/screaming-frog-vs-lumar-deepcrawl`, `/blog/sitebulb-vs-screaming-frog`, `/blog/screaming-frog-alternative`                                                      |
+| what is oai-searchbot                  | 1     | 60    | `/blog/block-ai-crawlers-robots-txt`, `/blog/can-ai-crawlers-see-javascript`                                                                                           |
+| claude.ai robots.txt                   | 1     | 63    | `/blog/ai-crawler-access-test-2026`, `/blog/block-ai-crawlers-robots-txt`, `/check/robots-ai`                                                                          |
+| screaming frog alternative online      | 1     | 70    | `/blog/screaming-frog-vs-lumar-deepcrawl`, `/blog/screaming-frog-alternative`                                                                                          |
+| ai robots txt                          | 1     | 73    | `/blog/ai-crawler-access-test-2026`, `/blog/block-ai-crawlers-robots-txt`, `/check/robots-ai`                                                                          |
+| block bots robots txt                  | 1     | 79    | `/blog/ai-crawler-access-test-2026`, `/blog/block-ai-crawlers-robots-txt`                                                                                              |
+| ai crawler robots txt                  | 1     | 81    | `/blog/ai-crawler-access-test-2026`, `/blog/block-ai-crawlers-robots-txt`, `/check/robots-ai`                                                                          |
+| robots txt for ai                      | 1     | 84    | `/blog/ai-crawler-access-test-2026`, `/blog/block-ai-crawlers-robots-txt`, `/check/robots-ai`                                                                          |
+| how to block ai crawlers               | 1     | 86    | `/blog/cloudflare-ai-crawler-defaults-september-15`, `/blog/block-ai-crawlers-robots-txt`                                                                              |
+| what is oai searchbot                  | 1     | 89    | `/blog/block-ai-crawlers-robots-txt`, `/blog/can-ai-crawlers-see-javascript`                                                                                           |
+| do ai crawlers respect robots txt      | 1     | 92    | `/blog/ai-crawler-access-test-2026`, `/blog/block-ai-crawlers-robots-txt`, `/check/robots-ai`                                                                          |
+| what is crawl depth?                   | 1     | 97    | `/guides`, `/blog/how-deep-is-too-deep-crawl-depth`, `/blog/crawl-depth-site-architecture`                                                                             |
+| crawl depth in seo                     | 1     | 100   | `/blog/how-deep-is-too-deep-crawl-depth`, `/blog/crawl-depth-site-architecture`                                                                                        |
 
 ## For the owner
 
@@ -145,5 +145,6 @@ Pages that share 100 or more impressions of attributed queries. Whether to merge
 ### `/blog/screaming-frog-alternative` and `/blog/sitebulb-vs-screaming-frog`
 
 Queries attributed to both: sitebulb vs screaming frog (289); screaming frog vs sitebulb (112); screaming frog vs semrush (10); semrush vs screaming frog (6); best screaming frog alternatives (5); sitebulb (1); screaming frog vs moz (1).
+
 - `/blog/screaming-frog-alternative`: 1658 impressions at 56.96; top attributed queries: screaming frog alternative (828, pos. 67.16); sitebulb alternative (344, pos. 46.32); sitebulb vs screaming frog (289, pos. 19.5).
 - `/blog/sitebulb-vs-screaming-frog`: 466 impressions at 31.25; top attributed queries: sitebulb vs screaming frog (289, pos. 19.5); screaming frog vs sitebulb (112, pos. 65.68); sitebulb pricing (17, pos. 67.82).
