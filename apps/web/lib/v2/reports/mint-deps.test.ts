@@ -99,6 +99,40 @@ describe('supabaseMintDeps', () => {
     await expect(failing.isMemberForSite('site-1')).rejects.toThrow(/is_member_for_site/);
   });
 
+  it('asks seat_may(<the site’s account>, mint_report) through the session, never the service role (Q16)', async () => {
+    const asked: string[] = [];
+    const session = {
+      from: (table: string) => {
+        asked.push(`from:${table}`);
+        const chain = {
+          select: () => chain,
+          eq: (c: string, v: string) => (asked.push(`eq:${c}=${v}`), chain),
+          maybeSingle: async () => ({ data: { account_id: 'acct-1' }, error: null }),
+        };
+        return chain;
+      },
+      rpc: async (fn: string, args: unknown) => {
+        asked.push(`rpc:${fn}:${JSON.stringify(args)}`);
+        return { data: true, error: null };
+      },
+    } as unknown as SupabaseClient;
+    const admin = client('admin', { data: null, error: null });
+    expect(await supabaseMintDeps(session, admin, null).mayMint('site-1')).toBe(true);
+    expect(asked).toEqual([
+      'from:sites',
+      'eq:id=site-1',
+      'rpc:seat_may:{"p_account":"acct-1","p_action":"mint_report"}',
+    ]);
+    expect(calls).toEqual([]);
+  });
+
+  it('a seat_may answer other than true may not mint; a site with no account may not either (Q16)', async () => {
+    for (const data of [false, null, 'true']) {
+      const s = client('session', { data, error: null });
+      expect(await supabaseMintDeps(s, s, null).mayMint('site-1')).toBe(false);
+    }
+  });
+
   it('reads the existing report, the dataset and writes the row with the service role', async () => {
     const admin = client('admin', { data: { slug: 'first' }, error: null });
     const deps = supabaseMintDeps(client('session', { data: null, error: null }), admin, null);

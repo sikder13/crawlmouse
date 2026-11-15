@@ -48,6 +48,8 @@ const ARTBOARD: Record<SeatAction, Role[]> = {
   buy_seats: ['owner'],
   // No row of the artboard: the account's alerts follow Settings, the owner's and managers'.
   edit_account_alerts: ['owner', 'account_manager'],
+  // No row of the artboard: publishing a client's report as a public page (CC-37 D5, Q16).
+  mint_report: ['owner', 'account_manager'],
 };
 
 let db: PGlite;

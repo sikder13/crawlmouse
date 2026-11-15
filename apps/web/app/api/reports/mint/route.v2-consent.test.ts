@@ -44,6 +44,8 @@ vi.mock('@/lib/v2/reports/mint-deps', async (importOriginal) => {
   return {
     supabaseMintDeps: (...args: Parameters<typeof real.supabaseMintDeps>) => ({
       ...real.supabaseMintDeps(...args),
+      // The role check (Q16) has its own tests; this file is about the event's consent gate.
+      mayMint: async () => true,
       slugForCheck: async () => null,
       snapshotOf: async () => ({ snapshot, accountId: 'acct-1' }),
       insert: async () => ({ error: null }),

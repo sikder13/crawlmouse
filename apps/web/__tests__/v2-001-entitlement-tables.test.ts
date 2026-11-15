@@ -50,6 +50,8 @@ const POSTURE: Record<
         'agency_checkout_at',
         'agency_checkout_interval',
         'agency_trial_consent_at',
+        // CC-37 (20261118000001): the card's last four, read for the owner through the service role.
+        'card_last4',
         // CC-33: our own test and staff accounts, read by the service role only.
         'internal',
       ],

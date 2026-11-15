@@ -26,16 +26,25 @@ function authorized(req: Request): boolean {
 
 export async function POST(req: Request) {
   const ip = getClientIp(req);
+  // Per-IP throttle, BEFORE the secret check, so it counts wrong-secret guesses from one address
+  // (A-10): a brute force against a short or leaked-prefix secret gets ADMIN_TAKEDOWN_PER_IP_PER_HOUR
+  // tries an hour from each IP. The long random ADMIN_SECRET stays the primary control. A request
+  // with no known client IP is not throttled here (it would share one global bucket).
+  if (ip !== 'unknown') {
+    const rl = await checkRateLimit(
+      `admin-takedown:ip:${ip}`,
+      ADMIN_TAKEDOWN_PER_IP_PER_HOUR,
+      HOUR_MS,
+    );
+    if (!rl.allowed) {
+      console.error(`[admin:takedown] throttled attempt from ip=${ip}`);
+      return NextResponse.json({ error: 'rate_limited' }, { status: 429 });
+    }
+  }
   if (!authorized(req)) {
     // Audit trail: a report-darkening endpoint should record rejected attempts (no secret leaked).
     console.error(`[admin:takedown] unauthorized attempt from ip=${ip}`);
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
-  }
-  // Defense-in-depth throttle (the long random ADMIN_SECRET is the primary control): caps a
-  // brute-force / runaway against a misconfigured short secret. Mirrors /api/takedown's pattern.
-  if (ip !== 'unknown') {
-    const rl = await checkRateLimit(`admin-takedown:ip:${ip}`, ADMIN_TAKEDOWN_PER_IP_PER_HOUR, HOUR_MS);
-    if (!rl.allowed) return NextResponse.json({ error: 'rate_limited' }, { status: 429 });
   }
   const body = await req.json().catch(() => ({}));
   const parsed = schema.safeParse(body);
