@@ -728,7 +728,8 @@ describe('the section applies twice and its revert removes it', () => {
                + (select count(*) from pg_tables
                    where tablename in ('operators', 'operator_actions'))
                + (select count(*) from information_schema.columns
-                   where table_name = 'accounts' and column_name = 'internal'))::int as n`,
+                   where table_schema = 'public' and table_name = 'accounts'
+                     and column_name = 'internal'))::int as n`,
         [FUNCTIONS],
       )
     ).rows[0]!.n;
@@ -746,6 +747,8 @@ describe('the section applies twice and its revert removes it', () => {
       await applyAllMigrations(own);
       const before = await definitions(own);
       expect(await present(own)).toBe(FUNCTIONS.length + 3);
+      // Rollbacks run newest first: 041's analytics.accounts reads accounts.internal.
+      await own.exec(readRollback('20261120000001_v2_041_analytics.revert.sql'));
       const revert = sectionA(readRollback(ROLLBACK));
       await own.exec(revert);
       expect(await present(own)).toBe(0);

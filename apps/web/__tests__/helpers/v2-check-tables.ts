@@ -427,6 +427,32 @@ export const ROWS = {
   // CC-38: the record of an account qa:seed made. It names an account and holds no foreign key;
   // service only.
   qa_accounts: (accountId: string): Row => ({ account_id: accountId, qa_key: 'free' }),
+  // CC-41: an account's first touch, written once at its first login; service only.
+  account_attribution: (accountId: string): Row => ({
+    account_id: accountId,
+    utm_source: 'linkedin',
+    utm_medium: 'social',
+    landing_path: '/blog/x',
+    first_seen_at: T0,
+  }),
+  // CC-41: a check's ledger draft, held until the writer records it; service only.
+  check_ledger_drafts: (checkId: string): Row => ({
+    check_id: checkId,
+    draft: {
+      cms: null,
+      frontend_framework: null,
+      edge_vendor: null,
+      without_js_state: null,
+      share_2xx: 1,
+      share_3xx: 0,
+      share_4xx: 0,
+      share_5xx: 0,
+      share_unanswered: 0,
+      signals_detected: [],
+      signals_indeterminate: [],
+      observations: [],
+    },
+  }),
   account_slack_destinations: (accountId: string, secretId: string): Row => ({
     account_id: accountId,
     vault_secret_id: secretId,
@@ -566,6 +592,8 @@ export const TABLES_029: readonly NewTable[] = ['contact_requests'];
 export const TABLES_033: readonly NewTable[] = ['operators', 'operator_actions', 'founder_notices'];
 /** The public tables CC-38's migration creates. */
 export const TABLES_038: readonly NewTable[] = ['qa_accounts'];
+/** The public tables CC-41's migration creates. */
+export const TABLES_041: readonly NewTable[] = ['account_attribution', 'check_ledger_drafts'];
 /** The tables 003 creates. */
 export const NEW_TABLES = (Object.keys(ROWS) as NewTable[])
   .filter(
@@ -577,10 +605,11 @@ export const NEW_TABLES = (Object.keys(ROWS) as NewTable[])
       !TABLES_028.includes(t) &&
       !TABLES_029.includes(t) &&
       !TABLES_033.includes(t) &&
-      !TABLES_038.includes(t),
+      !TABLES_038.includes(t) &&
+      !TABLES_041.includes(t),
   )
   .sort();
-/** Every public table 003, 006b, 008, 026b, 027b, 028, 029, 033 and CC-38's migration create. */
+/** Every public table 003, 006b, 008, 026b, 027b, 028, 029, 033, CC-38's and CC-41's migrations create. */
 export const ALL_NEW_TABLES = (Object.keys(ROWS) as NewTable[]).sort();
 
 /** Where a seeded row belongs: one of the account's two sites, or the account as a whole. */
@@ -650,6 +679,11 @@ export async function seedWorld(db: Db, tag: string): Promise<World> {
     `select to_regclass('public.qa_accounts')::text as t`,
   );
   const with038 = qa[0]!.t !== null;
+  // Nor, migrated before CC-41's migration, account_attribution.
+  const { rows: ft } = await db.query<{ t: string | null }>(
+    `select to_regclass('public.account_attribution')::text as t`,
+  );
+  const with041 = ft[0]!.t !== null;
   // A database migrated before 006d (the revert tests of 003 to 006c) has no identity columns.
   const { rows: identity } = await db.query<{ n: number }>(
     `select count(*)::int as n from pg_attribute
@@ -734,6 +768,9 @@ export async function seedWorld(db: Db, tag: string): Promise<World> {
       );
       const usage = randomUUID();
       await put('usage_events', ROWS.usage_events(usage, accountId, checkId), { id: usage }, scope);
+      if (with041) {
+        await put('check_ledger_drafts', ROWS.check_ledger_drafts(checkId), { check_id: checkId }, scope);
+      }
     }
     if (with008) {
       await put(
@@ -871,6 +908,14 @@ export async function seedWorld(db: Db, tag: string): Promise<World> {
   }
   if (with038) {
     await put('qa_accounts', ROWS.qa_accounts(accountId), { account_id: accountId }, 'account');
+  }
+  if (with041) {
+    await put(
+      'account_attribution',
+      ROWS.account_attribution(accountId),
+      { account_id: accountId },
+      'account',
+    );
   }
   await put(
     'seat_sites',
