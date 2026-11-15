@@ -144,6 +144,21 @@ describe('every existing post renders as it did at the baseline, plus the listed
       }
       const { doc } = await renderPostPage(slug);
       const now = doc.querySelector('article')!;
+      // The byline is set aside below, so what it says is pinned first: the author, the role and the
+      // two links, nothing else (ruling 2's data, lib/blog/authors.ts).
+      const author = getAuthor(POSTS_BY_SLUG.get(slug)!.author ?? '');
+      const byline = now.querySelector('span.post-byline');
+      if (author) {
+        expect(byline?.textContent, `${slug} byline`).toBe(
+          `By ${author.name}, ${author.role} (LinkedIn)·`,
+        );
+        expect(
+          [...byline!.querySelectorAll('a')].map((l) => l.getAttribute('href')),
+          `${slug} byline links`,
+        ).toEqual([`/authors/${author.slug}`, author.linkedin]);
+      } else {
+        expect(byline, `${slug} byline`).toBeNull();
+      }
       // Exactly the additions this post is listed for. The cluster links (D6) render after the
       // article, so none belongs inside it: one found here would be a container holding body text.
       const { 'nav[aria-label="More on this topic"]': clusters, ...mine } = stripAdditions(now);
