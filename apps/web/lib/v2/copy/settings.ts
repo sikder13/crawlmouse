@@ -6,6 +6,7 @@ import { SIGNIN_SENDER, SIGNIN_SENDER_LOCKED } from '../../auth/constants';
 import type { Addition, CopyChange } from '../copy-registry';
 import { listOf } from '../format';
 import { capitalise, count, numberWord, plural } from '../words';
+import { formatPlanPrice } from './plan-price';
 
 /** Evidence older than this is condensed to headers and changed parts (FACTS A6, long form). */
 export const EVIDENCE_CONDENSED_AFTER_DAYS = 90;
@@ -284,9 +285,8 @@ export const SETTINGS_CHANGES: CopyChange[] = [
     screen: 'settings',
     kind: 'ruling',
     locked: 'Agency, $69 a month',
-    rendered: 'Agency, $99 a month',
-    source:
-      'Owner ruling of 2026-11-03: the Agency list price is $99 (lib/billing/prices.ts, CC-27 D8)',
+    rendered: `Agency, ${formatPlanPrice('agency')} a month`,
+    source: `Owner ruling of 2026-11-03: the Agency list price is ${formatPlanPrice('agency')} (lib/billing/prices.ts, CC-27 D8)`,
   },
   {
     screen: 'settings',
