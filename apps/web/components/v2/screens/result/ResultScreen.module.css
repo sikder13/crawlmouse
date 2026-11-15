@@ -160,14 +160,18 @@
 /*
  * A fix title can hold a long URL, one token as wide as the track. Broken anywhere, it no longer sets
  * the table's minimum width, so the table fits beside the Pro panel and the action column is not
- * clipped; the action keeps its button on one line (CC-39 F3).
+ * clipped; the action keeps its button on one line (CC-39 F3). Only where the panel sits beside the
+ * table: on a phone the table is one track, and these rules squeezed the titles until words split
+ * (ruling 7), so there it keeps its ordinary wrapping.
  */
-.fixes td:first-child {
-  overflow-wrap: anywhere;
-}
+@media (min-width: 761px) {
+  .fixes td:first-child {
+    overflow-wrap: anywhere;
+  }
 
-.fixes td:last-child {
-  white-space: nowrap;
+  .fixes td:last-child {
+    white-space: nowrap;
+  }
 }
 
 .gain {
