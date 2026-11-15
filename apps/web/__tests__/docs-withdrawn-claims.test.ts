@@ -506,6 +506,14 @@ const WITHDRAWN: readonly WithdrawnClaim[] = [
     allowedIn: [],
   },
   {
+    text: "adds `accounts.internal` with CC-33's own statement",
+    withdrawnIn:
+      'docs/specs/v2/37-security.md D3, CC-37 ruling 4 (CC-33 merged; the Q6 fallback removed)',
+    truth:
+      "accounts.internal is CC-33's 20261115000001; 20261117000001 adds and drops no column (v2-037-security.test.ts).",
+    allowedIn: [],
+  },
+  {
     text: 'Three stages, in this order; the owner applies the migrations',
     withdrawnIn: 'docs/specs/v2/37-security.md "Deploy order", CC-37 review round 2 (N2)',
     truth:

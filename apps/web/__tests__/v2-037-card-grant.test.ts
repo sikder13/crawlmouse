@@ -1,11 +1,11 @@
 /**
  * Migration 20261118000001 (CC-37 D5, Q25): `authenticated` loses `accounts.card_last4`, and the
  * deploy order the split exists for (docs/specs/v2/37-security.md, "Deploy order"):
- *   20261115000001 and 20261117000001 → deploy the app → 20261118000001.
+ *   the merge deploys the app → one apply: 20261117000001, then 20261118000001.
  * One database walks those stages and, at each, the reads the shipped app makes are asked of it: the
  * mint's `seat_may(…, 'mint_report')`, Pricing's used-trial read of `accounts.internal`, and the
- * account pages' card read (`cardFor`); and the app before this step, which reads `card_last4`
- * through the session, while it is still live. On PGlite.
+ * account pages' card read (`cardFor`); and a session's read of `card_last4`, which the app before
+ * this step makes. On PGlite.
  */
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
@@ -115,19 +115,17 @@ describe('the deploy order, stage by stage', () => {
   let w: World;
   beforeAll(async () => {
     db = await freshDb();
-    // Production before CC-37: neither CC-33's file nor this step's.
-    await applyAllMigrations(db, undefined, (f) => f < '20261115000001');
+    // Production before CC-37's apply: every file before 20261117000001, CC-33's and CC-36's among them.
+    await applyAllMigrations(db, undefined, (f) => f < SECURITY);
     w = await world(db);
   }, 300_000);
   afterAll(async () => {
     await db?.close();
   });
 
-  it('before 20261117000001 the shipped app’s flag-gated reads fail: the mint raises and the used-trial read fails', async () => {
+  it('before 20261117000001 the shipped mint, behind V2_CHECKS_PUBLIC, raises; the used-trial read works on CC-33’s column', async () => {
     await expect(mayMint(db, w, w.people.owner)).rejects.toThrow(/mint_report is not an action/);
-    await expect(readUsedAgencyTrial(adminOver(db) as never, w.people.owner.id)).rejects.toThrow(
-      /internal/,
-    );
+    expect(await readUsedAgencyTrial(adminOver(db) as never, w.people.owner.id)).toBeNull();
   });
 
   it('after 20261117000001 and before 20261118000001, a session still reads the card', async () => {

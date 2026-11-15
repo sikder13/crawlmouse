@@ -60,10 +60,8 @@ the browser's device (CC-06c D9, pinned).
 - `start_agency_trial_account` answers `trial_used` for a person who has held an owner seat, of any status, on an agency
   account whose trial was used and that is not internal. A used internal account is not returned as `existing` either,
   so each start by its owner creates another agency account (one per test run, by design, Q9).
-- `20261117000001` adds `accounts.internal` with CC-33's own statement while `20261115000001` is not applied. Its revert
-  drops the column unless the migration history records `20261115000001`, so the rollbacks give back the fingerprint
-  they found; reverted that way, any mark set by hand is lost. Production's history table needs the one-time repair in
-  `docs/ops/db-migrations.md` §5 before that check means anything there.
+- `accounts.internal` is CC-33's (`20261115000001`, on production); `20261117000001` reads it and adds or drops no
+  column, and its revert leaves the column and its marks.
 - Tests: `apps/web/__tests__/v2-037-security.test.ts`; race: `scripts/db/agency-trial-repeat-race.test.ts`.
 
 ## D4 — SSRF guard
@@ -92,18 +90,18 @@ IP, so that case is not reached in production (review r2 n2).
 
 ## Deploy order
 
-As the repo's pipeline runs it (`docs/ops/db-migrations.md`): merging deploys the app, and `db-apply-prod.yml` then
-applies every pending file in one push, in name order, after the owner approves it
-(`scripts/db/production.ts` `manifestProblems`). So:
+Merge order follows the migration names (ruling 3): CC-33 (`20261115000001`) and CC-36 (`20261116000002`), both on
+production, then this PR, then CC-38 (`20261117000002`). The repo's pipeline (`docs/ops/db-migrations.md`): merging
+deploys the app, and `db-apply-prod.yml`, dispatched by the owner, applies every pending file in one push, in name
+order (`scripts/db/production.ts` `manifestProblems` refuses a run whose files are not the whole pending list). So:
 
-1. Merge. Vercel deploys the app.
-2. One apply of every pending file: `20261115000001` (CC-33, once it is on `main`), `20261117000001`, `20261118000001`.
+1. Merge. Vercel deploys the app; wait until the production deployment is Ready.
+2. The owner dispatches `db-apply-prod` and approves it: `20261117000001`, then `20261118000001` (the `card_last4`
+   revoke), in one push. The revoke is applied after the new app is live because the apply runs after the deploy.
 
-Between 1 and 2 the new app runs on the old schema. The two reads that need `20261117000001` sit behind flags that are
-off until later go-live steps: the v2 mint asks `seat_may(…, 'mint_report')`, which raises before that file
-(`V2_CHECKS_PUBLIC`, step 4), and Pricing and the Agency trial page read `accounts.internal`, which that file adds
-(`V2_BILLING`, step 5; both pages are a 404 with it off). The go-live row `migrations-applied` gates step 2, so both
-flags stay off until every file is applied. The account and Settings pages read `card_last4` with the service role,
-so `20261118000001` cannot break them, and inside the apply it runs after `20261117000001`. If the apply runs before the new deployment is Ready, the app still serving reads `card_last4` through the session
-only on pages that are a 404 while `V2_CHECKS_PUBLIC` is off (review r3 n-a).
+Between 1 and 2 the new app runs without `20261117000001`. The one read that needs it sits behind a flag that is off
+until a later go-live step: the v2 mint asks `seat_may(…, 'mint_report')`, which raises before that file
+(`V2_CHECKS_PUBLIC`, step 4). Pricing and the Agency trial page read `accounts.internal`, which CC-33's file already
+added. The go-live row `migrations-applied` gates step 2, so the flag stays off until every file is applied. The account
+and Settings pages read `card_last4` with the service role, so `20261118000001` cannot break them.
 `__tests__/v2-037-card-grant.test.ts` walks the schema through these stages.

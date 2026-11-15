@@ -10,9 +10,7 @@
 -- body's line diff against the one it replaces. erase_rules repeats, byte for byte, 028's two rows
 -- and filter that name tables in `auth`; outside them and comments the file names no `auth`
 -- object and no cascade (the test's "names nothing in auth"). It reads accounts.internal,
--- which CC-33's 20261115000001 adds; until that file is on main this one adds the column with the
--- same statement (questions Q6), so either order leaves one column. The revert drops it unless the
--- migration history records 20261115000001.
+-- which CC-33's 20261115000001 adds, so it is applied after that file.
 --
 -- The statements are re-runnable (the tests apply the file twice).
 -- The revert is infra/supabase/rollbacks/20261117000001_v2_037_security.revert.sql.
@@ -21,9 +19,6 @@
 -- scripts/db/trial-race.test.ts.
 
 -- ═══ A: internal accounts and the trial ledger (D3a) ═════════════════════════════════════════════
--- CC-33's statement, word for word (20261115000001 §A): a no-op once that file has run.
-alter table public.accounts add column if not exists internal boolean not null default false;
-
 -- The owner's own test accounts are marked internal (CC-33's operator script) so they can be reset
 -- and trialled again. An account is marked only after its first login, whose Pro trial wrote ledger
 -- rows for the email, the device and the network, and those rows would refuse the next test
