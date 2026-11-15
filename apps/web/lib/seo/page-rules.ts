@@ -39,7 +39,9 @@ export type RuleId =
   | 'breadcrumb-missing'
   | 'faq-not-visible'
   | 'jsonld-schema'
-  | 'link-not-live';
+  | 'link-not-live'
+  | 'no-in-link'
+  | 'too-deep';
 
 export interface Violation {
   path: string;
@@ -164,6 +166,67 @@ export function siteViolations(pages: readonly { path: string; head: PageHead }[
         rule: 'description-duplicate',
         detail: `also on ${[...others].join(', ')}`,
       });
+  }
+  return out;
+}
+
+/** A bound on click depth: pages whose path matches `pattern` are at most `clicks` from `from`. */
+export interface DepthBound {
+  from: string;
+  pattern: RegExp;
+  clicks: number;
+}
+
+/** Clicks from `from` to each page it reaches, following the links between the build's pages. */
+function clicksFrom(pages: readonly { path: string; links: readonly string[] }[], from: string) {
+  const out = new Map<string, number>([[from, 0]]);
+  const linksOf = new Map(pages.map((p) => [p.path, p.links]));
+  let frontier = [from];
+  for (let d = 1; frontier.length; d += 1) {
+    const next: string[] = [];
+    for (const path of frontier)
+      for (const to of linksOf.get(path) ?? [])
+        if (linksOf.has(to) && !out.has(to)) {
+          out.set(to, d);
+          next.push(to);
+        }
+    frontier = next;
+  }
+  return out;
+}
+
+/**
+ * Rules over the links between a build's pages: a page that no other page links to (the `root`
+ * aside) fails `no-in-link`; a page a `within` bound covers fails `too-deep` when it is further than
+ * the bound's clicks from its start, or not reached from it at all.
+ */
+export function linkViolations(
+  pages: readonly { path: string; links: readonly string[] }[],
+  args: { root: string; within: readonly DepthBound[] },
+): Violation[] {
+  const out: Violation[] = [];
+  for (const p of pages) {
+    if (p.path === args.root) continue;
+    if (!pages.some((q) => q.path !== p.path && q.links.includes(p.path)))
+      out.push({
+        path: p.path,
+        rule: 'no-in-link',
+        detail: 'no other page in the build links here',
+      });
+  }
+  for (const bound of args.within) {
+    const depth = clicksFrom(pages, bound.from);
+    for (const p of pages.filter((x) => bound.pattern.test(x.path) && x.path !== bound.from)) {
+      const d = depth.get(p.path);
+      if (d === undefined)
+        out.push({ path: p.path, rule: 'too-deep', detail: `not reached from ${bound.from}` });
+      else if (d > bound.clicks)
+        out.push({
+          path: p.path,
+          rule: 'too-deep',
+          detail: `${d} clicks from ${bound.from} (at most ${bound.clicks})`,
+        });
+    }
   }
   return out;
 }

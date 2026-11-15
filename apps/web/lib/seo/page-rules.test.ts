@@ -4,6 +4,7 @@ import { pageFacts } from './page-facts';
 import {
   headFromFacts,
   headFromMetadata,
+  linkViolations,
   pageViolations,
   siteViolations,
   type PageHead,
@@ -225,6 +226,32 @@ describe('siteViolations', () => {
       { path: '/a', rule: 'description-duplicate', detail: 'also on /b' },
       { path: '/b', rule: 'description-duplicate', detail: 'also on /a' },
     ]);
+  });
+});
+
+describe('linkViolations', () => {
+  const pages = [
+    { path: '/', links: ['/blog', '/a'] },
+    { path: '/blog', links: ['/blog/x', '/blog'] },
+    { path: '/blog/x', links: ['/blog/y'] },
+    { path: '/blog/y', links: ['/blog/y'] },
+    { path: '/a', links: [] },
+    { path: '/lonely', links: ['/'] },
+  ];
+  it('no-in-link: fails on a page no other page links to; the home is the root and exempt', () => {
+    expect(linkViolations(pages, { root: '/', within: [] })).toEqual([
+      { path: '/lonely', rule: 'no-in-link', detail: 'no other page in the build links here' },
+    ]);
+  });
+  it('too-deep: fails on a page more than the bound of clicks from where it must be reached', () => {
+    const bound = { from: '/blog', pattern: /^\/blog\/[^/]+$/, clicks: 1 };
+    expect(linkViolations(pages, { root: '/', within: [bound] })).toEqual([
+      { path: '/lonely', rule: 'no-in-link', detail: 'no other page in the build links here' },
+      { path: '/blog/y', rule: 'too-deep', detail: '2 clicks from /blog (at most 1)' },
+    ]);
+    expect(
+      linkViolations([...pages, { path: '/blog/z', links: [] }], { root: '/', within: [bound] }),
+    ).toContainEqual({ path: '/blog/z', rule: 'too-deep', detail: 'not reached from /blog' });
   });
 });
 

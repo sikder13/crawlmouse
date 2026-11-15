@@ -65,6 +65,7 @@ import { V2_REWRITES, type RewriteFlag } from '../lib/v2/rewrites';
 import { earnsImpressions } from '../lib/seo/search-console';
 import {
   headFromMetadata,
+  linkViolations,
   pageViolations,
   siteViolations,
   type PageHead,
@@ -217,6 +218,14 @@ async function buildRun(build: Build) {
     reported.push(...r.reported);
   }
   violations.push(...siteViolations(pages));
+  // No sitemap page without an in-link from another (the home is the root), and every post within
+  // two clicks of /blog (CC-40 D6).
+  violations.push(
+    ...linkViolations(
+      pages.map((p) => ({ path: p.path, links: p.body.links })),
+      { root: '/', within: [{ from: '/blog', pattern: /^\/blog\/[^/]+$/, clicks: 2 }] },
+    ),
+  );
   return { paths, pages, violations, reported };
 }
 
