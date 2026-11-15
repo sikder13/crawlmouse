@@ -164,3 +164,18 @@ export const RULED_CHANGES: readonly RuledChange[] = [
 /** The recorded description changes, as [before, after] pairs. */
 export const RULED_DESCRIPTIONS: readonly (readonly [before: string, after: string])[] =
   RULED_CHANGES.filter((c) => c.field === 'description').map((c) => [c.before, c.after] as const);
+
+/** The changes as a Markdown table for the spec and PR (OPERATING-RULES §10: rendered from data). */
+export function ruledChangesMarkdown(changes: readonly RuledChange[] = RULED_CHANGES): string {
+  const cell = (s: string) => s.replace(/\|/g, '\\|');
+  return [
+    `${changes.length} changes (ruling 3): ${changes.filter((c) => c.field === 'seoTitle').length} search-result titles, ${changes.filter((c) => c.field === 'description').length} meta descriptions.`,
+    '',
+    '| Post | Field | Before (chars) | After (chars) | Search Console, 3 months |',
+    '| --- | --- | --- | --- | --- |',
+    ...changes.map(
+      (c) =>
+        `| /blog/${c.slug} | ${c.field === 'seoTitle' ? '<title>' : 'description'} | ${cell(c.before)} (${c.before.length}) | ${cell(c.after)} (${c.after.length}) | ${cell(c.basis)} |`,
+    ),
+  ].join('\n');
+}

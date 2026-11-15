@@ -90,6 +90,54 @@ existing-post guard reverses each one and requires the baseline markup. The tabl
 
 **D7 — Proof.** Lighthouse, the final D1 run and the §13 command set are recorded in the PR description.
 
+## Rulings during the step
+
+**Ruling 1 (CTO, 08:20 ET).** Plan accepted. The \$69 Agency card is corrected by CC-39; this step merges
+it when it reaches main and the final audit compares each page's Offer prices with the prices it shows.
+
+**Ruling 2 (owner, 08:26 ET).** The 17 posts with no author are Samia Zaman's (`author: 'samia-zaman'` in
+`lib/blog/posts.ts`); her byline, author page (`/authors/samia-zaman`, now in the sitemap) and Person
+markup follow from the data, and `updatedAt` did not move for it. D8, the banned-wording rule, is below.
+
+**Ruling 3 (CTO, owner-delegated, 08:50 ET) — deliberate §13 changes.** The v2 home's title, description
+and `/llms.txt` descriptor are the ruling's (`lib/seo/site-copy.ts`), with the plans and prices in
+`/llms.txt` generated from `prices.ts`. A post may carry a `seoTitle`, which sets `<title>`, Open Graph
+and Twitter only; the H1, the Article headline, the slug and every heading keep the post's `title`.
+Each change is data in `apps/web/lib/blog/ruled-copy.ts`, with what it replaced and the Search Console
+line it rests on; `lib/blog/ruled-copy.test.ts` checks each `before` against the pre-CC-40 baseline
+fixture and each `after` against `posts.ts`, and the pinned existing-post guard applies them to its
+baseline and must then match exactly. The table is `ruledChangesMarkdown()`'s output;
+`__tests__/spec-40-d5-table.test.ts` fails when it differs. No slug or URL changed.
+
+<!-- prettier-ignore-start -->
+<!-- ruled-table:start -->
+17 changes (ruling 3): 7 search-result titles, 10 meta descriptions.
+
+| Post | Field | Before (chars) | After (chars) | Search Console, 3 months |
+| --- | --- | --- | --- | --- |
+| /blog/cloudflare-ai-crawler-defaults-september-15 | <title> | Cloudflare Starts Blocking AI Crawlers by Default on September 15. Here's Who It Affects — and How to Check Your Site (117) | Cloudflare Now Blocks AI Crawlers by Default: Check Your Site (61) | position 9.27, 123 impressions, 0 clicks; the 117-character title is cut in results |
+| /blog/block-ai-crawlers-robots-txt | <title> | Should You Block AI Crawlers? A robots.txt Guide for GPTBot, ClaudeBot & Co. (76) | Block AI Crawlers in robots.txt: GPTBot, ClaudeBot & More (57) | position 74.63, 1,030 impressions; queries "gptbot robots.txt", "block ai crawlers" |
+| /blog/screaming-frog-alternative | <title> | Screaming Frog Alternatives in 2026: Six Options, Compared Honestly (67) | Screaming Frog Alternatives (2026): 6 Options Compared (54) | position 56.96, 1,658 impressions; the title was 67 characters |
+| /blog/sitebulb-alternative | <title> | Sitebulb Alternatives (2026): Free and Paid Options, Honestly Compared (70) | Sitebulb Alternatives (2026): Free and Paid Options Compared (60) | position 47.02, 535 impressions; the title was 70 characters |
+| /blog/screaming-frog-vs-lumar-deepcrawl | <title> | Screaming Frog vs Lumar (DeepCrawl): Desktop Tool vs Enterprise Platform (72) | Screaming Frog vs DeepCrawl (Lumar): Which Crawler to Use? (58) | position 20.06, 449 impressions; queries "screaming frog vs deepcrawl" (297), "deepcrawl vs screaming frog" (90) |
+| /blog/how-deep-is-too-deep-crawl-depth | <title> | How Deep Is Too Deep? Crawl Depth Limits and How to Fix Buried Pages (68) | Crawl Depth: How Many Clicks Is Too Deep, and How to Fix It (59) | position 65.39, 594 impressions; queries "crawl depth", "crawl depth seo" |
+| /blog/discovered-currently-not-indexed | <title> | Discovered – Currently Not Indexed: Why It Happens and How to Fix It (68) | Discovered – Currently Not Indexed: Causes and Fixes (52) | position 81.67, 592 impressions; query "discovered currently not indexed" |
+| /blog/screaming-frog-alternative | description | Six real Screaming Frog alternatives compared — free, browser-based, cloud, and open source — plus the honest cases where Screaming Frog is still the right tool. (161) | Screaming Frog alternatives compared: free, browser-based, cloud and open-source crawlers, with prices, limits, and when Screaming Frog is still the pick. (154) | 1,658 impressions, 3 clicks, CTR 0.18%, position 56.96 |
+| /blog/can-ai-crawlers-see-javascript | description | AI crawlers like GPTBot and ClaudeBot don't run JavaScript, so a JS site can rank on Google yet be invisible to ChatGPT. Here's how to check what yours shows them. (163) | Can AI crawlers see JavaScript? GPTBot, ClaudeBot and PerplexityBot don't execute it, so a JS site can rank on Google yet show them nothing. How to check. (154) | 1,088 impressions, 6 clicks, CTR 0.55%, position 23.94 |
+| /blog/block-ai-crawlers-robots-txt | description | Should you block GPTBot, ClaudeBot, and other AI crawlers? A practical 2026 robots.txt guide — what each bot does, what blocking costs, and copy-paste rules. (157) | Block AI crawlers in robots.txt? What GPTBot, ClaudeBot and other bots do, what blocking costs, and copy-paste rules for each choice. (133) | 1,030 impressions, 0 clicks, position 74.63 |
+| /blog/how-deep-is-too-deep-crawl-depth | description | How many clicks from your homepage is too many? A practical, site-size-aware guide to crawl depth limits — and exactly how to pull buried pages back up. (152) | How deep is too deep? Crawl depth explained: how many clicks from the homepage is too many for your site's size, and how to pull buried pages back up. (150) | 594 impressions, 1 click, CTR 0.17%, position 65.39 |
+| /blog/discovered-currently-not-indexed | description | Discovered - currently not indexed means Google found your page but hasn't crawled it yet. Here's why it happens, and how stronger internal linking fixes it. (157) | Discovered – currently not indexed: Google found the URL but has not crawled it. Why it happens, how to check, and how internal links get it crawled. (149) | 592 impressions, 0 clicks, position 81.67 |
+| /blog/sitebulb-alternative | description | Six real Sitebulb alternatives compared with August 2026 pricing — free, paid, and open source. Includes when Sitebulb is still the right choice. (145) | Sitebulb alternatives with current pricing: free, paid and open-source crawlers compared honestly, and the cases where Sitebulb is still the right choice. (154) | 535 impressions, 0 clicks, position 47.02 |
+| /blog/sitebulb-vs-screaming-frog | description | Sitebulb and Screaming Frog are the two big SEO crawlers. Here's an honest comparison of features, pricing, and which to pick — plus a free no-install option. (158) | Sitebulb vs Screaming Frog: features, pricing and reports of the two big SEO crawlers compared, which one fits your work, and a free no-install option. (151) | 466 impressions, 0 clicks, position 31.25 |
+| /blog/screaming-frog-vs-lumar-deepcrawl | description | Screaming Frog and Lumar (formerly DeepCrawl) solve different problems at very different prices. An honest August 2026 comparison — and when you need neither. (158) | Screaming Frog vs DeepCrawl (now Lumar): desktop crawler vs enterprise platform — pricing, monitoring and CI/CD compared, and when you need neither. (148) | 449 impressions, 1 click, CTR 0.22%, position 20.06 |
+| /blog/sitebulb-vs-jetoctopus-vs-oncrawl | description | Sitebulb Cloud, JetOctopus, and Oncrawl are the main cloud SEO crawlers. An honest July 2026 comparison of pricing, log analysis, and which one fits your site. (159) | Sitebulb vs JetOctopus vs Oncrawl: the cloud SEO crawlers compared on pricing, log-file analysis and scale, and which one fits your site. (137) | 153 impressions, 0 clicks, position 22.14 |
+| /blog/cloudflare-ai-crawler-defaults-september-15 | description | From September 15, 2026, Cloudflare blocks Training and Agent crawlers by default on ad pages. What changes, who's affected, and how to check your site. (152) | Cloudflare blocks AI training and agent crawlers by default from September 15, 2026 on ad pages. Who is affected and how to check your own site's settings. (155) | 123 impressions, 0 clicks, position 9.27 |
+<!-- ruled-table:end -->
+<!-- prettier-ignore-end -->
+
+**For the owner, four weeks after launch:** add each changed page's clicks, impressions, CTR and position
+for the four weeks after the deploy beside its "before" line above, from the same Search Console report.
+
 ## Questions and smaller options taken
 
 Q1–Q8 in the step's notes (`questions.md`): the pinned-guard rewrite (Q1), attributed queries (Q2), the
