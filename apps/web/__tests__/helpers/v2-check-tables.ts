@@ -769,7 +769,12 @@ export async function seedWorld(db: Db, tag: string): Promise<World> {
       const usage = randomUUID();
       await put('usage_events', ROWS.usage_events(usage, accountId, checkId), { id: usage }, scope);
       if (with041) {
-        await put('check_ledger_drafts', ROWS.check_ledger_drafts(checkId), { check_id: checkId }, scope);
+        await put(
+          'check_ledger_drafts',
+          ROWS.check_ledger_drafts(checkId),
+          { check_id: checkId },
+          scope,
+        );
       }
     }
     if (with008) {
