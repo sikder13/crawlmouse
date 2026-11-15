@@ -16,6 +16,7 @@ export const MEASUREMENT_TABLES = ['access_tests', 'link_edges', 'page_results']
 export const DERIVED_TABLES = [
   'alert_events',
   'changes',
+  'check_ledger_drafts',
   'check_ledger_links',
   'crawl_batches',
   'persist_chunks',
@@ -128,6 +129,17 @@ export const LEDGER_TRIGGERS: Record<string, string> = {
   crawler_observations_append_only: 'research.ledger_append_only',
   crawler_observations_no_truncate: 'research.ledger_append_only',
 };
+
+/**
+ * The one view outside `research` that may read the ledger (CC-41 D5, rulings Q6): monthly counts by
+ * crawler and verdict, with no site key and no run. It is allowed by name and by the md5 of its
+ * definition (pg_get_viewdef), so a second view, or this one changed to show more, still fails the
+ * guard. A migration that changes it updates the hash here, in review.
+ */
+export const ALLOWED_LEDGER_VIEW = {
+  name: 'analytics.ledger_monthly',
+  md5: '4ccbf178fa4277f7f9c3eec70825d7b6',
+} as const;
 
 /**
  * The ledger's relations: every relation in `research`, and every partition (in `partitions`) of one.
@@ -290,7 +302,18 @@ export async function deidentificationViolations(d: Db): Promise<string[]> {
                  and (select relnamespace from pg_class where oid = d.objid) = 'pg_toast'::regnamespace)
       order by 1, 2`,
   );
-  for (const { dep, target } of inbound) bad.push(`${dep} depends on the ledger (${target})`);
+  const { rows: allowedView } = await d.query<{ h: string | null }>(
+    `select md5(pg_get_viewdef(to_regclass($1))) as h`,
+    [ALLOWED_LEDGER_VIEW.name],
+  );
+  const viewHash = allowedView[0]?.h ?? null;
+  const viewAllowed = viewHash === ALLOWED_LEDGER_VIEW.md5;
+  if (viewHash !== null && !viewAllowed)
+    bad.push(`${ALLOWED_LEDGER_VIEW.name}: its definition is not the allowed one`);
+  for (const { dep, target } of inbound) {
+    if (viewAllowed && dep === `rule _RETURN on view ${ALLOWED_LEDGER_VIEW.name}`) continue;
+    bad.push(`${dep} depends on the ledger (${target})`);
+  }
   const { rows: outbound } = await d.query<{ dep: string; target: string }>(
     `with ledger as (${LEDGER_RELATIONS}), owner_of as (${OWNER_OF})
      select pg_describe_object(d.classid, d.objid, d.objsubid) as dep,

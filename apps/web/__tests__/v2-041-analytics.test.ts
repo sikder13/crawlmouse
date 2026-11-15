@@ -1,0 +1,556 @@
+/**
+ * Migration 20261120000001 (CC-41 D2, D4, D5): first-touch attribution, the ledger writer function,
+ * the `analytics` read path and its reader role, and the catalog check that keeps the path free of
+ * personal columns (infra/supabase/checks/10-analytics-no-pii.sql).
+ */
+import { randomUUID, createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import type { PGlite, Transaction } from '@electric-sql/pglite';
+import { beforeAll, describe, expect, it } from 'vitest';
+import {
+  applyAllMigrations,
+  asRole,
+  freshDb,
+  readMigration,
+  readRollback,
+} from './helpers/pglite-migrations';
+import { ALLOWED_LEDGER_VIEW, deidentificationViolations } from './helpers/data-foundations';
+import {
+  insertRow,
+  LINEAGE,
+  MONTH0,
+  prepareMeasurement,
+  ROWS,
+  seedWorld,
+  type World,
+} from './helpers/v2-check-tables';
+
+const MIGRATION = '20261120000001_v2_041_analytics.sql';
+const REVERT = '20261120000001_v2_041_analytics.revert.sql';
+const CHECK_10 = readFileSync(
+  join(__dirname, '../../../infra/supabase/checks/10-analytics-no-pii.sql'),
+  'utf8',
+);
+const VIEWS = [
+  'account_attribution',
+  'accounts',
+  'checks',
+  'fix_events',
+  'fixes',
+  'ledger_monthly',
+  'seats',
+  'subscriptions',
+  'usage_events',
+];
+
+let db: PGlite;
+let world: World;
+
+beforeAll(async () => {
+  db = await freshDb();
+  await applyAllMigrations(db);
+  await prepareMeasurement(db);
+  world = await seedWorld(db, 'analytics');
+}, 120_000);
+
+async function asReader<T>(d: PGlite, fn: (tx: Transaction) => Promise<T>): Promise<T> {
+  return d.transaction(async (tx) => {
+    await tx.exec(`set local role analytics_reader`);
+    return fn(tx);
+  });
+}
+
+/** `sql` applied in a rolled-back transaction, and what `read` then returns. */
+async function after<T>(sql: string, read: (tx: Transaction) => Promise<T>): Promise<T> {
+  return db
+    .transaction(async (tx) => {
+      await tx.exec(sql);
+      throw { value: await read(tx) };
+    })
+    .catch((x: { value: T }) => {
+      if (x && typeof x === 'object' && 'value' in x) return x.value;
+      throw x;
+    });
+}
+
+const check10 = async (tx: Transaction | PGlite) =>
+  (await tx.query<{ object: string; problem: string }>(CHECK_10)).rows.map(
+    (r) => `${r.object}: ${r.problem}`,
+  );
+
+describe('account_attribution', () => {
+  const valid = (accountId: string) => ({
+    account_id: accountId,
+    utm_source: 'linkedin',
+    utm_medium: 'social',
+    utm_campaign: 'launch-week',
+    utm_content: null,
+    utm_term: null,
+    referrer_host: 'www.linkedin.com',
+    landing_path: '/blog/ai-crawler-access-test-2026',
+    ref: 'ph_launch',
+    first_seen_at: '2026-11-17T09:00:00Z',
+  });
+
+  it('holds one row per account and refuses a second', async () => {
+    const t = await db.transaction(async (tx) => {
+      await insertRow(tx, 'account_attribution', valid(world.accountId));
+      return tx
+        .query(
+          `insert into public.account_attribution (account_id, first_seen_at) values ($1, now())`,
+          [world.accountId],
+        )
+        .then(
+          () => 'inserted',
+          (e: { code?: string }) => e.code,
+        )
+        .finally(() => tx.rollback());
+    });
+    expect(t).toBe('23505');
+  });
+
+  it.each([
+    ['referrer_host', 'https://evil.example/path?q=1'],
+    ['referrer_host', 'Evil.Example'],
+    ['referrer_host', `${'a'.repeat(63)}.`.repeat(5)],
+    ['landing_path', '/blog?utm_source=x'],
+    ['landing_path', '/blog#frag'],
+    ['landing_path', 'blog'],
+    ['landing_path', `/${'a'.repeat(200)}`],
+    ['utm_source', '<script>'],
+    ['utm_source', 'x'.repeat(101)],
+    ['utm_source', ''],
+    ['utm_campaign', 'line\nbreak'],
+    ['ref', 'has space'],
+    ['ref', 'r'.repeat(65)],
+  ])('refuses %s = %j', async (column, value) => {
+    const code = await db
+      .transaction(async (tx) => {
+        await insertRow(tx, 'account_attribution', { ...valid(world.accountId), [column]: value });
+        return 'inserted';
+      })
+      .catch((e: { code?: string }) => e.code);
+    expect(code).toBe('23514');
+  });
+
+  it('no client role holds anything on it; service_role inserts and reads only', async () => {
+    const { rows } = await db.query<{ role: string; p: string }>(
+      `select r.role, p.p from unnest(array['anon','authenticated','service_role']) r(role)
+         cross join unnest(array['SELECT','INSERT','UPDATE','DELETE','TRUNCATE']) p(p)
+        where has_table_privilege(r.role, 'public.account_attribution', p.p) order by 1, 2`,
+    );
+    expect(rows).toEqual([
+      { role: 'service_role', p: 'INSERT' },
+      { role: 'service_role', p: 'SELECT' },
+    ]);
+  });
+
+  it('goes with its account', async () => {
+    const left = await after(
+      `insert into public.account_attribution (account_id, first_seen_at) values ('${world.accountId}', now());
+       delete from public.accounts where id = '${world.accountId}';`,
+      async (tx) =>
+        (await tx.query<{ n: number }>(`select count(*)::int as n from public.account_attribution`))
+          .rows[0]!.n,
+    );
+    expect(left).toBe(0);
+  });
+});
+
+const DRAFT = {
+  cms: 'wordpress',
+  frontend_framework: 'wordpress',
+  edge_vendor: 'cloudflare',
+  without_js_state: 'readable',
+  share_2xx: 0.9,
+  share_3xx: 0.1,
+  share_4xx: 0,
+  share_5xx: 0,
+  share_unanswered: 0,
+  signals_detected: ['schema_org'],
+  signals_indeterminate: [],
+  observations: [
+    { crawler: 'GPTBot', verdict: 'allowed', cause: null, robots_rule: 'named_allow_all' },
+  ],
+};
+
+async function siteAndCheck(tag: string): Promise<string> {
+  const site = randomUUID();
+  const check = randomUUID();
+  await insertRow(
+    db,
+    'sites',
+    ROWS.sites(site, world.accountId, `${tag}-${site.slice(0, 8)}.example`),
+  );
+  await insertRow(db, 'checks', ROWS.checks(check, site));
+  return check;
+}
+
+async function draftCode(check: string, draft: unknown): Promise<string> {
+  return asRole(db, 'service_role', null, (tx) =>
+    tx.query(`insert into public.check_ledger_drafts (check_id, draft) values ($1, $2::jsonb)`, [
+      check,
+      JSON.stringify(draft),
+    ]),
+  ).then(
+    () => 'inserted',
+    (e: { code?: string }) => e.code ?? 'error',
+  );
+}
+
+describe('check_ledger_drafts', () => {
+  it('holds a draft whose keys are exactly the ledger fields', async () => {
+    expect(await draftCode(await siteAndCheck('dr'), DRAFT)).toBe('inserted');
+  });
+
+  it.each([
+    ['an extra key (a host)', { ...DRAFT, host: 'client.example' }],
+    ['an extra key (the account)', { ...DRAFT, account_id: randomUUID() }],
+    ['a missing key', Object.fromEntries(Object.entries(DRAFT).filter(([k]) => k !== 'cms'))],
+    ['observations that are not an array', { ...DRAFT, observations: {} }],
+    ['an array instead of an object', [DRAFT]],
+  ])('refuses %s', async (_label, draft) => {
+    expect(await draftCode(await siteAndCheck('drx'), draft)).toBe('23514');
+  });
+
+  it('goes with its check, as the anonymous expiry deletes one', async () => {
+    const check = await siteAndCheck('drc');
+    expect(await draftCode(check, DRAFT)).toBe('inserted');
+    await db.query(`delete from public.checks where id = $1`, [check]);
+    const { rows } = await db.query<{ n: number }>(
+      `select count(*)::int as n from public.check_ledger_drafts where check_id = $1`,
+      [check],
+    );
+    expect(rows[0]!.n).toBe(0);
+  });
+
+  it('no client role holds anything on it', async () => {
+    const { rows } = await db.query<{ role: string; p: string }>(
+      `select r.role, p.p from unnest(array['anon','authenticated','crawl_worker','analytics_reader']) r(role)
+         cross join unnest(array['SELECT','INSERT','UPDATE','DELETE','TRUNCATE']) p(p)
+        where has_table_privilege(r.role, 'public.check_ledger_drafts', p.p)`,
+    );
+    expect(rows).toEqual([]);
+  });
+});
+
+describe('record_check_ledger', () => {
+  const run = (siteKey: string) => ({
+    observed_month: MONTH0,
+    site_key: siteKey,
+    site_key_version: 1,
+    lineage_id: LINEAGE,
+    cms: 'wordpress',
+    frontend_framework: 'wordpress',
+    edge_vendor: 'cloudflare',
+    without_js_state: 'readable',
+    share_2xx: 0.9,
+    share_3xx: 0.1,
+    share_4xx: 0,
+    share_5xx: 0,
+    share_unanswered: 0,
+    signals_detected: ['schema_org', 'llms_txt'],
+    signals_indeterminate: [],
+  });
+  const observations = [
+    { crawler: 'GPTBot', verdict: 'allowed', cause: null, robots_rule: 'named_allow_all' },
+    {
+      crawler: 'ClaudeBot',
+      verdict: 'disallowed_by_robots',
+      cause: null,
+      robots_rule: 'named_disallow_all',
+    },
+  ];
+
+  async function newCheck(): Promise<string> {
+    const site = randomUUID();
+    const check = randomUUID();
+    await insertRow(
+      db,
+      'sites',
+      ROWS.sites(site, world.accountId, `rcl-${site.slice(0, 8)}.example`),
+    );
+    await insertRow(db, 'checks', ROWS.checks(check, site));
+    return check;
+  }
+
+  it('writes the run, one observation per crawler and the link; a second call writes nothing', async () => {
+    const check = await newCheck();
+    const key = createHash('sha256').update(check).digest('hex');
+    const call = () =>
+      asRole(
+        db,
+        'service_role',
+        null,
+        async (tx) =>
+          (
+            await tx.query<{ id: string }>(
+              `select public.record_check_ledger($1, $2::jsonb, $3::jsonb) as id`,
+              [check, JSON.stringify(run(key)), JSON.stringify(observations)],
+            )
+          ).rows[0]!.id,
+      );
+    expect(await draftCode(check, DRAFT)).toBe('inserted');
+    const first = await call();
+    const drafts = await db.query<{ n: number }>(
+      `select count(*)::int as n from public.check_ledger_drafts where check_id = $1`,
+      [check],
+    );
+    expect(drafts.rows[0]!.n).toBe(0);
+    const second = await call();
+    expect(second).toBe(first);
+    const { rows } = await db.query<{ runs: number; obs: number; links: number }>(
+      `select (select count(*)::int from research.check_runs where site_key = $1) as runs,
+              (select count(*)::int from research.crawler_observations where run_id = $2) as obs,
+              (select count(*)::int from public.check_ledger_links where check_id = $3) as links`,
+      [key, first, check],
+    );
+    expect(rows[0]).toEqual({ runs: 1, obs: 2, links: 1 });
+  });
+
+  it('writes nothing when one observation is refused: one transaction', async () => {
+    const check = await newCheck();
+    const key = createHash('sha256').update(`bad-${check}`).digest('hex');
+    const bad = [
+      ...observations,
+      { crawler: 'Bad Crawler!', verdict: 'allowed', cause: null, robots_rule: 'no_group' },
+    ];
+    const code = await asRole(db, 'service_role', null, (tx) =>
+      tx.query(`select public.record_check_ledger($1, $2::jsonb, $3::jsonb)`, [
+        check,
+        JSON.stringify(run(key)),
+        JSON.stringify(bad),
+      ]),
+    ).then(
+      () => 'written',
+      (e: { code?: string }) => e.code,
+    );
+    expect(code).toBe('23514');
+    const { rows } = await db.query<{ runs: number }>(
+      `select count(*)::int as runs from research.check_runs where site_key = $1`,
+      [key],
+    );
+    expect(rows[0]!.runs).toBe(0);
+  });
+
+  it('only service_role may call it', async () => {
+    const { rows } = await db.query<{ role: string }>(
+      `select r.role from unnest(array['anon','authenticated','crawl_worker','analytics_reader','service_role']) r(role)
+        where has_function_privilege(r.role, 'public.record_check_ledger(uuid, jsonb, jsonb)', 'EXECUTE')`,
+    );
+    expect(rows.map((r) => r.role)).toEqual(['service_role']);
+  });
+});
+
+describe('the analytics read path', () => {
+  it('has exactly the planned views', async () => {
+    const { rows } = await db.query<{ v: string }>(
+      `select c.relname as v from pg_class c join pg_namespace n on n.oid = c.relnamespace
+        where n.nspname = 'analytics' order by 1`,
+    );
+    expect(rows.map((r) => r.v)).toEqual(VIEWS);
+  });
+
+  it('analytics_reader reads every view', async () => {
+    for (const v of VIEWS) {
+      await expect(
+        asReader(db, (tx) => tx.query(`select * from analytics.${v} limit 1`)),
+        v,
+      ).resolves.toBeDefined();
+    }
+  });
+
+  it.each([
+    'public.accounts',
+    'public.users',
+    'public.sites',
+    'public.checks',
+    'public.account_attribution',
+    'research.check_runs',
+    'research.crawler_observations',
+    'auth.users',
+  ])('analytics_reader is refused %s', async (rel) => {
+    const code = await asReader(db, (tx) => tx.query(`select 1 from ${rel} limit 1`)).then(
+      () => 'read',
+      (e: { code?: string }) => e.code,
+    );
+    expect(code).toBe('42501');
+  });
+
+  it('anon and authenticated cannot use the schema', async () => {
+    for (const role of ['anon', 'authenticated'] as const) {
+      const code = await asRole(db, role, null, (tx) =>
+        tx.query(`select 1 from analytics.accounts limit 1`),
+      ).then(
+        () => 'read',
+        (e: { code?: string }) => e.code,
+      );
+      expect(code, role).toBe('42501');
+    }
+  });
+
+  it('the reader logs in with no password, three connections and a 30-second statement timeout', async () => {
+    const { rows } = await db.query<{ login: boolean; lim: number; cfg: string[]; pw: boolean }>(
+      `select r.rolcanlogin as login, r.rolconnlimit as lim, r.rolconfig as cfg,
+              a.rolpassword is not null as pw
+         from pg_roles r join pg_authid a on a.oid = r.oid where r.rolname = 'analytics_reader'`,
+    );
+    expect(rows[0]).toEqual({ login: true, lim: 3, cfg: ['statement_timeout=30s'], pw: false });
+  });
+
+  it('a failure reason that is not a code reads as other', async () => {
+    const site = randomUUID();
+    const coded = randomUUID();
+    const free = randomUUID();
+    await insertRow(
+      db,
+      'sites',
+      ROWS.sites(site, world.accountId, `fr-${site.slice(0, 8)}.example`),
+    );
+    for (const [id, reason] of [
+      [coded, 'timed_out'],
+      [free, 'fetch https://client.example/secret failed'],
+    ] as const) {
+      await insertRow(db, 'checks', {
+        ...ROWS.checks(id, site),
+        status: 'failed',
+        failure_reason: reason,
+        lineage_id: null,
+        coverage: null,
+        technical_seo: null,
+        ai_readability: null,
+      });
+    }
+    const { rows } = await asReader(db, (tx) =>
+      tx.query<{ id: string; failure_reason: string }>(
+        `select id, failure_reason from analytics.checks where id in ($1, $2)`,
+        [coded, free],
+      ),
+    );
+    expect(Object.fromEntries(rows.map((r) => [r.id, r.failure_reason]))).toEqual({
+      [coded]: 'timed_out',
+      [free]: 'other',
+    });
+  });
+});
+
+describe('10-analytics-no-pii', () => {
+  it('passes on the migrated database', async () => {
+    expect(await check10(db)).toEqual([]);
+  });
+
+  it.each([
+    [
+      'a view with an email column',
+      `create view analytics.leak as select u.email from public.users u;
+       grant select on analytics.leak to analytics_reader`,
+      'analytics.leak.email: personal-looking column',
+    ],
+    [
+      'an aliased host column',
+      `create view analytics.sites_leak as select s.id, s.host as site_host from public.sites s`,
+      'analytics.sites_leak.site_host: personal-looking column',
+    ],
+    [
+      'an inet column',
+      `create view analytics.addr as select '127.0.0.1'::inet as client`,
+      'analytics.addr.client: personal-looking column (inet)',
+    ],
+    [
+      'a third attribution column outside the allowlist',
+      `create or replace view analytics.account_attribution as
+         select t.account_id, t.utm_source, t.utm_medium, t.utm_campaign, t.utm_content, t.utm_term,
+                t.referrer_host, t.landing_path, t.ref, t.first_seen_at, t.captured_at,
+                t.referrer_host as referrer_url
+           from public.account_attribution t`,
+      'analytics.account_attribution.referrer_url: personal-looking column',
+    ],
+    [
+      'an allowlisted name on another view',
+      `create view analytics.other as select 'x'::text as referrer_host`,
+      'analytics.other.referrer_host: personal-looking column',
+    ],
+    [
+      'a grant on a public table',
+      `grant select on public.users to analytics_reader`,
+      'public.users: analytics_reader holds SELECT',
+    ],
+    [
+      'a grant on the research schema',
+      `grant usage on schema research to analytics_reader`,
+      'research: analytics_reader holds USAGE on the schema',
+    ],
+    [
+      'a client grant on a view',
+      `grant select on analytics.accounts to authenticated`,
+      'analytics.accounts: authenticated holds SELECT',
+    ],
+    [
+      'a security definer function anyone may call',
+      `create function public.peek_emails() returns setof text language sql security definer
+         set search_path = pg_catalog as $f$ select email from public.users $f$`,
+      'public.peek_emails(): analytics_reader may execute this security definer function',
+    ],
+  ])('finds %s', async (_label, sql, expected) => {
+    expect((await after(sql, check10)).join('\n')).toContain(expected);
+  });
+});
+
+describe('the ledger guard allows exactly analytics.ledger_monthly', () => {
+  it('reports nothing on the migrated database', async () => {
+    expect(await deidentificationViolations(db)).toEqual([]);
+  });
+
+  it('a second view over the ledger in analytics still fails', async () => {
+    const bad = await after(
+      `create view analytics.ledger_sites as select site_key, observed_month from research.check_runs`,
+      deidentificationViolations,
+    );
+    expect(bad.join('\n')).toMatch(/view analytics\.ledger_sites depends on the ledger/);
+  });
+
+  it('ledger_monthly changed to show more fails', async () => {
+    const bad = await after(
+      `create or replace view analytics.ledger_monthly as
+         select o.observed_month, o.crawler, o.verdict, o.measurement_status,
+                count(*)::bigint as observations, max(o.cause) as cause
+           from research.crawler_observations o
+          group by o.observed_month, o.crawler, o.verdict, o.measurement_status`,
+      deidentificationViolations,
+    );
+    expect(bad).toContain(`${ALLOWED_LEDGER_VIEW.name}: its definition is not the allowed one`);
+    expect(bad.join('\n')).toMatch(
+      /rule _RETURN on view analytics\.ledger_monthly depends on the ledger/,
+    );
+  });
+});
+
+describe('migration 041 re-applies and reverts', () => {
+  const catalog = async (d: PGlite) =>
+    (
+      await d.query<{ o: string }>(
+        `select format('%s.%s:%s', n.nspname, c.relname, c.relkind) as o from pg_class c
+           join pg_namespace n on n.oid = c.relnamespace
+          where n.nspname in ('public', 'analytics') order by 1`,
+      )
+    ).rows.map((r) => r.o);
+
+  it('re-applying it changes nothing; the revert removes it and it applies again', async () => {
+    const d = await freshDb();
+    await applyAllMigrations(d);
+    const once = await catalog(d);
+    await d.exec(readMigration(MIGRATION));
+    expect(await catalog(d)).toEqual(once);
+    await d.exec(readRollback(REVERT));
+    const reverted = await catalog(d);
+    expect(
+      reverted.filter((o) => o.startsWith('analytics.') || o.includes('account_attribution')),
+    ).toEqual([]);
+    const { rows } = await d.query(`select 1 from pg_roles where rolname = 'analytics_reader'`);
+    expect(rows).toEqual([]);
+    await d.exec(readRollback(REVERT));
+    await d.exec(readMigration(MIGRATION));
+    expect(await catalog(d)).toEqual(once);
+  }, 180_000);
+});
