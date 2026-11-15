@@ -172,7 +172,7 @@ export function SiteScreen({
                     {f.status}
                   </span>,
                   <span key="p">
-                    {f.markDone ? <MarkDone action={f.markDone} /> : null}
+                    {f.markDone ? <MarkDone action={f.markDone} fixType={f.fixType} /> : null}
                     <ActionControl action={f.packet} variant="quiet" />
                   </span>,
                 ],

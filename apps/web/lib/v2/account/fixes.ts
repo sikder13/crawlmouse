@@ -199,7 +199,7 @@ export async function markDone(
 }
 
 /** A form's notice when the mark stands and its re-check was not queued, by the reason. */
-const UNQUEUED: Record<Extract<RecheckOutcome, { queued: false }>['reason'], NoticeCode> = {
+export const UNQUEUED: Record<Extract<RecheckOutcome, { queued: false }>['reason'], NoticeCode> = {
   capped: 'marked_done_capped',
   check_running: 'marked_done_check_running',
   recently_checked: 'marked_done_recently_checked',
