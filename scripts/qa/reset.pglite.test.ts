@@ -9,14 +9,7 @@ import { rateLimitWindowStart } from '../../apps/web/lib/rate-limit-window';
 import { reset } from './reset';
 import { exitCode, seed } from './seed';
 import { qaResetStore } from './store';
-import {
-  HAS_INTERNAL_MARKER,
-  migratedBase,
-  PGLITE_TIMEOUT,
-  withMarker,
-  world,
-  type World,
-} from './test-support';
+import { migratedBase, PGLITE_TIMEOUT, pgliteTest, world, type World } from './test-support';
 
 /**
  * CC-38 D2 on PGlite with every migration: `qa_reset`'s refusals (all inside the SQL function), what
@@ -26,7 +19,7 @@ import {
 
 let base: PGlite;
 beforeAll(async () => {
-  if (HAS_INTERNAL_MARKER) base = await migratedBase();
+  base = await migratedBase();
 }, 300_000);
 
 const MIGRATION = '20261119000001_v2_038_qa.sql';
@@ -110,7 +103,7 @@ async function qaResetError(db: PGlite, accountId: string): Promise<string | und
 }
 
 describe('qa_reset: refusals, inside the function', () => {
-  withMarker(
+  pgliteTest(
     'refuses a customer account: no qa_accounts row, internal false',
     async () => {
       const w = await world(base);
@@ -122,7 +115,7 @@ describe('qa_reset: refusals, inside the function', () => {
     PGLITE_TIMEOUT,
   );
 
-  withMarker(
+  pgliteTest(
     'refuses an internal account that has no qa_accounts row',
     async () => {
       const w = await world(base);
@@ -135,7 +128,7 @@ describe('qa_reset: refusals, inside the function', () => {
     PGLITE_TIMEOUT,
   );
 
-  withMarker(
+  pgliteTest(
     'refuses a qa_accounts row whose account is not internal',
     async () => {
       const w = await world(base);
@@ -160,7 +153,7 @@ describe('qa_reset: refusals, inside the function', () => {
     PGLITE_TIMEOUT,
   );
 
-  withMarker(
+  pgliteTest(
     'anon and authenticated can neither run qa_reset nor read qa_accounts',
     async () => {
       const w = await world(base);
@@ -203,7 +196,7 @@ describe('qa_reset: refusals, inside the function', () => {
 });
 
 describe('qa_reset: a deleted account', () => {
-  withMarker(
+  pgliteTest(
     'refuses a marked, internal account whose deleted_at is set, and changes none of its rows',
     async () => {
       const w = await seeded();
@@ -223,7 +216,7 @@ describe('qa_reset: a deleted account', () => {
 });
 
 describe('qa:reset', () => {
-  withMarker(
+  pgliteTest(
     'while crawls are paused it resets nothing, so the set is not left empty',
     async () => {
       const w = await seeded();
@@ -243,7 +236,7 @@ describe('qa:reset', () => {
     PGLITE_TIMEOUT,
   );
 
-  withMarker(
+  pgliteTest(
     'a capped first client in a reset asks for no first audit of a site it did not add',
     async () => {
       const w = await seeded();
@@ -262,7 +255,7 @@ describe('qa:reset', () => {
     PGLITE_TIMEOUT,
   );
 
-  withMarker(
+  pgliteTest(
     'three resets in a row refuse nothing, and each leaves a fresh seed’s set',
     async () => {
       const w = await seeded();
@@ -276,7 +269,7 @@ describe('qa:reset', () => {
     PGLITE_TIMEOUT,
   );
 
-  withMarker(
+  pgliteTest(
     'a used set, with a fix marked done, a report and its share link, goes back to a fresh seed’s set',
     async () => {
       const w = await seeded();
@@ -339,7 +332,7 @@ describe('qa:reset', () => {
     PGLITE_TIMEOUT,
   );
 
-  withMarker(
+  pgliteTest(
     'returns the set to a fresh seed’s sites and seats, through a real delete',
     async () => {
       const w = await seeded();
@@ -367,7 +360,7 @@ describe('qa:reset', () => {
     PGLITE_TIMEOUT,
   );
 
-  withMarker(
+  pgliteTest(
     'leaves the accounts rows byte for byte, and another account entirely',
     async () => {
       const w = await seeded();
@@ -386,7 +379,7 @@ describe('qa:reset', () => {
     PGLITE_TIMEOUT,
   );
 
-  withMarker(
+  pgliteTest(
     'an account no longer internal is refused by both halves: not reset, not re-marked, not re-seeded',
     async () => {
       const w = await seeded();
@@ -408,7 +401,7 @@ describe('qa:reset', () => {
     PGLITE_TIMEOUT,
   );
 
-  withMarker(
+  pgliteTest(
     'makes no agency account when the one it looks for is not found',
     async () => {
       const w = await seeded();
@@ -429,7 +422,7 @@ describe('qa:reset', () => {
     PGLITE_TIMEOUT,
   );
 
-  withMarker(
+  pgliteTest(
     'writes no qa_accounts row: an account whose row is gone stays without one',
     async () => {
       const w = await seeded();
@@ -452,7 +445,7 @@ describe('qa:reset', () => {
     PGLITE_TIMEOUT,
   );
 
-  withMarker(
+  pgliteTest(
     'an account-wide alert rule that has fired does not block the reset',
     async () => {
       const w = await seeded();
@@ -481,7 +474,24 @@ describe('qa:reset', () => {
 });
 
 describe('migration 20261119000001', () => {
-  withMarker(
+  pgliteTest(
+    'refuses to apply on a database without accounts.internal, and creates nothing there',
+    async () => {
+      const w = await world(base);
+      await w.db.exec(readRollback(ROLLBACK));
+      await w.db.exec('alter table public.accounts drop column internal cascade');
+      await expect(w.db.exec(readMigration(MIGRATION))).rejects.toThrow(
+        /public\.accounts\.internal is missing/,
+      );
+      const left = await w.db.query<{ t: string | null }>(
+        `select to_regclass('public.qa_accounts')::text t`,
+      );
+      expect(left.rows[0]?.t).toBeNull();
+    },
+    PGLITE_TIMEOUT,
+  );
+
+  pgliteTest(
     'its rollback applies, and the migration applies again after it',
     async () => {
       const w = await world(base);

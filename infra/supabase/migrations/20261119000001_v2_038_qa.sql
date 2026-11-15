@@ -16,6 +16,19 @@
 --
 -- Rollback: infra/supabase/rollbacks/20261119000001_v2_038_qa.revert.sql
 
+-- qa_reset reads accounts.internal (CC-33, migration 20261115000001). A plpgsql body is not checked
+-- against the catalog when it is created, so without this the file would apply on a database that
+-- lacks the column and qa_reset would fail only when called.
+do $$
+begin
+  if not exists (select 1 from information_schema.columns
+                  where table_schema = 'public' and table_name = 'accounts' and column_name = 'internal') then
+    raise exception '20261119000001: public.accounts.internal is missing; apply 20261115000001 (CC-33) first'
+      using errcode = '55000';
+  end if;
+end;
+$$;
+
 create table if not exists public.qa_accounts (
   account_id uuid primary key,
   qa_key text not null check (qa_key ~ '^[a-z][a-z-]{1,23}$'),
