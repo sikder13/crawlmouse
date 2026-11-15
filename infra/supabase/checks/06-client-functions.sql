@@ -1,6 +1,6 @@
 -- In public, research and partitions, authenticated may execute exactly is_member, member_role, is_member_for_site,
--- is_member_for_fix, usage_counts, seat_may and member_covers_all.
--- anon may execute none of their functions, and authenticated only the seven listed in `declared`.
+-- is_member_for_fix, usage_counts, seat_may, member_covers_all and is_operator.
+-- anon may execute none of their functions, and authenticated only the eight listed in `declared`.
 -- An existing listed function authenticated cannot execute is
 -- also a finding. Functions that belong to an extension are left out.
 with
@@ -12,7 +12,8 @@ declared(role, signature) as (
     ('authenticated', 'public.is_member_for_fix(uuid)'),
     ('authenticated', 'public.usage_counts(uuid)'),
     ('authenticated', 'public.seat_may(uuid, text)'),
-    ('authenticated', 'public.member_covers_all(uuid)')
+    ('authenticated', 'public.member_covers_all(uuid)'),
+    ('authenticated', 'public.is_operator()')
 ),
 funcs as (
   select p.oid, format('%s.%s(%s)', n.nspname, p.proname, oidvectortypes(p.proargtypes)) as signature

@@ -19,6 +19,7 @@ import { inngest } from '../../../../../inngest/client';
 import type { CheckRequested } from '../../../../../inngest/check-events';
 import { PLAN_CONCURRENCY_CAP } from '../../../../../inngest/concurrency';
 import { SCHEDULE_TICK_FN_ID } from '../../../../../inngest/schedule';
+import { SIGNIN_CANARY_FN_ID } from '../../../../../inngest/signin-canary';
 import { recordedInput } from '../../../../../packages/engine/fixtures/v2/build/recorded';
 import { workerClientFromEnv } from '../../worker-client/client';
 import { CRAWL_USER_AGENT } from './discover';
@@ -198,6 +199,18 @@ describe('registration with V2_PIPELINE unset (D3)', () => {
     }
   });
 
+  it('with SIGNIN_CANARY_TO and every v2 flag off is v1’s four, then the sign-in canary alone (ruling 4, Q16)', () => {
+    const to = ['canary', 'example.test'].join('@');
+    const fns = inngestFunctions({ SIGNIN_CANARY_TO: to });
+    expect(fns.slice(0, 4)).toEqual([
+      auditFn,
+      reconcileBillingFn,
+      reconcileBillingManualFn,
+      cleanupExpiredAuditsFn,
+    ]);
+    expect(configsOf(fns.slice(4)).map((c) => c.id)).toEqual([`crawlmouse-${SIGNIN_CANARY_FN_ID}`]);
+  });
+
   it('syncs the configs it synced before this change', async () => {
     // auditFn reads the variable when its module loads: load it afresh with the variable unset.
     vi.stubEnv('INNGEST_AUDIT_CONCURRENCY', undefined);
@@ -332,6 +345,16 @@ const MAIL_IDS = [
 ];
 const SWEEP = [undefined, '', '0', '-1', '2', '5', '6', '50', '1000', 'abc', '5.5'] as const;
 
+/**
+ * CC-33's founder functions: registered with V2_BILLING=1 or V2_CHECKS_PUBLIC=1. The sign-in canary is
+ * registered with SIGNIN_CANARY_TO alone (lib/v2/ops/functions.ts), which the sweep below unsets.
+ */
+const FOUNDER_IDS = [
+  'crawlmouse-crawlmouse.founder.entitlement',
+  'crawlmouse-crawlmouse.founder.sweep',
+  'crawlmouse-crawlmouse.founder.digest',
+];
+
 /** CC-28's alert and summary functions: registered with V2_PIPELINE and V2_CHECKS_PUBLIC both set. */
 const MONITOR_IDS = [
   'crawlmouse-crawlmouse.alert.dispatch',
@@ -375,6 +398,7 @@ describe('no registered function can declare a concurrency limit above the plan 
             vi.stubEnv('V2_BILLING', billing);
             vi.stubEnv('V2_PIPELINE', flag);
             vi.stubEnv('INNGEST_AUDIT_CONCURRENCY', audit);
+            vi.stubEnv('SIGNIN_CANARY_TO', undefined);
             vi.resetModules();
             const fresh = await import('./functions');
             for (const check of SWEEP) {
@@ -385,6 +409,8 @@ describe('no registered function can declare a concurrency limit above the plan 
                   (billing === '1' ? 2 : 0) +
                   // CC-27b's three deletion functions, the mail functions, and CC-31's schedules.
                   (pub === '1' ? 3 + MAIL_IDS.length + 1 : 0) +
+                  // CC-33's founder functions and their failure handlers, with either flag.
+                  (pub === '1' || billing === '1' ? 2 * FOUNDER_IDS.length : 0) +
                   // CC-28's scheduler tick, and its alert and summary functions.
                   (pub === '1' && flag === '1' ? 1 + MONITOR_IDS.length : 0),
               );
@@ -400,6 +426,10 @@ describe('no registered function can declare a concurrency limit above the plan 
                 expect(ids.includes(id), id).toBe(pub === '1');
               }
               expect(ids.includes('crawlmouse-crawlmouse.report.schedules')).toBe(pub === '1');
+              for (const id of FOUNDER_IDS) {
+                expect(ids.includes(id), id).toBe(pub === '1' || billing === '1');
+                expect(ids.includes(`${id}-failure`), id).toBe(pub === '1' || billing === '1');
+              }
               if (billing === '1') {
                 expect(configs.map((c) => c.id)).toEqual(
                   expect.arrayContaining([

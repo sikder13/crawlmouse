@@ -1,0 +1,81 @@
+/* The support console (CC-33 D2): staff tooling, laid out from the design system's parts, with no
+   artboard. */
+
+.main {
+  display: grid;
+  gap: 20px;
+  padding-top: 28px;
+  padding-bottom: 48px;
+}
+
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.notice {
+  margin: 0;
+  padding: 10px 14px;
+  border: 1px solid var(--v2-line);
+  border-radius: var(--v2-radius-surface);
+  background: var(--v2-s2);
+  font-size: var(--v2-text-small);
+}
+
+.panel {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+}
+
+.search {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.searchField {
+  flex: 1 1 320px;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 6px 16px;
+  margin: 0;
+  font-size: var(--v2-text-small);
+}
+
+.facts dt {
+  color: var(--v2-mut);
+}
+
+.facts dd {
+  margin: 0;
+  font-family: var(--v2-font-mono);
+}
+
+.empty {
+  margin: 0;
+  color: var(--v2-mut);
+  font-size: var(--v2-text-small);
+}
+
+.action {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.reason {
+  min-width: 180px;
+}
+
+/* A time in a table cell stays on one line; an id may break at its hyphens. */
+.nowrap {
+  white-space: nowrap;
+}

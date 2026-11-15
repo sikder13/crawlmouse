@@ -33,8 +33,8 @@ export function checkRouteDeps(
     store: { ...supabasePipelineStore(admin), ...supabaseStreamStore(admin) },
     evidence: supabaseEvidenceStore(admin),
     limits: checkRouteLimits,
-    captureFinished: (req, checkId, properties) =>
-      capturePublicEventAfterResponse(req, 'check_finished', checkId, properties),
+    captureFinished: (req, checkId, properties, accountId) =>
+      capturePublicEventAfterResponse(req, 'check_finished', checkId, properties, accountId),
     send: (event) => inngest.send(event),
     clientIp: getClientIp,
     now: () => Date.now(),

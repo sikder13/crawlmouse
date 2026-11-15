@@ -2,8 +2,11 @@
  * The links of the v2 marketing header and footer, in one place. An `href` is a page the live site
  * serves today, under apps/web/app. An entry with `planned: true` has no page yet: it renders as
  * plain text, not as a link, until its page ships and the entry gets an `href`.
+ * An entry with a `gate` is a page served only while that flag is on: the footer renders it as a link
+ * then and as plain text otherwise (SiteFooter).
  * __tests__/v2/footer.test.tsx checks each `href` here against apps/web/app, and each footer `href`
- * against app/sitemap.ts (Log in, at /login, is deliberately not in the sitemap).
+ * against app/sitemap.ts, a gated one with its flag on (Log in, at /login, is deliberately not in the
+ * sitemap).
  */
 
 /** A page the live site serves. */
@@ -33,6 +36,18 @@ export interface NavGroup {
 
 export type NavEntry = SiteLink | NavGroup;
 
+/** A flag that serves a page the footer links to. */
+export type FooterGate = 'checksPublic';
+
+/** Which of the footer's gates are open. */
+export type FooterGates = Readonly<Record<FooterGate, boolean>>;
+
+/** Every gate shut: what a client page shows, which cannot read the server's flags. */
+export const CLOSED_FOOTER_GATES: FooterGates = Object.freeze({ checksPublic: false });
+
+/** A page served only while its flag is on: a link then, plain text otherwise. */
+export type GatedLink = LiveLink & { gate: FooterGate };
+
 /** The Status link, which carries the live status shape. */
 export type StatusLink = LiveLink & { showsStatus: true };
 
@@ -42,7 +57,7 @@ export interface FooterControl {
   control: 'cookie-settings';
 }
 
-export type FooterItem = SiteLink | StatusLink | FooterControl;
+export type FooterItem = SiteLink | StatusLink | GatedLink | FooterControl;
 
 export interface FooterColumn {
   title: string;
@@ -51,7 +66,8 @@ export interface FooterColumn {
 
 export const isGroup = (e: NavEntry): e is NavGroup => 'items' in e;
 
-export const SUPPORT_EMAIL = 'support@crawlmouse.com';
+// Declared in lib, so the support link's builder (lib/v2/support/mailto.ts) reads the same constant.
+export { SUPPORT_EMAIL } from '../../lib/v2/copy/support';
 
 /** The footer's own words. */
 export const FOOTER_COPY = {
@@ -127,6 +143,12 @@ export const FOOTER_COLUMNS: FooterColumn[] = [
     items: [
       { label: 'About', planned: true },
       { label: 'Contact', planned: true },
+      {
+        label: 'Help',
+        href: '/help',
+        gate: 'checksPublic',
+        note: 'The help centre (CC-33 D4) answers 404 while V2_CHECKS_PUBLIC is off: a link while it is on, text while it is off.',
+      },
       { label: 'Privacy', href: '/privacy' },
       { label: 'Terms', href: '/terms' },
       { label: 'Acceptable use', href: '/aup' },

@@ -14,14 +14,22 @@
  * by event name, without the payload, and dropped: `captureServerEvent` resolves either way. The
  * check routes run it after their response (`after`, app/api/checks/route.ts and
  * app/api/checks/[id]/_lib/deps.ts), so the wait is not the visitor's.
+ *
+ * Internal accounts (CC-33 D1). An event about an account marked internal carries `internal: true`.
+ * Whether it is about one is read from its distinct id and its `accountId`, when the caller passes
+ * one (`isInternalEvent`, lib/v2/ops/internal-marker.ts), only for an event consent lets through.
+ * The property is this module's: a caller's own `internal` is dropped.
  */
 import type { FunnelEvent } from './analytics-events';
 import { serverCaptureAllowed } from './consent';
+import { isInternalEvent, type InternalLookup } from './v2/ops/internal-marker';
 
 export interface ServerEvent {
   event: FunnelEvent;
   /** Who or what the event is about: an account, a check reference. Not an email. */
   distinctId: string;
+  /** The account the event is about, when its distinct id does not name it. */
+  accountId?: string | null;
   properties?: Readonly<Record<string, unknown>>;
 }
 
@@ -57,15 +65,23 @@ export const posthogSend: SendCapture = async (body) => {
 
 export async function captureServerEvent(
   cookieHeader: string | null,
-  { event, distinctId, properties = {} }: ServerEvent,
+  { event, distinctId, accountId, properties = {} }: ServerEvent,
   send: SendCapture = posthogSend,
+  lookup?: InternalLookup,
 ): Promise<void> {
   if (!serverCaptureAllowed(cookieHeader)) return;
+  const own = Object.fromEntries(Object.entries(properties).filter(([k]) => k !== 'internal'));
+  const internal = await isInternalEvent(distinctId, accountId, lookup);
   try {
     await send({
       event,
       distinct_id: distinctId,
-      properties: { ...properties, $process_person_profile: false, $geoip_disable: true },
+      properties: {
+        ...own,
+        ...(internal ? { internal: true } : {}),
+        $process_person_profile: false,
+        $geoip_disable: true,
+      },
     });
   } catch {
     console.error(`analytics: server capture of ${event} failed`);

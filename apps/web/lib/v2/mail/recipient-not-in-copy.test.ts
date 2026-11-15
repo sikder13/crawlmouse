@@ -1,6 +1,6 @@
 /**
  * Tier B review S3: no message names its recipient. Every send path runs once here (each mail handler,
- * the two report-schedule handlers, `deliverAlert`, `sendSummary`) over the in-memory ledger and
+ * the two report-schedule handlers, `deliverAlert`, `sendSummary`, and CC-33's founder notice and digest) over the in-memory ledger and
  * transport, and each message's subject,
  * text and HTML are read for its `to` address and for that address's local part. The sweep asserts
  * that the ledger was claimed for every kind in `MAIL_KINDS`, so a kind added without a path here
@@ -13,6 +13,9 @@ import { describe, expect, it, vi } from 'vitest';
 import type { Fix } from '@crawlmouse/types/v2';
 import { fixture } from '../fixtures';
 import { deliverAlert, type AlertDeps, type StoredChange } from '../monitor/alerts';
+import { digest, entitlementNotice, type FounderDeps } from '../ops/founder';
+import type { FounderStore } from '../ops/founder-store';
+import { DIGEST_FIGURES, type DigestCounts } from './templates/founder-digest';
 import { sendSummary, type SummaryDeps } from '../monitor/summary';
 import { mailHandlers, reportMailHandlers } from './handlers';
 import { unsubscribeLinks } from './links';
@@ -47,6 +50,9 @@ const TO = {
   reportReader: 'qzx-report@inbox.example',
   // CC-29: an Agency Plus request goes to our own inbox, whatever address the form was given.
   agencyPlus: AGENCY_PLUS_INBOX,
+  // CC-33: the founder's notice and digest go to FOUNDER_NOTIFY_TO.
+  founderEvent: 'qzx-founder@inbox.example',
+  founderDigest: 'qzx-founder@inbox.example',
 };
 /** The address an Agency Plus form was given: in the request's body as data, never a recipient. */
 const SUBMITTED = 'qzx-submitted@inbox.example';
@@ -255,6 +261,40 @@ async function sweep() {
       await sendSummary(summary, { accountId: ACCOUNT, weekKey: '2026-W47', weekStart }),
     ),
   );
+  // CC-33: a founder notice (the account owner's address is in it, the founder's is not) and, at a
+  // Monday 08:07 New York, the digests.
+  const counts = Object.fromEntries(DIGEST_FIGURES.map(([k]) => [k, 1])) as DigestCounts;
+  const founderStore = {
+    claim: async () => 'send',
+    takeOverflow: async () => ({ total: 0, rows: [] }),
+    digestCounts: async () => counts,
+    account: async () => ({
+      internal: false,
+      subscriptionId: null,
+      ownerEmail: 'qzx-owner@inbox.example',
+      host: 'shop.example',
+    }),
+  } as unknown as FounderStore;
+  const founder = (now: Date): FounderDeps => ({
+    mail: { ...mail, now: () => now },
+    store: founderStore,
+    payment: async () => ({ invoice: null, earlier: 'none' }),
+    confirmed: async () => true,
+    to: TO.founderEvent,
+    now: () => now,
+    log: () => {},
+  });
+  answers.push(
+    await entitlementNotice(founder(NOW), {
+      id: `entitlement.changed:${ACCOUNT}:evt_1`,
+      accountId: ACCOUNT,
+      from: 'free',
+      to: 'pro_trial',
+      occurredAt: NOW.toISOString(),
+    }),
+  );
+  const tick = new Date('2026-11-16T13:07:00.000Z');
+  answers.push(JSON.stringify(await digest(founder(tick), tick)));
   return { answers, sent: transport.sent, kinds: new Set(ledger.claims.map((c) => c.kind)) };
 }
 
@@ -274,9 +314,12 @@ describe('no message names its recipient (S3)', () => {
       'sent',
       'sent',
       JSON.stringify({ sent: 1, outcomes: ['sent'] }),
+      'sent',
+      JSON.stringify({ daily: 'sent', weekly: 'sent', overflow: 'none' }),
     ]);
     expect(MAIL_KINDS.filter((k) => !kinds.has(k))).toEqual([]);
-    expect(sent.map((m) => m.to).sort()).toEqual(Object.values(TO).sort());
+    // The founder's address receives three messages: the notice, the daily and the weekly.
+    expect(sent.map((m) => m.to).sort()).toEqual([...Object.values(TO), TO.founderDigest].sort());
     expect(sent.map((m) => m.to)).not.toContain(SUBMITTED);
   });
 

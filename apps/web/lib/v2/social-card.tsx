@@ -16,6 +16,8 @@ import { billingV2Enabled } from '../billing/flags';
 import { AGENCIES_COPY } from './copy/agencies';
 import { CHECK_COPY, CHECK_QUESTIONS } from './copy/check-pages';
 import { DEVELOPERS_COPY } from './copy/developers';
+import { HELP_COPY } from './help/copy';
+import { HELP_QUESTIONS, HELP_SLUGS, helpPath } from './help/questions';
 import { PRICING_COPY } from './copy/pricing';
 
 export const SOCIAL_CARD_SIZE = { width: 1200, height: 630 } as const;
@@ -61,6 +63,14 @@ export const SOCIAL_CARDS: Readonly<Record<string, SocialCard>> = {
     CHECK_QUESTIONS.map((q) => [
       `check-${q}`,
       { path: `/check/${q}`, title: CHECK_COPY[q].title, served: () => checksPublicEnabled() },
+    ]),
+  ),
+  // CC-33 D4: the help centre, under the flag its pages answer 404 behind.
+  help: { path: '/help', title: HELP_COPY.title, served: () => checksPublicEnabled() },
+  ...Object.fromEntries(
+    HELP_SLUGS.map((slug) => [
+      `help-${slug}`,
+      { path: helpPath(slug), title: HELP_QUESTIONS[slug], served: () => checksPublicEnabled() },
     ]),
   ),
 };

@@ -1,0 +1,178 @@
+# CC-36 — the v1 → v2 cutover, keyed on the flags
+
+v2 goes live by switching four flags on in order (`docs/ops/go-live.md`): step 2 `V2_PIPELINE`,
+step 3 `V2_ACCOUNT_DOOR`, step 4 `V2_CHECKS_PUBLIC`, step 5 `V2_BILLING`. A step is undone by an
+Instant Rollback to the deployment before it, which brings back that deployment's environment. So
+what a visitor meets is keyed on a flag: with the flags off a v1 URL or page behaves as it did before
+this step, and with them on a visitor does not land on a v1 dead end or v1's look. Two changes are
+not keyed on a flag, and each says why: D4's cleanup fix and the account backfill (D5).
+
+The inventory this step works from is `docs/ops/v1-inventory.json` (CC-V1AUDIT, measured at
+`ee11796d`; verified again on `b82a8e1f`, differences in "Verified" below).
+
+## D1 — one table of retired addresses
+
+`apps/web/lib/v2/cutover.ts` `V1_CUTOVER`, read by `apps/web/middleware.ts` before anything else
+reads a request. A row answers only while every flag it names is on; otherwise the middleware does
+what it did before and v1 serves the address.
+
+| address                             | flags                             | answer                                                   |
+| ----------------------------------- | --------------------------------- | -------------------------------------------------------- |
+| `/compare`                          | `V2_CHECKS_PUBLIC`                | 308 `/`                                                  |
+| `/compare/:a/:b`                    | `V2_CHECKS_PUBLIC`                | 308 `/audit/:a`                                          |
+| `/top/:platform`                    | `V2_CHECKS_PUBLIC`                | 410, a small page drawn with the v2 tokens, linking home |
+| `/billing`                          | `V2_CHECKS_PUBLIC`, `V2_BILLING`  | 307 `/settings/plan`                                     |
+| `/api/trpc/*`                       | `V2_CHECKS_PUBLIC`                | 404 JSON                                                 |
+| `/api/audits/start`                 | `V2_CHECKS_PUBLIC`, `V2_PIPELINE` | 410 JSON naming `/api/checks`                            |
+| `/api/audits/:id/cancel`, `/notify` | `V2_CHECKS_PUBLIC`, `V2_PIPELINE` | 410 JSON naming the `/api/checks/<checkId>/…` route      |
+| `/api/audits/:id/reaudit`           | `V2_CHECKS_PUBLIC`, `V2_PIPELINE` | 410 JSON, no replacement                                 |
+
+Verify: `pnpm --filter @crawlmouse/web exec vitest run lib/v2/cutover.test.ts middleware.test.ts`.
+`cutover.test.ts` fails when a retired page or route of the inventory has no row and is not one of
+the exemptions it lists; `middleware.test.ts` walks each row with its flags on (the answer) and with
+each of its flags off in turn (passed on, as before this step).
+
+- **Why `/billing` waits for `V2_BILLING`.** Until step 5 it is v1's way to the Stripe portal, which
+  the owner's v1 Pro uses; its target is served from step 4. It is a 307, not a 308: after a rollback
+  `/settings/plan` is a 404, and a browser keeps a 308. `/billing` is not an indexed address.
+- **Why `/top/:platform` is a 410, and from the middleware.** No leaderboard is indexable: the page
+  is indexed at 10 qualifying reports (`app/top/[platform]/page.tsx`, `LEADERBOARD_MIN_INDEX`), and
+  production holds at most 1 per platform (measured 2026-11-13). Next 15.5 drops a status set on a
+  middleware rewrite (`next/dist/server/lib/router-utils/resolve-routes.js`, the rewrite branch), so
+  the middleware returns the whole document; `cutover.test.ts` pins its colours to
+  `styles/v2/tokens.css`.
+- **Caching.** Each row's answer carries `Cache-Control: no-store` (`middleware.test.ts` checks it
+  per row), so a browser does not keep a redirect or
+  a 410 past the rollback that undoes its row. Both `/compare` pages are `noindex` today.
+- **Spellings.** A row matches the path as sent and percent-decoded, with one trailing slash, and
+  without an `.rsc` suffix; a path that does not decode is read as sent. A redirect row's `:name`
+  takes `[A-Za-z0-9_-]+` (its value goes into the target); any other row's takes any characters.
+- **tRPC.** No page or component calls a tRPC hook (`grep -rn "trpc\." apps/web/app apps/web/components`
+  prints nothing); `app/layout.tsx` mounts the provider.
+- **Not rows:** `/`, `/dashboard` and `/r/:slug` are rewrites (`lib/v2/rewrites.ts`); `/audit/[id]`
+  branches in its page (a v2 check goes to its own page, a v1 audit is served).
+
+## D2 — the v1 API routes
+
+None is forwarded to its `/api/checks` counterpart. v2's start takes a `requestId` that a v1 client
+does not send and answers `{checkId}` where v1 reads `{auditId}`; the `[id]` routes take a
+`checks.id`, and a v1 id is an `audits.id`, so a forwarded call would be a 404 from v2. A 410 names
+the route to call instead. Because the middleware answers first, the v1 handler is not reached and
+no rate-limit bucket is spent; Turnstile and the limits of `/api/checks` are unchanged.
+
+- **Kept as v1:** `/api/audits/:id/stream`, `/export`, `/llms-txt`. The v1 audit page, still served
+  for a v1 audit, reads all three (`app/audit/[id]/AuditView.tsx`, `AuditSurfaceView.tsx`,
+  `components/ai/LlmsTxtGenerator.tsx`; `cutover.test.ts` checks each caller). So inventory finding
+  A-1 (the stream's unvalidated id and missing limit) is not closed by this step and goes to CC-37;
+  A-11 (notify) is, from step 4.
+- **The end date.** `API_ALIAS_LAST_DAY = '2027-02-15'`, 90 days after the earliest planned switch-on
+  (2026-11-17). `cutover.test.ts` checks the predicate at injected dates, and one test reads the real
+  clock and fails after that day. Then the `gone-api` rows, the v1 handlers they shadow and their
+  inventory items are removed together: removing the rows alone fails the inventory-coverage test.
+
+## D4 — v1 jobs and v1 data: kept, not migrated, not dropped
+
+- `auditFn` and `cleanupExpiredAuditsFn` stay registered, with their ids and crons. `auditFn` gets no
+  work once step 4 is on: `audit.requested` is sent by `/api/audits/start` and `/reaudit`
+  (`git grep -n "name: 'audit.requested'" -- apps/web ':!*.test.ts'`), and
+  both answer 410. A rollback finds both as it left them. The cleanup keeps calling
+  `prune_rate_limits` (B-F1).
+- **C-4.** `deleteExpiredAudits` (`inngest/billing-helpers.ts`) no longer deletes an expired audit
+  that a published report names (one neither taken down nor hidden). It pages by id after the last id
+  read, so kept audits do not block the batches after them (`billing.test.ts`, "kept audits that fill whole
+  batches…"), and reads each batch's ids twice (the report
+  read, the delete), 150 a batch. Tests: `inngest/billing.test.ts` and, on the migrated schema in
+  PGlite, `inngest/billing-ttl.db.test.ts`. Not keyed on a flag: it holds with v2 off too, and a
+  rollback to a deployment from before this step brings back the old cleanup.
+- **The race.** A report minted between a batch's report read and its delete loses its link to the
+  audit (the FK is `on delete set null`; the report keeps its snapshot). v1's mint reads an audit's
+  status and grade, not its expiry (`app/api/reports/mint/route.ts`), so an expired audit not yet
+  deleted can be minted. The window is one batch's two requests, once a day.
+- **/privacy.** An audit behind a published report now outlives the 30 days /privacy states; the
+  sentence needs an exception, which is the owner's legal text (questions.md Q13).
+- **No v1 table is dropped or altered here.** `audits`, `pages`, `links`, `findings`, `fixes`,
+  `sessions` and `benchmark_cohorts` are dropped by a later migration, no earlier than 30 days after
+  step 4 is switched on (with step 4 on 2026-11-17, not before 2026-12-17), together with the
+  `gone-api` rows, `auditFn` and `cleanupExpiredAuditsFn`.
+- **v1 audits are not converted into v2 checks**: a v1 grade is not a v2 grade, and a converted
+  record would claim evidence v2 never collected.
+
+## D5 — a v1 user's first v2 sign-in
+
+- **What the first sign-in does** (traced in questions.md Q12): it writes nothing to `audits`,
+  `public_reports` or `users.pro_until`. Without a v2 account, `runFirstLogin` answers `no_account`
+  and the dashboard shows its no-account state; the backfill below gives every existing user one.
+- **The line.** For a viewer whose own user id has completed, unexpired v1 audits, the v2 dashboard's
+  Sites card carries one closed disclosure, "Your earlier audits are still at their links", in its
+  empty and its sites state: up to 20, newest first, each with its host, date, the v1 grade labelled
+  as the earlier grade, and a link to `/audit/<id>`. Read through the service role keyed on the
+  signed-in viewer's own id (`app/dashboard/v2/earlier-audits.ts`), the rows the viewer's own session
+  could read: a v1 audit id is a capability URL, so another member of the account does not see it.
+- **The backfill** (owner ruling 1, 2026-11-13): migration `20261116000002_v2_036_account_backfill`
+  gives each `public.users` row whose `default_account_id` is null what a sign-up gets: a personal
+  Free account, its owner seat and `default_account_id`, through `public.provision_default_account`,
+  the part of `handle_new_user` it was extracted from (same statements, same `for update` on the
+  users row). It fills `users.email_normalized` where it is null. It starts no trial and writes no
+  ledger row or mail, and touches nothing in `auth.*`, `users.pro_until`, `audits` or
+  `public_reports`. A second run changes nothing. The revert restores `handle_new_user`'s prior text
+  and drops the function; it keeps the backfilled accounts, which hold a user's v2 data once they
+  sign in. Measured on production 2026-11-13: 11 of 12 users have no account; 3 users hold v1 audits.
+  Applied by the owner before step 3. Tests: `apps/web/__tests__/v2-036-account-backfill.test.ts`
+  (PGlite, every migration), `scripts/db/account-backfill-race.test.ts` (two transactions on
+  Postgres, its own CI step), and `apps/web/__tests__/v2/account-door-first-login.test.ts` (a
+  backfilled user's first v2 sign-in is `not_first`: no trial). A pre-001 user who never
+  confirmed their email (2 on production, 2026-11-13) has never signed in; their first sign-in is a
+  sign-up's and gets a sign-up's trial (questions.md Q19; the same test file pins it).
+- **Applying it** (owner, before step 3; the `golive:check` row `cc36-account-backfill`): only after
+  `20261115000001` is recorded on production, from a dry run taken after it, since the CLI's push
+  refuses an older version once a newer one is applied. The dry run's branch holds no production
+  rows, so the data step is proven by these read-only checks on production:
+  - before: `select count(*) from public.users where email_normalized is null and email !~ '@'` is 0
+    (`normalize_email` raises on such an address); `select count(*) from public.users u where
+default_account_id is null and exists (select 1 from public.seats s where s.user_id = u.id)` is 0;
+    `select count(*) from pg_proc where proname = 'provision_default_account'` is 0;
+  - after: `select count(*) from public.users where default_account_id is null` is 0; each backfilled
+    user holds one active owner seat on a `free` account with `internal` false (CC-33's column, left
+    to its default); the `trial_ledger` and `email_sends` row
+    counts are what they were before; one test sign-up gets one account.
+
+## D3 — kept public pages in the v2 shell
+
+With `V2_CHECKS_PUBLIC` on, each kept public page that draws v1's header and footer is rewritten
+(`V2_REWRITES`, one `checksPublic` row each) to a hidden target under `app/(v2-kept)/v2-kept/`, which
+calls v1's own page function, takes v1's `Header` and `Footer` out of what it returns
+(`app/(v2-kept)/_lib/v1-chrome.ts`, which throws unless it removed one of each), and draws the rest in
+v2's `PageShell` with the marketing nav (`KeptShell.tsx`). Each target exports v1's metadata, static
+params and segment literals, and is a 404 with the flag off or by direct request. A v1-minted
+`/r/<slug>` is drawn the same way by `app/v2-report/[slug]`. The pages: `/ai-readiness-checker`,
+`/authors/[slug]`, `/blog`, `/blog/research`, `/blog/[slug]`, `/bot`, `/guides`, `/login`, `/status`,
+`/takedown`, `/verify/[id]`, `/privacy`, `/terms`, `/aup`, `/subprocessors`, `/audit/[id]` (a v1
+audit) and v1 `/r/[slug]`.
+
+- **Why not a body module per page:** it would have broken source-reading guards and the sha256 pin on
+  `app/r/[slug]/page.tsx` (questions.md Q21). Three of the 17 v1 page files changed:
+  `/ai-readiness-checker` (its content moved to `AiReadinessChecker.tsx`), and `/login` and
+  `/takedown` (the chrome moved from the client form to the page); `git diff --stat b82a8e1f -- <file>`
+  per page lists them.
+- **Flag off is main's.** Measured on production builds of main `b82a8e1f` and the branch
+  (`apps/web/scripts/kept-pages-proof.mjs`, 31 kept URLs): 0 pages differ in the stylesheets they link,
+  and 0 in title, canonical, robots, OG/Twitter, JSON-LD, `<h1>` or `<main>`.
+- **Flag on keeps the head.** Flag off vs on, the 18 `/blog/<slug>` pages differ in their share-image
+  tags only: the URL lacks the content-hash query Next appends to a colocated image, and the tags are
+  ordered differently; the image is the same (questions.md Q22).
+- **`/ai-readiness-checker`** under the flag uses v2's start form, since v1's posts to a route that
+  answers 410 (questions.md Q4); `kept-guard.test.ts` fails if a target reaches a 410 route's caller.
+- **Not covered by the build proof:** the pages that read data (`/audit/<id>`, `/verify/<id>`, a v1
+  `/r/<slug>`), proven by the unit tests only. Printing a v1 report under the flag includes v2's header
+  and footer (follow-up).
+- Tests: `pnpm --filter @crawlmouse/web exec vitest run 'app/(v2-kept)'` and the middleware's rewrite
+  rows.
+
+## D6 — what each other cutover item is, and whose
+
+`notes/cc-35/for-cc-36.md` rows and the inventory findings this step owns, answered in PR.md and
+questions.md Q6–Q10: `cc36-v1-redirects` and `cc36-v1-pages` are built here (D1, D2, D3);
+`cc36-v1-crons` is answered by D4 (both functions stay; the row's two reasons hold); `cc36-v1-billing`
+is CC-38's and the owner's; `cc36-v1-accounts` is the backfill (D5). Findings: A-11 closes from step 4
+(D2), C-4 is fixed (D4), A-1 goes to CC-37, A-2 stays with the v1 export and llms-txt routes until the
+v1 drop.

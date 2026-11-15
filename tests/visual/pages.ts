@@ -1,6 +1,7 @@
 import { expect, type Page } from './pw';
 import { PREVIEWS as REGISTRY } from '../../apps/web/app/(v2-preview)/v2-preview/_preview/registry';
 import { MAIL_PREVIEW_INDEX as MAIL_REGISTRY } from '../../apps/web/lib/v2/mail/templates/preview-index';
+import { KEPT_PREVIEW_INDEX as KEPT_REGISTRY } from '../../apps/web/app/(v2-preview)/kept-preview/_lib/kept-index';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { ONCE_SPECS, owner, parsePart, routesNamedIn } from './part';
@@ -37,10 +38,19 @@ const ALL_MAIL_PREVIEWS = MAIL_REGISTRY.map((p) => ({
   name: `Mail: ${p.name}`,
   slug: `mail-${p.slug}`,
 }));
+/**
+ * Each kept v1 public page (CC-36 D3, `apps/web/app/(v2-preview)/kept-preview/_lib/kept-index.ts`)
+ * in both states: `v1`, its own address, which `next dev` serves as v1 (the harness does not set
+ * V2_CHECKS_PUBLIC), and `v2`, its preview in the v2 shell. The two go to the same share, by `v1`.
+ */
+const ALL_KEPT_PAGES = KEPT_REGISTRY.map((p) => ({ ...p, v2: `/kept-preview/${p.slug}` }));
+
 /** This job's share of the routes (part.ts): every route unless VISUAL_PART is set. */
 export const PART = parsePart(process.env.VISUAL_PART);
 export const ownsPath = owner(
-  [...ALL_PREVIEWS, ...ALL_MAIL_PREVIEWS].map((p) => p.path),
+  [...ALL_PREVIEWS, ...ALL_MAIL_PREVIEWS, ...ALL_KEPT_PAGES.map((p) => ({ path: p.v1 }))].map(
+    (p) => p.path,
+  ),
   PART,
   ONCE_SPECS.flatMap((f) =>
     routesNamedIn(readFileSync(fileURLToPath(new URL(`./${f}`, import.meta.url)), 'utf8')),
@@ -48,6 +58,7 @@ export const ownsPath = owner(
 );
 export const PREVIEWS = ALL_PREVIEWS.filter((p) => ownsPath(p.path));
 export const MAIL_PREVIEWS = ALL_MAIL_PREVIEWS.filter((p) => ownsPath(p.path));
+export const KEPT_PAGES = ALL_KEPT_PAGES.filter((p) => ownsPath(p.v1));
 
 export const MAIL_WIDTHS = [600, 390] as const;
 export const MAIL_HEIGHT = { 600: 900, 390: 844 } as const;
@@ -86,6 +97,19 @@ export async function openPreview(page: Page, path: string) {
       )
       .toBe(1);
   }
+}
+
+/**
+ * Open a kept v1 page at its own address and bring it to rest: fonts loaded, the network quiet
+ * (its header asks for the session), every finite animation finished. It loads no v2 tokens, so
+ * `openPreview`'s check for them does not apply.
+ */
+export async function openV1Page(page: Page, path: string) {
+  const res = await page.goto(path, { waitUntil: 'load' });
+  expect(res?.status(), `${path} should be served in development`).toBe(200);
+  await page.evaluate(() => document.fonts.ready);
+  await page.waitForLoadState('networkidle').catch(() => undefined);
+  await settleAnimations(page);
 }
 
 /** Wait until every animation on the page that has an end has reached it. */
