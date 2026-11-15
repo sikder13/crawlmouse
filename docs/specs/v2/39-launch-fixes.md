@@ -63,6 +63,18 @@ holds (Pro's $19 and $190):
 The screenshots that move (Home's Agency card, and the Result's Pro panel on an audit nobody keeps)
 are re-drawn by the PR's visual shards and accepted there; there is no separate dispatch.
 
+## Ruling 5: a member is not told to cancel
+
+CC-38's walk, re-run on this branch, showed a developer on an Agency trial bought through Checkout the
+rail sentence "The card on file is charged on Sun 29 Nov unless you cancel." It named no digits, so
+CC-37's rule held, but only the owner can cancel. A trial whose subscription renews at its end
+(`renews_at`, or a `trialing` subscription on Settings) now reads CC-37's "Managed by the account
+owner." for a member who is not the owner, on the rail (`account-shell.ts`), Settings › Plan
+(`settings.ts`) and the Trial ending banner (`trial-end.ts`). The Trial ending banner no longer says
+"No card is on file" for such a trial; its owner reads "The card on file is charged on <date> unless you
+cancel." The owner's other sentences are unchanged. Held by the "member who is not the owner" and "by role"
+blocks of `lib/v2/view/account-shell-card.test.ts`.
+
 ## Not fixed here
 
 **F8, the card's last four digits.** Nothing writes `accounts.card_last4`. No TypeScript writes it
