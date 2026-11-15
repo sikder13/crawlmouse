@@ -161,7 +161,7 @@ below is `copyEditsMarkdown()`'s output.
 | Where | Reason | Before | After | Why |
 | --- | --- | --- | --- | --- |
 | `apps/web/lib/blog/content/cloudflare-ai-crawler-defaults-september-15.tsx:158` | unsourced-figure | This isn’t a rare setup. Across the sites audited on Crawlmouse, roughly one in three sits behind a detected edge or CDN layer whose rules can override whatever robots.txt declares. | This isn’t a rare setup: many sites sit behind an edge or CDN layer whose rules can override whatever robots.txt declares. | The repository holds no count behind it, and none can be made here without querying production: `audits.ai_readiness` records `accessMatrix.wafDetected` per audit, which counts recent audits (free audits expire after 30 days), not distinct sites. Owner: a measured number can replace "many". |
-| `apps/web/lib/blog/content/how-deep-is-too-deep-crawl-depth.tsx:139` | banned-phrase | the cheapest, highest-leverage fix you have. | the cheapest, highest-impact fix you have. | Ruling 2 named this "leverage" for the plainest word that keeps the meaning. |
+| `apps/web/lib/blog/content/how-deep-is-too-deep-crawl-depth.tsx:145` | banned-phrase | the cheapest, highest-leverage fix you have. | the cheapest, highest-impact fix you have. | Ruling 2 named this "leverage" for the plainest word that keeps the meaning. |
 | `apps/web/lib/blog/content/free-internal-link-audit.tsx:107` | banned-phrase | <strong>Fix the cheap, high-leverage problems first.</strong> | <strong>Fix the cheap, high-impact problems first.</strong> | Ruling 2 named this "leverage" for the plainest word that keeps the meaning. |
 <!-- d8-table:end -->
 <!-- prettier-ignore-end -->

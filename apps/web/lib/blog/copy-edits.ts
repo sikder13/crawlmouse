@@ -44,7 +44,7 @@ export const COPY_EDITS: readonly CopyEdit[] = [
   {
     slug: HOW_DEEP,
     file: content(HOW_DEEP),
-    line: 139,
+    line: 145,
     reason: 'banned-phrase',
     source: {
       before: 'the cheapest, highest-leverage fix you have.',

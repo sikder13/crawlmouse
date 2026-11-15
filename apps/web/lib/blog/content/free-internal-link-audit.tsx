@@ -104,9 +104,9 @@ export function FreeInternalLinkAuditBody() {
           impact is highest.
         </li>
         <li>
-          <strong>Fix the cheap, high-impact problems first.</strong> A single contextual link
-          from a shallow, relevant page can lift a buried page several levels and rescue an orphan
-          in one move.
+          <strong>Fix the cheap, high-impact problems first.</strong> A single contextual link from
+          a shallow, relevant page can lift a buried page several levels and rescue an orphan in one
+          move.
         </li>
         <li>
           <strong>Re-crawl to confirm.</strong> Internal-linking fixes are one of the few SEO
