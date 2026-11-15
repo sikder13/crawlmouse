@@ -175,3 +175,34 @@ describe('surfaceKind', () => {
     expect(surfaceKind({ path: '/a', status: 308, location: '/b', robots: [] })).toBe('a redirect');
   });
 });
+
+describe('the no-title row', () => {
+  it('counts a page whose <title> is not in <head>', async () => {
+    const site: Record<string, string> = {
+      '/sitemap.xml': `<loc>${ORIGIN}/a</loc><loc>${ORIGIN}/b</loc>`,
+      '/a': '<html><head><title>A</title></head><body><main><h1>A</h1></main></body></html>',
+      '/b': '<html><head></head><body><title>B</title><main><h1>B</h1></main></body></html>',
+    };
+    const f = async (url: string) => {
+      const body = site[new URL(url).pathname];
+      return new Response(body ?? '', { status: body ? 200 : 404 });
+    };
+    const run = await auditBuild({
+      base: BASE,
+      origin: ORIGIN,
+      label: 'flags off',
+      sha: 'abc',
+      fetch: f,
+      parse: (h) => new JSDOM(h).window.document,
+    });
+    const md = renderReport({
+      origin: ORIGIN,
+      off: run,
+      on: { ...run, label: 'flags on' },
+      posts: [],
+      www: null,
+      commands: [],
+    });
+    expect(md).toMatch(/\| no <title> in <head> \| 1 \| 1 \|/);
+  });
+});
