@@ -31,9 +31,9 @@ describe('shouldSendEvent', () => {
 });
 
 describe('FUNNEL_EVENTS list-drift lock', () => {
-  it('has exactly the 71 funnel events (7 launch + 9 conversion-spine + 10 SPEC 04 viral loop + 7 SPEC 05 AI + 2 CC-25 account door + 6 CC-22b public check flow + 2 CC-26b + 5 CC-27b + 3 CC-28 monitoring + 3 CC-29 + 10 CC-31 + 6 CC-41 payment events + 1 CC-41 survey trigger) with no duplicates', () => {
-    expect(FUNNEL_EVENTS.length).toBe(71);
-    expect(new Set(FUNNEL_EVENTS).size).toBe(71);
+  it('has exactly the 72 funnel events (7 launch + 9 conversion-spine + 10 SPEC 04 viral loop + 7 SPEC 05 AI + 2 CC-25 account door + 6 CC-22b public check flow + 2 CC-26b + 5 CC-27b + 3 CC-28 monitoring + 3 CC-29 + 10 CC-31 + 6 CC-41 payment events + 1 CC-41 sign-up + 1 CC-41 survey trigger) with no duplicates', () => {
+    expect(FUNNEL_EVENTS.length).toBe(72);
+    expect(new Set(FUNNEL_EVENTS).size).toBe(72);
     for (const e of [
       'pricing_viewed',
       'plan_chosen',

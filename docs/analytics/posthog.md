@@ -21,12 +21,12 @@ An insight that filters out test accounts counts an event only when each of thes
 
 ## Actions
 
-| Action           | Matches                                                                                            | Description                                                                                                                                                        |
-| ---------------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| [cm] Activation  | `check_finished` where event `source` is not set                                                   | A check finished on the public check path (the home page's form and its copies), not the pipeline's copy of the event.                                             |
-| [cm] Sign-up     | `$identify`                                                                                        | A browser identified as a person, on a signed-in page. No event marks an account’s creation, and a second browser identifies again: count it with first-time math. |
-| [cm] Trial start | `trial_started` where event `kind` = `pro`, or `subscription_started` where event `trial` = `true` | The no-card Pro trial started, or a card trial's subscription started.                                                                                             |
-| [cm] Paid        | `subscription_started` where event `trial` = `false`, or `trial_converted`                         | A first paying subscription, or a trial that converted.                                                                                                            |
+| Action           | Matches                                                                                            | Description                                                                                                            |
+| ---------------- | -------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| [cm] Activation  | `check_finished` where event `source` is not set                                                   | A check finished on the public check path (the home page's form and its copies), not the pipeline's copy of the event. |
+| [cm] Sign-up     | `account_created`                                                                                  | An account created: the first login that confirmed the email (account_created, sent by the Continue page).             |
+| [cm] Trial start | `trial_started` where event `kind` = `pro`, or `subscription_started` where event `trial` = `true` | The no-card Pro trial started, or a card trial's subscription started.                                                 |
+| [cm] Paid        | `subscription_started` where event `trial` = `false`, or `trial_converted`                         | A first paying subscription, or a trial that converted.                                                                |
 
 ## Cohorts
 

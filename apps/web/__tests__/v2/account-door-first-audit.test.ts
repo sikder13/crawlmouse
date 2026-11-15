@@ -116,7 +116,7 @@ describe('a site named on Sign-up gets its first audit', () => {
       inputOf(user, 'flagoff@example.com', 'flagoff.example'),
     );
     expect(r.siteId).not.toBeNull();
-    expect(r.events.map((e) => e.name)).toEqual(['trial_started', 'site_added']);
+    expect(r.events.map((e) => e.name)).toEqual(['account_created', 'trial_started', 'site_added']);
     expect(await checks()).toEqual([]);
   });
 
@@ -140,7 +140,7 @@ describe('a site named on Sign-up gets its first audit', () => {
       inputOf(user, 'ceiling@example.com', 'ceiling.example'),
     );
     expect(r.siteId).not.toBeNull();
-    expect(r.events.map((e) => e.name)).toEqual(['trial_started', 'site_added']);
+    expect(r.events.map((e) => e.name)).toEqual(['account_created', 'trial_started', 'site_added']);
     expect(await checks()).toEqual([]);
     expect(sent).toEqual([]);
   });
@@ -167,7 +167,11 @@ describe('a site named on Sign-up gets its first audit', () => {
         firstTouch: null,
       },
     );
-    expect(landing.events.map((e) => e.name)).toEqual(['trial_started', 'site_added']);
+    expect(landing.events.map((e) => e.name)).toEqual([
+      'account_created',
+      'trial_started',
+      'site_added',
+    ]);
     const calls = report.mock.calls.map((c) => c[0]);
     expect(calls).toEqual(['first-audit-failed']);
     expect(report.mock.calls[0]![1]).toMatchObject({ siteId: expect.any(String) });

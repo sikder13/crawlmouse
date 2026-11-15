@@ -156,6 +156,12 @@ export const EVENT_REGISTRY: Record<EventName, EventEntry> = {
   ai_report_section_viewed: {
     senders: [browser('components/report/AiReadinessReportSection.tsx', ['band', 'confidence'])],
   },
+  account_created: {
+    senders: [
+      // Named by the first login; the Continue page sends it (ContinueScreen.tsx).
+      browser('lib/auth/first-login.ts', []),
+    ],
+  },
   trial_started: {
     senders: [
       // Named by the first login; the Continue page sends it (ContinueScreen.tsx).

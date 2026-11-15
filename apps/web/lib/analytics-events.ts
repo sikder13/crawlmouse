@@ -115,6 +115,9 @@ export const FUNNEL_EVENTS = [
   'subscription_canceled',
   'subscription_ended',
   'payment_failed',
+  // CC-41 — the sign-up: `account_created {}`, named by the first login (lib/auth/first-login.ts)
+  // and sent by the Continue page through track(), so a visitor's consent decision applies.
+  'account_created',
   // CC-41 D8 — a survey trigger only, never counted in a dashboard: the browser's `fix_done_confirmed
   // {type}` once Mark done's answer says the mark stands (components/v2/screens/site/MarkDone.tsx).
   // A mark is counted by the server's `fix_marked_done`.

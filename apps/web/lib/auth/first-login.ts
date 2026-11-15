@@ -115,7 +115,7 @@ export const TRIAL_OUTCOMES = {
 export type TrialOutcome = keyof typeof TRIAL_OUTCOMES;
 
 export interface DoorEvent {
-  name: Extract<FunnelEvent, 'trial_started' | 'site_added'>;
+  name: Extract<FunnelEvent, 'account_created' | 'trial_started' | 'site_added'>;
   props: Record<string, string | number>;
 }
 
@@ -136,6 +136,8 @@ export async function runFirstLogin(
   let trial: TrialOutcome = 'not_first';
   let zone = account.timezone;
   if (isFirstLogin(input.emailConfirmedAt, input.lastSignInAt)) {
+    // The sign-up: the verify that confirmed the email is the account's first login (CC-41).
+    events.push({ name: 'account_created', props: {} });
     const asked = validZone(input.signup?.tz);
     if (asked !== null) {
       await deps.store.setTimezone(account.accountId, asked);

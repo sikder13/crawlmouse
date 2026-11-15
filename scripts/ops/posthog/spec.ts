@@ -303,8 +303,8 @@ const actions: readonly ActionSpec[] = [
   {
     name: SIGN_UP,
     description:
-      'A browser identified as a person, on a signed-in page. No event marks an account’s creation, and a second browser identifies again: count it with first-time math.',
-    steps: [{ event: '$identify' }],
+      'An account created: the first login that confirmed the email (account_created, sent by the Continue page).',
+    steps: [{ event: 'account_created' }],
   },
   {
     name: TRIAL_START,

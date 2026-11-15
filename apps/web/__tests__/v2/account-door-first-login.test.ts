@@ -123,6 +123,7 @@ describe('runFirstLogin', () => {
     expect(a.site_limit).toBe(GATES.pro.sites);
     expect(await ledgerRows(a.id)).toBe(3);
     expect(r.events).toEqual([
+      { name: 'account_created', props: {} },
       { name: 'trial_started', props: { kind: 'pro', variant: 'no_card' } },
     ]);
   });
@@ -141,7 +142,7 @@ describe('runFirstLogin', () => {
     const a = await accountOf(db, i.userId);
     expect(a.state).toBe('free');
     expect(await ledgerRows(a.id)).toBe(0);
-    expect(r.events).toEqual([]);
+    expect(r.events).toEqual([{ name: 'account_created', props: {} }]);
   });
 
   it('is refused by two trials from this device in the last 30 days', async () => {
@@ -570,6 +571,7 @@ describe('the started trial’s effects are dispatched (CC-03 D9b)', () => {
     const a = await accountOf(db, i.userId);
     expect(r.trial).toBe('started');
     expect(r.events).toEqual([
+      { name: 'account_created', props: {} },
       { name: 'trial_started', props: { kind: 'pro', variant: 'no_card' } },
     ]);
     expect(a.state).toBe('pro_trial');
@@ -593,7 +595,7 @@ describe('a trial decision that cannot be made is reported, and the account stay
   it('a lock timeout: trial-decision-failed with reason lock_timeout', async () => {
     const { r, d, a } = await failing(sqlError('55P03'));
     expect(r.trial).toBe('failed');
-    expect(r.events).toEqual([]);
+    expect(r.events).toEqual([{ name: 'account_created', props: {} }]);
     expect(a.state).toBe('free');
     expect(d.report).toHaveBeenCalledWith('trial-decision-failed', {
       accountId: a.id,
