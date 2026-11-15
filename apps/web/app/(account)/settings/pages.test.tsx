@@ -369,7 +369,7 @@ describe('/settings/plan', () => {
     expect(renderToStaticMarkup(el)).toContain('0 of 1');
   });
 
-  it('is a 404 for an account manager and a developer', async () => {
+  it('the plan page is a 404 for an account manager and a developer', async () => {
     for (const u of [manager, developer]) {
       as(u);
       await expect(PlanPage()).rejects.toMatchObject(notFoundError);
@@ -411,7 +411,7 @@ describe('/settings/delete', () => {
     expect(html).toContain(`Type ${empty.email} to confirm`);
   });
 
-  it('is a 404 for an account manager and a developer', async () => {
+  it('the delete page is a 404 for an account manager and a developer', async () => {
     for (const u of [manager, developer]) {
       as(u);
       await expect(DeletePage(q())).rejects.toMatchObject(notFoundError);

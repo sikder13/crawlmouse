@@ -157,9 +157,10 @@ function trialCard(
     return {
       title,
       left,
-      note:
-        a.card_last4 === null
-          ? `${COPY.noCard} ${COPY.nothingCharged}`
+      note: !v.cardOnFile
+        ? `${COPY.noCard} ${COPY.nothingCharged}`
+        : a.card_last4 === null
+          ? COPY.cardManagedByOwner
           : billingEnd !== null
             ? COPY.cardNotCharged(a.card_last4, dayDate(end, zone))
             : COPY.cardCharged(a.card_last4, dayDate(end, zone)),
@@ -174,7 +175,7 @@ function trialCard(
     title,
     left,
     note: firstRun
-      ? `${a.card_last4 === null ? `${COPY.noCard} ` : ''}${COPY.trialFirstRun(freeSchedule)}`
+      ? `${!v.cardOnFile ? `${COPY.noCard} ` : ''}${COPY.trialFirstRun(freeSchedule)}`
       : COPY.trialLater(
           primarySite(v).host,
           freeSchedule,

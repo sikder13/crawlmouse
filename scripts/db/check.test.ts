@@ -71,14 +71,24 @@ describe('the check files', () => {
     expect(failed(results)).toBe(false);
   });
 
-  it('all but 08 and 09 pass on a database migrated through 001 only; both fail there, as they predate 20261106000002 and 20261108000002', async () => {
+  it('all but 01, 08 and 09 pass on a database migrated through 001 only; they fail there, as they predate 20261118000001, 20261106000002 and 20261108000002', async () => {
     const early = await migratedDb((f) => f <= '20261101000001_v2_001_entitlement_tables.sql');
     const results = await runChecks(pgliteDb(early));
-    const later = results.filter((r) =>
-      ['08-v1-client-grants.sql', '09-definer-search-path.sql'].includes(r.check.file),
+    const [first, ...later] = results.filter((r) =>
+      [
+        '01-client-table-privileges.sql',
+        '08-v1-client-grants.sql',
+        '09-definer-search-path.sql',
+      ].includes(r.check.file),
     );
     expect(later).toHaveLength(2);
-    expect(formatResults(results.filter((r) => !later.includes(r)))).not.toContain('FAIL');
+    expect(formatResults(results.filter((r) => r !== first && !later.includes(r)))).not.toContain(
+      'FAIL',
+    );
+    // 001 granted the card's last four to authenticated; 20261118000001 revokes it. Nothing else.
+    expect(first!.findings.map((row) => Object.values(row).join(': '))).toEqual([
+      'public.accounts.card_last4: authenticated holds SELECT on the column; not declared',
+    ]);
     // The v1 tables existed long before 001, with the broad client grants P2 removed.
     const lines = later[0]!.findings.map((row) => Object.values(row).join(': '));
     expect(lines).toContain('public.audits: anon holds TRUNCATE on the table');

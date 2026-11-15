@@ -521,6 +521,8 @@ describe('(d) the client contact and report recipient of another account', () =>
     expect(p.userId).toBeNull();
     expect(counted(p)).toEqual({
       'sites.client_contact_email nulled': 1,
+      // CC-37 (20261117000001): the name beside the address.
+      'sites.client_contact_name nulled': 1,
       'reports.recipient_email nulled': 2,
     });
     const { calls } = await erase({ email });
@@ -530,13 +532,13 @@ describe('(d) the client contact and report recipient of another account', () =>
     await nothingLeftOf(email);
   });
 
-  it('known gap, reported: the contact’s name stays beside the blanked address (no rule names sites.client_contact_name)', async () => {
-    // Rule 30 sets `client_contact_email = null` and nothing else. This pins what the rules do
-    // today, so the day a rule covers the name this test says so.
+  it('the contact’s name goes with the blanked address (rule 19, CC-37)', async () => {
+    // Until 20261117000001 the name stayed: rule 30 sets `client_contact_email = null` and nothing
+    // else. Rule 19 now nulls the name on the rows rule 30 blanks.
     const email = `named-${randomUUID().slice(0, 8)}@client.example`;
     await asContact(email);
     await erase({ email });
-    expect(await contactOf()).toEqual({ name: 'Jordan', email: null });
+    expect(await contactOf()).toEqual({ name: null, email: null });
   });
 });
 
