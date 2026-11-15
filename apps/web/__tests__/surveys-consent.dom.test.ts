@@ -65,6 +65,7 @@ beforeAll(async () => {
     }),
   );
   // The extension registers itself on window.__PosthogExtensions__, as the lazily loaded script does.
+  // @ts-expect-error posthog-js ships no types for its surveys bundle, which is a side-effect script.
   await import('posthog-js/dist/surveys');
   posthog = (await import('posthog-js')).default;
   posthog.init('phc_probe', {
