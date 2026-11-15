@@ -10,6 +10,7 @@ import { VerdictCell } from '../../VerdictCell';
 import { LOG_IN } from '../../footer-links';
 import { ACCOUNT_NAV } from '../../../../lib/v2/view/account-actions';
 import { MapSvg } from '../../map/MapSvg';
+import { formatPlanPrice } from '../../../../lib/v2/copy/plan-price';
 import type { DoorView, GradeView, ResultView } from '../../../../lib/v2/view/result';
 import { capitalise, count, numberWord, plural } from '../../../../lib/v2/words';
 import { AuditLink, AuditLinkWords } from './AuditPage';
@@ -301,7 +302,8 @@ export function ResultScreen({
                 it; nothing you can see is deleted after.
               </p>
               <p className={`${layout.mut} ${styles.proNote}`}>
-                Agencies: 25 client sites and reports under your own brand, $69 a month.
+                Agencies: 25 client sites and reports under your own brand,{' '}
+                {formatPlanPrice('agency')} a month.
               </p>
               <div className={`${layout.row} ${styles.actions} ${styles.proActions}`}>
                 <Button href="#keep">Keep this audit, start 14 days of{'\u00a0'}Pro</Button>
