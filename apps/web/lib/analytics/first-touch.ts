@@ -12,7 +12,11 @@
  * When it is written: by `rememberFirstTouch`, only when there is no `cm_ft` cookie already and
  * capture is not opted out (instrumentation-client.ts after PostHog starts, and on the consent
  * banner's grant). It is never overwritten.
+ *
+ * When it is read on the server: at sign-in (app/login/verify), only when `serverCaptureAllowed` says
+ * the visitor's consent allows a server capture (`consentedFirstTouch`).
  */
+import { serverCaptureAllowed } from '../consent';
 
 export const FIRST_TOUCH_COOKIE = 'cm_ft';
 
@@ -167,6 +171,11 @@ export function parseFirstTouch(raw: string): FirstTouch | null {
 export function firstTouchFromCookies(cookies: string | null | undefined): FirstTouch | null {
   const raw = cookies ? rawFirstTouch(cookies) : null;
   return raw === null ? null : parseFirstTouch(raw);
+}
+
+/** The `cm_ft` record in a `Cookie` header, or null when there is none or consent stops its use. */
+export function consentedFirstTouch(cookieHeader: string | null): FirstTouch | null {
+  return serverCaptureAllowed(cookieHeader) ? firstTouchFromCookies(cookieHeader) : null;
 }
 
 export interface RememberDeps {

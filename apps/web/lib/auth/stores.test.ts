@@ -28,6 +28,7 @@ function fakeSb(answers: Answer[]) {
       for (const op of [
         'select',
         'insert',
+        'upsert',
         'update',
         'eq',
         'is',
@@ -50,6 +51,46 @@ function fakeSb(answers: Answer[]) {
 }
 
 describe('supabaseDoorStore', () => {
+  it('recordAttribution inserts the record for the account, and leaves a row already there', async () => {
+    const f = fakeSb([{ error: null }]);
+    await supabaseDoorStore(f.sb).recordAttribution('a1', {
+      utm_source: 'blog',
+      referrer_host: 'news.ycombinator.com',
+      first_seen_at: '2026-11-01T10:00:00Z',
+    });
+    expect(f.calls).toEqual([
+      {
+        table: 'account_attribution',
+        ops: [
+          [
+            'upsert',
+            [
+              {
+                account_id: 'a1',
+                utm_source: 'blog',
+                utm_medium: null,
+                utm_campaign: null,
+                utm_content: null,
+                utm_term: null,
+                referrer_host: 'news.ycombinator.com',
+                landing_path: null,
+                ref: null,
+                first_seen_at: '2026-11-01T10:00:00Z',
+              },
+              { onConflict: 'account_id', ignoreDuplicates: true },
+            ],
+          ],
+        ],
+      },
+    ]);
+    const failing = fakeSb([{ error: { code: '23514', message: 'check violated' } }]);
+    await expect(
+      supabaseDoorStore(failing.sb).recordAttribution('a1', {
+        first_seen_at: '2026-11-01T10:00:00Z',
+      }),
+    ).rejects.toMatchObject({ code: '23514' });
+  });
+
   it('insertSite reads a unique violation as "already there" and throws anything else', async () => {
     const site = { accountId: 'a', ownerSeatId: 's', host: 'x.com', schedule: null };
     const dupe = fakeSb([{ error: { code: '23505', message: 'duplicate key' } }]);

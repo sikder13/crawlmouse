@@ -24,6 +24,7 @@ const base = {
   signup: null,
   device: 'd',
   ip: '203.0.113.1',
+  firstTouch: { utm_source: 'blog', first_seen_at: '2026-11-01T00:00:00Z' },
 };
 
 beforeEach(() => {
@@ -43,17 +44,25 @@ describe('afterSignIn', () => {
       device: 'd',
       ip: '203.0.113.1',
       signup: { site: 'acme.com' },
+      firstTouch: base.firstTouch,
     });
   });
 
-  it("sends no device when the link signs in an address other than the browser's door request (D9)", async () => {
+  it("sends no device and no first touch when the link signs in an address other than the browser's door request (D9)", async () => {
     await afterSignIn(deps, { ...base, boundTo: emailBinding('victim@example.com') });
-    expect(runFirstLogin.mock.calls[0]![1]).toMatchObject({ device: null, signup: null });
+    expect(runFirstLogin.mock.calls[0]![1]).toMatchObject({
+      device: null,
+      signup: null,
+      firstTouch: null,
+    });
   });
 
-  it('sends the device when there is no binding (a link opened on another device)', async () => {
+  it('sends the device and the first touch when there is no binding (a link opened on another device)', async () => {
     await afterSignIn(deps, { ...base, boundTo: undefined });
-    expect(runFirstLogin.mock.calls[0]![1]).toMatchObject({ device: 'd' });
+    expect(runFirstLogin.mock.calls[0]![1]).toMatchObject({
+      device: 'd',
+      firstTouch: base.firstTouch,
+    });
   });
 
   it('leaves the destination to the v1 rule when the link was not a Keep', async () => {

@@ -6,6 +6,7 @@
 import type { AccountState } from '@crawlmouse/types/v2';
 import type { PaidTier, Tier } from '../entitlement-v2';
 import type { TrialVariant } from '../billing/state-machine';
+import type { FirstTouch } from '../analytics/first-touch';
 import type { LedgerKind } from './ledger';
 import type { SiteSchedule } from './schedule';
 import type { TrialDecision, TrialTransition } from './trial-decision';
@@ -72,6 +73,11 @@ export interface DoorStore {
   /** Sets the owner where there is none; 'not_unowned' when another claim got there first. */
   takeSite(siteId: string, site: Omit<NewSite, 'host'>): Promise<TakeSiteResult>;
   clearExpiry(checkId: string): Promise<void>;
+  /**
+   * The account's first-touch row (`public.account_attribution`, CC-41 D2), written once: a row
+   * already there is left as it is (`on conflict do nothing`).
+   */
+  recordAttribution(accountId: string, record: FirstTouch): Promise<void>;
 }
 
 /** What a first-audit request did, each with the case that produces it. */
