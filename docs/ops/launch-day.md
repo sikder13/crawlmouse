@@ -55,6 +55,8 @@ Set as a literal:
 - `crawl-degraded`
 - `founder-notice-failed`
 - `landing-failed`
+- `ledger-key-missing`
+- `ledger-write-failed`
 - `reconcile-drift`
 - `schedule-claim`
 - `signin-canary`
