@@ -163,7 +163,11 @@ export async function markDone(
   if (marked.outcome === 'refused')
     return refuseTo(kind, back, 409, 'not_markable', { status: marked.status });
   if (marked.outcome === 'marked') {
-    await deps.capture('fix_marked_done', r.site.account_id, { type: r.fix.type });
+    await deps.capture(
+      'fix_marked_done',
+      { accountId: r.site.account_id, userId: caller.userId },
+      { type: r.fix.type },
+    );
   }
   const outcome: RecheckOutcome = await deps.requestRecheck({
     siteId: r.site.id,
@@ -174,7 +178,7 @@ export async function markDone(
   if (outcome.queued && outcome.created) {
     await deps.capture(
       'check_started',
-      r.site.account_id,
+      { accountId: r.site.account_id, userId: caller.userId },
       checkStarted('fix_recheck', outcome.checkId),
     );
   }

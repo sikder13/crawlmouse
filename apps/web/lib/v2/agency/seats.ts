@@ -171,6 +171,8 @@ export interface SeatDeps {
 /** The account the caller acts in, from their viewer. */
 export interface SeatAccount {
   accountId: string;
+  /** The signed-in person acting on the account: the inviter (`seat_invited`'s distinct id). */
+  actorUserId: string;
   tier: Tier;
   /** The seat limit at this moment, with the trial and past-due clocks read (`limits.seats`). */
   seatLimit: number;
@@ -254,10 +256,14 @@ export async function inviteSeat(
   });
   switch (r.outcome) {
     case 'invited':
-      await deps.capture('seat_invited', account.accountId, {
-        role: input.role,
-        scoped: input.scope !== 'all',
-      });
+      await deps.capture(
+        'seat_invited',
+        { accountId: account.accountId, userId: account.actorUserId },
+        {
+          role: input.role,
+          scoped: input.scope !== 'all',
+        },
+      );
       if (!(await mailAsked(deps, r.seatId, r.seq))) return notMailed(kind, r.seatId);
       return done(kind, 'seat_invited', { seatId: r.seatId }, 201);
     case 'marked':
@@ -383,7 +389,11 @@ export async function acceptInvite(
   const r = await deps.store.accept(caller.token, caller.userId, deps.now());
   switch (r.outcome) {
     case 'accepted': {
-      await deps.capture('seat_accepted', r.accountId, { role: r.role });
+      await deps.capture(
+        'seat_accepted',
+        { accountId: r.accountId, userId: caller.userId },
+        { role: r.role },
+      );
       const res =
         kind === 'form'
           ? new Response(null, { status: 303, headers: { location: '/dashboard' } })

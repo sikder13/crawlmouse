@@ -14,6 +14,8 @@ vi.mock('next/server', () => ({
 }));
 vi.mock('../../../../lib/analytics-server', () => ({
   captureServerEvent: async (_cookie: string | null, event: unknown) => void h.sent.push(event),
+  visitorDistinctId: (_cookie: string | null, userId: string | null, fallback: string) =>
+    userId ?? fallback,
 }));
 
 import { capturePublicEventAfterResponse } from './events';
@@ -34,7 +36,7 @@ describe('capturePublicEventAfterResponse', () => {
       'check_started',
       CHECK,
       { trigger: 'first_audit' },
-      null,
+      { accountId: null, userId: null },
     );
     expect(h.sent).toEqual([]);
     expect(h.tasks).toHaveLength(1);
@@ -49,7 +51,7 @@ describe('capturePublicEventAfterResponse', () => {
       'check_finished',
       CHECK,
       { trigger: 'manual', status: 'failed', pages: 0, durationMs: 1 },
-      account,
+      { accountId: account, userId: null },
     );
     await h.tasks[0]!();
     expect(h.sent).toEqual([expect.objectContaining({ accountId: account })]);
@@ -63,7 +65,7 @@ describe('capturePublicEventAfterResponse', () => {
         'check_started',
         CHECK,
         { trigger: 'first_audit' },
-        null,
+        { accountId: null, userId: null },
       ),
     ).resolves.toBeUndefined();
     expect(h.sent).toHaveLength(1);

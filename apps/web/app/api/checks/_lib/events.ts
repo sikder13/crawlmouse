@@ -5,13 +5,18 @@
  * drops a failed send.
  *
  * The check is named by `checkRef`, a hash, because its id is the capability to read it: the
- * distinct id is `check:{ref}` and the properties carry `check_ref`. That holds for these two
- * server events. The browser's own events from an audit page carry the page's URL, which holds
+ * properties carry `check_ref`. The distinct id is the visitor (CC-41 D1, `visitorDistinctId`): a
+ * signed-in viewer's `users.id`, else the browser's PostHog id from the consented cookie, else
+ * `check:{ref}`. That holds for these two server events. The browser's own events from an audit page carry the page's URL, which holds
  * the check id (instrumentation-client.ts: posthog-js with `capture_pageview`).
  */
 import { after } from 'next/server';
 import type { Check } from '@crawlmouse/types/v2';
-import { captureServerEvent, type SendCapture } from '../../../../lib/analytics-server';
+import {
+  captureServerEvent,
+  visitorDistinctId,
+  type SendCapture,
+} from '../../../../lib/analytics-server';
 import type { InternalLookup } from '../../../../lib/v2/ops/internal-marker';
 import { checkRef } from '../../../../lib/v2/pipeline/public';
 
@@ -39,22 +44,33 @@ export interface CaptureWith {
 }
 
 /**
- * `accountId` is the account that keeps the check's site, or null for a check no account keeps. The
- * distinct id names no account, so it is what `captureServerEvent` reads to mark an event about an
- * internal account (CC-33 D1).
+ * Who the event is about. `accountId` is the account that keeps the check's site, or null for a check
+ * no account keeps; it is what `captureServerEvent` reads to mark an event about an internal account
+ * (CC-33 D1). `userId` is the signed-in visitor's `users.id`, or null.
  */
+export interface PublicVisitor {
+  accountId: string | null;
+  userId: string | null;
+}
+
 export async function capturePublicEvent<E extends PublicServerEvent>(
   req: Request,
   event: E,
   checkId: string,
   properties: PublicServerEvents[E],
-  accountId: string | null,
+  { accountId, userId }: PublicVisitor,
   { send, lookup }: CaptureWith = {},
 ): Promise<void> {
   const ref = checkRef(checkId);
+  const cookie = req.headers.get('cookie');
   await captureServerEvent(
-    req.headers.get('cookie'),
-    { event, distinctId: `check:${ref}`, accountId, properties: { ...properties, check_ref: ref } },
+    cookie,
+    {
+      event,
+      distinctId: visitorDistinctId(cookie, userId, `check:${ref}`),
+      accountId,
+      properties: { ...properties, check_ref: ref },
+    },
     send,
     lookup,
   );
@@ -70,9 +86,9 @@ export async function capturePublicEventAfterResponse<E extends PublicServerEven
   event: E,
   checkId: string,
   properties: PublicServerEvents[E],
-  accountId: string | null,
+  visitor: PublicVisitor,
 ): Promise<void> {
-  const capture = () => capturePublicEvent(req, event, checkId, properties, accountId);
+  const capture = () => capturePublicEvent(req, event, checkId, properties, visitor);
   try {
     after(capture);
   } catch {

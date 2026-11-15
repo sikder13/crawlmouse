@@ -3,13 +3,19 @@
  * §8's (`check_started` in the one shape the product uses, `{trigger, check_ref}`), and each name is
  * in `FUNNEL_EVENTS` (`SERVER_EVENTS` is checked against it by the compiler).
  *
- * What is sent: the distinct id is the account's id; no email, host, IP or header value is put in
- * properties; a check is named by its `check_ref`, never its id. They go through the product's one
+ * What is sent: the distinct id is the acting person's `users.id`, or `account:<id>` for an event
+ * no person caused (CC-41 D1, `distinctIdFor`), with the account as `account_id`; no email, host, IP or
+ * header value is put in properties; a check is named by its `check_ref`, never its id. They go through the product's one
  * server sender, `captureServerEvent` (lib/analytics-server.ts), which reads the visitor's consent
  * from the request's cookie header (`serverCaptureAllowed`) and drops a send that fails.
  */
 import type { FunnelEvent } from '../../analytics-events';
-import { captureServerEvent, type SendCapture } from '../../analytics-server';
+import {
+  captureServerEvent,
+  distinctIdFor,
+  type EventKey,
+  type SendCapture,
+} from '../../analytics-server';
 import { checkRef } from '../pipeline/public';
 
 /** The names, each required to be in `FUNNEL_EVENTS` by `satisfies`. */
@@ -39,18 +45,18 @@ export type Sender = (
 ) => Promise<void>;
 
 export interface Capture {
-  <E extends ServerEventName>(
-    event: E,
-    accountId: string,
-    properties: ServerEvents[E],
-  ): Promise<void>;
+  <E extends ServerEventName>(event: E, key: EventKey, properties: ServerEvents[E]): Promise<void>;
 }
 
 /** The capture for one request: the product's sender, given the request's cookie header. */
 export function captureFor(req: Request, send?: SendCapture): Capture {
   const cookie = req.headers.get('cookie');
-  return (event, accountId, properties) =>
-    captureServerEvent(cookie, { event, distinctId: `account:${accountId}`, properties }, send);
+  return (event, key, properties) =>
+    captureServerEvent(
+      cookie,
+      { event, distinctId: distinctIdFor(cookie, key), accountId: key.accountId, properties },
+      send,
+    );
 }
 
 /**

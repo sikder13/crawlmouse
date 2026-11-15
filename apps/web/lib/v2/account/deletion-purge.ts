@@ -123,7 +123,11 @@ async function purgeOne(ports: PurgePorts, person: DuePerson): Promise<PurgeOutc
     return { outcome: 'refused', refusals: result.refusals };
   }
   await ports.rpc('finish_erasure', { p_user: userId });
-  await ports.capture('account_purged', accounts[0]!, { counts: result.before.counts });
+  await ports.capture(
+    'account_purged',
+    { accountId: accounts[0]! },
+    { counts: result.before.counts },
+  );
   return { outcome: 'purged', counts: result.before.counts };
 }
 

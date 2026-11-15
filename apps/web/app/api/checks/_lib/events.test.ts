@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { FUNNEL_EVENTS } from '../../../../lib/analytics-events';
 import { checkRef } from '../../../../lib/v2/pipeline/public';
 import type { CaptureBody } from '../../../../lib/analytics-server';
@@ -7,6 +7,7 @@ import { capturePublicEvent } from './events';
 
 const CHECK = '7b1f6c1e-8a53-4c0e-9d3a-2f6f1d0e4b11';
 const ACCOUNT = 'a0000000-0000-4000-8000-000000000001';
+const ANON = { accountId: null, userId: null };
 const request = (cookie?: string) =>
   new Request('https://crawlmouse.com/api/checks', {
     method: 'POST',
@@ -25,7 +26,7 @@ function recorder() {
 describe('capturePublicEvent', () => {
   it('sends the event under the check ref, with no person profile', async () => {
     const r = recorder();
-    await capturePublicEvent(request(), 'check_started', CHECK, { trigger: 'first_audit' }, null, {
+    await capturePublicEvent(request(), 'check_started', CHECK, { trigger: 'first_audit' }, ANON, {
       send: r.send,
     });
     expect(r.sent).toEqual([
@@ -49,7 +50,7 @@ describe('capturePublicEvent', () => {
       'check_finished',
       CHECK,
       { trigger: 'first_audit', status: 'finished', pages: 12, durationMs: 90_000 },
-      null,
+      ANON,
       { send: r.send },
     );
     const body = JSON.stringify(r.sent);
@@ -66,11 +67,18 @@ describe('capturePublicEvent', () => {
       return s.id === ACCOUNT;
     };
     const finished = { trigger: 'manual', status: 'failed', pages: 0, durationMs: 1 } as const;
-    await capturePublicEvent(request(), 'check_finished', CHECK, finished, ACCOUNT, {
-      send: r.send,
-      lookup,
-    });
-    await capturePublicEvent(request(), 'check_finished', CHECK, finished, null, {
+    await capturePublicEvent(
+      request(),
+      'check_finished',
+      CHECK,
+      finished,
+      { accountId: ACCOUNT, userId: null },
+      {
+        send: r.send,
+        lookup,
+      },
+    );
+    await capturePublicEvent(request(), 'check_finished', CHECK, finished, ANON, {
       send: r.send,
       lookup,
     });
@@ -85,7 +93,7 @@ describe('capturePublicEvent', () => {
       'check_started',
       CHECK,
       { trigger: 'first_audit' },
-      null,
+      ANON,
       { send: r.send },
     );
     expect(r.sent).toEqual([]);
@@ -98,10 +106,30 @@ describe('capturePublicEvent', () => {
       'check_started',
       CHECK,
       { trigger: 'first_audit' },
-      null,
+      ANON,
       { send: r.send },
     );
     expect(r.sent).toEqual([]);
+  });
+
+  it('is keyed by the signed-in visitor, else the browser’s PostHog id, else the check ref', async () => {
+    vi.stubEnv('NEXT_PUBLIC_POSTHOG_KEY', 'phc_k');
+    const ph = `ph_phc_k_posthog=${encodeURIComponent(JSON.stringify({ distinct_id: 'dev-5' }))}`;
+    const r = recorder();
+    const started = { trigger: 'first_audit' } as const;
+    const user = 'b0000000-0000-4000-8000-000000000005';
+    await capturePublicEvent(
+      request(ph),
+      'check_started',
+      CHECK,
+      started,
+      { accountId: null, userId: user },
+      { send: r.send },
+    );
+    await capturePublicEvent(request(ph), 'check_started', CHECK, started, ANON, { send: r.send });
+    await capturePublicEvent(request(), 'check_started', CHECK, started, ANON, { send: r.send });
+    expect(r.sent.map((b) => b.distinct_id)).toEqual([user, 'dev-5', `check:${checkRef(CHECK)}`]);
+    vi.unstubAllEnvs();
   });
 
   it('uses names the catalogue holds', () => {

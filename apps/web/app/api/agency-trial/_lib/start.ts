@@ -96,7 +96,8 @@ export async function startAgencyTrial(
     return refuse(409, 'trial_used', { reason: 'the person has used their agency trial' });
   }
   const { accountId } = started;
-  deps.defer(() => deps.capture('plan_chosen', accountId, { plan: 'agency', interval }));
+  const who = { userId: person.id, accountId };
+  deps.defer(() => deps.capture('plan_chosen', who, { plan: 'agency', interval }));
   // `created`: the account was made now, with this site its first. `existing` is the account of an
   // earlier submit, whose first site that submit stored and reported.
   if (started.outcome === 'created') deps.defer(() => deps.firstClient(accountId));
@@ -115,7 +116,7 @@ export async function startAgencyTrial(
   if (!result.ok) return refuse(result.status, result.error, result.detail);
   await deps.storeCheckout(accountId, { url: result.url, at, interval });
   deps.defer(() =>
-    deps.capture('trial_started', accountId, {
+    deps.capture('trial_started', who, {
       kind: 'agency',
       variant: 'card_required',
       stage: 'checkout_opened',

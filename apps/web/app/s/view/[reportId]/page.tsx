@@ -65,6 +65,6 @@ export default async function SharedProofPage({
   if (!shared || !doc) return notFound();
   await (
     await pageCapture()
-  )('proof_viewed', shared.report.accountId, { via: 'share' });
+  )('proof_viewed', { accountId: shared.report.accountId, visitor: true }, { via: 'share' });
   return <ProofScreen data={proofView(doc)} />;
 }

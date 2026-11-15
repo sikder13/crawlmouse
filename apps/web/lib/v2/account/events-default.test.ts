@@ -5,7 +5,8 @@
 import { describe, expect, it, vi } from 'vitest';
 
 const h = vi.hoisted(() => ({ calls: [] as unknown[][] }));
-vi.mock('../../analytics-server', () => ({
+vi.mock('../../analytics-server', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../analytics-server')>()),
   captureServerEvent: async (...args: unknown[]) => {
     h.calls.push(args);
   },

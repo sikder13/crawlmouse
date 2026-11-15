@@ -95,12 +95,16 @@ describe('startAgencyTrial', () => {
     expect(calls.checkout).toEqual([{ accountId: ACCOUNT, email: USER.email, interval: 'month' }]);
     expect(calls.stored).toEqual([[ACCOUNT, { url: URL_NEW, at: NOW, interval: 'month' }]]);
     expect(calls.events).toEqual([
-      ['plan_chosen', ACCOUNT, { plan: 'agency', interval: 'month' }],
+      [
+        'plan_chosen',
+        { userId: USER.id, accountId: ACCOUNT },
+        { plan: 'agency', interval: 'month' },
+      ],
       // CC-31 Q41: the account was made now, with this site its first client.
       ['first_client_added', ACCOUNT, {}],
       [
         'trial_started',
-        ACCOUNT,
+        { userId: USER.id, accountId: ACCOUNT },
         { kind: 'agency', variant: 'card_required', stage: 'checkout_opened' },
       ],
     ]);

@@ -10,12 +10,14 @@
  * - `trial_started {kind: 'agency', variant: 'card_required', stage: 'checkout_opened'}`: when the
  *   Agency trial's Checkout is opened. The trial itself starts at the webhook (CC-03).
  *
- * The distinct id is `account:<id>`; a signed-out view, which has no account, gets a random id of
- * its own, so no two views are joined. No property holds an address, a host or a name.
+ * The distinct id is the person's `users.id`, with their account as `account_id` when they have one
+ * (CC-41 D1). A signed-out view takes the browser's PostHog id when the request's consented cookie
+ * carries one (`visitorDistinctId`), else a random id of its own, so no two such views are joined.
+ * No property holds an address, a host or a name.
  */
 import { randomUUID } from 'node:crypto';
 import type { FunnelEvent } from '../../analytics-events';
-import { captureServerEvent } from '../../analytics-server';
+import { captureServerEvent, visitorDistinctId } from '../../analytics-server';
 import type { Interval } from '../../billing/catalog';
 import type { PaidTier } from '../../entitlement-v2';
 
@@ -27,9 +29,12 @@ export interface PricingEvents {
 
 export type PricingEventName = keyof PricingEvents & FunnelEvent;
 
+/** The signed-in person and the account they act in (none yet, for some); null when signed out. */
+export type PricingPerson = { userId: string; accountId: string | null } | null;
+
 export type CapturePricingEvent = <E extends PricingEventName>(
   event: E,
-  accountId: string | null,
+  person: PricingPerson,
   properties: PricingEvents[E],
 ) => Promise<void>;
 
@@ -38,10 +43,11 @@ export function pricingCapture(
   cookieHeader: string | null,
   capture: typeof captureServerEvent = captureServerEvent,
 ): CapturePricingEvent {
-  return (event, accountId, properties) =>
+  return (event, person, properties) =>
     capture(cookieHeader, {
       event,
-      distinctId: accountId === null ? `anon:${randomUUID()}` : `account:${accountId}`,
+      distinctId: person?.userId ?? visitorDistinctId(cookieHeader, null, `anon:${randomUUID()}`),
+      accountId: person?.accountId ?? null,
       properties,
     });
 }

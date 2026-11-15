@@ -8,7 +8,7 @@ import { accountDoorEnabled, checksPublicEnabled } from '@/lib/auth/flags';
 import { billingV2Enabled } from '@/lib/billing/flags';
 import { PRICING_COPY } from '@/lib/v2/copy/pricing';
 import { pricingCapture } from '@/lib/v2/pricing/events';
-import { readPricingViewer } from '@/lib/v2/pricing/read';
+import { readPricingVisit } from '@/lib/v2/pricing/read';
 import { reachedByRewrite } from '@/lib/v2/rewrite-target';
 import { socialCardPath } from '@/lib/v2/social-card';
 import { socialMetadata } from '@/lib/v2/social-metadata';
@@ -46,11 +46,12 @@ export default async function V2PricingPage({
   if (!(await reachedByRewrite())) return notFound();
   const now = new Date();
   const interval = intervalFrom((await searchParams).interval);
-  const viewer = await readPricingViewer(now);
+  const { viewer, userId } = await readPricingVisit(now);
   const capture = pricingCapture((await headers()).get('cookie'));
   const accountId = viewer.kind === 'signed_in' ? (viewer.account?.id ?? null) : null;
+  const person = userId === null ? null : { userId, accountId };
   after(() =>
-    capture('pricing_viewed', accountId, { interval, signedIn: viewer.kind === 'signed_in' }),
+    capture('pricing_viewed', person, { interval, signedIn: viewer.kind === 'signed_in' }),
   );
   const flags = { accountDoor: accountDoorEnabled(), checksPublic: checksPublicEnabled() };
   return <PricingScreen view={pricingView(viewer, interval, now, flags)} />;

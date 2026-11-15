@@ -196,7 +196,11 @@ export async function confirmEmailChange(
 
   const keep = input.caller?.userId === a.user_id ? input.caller.sessionId : null;
   await endSessions(ports, a.user_id, keep);
-  await ports.capture('account_email_changed', a.account_id, { tier: a.tier });
+  await ports.capture(
+    'account_email_changed',
+    { accountId: a.account_id, userId: a.user_id },
+    { tier: a.tier },
+  );
   return { ok: true };
 }
 

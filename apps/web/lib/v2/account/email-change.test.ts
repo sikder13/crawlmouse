@@ -1,3 +1,4 @@
+import type { EventKey } from '../../analytics-server';
 import type { PGlite } from '@electric-sql/pglite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { applyAllMigrations, freshDb } from '../../../__tests__/helpers/pglite-migrations';
@@ -38,7 +39,7 @@ async function person() {
 
 interface Recorded {
   emails: AccountEmailEvent[];
-  captured: [string, string, unknown][];
+  captured: [string, EventKey, unknown][];
   auth: string[];
   buckets: string[];
   reports: [string, Record<string, string>][];
@@ -65,8 +66,8 @@ function ports(over: Partial<EmailChangePorts> = {}): { ports: EmailChangePorts;
       sendEmails: async (events) => {
         rec.emails.push(...events);
       },
-      capture: async (event, accountId, properties) => {
-        rec.captured.push([event, accountId, properties]);
+      capture: async (event, key, properties) => {
+        rec.captured.push([event, key, properties]);
       },
       rateLimit: async (bucket) => {
         rec.buckets.push(bucket);
@@ -288,7 +289,9 @@ describe('confirmEmailChange', () => {
     expect(rec.auth).toEqual([`update ${p.userId} confirmed@example.org`]);
     expect(await emailOf(p.userId)).toBe('confirmed@example.org');
     expect(await sessions(p.userId)).toEqual([mine]);
-    expect(rec.captured).toEqual([['account_email_changed', p.accountId, { tier: 'free' }]]);
+    expect(rec.captured).toEqual([
+      ['account_email_changed', { accountId: p.accountId, userId: p.userId }, { tier: 'free' }],
+    ]);
     // The old address was told at the request; a second notice would re-issue its link.
     expect(rec.emails).toEqual([]);
   });

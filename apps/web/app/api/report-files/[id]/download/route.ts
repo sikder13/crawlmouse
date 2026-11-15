@@ -64,7 +64,8 @@ export async function GET(req: Request, { params }: Context) {
     file.storage_path as string,
     SIGNED_SECONDS,
   );
-  await agencyCaptureFor(req)('report_downloaded', report.account_id, {
+  const key = { accountId: report.account_id as string, userId: user.id };
+  await agencyCaptureFor(req)('report_downloaded', key, {
     kind: report.kind,
     format: report.format,
   });

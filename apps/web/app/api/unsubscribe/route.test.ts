@@ -3,9 +3,18 @@ import { signUnsubscribe } from '@/lib/v2/mail/unsubscribe-token';
 
 vi.mock('server-only', () => ({}));
 const rpc = vi.fn(async () => ({ data: true, error: null }));
-vi.mock('@/lib/supabase/admin', () => ({ supabaseAdmin: () => ({ rpc }) }));
+const ACCOUNT = 'a1111111-2222-4333-8444-555555555555';
+const seatRead = vi.fn((_table: string) => ({
+  select: () => ({
+    eq: () => ({ maybeSingle: async () => ({ data: { account_id: ACCOUNT }, error: null }) }),
+  }),
+}));
+vi.mock('@/lib/supabase/admin', () => ({ supabaseAdmin: () => ({ rpc, from: seatRead }) }));
 const capture = vi.fn(async () => undefined);
-vi.mock('@/lib/analytics-server', () => ({ captureServerEvent: capture }));
+vi.mock('@/lib/analytics-server', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/analytics-server')>()),
+  captureServerEvent: capture,
+}));
 
 const SECRET = 'k'.repeat(40);
 const SEAT = '11111111-2222-4333-8444-555555555555';
@@ -52,8 +61,24 @@ describe('POST /api/unsubscribe (D7)', () => {
     expect(capture).toHaveBeenCalledWith(null, {
       event: 'unsubscribed',
       distinctId: `seat:${SEAT}`,
+      accountId: ACCOUNT,
       properties: { kind: 'alerts' },
     });
+    expect(seatRead).toHaveBeenCalledWith('seats');
+  });
+
+  it('is keyed by the link holder’s browser when its consented PostHog cookie names it (CC-41 D1)', async () => {
+    vi.stubEnv('NEXT_PUBLIC_POSTHOG_KEY', 'phc_k');
+    const ph = `ph_phc_k_posthog=${encodeURIComponent(JSON.stringify({ distinct_id: 'dev-7' }))}`;
+    await post(
+      oneClick(token('alerts'), {
+        headers: { 'content-type': 'application/x-www-form-urlencoded', cookie: ph },
+      }),
+    );
+    expect(capture).toHaveBeenCalledWith(
+      ph,
+      expect.objectContaining({ distinctId: 'dev-7', accountId: ACCOUNT }),
+    );
   });
 
   it('takes a multipart one-click body too (RFC 8058 prefers it)', async () => {

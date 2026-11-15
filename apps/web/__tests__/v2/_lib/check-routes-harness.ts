@@ -106,12 +106,19 @@ export function harness(db: PGlite) {
     limits,
     captureFinished: (req, checkId, properties, accountId) => {
       finishedAccounts.push(accountId);
-      return capturePublicEvent(req, 'check_finished', checkId, properties, accountId, {
-        send: async (body) => {
-          captured.push(body);
+      return capturePublicEvent(
+        req,
+        'check_finished',
+        checkId,
+        properties,
+        { accountId, userId: null },
+        {
+          send: async (body) => {
+            captured.push(body);
+          },
+          lookup: async () => false,
         },
-        lookup: async () => false,
-      });
+      );
     },
     async send(event) {
       sent.push(event);

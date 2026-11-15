@@ -209,7 +209,9 @@ describe('a client report schedule’s mails, from the confirmation to a paused 
       'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
     });
     expect((await schedule()).pause_token_hash).toBe(sha256(pause));
-    expect(capture.mock.calls).toEqual([['first_client_report_sent', w.accountId, {}]]);
+    expect(capture.mock.calls).toEqual([
+      ['first_client_report_sent', { accountId: w.accountId }, {}],
+    ]);
     sent.push({ report, share, pause });
   });
 

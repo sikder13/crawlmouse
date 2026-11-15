@@ -182,7 +182,9 @@ describe('POST /api/billing/seats', () => {
     // The limits are the webhook's to write, from the subscription Stripe confirms.
     expect(await limitsOf(a.accountId)).toEqual(before);
     expect(before).toEqual({ seat_limit: GATES.agency.seats, site_limit: GATES.agency.sites });
-    expect(h.capture.mock.calls).toEqual([['seats_bought', a.accountId, { seats: 2, sites: 3 }]]);
+    expect(h.capture.mock.calls).toEqual([
+      ['seats_bought', { accountId: a.accountId, userId: a.owner.id }, { seats: 2, sites: 3 }],
+    ]);
   });
 
   it('sends seats_bought for a raise and not for a lowering alone, which buys nothing', async () => {
@@ -197,7 +199,9 @@ describe('POST /api/billing/seats', () => {
     expect(h.capture).not.toHaveBeenCalled();
     const raised = await buy({ seats: 1, sites: 4 }, chosen(a));
     expect(await raised.json()).toEqual({ seats: 1, sites: 4, changed: true });
-    expect(h.capture.mock.calls).toEqual([['seats_bought', a.accountId, { seats: 1, sites: 4 }]]);
+    expect(h.capture.mock.calls).toEqual([
+      ['seats_bought', { accountId: a.accountId, userId: a.owner.id }, { seats: 1, sites: 4 }],
+    ]);
   });
 
   it('a form is answered with a 303 back to Seats', async () => {

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { captureServerEvent } from '@/lib/analytics-server';
+import { captureServerEvent, visitorDistinctId } from '@/lib/analytics-server';
 import { checksPublicEnabled } from '@/lib/auth/flags';
 import { getClientIp } from '@/lib/client-ip';
 import { REPORT_VIEWS_PER_IP_PER_HOUR } from '@/lib/limits';
@@ -47,9 +47,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
     .maybeSingle();
   const accountId = (owner.data as { account_id: string | null } | null)?.account_id ?? null;
 
-  await captureServerEvent(req.headers.get('cookie'), {
+  const cookie = req.headers.get('cookie');
+  await captureServerEvent(cookie, {
     event: 'report_viewed',
-    distinctId: `report:${slug}`,
+    // The viewer, when their browser's consented cookie names them (CC-41 D1); else the report.
+    distinctId: visitorDistinctId(cookie, null, `report:${slug}`),
     accountId,
     properties: { kind: isV2Snapshot(report.report_snapshot) ? 'v2' : 'v1' },
   });

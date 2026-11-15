@@ -70,7 +70,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     if (outcome.created) {
       await captureFor(req)(
         'check_started',
-        site.account_id,
+        { accountId: site.account_id, userId: user.id },
         checkStarted('manual', outcome.checkId),
       );
     }

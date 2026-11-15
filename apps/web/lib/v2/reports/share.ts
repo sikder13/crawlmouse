@@ -182,10 +182,14 @@ export async function shareReport(
     if (r.outcome === 'not_found') return refuse(404, 'not_found');
     return kind === 'form' ? noticeTo(REPORTS_PAGE, 'not_ready') : refuse(409, 'not_ready');
   }
-  await deps.capture('report_shared', report.account_id, {
-    kind: report.kind,
-    format: report.format,
-  });
+  await deps.capture(
+    'report_shared',
+    { accountId: report.account_id, userId: caller.userId },
+    {
+      kind: report.kind,
+      format: report.format,
+    },
+  );
   if (kind === 'json') {
     return Response.json(
       { url: shareUrl(caller.origin, token), expiresAt: r.expiresAt },
@@ -271,10 +275,14 @@ export async function openShareLink(
   if (link.outcome === 'unknown') return shareNotFound();
   if (link.outcome === 'gone') return gone();
 
-  await deps.capture('share_link_opened', link.accountId, {
-    kind: link.kind,
-    format: link.format,
-  });
+  await deps.capture(
+    'share_link_opened',
+    { accountId: link.accountId, visitor: true },
+    {
+      kind: link.kind,
+      format: link.format,
+    },
+  );
   if (link.format === 'html') {
     const res = new Response(null, {
       status: 303,

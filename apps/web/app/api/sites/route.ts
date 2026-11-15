@@ -104,11 +104,12 @@ export async function POST(req: Request) {
   switch (added.outcome) {
     case 'created': {
       const capture = captureFor(req);
-      await capture('site_added', account.id, { n: added.n });
+      const key = { accountId: account.id, userId: user.id };
+      await capture('site_added', key, { n: added.n });
       if (added.n === 1 && account.kind === 'agency') {
-        await agencyCaptureFor(req)('first_client_added', account.id, {});
+        await agencyCaptureFor(req)('first_client_added', key, {});
       }
-      await capture('check_started', account.id, checkStarted('first_audit', added.checkId));
+      await capture('check_started', key, checkStarted('first_audit', added.checkId));
       // From the matrix, back to it, where the new client is a row; else to the new site's page.
       return body.kind === 'form'
         ? respond('form', back === MATRIX ? MATRIX : `/sites/${added.siteId}`)

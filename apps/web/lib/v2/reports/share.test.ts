@@ -135,7 +135,11 @@ describe('shareReport', () => {
     const token = url.slice(`${ORIGIN}/s/`.length);
     expect(f.store.create).toHaveBeenCalledWith(REPORT, token, 'user-1', NOW);
     expect(f.capture.mock.calls).toEqual([
-      ['report_shared', ACCOUNT, { kind: 'audit_pdf', format: 'pdf' }],
+      [
+        'report_shared',
+        { accountId: ACCOUNT, userId: 'user-1' },
+        { kind: 'audit_pdf', format: 'pdf' },
+      ],
     ]);
     expect(JSON.stringify(f.capture.mock.calls)).not.toContain(token);
   });

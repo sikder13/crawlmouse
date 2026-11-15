@@ -113,7 +113,13 @@ describe('the invitation mail’s request', () => {
 });
 
 describe('the routes’ answers', () => {
-  const account: SeatAccount = { accountId: A, tier: 'agency', seatLimit: 5, canBuySeats: true };
+  const account: SeatAccount = {
+    accountId: A,
+    actorUserId: 'u-inviter',
+    tier: 'agency',
+    seatLimit: 5,
+    canBuySeats: true,
+  };
   const body = {
     kind: 'json' as const,
     fields: { email: 'd@example.com', role: 'developer', scope: 'all' },

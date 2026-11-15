@@ -29,6 +29,7 @@ import { routeDeletionPorts } from './deletion-ports';
 import { emailChangePorts } from './email-change-ports';
 
 const ACCOUNT = 'a0000000-0000-4000-8000-000000000001';
+const USER = 'b0000000-0000-4000-8000-000000000001';
 const DENIED = 'cm_consent=denied';
 const GRANTED = 'cm_consent=granted';
 const sb = {} as SupabaseClient;
@@ -43,16 +44,29 @@ describe.each([
   ['emailChangePorts', (cookie: string) => emailChangePorts(sb, cookie).capture],
 ])('%s', (_name, captureFor) => {
   it('sends nothing for a request whose consent cookie says denied', async () => {
-    await captureFor(DENIED)('account_deletion_requested', ACCOUNT, { tier: 'free' });
+    await captureFor(DENIED)(
+      'account_deletion_requested',
+      { accountId: ACCOUNT, userId: USER },
+      {
+        tier: 'free',
+      },
+    );
     expect(h.sent).toEqual([]);
   });
 
-  it('sends the event, keyed by the account, when it says granted', async () => {
-    await captureFor(GRANTED)('account_deletion_requested', ACCOUNT, { tier: 'free' });
+  it('sends the event, keyed by the person with their account, when it says granted', async () => {
+    await captureFor(GRANTED)(
+      'account_deletion_requested',
+      { accountId: ACCOUNT, userId: USER },
+      {
+        tier: 'free',
+      },
+    );
     expect(h.sent).toHaveLength(1);
     expect(h.sent[0]).toMatchObject({
       event: 'account_deletion_requested',
-      distinct_id: `account:${ACCOUNT}`,
+      distinct_id: USER,
+      properties: { account_id: ACCOUNT },
     });
   });
 });
