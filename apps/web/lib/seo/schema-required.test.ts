@@ -21,6 +21,12 @@ describe('schemaProblems', () => {
       { type: 'Answer', missing: 'text' },
     ]);
   });
+  it('skips a node that only references another by @id, and checks one that says more', () => {
+    expect(schemaProblems({ '@type': 'WebPage', '@id': 'https://x/a' })).toEqual([]);
+    expect(schemaProblems({ '@type': 'WebPage', '@id': 'https://x/a', name: 'A' })).toEqual([
+      { type: 'WebPage', missing: 'url' },
+    ]);
+  });
   it('fails a type with no required set, and does not read inherited keys as one', () => {
     expect(schemaProblems({ '@type': 'Recipe', name: 'x' })).toEqual([
       { type: 'Recipe', missing: '@type' },

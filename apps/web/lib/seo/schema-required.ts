@@ -34,10 +34,18 @@ export interface SchemaProblem {
   missing: string;
 }
 
+/**
+ * A node that only points at another by `@id` (`{ "@type": "WebPage", "@id": url }`) is a reference,
+ * not a description, so it carries no required set.
+ */
+const isReference = (node: Record<string, unknown>) =>
+  Object.hasOwn(node, '@id') && Object.keys(node).every((k) => k === '@type' || k === '@id');
+
 /** What each typed node in a JSON-LD value lacks. Empty when every node carries its required set. */
 export function schemaProblems(value: unknown): SchemaProblem[] {
   const out: SchemaProblem[] = [];
   for (const node of typedNodes(value)) {
+    if (isReference(node)) continue;
     for (const type of typesOf(node)) {
       const required = Object.hasOwn(REQUIRED, type) ? REQUIRED[type] : undefined;
       if (!required) {
