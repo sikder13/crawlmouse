@@ -1,4 +1,10 @@
 import { LegalPage } from '@/components/legal/LegalPage';
+import {
+  FIRST_TOUCH_COOKIE,
+  FIRST_TOUCH_FIELD_LABELS,
+  FIRST_TOUCH_FIELDS,
+  FIRST_TOUCH_MAX_AGE_S,
+} from '@/lib/analytics/first-touch';
 
 export const metadata = {
   title: 'Privacy Policy',
@@ -127,6 +133,14 @@ export default function PrivacyPage() {
             privacy@crawlmouse.com
           </a>
           ).
+        </li>
+        <li>
+          <strong className="font-semibold">First visit ({FIRST_TOUCH_COOKIE}).</strong> A
+          first-party cookie, set under the same analytics consent and only on your first visit,
+          that records where you came from:{' '}
+          {FIRST_TOUCH_FIELDS.map((f) => FIRST_TOUCH_FIELD_LABELS[f]).join(', ')}. It is never
+          overwritten and is kept for {FIRST_TOUCH_MAX_AGE_S / 86_400} days. When you create an
+          account, these fields are stored with it, so we can tell which channel brought it.
         </li>
         <li>
           <strong className="font-semibold">Session replay.</strong> We capture replay only when an

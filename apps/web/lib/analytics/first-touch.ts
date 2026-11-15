@@ -52,6 +52,19 @@ export const FIRST_TOUCH_FIELDS = [
   'first_seen_at',
 ] as const;
 
+/** How the privacy page names each field (app/privacy/page.tsx). */
+export const FIRST_TOUCH_FIELD_LABELS: Record<(typeof FIRST_TOUCH_FIELDS)[number], string> = {
+  utm_source: 'utm_source',
+  utm_medium: 'utm_medium',
+  utm_campaign: 'utm_campaign',
+  utm_content: 'utm_content',
+  utm_term: 'utm_term',
+  referrer_host: 'the hostname of the site that sent you (not the address of its page)',
+  landing_path: 'the path of the page you landed on (not its query)',
+  ref: 'a referral code (ref)',
+  first_seen_at: 'the time of the visit',
+};
+
 export type FirstTouch = { [K in UtmField]?: string } & {
   referrer_host?: string;
   landing_path?: string;
