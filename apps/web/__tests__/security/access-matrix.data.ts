@@ -48,6 +48,8 @@ const PAGES_TEST = '__tests__/security/access-proof-pages.test.ts';
 const MATRIX_TEST = '__tests__/security/access-matrix.test.ts';
 const PUBLIC_TEST = '__tests__/security/access-proof-public.test.ts';
 const CALLERS_ARE_ROWS = 'every chain of importers from a caller row ends at a gated row';
+const KEPT_TEST = 'app/(v2-kept)/kept-access.test.tsx';
+const OPERATOR = 'an operator (a signed-in user `is_operator()` answers true for)';
 
 /** A link-landing route: it moves the token into a cookie and reads nothing. */
 const landing = (path: string, proof: Proof): Spec => ({
@@ -974,6 +976,36 @@ const ROUTES: readonly Spec[] = [
   },
   // staff, auth, forms
   {
+    path: 'api/internal/search',
+    v2: true,
+    identity: OPERATOR,
+    gate: 'operator',
+    detail:
+      'The support console’s search: resolves the query (an address, a host or a check id) to account ids through the service role (`consoleStore`) and records its kind and count, not the query. `requireOperator` runs first; anyone else is a 404.',
+    check: at('app/api/internal/search/route.ts', 'requireOperator'),
+    proof: by('app/api/internal/search/route.test.ts', 'signed in'),
+  },
+  {
+    path: 'api/internal/checks/[id]/rerun',
+    v2: true,
+    identity: OPERATOR,
+    gate: 'operator',
+    detail:
+      'Re-runs a failed check through the member re-check’s start path, under the site’s own account’s cap, and records the re-run or its refusal in `operator_actions`. `requireOperator` runs first; anyone else is a 404.',
+    check: at('app/api/internal/checks/[id]/rerun/route.ts', 'requireOperator'),
+    proof: by('app/api/internal/checks/[id]/rerun/route.test.ts', 'signed in'),
+  },
+  {
+    path: 'api/internal/accounts/[id]/sign-in-link',
+    v2: true,
+    identity: OPERATOR,
+    gate: 'operator',
+    detail:
+      'Re-sends a sign-in link to the address of an active seat on the account, under the magic-link route’s per-address bucket, recorded in `operator_actions` first. `requireOperator` runs first; anyone else is a 404.',
+    check: at('app/api/internal/accounts/[id]/sign-in-link/route.ts', 'requireOperator'),
+    proof: by('app/api/internal/accounts/[id]/sign-in-link/route.test.ts', 'signed in'),
+  },
+  {
     path: 'api/admin/takedown/process',
     v2: false,
     identity: 'the operator (Bearer ADMIN_SECRET)',
@@ -1098,7 +1130,7 @@ const ROUTES: readonly Spec[] = [
     detail: 'Liveness: the version and commit, no database or network read.',
     proof: by(
       'app/api/health/route.test.ts',
-      'depends on next/server and package.json only, and calls no fetch (a liveness probe must not reach Supabase or the network)',
+      'depends on next/server and the health module only, which depends on package.json only, and neither calls fetch (a liveness probe must not reach Supabase or the network)',
     ),
   },
   {
@@ -1241,13 +1273,59 @@ const ENTRIES: readonly Spec[] = [
     identity: 'signed-in seat, in its viewer account',
     gate: 'member_for_site',
     detail:
-      'The account home: the sites the seat’s scope covers, read by `sitesInScope` through the session.',
+      'The account home: the sites the seat’s scope covers, read by `sitesInScope` through the session. Its two service-role clients read the next check time of those sites alone (`readNextChecks`) and the signed-in viewer’s own completed v1 audits, keyed by their user id (`readEarlierAudits`).',
     check: at('lib/v2/account/dataset.ts', 'sitesInScope'),
     proof: by(
       PAGES_TEST,
       '/dashboard/v2: a developer sees the client their seat covers alone, and a stranger neither',
     ),
-    calls: 1,
+    calls: 2,
+  },
+  {
+    path: 'apps/web/app/internal/page.tsx',
+    v2: true,
+    identity: OPERATOR,
+    gate: 'operator',
+    detail:
+      'The support console’s search page: the accounts its `?accounts=` names (at most 20), each recorded as a `list_accounts` line before it is read through the service role. `requireOperator` runs first; anyone else is a 404.',
+    check: at('app/internal/page.tsx', 'requireOperator'),
+    proof: by('app/internal/page.test.tsx', 'is a 404 for a caller signed in, before any read'),
+  },
+  {
+    path: 'apps/web/app/internal/accounts/[id]/page.tsx',
+    v2: true,
+    identity: OPERATOR,
+    gate: 'operator',
+    detail:
+      'One account in the support console, recorded in `operator_actions` before it is read through the service role. `requireOperator` runs first; anyone else is a 404.',
+    check: at('app/internal/accounts/[id]/page.tsx', 'requireOperator'),
+    proof: by('app/internal/accounts/[id]/page.test.tsx', 'signed in'),
+  },
+  {
+    path: 'apps/web/app/(v2-kept)/v2-kept/audit/[id]/page.tsx',
+    v2: true,
+    identity: 'holder of the audit id (v1)',
+    gate: 'capability',
+    detail:
+      'v1’s audit page in the v2 shell, with V2_CHECKS_PUBLIC on: the v1 audit the id names, filtered by that id through the service role. Any other id is sent to the v2 overview, which decides for itself.',
+    check: at('app/audit/[id]/page.tsx', 'eq', 'id'),
+    proof: by(
+      KEPT_TEST,
+      'the holder of an audit id sees that audit alone; an id that names none is sent to the v2 overview, and nothing is drawn',
+    ),
+  },
+  {
+    path: 'apps/web/app/(v2-kept)/v2-kept/verify/[id]/page.tsx',
+    v2: true,
+    identity: 'signed-in person',
+    gate: 'own_rows',
+    detail:
+      'v1’s verification page in the v2 shell, with V2_CHECKS_PUBLIC on: the caller’s own verification row, filtered by their user id. Another person is a 404; signed out is sent to sign in.',
+    check: at('app/verify/[id]/page.tsx', 'eq', 'user_id'),
+    proof: by(
+      KEPT_TEST,
+      'the owner sees their verification; another signed-in person is a 404; signed out is sent to sign in',
+    ),
   },
   {
     path: 'apps/web/app/alerts/page.tsx',
@@ -1585,6 +1663,7 @@ const ENTRIES: readonly Spec[] = [
 ];
 
 const PIPELINE_FUNCTIONS = 'apps/web/lib/v2/pipeline/functions.ts';
+const OPS_FUNCTIONS = 'apps/web/lib/v2/ops/functions.ts';
 const callerProof: Proof = {
   ...repo(`apps/web/${MATRIX_TEST}`, CALLERS_ARE_ROWS),
   via: 'caller-check',
@@ -1726,7 +1805,6 @@ const LIBS: readonly Spec[] = [
   ...(
     [
       ['apps/web/lib/v2/agency/schedules-wiring.ts', 'The report-schedule functions’ store.', 1],
-      ['apps/web/lib/v2/mail/functions.ts', 'The mail functions’ stores.', 2],
       ['apps/web/lib/v2/monitor/functions.ts', 'The alert and summary functions’ stores.', 1],
       ['apps/web/lib/v2/monitor/schedule.ts', 'The scheduled re-check claims.', 1],
       ['apps/web/lib/billing/inngest-functions.ts', 'The billing functions’ stores.', 1],
@@ -1743,6 +1821,41 @@ const LIBS: readonly Spec[] = [
       calls,
     }),
   ),
+  {
+    path: 'apps/web/lib/v2/mail/functions.ts',
+    v2: true,
+    identity: 'Inngest',
+    gate: 'caller',
+    detail:
+      'The mail functions’ stores, and the mail log the support console’s functions share. Registered by the pipeline functions, served by the signed Inngest route.',
+    callers: [PIPELINE_FUNCTIONS, OPS_FUNCTIONS],
+    proof: callerProof,
+    calls: 2,
+  },
+  {
+    path: OPS_FUNCTIONS,
+    v2: true,
+    identity: 'Inngest',
+    gate: 'caller',
+    detail:
+      'The founder’s notices and the sign-in canary (CC-33): the founder’s stores, and the canary’s `signin_delivery_seen` read, over the service role. Registered by the pipeline functions, served by the signed Inngest route.',
+    callers: [PIPELINE_FUNCTIONS],
+    proof: callerProof,
+    calls: 1,
+  },
+  {
+    path: 'apps/web/lib/v2/ops/internal-marker.ts',
+    v2: true,
+    identity: 'its callers',
+    gate: 'caller',
+    detail:
+      'Asks `is_internal_subject` whether an analytics event’s account, seat or user is internal, for `captureServerEvent` to mark the event; answers a boolean that no response carries.',
+    publicCallers:
+      'it answers only whether an event names an internal account, and that answer goes to analytics, never to the caller',
+    callers: ['apps/web/lib/analytics-server.ts'],
+    proof: callerProof,
+    calls: 1,
+  },
   {
     path: 'apps/web/lib/billing/reconcile-v2.ts',
     v2: true,
@@ -1777,6 +1890,7 @@ const LIBS: readonly Spec[] = [
       'apps/web/app/api/contact/agency-plus/route.ts',
       'apps/web/app/api/developers/route.ts',
       'apps/web/app/api/fixes/[id]/email-developer/route.ts',
+      'apps/web/app/api/internal/accounts/[id]/sign-in-link/route.ts',
       'apps/web/app/api/report-files/[id]/share/route.ts',
       'apps/web/app/api/report-files/confirm/route.ts',
       'apps/web/app/api/report-files/decline/route.ts',
@@ -1943,6 +2057,7 @@ const LIBS: readonly Spec[] = [
       'apps/web/lib/v2/account/pages.ts',
       'apps/web/lib/v2/account/settings-pages.ts',
       'apps/web/lib/v2/account/viewer.ts',
+      'apps/web/lib/v2/ops/operator.ts',
       'apps/web/lib/v2/pipeline/public-deps.ts',
       'apps/web/lib/v2/pricing/read.ts',
     ],
