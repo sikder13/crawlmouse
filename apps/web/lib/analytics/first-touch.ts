@@ -39,6 +39,15 @@ export const UTM_FIELDS = [
 
 type UtmField = (typeof UTM_FIELDS)[number];
 
+/** Every field of the record, in the order the table lists them. */
+export const FIRST_TOUCH_FIELDS = [
+  ...UTM_FIELDS,
+  'referrer_host',
+  'landing_path',
+  'ref',
+  'first_seen_at',
+] as const;
+
 export type FirstTouch = { [K in UtmField]?: string } & {
   referrer_host?: string;
   landing_path?: string;
