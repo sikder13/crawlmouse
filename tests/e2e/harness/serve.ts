@@ -19,7 +19,9 @@ import { seed } from '../../../scripts/qa/seed';
 import { migrationsAddInternal } from '../../../scripts/qa/marker-gate';
 import { qaStore } from '../../../scripts/qa/store';
 import { finishCheck } from './checks';
-import { startStandin, type Standin } from './standin';
+import { runInternal } from '../../../scripts/ops/internal';
+import { restClient } from '../../../scripts/ops/supabase-rest';
+import { SERVICE_KEY, startStandin, type Standin } from './standin';
 import { WalkStripe } from './stripe';
 
 const PORT = Number(process.env.STANDIN_PORT ?? 54438);
@@ -27,8 +29,8 @@ const WEB = process.env.WALK_BASE ?? 'http://localhost:3238';
 export const QA_INBOX = { local: 'qa', domain: 'walk.example' };
 /** The walk's ledger pepper, built from parts; run.sh gives the build the same value. */
 const PEPPER = process.env.TRIAL_LEDGER_PEPPER ?? '';
-/** CC-33's `accounts.internal`: the set is seeded once its migration is on the tree (questions Q1). */
-const HAS_INTERNAL_MARKER = migrationsAddInternal();
+// The set needs CC-33's `accounts.internal`; without its migration the walk stops here.
+if (!migrationsAddInternal()) throw new Error('walk: no migration adds accounts.internal (CC-33)');
 
 const stripe = new WalkStripe(() => `${WEB}/api/webhooks/stripe-account`);
 
@@ -53,7 +55,7 @@ const standin: Standin = await startStandin(PORT, {
 
 const sb = postgrestOver(standin.db);
 let steps: unknown[] = [];
-if (HAS_INTERNAL_MARKER) {
+{
   steps = await seed({
     auth: {
       async find(email) {
@@ -87,11 +89,9 @@ if (HAS_INTERNAL_MARKER) {
       now: () => new Date(),
       paused: () => false,
     }),
+    // CC-33's ops:internal module itself, over its REST client, against the stand-in's /rest/v1.
     async markInternal(accountId) {
-      // CC-33's ops:internal, as it writes: accounts.internal by id, with the service role.
-      await standin.db.query('update public.accounts set internal = true where id = $1', [
-        accountId,
-      ]);
+      await runInternal([accountId], restClient({ url: standin.url, key: SERVICE_KEY }), () => {});
     },
     inbox: QA_INBOX,
     // The walk's inbox is its own test domain: the phrase the seed asks for is answered as typed.
@@ -104,7 +104,7 @@ console.log(
   JSON.stringify({
     ready: true,
     url: standin.url,
-    seeded: HAS_INTERNAL_MARKER,
+
     steps: steps.length,
   }),
 );

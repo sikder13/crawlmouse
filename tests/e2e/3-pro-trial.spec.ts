@@ -1,5 +1,5 @@
 import { expect, test } from './pw';
-import { control, holdStripe, NEEDS_SEED, qa, SEEDED, shot, signIn, sql } from './walk';
+import { control, holdStripe, qa, shot, signIn, sql } from './walk';
 
 /**
  * Journey 3 (CC-38 D4): `qa+protrial`, on the no-card Pro trial qa:seed started, upgrades. The walk
@@ -8,8 +8,6 @@ import { control, holdStripe, NEEDS_SEED, qa, SEEDED, shot, signIn, sql } from '
  * webhook (harness/stripe.ts) — and reads what the real webhook made of it. Then cancel, and restore.
  */
 const J = '3-pro-trial';
-
-test.skip(!SEEDED, NEEDS_SEED);
 
 const accountState = async () =>
   (

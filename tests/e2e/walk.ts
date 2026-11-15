@@ -10,9 +10,6 @@ export const STANDIN = process.env.STANDIN_URL ?? 'http://127.0.0.1:54438';
 const SHOTS = process.env.WALK_SHOTS ?? '';
 export const INBOX_DOMAIN = 'walk.example';
 export const qa = (key: string) => `qa+${key}@${INBOX_DOMAIN}`;
-/** CC-33's migration is the seed's precondition (scripts/qa, questions Q1). */
-export const SEEDED = process.env.WALK_SEEDED === 'true';
-export const NEEDS_SEED = 'the QA set is seeded once CC-33 (accounts.internal) is on the tree';
 
 export async function control<T = unknown>(name: string, body: object = {}): Promise<T> {
   const r = await fetch(`${STANDIN}/__harness/${name}`, {

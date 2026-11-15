@@ -68,7 +68,6 @@ GROUPS_STARTED+=($!)
 for i in $(seq 1 120); do [ -s "$LOGS/serve.out" ] && break; sleep 2; done
 [ -s "$LOGS/serve.out" ] || { echo "STAND-IN NOT READY"; tail -20 "$LOGS/serve.err"; stop; exit 1; }
 cat "$LOGS/serve.out"
-export WALK_SEEDED=$(grep -o '"seeded":[a-z]*' "$LOGS/serve.out" | cut -d: -f2)
 
 NODE_OPTIONS="--import $ROOT/tests/e2e/harness/preload.mjs" \
   setsid pnpm exec next start -p "$WEB_PORT" > "$LOGS/start.log" 2>&1 < /dev/null &

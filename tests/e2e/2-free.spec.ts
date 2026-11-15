@@ -1,13 +1,11 @@
 import { expect, test } from './pw';
-import { control, NEEDS_SEED, qa, SEEDED, shot, signIn, sql } from './walk';
+import { control, qa, shot, signIn, sql } from './walk';
 
 /**
  * Journey 2 (CC-38 D4): `qa+free` on Free — the seeded site's first check, a fix's packet, Mark done,
  * the re-check it starts, the before/after, and the upgrade gate when a second site is added.
  */
 const J = '2-free';
-
-test.skip(!SEEDED, NEEDS_SEED);
 
 test('Free: check, fix packet, mark done, re-check, before/after, the second-site gate', async ({
   page,

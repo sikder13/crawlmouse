@@ -1,6 +1,6 @@
 import { expect, test, type Page } from './pw';
 import { QA_HOSTS } from '../../scripts/qa/accounts';
-import { control, events, holdStripe, NEEDS_SEED, qa, SEEDED, shot, signIn, sql } from './walk';
+import { control, events, holdStripe, qa, shot, signIn, sql } from './walk';
 
 /**
  * Journey 4 (CC-38 D4): `qa+agencytrial` starts the Agency trial (card taken at Checkout, then the
@@ -14,7 +14,6 @@ const DEV = 'developer@walk.example';
 const FIRST_CLIENT = QA_HOSTS.trialClient;
 const CLIENTS = [2, 3, 4, 5, 6].map((n) => `client-${n}.walk.crawlmouse.com`);
 
-test.skip(!SEEDED, NEEDS_SEED);
 test.describe.configure({ mode: 'serial' });
 
 const agency = async () =>
@@ -208,4 +207,52 @@ test('a client report, its share link, the proof page signed out, and the share 
   await visitor.close();
 });
 
-test.fixme('the developer cannot see the card or mint a report (CC-37 D5; needs CC-37 on origin/main)', () => {});
+test('the developer sees no card digits and cannot publish a report; the owner can (CC-37 D5)', async ({
+  page,
+  context,
+  browser,
+}) => {
+  // The card's last four as the webhook would hold them (CC-39 F8 writes them; the walk sets them).
+  const DIGITS = ['4', '2', '4', '2'].join('');
+  const { id: accountId } = await agency();
+  await sql(`update public.accounts set card_last4 = $1 where id = $2`, [DIGITS, accountId]);
+  const [site] = await sql<{ id: string }>(
+    `select id from public.sites where host = $1 and removed_at is null`,
+    [CLIENTS[1]],
+  );
+  await control('finish', { siteId: site!.id });
+  const [check] = await sql<{ id: string }>(
+    `select id from public.checks where site_id = $1 and status = 'finished' order by finished_at desc limit 1`,
+    [site!.id],
+  );
+  /** A same-origin POST from the page, as its own forms send one. */
+  const mint = (p: Page) =>
+    p.evaluate(async (checkId) => {
+      const r = await fetch('/api/reports/mint', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ checkId }),
+      });
+      return { status: r.status, body: await r.text() };
+    }, check!.id);
+
+  const dev = await browser.newContext();
+  await signIn(dev, DEV);
+  const devPage = await dev.newPage();
+  await devPage.goto('/agency');
+  await shot(devPage, J, 'developer-card');
+  expect(await devPage.locator('body').innerText()).not.toContain(DIGITS);
+  const refused = await mint(devPage);
+  expect(refused.status, refused.body).toBe(403);
+  expect(refused.body).toContain('role_refused');
+  await dev.close();
+
+  await signIn(context, qa('agencytrial'));
+  await openAgency(page);
+  // Not shown to the developer, and shown to the owner: the digits are on the page that reads them.
+  await page.goto('/settings/plan');
+  await shot(page, J, 'owner-card');
+  expect(await page.locator('body').innerText()).toContain(DIGITS);
+  const minted = await mint(page);
+  expect(minted.status, minted.body).toBeLessThan(300);
+});
