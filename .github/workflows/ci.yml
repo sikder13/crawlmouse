@@ -866,6 +866,12 @@ jobs:
           TRIAL_RACE_DB_URL: postgresql://postgres:postgres@localhost:5432/postgres?sslmode=disable
           TRIAL_RACE_REQUIRED: '1'
         run: pnpm exec vitest run db/agency-trial-race.test.ts --passWithNoTests=false
+      - name: A person who used an Agency trial, and two first calls at once (CC-37)
+        working-directory: scripts
+        env:
+          TRIAL_RACE_DB_URL: postgresql://postgres:postgres@localhost:5432/postgres?sslmode=disable
+          TRIAL_RACE_REQUIRED: '1'
+        run: pnpm exec vitest run db/agency-trial-repeat-race.test.ts --passWithNoTests=false
       - name: Two transactions race for an account's last seat (CC-31)
         working-directory: scripts
         env:
@@ -878,3 +884,15 @@ jobs:
           TRIAL_RACE_DB_URL: postgresql://postgres:postgres@localhost:5432/postgres?sslmode=disable
           TRIAL_RACE_REQUIRED: '1'
         run: pnpm exec vitest run db/report-links-race.test.ts --passWithNoTests=false
+      - name: Concurrent claims race in claim_founder_notice (CC-33)
+        working-directory: scripts
+        env:
+          TRIAL_RACE_DB_URL: postgresql://postgres:postgres@localhost:5432/postgres?sslmode=disable
+          TRIAL_RACE_REQUIRED: '1'
+        run: pnpm exec vitest run db/founder-notice-race.test.ts --passWithNoTests=false
+      - name: A sign-up and the v1 account backfill race for one user (CC-36)
+        working-directory: scripts
+        env:
+          TRIAL_RACE_DB_URL: postgresql://postgres:postgres@localhost:5432/postgres?sslmode=disable
+          TRIAL_RACE_REQUIRED: '1'
+        run: pnpm exec vitest run db/account-backfill-race.test.ts --passWithNoTests=false

@@ -444,6 +444,27 @@ const WITHDRAWN: readonly WithdrawnClaim[] = [
     allowedIn: [],
   },
   {
+    // Withdrawn in SQL, which this guard cannot read; registered so no document repeats it.
+    text: 'so a retried notice reports the same rows',
+    withdrawnIn:
+      'infra/supabase/migrations/20261115000001_v2_033_operations.sql (take_founder_overflow), CC-33 review round 3 M2',
+    truth:
+      'A retried "N more" notice reports the rows carrying its key: the ones it took, or none once a ' +
+      'later hour re-took them; it takes no new row once a mail was claimed under its key.',
+    allowedIn: [],
+  },
+  {
+    // The same comment's other withdrawn sentence (round 3 M2), registered as the one above is.
+    text: 'finds no rows under its key',
+    withdrawnIn:
+      'infra/supabase/migrations/20261115000001_v2_033_operations.sql (take_founder_overflow), CC-33 review round 3 M2',
+    truth:
+      'A retry of an earlier hour\'s "N more" notice answers the rows still carrying its key, and ' +
+      'takes no row back from a later hour once a mail was claimed under its own key: the rows it ' +
+      'took, or none once a later hour re-took them.',
+    allowedIn: [],
+  },
+  {
     text: "the constants' bound",
     withdrawnIn: 'docs/ops/inngest-budget.md (the worst check), CC-35 review round 1 (Tier B B3)',
     truth:
@@ -482,6 +503,28 @@ const WITHDRAWN: readonly WithdrawnClaim[] = [
     text: 'the function count `golive:check` lists',
     withdrawnIn: 'docs/ops/go-live.md, CC-35 review round 2 (deploy safety R2-1, Tier B)',
     truth: 'golive:check prints no function count; functionCountsByStep() does, after each step.',
+    allowedIn: [],
+  },
+  {
+    text: "adds `accounts.internal` with CC-33's own statement",
+    withdrawnIn:
+      'docs/specs/v2/37-security.md D3, CC-37 ruling 4 (CC-33 merged; the Q6 fallback removed)',
+    truth:
+      "accounts.internal is CC-33's 20261115000001; 20261117000001 adds and drops no column (v2-037-security.test.ts).",
+    allowedIn: [],
+  },
+  {
+    text: 'Three stages, in this order; the owner applies the migrations',
+    withdrawnIn: 'docs/specs/v2/37-security.md "Deploy order", CC-37 review round 2 (N2)',
+    truth:
+      'Merging deploys the app and db-apply-prod then applies every pending file in one push, in name order; the reads that need 20261117000001 sit behind V2_CHECKS_PUBLIC and V2_BILLING.',
+    allowedIn: [],
+  },
+  {
+    text: '`card_on_file` for every role',
+    withdrawnIn: 'docs/specs/v2/37-security.md D5, CC-37 review round 1 (correctness m2; Q13)',
+    truth:
+      'card.ts returns onFile; the dataset carries cardsOnFile and the views AccountView.cardOnFile.',
     allowedIn: [],
   },
   {

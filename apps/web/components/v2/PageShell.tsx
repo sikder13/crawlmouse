@@ -2,7 +2,7 @@ import { memo, type ReactNode } from 'react';
 import { BrandLink } from './BrandLink';
 import { NavMenu } from './NavMenu';
 import { SiteFooter, type ServiceStatus } from './SiteFooter';
-import { isGroup, type NavEntry } from './footer-links';
+import { isGroup, type FooterGates, type NavEntry } from './footer-links';
 import layout from './layout.module.css';
 import styles from './PageShell.module.css';
 
@@ -21,6 +21,11 @@ export interface PageShellProps {
   status?: ServiceStatus;
   /** Shown after the footer's line (SiteFooter `lineMark`). */
   footerLineMark?: ReactNode;
+  /**
+   * Which of the footer's gated links are links (SiteFooter `gates`). A server page leaves it out and
+   * the footer reads the flags; a client page passes it, since it cannot read them.
+   */
+  footerGates?: FooterGates;
   children: ReactNode;
 }
 
@@ -51,6 +56,7 @@ export function PageShell({
   footer = true,
   status,
   footerLineMark,
+  footerGates,
   children,
 }: PageShellProps) {
   return (
@@ -69,7 +75,7 @@ export function PageShell({
         </div>
       </header>
       {children}
-      {footer ? <Footer status={status} lineMark={footerLineMark} /> : null}
+      {footer ? <Footer status={status} lineMark={footerLineMark} gates={footerGates} /> : null}
     </div>
   );
 }

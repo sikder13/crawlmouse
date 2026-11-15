@@ -16,10 +16,12 @@ v2_tables(rel) as (
     ('public.checks'), ('public.crawl_batches'), ('public.deploy_hooks'), ('public.email_sends'),
     ('public.email_suppressions'), ('public.evidence_blobs'),
     ('public.contact_requests'), ('public.fix_email_requests'), ('public.fix_events'), ('public.link_edges'), ('public.measurement_lineages'),
+    ('public.operator_actions'), ('public.operators'),
     ('public.page_results'), ('public.persist_chunks'), ('public.report_schedules'),
     ('public.reports'), ('public.seat_sites'), ('public.seats'), ('public.share_links'),
     ('public.site_fixes'), ('public.sites'), ('public.slack_sends'), ('public.subscriptions'), ('public.trial_ledger'),
-    ('public.usage_events')
+    ('public.usage_events'),
+    ('public.founder_notices')
 ),
 -- (relation, role, privilege, columns); null columns is a grant on the whole table.
 declared(rel, role, privilege, columns) as (
@@ -31,8 +33,9 @@ declared(rel, role, privilege, columns) as (
       'page_url', 'raw_status', 'request_headers', 'request_signing', 'signature_verified',
       'source_ip_class', 'tagged', 'template_key', 'tested_at', 'timing', 'ua', 'verdict',
       'witness', 'word_count', 'worker_release']),
+    -- Not card_last4: 20261118000001 revokes it (the owner reads it through the service role).
     ('public.accounts', 'authenticated', 'SELECT', array[
-      'card_last4', 'competitor_limit', 'created_at', 'current_subscription_id',
+      'competitor_limit', 'created_at', 'current_subscription_id',
       'deleted_at', 'disputed_at', 'email_change_notes', 'email_trial_reminder',
       'entitlement_changed_at', 'entitlement_version', 'id', 'kind', 'last_active_at',
       'name', 'past_due_since', 'past_due_tier', 'seat_limit', 'site_limit', 'state',

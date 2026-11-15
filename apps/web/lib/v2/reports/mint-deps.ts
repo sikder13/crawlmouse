@@ -40,6 +40,19 @@ export function supabaseMintDeps(
       if (error) throw new Error(`is_member_for_site failed: ${error.message}`);
       return data === true;
     },
+    async mayMint(siteId) {
+      // Through the session: `seat_may` reads `auth.uid()`, which the service role does not carry.
+      const site = await session.from('sites').select('account_id').eq('id', siteId).maybeSingle();
+      if (site.error) throw new Error(`mint: reading site ${siteId}: ${site.error.message}`);
+      const accountId = (site.data as { account_id: string | null } | null)?.account_id;
+      if (!accountId) return false;
+      const { data, error } = await session.rpc('seat_may', {
+        p_account: accountId,
+        p_action: 'mint_report',
+      });
+      if (error) throw new Error(`seat_may failed: ${error.message}`);
+      return data === true;
+    },
     rateLimit: (key) => checkRateLimit(key, MINT_REPORTS_PER_DAY, DAY_MS),
     verifyTurnstile: verifyTurnstileToken,
     async slugForCheck(checkId) {

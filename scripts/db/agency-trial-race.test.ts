@@ -23,7 +23,8 @@ if (URL_ENV && !['localhost', '127.0.0.1', '[::1]'].includes(new URL(URL_ENV).ho
   throw new Error('TRIAL_RACE_DB_URL must name a local Postgres (localhost, 127.0.0.1 or [::1])');
 }
 
-const MIGRATION = '20261114000001_v2_029_public_pages.sql';
+/** The migration that defines start_agency_trial_account last (it restates 20261114000001's). */
+const MIGRATION = '20261117000001_v2_037_security.sql';
 /** start_agency_trial_account's lock on the person's users row. */
 const USER_LOCK = '  perform 1 from public.users u where u.id = p_user for update;\n';
 /** Each test and hook names its own bound: a loaded CI runner can be several times slower. */

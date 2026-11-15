@@ -7,7 +7,8 @@
  * MINT_REPORTS_PER_DAY, with Turnstile once it is spent, as v1's mint does; then, through the
  * caller's own session and before any service-role read, the check as RLS shows it and
  * `is_member_for_site` for its site. A check of another account and a missing check are the same
- * 404. Only a `finished` check mints: a partial one is 409 `check_partial` (the snapshot has no place
+ * 404. Then `seat_may(<the site's account>, 'mint_report')`, also through the session: a role that
+ * may not publish the client (a developer) is 403 `role_refused` (CC-37 Q16). Only a `finished` check mints: a partial one is 409 `check_partial` (the snapshot has no place
  * for what was not measured), any other status 409 `check_not_finished`.
  *
  * Then, with the service role: the report already minted for the check is answered with its slug;
@@ -41,6 +42,8 @@ export interface MintV2Deps {
   checkAsCaller(checkId: string): Promise<{ siteId: string; status: string } | null>;
   /** `is_member_for_site` through the caller's own session. */
   isMemberForSite(siteId: string): Promise<boolean>;
+  /** `seat_may(<the site's account>, 'mint_report')` through the caller's own session. */
+  mayMint(siteId: string): Promise<boolean>;
   /** Counts one mint against `key`'s bucket: MINT_REPORTS_PER_DAY a day, as v1's mint. */
   rateLimit(key: string): Promise<{ allowed: boolean }>;
   verifyTurnstile(token: string, ip?: string): Promise<boolean>;
@@ -95,6 +98,7 @@ export async function mintV2(
 
   const check = await deps.checkAsCaller(checkId);
   if (!check || !(await deps.isMemberForSite(check.siteId))) return refuse(404, 'not_found');
+  if (!(await deps.mayMint(check.siteId))) return refuse(403, 'role_refused');
   if (check.status === 'partial') return refuse(409, 'check_partial');
   if (check.status !== 'finished') return refuse(409, 'check_not_finished');
 

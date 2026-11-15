@@ -187,6 +187,12 @@ export const PREVIEWS: PreviewEntry[] = [
   },
   { path: '/v2-preview/screens/site/withheld', name: 'Site, withheld', kind: 'screen' },
   { path: '/v2-preview/screens/dashboard/no-site', name: 'Dashboard, no site', kind: 'screen' },
+  // CC-36 D5: a viewer who used v1, before a site is added.
+  {
+    path: '/v2-preview/screens/dashboard/earlier',
+    name: 'Dashboard, no site, earlier audits',
+    kind: 'screen',
+  },
   {
     path: '/v2-preview/screens/site/first-check',
     name: 'Site, first check running',
@@ -448,4 +454,9 @@ export const PREVIEWS: PreviewEntry[] = [
     name: 'Public report, withheld',
     kind: 'screen',
   },
+  // CC-33: the help centre asks nothing of the reader, so nothing on it is orange; the error
+  // screen's orange element is "Try again".
+  { path: '/v2-preview/screens/help', name: 'Help', kind: 'screen', orange: 0 },
+  { path: '/v2-preview/screens/help-article', name: 'Help article', kind: 'screen', orange: 0 },
+  { path: '/v2-preview/screens/error', name: 'Error screen', kind: 'screen' },
 ];

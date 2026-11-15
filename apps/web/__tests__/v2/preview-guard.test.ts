@@ -12,6 +12,8 @@ const GROUP = join(WEB_ROOT, 'app', '(v2-preview)');
  * layout loads the tokens and sets noindex. No other live route may import v2.
  */
 const ACCOUNT_GROUP = join(WEB_ROOT, 'app', '(account)');
+/** CC-36 D3: the kept v1 public pages' targets, each a 404 with V2_CHECKS_PUBLIC off. */
+const KEPT_GROUP = join(WEB_ROOT, 'app', '(v2-kept)');
 const PREVIEW = join(GROUP, 'v2-preview');
 /**
  * The live v2 pages outside the groups, each a 404 while its flag is off: the public check flow's
@@ -27,6 +29,11 @@ const V2_LIVE = [
   // CC-29: For agencies (V2_BILLING) and the three /check pages (V2_CHECKS_PUBLIC), new addresses.
   join(WEB_ROOT, 'app', 'agencies'),
   join(WEB_ROOT, 'app', 'check'),
+  // CC-33: the help centre (V2_CHECKS_PUBLIC), a new address.
+  join(WEB_ROOT, 'app', 'help'),
+  // CC-33: the support console, flag-free and staff-only: each page is a 404 for anyone but an
+  // operator (requireOperator), before it reads anything, and its layout sets noindex.
+  join(WEB_ROOT, 'app', 'internal'),
 ];
 
 function walk(dir: string, out: string[] = []): string[] {
@@ -213,6 +220,7 @@ describe('v2 stays out of live pages', () => {
   const allowed = (file: string) =>
     file.startsWith(GROUP + '/') ||
     file.startsWith(ACCOUNT_GROUP + '/') ||
+    file.startsWith(KEPT_GROUP + '/') ||
     V2_LIVE.some((dir) => file.startsWith(dir + '/')) ||
     inV2PageDir(file) ||
     file.startsWith(join(WEB_ROOT, 'components', 'v2') + '/') ||
@@ -266,6 +274,12 @@ describe('v2 stays out of live pages', () => {
     for (const page of pages) expect(isFlagGated(page), relative(WEB_ROOT, page)).toBe(true);
   });
 
+  it('each page in the kept group is a 404 with its flag off', () => {
+    const pages = sources.filter((f) => f.startsWith(KEPT_GROUP + '/') && PAGE.test(f));
+    expect(pages.length).toBeGreaterThanOrEqual(16);
+    for (const page of pages) expect(isFlagGated(page), relative(WEB_ROOT, page)).toBe(true);
+  });
+
   it('no module outside the preview group, the account group, the public check pages and the signed-in v2 pages imports the v2 components or tokens', () => {
     const offenders: string[] = [];
     for (const file of sources) {
@@ -311,6 +325,7 @@ describe('v2 stays out of live pages', () => {
       'app/(account)/account/restore/[token]/route.ts',
       'app/(account)/account/restore/page.tsx',
       'app/(account)/check-email/page.tsx',
+      'app/(account)/error.tsx',
       'app/(account)/layout.tsx',
       'app/(account)/login/verify/continue/page.tsx',
       'app/(account)/settings/delete/page.tsx',

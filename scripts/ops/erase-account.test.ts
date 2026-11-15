@@ -335,6 +335,10 @@ describe('erase-account (B-F2)', () => {
       'seats deleted (invitations in other accounts)': 1,
       'reports.recipient_email nulled': 1,
       'sites.client_contact_email nulled': 1,
+      // CC-37 (20261117000001): the bystander's site holds no name beside the address and no entry
+      // of what its contact refused.
+      'sites.report_refusals pruned': 0,
+      'sites.client_contact_name nulled': 0,
       'fix_email_requests deleted': 0,
       'email_sends deleted (accounts)': 1,
       'slack_sends deleted (accounts)': 1,

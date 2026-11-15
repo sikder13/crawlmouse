@@ -47,11 +47,15 @@ export interface StreamDeps {
   store: Pick<StreamStore, 'snapshot' | 'scores'>;
   evidence: Pick<EvidenceStore, 'get'>;
   limits: Pick<CheckRouteLimits, 'streamOpens' | 'finishedOnce'>;
-  /** Sends `check_finished` (app/api/checks/_lib/events.ts, `capturePublicEvent`). */
+  /**
+   * Sends `check_finished` (app/api/checks/_lib/events.ts, `capturePublicEvent`), with the account
+   * that keeps the check's site as the stream last read it, or null for none.
+   */
   captureFinished(
     req: Request,
     checkId: string,
     properties: PublicServerEvents['check_finished'],
+    accountId: string | null,
   ): Promise<void>;
   clientIp(req: Request): string;
   now(): number;
@@ -152,7 +156,9 @@ export async function serveStream(
           const out = checkEvents(cursor, facts);
           send(out.events, out.cursor);
           if (cursor.ended) {
-            if (!before.ended) await finished(req, checkId, access.trigger, facts, deps);
+            if (!before.ended) {
+              await finished(req, checkId, access.trigger, facts, accountId, deps);
+            }
             break;
           }
           // A comment line when there was nothing to send, so an idle connection is not dropped.
@@ -228,16 +234,22 @@ async function finished(
   checkId: string,
   trigger: PublicServerEvents['check_finished']['trigger'],
   facts: ReturnType<typeof factsOf>,
+  accountId: string | null,
   deps: StreamDeps,
 ): Promise<void> {
   const status = facts.status as PublicServerEvents['check_finished']['status'];
   if (!(await deps.limits.finishedOnce(checkId))) return;
   const scores = status === 'failed' ? {} : await deps.store.scores(checkId);
-  await deps.captureFinished(req, checkId, {
-    trigger,
-    status,
-    pages: facts.counts?.pages_crawled ?? 0,
-    durationMs: Math.round(facts.elapsedMs),
-    ...scores,
-  });
+  await deps.captureFinished(
+    req,
+    checkId,
+    {
+      trigger,
+      status,
+      pages: facts.counts?.pages_crawled ?? 0,
+      durationMs: Math.round(facts.elapsedMs),
+      ...scores,
+    },
+    accountId,
+  );
 }

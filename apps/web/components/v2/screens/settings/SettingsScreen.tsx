@@ -160,6 +160,10 @@ export function SettingsScreen({
               ]}
             />
           </Card>
+
+          <p className={styles.support} data-v2-addition="">
+            {data.support.lead} <a href={data.support.href}>{data.support.label}</a>
+          </p>
         </div>
 
         <div className={styles.column}>

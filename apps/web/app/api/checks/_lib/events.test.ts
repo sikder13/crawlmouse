@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { FUNNEL_EVENTS } from '../../../../lib/analytics-events';
 import { checkRef } from '../../../../lib/v2/pipeline/public';
 import type { CaptureBody } from '../../../../lib/analytics-server';
+import type { Subject } from '../../../../lib/v2/ops/internal-marker';
 import { capturePublicEvent } from './events';
 
 const CHECK = '7b1f6c1e-8a53-4c0e-9d3a-2f6f1d0e4b11';
+const ACCOUNT = 'a0000000-0000-4000-8000-000000000001';
 const request = (cookie?: string) =>
   new Request('https://crawlmouse.com/api/checks', {
     method: 'POST',
@@ -23,7 +25,9 @@ function recorder() {
 describe('capturePublicEvent', () => {
   it('sends the event under the check ref, with no person profile', async () => {
     const r = recorder();
-    await capturePublicEvent(request(), 'check_started', CHECK, { trigger: 'first_audit' }, r.send);
+    await capturePublicEvent(request(), 'check_started', CHECK, { trigger: 'first_audit' }, null, {
+      send: r.send,
+    });
     expect(r.sent).toEqual([
       {
         event: 'check_started',
@@ -45,12 +49,33 @@ describe('capturePublicEvent', () => {
       'check_finished',
       CHECK,
       { trigger: 'first_audit', status: 'finished', pages: 12, durationMs: 90_000 },
-      r.send,
+      null,
+      { send: r.send },
     );
     const body = JSON.stringify(r.sent);
     for (const absent of [CHECK, '203.0.113.9', 'crawlmouse.com', 'ph=abc']) {
       expect(body).not.toContain(absent);
     }
+  });
+
+  it('is marked internal when the account it names is internal, and asks of no account it is not given', async () => {
+    const r = recorder();
+    const asked: Subject[] = [];
+    const lookup = async (s: Subject) => {
+      asked.push(s);
+      return s.id === ACCOUNT;
+    };
+    const finished = { trigger: 'manual', status: 'failed', pages: 0, durationMs: 1 } as const;
+    await capturePublicEvent(request(), 'check_finished', CHECK, finished, ACCOUNT, {
+      send: r.send,
+      lookup,
+    });
+    await capturePublicEvent(request(), 'check_finished', CHECK, finished, null, {
+      send: r.send,
+      lookup,
+    });
+    expect(asked).toEqual([{ kind: 'account', id: ACCOUNT }]);
+    expect(r.sent.map((b) => b.properties.internal)).toEqual([true, undefined]);
   });
 
   it('sends nothing where analytics needs prior consent', async () => {
@@ -60,7 +85,8 @@ describe('capturePublicEvent', () => {
       'check_started',
       CHECK,
       { trigger: 'first_audit' },
-      r.send,
+      null,
+      { send: r.send },
     );
     expect(r.sent).toEqual([]);
   });
@@ -72,7 +98,8 @@ describe('capturePublicEvent', () => {
       'check_started',
       CHECK,
       { trigger: 'first_audit' },
-      r.send,
+      null,
+      { send: r.send },
     );
     expect(r.sent).toEqual([]);
   });

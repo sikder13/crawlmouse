@@ -80,6 +80,16 @@ describe('the registry', () => {
     expect(at('resend-domain')).toMatchObject({ gates: 4 });
     expect(at('resend-webhook')).toMatchObject({ gates: 4 });
     expect(at('inngest-plan')).toMatchObject({ gates: 2 });
+    // CC-37 C-7: the value, which the Vercel probe cannot read, is the owner's box.
+    expect(at('stripe-reconcile-livemode-true')).toMatchObject({
+      gates: 5,
+      owner: 'owner',
+      check: { kind: 'manual' },
+      source: 'inngest/billing-helpers.ts:127',
+    });
+    expect(at('stripe-reconcile-livemode-true')?.mustBeTrue).toMatch(
+      /STRIPE_RECONCILE_LIVEMODE=true/,
+    );
     for (const id of [
       'cc36-v1-accounts',
       'cc36-v1-pages',
@@ -159,9 +169,10 @@ describe('the expected Inngest function counts', () => {
     // Independent truth: apps/web/lib/v2/pipeline/functions.test.ts asserts the synced configs are
     // (V2_PIPELINE ? 10 : 5) + …, because auditFn and checkFn each declare onFailure, and
     // notes/cc-03/PR.md:180 lists v1's five: audit, audit-failure, stripe-reconcile,
-    // stripe-reconcile-manual, audits-ttl-cleanup. After steps 1–5: 5, 10, 10, 26, 28 (CC-31 added
-    // three mail functions and the report schedules with V2_CHECKS_PUBLIC).
-    expect(STEPS.map(syncedFunctionCount)).toEqual([5, 10, 10, 26, 28]);
+    // stripe-reconcile-manual, audits-ttl-cleanup. After steps 1–5: 5, 10, 10, 32, 34 (CC-31 added
+    // three mail functions and the report schedules with V2_CHECKS_PUBLIC; CC-33 adds its three
+    // founder functions, each with a failure handler, with V2_CHECKS_PUBLIC or V2_BILLING: six).
+    expect(STEPS.map(syncedFunctionCount)).toEqual([5, 10, 10, 32, 34]);
   });
 });
 

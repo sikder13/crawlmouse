@@ -229,6 +229,16 @@ export const PRECONDITIONS: readonly Precondition[] = [
     check: manual,
   },
   {
+    id: 'cc36-account-backfill',
+    mustBeTrue:
+      'migration 20261116000002 (the v1 account backfill) is applied to production, after 20261115000001, with the pre- and post-checks in docs/specs/v2/36-cutover.md: no public.users row is left without default_account_id',
+    why: "without it, 11 of production's 12 users (measured 2026-11-13) meet the v2 dashboard's no-account state at their first v2 sign-in (owner ruling 1 of CC-36)",
+    source: 'docs/specs/v2/36-cutover.md:126',
+    gates: 3,
+    owner: 'CC-36',
+    check: manual,
+  },
+  {
     id: 'edge-rate-limits',
     mustBeTrue:
       'infra/vercel/firewall.json is applied at the edge (magic-link, audits/start and claim limits), per docs/ops/edge-firewall.md',
@@ -426,6 +436,15 @@ export const PRECONDITIONS: readonly Precondition[] = [
       "the v2 account's live webhook points at /api/webhooks/stripe-account with api_version 2026-05-27.dahlia and the spec's event list, its secret in STRIPE_ACCOUNT_WEBHOOK_SECRET",
     why: 'subscription changes reach the entitlement machine only through it',
     source: 'docs/specs/v2/03-billing.md:265',
+    gates: 5,
+    owner: 'owner',
+    check: manual,
+  },
+  {
+    id: 'stripe-reconcile-livemode-true',
+    mustBeTrue: 'Vercel Production has STRIPE_RECONCILE_LIVEMODE=true',
+    why: "unset, the reconcile's livemode guard does not run (v1 inventory C-7); 'false' with the live key refuses every reconcile. vercel-env-step-5 sees the name only: its probe reads no value",
+    source: 'inngest/billing-helpers.ts:127',
     gates: 5,
     owner: 'owner',
     check: manual,

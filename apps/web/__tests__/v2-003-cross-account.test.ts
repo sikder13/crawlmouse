@@ -71,6 +71,11 @@ const READ_SCOPE: Record<string, ReadScope> = {
   slack_sends: 'none',
   // 029: the Agency Plus contact form. Service only.
   contact_requests: 'none',
+  // 033: the console's operators and its record. Service only.
+  operators: 'none',
+  operator_actions: 'none',
+  // CC-33: founder notices. Service only.
+  founder_notices: 'none',
   // CC-38: the accounts qa:seed made, read by qa_reset. Service only.
   qa_accounts: 'none',
 };

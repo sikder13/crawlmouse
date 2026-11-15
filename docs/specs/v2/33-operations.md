@@ -1,0 +1,110 @@
+# CC-33 — operations: the support console, founder notifications, the help centre, in-product support
+
+This step builds the operating side of the product: who staff are, what they may see and do, what the
+founder is told, where a customer can read an answer, and how a customer reaches us from inside the
+product. It adds no customer feature and changes no grade.
+
+## Decisions
+
+| #   | Decision                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | Why                                                                                                  |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| D1  | **Operators, and accounts marked internal.** A table `operators (user_id, added_at)`, readable and writable by the service role only, filled by `pnpm ops:operator add <email>` (it refuses an address with no user). `accounts.internal boolean not null default false`, hidden from clients by the per-column grants, set only by `pnpm ops:internal <account-id>`. One SQL function, `is_operator()`, answers whether the caller is an operator; it is the only test of it, and no route compares emails or reads an environment list. Every server event and founder notice about an internal account carries `internal: true` (resolved inside `captureServerEvent` from the event's distinct id).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | Staff access and test data are decided in one place, and the repo holds no person's address.         |
+| D2  | **The support console, read-only, at `/internal`.** For operators only: anyone else, signed in or not, gets 404; the pages are `noindex` and outside the sitemap. Search by email, account id, site host, check id or Stripe customer id. One page per account: plan state and its history, seats, sites, the last 20 checks with status and failure reason, mail sent (from the ledger: kind, status, time, never the body), alerts, open fixes, the Stripe customer id as a dashboard link. Reads use the service role behind the operator check, never row security alone. Two actions, each a POST with a reason field, each written to `operator_actions` (who, what, target, reason, when) in the same transaction: re-run a check that failed or was reaped (through the existing start path, limits unchanged), and re-send a sign-in link to the account's own address (the magic-link path's per-address limit and Auth options; the record is written before the Auth call, which no transaction can hold — questions Q9). Every page view of an account is also written to `operator_actions`, before its data is read. Built from the design system's table, card and field pieces; it is staff tooling, so it has no artboard. | Support answers in minutes, and every look at a customer's data is on record.                        |
+| D3  | **Founder notifications, through the one mailer.** Two kinds, in the account-mail class (no unsubscribe, never suppressed): `founder_event` (instant: sign-up, trial started, first payment, cancellation, agency account created, payment failed) and `founder_digest` (daily at 08:00 America/New_York for the day before; on Monday also the week's totals and the change against the week before). Recipient `FOUNDER_NOTIFY_TO`; unset, nothing is sent and one log line says so. Each instant notice has a ledger key from its event, so a retried webhook cannot send twice. A notice names the plan, the amount as Stripe states it, the account id as an `/internal` link and the site host; it carries no card detail and no address but the account owner's. An internal account's notice has a `[TEST]` subject and is left out of the digest figures that name an account; the two bounce figures are keyed by address and include internal accounts' mail (questions Q14). The Sentry alerts stay. More than 20 instant notices in an hour become one "N more" notice.                                                                                                                                                         | The founder knows about every customer the moment they arrive.                                       |
+| D4  | **The help centre at `/help`.** Server-rendered, indexable, in the sitemap while `V2_CHECKS_PUBLIC` is on and 404 while it is off, in the v2 public page shell. Twelve articles, each titled as the reader's question. Prices and limits render from `prices.ts` and `GATES`; a capability `CAPABILITIES` marks coming is described as coming or left out; a test fails on a typed price or limit and on an article naming an unbuilt capability as built. One `<h1>`, a canonical, a title and a description per article; no `FAQPage` markup (owner ruling 2026-11-11). The footer's Help link is one row of the v2 footer's table.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | A question with a page is a question support does not answer twice, and each page is search content. |
+| D5  | **Support from inside the product.** An "Email support" link in Settings and on each error screen; "Something wrong with this fix?" on the fix page. Each is a `mailto:` to the support address whose subject and first lines carry the ids the page has (account, path, site, check, fix and its type, the error's Sentry event id and Next's digest of a server error), never an email address or a crawled string, built by one function with a property test. The error screen's link carries no account id: a client boundary holds none (questions Q5). An error boundary (`error.tsx`) for the account, sites, dashboard, alerts and changes segments renders a v2 error screen: what happened in one sentence, a retry that refreshes the route from the server before resetting the boundary, the support link and the Sentry event id.                                                                                                                                                                                                                                                                                                                                                                                             | The fastest signal of a wrong finding is the customer telling us, with the ids attached.             |
+| D6  | **The sign-in canary.** Resend's webhook records the delivery of the sign-in mail Supabase Auth sends through SMTP (evidence: questions Q4), so the canary is built: an Inngest function every 10 minutes, registered when `SIGNIN_CANARY_TO` is one plain address, whatever the v2 flags, so it can be proven before switch-on (owner ruling on questions Q16), requests a sign-in link for that one address and raises a Sentry `signal:signin-canary` when no delivery is recorded within 5 minutes, and, under its own `stage`, when its request or its look fails past Inngest's retries. It asks Supabase Auth directly rather than through the magic-link route, so the route has no exemption to grant: the route requires Turnstile in production, and D6 allows no exemption from it (questions Q4). `docs/ops/uptime.md` lists the monitors the owner creates; `/status` shows only what it measures: the website answering, from `/api/health`'s own logic, with the deploy's version; it names what it does not monitor, and shows no state nobody measured (owner ruling 2026-11-13 on questions Q6).                                                                                                                          | The launch-day abort signal has to exist, and a canary that cannot see a failure is worse than none. |
+
+## Out of this step
+
+Test accounts for each tier, lifecycle mails, extending a trial from the console, session replay, the
+status-page vendor, switching any flag.
+
+## D3 and D6 as built
+
+- **Founder notice keys.** `entitlement:<event id>` (the id billing gives `entitlement.changed`; an id
+  not shaped `entitlement.changed:<account>:<source>` is refused and logged, questions Q10),
+  `signup:<user>`, `agency:<account>`, `cancel:<subscription>:<canceled_at>`. Each is claimed in
+  `founder_notices` (`claim_founder_notice`) before anything is mailed, and its mail's ledger key is
+  `founder_event:<key>`. A retried claim answers the decision stored for its key.
+- **The bound.** 20 instant notices an hour for customers' accounts and 20 for internal ones, counted
+  apart. The rest are held, and the hourly tick at :07 mails them as one "N more" notice, keyed
+  `founder_event:overflow:<UTC hour>` from the tick's time, taken once in a `clock` step so a retry in
+  the next hour keeps the key. Rows taken by a notice whose mail's ledger row is `failed` are listed
+  again by a later hour's notice, whether `send` gave up after 3 attempts or recorded `failed` after
+  one: for a provider answer it does not retry, or for an attempt that threw while the run had retries
+  left (`apps/web/__tests__/v2-033-founder.test.ts`, "re-takes the rows of a notice whose mail gave
+  up"). A key takes rows on its first call, one where no row carries it and no mail was claimed under
+  it; a later call takes no new row, so a retry of an earlier hour's run whose rows a later hour
+  re-took mails nothing ("review M2").
+- **Payments.** Whether a payment is the first is Stripe's record, not the account's state history:
+  the customer's paid invoices (`invoices.list` with `status: 'paid'`), leaving out the latest invoice
+  and zero-amount ones (Stripe pays a zero invoice when a trial starts). With none, "First payment";
+  with one or more, "Payment (returning)"; with Stripe unread, "Payment". A change from `past_due` to
+  a paid state is announced when it is a first payment (a trial whose first charge failed), and not
+  otherwise. A Stripe read that fails is logged as `founder.stripe_unread` (kind and whether it is such
+  a recovery, nothing else). For a recovery the notice then throws `FounderStripeUnread` before
+  claiming anything, and Inngest retries the step (FOUNDER_RETRIES, 4). When the retries are spent
+  the run is marked failed in Inngest's dashboard under `crawlmouse.founder.entitlement`, with that
+  error's message, and reported to Sentry as below; no notice was mailed or claimed, and the
+  function's log holds one `founder.stripe_unread` line an attempt. Any other notice is sent with Stripe unread
+  (`apps/web/lib/v2/ops/founder.test.ts`, "review N3"). The amount is the invoice's `amount_paid` when its status is `paid`, and otherwise its
+  `amount_due`, said to be unpaid, with Stripe's status (`apps/web/lib/v2/ops/founder.test.ts`,
+  "review C2" and "review C3"). A payment notice is headed as a payment only when Stripe shows its
+  invoice `paid`; otherwise it is a plan start, "Plan started: Pro — first invoice not yet paid" (or
+  "invoice not yet paid", or "invoice not read from Stripe"), and the "N more" notice lists it the
+  same way. Its stored facts record the invoice as `invoice`: Stripe's status, `not_given` or
+  `not_read` ("review N4"). A card trial's end is commonly announced this way: at a trial's end
+  Stripe creates the invoice with a one-hour draft period before charging it
+  (docs.stripe.com/billing/invoices/subscription, "Update the first invoice of a subscription"), and
+  the charge that follows has no notice, since billing records `invoice.paid` without an entitlement change
+  (`apps/web/lib/billing/state-machine.ts`, `'invoice.paid': 'recorded_only'`).
+- **A founder function that fails.** A run of `crawlmouse.founder.entitlement`, `.sweep` or
+  `.digest` that fails past its retries runs that function's `onFailure`, which Inngest registers as
+  `<id>-failure` (inngest 3.54.2, `components/InngestFunction.js`, `getConfig`). It raises Sentry's
+  `founder-notice-failed` at level `error`, tagged `signal: founder-notice-failed` and
+  `function: <id>`, with Inngest's run id as an extra and nothing of the run's error, so no address
+  (`inngest/founder.test.ts` and `apps/web/lib/v2/ops/founder-signal.test.ts`, "review M3"). The
+  founder sees a Sentry issue under that message, and the run id finds the run in Inngest's
+  dashboard. Sentry's issue alerts, read on 2026-11-13, include none on this message; a page needs
+  one, added as `docs/ops/uptime.md` asks for `signin-canary`.
+- **Sign-ups** are announced once Supabase Auth shows the address confirmed. The sweep reads users
+  created in the 7 days before it runs (`apps/web/lib/v2/ops/founder.test.ts` asserts the window), so
+  a user still unconfirmed 7 days after signing up is not announced. A sign-up whose notice was
+  decided `send` is read again until its mail's ledger key is sent, suppressed or out of attempts. A run
+  reads 200 users in a rotation that moves 200 places per five-minute tick, so unconfirmed users ahead
+  of a confirmed one do not hold it back (`apps/web/__tests__/v2-033-founder-store.test.ts`, "review C1"
+  and "review C8").
+- **The digest** is mailed at the first hourly tick at or after 08:00 New York time, keyed
+  `founder_digest:daily:<date>` and, on Mondays, `founder_digest:weekly:<Monday>`. Its figures are
+  `founder_digest_counts`'s, each labelled as it is computed. Payments count payment notices whose
+  invoice Stripe showed `paid` when the plan changed, first and returning; renewals have no notice and
+  are not counted, and a recovery from `past_due` is counted only when it is a first payment, the one
+  case it has a notice. The other payment notices are counted as plans started with the invoice not
+  yet paid or not read (`apps/web/__tests__/v2-033-founder.test.ts`, "counts each figure"). A card
+  trial's conversion is among them: its charge clears about an hour after the plan changes and has
+  no notice of its own, so it is not counted as a payment (questions Q19). The digest's label for
+  payments says so (`apps/web/lib/v2/mail/templates/founder-digest.test.ts`, "names the figures"). The two bounce figures count addresses and include internal
+  accounts' mail; send failures leave out internal accounts and the founder notices' own mail
+  (questions Q14).
+- **The canary's look** (`signin_delivery_seen`, questions Q17) counts a delivery to its address of a
+  mail from `SIGNIN_SENDER` whose own creation time in Resend's event (`data.created_at`) is at or
+  after the request, less a minute for clock difference; the run before's mail, delivered late, and
+  another sender's mail do not count (`apps/web/__tests__/v2-033-founder.test.ts`, "review Q17").
+- **/status** (owner ruling on questions Q6): the page shows "Website: answering" from `/api/health`'s
+  own logic (`apps/web/lib/v2/ops/health.ts`), rendered on each request, with the deploy's version and
+  commit, and says that audits, email and billing are not monitored there. `app/status/page.test.tsx`
+  fails on a state word outside that line.
+
+## D1 as built: which server events carry `internal: true`
+
+`captureServerEvent` reads the account from the event's distinct id (`account:<id>`, `seat:<id>`, or a
+bare account or user id) and from the `accountId` its caller passes (`lib/v2/ops/internal-marker.ts`).
+The check stream passes the kept check's account with `check_finished`
+(`app/api/checks/[id]/stream/serve.test.ts`, "check_finished is handed the account of a kept check").
+These events cannot carry the mark (questions Q13):
+
+- `check_started` from the public check flow: the check's site has no account when it is created.
+- `report_viewed` (`report:<slug>`): the report row the route reads selects no account.
+- A signed-out visitor's pricing events (`anon:<uuid>`): there is no account.
+- `account_purged`: it is sent after the erasure has deleted the account, so the lookup finds no row.

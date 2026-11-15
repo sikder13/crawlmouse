@@ -1,6 +1,7 @@
 import { test, expect, type Page } from './pw';
 import {
   HEIGHT,
+  KEPT_PAGES,
   MAIL_HEIGHT,
   MAIL_PREVIEWS,
   MAIL_WIDTHS,
@@ -9,6 +10,7 @@ import {
   WIDTHS,
   fitViewportToPage,
   openPreview,
+  openV1Page,
 } from './pages';
 
 /**
@@ -66,6 +68,32 @@ for (const width of MAIL_WIDTHS) {
           await openPreview(page, p.path);
           await fitViewportToPage(page);
           await expect(page).toHaveScreenshot(`${p.slug}-${width}-${colorScheme}.png`);
+        });
+      }
+    });
+  }
+}
+
+// Each kept v1 public page (CC-36 D3) at 1280 and 390 px: as v1 serves it at its own address, which
+// has no dark scheme, and in the v2 shell as its target draws it, light and dark.
+for (const width of WIDTHS) {
+  for (const colorScheme of SCHEMES) {
+    test.describe(`kept ${width}px ${colorScheme}`, () => {
+      test.use({ viewport: { width, height: HEIGHT[width] }, colorScheme });
+
+      for (const p of KEPT_PAGES) {
+        if (colorScheme === 'light') {
+          test(`${p.name}, v1`, async ({ page }) => {
+            await openV1Page(page, p.v1);
+            await fitViewportToPage(page);
+            await expect(page).toHaveScreenshot(`kept-${p.slug}-v1-${width}.png`);
+          });
+        }
+        test(`${p.name}, in the v2 shell`, async ({ page }) => {
+          await openPreview(page, p.v2);
+          await pinYear(page);
+          await fitViewportToPage(page);
+          await expect(page).toHaveScreenshot(`kept-${p.slug}-v2-${width}-${colorScheme}.png`);
         });
       }
     });

@@ -60,7 +60,8 @@ export interface SafeFetchResult {
   truncated?: boolean;
 }
 
-const FORBIDDEN_HEADERS = new Set([
+/** Framing, routing and credential headers no caller may set on a crawl request. */
+export const FORBIDDEN_HEADERS: ReadonlySet<string> = new Set([
   'host',
   'authorization',
   'proxy-authorization',
@@ -70,13 +71,18 @@ const FORBIDDEN_HEADERS = new Set([
   'connection',
 ]);
 
-function normalizeHeaders(headers: Record<string, string> | undefined): Record<string, string> {
-  const out: Record<string, string> = {};
-  for (const [name, value] of Object.entries(headers ?? {})) {
+/** Throws when a header name, in any case, is one of FORBIDDEN_HEADERS. */
+export function refuseForbiddenHeaders(headers: Record<string, string> | undefined): void {
+  for (const name of Object.keys(headers ?? {})) {
     const key = name.toLowerCase();
     if (FORBIDDEN_HEADERS.has(key)) throw new Error(`Header ${key} is not allowed`);
-    out[key] = value;
   }
+}
+
+function normalizeHeaders(headers: Record<string, string> | undefined): Record<string, string> {
+  refuseForbiddenHeaders(headers);
+  const out: Record<string, string> = {};
+  for (const [name, value] of Object.entries(headers ?? {})) out[name.toLowerCase()] = value;
   return out;
 }
 
