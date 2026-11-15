@@ -46,21 +46,19 @@ export const JOURNEYS = [
     name: 'pro-trial',
     walks:
       'Pro trial → upgrade (the Checkout redirect, then the signed webhook) → Pro; cancel; restore',
+    waitsOn: "the cancel test fails until CC-39's confirming click is on origin/main",
   },
   {
     n: 4,
     name: 'agency',
     walks:
-      'Agency trial → six clients → a developer scoped to one, who sees only that one → client report → share link → proof page → revoke',
-    waitsOn:
-      "the developer's card and report-mint assertions are todo until CC-37 D5 is on origin/main",
+      'Agency trial → six clients → a developer scoped to one, who sees only that one → client report → share link → proof page → revoke; the developer sees no card digits and cannot publish a report, the owner can',
   },
   { n: 5, name: 'settings', walks: 'settings: email change, delete and restore' },
   {
     n: 6,
     name: 'v1-urls',
     walks: "the retired v1 URLs of CC-36's table answer as designed",
-    waitsOn: 'todo until CC-36 is on origin/main',
   },
   { n: 7, name: 'support', walks: '/help, /status, the error screen and the support link' },
 ] as const;
