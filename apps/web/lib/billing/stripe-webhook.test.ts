@@ -143,6 +143,12 @@ async function ledgerRow(eventId: string) {
   ).rows[0];
 }
 
+/** The stored plan without its payment events, which ./stripe-webhook.capture.test.ts covers. */
+async function storedEffects(eventId: string) {
+  const effects = (await ledgerRow(eventId))!.effects as { kind: string }[];
+  return effects.filter((x) => x.kind !== 'capture');
+}
+
 async function mirrorRow(subscriptionId: string) {
   return (
     await w.db.query<{
@@ -198,8 +204,8 @@ describe.each(PORTS)('through the %s port', (p) => {
         handled: true,
         handled_reason: null,
         processed_at: null,
-        effects: [{ kind: 'send', ...changed }],
       });
+      expect(await storedEffects(e.id)).toEqual([{ kind: 'send', ...changed }]);
       expect((await accountRow(accountId)).entitlement_version).toBe(1);
 
       expect(await w.deliver(e)).toEqual({ outcome: 'resumed' });
@@ -907,7 +913,7 @@ describe.each(PORTS)('through the %s port', (p) => {
           data: { accountId, from: 'pro_trial', to: 'pro' },
         },
       ];
-      expect((await ledgerRow(e.id))!.effects).toEqual(sends.map((s) => ({ kind: 'send', ...s })));
+      expect(await storedEffects(e.id)).toEqual(sends.map((s) => ({ kind: 'send', ...s })));
       expect(w.stripe.sent).toEqual(sends);
     });
 
@@ -916,9 +922,9 @@ describe.each(PORTS)('through the %s port', (p) => {
       const e = checkoutEvent(accountId, customer, sub(customer).id, BASE + 100);
       await w.deliver(e);
       expect(w.stripe.sent.map((s) => s.name)).toEqual(['entitlement.changed']);
-      expect(await ledgerRow(e.id)).toMatchObject({
-        effects: [expect.objectContaining({ name: 'entitlement.changed' })],
-      });
+      expect(await storedEffects(e.id)).toEqual([
+        expect.objectContaining({ name: 'entitlement.changed' }),
+      ]);
       // The relimit was done in the transaction: Pro's limits are on the row.
       const { rows } = await w.db.query<{ seat_limit: number; site_limit: number }>(
         `select seat_limit, site_limit from public.accounts where id = $1`,

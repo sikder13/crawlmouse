@@ -18,6 +18,7 @@
  */
 import type Stripe from 'stripe';
 import { dispatchPlanned, planEffects, type PlannedEffect } from './effects';
+import { paymentEvents, plannedCaptures } from './payment-events';
 import type { EntitlementSnapshot, Transition } from './state-machine';
 import { applyEntitlementTransition, EntitlementConflictError } from './state-machine-apply';
 import { normalise, orphanEffects, type Decision, type Report } from './stripe-normalise';
@@ -59,18 +60,61 @@ export function stripeReads(stripe: Stripe): StripeReads {
 }
 
 /**
+ * The payment events of a decision, keyed to the account's owner (CC-41 D3). With no owner, or when
+ * planning them throws, the decision plans none and a report says so: analytics never holds up a
+ * decision.
+ */
+async function capturesFor(
+  d: Extract<Decision, { kind: 'apply' }>,
+  before: EntitlementSnapshot,
+  transition: Transition,
+  stripe: Stripe.Event,
+  db: Pick<WebhookDb, 'ownerUserId'>,
+): Promise<PlannedEffect[]> {
+  try {
+    const events = paymentEvents({
+      stripe,
+      event: d.event,
+      before,
+      transition,
+      mirror: d.write.subscription?.mirror ?? null,
+    });
+    if (events.length === 0) return [];
+    const owner = await db.ownerUserId(d.accountId);
+    if (owner === null) {
+      d.reports.push({
+        level: 'warning',
+        message: 'billing.webhook.capture_without_owner',
+        detail: { events: events.map((e) => e.event).join(',') },
+      });
+      return [];
+    }
+    return plannedCaptures(events, { stripe, distinctId: owner, accountId: d.accountId });
+  } catch (err) {
+    d.reports.push({
+      level: 'error',
+      message: 'billing.webhook.capture_unplanned',
+      detail: { reason: (err as Error).message },
+    });
+    return [];
+  }
+}
+
+/**
  * The effects of an applied or ignored transition: the machine's, a cancellation of a disputed
- * account's subscription (spec 03, Q13), and for a checkout the orphan rules (Q10): its own
+ * account's subscription (spec 03, Q13), for a checkout the orphan rules (Q10): its own
  * subscription when its grant was ignored and the account does not already follow it (a repeated
  * completion, for a paid checkout or an agency trial alike), the subscription it replaced when it
- * applied.
+ * applied; and last, the payment events for PostHog.
  */
 async function planFor(
   d: Extract<Decision, { kind: 'apply' }>,
   before: EntitlementSnapshot,
   transition: Transition,
-  stripe: StripeReads,
+  event: Stripe.Event,
+  deps: Pick<WebhookDeps<WebhookDb>, 'db' | 'stripe'>,
 ): Promise<PlannedEffect[]> {
+  const stripe = deps.stripe;
   const source = d.write.eventId;
   const planned = planEffects(transition.effects, {
     accountId: d.accountId,
@@ -98,6 +142,7 @@ async function planFor(
       );
     }
   }
+  planned.push(...(await capturesFor(d, before, transition, event, deps.db)));
   return planned;
 }
 
@@ -129,7 +174,7 @@ async function decideOnce<Db extends WebhookDb>(
     return { decision, recorded, asMachine: false };
   }
   const store = eventStore(deps.db, decision.write, (before, transition) =>
-    planFor(decision, before, transition, deps.stripe),
+    planFor(decision, before, transition, event, deps),
   );
   const { transition } = await applyEntitlementTransition(
     store,
