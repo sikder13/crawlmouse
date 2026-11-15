@@ -150,8 +150,9 @@ function trialCard(
   // `renews_at` is the period end of a subscription not set to cancel (lib/v2/account/rows.ts), and a
   // trial with no card has no subscription; the card's last four digits are not recorded yet.
   const charges = a.renews_at !== null;
-  // A card on file whose digits this reader is not given (CC-37 Q25).
-  const withheld = v.cardOnFile && a.card_last4 === null;
+  // A card on file whose digits this reader is not given (CC-37 Q25), or a card a trial will charge
+  // read by a member who is not the owner: only the owner can cancel (CC-39 ruling 5).
+  const withheld = (v.cardOnFile && a.card_last4 === null) || (charges && !owner);
   const freeSchedule = FREE_SCHEDULE[GATES.free.schedule];
   const price = tier === 'pro' ? PRO_MONTHLY : AGENCY_MONTHLY;
   const title = `${PLAN_NAMES[tier]}, trial · ends ${dayDate(end, zone)}`;

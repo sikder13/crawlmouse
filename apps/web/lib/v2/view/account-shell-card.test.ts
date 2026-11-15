@@ -99,3 +99,23 @@ describe('the control: a trial with no card and no subscription is unchanged', (
     );
   });
 });
+
+describe('a Checkout trial read by a member who is not the owner (ruling 5, walk shot 4-agency-30)', () => {
+  // The owner cancels; a member cannot. CC-37 gives a non-owner "Managed by the account owner." for a
+  // card on file, and a trial that charges an unrecorded card is the same card.
+  for (const role of ['account_manager', 'developer'] as const) {
+    it(`${role}: the rail says the owner manages it, not "unless you cancel"`, () => {
+      for (const reader of [viewer, day0]) {
+        const card = deleteStepView(checkoutTrial, reader, { role }).shell.trial!;
+        expect(card.note).toBe('Managed by the account owner.');
+        expect(card.keep).toBeNull();
+        expect(card.billing).toBeNull();
+      }
+    });
+  }
+
+  it('the owner still reads the charge', () => {
+    const card = deleteStepView(checkoutTrial, viewer, { role: 'owner' }).shell.trial!;
+    expect(card.note).toBe('The card on file is charged on Sat 7 Nov unless you cancel.');
+  });
+});
