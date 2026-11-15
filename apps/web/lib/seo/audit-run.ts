@@ -18,6 +18,8 @@ export interface SurfaceAnswer {
 export interface SavedPage extends Omit<PageFacts, 'visibleText' | 'mainText'> {
   /** FAQPage questions the visible page does not show. */
   faqNotVisible: string[];
+  /** Each whole-dollar price the visible page shows ("$19"), in order, repeats removed. */
+  visiblePrices: number[];
   /** For a post, the other post whose main text is most alike (word 5-gram Jaccard). */
   nearest: { path: string; jaccard: number } | null;
 }
@@ -128,6 +130,7 @@ export function savePages(pages: readonly PageFacts[]): SavedPage[] {
     return {
       ...rest,
       faqNotVisible: hiddenFaqQuestions({ jsonLd: rest.jsonLd, visibleText }),
+      visiblePrices: visiblePrices(visibleText),
       nearest,
     };
   });
@@ -136,3 +139,9 @@ export function savePages(pages: readonly PageFacts[]): SavedPage[] {
 /** True when a robots value forbids indexing. */
 export const isNoindex = (robots: readonly string[]) =>
   robots.some((r) => /(^|[\s,])(noindex|none)([\s,]|$)/i.test(r));
+
+/** The whole-dollar amounts a text shows, as "$19" or "$1,990", in order, repeats removed. */
+export function visiblePrices(text: string): number[] {
+  const amounts = [...text.matchAll(/\$(\d{1,3}(?:,\d{3})*)(?![\d.,]\d)/g)];
+  return [...new Set(amounts.map((m) => Number(m[1]!.replace(/,/g, ''))))];
+}

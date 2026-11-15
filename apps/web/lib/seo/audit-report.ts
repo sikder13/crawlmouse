@@ -6,7 +6,7 @@
 import type { AuditRun, SavedPage } from './audit-run';
 import { isNoindex } from './audit-run';
 import { attributeQueries, type AttributablePage } from './attribution';
-import { skippedHeadings } from './page-facts';
+import { skippedHeadings, typedNodes, typesOf } from './page-facts';
 import { schemaProblems } from './schema-required';
 import {
   EXPORTED_AT,
@@ -256,6 +256,49 @@ function reasons(): string[] {
   ];
 }
 
+/** The prices a page's Offer nodes state, as numbers. */
+export function offerPrices(p: SavedPage): number[] {
+  return p.jsonLd
+    .flatMap((b) => typedNodes(b.data))
+    .filter((n) => typesOf(n).includes('Offer'))
+    .map((n) => Number(n.price));
+}
+
+const usdList = (xs: number[]) => xs.map((x) => `$${x}`).join(', ') || '—';
+
+/** Pages whose structured data states a price: what it states against what the page shows. */
+function prices(input: ReportInput): string[] {
+  const rows = (['off', 'on'] as const).flatMap((k) =>
+    input[k].pages
+      .filter((p) => offerPrices(p).length > 0)
+      .map((p) => {
+        const stated = offerPrices(p);
+        const shown = p.visiblePrices ?? [];
+        return {
+          label: input[k].label,
+          path: p.path,
+          stated,
+          shown,
+          notStated: shown.filter((x) => !stated.includes(x)),
+          notShown: stated.filter((x) => x !== 0 && !shown.includes(x)),
+        };
+      }),
+  );
+  const bad = rows.filter((r) => r.notStated.length > 0 || r.notShown.length > 0);
+  return [
+    bad.length === 0
+      ? 'Each page with an Offer shows only prices its structured data states, and states only prices it shows (a $0 Offer need not be shown).'
+      : `${bad.length} page${bad.length === 1 ? '' : 's'} where the visible prices and the structured data disagree.`,
+    '',
+    '| Build | Page | Offer prices | Prices shown | Shown, not in an Offer | In an Offer, not shown |',
+    '| --- | --- | --- | --- | --- | --- |',
+    ...rows.map(
+      (r) =>
+        `| ${r.label} | ${r.path} | ${usdList(r.stated)} | ${usdList(r.shown)} | ${usdList(r.notStated)} | ${usdList(r.notShown)} |`,
+    ),
+  ];
+}
+
 function surfaceCell(s: AuditRun['surfaces'][number]): string {
   if (s.status >= 300 && s.status < 400) return `${s.status} → ${s.location ?? '?'}`;
   if (s.status === 200)
@@ -325,6 +368,10 @@ export function renderReport(input: ReportInput): string {
     '',
     ...notIndexed(input),
     ...reasons(),
+    '## Prices: structured data against the page',
+    '',
+    ...prices(input),
+    '',
     '## App surfaces',
     '',
     ...surfaces(input),

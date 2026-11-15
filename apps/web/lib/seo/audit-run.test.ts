@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { JSDOM } from 'jsdom';
-import { auditBuild, isNoindex, sitemapLocs } from './audit-run';
+import { auditBuild, isNoindex, sitemapLocs, visiblePrices } from './audit-run';
 import { renderReport } from './audit-report';
 import { APP_SURFACES } from './app-surfaces';
 
@@ -120,5 +120,44 @@ describe('renderReport www verdict', () => {
       commands: [],
     });
     expect(md).toContain('NOT a single permanent redirect');
+  });
+});
+
+describe('prices', () => {
+  it('visiblePrices reads whole dollars, thousands separators included, and not a cents amount', () => {
+    expect(
+      visiblePrices('Pro $19 a month, $190 a year; Agency $1,990; $19 again; $4.50 fee'),
+    ).toEqual([19, 190, 1990]);
+  });
+
+  it('the report names a page whose visible price is not in its Offer, and an Offer price not shown', async () => {
+    const ld =
+      '<script type="application/ld+json">{"@type":"SoftwareApplication","name":"C","applicationCategory":"B","operatingSystem":"Web","offers":[{"@type":"Offer","price":"0","priceCurrency":"USD"},{"@type":"Offer","price":"99","priceCurrency":"USD"}]}</script>';
+    const site: Record<string, string> = {
+      '/sitemap.xml': `<loc>${ORIGIN}/</loc>`,
+      '/': `<html><head>${ld}</head><body><main><h1>H</h1><p>Agency $69 a month</p></main></body></html>`,
+    };
+    const f = async (url: string) => {
+      const body = site[new URL(url).pathname];
+      return new Response(body ?? '', { status: body ? 200 : 404 });
+    };
+    const run = await auditBuild({
+      base: BASE,
+      origin: ORIGIN,
+      label: 'flags on',
+      sha: 'abc',
+      fetch: f,
+      parse: (h) => new JSDOM(h).window.document,
+    });
+    const md = renderReport({
+      origin: ORIGIN,
+      off: { ...run, label: 'flags off', pages: [] },
+      on: run,
+      posts: [],
+      www: null,
+      commands: [],
+    });
+    expect(md).toContain('1 page where the visible prices and the structured data disagree.');
+    expect(md).toContain('| flags on | / | $0, $99 | $69 | $69 | $99 |');
   });
 });
