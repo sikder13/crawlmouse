@@ -23,8 +23,6 @@ const POST_DESCRIPTION =
   'owner: the description of a post that earns impressions is proposed in copy-proposals.md (D2), not changed here';
 const LAYOUT_DESCRIPTION = `${OUTSIDE}; the page sets no description of its own, so it carries the root layout's`;
 const HELP_COPY = `${OUTSIDE}; help copy is lib/v2/help, and an article's title is its question and its H1`;
-const CHECK_COPY =
-  'lead: the strings are in lib/v2/copy/check-pages.ts, which the brief allows changing while the pages are not indexed';
 
 export const PAGE_EXCEPTIONS: readonly PageException[] = [
   {
@@ -72,10 +70,6 @@ export const PAGE_EXCEPTIONS: readonly PageException[] = [
     builds: ['on'],
     reason: `${OUTSIDE}; the v2 page's description is lib/v2/view/developers.ts`,
   },
-  { path: '/check/gptbot', rule: 'description-length', builds: ['on'], reason: CHECK_COPY },
-  { path: '/check/javascript', rule: 'description-length', builds: ['on'], reason: CHECK_COPY },
-  { path: '/check/javascript', rule: 'title-length', builds: ['on'], reason: CHECK_COPY },
-  { path: '/check/robots-ai', rule: 'title-length', builds: ['on'], reason: CHECK_COPY },
   { path: '/help/audit-expired', rule: 'description-length', builds: ['on'], reason: HELP_COPY },
   {
     path: '/help/cancel-and-refunds',
