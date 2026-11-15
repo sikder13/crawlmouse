@@ -11,7 +11,8 @@
  * diff inputs, or null when there is none or it stored none; `previous_check_id` is its id, or null
  * with it, so the check row and its changes name the same check; the page cap is the event's). It
  * stores the built check with the pages' vantage (pageVantage), and the map drawing (D10). persist
- * hands that to persistBuiltCheck, the one writer (D5).
+ * hands that to persistBuiltCheck, the one writer (D5). build also stores the check's research-ledger
+ * draft (CC-41 D4, lib/v2/ledger/draft-step.ts), which never fails or changes the step.
  * finalize deletes the built check, which is scratch; the map drawing stays.
  */
 import {
@@ -27,6 +28,7 @@ import {
 } from '@crawlmouse/engine/v2/pipeline';
 import type { CheckSteps } from '../../../../../../inngest/check';
 import { CheckFailure } from '../../../../../../inngest/check-events';
+import { storeLedgerDraft } from '../../ledger/draft-step';
 import { getJson, putJson } from '../evidence';
 import { pageVantage, persistBuiltCheck, readOfFixes } from '../persist';
 import type { FixRead, PageVantage } from '../types';
@@ -139,6 +141,12 @@ export function finishSteps(
         read: readOfFixes(fixes, events),
       };
       await putJson(deps.evidence, pathOf(event, 'built'), stored);
+      await storeLedgerDraft(deps.ledger, deps.env, {
+        checkId: check.id,
+        built,
+        crawl: results.filter(isCrawl),
+        homepage: event.homepageUrl,
+      });
       return { status, pages: built.page_results.length, fixes: built.fixes.length };
     },
 

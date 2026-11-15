@@ -15,6 +15,7 @@ import {
 import { CHECK_CANCELLED_FN_ID, CHECK_FN_ID, type RunSoFar } from '../../../../../inngest/check';
 import { CHECK_EXPIRY_FN_ID } from '../../../../../inngest/check-expiry';
 import { CHECK_REAPER_FN_ID } from '../../../../../inngest/check-reaper';
+import { LEDGER_BACKFILL_FN_ID, LEDGER_WRITE_FN_ID } from '../../../../../inngest/ledger';
 import { inngest } from '../../../../../inngest/client';
 import type { CheckRequested } from '../../../../../inngest/check-events';
 import { PLAN_CONCURRENCY_CAP } from '../../../../../inngest/concurrency';
@@ -28,6 +29,7 @@ import type { ExpireDeps } from './expire';
 import {
   checkStepsFromEnv,
   inngestFunctions,
+  SERVICE_WIRING,
   stepDeps,
   type StepStores,
   type Wiring,
@@ -242,7 +244,7 @@ describe('registration with V2_PIPELINE unset (D3)', () => {
 });
 
 describe('registration with V2_PIPELINE=1 (D3)', () => {
-  it('adds checkFn, its cancel handler, the reaper and the expiry after v1’s four', () => {
+  it('adds checkFn, its cancel handler, the reaper, the expiry and the ledger’s two after v1’s four', () => {
     const fns = inngestFunctions({ V2_PIPELINE: '1' });
     expect(fns.slice(0, 4)).toEqual([
       auditFn,
@@ -259,7 +261,18 @@ describe('registration with V2_PIPELINE=1 (D3)', () => {
       `crawlmouse-${CHECK_CANCELLED_FN_ID}`,
       `crawlmouse-${CHECK_REAPER_FN_ID}`,
       `crawlmouse-${CHECK_EXPIRY_FN_ID}`,
+      `crawlmouse-${LEDGER_WRITE_FN_ID}`,
+      `crawlmouse-${LEDGER_BACKFILL_FN_ID}`,
     ]);
+  });
+
+  it('production wiring gives the check steps a ledger draft sink (CC-41 D4)', () => {
+    const stores = SERVICE_WIRING.stores({
+      NEXT_PUBLIC_SUPABASE_URL: 'http://127.0.0.1:54321',
+      SUPABASE_SERVICE_ROLE_KEY: 'test-only-service-role',
+    });
+    expect(typeof stores.ledger?.put).toBe('function');
+    expect(stepDeps({}, stores).ledger).toBe(stores.ledger);
   });
 
   it('registers the scheduler (CC-28 D4) only with V2_PIPELINE=1 and V2_CHECKS_PUBLIC=1', () => {
@@ -405,7 +418,9 @@ describe('no registered function can declare a concurrency limit above the plan 
               vi.stubEnv('INNGEST_CHECK_CONCURRENCY', check);
               const configs = configsOf(fresh.inngestFunctions(process.env));
               expect(configs.length).toBe(
-                (flag === '1' ? 10 : 5) +
+                // v1's five; with V2_PIPELINE the check's four, checkFn's failure handler and
+                // CC-41's ledger writer and backfill.
+                (flag === '1' ? 12 : 5) +
                   (billing === '1' ? 2 : 0) +
                   // CC-27b's three deletion functions, the mail functions, and CC-31's schedules.
                   (pub === '1' ? 3 + MAIL_IDS.length + 1 : 0) +

@@ -4,6 +4,7 @@
  */
 import type { DailyBudget, renderCheck } from '@crawlmouse/engine/v2/pipeline';
 import type { WorkerClient } from '../../../worker-client/types';
+import type { LedgerDraftSink } from '../../ledger/draft-step';
 import type { DiscoverDeps } from '../discover';
 import type { PipelineStore } from '../store';
 import type { EvidenceStore, PersistDb } from '../types';
@@ -14,6 +15,12 @@ export interface StepDeps {
   store: PipelineStore;
   evidence: EvidenceStore;
   persistDb: PersistDb;
+  /**
+   * Where the build step stores the check's research-ledger draft (lib/v2/ledger/draft-step.ts).
+   * Production's wiring sets it (functions.ts SERVICE_WIRING, pinned by functions.test.ts); a test
+   * that leaves it out stores no draft.
+   */
+  ledger?: LedgerDraftSink;
   /**
    * The worker client, built when a step asks for it (correctness 1): null when the environment holds
    * no worker credentials; it throws when they do not make a client (a malformed key, a URL with no

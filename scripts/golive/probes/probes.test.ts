@@ -153,7 +153,13 @@ describe('vercel-env', () => {
   });
 
   it('lists once for all five step rows', async () => {
-    const { fetch, calls } = vercel([...allOf(1), ...allOf(3), ...allOf(4), ...allOf(5)]);
+    const { fetch, calls } = vercel([
+      ...allOf(1),
+      ...allOf(2),
+      ...allOf(3),
+      ...allOf(4),
+      ...allOf(5),
+    ]);
     const d = deps({ fetch, env: { VERCEL_TOKEN: vercelToken } });
     for (const s of [1, 2, 3, 4, 5] as const)
       expect((await vercelEnvProbe(s)(d)).status).toBe('pass');

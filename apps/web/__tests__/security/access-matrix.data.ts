@@ -1824,6 +1824,17 @@ const LIBS: readonly Spec[] = [
     }),
   ),
   {
+    path: 'apps/web/lib/v2/ledger/functions.ts',
+    v2: true,
+    identity: 'Inngest',
+    gate: 'caller',
+    detail:
+      'The research ledger’s writer and backfill (CC-41 D4): reads an ended check’s row, its site and its draft, and writes the de-identified ledger rows through record_check_ledger. Registered by the pipeline functions, served by the signed Inngest route.',
+    callers: [PIPELINE_FUNCTIONS],
+    proof: callerProof,
+    calls: 1,
+  },
+  {
     path: 'apps/web/lib/v2/mail/functions.ts',
     v2: true,
     identity: 'Inngest',

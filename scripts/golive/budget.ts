@@ -192,6 +192,27 @@ const ROWS: readonly RowInput[] = [
     steps: 2,
     stepsHow: 'expire-unkept, settle-kept',
   },
+  {
+    file: 'inngest/ledger.ts',
+    id: 'crawlmouse.ledger.write',
+    onFailure: false,
+    callSites: 1,
+    registration: 'V2_PIPELINE',
+    trigger: 'check.finished',
+    steps: 1,
+    stepsHow: 'write',
+    stepAt: [37],
+  },
+  {
+    file: 'inngest/ledger.ts',
+    id: 'crawlmouse.ledger.backfill',
+    onFailure: false,
+    callSites: 1,
+    registration: 'V2_PIPELINE',
+    cron: '41 */6 * * *',
+    steps: 1,
+    stepsHow: 'backfill',
+  },
   // ── V2_BILLING ──
   {
     file: 'inngest/trial-lifecycle.ts',
@@ -700,11 +721,12 @@ const row = (id: string): FunctionRow => {
 };
 const perRun = (id: string): number => 1 + row(id).steps;
 
-/** The functions one finished check starts: the alert planner, the notify mail, the capture. */
+/** The functions one finished check starts: the alert planner, the notify mail, the capture, the ledger. */
 export const finishedFanOut = (): number =>
   perRun('crawlmouse.alert.dispatch') +
   perRun('crawlmouse.mail.check-notify') +
-  perRun('crawlmouse.events.check-finished');
+  perRun('crawlmouse.events.check-finished') +
+  perRun('crawlmouse.ledger.write');
 
 /** One alert that fires on both channels: the run, its plan, and a step per channel. */
 export const alertFiring = (): number => perRun('crawlmouse.alert.dispatch') + 2;

@@ -34,7 +34,10 @@ export const REQUIRED_ENV: Readonly<Record<Step, Why>> = {
     WORKER_SIGNING_SECRET: 'the app signs each worker request',
     WORKER_JWT_PRIVATE_KEY_PKCS8_B64: 'the app signs the batch JWT the worker verifies',
   },
-  2: {},
+  2: {
+    RESEARCH_SITE_KEY:
+      "the research ledger's site key; unset, no check is written to the ledger (CC-41 D4, reported once per deployment as ledger-key-missing)",
+  },
   3: {
     TRIAL_LEDGER_PEPPER: 'without it a first login silently gets no trial (spec 25)',
   },
