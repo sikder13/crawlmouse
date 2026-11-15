@@ -303,7 +303,7 @@ const actions: readonly ActionSpec[] = [
   {
     name: SIGN_UP,
     description:
-      'A browser identified as a person: the first signed-in page after an account exists. No event marks the account’s creation.',
+      'A browser identified as a person, on a signed-in page. No event marks an account’s creation, and a second browser identifies again: count it with first-time math.',
     steps: [{ event: '$identify' }],
   },
   {
