@@ -28,7 +28,7 @@ describe('ClusterLinks', () => {
     (slug) => {
       const r = links(slug);
       const cluster = clusterOf(slug)!;
-      expect(r.nav?.getAttribute('aria-label')).toBe('Related guides');
+      expect(r.nav?.getAttribute('aria-label')).toBe('More on this topic');
       expect(r.links).toContainEqual([`/guides#${cluster.id}`, `All guides in “${cluster.title}”`]);
       for (const p of relatedPosts(slug))
         expect(r.links).toContainEqual([`/blog/${p.slug}`, p.title]);

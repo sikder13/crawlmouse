@@ -14,7 +14,7 @@ export function ClusterLinks({ slug }: { slug: string }) {
   if (!cluster) return null;
   const checks = checksPublicEnabled() ? checksExplainedBy(slug) : [];
   return (
-    <nav aria-label="Related guides" className="cluster-links mt-16">
+    <nav aria-label="More on this topic" className="cluster-links mt-16">
       <h2 className="font-display font-semibold text-xl text-ink mb-4">Related guides</h2>
       <ul className="space-y-3">
         {relatedPosts(slug).map((p) => (
