@@ -244,6 +244,42 @@ describe('the account and mirror reads', () => {
     ]);
   });
 
+  it('ownerUserId: the users.id of the active owner seat; none once it is removed, or for no account', async () => {
+    const accountId = await w.account('cus_a');
+    const user = (
+      await w.db.query<{ id: string }>(
+        `select id from public.users where default_account_id = $1`,
+        [accountId],
+      )
+    ).rows[0]!.id;
+    await w.db.query(
+      `insert into auth.users (id, email) values ('3f1d2c4b-5a6e-4f70-8a9b-0c1d2e3f4a5b', 'am@example.com')`,
+    );
+    await w.db.query(
+      `insert into public.seats (account_id, user_id, invited_email, role, status, accepted_at)
+       values ($1, '3f1d2c4b-5a6e-4f70-8a9b-0c1d2e3f4a5b', 'am@example.com', 'account_manager', 'active', now())`,
+      [accountId],
+    );
+    expect(await port.ownerUserId(accountId)).toBe(user);
+    expect(log).toEqual([
+      [
+        ['from', 'seats'],
+        ['select', 'user_id'],
+        ['eq', 'account_id', accountId],
+        ['eq', 'role', 'owner'],
+        ['eq', 'status', 'active'],
+        ['maybeSingle'],
+      ],
+    ]);
+    expect(await port.ownerUserId('7d0a4f43-7f1c-4c55-9f3a-8f9f7b0e2c11')).toBeNull();
+    await w.db.query(
+      `update public.seats set status = 'removed', removed_at = now()
+        where account_id = $1 and role = 'owner'`,
+      [accountId],
+    );
+    expect(await port.ownerUserId(accountId)).toBeNull();
+  });
+
   it('load: the account’s snapshot and version, read by id', async () => {
     const id = await w.account('cus_a');
     const stored = await port.load(id);

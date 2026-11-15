@@ -96,6 +96,8 @@ export interface WebhookDb {
   /** The live account bound to a customer, or null. */
   accountByCustomer(customerId: string): Promise<string | null>;
   subscriptionById(id: string): Promise<StoredMirror | null>;
+  /** The `users.id` of the account's active owner seat, or null when it has none. */
+  ownerUserId(accountId: string): Promise<string | null>;
   load(accountId: string): Promise<StoredSnapshot | null>;
   /** The RPC. Throws EntitlementConflictError on 40001 and BindingConflictError on 23505. */
   applyEvent(p: ApplyEventParams): Promise<RecordedDecision>;
@@ -313,6 +315,17 @@ export function supabaseWebhookDb(sb: SupabaseClient): WebhookDb {
         .maybeSingle();
       if (error) failed('subscriptions read', error);
       return data ? storedMirrorOf(data) : null;
+    },
+    async ownerUserId(accountId) {
+      const { data, error } = await sb
+        .from('seats')
+        .select('user_id')
+        .eq('account_id', accountId)
+        .eq('role', 'owner')
+        .eq('status', 'active')
+        .maybeSingle();
+      if (error) failed('seats read', error);
+      return data ? (data.user_id as string) : null;
     },
     load: (accountId) => entitlement.load(accountId),
     async applyEvent(p) {
