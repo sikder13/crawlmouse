@@ -24,8 +24,8 @@ export const TRIAL_END_COPY = {
   reminderDue: (date: string) => `The reminder is due once, on ${date}.`,
   noCard: 'No card is on file, so nothing is charged either way.',
   /** A trial with a card on file becomes the plan at its end unless it is cancelled (ARCH-2 §3.1). */
-  card: (last4: string, date: string) =>
-    `The card ending ${last4} is charged on ${date} unless you cancel.`,
+  card: (last4: string | null, date: string) =>
+    `The card ${last4 === null ? 'on file' : `ending ${last4}`} is charged on ${date} unless you cancel.`,
   /** A card trial set to cancel at its end: not charged (CC-27b review, item 1). */
   cardCancelled: (last4: string, date: string) =>
     `The trial is cancelled: it ends on ${date} and the card ending ${last4} is not charged.`,

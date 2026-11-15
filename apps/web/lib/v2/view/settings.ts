@@ -402,11 +402,13 @@ export function settingsView(
   // A card on file, whether or not this reader is given its digits (CC-37 Q25); `withheld` is a card
   // on file whose digits this reader is not given.
   const onFile = v.cardOnFile;
-  const withheld = onFile && card === null;
   // A trial whose subscription is `trialing` came through Checkout, which takes a card
   // (checkout-v2.ts, `payment_method_collection: 'always'`), whether or not its last four digits
   // were recorded (CC-39 F8): the card is charged at the trial's end unless it is cancelled.
   const cardTrial = trial && (onFile || subscriptionStatus === 'trialing');
+  // A card trial read by anyone but the owner is the owner's to manage: only the owner cancels
+  // (CC-39 ruling 5).
+  const withheld = (onFile && card === null) || (cardTrial && !owner);
   const pastDue = a.state === 'past_due';
   const yearly = v.tier === 'agency' ? AGENCY_YEARLY : PRO_YEARLY;
   const date = (ts: string) => dayDate(ts, zone);

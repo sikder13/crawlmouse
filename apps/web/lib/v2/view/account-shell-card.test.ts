@@ -119,3 +119,43 @@ describe('a Checkout trial read by a member who is not the owner (ruling 5, walk
     expect(card.note).toBe('The card on file is charged on Sat 7 Nov unless you cancel.');
   });
 });
+
+describe('the same trial on Settings › Plan and Trial ending, by role (ruling 5 review)', () => {
+  const accountId = viewer.accountId;
+  const tev = (role: 'owner' | 'account_manager' | 'developer') =>
+    trialEndView(checkoutTrial, trialEndViewer(checkoutTrial, accountId), { role });
+
+  it('Settings › Plan: an account manager reads that the owner manages the card', () => {
+    const v = settingsView(checkoutTrial, viewer, {
+      role: 'account_manager',
+      subscriptionStatus: 'trialing',
+    });
+    expect(v.plan.note).toBe('Ends Sat 7 Nov. Managed by the account owner.');
+    expect(v.plan.note).not.toMatch(/unless you cancel/);
+  });
+
+  it('Settings › Plan: the owner still reads the charge', () => {
+    const v = settingsView(checkoutTrial, viewer, {
+      role: 'owner',
+      subscriptionStatus: 'trialing',
+    });
+    expect(v.plan.note).toMatch(/The card on file is charged then unless you cancel\.$/);
+  });
+
+  it('Trial ending: the banner does not say no card is on file, for any role', () => {
+    expect(tev('owner').banner.sub).not.toMatch(/No card is on file/);
+    expect(tev('owner').banner.sub).toContain(
+      'The card on file is charged on Sat 7 Nov unless you cancel.',
+    );
+    for (const role of ['account_manager', 'developer'] as const) {
+      expect(tev(role).banner.sub).not.toMatch(/No card is on file|unless you cancel/);
+      expect(tev(role).banner.sub).toContain('Managed by the account owner.');
+      expect(tev(role).shell.trial!.note).toBe('Managed by the account owner.');
+    }
+  });
+
+  it('the control: a trial with no card and no subscription still says no card is on file', () => {
+    const v = trialEndView(plain, trialEndViewer(plain, accountId), { role: 'owner' });
+    expect(v.banner.sub).toContain('No card is on file, so nothing is charged either way.');
+  });
+});
