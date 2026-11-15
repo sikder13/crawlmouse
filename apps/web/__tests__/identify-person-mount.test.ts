@@ -114,3 +114,33 @@ describe('the signed-in layouts identify the browser', () => {
     expect(mounts(join(APP, 'layout.tsx'))).toBe(false);
   });
 });
+
+describe('a signed-in layout refuses under the same flag as every page beneath it', () => {
+  const GATE = /if \(!(\w+Enabled)\(\)\) return notFound\(\);/;
+  const APP = join(__dirname, '../app');
+  const layouts = [
+    'agency',
+    'agency-trial',
+    'alerts',
+    'changes',
+    'dashboard/v2',
+    'reports',
+    'seats',
+    'sites',
+  ];
+  const pagesUnder = (dir: string): string[] =>
+    readdirSync(join(APP, dir), { recursive: true, encoding: 'utf8' })
+      .filter((f) => f === 'page.tsx' || f.endsWith('/page.tsx'))
+      .map((f) => join(dir, f));
+
+  it.each(layouts)('%s', (dir) => {
+    const own = readFileSync(join(APP, dir, 'layout.tsx'), 'utf8').match(GATE)?.[1];
+    expect(own, `${dir}/layout.tsx refuses on no flag`).toBeDefined();
+    const pages = pagesUnder(dir);
+    expect(pages.length).toBeGreaterThan(0);
+    for (const page of pages) {
+      // Without the same gate, the layout would 404 a page that serves with its own flag on.
+      expect(readFileSync(join(APP, page), 'utf8').match(GATE)?.[1], page).toBe(own);
+    }
+  });
+});
