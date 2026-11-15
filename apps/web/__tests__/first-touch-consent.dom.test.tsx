@@ -104,6 +104,12 @@ describe('instrumentation-client', () => {
     expect(document.cookie).not.toContain('cm_ft=');
   });
 
+  it('starts PostHog with surveys off after a decline recorded outside the consent regions', async () => {
+    localStorage.setItem('cm_consent', 'denied');
+    await load('/pricing');
+    expect(ph.init.mock.calls[0]![1]).toMatchObject({ disable_surveys: true });
+  });
+
   it('writes cm_ft for the landing page on the banner grant, not for a later page', async () => {
     await load('/guides/a?utm_source=reddit', ['cm_consent_required=1']);
     window.history.replaceState(null, '', '/pricing?utm_source=other');
