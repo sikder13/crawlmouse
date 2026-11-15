@@ -9,17 +9,24 @@
  *    or /yr. A price written like that is typed, whatever its value.
  * 2. Copy modules (`lib/v2/copy/*`) and every registry entry's `rendered`: each `$`+amount is one
  *    `SHOWN_PRICES` holds.
- * 3. The rendered v2 screens listed below: the same, and where a plan is named with its price ("Pro
- *    $19 a month", "Agency · $99 a month"), that price is the plan's for that interval.
- * 4. The blog (`lib/blog`, not otherwise swept: it quotes other products' prices): where it gives
- *    Pro's price, that price is Pro's.
+ * 3. The rendered v2 screens listed below: the same. And where a plan is named and then, within 40
+ *    characters with no other plan named between, a price followed by "a month", "a year", "/mo",
+ *    "/yr", "per month" or "per year" ("Pro $19 a month", "Agency · $99 a month"), that price is the
+ *    plan's for that interval. Other shapes ("Pro $99 monthly", "Pro, $99, billed monthly", the
+ *    second price of "$19 a month or $190 a year") are not held to a plan; check 1 still holds them
+ *    in source.
+ * 4. The blog (`lib/blog`, not otherwise swept: it quotes other products' prices): where it writes
+ *    "Pro $N/mo|month|yr|year" or "Pro at $N/…", that price is Pro's. A price written "a month" there,
+ *    or another product's plan called Pro, is not told apart.
  *
  * Not checked, by name: a registry entry's `locked` text (the artboard as drawn, which the lock
  * comparison replaces with `rendered`), whole-line comments, test and test-support files,
  * `lib/billing/prices.ts` itself, and the amounts `NOT_OUR_PRICES` lists for the one file each is in.
  * The v1 files in `PINNED_V1` are not held to check 1; check 2's rule is applied to them instead.
- * Screens not rendered here: the dashboard at its site limit, whose Agency line is built with
- * `formatPlanPrice` (check 1 holds its source).
+ * States not rendered here, held only by check 1 (no typed price in their source), so a formatter
+ * called with the wrong plan there would pass this file: the dashboard at its site limit (its Agency
+ * line) and Settings' `agencyLine` on a plan card that shows it. `lib/v2/view/settings.test.ts` pins
+ * the latter's text.
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';

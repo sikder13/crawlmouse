@@ -18,15 +18,16 @@ nothing else.
 ## Ruling 4: shown prices come from `prices.ts`
 
 The owner decision of 2026-11-03 (D-2026-11-03-2) set Agency at $99 a month ($990 a year) and an
-extra seat at $12. Two places a customer sees still said $69. Every shown price now reads
-`apps/web/lib/billing/prices.ts`, through `formatPlanPrice(plan, interval)` and `formatExtraPrice(item,
+extra seat at $12. Two places a customer sees still said $69. A shown price now reads
+`apps/web/lib/billing/prices.ts`, apart from the four files listed below as left as they are, through `formatPlanPrice(plan, interval)` and `formatExtraPrice(item,
 interval)` (`apps/web/lib/v2/copy/plan-price.ts`) or `usd()` on its constants.
 `__tests__/v2/shown-prices.test.tsx` holds this. It fails on a typed price in the source, whole dollars,
 spaced or with cents, outside the exemptions it names. It fails on any price `prices.ts` does not hold
 in the copy modules, the registry's `rendered` and the rendered v2 screens it lists. Where those name a
-plan with its price, it fails unless the price is that plan's. In the blog, it fails if Pro's price is
-not Pro's. Its header lists what it does not check: the dashboard at its site limit is not rendered, and
-its Agency line is held by the source check.
+plan followed by a price "a month", "a year", "/mo" or "/yr", it fails unless the price is that
+plan's; other shapes are held only by the source check. In the blog, it fails if a "Pro $N/…" price is
+not Pro's. Its header lists what it does not check, including two states it does not render: the
+dashboard at its site limit, and Settings' `agencyLine`.
 
 | Where                                                                             | Before                                  | After                                                               |
 | --------------------------------------------------------------------------------- | --------------------------------------- | ------------------------------------------------------------------- |
@@ -42,7 +43,7 @@ its Agency line is held by the source check.
 | `lib/entitlement-spec.ts:111` (the gates table's label)                           | "$12 seats" typed                       | `usd(EXTRA_SEAT)`                                                   |
 
 The five copy-module lines the ruling named at `account-door.ts:77`, `agency.ts:148`, `dashboard.ts:465`,
-`settings.ts:271` (now `:286`) and `seats.ts:175` are `locked:` entries: the artboard's text as drawn,
+`settings.ts:271` (now `:287`) and `seats.ts:175` are `locked:` entries: the artboard's text as drawn,
 which the lock comparison replaces with the entry's `rendered`. No screen shows them. Their `rendered`
 values said $99, or read `usd(EXTRA_SEAT)` for the seat ($12). They now read `prices.ts` where they
 were typed.
