@@ -10,6 +10,7 @@ import {
 } from './payment-events';
 import { FREE_START, next, type EntitlementEvent, type EntitlementSnapshot } from './state-machine';
 import type { MirrorRow } from './subscription-mirror';
+import { PAYMENT_PATHS, type PathEvent } from './payment-paths.fixture';
 
 /**
  * The payment events one decided Stripe event plans (CC-41 D3). Transitions come from the machine;
@@ -453,5 +454,51 @@ describe('plannedCaptures', () => {
         properties: { plan: 'pro' },
       },
     ]);
+  });
+});
+
+describe('the payment paths fixture is what paymentEvents sends (scripts/ops/posthog counts [cm] Paid over it)', () => {
+  const reduced = (events: ReturnType<typeof paymentEvents>): PathEvent[] =>
+    events
+      .filter((e) => e.event === 'subscription_started' || e.event === 'trial_converted')
+      .map((e) => {
+        const p = e.properties as { trial?: boolean; via?: 'checkout' | 'subscription' };
+        return {
+          event: e.event as PathEvent['event'],
+          properties: e.event === 'subscription_started' ? { trial: p.trial } : { via: p.via },
+        };
+      });
+  const agencyStart: EntitlementEvent = {
+    type: 'agency_trial_started',
+    at: new Date(AT.getTime() - 14 * DAY),
+    trialEnd: new Date(AT.getTime() - DAY),
+    subscriptionId: 'sub_1',
+    subscriptionStatus: 'trialing',
+  };
+
+  it('direct', () => {
+    expect(reduced(paymentEvents(input(FREE_START, checkout(), session())))).toEqual(
+      PAYMENT_PATHS.direct,
+    );
+  });
+  it('noCardTrialPays', () => {
+    expect(reduced(paymentEvents(input(noCardTrial(), checkout(), session())))).toEqual(
+      PAYMENT_PATHS.noCardTrialPays,
+    );
+  });
+  it('cardTrialStarts', () => {
+    expect(
+      reduced(paymentEvents(input(FREE_START, agencyStart, session(0, 'usd'), mirror('agency')))),
+    ).toEqual(PAYMENT_PATHS.cardTrialStarts);
+  });
+  it('cardTrialPays', () => {
+    const started = next(FREE_START, agencyStart);
+    if (started.outcome !== 'applied') throw new Error('the trial did not start');
+    const stripe = stripeEvent('customer.subscription.updated', subscriptionObject(false), {
+      status: 'trialing',
+    });
+    expect(
+      reduced(paymentEvents(input(started.state, updated('agency'), stripe, mirror('agency')))),
+    ).toEqual(PAYMENT_PATHS.cardTrialPays);
   });
 });

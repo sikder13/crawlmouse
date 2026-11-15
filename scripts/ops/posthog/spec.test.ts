@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { EVENT_REGISTRY } from '../../../apps/web/lib/analytics-registry';
 import { FUNNEL_EVENTS } from '../../../apps/web/lib/analytics-events';
 import { checkSpec } from './apply';
+import { PAID_ON_PATH, PAYMENT_PATHS } from '../../../apps/web/lib/billing/payment-paths.fixture';
 import {
   FEEDBACK_SELECTOR,
   PERSON_KEYS,
@@ -234,28 +235,13 @@ describe('[cm] Paid counts one paying subscription once, on each path', () => {
             f.value.map(String).includes(String(e.properties[f.key])),
         ),
     );
-  // What lib/billing/payment-events.ts sends on each path, as payment-events.test.ts pins it.
-  it.each<[string, Sent[]]>([
-    [
-      "a no-card trial's paying checkout",
-      [
-        { event: 'subscription_started', properties: { plan: 'pro', trial: false } },
-        { event: 'trial_converted', properties: { plan: 'pro', via: 'checkout' } },
-      ],
-    ],
-    [
-      "a card trial's subscription turning active",
-      [{ event: 'trial_converted', properties: { plan: 'agency', via: 'subscription' } }],
-    ],
-    [
-      'a direct purchase',
-      [{ event: 'subscription_started', properties: { plan: 'pro', trial: false } }],
-    ],
-    [
-      'a card trial starting',
-      [{ event: 'subscription_started', properties: { plan: 'agency', trial: true } }],
-    ],
-  ])('%s', (label, sent) => {
-    expect(sent.filter(matches).length, label).toBe(label === 'a card trial starting' ? 0 : 1);
+  // What lib/billing/payment-events.ts sends on each path: payment-events.test.ts holds this
+  // fixture equal to paymentEvents' output, so a change to a path fails there or here.
+  it.each(Object.keys(PAYMENT_PATHS) as (keyof typeof PAYMENT_PATHS)[])('%s', (path) => {
+    const sent: Sent[] = PAYMENT_PATHS[path].map((e) => ({
+      event: e.event,
+      properties: { ...e.properties },
+    }));
+    expect(sent.filter(matches).length).toBe(PAID_ON_PATH[path]);
   });
 });

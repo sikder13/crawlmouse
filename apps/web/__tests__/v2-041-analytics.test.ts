@@ -19,10 +19,12 @@ import { ALLOWED_LEDGER_VIEW, deidentificationViolations } from './helpers/data-
 import {
   insertRow,
   LINEAGE,
+  personalAccount,
   MONTH0,
   prepareMeasurement,
   ROWS,
   seedWorld,
+  signUp,
   type World,
 } from './helpers/v2-check-tables';
 
@@ -93,13 +95,19 @@ describe('account_attribution', () => {
     first_seen_at: '2026-11-17T09:00:00Z',
   });
 
+  /** An account with no attribution row yet: seedWorld gives the world's account one. */
+  const freshAccount = async (tag: string) =>
+    (await personalAccount(db, await signUp(db, `${tag}-${randomUUID().slice(0, 8)}@example.com`)))
+      .accountId;
+
   it('holds one row per account and refuses a second', async () => {
+    const accountId = await freshAccount('ft-once');
     const t = await db.transaction(async (tx) => {
-      await insertRow(tx, 'account_attribution', valid(world.accountId));
+      await insertRow(tx, 'account_attribution', valid(accountId));
       return tx
         .query(
           `insert into public.account_attribution (account_id, first_seen_at) values ($1, now())`,
-          [world.accountId],
+          [accountId],
         )
         .then(
           () => 'inserted',
@@ -147,12 +155,16 @@ describe('account_attribution', () => {
   });
 
   it('goes with its account', async () => {
+    const accountId = await freshAccount('ft-gone');
     const left = await after(
-      `insert into public.account_attribution (account_id, first_seen_at) values ('${world.accountId}', now());
-       delete from public.accounts where id = '${world.accountId}';`,
+      `insert into public.account_attribution (account_id, first_seen_at) values ('${accountId}', now());
+       delete from public.accounts where id = '${accountId}';`,
       async (tx) =>
-        (await tx.query<{ n: number }>(`select count(*)::int as n from public.account_attribution`))
-          .rows[0]!.n,
+        (
+          await tx.query<{ n: number }>(
+            `select count(*)::int as n from public.account_attribution where account_id = '${accountId}'`,
+          )
+        ).rows[0]!.n,
     );
     expect(left).toBe(0);
   });
@@ -442,7 +454,11 @@ describe('no view exposes a check id that is a capability', () => {
     const anon = randomUUID();
     const kept = randomUUID();
     await insertRow(db, 'sites', ROWS.sites(anonSite, null, `cap-${anonSite.slice(0, 8)}.example`));
-    await insertRow(db, 'sites', ROWS.sites(keptSite, world.accountId, `cap-${keptSite.slice(0, 8)}.example`));
+    await insertRow(
+      db,
+      'sites',
+      ROWS.sites(keptSite, world.accountId, `cap-${keptSite.slice(0, 8)}.example`),
+    );
     await insertRow(db, 'checks', ROWS.checks(anon, anonSite));
     await insertRow(db, 'checks', ROWS.checks(kept, keptSite));
     const { rows } = await asReader(db, (tx) =>
@@ -494,12 +510,10 @@ describe('the revert as Supabase runs it', () => {
     const d = await freshDb();
     await d.exec(`create role creator login createrole noinherit`);
     await d.exec(`set role creator; create role made_by_creator login; reset role`);
-    const owned = await d
-      .exec(`set role creator; drop owned by made_by_creator; reset role`)
-      .then(
-        () => 'dropped',
-        (e: { code?: string }) => e.code,
-      );
+    const owned = await d.exec(`set role creator; drop owned by made_by_creator; reset role`).then(
+      () => 'dropped',
+      (e: { code?: string }) => e.code,
+    );
     await d.exec(`reset role`);
     // Since PG16 a CREATEROLE role holds only ADMIN on a role it made: DROP OWNED is refused…
     expect(owned).toBe('42501');

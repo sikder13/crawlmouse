@@ -127,8 +127,10 @@ const SPENT: ReadonlySet<LedgerOutcome> = new Set(['already_linked', 'not_ended'
 
 /**
  * Writes the checks drafted in the BACKFILL_EVERY_HOURS hours that ended one hour before the slot
- * `now` falls in, bounded. This is a draft's one retry: a draft the retry does not write (it failed
- * again, or the check has no lineage or is already linked) is deleted, so none is kept for good.
+ * `now` falls in, bounded. This is a draft's one retry: a draft it reads and does not write (the write
+ * failed again, or the check is already linked, has not ended or has no lineage) is deleted. A draft
+ * past BACKFILL_LIMIT, or in a slot whose run Inngest skips, is not read and stays until its check
+ * goes; `bounded` says when the first happened.
  */
 export async function backfillLedger(
   deps: WriterDeps & { onFailure: (checkId: string, error: unknown) => void },
