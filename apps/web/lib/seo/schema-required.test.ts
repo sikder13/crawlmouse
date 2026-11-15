@@ -35,6 +35,18 @@ describe('schemaProblems', () => {
       { type: 'toString', missing: '@type' },
     ]);
   });
+  it('does not check a node reference ({@type, @id} only); a node with any other property is checked', () => {
+    const ref = { '@type': 'WebPage', '@id': 'https://crawlmouse.com/blog/x' };
+    expect(schemaProblems({ '@type': 'Person', name: 'p', mainEntityOfPage: ref })).toEqual([]);
+    expect(schemaProblems({ ...ref, description: 'd' })).toEqual([
+      { type: 'WebPage', missing: 'name' },
+      { type: 'WebPage', missing: 'url' },
+    ]);
+    expect(schemaProblems({ '@type': 'WebPage' })).toEqual([
+      { type: 'WebPage', missing: 'name' },
+      { type: 'WebPage', missing: 'url' },
+    ]);
+  });
   it('declares a set for every type the site emits today', () => {
     for (const t of [
       'Organization',

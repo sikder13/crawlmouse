@@ -5,7 +5,7 @@
  */
 import type { AuditRun, SavedPage } from './audit-run';
 import { isNoindex } from './audit-run';
-import { attributeQueries, type AttributablePage } from './attribution';
+import { attributeQueries, pageTerms, type AttributablePage } from './attribution';
 import { skippedHeadings, typedNodes, typesOf } from './page-facts';
 import { schemaProblems } from './schema-required';
 import {
@@ -37,7 +37,6 @@ export interface ReportInput {
   commands: readonly string[];
 }
 
-const TITLE_SUFFIX = ' · Crawlmouse';
 const cell = (s: string) => s.replace(/\|/g, '\\|').replace(/\n/g, ' ');
 const isPost = (path: string) => /^\/blog\/[^/]+$/.test(path) && path !== '/blog/research';
 
@@ -131,12 +130,9 @@ function summary(input: ReportInput): string[] {
 
 function attribution(input: ReportInput, run: AuditRun): Map<string, string[]> {
   const byPath = new Map(input.posts.map((p) => [`/blog/${p.slug}`, p]));
-  const pages: AttributablePage[] = run.pages.map((p) => {
-    const post = byPath.get(p.path);
-    if (post) return { path: p.path, terms: [post.slug, post.title, ...post.keywords] };
-    const title = (p.title ?? '').replace(TITLE_SUFFIX, '');
-    return { path: p.path, terms: [p.path, title, ...(p.path === '/' ? ['crawlmouse'] : [])] };
-  });
+  const pages: AttributablePage[] = run.pages.map((p) =>
+    pageTerms(p.path, p.title, byPath.get(p.path)),
+  );
   const out = new Map<string, string[]>();
   for (const [path, rows] of attributeQueries(QUERIES, pages)) {
     out.set(
