@@ -7,7 +7,8 @@
  * Served at /stripe/v1/… of the stand-in (the production build's SDK is pointed here by
  * ./preload.mjs): the price listing the catalog reads (`price_<lookup key>`, as
  * lib/billing/catalog.fake.ts names them), customers, Checkout Sessions (create, list, expire),
- * subscriptions (retrieve, list, update), billing portal sessions. Subscriptions and signed events
+ * subscriptions (retrieve, list, update), billing portal configurations (list, create, update) and
+ * sessions. Subscriptions and signed events
  * come from the repo's StripeFake (lib/billing/stripe.fake.ts), whose webhook secret the walk's
  * build is given. NOT part of the product.
  */
@@ -39,6 +40,21 @@ export function decodeForm(body: string): Params {
   return out;
 }
 
+/** Form values as Stripe returns them: `'true'`/`'false'` as booleans, recursively. */
+function typed(v: Params): Params {
+  const one = (x: unknown): unknown =>
+    x === 'true'
+      ? true
+      : x === 'false'
+        ? false
+        : Array.isArray(x)
+          ? x.map(one)
+          : x !== null && typeof x === 'object'
+            ? typed(x as Params)
+            : x;
+  return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, one(x)]));
+}
+
 export interface Session {
   id: string;
   params: Params;
@@ -49,6 +65,8 @@ export class WalkStripe {
   readonly fake = new StripeFake();
   readonly sessions = new Map<string, Session>();
   readonly customers = new Map<string, Params>();
+  /** The billing portal's configurations (lib/billing/portal-config.ts lists, creates and repairs v2's). */
+  readonly portalConfigs = new Map<string, Params & { id: string; active: boolean }>();
   private n = 0;
 
   constructor(private readonly webhookUrl: () => string) {}
@@ -144,6 +162,31 @@ export class WalkStripe {
           .filter((f) => f.customer === customer)
           .map(stripeSubscription),
       );
+    }
+    if (path === 'billing_portal/configurations' && req.method === 'GET') {
+      return list([...this.portalConfigs.values()].filter((c) => c.active));
+    }
+    if (path === 'billing_portal/configurations' && req.method === 'POST') {
+      const config = {
+        id: this.id('bpc'),
+        object: 'billing_portal.configuration',
+        active: true,
+        ...typed(form),
+      };
+      this.portalConfigs.set(config.id, config);
+      return json(200, config);
+    }
+    if (
+      parts[0] === 'billing_portal' &&
+      parts[1] === 'configurations' &&
+      parts[2] &&
+      req.method === 'POST'
+    ) {
+      const config = this.portalConfigs.get(parts[2]);
+      if (!config)
+        return json(404, { error: { message: `walk stripe: no configuration ${parts[2]}` } });
+      Object.assign(config, typed(form));
+      return json(200, config);
     }
     if (path === 'billing_portal/sessions' && req.method === 'POST') {
       return json(200, {
