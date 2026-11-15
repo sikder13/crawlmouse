@@ -54,9 +54,9 @@ grant select, insert on table public.account_attribution to service_role;
 
 -- ─── 2. The ledger writer ─────────────────────────────────────────────────────────────────────────
 
--- What the check's build step knew that the ledger needs and nothing after it keeps (each crawler's
--- robots.txt group, chiefly), held until the writer records the check's ledger rows and deletes this
--- row. It goes with its check: the anonymous expiry's delete takes it in the same cascade. Its keys are
+-- What the check's build step computes for the ledger from what only it reads (the crawl batches,
+-- whose unanswered pages no persisted row holds, and robots.txt as read), held until the writer
+-- records the check's ledger rows and deletes this row. It goes with its check: the anonymous expiry's delete takes it in the same cascade. Its keys are
 -- exactly the ledger's own fields, so it can hold nothing the ledger may not (CC-41 rulings Q2, Q13).
 create table if not exists public.check_ledger_drafts (
   check_id uuid primary key references public.checks (id) on delete cascade,

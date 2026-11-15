@@ -7,7 +7,7 @@
  * `maybeSingle` as the one row, null for none, PGRST116 for more.
  *
  * Modelled: `from(table)` with `select`, `insert`, `upsert` (`onConflict` required,
- * `ignoreDuplicates`) and `update`; the filters `eq`, `neq`, `gte`, `lt`, `is`,
+ * `ignoreDuplicates`), `update` and `delete`; the filters `eq`, `neq`, `gte`, `lt`, `is`,
  * `not(column, 'is' | 'eq', value)`, `filter(column, 'is' | 'not.is', value)` and `in`; `select(columns)` after
  * `insert` or `update`, which returns the written rows as PostgREST's `return=representation` does; `order`, `limit`, `range` and `maybeSingle` after a
  * `select`, and `single` (one row, else PGRST116, as for none); and `rpc(fn, args)` for a function that returns one value, or, for a set-returning
@@ -295,6 +295,11 @@ export function postgrestOver(pg: PGlite, options: PostgrestOptions = {}): Supab
         statement =
           `insert into ${target} (${cols.join(', ')}) values (${cols.map((c) => param(r[c])).join(', ')})` +
           ` on conflict (${conflict}) ${resolution}`;
+        return filters;
+      },
+      delete() {
+        calls.push(['delete']);
+        statement = `delete from ${target}`;
         return filters;
       },
       update(values: unknown) {
