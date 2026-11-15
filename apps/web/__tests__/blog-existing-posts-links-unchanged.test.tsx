@@ -1,9 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { POSTS, postsWithTag } from '../lib/blog/posts';
 import { renderPostPage } from './helpers/blog-render';
 import { stripAdditions } from './helpers/blog-additions';
+import { checksExplainedBy, clusterHub, clusterOf, relatedPosts } from '../lib/blog/clusters';
+import { checkPath } from '../lib/v2/copy/check-pages';
 
 // Owner ruling before merging C-01: every post that existed before it keeps exactly the internal
 // links it had, in the same order, on the whole page (header, breadcrumbs, body, the call to action,
@@ -76,4 +78,39 @@ describe('every existing post keeps exactly its internal links, outside the list
       ).toEqual([]);
     }
   });
+});
+
+// The one container the links comparison sets aside holds exactly what D6 puts there, so it cannot
+// carry any other link: one block per page, after the article, linking the post's related posts,
+// the /check pages it explains while V2_CHECKS_PUBLIC is on, and its cluster's hub, in that order.
+describe('the cluster links hold only what D6 lists', () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  const expected = (slug: string, checks: boolean) => {
+    const cluster = clusterOf(slug);
+    return [
+      ...relatedPosts(slug).map((p) => `/blog/${p.slug}`),
+      ...(checks ? checksExplainedBy(slug).map(checkPath) : []),
+      ...(cluster ? [clusterHub(cluster)] : []),
+    ];
+  };
+
+  it.each([
+    ['off', ''],
+    ['on', '1'],
+  ] as const)(
+    'flags %s: each post has one block, outside the article, with exactly its links',
+    async (_, v) => {
+      vi.stubEnv('V2_CHECKS_PUBLIC', v);
+      for (const slug of SLUGS) {
+        const { doc } = await renderPostPage(slug);
+        const navs = [...doc.querySelectorAll('nav[aria-label="More on this topic"]')];
+        expect(navs, slug).toHaveLength(clusterOf(slug) ? 1 : 0);
+        if (navs.length === 0) continue;
+        expect(navs[0]!.closest('article'), slug).toBeNull();
+        const links = [...navs[0]!.querySelectorAll('a[href]')].map((a) => a.getAttribute('href'));
+        expect(links, slug).toEqual(expected(slug, v === '1'));
+      }
+    },
+  );
 });

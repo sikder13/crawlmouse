@@ -106,8 +106,8 @@ describe('every existing post renders as it did at the baseline, plus the listed
       }
       const { doc } = await renderPostPage(slug);
       const now = doc.querySelector('article')!;
-      // Exactly the additions this post is listed for, so a container cannot hide anything else.
-      // The cluster links (D6) are one block wherever the layout places it.
+      // Exactly the additions this post is listed for. The cluster links (D6) render after the
+      // article, so none belongs inside it: one found here would be a container holding body text.
       const { 'nav[aria-label="More on this topic"]': clusters, ...mine } = stripAdditions(now);
       expect(mine).toEqual({
         'p.post-summary': addedSummary(slug) ? 1 : 0,
@@ -115,7 +115,7 @@ describe('every existing post renders as it did at the baseline, plus the listed
         '.post-author-role': 0,
         'sup.post-source': Object.values(POST_SOURCES).filter((x) => x.slug === slug).length,
       });
-      expect(clusters).toBeLessThanOrEqual(1);
+      expect(clusters).toBe(0);
       dropUpdatedDate(now);
       expect(reverseEdits(now.outerHTML, slug)).toBe(then.outerHTML);
     },
