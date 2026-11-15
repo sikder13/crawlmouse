@@ -191,7 +191,7 @@ The owner's rulings of 2026-11-03. Per-page rows are kept 13 months on every pla
 | \`page_results\`, \`access_tests\` | 13 months | 13 months | 13 months | the month's partition is dropped |
 | \`link_edges\` | latest two checks per site | latest two checks per site | latest two checks per site | the diff step deletes the third-newest check's edges (ARCH-2); the 13-month drop is the backstop |
 | \`checks\`, \`site_fixes\`, \`changes\` | kept | kept | kept | with the site or the account |
-| anonymous checks (\`sites.account_id\` null) | 30 days from \`started_at\` | | | \`expires_at\`; deleted by the cleanup job, with their rows |
+| anonymous checks (\`sites.account_id\` null) | \`ANONYMOUS_EXPIRY_HOURS\` after the check is requested (\`lib/v2/pipeline/limits.ts\`, \`request.ts\`) | | | \`expires_at\`; deleted by the cleanup job, with their rows |
 | \`usage_events\` | with the account | with the account | with the account | cascade on account deletion |
 | \`check_ledger_links\` | with the check | with the check | with the check | cascade |
 | \`research.*\` | kept indefinitely, de-identified | | | only by \`research_retention\`, for an opt-out or a legal erasure |
