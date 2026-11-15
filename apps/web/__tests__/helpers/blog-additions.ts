@@ -1,3 +1,4 @@
+import { COPY_EDITS } from '../../lib/blog/copy-edits';
 import { V2_EDITS } from '../../lib/blog/v2-edits';
 
 // What CC-40 adds to an existing post page, and how the two existing-post guards set it aside to
@@ -14,7 +15,8 @@ import { V2_EDITS } from '../../lib/blog/v2-edits';
 //
 // D4 (c) changes the existing date line rather than adding to it, so `dropUpdatedDate` removes the
 // updated date from the baseline and the current page alike; the guards pin the current one to the
-// post's `updatedAt` separately. D5's sentence edits are reversed from lib/blog/v2-edits.ts.
+// post's `updatedAt` separately. Sentence edits are reversed from lib/blog/v2-edits.ts (D5) and
+// lib/blog/copy-edits.ts (D8, and the unsourced figure).
 
 export const ADDITION_SELECTORS = [
   'p.post-summary',
@@ -48,8 +50,9 @@ export function dropUpdatedDate(article: Element): void {
   }
 }
 
-/** The D5 edits made in this post's body (the layout's edit renders outside `<article>`). */
-export const bodyEdits = (slug: string) => V2_EDITS.filter((e) => e.slug === slug);
+/** The listed edits made in this post's body (the layout's D5 edit renders outside `<article>`). */
+export const bodyEdits = (slug: string) =>
+  [...V2_EDITS, ...COPY_EDITS].filter((e) => e.slug === slug);
 
 /**
  * Puts each listed edit's baseline wording back. Throws if an edit's new wording is not in the
