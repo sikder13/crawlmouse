@@ -51,7 +51,7 @@ describe('the fixture of production before P1 and P2 holds what was measured the
 });
 
 describe('the v2-set fixture', () => {
-  it('runs checks 02 to 07, every check but 01, 08 and 09', () => {
+  it('runs checks 02 to 07 and 10, every check but 01, 08 and 09', () => {
     expect(V2_SET_CHECKS.map((c) => c.file)).toEqual([
       '02-partitions-rls-owner-only.sql',
       '03-worker-roles-no-login.sql',
@@ -59,6 +59,7 @@ describe('the v2-set fixture', () => {
       '05-private-buckets.sql',
       '06-client-functions.sql',
       '07-partition-triggers.sql',
+      '10-analytics-no-pii.sql',
     ]);
   });
 });
