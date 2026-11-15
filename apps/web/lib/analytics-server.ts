@@ -98,6 +98,38 @@ export function browserDistinctId(cookieHeader: string | null): string | null {
   return typeof id === 'string' && BROWSER_DISTINCT_ID.test(id) ? id : null;
 }
 
+/**
+ * Who an event is about, for its distinct id (CC-41 D1): the human who acted (`userId`, their
+ * `users.id`) in `accountId`; or, with no `userId`, the account itself (a system event: a step, a
+ * cron or a webhook acting for the account). `visitor` marks an event about someone who may not be
+ * signed in (a link holder): with no `userId`, their browser's PostHog id is used when the request's
+ * consented cookie carries one.
+ */
+export interface EventKey {
+  accountId: string;
+  userId?: string | null;
+  visitor?: boolean;
+}
+
+/** `userId`; else, for a `visitor`, the browser's PostHog id; else `account:<accountId>`. */
+export function distinctIdFor(cookieHeader: string | null, key: EventKey): string {
+  const fallback = `account:${key.accountId}`;
+  if (key.visitor) return visitorDistinctId(cookieHeader, key.userId ?? null, fallback);
+  return key.userId ?? fallback;
+}
+
+/**
+ * The distinct id of an event about a visitor who may be anonymous: the signed-in user's id, else the
+ * browser's PostHog id from its consented cookie (`browserDistinctId`), else `fallback`.
+ */
+export function visitorDistinctId(
+  cookieHeader: string | null,
+  userId: string | null,
+  fallback: string,
+): string {
+  return userId ?? browserDistinctId(cookieHeader) ?? fallback;
+}
+
 export async function captureServerEvent(
   cookieHeader: string | null,
   { event, distinctId, accountId, properties = {} }: ServerEvent,

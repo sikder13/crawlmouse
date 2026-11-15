@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   CAPTURE_TIMEOUT_MS,
   browserDistinctId,
+  distinctIdFor,
+  visitorDistinctId,
   captureServerEvent,
   posthogSend,
   type CaptureBody,
@@ -269,5 +271,37 @@ describe('browserDistinctId (CC-41 D1)', () => {
     const id = `${'A-z0.9_:@'.repeat(22)}ab`;
     expect(id).toHaveLength(200);
     expect(browserDistinctId(cookieOf({ distinct_id: id }))).toBe(id);
+  });
+});
+
+describe('distinct ids by who the event is about (CC-41 D1)', () => {
+  const ACCOUNT = 'a0000000-0000-4000-8000-000000000004';
+  const USER = 'b0000000-0000-4000-8000-000000000004';
+
+  it('a human’s own action is keyed by their users.id; a system event by its account', () => {
+    vi.stubEnv('NEXT_PUBLIC_POSTHOG_KEY', 'phc_k');
+    const cookie = `ph_phc_k_posthog=${encodeURIComponent(JSON.stringify({ distinct_id: 'dev-1' }))}`;
+    expect(distinctIdFor(cookie, { accountId: ACCOUNT, userId: USER })).toBe(USER);
+    expect(distinctIdFor(cookie, { accountId: ACCOUNT })).toBe(`account:${ACCOUNT}`);
+    expect(distinctIdFor(cookie, { accountId: ACCOUNT, userId: null })).toBe(`account:${ACCOUNT}`);
+  });
+
+  it('a visitor event takes the user, else the browser’s id, else the account', () => {
+    vi.stubEnv('NEXT_PUBLIC_POSTHOG_KEY', 'phc_k');
+    const cookie = `ph_phc_k_posthog=${encodeURIComponent(JSON.stringify({ distinct_id: 'dev-1' }))}`;
+    const key = { accountId: ACCOUNT, visitor: true };
+    expect(distinctIdFor(cookie, { ...key, userId: USER })).toBe(USER);
+    expect(distinctIdFor(cookie, key)).toBe('dev-1');
+    expect(distinctIdFor('a=1', key)).toBe(`account:${ACCOUNT}`);
+    expect(distinctIdFor(`${cookie}; cm_consent=denied`, key)).toBe(`account:${ACCOUNT}`);
+  });
+
+  it('a visitor is the signed-in user, else the browser’s PostHog id, else the fallback', () => {
+    vi.stubEnv('NEXT_PUBLIC_POSTHOG_KEY', 'phc_k');
+    const cookie = `ph_phc_k_posthog=${encodeURIComponent(JSON.stringify({ distinct_id: 'dev-1' }))}`;
+    expect(visitorDistinctId(cookie, USER, 'check:r')).toBe(USER);
+    expect(visitorDistinctId(cookie, null, 'check:r')).toBe('dev-1');
+    expect(visitorDistinctId('a=1', null, 'check:r')).toBe('check:r');
+    expect(visitorDistinctId(`${cookie}; cm_consent=denied`, null, 'check:r')).toBe('check:r');
   });
 });
