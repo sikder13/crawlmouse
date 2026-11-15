@@ -121,6 +121,11 @@ describe('every existing post renders as it did at the baseline, plus the listed
       expect((now.metadata.openGraph as { modifiedTime?: string }).modifiedTime).toBe(
         POSTS_BY_SLUG.get(slug)!.updatedAt,
       );
+      // updatedAt moves only for a post whose body gained D4's summary or questions (D4; rulings 2
+      // and 3 move no date): otherwise it is the baseline's.
+      const gained = Boolean(addedSummary(slug)) || addedQuestions(slug).length > 0;
+      const baseline = (then.metadata.openGraph as { modifiedTime?: string }).modifiedTime;
+      if (!gained) expect(POSTS_BY_SLUG.get(slug)!.updatedAt, `${slug} updatedAt`).toBe(baseline);
       expect(now.h1).toBe(then.h1);
       expect(now.h1Count).toBe(then.h1Count);
     },
