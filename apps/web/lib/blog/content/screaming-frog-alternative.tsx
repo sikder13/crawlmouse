@@ -86,10 +86,10 @@ export function ScreamingFrogAlternativeBody() {
       <h3>1. Crawlmouse &mdash; free, browser-based, focused on structure and AI readiness</h3>
       <p>
         Crawlmouse (that&rsquo;s us, so judge this entry hardest) runs in the browser: paste a URL,
-        get an A&ndash;F internal-linking grade and a 0&ndash;100{' '}
-        <Link href={'/ai-readiness-checker' as Route}>AI-readiness score</Link> for the whole site,
-        with fixes in plain language. Nothing to install, free forever, and the same site gets the
-        same score every time.
+        get grades for the whole site&rsquo;s structure and for{' '}
+        <Link href={'/ai-readiness-checker' as Route}>how well AI crawlers can read it</Link>, with
+        fixes in plain language. Nothing to install, free forever, and the same site gets the same
+        score every time.
       </p>
       <p>
         The honest scope: Crawlmouse is not a 300-check technical crawler. It answers two questions
@@ -106,8 +106,7 @@ export function ScreamingFrogAlternativeBody() {
         &mdash; read on.
       </p>
       <p>
-        <strong>Price:</strong> free; Pro at $19/month for every fix, CSV export, and white-label
-        reports.
+        <strong>Price:</strong> free; paid plans from $19/month.
       </p>
 
       <h3>2. Sitebulb &mdash; the closest like-for-like swap</h3>

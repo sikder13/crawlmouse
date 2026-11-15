@@ -158,7 +158,7 @@ export function SitebulbAlternativeBody() {
         Full disclosure: this is our tool. <Link href={{ pathname: '/' }}>Crawlmouse</Link> takes
         the narrow-but-free approach. You paste a URL and it crawls the live site in the browser —
         nothing to install, no trial clock, no per-seat licence. It maps the internal-link graph and
-        returns a single A&ndash;F grade plus the specific problems behind it: orphan pages, pages
+        returns a grade for its structure plus the specific problems behind it: orphan pages, pages
         buried too deep, weak hubs, thin anchor text.
       </p>
       <p>

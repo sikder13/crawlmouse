@@ -109,8 +109,8 @@ export function ArticleLayout({
             See how your own internal linking grades
           </h2>
           <p className="mt-2 text-ink/70">
-            Crawlmouse crawls your site, maps every internal link, and gives you an A–F grade in
-            under two minutes. Free, no install.
+            Crawlmouse crawls your site, maps every internal link, and grades what it finds. Free,
+            no install.
           </p>
           <Link
             href={{ pathname: '/' }}

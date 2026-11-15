@@ -95,7 +95,7 @@ export function FreeInternalLinkAuditBody() {
         <li>
           <strong>Crawl the site.</strong> Paste your URL into{' '}
           <Link href={{ pathname: '/' }}>Crawlmouse</Link>. It crawls the live site, builds the
-          internal-link graph, and returns a single A&ndash;F grade plus the specific problems
+          internal-link graph, and returns a grade for its structure plus the specific problems
           behind it — in the browser, no account or download.
         </li>
         <li>
