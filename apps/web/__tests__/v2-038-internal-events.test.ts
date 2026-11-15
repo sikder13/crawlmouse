@@ -83,17 +83,14 @@ describe('CC-38 D3: the server events name the subject internal is derived from'
     expect(calls.filter((c) => c.subject.startsWith('escape:'))).toEqual([]);
   });
 
-  it.runIf(CC33)('accepts no call whose subject internal cannot be derived from', () => {
+  it("reads CC-33's marker on the tree (lib/v2/ops/internal-marker.ts)", () => {
+    expect(CC33).toBe(true);
+  });
+
+  it('accepts no call whose subject internal cannot be derived from', () => {
     const refused = calls.filter((c) => !c.ok).map((c) => `${c.at} ${c.subject}`);
     expect(refused).toEqual([]);
   });
-
-  it.skipIf(CC33)(
-    'is waiting for CC-33: without it the check events name no account (the property runs once lib/v2/ops/internal-marker.ts exists)',
-    () => {
-      expect(calls.some((c) => !c.ok)).toBe(true);
-    },
-  );
 });
 
 /**
