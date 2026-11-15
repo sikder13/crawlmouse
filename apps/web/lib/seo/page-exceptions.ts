@@ -47,9 +47,8 @@ export const PAGE_EXCEPTIONS: readonly PageException[] = [
   // v1 home (app/page.tsx): the feature cards' h3s follow the h1 with no h2 between.
   { path: '/', rule: 'heading-skip', builds: ['off'], reason: OUTSIDE },
   { path: '/pricing', rule: 'description-length', builds: ['off'], reason: OUTSIDE },
-  // The v2 home sets no metadata of its own until D2 gives it some; then this entry's 'on' build
-  // stops firing and is removed.
-  { path: '/', rule: 'description-duplicate', builds: BOTH, reason: LAYOUT_DESCRIPTION },
+  // v1's home sets no description of its own; the v2 home's own (D2) leaves the 'on' build clean.
+  { path: '/', rule: 'description-duplicate', builds: ['off'], reason: LAYOUT_DESCRIPTION },
   ...['/status', '/privacy', '/terms', '/aup', '/subprocessors', '/takedown'].map(
     (path): PageException => ({
       path,
