@@ -12,6 +12,10 @@
  *   session  {email}         a signed-in session cookie for that user
  *   user     {email}         a confirmed user at that address, made as a sign-up makes one
  *   sessions {}              the open and finished Checkout Sessions, as the app opened them
+ *   replay   {}              the last Stripe event delivered, sent again byte for byte (a retry)
+ *   customers {}             the Stripe customers the app created, with their metadata
+ *   captures {}              the PostHog events the capture stub (./posthog.ts) has recorded
+ *   posthog-requests {}      the requests the capture stub answered: method, path, body encoding
  */
 import { supabaseEntitlementStore } from '../../../apps/web/lib/billing/state-machine-apply';
 import { postgrestOver } from '../../../apps/web/__tests__/helpers/postgrest-pglite';
@@ -22,6 +26,7 @@ import { finishCheck } from './checks';
 import { runInternal } from '../../../scripts/ops/internal';
 import { restClient } from '../../../scripts/ops/supabase-rest';
 import { SERVICE_KEY, startStandin, type Standin } from './standin';
+import { WalkPostHog } from './posthog';
 import { WalkStripe } from './stripe';
 
 const PORT = Number(process.env.STANDIN_PORT ?? 54438);
@@ -33,6 +38,7 @@ const PEPPER = process.env.TRIAL_LEDGER_PEPPER ?? '';
 if (!migrationsAddInternal()) throw new Error('walk: no migration adds accounts.internal (CC-33)');
 
 const stripe = new WalkStripe(() => `${WEB}/api/webhooks/stripe-account`);
+const posthog = new WalkPostHog();
 
 function cookieOf(email: string): string {
   const u = standin.auth.byEmail(email);
@@ -41,7 +47,10 @@ function cookieOf(email: string): string {
 }
 
 const standin: Standin = await startStandin(PORT, {
-  routes: [{ prefix: '/stripe/', handle: (req, res, url) => stripe.handle(req, res, url) }],
+  routes: [
+    { prefix: '/stripe/', handle: (req, res, url) => stripe.handle(req, res, url) },
+    { prefix: '/ph/', handle: (req, res, url) => posthog.handle(req, res, url) },
+  ],
   controls: {
     finish: async (b, db) => ({ checkId: await finishCheck(db, String(b.siteId)) }),
     complete: async (b) => stripe.complete(String(b.sessionId)),
@@ -50,6 +59,10 @@ const standin: Standin = await startStandin(PORT, {
     session: async (b) => ({ name: 'sb-127-auth-token', value: cookieOf(String(b.email)) }),
     user: async (b) => ({ id: (await standin.auth.create(String(b.email))).id }),
     sessions: async () => [...stripe.sessions.values()],
+    replay: async () => stripe.replay(),
+    customers: async () => [...stripe.customers.entries()].map(([id, params]) => ({ id, params })),
+    captures: async () => posthog.captures,
+    'posthog-requests': async () => posthog.requests,
   },
 });
 
