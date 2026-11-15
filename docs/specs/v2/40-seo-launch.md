@@ -45,10 +45,10 @@ at build); `softwareApplicationLd()` describes v2 and offers Free at 0, Pro mont
 while `V2_BILLING` sells it — Agency monthly and yearly, each price from `prices.ts`;
 `organizationLd()` names Crawlmouse with `parentOrganization` Nahl Technologies Inc
 (https://nahltech.com) and an address of locality, region and country only (Indianapolis, IN, US) and
-no `sameAs` (no profile is known to exist); `/llms.txt` carries the v2 descriptor and lists each key
-page with its own title and meta description read from the page's metadata (`lib/seo/llms-v2.ts`),
-then every post with its description. The three owner strings are one constant each in
-`lib/seo/site-copy.ts`; the options are in the step's notes (`copy-proposals.md`).
+no `sameAs` (no profile is known to exist); `/llms.txt` carries the v2 descriptor, the plans on sale with their prices, the key
+pages listed in `lib/seo/llms-v2.ts` with the title and description each page's metadata reads (taken
+from the same copy module or page export), then every post with its description. The owner strings are
+in `lib/seo/site-copy.ts` (ruling 3 below).
 Flags off: `lib/seo/flags-off-v1.test.tsx` compares the root layout metadata, the share card (its PNG's
 sha256), Organization, WebSite and SoftwareApplication, and `/llms.txt` with a capture from main 66c58828.
 
@@ -102,12 +102,14 @@ markup follow from the data, and `updatedAt` did not move for it. D8, the banned
 **Ruling 3 (CTO, owner-delegated, 08:50 ET) — deliberate §13 changes.** The v2 home's title, description
 and `/llms.txt` descriptor are the ruling's (`lib/seo/site-copy.ts`), with the plans and prices in
 `/llms.txt` generated from `prices.ts`. A post may carry a `seoTitle`, which sets `<title>`, Open Graph
-and Twitter only; the H1, the Article headline, the slug and every heading keep the post's `title`.
+and Twitter only; the H1 and the Article headline keep the post's `title`, and no slug or heading changed.
 Each change is data in `apps/web/lib/blog/ruled-copy.ts`, with what it replaced and the Search Console
 line it rests on; `lib/blog/ruled-copy.test.ts` checks each `before` against the pre-CC-40 baseline
-fixture and each `after` against `posts.ts`, and the pinned existing-post guard applies them to its
-baseline and must then match exactly. The table is `ruledChangesMarkdown()`'s output;
-`__tests__/spec-40-d5-table.test.ts` fails when it differs. No slug or URL changed.
+fixture and each `after` against `posts.ts`; the pinned existing-post guard applies them to the
+baseline's metadata and requires the result to equal what the post renders. The table is `ruledChangesMarkdown()`'s output;
+`__tests__/spec-40-d5-table.test.ts` fails when it differs. The `/llms.txt` descriptor departs from
+the ruling's words in one clause: "gives the fix for each problem it finds" is true on Pro and Agency
+only, so it says how many fixes Free gives, read from `GATES` (questions Q14, for the CTO).
 
 <!-- prettier-ignore-start -->
 <!-- ruled-table:start -->

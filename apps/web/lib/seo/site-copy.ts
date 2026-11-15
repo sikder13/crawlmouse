@@ -1,3 +1,6 @@
+import { GATES } from '../entitlement-v2';
+import { numberWord } from '../v2/words';
+
 /**
  * What the site says about itself once v2 is public (CC-40 D2), served only while V2_CHECKS_PUBLIC
  * is on; with it off every caller serves its v1 text unchanged. The home title, description and
@@ -13,12 +16,21 @@ export const V2_HOME_DESCRIPTION =
   'See what Googlebot, GPTBot, ClaudeBot and PerplexityBot actually get from your site, and how to ' +
   'fix what blocks them. Free check, nothing to install.';
 
-/** The `/llms.txt` descriptor. The plans and prices that follow it are generated (lib/seo/llms-v2.ts). */
-export const V2_LLMS_DESCRIPTOR =
-  'Crawlmouse (by Nahl Technologies) checks whether search engines and AI crawlers can read a ' +
-  'website. It fetches the site as Googlebot, GPTBot, ClaudeBot and PerplexityBot, shows what each ' +
-  'one received, grades SEO and AI readability, and gives the fix for each problem it finds. Free ' +
-  'for one site, no install.';
+/**
+ * The `/llms.txt` descriptor: ruling 3's wording, except that "gives the fix for each problem it
+ * finds" is true only on Pro and Agency, so it names what Free gives, read from GATES (questions Q14).
+ * The plans and prices that follow it are generated (lib/seo/llms-v2.ts).
+ */
+export function v2LlmsDescriptor(): string {
+  const free = GATES.free.fixesVisible;
+  const freeFixes = free === 'all' ? 'every one' : `${numberWord(free)} per check`;
+  return (
+    'Crawlmouse (by Nahl Technologies) checks whether search engines and AI crawlers can read a ' +
+    'website. It fetches the site as Googlebot, GPTBot, ClaudeBot and PerplexityBot, shows what each ' +
+    `one received, grades SEO and AI readability, and gives the fix for the problems it finds: ${freeFixes} ` +
+    'on the free plan, every one on Pro and Agency. Free for one site, no install.'
+  );
+}
 
 /**
  * The root share card's words: the v2 home's H1 question without its "actually"

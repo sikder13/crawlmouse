@@ -2,7 +2,7 @@ import { postsNewestFirst } from '@/lib/blog/posts';
 import { siteUrl } from '@/lib/site-url';
 import { checksPublicEnabled } from '@/lib/auth/flags';
 import { plansLine, v2KeyPages } from '@/lib/seo/llms-v2';
-import { V2_LLMS_DESCRIPTOR } from '@/lib/seo/site-copy';
+import { v2LlmsDescriptor } from '@/lib/seo/site-copy';
 
 // Served at /llms.txt (the folder name `llms.txt` is a literal path segment, so this
 // Route Handler resolves at that exact path). It's the llms.txt convention: a plain-text,
@@ -65,7 +65,7 @@ export function GET() {
   const body = `${[
     '# Crawlmouse',
     '',
-    `> ${v2 ? V2_LLMS_DESCRIPTOR : DESCRIPTOR}`,
+    `> ${v2 ? v2LlmsDescriptor() : DESCRIPTOR}`,
     ...(v2 ? ['', plansLine()] : []),
     '',
     '## Key pages',

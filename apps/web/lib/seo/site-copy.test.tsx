@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { schemaProblems } from './schema-required';
-import { V2_HOME_DESCRIPTION, V2_HOME_TITLE, V2_LLMS_DESCRIPTOR } from './site-copy';
+import { V2_HOME_DESCRIPTION, V2_HOME_TITLE, v2LlmsDescriptor } from './site-copy';
 import { POSTS } from '../blog/posts';
 
 // CC-40 D2, flags on. The prices below are written out as the brief states them (Pro $19/$190,
@@ -20,6 +20,13 @@ const fixture = JSON.parse(
 );
 const ON = { V2_ACCOUNT_DOOR: '1', V2_PIPELINE: '1', V2_CHECKS_PUBLIC: '1', V2_BILLING: '1' };
 
+describe('/llms.txt is built with the site', () => {
+  it('is force-static, so the flags it reads are the build\u2019s', async () => {
+    const route = await import('../../app/llms.txt/route');
+    expect(route.dynamic).toBe('force-static');
+  }, 60_000);
+});
+
 describe('the owner strings', () => {
   it('the home title is at most 60 characters and the description 120–155', () => {
     expect(V2_HOME_TITLE.length).toBeLessThanOrEqual(60);
@@ -28,10 +35,16 @@ describe('the owner strings', () => {
   });
   it('the title and the llms descriptor lead with the brand the home earns its clicks on', () => {
     expect(V2_HOME_TITLE.startsWith('Crawlmouse')).toBe(true);
-    expect(V2_LLMS_DESCRIPTOR.startsWith('Crawlmouse')).toBe(true);
+    expect(v2LlmsDescriptor().startsWith('Crawlmouse')).toBe(true);
+  });
+  it('the llms descriptor says what Free gives, and Free gives three fixes a check', () => {
+    // Written out, not read from GATES: the sentence must change if Free's fixes do.
+    expect(v2LlmsDescriptor()).toContain(
+      'gives the fix for the problems it finds: three per check on the free plan, every one on Pro and Agency.',
+    );
   });
   it('none promises the v1 grade', () => {
-    for (const s of [V2_HOME_TITLE, V2_HOME_DESCRIPTION, V2_LLMS_DESCRIPTOR]) {
+    for (const s of [V2_HOME_TITLE, V2_HOME_DESCRIPTION, v2LlmsDescriptor()]) {
       expect(s).not.toMatch(/A–F|internal-link(ing)? grade|one complete fix/i);
     }
   });
@@ -109,7 +122,7 @@ describe('flags on', () => {
     const { GET } = await import('../../app/llms.txt/route');
     const body = await GET().text();
     expect(body).toContain(
-      `> ${V2_LLMS_DESCRIPTOR}\n\nPlans: Free; Pro $19/month or $190/year; Agency $99/month or $990/year.\n`,
+      `> ${v2LlmsDescriptor()}\n\nPlans: Free; Pro $19/month or $190/year; Agency $99/month or $990/year.\n`,
     );
     expect(body).not.toMatch(/A–F|one complete fix|CLI, GitHub Action/);
     const { CHECK_COPY } = await import('../v2/copy/check-pages');
