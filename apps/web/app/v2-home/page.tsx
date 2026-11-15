@@ -3,14 +3,23 @@ import { notFound } from 'next/navigation';
 import { LiveHome } from '@/components/v2/screens/home/LiveHome';
 import { checksPublicEnabled } from '@/lib/auth/flags';
 import { JsonLd, softwareApplicationLd, websiteLd } from '@/lib/seo/jsonld';
-import { V2_HOME_DESCRIPTION, V2_HOME_TITLE } from '@/lib/seo/site-copy';
+import { V2_HOME_DESCRIPTION, V2_HOME_TITLE, V2_SHARE_CARD } from '@/lib/seo/site-copy';
 
 /**
  * v2's title and description for `/` (CC-40 D2). Its own, so the root layout's v1 text, which v1's
- * home and v1 /pricing and /developers inherit, stays main's byte for byte. Open Graph and Twitter
- * are set whole (Next replaces a parent's object): the canonical is `/`, and the image is the root
- * share card, whose words follow the same flag (app/opengraph-image.tsx). Robots come from the root.
+ * home and v1 /pricing and /developers inherit, stays main's byte for byte. Next replaces a parent's
+ * `openGraph` and `twitter` objects whole and attaches the root's file card only to the root
+ * segment's own metadata, so the image is named here: the root share card, whose words follow the same
+ * flag (app/opengraph-image.tsx). `app/v2-home/page.test.tsx` pins it. Robots come from the root.
  */
+const SHARE_IMAGE = {
+  url: '/opengraph-image',
+  width: 1200,
+  height: 630,
+  type: 'image/png',
+  alt: V2_SHARE_CARD.alt,
+};
+
 export const metadata: Metadata = {
   title: { absolute: V2_HOME_TITLE },
   description: V2_HOME_DESCRIPTION,
@@ -22,8 +31,14 @@ export const metadata: Metadata = {
     url: '/',
     title: V2_HOME_TITLE,
     description: V2_HOME_DESCRIPTION,
+    images: [SHARE_IMAGE],
   },
-  twitter: { card: 'summary_large_image', title: V2_HOME_TITLE, description: V2_HOME_DESCRIPTION },
+  twitter: {
+    card: 'summary_large_image',
+    title: V2_HOME_TITLE,
+    description: V2_HOME_DESCRIPTION,
+    images: [SHARE_IMAGE],
+  },
 };
 
 /**

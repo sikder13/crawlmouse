@@ -2,7 +2,7 @@
  * What the site says about itself once v2 is public (CC-40 D2), served only while V2_CHECKS_PUBLIC
  * is on; with it off every caller serves its v1 text unchanged. The three owner strings are option 1
  * of the proposals in the CC-40 notes (`copy-proposals.md`); choosing option 2 is changing one
- * constant here. `site-copy.test.ts` holds each to the length its decision names.
+ * constant here. `site-copy.test.tsx` holds each to the length its decision names.
  */
 
 /** The v2 home's `<title>`, absolute (no " · Crawlmouse" suffix). Owner string; at most 60 characters. */
@@ -20,8 +20,9 @@ export const V2_LLMS_DESCRIPTOR =
   'grades SEO and AI readability, and keeps checking. Free for one site, no install.';
 
 /**
- * The root share card's words. The headline is the v2 home's H1
- * (components/v2/screens/home/HomeScreen.tsx); the sub and footer say what that page says.
+ * The root share card's words: the v2 home's H1 question without its "actually"
+ * (components/v2/screens/home/HomeScreen.tsx), and a sub and footer that restate that page's sub and
+ * its Free plan card.
  */
 export const V2_SHARE_CARD = {
   alt: V2_HOME_TITLE,
