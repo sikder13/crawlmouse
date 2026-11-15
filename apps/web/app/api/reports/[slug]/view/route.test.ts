@@ -10,6 +10,8 @@ import { FIRST_AUDIT } from '@/lib/v2/view/segment/test-helpers';
 
 const store = vi.hoisted(() => ({
   row: null as unknown,
+  /** The report's account as `public_reports.account_id` holds it. */
+  accountId: null as string | null,
   allowed: true,
   buckets: [] as string[],
   reads: 0,
@@ -19,6 +21,18 @@ vi.mock('@/lib/reports', () => ({
     store.reads++;
     return store.row;
   },
+}));
+vi.mock('server-only', () => ({}));
+vi.mock('@/lib/supabase/admin', () => ({
+  supabaseAdmin: () => ({
+    from: () => ({
+      select: () => ({
+        eq: () => ({
+          maybeSingle: async () => ({ data: { account_id: store.accountId }, error: null }),
+        }),
+      }),
+    }),
+  }),
 }));
 vi.mock('@/lib/rate-limit', () => ({
   checkRateLimit: async (key: string) => {
@@ -74,6 +88,7 @@ beforeEach(() => {
   vi.stubGlobal('fetch', fetchMock);
   fetchMock.mockClear();
   store.row = v2Row();
+  store.accountId = null;
   store.allowed = true;
   store.buckets = [];
   store.reads = 0;
@@ -136,5 +151,33 @@ describe('POST /api/reports/[slug]/view', () => {
     store.allowed = false;
     expect((await post()).status).toBe(429);
     expect([store.reads, fetchMock.mock.calls.length]).toEqual([0, 0]);
+  });
+});
+
+describe("POST /api/reports/[slug]/view: an internal account's report", () => {
+  it('is sent marked internal, the account read from public_reports and asked of is_internal_subject', async () => {
+    const INTERNAL = 'a1111111-1111-4111-8111-111111111111';
+    store.accountId = INTERNAL;
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://db.example.test');
+    vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY', ['service', 'role', 'sample'].join('-'));
+    const asked: string[] = [];
+    fetchMock.mockImplementation((async (url: string, init?: RequestInit) => {
+      if (String(url).includes('/rest/v1/rpc/is_internal_subject')) {
+        const body = JSON.parse(String(init?.body)) as { p_id: string };
+        asked.push(body.p_id);
+        return new Response(JSON.stringify(body.p_id === INTERNAL), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      return new Response(null, { status: 200 });
+    }) as never);
+    const res = await post('internal1');
+    expect(res.status).toBe(204);
+    expect(asked).toContain(INTERNAL);
+    const events = sent().filter((e) => e.event === 'report_viewed');
+    expect(events).toHaveLength(1);
+    expect(events[0].properties.internal).toBe(true);
+    fetchMock.mockImplementation((async () => new Response(null, { status: 200 })) as never);
   });
 });

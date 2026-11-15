@@ -225,6 +225,8 @@ async function freshRow(table: NewTable): Promise<Record<string, unknown>> {
       return ROWS.operator_actions(randomUUID(), world.accountId);
     case 'founder_notices':
       return ROWS.founder_notices(`signup:${hex}`, world.accountId);
+    case 'qa_accounts':
+      return ROWS.qa_accounts(randomUUID());
   }
 }
 
@@ -334,6 +336,7 @@ const HIDDEN: Record<NewTable, string[] | null> = {
   operators: null,
   operator_actions: null,
   founder_notices: null,
+  qa_accounts: null,
 };
 const ALERT_INSERT = ['account_id', 'site_id', 'kind', 'enabled', 'threshold_points', 'channels'];
 const ALERT_UPDATE = ['enabled', 'threshold_points', 'channels'];
@@ -403,6 +406,8 @@ async function postureViolations(d: Db, table: NewTable): Promise<string[]> {
   // 033: operators are added and removed by the ops script; the console's record is append-only.
   if (table === 'operators') expectedTable.service_role = 'ard';
   if (table === 'operator_actions') expectedTable.service_role = 'ar';
+  // CC-38's qa_accounts: the seed reads and adds rows; qa_reset reads them as the definer.
+  if (table === 'qa_accounts') expectedTable.service_role = 'ar';
   // 028 lets service_role read its ledgers and suppressions; its functions write them.
   if (['email_sends', 'email_suppressions', 'slack_sends'].includes(table))
     expectedTable.service_role = 'r';

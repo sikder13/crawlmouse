@@ -1,0 +1,260 @@
+import { expect, test, type Page } from './pw';
+import { QA_HOSTS } from '../../scripts/qa/accounts';
+import { control, events, holdStripe, qa, shot, signIn, sql } from './walk';
+
+/**
+ * Journey 4 (CC-38 D4): `qa+agencytrial` starts the Agency trial (card taken at Checkout, then the
+ * webhook), adds clients up to six, invites a developer scoped to one client; the developer sees only
+ * that client; the owner makes a client report, shares it, the proof page opens signed out, and the
+ * share is revoked; then CC-37 D5: the developer sees no card digits and cannot publish a report.
+ */
+const J = '4-agency';
+const DEV = 'developer@walk.example';
+/** The Agency trial's first client, as qa:seed adds it (scripts/qa/accounts.ts QA_HOSTS). */
+const FIRST_CLIENT = QA_HOSTS.trialClient;
+const CLIENTS = [2, 3, 4, 5, 6].map((n) => `client-${n}.walk.crawlmouse.com`);
+
+test.describe.configure({ mode: 'serial' });
+
+const agency = async () =>
+  (
+    await sql<{ id: string; state: string }>(
+      `select a.id, a.state from public.accounts a join public.qa_accounts q on q.account_id = a.id
+        where q.qa_key = 'agencytrial' and a.kind = 'agency'`,
+    )
+  )[0]!;
+
+/** The agency is a second account: a browser acts in the personal one until it switches. */
+async function openAgency(page: Page): Promise<void> {
+  await page.goto('/agency');
+  await page.getByRole('button', { name: 'Open QA Agency Trial' }).click();
+  await page.waitForLoadState('networkidle');
+}
+
+test('the Agency trial starts through Checkout and the webhook', async ({ page, context }) => {
+  await signIn(context, qa('agencytrial'));
+  expect((await agency()).state).toBe('free');
+  await page.goto('/agency-trial');
+  await shot(page, J, 'agency-trial');
+  // Stripe's page stays unvisited (walk.ts holdStripe).
+  const stripe = await holdStripe(page);
+  const asked = page.waitForResponse(
+    (r) => r.request().method() === 'POST' && r.url().includes('/api/agency-trial'),
+  );
+  // The form names the seeded first client; the agency's account already holds it, with its first
+  // audit (qa:seed), so start_agency_trial_account keeps it whatever is typed here. The walk types a
+  // name its preload resolves, so the route's SSRF admission passes.
+  await page.getByLabel(/First client site/).fill('client-1.walk.crawlmouse.com');
+  await page.getByRole('checkbox', { name: /I agree that after 14 days/ }).check();
+  await page.getByRole('button', { name: 'Start a 14-day trial' }).click();
+  expect((await asked).status()).toBeLessThan(400);
+  await expect.poll(() => stripe.at(-1)).toMatch(/^https:\/\/checkout\.stripe\.com\/c\/pay\//);
+  await shot(page, J, 'checkout-redirect');
+
+  const sessions =
+    await control<{ id: string; params: Record<string, unknown>; status: string }[]>('sessions');
+  const open = sessions.filter((s) => s.status === 'open');
+  expect(open).toHaveLength(1);
+  // The trial's session takes a card and starts the trial (lib/billing/agency-trial.ts).
+  expect(open[0]!.params.payment_method_collection).toBe('always');
+  expect((open[0]!.params.subscription_data as Record<string, string>).trial_period_days).toBe(
+    '14',
+  );
+  const delivered = await control<{ status: number; body: string }>('complete', {
+    sessionId: open[0]!.id,
+  });
+  expect(delivered.status, delivered.body).toBe(200);
+  expect((await agency()).state).toBe('agency_trial');
+
+  // The trial is a second account: the workspace offers the switch into it.
+  await openAgency(page);
+  await shot(page, J, 'matrix');
+
+  // Five more clients through the matrix's form, to six.
+  for (const host of CLIENTS) {
+    await page.getByPlaceholder('example.com').fill(host);
+    const added = page.waitForResponse(
+      (r) => r.request().method() === 'POST' && r.url().endsWith('/api/sites'),
+    );
+    await page.getByRole('button', { name: /^Add a client site/ }).click();
+    expect((await added).status()).toBeLessThan(400);
+    await page.waitForLoadState('networkidle');
+  }
+  const six = await sql<{ host: string }>(
+    `select host from public.sites where account_id = $1 and removed_at is null order by host`,
+    [(await agency()).id],
+  );
+  expect(six.map((s) => s.host)).toEqual([FIRST_CLIENT, ...CLIENTS].sort());
+  await shot(page, J, 'six-clients');
+});
+
+test('a developer invited to one client sees that client and no other', async ({
+  page,
+  context,
+  browser,
+}) => {
+  await signIn(context, qa('agencytrial'));
+  await openAgency(page);
+  await page.goto('/seats');
+  await shot(page, J, 'seats');
+  await page.getByLabel('Their email address').fill(DEV);
+  await page.getByLabel('Role', { exact: true }).selectOption({ label: 'Developer' });
+  await page.getByLabel('Clients', { exact: true }).selectOption({ index: 1 });
+  await page.getByRole('checkbox', { name: CLIENTS[1]! }).check();
+  const invited = page.waitForResponse(
+    (r) => r.request().method() === 'POST' && r.url().includes('/api/seats'),
+  );
+  await page.getByRole('button', { name: 'Send the invitation' }).click();
+  expect((await invited).status()).toBeLessThan(400);
+  await page.waitForLoadState('networkidle');
+  await shot(page, J, 'invited');
+
+  // The mail's link, minted as the mailer mints it from the recorded event (issue_seat_invite).
+  const [mail] = (await events('seat.invite.requested')).slice(-1);
+  expect(mail).toBeDefined();
+  const [issued] = await sql<{ token: string }>(
+    `select token from public.issue_seat_invite($1, $2, now())`,
+    [mail!.data.seat_id, mail!.data.seq],
+  );
+  await control('user', { email: DEV });
+  const dev = await browser.newContext();
+  await signIn(dev, DEV);
+  const devPage = await dev.newPage();
+  await devPage.goto(`/invite/${issued!.token}`);
+  await shot(devPage, J, 'invite-page');
+  await devPage
+    .getByRole('button', { name: /accept|join/i })
+    .first()
+    .click();
+  await devPage.waitForLoadState('networkidle');
+  await devPage.goto('/agency');
+  await shot(devPage, J, 'developer-matrix');
+  await expect(devPage.getByText(CLIENTS[1]!).first()).toBeVisible();
+  for (const other of [FIRST_CLIENT, ...CLIENTS.filter((c) => c !== CLIENTS[1])]) {
+    await expect(devPage.getByText(other)).toHaveCount(0);
+  }
+  // Not listed is not enough: another client's site page, opened by its address, is refused.
+  const [other] = await sql<{ id: string }>(
+    `select id from public.sites where host = $1 and removed_at is null`,
+    [FIRST_CLIENT],
+  );
+  const refused = await devPage.goto(`/sites/${other!.id}`);
+  expect(refused?.status()).toBe(404);
+  await shot(devPage, J, 'developer-other-client');
+  await dev.close();
+});
+
+test('a client report, its share link, the proof page signed out, and the share revoked', async ({
+  page,
+  context,
+  browser,
+}) => {
+  await signIn(context, qa('agencytrial'));
+  await openAgency(page);
+  const host = CLIENTS[0]!;
+  const [site] = await sql<{ id: string }>(
+    `select id from public.sites where host = $1 and removed_at is null`,
+    [host],
+  );
+  // Two finished checks: the first audit, then a re-check run from the site's page.
+  await control('finish', { siteId: site!.id });
+  await page.goto(`/sites/${site!.id}`);
+  await page.getByRole('button', { name: 'Run a check now' }).first().click();
+  await page.waitForLoadState('networkidle');
+  await control('finish', { siteId: site!.id });
+
+  await page.goto('/reports');
+  await page.getByRole('combobox').first().selectOption({ label: host });
+  await page.getByRole('button', { name: 'Show' }).click();
+  await page.waitForLoadState('networkidle');
+  await shot(page, J, 'reports-for-client');
+
+  const made = page.waitForResponse(
+    (r) => r.request().method() === 'POST' && r.url().includes('/api/reports'),
+  );
+  await page.getByRole('button', { name: 'Compare these two' }).click();
+  expect((await made).status()).toBeLessThan(400);
+  await page.waitForLoadState('networkidle');
+  await page.goto('/reports');
+  await shot(page, J, 'report-made');
+
+  await page.getByRole('button', { name: 'Link' }).first().click();
+  // The new link is shown once, for a short while, in the row.
+  const shown = page.locator('code', { hasText: '/s/' }).first();
+  await expect(shown).toBeVisible();
+  await shot(page, J, 'share-link');
+  const share = new URL((await shown.textContent())!.trim()).pathname;
+  expect(share).toMatch(/^\/s\//);
+
+  // Opened with no session: the proof page.
+  const visitor = await browser.newContext();
+  const outsider = await visitor.newPage();
+  const opened = await outsider.goto(share);
+  expect(opened?.status()).toBe(200);
+  await expect(outsider.getByRole('heading', { level: 1 })).toBeVisible();
+  await shot(outsider, J, 'proof-signed-out');
+
+  // Revoked: the link answers 410.
+  await page
+    .getByRole('button', { name: /^Withdraw link/ })
+    .first()
+    .click();
+  await page.waitForLoadState('networkidle');
+  await shot(page, J, 'revoked');
+  const after = await outsider.goto(share);
+  expect(after?.status()).toBe(410);
+  await shot(outsider, J, 'proof-gone');
+  await visitor.close();
+});
+
+test('the developer sees no card digits and cannot publish a report; the owner can (CC-37 D5)', async ({
+  page,
+  context,
+  browser,
+}) => {
+  // The card's last four as the webhook would hold them (CC-39 F8 writes them; the walk sets them).
+  const DIGITS = ['4', '2', '4', '2'].join('');
+  const { id: accountId } = await agency();
+  await sql(`update public.accounts set card_last4 = $1 where id = $2`, [DIGITS, accountId]);
+  const [site] = await sql<{ id: string }>(
+    `select id from public.sites where host = $1 and removed_at is null`,
+    [CLIENTS[1]],
+  );
+  await control('finish', { siteId: site!.id });
+  const [check] = await sql<{ id: string }>(
+    `select id from public.checks where site_id = $1 and status = 'finished' order by finished_at desc limit 1`,
+    [site!.id],
+  );
+  /** A same-origin POST from the page, as its own forms send one. */
+  const mint = (p: Page) =>
+    p.evaluate(async (checkId) => {
+      const r = await fetch('/api/reports/mint', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ checkId }),
+      });
+      return { status: r.status, body: await r.text() };
+    }, check!.id);
+
+  const dev = await browser.newContext();
+  await signIn(dev, DEV);
+  const devPage = await dev.newPage();
+  // Into the agency, as the developer acts in it: its rail is where the trial's billing card shows.
+  await openAgency(devPage);
+  await expect(devPage.getByText('QA Agency Trial').first()).toBeVisible();
+  await shot(devPage, J, 'developer-card');
+  expect(await devPage.locator('body').innerText()).not.toContain(DIGITS);
+  const refused = await mint(devPage);
+  expect(refused.status, refused.body).toBe(403);
+  expect(refused.body).toContain('role_refused');
+  await dev.close();
+
+  await signIn(context, qa('agencytrial'));
+  await openAgency(page);
+  // Not shown to the developer, and shown to the owner: the digits are on the page that reads them.
+  await page.goto('/settings/plan');
+  await shot(page, J, 'owner-card');
+  expect(await page.locator('body').innerText()).toContain(DIGITS);
+  const minted = await mint(page);
+  expect(minted.status, minted.body).toBeLessThan(300);
+});
