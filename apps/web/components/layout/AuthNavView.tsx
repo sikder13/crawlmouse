@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import type { UrlObject } from 'url';
+import { SignOutForm } from '../auth/SignOutForm';
 
 const loginHref: UrlObject = { pathname: '/login' };
 
@@ -39,14 +40,14 @@ export function AuthNavView({ email }: { email: string | null }) {
         <p className="truncate border-b border-oat px-4 py-3 text-xs text-ink/60">
           Signed in as <span className="font-medium text-ink">{email}</span>
         </p>
-        <form action="/api/auth/logout" method="post">
+        <SignOutForm>
           <button
             type="submit"
             className="block w-full px-4 py-3 text-left text-sm font-medium text-ink transition-colors hover:bg-oat/60 hover:text-warning"
           >
             Log out
           </button>
-        </form>
+        </SignOutForm>
       </div>
     </details>
   );
