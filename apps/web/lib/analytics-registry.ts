@@ -11,15 +11,7 @@ import type { FunnelEvent } from './analytics-events';
 
 export type EventName = FunnelEvent;
 
-/**
- * Who the event is about.
- * - `browser`: the browser's PostHog id; the person's `users.id` once a signed-in page identifies it.
- * - `user`: the `users.id` of the human who acted.
- * - `owner`: the `users.id` of the account's owner (a webhook acts for no one in the room).
- * - `visitor`: the signed-in human's `users.id`, else the browser's PostHog id from its consented
- *   cookie, else `fallback`.
- * - `account`: `fallback`, an id that names the account or the check, not a person.
- */
+/** Who the event is about: DISTINCT_ID_KINDS says what each kind is. */
 export type DistinctId =
   | { kind: 'browser' }
   | { kind: 'user' }
@@ -27,13 +19,25 @@ export type DistinctId =
   | { kind: 'visitor'; fallback: string }
   | { kind: 'account'; fallback: string };
 
-/**
- * What lets the event be sent.
- * - `browser`: posthog-js capture, which sends nothing while capture is opted out.
- * - `request`: `serverCaptureAllowed` on the request's `Cookie` header (lib/consent.ts).
- * - `no_request`: a step, cron or webhook with no request, so no visitor's consent is read.
- */
+/** What lets the event be sent: CONSENT_GATES says what each gate is. */
 export type ConsentGate = 'browser' | 'request' | 'no_request';
+
+export const DISTINCT_ID_KINDS: Record<DistinctId['kind'], string> = {
+  browser:
+    "the browser's PostHog id, which becomes the person's `users.id` once a signed-in page identifies the browser",
+  user: 'the `users.id` of the human who acted',
+  owner: "the `users.id` of the account's owner",
+  visitor:
+    "the signed-in human's `users.id`, else the browser's PostHog id from its consented cookie, else the fallback shown",
+  account: 'the id shown, which names the account or the check, not a person',
+};
+
+export const CONSENT_GATES: Record<ConsentGate, string> = {
+  browser: 'posthog-js capture, which sends nothing while capture is opted out',
+  request: "`serverCaptureAllowed` on the request's `Cookie` header (lib/consent.ts)",
+  no_request:
+    'a step, cron or webhook with no request: `serverCaptureAllowed` is given no cookie, so no visitor’s decision is read',
+};
 
 export interface Sender {
   side: 'browser' | 'server';
@@ -45,12 +49,16 @@ export interface Sender {
 
 export interface EventEntry {
   senders: readonly Sender[];
-  /**
-   * `also`: a survey's trigger and a counted event. `only`: a survey's trigger and nothing else, so
-   * no dashboard counts it (ruling Q11).
-   */
-  surveyTrigger?: 'also' | 'only';
+  /** SURVEY_TRIGGERS says what each value means. */
+  surveyTrigger?: SurveyTrigger;
 }
+
+export type SurveyTrigger = 'also' | 'only';
+
+export const SURVEY_TRIGGERS: Record<SurveyTrigger, string> = {
+  also: 'a survey trigger, counted like any other event',
+  only: 'a survey trigger and nothing else (ruling Q11): `pnpm --filter @crawlmouse/scripts exec vitest run ops/posthog/spec.test.ts` fails when an action, cohort or insight counts it',
+};
 
 const browser = (file: string, properties: readonly string[] = []): Sender => ({
   side: 'browser',
