@@ -103,6 +103,17 @@ export const FUNNEL_EVENTS = [
   'pricing_viewed',
   'plan_chosen',
   'report_viewed',
+  // CC-41 D3 — payment events, sent from the server by the v2 Stripe webhook (lib/billing/
+  // payment-events.ts), keyed by the account owner's users.id with an `account_id` property, with
+  // amounts read from the Stripe event: `subscription_started {plan, interval, trial, amount_cents,
+  // currency}`, `trial_converted {plan}`, `plan_changed {from, to}`, `subscription_canceled {plan,
+  // at_period_end}`, `subscription_ended {plan}` and `payment_failed {plan, attempt}`.
+  'subscription_started',
+  'trial_converted',
+  'plan_changed',
+  'subscription_canceled',
+  'subscription_ended',
+  'payment_failed',
 ] as const;
 
 export type FunnelEvent = (typeof FUNNEL_EVENTS)[number];

@@ -7,6 +7,7 @@ import type { BillingAccount, CheckoutDeps } from './checkout-v2';
 import { FREE_START, type EntitlementSnapshot } from './state-machine';
 
 const ACCOUNT = '7d2f1c4a-9e3b-4b8a-8c1d-5e6f7a8b9c0d';
+const USER = '0e6b8f2a-3c1d-4f5e-9a7b-2c8d1e0f3a4b';
 const ORIGIN = 'https://crawlmouse.com';
 const NOW = new Date('2026-11-08T12:00:00.000Z');
 const SESSION_URL = 'https://checkout.stripe.com/c/pay/cs_test_trial';
@@ -20,6 +21,7 @@ let account: BillingAccount;
 let clock: Date;
 let log: string[];
 const sessionsCreate = vi.fn();
+const customersCreate = vi.fn();
 const sessionsExpire = vi.fn();
 const priceFor = vi.fn();
 
@@ -35,8 +37,9 @@ function deps(): CheckoutDeps {
     report: () => {},
     stripe: {
       customers: {
-        create: async () => {
+        create: async (params, options) => {
           log.push('customers.create');
+          customersCreate(params, options);
           return { id: 'cus_new' };
         },
       },
@@ -69,6 +72,7 @@ beforeEach(() => {
   clock = NOW;
   log = [];
   sessionsCreate.mockReset();
+  customersCreate.mockReset();
   sessionsExpire.mockReset();
   priceFor
     .mockReset()
@@ -78,7 +82,7 @@ beforeEach(() => {
 });
 
 const start = (interval: 'month' | 'year' = 'month') =>
-  agencyTrial(deps(), { accountId: ACCOUNT, email: 'owner@example.com', interval });
+  agencyTrial(deps(), { accountId: ACCOUNT, userId: USER, email: 'owner@example.com', interval });
 
 describe('agencyTrial refusals: what the webhook would ignore, before any Stripe call', () => {
   it.each<[string, EntitlementSnapshot]>([
@@ -118,7 +122,7 @@ describe('agencyTrial refusals: what the webhook would ignore, before any Stripe
     const d = deps();
     d.accounts.read = async () => null;
     await expect(
-      agencyTrial(d, { accountId: ACCOUNT, email: null, interval: 'month' }),
+      agencyTrial(d, { accountId: ACCOUNT, userId: USER, email: null, interval: 'month' }),
     ).rejects.toThrow(`account ${ACCOUNT} not found`);
   });
 });
@@ -133,7 +137,7 @@ describe("agencyTrial's session", () => {
           mode: 'subscription',
           customer: 'cus_stored',
           client_reference_id: ACCOUNT,
-          metadata: { account_id: ACCOUNT },
+          metadata: { account_id: ACCOUNT, posthog_person_distinct_id: USER },
           line_items: [{ price: 'price_agency_year', quantity: 1 }],
           payment_method_types: ['card'],
           payment_method_collection: 'always',
@@ -141,7 +145,7 @@ describe("agencyTrial's session", () => {
           customer_update: { address: 'auto', name: 'auto' },
           expires_at: Date.UTC(2026, 10, 8, 12, 31, 0) / 1000,
           subscription_data: {
-            metadata: { account_id: ACCOUNT },
+            metadata: { account_id: ACCOUNT, posthog_person_distinct_id: USER },
             trial_period_days: 14,
             trial_settings: { end_behavior: { missing_payment_method: 'cancel' } },
           },
@@ -151,6 +155,21 @@ describe("agencyTrial's session", () => {
         },
       ],
     ]);
+  });
+
+  it('creates a missing customer keyed to the account and to its owner as a PostHog person', async () => {
+    account = { snapshot: FREE_START, stripeCustomerId: null };
+    await start();
+    expect(customersCreate.mock.calls).toEqual([
+      [
+        {
+          email: 'owner@example.com',
+          metadata: { account_id: ACCOUNT, posthog_person_distinct_id: USER },
+        },
+        { idempotencyKey: `customer:${ACCOUNT}` },
+      ],
+    ]);
+    expect(sessionsCreate.mock.calls[0]![0].customer).toBe('cus_new');
   });
 
   it("expires the customer's open sessions first (finding 1)", async () => {

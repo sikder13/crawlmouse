@@ -92,7 +92,9 @@ describe('startAgencyTrial', () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ url: URL_NEW });
     expect(calls.startAccount).toEqual([[USER.id, 'Summit Digital', 'clientsite.com']]);
-    expect(calls.checkout).toEqual([{ accountId: ACCOUNT, email: USER.email, interval: 'month' }]);
+    expect(calls.checkout).toEqual([
+      { accountId: ACCOUNT, userId: USER.id, email: USER.email, interval: 'month' },
+    ]);
     expect(calls.stored).toEqual([[ACCOUNT, { url: URL_NEW, at: NOW, interval: 'month' }]]);
     expect(calls.events).toEqual([
       ['plan_chosen', ACCOUNT, { plan: 'agency', interval: 'month' }],
@@ -171,7 +173,9 @@ describe('startAgencyTrial', () => {
       );
       const res = await startAgencyTrial(json({ ...GOOD, interval: asked }), USER, deps);
       expect(await res.json()).toEqual({ url: URL_NEW });
-      expect(calls.checkout).toEqual([{ accountId: ACCOUNT, email: USER.email, interval: asked }]);
+      expect(calls.checkout).toEqual([
+        { accountId: ACCOUNT, userId: USER.id, email: USER.email, interval: asked },
+      ]);
       expect(calls.stored).toEqual([[ACCOUNT, { url: URL_NEW, at: NOW, interval: asked }]]);
     },
   );

@@ -48,6 +48,7 @@ export interface AgencyTrialDeps {
   /** CC-03's `agencyTrial` with the deps its own route builds. */
   checkout(input: {
     accountId: string;
+    userId: string;
     email: string | null;
     interval: Interval;
   }): Promise<BillingResult>;
@@ -111,7 +112,12 @@ export async function startAgencyTrial(
     return respond(body.kind, open.url);
   }
 
-  const result = await deps.checkout({ accountId, email: person.email, interval });
+  const result = await deps.checkout({
+    accountId,
+    userId: person.id,
+    email: person.email,
+    interval,
+  });
   if (!result.ok) return refuse(result.status, result.error, result.detail);
   await deps.storeCheckout(accountId, { url: result.url, at, interval });
   deps.defer(() =>

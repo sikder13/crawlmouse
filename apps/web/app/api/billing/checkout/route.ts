@@ -55,6 +55,7 @@ export async function POST(req: Request) {
       },
       {
         accountId: target.accountId,
+        userId: user.id,
         email: user.email ?? null,
         plan: input.plan,
         interval: input.interval,
