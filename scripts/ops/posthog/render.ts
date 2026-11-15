@@ -41,7 +41,8 @@ export const EVENTS_DOC = fileURLToPath(
 );
 
 const code = (s: string | number) => `\`${s}\``;
-const cell = (s: string) => s.replace(/\|/g, '\\|');
+/** A table cell: backslashes first, so a backslash already there cannot undo the pipe's escape. */
+export const cell = (s: string) => s.replace(/\\/g, '\\\\').replace(/\|/g, '\\|');
 
 const OPERATOR: Record<PropertyFilter['operator'], [one: string, many: string]> = {
   exact: ['=', 'is one of'],

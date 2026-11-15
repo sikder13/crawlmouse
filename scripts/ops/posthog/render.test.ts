@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { EVENT_REGISTRY } from '../../../apps/web/lib/analytics-registry';
 import { REQUIRED_SCOPES } from './client';
 import {
+  cell,
   EVENTS_DOC,
   POSTHOG_DOC,
   filterText,
@@ -49,5 +50,13 @@ describe('filterText', () => {
     expect(filterText({ type: 'behavioral', event: 'first_client_added', withinDays: 365 })).toBe(
       'sent `first_client_added` in the last 365 days',
     );
+  });
+});
+
+describe('a table cell', () => {
+  it('escapes a backslash before a pipe, so an escape already in the text cannot undo it', () => {
+    expect(cell('a|b')).toBe('a\\|b');
+    expect(cell('a\\|b')).toBe('a\\\\\\|b');
+    expect(cell('^(localhost|127\\.0\\.0\\.1)$')).toBe('^(localhost\\|127\\\\.0\\\\.0\\\\.1)$');
   });
 });
