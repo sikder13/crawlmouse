@@ -6,7 +6,8 @@
  *
  * Four entries are narrower than the bare word, and `banned-phrases.test.ts` pins each with a
  * sentence that matches and one that does not:
- * - `leverage` only as a verb ("leverage your links"), not the noun ("a high-leverage fix").
+ * - `leverage` only as a verb ("leverage your links"), not the noun ("the leverage a hub gives").
+ *   The compound "high-leverage" is its own entry.
  * - `robust` only in prose, not inside an identifier (`robust_parser`, `is-robust`, `robust()`).
  * - "best … tool" only when the sentence says it of Crawlmouse, "we" or "our …".
  * - "100%" only as a promise ("100% accurate"), not as a measured share ("100% of pages").

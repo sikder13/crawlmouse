@@ -52,8 +52,27 @@ in `lib/seo/site-copy.ts` (ruling 3 below).
 Flags off: `lib/seo/flags-off-v1.test.tsx` compares the root layout metadata, the share card (its PNG's
 sha256), Organization, WebSite and SoftwareApplication, and `/llms.txt` with a capture from main 66c58828.
 
-**D3 — Technical SEO on each public page, both builds, pinned by one test.** See subagent A's section
-(below, completed at merge).
+**D3 — Technical SEO on each public page, both builds, pinned by one test.**
+`__tests__/seo-public-pages.test.tsx` calls `app/sitemap.ts` with the four flags off and then on, maps
+each URL to its route module (the v1 page, or the v2 or kept target that `V2_REWRITES` names; an
+unmapped URL fails), takes the route's own `Metadata` and the page's rendered markup, and runs
+`apps/web/lib/seo/page-rules.ts`: exactly one H1, no skipped heading level, a self canonical, one meta
+description of 70–160 characters not shared with another page, a title over 60 characters reported on a
+page that earns impressions and failed on one that does not, no image without `alt`, no `noindex`,
+Article with `dateModified`, BreadcrumbList on posts, guides, research, author and help pages, FAQPage
+only for visible questions, JSON-LD that passes `schema-required.ts`, an internal link only to a page
+live in that build, an in-link from another sitemap page, and each post within two clicks of `/blog`.
+Exceptions are data (`apps/web/lib/seo/page-exceptions.ts`: page, rule, builds, reason), and the test
+fails on an exception that no longer fires. What it cannot see is in its header: `/r/` reports (the
+sitemap's database read fails in tests), mixed flag states, and the merged `<head>`, which D1 reads on a
+production build. BreadcrumbList was added to `/guides`, `/authors/[slug]`, `/help` and `/help/[slug]`.
+
+Sitemap `lastModified` (§13 guard change): posts keep `updatedAt`; `/blog` takes its newest post's,
+`/guides` its newest clustered post's, the legal pages the "Last updated" date each shows
+(`apps/web/lib/seo/page-dates.ts`, held to the rendered text by `__tests__/sitemap-last-modified.test.ts`),
+and pages with no real date omit it. `__tests__/seo-robots-sitemap-guard.test.ts` now lets an entry omit
+`lastModified` only if its path is on the named `UNDATED` list, in both flag states, and still checks
+each dated entry.
 
 **D4 — Answer-engine structure, additive only.** `lib/blog/answers.ts` holds, per post, the summary and
 the "Questions this answers" items, each with the body sentences it is drawn from;
@@ -86,7 +105,19 @@ existing-post guard reverses each one and requires the baseline markup. The tabl
 <!-- d5-table:end -->
 <!-- prettier-ignore-end -->
 
-**D6 — Keyword map, clusters and internal links.** See subagent A's section (below, completed at merge).
+**D6 — Keyword map, clusters and internal links.** The `/guides` clusters are data in
+`apps/web/lib/blog/clusters.ts` (moved from the page; `app/guides/page.test.tsx` holds the page to a
+snapshot captured before the move, apart from each section's new anchor and ruling 3's descriptions,
+which the page lists). `components/blog/ClusterLinks.tsx` renders, after each post's article, a
+`nav[aria-label="More on this topic"]` with two or three related posts from the post's cluster and its
+neighbour (never a research post), the `/check` pages the post explains while `V2_CHECKS_PUBLIC` is on
+(`CHECK_EXPLAINERS`), and the cluster's hub on `/guides`. `__tests__/blog-existing-posts-links-unchanged.test.tsx`
+requires that block to hold exactly those links and every other link on the page to be the baseline's.
+`docs/seo/keyword-map.md` (`pnpm seo:keywords`) is rendered from the audit runs and the Search Console
+export: a primary query per page (its top attributed query no other page shares, else its top shared
+query, else the post's first keyword, labelled), secondaries, and the pairs of pages sharing attributed
+queries, with the owner's list of pairs over 100 shared impressions. Cannibal pairs are handled with
+links and distinct descriptions only; no page was merged, moved or retitled for them.
 
 **D7 — Proof.** Lighthouse, the final D1 run and the §13 command set are recorded in the PR description.
 
@@ -148,8 +179,8 @@ and the four narrowed ones (`leverage` as a verb, `robust` in prose, "best … t
 (`__tests__/helpers/public-pages.ts`), plus the root layout's metadata and Organization block and
 `/llms.txt`, and fails on a match not in `lib/seo/banned-phrase-exceptions.ts` or on an exception that
 no longer fires; its header says what it cannot see. On this tree it finds no match in either build, so
-the exception list is empty. "high-leverage" and "highest-leverage" (`free-internal-link-audit`,
-`how-deep-is-too-deep-crawl-depth`) are the noun, not the verb, and are not changed.
+the exception list is empty. "high-leverage" and "highest-leverage" are a narrow entry of their own (ruling 2 named both
+uses); the two sentences that held them say "high-impact" and "highest-impact" (table below).
 
 The cloudflare post's "roughly one in three" figure is not in the repository's data, so the sentence
 names no number now. Each such edit is data in `apps/web/lib/blog/copy-edits.ts`, reversed by the
