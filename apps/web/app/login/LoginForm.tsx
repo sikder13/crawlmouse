@@ -2,8 +2,6 @@
 
 import { useRef, useState, type FormEvent } from 'react';
 import { type TurnstileInstance } from '@marsidev/react-turnstile';
-import { Header } from '@/components/layout/Header';
-import { Footer } from '@/components/layout/Footer';
 import { Card } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
@@ -29,11 +27,18 @@ export function LoginForm() {
       // R1 fold-in — carry a `?next=` return target (e.g. a report being claimed) through sign-in.
       // Read from the URL client-side (no useSearchParams → no Suspense boundary); the server validates
       // it to a same-origin relative path before using it (no open redirect).
-      const next = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('next') : null;
+      const next =
+        typeof window !== 'undefined'
+          ? new URLSearchParams(window.location.search).get('next')
+          : null;
       const res = await fetch('/api/auth/magic-link', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ email, turnstileToken: token ?? undefined, next: next ?? undefined }),
+        body: JSON.stringify({
+          email,
+          turnstileToken: token ?? undefined,
+          next: next ?? undefined,
+        }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -51,46 +56,50 @@ export function LoginForm() {
   }
 
   return (
-    <>
-      <Header />
-      <main className="max-w-md mx-auto px-6 pt-24 pb-32">
-        <Card>
-          <h1 className="font-display font-bold text-h2">Sign in</h1>
-          {sent ? (
-            <p className="mt-4 text-body text-ink">
-              Check your inbox &mdash; we sent a magic link to <strong>{email}</strong>. It expires in 10 minutes; open it on any device.
-            </p>
-          ) : (
-            <>
-              {/* The signup value-moment (§6): no signup is needed to run an audit — this surface
+    <main className="max-w-md mx-auto px-6 pt-24 pb-32">
+      <Card>
+        <h1 className="font-display font-bold text-h2">Sign in</h1>
+        {sent ? (
+          <p className="mt-4 text-body text-ink">
+            Check your inbox &mdash; we sent a magic link to <strong>{email}</strong>. It expires in
+            10 minutes; open it on any device.
+          </p>
+        ) : (
+          <>
+            {/* The signup value-moment (§6): no signup is needed to run an audit — this surface
                   asks only when there's a reason to (save, track, monitor), and names the payoff. */}
-              <p className="mt-2 text-body text-ink-muted">
-                Save every audit to your dashboard, track your grade over time, and unlock monitoring &mdash; free with an account. No password.
-              </p>
-              <form onSubmit={handleSubmit} className="mt-6 space-y-3">
-                <Input
-                  type="email"
-                  placeholder="you@yourstore.com"
-                  aria-label="Email address"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  autoFocus
-                />
-                <Turnstile ref={widgetRef} onToken={setToken} />
-                <Button type="submit" size="md" className="w-full" disabled={loading || !email || (needToken && !token)}>
-                  {loading ? 'Sending...' : 'Send magic link'}
-                </Button>
-                {error && <div className="text-warning text-sm">{error}</div>}
-              </form>
-              <p className="mt-4 text-caption text-ink-muted">
-                New here? The same link creates your account and claims any audits you&rsquo;ve already run.
-              </p>
-            </>
-          )}
-        </Card>
-      </main>
-      <Footer />
-    </>
+            <p className="mt-2 text-body text-ink-muted">
+              Save every audit to your dashboard, track your grade over time, and unlock monitoring
+              &mdash; free with an account. No password.
+            </p>
+            <form onSubmit={handleSubmit} className="mt-6 space-y-3">
+              <Input
+                type="email"
+                placeholder="you@yourstore.com"
+                aria-label="Email address"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                autoFocus
+              />
+              <Turnstile ref={widgetRef} onToken={setToken} />
+              <Button
+                type="submit"
+                size="md"
+                className="w-full"
+                disabled={loading || !email || (needToken && !token)}
+              >
+                {loading ? 'Sending...' : 'Send magic link'}
+              </Button>
+              {error && <div className="text-warning text-sm">{error}</div>}
+            </form>
+            <p className="mt-4 text-caption text-ink-muted">
+              New here? The same link creates your account and claims any audits you&rsquo;ve
+              already run.
+            </p>
+          </>
+        )}
+      </Card>
+    </main>
   );
 }

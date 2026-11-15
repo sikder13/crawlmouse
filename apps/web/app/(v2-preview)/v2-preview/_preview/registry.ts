@@ -187,6 +187,12 @@ export const PREVIEWS: PreviewEntry[] = [
   },
   { path: '/v2-preview/screens/site/withheld', name: 'Site, withheld', kind: 'screen' },
   { path: '/v2-preview/screens/dashboard/no-site', name: 'Dashboard, no site', kind: 'screen' },
+  // CC-36 D5: a viewer who used v1, before a site is added.
+  {
+    path: '/v2-preview/screens/dashboard/earlier',
+    name: 'Dashboard, no site, earlier audits',
+    kind: 'screen',
+  },
   {
     path: '/v2-preview/screens/site/first-check',
     name: 'Site, first check running',

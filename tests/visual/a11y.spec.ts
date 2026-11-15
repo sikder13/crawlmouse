@@ -316,6 +316,11 @@ test.describe('keyboard focus reaches every interactive primitive', () => {
   test('button, link button, door card, field, overflowing table and brand link', async ({
     page,
   }) => {
+    // Five previews in one test; a part that does not own card, field and verdict-cell compiles them
+    // here, cold. On CI this took 1.4 min of the 2-min budget on main's shard (2,1) (run 43607113643),
+    // and with the kept pages compiled too (CC-36) that shard ran 2,291 s of tests against main's
+    // 1,815 s and this test ran past 120 s twice. `slow` triples this test's budget only.
+    test.slow();
     const kinds = new Set<string>();
     for (const path of [
       '/v2-preview/button',

@@ -16,6 +16,10 @@ const h = vi.hoisted(() => ({
   dataset: null as unknown,
   nextRead: [] as string[][],
   nextAt: null as string | null,
+  earlierRead: [] as { userId: string; now: Date }[],
+  earlier: [] as unknown[],
+  earlierFails: false,
+  reported: [] as unknown[],
 }));
 
 vi.mock('server-only', () => ({}));
@@ -33,6 +37,16 @@ vi.mock('@/lib/v2/account/sites-store', () => ({
     h.nextRead.push([...ids]);
     return new Map(ids.map((id) => [id, h.nextAt]));
   },
+}));
+vi.mock('./earlier-audits', () => ({
+  readEarlierAudits: async (_admin: unknown, userId: string, now: Date) => {
+    h.earlierRead.push({ userId, now });
+    if (h.earlierFails) throw new Error('earlier audits: read failed: down');
+    return h.earlier;
+  },
+}));
+vi.mock('@sentry/nextjs', () => ({
+  captureException: (e: unknown) => void h.reported.push(e),
 }));
 vi.mock('@/lib/v2/account/pages', () => ({
   readAccount: async (_s: unknown, accountId: string, seatId: string, now: Date) => ({
@@ -75,11 +89,15 @@ const MAIN_SHA256 = '3c564084adaf59952d38a962ecd91a3ac87f54c710f482d4b3c084e2df4
 
 beforeEach(() => {
   h.viewerRead = 0;
+  h.earlierFails = false;
+  h.reported = [];
   h.rewritten = true;
   h.viewer = { kind: 'signed_out' };
   h.dataset = null;
   h.nextRead = [];
   h.nextAt = null;
+  h.earlierRead = [];
+  h.earlier = [];
 });
 afterEach(() => vi.unstubAllEnvs());
 
@@ -181,6 +199,49 @@ describe('/dashboard/v2', () => {
       .finally(() => vi.useRealTimers());
     expect(h.nextRead).toEqual([bad.sites.map((s) => s.id)]);
     expect(el.children.props.data.header.line).toContain('next check Fri 13 Nov around 06:37');
+  });
+
+  it('reads the earlier audits of the signed-in viewer’s own user id, not the account owner’s (CC-36 D5)', async () => {
+    vi.stubEnv('V2_CHECKS_PUBLIC', '1');
+    const bad = fixture('bad-site');
+    // The id readViewer gives the signed-in caller; the account and seat ids are other values.
+    const v = viewerOn(BAD, bad.seats[0]!.id);
+    h.viewer = { ...v, viewer: { ...v.viewer, userId: 'u-member-viewer' } };
+    h.dataset = bad;
+    type Earlier = { children: ReactElement<{ data: { earlier: { rows: unknown[] } | null } }> };
+    h.earlier = [
+      {
+        id: 'e0000000-0000-4000-8000-000000000001',
+        url: 'https://shop.example/',
+        grade: 'B',
+        completedAt: '2026-10-01T12:00:00.000Z',
+      },
+    ];
+    const el = (await render()).props as unknown as Earlier;
+    expect(h.earlierRead.map((r) => r.userId)).toEqual(['u-member-viewer']);
+    expect(el.children.props.data.earlier?.rows).toHaveLength(1);
+    h.earlier = [];
+    const none = (await render()).props as unknown as Earlier;
+    expect(none.children.props.data.earlier).toBeNull();
+  });
+
+  it('a failed earlier-audits read is reported and leaves the line out; the dashboard still renders', async () => {
+    vi.stubEnv('V2_CHECKS_PUBLIC', '1');
+    const bad = fixture('bad-site');
+    h.viewer = viewerOn(BAD, bad.seats[0]!.id);
+    h.dataset = bad;
+    h.earlierFails = true;
+    type Earlier = { children: ReactElement<{ data: { earlier: unknown } }> };
+    const el = (await render()).props as unknown as Earlier;
+    expect(el.children.props.data.earlier).toBeNull();
+    expect(h.reported).toHaveLength(1);
+  });
+
+  it.each(['no_account', 'ambiguous'])('a %s viewer reads no earlier audits', async (kind) => {
+    vi.stubEnv('V2_CHECKS_PUBLIC', '1');
+    h.viewer = { kind, userId: 'u1' };
+    await render();
+    expect(h.earlierRead).toEqual([]);
   });
 
   it('with the flag on, reads the viewer: signed out goes to /login', async () => {

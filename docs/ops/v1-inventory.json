@@ -30,12 +30,12 @@
       "reason": "SEO landing in the sitemap; ARCH-2 keeps it as a landing page that posts to /api/checks",
       "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
       "checks": {
-        "input": "n/a — static page, reads no params, query or body (app/ai-readiness-checker/page.tsx:46)",
-        "output": "pass — renders only build-time constants; no DB read, no user or internal id in the HTML or RSC payload (app/ai-readiness-checker/page.tsx:46)",
-        "cache": "pass — static (○ in the build table), reads no cookies, so nothing per-user can be cached (app/ai-readiness-checker/page.tsx:46)",
-        "redirect": "n/a — no redirect or next param (app/ai-readiness-checker/page.tsx:46)",
+        "input": "n/a — static page, reads no params, query or body (app/ai-readiness-checker/AiReadinessChecker.tsx:44)",
+        "output": "pass — renders only build-time constants; no DB read, no user or internal id in the HTML or RSC payload (app/ai-readiness-checker/AiReadinessChecker.tsx:44)",
+        "cache": "pass — static (○ in the build table), reads no cookies, so nothing per-user can be cached (app/ai-readiness-checker/AiReadinessChecker.tsx:44)",
+        "redirect": "n/a — no redirect or next param (app/ai-readiness-checker/AiReadinessChecker.tsx:44)",
         "errors": "n/a — no error response of its own; a render throw goes to app/global-error.tsx, which shows no error text (app/global-error.tsx:14)",
-        "escaping": "pass — JSON-LD from constants (app/ai-readiness-checker/page.tsx:58), lib/seo/jsonld.tsx:118-125 now escapes < > & U+2028 U+2029 (fixed in fed2923e)",
+        "escaping": "pass — JSON-LD from constants (app/ai-readiness-checker/AiReadinessChecker.tsx:56), lib/seo/jsonld.tsx:118-125 now escapes < > & U+2028 U+2029 (fixed in fed2923e)",
         "abuse": "pass — its form posts to /api/audits/start (Turnstile + limits, app/api/audits/start/route.ts:58-117)"
       },
       "e2e": {
@@ -1612,7 +1612,7 @@
       "items": ["app/api/audits/[id]/stream/route.ts"],
       "evidence": "apps/web/app/api/audits/[id]/stream/route.ts:253; apps/web/app/api/audits/[id]/stream/route.ts:309",
       "what": "the id is not validated and the stream has no rate limit: a garbage id polls the database every 2.5 s until the 250 s self-close; its no-cache header lacks private.",
-      "owner": "lead follow-up (retired at cutover)"
+      "owner": "CC-37 (CC-36 ruling 1): the v1 audit page still reads this route under the cutover flags, so CC-36 keeps it (docs/specs/v2/36-cutover.md D2)"
     },
     {
       "id": "A-2",
@@ -1620,7 +1620,7 @@
       "items": ["app/api/audits/[id]/export/route.ts", "app/api/audits/[id]/llms-txt/route.ts"],
       "evidence": "apps/web/app/api/audits/[id]/export/route.ts:85; apps/web/app/api/audits/[id]/llms-txt/route.ts:43",
       "what": "owner-only bodies with no Cache-Control; dynamic, not CDN-cached, so hardening.",
-      "owner": "lead follow-up (retired at cutover)"
+      "owner": "lead follow-up: the v1 audit page still reads export and llms-txt under the cutover flags; they go with the v1 drop (docs/specs/v2/36-cutover.md D2, D4)"
     },
     {
       "id": "A-3",
@@ -1728,7 +1728,7 @@
       "items": ["inngest/billing.ts#cleanupExpiredAuditsFn"],
       "evidence": "inngest/billing-helpers.ts:228",
       "what": "the TTL cleanup does not exempt an audit behind a minted report; the report keeps its snapshot (FK on delete set null). One 2026-06-14 report has neither snapshot nor audit and renders through the legacy fallback (apps/web/app/r/[slug]/page.tsx:68).",
-      "owner": "lead follow-up"
+      "fixedIn": "6883cbc3"
     },
     {
       "id": "C-5",
@@ -1776,7 +1776,7 @@
       "items": ["app/api/audits/[id]/notify/route.ts"],
       "evidence": "apps/web/app/api/audits/[id]/notify/route.ts:36; inngest/notify.ts:43",
       "what": "anyone holding an audit id can replace notify_email on a running audit: the owner's address is overwritten and an arbitrary address gets a mail with the /audit/<id> link. Capped at 10 per IP and 5 per address a day.",
-      "owner": "lead follow-up (retired at cutover)"
+      "owner": "closed from go-live step 4: with V2_CHECKS_PUBLIC and V2_PIPELINE on, the middleware answers this route 410 before it runs (apps/web/lib/v2/cutover.ts, CC-36 D2); open while those flags are off"
     },
     {
       "id": "C-7",
