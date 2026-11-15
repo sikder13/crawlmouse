@@ -3,7 +3,9 @@
  * - the Stripe SDK's requests to api.stripe.com, through `https.request`, `https.get` or `fetch`, go to
  *   the stand-in's Stripe (./stripe.ts) over plain HTTP on 127.0.0.1 (run.sh sets WALK_STRIPE_PORT);
  * - the walk's site names resolve, for the SSRF guard's lookup (below);
- * - no socket of this process reaches the addresses those names resolve to.
+ * - no socket of this process reaches the addresses those names resolve to;
+ * - no socket of this process reaches a PostHog host (`*.posthog.com`): the walk's captures go to the
+ *   stand-in's stub (./posthog.ts), and a sender that would reach PostHog itself fails here instead.
  */
 import dns from 'node:dns';
 import http from 'node:http';
@@ -104,6 +106,11 @@ net.Socket.prototype.connect = function walkConnect(...args) {
   const host = String(target.host ?? '');
   if (host.endsWith(WALK) || answered.has(host)) {
     throw new Error(`walk preload: a connection to ${host} was refused (the walk reaches no site)`);
+  }
+  if (host === 'posthog.com' || host.endsWith('.posthog.com')) {
+    throw new Error(
+      `walk preload: a connection to ${host} was refused (the walk reaches no PostHog)`,
+    );
   }
   this.once('lookup', (err, address) => {
     if (!err && answered.has(address)) {

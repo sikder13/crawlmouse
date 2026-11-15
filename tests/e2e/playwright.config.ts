@@ -9,6 +9,9 @@ import { defineConfig } from './pw';
 export default defineConfig({
   testDir: '.',
   testMatch: /\d-[a-z-]+\.spec\.ts$/,
+  // Journey 8 (CC-41 D7) needs a build with PostHog pointed at the stand-in; run.sh makes one and sets
+  // WALK_DATA only when it is selected (`bash tests/e2e/run.sh 8-data`), so the others run as before.
+  testIgnore: process.env.WALK_DATA === '1' ? [] : [/8-data-foundation\.spec\.ts$/],
   // The journeys share one database and run in order: a later one may read what an earlier made.
   workers: 1,
   fullyParallel: false,

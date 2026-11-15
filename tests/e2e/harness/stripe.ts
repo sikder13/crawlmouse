@@ -201,9 +201,12 @@ export class WalkStripe {
   }
 
   /** Stripe's side of a finished Checkout: the subscription, then the signed event to the webhook. */
-  async complete(
-    sessionId: string,
-  ): Promise<{ status: number; body: string; subscription: string }> {
+  async complete(sessionId: string): Promise<{
+    status: number;
+    body: string;
+    subscription: string;
+    event: { id: string; created: number };
+  }> {
     const s = this.sessions.get(sessionId);
     if (!s || s.status !== 'open') throw new Error(`walk stripe: no open session ${sessionId}`);
     const line = (s.params.line_items as Params[])[0]!;
@@ -259,11 +262,23 @@ export class WalkStripe {
     );
   }
 
+  /** The last event delivered, exactly as it was sent: what `replay` sends again. */
+  private last: { payload: string; header: string } | null = null;
+
+  /** Stripe's retry of the last delivery: the same event, the same signed bytes. */
+  async replay() {
+    if (!this.last) throw new Error('walk stripe: nothing delivered yet');
+    return this.post(this.last.payload, this.last.header);
+  }
+
   private async deliver(type: string, object: Record<string, unknown>) {
-    const { payload, header } = signedPayload(type, object, {
-      id: this.id('evt'),
-      created: Math.floor(Date.now() / 1000),
-    });
+    const event = { id: this.id('evt'), created: Math.floor(Date.now() / 1000) };
+    const { payload, header } = signedPayload(type, object, event);
+    this.last = { payload, header };
+    return { ...(await this.post(payload, header)), event };
+  }
+
+  private async post(payload: string, header: string) {
     const r = await fetch(this.webhookUrl(), {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'stripe-signature': header },

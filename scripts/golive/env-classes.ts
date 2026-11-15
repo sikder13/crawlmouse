@@ -108,6 +108,8 @@ export const TEST_ONLY_ENV: Why = {
   V2_PREVIEW_ON_NEXT_START: 'CI sets it to serve the previews on next start; ignored on Vercel',
   PERF_STRICT: "packages/timing's strict job",
   PERF_SAMPLES_DIR: "packages/timing's sample output",
+  POSTHOG_CAPTURE_URL:
+    "the launch walk's capture stub for server events (tests/e2e/run.sh); ignored when VERCEL_ENV is production (lib/analytics-server.ts)",
 };
 
 /**

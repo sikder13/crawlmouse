@@ -161,6 +161,41 @@ describe('posthogSend', () => {
     await expect(posthogSend(body)).rejects.toThrow('capture answered 500');
   });
 
+  it('posts to POSTHOG_CAPTURE_URL when it is set outside production (the walk’s capture stub)', async () => {
+    vi.stubEnv('NEXT_PUBLIC_POSTHOG_KEY', 'phc_test');
+    vi.stubEnv('POSTHOG_CAPTURE_URL', 'http://127.0.0.1:54438/ph/i/v0/e/');
+    for (const env of ['preview', 'development', '']) {
+      vi.stubEnv('VERCEL_ENV', env);
+      const fetched = vi.fn(async () => new Response(null, { status: 200 }));
+      vi.stubGlobal('fetch', fetched);
+      await posthogSend(body);
+      const [url] = fetched.mock.calls[0] as unknown as [string];
+      expect(url, `VERCEL_ENV=${env || '(empty)'}`).toBe('http://127.0.0.1:54438/ph/i/v0/e/');
+    }
+  });
+
+  it('ignores POSTHOG_CAPTURE_URL in production: it sends to PostHog only', async () => {
+    vi.stubEnv('NEXT_PUBLIC_POSTHOG_KEY', 'phc_test');
+    vi.stubEnv('POSTHOG_CAPTURE_URL', 'http://127.0.0.1:54438/ph/i/v0/e/');
+    vi.stubEnv('VERCEL_ENV', 'production');
+    const fetched = vi.fn(async () => new Response(null, { status: 200 }));
+    vi.stubGlobal('fetch', fetched);
+    await posthogSend(body);
+    const [url] = fetched.mock.calls[0] as unknown as [string];
+    expect(url).toBe('https://us.i.posthog.com/i/v0/e/');
+  });
+
+  it('an empty POSTHOG_CAPTURE_URL is unset', async () => {
+    vi.stubEnv('NEXT_PUBLIC_POSTHOG_KEY', 'phc_test');
+    vi.stubEnv('POSTHOG_CAPTURE_URL', '');
+    vi.stubEnv('VERCEL_ENV', 'preview');
+    const fetched = vi.fn(async () => new Response(null, { status: 200 }));
+    vi.stubGlobal('fetch', fetched);
+    await posthogSend(body);
+    const [url] = fetched.mock.calls[0] as unknown as [string];
+    expect(url).toBe('https://us.i.posthog.com/i/v0/e/');
+  });
+
   it('waits CAPTURE_TIMEOUT_MS (2 s) for PostHog: a send that does not settle is aborted and dropped', async () => {
     vi.stubEnv('NEXT_PUBLIC_POSTHOG_KEY', 'phc_test');
     const bound = new AbortController();

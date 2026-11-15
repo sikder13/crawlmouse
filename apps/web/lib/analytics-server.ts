@@ -51,6 +51,18 @@ export type SendCapture = (body: CaptureBody) => Promise<void>;
 
 const POSTHOG_CAPTURE_URL = 'https://us.i.posthog.com/i/v0/e/';
 
+/**
+ * Where a capture is posted: PostHog's endpoint, or `POSTHOG_CAPTURE_URL` when that server-only
+ * variable is set and this is not a Vercel production deployment (the launch walk's capture stub,
+ * tests/e2e/harness/posthog.ts). In production the variable is ignored, so production sends to
+ * PostHog only.
+ */
+function captureUrl(): string {
+  const override = process.env.POSTHOG_CAPTURE_URL;
+  if (!override || process.env.VERCEL_ENV === 'production') return POSTHOG_CAPTURE_URL;
+  return override;
+}
+
 /** How long a capture waits for PostHog before the request is aborted. */
 export const CAPTURE_TIMEOUT_MS = 2000;
 
@@ -61,7 +73,7 @@ export const CAPTURE_TIMEOUT_MS = 2000;
 export const posthogSend: SendCapture = async (body) => {
   const apiKey = process.env.NEXT_PUBLIC_POSTHOG_KEY;
   if (!apiKey) return;
-  const res = await fetch(POSTHOG_CAPTURE_URL, {
+  const res = await fetch(captureUrl(), {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ api_key: apiKey, ...body }),

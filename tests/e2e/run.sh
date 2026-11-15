@@ -6,6 +6,8 @@
 #   bash tests/e2e/run.sh                 # build, then walk
 #   SKIP_BUILD=1 bash tests/e2e/run.sh    # walk the build already in apps/web/.next (one this made)
 #   bash tests/e2e/run.sh 2-free          # walk the journeys whose file names match
+#   bash tests/e2e/run.sh 8-data          # journey 8 (CC-41 D7): a build with PostHog on, pointed
+#                                         # at the stand-in's capture stub; selected only by name
 #
 # Screenshots go to $WALK_SHOTS when it is set (none are taken otherwise). Results:
 # tests/e2e/results.json (gitignored), read by `pnpm golive:check --go-no-go`.
@@ -56,10 +58,27 @@ export INNGEST_EVENT_KEY=walk INNGEST_BASE_URL=http://127.0.0.1:$STANDIN_PORT
 export WALK_STRIPE_PORT=$STANDIN_PORT STANDIN_PORT WALK_BASE=http://localhost:$WEB_PORT
 export STANDIN_URL=http://127.0.0.1:$STANDIN_PORT
 
+# Journey 8 only (CC-41 D7): PostHog on, the browser and the server both sending to the stand-in's
+# capture stub (harness/posthog.ts), its events written to $WALK_CAPTURES. Without `8-data` among the
+# arguments none of this is set, so the other journeys build and run as they did. The build records
+# which of the two it is, and SKIP_BUILD refuses a build of the other kind.
+WALK_MODE=default
+for a in "$@"; do case "$a" in *8-data*) WALK_MODE=data ;; esac; done
+if [ "$WALK_MODE" = data ]; then
+  export WALK_DATA=1 NEXT_PUBLIC_POSTHOG_KEY=walk_placeholder_project_token
+  export NEXT_PUBLIC_POSTHOG_HOST=$STANDIN_URL/ph POSTHOG_CAPTURE_URL=$STANDIN_URL/ph/i/v0/e/
+  export WALK_CAPTURES=$LOGS/captures.jsonl WALK_EVIDENCE=$LOGS/d7-evidence.json
+  : > "$WALK_CAPTURES"
+fi
+
 if [ "${SKIP_BUILD:-}" != 1 ]; then
   rm -rf .next
   echo "building $(git rev-parse --short HEAD) at $(date '+%H:%M:%S')"
   pnpm exec next build > "$LOGS/build.log" 2>&1 || { echo "BUILD FAILED"; tail -30 "$LOGS/build.log"; exit 1; }
+  echo "$WALK_MODE" > .next/WALK_MODE
+elif [ "$(cat .next/WALK_MODE 2>/dev/null || echo default)" != "$WALK_MODE" ]; then
+  echo "the build in apps/web/.next is a $(cat .next/WALK_MODE 2>/dev/null || echo default) build; this walk needs a $WALK_MODE one: run without SKIP_BUILD"
+  exit 1
 fi
 
 : > "$LOGS/serve.out"
