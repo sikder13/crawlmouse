@@ -46,6 +46,22 @@ export interface AttributablePage {
   terms: readonly string[];
 }
 
+const TITLE_SUFFIX = ' · Crawlmouse';
+
+/**
+ * A page's own words: a post's slug, title and keywords; any other page's path and served title
+ * (without the site suffix), and for the home the brand.
+ */
+export function pageTerms(
+  path: string,
+  title: string | null,
+  post?: { slug: string; title: string; keywords: readonly string[] },
+): AttributablePage {
+  if (post) return { path, terms: [post.slug, post.title, ...post.keywords] };
+  const own = (title ?? '').replace(TITLE_SUFFIX, '');
+  return { path, terms: [path, own, ...(path === '/' ? ['crawlmouse'] : [])] };
+}
+
 /** The share of a query's words a page's terms cover, 0–1. */
 export function coverage(query: string, page: AttributablePage): number {
   const q = [...new Set(words(query))];
