@@ -4,14 +4,18 @@ import { describe, expect, it } from 'vitest';
 import { renderToString } from 'react-dom/server';
 import BlogIndex from '../app/blog/page';
 import { POSTS_BY_SLUG, allPostSlugs } from '../lib/blog/posts';
+import { addedQuestions, addedSummary, postAbstract } from '../lib/blog/answers';
+import { POST_SOURCES } from '../lib/blog/post-source';
 import {
   parse,
   renderIndexHtml,
+  renderPostPage,
   snapshotIndex,
   snapshotPost,
   type IndexSnapshot,
   type PostSnapshot,
 } from './helpers/blog-render';
+import { bodyEdits, dropUpdatedDate, reverseEdits, stripAdditions } from './helpers/blog-additions';
 
 // OPERATING-RULES §13: no indexed URL loses its title, description, H1 or canonical. The fixture is
 // what main served at `capturedFrom`, before authors, tags and the research article existed. Every
@@ -20,6 +24,13 @@ import {
 // The fixture and the comparison share one helper, so agreement alone proves nothing (§10). The
 // first block pins the fixture itself against the post metadata, an independent source: a helper
 // that captured empty strings would fail there instead of comparing empty to empty.
+//
+// CC-40 (D4, D5, D6; owner brief of 2026-11-15) adds to these pages. The comparison is therefore
+// "baseline plus listed additions only": the additions are set aside by the containers they render
+// in, each D5 sentence edit listed in lib/blog/v2-edits.ts is reversed, and what is left must equal
+// the baseline byte for byte (helpers/blog-additions.ts says what each step removes). Title,
+// description, canonical and H1 are compared exactly; the metadata's modifiedTime and the Article's
+// dateModified follow `updatedAt`, and the Article gains an `abstract`; nothing else may differ.
 
 const fixture = JSON.parse(
   readFileSync(resolve(__dirname, '__fixtures__/blog-baseline.json'), 'utf8'),
@@ -62,25 +73,110 @@ describe('the baseline fixture is what it claims to be', () => {
   });
 });
 
-describe('every existing post renders as it did at the baseline', () => {
+describe('every existing post renders as it did at the baseline, plus the listed additions', () => {
   it('no baseline post was removed', () => {
     const live = new Set(allPostSlugs());
     expect(BASELINE_SLUGS.filter((s) => !live.has(s))).toEqual([]);
   });
 
   it.each(BASELINE_SLUGS)(
-    '%s: metadata, H1, article markup and JSON-LD unchanged',
+    '%s: metadata, H1 and canonical unchanged; modifiedTime is updatedAt',
     async (slug) => {
       const now = await snapshotPost(slug);
       const then = fixture.posts[slug]!;
-      expect(now.metadata).toEqual(then.metadata);
+      expect(withoutModifiedTime(now.metadata)).toEqual(withoutModifiedTime(then.metadata));
+      expect((now.metadata.openGraph as { modifiedTime?: string }).modifiedTime).toBe(
+        POSTS_BY_SLUG.get(slug)!.updatedAt,
+      );
       expect(now.h1).toBe(then.h1);
       expect(now.h1Count).toBe(then.h1Count);
-      expect(now.articleHtml).toBe(then.articleHtml);
-      expect(now.jsonLd).toEqual(then.jsonLd);
+    },
+  );
+
+  it.each(BASELINE_SLUGS)(
+    '%s: article markup is the baseline once additions are set aside and listed edits reversed',
+    async (slug) => {
+      const then = parse(fixture.posts[slug]!.articleHtml).querySelector('article')!;
+      dropUpdatedDate(then);
+      for (const e of bodyEdits(slug)) {
+        expect(
+          then.outerHTML.split(e.html.before).length - 1,
+          `${e.file}:${e.line} in the baseline`,
+        ).toBe(1);
+      }
+      const { doc } = await renderPostPage(slug);
+      const now = doc.querySelector('article')!;
+      // Exactly the additions this post is listed for, so a container cannot hide anything else.
+      // The cluster links (D6) are one block wherever the layout places it.
+      const { 'nav[aria-label="More on this topic"]': clusters, ...mine } = stripAdditions(now);
+      expect(mine).toEqual({
+        'p.post-summary': addedSummary(slug) ? 1 : 0,
+        'section.post-questions': addedQuestions(slug).length > 0 ? 1 : 0,
+        '.post-author-role': 0,
+        'sup.post-source': Object.values(POST_SOURCES).filter((x) => x.slug === slug).length,
+      });
+      expect(clusters).toBeLessThanOrEqual(1);
+      dropUpdatedDate(now);
+      expect(reverseEdits(now.outerHTML, slug)).toBe(then.outerHTML);
+    },
+  );
+
+  it.each(BASELINE_SLUGS)(
+    '%s: the date line shows updatedAt when it differs from publishedAt',
+    async (slug) => {
+      const meta = POSTS_BY_SLUG.get(slug)!;
+      const { doc } = await renderPostPage(slug);
+      const times = [...doc.querySelectorAll('article header time')].map((t) =>
+        t.getAttribute('datetime'),
+      );
+      expect(times).toEqual(
+        meta.updatedAt === meta.publishedAt
+          ? [meta.publishedAt]
+          : [meta.publishedAt, meta.updatedAt],
+      );
+    },
+  );
+
+  it.each(BASELINE_SLUGS)(
+    '%s: JSON-LD is the baseline outside the additions, but dateModified and an added abstract',
+    async (slug) => {
+      const { doc } = await renderPostPage(slug);
+      stripAdditions(doc);
+      const now = jsonLdBlocks(doc);
+      const then = fixture.posts[slug]!.jsonLd;
+      const article = (now.flat() as Record<string, unknown>[]).find(
+        (n) => n['@type'] === 'Article',
+      )!;
+      expect(article.dateModified).toBe(POSTS_BY_SLUG.get(slug)!.updatedAt);
+      expect(article.abstract).toBe(postAbstract(slug));
+      expect(now.map(withoutArticleDates)).toEqual(then.map(withoutArticleDates));
     },
   );
 });
+
+function withoutModifiedTime(m: Record<string, unknown>): Record<string, unknown> {
+  const copy = JSON.parse(JSON.stringify(m)) as Record<string, unknown>;
+  delete (copy.openGraph as Record<string, unknown> | undefined)?.modifiedTime;
+  return copy;
+}
+
+function jsonLdBlocks(doc: Document): unknown[] {
+  return [...doc.querySelectorAll('script[type="application/ld+json"]')].map(
+    (s) => JSON.parse(s.textContent ?? 'null') as unknown,
+  );
+}
+
+/** A JSON-LD block with its Article node's dateModified and abstract removed. */
+function withoutArticleDates(block: unknown): unknown {
+  const copy = JSON.parse(JSON.stringify(block)) as unknown;
+  for (const n of [copy].flat() as Record<string, unknown>[]) {
+    if (n && n['@type'] === 'Article') {
+      delete n.dateModified;
+      delete n.abstract;
+    }
+  }
+  return copy;
+}
 
 describe('/blog is unchanged apart from the cards of posts added since the baseline', () => {
   it('keeps its metadata', () => {

@@ -4,6 +4,8 @@ import { checksPublicEnabled } from '@/lib/auth/flags';
 import { billingV2Enabled } from '@/lib/billing/flags';
 import { AGENCY_MONTHLY, AGENCY_YEARLY, PRO_MONTHLY, PRO_YEARLY } from '@/lib/billing/prices';
 import { PARENT_ORGANIZATION, V2_HOME_DESCRIPTION } from './site-copy';
+import { postAbstract } from '@/lib/blog/answers';
+import type { PostDataset } from '@/lib/blog/datasets';
 
 // Typed schema.org JSON-LD builders + a tiny renderer. Structured data helps search engines
 // understand the site (Organization / SoftwareApplication), the homepage (WebSite), the blog
@@ -157,6 +159,8 @@ export function faqLd(items: ReadonlyArray<{ question: string; answer: string }>
 
 export function articleLd(post: BlogPostMeta) {
   const url = siteUrl(`/blog/${post.slug}`);
+  // The post's direct answer (lib/blog/answers.ts), the same words the page shows under its H1.
+  const abstract = postAbstract(post.slug);
   return {
     '@context': 'https://schema.org',
     '@type': 'Article',
@@ -174,6 +178,25 @@ export function articleLd(post: BlogPostMeta) {
     url,
     image: siteUrl(`/blog/${post.slug}/opengraph-image`),
     keywords: post.keywords.join(', '),
+    ...(abstract ? { abstract } : {}),
+  };
+}
+
+/**
+ * The data behind a research post as a Dataset node. Every field comes from the post's own body
+ * (lib/blog/datasets.ts says where); nothing is asserted that the post does not state, so there is no
+ * `license` or `distribution`.
+ */
+export function datasetLd(post: BlogPostMeta, data: PostDataset, creator: object) {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'Dataset',
+    name: data.name,
+    description: data.description.text,
+    temporalCoverage: `${data.collected.start}/${data.collected.end}`,
+    size: data.size.text,
+    creator,
+    url: siteUrl(`/blog/${post.slug}`),
   };
 }
 
