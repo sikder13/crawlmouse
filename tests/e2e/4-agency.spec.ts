@@ -6,7 +6,7 @@ import { control, events, holdStripe, qa, shot, signIn, sql } from './walk';
  * Journey 4 (CC-38 D4): `qa+agencytrial` starts the Agency trial (card taken at Checkout, then the
  * webhook), adds clients up to six, invites a developer scoped to one client; the developer sees only
  * that client; the owner makes a client report, shares it, the proof page opens signed out, and the
- * share is revoked. CC-37 D5's two developer assertions (no card, no mint) wait for CC-37.
+ * share is revoked; then CC-37 D5: the developer sees no card digits and cannot publish a report.
  */
 const J = '4-agency';
 const DEV = 'developer@walk.example';
@@ -239,7 +239,9 @@ test('the developer sees no card digits and cannot publish a report; the owner c
   const dev = await browser.newContext();
   await signIn(dev, DEV);
   const devPage = await dev.newPage();
-  await devPage.goto('/agency');
+  // Into the agency, as the developer acts in it: its rail is where the trial's billing card shows.
+  await openAgency(devPage);
+  await expect(devPage.getByText('QA Agency Trial').first()).toBeVisible();
   await shot(devPage, J, 'developer-card');
   expect(await devPage.locator('body').innerText()).not.toContain(DIGITS);
   const refused = await mint(devPage);
