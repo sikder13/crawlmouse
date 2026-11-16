@@ -1,7 +1,7 @@
 /**
  * The privacy page's Data retention list (CC-41 rulings 3): with V2_CHECKS_PUBLIC off, exactly main's
- * list; with it on, v2's: an audit nobody keeps, an audit kept by an account, the de-identified
- * research records, then main's other three lines. Each number is rendered from its constant (a test
+ * list; with it on, v2's: an audit nobody keeps, an audit kept by an account, v1's audits (still
+ * cleaned up after 30 days), the de-identified research records, then main's other three lines. Each number is rendered from its constant (a test
  * gives the constants other values and reads them back).
  */
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -45,20 +45,25 @@ describe('the privacy page’s Data retention list', () => {
     const { ANONYMOUS_EXPIRY_HOURS } = await import('../lib/v2/pipeline/limits');
     const { RESTORE_DAYS } = await import('../lib/v2/copy/restore-window');
     const list = items(await retentionList('1'));
-    expect(list).toHaveLength(6);
+    expect(list).toHaveLength(7);
     expect(list[0]).toBe(
-      `An audit nobody keeps is deleted, together with its stored evidence, at the first daily cleanup once ${ANONYMOUS_EXPIRY_HOURS} hours have passed since it was requested.`,
+      `An audit nobody keeps is deleted, together with its stored evidence, by the daily cleanup once ${ANONYMOUS_EXPIRY_HOURS} hours have passed since it was requested.`,
     );
     expect(list[1]).toBe(
       `An audit kept by an account stays for as long as the account exists. Deleting the account deletes its audits, once the ${RESTORE_DAYS}-day restore window has passed.`,
     );
-    expect(list[2]).toMatch(/^De-identified research records: /);
-    expect(list[2]).toContain(
+    // v1's audits are still cleaned up after 30 days (cleanupExpiredAuditsFn, whatever the flags):
+    // spec 22b's list names both rules.
+    expect(list[2]).toBe(
+      'Free-tier audits made with the earlier version of Crawlmouse are deleted automatically 30 days after they are created.',
+    );
+    expect(list[3]).toMatch(/^De-identified research records: /);
+    expect(list[3]).toContain(
       'no account, email, URL or page path, and no time finer than the month',
     );
-    expect(list[2]).toContain('kept indefinitely');
-    expect(list.slice(3)).toEqual(items(MAIN_LIST).slice(1));
-    expect(list.join(' ')).not.toContain('30 days');
+    expect(list[3]).toContain('While the audit a record came from exists, the two stay linked');
+    expect(list[3]).toContain('kept indefinitely');
+    expect(list.slice(4)).toEqual(items(MAIN_LIST).slice(1));
   });
 
   it('renders the hours and the restore days from their constants', async () => {

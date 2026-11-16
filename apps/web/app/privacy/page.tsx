@@ -189,19 +189,24 @@ export default function PrivacyPage() {
         {checksPublicEnabled() ? (
           <>
             <li>
-              An audit nobody keeps is deleted, together with its stored evidence, at the first
-              daily cleanup once {ANONYMOUS_EXPIRY_HOURS} hours have passed since it was requested.
+              An audit nobody keeps is deleted, together with its stored evidence, by the daily
+              cleanup once {ANONYMOUS_EXPIRY_HOURS} hours have passed since it was requested.
             </li>
             <li>
               An audit kept by an account stays for as long as the account exists. Deleting the
               account deletes its audits, once the {RESTORE_DAYS}-day restore window has passed.
             </li>
             <li>
+              Free-tier audits made with the earlier version of Crawlmouse are deleted automatically
+              30 days after they are created.
+            </li>
+            <li>
               De-identified research records: what each crawler received from a site, the
               site&rsquo;s platform, and similar measurements. They carry no account, email, URL or
               page path, and no time finer than the month; a site is identified only by a keyed
-              one-way code. These records are kept indefinitely and used to improve the product and
-              to publish aggregate research.
+              one-way code. While the audit a record came from exists, the two stay linked; deleting
+              the audit deletes the link. These records are kept indefinitely and used to improve
+              the product and to publish aggregate research.
             </li>
           </>
         ) : (
