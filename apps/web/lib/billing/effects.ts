@@ -10,6 +10,8 @@
  * (spec 03, "The webhook").
  *
  * The webhook adds `cancel` entries of its own (spec 03, "Stripe writes from the webhook"); the machine plans none.
+ * It also adds `capture` entries, the payment events PostHog is sent (CC-41 D3, ./payment-events.ts):
+ * stored with the rest of the plan, so a plan sent again sends each capture with the same body.
  *
  * `relimit`, `pause_others`, `pause_over_limit` and `resume` plan nothing: since migration 003
  * `apply_entitlement_transition` applies them in the transaction that writes the state, so carrying
@@ -20,6 +22,24 @@ import { AccountStateSchema } from '@crawlmouse/types/v2';
 import type { Effect, EntitlementSnapshot } from './state-machine';
 
 const SUBSCRIPTION_ID = /^sub_[A-Za-z0-9_]+$/;
+
+const PAID = z.enum(['pro', 'agency']);
+
+/** A payment event for PostHog: its name, its own properties, and who and when it is about. */
+function captureOf<E extends string, P extends z.ZodRawShape>(event: E, properties: P) {
+  return z.strictObject({
+    kind: z.literal('capture'),
+    /** The capture's own id, fixed by the Stripe event and the event name (./payment-events.ts). */
+    uuid: z.uuid(),
+    event: z.literal(event),
+    /** The account owner's `users.id`. */
+    distinctId: z.string().min(1),
+    accountId: z.string().min(1),
+    /** Stripe's `event.created`, as ISO. */
+    timestamp: z.iso.datetime(),
+    properties: z.strictObject(properties),
+  });
+}
 
 export const PlannedEffectSchema = z.union([
   z.strictObject({
@@ -76,12 +96,30 @@ export const PlannedEffectSchema = z.union([
     reason: z.enum(['orphaned', 'disputed']),
     source: z.string().min(1),
   }),
+  captureOf('subscription_started', {
+    plan: PAID,
+    interval: z.enum(['month', 'year']),
+    trial: z.boolean(),
+    /** The checkout session's `amount_total` and `currency`; null where the event has none. */
+    amount_cents: z.number().int().nonnegative().nullable(),
+    currency: z
+      .string()
+      .regex(/^[a-z]{3}$/)
+      .nullable(),
+  }),
+  captureOf('trial_converted', { plan: PAID, via: z.enum(['checkout', 'subscription']) }),
+  captureOf('plan_changed', { from: PAID, to: PAID }),
+  captureOf('subscription_canceled', { plan: PAID, at_period_end: z.boolean() }),
+  captureOf('subscription_ended', { plan: PAID }),
+  /** `attempt` is the invoice's `attempt_count`; null where the event has none. */
+  captureOf('payment_failed', { plan: PAID, attempt: z.number().int().nonnegative().nullable() }),
 ]);
 
 export type PlannedEffect = z.infer<typeof PlannedEffectSchema>;
 export type PlannedSend = Extract<PlannedEffect, { kind: 'send' }>;
 export type PlannedAlert = Extract<PlannedEffect, { kind: 'alert' }>;
 export type PlannedCancel = Extract<PlannedEffect, { kind: 'cancel' }>;
+export type PlannedCapture = Extract<PlannedEffect, { kind: 'capture' }>;
 
 /** A stored plan, read back from `stripe_events.effects`: refused whole when any entry is malformed. */
 export const PlannedEffectsSchema = z.array(PlannedEffectSchema);
@@ -177,13 +215,32 @@ export interface EffectSinks {
    * rate-limits can still drop it; the plan, alert included, stays in `stripe_events.effects`.
    */
   alert(alert: PlannedAlert): Promise<void>;
+  /**
+   * Sends a payment event to PostHog. Only the webhook plans captures; sinks for the clock and the
+   * first-login trial, which plan none, may leave it out, and a capture given to them is dropped.
+   */
+  capture?(capture: PlannedCapture): Promise<void>;
+}
+
+/** A capture that fails is logged by name and dropped: analytics never holds up a plan. */
+async function sendCapture(sinks: EffectSinks, c: PlannedCapture): Promise<void> {
+  if (sinks.capture === undefined) {
+    console.warn(`[billing] no capture sink: ${c.event} dropped`);
+    return;
+  }
+  try {
+    await sinks.capture(c);
+  } catch {
+    console.error(`[billing] capture of ${c.event} failed`);
+  }
 }
 
 /**
- * Carries out a plan: every event in one send, then each cancellation, then each alert, each awaited.
- * Anything that fails throws, so the caller does not mark the plan done and sends it again. On a
- * repeat, an event is dropped by Inngest within 24 hours of its first send, a cancellation is skipped
- * once Stripe shows the subscription ended, and an alert is raised again.
+ * Carries out a plan: every event in one send, then each cancellation, then each alert, then each
+ * capture, each awaited. Anything but a capture that fails throws, so the caller does not mark the
+ * plan done and sends it again; a capture that fails is logged and dropped. On a repeat, an event is
+ * dropped by Inngest within 24 hours of its first send, a cancellation is skipped once Stripe shows
+ * the subscription ended, an alert is raised again, and a capture is sent again with the same body.
  */
 export async function dispatchPlanned(
   planned: readonly PlannedEffect[],
@@ -195,4 +252,5 @@ export async function dispatchPlanned(
   }
   for (const p of planned) if (p.kind === 'cancel') await sinks.cancel(p);
   for (const p of planned) if (p.kind === 'alert') await sinks.alert(p);
+  for (const p of planned) if (p.kind === 'capture') await sendCapture(sinks, p);
 }

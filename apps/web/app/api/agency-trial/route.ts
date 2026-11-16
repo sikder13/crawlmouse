@@ -87,7 +87,8 @@ export async function POST(req: Request) {
           input,
         ),
       capture: pricingCapture(req.headers.get('cookie')),
-      firstClient: (accountId) => agencyCaptureFor(req)('first_client_added', accountId, {}),
+      firstClient: (accountId) =>
+        agencyCaptureFor(req)('first_client_added', { accountId, userId: user.id }, {}),
       defer: (work) => after(work),
       now,
     },

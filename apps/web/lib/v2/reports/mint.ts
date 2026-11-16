@@ -65,7 +65,8 @@ export interface MintV2Deps {
     report_snapshot: PublicSnapshotV2;
     minted_by: string;
   }): Promise<{ error: WriteError | null }>;
-  reportMinted(accountId: string): Promise<void>;
+  /** `report_minted`, keyed by the person who minted (`userId`), with the account. */
+  reportMinted(accountId: string, userId: string): Promise<void>;
   newSlug(): string;
   now(): Date;
 }
@@ -123,7 +124,7 @@ export async function mintV2(
       minted_by: user.id,
     });
     if (!error) {
-      await deps.reportMinted(accountId);
+      await deps.reportMinted(accountId, user.id);
       return answer(slug, false);
     }
     if (isUndefinedColumnError(error)) return refuse(503, 'minting_unavailable');

@@ -1345,6 +1345,9 @@ describe('migration 006b applies, re-applies and reverts', () => {
     await applyAllMigrations(d);
     await prepareMeasurement(d);
     await seedWorld(d, 'revert-006b');
+    // Rollbacks run newest first: 041's analytics views read usage_events and the ledger, so 041 is
+    // reverted before 006b, as it would be on a real database.
+    await d.exec(readRollback('20261120000001_v2_041_analytics.revert.sql'));
     await d.exec(readRollback(ROLLBACK));
     const { rows } = await d.query<{ n: number }>(
       `select count(*)::int as n from pg_namespace where nspname = 'research'`,

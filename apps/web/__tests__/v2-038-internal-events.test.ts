@@ -75,8 +75,9 @@ describe('CC-38 D3: the server events name the subject internal is derived from'
     expect(calls.some((c) => c.at.startsWith('apps/web/lib/v2/account/account-events.ts:'))).toBe(
       true,
     );
-    // Through a wrapper: persist.ts sends fix_closed through account/events.ts's Sender.
-    expect(calls.some((c) => c.at.startsWith('apps/web/lib/v2/pipeline/persist.ts:'))).toBe(true);
+    // Through a wrapper: persist.ts sends fix_closed through account/events.ts's Sender, which names
+    // the account in the call it makes (sendWithoutRequest).
+    expect(calls.some((c) => c.at.startsWith('apps/web/lib/v2/account/events.ts:'))).toBe(true);
   });
 
   it('finds no reference to captureServerEvent other than a call, an import, a typeof or a typed binding', () => {

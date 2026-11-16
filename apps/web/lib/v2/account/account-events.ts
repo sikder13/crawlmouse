@@ -1,11 +1,13 @@
 /**
  * The product events CC-27b sends (D9), through the product's one server sender. The distinct id is
- * `account:<id>`; no property holds an address, a host or a token. A request's consent cookies decide
+ * the person's `users.id` for their own action, and `account:<id>` for the purge, which no person
+ * runs (CC-41 D1, `distinctIdFor`); the account is `account_id`. No property holds an address, a host
+ * or a token. A request's consent cookies decide
  * whether a route's event is sent (`captureServerEvent` reads them); the purge has no request and
  * sends with no cookie header, so with no person profile and keyed by the account only.
  */
 import type { FunnelEvent } from '../../analytics-events';
-import { captureServerEvent } from '../../analytics-server';
+import { captureServerEvent, distinctIdFor, type EventKey } from '../../analytics-server';
 import type { Tier } from '../../entitlement-v2';
 
 export interface AccountEvents {
@@ -21,7 +23,7 @@ export type AccountEventName = keyof AccountEvents & FunnelEvent;
 
 export type CaptureAccountEvent = <E extends AccountEventName>(
   event: E,
-  accountId: string,
+  key: EventKey,
   properties: AccountEvents[E],
 ) => Promise<void>;
 
@@ -30,6 +32,11 @@ export function accountCapture(
   cookieHeader: string | null,
   capture: typeof captureServerEvent = captureServerEvent,
 ): CaptureAccountEvent {
-  return (event, accountId, properties) =>
-    capture(cookieHeader, { event, distinctId: `account:${accountId}`, properties });
+  return (event, key, properties) =>
+    capture(cookieHeader, {
+      event,
+      distinctId: distinctIdFor(cookieHeader, key),
+      accountId: key.accountId,
+      properties,
+    });
 }

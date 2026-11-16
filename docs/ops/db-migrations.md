@@ -31,19 +31,29 @@ The scripts behind them are in `scripts/db`. Their tests:
       and its error: the run log's first error line when Supabase kept a log, otherwise the error
       its recorded statements raise on the branch, run in a transaction that is rolled back. The
       branch reports healthy before its replay has run, so this step comes before any comparison;
-   3. compare the branch's fingerprint (`infra/supabase/checks/fingerprint.sql`) with
+   3. make the branch's extensions match production's (`scripts/db/extensions.ts`): read
+      production's `pg_extension` through the read-only endpoint, drop on the branch each extension
+      production does not have (a plain `drop extension`, never `cascade`, so a drop that anything
+      outside the extension depends on fails the step), print each dropped name in the job log,
+      and print, without installing it, each extension production has and the branch lacks. Its
+      summary line starts `extensions equal to production after alignment:` with yes or no, then
+      the differences and the extensions dropped. Why it exists: on 2026-11-16 the branch for
+      pull request 89 had pg_net, with PUBLIC grants on schema `net` and its tables, and
+      production had no `net` schema; check 10 failed on the branch for a reason production did
+      not share, and the fingerprint reported equal, because it leaves extensions out by design;
+   4. compare the branch's fingerprint (`infra/supabase/checks/fingerprint.sql`) with
       production's, section by section, and fail on a difference;
-   4. read the branch's migration history: fail if it needs the repair in §5, if a pending file
+   5. read the branch's migration history: fail if it needs the repair in §5, if a pending file
       has no rollback, or if the pull request changes a migration file that is already applied
       (production would never receive the change: add a new migration instead). A changed file
       whose history row holds exactly its bytes, as one statement, passes: it was applied before
       the merge, as in §9;
-   5. `supabase db push`, after checking that the CLI's list equals the pending files;
-   6. run the checks in §6;
-   7. run each pending file again in its own transaction, and fail if the fingerprint changes;
-   8. run the rollbacks in reverse order, and fail unless the fingerprint equals production's;
-   9. `supabase db push` again, and fail unless the fingerprint equals the first push's;
-   10. if the pull request changes the rollback of an applied migration, revert the migrations
+   6. `supabase db push`, after checking that the CLI's list equals the pending files;
+   7. run the checks in §6;
+   8. run each pending file again in its own transaction, and fail if the fingerprint changes;
+   9. run the rollbacks in reverse order, and fail unless the fingerprint equals production's;
+   10. `supabase db push` again, and fail unless the fingerprint equals the first push's;
+   11. if the pull request changes the rollback of an applied migration, revert the migrations
        from that one on, newest first, push them again, and fail if the fingerprint changes.
 
    The branch is deleted at the end of the run, pass or fail, and again when the pull request
@@ -120,6 +130,11 @@ The pull request comment names the failed step. The job log has the full output.
   its own, with its own pull request; a platform difference is reported, and the fingerprint is
   changed in a reviewed pull request only if the difference is shown to be the platform's.
 
+- **Branch extensions match production's** failed. Dropping an extension production does not
+  have failed on the branch: something outside the extension depends on it, or the branch's role
+  cannot drop it. The job log names the extension and Postgres's error. The step never uses
+  `cascade`; do not add it. A `no` in its result with the step passing means production has an
+  extension the branch lacks: it is printed, not installed.
 - **History is clean and each pending file has a rollback** failed. Either production's history
   needs the repair in §5, or a pending migration has no rollback file.
 - **supabase db push** failed. The CLI's error is in the log. A file that fails to apply leaves
@@ -151,8 +166,8 @@ committed by then, and the failure says what the revert restored.
   so rollbacks run newest first, one per run. The order is checked by the plan and again inside the
   rollback's transaction, after it locks the history table, so an apply run in between is
   seen (`pnpm --filter @crawlmouse/scripts exec vitest run db/production.test.ts db/rollback.test.ts`).
-- A rollback changed in a pull request is run on the branch by the dry run's step 9 before it
-  merges. Check its comment before dispatching. Step 9 reverts every migration from the changed
+- A rollback changed in a pull request is run on the branch by the dry run's step 11 before it
+  merges. Check its comment before dispatching. Step 11 reverts every migration from the changed
   one on, so it fails when one of them has no rollback file: adding a rollback for an old v1
   migration needs rollbacks for the migrations after it too.
 - Rollback and apply runs queue in separate groups: a push that queues an apply does not cancel a
@@ -387,12 +402,13 @@ what it guards. The list below is rendered from the files' leading comments, and
 - **`01-client-table-privileges.sql`**: Client roles hold exactly the declared privileges on the v2 tables. anon holds nothing on any v2 table or partition. authenticated and crawl_worker hold exactly the grants in this file's `declared` list, at the table or column level: a privilege held but not listed, or listed on an existing table and column but not held, is a finding. The v2 tables are the ones in its `v2_tables` list, every relation in the research and partitions schemas, and every partition, in any schema, of a table in those schemas or public. A table, column or role that does not exist yet (a migration not applied) is skipped; scripts/db/check.test.ts requires every listed table to exist once the migrations have run. A migration that changes these grants changes this list in the same pull request.
 - **`02-partitions-rls-owner-only.sql`**: Every partition has row-level security on and an owner-only ACL. Every relation in the partitions schema, and every partition (in any schema) of a table in public, research or partitions, must have RLS enabled, and its ACL may name only the table's owner: no client role, no PUBLIC, no other role. Supabase's own partitioned tables are left out.
 - **`03-worker-roles-no-login.sql`**: crawl_worker and research_retention cannot log in, bypass row-level security, or reach a role that can. Neither role may log in, bypass RLS, be a superuser, create roles or databases, or replicate, and neither may be a member (directly or through other roles) of a role that bypasses RLS or is a superuser. Both are meant to be assumed through SET ROLE or a signed token. A role that does not exist yet (its migration not applied) is skipped.
-- **`04-private-schemas.sql`**: The research and partitions schemas grant no USAGE or CREATE to client roles. anon and authenticated (and PUBLIC, which both inherit) may not use or create objects in either schema. A schema that does not exist yet is skipped.
+- **`04-private-schemas.sql`**: The research, partitions and analytics schemas grant no USAGE or CREATE to client roles. anon and authenticated (and PUBLIC, which both inherit) may not use or create objects in any of them. A schema that does not exist yet is skipped.
 - **`05-private-buckets.sql`**: The evidence and reports buckets are private. A bucket that does not exist yet is skipped.
 - **`06-client-functions.sql`**: In public, research and partitions, authenticated may execute exactly is_member, member_role, is_member_for_site, is_member_for_fix, usage_counts, seat_may, member_covers_all and is_operator. anon may execute none of their functions, and authenticated only the eight listed in `declared`. An existing listed function authenticated cannot execute is also a finding. Functions that belong to an extension are left out.
 - **`07-partition-triggers.sql`**: Every partition holds each row and TRUNCATE trigger its parent table holds. For each partition of a table in public, research or partitions, each row trigger and each TRUNCATE trigger on its parent must exist on the partition under the same name, calling the same function. Postgres copies row triggers to a new partition; it copies no statement trigger, and v2_premake_month_partitions creates the TRUNCATE guards per partition. Other statement triggers stay on the parent and are not required here. The fingerprint merges the lines of a table's partitions, so a trigger missing from one partition shows only here.
 - **`08-v1-client-grants.sql`**: The client roles hold exactly the declared privileges on the v1 tables and functions. On the 18 v1 tables in `v1_tables` and the 2 functions in `v1_functions`, anon holds nothing and authenticated holds SELECT on the columns in `declared`, without grant option, and nothing else, as 20261106000002_v1_client_grant_hardening.sql left them. Privileges are read as the roles hold them (has_table_privilege and its siblings), so a grant reaching them through PUBLIC or through a role they inherit from counts; a membership granted without INHERIT is not read. Any other privilege is a finding, one row per privilege (per v1 table read, for a relation with a rule), and so is a declared column authenticated cannot read, and so is any privilege the client roles hold on a relation with a rule that reads a v1 table: a view, a materialized view, or a table whose rule's action does, directly or through other such relations. A v1 table or function that does not exist is a finding rather than a skip, and a missing postgres, anon or authenticated role makes the check error, so it cannot pass by reading nothing. postgres's default privileges in public, or in every schema, must grant anon, authenticated, PUBLIC and any role either inherits from nothing, except what Postgres writes into an every-schema row itself when one is created: PUBLIC's EXECUTE on functions and USAGE on types, which new functions and types get anyway unless such a row revokes them (check 06 governs who may execute the functions in our schemas). Default privileges of other owners, supabase_admin's among them, are not read. A migration that changes these grants, or drops or renames a v1 table or function, changes these lists in the same pull request.
 - **`09-definer-search-path.sql`**: Every SECURITY DEFINER function in public, research and partitions searches pg_catalog first and the caller's temporary schema last. A definer function's search_path setting must be exactly "pg_catalog, pg_temp" or "pg_catalog, public, pg_temp"; any other setting, or none, is a finding. Left out, pg_temp is searched first for relations and types, so a caller's temp object could stand in for a name the body (or a SQL function inlined into it, such as auth.uid()) writes without a schema, and run as the function's owner. An empty setting ("") leaves it out too, so it is a finding: the check cannot see whether a body names every type with its schema. public ahead of pg_temp is safe only while no one else can create objects in public, so a role that holds CREATE on public without being a superuser or a member of its owner is a finding too, as is a CREATE grant to PUBLIC. Functions that belong to an extension are left out.
+- **`10-analytics-no-pii.sql`**: The analytics schema exposes no personal column, and `analytics_reader` reads nothing outside it. A column of an `analytics` relation is a finding when its name matches the personal-data list (email, name, host, url, uri, ip, token, address, phone, password, secret, referrer, path, card, customer, note) or its type is inet or cidr, unless it is one of the two allowlisted attribution columns below. Also a finding: any table, view or sequence outside `analytics` on which `analytics_reader` holds a privilege; any schema other than `analytics`, `public` and the catalog schemas on which it holds USAGE or CREATE (`public`'s USAGE is PUBLIC's, so its tables are checked one by one above instead); and any privilege anon or authenticated holds on an `analytics` relation. Also a finding: a SECURITY DEFINER function outside the catalog schemas that `analytics_reader` may execute (through PUBLIC or a grant), since it would run with its owner's rights. Functions that belong to an extension are left out, as `06-client-functions` leaves them out. The allowlist, and why each entry is safe (CC-41 rulings, Q5): `analytics.account_attribution.referrer_host`: a hostname only, lowercased, at most 253 characters of letters, digits, hyphens and dots; never a scheme, path or query. `analytics.account_attribution.landing_path`: a path of our own site as a shape, at most 200 characters of `[A-Za-z0-9/._~-]`, never a query or fragment; a segment that is not a lowercase slug (an id, a host, anything encoded) is written `~` (`landingShape`). Both are enforced where the value is written and read back (`apps/web/lib/analytics/first-touch.ts`); the table's CHECKs (migration 20261120000001) enforce each one's alphabet and length, not the shape.
 
 <!-- checks:end -->
 

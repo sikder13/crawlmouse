@@ -74,6 +74,26 @@
   color: var(--v2-fg);
 }
 
+/* The Feedback button (CC-41 D8a), at the foot of the rail, drawn as a rail link is. */
+.feedback {
+  display: flex;
+  align-items: center;
+  min-height: var(--v2-control-h-sm);
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--v2-radius-control);
+  background: none;
+  color: var(--v2-fg2);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.feedback:hover {
+  background: var(--v2-s1);
+  color: var(--v2-fg);
+}
+
 .card {
   margin-top: auto;
 }

@@ -109,6 +109,16 @@ export function pgliteWebhookDb(db: PGlite, hooks: PgliteHooks = {}): WebhookDb 
       );
       return rows[0] ? storedMirrorOf(rows[0]) : null;
     },
+    async ownerUserId(accountId) {
+      const { rows } = await svc(db, (tx) =>
+        tx.query<{ user_id: string }>(
+          `select user_id from public.seats
+            where account_id = $1 and role = 'owner' and status = 'active'`,
+          [accountId],
+        ),
+      );
+      return rows[0]?.user_id ?? null;
+    },
     async load(accountId) {
       const { rows } = await svc(db, (tx) =>
         tx.query<AccountRow>(`select * from public.accounts where id = $1`, [accountId]),

@@ -693,6 +693,8 @@ describe('the migration and its revert', () => {
     try {
       await applyAllMigrations(d);
       await d.exec(readMigration(MIGRATION));
+      // Rollbacks run newest first: 041's analytics.accounts reads accounts.internal.
+      await d.exec(readRollback('20261120000001_v2_041_analytics.revert.sql'));
       await d.exec(readRollback(ROLLBACK));
       await d.exec(readRollback(ROLLBACK));
       const gone = await d.query<{ t: string | null; f: number }>(

@@ -167,7 +167,11 @@ describe('POST /api/sites/[id]/checks', () => {
     expect(await queued(s.id)).toEqual([{ id: body.checkId, trigger: 'manual' }]);
     expect(h.send).toHaveBeenCalledTimes(1);
     expect(h.capture.mock.calls).toEqual([
-      ['check_started', p.accountId, checkStarted('manual', body.checkId)],
+      [
+        'check_started',
+        { accountId: p.accountId, userId: p.id },
+        checkStarted('manual', body.checkId),
+      ],
     ]);
 
     const again = await recheck(s.id);

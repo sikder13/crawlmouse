@@ -1,6 +1,7 @@
 /**
  * The Stripe customer portal configuration v2 opens (CC-03 D8, spec 03 Q7): payment method update,
- * invoice history and cancellation at the end of the period without proration, and nothing else. The
+ * invoice history and cancellation at the end of the period without proration, and nothing else.
+ * The cancellation asks why, offering every reason Stripe has (CC-41 D8c). The
  * account's default configuration allows plan changes and customer details, so v2 uses its own, found
  * by `metadata.crawlmouse_key`, created on first use and updated back when its features have drifted.
  */
@@ -11,10 +12,30 @@ type Configuration = Stripe.BillingPortal.Configuration;
 
 const KEY = 'portal_v2_billing';
 
+type Reason =
+  Stripe.BillingPortal.ConfigurationCreateParams.Features.SubscriptionCancel.CancellationReason.Option;
+
+/** Every option of Stripe's cancellation reason (stripe 22.2.0). */
+const REASONS: readonly Reason[] = [
+  'customer_service',
+  'low_quality',
+  'missing_features',
+  'other',
+  'switched_service',
+  'too_complex',
+  'too_expensive',
+  'unused',
+];
+
 const FEATURES: Stripe.BillingPortal.ConfigurationCreateParams.Features = {
   payment_method_update: { enabled: true },
   invoice_history: { enabled: true },
-  subscription_cancel: { enabled: true, mode: 'at_period_end', proration_behavior: 'none' },
+  subscription_cancel: {
+    enabled: true,
+    mode: 'at_period_end',
+    proration_behavior: 'none',
+    cancellation_reason: { enabled: true, options: [...REASONS] },
+  },
   subscription_update: { enabled: false },
   customer_update: { enabled: false },
 };
@@ -39,6 +60,12 @@ export interface PortalConfigurationSource {
   };
 }
 
+function sameSet(a: readonly string[], b: readonly string[]): boolean {
+  const left = new Set(a);
+  const right = new Set(b);
+  return left.size === right.size && [...left].every((x) => right.has(x));
+}
+
 /**
  * How a configuration differs from D8, empty when it does not. Every feature Stripe returns is read:
  * one outside the three allowed counts as on unless it says `enabled: false`.
@@ -55,6 +82,9 @@ export function portalDrift(c: Configuration): string[] {
   const cancel = c.features.subscription_cancel;
   if (cancel?.mode !== 'at_period_end') drift.push('cancellation is not at the period end');
   if (cancel?.proration_behavior !== 'none') drift.push('cancellation prorates');
+  const reason = cancel?.cancellation_reason;
+  if (reason?.enabled !== true) drift.push('cancellation reason is off');
+  if (!sameSet(reason?.options ?? [], REASONS)) drift.push('cancellation reason options differ');
   for (const [name, feature] of Object.entries(features)) {
     if (!ALLOWED.includes(name) && feature?.enabled !== false) drift.push(`${name} is on`);
   }

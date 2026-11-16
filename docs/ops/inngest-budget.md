@@ -24,6 +24,7 @@ from the step calls it cites; no test derives that number from the code.
 | `crawlmouse.audits-ttl-cleanup`     | `inngest/billing.ts`          | v1                             | cron `0 4 * * *`    | 2 (delete-expired, prune-rate-limits)                                                | 3                |
 | `crawlmouse.check.reaper`           | `inngest/check-reaper.ts`     | V2_PIPELINE                    | cron `*/10 * * * *` | 1 (reap)                                                                             | 288              |
 | `crawlmouse.check.expiry`           | `inngest/check-expiry.ts`     | V2_PIPELINE                    | cron `17 5 * * *`   | 2 (expire-unkept, settle-kept)                                                       | 3                |
+| `crawlmouse.ledger.backfill`        | `inngest/ledger.ts`           | V2_PIPELINE                    | cron `41 */6 * * *` | 1 (backfill)                                                                         | 8                |
 | `crawlmouse.billing.past-due-sweep` | `inngest/past-due-sweep.ts`   | V2_BILLING                     | cron `0 * * * *`    | 2 (now, candidates; then two per due account, none when nothing is due)              | 72               |
 | `crawlmouse.account.purge-deleted`  | `inngest/deletion.ts`         | V2_CHECKS_PUBLIC               | cron `30 3 * * *`   | 2 (now, due; then one per person due)                                                | 3                |
 | `crawlmouse.mail.contact-purge`     | `inngest/mail.ts`             | V2_CHECKS_PUBLIC               | cron `43 5 * * *`   | 1 (purge)                                                                            | 2                |
@@ -33,7 +34,7 @@ from the step calls it cites; no test derives that number from the code.
 | `crawlmouse.founder.sweep`          | `inngest/founder.ts`          | V2_BILLING or V2_CHECKS_PUBLIC | cron `*/5 * * * *`  | 1 (sweep: sign-ups, agency accounts and cancellations, read and noticed in one step) | 576              |
 | `crawlmouse.founder.digest`         | `inngest/founder.ts`          | V2_BILLING or V2_CHECKS_PUBLIC | cron `7 * * * *`    | 2 (clock, digest: the daily and weekly digests and the "N more" notice, in one step) | 72               |
 
-**Floor: 37,634 executions a month.** v1's own crons are 186 of it, counted as
+**Floor: 37,882 executions a month.** v1's own crons are 186 of it, counted as
 they run with V2_BILLING on (the reconcile's second step); with every flag off they are one step fewer a day.
 
 Not in the floor: `crawlmouse.ops.signin-canary` (`inngest/signin-canary.ts`, cron `*/10 * * * *`, 3 steps idle: request, wait (a sleep), look; then report-{stage} when it raises its signal) runs once `SIGNIN_CANARY_TO` is set, whatever the flags, and adds 17,856 executions a month.
@@ -42,10 +43,10 @@ Not in the floor: `crawlmouse.ops.signin-canary` (`inngest/signin-canary.ts`, cr
 
 | After setting                                              | Floor a month |
 | ---------------------------------------------------------- | ------------- |
-| V2_PIPELINE                                                | 9,207         |
-| V2_PIPELINE, V2_ACCOUNT_DOOR                               | 9,207         |
-| V2_PIPELINE, V2_ACCOUNT_DOOR, V2_CHECKS_PUBLIC             | 35,402        |
-| V2_PIPELINE, V2_ACCOUNT_DOOR, V2_CHECKS_PUBLIC, V2_BILLING | 37,634        |
+| V2_PIPELINE                                                | 9,455         |
+| V2_PIPELINE, V2_ACCOUNT_DOOR                               | 9,455         |
+| V2_PIPELINE, V2_ACCOUNT_DOOR, V2_CHECKS_PUBLIC             | 35,650        |
+| V2_PIPELINE, V2_ACCOUNT_DOOR, V2_CHECKS_PUBLIC, V2_BILLING | 37,882        |
 
 A cron registered under two flags (`V2_PIPELINE+V2_CHECKS_PUBLIC`) starts with the second of them.
 
@@ -57,6 +58,7 @@ A cron registered under two flags (`V2_PIPELINE+V2_CHECKS_PUBLIC`) starts with t
 | `crawlmouse.stripe-reconcile-manual` | `inngest/billing.ts`         | v1                             | billing.reconcile.requested                          | 1 (reconcile)                                                                       | `inngest/billing.ts:95`                                                                                                                                                                                 |
 | `crawlmouse.check.run`               | `inngest/check.ts`           | V2_PIPELINE                    | check.requested                                      | see the check shapes                                                                | measured                                                                                                                                                                                                |
 | `crawlmouse.check.cancelled`         | `inngest/check.ts`           | V2_PIPELINE                    | inngest/function.cancelled (checkFn)                 | 2 (fail, emit-failed)                                                               | `inngest/check.ts:445`, `inngest/check.ts:447`                                                                                                                                                          |
+| `crawlmouse.ledger.write`            | `inngest/ledger.ts`          | V2_PIPELINE                    | check.finished                                       | 1 (write)                                                                           | `inngest/ledger.ts:39`                                                                                                                                                                                  |
 | `crawlmouse.trial.lifecycle`         | `inngest/trial-lifecycle.ts` | V2_BILLING                     | trial.started                                        | 6 (reminder-due, remind, remind-effects, trial-ends, expire, expire-effects)        | `inngest/trial-lifecycle.ts:87`, `inngest/trial-lifecycle.ts:89`, `inngest/trial-lifecycle.ts:99`, `inngest/trial-lifecycle.ts:102`, `inngest/trial-lifecycle.ts:103`, `inngest/trial-lifecycle.ts:113` |
 | `crawlmouse.account.deletion-cancel` | `inngest/deletion.ts`        | V2_CHECKS_PUBLIC               | account.deletion_confirmed                           | 1 (cancel)                                                                          | `inngest/deletion.ts:73`                                                                                                                                                                                |
 | `crawlmouse.account.deletion-resume` | `inngest/deletion.ts`        | V2_CHECKS_PUBLIC               | account.restored                                     | 1 (resume-{id}, one per subscription)                                               | `inngest/deletion.ts:85`                                                                                                                                                                                |
@@ -71,7 +73,7 @@ A cron registered under two flags (`V2_PIPELINE+V2_CHECKS_PUBLIC`) starts with t
 | `crawlmouse.summary.send`            | `inngest/summary.ts`         | V2_PIPELINE+V2_CHECKS_PUBLIC   | summary.requested                                    | 1 (send)                                                                            | `inngest/summary.ts:88`                                                                                                                                                                                 |
 | `crawlmouse.founder.entitlement`     | `inngest/founder.ts`         | V2_BILLING or V2_CHECKS_PUBLIC | entitlement.changed                                  | 1 (notify)                                                                          | `inngest/founder.ts:71`                                                                                                                                                                                 |
 
-A finished check starts three of them (the alert planner, the notify mail, the capture): 6 executions.
+A finished check starts 4 of them (`crawlmouse.alert.dispatch`, `crawlmouse.mail.check-notify`, `crawlmouse.events.check-finished`, `crawlmouse.ledger.write`): 8 executions.
 One alert that fires on both channels: 4. One mail: 2.
 
 ## One check, by shape
@@ -92,9 +94,9 @@ production, so the shapes stand in for them until they are.
 
 | Shape             | Why                                                                                                                                                                                                                                                                                                                                                                                                          | checkFn run | First check | Scheduled re-check |
 | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------- | ----------- | ------------------ |
-| typical           | v1's median audit: 27 pages, one crawl batch, 14 s; access stage 1 only                                                                                                                                                                                                                                                                                                                                      | 22          | 28          | 29                 |
-| large             | v1's 90th percentile: 195 pages, four crawl batches, 247 s in all; both access stages                                                                                                                                                                                                                                                                                                                        | 69          | 75          | 76                 |
-| heaviest searched | the most executions of 48 shapes tried (claim waits 0 or 5; 0, 1, 20 busy answers a post; batches done at 5, 15, 35, 299 s; a first read that finds the batch gone, or not), all 40 crawl batches and both access stages, cut at the 20-minute finish timeout. This one: 0 claim waits, 0 busy a post, batches of 15 s, each re-posted once. Not a bound: batches that differ from one another are not tried | 485         | 491         | 492                |
+| typical           | v1's median audit: 27 pages, one crawl batch, 14 s; access stage 1 only                                                                                                                                                                                                                                                                                                                                      | 22          | 30          | 31                 |
+| large             | v1's 90th percentile: 195 pages, four crawl batches, 247 s in all; both access stages                                                                                                                                                                                                                                                                                                                        | 69          | 77          | 78                 |
+| heaviest searched | the most executions of 48 shapes tried (claim waits 0 or 5; 0, 1, 20 busy answers a post; batches done at 5, 15, 35, 299 s; a first read that finds the batch gone, or not), all 40 crawl batches and both access stages, cut at the 20-minute finish timeout. This one: 0 claim waits, 0 busy a post, batches of 15 s, each re-posted once. Not a bound: batches that differ from one another are not tried | 485         | 493         | 494                |
 
 A run that passes its finish timeout is counted to the sleep that passes it, and Inngest cancels
 it there; the table still adds the fan-out of a finished check to it, where the real run would
@@ -104,9 +106,9 @@ start `crawlmouse.check.cancelled` and the failed-check mail instead.
 
 | Checks a month | typical | large   | heaviest searched |
 | -------------- | ------- | ------- | ----------------- |
-| 100            | 40,434  | 45,134  | 86,734            |
-| 1,000          | 65,634  | 112,634 | 528,634           |
-| 5,000          | 177,634 | 412,634 | 2,492,634         |
+| 100            | 40,882  | 45,582  | 87,182            |
+| 1,000          | 67,882  | 114,882 | 530,882           |
+| 5,000          | 187,882 | 422,882 | 2,502,882         |
 
 Every figure is a clean run: a step that fails and is retried is one more execution, and an
 `onFailure` handler's run and steps are more again. The totals are a floor under real traffic.
@@ -116,7 +118,7 @@ the brief measured 85 audits in production in the 30 days to 2026-11-13 (F2), co
 
 ## The rule (CC-35 D2)
 
-The floor plus 1,000 typical checks is **65,634** against the line of 40,000.
+The floor plus 1,000 typical checks is **67,882** against the line of 40,000.
 **It is over the line: `golive:check` reports the Hobby plan as a failing precondition of `V2_PIPELINE`, and the owner decides the plan (Pro starts at $99 a month for 1M executions) before step 2.**
 
 The largest part of the floor is `crawlmouse.founder.sweep`, on cron `*/5 * * * *` (17,856 a month).

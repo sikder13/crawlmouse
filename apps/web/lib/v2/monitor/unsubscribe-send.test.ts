@@ -24,7 +24,10 @@ import { sendSummary, type SummaryDeps } from './summary';
 vi.mock('server-only', () => ({}));
 const rpc = vi.fn(async () => ({ data: true, error: null }));
 vi.mock('@/lib/supabase/admin', () => ({ supabaseAdmin: () => ({ rpc, from: rpc }) }));
-vi.mock('@/lib/analytics-server', () => ({ captureServerEvent: vi.fn(async () => undefined) }));
+vi.mock('@/lib/analytics-server', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/analytics-server')>()),
+  captureServerEvent: vi.fn(async () => undefined),
+}));
 vi.mock('next/headers', () => ({ cookies: async () => ({ get: () => undefined }) }));
 
 const SECRET = 'u'.repeat(40);
@@ -235,7 +238,7 @@ describe('the product events as production wires them (S1, D11)', () => {
       capture.mockClear();
       const m = await sent();
       expect(capture.mock.calls).toEqual([
-        [null, { event, distinctId: `account:${ACCOUNT}`, properties }],
+        [null, { event, distinctId: `account:${ACCOUNT}`, accountId: ACCOUNT, properties }],
       ]);
       const token = links(m).header.searchParams.get('t')!;
       const json = JSON.stringify(capture.mock.calls);

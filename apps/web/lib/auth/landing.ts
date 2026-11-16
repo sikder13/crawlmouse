@@ -14,6 +14,7 @@ import {
   DASHBOARD,
   type SignupCarry,
 } from './continue-intent';
+import type { FirstTouch } from '../analytics/first-touch';
 import type { Report } from './door-store';
 import { runFirstLogin, type DoorEvent, type FirstLoginDeps } from './first-login';
 
@@ -33,6 +34,8 @@ export interface LandingInput {
   signup: SignupCarry | null;
   device: string | null;
   ip: string;
+  /** The browser's `cm_ft` record, re-checked, when consent allows reading it; else null. */
+  firstTouch: FirstTouch | null;
 }
 
 export interface Landing {
@@ -52,7 +55,9 @@ export async function afterSignIn(
   const bound = bindingMatches(input.boundTo, user.email);
   // Another address's link opened in a browser that asked for one: this browser's device id is the
   // victim's, and recording it under the other account would refuse the victim's own trial later.
-  const device = bindingMismatch(input.boundTo, user.email) ? null : input.device;
+  // Its first touch is the victim's too, so it is not recorded for the other account either.
+  const foreign = bindingMismatch(input.boundTo, user.email);
+  const device = foreign ? null : input.device;
   if (user.email) {
     try {
       const r = await runFirstLogin(deps.firstLogin, {
@@ -63,6 +68,7 @@ export async function afterSignIn(
         device,
         ip: input.ip,
         signup: bound ? input.signup : null,
+        firstTouch: foreign ? null : input.firstTouch,
       });
       events.push(...r.events);
     } catch {

@@ -9,7 +9,22 @@ import { accountPortalConfiguration, portalConfiguration, portalDrift } from './
 
 type Configuration = Stripe.BillingPortal.Configuration;
 
-/** D8's portal: card, invoices, cancel at the period end with no proration; nothing else. */
+/** Stripe 22.2.0's `SubscriptionCancel.CancellationReason.Option`, written out here. */
+const REASONS = [
+  'customer_service',
+  'low_quality',
+  'missing_features',
+  'other',
+  'switched_service',
+  'too_complex',
+  'too_expensive',
+  'unused',
+];
+
+/**
+ * D8's portal: card, invoices, cancel at the period end with no proration, asking why with every
+ * reason Stripe offers (CC-41 D8c); nothing else.
+ */
 const D8_FEATURES = {
   customer_update: { enabled: false, allowed_updates: [] },
   invoice_history: { enabled: true },
@@ -18,7 +33,7 @@ const D8_FEATURES = {
     enabled: true,
     mode: 'at_period_end',
     proration_behavior: 'none',
-    cancellation_reason: { enabled: false, options: [] },
+    cancellation_reason: { enabled: true, options: [...REASONS].reverse() },
   },
   subscription_update: {
     enabled: false,
@@ -34,10 +49,19 @@ const D8_FEATURES = {
 const SENT_FEATURES = {
   payment_method_update: { enabled: true },
   invoice_history: { enabled: true },
-  subscription_cancel: { enabled: true, mode: 'at_period_end', proration_behavior: 'none' },
+  subscription_cancel: {
+    enabled: true,
+    mode: 'at_period_end',
+    proration_behavior: 'none',
+    cancellation_reason: { enabled: true, options: REASONS },
+  },
   subscription_update: { enabled: false },
   customer_update: { enabled: false },
 };
+
+const reason = (cancellation_reason: unknown) => ({
+  subscription_cancel: { ...D8_FEATURES.subscription_cancel, cancellation_reason },
+});
 
 function configuration(
   id: string,
@@ -127,6 +151,10 @@ describe('portalConfiguration', () => {
       'cancellation off',
       { subscription_cancel: { ...D8_FEATURES.subscription_cancel, enabled: false } },
     ],
+    ['the cancellation reason off', reason({ enabled: false, options: REASONS })],
+    ['no cancellation reason', reason(undefined)],
+    ['a reason missing', reason({ enabled: true, options: REASONS.slice(1) })],
+    ['a reason added', reason({ enabled: true, options: [...REASONS, 'too_slow'] })],
   ])('updates a tagged configuration with %s back to D8', async (_, change) => {
     const s = stripeWith([configuration('bpc_ours', OURS, { ...D8_FEATURES, ...change })], {
       update: configuration('bpc_ours', OURS),
@@ -159,6 +187,50 @@ describe('portalConfiguration', () => {
 describe('portalDrift', () => {
   it("is empty for D8's configuration", () => {
     expect(portalDrift(configuration('bpc_ours', OURS))).toEqual([]);
+  });
+
+  it.each<[string, unknown, string[]]>([
+    ['off', { enabled: false, options: REASONS }, ['cancellation reason is off']],
+    ['missing', undefined, ['cancellation reason is off', 'cancellation reason options differ']],
+    ['without options', { enabled: true, options: [] }, ['cancellation reason options differ']],
+    [
+      'short of one option',
+      { enabled: true, options: REASONS.filter((r) => r !== 'unused') },
+      ['cancellation reason options differ'],
+    ],
+    [
+      'with an option repeated in place of another',
+      { enabled: true, options: [...REASONS.slice(1), 'other'] },
+      ['cancellation reason options differ'],
+    ],
+    [
+      'with one option swapped for another',
+      { enabled: true, options: [...REASONS.slice(1), 'too_slow'] },
+      ['cancellation reason options differ'],
+    ],
+    [
+      'with an extra option',
+      { enabled: true, options: [...REASONS, 'too_slow'] },
+      ['cancellation reason options differ'],
+    ],
+  ])('names a cancellation reason %s', (_, cancellation_reason, drift) => {
+    expect(
+      portalDrift(
+        configuration('bpc_ours', OURS, { ...D8_FEATURES, ...reason(cancellation_reason) }),
+      ),
+    ).toEqual(drift);
+  });
+
+  it('takes the options in any order', () => {
+    const shuffled = [...REASONS.slice(4), ...REASONS.slice(0, 4)];
+    expect(
+      portalDrift(
+        configuration('bpc_ours', OURS, {
+          ...D8_FEATURES,
+          ...reason({ enabled: true, options: shuffled }),
+        }),
+      ),
+    ).toEqual([]);
   });
 
   it('names a feature that is not disabled by saying so', () => {

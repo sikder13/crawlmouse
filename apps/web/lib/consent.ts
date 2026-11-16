@@ -32,6 +32,19 @@ export function consentDecisionCookie(decision: ConsentDecision): string {
  */
 export const CONSENT_OPEN_EVENT = 'cm:open-consent';
 
+/**
+ * Window event the CookieConsent banner dispatches once a visitor has granted consent and capture is
+ * opted in: instrumentation-client.ts writes the first-touch cookie then, and IdentifyPerson
+ * identifies a signed-in browser.
+ */
+export const CONSENT_GRANTED_EVENT = 'cm:consent-granted';
+
+/**
+ * Window event the CookieConsent banner dispatches once a visitor has declined and capture is opted
+ * out: the account shell's Feedback button leaves the page then.
+ */
+export const CONSENT_DENIED_EVENT = 'cm:consent-denied';
+
 // EU-27 + EEA (Iceland, Liechtenstein, Norway) + United Kingdom. ISO 3166-1 alpha-2 codes, matching
 // what Vercel's `x-vercel-ip-country` header returns. (Greece is GR in ISO, not the EU's "EL".)
 const CONSENT_REQUIRED_COUNTRIES: ReadonlySet<string> = new Set([
@@ -118,4 +131,14 @@ export function serverCaptureAllowed(cookieHeader?: string | null): boolean {
   const decision = consentDecisionFromCookie(cookieHeader);
   if (decision !== null) return decision === 'granted';
   return !consentRequiredFromCookie(cookieHeader);
+}
+
+/**
+ * Whether PostHog starts with surveys off (CC-41 D8): when capture starts opted out (a region that
+ * needs prior consent, with no grant), and whenever the visitor's recorded decision is a decline,
+ * in any region. posthog-js skips surveys for an opted-out visitor only in its cookieless mode, so
+ * this is what keeps a declined visitor's later pages free of surveys.
+ */
+export function surveysOffAtStart(consentRequired: boolean, decision: string | null): boolean {
+  return (consentRequired && decision !== 'granted') || decision === 'denied';
 }

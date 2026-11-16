@@ -41,7 +41,8 @@ vi.mock('@/lib/v2/reports/generate-run', async (original) => ({
   ...(await original<typeof import('@/lib/v2/reports/generate-run')>()),
   supabaseReportBucket: () => h.bucket.bucket,
 }));
-vi.mock('@/lib/analytics-server', () => ({
+vi.mock('@/lib/analytics-server', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/analytics-server')>()),
   captureServerEvent: async (_cookie: unknown, event: (typeof h.events)[number]) => {
     h.events.push(event);
   },
@@ -209,7 +210,8 @@ describe('GET /api/report-files/[id]/download', () => {
     expect(h.events).toEqual([
       {
         event: 'report_downloaded',
-        distinctId: `account:${w.accountId}`,
+        distinctId: w.developer.id,
+        accountId: w.accountId,
         properties: { kind: 'audit_pdf', format: 'pdf' },
       },
     ]);

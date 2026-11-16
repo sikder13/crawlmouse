@@ -4,6 +4,7 @@ import { parseArgs } from 'node:util';
 import { pathToFileURL } from 'node:url';
 import { failed, formatResults, listChecks, runChecks, type Check } from './check';
 import { connect, readOnlyApi, type Db } from './db';
+import { alignExtensions, formatAlignment } from './extensions';
 import { listMigrations, rollbackPath, sha256, type MigrationFile } from './files';
 import {
   compareFingerprints,
@@ -25,17 +26,20 @@ import { PRODUCTION_REF, refOfUrl } from './target';
  *   1. delete the PR's Supabase branch if one exists, create it again from production, wait for it
  *   2. Supabase's replay of production's history onto the branch finished, and the branch recorded
  *      every migration production records; otherwise name the first missing one and its error
- *   3. the branch fingerprint equals the production fingerprint, section by section
- *   4. its history is clean, and every pending file has a rollback
- *   5. `supabase db push` applies the pending files (the CLI's list must equal them)
- *   6. the catalog checks pass
- *   7. each pending file runs again in its own transaction, and the fingerprint does not change
- *   8. the rollbacks run in reverse order, and the fingerprint equals production's again
- *   9. `supabase db push` applies them once more; fingerprint and checks as after step 6
- *  10. if the pull request changes the rollback of an applied migration: the migrations from that
+ *   3. the branch's extensions are made to match production's: each one production lacks is
+ *      dropped on the branch (never with CASCADE), and one production has that the branch lacks is
+ *      reported, not installed (extensions.ts)
+ *   4. the branch fingerprint equals the production fingerprint, section by section
+ *   5. its history is clean, and every pending file has a rollback
+ *   6. `supabase db push` applies the pending files (the CLI's list must equal them)
+ *   7. the catalog checks pass
+ *   8. each pending file runs again in its own transaction, and the fingerprint does not change
+ *   9. the rollbacks run in reverse order, and the fingerprint equals production's again
+ *  10. `supabase db push` applies them once more; fingerprint and checks as after step 7
+ *  11. if the pull request changes the rollback of an applied migration: the migrations from that
  *      one on are reverted, newest first, and pushed again, and the fingerprint must not change
  *
- * Step 4 also fails when the pull request changes a migration file that is already applied:
+ * Step 5 also fails when the pull request changes a migration file that is already applied:
  * production would never receive the change. Add a new migration instead. A changed file whose
  * history row holds exactly its bytes, as one statement, passes: it was applied before the merge.
  *
@@ -203,6 +207,11 @@ export async function dryRun(
         problems.push(`replay steps: ${replay.steps}`);
       throw new Error(problems.join('; '));
     });
+
+    await step("Branch extensions match production's", async () => [
+      undefined,
+      formatAlignment(await alignExtensions(prodDb, branchDb, deps.log)),
+    ]);
 
     const production = await step(
       'Branch fingerprint equals the production fingerprint',

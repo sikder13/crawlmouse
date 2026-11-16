@@ -72,10 +72,11 @@ export function supabaseMintDeps(
       };
     },
     insert: async (row) => admin.from('public_reports').insert(row),
-    reportMinted: (accountId) =>
+    reportMinted: (accountId, userId) =>
       captureServerEvent(cookieHeader, {
         event: 'report_minted',
-        distinctId: `account:${accountId}`,
+        distinctId: userId,
+        accountId,
         properties: { kind: 'v2' },
       }),
     newSlug: newReportSlug,

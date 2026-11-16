@@ -1268,6 +1268,35 @@ const ENTRIES: readonly Spec[] = [
     ),
     calls: 1,
   },
+  // CC-41 D1: the signed-in layouts identify the browser with the viewer's own traits.
+  ...(
+    [
+      'app/(account)/layout.tsx',
+      'app/agency-trial/layout.tsx',
+      'app/agency/layout.tsx',
+      'app/alerts/layout.tsx',
+      'app/changes/layout.tsx',
+      'app/dashboard/v2/layout.tsx',
+      'app/reports/layout.tsx',
+      'app/seats/layout.tsx',
+      'app/sites/layout.tsx',
+    ] as const
+  ).map(
+    (layout): Spec => ({
+      path: `apps/web/${layout}`,
+      v2: true,
+      identity: 'signed-in person, in their viewer account',
+      gate: 'own_rows',
+      detail:
+        'Renders IdentifyPersonMount: the viewer’s own user id, account, state and check count, read through `loadViewer` and the session (row security bounds the count to an account they sit on), and whether that account is internal; no email or name.',
+      check: at('lib/analytics/person-read.ts', 'loadViewer'),
+      proof: by(
+        'lib/analytics/person-read.test.ts',
+        'reads the user, the account state, internal and the check count; no email or name',
+      ),
+      calls: 0,
+    }),
+  ),
   // v2: the account's pages
   {
     path: 'apps/web/app/dashboard/v2/page.tsx',
@@ -1824,6 +1853,17 @@ const LIBS: readonly Spec[] = [
     }),
   ),
   {
+    path: 'apps/web/lib/v2/ledger/functions.ts',
+    v2: true,
+    identity: 'Inngest',
+    gate: 'caller',
+    detail:
+      'The research ledger’s writer and backfill (CC-41 D4): reads an ended check’s row, its site and its draft, and writes the de-identified ledger rows through record_check_ledger. Registered by the pipeline functions, served by the signed Inngest route.',
+    callers: [PIPELINE_FUNCTIONS],
+    proof: callerProof,
+    calls: 1,
+  },
+  {
     path: 'apps/web/lib/v2/mail/functions.ts',
     v2: true,
     identity: 'Inngest',
@@ -1854,7 +1894,7 @@ const LIBS: readonly Spec[] = [
       'Asks `is_internal_subject` whether an analytics event’s account, seat or user is internal, for `captureServerEvent` to mark the event; answers a boolean that no response carries.',
     publicCallers:
       'it answers only whether an event names an internal account, and that answer goes to analytics, never to the caller',
-    callers: ['apps/web/lib/analytics-server.ts'],
+    callers: ['apps/web/lib/analytics-server.ts', 'apps/web/lib/analytics/person-read.ts'],
     proof: callerProof,
     calls: 1,
   },

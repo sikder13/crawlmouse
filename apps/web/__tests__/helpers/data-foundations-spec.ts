@@ -191,7 +191,7 @@ The owner's rulings of 2026-11-03. Per-page rows are kept 13 months on every pla
 | \`page_results\`, \`access_tests\` | 13 months | 13 months | 13 months | the month's partition is dropped |
 | \`link_edges\` | latest two checks per site | latest two checks per site | latest two checks per site | the diff step deletes the third-newest check's edges (ARCH-2); the 13-month drop is the backstop |
 | \`checks\`, \`site_fixes\`, \`changes\` | kept | kept | kept | with the site or the account |
-| anonymous checks (\`sites.account_id\` null) | 30 days from \`started_at\` | | | \`expires_at\`; deleted by the cleanup job, with their rows |
+| anonymous checks (\`sites.account_id\` null) | \`ANONYMOUS_EXPIRY_HOURS\` after the check is requested (\`lib/v2/pipeline/limits.ts\`, \`request.ts\`) | | | \`expires_at\`; deleted by the cleanup job, with their rows |
 | \`usage_events\` | with the account | with the account | with the account | cascade on account deletion |
 | \`check_ledger_links\` | with the check | with the check | with the check | cascade |
 | \`research.*\` | kept indefinitely, de-identified | | | only by \`research_retention\`, for an opt-out or a legal erasure |
@@ -363,6 +363,7 @@ The owner applied 003, 005, 007 and then 006b to production on 2026-11-05. A lat
                                                    (date_trunc('month', now()) + interval '3 months')::date)$$);
      \`\`\`
      Before relying on \`pg_partman\` for anything, verify on the project that it is available (\`select * from pg_available_extensions where name = 'pg_partman';\`); this function stays the primary mechanism either way.
+   - **Do not enable \`pg_net\` on production without revisiting \`analytics_reader\` first.** On a Supabase branch (2026-11-16) pg_net came with PUBLIC USAGE on schema \`net\` and every privilege on its tables, \`net.http_request_queue\` among them, whose rows make the database send HTTP requests. \`analytics_reader\` holds what PUBLIC holds, so check 10 (\`10-analytics-no-pii.sql\`) fails on the next dry run and apply, and migration 041 does not revoke these grants: the migration's role could not, on that branch.
 3. **On production, after an apply.** \`get_advisors\` (security): no new finding. \`select partrelid::regclass, pg_get_partkeydef(partrelid) from pg_partitioned_table;\`: the five tables of §4.
 `;
 

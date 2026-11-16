@@ -19,6 +19,8 @@
     "seo:keywords": "tsx scripts/seo/keyword-map.ts",
     "ops:operator": "tsx scripts/ops/operator.ts",
     "ops:internal": "tsx scripts/ops/internal.ts",
+    "ops:posthog": "tsx scripts/ops/posthog/apply.ts",
+    "ops:posthog:docs": "tsx scripts/ops/posthog/render.ts",
     "research:build-panel": "tsx scripts/research/cf-panel/build-panel.ts",
     "research:snapshot": "tsx scripts/research/cf-panel/snapshot.ts",
     "research:diff": "tsx scripts/research/cf-panel/report.ts",

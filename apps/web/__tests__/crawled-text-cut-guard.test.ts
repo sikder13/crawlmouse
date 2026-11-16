@@ -77,6 +77,34 @@ const isCut = (line: string): boolean =>
 /** [ "<path> :: <source line>", "why it is safe" ] — the auditable inventory. */
 const INVENTORY: [entry: string, why: string][] = [
   [
+    'apps/web/lib/analytics-server.ts :: parsed = JSON.parse(decodeURIComponent(pair.slice(name.length)));',
+    "STRING slice of a cookie pair after its ASCII `name=` prefix: the cut is at the prefix's end, so it cannot split a surrogate pair, and the value is parsed and bounded before use; never crawled text (CC-41).",
+  ],
+  [
+    'apps/web/lib/analytics/first-touch.ts :: return pair === undefined ? null : pair.slice(name.length);',
+    "STRING slice of a cookie pair after its ASCII `name=` prefix: the cut is at the prefix's end, so it cannot split a surrogate pair, and the value is parsed and bounded before use; never crawled text (CC-41).",
+  ],
+  [
+    "apps/web/lib/analytics/first-touch.ts :: const segments = pathname.split('/').slice(1);",
+    "ARRAY slice of a URL pathname's segments (drops the empty one before the leading slash); segments are shaped or replaced, never cut (CC-41).",
+  ],
+  [
+    "apps/web/lib/analytics/first-touch.ts :: return d.toISOString().replace(/\\.\\d{3}Z$/, 'Z');",
+    'Not a cut of crawled text: an ISO timestamp of our own clock with its milliseconds removed (CC-41).',
+  ],
+  [
+    "apps/web/lib/billing/payment-events.ts :: const b = createHash('sha1').update(ns).update(name, 'utf8').digest().subarray(0, 16);",
+    'BYTES: the first 16 bytes of a SHA-1 digest, for a UUIDv5; never text (CC-41).',
+  ],
+  [
+    'apps/web/lib/billing/payment-events.ts :: return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;',
+    "STRING slices of a 32-character hex digest into a UUID's groups: `[0-9a-f]` only (CC-41).",
+  ],
+  [
+    'apps/web/lib/v2/ledger/write.ts :: for (const checkId of ids.slice(0, limit)) {',
+    "ARRAY slice of check ids, to the backfill's bound (CC-41).",
+  ],
+  [
     'apps/web/lib/v2/account/sites-test-support.ts :: [accountId, tier, g.sites, g.seats, g.competitorsPerSite, `sub_${randomUUID().slice(0, 8)}`],',
     'STRING slice of a `randomUUID()` (or a site id, also a UUID) in PGlite test seeding: `[0-9a-f-]` only, never crawled text, and written only to a test database (CC-26b).',
   ],

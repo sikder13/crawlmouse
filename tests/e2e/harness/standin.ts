@@ -160,7 +160,8 @@ async function rest(client: SupabaseClient, req: IncomingMessage, res: ServerRes
     if (req.method !== 'GET' && req.method !== 'HEAD') {
       throw new Error(`standin: a count on ${req.method} ${path} is not modelled`);
     }
-    let counted = client.from(path).select('*') as unknown as Chain;
+    // The request's own columns, as PostgREST counts them: a '*' would need every column's grant.
+    let counted = client.from(path).select(q.get('select') ?? '*') as unknown as Chain;
     for (const [key, value] of q) if (!RESERVED.has(key)) counted = filter(counted, key, value);
     const all = (await (counted as unknown as PromiseLike<{
       data: unknown[] | null;

@@ -450,6 +450,7 @@ describe('qa:seed --billing: the coupon and a second run', () => {
 
 describe('qa:seed --billing: parity with the app’s checkout', () => {
   const ACCOUNT = '0b8c6f8e-3c55-4d1b-9a7a-2f0c4f9d6c11';
+  const OWNER = '6f2d1c4e-8a3b-4f7d-9e1a-5b0c2d3e4f5a';
 
   /** The app's own session (and customer, when none is stored) for the plan, through its entry points. */
   async function appSession(
@@ -490,7 +491,7 @@ describe('qa:seed --billing: parity with the app’s checkout', () => {
       now: () => NOW,
       report: () => {},
     };
-    const buyer = { accountId: ACCOUNT, email: 'qa+parity@example.test' };
+    const buyer = { accountId: ACCOUNT, userId: OWNER, email: 'qa+parity@example.test' };
     const r = trial
       ? await agencyTrial(deps, { ...buyer, interval: 'month' })
       : await checkoutV2(deps, { ...buyer, plan, interval: 'month' });
@@ -510,6 +511,7 @@ describe('qa:seed --billing: parity with the app’s checkout', () => {
       const app = await appSession(b.plan, b.trial, 'cus_parity');
       const ours = sessionParams({
         accountId: ACCOUNT,
+        userId: OWNER,
         customer: 'cus_parity',
         price: await catalog.priceFor(b.plan, b.interval, 'base'),
         billing: b,
@@ -540,7 +542,12 @@ describe('qa:seed --billing: parity with the app’s checkout', () => {
     expect(app.customer!.key).toBe(`customer:${ACCOUNT}`);
     expect(Object.keys(app.customer!.params).sort()).toEqual(Object.keys(ours.params).sort());
     expect(ours.params.email).toBe('qa+pro@example.test');
-    expect(ours.params.metadata).toEqual({ ...appMeta, account_id: pro, internal: 'true' });
+    expect(ours.params.metadata).toEqual({
+      ...appMeta,
+      account_id: pro,
+      posthog_person_distinct_id: 'user-pro',
+      internal: 'true',
+    });
   });
 });
 

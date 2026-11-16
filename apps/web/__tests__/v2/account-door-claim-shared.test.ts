@@ -46,6 +46,7 @@ describe('the claim has one implementation', () => {
           signup: null,
           device: null,
           ip: 'unknown',
+          firstTouch: null,
         },
       );
     } finally {

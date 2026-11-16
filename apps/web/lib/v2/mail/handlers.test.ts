@@ -497,12 +497,12 @@ describe('check_finished (D11)', () => {
   it('names the owner read from the database, not the event, and no address or host', async () => {
     const { h, capture } = setup();
     expect(await h.checkFinished(CHECK)).toBe('captured');
-    expect(capture).toHaveBeenCalledWith('check_finished', `account:${ACCOUNT}`, {
-      trigger: 'scheduled',
-      status: 'finished',
-      check_ref: checkRef(CHECK),
-      source: 'pipeline',
-    });
+    expect(capture).toHaveBeenCalledWith(
+      'check_finished',
+      `account:${ACCOUNT}`,
+      { trigger: 'scheduled', status: 'finished', check_ref: checkRef(CHECK), source: 'pipeline' },
+      ACCOUNT,
+    );
   });
 
   it('an unkept check is named by its reference', async () => {
@@ -516,7 +516,10 @@ describe('check_finished (D11)', () => {
       }),
     );
     await h.checkFinished(CHECK);
-    expect(capture.mock.calls[0]![1]).toBe(`check:${checkRef(CHECK)}`);
+    expect([capture.mock.calls[0]![1], capture.mock.calls[0]![3]]).toEqual([
+      `check:${checkRef(CHECK)}`,
+      null,
+    ]);
   });
 });
 
@@ -945,7 +948,7 @@ describe('the client report (CC-31 D8)', () => {
     const { h, capture, transport } = reportSetup(reportStore({ markClientReportSent: mark }));
     expect(await h.clientReport(REPORT)).toBe('sent');
     expect(mark).toHaveBeenCalledWith(REPORT, NOW);
-    expect(capture.mock.calls).toEqual([['first_client_report_sent', ACCOUNT, {}]]);
+    expect(capture.mock.calls).toEqual([['first_client_report_sent', { accountId: ACCOUNT }, {}]]);
     // The event again: the ledger answers `done`, the mark answers null, and nothing is captured twice.
     expect(await h.clientReport(REPORT)).toBe('done');
     expect(mark).toHaveBeenCalledTimes(2);
@@ -973,7 +976,7 @@ describe('the client report (CC-31 D8)', () => {
     await expect(h.clientReport(REPORT)).rejects.toBeInstanceOf(MailRetry);
     await expect(guarded('test', () => h.clientReport(REPORT))).resolves.toBe('done');
     expect(transport.sent).toHaveLength(1);
-    expect(capture.mock.calls).toEqual([['first_client_report_sent', ACCOUNT, {}]]);
+    expect(capture.mock.calls).toEqual([['first_client_report_sent', { accountId: ACCOUNT }, {}]]);
   });
 
   it('marks nothing for a report whose mail did not go', async () => {

@@ -210,8 +210,12 @@ describe('POST /api/sites', () => {
       data: { checkId: body.checkId, siteId: body.siteId, trigger: 'first_audit' },
     });
     expect(h.capture.mock.calls).toEqual([
-      ['site_added', p.accountId, { n: 1 }],
-      ['check_started', p.accountId, checkStarted('first_audit', body.checkId)],
+      ['site_added', { accountId: p.accountId, userId: p.id }, { n: 1 }],
+      [
+        'check_started',
+        { accountId: p.accountId, userId: p.id },
+        checkStarted('first_audit', body.checkId),
+      ],
     ]);
   });
 
@@ -260,8 +264,9 @@ describe('POST /api/sites', () => {
     as(p);
     h.chosen = agency.accountId;
     expect((await POST(json({ url: 'first-client.example' }))).status).toBe(201);
-    expect(h.capture.mock.calls[0]).toEqual(['site_added', agency.accountId, { n: 1 }]);
-    expect(h.agencyCapture.mock.calls).toEqual([['first_client_added', agency.accountId, {}]]);
+    const key = { accountId: agency.accountId, userId: p.id };
+    expect(h.capture.mock.calls[0]).toEqual(['site_added', key, { n: 1 }]);
+    expect(h.agencyCapture.mock.calls).toEqual([['first_client_added', key, {}]]);
     h.agencyCapture.mockClear();
     expect((await POST(json({ url: 'second-client.example' }))).status).toBe(201);
     expect(h.agencyCapture).not.toHaveBeenCalled();

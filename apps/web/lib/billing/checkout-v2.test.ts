@@ -18,6 +18,8 @@ import { FREE_START, type EntitlementSnapshot } from './state-machine';
 import { CatalogError } from './stripe-catalog';
 
 const ACCOUNT = '0b8c6f8e-3c55-4d1b-9a7a-2f0c4f9d6c11';
+/** The signed-in owner's `users.id`, PostHog's person key (CC-41 D3). */
+const USER = '0e6b8f2a-3c1d-4f5e-9a7b-2c8d1e0f3a4b';
 const ORIGIN = 'https://crawlmouse.com';
 const NOW = new Date('2026-11-08T12:00:00.000Z');
 // Thirty-one minutes after NOW, in Unix seconds, computed here rather than by the module.
@@ -175,7 +177,13 @@ beforeEach(() => {
 });
 
 const buy = (plan: 'pro' | 'agency' = 'pro', interval: 'month' | 'year' = 'month') =>
-  checkoutV2(deps(), { accountId: ACCOUNT, email: 'owner@example.com', plan, interval });
+  checkoutV2(deps(), {
+    accountId: ACCOUNT,
+    userId: USER,
+    email: 'owner@example.com',
+    plan,
+    interval,
+  });
 
 const STRIPE_CALLS = ['customers.create', 'sessions.list', 'sessions.create'];
 const noStripe = () => expect(w.log.filter((l) => /^(customers|sessions)\./.test(l))).toEqual([]);
@@ -274,7 +282,10 @@ describe("checkoutV2's Stripe customer", () => {
     await buy();
     expect(customersCreate.mock.calls).toEqual([
       [
-        { email: 'owner@example.com', metadata: { account_id: ACCOUNT } },
+        {
+          email: 'owner@example.com',
+          metadata: { account_id: ACCOUNT, posthog_person_distinct_id: USER },
+        },
         { idempotencyKey: `customer:${ACCOUNT}` },
       ],
     ]);
@@ -283,8 +294,16 @@ describe("checkoutV2's Stripe customer", () => {
   });
 
   it('creates one without an email when the caller has none', async () => {
-    await checkoutV2(deps(), { accountId: ACCOUNT, email: null, plan: 'pro', interval: 'month' });
-    expect(customersCreate.mock.calls[0]![0]).toEqual({ metadata: { account_id: ACCOUNT } });
+    await checkoutV2(deps(), {
+      accountId: ACCOUNT,
+      userId: USER,
+      email: null,
+      plan: 'pro',
+      interval: 'month',
+    });
+    expect(customersCreate.mock.calls[0]![0]).toEqual({
+      metadata: { account_id: ACCOUNT, posthog_person_distinct_id: USER },
+    });
   });
 
   it('reuses the stored one: no customer created, nothing stored', async () => {
@@ -317,6 +336,7 @@ describe("checkoutV2's Stripe customer", () => {
         .mockResolvedValueOnce({ snapshot: STATES.free, stripeCustomerId: 'cus_bound' });
       const result = await checkoutV2(deps0, {
         accountId: ACCOUNT,
+        userId: USER,
         email: 'owner@example.com',
         plan: 'pro',
         interval: 'month',
@@ -371,13 +391,15 @@ describe("checkoutV2's session", () => {
           mode: 'subscription',
           customer: 'cus_new',
           client_reference_id: ACCOUNT,
-          metadata: { account_id: ACCOUNT },
+          metadata: { account_id: ACCOUNT, posthog_person_distinct_id: USER },
           line_items: [{ price: 'price_agency_y', quantity: 1 }],
           payment_method_types: ['card'],
           automatic_tax: { enabled: true },
           customer_update: { address: 'auto', name: 'auto' },
           expires_at: EXPIRES_AT,
-          subscription_data: { metadata: { account_id: ACCOUNT } },
+          subscription_data: {
+            metadata: { account_id: ACCOUNT, posthog_person_distinct_id: USER },
+          },
           success_url: `${ORIGIN}/settings/plan?checkout=done`,
           cancel_url: `${ORIGIN}/settings/plan`,
         },
@@ -398,7 +420,13 @@ describe("checkoutV2's session", () => {
     const d = deps();
     d.stripe.checkout.sessions.create = async () => ({ url: null });
     await expect(
-      checkoutV2(d, { accountId: ACCOUNT, email: null, plan: 'pro', interval: 'month' }),
+      checkoutV2(d, {
+        accountId: ACCOUNT,
+        userId: USER,
+        email: null,
+        plan: 'pro',
+        interval: 'month',
+      }),
     ).rejects.toThrow('the Checkout Session has no url');
   });
 });

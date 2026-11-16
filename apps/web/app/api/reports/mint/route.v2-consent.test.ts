@@ -90,13 +90,13 @@ describe('POST /api/reports/mint {checkId}: report_minted through the consent ga
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('sends one report_minted {kind: v2}, keyed by the account, when the visitor granted', async () => {
+  it('sends one report_minted {kind: v2}, keyed by the person who minted, with the account, when the visitor granted', async () => {
     expect((await mint('cm_consent=granted')).status).toBe(200);
     expect(sent()).toHaveLength(1);
     expect(sent()[0]).toMatchObject({
       event: 'report_minted',
-      distinct_id: 'account:acct-1',
-      properties: { kind: 'v2' },
+      distinct_id: 'u-1',
+      properties: { kind: 'v2', account_id: 'acct-1' },
     });
   });
 });

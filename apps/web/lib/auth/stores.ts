@@ -5,6 +5,7 @@
  * here as "already there".
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { FIRST_TOUCH_FIELDS } from '../analytics/first-touch';
 import type { CheckForClaim, DoorStore, MemberAccount, NewSite, Report } from './door-store';
 import type { SiteSchedule } from './schedule';
 import { parseTrialDecision } from './trial-decision';
@@ -161,6 +162,15 @@ export function supabaseDoorStore(sb: SupabaseClient): DoorStore {
     async clearExpiry(checkId) {
       const { error } = await sb.from('checks').update({ expires_at: null }).eq('id', checkId);
       if (error) fail('checks expiry write', error);
+    },
+
+    async recordAttribution(accountId, record) {
+      const row: Record<string, string | null> = { account_id: accountId };
+      for (const field of FIRST_TOUCH_FIELDS) row[field] = record[field] ?? null;
+      const { error } = await sb
+        .from('account_attribution')
+        .upsert(row, { onConflict: 'account_id', ignoreDuplicates: true });
+      if (error) fail('account_attribution insert', error);
     },
   };
 }

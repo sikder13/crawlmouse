@@ -7,7 +7,13 @@ import Stripe from 'stripe';
 import type { PaidTier } from '../entitlement-v2';
 import { lookupKey, type Interval } from './catalog';
 import { fakePriceId } from './catalog.fake';
-import type { EffectSinks, InngestSend, PlannedAlert, PlannedCancel } from './effects';
+import type {
+  EffectSinks,
+  InngestSend,
+  PlannedAlert,
+  PlannedCancel,
+  PlannedCapture,
+} from './effects';
 import type { SubscriptionStatus } from './state-machine';
 import type { StripeReads } from './webhook-types';
 
@@ -94,6 +100,8 @@ export class StripeFake implements StripeReads {
   readonly sent: InngestSend[] = [];
   readonly cancelled: PlannedCancel[] = [];
   readonly alerts: PlannedAlert[] = [];
+  /** Payment events as the sink was given them. */
+  readonly captured: PlannedCapture[] = [];
   /** Thrown by the subscription and charge reads while set, as in a Stripe outage. */
   failReads: Error | null = null;
   /** Runs once, inside the next subscription read, before it answers. */
@@ -146,6 +154,9 @@ export class StripeFake implements StripeReads {
       },
       alert: async (alert) => {
         this.alerts.push(alert);
+      },
+      capture: async (capture) => {
+        this.captured.push(capture);
       },
     };
   }

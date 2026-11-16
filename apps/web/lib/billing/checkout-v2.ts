@@ -73,6 +73,12 @@ export interface CheckoutDeps {
 
 export interface Buyer {
   accountId: string;
+  /**
+   * The signed-in owner's `users.id`. Written to the customer's, the session's and the
+   * subscription's metadata as `posthog_person_distinct_id`, the key PostHog's revenue analytics
+   * joins a Stripe customer to a person by (CC-41 D3).
+   */
+  userId: string;
   /** The owner's sign-in address, given to a new Stripe customer. */
   email: string | null;
 }
@@ -121,7 +127,7 @@ async function customerFor(
   let created: { id: string };
   try {
     created = await deps.stripe.customers.create(
-      { ...(buyer.email ? { email: buyer.email } : {}), metadata: { account_id: buyer.accountId } },
+      { ...(buyer.email ? { email: buyer.email } : {}), metadata: metadataOf(buyer) },
       { idempotencyKey: `customer:${buyer.accountId}` },
     );
   } catch (err) {
@@ -135,6 +141,10 @@ async function customerFor(
   const now = await deps.accounts.read(buyer.accountId);
   if (!now?.stripeCustomerId) throw new Error(`account ${buyer.accountId} holds no customer`);
   return now.stripeCustomerId;
+}
+
+function metadataOf(buyer: Buyer): Record<string, string> {
+  return { account_id: buyer.accountId, posthog_person_distinct_id: buyer.userId };
 }
 
 async function expireOpenSessions(stripe: CheckoutStripe, customer: string): Promise<void> {
@@ -178,7 +188,7 @@ export async function startCheckout(
   if (customer === null) return UNAVAILABLE;
   await expireOpenSessions(deps.stripe, customer);
 
-  const metadata = { account_id: buyer.accountId };
+  const metadata = metadataOf(buyer);
   const trial = terms.trialDays !== undefined;
   const session = await deps.stripe.checkout.sessions.create({
     mode: 'subscription',

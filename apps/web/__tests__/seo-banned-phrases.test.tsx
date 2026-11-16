@@ -44,7 +44,7 @@ vi.mock('next/navigation', async (actual) => ({
 vi.mock('server-only', () => ({}));
 vi.mock('@/lib/v2/rewrite-target', () => ({ reachedByRewrite: async () => true }));
 vi.mock('@/lib/v2/pricing/read', () => ({
-  readPricingViewer: async () => ({ kind: 'signed_out' }),
+  readPricingVisit: async () => ({ viewer: { kind: 'signed_out' }, userId: null }),
 }));
 vi.mock('next/headers', () => ({ headers: async () => new Headers() }));
 vi.mock('next/server', async (actual) => ({

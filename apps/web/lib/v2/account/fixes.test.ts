@@ -80,10 +80,14 @@ describe('markDone', () => {
       events: [{ kind: 'marked_done', by_seat_id: fw.w.scopedSeatId }],
     });
     expect(captured).toEqual([
-      ['fix_marked_done', fw.w.accountId, { type: 'orphan_pages' }],
+      [
+        'fix_marked_done',
+        { accountId: fw.w.accountId, userId: fw.w.scopedUserId },
+        { type: 'orphan_pages' },
+      ],
       [
         'check_started',
-        fw.w.accountId,
+        { accountId: fw.w.accountId, userId: fw.w.scopedUserId },
         checkStarted('fix_recheck', recheck.queued ? recheck.checkId : ''),
       ],
     ]);

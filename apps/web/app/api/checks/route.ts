@@ -24,12 +24,17 @@ const NO_STORE = { 'Cache-Control': 'no-store' };
 const answer = (body: object, status: number) =>
   NextResponse.json(body, { status, headers: NO_STORE });
 
-async function signedIn(): Promise<boolean> {
-  const sb = await supabaseServer();
-  const {
-    data: { user },
-  } = await sb.auth.getUser();
-  return user !== null;
+/** The signed-in caller's `users.id`, or null; read once per request. */
+function signedInUser(): () => Promise<string | null> {
+  let read: Promise<string | null> | undefined;
+  return () =>
+    (read ??= (async () => {
+      const sb = await supabaseServer();
+      const {
+        data: { user },
+      } = await sb.auth.getUser();
+      return user?.id ?? null;
+    })());
 }
 
 /**
@@ -56,9 +61,16 @@ export async function POST(req: Request) {
     return answer({ code: 'invalid_request', error: 'Send a url and a requestId.' }, 400);
   }
 
+  const userId = signedInUser();
   let outcome;
   try {
-    outcome = await startPublicCheck(startDeps(signedIn), { ...parsed.data, ip: getClientIp(req) });
+    outcome = await startPublicCheck(
+      startDeps(async () => (await userId()) !== null),
+      {
+        ...parsed.data,
+        ip: getClientIp(req),
+      },
+    );
   } catch (cause) {
     console.error('[api/checks] start failed:', scrubbed(cause, parsed.data));
     return answer(
@@ -76,7 +88,7 @@ export async function POST(req: Request) {
       'check_started',
       checkId,
       { trigger: 'first_audit' },
-      null,
+      { accountId: null, userId: await userId() },
     );
   }
   return answer({ checkId: outcome.checkId }, 200);

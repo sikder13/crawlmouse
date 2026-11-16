@@ -9,6 +9,7 @@ import {
   CONSENT_REQUIRED_COOKIE,
   CONSENT_DECISION_STORAGE_KEY,
   CONSENT_OPEN_EVENT,
+  surveysOffAtStart,
 } from './consent';
 
 describe('isConsentRequiredCountry', () => {
@@ -122,5 +123,18 @@ describe('serverCaptureAllowed', () => {
   it('allows a request with no cookie header, as the region default does', () => {
     expect(serverCaptureAllowed(null)).toBe(true);
     expect(serverCaptureAllowed('')).toBe(true);
+  });
+});
+
+describe('surveysOffAtStart', () => {
+  it.each([
+    [false, null, false],
+    [false, 'granted', false],
+    [false, 'denied', true],
+    [true, null, true],
+    [true, 'granted', false],
+    [true, 'denied', true],
+  ] as const)('consent required %s, decision %s → off %s', (required, decision, off) => {
+    expect(surveysOffAtStart(required, decision)).toBe(off);
   });
 });

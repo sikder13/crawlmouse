@@ -123,6 +123,7 @@ describe('runFirstLogin', () => {
     expect(a.site_limit).toBe(GATES.pro.sites);
     expect(await ledgerRows(a.id)).toBe(3);
     expect(r.events).toEqual([
+      { name: 'account_created', props: {} },
       { name: 'trial_started', props: { kind: 'pro', variant: 'no_card' } },
     ]);
   });
@@ -141,7 +142,7 @@ describe('runFirstLogin', () => {
     const a = await accountOf(db, i.userId);
     expect(a.state).toBe('free');
     expect(await ledgerRows(a.id)).toBe(0);
-    expect(r.events).toEqual([]);
+    expect(r.events).toEqual([{ name: 'account_created', props: {} }]);
   });
 
   it('is refused by two trials from this device in the last 30 days', async () => {
@@ -400,6 +401,75 @@ describe('runFirstLogin', () => {
   });
 });
 
+describe('first-touch attribution (CC-41 D2)', () => {
+  const FT = {
+    utm_source: 'linkedin',
+    utm_medium: 'social',
+    utm_campaign: 'launch week',
+    referrer_host: 'www.linkedin.com',
+    landing_path: '/blog/robots-txt',
+    ref: 'abc_1',
+    first_seen_at: '2026-11-01T10:00:00Z',
+  };
+  const attribution = async (accountId: string) =>
+    (
+      await db.query<Record<string, unknown>>(
+        `select utm_source, utm_medium, utm_campaign, utm_content, utm_term, referrer_host,
+                landing_path, ref, to_char(first_seen_at at time zone 'UTC',
+                'YYYY-MM-DD"T"HH24:MI:SS"Z"') as first_seen_at
+           from public.account_attribution where account_id = $1`,
+        [accountId],
+      )
+    ).rows;
+
+  it('the first login writes one row for the personal account, with the cookie’s fields', async () => {
+    const i = await input('ft@example.com', { firstTouch: FT });
+    await runFirstLogin(deps(), i);
+    const { id } = await accountOf(db, i.userId);
+    expect(await attribution(id)).toEqual([{ ...FT, utm_content: null, utm_term: null }]);
+  });
+
+  it('a later sign-in writes nothing, and a row already there is kept as it is', async () => {
+    const i = await input('ft2@example.com', { firstTouch: FT });
+    await runFirstLogin(deps(), i);
+    const { id } = await accountOf(db, i.userId);
+    await runFirstLogin(deps(), {
+      ...i,
+      emailConfirmedAt: '2026-10-01T00:00:00Z',
+      firstTouch: { ...FT, utm_source: 'later' },
+    });
+    expect((await attribution(id)).map((r) => r.utm_source)).toEqual(['linkedin']);
+    // The store itself never overwrites, whoever calls it.
+    await pgliteDoorStore(db).recordAttribution(id, { ...FT, utm_source: 'again' });
+    expect((await attribution(id)).map((r) => r.utm_source)).toEqual(['linkedin']);
+  });
+
+  it('no cookie, no row', async () => {
+    const i = await input('ft3@example.com', { firstTouch: null });
+    await runFirstLogin(deps(), i);
+    const { id } = await accountOf(db, i.userId);
+    expect(await attribution(id)).toEqual([]);
+  });
+
+  it('a write that fails is reported with the account id only, and the sign-in goes on', async () => {
+    const i = await input('ft4@example.com', { firstTouch: FT, signup: { site: 'acme.com' } });
+    const store = pgliteDoorStore(db);
+    const d = deps({
+      store: {
+        ...store,
+        recordAttribution: async () => {
+          throw new Error('account_attribution insert failed: ft4@example.com');
+        },
+      },
+    });
+    const r = await runFirstLogin(d, i);
+    const { id } = await accountOf(db, i.userId);
+    expect(r.trial).toBe('started');
+    expect(r.siteId).not.toBeNull();
+    expect(d.report.mock.calls).toEqual([['attribution-write-failed', { accountId: id }]]);
+  });
+});
+
 describe('the started trial’s effects are dispatched (CC-03 D9b)', () => {
   // 14 days after NOW, written out.
   const TRIAL_END = '2026-11-19T12:00:00.000Z';
@@ -501,6 +571,7 @@ describe('the started trial’s effects are dispatched (CC-03 D9b)', () => {
     const a = await accountOf(db, i.userId);
     expect(r.trial).toBe('started');
     expect(r.events).toEqual([
+      { name: 'account_created', props: {} },
       { name: 'trial_started', props: { kind: 'pro', variant: 'no_card' } },
     ]);
     expect(a.state).toBe('pro_trial');
@@ -524,7 +595,7 @@ describe('a trial decision that cannot be made is reported, and the account stay
   it('a lock timeout: trial-decision-failed with reason lock_timeout', async () => {
     const { r, d, a } = await failing(sqlError('55P03'));
     expect(r.trial).toBe('failed');
-    expect(r.events).toEqual([]);
+    expect(r.events).toEqual([{ name: 'account_created', props: {} }]);
     expect(a.state).toBe('free');
     expect(d.report).toHaveBeenCalledWith('trial-decision-failed', {
       accountId: a.id,

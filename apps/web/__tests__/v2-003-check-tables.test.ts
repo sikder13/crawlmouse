@@ -227,6 +227,15 @@ async function freshRow(table: NewTable): Promise<Record<string, unknown>> {
       return ROWS.founder_notices(`signup:${hex}`, world.accountId);
     case 'qa_accounts':
       return ROWS.qa_accounts(randomUUID());
+    case 'account_attribution': {
+      // One row per account, and the world's account has one: a fresh account.
+      const owner = await signUp(db, `ft-${hex.slice(0, 8)}@example.com`);
+      const { accountId } = await personalAccount(db, owner);
+      return ROWS.account_attribution(accountId);
+    }
+    case 'check_ledger_drafts':
+      await needCheck();
+      return ROWS.check_ledger_drafts(check);
   }
 }
 
@@ -337,6 +346,8 @@ const HIDDEN: Record<NewTable, string[] | null> = {
   operator_actions: null,
   founder_notices: null,
   qa_accounts: null,
+  account_attribution: null,
+  check_ledger_drafts: null,
 };
 const ALERT_INSERT = ['account_id', 'site_id', 'kind', 'enabled', 'threshold_points', 'channels'];
 const ALERT_UPDATE = ['enabled', 'threshold_points', 'channels'];
@@ -408,6 +419,10 @@ async function postureViolations(d: Db, table: NewTable): Promise<string[]> {
   if (table === 'operator_actions') expectedTable.service_role = 'ar';
   // CC-38's qa_accounts: the seed reads and adds rows; qa_reset reads them as the definer.
   if (table === 'qa_accounts') expectedTable.service_role = 'ar';
+  // CC-41: the first login adds an account's first touch once; the build stores a check's draft,
+  // and the writer reads and deletes it.
+  if (table === 'account_attribution') expectedTable.service_role = 'ar';
+  if (table === 'check_ledger_drafts') expectedTable.service_role = 'ard';
   // 028 lets service_role read its ledgers and suppressions; its functions write them.
   if (['email_sends', 'email_suppressions', 'slack_sends'].includes(table))
     expectedTable.service_role = 'r';

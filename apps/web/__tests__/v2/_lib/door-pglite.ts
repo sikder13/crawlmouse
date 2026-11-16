@@ -4,6 +4,7 @@
  * tests interleave calls the way two concurrent requests would. PGlite has one connection: a lock
  * never waits here, so these tests cover interleavings between calls, not inside one.
  */
+import { FIRST_TOUCH_FIELDS } from '../../../lib/analytics/first-touch';
 import type { PGlite } from '@electric-sql/pglite';
 import {
   EntitlementConflictError,
@@ -292,6 +293,16 @@ export function pgliteDoorStore(db: PGlite): DoorStore {
     async clearExpiry(checkId) {
       await svc(db, (tx) =>
         tx.query(`update public.checks set expires_at = null where id = $1`, [checkId]),
+      );
+    },
+    async recordAttribution(accountId, record) {
+      await svc(db, (tx) =>
+        tx.query(
+          `insert into public.account_attribution (account_id, ${FIRST_TOUCH_FIELDS.join(', ')})
+           values ($1, ${FIRST_TOUCH_FIELDS.map((_, i) => `$${i + 2}`).join(', ')})
+           on conflict (account_id) do nothing`,
+          [accountId, ...FIRST_TOUCH_FIELDS.map((f) => record[f] ?? null)],
+        ),
       );
     },
   };

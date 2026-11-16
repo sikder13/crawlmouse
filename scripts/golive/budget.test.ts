@@ -157,6 +157,7 @@ describe('the function rows against the code', () => {
     'inngest/summary.ts': 4, // 52 57 61 88
     'inngest/founder.ts': 4, // 71 95 109 110 (CC-33)
     'inngest/signin-canary.ts': 4, // 54 62 74 77 (CC-33)
+    'inngest/ledger.ts': 2, // 39 49 (CC-41)
   };
   it.each(Object.entries(HAND))('counts %s step call sites as a hand count does', (file, hand) => {
     expect(count(code(readFileSync(join(ROOT, file), 'utf8')), STEP_CALL)).toBe(hand);
@@ -344,7 +345,8 @@ describe('a check against a worker that answers busy, runs long or loses a batch
 describe('the month', () => {
   it('computes the floor from the cron rows: runs a day × (1 + idle steps) × 31', () => {
     // Independent sum: reaper 144×2, three hourly ticks and the sweep 24×3 each, the hourly report
-    // schedules 24×2 (CC-31), five dailies, and CC-33's founder sweep 288×2 and digest tick 24×3.
+    // schedules 24×2 (CC-31), five dailies, CC-33's founder sweep 288×2 and digest tick 24×3, and
+    // CC-41's ledger backfill 4×2.
     // CC-33's sign-in canary is in no flag's floor: it runs once SIGNIN_CANARY_TO is set.
     const hand =
       (144 * 2 +
@@ -356,21 +358,22 @@ describe('the month', () => {
         (1 + 2) +
         (1 + 1) +
         288 * 2 +
-        24 * 3) *
+        24 * 3 +
+        4 * 2) *
       31;
     expect(monthlyFloor()).toBe(hand);
-    expect(FUNCTIONS.filter((f) => f.runsPerDay > 0).map(cronPerDay)).toHaveLength(13);
+    expect(FUNCTIONS.filter((f) => f.runsPerDay > 0).map(cronPerDay)).toHaveLength(14);
     // The canary, idle: 144 runs a day of request, wait and look.
     expect(canaryMonthly()).toBe(144 * (1 + 3) * 31);
   });
 
-  it('counts a finished check as starting three functions of two executions each', () => {
-    expect(finishedFanOut()).toBe(6);
+  it('counts a finished check as starting four functions of two executions each', () => {
+    expect(finishedFanOut()).toBe(8);
   });
 
   it('fails the Hobby plan when the floor plus 1,000 typical checks passes the line', async () => {
     const { total, passes } = await hobbyVerdict();
-    expect(total).toBe(monthlyFloor() + 1_000 * (22 + 6));
+    expect(total).toBe(monthlyFloor() + 1_000 * (22 + 8));
     expect(passes).toBe(total <= HOBBY_HEADROOM_LINE);
   });
 });
@@ -384,8 +387,8 @@ describe('docs/ops/inngest-budget.md', () => {
 describe('the floor by switch-on step', () => {
   it('starts schedule and summary only once V2_CHECKS_PUBLIC joins V2_PIPELINE', () => {
     const [pipeline, door, checks, billing] = floorBySwitchOn();
-    // V2_PIPELINE: v1's 3+3 a day, the reaper 288, the expiry 3.
-    expect(pipeline!.floor).toBe((3 + 3 + 288 + 3) * 31);
+    // V2_PIPELINE: v1's 3+3 a day, the reaper 288, the expiry 3, the ledger backfill 8 (CC-41).
+    expect(pipeline!.floor).toBe((3 + 3 + 288 + 3 + 8) * 31);
     expect(door!.floor).toBe(pipeline!.floor);
     // V2_CHECKS_PUBLIC adds the purge 3, the contact purge 2, the schedule and summary ticks 72 each,
     // CC-31's report schedules 48, and CC-33's founder sweep 576 and digest tick 72 (either flag).

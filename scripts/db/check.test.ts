@@ -50,7 +50,7 @@ async function expectFinding(prefix: string, mutation: string, expected: string)
 }
 
 describe('the check files', () => {
-  it('are the six of the brief, the partition-trigger, v1 client-grant and definer search_path checks, each with a title', () => {
+  it('are the six of the brief, the partition-trigger, v1 client-grant, definer search_path and analytics PII checks, each with a title', () => {
     expect(checks.map((c) => c.file)).toEqual([
       '01-client-table-privileges.sql',
       '02-partitions-rls-owner-only.sql',
@@ -61,6 +61,7 @@ describe('the check files', () => {
       '07-partition-triggers.sql',
       '08-v1-client-grants.sql',
       '09-definer-search-path.sql',
+      '10-analytics-no-pii.sql',
     ]);
     for (const c of checks) expect(c.title.length, c.file).toBeGreaterThan(10);
   });

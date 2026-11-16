@@ -1,7 +1,7 @@
 /**
  * The functions the Inngest serve route registers (D3): v1's four, in today's order; and checkFn, its
- * cancel handler, the reaper and the daily expiry (CC-22b D8) only when V2_PIPELINE=1 in the
- * environment the route module loads with. CC-03's two billing functions follow, only when
+ * cancel handler, the reaper, the daily expiry (CC-22b D8) and the research ledger's writer and
+ * six-hourly backfill (CC-41 D4) only when V2_PIPELINE=1 in the environment the route module loads with. CC-03's two billing functions follow, only when
  * V2_BILLING=1, then CC-27b's three deletion functions, the mail functions (CC-28's four, CC-31's
  * three and CC-29's deletion of Agency Plus requests: lib/v2/mail/functions.ts) and CC-31's client
  * report schedules, only when V2_CHECKS_PUBLIC=1. CC-28's scheduler tick, alert and summary
@@ -39,6 +39,7 @@ import {
 } from '../../../../../inngest/check';
 import { createExpireAnonymousChecksFn } from '../../../../../inngest/check-expiry';
 import { createCheckReaperFn } from '../../../../../inngest/check-reaper';
+import { createLedgerBackfillFn, createLedgerWriteFn } from '../../../../../inngest/ledger';
 import { checksPublicEnabled, pipelineEnabled } from '../../auth/flags';
 import { billingFunctions } from '../../billing/inngest-functions';
 import { deletionFunctions } from '../account/deletion-ports';
@@ -48,6 +49,8 @@ import { reportScheduleFunctions } from '../agency/schedules-wiring';
 import { workerClientFromEnv } from '../../worker-client/client';
 import { monitorFunctions } from '../monitor/functions';
 import { opsFunctions } from '../ops/functions';
+import { ledgerWorkFromEnv } from '../ledger/functions';
+import { putLedgerDraft } from '../ledger/store';
 import { CRAWL_USER_AGENT } from './discover';
 import { supabaseEvidenceStore } from './evidence';
 import { expireUnkept, settleKept, type ExpireDeps } from './expire';
@@ -67,7 +70,7 @@ import { supabasePipelineStore, type PipelineStore } from './store';
 type Env = Readonly<Record<string, string | undefined>>;
 
 /** The stores a check's steps read and write. */
-export type StepStores = Pick<StepDeps, 'store' | 'evidence' | 'persistDb'>;
+export type StepStores = Pick<StepDeps, 'store' | 'evidence' | 'persistDb' | 'ledger'>;
 
 /** Where the functions get their stores. Production's go through the service-role client. */
 export interface Wiring {
@@ -92,6 +95,7 @@ export const SERVICE_WIRING: Wiring = {
       store: supabasePipelineStore(sb),
       evidence: supabaseEvidenceStore(sb),
       persistDb: supabasePersistDb(sb),
+      ledger: { put: (checkId, draft) => putLedgerDraft(sb, checkId, draft) },
     };
   },
   expiry: (env) => {
@@ -145,6 +149,9 @@ export function inngestFunctions(
       expireUnkept: () => expireUnkept(wiring.expiry(env)),
       settleKept: () => settleKept(wiring.expiry(env)),
     }),
+    // CC-41 D4: the research ledger's writer, after each check, and its six-hourly backfill.
+    createLedgerWriteFn(() => ledgerWorkFromEnv(env)),
+    createLedgerBackfillFn(() => ledgerWorkFromEnv(env)),
     ...billing,
     ...deletion,
     ...mail,
@@ -172,6 +179,7 @@ export function stepDeps(env: Env, stores: StepStores): StepDeps {
     store: stores.store,
     evidence: stores.evidence,
     persistDb: stores.persistDb,
+    ledger: stores.ledger,
     worker: () => workerClientFromEnv(env),
     now: Date.now,
     // 32 characters of [A-Za-z0-9_-], which the worker's nonce rule takes.

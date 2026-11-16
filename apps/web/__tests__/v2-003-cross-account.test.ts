@@ -78,6 +78,9 @@ const READ_SCOPE: Record<string, ReadScope> = {
   founder_notices: 'none',
   // CC-38: the accounts qa:seed made, read by qa_reset. Service only.
   qa_accounts: 'none',
+  // CC-41: an account's first touch and a check's ledger draft. Service only.
+  account_attribution: 'none',
+  check_ledger_drafts: 'none',
 };
 
 let db: PGlite;

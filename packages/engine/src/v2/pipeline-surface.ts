@@ -43,3 +43,10 @@ export { templateKeyFor } from '../analysis/template-key.js';
 // framework a check's stack puts first.
 export { PACKETS } from './packets/registry.js';
 export { frameworkOf } from './packets/stack.js';
+// The research ledger's writer (apps/web/lib/v2/ledger) reads these: robots.txt as the build read it
+// and each crawler's group in it, the without-JS state, and the registry's robots tokens.
+export { robotsText } from './build/record.js';
+export { parseRobotsTxt } from '../robots.js';
+export type { ParsedRobots, RobotsRules } from '../robots.js';
+export { jsTextState } from './render/state.js';
+export { CRAWLER_REGISTRY_V2 } from './crawler-registry.js';
