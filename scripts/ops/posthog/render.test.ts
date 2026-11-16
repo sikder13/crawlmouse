@@ -54,9 +54,13 @@ describe('filterText', () => {
 });
 
 describe('a table cell', () => {
-  it('escapes a backslash before a pipe, so an escape already in the text cannot undo it', () => {
+  it('escapes each pipe and leaves a backslash as written', () => {
     expect(cell('a|b')).toBe('a\\|b');
-    expect(cell('a\\|b')).toBe('a\\\\\\|b');
-    expect(cell('^(localhost|127\\.0\\.0\\.1)$')).toBe('^(localhost\\|127\\\\.0\\\\.0\\\\.1)$');
+    expect(cell('^\\[cm\\] ')).toBe('^\\[cm\\] ');
+    expect(cell('^/blog(/|$)')).toBe('^/blog(/\\|$)');
+  });
+
+  it('refuses a backslash before a pipe, which no GFM table cell can show', () => {
+    expect(() => cell('a\\|b')).toThrow(/backslash before a pipe/);
   });
 });

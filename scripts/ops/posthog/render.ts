@@ -41,8 +41,16 @@ export const EVENTS_DOC = fileURLToPath(
 );
 
 const code = (s: string | number) => `\`${s}\``;
-/** A table cell: backslashes first, so a backslash already there cannot undo the pipe's escape. */
-export const cell = (s: string) => s.replace(/\\/g, '\\\\').replace(/\|/g, '\\|');
+/**
+ * A table cell: each pipe written `\|`, which GFM's table parser reads as a literal pipe, inside a
+ * code span too. A backslash is left as it is, since a code span shows it as written. Text that already
+ * holds a backslash before a pipe has no correct rendering in a GFM table cell, so it is refused.
+ */
+export function cell(s: string): string {
+  if (s.includes('\\|'))
+    throw new Error(`a table cell cannot hold a backslash before a pipe: ${s}`);
+  return s.split('|').join('\\|');
+}
 
 const OPERATOR: Record<PropertyFilter['operator'], [one: string, many: string]> = {
   exact: ['=', 'is one of'],
