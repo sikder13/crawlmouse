@@ -35,12 +35,17 @@ The scripts behind them are in `scripts/db`. Their tests:
       production's `pg_extension` through the read-only endpoint, drop on the branch each extension
       production does not have (a plain `drop extension`, never `cascade`, so a drop that anything
       outside the extension depends on fails the step), print each dropped name in the job log,
-      and print, without installing it, each extension production has and the branch lacks. Its
-      summary line starts `extensions equal to production after alignment:` with yes or no, then
-      the differences and the extensions dropped. Why it exists: on 2026-11-16 the branch for
-      pull request 89 had pg_net, with PUBLIC grants on schema `net` and its tables, and
-      production had no `net` schema; check 10 failed on the branch for a reason production did
-      not share, and the fingerprint reported equal, because it leaves extensions out by design;
+      and, for each extension production has and the branch lacks, create it on the branch
+      (`create extension if not exists`) when its name is on `CREATE_ON_BRANCH` in that file
+      (`pg_cron` only), and otherwise print it. A branch that refuses the create is printed and the run goes on.
+      Its summary line starts `extensions equal to production after alignment:` with yes or no,
+      then the differences, the extensions dropped and created, and any the branch refused. Why
+      it exists: on 2026-11-16 the branch for pull request 89 had pg_net, with PUBLIC grants on
+      schema `net` and its tables, and production had no `net` schema; check 10 failed on the
+      branch for a reason production did not share, and the fingerprint reported equal, because
+      it leaves extensions out by design. The same day, production had pg_cron and the branch did
+      not, so migration 041's dry run passed and its post-apply checks on production failed over
+      `cron` tables the branch never had;
    4. compare the branch's fingerprint (`infra/supabase/checks/fingerprint.sql`) with
       production's, section by section, and fail on a difference;
    5. read the branch's migration history: fail if it needs the repair in §5, if a pending file
@@ -134,7 +139,9 @@ The pull request comment names the failed step. The job log has the full output.
   have failed on the branch: something outside the extension depends on it, or the branch's role
   cannot drop it. The job log names the extension and Postgres's error. The step never uses
   `cascade`; do not add it. A `no` in its result with the step passing means production has an
-  extension the branch lacks: it is printed, not installed.
+  extension the branch still lacks: one not on `CREATE_ON_BRANCH`, printed and not installed, or
+  one the branch refused to create (`the branch refused to create:` names it). Report a refusal;
+  do not work around it.
 - **History is clean and each pending file has a rollback** failed. Either production's history
   needs the repair in §5, or a pending migration has no rollback file.
 - **supabase db push** failed. The CLI's error is in the log. A file that fails to apply leaves
