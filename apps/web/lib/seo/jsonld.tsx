@@ -1,5 +1,11 @@
 import { siteOrigin, siteUrl } from '@/lib/site-url';
 import type { BlogPostMeta } from '@/lib/blog/posts';
+import { checksPublicEnabled } from '@/lib/auth/flags';
+import { billingV2Enabled } from '@/lib/billing/flags';
+import { AGENCY_MONTHLY, AGENCY_YEARLY, PRO_MONTHLY, PRO_YEARLY } from '@/lib/billing/prices';
+import { PARENT_ORGANIZATION, V2_HOME_DESCRIPTION } from './site-copy';
+import { postAbstract } from '@/lib/blog/answers';
+import type { PostDataset } from '@/lib/blog/datasets';
 
 // Typed schema.org JSON-LD builders + a tiny renderer. Structured data helps search engines
 // understand the site (Organization / SoftwareApplication), the homepage (WebSite), the blog
@@ -11,7 +17,30 @@ const DESCRIPTION =
   "Free, no-install internal-linking grader for any website. Crawlmouse maps a site's internal links " +
   'and grades its structure — orphan pages, hub strength, click depth, and anchor diversity — in seconds.';
 
+/**
+ * The Organization node, on every page (root layout). While V2_CHECKS_PUBLIC is on it names the
+ * company behind Crawlmouse and that company's city; it lists no `sameAs`, because no profile of
+ * Crawlmouse's own is known to exist, and no street address, by decision (CC-40 D2). With the flag
+ * off it is v1's node unchanged.
+ */
 export function organizationLd() {
+  if (checksPublicEnabled()) {
+    const { name, url, address } = PARENT_ORGANIZATION;
+    return {
+      '@context': 'https://schema.org',
+      '@type': 'Organization',
+      name: NAME,
+      url: siteOrigin(),
+      logo: siteUrl('/apple-icon'),
+      parentOrganization: { '@type': 'Organization', name, url },
+      address: {
+        '@type': 'PostalAddress',
+        addressLocality: address.locality,
+        addressRegion: address.region,
+        addressCountry: address.country,
+      },
+    };
+  }
   return {
     '@context': 'https://schema.org',
     '@type': 'Organization',
@@ -32,7 +61,61 @@ export function websiteLd() {
   };
 }
 
+/** One plan at one price; `interval` is how often a paid plan bills (ISO 8601), null for Free. */
+function offer(name: string, price: number, interval: 'P1M' | 'P1Y' | null) {
+  return {
+    '@type': 'Offer',
+    name,
+    price: String(price),
+    priceCurrency: 'USD',
+    url: siteUrl('/pricing'),
+    ...(interval && {
+      priceSpecification: {
+        '@type': 'UnitPriceSpecification',
+        price: String(price),
+        priceCurrency: 'USD',
+        billingDuration: interval,
+      },
+    }),
+  };
+}
+
+/**
+ * The plans on sale, priced from lib/billing/prices.ts: Free, Pro (sold in both builds) and, while
+ * V2_BILLING sells it, Agency, each paid plan monthly and yearly.
+ */
+export function planOffers() {
+  return [
+    offer('Free', 0, null),
+    offer('Pro, monthly', PRO_MONTHLY, 'P1M'),
+    offer('Pro, yearly', PRO_YEARLY, 'P1Y'),
+    ...(billingV2Enabled()
+      ? [
+          offer('Agency, monthly', AGENCY_MONTHLY, 'P1M'),
+          offer('Agency, yearly', AGENCY_YEARLY, 'P1Y'),
+        ]
+      : []),
+  ];
+}
+
+/**
+ * The product, on the home page only. While V2_CHECKS_PUBLIC is on it describes v2 and lists every
+ * plan on sale at its real price; with the flag off it is v1's node unchanged (one Offer at 0).
+ * Never a rating: the site has none to report.
+ */
 export function softwareApplicationLd() {
+  if (checksPublicEnabled()) {
+    return {
+      '@context': 'https://schema.org',
+      '@type': 'SoftwareApplication',
+      name: NAME,
+      applicationCategory: 'BusinessApplication',
+      operatingSystem: 'Web',
+      url: siteOrigin(),
+      description: V2_HOME_DESCRIPTION,
+      offers: planOffers(),
+    };
+  }
   return {
     '@context': 'https://schema.org',
     '@type': 'SoftwareApplication',
@@ -76,6 +159,8 @@ export function faqLd(items: ReadonlyArray<{ question: string; answer: string }>
 
 export function articleLd(post: BlogPostMeta) {
   const url = siteUrl(`/blog/${post.slug}`);
+  // The post's direct answer (lib/blog/answers.ts), the same words the page shows under its H1.
+  const abstract = postAbstract(post.slug);
   return {
     '@context': 'https://schema.org',
     '@type': 'Article',
@@ -93,6 +178,25 @@ export function articleLd(post: BlogPostMeta) {
     url,
     image: siteUrl(`/blog/${post.slug}/opengraph-image`),
     keywords: post.keywords.join(', '),
+    ...(abstract ? { abstract } : {}),
+  };
+}
+
+/**
+ * The data behind a research post as a Dataset node. Every field comes from the post's own body
+ * (lib/blog/datasets.ts says where); nothing is asserted that the post does not state, so there is no
+ * `license` or `distribution`.
+ */
+export function datasetLd(post: BlogPostMeta, data: PostDataset, creator: object) {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'Dataset',
+    name: data.name,
+    description: data.description.text,
+    temporalCoverage: `${data.collected.start}/${data.collected.end}`,
+    size: data.size.text,
+    creator,
+    url: siteUrl(`/blog/${post.slug}`),
   };
 }
 

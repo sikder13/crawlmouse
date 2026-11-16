@@ -58,9 +58,10 @@ describe('the author map', () => {
     }
   });
 
-  it('no post published before this change has an author yet (the owner assigns them separately)', () => {
-    const assigned = POSTS.filter((p) => BASELINE_SLUGS.includes(p.slug) && p.author !== undefined);
-    expect(assigned.map((p) => p.slug)).toEqual([]);
+  // Owner, 2026-11-15 (CC-40 ruling 2): each post published before the research post is Samia Zaman's.
+  it('each post published before the research post is Samia Zaman\u2019s', () => {
+    const named = POSTS.filter((p) => BASELINE_SLUGS.includes(p.slug)).map((p) => p.author);
+    expect(named).toEqual(BASELINE_SLUGS.map(() => 'samia-zaman'));
   });
 
   it('builds a Person node with the author page URL and the LinkedIn URL as sameAs', () => {
@@ -75,18 +76,19 @@ describe('the author map', () => {
   });
 
   it('lists an author as published only once a post names them', () => {
-    expect(publishedAuthors().map((a) => a.slug)).toEqual(['udaay-sikder']);
-    const withSamia: BlogPostMeta[] = [
-      ...POSTS,
-      { ...POSTS[0]!, slug: 'x', author: 'samia-zaman' },
-    ];
-    expect(publishedAuthors(withSamia).map((a) => a.slug)).toEqual(['udaay-sikder', 'samia-zaman']);
+    expect(publishedAuthors().map((a) => a.slug)).toEqual(['udaay-sikder', 'samia-zaman']);
+    const onlyResearch: BlogPostMeta[] = POSTS.filter((p) => p.author === 'udaay-sikder');
+    expect(publishedAuthors(onlyResearch).map((a) => a.slug)).toEqual(['udaay-sikder']);
     expect(publishedAuthors([]).map((a) => a.slug)).toEqual([]);
   });
 
   it('postsByAuthor returns the named author’s posts, newest first', () => {
     expect(postsByAuthor('udaay-sikder').map((p) => p.slug)).toEqual([NEW_POST]);
-    expect(postsByAuthor('samia-zaman')).toEqual([]);
+    expect(
+      postsByAuthor('samia-zaman')
+        .map((p) => p.slug)
+        .sort(),
+    ).toEqual([...BASELINE_SLUGS].sort());
   });
 });
 
@@ -115,24 +117,33 @@ describe('the research post carries a byline and a Person in its Article JSON-LD
   });
 });
 
-describe('posts with no author are untouched', () => {
-  it.each(BASELINE_SLUGS)('%s: no byline link and an Organization author', async (slug) => {
-    const { doc } = await renderPostPage(slug);
-    expect(doc.querySelector('article a[href^="/authors/"]')).toBeNull();
-    expect(doc.querySelector('article header')?.textContent).not.toContain('By ');
-    const nodes = [...doc.querySelectorAll('script[type="application/ld+json"]')].flatMap(
-      (s) => JSON.parse(s.textContent!) as unknown,
-    ) as Array<Record<string, unknown>>;
-    expect(nodes.find((n) => n['@type'] === 'Article')?.author).toEqual({
-      '@type': 'Organization',
-      name: 'Crawlmouse',
-    });
-    expect(JSON.stringify(nodes)).not.toContain('"Person"');
-  });
+describe('the posts Samia Zaman wrote carry her byline and Person', () => {
+  it.each(BASELINE_SLUGS)(
+    '%s: a byline linked to her page, and her Person as the author',
+    async (slug) => {
+      const { doc } = await renderPostPage(slug);
+      const link = doc.querySelector('article header a[href="/authors/samia-zaman"]');
+      expect(link?.textContent).toBe('Samia Zaman');
+      expect(link?.getAttribute('rel')).toBe('author');
+      expect(doc.querySelector('article header')?.textContent).toContain(
+        'By Samia Zaman, Growth, Nahl Technologies',
+      );
+      const nodes = [...doc.querySelectorAll('script[type="application/ld+json"]')].flatMap(
+        (s) => JSON.parse(s.textContent!) as unknown,
+      ) as Array<Record<string, unknown>>;
+      expect(nodes.find((n) => n['@type'] === 'Article')?.author).toEqual({
+        '@type': 'Person',
+        name: 'Samia Zaman',
+        url: 'https://crawlmouse.com/authors/samia-zaman',
+        sameAs: ['https://www.linkedin.com/in/samiazaman/'],
+        jobTitle: 'Growth, Nahl Technologies',
+      });
+    },
+  );
 
   it('ArticleLayout renders the same header with and without an unknown author key', () => {
     // A slug that is not in the map must not render a byline (it would link to a 404).
-    const base = POSTS.find((p) => p.slug === BASELINE_SLUGS[0])!;
+    const base = { ...POSTS.find((p) => p.slug === BASELINE_SLUGS[0])!, author: undefined };
     const render = (meta: BlogPostMeta) =>
       renderToStaticMarkup(
         <ArticleLayout meta={meta} related={[]}>

@@ -77,7 +77,7 @@ export const CHECK_COPY: Readonly<Record<CheckQuestion, CheckPageCopy>> = {
   gptbot: {
     title: 'Is GPTBot blocked? A free AI visibility check',
     description:
-      'Find out whether GPTBot, OAI-SearchBot and ChatGPT-User can reach your site, and which of them your AI visibility depends on. Free, about two minutes, nothing to install.',
+      'Find out whether GPTBot, OAI-SearchBot and ChatGPT-User can reach your site, and which your AI visibility depends on. Free, about two minutes, no install.',
     h1: 'Is GPTBot blocked on your site?',
     sub: 'Crawlmouse requests pages from your site as GPTBot and the other AI crawlers, and shows you what each one got back.',
     heading: 'GPTBot is one of OpenAI’s crawlers, and blocking it is your choice.',
@@ -97,9 +97,9 @@ export const CHECK_COPY: Readonly<Record<CheckQuestion, CheckPageCopy>> = {
     ],
   },
   javascript: {
-    title: 'Can AI crawlers read your JavaScript? A free AI visibility check',
+    title: 'AI crawlers and JavaScript: AI visibility check',
     description:
-      'Most AI crawlers read only the HTML your server sends. See how much of each page is left without JavaScript, page by page. Free, about two minutes, nothing to install.',
+      'Most AI crawlers read only the HTML your server sends. See how much of each page is left without JavaScript, page by page. Free, about two minutes, no install.',
     h1: 'Can AI crawlers read your site without JavaScript?',
     sub: 'Crawlmouse compares what a browser renders with the raw response a crawler receives, page by page, and gives you the number.',
     heading: 'Most AI crawlers never run your JavaScript.',
@@ -119,7 +119,7 @@ export const CHECK_COPY: Readonly<Record<CheckQuestion, CheckPageCopy>> = {
     ],
   },
   'robots-ai': {
-    title: 'robots.txt for AI crawlers: a free AI visibility check',
+    title: 'robots.txt for AI crawlers: AI visibility check',
     description:
       'What your robots.txt tells GPTBot, OAI-SearchBot, ClaudeBot and PerplexityBot, and what it cannot stop. Free, about two minutes, nothing to install.',
     h1: 'What does your robots.txt tell AI crawlers?',

@@ -69,6 +69,14 @@ interface WithdrawnClaim {
 
 const WITHDRAWN: readonly WithdrawnClaim[] = [
   {
+    text: 'are the noun, not the verb, and are not changed',
+    withdrawnIn: 'docs/specs/v2/40-seo-launch.md (D8), CC-40 review round 2',
+    truth:
+      'Both uses of "high-leverage" were replaced ("high-impact", "highest-impact"); the compound has its ' +
+      'own entry in apps/web/lib/seo/banned-phrases.ts (lib/blog/copy-edits.ts records the two edits).',
+    allowedIn: [],
+  },
+  {
     text: 'A site keeps at most `report_refusals_max()` entries',
     withdrawnIn: 'docs/specs/v2/31-agency.md §10, CC-31 review rounds 6 and 7',
     truth:

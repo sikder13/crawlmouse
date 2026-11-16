@@ -37,15 +37,23 @@ describe('app/v2-home', () => {
     expect(digest).toContain('404');
   }, 60_000);
 
-  it('with the flag on is the v2 home with WebSite and SoftwareApplication structured data, no FAQPage, and exports no metadata', async () => {
+  it('with the flag on is the v2 home with WebSite and SoftwareApplication structured data, no FAQPage, and its own metadata (CC-40 D2)', async () => {
     vi.stubEnv('V2_CHECKS_PUBLIC', '1');
     const route = await import('./page');
-    expect(Object.keys(route)).toEqual(['default']);
+    expect(Object.keys(route).sort()).toEqual(['default', 'metadata']);
     const markup = renderToStaticMarkup(route.default() as ReactElement);
     expect(ldTypes(markup)).toEqual(['WebSite', 'SoftwareApplication']);
     expect(markup).not.toContain('FAQPage');
     expect(markup).toContain('data-event="home_viewed"');
     expect(markup.match(/<h1/g)).toHaveLength(1);
     expect(markup).not.toContain('href="#"');
+    // The share card is named on the page: its openGraph and twitter replace the root's whole.
+    const image = { url: '/opengraph-image', width: 1200, height: 630, type: 'image/png' };
+    const meta = route.metadata as {
+      openGraph: { images: unknown[] };
+      twitter: { images: unknown[] };
+    };
+    expect(meta.openGraph.images).toEqual([expect.objectContaining(image)]);
+    expect(meta.twitter.images).toEqual([expect.objectContaining(image)]);
   }, 60_000);
 });

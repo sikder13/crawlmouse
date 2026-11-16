@@ -257,6 +257,38 @@ const INVENTORY: [entry: string, why: string][] = [
     'crawled text, cut WITHOUT the shared helper \u2014 PRE-EXISTING, tracked as FU-7',
   ],
   [
+    "apps/web/lib/seo/attribution.ts :: .map((w) => (w.length > 3 && w.endsWith('s') && !w.endsWith('ss') ? w.slice(0, -1) : w));",
+    'a word already split on [^a-z0-9], so ASCII only; the audit report is not persisted \u2014 cannot split a surrogate pair',
+  ],
+  [
+    'apps/web/lib/seo/audit-report.ts :: const run = (r: AuditRun) => `${r.label}: commit \\`${r.sha.slice(0, 8)}\\`, read ${r.takenAt}`;',
+    'a git commit SHA, hex only \u2014 cannot split a surrogate pair',
+  ],
+  [
+    'apps/web/lib/seo/audit-report.ts :: rows.slice(0, 3).map((r) => `${r[0]} (${r[2]})`),',
+    'array slice (the top three Search Console rows) \u2014 cannot split a surrogate pair',
+  ],
+  [
+    "apps/web/lib/seo/page-facts.ts :: for (let i = 0; i + n <= w.length; i += 1) out.add(w.slice(i, i + n).join(' '));",
+    'array slice (a run of words for a shingle) \u2014 cannot split a surrogate pair',
+  ],
+  [
+    'apps/web/lib/seo/page-facts.ts :: level: Number(h.tagName.slice(1)),',
+    'an element tag name (H1\u2013H6), ASCII only \u2014 cannot split a surrogate pair',
+  ],
+  [
+    'apps/web/lib/seo/keyword-map.ts :: .slice(0, 3)',
+    'array slice (a page\u2019s top three attributed query rows) \u2014 cannot split a surrogate pair',
+  ],
+  [
+    'apps/web/lib/seo/keyword-map.ts :: secondary: post.keywords.slice(1, 1 + SECONDARIES),',
+    'array slice (a post\u2019s keyword list) \u2014 cannot split a surrogate pair',
+  ],
+  [
+    'apps/web/lib/seo/keyword-map.ts :: secondary: rows.slice(1, 1 + SECONDARIES).map((r) => `${r[0]} (${r[2]})`),',
+    'array slice (attributed query rows) \u2014 cannot split a surrogate pair',
+  ],
+  [
     'apps/web/lib/v2/account/deletion-ports.ts :: const { error } = await sb.storage.from(bucket).remove(names.slice(i, i + REMOVE_BATCH));',
     'array slice (a batch of Storage object names) \u2014 cannot split a surrogate pair',
   ],

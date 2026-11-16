@@ -1,0 +1,97 @@
+{
+  "capturedFrom": "66c5882815652950f213bd2f5527fcb17eb46128",
+  "layoutMetadata": {
+    "metadataBase": "https://crawlmouse.com/",
+    "title": {
+      "default": "Crawlmouse — Grade your site's internal linking",
+      "template": "%s · Crawlmouse"
+    },
+    "description": "Free, no-install internal-linking grader for any website. Find orphan pages, weak hubs, and pages buried too deep — and get a clear A–F grade in seconds.",
+    "applicationName": "Crawlmouse",
+    "keywords": [
+      "internal linking",
+      "internal link checker",
+      "internal link audit",
+      "orphan pages",
+      "site structure",
+      "crawl depth",
+      "SEO audit"
+    ],
+    "authors": [
+      {
+        "name": "Nahl Technologies Inc"
+      }
+    ],
+    "creator": "Nahl Technologies Inc",
+    "alternates": {
+      "canonical": "/"
+    },
+    "openGraph": {
+      "type": "website",
+      "siteName": "Crawlmouse",
+      "title": "Crawlmouse — Grade your site's internal linking",
+      "description": "Free, no-install internal-linking grader for any website. Find orphan pages, weak hubs, and pages buried too deep — and get a clear A–F grade in seconds.",
+      "url": "https://crawlmouse.com",
+      "locale": "en_US"
+    },
+    "twitter": {
+      "card": "summary_large_image",
+      "title": "Crawlmouse — Grade your site's internal linking",
+      "description": "Free, no-install internal-linking grader for any website. Find orphan pages, weak hubs, and pages buried too deep — and get a clear A–F grade in seconds."
+    },
+    "robots": {
+      "index": true,
+      "follow": true,
+      "googleBot": {
+        "index": true,
+        "follow": true,
+        "max-image-preview": "large",
+        "max-snippet": -1,
+        "max-video-preview": -1
+      }
+    }
+  },
+  "ogImage": {
+    "alt": "Crawlmouse — Grade your site's internal linking",
+    "size": {
+      "width": 1200,
+      "height": 630
+    },
+    "contentType": "image/png",
+    "pngSha256": "5cd58bb4aa18a46d66151a214de0849c28d203e832cabe1afb7e5cb00db815cf",
+    "deterministic": true
+  },
+  "organizationLd": {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "Crawlmouse",
+    "legalName": "Nahl Technologies Inc",
+    "url": "https://crawlmouse.com",
+    "logo": "https://crawlmouse.com/apple-icon"
+  },
+  "websiteLd": {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "name": "Crawlmouse",
+    "url": "https://crawlmouse.com",
+    "publisher": {
+      "@type": "Organization",
+      "name": "Crawlmouse"
+    }
+  },
+  "softwareApplicationLd": {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "Crawlmouse",
+    "applicationCategory": "BusinessApplication",
+    "operatingSystem": "Web",
+    "url": "https://crawlmouse.com",
+    "description": "Free, no-install internal-linking grader for any website. Crawlmouse maps a site's internal links and grades its structure — orphan pages, hub strength, click depth, and anchor diversity — in seconds.",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "USD"
+    }
+  },
+  "llmsTxt": "# Crawlmouse\n\n> Crawlmouse is a free, browser-based website auditor by Nahl Technologies. Paste a URL and get an honest A–F grade on your internal links and what AI crawlers actually see — orphan pages, click depth, link graph. Free, no signup.\n\n## Key pages\n\n- [Grade your site's internal linking](https://crawlmouse.com/): Free A–F grade in under two minutes — no account, no install.\n- [Pricing](https://crawlmouse.com/pricing): Free is genuinely free — a real grade and one complete fix.\n- [Crawlmouse for developers](https://crawlmouse.com/developers): CLI, GitHub Action & webhooks.\n- [The Crawlmouse blog](https://crawlmouse.com/blog): Practical, no-fluff guides to internal linking, orphan pages, crawl depth, and the site structure that actually ranks — from the team behind Crawlmouse.\n- [All guides](https://crawlmouse.com/guides): Every guide, grouped by topic.\n- [About CrawlmouseBot](https://crawlmouse.com/bot): How our crawler behaves and how to control it.\n\n## Guides\n\n- [We fetched 96 websites as AI crawlers. The answer depended on who was asking.](https://crawlmouse.com/blog/ai-crawler-access-test-2026): We fetched 96 websites as AI crawlers in October 2026. From two cloud networks, the same crawler names got different answers on three of five sites.\n- [Cloudflare Starts Blocking AI Crawlers by Default on September 15. Here's Who It Affects — and How to Check Your Site](https://crawlmouse.com/blog/cloudflare-ai-crawler-defaults-september-15): From September 15, 2026, Cloudflare blocks Training and Agent crawlers by default on ad pages. What changes, who's affected, and how to check your site.\n- [Should You Block AI Crawlers? A robots.txt Guide for GPTBot, ClaudeBot & Co.](https://crawlmouse.com/blog/block-ai-crawlers-robots-txt): Should you block GPTBot, ClaudeBot, and other AI crawlers? A practical 2026 robots.txt guide — what each bot does, what blocking costs, and copy-paste rules.\n- [How to Find Orphan Pages on Squarespace (Free, Nothing to Install)](https://crawlmouse.com/blog/find-orphan-pages-squarespace): Squarespace's Not Linked section quietly creates orphan pages. Here is how to find every orphan on your Squarespace site for free — and fix the ones that matter.\n- [Screaming Frog vs Lumar (DeepCrawl): Desktop Tool vs Enterprise Platform](https://crawlmouse.com/blog/screaming-frog-vs-lumar-deepcrawl): Screaming Frog and Lumar (formerly DeepCrawl) solve different problems at very different prices. An honest August 2026 comparison — and when you need neither.\n- [Sitebulb vs JetOctopus vs Oncrawl: Cloud SEO Crawlers Compared](https://crawlmouse.com/blog/sitebulb-vs-jetoctopus-vs-oncrawl): Sitebulb Cloud, JetOctopus, and Oncrawl are the main cloud SEO crawlers. An honest July 2026 comparison of pricing, log analysis, and which one fits your site.\n- [How to Find Orphan Pages on Webflow (Free, No App)](https://crawlmouse.com/blog/find-orphan-pages-webflow): Webflow orphans pages when you limit CMS Collection Lists or skip navigation links. Here's how to find every orphan page on your Webflow site for free.\n- [Sitebulb vs Screaming Frog: Which SEO Crawler Should You Use?](https://crawlmouse.com/blog/sitebulb-vs-screaming-frog): Sitebulb and Screaming Frog are the two big SEO crawlers. Here's an honest comparison of features, pricing, and which to pick — plus a free no-install option.\n- [Can AI Crawlers See Your JavaScript Site? (How to Check)](https://crawlmouse.com/blog/can-ai-crawlers-see-javascript): AI crawlers like GPTBot and ClaudeBot don't run JavaScript, so a JS site can rank on Google yet be invisible to ChatGPT. Here's how to check what yours shows them.\n- [How to Find Orphan Pages on Shopify (Free, No App Needed)](https://crawlmouse.com/blog/find-orphan-pages-shopify): Shopify orphans your canonical product URLs by default, so they rarely get crawled or indexed. Here's how to find every orphan page on your store for free.\n- [Discovered – Currently Not Indexed: Why It Happens and How to Fix It](https://crawlmouse.com/blog/discovered-currently-not-indexed): Discovered - currently not indexed means Google found your page but hasn't crawled it yet. Here's why it happens, and how stronger internal linking fixes it.\n- [Sitebulb Alternatives (2026): Free and Paid Options, Honestly Compared](https://crawlmouse.com/blog/sitebulb-alternative): Six real Sitebulb alternatives compared with August 2026 pricing — free, paid, and open source. Includes when Sitebulb is still the right choice.\n- [Screaming Frog Alternatives in 2026: Six Options, Compared Honestly](https://crawlmouse.com/blog/screaming-frog-alternative): Six real Screaming Frog alternatives compared — free, browser-based, cloud, and open source — plus the honest cases where Screaming Frog is still the right tool.\n- [How to Find Orphan Pages in WordPress (Free, No Plugin Needed)](https://crawlmouse.com/blog/find-orphan-pages-wordpress): Orphan pages pile up fast in WordPress. Here's how to find every orphaned post and page for free — no extra plugin needed — and fix the ones worth keeping.\n- [How Deep Is Too Deep? Crawl Depth Limits and How to Fix Buried Pages](https://crawlmouse.com/blog/how-deep-is-too-deep-crawl-depth): How many clicks from your homepage is too many? A practical, site-size-aware guide to crawl depth limits — and exactly how to pull buried pages back up.\n- [Crawl Depth & Site Architecture: Why Click-Depth Affects Rankings](https://crawlmouse.com/blog/crawl-depth-site-architecture): Click depth — how far a page sits from your homepage — shapes how often search engines crawl it and how much authority it gets. Here's how to fix it.\n- [How to Find Orphan Pages on Your Website (Free, No Install)](https://crawlmouse.com/blog/orphan-pages): Orphan pages have no internal links, so search engines rarely rank them. Here's how to find every orphan page free — no Screaming Frog or Semrush install.\n- [Internal Link Checker: How to Audit Your Site's Internal Links Free](https://crawlmouse.com/blog/free-internal-link-audit): Check your internal links without installing software. Here's how to run a free internal-link audit — orphan pages, weak hubs, and buried pages — in your browser.\n\n## Maker\n\nBuilt by [Nahl Technologies](https://nahltech.com), an AI consulting and implementation firm in Indianapolis.\n"
+}
