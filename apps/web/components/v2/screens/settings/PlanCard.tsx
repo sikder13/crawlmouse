@@ -62,6 +62,12 @@ export function PlanCard({
             ],
           }))}
         />
+        {plan.confirm ? (
+          <div className={styles.term}>
+            <span>{plan.confirm.text}</span>
+            <ActionControl action={plan.confirm.action} />
+          </div>
+        ) : null}
       </div>
     </Card>
   );

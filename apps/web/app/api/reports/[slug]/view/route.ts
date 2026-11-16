@@ -6,6 +6,7 @@ import { REPORT_VIEWS_PER_IP_PER_HOUR } from '@/lib/limits';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { isReportGoneEitherKind } from '@/lib/report-visibility';
 import { getPublicReport } from '@/lib/reports';
+import { supabaseAdmin } from '@/lib/supabase/admin';
 import { isV2Snapshot } from '@/lib/v2/reports/snapshot';
 
 export const runtime = 'nodejs';
@@ -37,9 +38,19 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
   const report = await getPublicReport(slug);
   if (report === null || isReportGoneEitherKind(report)) return new Response(null, { status: 404 });
 
+  // The report's account, so the event of an internal account's report is marked (CC-38 D3); the
+  // cached row above does not carry it. A failed read sends the event unmarked rather than none.
+  const owner = await supabaseAdmin()
+    .from('public_reports')
+    .select('account_id')
+    .eq('slug', slug)
+    .maybeSingle();
+  const accountId = (owner.data as { account_id: string | null } | null)?.account_id ?? null;
+
   await captureServerEvent(req.headers.get('cookie'), {
     event: 'report_viewed',
     distinctId: `report:${slug}`,
+    accountId,
     properties: { kind: isV2Snapshot(report.report_snapshot) ? 'v2' : 'v1' },
   });
   return new Response(null, { status: 204 });

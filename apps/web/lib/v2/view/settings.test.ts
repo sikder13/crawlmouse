@@ -244,7 +244,8 @@ describe('Settings, billed yearly, and past due on Free', () => {
   };
 
   it('a yearly plan cancels at the end of the paid year', () => {
-    const p = settingsView(yearly, ACCOUNT_VIEWERS.withheld()).plan;
+    // On 31 Oct, on Agency: from 1 Nov it is past due, and a cancel then ends it at once (CC-39).
+    const p = settingsView(yearly, { accountId: NW, now: '2026-10-31T12:00:00Z' }).plan;
     expect(p.terms[0]!.text).toMatch(/^Two clicks, effective at the end of the paid year\. /);
   });
 

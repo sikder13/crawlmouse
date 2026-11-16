@@ -12,8 +12,8 @@ import {
   type Site,
   type Verdict,
 } from '@crawlmouse/types/v2';
-import { AGENCY_MONTHLY } from '../../billing/prices';
 import { GATES } from '../../entitlement-v2';
+import { formatPlanPrice } from '../copy/plan-price';
 import { TRIAL_DAYS } from '../copy/account';
 import { DASHBOARD_COPY as COPY, SETUP_COPY } from '../copy/dashboard';
 import { fixesAsOf } from '../fixtures';
@@ -1043,7 +1043,7 @@ export function dashboardView(
         v.tier === 'pro' && slots >= limit
           ? action(
               'pricing',
-              `Need more? Agency watches ${GATES.agency.sites}, $${AGENCY_MONTHLY} a month`,
+              `Need more? Agency watches ${GATES.agency.sites}, ${formatPlanPrice('agency')} a month`,
             )
           : null,
       rows,

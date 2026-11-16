@@ -76,6 +76,8 @@ const READ_SCOPE: Record<string, ReadScope> = {
   operator_actions: 'none',
   // CC-33: founder notices. Service only.
   founder_notices: 'none',
+  // CC-38: the accounts qa:seed made, read by qa_reset. Service only.
+  qa_accounts: 'none',
 };
 
 let db: PGlite;

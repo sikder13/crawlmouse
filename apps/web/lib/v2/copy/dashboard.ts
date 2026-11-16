@@ -8,6 +8,7 @@ import type { Addition, CopyChange, LockedScreen } from '../copy-registry';
 import { RECHECK_MINUTES } from '../recheck';
 import { ALERTS_SENDER } from '../../auth/constants';
 import { TRIAL_DAYS } from './account';
+import { formatPlanPrice } from './plan-price';
 
 export const DASHBOARD_COPY = {
   kept: (host: string) => `${host} is kept.`,
@@ -464,8 +465,7 @@ const HOME: CopyChange[] = [
     kind: 'ruling',
     locked: 'Need more? Agency watches 25, $69 a month',
     rendered: '',
-    source:
-      'Owner ruling Q10: the Agency line renders only when primary sites equal the limit (4 of 5 here); when it does, its price is AGENCY_MONTHLY, $99 (FACTS D6, the decision of 2026-11-03)',
+    source: `Owner ruling Q10: the Agency line renders only when primary sites equal the limit (4 of 5 here); when it does, its price is AGENCY_MONTHLY, ${formatPlanPrice('agency')} (FACTS D6, the decision of 2026-11-03)`,
   },
   {
     screen: 'dashboard',

@@ -6,6 +6,7 @@ import { Table } from '../../Table';
 import { VerdictCell } from '../../VerdictCell';
 import { LOG_IN, MARKETING_NAV } from '../../footer-links';
 import type { HomeView } from '../../../../lib/v2/view/home';
+import { formatPlanPrice } from '../../../../lib/v2/copy/plan-price';
 import { count } from '../../../../lib/v2/words';
 import { AuditForm } from './AuditForm';
 import { Stage } from './Stage';
@@ -15,7 +16,7 @@ import styles from './HomeScreen.module.css';
 const PLANS = [
   {
     name: 'Free',
-    price: '$0',
+    price: formatPlanPrice('free'),
     per: null,
     body: 'One site, checked monthly. The full crawler matrix, three complete fixes per audit, history kept.',
     action: 'Create a free account',
@@ -23,15 +24,15 @@ const PLANS = [
   },
   {
     name: 'Pro',
-    price: '$19',
+    price: formatPlanPrice('pro'),
     per: ' a month',
     body: 'Five sites, checked weekly. Every fix with a copy-paste packet, alerts to Slack, one competitor per site, PDF and CSV export.',
     action: 'Start with 14 days of Pro',
-    note: 'The same free account; $19 a month only if you keep Pro',
+    note: `The same free account; ${formatPlanPrice('pro')} a month only if you keep Pro`,
   },
   {
     name: 'Agency',
-    price: '$69',
+    price: formatPlanPrice('agency'),
     per: ' a month',
     body: 'Twenty-five client sites, five seats, reports on your domain with your logo, and a one-page audit you can hand to a prospect.',
     action: 'Start a 14-day trial',

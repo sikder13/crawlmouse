@@ -6,6 +6,8 @@
  * gets the generic one. Alerts has no success line: its route sends a form back with none.
  */
 
+import { numberWord } from '../words';
+
 export const SETTINGS_NOTICES = {
   saved: 'Saved.',
   emailSent:
@@ -25,6 +27,17 @@ export const OWN_ACCOUNT_COPY = {
   address: 'Your sign-in address belongs to your own account. Switch to it to change the address.',
   deletion: 'Deleting your account is done from your own account. Switch to it to delete.',
   switchTo: 'Switch to your own account',
+} as const;
+
+/**
+ * The delete step's sentences where they differ from the routes' (CC-39 D4, walk-findings item 9).
+ * `email_change_pending` holds a deletion while the change's confirmation link is live and, once the
+ * change applies, while its undo link is (`email_change_live`): the step names both, and the undo
+ * link's days.
+ */
+export const DELETE_BLOCKED_SENTENCES = {
+  email_change_pending: (undoDays: number) =>
+    `The sign-in address is being changed, so the account cannot be deleted yet: deleting waits until the change’s confirmation link is used or expires and, once the change applies, for the ${numberWord(undoDays)} days its undo link works.`,
 } as const;
 
 export const REFUSAL_SENTENCES: Readonly<Record<string, string>> = {

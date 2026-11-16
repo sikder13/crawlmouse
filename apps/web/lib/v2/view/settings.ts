@@ -14,6 +14,7 @@ import {
   TRIAL_REMINDER_DAYS_BEFORE_END,
   type EmailKind,
 } from '../../auth/constants';
+import { AT_ONCE } from '../../billing/cancel';
 import { AGENCY_MONTHLY, AGENCY_YEARLY, PRO_MONTHLY, PRO_YEARLY } from '../../billing/prices';
 import { GATES, PAST_DUE_GRACE_DAYS } from '../../entitlement-v2';
 import { TRIAL_DAYS } from '../copy/account';
@@ -38,10 +39,12 @@ import { FREE_FIXES } from './free-fixes';
 import { ACCOUNT_COPY } from '../copy/account';
 import { DELETE_COPY, deletionMoney } from '../copy/deletion';
 import {
+  DELETE_BLOCKED_SENTENCES,
   OWN_ACCOUNT_COPY as OWN,
   REFUSAL_SENTENCES,
   SETTINGS_NOTICES as NOTICES,
 } from '../copy/settings-notices';
+import { EMAIL_UNDO_DAYS } from '../account/email-change-page';
 import type { SeatRole } from '../account/profile';
 import { SUPPORT_COPY } from '../copy/support';
 import { supportMailto } from '../support/mailto';
@@ -127,6 +130,18 @@ export const CC27B_ROUTES = {
 } as const satisfies Record<string, RouteSpec>;
 
 export type Cc27bKey = keyof typeof CC27B_ROUTES;
+
+/**
+ * The step the cancel route sends a form back to Settings › Plan with after the first click
+ * (`?cancel=confirm`). Its `?cancel=done` is not read: the page shows a cancel once the webhook has
+ * written it, never from the address alone.
+ */
+export type CancelStep = 'confirm';
+
+/** The `cancel` search parameter as a step; null for anything else, a repeated one included. */
+export function cancelStepFrom(value: string | string[] | undefined): CancelStep | null {
+  return value === 'confirm' ? value : null;
+}
 
 /**
  * What CC-27b must hold beyond the routes, each with where it is decided. SPEC 27 lists these with
@@ -270,6 +285,11 @@ export interface SettingsView {
     termsLabel: string;
     /** Cancel and Receipts, each with its control where the account has one to use. */
     terms: { label: string; text: string; action: ActionView | null }[];
+    /**
+     * Cancel's second click: what ends and when, and the form that sends `confirm`. Shown after the
+     * first click (`cancelStep: 'confirm'`) where the Cancel row offers one; null otherwise.
+     */
+    confirm: { text: string; action: ActionView } | null;
   };
   columns: typeof COPY.columns;
   /** "Email support": the support link with the account's id and this page's path (CC-33 D5). */
@@ -298,7 +318,13 @@ export function settingsView(
     subscriptionStatus,
     notOwnAccount,
     undeliverable = null,
+    cancelStep = null,
   }: {
+    /**
+     * `confirm` after Cancel's first click (the `cancel` search parameter), when the card offers the
+     * second; null otherwise.
+     */
+    cancelStep?: CancelStep | null;
     /**
      * Set where the account shown is not the reader's own personal account (an agency's, or one
      * they hold a seat on): their sign-in address and their deletion belong to their own account
@@ -373,8 +399,16 @@ export function settingsView(
   const paid = v.tier !== 'free';
   const ending = paid && billingEnd !== null ? billingEnd : null;
   const card = a.card_last4;
+  // A card on file, whether or not this reader is given its digits (CC-37 Q25); `withheld` is a card
+  // on file whose digits this reader is not given.
   const onFile = v.cardOnFile;
-  const cardTrial = trial && onFile;
+  // A trial whose subscription is `trialing` came through Checkout, which takes a card
+  // (checkout-v2.ts, `payment_method_collection: 'always'`), whether or not its last four digits
+  // were recorded (CC-39 F8): the card is charged at the trial's end unless it is cancelled.
+  const cardTrial = trial && (onFile || subscriptionStatus === 'trialing');
+  // A card trial read by anyone but the owner is the owner's to manage: only the owner cancels
+  // (CC-39 ruling 5).
+  const withheld = (onFile && card === null) || (cardTrial && !owner);
   const pastDue = a.state === 'past_due';
   const yearly = v.tier === 'agency' ? AGENCY_YEARLY : PRO_YEARLY;
   const date = (ts: string) => dayDate(ts, zone);
@@ -410,6 +444,21 @@ export function settingsView(
   const billing = { fields: { accountId: v.account.id } };
   const cancel = owner ? routeAction('cancelPlan', COPY.cancelAction, {}, billing) : null;
   const portal = owner ? routeAction('billingPortal', COPY.portalAction, {}, billing) : null;
+  // A card on file or a subscription means a Stripe customer, which the portal opens for.
+  const customer = onFile || (subscriptionStatus !== undefined && subscriptionStatus !== null);
+  // A cancel ends at once where lib/billing/cancel.ts cancels at once (`AT_ONCE`: past due, unpaid,
+  // paused), the account's own past-due state included; otherwise at the trial's or period's end.
+  const atOnce = pastDue || (subscriptionStatus != null && AT_ONCE.has(subscriptionStatus));
+  // The Cancel row offers the first click on a card trial and on a paid plan not already ending.
+  const offersCancel = ending === null && (cardTrial || (!trial && paid));
+  // After the first click the confirm step stands in the Cancel row's place, so the page carries
+  // one cancel form at a time.
+  const confirming = cancelStep === 'confirm' && cancel !== null && offersCancel;
+  const cancelRow = (text: string) => ({
+    label: COPY.cancel,
+    text,
+    action: confirming ? null : cancel,
+  });
 
   return {
     // The plan card carries the plan's terms and its Keep, so the rail's trial card leaves them out.
@@ -476,14 +525,14 @@ export function settingsView(
       // A plan set to end is said first: a card trial set to cancel is not charged.
       note:
         cardTrial && ending !== null
-          ? card === null
+          ? withheld
             ? `${COPY.trialCancellingWithheld(plan, date(ending))} ${ACCOUNT_COPY.cardManagedByOwner}`
             : COPY.trialCancelling(plan, date(ending), card)
           : trial
             ? `${COPY.ends(date(a.trial_ends_at!))} ${
-                !onFile
+                !cardTrial
                   ? COPY.noCardTerms(plan)
-                  : card === null
+                  : withheld
                     ? ACCOUNT_COPY.cardManagedByOwner
                     : COPY.cardTerms(card)
               }`
@@ -520,15 +569,13 @@ export function settingsView(
         cardTrial && ending !== null
           ? { label: COPY.cancel, text: COPY.trialCancelled(date(ending)), action: null }
           : cardTrial
-            ? {
-                label: COPY.cancel,
-                text: COPY.cancelCardTrial(
+            ? cancelRow(
+                COPY.cancelCardTrial(
                   date(a.trial_ends_at!),
                   CANCEL_CLICKS,
                   EVIDENCE_CONDENSED_AFTER_DAYS,
                 ),
-                action: cancel,
-              }
+              )
             : trial
               ? {
                   label: COPY.cancel,
@@ -542,21 +589,37 @@ export function settingsView(
                     action: null,
                   }
                 : paid
-                  ? {
-                      label: COPY.cancel,
-                      text: COPY.cancelPaid(
-                        CANCEL_CLICKS,
-                        EVIDENCE_CONDENSED_AFTER_DAYS,
-                        a.billing_period_months === 12 ? 'year' : 'month',
-                      ),
-                      action: cancel,
-                    }
+                  ? cancelRow(
+                      atOnce
+                        ? COPY.cancelAtOnce(CANCEL_CLICKS, EVIDENCE_CONDENSED_AFTER_DAYS)
+                        : COPY.cancelPaid(
+                            CANCEL_CLICKS,
+                            EVIDENCE_CONDENSED_AFTER_DAYS,
+                            a.billing_period_months === 12 ? 'year' : 'month',
+                          ),
+                    )
                   : { label: COPY.cancel, text: COPY.cancelFree, action: null },
-        // A card on file means a Stripe customer, whose receipts the portal lists.
-        !onFile
-          ? { label: COPY.receipts, text: COPY.noReceipts, action: null }
-          : { label: COPY.receipts, text: COPY.receiptsText, action: portal },
+        customer
+          ? { label: COPY.receipts, text: COPY.receiptsText, action: portal }
+          : { label: COPY.receipts, text: COPY.noReceipts, action: null },
       ],
+      confirm: confirming
+        ? {
+            text: atOnce
+              ? COPY.confirmNow(plan)
+              : cardTrial
+                ? COPY.confirmTrial(plan, date(a.trial_ends_at!))
+                : COPY.confirmPeriodEnd(plan, a.renews_at === null ? null : date(a.renews_at)),
+            action: routeAction(
+              'cancelPlan',
+              COPY.confirmAction(plan),
+              {},
+              {
+                fields: { accountId: v.account.id, confirm: 'true' },
+              },
+            ),
+          }
+        : null,
     },
     columns: COPY.columns,
     support: {
@@ -660,9 +723,11 @@ export function deleteStepView(
     blocked:
       blocked === null
         ? null
-        : Object.hasOwn(REFUSAL_SENTENCES, blocked)
-          ? REFUSAL_SENTENCES[blocked]!
-          : NOTICES.unknown,
+        : blocked === 'email_change_pending'
+          ? DELETE_BLOCKED_SENTENCES.email_change_pending(EMAIL_UNDO_DAYS)
+          : Object.hasOwn(REFUSAL_SENTENCES, blocked)
+            ? REFUSAL_SENTENCES[blocked]!
+            : NOTICES.unknown,
     submit:
       role === 'owner' && blocked === null
         ? routeAction('deleteAccount', COPY.sendDeleteLink)

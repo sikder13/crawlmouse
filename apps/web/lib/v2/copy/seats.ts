@@ -8,6 +8,7 @@ import type { SeatAction } from '../agency/guard';
 import type { Addition, CopyChange } from '../copy-registry';
 import { count, plural } from '../words';
 import { agencyRailChanges } from './agency';
+import { formatExtraPrice } from './plan-price';
 
 export const SEATS_COPY = {
   title: 'Seats',
@@ -173,7 +174,7 @@ export const SEATS_CHANGES: CopyChange[] = [
     screen: 'agency-seats',
     kind: 'ruling',
     locked: '$9 a seat a month',
-    rendered: `${usd(EXTRA_SEAT)} a seat a month`,
+    rendered: `${formatExtraPrice('seat')} a seat a month`,
     source:
       'CC-31 brief, D10: a price is read from prices.ts, where a seat beyond the plan’s is EXTRA_SEAT',
   },

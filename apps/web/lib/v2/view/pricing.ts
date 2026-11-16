@@ -95,6 +95,8 @@ export interface PlanView {
  * "coming" (`comingLabel`) when one of its capabilities is not built.
  */
 export interface PricingView {
+  /** The reader is signed in: the header offers their Sites in place of Log in (CC-39 D2). */
+  signedIn: boolean;
   /** The h1 (the artboard's, Q33): it names the monitoring that is coming (SEO R2-N2). */
   title: TaggedView;
   lead: TaggedView[];
@@ -282,6 +284,7 @@ export function pricingView(
   });
   const tiers: Tier[] = ['free', 'pro', 'agency'];
   return {
+    signedIn: viewer.kind === 'signed_in',
     title: tagged(COPY.title),
     lead: COPY.lead().map(tagged),
     interval,

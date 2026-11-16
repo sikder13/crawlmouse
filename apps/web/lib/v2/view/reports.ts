@@ -354,8 +354,9 @@ export function reportsView(
         state: COPY.fileStates[stateOf(r) ?? 'stored'],
         actions: rowActions(r),
         linkUntil: sharedUntil(r),
+        // A link withdrawn while the share cookie lasts no longer opens: its address is not shown.
         madeLink:
-          side.madeLink?.reportId === r.id && hasFile(r)
+          side.madeLink?.reportId === r.id && sharedUntil(r) !== null
             ? { label: COPY.madeLink, url: side.madeLink.url }
             : null,
       })),
