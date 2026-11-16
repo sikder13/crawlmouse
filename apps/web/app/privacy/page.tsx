@@ -1,4 +1,7 @@
 import { LegalPage } from '@/components/legal/LegalPage';
+import { checksPublicEnabled } from '@/lib/auth/flags';
+import { RESTORE_DAYS } from '@/lib/v2/copy/restore-window';
+import { ANONYMOUS_EXPIRY_HOURS } from '@/lib/v2/pipeline/limits';
 import {
   FIRST_TOUCH_COOKIE,
   FIRST_TOUCH_FIELD_LABELS,
@@ -183,7 +186,27 @@ export default function PrivacyPage() {
 
       <h2 className="font-display font-bold text-2xl mt-8">Data retention</h2>
       <ul className="list-disc pl-6 space-y-2">
-        <li>Free-tier audits are deleted automatically 30 days after they are created.</li>
+        {checksPublicEnabled() ? (
+          <>
+            <li>
+              An audit nobody keeps is deleted, together with its stored evidence, at the first
+              daily cleanup once {ANONYMOUS_EXPIRY_HOURS} hours have passed since it was requested.
+            </li>
+            <li>
+              An audit kept by an account stays for as long as the account exists. Deleting the
+              account deletes its audits, once the {RESTORE_DAYS}-day restore window has passed.
+            </li>
+            <li>
+              De-identified research records: what each crawler received from a site, the
+              site&rsquo;s platform, and similar measurements. They carry no account, email, URL or
+              page path, and no time finer than the month; a site is identified only by a keyed
+              one-way code. These records are kept indefinitely and used to improve the product and
+              to publish aggregate research.
+            </li>
+          </>
+        ) : (
+          <li>Free-tier audits are deleted automatically 30 days after they are created.</li>
+        )}
         <li>Account data (your email and billing status) is kept until you request deletion.</li>
         <li>
           Billing and tax records are kept for as long as applicable law requires, which is
