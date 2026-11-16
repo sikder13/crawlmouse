@@ -10,8 +10,15 @@ import type { Db } from './db';
  * Production is only read, with EXTENSIONS_SQL. On the branch, each extension production lacks is
  * dropped with a plain DROP EXTENSION, never CASCADE: Postgres then drops the extension's own
  * objects and refuses when anything else depends on them, and the refusal fails the step. An
- * extension production has and the branch lacks is reported, not installed.
+ * extension production has and the branch lacks is created on the branch when it is on
+ * CREATE_ON_BRANCH, and reported otherwise. pg_cron is on it: production has it, a new branch does
+ * not, and migration 041's post-apply checks failed on production over `cron` tables the dry run
+ * never saw (2026-11-16). A branch that refuses the create is logged and the run goes on, with the
+ * extension still reported as missing.
  */
+
+/** Extensions the dry run creates on its branch when production has them and the branch lacks them. */
+export const CREATE_ON_BRANCH: readonly string[] = ['pg_cron'];
 
 export const EXTENSIONS_SQL = 'select extname::text as name from pg_extension order by 1';
 
@@ -31,7 +38,11 @@ const quoteIdent = (name: string) => `"${name.replace(/"/g, '""')}"`;
 export interface Alignment {
   /** Dropped on the branch, in the order they were dropped. */
   dropped: string[];
-  /** Installed on production and not on the branch; left as they are. */
+  /** Created on the branch because production has them and they are on the allowlist. */
+  created: string[];
+  /** On the allowlist, and the branch refused to create them: name and Postgres's message. */
+  refused: Array<{ name: string; error: string }>;
+  /** Installed on production and not on the branch after the step. */
   missing: string[];
   /** The branch's extension set equals production's after the drops. */
   equal: boolean;
@@ -41,6 +52,7 @@ export async function alignExtensions(
   production: Db,
   branch: Db,
   log: (line: string) => void,
+  createOnBranch: readonly string[] = CREATE_ON_BRANCH,
 ): Promise<Alignment> {
   const wanted = new Set(await readExtensions(production));
   const remaining = new Set(await readExtensions(branch));
@@ -68,17 +80,41 @@ export async function alignExtensions(
     dropped.push(next);
     remaining.delete(next);
   }
+  const created: string[] = [];
+  const refused: Alignment['refused'] = [];
+  for (const n of [...wanted].filter((w) => !remaining.has(w)).sort()) {
+    if (!createOnBranch.includes(n)) continue;
+    try {
+      await branch.exec(`create extension if not exists ${quoteIdent(n)}`);
+      log(`created extension ${n} on the branch (production has it)`);
+      created.push(n);
+    } catch (err) {
+      const error = err instanceof Error ? err.message : String(err);
+      log(`the branch refused to create extension ${n}: ${error}`);
+      refused.push({ name: n, error });
+    }
+  }
   const after = new Set(await readExtensions(branch));
   const missing = [...wanted].filter((n) => !after.has(n)).sort();
   for (const n of missing)
     log(`production has extension ${n} and the branch does not; not installed`);
   const extraAfter = [...after].filter((n) => !wanted.has(n)).sort();
-  return { dropped, missing, equal: missing.length === 0 && extraAfter.length === 0 };
+  return {
+    dropped,
+    created,
+    refused,
+    missing,
+    equal: missing.length === 0 && extraAfter.length === 0,
+  };
 }
 
 export function formatAlignment(a: Alignment): string {
   const differences =
     a.missing.length > 0 ? `missing on the branch: ${a.missing.join(', ')}` : 'none';
-  const dropped = a.dropped.length > 0 ? a.dropped.join(', ') : 'none';
-  return `extensions equal to production after alignment: ${a.equal ? 'yes' : 'no'}, differences: ${differences}; dropped on the branch: ${dropped}`;
+  const list = (names: string[]) => (names.length > 0 ? names.join(', ') : 'none');
+  const refused =
+    a.refused.length > 0
+      ? `; the branch refused to create: ${list(a.refused.map((r) => r.name))}`
+      : '';
+  return `extensions equal to production after alignment: ${a.equal ? 'yes' : 'no'}, differences: ${differences}; dropped on the branch: ${list(a.dropped)}; created on the branch: ${list(a.created)}${refused}`;
 }

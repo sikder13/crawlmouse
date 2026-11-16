@@ -604,8 +604,9 @@ describe('what analytics_reader would hold through PUBLIC', () => {
     expect(after).toContain('extensions.pg_stat_statements_info dashboard_user SELECT');
     expect(after).toContain('extensions.pg_stat_statements_info service_role INSERT*');
     expect(after).toContain('extensions.other PUBLIC SELECT');
-    // Check 10 reports only the view the migration leaves alone.
-    expect(await check10(d)).toEqual(['extensions.other: analytics_reader holds SELECT']);
+    // As on production, PUBLIC holds no USAGE on `extensions`, so the reader can reach none of it
+    // and check 10 has nothing to report, `extensions.other`'s PUBLIC SELECT included.
+    expect(await check10(d)).toEqual([]);
   }, 180_000);
 
   it('the revert gives PUBLIC back exactly what it held, also after the migration ran twice', async () => {
@@ -713,15 +714,17 @@ describe('10-analytics-no-pii', () => {
       'research: analytics_reader holds USAGE on the schema',
     ],
     [
-      'PUBLIC SELECT on pg_stat_statements',
+      'PUBLIC SELECT on pg_stat_statements, in a schema the reader can use',
       `create schema extensions;
+       grant usage on schema extensions to public;
        create view extensions.pg_stat_statements as select 1::bigint as calls;
        grant select on extensions.pg_stat_statements to public`,
       'extensions.pg_stat_statements: analytics_reader holds SELECT',
     ],
     [
-      "PUBLIC INSERT on pg_net's request queue",
+      "PUBLIC INSERT on pg_net's request queue, in a schema the reader can use",
       `create schema net;
+       grant usage on schema net to public;
        create table net.http_request_queue (id bigint);
        grant insert on net.http_request_queue to public`,
       'net.http_request_queue: analytics_reader holds INSERT',
@@ -745,6 +748,71 @@ describe('10-analytics-no-pii', () => {
   ])('finds %s', async (_label, sql, expected) => {
     expect((await after(sql, check10)).join('\n')).toContain(expected);
   });
+});
+
+/**
+ * Check 10 reports what analytics_reader can reach. Postgres needs USAGE on a schema before any
+ * privilege on an object in it can be used, so a relation or function privilege outside `analytics`
+ * counts only with the schema's USAGE; USAGE on a schema is reported on its own. The `cron` shape
+ * from production (2026-11-16): PUBLIC SELECT on `cron.job`, SELECT and DELETE on
+ * `cron.job_run_details` (`=rd/supabase_admin`), and no USAGE on `cron` for PUBLIC. Each case runs
+ * under two schema names and two table names, so no result rests on one name.
+ */
+describe('check 10 counts a privilege only where the reader can use the schema', () => {
+  const SHAPES = [
+    ['sched_a', 'job'],
+    ['jobs_b', 'run_details'],
+  ] as const;
+  const cronShape = (schema: string, table: string) =>
+    `create schema ${schema};
+     create table ${schema}.${table} (id bigint);
+     grant select, delete on ${schema}.${table} to public;`;
+
+  it.each(SHAPES)(
+    'a PUBLIC grant on %s.%s, a schema the reader cannot use, is not reported',
+    async (schema, table) => {
+      const found = await after(cronShape(schema, table), check10);
+      expect(found.filter((f) => f.startsWith(`${schema}`))).toEqual([]);
+      expect(found).toEqual([]);
+    },
+  );
+
+  it.each(SHAPES)(
+    'the same grant on %s.%s is reported once the reader can use the schema',
+    async (schema, table) => {
+      const found = await after(
+        `${cronShape(schema, table)} grant usage on schema ${schema} to public;`,
+        check10,
+      );
+      expect(found).toEqual([
+        `${schema}: analytics_reader holds USAGE on the schema`,
+        `${schema}.${table}: analytics_reader holds DELETE`,
+        `${schema}.${table}: analytics_reader holds SELECT`,
+      ]);
+    },
+  );
+
+  it.each(['sched_a', 'jobs_b'])('USAGE on schema %s alone is reported', async (schema) => {
+    const found = await after(
+      `create schema ${schema}; grant usage on schema ${schema} to public;`,
+      check10,
+    );
+    expect(found).toEqual([`${schema}: analytics_reader holds USAGE on the schema`]);
+  });
+
+  it.each(SHAPES)(
+    'a security definer function in %s the reader may execute counts only with the schema’s USAGE (%s)',
+    async (schema, name) => {
+      const fn = `create schema ${schema};
+        create function ${schema}.${name}() returns int language sql security definer
+          set search_path = pg_catalog as $f$ select 1 $f$;`;
+      expect(await after(fn, check10)).toEqual([]);
+      expect(await after(`${fn} grant usage on schema ${schema} to public;`, check10)).toEqual([
+        `${schema}: analytics_reader holds USAGE on the schema`,
+        `${schema}.${name}(): analytics_reader may execute this security definer function`,
+      ]);
+    },
+  );
 });
 
 describe('the ledger guard allows exactly analytics.ledger_monthly', () => {

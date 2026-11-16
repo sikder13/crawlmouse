@@ -247,7 +247,7 @@ describe('the dry run', () => {
     expect(
       summary.steps.find((s) => s.step === "Branch extensions match production's")!.result,
     ).toBe(
-      'extensions equal to production after alignment: yes, differences: none; dropped on the branch: pgcrypto',
+      'extensions equal to production after alignment: yes, differences: none; dropped on the branch: pgcrypto; created on the branch: none',
     );
     expect(h.calls).toEqual([
       'create pr-ext',
