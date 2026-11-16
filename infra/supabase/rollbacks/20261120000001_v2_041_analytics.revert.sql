@@ -5,9 +5,10 @@
 -- `drop owned by`: since PG16 that needs the role's own privileges, which Supabase's non-superuser
 -- `postgres` does not hold on a role it created, so the revert would abort there.)
 --
--- First, PUBLIC gets back what the migration's section 5 revoked from it, as recorded in the comment
--- on schema `analytics`: each privilege on each object that still exists, and nothing else. With no
--- `analytics` schema there is no record and nothing to give back.
+-- First, PUBLIC gets back the SELECT on pg_stat_statements' views that the migration's section 5
+-- revoked, as recorded in the comment on schema `analytics`: each recorded privilege on each view that
+-- still exists, and nothing else. With no `analytics` schema there is no record and nothing to give
+-- back.
 do $$
 declare
   e jsonb;
@@ -20,12 +21,10 @@ begin
       obj_description('analytics'::regnamespace, 'pg_namespace')::jsonb, '[]'::jsonb))
   loop
     if e->>'privilege' not in ('SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES',
-                               'TRIGGER', 'MAINTAIN', 'USAGE', 'CREATE') then
+                               'TRIGGER', 'MAINTAIN') then
       raise exception 'the record on schema analytics names an unknown privilege: %', e;
     end if;
-    if e->>'kind' = 'schema' and to_regnamespace(e->>'object') is not null then
-      execute format('grant %s on schema %s to public', e->>'privilege', e->>'object');
-    elsif e->>'kind' = 'table' and to_regclass(e->>'object') is not null then
+    if to_regclass(e->>'object') is not null then
       execute format('grant %s on table %s to public', e->>'privilege', e->>'object');
     end if;
   end loop;

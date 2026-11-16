@@ -527,11 +527,9 @@ describe('the revert as Supabase runs it', () => {
 
 /**
  * Supabase-shaped stand-ins for what a project carries outside the migrations: pg_stat_statements'
- * two views in `extensions` (PUBLIC SELECT, `=r/postgres` on production, and dashboard_user's own
- * grant), and pg_net's schema (PUBLIC USAGE and every privilege on its tables, as the dry-run branch
- * had them on 2026-11-16) with a named role's grants beside PUBLIC's. `net.partial` is a table PUBLIC
- * holds one privilege on and `net.untouched` one it holds nothing on, so a revert that restored more
- * than was revoked would show.
+ * two views in `extensions`, with PUBLIC SELECT (`=r/postgres` on production, 2026-11-16) and
+ * dashboard_user's own grant beside it. `extensions.other` is a view PUBLIC holds SELECT on that the
+ * migration does not name, so a revoke that reached past the two views would show.
  */
 const SUPABASE_EXTRAS = `
   create role dashboard_user;
@@ -539,23 +537,16 @@ const SUPABASE_EXTRAS = `
   grant usage on schema extensions to anon, authenticated, service_role, dashboard_user;
   create view extensions.pg_stat_statements as select 1::bigint as calls;
   create view extensions.pg_stat_statements_info as select 1::bigint as dealloc;
-  grant select on extensions.pg_stat_statements, extensions.pg_stat_statements_info to public;
+  create view extensions.other as select 1::bigint as n;
+  grant select on extensions.pg_stat_statements, extensions.pg_stat_statements_info,
+                  extensions.other to public;
   grant select on extensions.pg_stat_statements, extensions.pg_stat_statements_info to dashboard_user;
-  create schema net;
-  grant usage on schema net to public;
-  grant usage on schema net to service_role;
-  create table net.http_request_queue (id bigint);
-  create table net._http_response (id bigint);
-  grant all on all tables in schema net to public;
-  grant select, insert on net.http_request_queue to service_role with grant option;
-  create table net.partial (id bigint);
-  grant select on net.partial to public;
-  create table net.untouched (id bigint);
+  grant select, insert on extensions.pg_stat_statements_info to service_role with grant option;
 `;
 
 /**
- * One line per grantee and privilege on the schemas `extensions` and `net` and the relations in
- * them, computed here from the catalog and not with the migration's own query.
+ * One line per grantee and privilege on the schema `extensions` and the relations in it, computed
+ * here from the catalog and not with the migration's own query.
  */
 const extrasAcl = async (d: PGlite) =>
   (
@@ -565,22 +556,24 @@ const extrasAcl = async (d: PGlite) =>
                 a.is_grantable as gr
            from pg_class c join pg_namespace n on n.oid = c.relnamespace,
                 aclexplode(coalesce(c.relacl, acldefault('r', c.relowner))) a
-          where n.nspname in ('extensions', 'net')
+          where n.nspname = 'extensions'
          union all
          select n.nspname::text, a.grantee, a.privilege_type, a.is_grantable
            from pg_namespace n, aclexplode(coalesce(n.nspacl, acldefault('n', n.nspowner))) a
-          where n.nspname in ('extensions', 'net')) x
+          where n.nspname = 'extensions') x
          cross join lateral (select case x.grantee when 0 then 'PUBLIC'
                                      else pg_get_userbyid(x.grantee) end as g) r
         order by 1`,
     )
   ).rows.map((r) => r.line);
 
-/** Every migration but 041, the stand-ins, then 041: the order production and a branch see. */
-async function withExtras(): Promise<PGlite> {
+const TARGETS = /^extensions\.pg_stat_statements(_info)? PUBLIC /;
+
+/** Every migration but 041, the stand-ins (and `extra`), then 041: the order production sees. */
+async function withExtras(extra = ''): Promise<PGlite> {
   const d = await freshDb();
   await applyAllMigrations(d, undefined, (f) => f !== MIGRATION);
-  await d.exec(SUPABASE_EXTRAS);
+  await d.exec(SUPABASE_EXTRAS + extra);
   return d;
 }
 
@@ -593,30 +586,26 @@ const section5 = () => {
 };
 
 describe('what analytics_reader would hold through PUBLIC', () => {
-  it('the migration takes PUBLIC’s grants on pg_stat_statements and net, and only those', async () => {
+  it('the migration takes PUBLIC’s SELECT on pg_stat_statements’ two views, and only that', async () => {
     const d = await withExtras();
     const before = await extrasAcl(d);
-    // The stand-ins hold what production and the branch held.
     expect(before).toEqual(
       expect.arrayContaining([
         'extensions.pg_stat_statements PUBLIC SELECT',
         'extensions.pg_stat_statements_info PUBLIC SELECT',
         'extensions.pg_stat_statements dashboard_user SELECT',
-        'net PUBLIC USAGE',
-        'net.http_request_queue PUBLIC INSERT',
-        'net._http_response PUBLIC DELETE',
-        'net.partial PUBLIC SELECT',
+        'extensions.other PUBLIC SELECT',
       ]),
     );
     await d.exec(readMigration(MIGRATION));
     const after = await extrasAcl(d);
-    expect(after).toEqual(before.filter((l) => !l.includes(' PUBLIC ')));
+    expect(after).toEqual(before.filter((l) => !TARGETS.test(l)));
     expect(after).toContain('extensions.pg_stat_statements dashboard_user SELECT');
     expect(after).toContain('extensions.pg_stat_statements_info dashboard_user SELECT');
-    expect(after).toContain('net service_role USAGE');
-    expect(after).toContain('net.http_request_queue service_role INSERT*');
-    expect(after).toContain('extensions anon USAGE');
-    expect(await check10(d)).toEqual([]);
+    expect(after).toContain('extensions.pg_stat_statements_info service_role INSERT*');
+    expect(after).toContain('extensions.other PUBLIC SELECT');
+    // Check 10 reports only the view the migration leaves alone.
+    expect(await check10(d)).toEqual(['extensions.other: analytics_reader holds SELECT']);
   }, 180_000);
 
   it('the revert gives PUBLIC back exactly what it held, also after the migration ran twice', async () => {
@@ -625,46 +614,47 @@ describe('what analytics_reader would hold through PUBLIC', () => {
     await d.exec(readMigration(MIGRATION));
     await d.exec(readMigration(MIGRATION));
     await d.exec(readRollback(REVERT));
-    const reverted = await extrasAcl(d);
-    expect(reverted).toEqual(before);
-    // PUBLIC held one privilege on net.partial and none on net.untouched; it holds the same now.
-    expect(reverted.filter((l) => /^net\.(partial|untouched) PUBLIC /.test(l))).toEqual([
-      'net.partial PUBLIC SELECT',
-    ]);
+    expect(await extrasAcl(d)).toEqual(before);
     // Applied again after the revert, it takes them again.
     await d.exec(readMigration(MIGRATION));
-    expect(await extrasAcl(d)).toEqual(before.filter((l) => !l.includes(' PUBLIC ')));
+    expect(await extrasAcl(d)).toEqual(before.filter((l) => !TARGETS.test(l)));
     await d.exec(readRollback(REVERT));
     expect(await extrasAcl(d)).toEqual(before);
   }, 180_000);
 
-  it('with neither extension installed it revokes nothing and the revert grants nothing', async () => {
+  it('the revert grants nothing PUBLIC did not hold', async () => {
+    const d = await withExtras(`revoke select on extensions.pg_stat_statements_info from public;`);
+    const before = await extrasAcl(d);
+    expect(before).not.toContain('extensions.pg_stat_statements_info PUBLIC SELECT');
+    await d.exec(readMigration(MIGRATION));
+    await d.exec(readRollback(REVERT));
+    const reverted = await extrasAcl(d);
+    expect(reverted).toEqual(before);
+    expect(reverted.filter((l) => TARGETS.test(l))).toEqual([
+      'extensions.pg_stat_statements PUBLIC SELECT',
+    ]);
+  }, 180_000);
+
+  it('with pg_stat_statements absent it revokes nothing and records nothing', async () => {
     const { rows } = await db.query<{ c: string | null }>(
       `select obj_description('analytics'::regnamespace, 'pg_namespace') as c`,
     );
     expect(rows[0]!.c).toBe('[]');
-    const d = await freshDb();
-    await applyAllMigrations(d);
-    await d.exec(readRollback(REVERT));
-    const { rows: granted } = await d.query(
-      `select 1 from pg_namespace where nspname in ('extensions', 'net')`,
-    );
-    expect(granted).toEqual([]);
-  }, 180_000);
+  });
 
-  it('fails, naming the object, when the role running it cannot revoke PUBLIC’s grant', async () => {
+  it('fails, naming the view, when the role running it cannot revoke PUBLIC’s grant', async () => {
     const d = await freshDb();
     await d.exec(`
-      create role net_owner;
+      create role ext_owner;
       create role runner;
-      create schema net authorization net_owner;
-      set role net_owner;
-      grant usage on schema net to public;
-      create table net.http_request_queue (id bigint);
-      grant all on net.http_request_queue to public;
+      create schema extensions authorization ext_owner;
+      set role ext_owner;
+      grant usage on schema extensions to public;
+      create view extensions.pg_stat_statements as select 1::bigint as calls;
+      grant select on extensions.pg_stat_statements to public;
       reset role;
       create schema analytics authorization runner;`);
-    // runner holds PUBLIC's privileges and no grant option, so Postgres only warns and revokes
+    // runner holds PUBLIC's SELECT and no grant option, so Postgres only warns and revokes
     // nothing; the migration must turn that into an error.
     const message = await d.exec(`set role runner;\n${section5()}`).then(
       () => 'applied',
@@ -672,7 +662,7 @@ describe('what analytics_reader would hold through PUBLIC', () => {
     );
     await d.exec(`reset role`);
     expect(message).toMatch(/PUBLIC still holds/);
-    expect(message).toContain('net.http_request_queue');
+    expect(message).toContain('extensions.pg_stat_statements');
   }, 120_000);
 });
 
