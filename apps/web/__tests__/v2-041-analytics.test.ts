@@ -572,6 +572,25 @@ describe('10-analytics-no-pii', () => {
       'research: analytics_reader holds USAGE on the schema',
     ],
     [
+      'PUBLIC SELECT on pg_stat_statements',
+      `create schema extensions;
+       create view extensions.pg_stat_statements as select 1::bigint as calls;
+       grant select on extensions.pg_stat_statements to public`,
+      'extensions.pg_stat_statements: analytics_reader holds SELECT',
+    ],
+    [
+      "PUBLIC INSERT on pg_net's request queue",
+      `create schema net;
+       create table net.http_request_queue (id bigint);
+       grant insert on net.http_request_queue to public`,
+      'net.http_request_queue: analytics_reader holds INSERT',
+    ],
+    [
+      'PUBLIC USAGE on schema net',
+      `create schema net; grant usage on schema net to public`,
+      'net: analytics_reader holds USAGE on the schema',
+    ],
+    [
       'a client grant on a view',
       `grant select on analytics.accounts to authenticated`,
       'analytics.accounts: authenticated holds SELECT',
