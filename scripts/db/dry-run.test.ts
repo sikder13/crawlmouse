@@ -4,6 +4,7 @@ import type { PGlite } from '@electric-sql/pglite';
 import { describe, expect, it } from 'vitest';
 import { listChecks } from './check';
 import { dryRun, replayError, type DryRunDeps } from './dry-run';
+import { EXTENSIONS_SQL } from './extensions';
 import { listMigrations, type MigrationFile } from './files';
 import { readFingerprint } from './fingerprint';
 import { diffHistory, readHistory } from './history';
@@ -175,6 +176,7 @@ describe('the dry run', () => {
     expect(summary.steps.map((s) => s.step)).toEqual([
       'Create the branch from production',
       'Branch replayed every recorded migration',
+      "Branch extensions match production's",
       'Branch fingerprint equals the production fingerprint',
       'History is clean and each pending file has a rollback',
       'supabase db push',
@@ -197,6 +199,68 @@ describe('the dry run', () => {
     expect(renderDryRun(summary)).toContain(
       `| \`${summary.files[0]!.file}\` | \`${summary.files[0]!.sha256}\` |`,
     );
+  }, 300_000);
+
+  it('drops on the branch, before any push, an extension production lacks, and only writes to the branch', async () => {
+    // Production without pgcrypto, the branch with it: the shape pg_net had on 2026-11-16.
+    const h = await harness({ productionSetup: 'drop extension pgcrypto' });
+    const productionTexts: string[] = [];
+    const productionWrites: string[] = [];
+    const deps: DryRunDeps = {
+      ...h.deps,
+      production: () => {
+        const db = h.deps.production();
+        return {
+          ...db,
+          query: (text, params) => {
+            productionTexts.push(text);
+            return db.query(text, params);
+          },
+          exec: async (text) => {
+            productionWrites.push(text);
+            throw new Error('production is read-only in a dry run');
+          },
+          transaction: async () => {
+            throw new Error('production is read-only in a dry run');
+          },
+        };
+      },
+      connect: (url) => {
+        const db = h.deps.connect(url);
+        return {
+          ...db,
+          exec: async (text) => {
+            if (/^\s*drop extension\b/i.test(text)) h.calls.push(text);
+            return db.exec(text);
+          },
+        };
+      },
+    };
+    const summary = await dryRun(deps, {
+      files,
+      checkFiles: V2_SET_CHECKS,
+      branch: 'pr-ext',
+      commit: 'abc',
+    });
+    expect(summary.steps.filter((s) => s.result.startsWith('FAILED'))).toEqual([]);
+    expect(summary.passed).toBe(true);
+    expect(
+      summary.steps.find((s) => s.step === "Branch extensions match production's")!.result,
+    ).toBe(
+      'extensions equal to production after alignment: yes, differences: none; dropped on the branch: pgcrypto',
+    );
+    expect(h.calls).toEqual([
+      'create pr-ext',
+      'drop extension "pgcrypto"',
+      'push --dry-run',
+      'push',
+      'push --dry-run',
+      'push',
+    ]);
+    expect(h.logged).toContain('dropped extension pgcrypto (production does not have it)');
+    // production's exec and transaction throw above, so a write would have failed the run.
+    expect(productionWrites).toEqual([]);
+    expect(productionTexts).toContain(EXTENSIONS_SQL);
   }, 300_000);
 
   it('fails before any push when the branch is not a copy of production, naming the section', async () => {
