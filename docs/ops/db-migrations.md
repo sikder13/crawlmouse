@@ -31,19 +31,29 @@ The scripts behind them are in `scripts/db`. Their tests:
       and its error: the run log's first error line when Supabase kept a log, otherwise the error
       its recorded statements raise on the branch, run in a transaction that is rolled back. The
       branch reports healthy before its replay has run, so this step comes before any comparison;
-   3. compare the branch's fingerprint (`infra/supabase/checks/fingerprint.sql`) with
+   3. make the branch's extensions match production's (`scripts/db/extensions.ts`): read
+      production's `pg_extension` through the read-only endpoint, drop on the branch each extension
+      production does not have (a plain `drop extension`, never `cascade`, so a drop that anything
+      outside the extension depends on fails the step), print each dropped name in the job log,
+      and print, without installing it, each extension production has and the branch lacks. Its
+      summary line starts `extensions equal to production after alignment:` with yes or no, then
+      the differences and the extensions dropped. Why it exists: on 2026-11-16 the branch for
+      pull request 89 had pg_net, with PUBLIC grants on schema `net` and its tables, and
+      production had no `net` schema; check 10 failed on the branch for a reason production did
+      not share, and the fingerprint reported equal, because it leaves extensions out by design;
+   4. compare the branch's fingerprint (`infra/supabase/checks/fingerprint.sql`) with
       production's, section by section, and fail on a difference;
-   4. read the branch's migration history: fail if it needs the repair in §5, if a pending file
+   5. read the branch's migration history: fail if it needs the repair in §5, if a pending file
       has no rollback, or if the pull request changes a migration file that is already applied
       (production would never receive the change: add a new migration instead). A changed file
       whose history row holds exactly its bytes, as one statement, passes: it was applied before
       the merge, as in §9;
-   5. `supabase db push`, after checking that the CLI's list equals the pending files;
-   6. run the checks in §6;
-   7. run each pending file again in its own transaction, and fail if the fingerprint changes;
-   8. run the rollbacks in reverse order, and fail unless the fingerprint equals production's;
-   9. `supabase db push` again, and fail unless the fingerprint equals the first push's;
-   10. if the pull request changes the rollback of an applied migration, revert the migrations
+   6. `supabase db push`, after checking that the CLI's list equals the pending files;
+   7. run the checks in §6;
+   8. run each pending file again in its own transaction, and fail if the fingerprint changes;
+   9. run the rollbacks in reverse order, and fail unless the fingerprint equals production's;
+   10. `supabase db push` again, and fail unless the fingerprint equals the first push's;
+   11. if the pull request changes the rollback of an applied migration, revert the migrations
        from that one on, newest first, push them again, and fail if the fingerprint changes.
 
    The branch is deleted at the end of the run, pass or fail, and again when the pull request
@@ -120,6 +130,11 @@ The pull request comment names the failed step. The job log has the full output.
   its own, with its own pull request; a platform difference is reported, and the fingerprint is
   changed in a reviewed pull request only if the difference is shown to be the platform's.
 
+- **Branch extensions match production's** failed. Dropping an extension production does not
+  have failed on the branch: something outside the extension depends on it, or the branch's role
+  cannot drop it. The job log names the extension and Postgres's error. The step never uses
+  `cascade`; do not add it. A `no` in its result with the step passing means production has an
+  extension the branch lacks: it is printed, not installed.
 - **History is clean and each pending file has a rollback** failed. Either production's history
   needs the repair in §5, or a pending migration has no rollback file.
 - **supabase db push** failed. The CLI's error is in the log. A file that fails to apply leaves
@@ -151,8 +166,8 @@ committed by then, and the failure says what the revert restored.
   so rollbacks run newest first, one per run. The order is checked by the plan and again inside the
   rollback's transaction, after it locks the history table, so an apply run in between is
   seen (`pnpm --filter @crawlmouse/scripts exec vitest run db/production.test.ts db/rollback.test.ts`).
-- A rollback changed in a pull request is run on the branch by the dry run's step 9 before it
-  merges. Check its comment before dispatching. Step 9 reverts every migration from the changed
+- A rollback changed in a pull request is run on the branch by the dry run's step 11 before it
+  merges. Check its comment before dispatching. Step 11 reverts every migration from the changed
   one on, so it fails when one of them has no rollback file: adding a rollback for an old v1
   migration needs rollbacks for the migrations after it too.
 - Rollback and apply runs queue in separate groups: a push that queues an apply does not cancel a

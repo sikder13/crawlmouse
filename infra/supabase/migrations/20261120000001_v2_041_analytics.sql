@@ -255,7 +255,7 @@ grant select on all tables in schema analytics to analytics_reader;
 -- pg_net's schema `net` is not handled here. Its objects are not the migration role's to revoke on
 -- (a dry-run branch, 2026-11-16: "no privileges could be revoked"), and production has no `net`
 -- schema. If pg_net is installed while analytics_reader exists, check 10 reports `net` and the dry
--- run fails (docs/ops/go-live.md).
+-- run fails (docs/specs/v2/06b-data-foundations.md, the runbook's by-hand steps).
 -- Only PUBLIC's grants are revoked. The block fails if PUBLIC still holds one afterwards (a REVOKE by
 -- a role that is not the object's owner and holds no grant option only warns) or if any named role's
 -- grant changed. What PUBLIC held and lost is kept as JSON in the comment on schema `analytics`,
