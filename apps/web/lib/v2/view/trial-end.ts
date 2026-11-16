@@ -150,13 +150,19 @@ export function trialEndView(
     a.email_prefs.trial_reminder && (at(reminder) >= at(v.now) || sameDay(reminder, v.now, zone))
       ? COPY.reminderDue(dayDate(reminder, zone))
       : null;
-  const cardLine = !onFile
-    ? COPY.noCard
-    : card === null
-      ? ACCOUNT_COPY.cardManagedByOwner
-      : cancelled
-        ? COPY.cardCancelled(card, dayDate(end, zone))
-        : COPY.card(card, dayDate(end, zone));
+  // A trial whose subscription renews at its end charges the card Checkout took, recorded or not
+  // (CC-39 F8, ruling 5); only the owner can cancel it.
+  const charges = a.renews_at !== null;
+  const cardLine =
+    !onFile && !charges
+      ? COPY.noCard
+      : card !== null
+        ? cancelled
+          ? COPY.cardCancelled(card, dayDate(end, zone))
+          : COPY.card(card, dayDate(end, zone))
+        : owner && !onFile
+          ? COPY.card(null, dayDate(end, zone))
+          : ACCOUNT_COPY.cardManagedByOwner;
   const dashboard = ACCOUNT_NAV[0];
 
   const {

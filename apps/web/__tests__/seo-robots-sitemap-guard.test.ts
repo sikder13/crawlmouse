@@ -44,6 +44,21 @@ const SITEMAP_EXCLUDE = [
   ...V2_REWRITES.map((r) => r.to.split('/:')[0]!),
 ];
 
+// CC-40 D3: the sitemap entries with no real date of their own (`/*` names every path under one).
+const UNDATED = [
+  '/',
+  '/pricing',
+  '/ai-readiness-checker',
+  '/developers',
+  '/bot',
+  '/status',
+  '/takedown',
+  '/agencies',
+  '/check/*',
+  '/help',
+  '/help/*',
+];
+
 describe('robots.txt', () => {
   // robots moved from Next's `robots.ts` metadata convention to a route handler
   // (app/robots.txt/route.ts) so the file could carry the Content-Signal comment, which the
@@ -141,13 +156,35 @@ describe('sitemap.ts', () => {
     }
   });
 
-  it('every entry has a VALID lastModified date', async () => {
-    for (const e of await sitemap()) {
-      expect(e.lastModified, `${e.url} needs lastModified`).toBeTruthy();
-      const t = new Date(e.lastModified as string | number | Date).getTime();
-      expect(Number.isNaN(t), `${e.url} lastModified must be a valid date`).toBe(false);
-    }
-  });
+  // CC-40 D3: a page with no real date omits lastModified rather than claim the build's time. Only a
+  // path on UNDATED may omit it; every other entry carries a valid date, in both builds.
+  it.each(['', '1'])(
+    'every entry not on UNDATED has a VALID lastModified date, and only UNDATED omit it (flags=%j)',
+    async (flag) => {
+      vi.stubEnv('V2_BILLING', flag);
+      vi.stubEnv('V2_CHECKS_PUBLIC', flag);
+      try {
+        for (const e of await sitemap()) {
+          const path = new URL(e.url).pathname;
+          const undated = UNDATED.some((u) =>
+            u.endsWith('/*') ? path.startsWith(u.slice(0, -1)) : path === u,
+          );
+          if (undated) {
+            expect(
+              e.lastModified,
+              `${e.url} is undated and must omit lastModified`,
+            ).toBeUndefined();
+            continue;
+          }
+          expect(e.lastModified, `${e.url} needs lastModified`).toBeTruthy();
+          const t = new Date(e.lastModified as string | number | Date).getTime();
+          expect(Number.isNaN(t), `${e.url} lastModified must be a valid date`).toBe(false);
+        }
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    },
+  );
 });
 
 // CC-29: the new public pages answer 404 while their flag is off (/agencies under V2_BILLING, the

@@ -13,6 +13,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import type { Report } from '@crawlmouse/types/v2';
 import { noticeTo, refuse, type RequestBody } from '../account/route';
 import type { AgencyCapture } from '../agency/events';
+import { GONE_PAGE } from './share-gone';
 
 // ─── the token ───────────────────────────────────────────────────────────────────────────────────
 
@@ -227,23 +228,8 @@ export const shareTooMany = (retryAfterSeconds: number): Response =>
     { ...SHARE_HEADERS, 'Retry-After': String(Math.max(1, retryAfterSeconds)) },
   );
 
-/** What a link that no longer opens answers with. Static: nothing of the request or the link is in it. */
-export const GONE_PAGE = `<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="robots" content="noindex, nofollow">
-<meta name="referrer" content="no-referrer">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>This link no longer opens</title>
-</head>
-<body>
-<h1>This link no longer opens</h1>
-<p>It has expired or was withdrawn by the person who shared it. Ask them for a new link.</p>
-<p><a href="/">Crawlmouse</a></p>
-</body>
-</html>
-`;
+/** What a link that no longer opens answers with: `share-gone.ts`. */
+export { GONE_PAGE };
 
 const gone = (): Response =>
   new Response(GONE_PAGE, {

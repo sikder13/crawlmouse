@@ -2,7 +2,6 @@
 
 import { createContext, useContext, useState, type ReactNode } from 'react';
 import { Heading } from '../../Heading';
-import { ScrollRegion } from '../../ScrollRegion';
 import type { PacketBodyView, PacketFramework } from '../../../../lib/v2/view/fix';
 import { PacketActions } from '../segment/PacketActions';
 import { DownloadText } from './DownloadText';
@@ -34,10 +33,9 @@ export function usePacketChoice(): Choice {
 }
 
 /**
- * A body's block. Where it has both verify layers, its strict command (`exactLine`) is one line in
- * a strip that scrolls sideways (`ScrollRegion`: a tab stop while it overflows), between the text
- * above and below it: the command is whole in the page, for find-in-page and for selecting, and
- * takes one line of it however long it is.
+ * A body's block. Where it has both verify layers, its strict command (`exactLine`) is its own
+ * element between the text above and below it, wrapping inside the packet box as that text does:
+ * the command is whole in the page, for find-in-page and for selecting (CC-39 F4).
  */
 function PacketBlock({ body }: { body: PacketBodyView }) {
   const at = body.exactLine;
@@ -47,9 +45,9 @@ function PacketBlock({ body }: { body: PacketBodyView }) {
   return (
     <div className={styles.packet} data-v2-packet-layers="">
       <pre className={styles.packetPart}>{part(0, at)}</pre>
-      <ScrollRegion label="Exact check command" className={styles.exact}>
-        <pre className={styles.exactLine}>{lines[at]}</pre>
-      </ScrollRegion>
+      <pre className={styles.exactLine} data-v2-exact-check="">
+        {lines[at]}
+      </pre>
       <pre className={styles.packetPart}>{part(at + 1, lines.length)}</pre>
     </div>
   );

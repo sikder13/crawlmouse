@@ -16,14 +16,27 @@ export const REFUND_POLICY = 'We don’t refund partial periods except where the
 
 const MONEY_ENDS = `A plan, or a trial with a card, is set to end when its current period ends, and nothing more is charged. If that comes after the ${numberWord(RESTORE_DAYS)} days, it is cancelled when the account is erased.`;
 
+function whatFor(n: number): string[] {
+  return [
+    'Signing in stops at once, on every device.',
+    `For ${RESTORE_DAYS} days the restore link in the same email undoes it. After that ${
+      n === 1 ? 'the account, its' : 'the accounts, their'
+    } sites, checks and reports, and your sign-in are erased.`,
+    'A few things are kept: one-way fingerprints that stop a second free trial, any takedown request of yours that is still open, and public reports you published, which no longer name you.',
+  ];
+}
+
 export const DELETE_COPY = {
   title: 'Delete your account',
-  lead: 'Pressing the button deletes these accounts and everything in them:',
-  what: [
-    'Signing in stops at once, on every device.',
-    `For ${RESTORE_DAYS} days the restore link in the same email undoes it. After that the accounts, their sites, checks and reports, and your sign-in are erased.`,
-    'A few things are kept: one-way fingerprints that stop a second free trial, any takedown request of yours that is still open, and public reports you published, which no longer name you.',
-  ],
+  /** The lead, the restore line and the button follow how many accounts the link names (CC-39 D4). */
+  lead: (n: number) =>
+    n === 1
+      ? 'Pressing the button deletes this account and everything in it:'
+      : 'Pressing the button deletes these accounts and everything in them:',
+  /** What deleting does, for any number of accounts (the help article quotes it). */
+  what: whatFor(2),
+  /** The same, for the number of accounts the link names. */
+  whatFor,
   /**
    * A plan the confirm sets to end (`active`, or `trialing` with a card): true of a trial, which has
    * paid for nothing yet, as of a paid period.
@@ -36,7 +49,7 @@ export const DELETE_COPY = {
    * `unpaid` (overdue) and `paused` (on hold), so the sentence names no failure a pause has not had.
    */
   moneyNotCollected: `A plan whose payments are overdue or on hold is not set to end when you confirm. It is cancelled when the account is erased, after the ${numberWord(RESTORE_DAYS)} days.`,
-  button: 'Delete these accounts',
+  button: (n: number) => (n === 1 ? 'Delete this account' : 'Delete these accounts'),
   /** The account named by its sign-in address has no site. */
   noSite: 'no site yet',
 } as const;

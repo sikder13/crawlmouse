@@ -1,0 +1,73 @@
+/**
+ * CC-39 F10: on /sites/<id> at 1280px the "Settings for this site" card sat beside the alerts card at
+ * about 480px. Its controls (the schedule's three selects, "Yes, remove this site") stayed on one
+ * line, so the table outgrew the card: the controls were clipped at its right edge and the
+ * explanation column was squeezed to a word per line. Now the two cards stack up to 1300px (the
+ * shared breakpoint is 1100px), a control's fields wrap within their cell, and the explanation keeps
+ * a minimum width beside them.
+ *
+ * This reads the rules and the markup they key on; it does not measure layout. The controls are on
+ * a live page only (`LiveActions`), so the geometry check is on a live /sites/<id> (CC-39
+ * report-D3.md).
+ */
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { JSDOM } from 'jsdom';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { describe, expect, it } from 'vitest';
+import { LiveActions } from '../../components/v2/screens/account/LiveActions';
+import { SiteScreen } from '../../components/v2/screens/site/SiteScreen';
+import { shellPreview, sitePreview } from '../../app/(v2-preview)/v2-preview/_preview/accounts';
+
+const CSS = readFileSync(
+  resolve(__dirname, '../../components/v2/screens/site/SiteScreen.module.css'),
+  'utf8',
+);
+
+/** The body of the `@media` block whose condition is exactly `condition`. */
+function media(condition: string): string {
+  const at = CSS.indexOf(`@media ${condition} {`);
+  expect(at, condition).toBeGreaterThanOrEqual(0);
+  const next = CSS.indexOf('\n}', at);
+  return CSS.slice(at, next);
+}
+
+const classOf = (el: Element, name: string) =>
+  [...el.classList].some((c) => new RegExp(`^_${name}_`).test(c));
+
+describe('the site page’s settings card (CC-39 F10)', () => {
+  it('stacks the settings and alerts cards up to 1300px', () => {
+    expect(media('(max-width: 1300px)')).toMatch(
+      /\.panels\.panels \{\s*grid-template-columns: minmax\(0, 1fr\);\s*\}/,
+    );
+  });
+
+  it('wraps a control’s fields in their cell and keeps the explanation readable, off a phone', () => {
+    const wide = media('(min-width: 761px)');
+    expect(wide).toMatch(/\.settings td:last-child form \{[^}]*flex-wrap: wrap;/);
+    expect(wide).toMatch(/\.settings td:nth-child\(2\) \{[^}]*min-width: 12em;/);
+  });
+
+  it('carries the classes the rules key on, with each control in the row’s last cell', () => {
+    const html = renderToStaticMarkup(
+      <LiveActions>
+        <SiteScreen data={sitePreview('home')} shell={shellPreview('home')} />
+      </LiveActions>,
+    );
+    const doc = new JSDOM(html).window.document;
+    const table = doc.querySelector('table[aria-label="Site settings"]')!;
+    const section = table.closest('section')!.parentElement!;
+    expect(classOf(section, 'panels')).toBe(true);
+    expect(classOf(table.parentElement!, 'settings')).toBe(true);
+    const rows = [...table.querySelectorAll('tbody tr')];
+    expect(rows.length).toBeGreaterThan(0);
+    const forms = rows.flatMap((tr) => [...tr.querySelectorAll('form')]);
+    expect(forms.length).toBeGreaterThan(0);
+    for (const form of forms) {
+      const cells = [...form.closest('tr')!.children];
+      expect(cells.indexOf(form.closest('td')!)).toBe(cells.length - 1);
+    }
+    // The schedule's selects are drawn on the live page, inside that last cell.
+    expect(forms.some((f) => f.querySelectorAll('select').length >= 2)).toBe(true);
+  });
+});

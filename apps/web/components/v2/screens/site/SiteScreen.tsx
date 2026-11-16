@@ -200,7 +200,7 @@ export function SiteScreen({
         )}
       </Card>
 
-      <section className={`${shared.two} ${shared.twoWide}`}>
+      <section className={`${shared.two} ${shared.twoWide} ${styles.panels}`}>
         <Card as="section" className={shared.panel}>
           <CardHead title="Settings for this site" />
           <Table

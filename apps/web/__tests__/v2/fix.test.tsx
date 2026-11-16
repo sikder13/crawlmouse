@@ -157,16 +157,14 @@ describe('the packet block’s two verify layers', () => {
     expect([...at].sort((a, b) => a - b)).toEqual(at);
   });
 
-  it('holds the whole strict command in the HTML, alone on the line of a strip that scrolls', () => {
-    const strip = markup.match(
-      /<div[^>]*data-v2-scroll-region=""[^>]*><pre[^>]*>([^<]*)<\/pre><\/div>/,
-    );
-    expect(strip).not.toBeNull();
-    expect(text(strip![1]!)).toBe(`    ${long}`);
+  it('holds the whole strict command in the HTML, alone in its own element', () => {
+    const exact = markup.match(/<pre[^>]*data-v2-exact-check=""[^>]*>([^<]*)<\/pre>/);
+    expect(exact).not.toBeNull();
+    expect(text(exact![1]!)).toBe(`    ${long}`);
     // Once in the page: the block is not also printed whole beside its parts.
     expect(text(markup).split(long)).toHaveLength(2);
-    // The readable command is not in the strip: it stays in the text above, which wraps.
-    expect(text(strip![1]!)).not.toContain(seeFor('nextjs').command);
+    // The readable command is not in it: it stays in the text above.
+    expect(text(exact![1]!)).not.toContain(seeFor('nextjs').command);
   });
 
   it('a packet without a readable command is one block, as the locked screen has it', () => {

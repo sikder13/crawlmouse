@@ -214,7 +214,7 @@ function seoCard(c: Check, prev: Check | null, zone: string): GradeCardView {
   const parts = [
     t?.site_structure_score != null ? `Structure ${Math.round(t.site_structure_score)}` : null,
     s ? `Orphans ${s.orphan_pages}` : null,
-    s ? `Depth ${s.avg_click_depth}` : null,
+    s ? `Depth ${s.avg_click_depth.toFixed(1)}` : null,
   ].filter(Boolean);
   return {
     label: 'Technical SEO',

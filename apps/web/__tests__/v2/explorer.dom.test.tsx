@@ -368,8 +368,8 @@ describe('the framework switch, operated', () => {
     /** The block as the page holds it: the text above the strict command, the command, the rest. */
     const parts = (host: HTMLElement) =>
       [...host.querySelectorAll('[data-v2-packet-layers] pre')].map((p) => p.textContent!);
-    const strip = (host: HTMLElement) =>
-      host.querySelector<HTMLElement>('[data-v2-scroll-region]')!;
+    const exactCheck = (host: HTMLElement) =>
+      host.querySelector<HTMLElement>('[data-v2-exact-check]')!;
 
     it('shows both layers of the body chosen, and the switch changes both', () => {
       const host = layeredPage();
@@ -389,8 +389,8 @@ describe('the framework switch, operated', () => {
         expect(at.every((n) => n >= 0)).toBe(true);
         expect([...at].sort((a, b) => a - b)).toEqual(at);
         expect(above!.endsWith('  Exact check')).toBe(true);
-        // The strict command is the one line of the strip that scrolls, whole.
-        expect(strip(host).textContent).toBe(command);
+        // The strict command is its own element, whole.
+        expect(exactCheck(host).textContent).toBe(command);
         expect(command).toBe(body.block.split('\n')[body.exactLine!]);
         expect(below).toContain('→ expect');
         // No other body's readable command is left in the page.
@@ -399,27 +399,6 @@ describe('the framework switch, operated', () => {
           expect(host.textContent).not.toContain(seeFor(other.key).today);
         }
       });
-    });
-
-    it('names the strip that scrolls and puts it in the tab order while the command overflows it', async () => {
-      const host = layeredPage();
-      const el = strip(host);
-      expect(el.getAttribute('tabindex')).toBeNull();
-      // jsdom lays nothing out: the widths of a command wider than its strip, set by hand.
-      Object.defineProperty(el, 'scrollWidth', { value: 4000, configurable: true });
-      Object.defineProperty(el, 'clientWidth', { value: 320, configurable: true });
-      // The region checks again at the next frame after its content changes, as a choice makes it.
-      await act(async () => {
-        toggles(host)[1]!.click();
-        await Promise.resolve();
-      });
-      act(() => {
-        vi.advanceTimersToNextFrame();
-      });
-      expect(strip(host)).toBe(el);
-      expect(strip(host).getAttribute('tabindex')).toBe('0');
-      expect(strip(host).getAttribute('role')).toBe('region');
-      expect(strip(host).getAttribute('aria-label')).toBe('Exact check command');
     });
   });
 

@@ -312,6 +312,8 @@ export function supabaseConsoleStore(
     },
 
     async dossier(accountId) {
+      // Each list read in order ends that order with `id`, so rows that tie on the column before it come
+      // back in one order every time (two sites added in the same millisecond share a `created_at`).
       const account = row<AccountRow>(
         'account',
         await admin.from('accounts').select(ACCOUNT_COLUMNS).eq('id', accountId).maybeSingle(),
@@ -324,6 +326,7 @@ export function supabaseConsoleStore(
           .select('id, user_id, role, status, accepted_at, removed_at')
           .eq('account_id', accountId)
           .order('created_at', { ascending: true })
+          .order('id', { ascending: true })
           .limit(limits.seats),
       );
       const userIds = unique(seats.map((s) => s.user_id));
@@ -341,6 +344,7 @@ export function supabaseConsoleStore(
           .select('id, host, paused_reason, removed_at')
           .eq('account_id', accountId)
           .order('created_at', { ascending: true })
+          .order('id', { ascending: true })
           .limit(limits.sites),
       );
       const siteIds = sites.map((s) => s.id);
@@ -354,6 +358,7 @@ export function supabaseConsoleStore(
                 .select('id, site_id, status, trigger, failure_reason, queued_at, finished_at')
                 .in('site_id', siteIds)
                 .order('queued_at', { ascending: false })
+                .order('id', { ascending: true })
                 .limit(limits.checks),
             );
       const mail = rows<MailRow>(
@@ -363,6 +368,7 @@ export function supabaseConsoleStore(
           .select('id, kind, status, attempts, error_code, claimed_at, sent_at')
           .eq('account_id', accountId)
           .order('claimed_at', { ascending: false })
+          .order('id', { ascending: true })
           .limit(limits.mail),
       );
       const rules = rows<RuleRow>(
@@ -388,6 +394,7 @@ export function supabaseConsoleStore(
                   rules.map((r) => r.id),
                 )
                 .order('sent_at', { ascending: false })
+                .order('id', { ascending: true })
                 .limit(limits.alerts),
             );
       const fixes =
@@ -401,6 +408,7 @@ export function supabaseConsoleStore(
                 .in('site_id', siteIds)
                 .in('status', ['open', 'reopened'])
                 .order('number', { ascending: true })
+                .order('id', { ascending: true })
                 .limit(limits.fixes),
             );
       const counted = await admin.rpc('operator_account_counts', {

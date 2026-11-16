@@ -2,13 +2,17 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { HelpIndexScreen } from '@/components/v2/screens/help/HelpScreens';
 import { checksPublicEnabled } from '@/lib/auth/flags';
+import { JsonLd, breadcrumbLd } from '@/lib/seo/jsonld';
 import { HELP_COPY } from '@/lib/v2/help/copy';
 import { HELP_INDEX_PATH, helpIndexView } from '@/lib/v2/help/view';
 import { socialCardPath } from '@/lib/v2/social-card';
 import { socialMetadata } from '@/lib/v2/social-metadata';
 import '@/styles/v2/tokens.css';
 
-/** Indexable (the root layout's robots apply); canonical to its own address, and shared as itself. */
+/**
+ * Indexable (the root layout's robots apply); canonical to its own address, and shared as itself.
+ * The page carries a BreadcrumbList (CC-40 D3).
+ */
 export const metadata: Metadata = {
   title: HELP_COPY.title,
   description: HELP_COPY.description,
@@ -28,5 +32,15 @@ export const metadata: Metadata = {
  */
 export default function HelpPage() {
   if (!checksPublicEnabled()) return notFound();
-  return <HelpIndexScreen data={helpIndexView()} />;
+  return (
+    <>
+      <JsonLd
+        data={breadcrumbLd([
+          { name: 'Home', path: '/' },
+          { name: HELP_COPY.title, path: HELP_INDEX_PATH },
+        ])}
+      />
+      <HelpIndexScreen data={helpIndexView()} />
+    </>
+  );
 }

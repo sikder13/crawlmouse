@@ -25,7 +25,7 @@ async function render(slug: string) {
 
 describe('/authors/[slug]', () => {
   it('builds a page only for authors with a post, and 404s every other slug', () => {
-    expect(generateStaticParams()).toEqual([{ slug: 'udaay-sikder' }]);
+    expect(generateStaticParams()).toEqual([{ slug: 'udaay-sikder' }, { slug: 'samia-zaman' }]);
     expect(dynamicParams).toBe(false);
   });
 
@@ -71,7 +71,7 @@ describe('/authors/[slug]', () => {
     expect(String(meta.description)).toContain('Udaay Sikder');
   });
 
-  it.each(['samia-zaman', 'nobody', '__proto__', 'constructor'])('404s %s', async (slug) => {
+  it.each(['nobody', '__proto__', 'constructor'])('404s %s', async (slug) => {
     // Next's notFound() throws an error whose digest is NEXT_HTTP_ERROR_FALLBACK;404; any other
     // throw would be a 500, not a 404.
     await expect(AuthorPage(props(slug))).rejects.toMatchObject({
@@ -82,11 +82,13 @@ describe('/authors/[slug]', () => {
 });
 
 describe('the sitemap lists published author pages', () => {
-  it('includes /authors/udaay-sikder and leaves out an author with no posts', async () => {
+  it('lists exactly the author pages of authors a post names', async () => {
     const { default: sitemap } = await import('../app/sitemap');
-    const urls = (await sitemap()).map((e) => e.url);
-    expect(urls).toContain('https://crawlmouse.com/authors/udaay-sikder');
-    expect(urls).not.toContain('https://crawlmouse.com/authors/samia-zaman');
+    const urls = (await sitemap()).map((e) => e.url).filter((u) => u.includes('/authors/'));
+    expect(urls).toEqual([
+      'https://crawlmouse.com/authors/udaay-sikder',
+      'https://crawlmouse.com/authors/samia-zaman',
+    ]);
   });
 
   it('dates the author and research entries by the newest post they list', async () => {
@@ -107,7 +109,7 @@ describe('the sitemap lists published author pages', () => {
       newest(postsByAuthor('udaay-sikder').map((p) => p.slug)),
     );
     expect(at('/blog/research')).toBe(newest(postsWithTag('research').map((p) => p.slug)));
-    // Independent of the helpers: the one research post's own date.
-    expect(at('/blog/research')).toBe(new Date('2026-10-28').getTime());
+    // Independent of the helpers: the one research post's own updatedAt (CC-40 D4 moved it).
+    expect(at('/blog/research')).toBe(new Date('2026-11-15').getTime());
   });
 });

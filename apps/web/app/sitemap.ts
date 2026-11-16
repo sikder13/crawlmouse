@@ -10,6 +10,8 @@ import { checksPublicEnabled } from '@/lib/auth/flags';
 import { billingV2Enabled } from '@/lib/billing/flags';
 import { CHECK_QUESTIONS, checkPath } from '@/lib/v2/copy/check-pages';
 import { HELP_SLUGS, helpPath } from '@/lib/v2/help/questions';
+import { CLUSTERS } from '@/lib/blog/clusters';
+import { LEGAL_UPDATED } from '@/lib/seo/page-dates';
 
 type ChangeFreq = NonNullable<MetadataRoute.Sitemap[number]['changeFrequency']>;
 
@@ -18,25 +20,32 @@ type ChangeFreq = NonNullable<MetadataRoute.Sitemap[number]['changeFrequency']>;
 // and the sitemap catches up within this window.
 export const revalidate = 3600;
 
+// The newest updatedAt among a list of posts.
+const newest = (list: readonly BlogPostMeta[]) =>
+  new Date(list.reduce((max, p) => (p.updatedAt > max ? p.updatedAt : max), ''));
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const now = new Date();
+  // CC-40 D3: an entry carries lastModified only when the page has a real date (its posts' newest
+  // updatedAt, or the date a legal page shows); one without omits it rather than claim the build's time.
   const entry = (
     path: string,
     priority: number,
     changeFrequency: ChangeFreq,
+    lastModified?: Date,
   ): MetadataRoute.Sitemap[number] => ({
     url: path ? siteUrl(path) : siteOrigin(),
-    lastModified: now,
+    ...(lastModified ? { lastModified } : {}),
     changeFrequency,
     priority,
   });
+  const guided = new Set(CLUSTERS.flatMap((c) => c.slugs));
 
   const marketing: MetadataRoute.Sitemap = [
     entry('', 1.0, 'weekly'),
     entry('/pricing', 0.9, 'monthly'),
     entry('/ai-readiness-checker', 0.9, 'monthly'),
-    entry('/blog', 0.8, 'weekly'),
-    entry('/guides', 0.8, 'weekly'),
+    entry('/blog', 0.8, 'weekly', newest(POSTS)),
+    entry('/guides', 0.8, 'weekly', newest(POSTS.filter((p) => guided.has(p.slug)))),
     entry('/developers', 0.7, 'monthly'),
     entry('/bot', 0.4, 'yearly'),
     entry('/status', 0.3, 'weekly'),
@@ -64,7 +73,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     '/aup',
     '/subprocessors',
     '/takedown',
-  ].map((p) => entry(p, 0.2, 'yearly'));
+  ].map((p) =>
+    entry(
+      p,
+      0.2,
+      'yearly',
+      Object.hasOwn(LEGAL_UPDATED, p) ? new Date(LEGAL_UPDATED[p]!) : undefined,
+    ),
+  );
 
   // Leaderboards (/top/*) are intentionally NOT listed here: their indexing is
   // page-controlled via the robots meta in app/top/[platform]/page.tsx (noindex
@@ -79,8 +95,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   // Tag pages (/blog/research) and author pages (/authors/<slug>), each listed once it lists a post.
   // Their lastModified is the newest updatedAt among the posts they list.
-  const newest = (list: readonly BlogPostMeta[]) =>
-    new Date(list.reduce((max, p) => (p.updatedAt > max ? p.updatedAt : max), ''));
   const listing = (path: string, list: readonly BlogPostMeta[]): MetadataRoute.Sitemap[number] => ({
     url: siteUrl(path),
     lastModified: newest(list),

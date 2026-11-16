@@ -20,6 +20,9 @@ const nextConfig = {
   typedRoutes: true,
   // No X-Powered-By: Next.js header (ZAP's baseline flags it; it tells a scanner what to try).
   poweredByHeader: false,
+  // AI crawlers don't run JavaScript, so metadata Next streams into <body> never reaches their <head>:
+  // every agent gets blocking metadata (CC-40 ruling 4; __tests__/next-config-html-limited-bots.test.ts).
+  htmlLimitedBots: /.*/,
   // PostHog reverse proxy: route /ingest/* to PostHog's US hosts so events survive ad-blockers.
   // skipTrailingSlashRedirect keeps PostHog's trailing-slash paths from 308-redirecting.
   skipTrailingSlashRedirect: true,

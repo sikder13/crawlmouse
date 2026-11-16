@@ -43,13 +43,16 @@ async function person(tag = 'p') {
   return { email, userId, accountId, seatId };
 }
 
-async function site(accountId: string | null, host = `${randomUUID().slice(0, 8)}.example`) {
-  const id = randomUUID();
-  await db.query(`insert into public.sites (id, account_id, host) values ($1, $2, $3)`, [
-    id,
-    accountId,
-    host,
-  ]);
+async function site(
+  accountId: string | null,
+  host = `${randomUUID().slice(0, 8)}.example`,
+  { id = randomUUID(), createdAt }: { id?: string; createdAt?: string } = {},
+) {
+  await db.query(
+    `insert into public.sites (id, account_id, host, created_at)
+     values ($1, $2, $3, coalesce($4::timestamptz, now()))`,
+    [id, accountId, host, createdAt ?? null],
+  );
   return { id, host };
 }
 
@@ -252,8 +255,10 @@ describe('dossier bounds', () => {
        values ($1, $2, $3, 'developer', 'active', now())`,
       [p.accountId, dev.userId, dev.email],
     );
-    const s1 = await site(p.accountId);
-    await site(p.accountId);
+    // Two inserts in a row can share a `created_at`, and then either site may come first; the dates
+    // here are set apart so that `s1` is the older one.
+    const s1 = await site(p.accountId, undefined, { createdAt: '2026-11-01T10:00:00Z' });
+    await site(p.accountId, undefined, { createdAt: '2026-11-01T11:00:00Z' });
     const c1 = await check(s1.id, 'failed', 2);
     const c2 = await check(s1.id, 'failed', 1);
     for (let i = 0; i < 2; i++) {
@@ -316,6 +321,48 @@ describe('dossier bounds', () => {
         String(calls[0]![1]),
       ).toBe(true);
     }
+  });
+});
+
+describe('dossier order', () => {
+  it('sites with the same created_at come back in id order, whichever was added first', async () => {
+    const p = await person();
+    const at = { createdAt: '2026-11-01T10:00:00Z' };
+    // Eight ids, added highest first, so neither the order they were added in nor where the rows
+    // land on disk gives id order: only an order that ends with `id` does (1 in 8! by chance).
+    const ids = Array.from({ length: 8 }, (_, k) => `0000000${k}-0000-4000-8000-000000000000`);
+    for (const id of [...ids].reverse()) await site(p.accountId, undefined, { ...at, id });
+    expect((await store.dossier(p.accountId))!.sites.map((s) => s.id)).toEqual(ids);
+    const one = { seats: 1, sites: 1, checks: 1, mail: 1, rules: 1, alerts: 1, fixes: 1 };
+    const first = (await supabaseConsoleStore(postgrestOver(db), operatorId, one).dossier(
+      p.accountId,
+    ))!;
+    expect(first.sites.map((s) => s.id)).toEqual([ids[0]]);
+  });
+
+  it('each list it reads in order ends that order with id', async () => {
+    const p = await person();
+    await check((await site(p.accountId)).id, 'failed', 1);
+    await insertRow(db, 'alert_rules', ROWS.alert_rules(randomUUID(), p.accountId, null));
+    const log: Call[][] = [];
+    await supabaseConsoleStore(postgrestOver(db, { log }), operatorId).dossier(p.accountId);
+    const ordered = log
+      .filter((calls) => calls[0]![0] === 'from')
+      .map((calls) => ({
+        table: String(calls[0]![1]),
+        orders: calls.filter(([m]) => m === 'order').map((c) => c[1]),
+      }))
+      .filter((r) => r.orders.length > 0);
+    expect(ordered.map((r) => r.table)).toEqual([
+      'seats',
+      'sites',
+      'checks',
+      'email_sends',
+      'alert_rules',
+      'alert_events',
+      'site_fixes',
+    ]);
+    for (const r of ordered) expect(r.orders.at(-1), r.table).toBe('id');
   });
 });
 

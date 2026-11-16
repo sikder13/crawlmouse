@@ -8,8 +8,13 @@ import type { BlogTag } from './tags';
 export interface BlogPostMeta {
   /** URL slug: /blog/<slug> */
   slug: string;
-  /** H1 + <title> (before the "· Crawlmouse" suffix). */
+  /** H1, the Article headline, and the <title> unless `seoTitle` is set. */
   title: string;
+  /**
+   * The search-result title (<title>, Open Graph, Twitter) where it differs from the H1. Set only by a
+   * recorded ruling (lib/blog/ruled-copy.ts).
+   */
+  seoTitle?: string;
   /** Meta description (~150–160 chars). */
   description: string;
   /** Short blurb for the index card. */
@@ -44,7 +49,7 @@ export const POSTS: readonly BlogPostMeta[] = [
       'ai crawler research 2026',
     ],
     publishedAt: '2026-10-28',
-    updatedAt: '2026-10-28',
+    updatedAt: '2026-11-15',
     readingMinutes: 11,
     author: 'udaay-sikder',
     tags: ['research'],
@@ -53,8 +58,9 @@ export const POSTS: readonly BlogPostMeta[] = [
     slug: 'cloudflare-ai-crawler-defaults-september-15',
     title:
       "Cloudflare Starts Blocking AI Crawlers by Default on September 15. Here's Who It Affects — and How to Check Your Site",
+    seoTitle: 'Cloudflare Now Blocks AI Crawlers by Default: Check Your Site',
     description:
-      "From September 15, 2026, Cloudflare blocks Training and Agent crawlers by default on ad pages. What changes, who's affected, and how to check your site.",
+      "Cloudflare blocks AI training and agent crawlers by default from September 15, 2026 on ad pages. Who is affected and how to check your own site's settings.",
     excerpt:
       'On September 15, 2026, Cloudflare changes what happens to AI crawlers on a large slice of the web — by default, without site owners touching anything. Here is what actually changes, who it affects, and how to check where your site stands — from inside the dashboard and from the outside, the way a crawler sees it.',
     keywords: [
@@ -65,14 +71,16 @@ export const POSTS: readonly BlogPostMeta[] = [
       'check cloudflare ai bot settings',
     ],
     publishedAt: '2026-09-06',
-    updatedAt: '2026-09-06',
+    updatedAt: '2026-11-15',
     readingMinutes: 9,
+    author: 'samia-zaman',
   },
   {
     slug: 'screaming-frog-vs-lumar-deepcrawl',
     title: 'Screaming Frog vs Lumar (DeepCrawl): Desktop Tool vs Enterprise Platform',
+    seoTitle: 'Screaming Frog vs DeepCrawl (Lumar): Which Crawler to Use?',
     description:
-      'Screaming Frog and Lumar (formerly DeepCrawl) solve different problems at very different prices. An honest August 2026 comparison — and when you need neither.',
+      'Screaming Frog vs DeepCrawl (now Lumar): desktop crawler vs enterprise platform — pricing, monitoring and CI/CD compared, and when you need neither.',
     excerpt:
       'People still search "Screaming Frog vs DeepCrawl" — but DeepCrawl became Lumar, and the comparison changed. Desktop audits vs enterprise platform: an honest August 2026 breakdown of pricing, monitoring, CI/CD, and fit.',
     keywords: [
@@ -86,6 +94,7 @@ export const POSTS: readonly BlogPostMeta[] = [
     publishedAt: '2026-08-18',
     updatedAt: '2026-08-18',
     readingMinutes: 9,
+    author: 'samia-zaman',
   },
   {
     slug: 'find-orphan-pages-squarespace',
@@ -104,12 +113,14 @@ export const POSTS: readonly BlogPostMeta[] = [
     publishedAt: '2026-08-18',
     updatedAt: '2026-08-18',
     readingMinutes: 8,
+    author: 'samia-zaman',
   },
   {
     slug: 'block-ai-crawlers-robots-txt',
     title: 'Should You Block AI Crawlers? A robots.txt Guide for GPTBot, ClaudeBot & Co.',
+    seoTitle: 'Block AI Crawlers in robots.txt: GPTBot, ClaudeBot & More',
     description:
-      'Should you block GPTBot, ClaudeBot, and other AI crawlers? A practical 2026 robots.txt guide — what each bot does, what blocking costs, and copy-paste rules.',
+      'Block AI crawlers in robots.txt? What GPTBot, ClaudeBot and other bots do, what blocking costs, and copy-paste rules for each choice.',
     excerpt:
       'A quarter of top sites now block GPTBot, and Cloudflare blocks AI crawlers by default. Before you follow: training bots and AI search bots are different switches. A practical robots.txt guide with copy-paste rules for each stance.',
     keywords: [
@@ -123,12 +134,13 @@ export const POSTS: readonly BlogPostMeta[] = [
     publishedAt: '2026-08-18',
     updatedAt: '2026-09-06',
     readingMinutes: 9,
+    author: 'samia-zaman',
   },
   {
     slug: 'sitebulb-vs-jetoctopus-vs-oncrawl',
     title: 'Sitebulb vs JetOctopus vs Oncrawl: Cloud SEO Crawlers Compared',
     description:
-      'Sitebulb Cloud, JetOctopus, and Oncrawl are the main cloud SEO crawlers. An honest July 2026 comparison of pricing, log analysis, and which one fits your site.',
+      'Sitebulb vs JetOctopus vs Oncrawl: the cloud SEO crawlers compared on pricing, log-file analysis and scale, and which one fits your site.',
     excerpt:
       'Once your site outgrows a desktop crawler, you end up comparing Sitebulb Cloud, JetOctopus, and Oncrawl. Here is an honest July 2026 comparison — pricing, log analysis, JavaScript crawling, and when none of the three is the right spend.',
     keywords: [
@@ -142,12 +154,13 @@ export const POSTS: readonly BlogPostMeta[] = [
     publishedAt: '2026-07-22',
     updatedAt: '2026-08-18',
     readingMinutes: 10,
+    author: 'samia-zaman',
   },
   {
     slug: 'can-ai-crawlers-see-javascript',
     title: 'Can AI Crawlers See Your JavaScript Site? (How to Check)',
     description:
-      "AI crawlers like GPTBot and ClaudeBot don't run JavaScript, so a JS site can rank on Google yet be invisible to ChatGPT. Here's how to check what yours shows them.",
+      "Can AI crawlers see JavaScript? GPTBot, ClaudeBot and PerplexityBot don't execute it, so a JS site can rank on Google yet show them nothing. How to check.",
     excerpt:
       "Googlebot renders JavaScript; the AI crawlers behind ChatGPT, Claude, and Perplexity don't. Here is why a JS site can rank on Google yet be blank to AI search, and how to check yours.",
     keywords: [
@@ -163,12 +176,13 @@ export const POSTS: readonly BlogPostMeta[] = [
     publishedAt: '2026-07-06',
     updatedAt: '2026-08-18',
     readingMinutes: 11,
+    author: 'samia-zaman',
   },
   {
     slug: 'sitebulb-vs-screaming-frog',
     title: 'Sitebulb vs Screaming Frog: Which SEO Crawler Should You Use?',
     description:
-      "Sitebulb and Screaming Frog are the two big SEO crawlers. Here's an honest comparison of features, pricing, and which to pick — plus a free no-install option.",
+      'Sitebulb vs Screaming Frog: features, pricing and reports of the two big SEO crawlers compared, which one fits your work, and a free no-install option.',
     excerpt:
       'Screaming Frog and Sitebulb are the two big technical-SEO crawlers, and they overlap heavily. Here is an honest comparison of features, pricing, and learning curve — and when you need neither.',
     keywords: [
@@ -184,6 +198,7 @@ export const POSTS: readonly BlogPostMeta[] = [
     publishedAt: '2026-07-06',
     updatedAt: '2026-07-22',
     readingMinutes: 10,
+    author: 'samia-zaman',
   },
   {
     slug: 'find-orphan-pages-webflow',
@@ -203,13 +218,14 @@ export const POSTS: readonly BlogPostMeta[] = [
     publishedAt: '2026-07-06',
     updatedAt: '2026-07-06',
     readingMinutes: 8,
+    author: 'samia-zaman',
   },
   {
     slug: 'sitebulb-alternative',
     title: 'Sitebulb Alternatives (2026): Free and Paid Options, Honestly Compared',
+    seoTitle: 'Sitebulb Alternatives (2026): Free and Paid Options Compared',
     description:
-      'Six real Sitebulb alternatives compared with August 2026 pricing — free, paid, and open source. ' +
-      'Includes when Sitebulb is still the right choice.',
+      'Sitebulb alternatives with current pricing: free, paid and open-source crawlers compared honestly, and the cases where Sitebulb is still the right choice.',
     excerpt:
       'Sitebulb has no free tier and its pricing now runs $18–$245/month. Here are six real alternatives — ' +
       'free, paid, and open source — with current pricing and an honest note on when Sitebulb is still ' +
@@ -227,12 +243,14 @@ export const POSTS: readonly BlogPostMeta[] = [
     publishedAt: '2026-07-04',
     updatedAt: '2026-09-07',
     readingMinutes: 10,
+    author: 'samia-zaman',
   },
   {
     slug: 'discovered-currently-not-indexed',
     title: 'Discovered – Currently Not Indexed: Why It Happens and How to Fix It',
+    seoTitle: 'Discovered – Currently Not Indexed: Causes and Fixes',
     description:
-      "Discovered - currently not indexed means Google found your page but hasn't crawled it yet. Here's why it happens, and how stronger internal linking fixes it.",
+      'Discovered – currently not indexed: Google found the URL but has not crawled it. Why it happens, how to check, and how internal links get it crawled.',
     excerpt:
       'A page that returns 200 and sits in your sitemap can still refuse to index. Here is what the ' +
       'not-indexed statuses mean, and the internal-linking fix that actually moves them.',
@@ -247,6 +265,7 @@ export const POSTS: readonly BlogPostMeta[] = [
     publishedAt: '2026-07-04',
     updatedAt: '2026-07-04',
     readingMinutes: 9,
+    author: 'samia-zaman',
   },
   {
     slug: 'find-orphan-pages-shopify',
@@ -267,6 +286,7 @@ export const POSTS: readonly BlogPostMeta[] = [
     publishedAt: '2026-07-04',
     updatedAt: '2026-07-04',
     readingMinutes: 8,
+    author: 'samia-zaman',
   },
   {
     slug: 'find-orphan-pages-wordpress',
@@ -286,12 +306,14 @@ export const POSTS: readonly BlogPostMeta[] = [
     publishedAt: '2026-07-02',
     updatedAt: '2026-07-02',
     readingMinutes: 8,
+    author: 'samia-zaman',
   },
   {
     slug: 'screaming-frog-alternative',
     title: 'Screaming Frog Alternatives in 2026: Six Options, Compared Honestly',
+    seoTitle: 'Screaming Frog Alternatives (2026): 6 Options Compared',
     description:
-      'Six real Screaming Frog alternatives compared — free, browser-based, cloud, and open source — plus the honest cases where Screaming Frog is still the right tool.',
+      'Screaming Frog alternatives compared: free, browser-based, cloud and open-source crawlers, with prices, limits, and when Screaming Frog is still the pick.',
     excerpt:
       'Screaming Frog is the default answer to "how do I crawl my site" — and "default" is not the same as ' +
       '"right for you." Six real alternatives matched to the actual jobs people hire a crawler for, and the ' +
@@ -305,14 +327,16 @@ export const POSTS: readonly BlogPostMeta[] = [
       'screaming frog vs sitebulb',
     ],
     publishedAt: '2026-07-02',
-    updatedAt: '2026-09-07',
+    updatedAt: '2026-11-15',
     readingMinutes: 8,
+    author: 'samia-zaman',
   },
   {
     slug: 'how-deep-is-too-deep-crawl-depth',
     title: 'How Deep Is Too Deep? Crawl Depth Limits and How to Fix Buried Pages',
+    seoTitle: 'Crawl Depth: How Many Clicks Is Too Deep, and How to Fix It',
     description:
-      'How many clicks from your homepage is too many? A practical, site-size-aware guide to crawl depth limits — and exactly how to pull buried pages back up.',
+      "How deep is too deep? Crawl depth explained: how many clicks from the homepage is too many for your site's size, and how to pull buried pages back up.",
     excerpt:
       'There is no single magic number, but there is a clear answer for your site. Here is how deep is too deep by site size, why it matters, and how to fix the pages that slipped too far.',
     keywords: [
@@ -324,8 +348,9 @@ export const POSTS: readonly BlogPostMeta[] = [
       'click depth',
     ],
     publishedAt: '2026-06-30',
-    updatedAt: '2026-06-30',
+    updatedAt: '2026-11-15',
     readingMinutes: 8,
+    author: 'samia-zaman',
   },
   {
     slug: 'free-internal-link-audit',
@@ -346,6 +371,7 @@ export const POSTS: readonly BlogPostMeta[] = [
     publishedAt: '2026-06-12',
     updatedAt: '2026-07-02',
     readingMinutes: 8,
+    author: 'samia-zaman',
   },
   {
     slug: 'orphan-pages',
@@ -367,6 +393,7 @@ export const POSTS: readonly BlogPostMeta[] = [
     publishedAt: '2026-06-12',
     updatedAt: '2026-07-02',
     readingMinutes: 9,
+    author: 'samia-zaman',
   },
   {
     slug: 'crawl-depth-site-architecture',
@@ -377,8 +404,9 @@ export const POSTS: readonly BlogPostMeta[] = [
       'A page buried eight clicks deep gets crawled less, earns less internal authority, and ranks worse than the same content three clicks from home. Here is why, and what to do.',
     keywords: ['crawl depth', 'click depth seo', 'site architecture seo', 'page depth seo'],
     publishedAt: '2026-06-12',
-    updatedAt: '2026-06-12',
+    updatedAt: '2026-11-15',
     readingMinutes: 9,
+    author: 'samia-zaman',
   },
 ] as const;
 

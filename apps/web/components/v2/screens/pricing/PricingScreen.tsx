@@ -7,6 +7,7 @@ import { PageShell } from '../../PageShell';
 import { Table } from '../../Table';
 import { VisuallyHidden } from '../../VisuallyHidden';
 import { LOG_IN, MARKETING_NAV } from '../../footer-links';
+import { ACCOUNT_NAV } from '@/lib/v2/view/account-actions';
 import layout from '../../layout.module.css';
 import { Capability, ComingMark } from '../agencies/Capability';
 import { AgencyPlusForm, type ContactState } from './AgencyPlusForm';
@@ -14,6 +15,9 @@ import { PlanButton } from './PlanButton';
 import styles from './Pricing.module.css';
 
 export const AGENCY_PLUS_ANCHOR = 'agency-plus';
+
+/** The signed-in shell's first rail entry (Sites, the dashboard), offered in place of Log in. */
+const SIGNED_IN_ENTRY = ACCOUNT_NAV[0];
 
 /**
  * Final-Pricing (CC-29 D2): the three plans on the chosen interval, the Agency Plus row with its
@@ -28,9 +32,15 @@ export function PricingScreen({ view, contact }: { view: PricingView; contact?: 
       nav={MARKETING_NAV}
       footerLineMark={view.footerComing ? <ComingMark label={view.footerComing} /> : null}
       actions={
-        <Button variant="quiet" href={LOG_IN.href}>
-          {LOG_IN.label}
-        </Button>
+        view.signedIn ? (
+          <Button variant="quiet" href={SIGNED_IN_ENTRY.href}>
+            {SIGNED_IN_ENTRY.label}
+          </Button>
+        ) : (
+          <Button variant="quiet" href={LOG_IN.href}>
+            {LOG_IN.label}
+          </Button>
+        )
       }
     >
       <main>

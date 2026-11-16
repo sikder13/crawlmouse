@@ -161,12 +161,13 @@ describe('no kept target reaches a module that calls a route the cutover retires
 
 describe('nothing outside the v2 pages imports the kept group', () => {
   const KEPT = join(APP, '(v2-kept)');
-  /** Who may: the group itself, the report's target, the dev-only previews, and tests. */
+  /** Who may: the group itself, the report's target, the dev-only previews, tests and their helpers. */
   const mayImport = (file: string) =>
     file.startsWith(KEPT + '/') ||
     rel(file) === 'app/v2-report/[slug]/page.tsx' ||
     file.startsWith(join(APP, '(v2-preview)') + '/') ||
-    /\.test\.tsx?$/.test(file);
+    /\.test\.tsx?$/.test(file) ||
+    file.startsWith(join(WEB, '__tests__', 'helpers') + '/');
   const sources: string[] = [];
   const walk = (dir: string) => {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {

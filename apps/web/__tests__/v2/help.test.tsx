@@ -9,7 +9,8 @@
  * - the delete article says what `deletionMoney` says for each subscription state;
  * - every capability it names carries its `CAPABILITIES` key, a coming one with its mark, and its
  *   title and description, which a search result shows with no mark, name no coming capability;
- * - each page has one h1, its own canonical, title and description, and no FAQPage markup;
+ * - each page has one h1, its own canonical, title and description, and no FAQPage markup: its one
+ *   structured-data block is a BreadcrumbList (CC-40 D3);
  * - with V2_CHECKS_PUBLIC off, the index and each article are 404s.
  */
 import { MIN_GRADEABLE_PAGES } from '@crawlmouse/types';
@@ -624,7 +625,10 @@ describe('/help and /help/[slug] (D4)', () => {
     expect(await digestOf(() => Page(params('__proto__')))).toContain('404');
   });
 
-  /** One h1 holding `h1`, the page's own canonical, no robots of its own and no FAQPage markup. */
+  /**
+   * One h1 holding `h1`, the page's own canonical, no robots of its own, and no FAQPage markup: the
+   * one structured-data block is a BreadcrumbList (CC-40 D3).
+   */
   function expectPage(
     markup: string,
     meta: { alternates?: unknown; title?: unknown; description?: unknown; robots?: unknown },
@@ -636,7 +640,11 @@ describe('/help and /help/[slug] (D4)', () => {
     expect(meta.robots).toBeUndefined();
     expect(markup.match(/<h1/g)).toHaveLength(1);
     expect(markup.match(/<h1[^>]*>([^<]*)<\/h1>/)?.[1]?.replace(/&#x27;/g, "'")).toBe(own.title);
-    expect(markup).not.toMatch(/FAQPage|application\/ld\+json/);
+    expect(markup).not.toContain('FAQPage');
+    const blocks = [...markup.matchAll(/<script type="application\/ld\+json">(.*?)<\/script>/gs)];
+    expect(blocks.map((b) => (JSON.parse(b[1]!) as { '@type': string })['@type'])).toEqual([
+      'BreadcrumbList',
+    ]);
     expect(markup).not.toContain('href="#"');
     expect(markup.match(/data-v2-primary=""/g)).toBeNull();
   }

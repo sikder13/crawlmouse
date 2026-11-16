@@ -8,7 +8,9 @@ import { StatusPill } from '../../StatusPill';
 import { Table } from '../../Table';
 import { VerdictCell } from '../../VerdictCell';
 import { LOG_IN } from '../../footer-links';
+import { ACCOUNT_NAV } from '../../../../lib/v2/view/account-actions';
 import { MapSvg } from '../../map/MapSvg';
+import { formatPlanPrice } from '../../../../lib/v2/copy/plan-price';
 import type { DoorView, GradeView, ResultView } from '../../../../lib/v2/view/result';
 import { capitalise, count, numberWord, plural } from '../../../../lib/v2/words';
 import { AuditLink, AuditLinkWords } from './AuditPage';
@@ -20,15 +22,21 @@ import styles from './ResultScreen.module.css';
 const shareNote = (keptUntil: string | null) =>
   keptUntil === null ? undefined : `The link lasts as long as this audit: until ${keptUntil}`;
 
+/** The signed-in shell's first rail entry (Sites, the dashboard), offered in place of Log in. */
+const SIGNED_IN_ENTRY = ACCOUNT_NAV[0];
+
 /**
  * The Result page's frame. Its header offers what the state can do: `share` a finished result,
- * `rerun` a finished, failed or expired audit. Logging in is always offered.
+ * `rerun` a finished, failed or expired audit. Its caller passes `signedIn` for a kept audit's
+ * result, fix, map and segment pages, which then offer Sites in place of Log in; the waiting,
+ * failed, refused and expired states pass nothing and offer Log in.
  */
 export function ResultShell({
   children,
   keep,
   share,
   rerun = false,
+  signedIn = false,
   mainClassName,
 }: {
   children: React.ReactNode;
@@ -38,6 +46,11 @@ export function ResultShell({
   /** Offer to share the result; `keptUntil` is null once it is kept. */
   share?: { keptUntil: string | null };
   rerun?: boolean;
+  /**
+   * The reader is signed in. A page passes it for a kept audit, which only a member of its account
+   * can read (`readableCheck`); an audit nobody keeps does not say who reads it.
+   */
+  signedIn?: boolean;
 }) {
   return (
     <PageShell
@@ -54,9 +67,15 @@ export function ResultShell({
               Re-run, free
             </AuditLink>
           ) : null}
-          <Button variant="quiet" size="sm" href={LOG_IN.href}>
-            {LOG_IN.label}
-          </Button>
+          {signedIn ? (
+            <Button variant="quiet" size="sm" href={SIGNED_IN_ENTRY.href}>
+              {SIGNED_IN_ENTRY.label}
+            </Button>
+          ) : (
+            <Button variant="quiet" size="sm" href={LOG_IN.href}>
+              {LOG_IN.label}
+            </Button>
+          )}
         </>
       }
     >
@@ -111,6 +130,7 @@ export function ResultScreen({
         kept ? null : <KeepBar domain={data.domain} expires={data.keptUntil!} checkId={checkId} />
       }
       share={{ keptUntil: data.keptUntil }}
+      signedIn={kept}
       rerun
     >
       <section>
@@ -282,7 +302,8 @@ export function ResultScreen({
                 it; nothing you can see is deleted after.
               </p>
               <p className={`${layout.mut} ${styles.proNote}`}>
-                Agencies: 25 client sites and reports under your own brand, $69 a month.
+                Agencies: 25 client sites and reports under your own brand,{' '}
+                {formatPlanPrice('agency')} a month.
               </p>
               <div className={`${layout.row} ${styles.actions} ${styles.proActions}`}>
                 <Button href="#keep">Keep this audit, start 14 days of{'\u00a0'}Pro</Button>
