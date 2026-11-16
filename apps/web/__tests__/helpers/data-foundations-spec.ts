@@ -363,6 +363,7 @@ The owner applied 003, 005, 007 and then 006b to production on 2026-11-05. A lat
                                                    (date_trunc('month', now()) + interval '3 months')::date)$$);
      \`\`\`
      Before relying on \`pg_partman\` for anything, verify on the project that it is available (\`select * from pg_available_extensions where name = 'pg_partman';\`); this function stays the primary mechanism either way.
+   - **Do not enable \`pg_net\` on production without revisiting \`analytics_reader\` first.** On a Supabase branch (2026-11-16) pg_net came with PUBLIC USAGE on schema \`net\` and every privilege on its tables, \`net.http_request_queue\` among them, whose rows make the database send HTTP requests. \`analytics_reader\` holds what PUBLIC holds, so check 10 (\`10-analytics-no-pii.sql\`) fails on the next dry run and apply, and migration 041 does not revoke these grants: the migration's role could not, on that branch.
 3. **On production, after an apply.** \`get_advisors\` (security): no new finding. \`select partrelid::regclass, pg_get_partkeydef(partrelid) from pg_partitioned_table;\`: the five tables of §4.
 `;
 
