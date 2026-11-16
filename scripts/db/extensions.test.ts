@@ -41,6 +41,7 @@ async function branchWithExtras(setup = '') {
   return pgliteDb(pg);
 }
 
+// A fresh PGlite takes about a second alone and past 5s under a full suite's load.
 const drops = (executed: string[]) => executed.filter((t) => /^\s*drop\b/i.test(t));
 
 describe('alignExtensions', () => {
@@ -62,7 +63,7 @@ describe('alignExtensions', () => {
     expect(formatAlignment(a)).toBe(
       'extensions equal to production after alignment: yes, differences: none; dropped on the branch: earthdistance, cube',
     );
-  });
+  }, 120_000);
 
   it('keeps every extension production has, pg_cron’s case', async () => {
     const branch = await branchWithExtras();
@@ -73,7 +74,7 @@ describe('alignExtensions', () => {
     );
     expect(a).toEqual({ dropped: [], missing: [], equal: true });
     expect(drops(branch.executed)).toEqual([]);
-  });
+  }, 120_000);
 
   it('reports an extension production has and the branch lacks, and installs nothing', async () => {
     const branch = await branchWithExtras();
@@ -91,13 +92,13 @@ describe('alignExtensions', () => {
     expect(formatAlignment(a)).toBe(
       'extensions equal to production after alignment: no, differences: missing on the branch: pg_cron; dropped on the branch: none',
     );
-  });
+  }, 120_000);
 
   it('never writes to production: it sends production one query, the extension list', async () => {
     const prod = production(['plpgsql']);
     await alignExtensions(prod, await branchWithExtras(), () => {});
     expect(prod.asked).toEqual([EXTENSIONS_SQL]);
-  });
+  }, 120_000);
 
   it('fails, naming it and without CASCADE, when a table of ours depends on the extension', async () => {
     const branch = await branchWithExtras(
@@ -118,5 +119,5 @@ describe('alignExtensions', () => {
       `select to_regclass('public.keys') is not null as kept`,
     );
     expect(rows).toEqual([{ kept: true }]);
-  });
+  }, 120_000);
 });
