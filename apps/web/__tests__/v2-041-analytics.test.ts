@@ -521,7 +521,8 @@ describe('the revert as Supabase runs it', () => {
     await d.exec(`set role creator; drop role made_by_creator; reset role`);
     const { rows } = await d.query(`select 1 from pg_roles where rolname = 'made_by_creator'`);
     expect(rows).toEqual([]);
-  });
+    // A fresh PGlite takes about a second alone and past 5s under a full suite's load.
+  }, 120_000);
 });
 
 describe('10-analytics-no-pii', () => {
