@@ -3,12 +3,18 @@
 -- (email, name, host, url, uri, ip, token, address, phone, password, secret, referrer, path, card,
 -- customer, note) or its type is inet or cidr, unless it is one of the two allowlisted attribution
 -- columns below. Also a finding: any table, view or sequence outside `analytics` on which
--- `analytics_reader` holds a privilege; any schema other than `analytics`, `public` and the catalog
--- schemas on which it holds USAGE or CREATE (`public`'s USAGE is PUBLIC's, so its tables are checked
--- one by one above instead); and any privilege anon or authenticated holds on an `analytics` relation.
--- Also a finding: a SECURITY DEFINER function outside the catalog schemas that `analytics_reader` may
--- execute (through PUBLIC or a grant), since it would run with its owner's rights. Functions that
--- belong to an extension are left out, as `06-client-functions` leaves them out.
+-- `analytics_reader` holds a privilege and whose schema it holds USAGE on; any schema other than
+-- `analytics`, `public` and the catalog schemas on which it holds USAGE or CREATE, reported on its own
+-- (`public`'s USAGE is PUBLIC's, so its tables are checked one by one above instead); and any
+-- privilege anon or authenticated holds on an `analytics` relation. Also a finding: a SECURITY
+-- DEFINER function outside the catalog schemas that `analytics_reader` may execute (through PUBLIC or
+-- a grant) and whose schema it holds USAGE on, since it would run with its owner's rights. Functions
+-- that belong to an extension are left out, as `06-client-functions` leaves them out.
+-- A privilege on an object in a schema the role holds no USAGE on is not reported: Postgres refuses
+-- the object's name before it checks the privilege, so the role cannot use it. Production's `cron`
+-- tables carry PUBLIC grants made by `supabase_admin` (`=r` on `cron.job`, `=rd` on
+-- `cron.job_run_details`, 2026-11-16) in a schema that grants PUBLIC no USAGE; the USAGE finding is
+-- what reports such a schema once the role can reach it.
 --
 -- The allowlist, and why each entry is safe (CC-41 rulings, Q5):
 --   `analytics.account_attribution.referrer_host`: a hostname only, lowercased, at most 253 characters
@@ -47,6 +53,7 @@ select format('%I.%I', n.nspname, c.relname), format('analytics_reader holds %s'
    and n.nspname <> 'analytics'
    and n.nspname not in ('pg_catalog', 'information_schema')
    and c.relkind in ('r', 'p', 'v', 'm', 'f')
+   and has_schema_privilege('analytics_reader', n.oid, 'USAGE')
    and has_table_privilege('analytics_reader', c.oid, p.privilege)
 union all
 select n.nspname::text, format('analytics_reader holds %s on the schema', p.privilege)
@@ -75,5 +82,6 @@ select format('%I.%I(%s)', n.nspname, p.proname, pg_get_function_identity_argume
    and n.nspname not in ('pg_catalog', 'information_schema')
    and not exists (select 1 from pg_depend d
                     where d.classid = 'pg_proc'::regclass and d.objid = p.oid and d.deptype = 'e')
+   and has_schema_privilege('analytics_reader', n.oid, 'USAGE')
    and has_function_privilege('analytics_reader', p.oid, 'EXECUTE')
 order by 1, 2;
