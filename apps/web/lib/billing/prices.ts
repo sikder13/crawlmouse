@@ -15,6 +15,11 @@ export const EXTRA_SITE = 3;
 /** The same two, a year: ten months' price, as the plans are. */
 export const EXTRA_SEAT_YEARLY = 120;
 export const EXTRA_SITE_YEARLY = 30;
+/**
+ * Agency Plus's "from" price a month (FACTS A3): the anchor row on Pricing, sold by contact form
+ * only, with no Stripe price behind it.
+ */
+export const AGENCY_PLUS_FROM_MONTHLY = 249;
 
 /** "$19". Whole dollars only: a fractional price would need a format decision first. */
 export function usd(dollars: number): string {

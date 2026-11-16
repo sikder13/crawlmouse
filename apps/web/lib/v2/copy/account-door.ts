@@ -5,6 +5,7 @@
  */
 import { SIGNIN_SENDER, SIGNIN_SENDER_LOCKED } from '../../auth/constants';
 import type { Addition, CopyChange, LockedScreen } from '../copy-registry';
+import { formatPlanPrice } from './plan-price';
 
 const MASKED =
   'FACTS correction (CC-25 scope 3): Check-email shows the address masked, the local part shortened and the domain whole (lib/auth/mask-email.ts).';
@@ -75,9 +76,8 @@ export const ACCOUNT_DOOR_CHANGES: CopyChange[] = [
     screen: 'signup',
     kind: 'facts',
     locked: '$69 a month',
-    rendered: '$99 a month',
-    source:
-      'FACTS correction (CC-25 D7): the project decision of 2026-11-03 sets the Agency list price at $99 a month.',
+    rendered: `${formatPlanPrice('agency')} a month`,
+    source: `FACTS correction (CC-25 D7): the project decision of 2026-11-03 sets the Agency list price at ${formatPlanPrice('agency')} a month.`,
   },
   // ── Check-email, from an audit ────────────────────────────────────────────────────────────
   {

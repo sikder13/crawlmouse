@@ -13,7 +13,12 @@ import segment from '../segment/SegmentScreen.module.css';
 export function ExplorerScreen({ data }: { data: LinkMapView }) {
   const { frame } = data;
   return (
-    <ResultShell share={{ keptUntil: frame.keptUntil }} rerun mainClassName={segment.main}>
+    <ResultShell
+      share={{ keptUntil: frame.keptUntil }}
+      signedIn={frame.keptUntil === null}
+      rerun
+      mainClassName={segment.main}
+    >
       <div className={`${layout.row} ${segment.crumbRow}`}>
         <div className={`${layout.row} ${segment.crumb}`}>
           <a href={frame.overview}>{frame.domain}</a>

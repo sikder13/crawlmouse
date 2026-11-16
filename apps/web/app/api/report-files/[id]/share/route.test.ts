@@ -574,10 +574,11 @@ describe('GET /s/[token]', () => {
 });
 
 describe('the gone page', () => {
-  it('holds no script, and no link but the home page', () => {
+  it('holds no script, and no link but the home page and the support address', () => {
     expect(GONE_PAGE).not.toMatch(/<script|javascript:|\son\w+=/i);
     expect([...GONE_PAGE.matchAll(/(?:href|src|action)="([^"]*)"/g)].map((m) => m[1])).toEqual([
       '/',
+      'mailto:support@crawlmouse.com',
     ]);
     expect(GONE_PAGE).toContain('<meta name="robots" content="noindex, nofollow">');
   });

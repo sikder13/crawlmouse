@@ -269,7 +269,7 @@ function verifyLayersSection(): string {
     ...prompt,
     '```',
     '',
-    'On the fix page the strict command (the view’s `exactLine`) is one unwrapped line in a strip that scrolls sideways (`ScrollRegion`, a named tab stop while the command overflows it); the rest of the block wraps. The command is in the HTML once and whole. `PacketBlock` in `apps/web/components/v2/screens/fix/PacketChoice.tsx`; the rules are `.exact` and `.exactLine` in `FixScreen.module.css`.',
+    'On the fix page the strict command (the view’s `exactLine`) is its own `<pre data-v2-exact-check>` between the text above and below it, and wraps inside the packet box as that text does (CC-39 F4). The command is in the HTML once and whole. `PacketBlock` in `apps/web/components/v2/screens/fix/PacketChoice.tsx`; the rule is `.packetPart, .exactLine` in `FixScreen.module.css`.',
     '',
     `A prompt’s first line is \`${PROMPT_TITLE_LABEL} "…"\`: the fix’s title on one line in straight double quotes, with each quotation mark in it (\`" “ ” „ ‟ « »\`) written as an apostrophe and backslashes at its end dropped (\`promptTitle\`).`,
     '',

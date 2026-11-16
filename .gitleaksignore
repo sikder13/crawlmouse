@@ -25,3 +25,6 @@ b93abad6bd1f3b1b8cd21cbf1582198ad366d40d:apps/web/lib/v2/pipeline/functions.test
 # hand-written sample of a share link token's shape in a test, not a credential and no row's token;
 # replaced by a built sample in the next commit (CC-31, questions.md Q32; owner-approved 2026-11-12)
 48bb939a6c57c4b86280f10faa9bcf294b53164c:apps/web/lib/auth/sentry-scrub.test.ts:generic-api-key:101
+# owner-approved 2026-11-15 (CC-41 Q15): test-only HMAC key, sequential bytes 00..ff, not a credential; production reads RESEARCH_SITE_KEY from the environment.
+903713bd22e9b95d4125ccf24fd0c83d3cb4b969:apps/web/lib/v2/ledger/site-key.test.ts:generic-api-key:4
+903713bd22e9b95d4125ccf24fd0c83d3cb4b969:apps/web/lib/v2/ledger/write.test.ts:generic-api-key:24

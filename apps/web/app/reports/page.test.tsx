@@ -235,6 +235,12 @@ describe('/reports', () => {
     as(w.owner);
     const token = newShareToken();
     h.cookies.set('cm_share_made', `${ids.proof}.${token}`);
+    // Making a link sets the report's expiry (create_share_link); a row shows the address only while
+    // the link works (CC-39 F11).
+    await h.db.query(
+      `update public.reports set share_expires_at = now() + interval '30 days' where id = $1`,
+      [ids.proof],
+    );
     const html = await page({ notice: 'share_made' });
     expect(rowOf(html, ids.proof)!.text).toContain(`https://crawlmouse.com/s/${token}`);
     expect(html.split(token)).toHaveLength(2);

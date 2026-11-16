@@ -364,7 +364,7 @@ describe('/settings of an account that is not the caller’s own personal accoun
 describe('/settings/plan', () => {
   it('answers for an account that holds no site', async () => {
     as(empty);
-    const el = screen(await PlanPage());
+    const el = screen(await PlanPage(q()));
     expect(el.type).toBe(PlanScreen);
     expect(renderToStaticMarkup(el)).toContain('0 of 1');
   });
@@ -372,7 +372,7 @@ describe('/settings/plan', () => {
   it('the plan page is a 404 for an account manager and a developer', async () => {
     for (const u of [manager, developer]) {
       as(u);
-      await expect(PlanPage()).rejects.toMatchObject(notFoundError);
+      await expect(PlanPage(q())).rejects.toMatchObject(notFoundError);
     }
   });
 });

@@ -37,6 +37,7 @@ import { ACCOUNT_DOOR_ADDITIONS, ACCOUNT_DOOR_CHANGES } from './copy/account-doo
 import { CLIENT_ADDITIONS, CLIENT_CHANGES, MATRIX_ADDITIONS, MATRIX_CHANGES } from './copy/agency';
 import { CLIENT_REPORTS_ADDITIONS, CLIENT_REPORTS_CHANGES } from './copy/client-reports';
 import { SEATS_ADDITIONS, SEATS_CHANGES } from './copy/seats';
+import { formatPlanPrice } from './copy/plan-price';
 
 export type LockedScreen =
   | 'signup'
@@ -85,8 +86,18 @@ export interface CopyChange {
   onlyOnPhone?: boolean;
 }
 
+/** Why a screen shows Agency's price where its artboard says $69 (CC-39 ruling 4). */
+const AGENCY_PRICE_SOURCE = `Owner ruling of 2026-11-03 (D-2026-11-03-2): Agency is ${formatPlanPrice('agency')} a month, read from lib/billing/prices.ts (CC-39 ruling 4)`;
+
 const BASE_CHANGES: CopyChange[] = [
   // ── Home ──────────────────────────────────────────────────────────────────────────────────
+  {
+    screen: 'home',
+    kind: 'ruling',
+    locked: 'Agency $69 a month',
+    rendered: `Agency ${formatPlanPrice('agency')} a month`,
+    source: AGENCY_PRICE_SOURCE,
+  },
   {
     screen: 'home',
     kind: 'fixture',
@@ -206,6 +217,13 @@ const BASE_CHANGES: CopyChange[] = [
   },
   // ── Result (both themes) ──────────────────────────────────────────────────────────────────
   // A locked sentence changed for two reasons is two entries, one per kind, applied in order.
+  {
+    screen: 'result',
+    kind: 'ruling',
+    locked: 'your own brand, $69 a month.',
+    rendered: `your own brand, ${formatPlanPrice('agency')} a month.`,
+    source: AGENCY_PRICE_SOURCE,
+  },
   {
     screen: 'result',
     kind: 'fixture',

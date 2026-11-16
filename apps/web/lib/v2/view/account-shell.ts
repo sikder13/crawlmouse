@@ -146,6 +146,13 @@ function trialCard(
   const end = a.trial_ends_at!;
   const days = calendarDays(v.now, end, zone);
   const tier: Tier = a.state === 'pro_trial' ? 'pro' : 'agency';
+  // A trial whose subscription renews at its end charges the card Checkout took (CC-39 D1, ruling 1).
+  // `renews_at` is the period end of a subscription not set to cancel (lib/v2/account/rows.ts), and a
+  // trial with no card has no subscription; the card's last four digits are not recorded yet.
+  const charges = a.renews_at !== null;
+  // A card on file whose digits this reader is not given (CC-37 Q25), or a card a trial will charge
+  // read by a member who is not the owner: only the owner can cancel (CC-39 ruling 5).
+  const withheld = (v.cardOnFile && a.card_last4 === null) || (charges && !owner);
   const freeSchedule = FREE_SCHEDULE[GATES.free.schedule];
   const price = tier === 'pro' ? PRO_MONTHLY : AGENCY_MONTHLY;
   const title = `${PLAN_NAMES[tier]}, trial · ends ${dayDate(end, zone)}`;
@@ -157,13 +164,14 @@ function trialCard(
     return {
       title,
       left,
-      note: !v.cardOnFile
-        ? `${COPY.noCard} ${COPY.nothingCharged}`
-        : a.card_last4 === null
-          ? COPY.cardManagedByOwner
-          : billingEnd !== null
-            ? COPY.cardNotCharged(a.card_last4, dayDate(end, zone))
-            : COPY.cardCharged(a.card_last4, dayDate(end, zone)),
+      note:
+        !v.cardOnFile && !charges && billingEnd === null
+          ? `${COPY.noCard} ${COPY.nothingCharged}`
+          : withheld
+            ? COPY.cardManagedByOwner
+            : billingEnd !== null
+              ? COPY.cardNotCharged(a.card_last4, dayDate(end, zone))
+              : COPY.cardCharged(a.card_last4, dayDate(end, zone)),
       billing: null,
       keep: null,
     };
@@ -174,18 +182,23 @@ function trialCard(
   return {
     title,
     left,
-    note: firstRun
-      ? `${!v.cardOnFile ? `${COPY.noCard} ` : ''}${COPY.trialFirstRun(freeSchedule)}`
-      : COPY.trialLater(
-          primarySite(v).host,
-          freeSchedule,
-          primarySites(v).length - 1,
-          reminderDue ? null : TRIAL_REMINDER_DAYS_BEFORE_END,
-        ),
+    note: charges
+      ? withheld
+        ? COPY.cardManagedByOwner
+        : COPY.cardCharged(a.card_last4, dayDate(end, zone))
+      : firstRun
+        ? `${!v.cardOnFile ? `${COPY.noCard} ` : ''}${COPY.trialFirstRun(freeSchedule)}`
+        : COPY.trialLater(
+            primarySite(v).host,
+            freeSchedule,
+            primarySites(v).length - 1,
+            reminderDue ? null : TRIAL_REMINDER_DAYS_BEFORE_END,
+          ),
     // Billing and Keep are the owner's: Settings › Plan and the checkout refuse anyone else.
     billing: owner && firstRun ? action('plan', 'Billing') : null,
+    // A trial that charges its card becomes the plan at its end: there is nothing to keep it by.
     keep:
-      !owner || firstRun
+      !owner || firstRun || charges
         ? null
         : action(
             'keepPlan',

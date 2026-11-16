@@ -1,3 +1,4 @@
+import { PRO_MONTHLY, usd } from '../billing/prices';
 export interface FaqItem {
   question: string;
   answer: string;
@@ -9,12 +10,11 @@ export const HOMEPAGE_FAQ: readonly FaqItem[] = [
   {
     question: 'What is Crawlmouse?',
     answer:
-      "Crawlmouse is a free tool that crawls your website, maps its internal links, and grades the structure — orphan pages, hub strength, click depth, and anchor-text diversity — as a single A–F score you can share.",
+      'Crawlmouse is a free tool that crawls your website, maps its internal links, and grades the structure — orphan pages, hub strength, click depth, and anchor-text diversity — as a single A–F score you can share.',
   },
   {
     question: 'Is Crawlmouse free?',
-    answer:
-      'Yes. You can audit any site for free, with no account and nothing to install. A Pro plan ($19/month) adds CSV export and higher limits for people who audit sites regularly.',
+    answer: `Yes. You can audit any site for free, with no account and nothing to install. A Pro plan (${usd(PRO_MONTHLY)}/month) adds CSV export and higher limits for people who audit sites regularly.`,
   },
   {
     question: 'Do I need to install anything?',

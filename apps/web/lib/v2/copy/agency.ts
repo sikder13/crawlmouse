@@ -5,6 +5,7 @@
  */
 import type { Addition, CopyChange, LockedScreen } from '../copy-registry';
 import { count, plural } from '../words';
+import { formatPlanPrice } from './plan-price';
 
 /** The agency rail's plan card and the account switcher (the switcher is outside the artboards). */
 export const AGENCY_RAIL_COPY = {
@@ -146,9 +147,8 @@ export function agencyRailChanges(screen: LockedScreen): CopyChange[] {
       screen,
       kind: 'ruling',
       locked: 'Agency · $69 a month',
-      rendered: 'Agency · $99 a month',
-      source:
-        'Owner ruling of 2026-11-03: the Agency list price is $99 (lib/billing/prices.ts AGENCY_MONTHLY)',
+      rendered: `Agency · ${formatPlanPrice('agency')} a month`,
+      source: `Owner ruling of 2026-11-03: the Agency list price is ${formatPlanPrice('agency')} (lib/billing/prices.ts AGENCY_MONTHLY)`,
     },
     {
       screen,
