@@ -1,9 +1,11 @@
 -- v2 migration 041 (CC-41, the data foundation for growth): first-touch attribution, the research
 -- ledger's writer function, and the read path for analysis.
 --
--- Additive only. It creates public.account_attribution, public.check_ledger_drafts,
--- public.record_check_ledger(), the schema `analytics` with its views, and the role
--- analytics_reader. No existing table, column, policy or grant is dropped or changed.
+-- It creates public.account_attribution, public.check_ledger_drafts, public.record_check_ledger(),
+-- the schema `analytics` with its views, and the role analytics_reader. No existing table, column or
+-- policy is dropped or changed. One kind of existing grant is: section 5 revokes from PUBLIC its
+-- grants on pg_stat_statements' views and, where pg_net is installed, on schema `net` and its tables,
+-- and records what it revoked so the revert restores it.
 --
 -- 1. public.account_attribution: one row per account, written once at the account's first login from
 --    the visitor's first-party `cm_ft` cookie (apps/web/lib/analytics/first-touch.ts). The CHECKs
@@ -23,8 +25,9 @@
 --    view exposes the id of such a check: `checks.id` is null for it, and the fix views hold only the
 --    fixes of kept sites.
 -- 4. Role analytics_reader: LOGIN with no password (the owner sets one through the runbook),
---    connection limit 3, statement_timeout 30s; USAGE on `analytics` and SELECT on its views, nothing
---    else.
+--    connection limit 3, statement_timeout 30s; USAGE on `analytics` and SELECT on its views.
+-- 5. PUBLIC's grants on pg_stat_statements and pg_net's objects, revoked: every role holds what PUBLIC
+--    holds, the reader included.
 --
 -- Every statement is re-runnable. The revert is
 -- infra/supabase/rollbacks/20261120000001_v2_041_analytics.revert.sql.
@@ -242,3 +245,101 @@ alter role analytics_reader connection limit 3;
 alter role analytics_reader set statement_timeout = '30s';
 grant usage on schema analytics to analytics_reader;
 grant select on all tables in schema analytics to analytics_reader;
+
+-- ─── 5. What the reader would hold through PUBLIC ─────────────────────────────────────────────────
+--
+-- analytics_reader is noinherit and a member of no role, but every role holds what PUBLIC holds, and
+-- check 10 reports anything it holds outside `analytics`. Two kinds of object carry PUBLIC grants on
+-- a Supabase project:
+--   (1) pg_stat_statements' two views in `extensions`: PUBLIC SELECT (`=r/postgres` on production,
+--       2026-11-16). The reader cannot reach them while `extensions` grants it no USAGE, but the views
+--       hold the text of every role's statements. dashboard_user has its own grant and keeps it.
+--   (2) pg_net's schema `net`, where the extension is installed: PUBLIC USAGE and every privilege on
+--       its tables (so on a dry-run branch, 2026-11-16). Inserting into net.http_request_queue makes
+--       the database send an HTTP request. Production has no `net` schema today, so this part does
+--       nothing there. If pg_net is installed later, this revoke holds only as long as the extension
+--       does not grant to PUBLIC again; check 10 reports it if it does.
+-- Only PUBLIC's grants are revoked. The block fails if PUBLIC still holds one afterwards (a REVOKE by
+-- a role that is not the object's owner and holds no grant option only warns) or if any named role's
+-- grant changed. What PUBLIC held and lost is kept as JSON in the comment on schema `analytics`,
+-- merged across re-runs, so the revert gives back exactly that and nothing PUBLIC did not hold.
+do $$
+declare
+  rels oid[] := array[]::oid[];
+  nsps oid[] := array[]::oid[];
+  -- Every grant on those objects, one element per grantee and privilege, PUBLIC named 'PUBLIC'.
+  grants constant text := $q$
+    select coalesce(jsonb_agg(jsonb_build_object('kind', g.kind, 'object', g.object,
+                                                 'grantee', g.grantee, 'privilege', g.privilege,
+                                                 'grantable', g.grantable)
+                              order by g.kind, g.object, g.grantee, g.privilege), '[]'::jsonb)
+      from (select 'table' as kind, format('%I.%I', n.nspname, c.relname) as object,
+                   case a.grantee when 0 then 'PUBLIC' else pg_get_userbyid(a.grantee)::text end
+                     as grantee,
+                   a.privilege_type as privilege, a.is_grantable as grantable
+              from pg_class c
+              join pg_namespace n on n.oid = c.relnamespace
+             cross join lateral aclexplode(coalesce(c.relacl, acldefault('r', c.relowner))) a
+             where c.oid = any($1)
+            union all
+            select 'schema', format('%I', n.nspname),
+                   case a.grantee when 0 then 'PUBLIC' else pg_get_userbyid(a.grantee)::text end,
+                   a.privilege_type, a.is_grantable
+              from pg_namespace n
+             cross join lateral aclexplode(coalesce(n.nspacl, acldefault('n', n.nspowner))) a
+             where n.oid = any($2)) g
+  $q$;
+  before jsonb;
+  after jsonb;
+  held jsonb;
+  kept jsonb;
+  e jsonb;
+begin
+  -- (1) pg_stat_statements, where the extension is installed.
+  rels := rels || array_remove(array[to_regclass('extensions.pg_stat_statements')::oid,
+                                     to_regclass('extensions.pg_stat_statements_info')::oid], null);
+  -- (2) pg_net's schema and the tables, views and foreign tables in it, where it is installed.
+  if to_regnamespace('net') is not null then
+    nsps := nsps || to_regnamespace('net')::oid;
+    rels := rels || array(select c.oid from pg_class c
+                           where c.relnamespace = to_regnamespace('net')
+                             and c.relkind in ('r', 'p', 'v', 'm', 'f'));
+  end if;
+
+  execute grants into before using rels, nsps;
+  select coalesce(jsonb_agg(x - 'grantee' - 'grantable' order by x->>'kind', x->>'object', x->>'privilege'),
+                  '[]'::jsonb)
+    into held
+    from jsonb_array_elements(before) x
+   where x->>'grantee' = 'PUBLIC';
+
+  for e in select jsonb_array_elements(held) loop
+    execute format('revoke %s on %s %s from public', e->>'privilege',
+                   case e->>'kind' when 'schema' then 'schema' else 'table' end, e->>'object');
+  end loop;
+
+  execute grants into after using rels, nsps;
+  if exists (select 1 from jsonb_array_elements(after) x where x->>'grantee' = 'PUBLIC') then
+    raise exception 'PUBLIC still holds % after the revoke: the role running this migration could not revoke it',
+      (select string_agg(format('%s on %s', x->>'privilege', x->>'object'), ', ')
+         from jsonb_array_elements(after) x where x->>'grantee' = 'PUBLIC');
+  end if;
+  select coalesce(jsonb_agg(x order by x->>'kind', x->>'object', x->>'grantee', x->>'privilege'),
+                  '[]'::jsonb)
+    into kept
+    from jsonb_array_elements(before) x
+   where x->>'grantee' <> 'PUBLIC';
+  if after <> kept then
+    raise exception 'a named role''s grant changed: before %, after %', kept, after;
+  end if;
+
+  select coalesce(jsonb_agg(x order by x->>'kind', x->>'object', x->>'privilege'), '[]'::jsonb)
+    into held
+    from (select jsonb_array_elements(coalesce(
+                   obj_description('analytics'::regnamespace, 'pg_namespace')::jsonb, '[]'::jsonb)) x
+          union
+          select jsonb_array_elements(held)) u;
+  execute format('comment on schema analytics is %L', held::text);
+  raise notice 'migration 041: PUBLIC lost %; the named grants on those objects are %', held, after;
+end;
+$$;
