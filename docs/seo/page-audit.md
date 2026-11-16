@@ -2,8 +2,8 @@
 
 _Rendered by `scripts/seo/audit.ts --render` from the runs in `docs/seo/audit-data/`. Do not edit by hand._
 
-- flags off: commit `7cb4c3ec`, read 2026-11-15T15:42:19.337Z
-- flags on: commit `7cb4c3ec`, read 2026-11-15T15:36:46.659Z
+- flags off: commit `0c4040f1`, read 2026-11-16T01:45:46.557Z
+- flags on: commit `0c4040f1`, read 2026-11-16T01:41:35.954Z
 - before: flags off: commit `2ed206c5`, read 2026-11-15T13:01:52.993Z
 - before: flags on: commit `2ed206c5`, read 2026-11-15T13:10:20.265Z
 - Search Console export of 2026-11-15 (indexed list as of 2026-11-08). Queries are attributed to pages by word match (`lib/seo/attribution.ts`): the export has no page × query table.
@@ -77,7 +77,7 @@ Search Console's reasons for the 21 URLs it does not index (counts only; the exp
 | Build     | Page | Offer prices             | Prices shown | Shown, not in an Offer | In an Offer, not shown |
 | --------- | ---- | ------------------------ | ------------ | ---------------------- | ---------------------- |
 | flags off | /    | $0                       | $19          | $19                    | —                      |
-| flags on  | /    | $0, $19, $190, $99, $990 | $0, $19, $69 | $69                    | $190, $99, $990        |
+| flags on  | /    | $0, $19, $190, $99, $990 | $0, $19, $99 | —                      | $190, $990             |
 
 ## App surfaces
 
@@ -111,7 +111,7 @@ flags on: 21 app surfaces — noindex 5; not found 3; a redirect 12; an error (5
 
 ## www
 
-`https://www.crawlmouse.com/` answered one 308 to https://crawlmouse.com/: not separately indexable (read 2026-11-15T16:01:57.809Z).
+`https://www.crawlmouse.com/` answered one 308 to https://crawlmouse.com/: not separately indexable (read 2026-11-16T01:46:26.402Z).
 
 ## Pages, flags off
 

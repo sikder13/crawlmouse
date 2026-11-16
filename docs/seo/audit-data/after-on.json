@@ -1,7 +1,7 @@
 {
   "label": "flags on",
-  "sha": "7cb4c3ec4d11069963c0a71f6bb136f2b406d149",
-  "takenAt": "2026-11-15T15:36:46.659Z",
+  "sha": "0c4040f1d15718eaf599725675cecfab0424ed5b",
+  "takenAt": "2026-11-16T01:41:35.954Z",
   "sitemap": [
     "/",
     "/pricing",
@@ -244,7 +244,7 @@
       "wordCount": 459,
       "imagesWithoutAlt": [],
       "faqNotVisible": [],
-      "visiblePrices": [0, 19, 69],
+      "visiblePrices": [0, 19, 99],
       "nearest": null
     },
     {

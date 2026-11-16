@@ -15,9 +15,9 @@ impressions changes without the owner (OPERATING-RULES §13).
 - Two guards froze each pre-C-01 post's article markup and links (`__tests__/blog-existing-posts-*.test.tsx`).
   D4–D6 change those by design; the guards now require the baseline back after the listed additions are
   set aside and the D5 edits reversed (D4 below).
-- The v2 home's plan card says Agency $69 (`apps/web/components/v2/screens/home/HomeScreen.tsx`);
-  `apps/web/lib/billing/prices.ts` and `/pricing` say $99. D2's structured data follows prices.ts; the
-  card is the owner's to correct before the flag turns on.
+- The v2 home's plan card said Agency $69 (`apps/web/components/v2/screens/home/HomeScreen.tsx`) where
+  `apps/web/lib/billing/prices.ts` and `/pricing` say $99. D2's structured data follows prices.ts; CC-39
+  corrected the card, and the audit on the merged tree shows $99 (`docs/seo/page-audit.md`, Prices).
 
 ## Decisions
 
@@ -205,6 +205,11 @@ JavaScript (GPTBot, ClaudeBot) found no `<title>`, description or canonical in t
 `/status`, v2 `/pricing` or a `/r/` report. `apps/web/next.config.mjs` sets `htmlLimitedBots: /.*/`;
 `__tests__/next-config-html-limited-bots.test.ts` holds it to six named agents. Titles, descriptions,
 headings and canonicals are unchanged; their place in the document moved, in both builds.
+
+**Ruling 5 (CTO) — merge main after CC-39.** Main merged with no conflicting hunks (both sides' root
+`package.json` scripts kept; `.gitleaksignore` equal to main's). `docs/seo/page-audit.md` and
+`docs/seo/audit-data/after-*.json` are re-read from the merged tree: the commit, the read times and the
+v2 home's shown prices (now `$0, $19, $99`) change (`git diff 0c4040f1 -- docs/seo`).
 
 ## Questions and smaller options taken
 
