@@ -30,7 +30,10 @@ import {
   type LedgerStore,
 } from './write';
 
-const SECRET = '00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff';
+/** A test-only key: the bytes 00, 11, … ff, twice (32 bytes), as hex. */
+const SECRET = Array.from({ length: 16 }, (_, i) => (i * 0x11).toString(16).padStart(2, '0'))
+  .join('')
+  .repeat(2);
 const HOST = 'shop.distinctive-client-name.co.uk';
 
 const DRAFT: LedgerDraft = {
