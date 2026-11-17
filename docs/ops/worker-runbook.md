@@ -387,10 +387,16 @@ needs it, so it is recorded here once the first deploy has allocated it. Take th
 "Egress address" above, with `--app crawlmouse-worker`, before and after a
 `flyctl machine restart <id> --app crawlmouse-worker`.
 
-| Family | Address      | Before restart | After restart | Recorded |
-| ------ | ------------ | -------------- | ------------- | -------- |
-| IPv4   | not recorded |                |               |          |
-| IPv6   | not recorded |                |               |          |
+| Family | Address                         | Before restart | After restart | Recorded   |
+| ------ | ------------------------------- | -------------- | ------------- | ---------- |
+| IPv4   | `209.71.119.230`                | the same       | the same      | 2026-11-16 |
+| IPv6   | `2a09:8280:e618:1:0:208:73b7:0` | not read       | not read      | 2026-11-16 |
+
+Both addresses are the app's `egress_v4` and `egress_v6` in `iad`, read with the read-only token:
+`flyctl ips list --app crawlmouse-worker --json`. The IPv4 columns come from worker-production run
+43789159313, whose deploy job logged "egress: the app's own IPv4, the same before and after a
+restart" with the readings masked. That check reads IPv4 only. The IPv6 readings need the SSH
+console and a restart, which a read-only token cannot do, so they are not taken.
 
 ### The app's variables
 
