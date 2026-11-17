@@ -5,6 +5,7 @@
 import type { AlertRule } from '@crawlmouse/types/v2';
 import type { Addition, CopyChange } from '../copy-registry';
 import { RECHECK_MINUTES } from '../recheck';
+import { RESTORE_DAYS } from './restore-window';
 import { plural } from '../words';
 import { railChanges } from './dashboard';
 
@@ -15,7 +16,8 @@ export const TAGGED_UA_LINE =
 export const SITE_COPY = {
   fixesSub: `Mark one done and it is re-checked in about ${RECHECK_MINUTES} ${plural(RECHECK_MINUTES, 'minute', 'minutes')}; it closes only when the next crawl agrees.`,
   copyAll: 'Copy all as one prompt',
-  removeNote: 'Its history stays in your account in case you add it back',
+  /** The expiry's purge step deletes a removed site's checks after RESTORE_DAYS (CC-GL D2). */
+  removeNote: `Its history is deleted ${RESTORE_DAYS} ${plural(RESTORE_DAYS, 'day', 'days')} after you remove it`,
   noFixes: 'No fixes are open at the latest check.',
   noAlerts: 'No alert rules yet.',
   searchEngineCause: 'allowed by robots.txt; verified bot, not fetched',
@@ -70,6 +72,14 @@ const ZONE =
 
 export const SITE_CHANGES: CopyChange[] = [
   ...railChanges('site'),
+  {
+    screen: 'site',
+    kind: 'ruling',
+    locked: 'Its history stays in your account in case you add it back',
+    rendered: SITE_COPY.removeNote,
+    source:
+      'CC-GL rulings 1, Q1 (2026-11-16): a removed site’s checks and evidence are deleted RESTORE_DAYS days later by the expiry’s purge step, and the add-it-back promise is dropped, not built',
+  },
   {
     screen: 'site',
     kind: 'fixture',

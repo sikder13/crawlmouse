@@ -2,6 +2,7 @@ import { LegalPage } from '@/components/legal/LegalPage';
 import { checksPublicEnabled } from '@/lib/auth/flags';
 import { RESTORE_DAYS } from '@/lib/v2/copy/restore-window';
 import { ANONYMOUS_EXPIRY_HOURS } from '@/lib/v2/pipeline/limits';
+import { plural } from '@/lib/v2/words';
 import {
   FIRST_TOUCH_COOKIE,
   FIRST_TOUCH_FIELD_LABELS,
@@ -195,6 +196,10 @@ export default function PrivacyPage() {
             <li>
               An audit kept by an account stays for as long as the account exists. Deleting the
               account deletes its audits, once the {RESTORE_DAYS}-day restore window has passed.
+            </li>
+            <li>
+              Removing a site deletes its audits and their stored evidence {RESTORE_DAYS}{' '}
+              {plural(RESTORE_DAYS, 'day', 'days')} later.
             </li>
             <li>
               Free-tier audits made with the earlier version of Crawlmouse are deleted automatically
