@@ -1,13 +1,18 @@
 /**
- * The ExpireStore over SQL, for PGlite: migration 022b's three functions by positional arguments,
+ * The ExpireStore over SQL, for PGlite: migration 022b's three functions and 20261121000001's three
+ * by positional arguments,
  * each call through `run` (one transaction as the service role in the tests).
  * ../expire-store.test.ts runs the same cases against this and supabaseExpireStore.
  */
 import {
   expiredPage,
+  removedChecksPage,
+  removedSitesPage,
   unsettledPage,
   type ExpiredRow,
   type ExpireStore,
+  type RemovedCheckRow,
+  type RemovedSiteRow,
   type UnsettledRow,
 } from '../expire-store';
 import type { RunSql } from './sql-keep-store';
@@ -45,6 +50,39 @@ export function sqlExpireStore(run: RunSql): ExpireStore {
         ),
       );
       return unsettledPage(rows);
+    },
+
+    async removedPastKeeping(before, after, limit) {
+      const { rows } = await run((db) =>
+        db.query<RemovedSiteRow>(
+          `select site_id, account_id, remaining
+             from public.removed_sites_past_keeping($1::timestamptz, $2::uuid, $3)`,
+          [before, after, limit],
+        ),
+      );
+      return removedSitesPage(rows);
+    },
+
+    async removedSiteChecks(siteId, after, limit) {
+      const { rows } = await run((db) =>
+        db.query<RemovedCheckRow>(
+          `select check_id, batches, copied_for, paths, remaining
+             from public.removed_site_checks($1::uuid, $2::uuid, $3)`,
+          [siteId, after, limit],
+        ),
+      );
+      return removedChecksPage(rows);
+    },
+
+    async deleteRemovedChecks(siteId, before, checkIds) {
+      if (checkIds.length === 0) return 0;
+      const { rows } = await run((db) =>
+        db.query<{ n: number | null }>(
+          `select public.delete_removed_site_checks($1::uuid, $2::timestamptz, $3::uuid[]) as n`,
+          [siteId, before, [...checkIds]],
+        ),
+      );
+      return rows[0]?.n ?? null;
     },
   };
 }

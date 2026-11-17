@@ -299,7 +299,7 @@ describe('registration with V2_PIPELINE=1 (D3)', () => {
     );
   });
 
-  it('the registered expiry runs expireUnkept, then settleKept, over the wiring’s stores', async () => {
+  it('the registered expiry runs expireUnkept, then settleKept, then purgeRemoved, over the wiring’s stores', async () => {
     const calls: string[] = [];
     const evidence = memoryEvidenceStore();
     const expiry: ExpireDeps = {
@@ -313,6 +313,12 @@ describe('registration with V2_PIPELINE=1 (D3)', () => {
           calls.push('unsettledKept');
           return { rows: [], remaining: 0 };
         },
+        removedPastKeeping: async () => {
+          calls.push('removedPastKeeping');
+          return { rows: [], remaining: 0 };
+        },
+        removedSiteChecks: async () => ({ rows: [], remaining: 0 }),
+        deleteRemovedChecks: async () => 0,
       },
       evidence,
       keep: { store: {} as KeepStore, evidence, report: () => {} },
@@ -325,10 +331,11 @@ describe('registration with V2_PIPELINE=1 (D3)', () => {
     const out = await fn.fn({
       step: { run: async (_id: string, body: () => Promise<unknown>) => body() },
     });
-    expect(calls).toEqual(['expiredUnkept', 'unsettledKept']);
+    expect(calls).toEqual(['expiredUnkept', 'unsettledKept', 'removedPastKeeping']);
     expect(out).toEqual({
       expired: { sites: 0, checks: 0, skipped: 0, left: 0 },
       settled: { moved: 0, nothing: 0, failed: 0, left: 0 },
+      purged: { sites: 0, checks: 0, skipped: 0, left: 0 },
     });
   });
 });

@@ -1,9 +1,10 @@
 /**
  * `crawlmouse.check.expiry` (CC-22b D8): once a day, deletes the audits nobody kept once they have
- * expired, with their evidence objects, then moves what kept audits still hold under `anon/`.
+ * expired, with their evidence objects, then moves what kept audits still hold under `anon/`, then
+ * deletes the audits, fixes and evidence objects of sites removed seven days ago or more (CC-GL D2).
  *
  * The work is injected (apps/web/lib/v2/pipeline/expire.ts): this package does not import the app.
- * Each job is one step and returns counts, which stay small whatever the number of rows. Both are
+ * Each job is one step and returns counts, which stay small whatever the number of rows. Each is
  * safe to run again: a retried step lists what is still there.
  */
 import { inngest } from './client';
@@ -27,9 +28,18 @@ export interface SettledCounts {
   left: number;
 }
 
+/** Counts of one run of the purge step. */
+export interface PurgedCounts {
+  sites: number;
+  checks: number;
+  skipped: number;
+  left: number;
+}
+
 export interface ExpiryWork {
   expireUnkept(): Promise<ExpiredCounts>;
   settleKept(): Promise<SettledCounts>;
+  purgeRemoved(): Promise<PurgedCounts>;
 }
 
 export function createExpireAnonymousChecksFn(work: ExpiryWork) {
@@ -44,7 +54,11 @@ export function createExpireAnonymousChecksFn(work: ExpiryWork) {
       const settled = await step.run('settle-kept', async () =>
         sized('settle-kept', await work.settleKept()),
       );
-      return { expired, settled };
+      // Last, so a database without its functions (migration 20261121000001) fails this step alone.
+      const purged = await step.run('purge-removed', async () =>
+        sized('purge-removed', await work.purgeRemoved()),
+      );
+      return { expired, settled, purged };
     },
   );
 }

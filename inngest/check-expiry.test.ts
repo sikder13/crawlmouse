@@ -5,6 +5,7 @@ import { CHECK_EXPIRY_FN_ID, createExpireAnonymousChecksFn, type ExpiryWork } fr
 
 const EXPIRED = { sites: 3, checks: 3, skipped: 1, left: 7 };
 const SETTLED = { moved: 2, nothing: 1, failed: 0, left: 0 };
+const PURGED = { sites: 1, checks: 4, skipped: 0, left: 2 };
 
 async function runWith(work: ExpiryWork) {
   const ids: string[] = [];
@@ -28,6 +29,7 @@ describe('createExpireAnonymousChecksFn (CC-22b D8)', () => {
       createExpireAnonymousChecksFn({
         expireUnkept: async () => EXPIRED,
         settleKept: async () => SETTLED,
+        purgeRemoved: async () => PURGED,
       }) as unknown as {
         getConfig(o: { baseUrl: URL; appPrefix: string }): Record<string, unknown>[];
       }
@@ -40,7 +42,7 @@ describe('createExpireAnonymousChecksFn (CC-22b D8)', () => {
     expect(CHECK_EXPIRY_FN_ID).toBe('crawlmouse.check.expiry');
   });
 
-  it('expires in one step and settles in the next, and returns both steps’ counts', async () => {
+  it('expires in one step, settles in the next, purges removed sites in the third, and returns each step’s counts', async () => {
     const order: string[] = [];
     const { out, ids } = await runWith({
       expireUnkept: async () => {
@@ -51,11 +53,35 @@ describe('createExpireAnonymousChecksFn (CC-22b D8)', () => {
         order.push('settle');
         return SETTLED;
       },
+      purgeRemoved: async () => {
+        order.push('purge');
+        return PURGED;
+      },
     });
-    expect(ids).toEqual(['expire-unkept', 'settle-kept']);
-    expect(order).toEqual(['expire', 'settle']);
-    expect(out).toEqual({ expired: EXPIRED, settled: SETTLED });
+    expect(ids).toEqual(['expire-unkept', 'settle-kept', 'purge-removed']);
+    expect(order).toEqual(['expire', 'settle', 'purge']);
+    expect(out).toEqual({ expired: EXPIRED, settled: SETTLED, purged: PURGED });
     expect(Buffer.byteLength(JSON.stringify(out))).toBeLessThan(STEP_OUTPUT_BYTES);
+  });
+
+  it('a failed purge step fails the run after the other two have run', async () => {
+    const order: string[] = [];
+    await expect(
+      runWith({
+        expireUnkept: async () => {
+          order.push('expire');
+          return EXPIRED;
+        },
+        settleKept: async () => {
+          order.push('settle');
+          return SETTLED;
+        },
+        purgeRemoved: async () => {
+          throw new Error('function removed_sites_past_keeping does not exist');
+        },
+      }),
+    ).rejects.toThrow('removed_sites_past_keeping');
+    expect(order).toEqual(['expire', 'settle']);
   });
 
   it('a failed expire step fails the run before the settle step starts', async () => {
@@ -68,6 +94,10 @@ describe('createExpireAnonymousChecksFn (CC-22b D8)', () => {
         settleKept: async () => {
           order.push('settle');
           return SETTLED;
+        },
+        purgeRemoved: async () => {
+          order.push('purge');
+          return PURGED;
         },
       }),
     ).rejects.toThrow('database unavailable');

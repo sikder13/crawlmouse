@@ -161,4 +161,76 @@ describe.each<[string, (db: PGlite) => ExpireStore]>([
       remaining: 1,
     });
   });
+  it('removedPastKeeping, removedSiteChecks, deleteRemovedChecks: the removed site past the cutoff, its checks a page at a time with their stored paths, and the delete of those named', async () => {
+    const keeper = await accountId();
+    const kept = async (h: string, removedAt: Date | null) => {
+      const made = await anonymousCheck(db, h, null);
+      await end(made.checkId);
+      await db.query(`update public.sites set account_id = $2, removed_at = $3 where id = $1`, [
+        made.siteId,
+        keeper,
+        removedAt,
+      ]);
+      return made;
+    };
+    const removed = await kept('removed.example', new Date(NOW - 10 * 24 * HOUR));
+    const path = `${keeper}/${removed.siteId}/${removed.checkId}/batch-0.json.gz`;
+    await batch(removed.checkId, 0, path);
+    const second = await db.query<{ id: string }>(
+      `insert into public.checks (site_id, status, trigger, grade_version, started_at, finished_at,
+                                  failure_reason)
+       values ($1, 'failed', 'scheduled', '2.0.0', now(), now(), 'persist_failed') returning id`,
+      [removed.siteId],
+    );
+    // Not listed: removed inside the cutoff, and live.
+    await kept('recent.example', new Date(NOW - HOUR));
+    await kept('live.example', null);
+    const before = new Date(NOW - 7 * 24 * HOUR).toISOString();
+
+    expect(await store.removedPastKeeping(before, null, 10)).toEqual({
+      rows: [{ siteId: removed.siteId, accountId: keeper }],
+      remaining: 1,
+    });
+    expect(await store.removedPastKeeping(before, removed.siteId, 10)).toEqual({
+      rows: [],
+      remaining: 0,
+    });
+    const checks = [
+      { checkId: removed.checkId, batches: [0], copiedFor: [], paths: [path] },
+      { checkId: second.rows[0]!.id, batches: [], copiedFor: [], paths: [] },
+    ].sort((a, b) => (a.checkId < b.checkId ? -1 : 1));
+    expect(await store.removedSiteChecks(removed.siteId, null, 1)).toEqual({
+      rows: [checks[0]],
+      remaining: 2,
+    });
+    expect(await store.removedSiteChecks(removed.siteId, checks[0]!.checkId, 1)).toEqual({
+      rows: [checks[1]],
+      remaining: 1,
+    });
+
+    expect(await store.deleteRemovedChecks(removed.siteId, before, [])).toBe(0);
+    expect(await store.deleteRemovedChecks(removed.siteId, before, [checks[0]!.checkId])).toBe(1);
+    expect(
+      await count(db, 'select 1 from public.checks where site_id = $1', [removed.siteId]),
+    ).toBe(1);
+    // A check running on the site: the delete refuses the site, whatever the read said.
+    const running = await db.query<{ id: string }>(
+      `insert into public.checks (site_id, status, trigger, grade_version, started_at, progress,
+                                  inngest_run_id, heartbeat_at)
+       values ($1, 'running', 'scheduled', '2.0.0', now(),
+               '{"steps":[],"pages_crawled":0,"pages_estimated":null,"links_found":0,"elapsed_ms":0,"recent_fetches":[]}'::jsonb,
+               'run-x', now()) returning id`,
+      [removed.siteId],
+    );
+    expect(
+      await store.deleteRemovedChecks(removed.siteId, before, [checks[1]!.checkId]),
+    ).toBeNull();
+    await db.query(`delete from public.checks where id = $1`, [running.rows[0]!.id]);
+    // A cutoff before the removal: the site does not qualify, and nothing is deleted.
+    const early = new Date(NOW - 30 * 24 * HOUR).toISOString();
+    expect(await store.deleteRemovedChecks(removed.siteId, early, [checks[1]!.checkId])).toBeNull();
+    expect(
+      await count(db, 'select 1 from public.checks where site_id = $1', [removed.siteId]),
+    ).toBe(1);
+  });
 });
