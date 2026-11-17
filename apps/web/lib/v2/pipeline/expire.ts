@@ -96,6 +96,10 @@ export interface ExpireOutput {
 }
 
 const iso = (ms: number): string => new Date(ms).toISOString();
+
+/** What a skipped site's report says of the failure: an Error's message, cut for the log line. */
+const errorSnippet = (cause: unknown): string =>
+  cause instanceof Error ? cause.message.slice(0, 200) : 'not an Error';
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 export async function expireUnkept(deps: ExpireDeps): Promise<ExpireOutput> {
@@ -137,7 +141,7 @@ export async function expireUnkept(deps: ExpireDeps): Promise<ExpireOutput> {
         // Named, so a site that is skipped run after run can be found: it outlives its 24 hours.
         deps.keep.report('expiry-site-skipped', {
           siteId: site.siteId,
-          error: cause instanceof Error ? cause.message.slice(0, 200) : 'not an Error',
+          error: errorSnippet(cause),
         });
       }
     }
@@ -249,7 +253,7 @@ export async function purgeRemoved(deps: ExpireDeps): Promise<PurgeOutput> {
         out.skipped++;
         deps.keep.report('purge-site-skipped', {
           siteId: site.siteId,
-          error: cause instanceof Error ? cause.message.slice(0, 200) : 'not an Error',
+          error: errorSnippet(cause),
         });
       }
     }
