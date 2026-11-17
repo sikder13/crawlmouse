@@ -194,7 +194,7 @@ export default function PrivacyPage() {
               cleanup once {ANONYMOUS_EXPIRY_HOURS} hours have passed since it was requested.
             </li>
             <li>
-              An audit kept by an account stays for as long as the account exists. Deleting the
+              An audit kept by an account stays while the account keeps its site. Deleting the
               account deletes its audits, once the {RESTORE_DAYS}-day restore window has passed.
             </li>
             <li>

@@ -51,7 +51,7 @@ describe('the privacy page’s Data retention list', () => {
       `An audit nobody keeps is deleted, together with its stored evidence, by the daily cleanup once ${ANONYMOUS_EXPIRY_HOURS} hours have passed since it was requested.`,
     );
     expect(list[1]).toBe(
-      `An audit kept by an account stays for as long as the account exists. Deleting the account deletes its audits, once the ${RESTORE_DAYS}-day restore window has passed.`,
+      `An audit kept by an account stays while the account keeps its site. Deleting the account deletes its audits, once the ${RESTORE_DAYS}-day restore window has passed.`,
     );
     // The expiry's purge-removed step (lib/v2/pipeline/expire.ts purgeRemoved).
     expect(list[2]).toBe(
