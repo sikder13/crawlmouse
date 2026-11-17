@@ -542,6 +542,35 @@ const WITHDRAWN: readonly WithdrawnClaim[] = [
       'Step 2 serves no route a visitor can use: each route reading V2_PIPELINE answers 404 first while V2_CHECKS_PUBLIC is off.',
     allowedIn: [],
   },
+  {
+    text: 'Its history stays in your account in case you add it back',
+    withdrawnIn: 'apps/web/lib/v2/copy/site.ts (removeNote), CC-GL rulings 1 Q1 (2026-11-16)',
+    truth:
+      'The expiry’s purge step deletes a removed site’s checks, fixes and evidence objects ' +
+      'RESTORE_DAYS days after removal and keeps the site row; no reader shows a removed site’s ' +
+      'checks again, so there was nothing to add back.',
+    // The site page's copy-changes table quotes it as the locked text the ruling replaced.
+    allowedIn: ['docs/specs/v2/26-dashboard-site.md'],
+  },
+  {
+    text: 'removed sites stay, with their history',
+    withdrawnIn: 'migration 20261121000001 (its header), CC-GL rulings 1 Q1 (2026-11-16)',
+    truth:
+      'The site row stays; its checks and fixes are deleted RESTORE_DAYS days after removal by the ' +
+      'expiry’s purge step.',
+    // The spec reproduces applied migration 003's SQL verbatim, comment included; an applied
+    // migration's text is not edited.
+    allowedIn: ['docs/specs/v2/06-check-tables.md'],
+  },
+  {
+    text: 'sets `removed_at`; history kept',
+    withdrawnIn:
+      'apps/web/lib/v2/view/account-actions.ts (removeSite), CC-GL rulings 1 Q1 (2026-11-16)',
+    truth:
+      'removeSite sets removed_at; the daily expiry deletes the site’s checks and evidence ' +
+      'RESTORE_DAYS days later and keeps the site row.',
+    allowedIn: [],
+  },
 ];
 
 /**
