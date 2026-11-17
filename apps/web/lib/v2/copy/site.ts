@@ -78,7 +78,7 @@ export const SITE_CHANGES: CopyChange[] = [
     locked: 'Its history stays in your account in case you add it back',
     rendered: SITE_COPY.removeNote,
     source:
-      'CC-GL rulings 1, Q1 (2026-11-16): a removed site’s checks and evidence are deleted RESTORE_DAYS days later by the expiry’s purge step, and the add-it-back promise is dropped, not built',
+      'Owner ruling (CC-GL rulings 1, Q1, 2026-11-16): a removed site’s checks and evidence are deleted RESTORE_DAYS days later by the expiry’s purge step, and the add-it-back promise is dropped, not built',
   },
   {
     screen: 'site',

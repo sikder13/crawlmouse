@@ -146,7 +146,7 @@ describe('the function rows against the code', () => {
     'inngest/billing.ts': 5, // 65 77 95 116 120
     'inngest/check.ts': 13, // 193 197 205 235 256 313 379 380 390 391 392 445 447
     'inngest/check-reaper.ts': 1, // 39
-    'inngest/check-expiry.ts': 2, // 41 44
+    'inngest/check-expiry.ts': 3, // 51 54 58 (CC-GL D2)
     'inngest/trial-lifecycle.ts': 6, // 87 89 99 102 103 113
     'inngest/past-due-sweep.ts': 4, // 51 52 58 61
     'inngest/deletion.ts': 6, // 73 85 97 98 106 110
@@ -348,13 +348,14 @@ describe('the month', () => {
     // schedules 24×2 (CC-31), five dailies, CC-33's founder sweep 288×2 and digest tick 24×3, and
     // CC-41's ledger backfill 4×2.
     // CC-33's sign-in canary is in no flag's floor: it runs once SIGNIN_CANARY_TO is set.
+    // Since CC-GL D2 the check expiry runs three steps (expire-unkept, settle-kept, purge-removed): 1 + 3.
     const hand =
       (144 * 2 +
         24 * 3 * 3 +
         24 * 2 +
         (2 + 1) +
         (2 + 1) +
-        (1 + 2) +
+        (1 + 3) +
         (1 + 2) +
         (1 + 1) +
         288 * 2 +
@@ -388,7 +389,7 @@ describe('the floor by switch-on step', () => {
   it('starts schedule and summary only once V2_CHECKS_PUBLIC joins V2_PIPELINE', () => {
     const [pipeline, door, checks, billing] = floorBySwitchOn();
     // V2_PIPELINE: v1's 3+3 a day, the reaper 288, the expiry 3, the ledger backfill 8 (CC-41).
-    expect(pipeline!.floor).toBe((3 + 3 + 288 + 3 + 8) * 31);
+    expect(pipeline!.floor).toBe((3 + 3 + 288 + 4 + 8) * 31);
     expect(door!.floor).toBe(pipeline!.floor);
     // V2_CHECKS_PUBLIC adds the purge 3, the contact purge 2, the schedule and summary ticks 72 each,
     // CC-31's report schedules 48, and CC-33's founder sweep 576 and digest tick 72 (either flag).
