@@ -133,9 +133,17 @@ export function postHogClient({
         // A `next` link is followed only within this project's API, so the key goes nowhere else.
         if (!url.startsWith(base))
           throw new Error(`${kind}: refusing to follow a next link off ${base}`);
-        const answer = (await call('GET', url)) as { results: Remote[]; next: string | null };
-        out.push(...answer.results.filter((r) => r.deleted !== true));
-        url = answer.next;
+        const answer = (await call('GET', url)) as {
+          results?: unknown;
+          next?: string | null;
+        } | null;
+        if (!Array.isArray(answer?.results)) {
+          const path = url.slice(POSTHOG_HOST.length).split('?')[0];
+          throw new Error(`${kind}: GET ${path} answered without a results array`);
+        }
+        out.push(...(answer.results as Remote[]).filter((r) => r.deleted !== true));
+        // Some list endpoints answer with no `next` field at all: that is the last page too.
+        url = answer.next ?? null;
       }
       return out;
     },
