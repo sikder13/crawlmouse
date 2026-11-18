@@ -349,14 +349,17 @@ describe('the footer’s social links (CC-42A decision 7)', () => {
 
   it('renders each as an external link that opens apart, with noopener, and says so', () => {
     const out = html();
-    const a = out.match(
-      new RegExp(`<a [^>]*href="${FACEBOOK.replace(/[?.]/g, '\\$&')}"[^>]*>[\\s\\S]*?</a>`),
-    );
-    expect(a, 'the Facebook link').not.toBeNull();
-    expect(a![0]).toMatch(/rel="noopener"/);
-    expect(a![0]).toMatch(/target="_blank"/);
-    expect(a![0]).toContain('Facebook');
-    expect(a![0]).toContain('opens in a new tab');
+    expect(FOOTER_SOCIAL.length).toBeGreaterThan(0);
+    for (const l of FOOTER_SOCIAL) {
+      const href = l.href.replace(/[?.]/g, '\\$&');
+      const a = out.match(new RegExp(`<a [^>]*href="${href}"[^>]*>[\\s\\S]*?</a>`));
+      expect(a, l.label).not.toBeNull();
+      expect(a![0]).toMatch(/rel="noopener"/);
+      expect(a![0]).toMatch(/target="_blank"/);
+      expect(a![0]).toContain(l.label);
+      expect(a![0]).toContain('opens in a new tab');
+    }
+    expect(out).toContain(`href="${FACEBOOK}"`);
   });
 
   it('is an https address on another host: the internal-link checks do not apply to it', () => {
