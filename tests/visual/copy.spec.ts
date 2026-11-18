@@ -4,6 +4,7 @@ import { HEIGHT, WIDTHS, openPreview } from './pages';
 import {
   FOOTER_COLUMNS,
   FOOTER_COPY,
+  FOOTER_SOCIAL,
   MARKETING_NAV,
   SUPPORT_EMAIL,
 } from '../../apps/web/components/v2/footer-links';
@@ -174,6 +175,8 @@ const footerFromMap = () =>
     FOOTER_COPY.company,
     SUPPORT_EMAIL,
     'Copy address',
+    // The social links' "(opens in a new tab)" is visually hidden, so innerText leaves it out.
+    ...FOOTER_SOCIAL.map((l) => l.label),
     `© ${new Date().getFullYear()}`,
     ...FOOTER_COLUMNS.flatMap((c) => [c.title, ...c.items.map((i) => i.label)]),
   ].join(' ');
