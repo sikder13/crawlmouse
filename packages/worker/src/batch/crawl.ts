@@ -293,14 +293,7 @@ async function crawlPage(
     !inPart &&
     fromUrl !== null &&
     extracted.notRead.tooLong + edges.tooLong + extracted.notRead.pastLimit === 0;
-  const featuresBytes = read.features ? Buffer.byteLength(JSON.stringify(read.features)) : 0;
-  // Counted as the store holds it, in JSON (json-bytes.ts): a page of quotes or backslashes costs
-  // what it takes there, so no page can make a result larger than the room plus its rows.
-  const cost =
-    jsonBytes(rawText) +
-    featuresBytes +
-    edges.kept.reduce((n, e) => n + edgeBytes(e), 0) +
-    hreflang.links.reduce((n, l) => n + jsonBytes(l.hreflang) + jsonBytes(l.href), 0);
+  const cost = pageCost(rawText, read.features, edges.kept, hreflang.links);
   const recorded = cost <= room.bytes;
   if (recorded) room.bytes -= cost;
   else {
@@ -337,8 +330,39 @@ async function crawlPage(
   return { page, edges: recorded ? edges.kept : [], complete: true, landed };
 }
 
-const edgeBytes = (e: LinkEdge): number =>
-  jsonBytes(e.from_url) + jsonBytes(e.to_url) + jsonBytes(e.anchor_text) + 128;
+/**
+ * A fixed charge per edge for its other fields and its keys, below what they take in the JSON; the
+ * gap is measured and pinned in page-cost.test.ts. Unchanged by CC-42B, so where an ordinary batch is
+ * cut stays where it was.
+ */
+export const EDGE_OVERHEAD = 128;
+
+/**
+ * What a page's text, content features, edges and hreflang alternates take from the batch's room.
+ * The page's strings are counted as the result's JSON holds them (json-bytes.ts), so a page of
+ * quotes or backslashes is charged what it costs there, and content features as their JSON. What
+ * is not counted exactly: each edge's other fields and keys (EDGE_OVERHEAD), each hreflang alternate's keys, and the page's row (its title, description, redirects
+ * and limitations), which every page keeps whether or not its text is recorded. So a result can
+ * pass the room by those; src/load.test.ts measures the largest the result store must hold.
+ */
+export function pageCost(
+  rawText: string,
+  features: unknown,
+  edges: readonly LinkEdge[],
+  hreflang: Hreflang['links'],
+): number {
+  const featuresBytes = features ? Buffer.byteLength(JSON.stringify(features)) : 0;
+  return (
+    jsonBytes(rawText) +
+    featuresBytes +
+    edges.reduce(
+      (n, e) =>
+        n + jsonBytes(e.from_url) + jsonBytes(e.to_url) + jsonBytes(e.anchor_text) + EDGE_OVERHEAD,
+      0,
+    ) +
+    hreflang.reduce((n, l) => n + jsonBytes(l.hreflang) + jsonBytes(l.href), 0)
+  );
+}
 
 /**
  * One edge per distinct same-host target, in page order; only the first MAX_EDGES_PER_PAGE are built.

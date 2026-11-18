@@ -15,8 +15,11 @@ export const MAX_RECORDS = 500;
 /**
  * BATCH_CONCURRENCY results of the largest size src/load.test.ts measures, twice over, rounded up to
  * a multiple of 16 MiB: 16 × 8.36 MiB × 2 = 267.4 MiB → 272 MiB (measured 2026-11-18). The load test
- * fails when that product passes this bound, so a larger result or a higher limit cannot ship without
- * raising it. Held off the heap (Buffers), so it counts in resident memory, not the heap limit.
+ * fails when that product passes this bound, or when a case measures a result larger than the one
+ * recorded. A batch can still store more than the largest measured (crawl.ts, pageCost, says what
+ * its room does not count); then prune() evicts the oldest finished results to stay under this
+ * bound, and a caller that reads an evicted one gets a 404 and posts the batch once more (inngest/check.ts). Held off the
+ * heap (Buffers), so it counts in resident memory, not the heap limit.
  */
 export const MAX_RESULT_BYTES = 272 * 1024 * 1024;
 
