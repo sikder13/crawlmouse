@@ -42,71 +42,86 @@ function page(host: string, n: number, pages: number): string {
   return `<!doctype html><html><head><title>${host} ${n}</title></head><body><p>${host} page ${n}</p>${links}</body></html>`;
 }
 
+interface Plan {
+  pages: number;
+  latencies: number[];
+  notFoundEvery: number;
+  crawlDelayS: number;
+}
+
+/**
+ * Runs one crawl batch per plan at once, each on its own site, with one Sites, RobotsCache and clock
+ * as the server shares them. Returns each site's request starts as the fetcher saw them, by site key.
+ */
+async function crawlAll(plans: Plan[]) {
+  const clock = new VirtualClock();
+  const starts = new Map<string, number[]>();
+  let call = 0;
+  const fetcher: Fetcher = async (url, identity, limits) => {
+    const host = new URL(url).hostname;
+    const i = Number(/^site-(\d+)\./.exec(host)![1]);
+    const plan = plans[i]!;
+    const key = siteKeyOf(url);
+    starts.set(key, [...(starts.get(key) ?? []), clock.now()]);
+    const startedAt = clock.now();
+    await clock.sleep(plan.latencies[call++ % plan.latencies.length]!);
+    const path = new URL(url).pathname;
+    if (path === '/robots.txt' && plan.crawlDelayS > 0) {
+      return outcome({
+        url,
+        identity,
+        startedAt,
+        status: 200,
+        finalUrl: url,
+        headers: { 'content-type': 'text/plain' },
+        body: `User-agent: *\nAllow: /\nCrawl-delay: ${plan.crawlDelayS}\n`,
+        maxBytes: limits.maxBytes,
+      });
+    }
+    const m = /^\/p\/(\d+)$/.exec(path);
+    const missing = !m || (plan.notFoundEvery > 0 && Number(m[1]) % plan.notFoundEvery === 0);
+    return outcome({
+      url,
+      identity,
+      startedAt,
+      status: missing ? 404 : 200,
+      finalUrl: url,
+      headers: { 'content-type': missing ? 'text/plain' : 'text/html' },
+      body: missing ? 'not found' : page(host, Number(m![1]), plan.pages),
+      maxBytes: limits.maxBytes,
+    });
+  };
+  const deps = {
+    clock,
+    sites: new Sites(clock),
+    fetcher,
+    robotsCache: new RobotsCache(clock),
+  };
+  const reqs = plans.map(
+    (p, i) =>
+      ({
+        kind: 'crawl' as const,
+        check_id: checkId(i),
+        site_id: '00000000-0000-4000-8000-0000000000a1',
+        batch: 1,
+        nonce: 'n'.repeat(16),
+        jwt: 'x',
+        budget: BUDGET_CEILINGS,
+        urls: Array.from({ length: p.pages }, (_, k) => `https://${hostOf(i)}/p/${k}`),
+      }) satisfies BatchRequest,
+  );
+
+  const results = await clock.run(Promise.all(reqs.map((r) => runBatch(r, deps))));
+  return { starts, results, reqs, clock };
+}
+
 describe('batches at once on distinct sites', () => {
   it('keep every site at or above the floor and never mix rows between batches (property)', async () => {
     await fc.assert(
       fc.asyncProperty(
         fc.array(sitePlan, { minLength: 2, maxLength: MAX_BATCH_CONCURRENCY }),
         async (plans) => {
-          const clock = new VirtualClock();
-          const starts = new Map<string, number[]>();
-          let call = 0;
-          const fetcher: Fetcher = async (url, identity, limits) => {
-            const host = new URL(url).hostname;
-            const i = Number(/^site-(\d+)\./.exec(host)![1]);
-            const plan = plans[i]!;
-            const key = siteKeyOf(url);
-            starts.set(key, [...(starts.get(key) ?? []), clock.now()]);
-            const startedAt = clock.now();
-            await clock.sleep(plan.latencies[call++ % plan.latencies.length]!);
-            const path = new URL(url).pathname;
-            if (path === '/robots.txt' && plan.crawlDelayS > 0) {
-              return outcome({
-                url,
-                identity,
-                startedAt,
-                status: 200,
-                finalUrl: url,
-                headers: { 'content-type': 'text/plain' },
-                body: `User-agent: *\nAllow: /\nCrawl-delay: ${plan.crawlDelayS}\n`,
-                maxBytes: limits.maxBytes,
-              });
-            }
-            const m = /^\/p\/(\d+)$/.exec(path);
-            const missing =
-              !m || (plan.notFoundEvery > 0 && Number(m[1]) % plan.notFoundEvery === 0);
-            return outcome({
-              url,
-              identity,
-              startedAt,
-              status: missing ? 404 : 200,
-              finalUrl: url,
-              headers: { 'content-type': missing ? 'text/plain' : 'text/html' },
-              body: missing ? 'not found' : page(host, Number(m![1]), plan.pages),
-              maxBytes: limits.maxBytes,
-            });
-          };
-          const deps = {
-            clock,
-            sites: new Sites(clock),
-            fetcher,
-            robotsCache: new RobotsCache(clock),
-          };
-          const reqs = plans.map(
-            (p, i) =>
-              ({
-                kind: 'crawl' as const,
-                check_id: checkId(i),
-                site_id: '00000000-0000-4000-8000-0000000000a1',
-                batch: 1,
-                nonce: 'n'.repeat(16),
-                jwt: 'x',
-                budget: BUDGET_CEILINGS,
-                urls: Array.from({ length: p.pages }, (_, k) => `https://${hostOf(i)}/p/${k}`),
-              }) satisfies BatchRequest,
-          );
-
-          const results = await clock.run(Promise.all(reqs.map((r) => runBatch(r, deps))));
+          const { starts, results, reqs } = await crawlAll(plans);
 
           // The floor, per site, start to start, as the fetcher saw the requests.
           expect([...starts.keys()].sort()).toEqual(
@@ -149,4 +164,31 @@ describe('batches at once on distinct sites', () => {
       { numRuns: 40 },
     );
   }, 120_000);
+
+  // The property above holds each site to at least its own gap. This holds it to no more: with one
+  // limiter shared by every site, each site would wait its turn behind all the others, N floors a
+  // request, and a Crawl-delay on one site would slow the rest.
+  it("pace each site on its own: the floor, not every site's turn, and one Crawl-delay stays its own", async () => {
+    const plans: Plan[] = Array.from({ length: MAX_BATCH_CONCURRENCY }, (_, i) => ({
+      pages: 10,
+      latencies: [0],
+      notFoundEvery: 0,
+      crawlDelayS: i === 0 ? 2 : 0,
+    }));
+    const { starts } = await crawlAll(plans);
+    const gaps = (i: number) => {
+      const ts = starts.get(siteKeyOf(`https://${hostOf(i)}/`))!;
+      expect(ts.length).toBeGreaterThan(plans[i]!.pages);
+      return ts.slice(1).map((t, k) => t - ts[k]!);
+    };
+    for (let i = 1; i < plans.length; i++) {
+      for (const g of gaps(i)) expect(g).toBeLessThan(2 * FLOOR_GAP_MS);
+    }
+    // Site 0 waits its Crawl-delay once robots.txt is read: its own, and only its own.
+    expect(
+      gaps(0)
+        .slice(1)
+        .every((g) => g >= 2000),
+    ).toBe(true);
+  });
 });

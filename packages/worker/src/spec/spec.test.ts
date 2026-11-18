@@ -17,6 +17,7 @@ import {
   withCapacitySection,
 } from './capacity.js';
 import { MAX_BATCH_CONCURRENCY } from '../config.js';
+import { MAX_RESULT_BYTES } from '../batch/store.js';
 
 describe('generated documents', () => {
   it('docs/specs/v2/12-crawl-worker.md is exactly what the code renders', async () => {
@@ -110,5 +111,14 @@ describe('the capacity section', () => {
     };
     expect(renderCapacity(big)).toContain('does not hold');
     expect(renderCapacity(data)).toMatch(/which the store's \d+ MiB holds\./);
+  });
+
+  it('decides holds at the exact boundary: 16 × the largest × 2 equal to the store holds, a byte more does not', () => {
+    const at = (bytes: number) =>
+      renderCapacity({ ...data, worst_case: { ...data.worst_case, largest_result_bytes: bytes } });
+    const exact = MAX_RESULT_BYTES / (MAX_BATCH_CONCURRENCY * 2);
+    expect(Number.isInteger(exact)).toBe(true);
+    expect(at(exact)).toMatch(/which the store's \d+ MiB holds\./);
+    expect(at(exact + 1)).toContain('does not hold');
   });
 });

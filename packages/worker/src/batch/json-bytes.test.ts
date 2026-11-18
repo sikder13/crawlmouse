@@ -27,7 +27,30 @@ describe('jsonBytes', () => {
         fc.array(
           fc.oneof(
             fc.string({ unit: 'binary' }),
-            fc.constantFrom('"', '\\', '\u0000', '\u0008', '\u001f', '\ud800', '\udfff', '😀'),
+            // Each edge of a class jsonBytes tells apart, so a one-code-point slip is generated.
+            fc.constantFrom(
+              '"',
+              '\\',
+              '\u0000',
+              '\u0008',
+              '\u000b',
+              '\u001f',
+              '\u007f',
+              '\u0080',
+              '\u00a0',
+              '\u07ff',
+              '\u0800',
+              '\u2028',
+              '\u2029',
+              '\ud7ff',
+              '\ud800',
+              '\udbff',
+              '\udc00',
+              '\udfff',
+              '\ue000',
+              '\uffff',
+              '😀',
+            ),
           ),
         ),
         (parts) => {

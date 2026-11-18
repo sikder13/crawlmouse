@@ -32,6 +32,8 @@ export interface FlyctlAnswers {
   machines?: string | null;
   /** What each `flyctl ssh console` prints as its last line, in turn (the last repeats); `FAIL` fails it. */
   ssh?: string[];
+  /** Run the step with the jq on PATH instead of the stand-in, to check the stand-in against it. */
+  realJq?: boolean;
 }
 
 export interface StepRun {
@@ -134,7 +136,7 @@ export function runStep(
     };
     mkdirSync(bin);
     stub('flyctl', FLYCTL);
-    stub('jq', `#!${process.execPath}\n${JQ}`);
+    if (!answers.realJq) stub('jq', `#!${process.execPath}\n${JQ}`);
     stub('curl', '#!/usr/bin/env bash\nexit 0\n');
     stub('sleep', '#!/usr/bin/env bash\nexit 0\n');
     if (answers.ips != null) writeFileSync(join(dir, 'ips'), answers.ips);

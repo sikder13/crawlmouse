@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process';
 import { DEFAULT_BATCH_CONCURRENCY, MAX_BATCH_CONCURRENCY } from './config.js';
 import { READER_FILE } from './reader/file.js';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -342,12 +343,12 @@ describe("the deploy step that reads the machine's size back, against a stand-in
     },
   });
   /** Runs the step with this toml as the workspace's packages/worker/fly.toml. */
-  const check = (machines: string | null, toml = flyToml) => {
+  const check = (machines: string | null, toml = flyToml, realJq = false) => {
     const ws = mkdtempSync(join(tmpdir(), 'worker-ws-'));
     try {
       mkdirSync(join(ws, 'packages/worker'), { recursive: true });
       writeFileSync(join(ws, 'packages/worker/fly.toml'), toml);
-      return runStep(sizeCheck, { machines }, { GITHUB_WORKSPACE: ws });
+      return runStep(sizeCheck, { machines, realJq }, { GITHUB_WORKSPACE: ws });
     } finally {
       rmSync(ws, { recursive: true, force: true });
     }
@@ -443,4 +444,20 @@ describe("the deploy step that reads the machine's size back, against a stand-in
     );
     expect(workflow).toMatch(/\n {2}build:\n {4}runs-on: ubuntu-24\.04\n {4}timeout-minutes: 25\n/);
   });
+
+  // The stand-in implements the step's filter in JavaScript; this runs the same listings through the
+  // runner's jq, which prints numbers and null in interpolation its own way. CI's ubuntu-24.04 runner
+  // has jq; where none is installed the case is skipped and says so.
+  const hasJq = spawnSync('jq', ['--version']).status === 0;
+  it.runIf(hasJq)('reads the same with the real jq: integers, null and a mismatch', () => {
+    const ok = check(JSON.stringify([shipped]), flyToml, true);
+    expect(ok.code).toBe(0);
+    expect(ok.log).toContain('machines: shared 2 2048 16 (CPU kind');
+    const nulls = check(JSON.stringify([machine('shared', 2, 2048, undefined)]), flyToml, true);
+    expect(nulls.log).toContain("::error::a machine runs 'shared 2 2048 null'");
+    const old = check(JSON.stringify([shipped, machine('shared', 1, 1024, '4')]), flyToml, true);
+    expect(old.log).toContain("::error::a machine runs 'shared 1 1024 4'");
+    expect(check('[]', flyToml, true).log).toContain('shows no machine');
+  });
+  it.skipIf(hasJq)('skips the real-jq case: no jq on PATH', () => {});
 });
