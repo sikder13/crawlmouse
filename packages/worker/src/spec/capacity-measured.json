@@ -1,0 +1,624 @@
+{
+  "measured": "2026-11-18",
+  "app": "crawlmouse-worker-staging",
+  "window_s": 240,
+  "method": "One crawl batch in flight per site (cm42b-*.fly.dev, each its own registrable domain), 50 URLs a batch at most, CRAWL_BATCH_BUDGET, for 240 s per level; heap 256 MB as shipped then.",
+  "rows": [
+    {
+      "machine": "shared-cpu-1x 1 GB",
+      "batches": 4,
+      "vcpu_mean": 0.051,
+      "vcpu_max": 0.062,
+      "throttle_max": 0.0,
+      "balance_min": 5667.021,
+      "peak_rss_mib": 144,
+      "loop_delay_ms": {
+        "p50": 0,
+        "p99": 1,
+        "max": 14
+      },
+      "s_per_page": {
+        "p50": 0.52,
+        "p90": 0.61,
+        "max": 0.9
+      },
+      "wire_gap_p1_ms": 497,
+      "wire_gaps_under_250": 0,
+      "wire_gaps": 1864,
+      "batches_done": 108,
+      "batches_total": 108,
+      "pages": 1860,
+      "partial": 0,
+      "refused": 0,
+      "timeouts": 0
+    },
+    {
+      "machine": "shared-cpu-1x 1 GB",
+      "batches": 8,
+      "vcpu_mean": 0.084,
+      "vcpu_max": 0.107,
+      "throttle_max": 0.0,
+      "balance_min": 5509.021,
+      "peak_rss_mib": 162,
+      "loop_delay_ms": {
+        "p50": 0,
+        "p99": 1,
+        "max": 21
+      },
+      "s_per_page": {
+        "p50": 0.52,
+        "p90": 0.67,
+        "max": 3.5
+      },
+      "wire_gap_p1_ms": 497,
+      "wire_gaps_under_250": 0,
+      "wire_gaps": 3758,
+      "batches_done": 179,
+      "batches_total": 179,
+      "pages": 3710,
+      "partial": 0,
+      "refused": 0,
+      "timeouts": 2
+    },
+    {
+      "machine": "shared-cpu-1x 1 GB",
+      "batches": 16,
+      "vcpu_mean": 0.152,
+      "vcpu_max": 0.183,
+      "throttle_max": 0.0,
+      "balance_min": 3203.021,
+      "peak_rss_mib": 186,
+      "loop_delay_ms": {
+        "p50": 0,
+        "p99": 2,
+        "max": 23
+      },
+      "s_per_page": {
+        "p50": 0.52,
+        "p90": 0.6,
+        "max": 1.1
+      },
+      "wire_gap_p1_ms": 496,
+      "wire_gaps_under_250": 11,
+      "wire_gaps": 7536,
+      "batches_done": 364,
+      "batches_total": 364,
+      "pages": 7480,
+      "partial": 0,
+      "refused": 0,
+      "timeouts": 0
+    },
+    {
+      "machine": "shared-cpu-1x 1 GB",
+      "batches": 32,
+      "vcpu_mean": 0.594,
+      "vcpu_max": 1.022,
+      "throttle_max": 93.613,
+      "balance_min": 0.5,
+      "peak_rss_mib": 204,
+      "loop_delay_ms": {
+        "p50": 0,
+        "p99": 463,
+        "max": 2142
+      },
+      "s_per_page": {
+        "p50": 0.53,
+        "p90": 1.65,
+        "max": 5.6
+      },
+      "wire_gap_p1_ms": 486,
+      "wire_gaps_under_250": 48,
+      "wire_gaps": 10682,
+      "batches_done": 465,
+      "batches_total": 465,
+      "pages": 10530,
+      "partial": 0,
+      "refused": 0,
+      "timeouts": 1
+    },
+    {
+      "machine": "shared-cpu-1x 1 GB",
+      "batches": 64,
+      "vcpu_mean": 0.857,
+      "vcpu_max": 1.025,
+      "throttle_max": 94.372,
+      "balance_min": 0.5,
+      "peak_rss_mib": 218,
+      "loop_delay_ms": {
+        "p50": 0,
+        "p99": 2941,
+        "max": 4782
+      },
+      "s_per_page": {
+        "p50": 4.9,
+        "p90": 18.76,
+        "max": 22.0
+      },
+      "wire_gap_p1_ms": 288,
+      "wire_gaps_under_250": 27,
+      "wire_gaps": 3159,
+      "batches_done": 113,
+      "batches_total": 114,
+      "pages": 3010,
+      "partial": 7,
+      "refused": 1,
+      "timeouts": 335
+    },
+    {
+      "machine": "shared-cpu-2x 2 GB",
+      "batches": 4,
+      "vcpu_mean": 0.06,
+      "vcpu_max": 0.088,
+      "throttle_max": 0.0,
+      "balance_min": 10115.424,
+      "peak_rss_mib": 149,
+      "loop_delay_ms": {
+        "p50": 0,
+        "p99": 1,
+        "max": 17
+      },
+      "s_per_page": {
+        "p50": 0.53,
+        "p90": 0.67,
+        "max": 1.0
+      },
+      "wire_gap_p1_ms": 498,
+      "wire_gaps_under_250": 0,
+      "wire_gaps": 1878,
+      "batches_done": 107,
+      "batches_total": 107,
+      "pages": 1850,
+      "partial": 0,
+      "refused": 0,
+      "timeouts": 0
+    },
+    {
+      "machine": "shared-cpu-2x 2 GB",
+      "batches": 8,
+      "vcpu_mean": 0.089,
+      "vcpu_max": 0.11,
+      "throttle_max": 0.0,
+      "balance_min": 12519.425,
+      "peak_rss_mib": 166,
+      "loop_delay_ms": {
+        "p50": 0,
+        "p99": 1,
+        "max": 7
+      },
+      "s_per_page": {
+        "p50": 0.52,
+        "p90": 0.58,
+        "max": 0.9
+      },
+      "wire_gap_p1_ms": 497,
+      "wire_gaps_under_250": 0,
+      "wire_gaps": 3824,
+      "batches_done": 184,
+      "batches_total": 184,
+      "pages": 3800,
+      "partial": 0,
+      "refused": 0,
+      "timeouts": 0
+    },
+    {
+      "machine": "shared-cpu-2x 2 GB",
+      "batches": 16,
+      "vcpu_mean": 0.168,
+      "vcpu_max": 0.207,
+      "throttle_max": 0.0,
+      "balance_min": 12557.429,
+      "peak_rss_mib": 189,
+      "loop_delay_ms": {
+        "p50": 0,
+        "p99": 1,
+        "max": 8
+      },
+      "s_per_page": {
+        "p50": 0.52,
+        "p90": 0.6,
+        "max": 1.1
+      },
+      "wire_gap_p1_ms": 497,
+      "wire_gaps_under_250": 15,
+      "wire_gaps": 7580,
+      "batches_done": 364,
+      "batches_total": 364,
+      "pages": 7500,
+      "partial": 0,
+      "refused": 0,
+      "timeouts": 0
+    },
+    {
+      "machine": "shared-cpu-2x 2 GB",
+      "batches": 32,
+      "vcpu_mean": 0.312,
+      "vcpu_max": 0.4,
+      "throttle_max": 0.0,
+      "balance_min": 7865.429,
+      "peak_rss_mib": 201,
+      "loop_delay_ms": {
+        "p50": 0,
+        "p99": 2,
+        "max": 21
+      },
+      "s_per_page": {
+        "p50": 0.52,
+        "p90": 0.61,
+        "max": 1.1
+      },
+      "wire_gap_p1_ms": 496,
+      "wire_gaps_under_250": 30,
+      "wire_gaps": 15228,
+      "batches_done": 694,
+      "batches_total": 694,
+      "pages": 15100,
+      "partial": 0,
+      "refused": 0,
+      "timeouts": 0
+    },
+    {
+      "machine": "shared-cpu-2x 2 GB",
+      "batches": 64,
+      "vcpu_mean": 0.925,
+      "vcpu_max": 1.955,
+      "throttle_max": 177.535,
+      "balance_min": 1.0,
+      "peak_rss_mib": 226,
+      "loop_delay_ms": {
+        "p50": 0,
+        "p99": 219,
+        "max": 1020
+      },
+      "s_per_page": {
+        "p50": 0.53,
+        "p90": 1.22,
+        "max": 2.3
+      },
+      "wire_gap_p1_ms": 487,
+      "wire_gaps_under_250": 84,
+      "wire_gaps": 24868,
+      "batches_done": 1114,
+      "batches_total": 1114,
+      "pages": 24580,
+      "partial": 0,
+      "refused": 0,
+      "timeouts": 0
+    },
+    {
+      "machine": "performance-1x 2 GB",
+      "batches": 4,
+      "vcpu_mean": 0.059,
+      "vcpu_max": 0.075,
+      "throttle_max": 0.0,
+      "balance_min": 81312.0,
+      "peak_rss_mib": 142,
+      "loop_delay_ms": {
+        "p50": 0,
+        "p99": 1,
+        "max": 16
+      },
+      "s_per_page": {
+        "p50": 0.52,
+        "p90": 0.6,
+        "max": 1.1
+      },
+      "wire_gap_p1_ms": 497,
+      "wire_gaps_under_250": 0,
+      "wire_gaps": 1888,
+      "batches_done": 108,
+      "batches_total": 108,
+      "pages": 1860,
+      "partial": 0,
+      "refused": 0,
+      "timeouts": 0
+    },
+    {
+      "machine": "performance-1x 2 GB",
+      "batches": 8,
+      "vcpu_mean": 0.084,
+      "vcpu_max": 0.106,
+      "throttle_max": 0.0,
+      "balance_min": 112661.994,
+      "peak_rss_mib": 157,
+      "loop_delay_ms": {
+        "p50": 0,
+        "p99": 1,
+        "max": 15
+      },
+      "s_per_page": {
+        "p50": 0.52,
+        "p90": 0.65,
+        "max": 0.9
+      },
+      "wire_gap_p1_ms": 497,
+      "wire_gaps_under_250": 0,
+      "wire_gaps": 3754,
+      "batches_done": 181,
+      "batches_total": 181,
+      "pages": 3730,
+      "partial": 0,
+      "refused": 0,
+      "timeouts": 0
+    },
+    {
+      "machine": "performance-1x 2 GB",
+      "batches": 16,
+      "vcpu_mean": 0.151,
+      "vcpu_max": 0.184,
+      "throttle_max": 0.0,
+      "balance_min": 143267.012,
+      "peak_rss_mib": 182,
+      "loop_delay_ms": {
+        "p50": 0,
+        "p99": 2,
+        "max": 19
+      },
+      "s_per_page": {
+        "p50": 0.52,
+        "p90": 0.59,
+        "max": 1.1
+      },
+      "wire_gap_p1_ms": 497,
+      "wire_gaps_under_250": 8,
+      "wire_gaps": 7550,
+      "batches_done": 363,
+      "batches_total": 363,
+      "pages": 7470,
+      "partial": 0,
+      "refused": 0,
+      "timeouts": 0
+    },
+    {
+      "machine": "performance-1x 2 GB",
+      "batches": 32,
+      "vcpu_mean": 0.282,
+      "vcpu_max": 0.337,
+      "throttle_max": 0.0,
+      "balance_min": 171876.999,
+      "peak_rss_mib": 197,
+      "loop_delay_ms": {
+        "p50": 0,
+        "p99": 3,
+        "max": 26
+      },
+      "s_per_page": {
+        "p50": 0.52,
+        "p90": 0.61,
+        "max": 1.2
+      },
+      "wire_gap_p1_ms": 492,
+      "wire_gaps_under_250": 32,
+      "wire_gaps": 15238,
+      "batches_done": 693,
+      "batches_total": 693,
+      "pages": 15110,
+      "partial": 0,
+      "refused": 0,
+      "timeouts": 0
+    },
+    {
+      "machine": "performance-1x 2 GB",
+      "batches": 64,
+      "vcpu_mean": 0.254,
+      "vcpu_max": 0.633,
+      "throttle_max": 0.0,
+      "balance_min": 196667.042,
+      "peak_rss_mib": 208,
+      "loop_delay_ms": {
+        "p50": 0,
+        "p99": 5,
+        "max": 166
+      },
+      "s_per_page": {
+        "p50": 0.52,
+        "p90": 0.64,
+        "max": 1.3
+      },
+      "wire_gap_p1_ms": 486,
+      "wire_gaps_under_250": 10,
+      "wire_gaps": 30228,
+      "batches_done": 1372,
+      "batches_total": 1372,
+      "pages": 29940,
+      "partial": 0,
+      "refused": 0,
+      "timeouts": 1
+    }
+  ],
+  "worst_case": {
+    "measured": "2026-11-18",
+    "heap_mb": 512,
+    "bound_mib": {
+      "4": 1240,
+      "8": 1180,
+      "16": 1580
+    },
+    "largest_result_bytes": 8762394,
+    "runs": [
+      {
+        "batches": 4,
+        "case": "access, 2 pages",
+        "peak_rss_mib": 527.6,
+        "heap_used_mib": 45.4
+      },
+      {
+        "batches": 4,
+        "case": "densest markup, 4 URLs",
+        "peak_rss_mib": 911.4,
+        "heap_used_mib": 64.0
+      },
+      {
+        "batches": 4,
+        "case": "10 MB pages, 50 URLs",
+        "peak_rss_mib": 782.5,
+        "heap_used_mib": 125.8
+      },
+      {
+        "batches": 4,
+        "case": "brotli, 50 URLs",
+        "peak_rss_mib": 743.4,
+        "heap_used_mib": 123.1
+      },
+      {
+        "batches": 8,
+        "case": "brotli, 50 URLs, cut short at 60 s",
+        "peak_rss_mib": 825.3,
+        "heap_used_mib": 177.9
+      },
+      {
+        "batches": 8,
+        "case": "brotli, 50 URLs, full budget (once, not in CI)",
+        "peak_rss_mib": 868.9,
+        "heap_used_mib": 224.7
+      },
+      {
+        "batches": 16,
+        "case": "access, 2 pages",
+        "peak_rss_mib": 626.3,
+        "heap_used_mib": 97.7
+      },
+      {
+        "batches": 16,
+        "case": "densest markup, 4 URLs",
+        "peak_rss_mib": 1108.0,
+        "heap_used_mib": 165.6
+      },
+      {
+        "batches": 16,
+        "case": "10 MB pages, 50 URLs, cut short at 60 s",
+        "peak_rss_mib": 915.1,
+        "heap_used_mib": 260.5
+      },
+      {
+        "batches": 16,
+        "case": "brotli, 50 URLs, cut short at 60 s",
+        "peak_rss_mib": 928.6,
+        "heap_used_mib": 244.6
+      },
+      {
+        "batches": 16,
+        "case": "10 MB pages, 50 URLs, full budget (once, not in CI)",
+        "peak_rss_mib": 1131.1,
+        "heap_used_mib": 397.0
+      },
+      {
+        "batches": 16,
+        "case": "brotli, 50 URLs, full budget (once, not in CI)",
+        "peak_rss_mib": 1167.6,
+        "heap_used_mib": 401.9
+      }
+    ],
+    "note": "Each peak is the highest of the runs on the date: one run of the file alone, one inside the full worker suite; the full-budget rows ran once."
+  },
+  "first_requests": {
+    "measured": "2026-11-18",
+    "machine": "shared-cpu-2x 2 GB",
+    "batches": 16,
+    "sites": 16,
+    "arrival_gaps_under_250": [
+      {
+        "site": "cm42b-l-1",
+        "first": "/robots.txt",
+        "second": "/",
+        "gap_ms": 65
+      },
+      {
+        "site": "cm42b-l-2",
+        "first": "/robots.txt",
+        "second": "/",
+        "gap_ms": 33
+      },
+      {
+        "site": "cm42b-l-3",
+        "first": "/robots.txt",
+        "second": "/",
+        "gap_ms": 60
+      },
+      {
+        "site": "cm42b-l-4",
+        "first": "/robots.txt",
+        "second": "/",
+        "gap_ms": 64
+      },
+      {
+        "site": "cm42b-m-1",
+        "first": "/robots.txt",
+        "second": "/",
+        "gap_ms": 50
+      },
+      {
+        "site": "cm42b-m-2",
+        "first": "/robots.txt",
+        "second": "/",
+        "gap_ms": 71
+      },
+      {
+        "site": "cm42b-m-3",
+        "first": "/robots.txt",
+        "second": "/",
+        "gap_ms": 96
+      },
+      {
+        "site": "cm42b-m-4",
+        "first": "/robots.txt",
+        "second": "/",
+        "gap_ms": 74
+      },
+      {
+        "site": "cm42b-m-5",
+        "first": "/robots.txt",
+        "second": "/",
+        "gap_ms": 42
+      },
+      {
+        "site": "cm42b-m-6",
+        "first": "/robots.txt",
+        "second": "/",
+        "gap_ms": 45
+      },
+      {
+        "site": "cm42b-s-1",
+        "first": "/robots.txt",
+        "second": "/",
+        "gap_ms": 126
+      },
+      {
+        "site": "cm42b-s-2",
+        "first": "/robots.txt",
+        "second": "/",
+        "gap_ms": 67
+      },
+      {
+        "site": "cm42b-s-3",
+        "first": "/robots.txt",
+        "second": "/",
+        "gap_ms": 60
+      },
+      {
+        "site": "cm42b-s-4",
+        "first": "/robots.txt",
+        "second": "/",
+        "gap_ms": 14
+      },
+      {
+        "site": "cm42b-s-5",
+        "first": "/robots.txt",
+        "second": "/",
+        "gap_ms": 65
+      },
+      {
+        "site": "cm42b-s-6",
+        "first": "/robots.txt",
+        "second": "/",
+        "gap_ms": 41
+      }
+    ],
+    "worker_start_gap_min_ms": 499,
+    "probe": {
+      "site": "cm42b-s-20",
+      "robots_start_to_arrival_ms": 61,
+      "next_start_to_arrival_ms": 5,
+      "start_gap_ms": 500
+    }
+  }
+}

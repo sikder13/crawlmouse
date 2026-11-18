@@ -51,6 +51,13 @@ export type GatedLink = LiveLink & { gate: FooterGate };
 /** The Status link, which carries the live status shape. */
 export type StatusLink = LiveLink & { showsStatus: true };
 
+/** A page on another site: opened apart from ours, and never checked against our routes. */
+export interface ExternalLink {
+  label: string;
+  href: `https://${string}`;
+  external: true;
+}
+
 /** A footer control that is a button, not a link. */
 export interface FooterControl {
   label: string;
@@ -79,6 +86,11 @@ export const FOOTER_COPY = {
 // Shared by the header and the footer, so the two cannot point the same label at different pages.
 const BLOG: LiveLink = { label: 'Blog', href: '/blog' };
 const RESEARCH: LiveLink = { label: 'Research', href: '/blog/research' };
+const SCREAMING_FROG: LiveLink = {
+  label: 'Screaming Frog alternatives',
+  href: '/blog/screaming-frog-alternative',
+  note: 'The post with the most Search Console impressions (CC-42A brief, decision 7).',
+};
 const GUIDES: LiveLink = { label: 'Guides', href: '/guides' };
 const DOCS: PlannedLink = { label: 'Docs', planned: true };
 const DEVELOPERS: LiveLink = { label: 'Developers', href: '/developers' };
@@ -111,6 +123,7 @@ export const FOOTER_COLUMNS: FooterColumn[] = [
     title: 'Learn',
     items: [
       BLOG,
+      SCREAMING_FROG,
       RESEARCH,
       GUIDES,
       DOCS,
@@ -162,5 +175,14 @@ export const FOOTER_COLUMNS: FooterColumn[] = [
       // The live footer's consent control (GDPR Art. 7(3): withdrawing consent as easy as giving it).
       { label: 'Cookie settings', control: 'cookie-settings' },
     ],
+  },
+];
+
+/** Crawlmouse on other sites, in the footer's brand block. */
+export const FOOTER_SOCIAL: ExternalLink[] = [
+  {
+    label: 'Facebook',
+    href: 'https://www.facebook.com/profile.php?id=61596663805615',
+    external: true,
   },
 ];

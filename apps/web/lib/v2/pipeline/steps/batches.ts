@@ -151,7 +151,7 @@ export function batchSteps(
     if ('none' in planned) return { status: 'none', why: planned.none };
     const now = deps.now();
     const budget = at.kind === 'crawl' ? CRAWL_BATCH_BUDGET : ACCESS_BATCH_BUDGET;
-    const seconds = batchSeconds(phaseEndsAt(at, so), now, budget.max_seconds);
+    const seconds = batchSeconds(phaseEndsAt(at, so, now), now, budget.max_seconds);
     if (seconds === null) return { status: 'none', why: 'no_time' };
 
     const nonce = deps.nonce();
@@ -186,8 +186,10 @@ export function batchSteps(
       const out = await attempt(event, at, so);
       // An attempt that returns writes the heartbeat (one that throws writes none): a worker
       // answering busy for minutes keeps a check waiting between posts, and the reaper reads a check
-      // without one as stalled (correctness 10).
-      await progress(event, at, so, deps.now());
+      // without one as stalled (correctness 10). A busy answer writes since when the check has been
+      // waiting (the progress screen's "In line"); any other answer ends the wait.
+      const waitingSince = out.status === 'busy' ? (so.waitingSince ?? out.at) : null;
+      await progress(event, at, { ...so, waitingSince }, deps.now());
       return out;
     },
 

@@ -123,6 +123,9 @@ describe('sitePage: a site whose first check has not ended', () => {
         links_found: 9,
         elapsed_ms: 1000,
         recent_fetches: [],
+        waiting_since: null,
+        sitemap_urls: null,
+        robots_txt: null,
       },
     } as Check;
     const d = { ...bad, checks: bad.checks.map((c) => (c.id === first.id ? running : c)) };
@@ -385,6 +388,9 @@ describe('a running first check', () => {
         links_found: 0,
         elapsed_ms: 10,
         recent_fetches: [],
+        waiting_since: null,
+        sitemap_urls: null,
+        robots_txt: null,
       },
     } as Check;
     const d = { ...bad, checks: bad.checks.map((c) => (c.id === first.id ? one : c)) };

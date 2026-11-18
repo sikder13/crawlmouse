@@ -11,7 +11,7 @@
  * `notify_email` is written here; that test fails if production's requests name it in a select.
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { Check } from '@crawlmouse/types/v2';
+import { RobotsTxtStateSchema, type Check, type RobotsTxtState } from '@crawlmouse/types/v2';
 import type { CrawlBatchStatus } from './types';
 
 /** A `crawl_batches` row as the stream reads it. `pages` and `links` are its summary's counts. */
@@ -36,6 +36,10 @@ export interface StreamSnapshot {
     steps: { phase: string; state: string }[];
     pages_crawled: number;
     links_found: number;
+    /** Null when absent: a row written before these fields were. */
+    waiting_since: string | null;
+    sitemap_urls: number | null;
+    robots_txt: RobotsTxtState | null;
   } | null;
   startedAt: string | null;
   finishedAt: string | null;
@@ -85,8 +89,16 @@ function progressOf(v: unknown): StreamSnapshot['progress'] {
     }),
     pages_crawled: count(p.pages_crawled),
     links_found: count(p.links_found),
+    waiting_since: text(p.waiting_since),
+    sitemap_urls:
+      typeof p.sitemap_urls === 'number' && Number.isFinite(p.sitemap_urls) ? p.sitemap_urls : null,
+    robots_txt: ROBOTS_TXT.has(p.robots_txt as RobotsTxtState)
+      ? (p.robots_txt as RobotsTxtState)
+      : null,
   };
 }
+
+const ROBOTS_TXT: ReadonlySet<RobotsTxtState> = new Set(RobotsTxtStateSchema.options);
 
 function batchOf(r: Row): StreamBatch {
   const summary = record(r.summary);

@@ -530,7 +530,10 @@
             "status": 200,
             "links": 29
           }
-        ]
+        ],
+        "waiting_since": null,
+        "sitemap_urls": null,
+        "robots_txt": null
       }
     }
   ],

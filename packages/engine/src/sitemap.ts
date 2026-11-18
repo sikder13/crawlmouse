@@ -12,6 +12,20 @@ export interface DiscoverResult {
   source: 'robots' | 'common_path' | 'none';
   /** Parsed robots.txt (rules + sitemaps), or null if robots.txt was absent. */
   robots: ParsedRobots | null;
+  /**
+   * What the one robots.txt request answered: `found` for a 2xx (an empty file included),
+   * `not_found` for a 404 or 410, `unreadable` for any other status or a fetch that threw.
+   */
+  robotsStatus: RobotsStatus;
+}
+
+export type RobotsStatus = 'found' | 'not_found' | 'unreadable';
+
+/** A robots.txt response's status as a RobotsStatus; null is a fetch that threw. */
+export function robotsStatusOf(status: number | null): RobotsStatus {
+  if (status === null) return 'unreadable';
+  if (status >= 200 && status < 300) return 'found';
+  return status === 404 || status === 410 ? 'not_found' : 'unreadable';
 }
 
 export interface DiscoverOptions {
@@ -31,10 +45,11 @@ export async function discoverSitemaps(
 ): Promise<DiscoverResult> {
   let robots: ParsedRobots | null = null;
   const robotsRes = await opts.fetcher(`${origin}/robots.txt`).catch(() => null);
+  const robotsStatus = robotsStatusOf(robotsRes?.status ?? null);
   if (robotsRes && robotsRes.status === 200 && robotsRes.body) {
     robots = parseRobotsTxt(robotsRes.body);
     if (robots.sitemaps.length > 0) {
-      return { sitemapUrls: robots.sitemaps, source: 'robots', robots };
+      return { sitemapUrls: robots.sitemaps, source: 'robots', robots, robotsStatus };
     }
   }
 
@@ -42,11 +57,11 @@ export async function discoverSitemaps(
     const url = `${origin}${path}`;
     const res = await opts.fetcher(url).catch(() => null);
     if (res && res.status === 200 && res.body) {
-      return { sitemapUrls: [url], source: 'common_path', robots };
+      return { sitemapUrls: [url], source: 'common_path', robots, robotsStatus };
     }
   }
 
-  return { sitemapUrls: [], source: 'none', robots };
+  return { sitemapUrls: [], source: 'none', robots, robotsStatus };
 }
 
 export interface ParseOptions {

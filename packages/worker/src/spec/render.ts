@@ -200,7 +200,7 @@ export function renderSpec(): string {
     ['Link edges per page', `${MAX_EDGES_PER_PAGE}`],
     ['URL length read or linked from', `${MAX_URL_LENGTH} characters`],
     [
-      'Text, link edges, content features and hreflang alternates per crawl batch',
+      "Text, link edges, content features and hreflang alternates per crawl batch, counted in the bytes the result's JSON takes (`src/batch/json-bytes.ts`)",
       kib(MAX_RESULT_TEXT_BYTES),
     ],
     [

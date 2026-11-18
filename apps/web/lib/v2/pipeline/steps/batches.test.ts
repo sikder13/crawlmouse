@@ -37,6 +37,10 @@ const SO: RunSoFar = {
   pagesCrawled: 0,
   linksFound: 0,
   release: null,
+  busyMs: 0,
+  busyBeforeCrawlMs: 0,
+  waitingSince: null,
+  discovered: null,
 };
 const CRAWL_1: BatchAt = { kind: 'crawl', batch: 1, stage: null };
 
@@ -170,6 +174,31 @@ describe('post (finding 2)', () => {
     s.clock.now += 30_000;
     expect(await s.steps.post(EVENT, CRAWL_1, SO)).toMatchObject({ status: 'posted' });
     expect(heartbeat()).toBe(new Date(T0 + 60_000).toISOString());
+  });
+
+  it('writes since when the check has waited on a busy answer, keeps it across busy answers, and clears it once a batch is taken (CC-42A decision 4)', async () => {
+    const s = await setup(new Map([[1, renumbered(readRecorded('batches')[0]!, 1)]]));
+    const found = { sitemap_urls: 12, robots_txt: 'found' as const };
+    s.refuse.push('busy', 'busy');
+    const first = await s.steps.post(EVENT, CRAWL_1, { ...SO, discovered: found });
+    expect(first).toEqual({ status: 'busy', at: T0 });
+    expect(s.rows.get(CHECK)!.progress).toMatchObject({
+      waiting_since: new Date(T0).toISOString(),
+      sitemap_urls: 12,
+      robots_txt: 'found',
+    });
+    // The orchestration hands the wait's start back on the next post; a second busy keeps it.
+    s.clock.now = T0 + 30_000;
+    await s.steps.post(EVENT, CRAWL_1, { ...SO, discovered: found, waitingSince: T0 });
+    expect(s.rows.get(CHECK)!.progress?.waiting_since).toBe(new Date(T0).toISOString());
+    s.clock.now = T0 + 60_000;
+    const taken = await s.steps.post(EVENT, CRAWL_1, {
+      ...SO,
+      discovered: found,
+      waitingSince: T0,
+    });
+    expect(taken.status).toBe('posted');
+    expect(s.rows.get(CHECK)!.progress).toMatchObject({ waiting_since: null, sitemap_urls: 12 });
   });
 
   it('answers busy and paused as outputs, and counts batch_exists as posted', async () => {

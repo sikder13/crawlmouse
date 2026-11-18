@@ -34,6 +34,7 @@ import type { Findings } from './findings.js';
 import { isNotRead, type PageRead, type PageReader, type StackHeaders } from '../reader/read.js';
 import { politeFetch, type FetchContext, type NotRequested } from './polite-fetch.js';
 import { pathOf, type BatchRobots, type SiteBlock } from './site-rules.js';
+import { jsonBytes } from './json-bytes.js';
 
 /**
  * A crawl batch: each URL is requested once as our crawl identity, two at a time at most (the site's
@@ -45,8 +46,9 @@ import { pathOf, type BatchRobots, type SiteBlock } from './site-rules.js';
 export const MAX_EDGES_PER_PAGE = 1000;
 /**
  * What one batch may hold in served text and link edges. Pages past it keep their row but not their
- * text or links, and the batch is partial with `result_size`. Response bytes are a separate budget,
- * set by the caller.
+ * text or links, and the batch is partial with `result_size`. Counted in the bytes the result's JSON
+ * takes (json-bytes.ts), not the text's UTF-8 bytes. Response bytes are a separate budget, set by the
+ * caller.
  */
 export const MAX_RESULT_TEXT_BYTES = 8 * 1024 * 1024;
 const CONCURRENT_PAGES = 2;
@@ -291,15 +293,7 @@ async function crawlPage(
     !inPart &&
     fromUrl !== null &&
     extracted.notRead.tooLong + edges.tooLong + extracted.notRead.pastLimit === 0;
-  const featuresBytes = read.features ? Buffer.byteLength(JSON.stringify(read.features)) : 0;
-  const cost =
-    Buffer.byteLength(rawText) +
-    featuresBytes +
-    edges.kept.reduce((n, e) => n + edgeBytes(e), 0) +
-    hreflang.links.reduce(
-      (n, l) => n + Buffer.byteLength(l.hreflang) + Buffer.byteLength(l.href),
-      0,
-    );
+  const cost = pageCost(rawText, read.features, edges.kept, hreflang.links);
   const recorded = cost <= room.bytes;
   if (recorded) room.bytes -= cost;
   else {
@@ -336,11 +330,40 @@ async function crawlPage(
   return { page, edges: recorded ? edges.kept : [], complete: true, landed };
 }
 
-const edgeBytes = (e: LinkEdge): number =>
-  Buffer.byteLength(e.from_url) +
-  Buffer.byteLength(e.to_url) +
-  Buffer.byteLength(e.anchor_text) +
-  128;
+/**
+ * A fixed charge per edge for its other fields and its keys, below what they take in the JSON; the
+ * gap is measured and pinned in page-cost.test.ts. Unchanged by CC-42B, so where an ordinary batch is
+ * cut stays where it was.
+ */
+export const EDGE_OVERHEAD = 128;
+
+/**
+ * What a page's text, content features, edges and hreflang alternates take from the batch's room.
+ * The page's strings are counted as the result's JSON holds them (json-bytes.ts), so a page of
+ * quotes or backslashes is charged what it costs there, and content features as their JSON. What
+ * is not counted exactly: each edge's other fields and keys (EDGE_OVERHEAD), each hreflang alternate's keys, and the page's row (its title, description, redirects
+ * and limitations), which every page keeps whether or not its text is recorded. So a result can
+ * pass the room by those. src/load.test.ts measures the largest result its own cases produce, not the
+ * largest a batch can.
+ */
+export function pageCost(
+  rawText: string,
+  features: unknown,
+  edges: readonly LinkEdge[],
+  hreflang: Hreflang['links'],
+): number {
+  const featuresBytes = features ? Buffer.byteLength(JSON.stringify(features)) : 0;
+  return (
+    jsonBytes(rawText) +
+    featuresBytes +
+    edges.reduce(
+      (n, e) =>
+        n + jsonBytes(e.from_url) + jsonBytes(e.to_url) + jsonBytes(e.anchor_text) + EDGE_OVERHEAD,
+      0,
+    ) +
+    hreflang.reduce((n, l) => n + jsonBytes(l.hreflang) + jsonBytes(l.href), 0)
+  );
+}
 
 /**
  * One edge per distinct same-host target, in page order; only the first MAX_EDGES_PER_PAGE are built.

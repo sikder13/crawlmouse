@@ -9,6 +9,7 @@ import {
   FUNCTIONS,
   HOBBY_HEADROOM_LINE,
   SHAPES,
+  BUSY_PER_POST_MAX,
   MAX_SECONDS,
   SEARCH,
   checkExecutions,
@@ -144,7 +145,7 @@ describe('the function rows against the code', () => {
   const HAND: Record<string, number> = {
     'inngest/audit.ts': 5, // 357 361 376 378 386
     'inngest/billing.ts': 5, // 65 77 95 116 120
-    'inngest/check.ts': 13, // 193 197 205 235 256 313 379 380 390 391 392 445 447
+    'inngest/check.ts': 13, // 240 244 252 312 345 404 470 471 481 482 483 536 538
     'inngest/check-reaper.ts': 1, // 39
     'inngest/check-expiry.ts': 3, // 51 54 58 (CC-GL D2)
     'inngest/trial-lifecycle.ts': 6, // 87 89 99 102 103 113
@@ -285,14 +286,18 @@ describe('a check against a worker that answers busy, runs long or loses a batch
 
   it('adds a sleep and a post for each busy answer, on each of the four posts', async () => {
     expect(await checkExecutions({ ...one, busyPerPost: 1 })).toBe(18 + 4 * 2);
-    // At 20 busy answers a post the clock decides: run, claim, discover 3; crawl-1-post 20 busy (post
-    // and 30 s sleep each) and taken 41, now 600 s; wait 5 s, poll, read 3, now 605 s; crawl-2-post
-    // busy: the 20th sleep reaches 1,205 s, past the finish timeout: 40. 3 + 41 + 3 + 40 = 87.
-    expect(await checkExecutions({ ...one, busyPerPost: PACE.busyRetries })).toBe(87);
+    // At 30 busy answers a post (BUSY_PER_POST_MAX) the clock decides. Run, claim, discover: 3.
+    // crawl-1-post: 30 busy (post and 30 s sleep each), the wait budget reaching 870 s of 900, then
+    // taken at the 31st post: 61, now 900 s. Wait 5 s, poll, read: 3, now 905 s. crawl-2-post: 30
+    // busy, then it plans nothing (`done`): 61, now 1,805 s. access-1-post: busy; the 14th sleep
+    // reaches 2,225 s, past the finish timeout (2,220 s): 14 posts and 14 sleeps, 28.
+    // 3 + 61 + 3 + 61 + 28 = 156.
+    expect(BUSY_PER_POST_MAX).toBe(30);
+    expect(await checkExecutions({ ...one, busyPerPost: BUSY_PER_POST_MAX })).toBe(156);
   });
 
-  it('refuses more busy answers than a post retries', async () => {
-    await expect(checkExecutions({ ...one, busyPerPost: PACE.busyRetries + 1 })).rejects.toThrow();
+  it('refuses a shape with more busy answers a post than BUSY_PER_POST_MAX', async () => {
+    await expect(checkExecutions({ ...one, busyPerPost: BUSY_PER_POST_MAX + 1 })).rejects.toThrow();
   });
 
   it('polls a batch done just before its deadline 12 times', async () => {
@@ -307,17 +312,19 @@ describe('a check against a worker that answers busy, runs long or loses a batch
 
   it('stops counting at the sleep that passes the finish timeout', async () => {
     // Hand count: run 1; claim 1 and five waits of 60 s (sleep + claim) 10, now 300 s; discover 1;
-    // crawl-1-post busy 20 times (20 posts, 20 sleeps of 30 s) and taken at the 21st post: 41, now
-    // 900 s; polls at 905, 915, 935, 965, 995, …, 1175 (11 sleeps, 11 polls): 22; the sleep to 1205 s
-    // passes 1,200 s and is the last: 1. 1 + 1 + 10 + 1 + 41 + 22 + 1 = 77.
+    // crawl-1-post busy 30 times (30 posts, 30 sleeps of 30 s) and taken at the 31st post: 61, now
+    // 1,200 s; polls 5, 15, 35, 65, …, 305 s after the post (12 sleeps, 12 polls), done at the
+    // first past 299 s, then read: 25, now 1,505 s; crawl-2-post busy: the 24th sleep reaches
+    // 2,225 s, past 2,220 s, and is the last: 24 posts and 24 sleeps, 48.
+    // 1 + 1 + 10 + 1 + 61 + 25 + 48 = 147.
     const cut: CheckShape = {
       ...one,
       claimWaits: PACE.claimWaits,
-      busyPerPost: PACE.busyRetries,
+      busyPerPost: BUSY_PER_POST_MAX,
       batchSeconds: MAX_SECONDS + PACE.pollGraceS - 1,
     };
-    expect(PACE.finishS).toBe(1200);
-    expect(await checkExecutions(cut)).toBe(77);
+    expect(PACE.finishS).toBe(2220);
+    expect(await checkExecutions(cut)).toBe(147);
   });
 
   it('names as heaviest the largest count of the shapes it tries, and says it is no bound', async () => {

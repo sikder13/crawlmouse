@@ -68,6 +68,8 @@ const page = (head: string, body = '<p>ok</p>'): FakeResponse => ({
   body: `<html><head>${head}</head><body>${body}</body></html>`,
 });
 const at = (path: string) => `${BASE}${path}`;
+/** Links on each page of the content-features room case: enough to bring fifty pages near 8 MiB. */
+const LINKS_PER_PAGE = 520;
 
 describe('redirect hops', () => {
   it('records each hop as (from, status, location), and no loop', async () => {
@@ -486,6 +488,29 @@ describe('what a row stores, against the batch room', () => {
     expect(
       dropped.limitations.some((l) => /hreflang alternates of this page were not recorded/.test(l)),
     ).toBe(true);
+  });
+
+  it('charges content features to the room: the same pages fit without their JSON-LD and not with it', async () => {
+    // Fifty pages of the same text and links, close to the 8 MiB room between them; the JSON-LD adds
+    // about 20 KB of content features a page, which is not page text, and tips the batch over.
+    const links = Array.from({ length: LINKS_PER_PAGE }, (_, i) => `<a href="/l/${i}">l${i}</a>`);
+    const body = `<p>${'lorem '.repeat(10_000)}</p>${links.join(' ')}`;
+    const graph = Array.from({ length: 200 }, (_, i) => ({
+      '@type': ['Product', `Type${i % 30}`],
+      name: `Product ${i}`,
+      description: 'x'.repeat(100),
+    }));
+    const ld = `<script type="application/ld+json">${JSON.stringify({ '@context': 'https://schema.org', '@graph': graph })}</script>`;
+    const paths = Array.from({ length: 50 }, (_, i) => `/p${i}`);
+    const kept = async (head: string) => {
+      const r = await rows(paths, (url) => (url.includes('/p') ? page(head, body) : undefined));
+      return paths.filter((p) => r.get(p)!.raw_text !== null).length;
+    };
+    const without = await kept('');
+    const withFeatures = await kept(ld);
+    process.stdout.write(`features room: ${without} kept without JSON-LD, ${withFeatures} with\n`);
+    expect(without).toBe(paths.length);
+    expect(withFeatures).toBeLessThan(paths.length);
   });
 
   it('a redirect to a URL that is not http(s) keeps the hop and no location', async () => {

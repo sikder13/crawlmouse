@@ -319,6 +319,7 @@ export const NESTED: Record<string, string[]> = {
   PageKind: ['checks.coverage'],
   RecommendationClass: ['checks.signals'],
   RefusalTrigger: ['checks.technical_seo'],
+  RobotsTxtState: ['checks.progress'],
   SampleMethod: ['checks.coverage'],
   SignalKind: ['checks.signals'],
   StepState: ['checks.progress'],

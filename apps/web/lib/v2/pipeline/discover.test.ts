@@ -118,4 +118,42 @@ describe('discoverSeeds (Q8)', () => {
       expect(r.opts?.totalDeadlineMs).toBeLessThanOrEqual(10_000);
     }
   });
+
+  describe('robotsTxt: the status of the robots.txt request discovery already makes', () => {
+    it('found', async () => {
+      const { deps } = site({ 'https://example.com/robots.txt': 'User-agent: *\n' });
+      expect((await discoverSeeds('https://example.com', deps)).robotsTxt).toBe('found');
+    });
+
+    it('not_found', async () => {
+      const { deps } = site({});
+      expect((await discoverSeeds('https://example.com', deps)).robotsTxt).toBe('not_found');
+    });
+
+    it('unreadable: a status other than 2xx, 404 or 410', async () => {
+      const fetch = (async (url: string) => ({
+        status: url.endsWith('/robots.txt') ? 503 : 404,
+        body: '',
+        headers: {},
+        finalUrl: url,
+      })) as Fetch;
+      const out = await discoverSeeds('https://example.com', {
+        fetch,
+        userAgent: UA,
+        now: () => 0,
+      });
+      expect(out.robotsTxt).toBe('unreadable');
+    });
+
+    it('unreadable: the DISCOVER_S deadline had passed before robots.txt was asked for', async () => {
+      // The deadline is read once at the start; every later reading is past it, so the fetcher
+      // throws before it sends anything.
+      let reads = 0;
+      const now = () => (reads++ === 0 ? 0 : DISCOVER_S * 1000 + 1);
+      const { deps, requests } = site({ 'https://example.com/robots.txt': 'User-agent: *\n' });
+      const out = await discoverSeeds('https://example.com', { ...deps, now });
+      expect(requests).toHaveLength(0);
+      expect(out.robotsTxt).toBe('unreadable');
+    });
+  });
 });

@@ -21,7 +21,7 @@ import type { StepDeps } from './deps';
 import { progressOf } from './progress';
 import { iso, pathOf } from './stored';
 
-const NOTHING_YET = { pagesCrawled: 0, linksFound: 0 };
+const NOTHING_YET = { pagesCrawled: 0, linksFound: 0, discovered: null, waitingSince: null };
 
 export function lifecycleSteps(deps: StepDeps): Pick<CheckSteps, 'claim' | 'discover' | 'fail'> {
   return {
@@ -43,15 +43,19 @@ export function lifecycleSteps(deps: StepDeps): Pick<CheckSteps, 'claim' | 'disc
     },
 
     async discover(event, so) {
-      const { seeds, sitemapUrls } = await discoverSeeds(event.homepageUrl, deps.discover);
+      const { seeds, sitemapUrls, robotsTxt } = await discoverSeeds(
+        event.homepageUrl,
+        deps.discover,
+      );
       await putJson(deps.evidence, pathOf(event, 'seeds'), seeds);
       const at = deps.now();
+      const discovered = { sitemap_urls: sitemapUrls, robots_txt: robotsTxt };
       await deps.store.progress(
         event.checkId,
-        progressOf('homepage', so, at - so.startedAt),
+        progressOf('homepage', { ...so, discovered }, at - so.startedAt),
         iso(at),
       );
-      return { seeds: seeds.length, sitemap_urls: sitemapUrls, at };
+      return { seeds: seeds.length, sitemap_urls: sitemapUrls, robots_txt: robotsTxt, at };
     },
 
     fail: (event, reason) => failCheck(deps.store, event.checkId, reason),

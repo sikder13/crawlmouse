@@ -15,7 +15,12 @@
  * not observe them start.
  */
 import { gunzipSync } from 'node:zlib';
-import { BatchResultSchema, type Check, type CrawlBatchResult } from '@crawlmouse/types/v2';
+import {
+  BatchResultSchema,
+  type Check,
+  type CrawlBatchResult,
+  type RobotsTxtState,
+} from '@crawlmouse/types/v2';
 import { PHASES, type ProgressEvent } from '../progress';
 import type { StreamBatch, StreamSnapshot } from './stream-store';
 import type { EvidenceStore } from './types';
@@ -34,6 +39,8 @@ export interface Cursor {
   /** The last event's `at_ms`. */
   at: number;
   ended: boolean;
+  /** The wait for a free crawler the viewer was last sent (`since_ms`); null when none. */
+  waitingSince: number | null;
 }
 
 export const START: Cursor = Object.freeze({
@@ -43,6 +50,7 @@ export const START: Cursor = Object.freeze({
   links: 0,
   at: 0,
   ended: false,
+  waitingSince: null,
 });
 
 const ALL_DONE = 2 * PHASES.length;
@@ -51,25 +59,35 @@ const ALL_DONE = 2 * PHASES.length;
  * say (stream.test.ts, "a running check is not taken past the crawler tests").
  */
 const OBSERVED = 2 * PHASES.indexOf('without_js');
-const CURSOR = /^1\.(\d{1,7})\.(\d{1,2})\.(\d{1,9})\.(\d{1,9})\.(\d{1,12})\.([01])$/;
+/**
+ * Format 2 adds the wait as its last field: 0 for none, `since_ms + 1` for a wait. Format 1, which
+ * a viewer who connected before format 2 shipped may still send, is read as having sent no wait.
+ */
+const CURSOR =
+  /^(?:1\.(\d{1,7})\.(\d{1,2})\.(\d{1,9})\.(\d{1,9})\.(\d{1,12})\.([01])|2\.(\d{1,7})\.(\d{1,2})\.(\d{1,9})\.(\d{1,9})\.(\d{1,12})\.([01])\.(\d{1,12}))$/;
 
 export const formatCursor = (c: Cursor): string =>
-  `1.${c.batch}.${c.step}.${c.pages}.${c.links}.${c.at}.${c.ended ? 1 : 0}`;
+  `2.${c.batch}.${c.step}.${c.pages}.${c.links}.${c.at}.${c.ended ? 1 : 0}.${
+    c.waitingSince === null ? 0 : c.waitingSince + 1
+  }`;
 
 /** The cursor a `Last-Event-ID` names; null when it is not one `formatCursor` writes. */
 export function parseCursor(text: string): Cursor | null {
   const m = CURSOR.exec(text);
   if (!m) return null;
-  const group = (i: number) => Number(m[i]);
+  const v2 = m[7] !== undefined;
+  const group = (i: number) => Number(m[v2 ? i + 6 : i]);
   const step = group(2);
   if (step > ALL_DONE) return null;
+  const w = v2 ? Number(m[13]) : 0;
   return {
     batch: group(1),
     step,
     pages: group(3),
     links: group(4),
     at: group(5),
-    ended: m[6] === '1',
+    ended: m[v2 ? 12 : 6] === '1',
+    waitingSince: w === 0 ? null : w - 1,
   };
 }
 
@@ -82,6 +100,10 @@ export interface CheckFacts {
   counts: { pages_crawled: number; links_found: number } | null;
   /** Milliseconds from the check's start to its end, or to this poll; 0 before it starts. */
   elapsedMs: number;
+  /** When the check began waiting for a free crawler, in ms from its start; null when not. */
+  waitingSinceMs: number | null;
+  /** What discovery found, as the stored progress holds it; null before discovery or without it. */
+  discovered: { robots_txt: RobotsTxtState | null; sitemap_urls: number | null } | null;
 }
 
 /** A crawl batch whose result is stored. `result` is null when it is passed over (see `readBatch`). */
@@ -131,7 +153,19 @@ export function factsOf(s: StreamSnapshot, now: number): CheckFacts {
           }
         : null,
     elapsedMs: started === null ? 0 : Math.max(0, until - started),
+    waitingSinceMs: waitedFrom(s.progress?.waiting_since ?? null, started),
+    discovered:
+      s.progress && (s.progress.robots_txt !== null || s.progress.sitemap_urls !== null)
+        ? { robots_txt: s.progress.robots_txt, sitemap_urls: s.progress.sitemap_urls }
+        : null,
   };
+}
+
+/** A stored `waiting_since` as ms from the check's start; null without both, or unreadable. */
+function waitedFrom(since: string | null, started: number | null): number | null {
+  if (since === null || started === null) return null;
+  const t = Date.parse(since);
+  return Number.isFinite(t) ? Math.max(0, t - started) : null;
 }
 
 /**
@@ -250,6 +284,10 @@ export function checkEvents(cursor: Cursor, check: CheckFacts): Emitted {
         ? { type: 'stage', at_ms: at, phase: PHASES[(k - 1) / 2]!, state: 'now' }
         : { type: 'stage', at_ms: at, phase: PHASES[k / 2 - 1]!, state: 'done' },
     );
+    // Discovery's findings go with the stage that ends it, which the cursor sends once.
+    if (k === 2 && check.discovered) {
+      events.push({ type: 'discovered', at_ms: at, ...check.discovered });
+    }
   }
   const pages = Math.max(cursor.pages, check.counts?.pages_crawled ?? 0);
   const links = Math.max(cursor.links, check.counts?.links_found ?? 0);
@@ -257,9 +295,25 @@ export function checkEvents(cursor: Cursor, check: CheckFacts): Emitted {
     events.push({ type: 'counts', at_ms: at, pages_crawled: pages, links_found: links });
   }
   const ended = isEnded(check.status) ? check.status : null;
+  // A wait is sent when it begins and when it ends; an ended check is waiting for nothing.
+  const since =
+    ended || check.waitingSinceMs === null ? null : Math.min(Math.round(check.waitingSinceMs), at);
+  const waitChanged = !ended && since !== cursor.waitingSince;
+  if (waitChanged) events.push({ type: 'waiting', at_ms: at, since_ms: since });
   if (ended) events.push({ type: 'ended', at_ms: at, status: ended });
   if (events.length === 0) return { events, cursor };
-  return { events, cursor: { ...cursor, step, pages, links, at, ended: ended !== null } };
+  return {
+    events,
+    cursor: {
+      ...cursor,
+      step,
+      pages,
+      links,
+      at,
+      ended: ended !== null,
+      waitingSince: ended ? null : since,
+    },
+  };
 }
 
 /** The events a snapshot implies after `cursor`, and the cursor once they are sent. */
