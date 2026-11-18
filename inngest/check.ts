@@ -64,6 +64,8 @@ export const PACE = {
   /** The wait for the site's running check to end before claiming again, and how many times. */
   claimWaitS: 60,
   claimWaits: 5,
+  /** Discovery's bound on reading robots.txt and the sitemaps (DISCOVER_S in the app's limits). */
+  discoverS: 60,
   /**
    * The run's finish timeout: 37 minutes. Its parts: every claim wait (300 s), discovery (60 s), the
    * wait budget (QUEUE_WAIT_MAX_S, 900 s), the crawl (CRAWL_CEILING_S, 480 s), the access slice
@@ -73,6 +75,14 @@ export const PACE = {
   /** Crawl batches per check: 40 × 50 URLs is 2,000, the largest page cap in FACTS. */
   maxCrawlBatches: 40,
 } as const;
+
+/**
+ * The latest a check's first crawl batch is taken, in seconds from its first claim attempt, for the
+ * finish timeout still to give it a whole crawl window: every claim wait, discovery, then the wait
+ * budget. PACE.finishS is this plus the crawl, the access slice and the reserve (steps/time.test.ts).
+ */
+export const FIRST_ACCEPT_BY_S =
+  PACE.claimWaits * PACE.claimWaitS + PACE.discoverS + QUEUE_WAIT_MAX_S;
 
 /** runCheck's steps return under this many bytes as JSON (`sized`, ARCH-2 §4.2); bulk data is stored. */
 export const STEP_OUTPUT_BYTES = 4096;
@@ -284,9 +294,19 @@ export async function runCheck(
         if (lastBusy !== null) so.busyMs += out.at - lastBusy;
         lastBusy = out.at;
         so.waitingSince ??= out.at;
-        // Given up before the next wait would pass the budget, so a first batch is never taken
-        // later than the budget plus one step's latency (review round 1, correctness N1).
-        if (so.crawlFrom === null && so.busyMs + PACE.busyWaitS * 1000 > QUEUE_WAIT_MAX_S * 1000) {
+        // Before its first batch a check gives up when the next wait would pass the budget, or
+        // would bring its next post after FIRST_ACCEPT_BY_S from its start, the latest first batch
+        // that the finish timeout still gives a whole crawl window. The second matters when every
+        // claim wait was used: step latency there is not charged to busyMs (review rounds 1–2,
+        // correctness N1). A first batch that is taken is then taken after either bound by no more
+        // than the taken post's own latency and the sleep's lateness; time.test.ts checks the
+        // crawl it gets at 1, 2, 3 and 5 s a step.
+        const nextPost = out.at + PACE.busyWaitS * 1000;
+        if (
+          so.crawlFrom === null &&
+          (so.busyMs + PACE.busyWaitS * 1000 > QUEUE_WAIT_MAX_S * 1000 ||
+            nextPost > so.startedAt + FIRST_ACCEPT_BY_S * 1000)
+        ) {
           return { status: 'capacity' };
         }
         await step.sleep(`${prefix}-busy-${k + 1}`, PACE.busyWaitS * 1000);

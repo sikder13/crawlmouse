@@ -14,6 +14,7 @@ import {
   DISCOVER_S,
   MIN_BATCH_S,
   PACE,
+  FIRST_ACCEPT_BY_S,
   QUEUE_WAIT_MAX_S,
   RESERVE_S,
 } from '../limits';
@@ -46,6 +47,9 @@ describe('the time plan', () => {
     );
     expect(PACE.finishS).toBe(2220);
     expect(QUEUE_WAIT_MAX_S).toBe(900);
+    // The latest first batch that still gets a whole window: the finish timeout less the crawl,
+    // the access slice and the reserve.
+    expect(FIRST_ACCEPT_BY_S).toBe(PACE.finishS - CRAWL_CEILING_S - ACCESS_SLICE_S - RESERVE_S);
   });
 
   it('ends the fetching phases RESERVE_S before the finish timeout', () => {
@@ -314,39 +318,48 @@ describe('waiting on the worker (CC-42A decisions 1 and 2)', () => {
     expect(waitedS).toBeLessThan(QUEUE_WAIT_MAX_S + 2 * PACE.busyWaitS);
   });
 
-  it('every claim wait, then the whole budget waited for the first batch: the crawl reads as many batches as without the wait (review round 1, correctness N1)', async () => {
+  /** The most busy answers to its first batch after which `shape` is still graded, not failed. */
+  const mostGraded = async (shape: Parameters<typeof simulate>[0]) => {
+    for (let n = QUEUE_WAIT_MAX_S / PACE.busyWaitS; n >= 0; n--) {
+      if ((await simulate({ ...shape, busyFirst: n })).result.status !== 'failed') return n;
+    }
+    return -1;
+  };
+
+  it('every claim wait, then as long a wait as is still graded: the crawl reads as many batches as without the wait (review rounds 1 and 2, correctness N1)', async () => {
     const shape = { latencyS: 1, busyClaims: PACE.claimWaits, slowBatches: false, doneAfterS: 20 };
     const alone = await simulate(shape);
-    // 29 busy answers, 31 s apart at this latency: 868 s, the most that fit the budget here.
-    const waited = await simulate({ ...shape, busyFirst: QUEUE_WAIT_MAX_S / PACE.busyWaitS - 1 });
+    const n = await mostGraded(shape);
+    // At 1 s a step the deadline (FIRST_ACCEPT_BY_S) costs a few of the budget's 30 waits.
+    expect(n).toBeGreaterThanOrEqual(26);
+    const waited = await simulate({ ...shape, busyFirst: n });
     expect(waited.result).toEqual(alone.result);
     expect(crawlReads(waited.ids)).toBe(crawlReads(alone.ids));
     expect(crawlReads(alone.ids)).toBeGreaterThan(5);
   });
 
-  it('a check whose next wait would pass the budget fails capacity_wait_exceeded rather than being taken late with a shorter crawl', async () => {
-    const shape = { latencyS: 1, busyClaims: PACE.claimWaits, slowBatches: false, doneAfterS: 20 };
-    const alone = await simulate(shape);
-    for (const busyFirst of [28, 29, 30, 31]) {
-      const waited = await simulate({ ...shape, busyFirst });
-      if (waited.result.status === 'failed') {
-        expect(waited.result, String(busyFirst)).toEqual({
-          status: 'failed',
-          reason: 'capacity_wait_exceeded',
-        });
-      } else {
-        expect(crawlReads(waited.ids), String(busyFirst)).toBe(crawlReads(alone.ids));
+  it.each([1, 2, 3, 5])(
+    'at %i s a step, every claim wait: a check is never graded on a shorter crawl for having waited; it fails capacity_wait_exceeded instead (review rounds 1 and 2, correctness N1)',
+    async (latencyS) => {
+      const shape = { latencyS, busyClaims: PACE.claimWaits, slowBatches: false, doneAfterS: 20 };
+      const alone = await simulate(shape);
+      for (let busyFirst = 24; busyFirst <= 31; busyFirst++) {
+        const waited = await simulate({ ...shape, busyFirst });
+        if (waited.result.status === 'failed') {
+          expect(waited.result, String(busyFirst)).toEqual({
+            status: 'failed',
+            reason: 'capacity_wait_exceeded',
+          });
+        } else {
+          expect(crawlReads(waited.ids), String(busyFirst)).toBe(crawlReads(alone.ids));
+        }
       }
-    }
-  });
+    },
+  );
 
-  it('every claim wait, the whole budget spent before the first batch, slow batches: still ends within the finish timeout, under the step limit', async () => {
-    const run = await simulate({
-      latencyS: 1,
-      busyClaims: PACE.claimWaits,
-      slowBatches: true,
-      busyFirst: QUEUE_WAIT_MAX_S / PACE.busyWaitS - 1,
-    });
+  it('every claim wait, then as long a wait as is still graded, slow batches: still ends within the finish timeout, under the step limit', async () => {
+    const shape = { latencyS: 1, busyClaims: PACE.claimWaits, slowBatches: true };
+    const run = await simulate({ ...shape, busyFirst: await mostGraded(shape) });
     expect(run.result.status).toBe('partial');
     expect((run.stepsAt.get('render')! - T0) / S).toBeLessThanOrEqual(PACE.finishS - RESERVE_S + 1);
     expect(run.ids.length).toBeLessThanOrEqual(worstCaseSteps());

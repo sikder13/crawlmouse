@@ -171,7 +171,7 @@ const ROWS: readonly RowInput[] = [
     trigger: 'inngest/function.cancelled (checkFn)',
     steps: 2,
     stepsHow: 'fail, emit-failed',
-    stepAt: [516, 518],
+    stepAt: [536, 538],
   },
   {
     file: 'inngest/check-reaper.ts',

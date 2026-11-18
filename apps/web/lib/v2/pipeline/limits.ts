@@ -3,7 +3,14 @@
  * bounds (PACE) and the failure reasons live with the Inngest functions, which do not import the
  * app, and are re-exported here beside the rest.
  */
-export { PACE, QUEUE_WAIT_MAX_S, STEP_OUTPUT_BYTES } from '../../../../../inngest/check';
+import { PACE } from '../../../../../inngest/check';
+
+export {
+  FIRST_ACCEPT_BY_S,
+  PACE,
+  QUEUE_WAIT_MAX_S,
+  STEP_OUTPUT_BYTES,
+} from '../../../../../inngest/check';
 export { FAILURE_REASONS, type FailureReason } from '../../../../../inngest/check-events';
 
 /**
@@ -20,8 +27,8 @@ export const CRAWL_CEILING_S = 480;
 export const ACCESS_SLICE_S = 300;
 /** A batch that could be given less than this is not posted; its phase ends instead. */
 export const MIN_BATCH_S = 60;
-/** Discovery's bound on reading robots.txt and the sitemaps. */
-export const DISCOVER_S = 60;
+/** Discovery's bound on reading robots.txt and the sitemaps (PACE.discoverS, one value). */
+export const DISCOVER_S = PACE.discoverS;
 /** One discovery request's socket idle time and its whole time. */
 export const DISCOVER_REQUEST_MS = 10_000;
 export { SITEMAP_URL_CAP } from '../sitemap-cap';
