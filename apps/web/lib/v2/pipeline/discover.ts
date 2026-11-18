@@ -11,6 +11,7 @@ import {
   discoverSitemaps,
   parseSitemapEntries,
   type safeFetch,
+  type RobotsStatus,
   type Seed,
 } from '@crawlmouse/engine/v2/pipeline';
 import { DISCOVER_REQUEST_MS, DISCOVER_S, SITEMAP_URL_CAP } from './limits';
@@ -44,7 +45,7 @@ function canonicalHttp(raw: string): string | null {
 export async function discoverSeeds(
   homepageUrl: string,
   deps: DiscoverDeps,
-): Promise<{ seeds: Seed[]; sitemapUrls: number }> {
+): Promise<{ seeds: Seed[]; sitemapUrls: number; robotsTxt: RobotsStatus }> {
   const deadline = deps.now() + DISCOVER_S * 1000;
   // A fetch that throws reads as "not there" to both engine readers, so once the deadline has
   // passed every sitemap left is skipped.
@@ -59,7 +60,9 @@ export async function discoverSeeds(
     return { status: res.status, body: res.body };
   };
 
-  const { sitemapUrls } = await discoverSitemaps(new URL(homepageUrl).origin, { fetcher });
+  const { sitemapUrls, robotsStatus } = await discoverSitemaps(new URL(homepageUrl).origin, {
+    fetcher,
+  });
   const entries: { loc: string; lastmod: string | null }[] = [];
   for (const sitemap of sitemapUrls) {
     if (entries.length >= SITEMAP_URL_CAP) break;
@@ -76,5 +79,5 @@ export async function discoverSeeds(
     listed.add(url);
     seeds.push({ url, source: 'sitemap', lastmod });
   }
-  return { seeds, sitemapUrls: entries.length };
+  return { seeds, sitemapUrls: entries.length, robotsTxt: robotsStatus };
 }

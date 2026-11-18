@@ -36,7 +36,12 @@ export type { JsTextState } from './render/state.js';
 export { checkMap } from './layout/check-map.js';
 export type { MapDrawing } from './layout/check-map.js';
 export { safeFetch } from '../safe-fetch.js';
-export { discoverSitemaps, parseSitemapEntries, parseSitemapUrls } from '../sitemap.js';
+export {
+  discoverSitemaps,
+  parseSitemapEntries,
+  parseSitemapUrls,
+  type RobotsStatus,
+} from '../sitemap.js';
 export { canonicalizeUrl } from '../url-canonical.js';
 export { templateKeyFor } from '../analysis/template-key.js';
 // The fix page reads these two (apps/web/lib/v2/view): why a fix type has no packet, and which
