@@ -1,11 +1,14 @@
 import { readFileSync } from 'node:fs';
 import { MAX_BATCH_CONCURRENCY } from '../config.js';
 import { MAX_RECORDS, MAX_RESULT_BYTES } from '../batch/store.js';
+import { FLOOR_GAP_MS } from '../politeness/limiter.js';
 
 /**
  * The runbook's capacity section, rendered from what was measured (capacity-measured.json) and from
- * the values that ship (config.ts, store.ts, fly.toml), so no sentence in it can name a level,
- * machine or bound the data and the code do not hold (docs/OPERATING-RULES.md §10).
+ * the values that ship (config.ts, store.ts, limiter.ts, both fly tomls). Each number in it is read
+ * from one of those; the sentences around them are fixed text (docs/OPERATING-RULES.md §10).
+ * src/load.test.ts reads its levels and bounds from the same file, so the runbook and the test cannot
+ * disagree about them.
  */
 
 export const CAPACITY_START =
@@ -37,6 +40,7 @@ interface WorstCase {
   batches: number;
   case: string;
   peak_rss_mib: number;
+  heap_used_mib: number;
 }
 
 export interface CapacityData {
@@ -45,10 +49,27 @@ export interface CapacityData {
   window_s: number;
   method: string;
   rows: Row[];
+  first_requests: {
+    measured: string;
+    machine: string;
+    batches: number;
+    sites: number;
+    arrival_gaps_under_250: Array<{ site: string; first: string; second: string; gap_ms: number }>;
+    worker_start_gap_min_ms: number;
+    probe: {
+      site: string;
+      robots_start_to_arrival_ms: number;
+      next_start_to_arrival_ms: number;
+      start_gap_ms: number;
+    };
+  };
   worst_case: {
     measured: string;
     heap_mb: number;
+    /** The memory bound at each level src/load.test.ts runs; its keys are those levels. */
     bound_mib: Record<string, number>;
+    /** How the peaks were taken (how many runs each is the highest of). */
+    note: string;
     runs: WorstCase[];
     largest_result_bytes: number;
   };
@@ -58,22 +79,55 @@ export const CAPACITY_PATH = new URL('./capacity-measured.json', import.meta.url
 export const loadCapacity = (): CapacityData =>
   JSON.parse(readFileSync(CAPACITY_PATH, 'utf8')) as CapacityData;
 
-const FLY_TOML = new URL('../../fly.toml', import.meta.url);
+/** The levels src/load.test.ts runs, from the bounds the data file holds. */
+export const loadLevels = (data: CapacityData = loadCapacity()): number[] =>
+  Object.keys(data.worst_case.bound_mib)
+    .map(Number)
+    .sort((a, b) => a - b);
 
-/** The [[vm]] size and memory, and the heap limit, as fly.toml sets them. */
-export function shippedMachine(toml = readFileSync(FLY_TOML, 'utf8')): {
+/** A level's bound: its highest measured peak × 1.35, rounded up to 10 MiB. */
+export const boundFor = (peakMib: number): number => Math.ceil((peakMib * 1.35) / 10) * 10;
+
+const TOMLS = [
+  new URL('../../fly.toml', import.meta.url),
+  new URL('../../fly.production.toml', import.meta.url),
+];
+
+export interface Shipped {
+  batchConcurrency: number;
   size: string;
   memory: string;
   heapMb: number;
-} {
+}
+
+/** BATCH_CONCURRENCY, the [[vm]] size and memory, and the heap limit, as a fly toml sets them. */
+export function shippedBy(toml: string): Shipped {
+  const batches = /\n {2}BATCH_CONCURRENCY = "(\d+)"\n/.exec(toml);
   const vm = /\n\[\[vm\]\]\n {2}size = "([^"]+)"\n {2}memory = "([^"]+)"\n/.exec(toml);
   const heap = /--max-old-space-size=(\d+)/.exec(toml);
-  if (!vm || !heap) throw new Error('fly.toml: [[vm]] or the heap limit is missing');
-  return { size: vm[1]!, memory: vm[2]!, heapMb: Number(heap[1]) };
+  if (!batches || !vm || !heap)
+    throw new Error('fly toml: BATCH_CONCURRENCY, [[vm]] or the heap limit is missing');
+  return {
+    batchConcurrency: Number(batches[1]),
+    size: vm[1]!,
+    memory: vm[2]!,
+    heapMb: Number(heap[1]),
+  };
+}
+
+/** What both tomls ship; throws when staging and production differ, since the section names one. */
+export function shipped(tomls: string[] = TOMLS.map((u) => readFileSync(u, 'utf8'))): Shipped {
+  const all = tomls.map(shippedBy);
+  for (const s of all) {
+    if (JSON.stringify(s) !== JSON.stringify(all[0]))
+      throw new Error('fly.toml and fly.production.toml ship different capacity');
+  }
+  return all[0]!;
 }
 
 const fmt = (n: number, d = 2) => n.toFixed(d);
 const mib = (bytes: number) => `${Math.round(bytes / 1048576)} MiB`;
+const seconds = (ms: number) => `${fmt(ms / 1000)} s`;
 
 function table(header: string[], rows: string[][]): string {
   const line = (cells: string[]) => `| ${cells.join(' | ')} |`;
@@ -81,35 +135,56 @@ function table(header: string[], rows: string[][]): string {
 }
 
 /** Per machine: the first level Fly throttled, and the one before it; or none up to the last level. */
-function knees(rows: Row[]): string[] {
+export function knees(rows: Row[]): string[] {
   const machines = [...new Set(rows.map((r) => r.machine))];
   return machines.map((m) => {
     const levels = rows.filter((r) => r.machine === m).sort((a, b) => a.batches - b.batches);
     const i = levels.findIndex((r) => r.throttle_max > 0);
     if (i < 0) return `- **${m}:** not throttled at any level, up to ${levels.at(-1)!.batches}.`;
     const r = levels[i]!;
-    const before = i > 0 ? `not at ${levels[i - 1]!.batches}` : 'from the first level';
+    const before = i > 0 ? `not at ${levels[i - 1]!.batches}` : 'at its first level';
     return `- **${m}:** throttled at ${r.batches} (${before}): loop delay p99 ${r.loop_delay_ms.p99} ms, p90 ${fmt(r.s_per_page.p90)} s a page.`;
   });
 }
 
-export function renderCapacity(data: CapacityData = loadCapacity(), toml?: string): string {
-  const shipped = shippedMachine(toml);
-  const w = data.worst_case;
-  const levels = [...new Set(w.runs.map((r) => r.batches))].sort((a, b) => a - b);
+/** The first-request gaps, described from the pairs the data holds. */
+function firstRequests(f: CapacityData['first_requests']): string {
+  const pairs = [
+    ...new Set(f.arrival_gaps_under_250.map((g) => `\`${g.first}\` then \`${g.second}\``)),
+  ];
+  const sites = new Set(f.arrival_gaps_under_250.map((g) => g.site)).size;
+  const gaps = f.arrival_gaps_under_250.map((g) => g.gap_ms);
+  const p = f.probe;
   return [
-    `**What ships:** \`BATCH_CONCURRENCY\` ${MAX_BATCH_CONCURRENCY}, the most the worker allows, on ${shipped.size} with ${shipped.memory} and a ${shipped.heapMb} MB heap (fly.toml). The result store keeps ${MAX_RECORDS} batches and ${mib(MAX_RESULT_BYTES)} of results.`,
-    `**Realistic pages, on Fly.** Measured ${data.measured} on \`${data.app}\`. ${data.method} Loop delay is \`monitorEventLoopDelay\` less its 20 ms sampling interval. A site's floor is 0.50 s a page.`,
+    `**Gaps under 250 ms on the wire.** The column above counts arrivals at the fixture, not starts in the worker. Re-measured ${f.measured} on ${f.machine} at ${f.batches} batches over ${f.sites} sites: ${gaps.length} arrival gaps under 250 ms (${Math.min(...gaps)} to ${Math.max(...gaps)} ms), on ${sites} sites, and every one was ${pairs.join(' or ')}. The worker started those requests at least ${f.worker_start_gap_min_ms} ms apart (\`fetched_at\` on the page rows).`,
+    `The first request to a site opens the connection and the next reuses it. On \`${p.site}\` alone, robots.txt arrived ${p.robots_start_to_arrival_ms} ms after its start and the next request ${p.next_start_to_arrival_ms} ms after its start, ${p.start_gap_ms} ms later, so the arrivals were ${p.start_gap_ms - p.robots_start_to_arrival_ms + p.next_start_to_arrival_ms} ms apart. In the ${f.batches}-site run the robots.txt starts were not recorded, so a longer connection setup under load is the explanation the probe supports, not a figure measured for each of those gaps.`,
+  ].join('\n\n');
+}
+
+export function renderCapacity(data: CapacityData = loadCapacity(), tomls?: string[]): string {
+  const ship = shipped(tomls);
+  const w = data.worst_case;
+  const levels = loadLevels(data);
+  const ratios = levels.map((n) => {
+    const peak = Math.max(...w.runs.filter((r) => r.batches === n).map((r) => r.peak_rss_mib));
+    return `${n}: ${fmt(peak, 1)} → ${w.bound_mib[String(n)]} MiB (× ${fmt(w.bound_mib[String(n)]! / peak)})`;
+  });
+  const need = MAX_BATCH_CONCURRENCY * w.largest_result_bytes * 2;
+  return [
+    `**What ships:** \`BATCH_CONCURRENCY\` ${ship.batchConcurrency} (the worker allows at most ${MAX_BATCH_CONCURRENCY}), on ${ship.size} with ${ship.memory} and a ${ship.heapMb} MB heap, in both fly tomls. The result store keeps ${MAX_RECORDS} batches and ${mib(MAX_RESULT_BYTES)} of results.`,
+    `**Realistic pages, on Fly.** Measured ${data.measured} on \`${data.app}\`. ${data.method} Levels ran one after another, each for ${data.window_s} s, so a level drew on the CPU burst balance the levels before it left; "Balance min" is Fly's \`fly_instance_cpu_balance\` at its lowest in the level, as Fly reports it. Loop delay is \`monitorEventLoopDelay\` less its 20 ms sampling interval. A site's floor is ${seconds(FLOOR_GAP_MS)} a page.`,
     table(
       [
         'Machine',
         'Batches',
         'vCPU mean / max',
         'Throttle max',
+        'Balance min',
         'Peak RSS MiB',
         'Loop delay p50 / p99 / max ms',
         's a page p50 / p90 / max',
         'Wire gap p1 ms',
+        'Wire gaps under 250 ms',
         'Batches done',
         'Partial, refused, timeouts',
       ],
@@ -118,19 +193,22 @@ export function renderCapacity(data: CapacityData = loadCapacity(), toml?: strin
         String(r.batches),
         `${fmt(r.vcpu_mean)} / ${fmt(r.vcpu_max)}`,
         fmt(r.throttle_max, 0),
+        fmt(r.balance_min, 0),
         String(r.peak_rss_mib),
         `${r.loop_delay_ms.p50} / ${r.loop_delay_ms.p99} / ${r.loop_delay_ms.max}`,
         `${fmt(r.s_per_page.p50)} / ${fmt(r.s_per_page.p90)} / ${fmt(r.s_per_page.max, 1)}`,
         String(r.wire_gap_p1_ms),
+        `${r.wire_gaps_under_250} of ${r.wire_gaps}`,
         `${r.batches_done} of ${r.batches_total}`,
         `${r.partial}, ${r.refused}, ${r.timeouts}`,
       ]),
     ),
-    `Where each machine's CPU stopped keeping up (the first level Fly throttled it):`,
+    `Where each machine's CPU stopped keeping up (the first level Fly throttled it, within a ${data.window_s} s level):`,
     knees(data.rows).join('\n'),
-    `**Worst-case pages, in \`src/load.test.ts\`.** Measured ${w.measured} at a ${w.heap_mb} MB heap, 10 MB pages, the result store full; each level's bound is the highest peak plus about 35%.`,
+    firstRequests(data.first_requests),
+    `**Worst-case pages, in \`src/load.test.ts\`.** Measured ${w.measured} at a ${w.heap_mb} MB heap, on the test's 10 MB pages, with the result store full. ${w.note} A level's bound is its highest peak × 1.35, rounded up to 10 MiB: ${ratios.join('; ')}.`,
     table(
-      ['Batches', 'Case', 'Peak RSS MiB', 'Bound MiB'],
+      ['Batches', 'Case', 'Peak RSS MiB', 'Heap used MiB', 'Bound MiB'],
       w.runs
         .slice()
         .sort((a, b) => a.batches - b.batches || a.case.localeCompare(b.case))
@@ -138,10 +216,11 @@ export function renderCapacity(data: CapacityData = loadCapacity(), toml?: strin
           String(r.batches),
           r.case,
           fmt(r.peak_rss_mib, 1),
+          fmt(r.heap_used_mib, 1),
           String(w.bound_mib[String(r.batches)]),
         ]),
     ),
-    `Levels run: ${levels.join(', ')}. The largest result measured is ${(w.largest_result_bytes / 1048576).toFixed(2)} MiB; ${MAX_BATCH_CONCURRENCY} of them twice over is ${mib(MAX_BATCH_CONCURRENCY * w.largest_result_bytes * 2)}, which the store's ${mib(MAX_RESULT_BYTES)} ${MAX_BATCH_CONCURRENCY * w.largest_result_bytes * 2 <= MAX_RESULT_BYTES ? 'holds' : 'does not hold'}.`,
+    `Levels run: ${levels.join(', ')}. The largest result the load test measured is ${(w.largest_result_bytes / 1048576).toFixed(2)} MiB; ${MAX_BATCH_CONCURRENCY} of them twice over is ${mib(need)}, which the store's ${mib(MAX_RESULT_BYTES)} ${need <= MAX_RESULT_BYTES ? 'holds' : 'does not hold'}.`,
   ].join('\n\n');
 }
 

@@ -429,7 +429,7 @@
     "measured": "2026-11-18",
     "heap_mb": 512,
     "bound_mib": {
-      "4": 990,
+      "4": 1240,
       "8": 1180,
       "16": 1580
     },
@@ -438,63 +438,187 @@
       {
         "batches": 4,
         "case": "access, 2 pages",
-        "peak_rss_mib": 527.6
+        "peak_rss_mib": 527.6,
+        "heap_used_mib": 45.4
       },
       {
         "batches": 4,
         "case": "densest markup, 4 URLs",
-        "peak_rss_mib": 703.4
+        "peak_rss_mib": 911.4,
+        "heap_used_mib": 64.0
       },
       {
         "batches": 4,
         "case": "10 MB pages, 50 URLs",
-        "peak_rss_mib": 725.0
+        "peak_rss_mib": 782.5,
+        "heap_used_mib": 125.8
       },
       {
         "batches": 4,
         "case": "brotli, 50 URLs",
-        "peak_rss_mib": 726.2
+        "peak_rss_mib": 743.4,
+        "heap_used_mib": 123.1
       },
       {
         "batches": 8,
         "case": "brotli, 50 URLs, cut short at 60 s",
-        "peak_rss_mib": 809.8
+        "peak_rss_mib": 825.3,
+        "heap_used_mib": 177.9
       },
       {
         "batches": 8,
         "case": "brotli, 50 URLs, full budget (once, not in CI)",
-        "peak_rss_mib": 868.9
+        "peak_rss_mib": 868.9,
+        "heap_used_mib": 224.7
       },
       {
         "batches": 16,
         "case": "access, 2 pages",
-        "peak_rss_mib": 626.3
+        "peak_rss_mib": 626.3,
+        "heap_used_mib": 97.7
       },
       {
         "batches": 16,
         "case": "densest markup, 4 URLs",
-        "peak_rss_mib": 1104.3
+        "peak_rss_mib": 1108.0,
+        "heap_used_mib": 165.6
       },
       {
         "batches": 16,
         "case": "10 MB pages, 50 URLs, cut short at 60 s",
-        "peak_rss_mib": 892.7
+        "peak_rss_mib": 915.1,
+        "heap_used_mib": 260.5
       },
       {
         "batches": 16,
         "case": "brotli, 50 URLs, cut short at 60 s",
-        "peak_rss_mib": 910.3
+        "peak_rss_mib": 928.6,
+        "heap_used_mib": 244.6
       },
       {
         "batches": 16,
         "case": "10 MB pages, 50 URLs, full budget (once, not in CI)",
-        "peak_rss_mib": 1131.1
+        "peak_rss_mib": 1131.1,
+        "heap_used_mib": 397.0
       },
       {
         "batches": 16,
         "case": "brotli, 50 URLs, full budget (once, not in CI)",
-        "peak_rss_mib": 1167.6
+        "peak_rss_mib": 1167.6,
+        "heap_used_mib": 401.9
       }
-    ]
+    ],
+    "note": "Each peak is the highest of the runs on the date: one run of the file alone, one inside the full worker suite; the full-budget rows ran once."
+  },
+  "first_requests": {
+    "measured": "2026-11-18",
+    "machine": "shared-cpu-2x 2 GB",
+    "batches": 16,
+    "sites": 16,
+    "arrival_gaps_under_250": [
+      {
+        "site": "cm42b-l-1",
+        "first": "/robots.txt",
+        "second": "/",
+        "gap_ms": 65
+      },
+      {
+        "site": "cm42b-l-2",
+        "first": "/robots.txt",
+        "second": "/",
+        "gap_ms": 33
+      },
+      {
+        "site": "cm42b-l-3",
+        "first": "/robots.txt",
+        "second": "/",
+        "gap_ms": 60
+      },
+      {
+        "site": "cm42b-l-4",
+        "first": "/robots.txt",
+        "second": "/",
+        "gap_ms": 64
+      },
+      {
+        "site": "cm42b-m-1",
+        "first": "/robots.txt",
+        "second": "/",
+        "gap_ms": 50
+      },
+      {
+        "site": "cm42b-m-2",
+        "first": "/robots.txt",
+        "second": "/",
+        "gap_ms": 71
+      },
+      {
+        "site": "cm42b-m-3",
+        "first": "/robots.txt",
+        "second": "/",
+        "gap_ms": 96
+      },
+      {
+        "site": "cm42b-m-4",
+        "first": "/robots.txt",
+        "second": "/",
+        "gap_ms": 74
+      },
+      {
+        "site": "cm42b-m-5",
+        "first": "/robots.txt",
+        "second": "/",
+        "gap_ms": 42
+      },
+      {
+        "site": "cm42b-m-6",
+        "first": "/robots.txt",
+        "second": "/",
+        "gap_ms": 45
+      },
+      {
+        "site": "cm42b-s-1",
+        "first": "/robots.txt",
+        "second": "/",
+        "gap_ms": 126
+      },
+      {
+        "site": "cm42b-s-2",
+        "first": "/robots.txt",
+        "second": "/",
+        "gap_ms": 67
+      },
+      {
+        "site": "cm42b-s-3",
+        "first": "/robots.txt",
+        "second": "/",
+        "gap_ms": 60
+      },
+      {
+        "site": "cm42b-s-4",
+        "first": "/robots.txt",
+        "second": "/",
+        "gap_ms": 14
+      },
+      {
+        "site": "cm42b-s-5",
+        "first": "/robots.txt",
+        "second": "/",
+        "gap_ms": 65
+      },
+      {
+        "site": "cm42b-s-6",
+        "first": "/robots.txt",
+        "second": "/",
+        "gap_ms": 41
+      }
+    ],
+    "worker_start_gap_min_ms": 499,
+    "probe": {
+      "site": "cm42b-s-20",
+      "robots_start_to_arrival_ms": 61,
+      "next_start_to_arrival_ms": 5,
+      "start_gap_ms": 500
+    }
   }
 }
