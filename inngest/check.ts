@@ -45,7 +45,7 @@ export const PACE = {
    * result is then stored.
    */
   pollGraceS: 60,
-  /** The wait after the worker answered busy (it runs two batches at once). */
+  /** The wait after the worker answered busy (it runs BATCH_CONCURRENCY batches at once). */
   busyWaitS: 30,
   /** Busy answers to one post before the batch is given up: ten minutes of waiting. */
   busyRetries: 20,

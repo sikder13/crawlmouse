@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { brotliCompressSync, constants as zlib } from 'node:zlib';
 import { build } from 'esbuild';
 import { bundleReader } from '../build.js';
-import { DEFAULT_BATCH_CONCURRENCY, MAX_BATCH_CONCURRENCY } from './config.js';
+import { MAX_BATCH_CONCURRENCY } from './config.js';
 import { READER_FILE } from './reader/file.js';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { BUDGET_CEILINGS, MAX_URLS_PER_BATCH, type BatchRequest } from './batch/request.js';
@@ -16,8 +16,8 @@ import { startServer, type FixtureServer } from './test-support/http.js';
 /**
  * The worker under load, as it ships: the probe (test-support/load-probe.ts) bundled the way build.ts
  * bundles main.ts, run in a process with fly.toml's heap limit and environment, with the result store
- * already full. Four batches at once (MAX_BATCH_CONCURRENCY, the most BATCH_CONCURRENCY may set;
-fly.toml sets 2), each on a site of its own serving
+ * already full. Four batches at once (MAX_BATCH_CONCURRENCY, the most BATCH_CONCURRENCY may set,
+ * and what fly.toml sets), each on a site of its own serving
  * 10 MB pages, each response dripped over about a second so the requests overlap: access batches,
  * crawl batches of the most URLs a batch may hold on brotli-compressed pages (a decoder's window on
  * top of each page), and crawl batches on the densest markup measured. The pages hold text outside Latin-1, so each
@@ -221,10 +221,10 @@ describe.runIf(process.platform === 'linux')('memory under load', () => {
     expect(PEAK_RSS_MIB).toBeLessThanOrEqual(VM_MIB * 0.9);
   });
 
-  it('runs more batches at once than the worker is configured to', () => {
-    expect(ENV.BATCH_CONCURRENCY).toBe(String(DEFAULT_BATCH_CONCURRENCY));
+  it('runs as many batches at once as fly.toml configures, the most the worker allows', () => {
+    expect(ENV.BATCH_CONCURRENCY).toBe(String(MAX_BATCH_CONCURRENCY));
     expect(HOSTS.length).toBe(MAX_BATCH_CONCURRENCY);
-    expect(HOSTS.length).toBeGreaterThan(Number(ENV.BATCH_CONCURRENCY));
+    expect(HOSTS.length).toBeGreaterThanOrEqual(Number(ENV.BATCH_CONCURRENCY));
   });
 
   it(`4 crawl batches of ${MAX_URLS_PER_BATCH} URLs on 10 MB pages finish within ${PEAK_RSS_MIB} MiB`, async () => {

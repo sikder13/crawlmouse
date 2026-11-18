@@ -11,8 +11,10 @@ kill_timeout = "5s"
 
 [env]
   PORT = "8080"
-  # Batches run at once. Two on one shared vCPU until utilisation is measured on Fly itself.
-  BATCH_CONCURRENCY = "2"
+  # Batches run at once. Four, the most the worker allows. At two, the load test of 2026-11-17
+  # (40 checks) failed 18 that never won a slot, while the machine peaked at 266 MB with its CPU
+  # under 3% busy. Four is untested at that scale; src/load.test.ts measures four at once.
+  BATCH_CONCURRENCY = "4"
   # The engine's page extractor computes AI-legibility signals by default; the worker discards them.
   AI_READINESS_EXTRACTION = "0"
   # Old space 256 MB, and young-generation semi-spaces of 4 MB, which lowered the peak in each load

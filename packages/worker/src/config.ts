@@ -13,8 +13,9 @@ export interface WorkerConfig {
   signingSecret: string;
   jwtPublicKey: KeyObject;
   /**
-   * Batches run at once (BATCH_CONCURRENCY). Default 2: on one shared vCPU the reader thread keeps
-   * request timers honest but adds no CPU, so more batches only queue behind each other's pages.
+   * Batches run at once (BATCH_CONCURRENCY). Default 2 when the variable is unset: on one shared
+   * vCPU the reader thread keeps request timers honest but adds no CPU, so more batches only queue
+   * behind each other's pages. Both fly tomls set 4 (see the comment there).
    */
   batchConcurrency: number;
   /** CRAWL_PAUSED, read the way the app reads it (apps/web/lib/crawl-pause.ts): only `1`, whitespace ignored. */

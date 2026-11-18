@@ -230,7 +230,7 @@ restart loses the batches that were running, and `GET /batch/{id}` for one of th
   All batches share the one thread, and reads queue in order, so a site whose pages are slow to read
   delays the reads of the batches running beside it. Those batches can then spend their time budget
   and come back partial with `budget_seconds`, which is the worker's limit, not those sites'.
-- **Batches at once.** `BATCH_CONCURRENCY` in fly.toml (2), at most 4 (the worker refuses to start
+- **Batches at once.** `BATCH_CONCURRENCY` in fly.toml (4), at most 4 (the worker refuses to start
   above it). More batches add no CPU on a shared vCPU; they queue behind each other's pages.
 - **CPU throttled.** A `shared-cpu-1x` vCPU is guaranteed 6.25% of a core (5 ms per 80 ms). It runs
   at up to 100% while it has burst balance, which accrues from unused baseline time (starting at
