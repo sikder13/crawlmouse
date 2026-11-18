@@ -178,6 +178,24 @@ describe('the lab serves every lab host', () => {
     }
   });
 
+  it('answers 404 on every lab host to the lab’s own paths, which Vercel would otherwise serve as files', () => {
+    for (const host of labHosts()) {
+      for (const ua of [CONTROL.userAgent, CRAWL.userAgent]) {
+        for (const path of [
+          '/sites/cf-blocked/',
+          '/sites/healthy/index.html',
+          '/blocked.html',
+          '/404.html',
+        ]) {
+          expect(routeFor(host, path, ua), `${host}${path} ${ua}`).toEqual({
+            status: 404,
+            dest: '/404.html',
+          });
+        }
+      }
+    }
+  });
+
   it('holds under 500 pages across every host, so a QA run stays cheap', () => {
     const pages = (dir: string): number =>
       readdirSync(dir, { withFileTypes: true }).reduce(

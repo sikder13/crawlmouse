@@ -376,7 +376,7 @@ function buildSites() {
     sites.push(site);
   }
 
-  // client-1 — a bakery: seven sitemap-only orphan pages, no structured data, no llms.txt.
+  // client-1 — a bakery: nine sitemap-only orphan pages, one "Back to the menu" anchor into each section, no structured data, no llms.txt.
   {
     const site = {
       label: 'client-1',
@@ -401,11 +401,15 @@ function buildSites() {
       robots: 'open',
       logoOnly: true,
     };
-    site.pages = hierarchy(site, [
-      { title: 'Breads', leaves: ['Country sourdough', 'Seeded rye', 'Milk loaf'] },
-      { title: 'Pastries', leaves: ['Almond croissants', 'Cardamom buns', 'Fruit danishes'] },
-      { title: 'Cakes', leaves: ['Celebration cakes', 'Lemon drizzle'] },
-    ]);
+    site.pages = hierarchy(
+      site,
+      [
+        { title: 'Breads', leaves: ['Country sourdough', 'Seeded rye', 'Milk loaf'] },
+        { title: 'Pastries', leaves: ['Almond croissants', 'Cardamom buns', 'Fruit danishes'] },
+        { title: 'Cakes', leaves: ['Celebration cakes', 'Lemon drizzle'] },
+      ],
+      { hubPhrases: ['Back to the menu'] },
+    );
     site.pages.push(
       ...orphans(
         site,
@@ -417,6 +421,8 @@ function buildSites() {
           'Bread classes',
           'Allergen list',
           'New oven',
+          'Gluten-free trial',
+          'Market stall dates',
         ],
         '/news/',
       ),
@@ -428,8 +434,8 @@ function buildSites() {
   {
     const site = {
       label: 'client-2',
-      name: 'Corranbay Cycle Works',
-      town: 'Corran Bay',
+      name: 'Corranwick Cycle Works',
+      town: 'Corranwick Bay',
       tagline: 'Repairs, servicing and fitting for every kind of bicycle.',
       homeTitle: 'Bike repairs you can trust',
       homeTopic: 'bicycle maintenance',
@@ -507,14 +513,14 @@ function buildSites() {
     sites.push(site);
   }
 
-  // client-3 — a dental practice: a broken internal link, no sitemap, robots.txt blocks GPTBot.
+  // client-3 — a dental practice: broken internal links, a deep chain, no sitemap, robots.txt blocks GPTBot.
   {
     const site = {
       label: 'client-3',
-      name: 'Quenby Fold Dental',
-      town: 'Quenby Fold',
+      name: 'Quenmere Fold Dental',
+      town: 'Quenmere Fold',
       tagline: 'Calm, unhurried dental care for the whole family.',
-      homeTitle: 'Family dentistry in Quenby Fold',
+      homeTitle: 'Family dentistry in Quenmere Fold',
       homeTopic: 'dental care',
       palette: 'teal',
       words: [
@@ -547,6 +553,15 @@ function buildSites() {
     site.pages
       .find((p) => p.path === '/patients/fees/')
       .links.push({ href: '/payment-plans/', text: 'Payment plans' });
+    site.pages.push(
+      ...chain(site.pages, '/patients/children/', [
+        'First visit for toddlers',
+        'Fissure sealants',
+        'Orthodontic assessment',
+        'Brace aftercare',
+        'Retainers',
+      ]),
+    );
     sites.push(site);
   }
 
@@ -554,8 +569,8 @@ function buildSites() {
   {
     const site = {
       label: 'client-4',
-      name: 'Ashvale Ledger & Co',
-      town: 'Ashvale',
+      name: 'Ashmarrow Ledger & Co',
+      town: 'Ashmarrow',
       tagline: 'Bookkeeping, tax returns and payroll for small firms.',
       homeTitle: 'Accountants for small businesses',
       homeTopic: 'small business finance',
@@ -648,10 +663,10 @@ function buildSites() {
   {
     const site = {
       label: 'client-5',
-      name: 'Fenwyck Paws Grooming',
-      town: 'Fenwyck',
+      name: 'Fennowmere Paws Grooming',
+      town: 'Fennowmere',
       tagline: 'Bath, brush and trim for dogs of every size.',
-      homeTitle: 'Dog grooming in Fenwyck',
+      homeTitle: 'Dog grooming in Fennowmere',
       homeTopic: 'dog grooming',
       palette: 'plum',
       words: [
@@ -753,16 +768,16 @@ function buildSites() {
       'Brackenhythe',
       'Ostrick Vale',
       'Tarrowmere',
-      'Ashvale',
-      'Fenwyck',
-      'Corran Bay',
-      'Quenby Fold',
+      'Ashmarrow',
+      'Fennowmere',
+      'Corranwick Bay',
+      'Quenmere Fold',
       'Marrowgate',
       'Kelderby',
       'Wyndle Cross',
       'Pellham Moor',
-      'Oakhurst Rise',
-      'Thornbury Lane',
+      'Oakquill Rise',
+      'Thornquill Lane',
       'Sallow End',
     ];
     site.pages = hierarchy(site, [
@@ -975,7 +990,7 @@ function buildSites() {
   {
     const site = {
       label: 'demo-2',
-      name: 'Silverbirch Physio',
+      name: 'Silverquill Physio',
       town: 'Kelderby',
       tagline: 'Physiotherapy that gets you back to what you love.',
       homeTitle: 'Physiotherapy in Kelderby',
@@ -1039,7 +1054,14 @@ function buildSites() {
     site.pages.push(
       ...orphans(
         site,
-        ['New clinic hours', 'Running club talk', 'Desk posture workshop'],
+        [
+          'New clinic hours',
+          'Running club talk',
+          'Desk posture workshop',
+          'Holiday cover',
+          'Team charity run',
+          'Old price list',
+        ],
         '/news/',
       ),
     );
@@ -1205,7 +1227,7 @@ ${jsonLd(site, page, url)}
 </head>
 <body>
 <header class="site"><a href="/" aria-label="${esc(site.name)}">${LOGO(PALETTES[site.palette].accent)}</a><span class="brand">${esc(site.name)}</span>${nav}</header>
-<section class="hero"><h1>${esc(page.path === '/' ? page.title : page.title)}</h1><p>${esc(page.lead)}</p></section>
+<section class="hero"><h1>${esc(page.title)}</h1><p>${esc(page.lead)}</p></section>
 <main>
 ${body}
 </main>
@@ -1325,7 +1347,11 @@ function siteFiles(site) {
  * the bare deployment URL reach no folder (a request no route took would fall through to the files).
  */
 function vercelJson(sites) {
-  const routes = [];
+  // Vercel serves a file that exists at the requested path ahead of a host rewrite (measured: a
+  // lab host answered /sites/<other>/ with the other site), so the lab's own paths are refused first.
+  const routes = [
+    { src: '/(?:sites/.*|blocked\\.html|404\\.html)', status: 404, dest: '/404.html' },
+  ];
   for (const s of sites) {
     const host = `${s.label}.${ZONE}`;
     if (s.label === 'cf-blocked') {
@@ -1349,13 +1375,20 @@ function vercelJson(sites) {
   return `${JSON.stringify(
     {
       $schema: 'https://openapi.vercel.sh/vercel.json',
-      ignoreCommand: 'git diff --quiet HEAD^ HEAD -- .',
+      ignoreCommand: IGNORE_COMMAND,
       routes,
     },
     null,
     2,
   )}\n`;
 }
+
+/**
+ * Build only when this folder changed since the last deployed commit; when that commit is unknown or
+ * not in the clone, build (exit 1 builds, exit 0 skips).
+ */
+const IGNORE_COMMAND =
+  'if [ -n "$VERCEL_GIT_PREVIOUS_SHA" ]; then git diff --quiet "$VERCEL_GIT_PREVIOUS_SHA" HEAD -- .; else exit 1; fi';
 
 const BLOCKED = `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><title>Access denied</title></head>

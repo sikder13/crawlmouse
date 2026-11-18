@@ -1,7 +1,12 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "ignoreCommand": "git diff --quiet HEAD^ HEAD -- .",
+  "ignoreCommand": "if [ -n \"$VERCEL_GIT_PREVIOUS_SHA\" ]; then git diff --quiet \"$VERCEL_GIT_PREVIOUS_SHA\" HEAD -- .; else exit 1; fi",
   "routes": [
+    {
+      "src": "/(?:sites/.*|blocked\\.html|404\\.html)",
+      "status": 404,
+      "dest": "/404.html"
+    },
     {
       "src": "/(.*)",
       "has": [
