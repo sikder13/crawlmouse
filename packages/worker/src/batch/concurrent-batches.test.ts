@@ -135,7 +135,7 @@ describe('batches at once on distinct sites', () => {
               expect(ts[k]! - ts[k - 1]!).toBeGreaterThanOrEqual(k === 1 ? FLOOR_GAP_MS : own);
             }
           });
-          // At the same time, not one after another: every site had started before any had finished.
+          // At the same time, not one after another: every site had made its first request before any made its last.
           const firsts = [...starts.values()].map((ts) => ts[0]!);
           const lasts = [...starts.values()].map((ts) => ts.at(-1)!);
           expect(Math.max(...firsts)).toBeLessThan(Math.min(...lasts));
