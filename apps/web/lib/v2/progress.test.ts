@@ -31,7 +31,10 @@ const STREAM: ProgressEvent[] = [
     pages_measured: 2,
   },
   { type: 'stage', at_ms: 1000, phase: 'robots_and_sitemap', state: 'done' },
+  { type: 'discovered', at_ms: 1000, robots_txt: 'found', sitemap_urls: 2 },
   { type: 'stage', at_ms: 1000, phase: 'homepage', state: 'now' },
+  { type: 'waiting', at_ms: 1100, since_ms: 1050 },
+  { type: 'waiting', at_ms: 1300, since_ms: null },
   {
     type: 'page_fetched',
     at_ms: 1400,
@@ -121,6 +124,47 @@ const STREAM: ProgressEvent[] = [
   },
   { type: 'ended', at_ms: 4000, status: 'finished' },
 ];
+
+describe('waiting and discovery (CC-42A)', () => {
+  const upTo = (n: number) => STREAM.slice(0, n).reduce(reduce, INITIAL_STATE);
+  const at = (type: ProgressEvent['type'], k = 0) =>
+    STREAM.findIndex(
+      (e, i) => e.type === type && STREAM.slice(0, i).filter((x) => x.type === type).length === k,
+    );
+
+  it('a wait is held from its waiting event to the next, and the end clears it', () => {
+    expect(upTo(at('waiting')).waiting_since_ms).toBeNull();
+    expect(upTo(at('waiting') + 1).waiting_since_ms).toBe(1050);
+    expect(upTo(at('waiting', 1) + 1).waiting_since_ms).toBeNull();
+    const waitingAtEnd = reduce(
+      reduce(INITIAL_STATE, { type: 'waiting', at_ms: 10, since_ms: 5 }),
+      { type: 'ended', at_ms: 20, status: 'failed' },
+    );
+    expect(waitingAtEnd.waiting_since_ms).toBeNull();
+  });
+
+  it('a wait cannot begin after the event that announces it', () => {
+    expect(() => reduce(INITIAL_STATE, { type: 'waiting', at_ms: 10, since_ms: 11 })).toThrow(
+      /begins later/,
+    );
+  });
+
+  it('discovery lands once, with what it found', () => {
+    const s = upTo(at('discovered') + 1);
+    expect(s.discovery).toEqual({ robots_txt: 'found', sitemap_urls: 2 });
+    expect(() =>
+      reduce(s, { type: 'discovered', at_ms: 1000, robots_txt: null, sitemap_urls: null }),
+    ).toThrow(/Discovered twice/);
+  });
+
+  it('the contract snapshot carries what discovery found, and no wait instant', () => {
+    const p = toProgress(upTo(at('waiting') + 1));
+    expect(p.robots_txt).toBe('found');
+    expect(p.sitemap_urls).toBe(2);
+    expect(p.waiting_since).toBeNull();
+    expect(ProgressSchema.safeParse(p).success).toBe(true);
+  });
+});
 
 describe('the progress-event contract', () => {
   it('parses every event of a stream that uses each event type', () => {

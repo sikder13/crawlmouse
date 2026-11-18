@@ -143,6 +143,15 @@ export const CheckPhaseSchema = named(
   z.enum(['robots_and_sitemap', 'homepage', 'crawl', 'crawler_tests', 'without_js', 'grading']),
 );
 export const StepStateSchema = named('StepState', z.enum(['done', 'now', 'next']));
+/**
+ * The engine's `RobotsStatus` (packages/engine/src/sitemap.ts), pinned there in
+ * packages/engine/src/v2/contract-pins.test.ts. What discovery's one robots.txt request answered: a 2xx (an empty file included), a 404 or 410,
+ * or any other status, a fetch that threw, or discovery's deadline.
+ */
+export const RobotsTxtStateSchema = named(
+  'RobotsTxtState',
+  z.enum(['found', 'not_found', 'unreadable']),
+);
 export const SampleMethodSchema = named(
   'SampleMethod',
   z.enum(['stratified_by_template', 'census']),
@@ -490,6 +499,7 @@ export const V1_PINNED_ENUMS = {
   WithheldReason: WithheldReasonSchema,
   TechnicalSeoPending: TechnicalSeoPendingSchema,
   ContentScoreWithheld: ContentScoreWithheldSchema,
+  RobotsTxtState: RobotsTxtStateSchema,
 } as const;
 
 export const REGISTRY_ONLY_ENUMS = {
@@ -533,6 +543,7 @@ export type FrontendMarker = z.infer<typeof FrontendMarkerSchema>;
 export type VerificationMethod = z.infer<typeof VerificationMethodSchema>;
 export type GradeName = z.infer<typeof GradeNameSchema>;
 export type GradeLetter = z.infer<typeof GradeLetterSchema>;
+export type RobotsTxtState = z.infer<typeof RobotsTxtStateSchema>;
 export type FixSection = z.infer<typeof FixSectionSchema>;
 export type FixType = z.infer<typeof FixTypeSchema>;
 export type AccessCause = z.infer<typeof AccessCauseSchema>;

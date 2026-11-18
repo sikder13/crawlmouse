@@ -14,6 +14,7 @@
  */
 import {
   PACE,
+  QUEUE_WAIT_MAX_S,
   runCheck,
   type CheckStepTools,
   type CheckSteps,
@@ -170,7 +171,7 @@ const ROWS: readonly RowInput[] = [
     trigger: 'inngest/function.cancelled (checkFn)',
     steps: 2,
     stepsHow: 'fail, emit-failed',
-    stepAt: [445, 447],
+    stepAt: [508, 510],
   },
   {
     file: 'inngest/check-reaper.ts',
@@ -518,7 +519,7 @@ export interface CheckShape {
   accessStages: 1 | 2;
   /** Seconds the worker takes over each batch, crawl and access alike. */
   batchSeconds: number;
-  /** Busy answers before the worker takes each post (at most PACE.busyRetries); 0 when absent. */
+  /** Busy answers before the worker takes each post (at most BUSY_PER_POST_MAX); 0 when absent. */
   busyPerPost?: number;
   /** The first read of each batch finds it gone, so the batch is posted once more; false when absent. */
   readFailsFirst?: boolean;
@@ -551,10 +552,16 @@ export const SHAPES: readonly CheckShape[] = [
 /** A batch's max_seconds as the post step answers it (apps/web/lib/v2/pipeline/limits.ts). */
 export const MAX_SECONDS = 240;
 
+/**
+ * The most busy answers one post can be given and still be waited on: the wait budget
+ * (QUEUE_WAIT_MAX_S) in busy waits. A check waits on busy answers for at most that long in all.
+ */
+export const BUSY_PER_POST_MAX = Math.floor(QUEUE_WAIT_MAX_S / PACE.busyWaitS);
+
 /** The values the heaviest-shape search tries, each a uniform shape over a whole check. */
 export const SEARCH = {
   claimWaits: [0, PACE.claimWaits],
-  busyPerPost: [0, 1, PACE.busyRetries],
+  busyPerPost: [0, 1, BUSY_PER_POST_MAX],
   /** Done at the first, second and third poll, and at the last poll before the deadline. */
   batchSeconds: [PACE.pollStartS, 15, 35, MAX_SECONDS + PACE.pollGraceS - 1],
   readFailsFirst: [false, true],
@@ -626,8 +633,8 @@ class FinishTimeout extends Error {}
  */
 export async function checkExecutions(shape: CheckShape): Promise<number> {
   const busyPerPost = shape.busyPerPost ?? 0;
-  if (busyPerPost > PACE.busyRetries) {
-    throw new Error(`the ${shape.label} shape answers busy more than PACE.busyRetries a post`);
+  if (busyPerPost > BUSY_PER_POST_MAX) {
+    throw new Error(`the ${shape.label} shape answers busy more than BUSY_PER_POST_MAX a post`);
   }
   let now = 0;
   let calls = 0;
@@ -662,7 +669,7 @@ export async function checkExecutions(shape: CheckShape): Promise<number> {
       }
       return { outcome: 'claimed', at: now, site: { ...EVENT } };
     },
-    discover: async () => ({ seeds: 1, sitemap_urls: 0, at: now }),
+    discover: async () => ({ seeds: 1, sitemap_urls: 0, robots_txt: 'found', at: now }),
     post: async (_e, at) => {
       if (busyLeft > 0) {
         busyLeft -= 1;

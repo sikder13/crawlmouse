@@ -75,6 +75,45 @@ function checkRow(): Record<string, unknown> {
 }
 
 describe('checkFromRow', () => {
+  const OLD_PROGRESS = {
+    steps: [{ phase: 'crawl', state: 'now' }],
+    pages_crawled: 3,
+    pages_estimated: null,
+    links_found: 9,
+    elapsed_ms: 4000,
+    recent_fetches: [],
+  };
+  const running = (progress: unknown) => ({
+    ...checkRow(),
+    status: 'running',
+    finished_at: null,
+    failure_reason: null,
+    progress,
+  });
+
+  it('reads a running check whose progress was written before the wait and discovery fields (CC-42A)', () => {
+    expect(checkFromRow(running(OLD_PROGRESS)).progress).toEqual({
+      ...OLD_PROGRESS,
+      waiting_since: null,
+      sitemap_urls: null,
+      robots_txt: null,
+    });
+  });
+
+  it('keeps the wait and discovery fields a newer row holds', () => {
+    const progress = {
+      ...OLD_PROGRESS,
+      waiting_since: '2026-11-05T02:30:20.000Z',
+      sitemap_urls: 1240,
+      robots_txt: 'not_found',
+    };
+    expect(checkFromRow(running(progress)).progress).toEqual(progress);
+  });
+
+  it('still refuses a progress field the contract does not define', () => {
+    expect(() => checkFromRow(running({ ...OLD_PROGRESS, extra: 1 }))).toThrow();
+  });
+
   it('keeps the contract fields, writes instants with a Z to the digit, and drops the rest', () => {
     expect(checkFromRow(checkRow())).toEqual({
       ...Object.fromEntries(

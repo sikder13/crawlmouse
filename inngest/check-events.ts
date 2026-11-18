@@ -45,8 +45,13 @@ export const FAILURE_REASONS = [
   'not_started',
   /** A batch came from another worker release than the check's first. */
   'worker_redeployed',
-  /** No crawl batch could be posted or read, or the worker kept refusing. */
+  /** No crawl batch could be posted or read: the worker did not answer, or refused our credentials. */
   'worker_unavailable',
+  /**
+   * The worker answered, and was busy with other checks for the whole wait budget
+   * (QUEUE_WAIT_MAX_S): the check never won a slot for its first crawl batch.
+   */
+  'capacity_wait_exceeded',
   'build_failed',
   'persist_failed',
   /** Anything else. */

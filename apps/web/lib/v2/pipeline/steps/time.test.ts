@@ -14,9 +14,10 @@ import {
   DISCOVER_S,
   MIN_BATCH_S,
   PACE,
+  QUEUE_WAIT_MAX_S,
   RESERVE_S,
 } from '../limits';
-import { batchSeconds, fetchEndsAt, phaseEndsAt } from './time';
+import { addBackMs, batchSeconds, fetchEndsAt, phaseEndsAt } from './time';
 
 const S = 1000;
 const T0 = Date.UTC(2026, 10, 8, 12, 0, 0);
@@ -26,23 +27,73 @@ const so = (over: Partial<RunSoFar> = {}): RunSoFar => ({
   pagesCrawled: 0,
   linksFound: 0,
   release: null,
+  busyMs: 0,
+  busyBeforeCrawlMs: 0,
+  waitingSince: null,
+  discovered: null,
   ...over,
 });
 
 describe('the time plan', () => {
-  it('ends the fetching phases RESERVE_S before the finish timeout', () => {
-    expect(fetchEndsAt(T0)).toBe(T0 + (1200 - 180) * S);
+  it('the finish timeout is its parts: claim waits, discovery, the wait budget, the crawl, the access slice, the reserve', () => {
+    expect(PACE.finishS).toBe(
+      PACE.claimWaits * PACE.claimWaitS +
+        DISCOVER_S +
+        QUEUE_WAIT_MAX_S +
+        CRAWL_CEILING_S +
+        ACCESS_SLICE_S +
+        RESERVE_S,
+    );
+    expect(PACE.finishS).toBe(2220);
+    expect(QUEUE_WAIT_MAX_S).toBe(900);
   });
 
-  it('ends the crawl at its ceiling after discovery, or leaves the access slice, whichever first', () => {
+  it('ends the fetching phases RESERVE_S before the finish timeout', () => {
+    expect(fetchEndsAt(T0)).toBe(T0 + (PACE.finishS - RESERVE_S) * S);
+  });
+
+  it('ends the crawl at its ceiling after the first accepted batch, or leaves the access slice, whichever first', () => {
     const crawl = { kind: 'crawl' } as const;
-    expect(phaseEndsAt(crawl, so({ crawlFrom: T0 + 10 * S }))).toBe(
+    const now = T0 + 500 * S;
+    expect(phaseEndsAt(crawl, so({ crawlFrom: T0 + 10 * S }), now)).toBe(
       T0 + (10 + CRAWL_CEILING_S) * S,
     );
-    expect(phaseEndsAt(crawl, so({ crawlFrom: T0 + 400 * S }))).toBe(
+    expect(phaseEndsAt(crawl, so({ crawlFrom: T0 + 1700 * S }), now)).toBe(
       fetchEndsAt(T0) - ACCESS_SLICE_S * S,
     );
-    expect(phaseEndsAt({ kind: 'access' }, so())).toBe(fetchEndsAt(T0));
+    expect(phaseEndsAt({ kind: 'access' }, so(), now)).toBe(fetchEndsAt(T0));
+  });
+
+  it('before any crawl batch is accepted, the crawl clock has not started: the window is measured from now', () => {
+    const crawl = { kind: 'crawl' } as const;
+    // Discovery ended at T0 + 60 s; the check then waited 600 s on busy answers.
+    const now = T0 + 660 * S;
+    const plan = so({ crawlFrom: null, busyMs: 600 * S });
+    expect(phaseEndsAt(crawl, plan, now)).toBe(now + CRAWL_CEILING_S * S);
+    // So the first batch the worker takes is given its full budget, however long it waited.
+    expect(batchSeconds(phaseEndsAt(crawl, plan, now), now, CRAWL_BATCH_BUDGET.max_seconds)).toBe(
+      CRAWL_BATCH_BUDGET.max_seconds,
+    );
+  });
+
+  it('busy time after the first accepted batch is added back to the crawl end and the fetch end', () => {
+    const crawlFrom = T0 + 400 * S;
+    const plan = so({ crawlFrom, busyMs: 300 * S, busyBeforeCrawlMs: 100 * S });
+    expect(addBackMs(plan)).toBe(200 * S);
+    expect(phaseEndsAt({ kind: 'crawl' }, plan, crawlFrom)).toBe(
+      crawlFrom + (CRAWL_CEILING_S + 200) * S,
+    );
+  });
+
+  it('the add-back is what is left of ONE budget per check: the first wait counts against it', () => {
+    // 700 s before the first batch, 400 s after: only 200 s of the later wait is added back.
+    expect(addBackMs(so({ crawlFrom: T0, busyMs: 1100 * S, busyBeforeCrawlMs: 700 * S }))).toBe(
+      (QUEUE_WAIT_MAX_S - 700) * S,
+    );
+    // A budget spent before the first batch leaves nothing to add back.
+    expect(addBackMs(so({ crawlFrom: T0, busyMs: 1000 * S, busyBeforeCrawlMs: 900 * S }))).toBe(0);
+    // Nothing is added back before the crawl clock starts.
+    expect(addBackMs(so({ crawlFrom: null, busyMs: 300 * S }))).toBe(0);
   });
 
   it('gives a batch its budget, or what the phase leaves after the grace and one poll wait', () => {
@@ -54,13 +105,19 @@ describe('the time plan', () => {
     expect(batchSeconds(end, end - (MIN_BATCH_S + 89) * S, 240)).toBeNull();
   });
 
-  it('worst case from limits.ts: every claim wait, every batch at its deadline plus a poll wait, then the reserve, fit 1,200 s', () => {
-    // Zero is the first claim attempt; the claim waits are inside the run.
-    let t = PACE.claimWaits * PACE.claimWaitS + DISCOVER_S;
-    const plan = so({ startedAt: 0, crawlFrom: t * S });
+  it('worst case from limits.ts: every claim wait, the whole wait budget, every batch at its deadline plus a poll wait, then the reserve, fit the finish timeout', () => {
+    // Zero is the first claim attempt; the claim waits are inside the run. The whole budget is
+    // spent waiting before the first batch, so none is added back after it.
+    let t = PACE.claimWaits * PACE.claimWaitS + DISCOVER_S + QUEUE_WAIT_MAX_S;
+    const plan = so({
+      startedAt: 0,
+      crawlFrom: t * S,
+      busyMs: QUEUE_WAIT_MAX_S * S,
+      busyBeforeCrawlMs: QUEUE_WAIT_MAX_S * S,
+    });
     const phase = (kind: BatchAt['kind'], most: number, batches: number) => {
       for (let n = 0; n < batches; n++) {
-        const s = batchSeconds(phaseEndsAt({ kind }, plan), t * S, most);
+        const s = batchSeconds(phaseEndsAt({ kind }, plan, t * S), t * S, most);
         if (s === null) return;
         // The batch reaches its deadline, and the poll that sees it comes one poll wait later.
         t += s + PACE.pollGraceS + PACE.pollMaxS;
@@ -72,6 +129,27 @@ describe('the time plan', () => {
     t += RESERVE_S;
     expect(fetching).toBeLessThanOrEqual(PACE.finishS - RESERVE_S);
     expect(t).toBeLessThanOrEqual(PACE.finishS);
+  });
+
+  it('the same worst case with the budget spent AFTER the first batch fits too', () => {
+    let t = PACE.claimWaits * PACE.claimWaitS + DISCOVER_S;
+    const plan = so({
+      startedAt: 0,
+      crawlFrom: t * S,
+      busyMs: QUEUE_WAIT_MAX_S * S,
+      busyBeforeCrawlMs: 0,
+    });
+    t += QUEUE_WAIT_MAX_S;
+    const phase = (kind: BatchAt['kind'], most: number, batches: number) => {
+      for (let n = 0; n < batches; n++) {
+        const s = batchSeconds(phaseEndsAt({ kind }, plan, t * S), t * S, most);
+        if (s === null) return;
+        t += s + PACE.pollGraceS + PACE.pollMaxS;
+      }
+    };
+    phase('crawl', CRAWL_BATCH_BUDGET.max_seconds, PACE.maxCrawlBatches);
+    phase('access', ACCESS_BATCH_BUDGET.max_seconds, 2);
+    expect(t).toBeLessThanOrEqual(PACE.finishS - RESERVE_S);
   });
 });
 
@@ -87,7 +165,15 @@ const SITE = {
   homepageUrl: 'https://example.com',
 };
 
-function simulate(opts: { latencyS: number; busyClaims: number; slowBatches: boolean }) {
+function simulate(opts: {
+  latencyS: number;
+  busyClaims: number;
+  slowBatches: boolean;
+  /** The worker answers busy to this many posts before it takes the first crawl batch. */
+  busyFirst?: number;
+  /** ...and to this many posts of each later batch. */
+  busyLater?: number;
+}) {
   const clock = { now: T0 };
   const ids: string[] = [];
   const stepsAt = new Map<string, number>();
@@ -108,6 +194,7 @@ function simulate(opts: { latencyS: number; busyClaims: number; slowBatches: boo
     },
   };
   const posted = new Map<number, { at: number; seconds: number }>();
+  const busyAnswers = new Map<number, number>();
   let claims = 0;
   const steps: CheckSteps = {
     claim: async () =>
@@ -116,12 +203,17 @@ function simulate(opts: { latencyS: number; busyClaims: number; slowBatches: boo
         : { outcome: 'claimed', at: clock.now, site: SITE },
     discover: async () => {
       clock.now += DISCOVER_S * S;
-      return { seeds: 1, sitemap_urls: 0, at: clock.now };
+      return { seeds: 1, sitemap_urls: 0, robots_txt: 'found', at: clock.now };
     },
     post: async (_e, at, soFar) => {
+      const busyFor = at.batch === 1 ? (opts.busyFirst ?? 0) : (opts.busyLater ?? 0);
+      if ((busyAnswers.get(at.batch) ?? 0) < busyFor) {
+        busyAnswers.set(at.batch, (busyAnswers.get(at.batch) ?? 0) + 1);
+        return { status: 'busy', at: clock.now };
+      }
       const most =
         at.kind === 'crawl' ? CRAWL_BATCH_BUDGET.max_seconds : ACCESS_BATCH_BUDGET.max_seconds;
-      const seconds = batchSeconds(phaseEndsAt(at, soFar), clock.now, most);
+      const seconds = batchSeconds(phaseEndsAt(at, soFar, clock.now), clock.now, most);
       if (seconds === null) return { status: 'none', why: 'no_time' };
       posted.set(at.batch, { at: clock.now, seconds });
       return { status: 'posted', urls: 50, at: clock.now, max_seconds: seconds };
@@ -179,6 +271,55 @@ describe('the time plan through the orchestration (finding 8)', () => {
   });
 });
 
+describe('waiting on the worker (CC-42A decisions 1 and 2)', () => {
+  const crawlReads = (ids: string[]) => ids.filter((id) => /^crawl-\d+-read$/.test(id)).length;
+
+  it('a check answered busy for 600 s before its first batch gets the same crawl as one that was not', async () => {
+    const alone = await simulate({ latencyS: 1, busyClaims: 0, slowBatches: true });
+    const waited = await simulate({
+      latencyS: 1,
+      busyClaims: 0,
+      slowBatches: true,
+      busyFirst: 600 / PACE.busyWaitS,
+    });
+    expect(waited.result).toEqual(alone.result);
+    expect(crawlReads(waited.ids)).toBe(crawlReads(alone.ids));
+    expect(crawlReads(alone.ids)).toBeGreaterThan(1);
+  });
+
+  it('busy answers between batches are added back: the crawl reads as many batches', async () => {
+    const alone = await simulate({ latencyS: 1, busyClaims: 0, slowBatches: true });
+    const waited = await simulate({ latencyS: 1, busyClaims: 0, slowBatches: true, busyLater: 2 });
+    expect(crawlReads(waited.ids)).toBe(crawlReads(alone.ids));
+  });
+
+  it('a check that never wins a slot within QUEUE_WAIT_MAX_S fails capacity_wait_exceeded, not worker_unavailable', async () => {
+    const run = await simulate({
+      latencyS: 1,
+      busyClaims: 0,
+      slowBatches: true,
+      busyFirst: 10_000,
+    });
+    expect(run.result).toEqual({ status: 'failed', reason: 'capacity_wait_exceeded' });
+    // It gave up once the budget was spent, not before and not long after.
+    const waitedS = run.elapsedS - DISCOVER_S;
+    expect(waitedS).toBeGreaterThanOrEqual(QUEUE_WAIT_MAX_S);
+    expect(waitedS).toBeLessThan(QUEUE_WAIT_MAX_S + 2 * PACE.busyWaitS);
+  });
+
+  it('every claim wait, the whole budget spent before the first batch, slow batches: still ends within the finish timeout, under the step limit', async () => {
+    const run = await simulate({
+      latencyS: 1,
+      busyClaims: PACE.claimWaits,
+      slowBatches: true,
+      busyFirst: QUEUE_WAIT_MAX_S / PACE.busyWaitS - 1,
+    });
+    expect(run.result.status).toBe('partial');
+    expect((run.stepsAt.get('render')! - T0) / S).toBeLessThanOrEqual(PACE.finishS - RESERVE_S + 1);
+    expect(run.ids.length).toBeLessThanOrEqual(worstCaseSteps());
+  });
+});
+
 /**
  * Inngest's limit on steps per function run: "1,000 steps" (Usage limits,
  * https://www.inngest.com/docs/usage-limits/inngest, read 2026-11-08). A sleep is a step.
@@ -186,16 +327,24 @@ describe('the time plan through the orchestration (finding 8)', () => {
 const STEP_LIMIT = 1000;
 
 /**
- * An upper bound on a run's steps, from PACE and the finish timeout. Every sleep is at least
- * pollStartS long and a run lasts at most finishS, so a run sleeps at most finishS / pollStartS
- * times, and each sleep is followed by at most one step (a poll, a post or a claim). Each batch adds
- * at most its first post, two reads, its re-post and its fail; the crawl adds one post that plans
- * nothing; the claim, discover, render, build, persist, finalize, emit, fail and emit-failed are one
- * each.
+ * An upper bound on a run's steps, from PACE and the finish timeout. A sleep shorter than
+ * `LONG_SLEEP_S` is one of a posting's first polls, whose wait doubles from pollStartS to pollMaxS:
+ * `shortPolls` per posting, and a batch is posted at most twice (its post and its re-post). Every
+ * other sleep (a later poll, a busy wait, a claim wait) is at least LONG_SLEEP_S, and the run lasts
+ * at most finishS, so there are at most finishS / LONG_SLEEP_S of them. Each sleep is followed by at
+ * most one step (a poll, a post or a claim). Each batch adds at most its first post, two reads, its
+ * re-post and its fail; the crawl adds one post that plans nothing; the claim, discover, render,
+ * build, persist, finalize, emit, fail and emit-failed are one each.
  */
+const LONG_SLEEP_S = Math.min(PACE.pollMaxS, PACE.busyWaitS, PACE.claimWaitS);
+function shortPolls(): number {
+  let n = 0;
+  for (let w = PACE.pollStartS; w < LONG_SLEEP_S; w *= 2) n++;
+  return n;
+}
 function worstCaseSteps(): number {
-  const sleeps = Math.floor(PACE.finishS / PACE.pollStartS);
   const batches = PACE.maxCrawlBatches + 2;
+  const sleeps = 2 * batches * shortPolls() + Math.floor(PACE.finishS / LONG_SLEEP_S);
   return 2 * sleeps + 5 * batches + 1 + 9;
 }
 
@@ -204,7 +353,10 @@ describe('the step count (finding 18)', () => {
     expect(worstCaseSteps()).toBeLessThan(STEP_LIMIT);
   });
 
-  it('every wait between steps is at least pollStartS, which the bound assumes', () => {
-    expect(Math.min(PACE.pollStartS, PACE.busyWaitS, PACE.claimWaitS)).toBe(PACE.pollStartS);
+  it('the sleeps the bound counts as short are exactly a posting’s doubling polls: 5, 10 and 20 s', () => {
+    expect(LONG_SLEEP_S).toBe(30);
+    expect(shortPolls()).toBe(3);
+    // Every wait the orchestration sleeps that is not a doubling poll is at least LONG_SLEEP_S.
+    expect(Math.min(PACE.busyWaitS, PACE.claimWaitS, PACE.pollMaxS)).toBe(LONG_SLEEP_S);
   });
 });

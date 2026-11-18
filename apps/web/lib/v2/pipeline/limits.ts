@@ -3,11 +3,11 @@
  * bounds (PACE) and the failure reasons live with the Inngest functions, which do not import the
  * app, and are re-exported here beside the rest.
  */
-export { PACE, STEP_OUTPUT_BYTES } from '../../../../../inngest/check';
+export { PACE, QUEUE_WAIT_MAX_S, STEP_OUTPUT_BYTES } from '../../../../../inngest/check';
 export { FAILURE_REASONS, type FailureReason } from '../../../../../inngest/check-events';
 
 /**
- * Of the run's 20 minutes, what render, build, persist and finalize keep after the last batch. Render
+ * Of the run's finish timeout, what render, build, persist and finalize keep after the last batch. Render
  * runs with a daily budget that refuses (Q7), so today it returns at once; a deadline inside
  * renderCheck has to come before rendering is enabled. Persist is one step whatever
  * persistBuiltCheck sends inside it (Q11: staged chunks, then the finishing RPC); its duration at the
@@ -28,8 +28,12 @@ export const DISCOVER_REQUEST_MS = 10_000;
 export const SITEMAP_URL_CAP = 5000;
 /** The crawl's page cap when a request sets none: v1's free cap. */
 export const DEFAULT_PAGE_CAP = 500;
-/** The reaper fails a queued or running check whose heartbeat is older than this (D13). */
-export const REAP_AFTER_S = 30 * 60;
+/**
+ * The reaper fails a queued or running check whose heartbeat is older than this (D13): above the
+ * finish timeout plus the longest wait between two heartbeats (steps/lifecycle.test.ts), so no check
+ * whose run may still be alive is reaped. 45 minutes since the finish timeout became 37 (CC-42A).
+ */
+export const REAP_AFTER_S = 45 * 60;
 /** An audit nobody keeps stays readable this long after it was requested (CC-22b D8). */
 export const ANONYMOUS_EXPIRY_HOURS = 24;
 /** Manual and fix re-check requests in one 2-minute bucket are one check (ARCH-2 §4.1). */

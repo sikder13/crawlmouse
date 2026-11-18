@@ -114,7 +114,12 @@ async function runRecorded() {
   // "newest" picks read them); they stand in for discovery here, so the planners meet the same seeds.
   steps.discover = async () => {
     await putJson(evidence, `anon/${SITE_ID}/${CHECK}/seeds.json.gz`, seedsOf(HOST));
-    return { seeds: seedsOf(HOST).length, sitemap_urls: seedsOf(HOST).length - 1, at: clock.now };
+    return {
+      seeds: seedsOf(HOST).length,
+      sitemap_urls: seedsOf(HOST).length - 1,
+      robots_txt: 'found',
+      at: clock.now,
+    };
   };
   const ids: string[] = [];
   const tools: CheckStepTools = {

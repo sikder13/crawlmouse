@@ -37,6 +37,10 @@ const SO: RunSoFar = {
   pagesCrawled: 0,
   linksFound: 0,
   release: null,
+  busyMs: 0,
+  busyBeforeCrawlMs: 0,
+  waitingSince: null,
+  discovered: null,
 };
 const CRAWL_1: BatchAt = { kind: 'crawl', batch: 1, stage: null };
 

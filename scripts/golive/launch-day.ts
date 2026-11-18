@@ -39,6 +39,7 @@ export const REASON_COUNTED: Readonly<Record<FailureReason, true | { notCounted:
   not_started: true,
   worker_redeployed: true,
   worker_unavailable: true,
+  capacity_wait_exceeded: true,
   build_failed: true,
   persist_failed: true,
   internal: true,

@@ -5,6 +5,7 @@ import { CheckFailure, failureReasonOf, type CheckRequested } from './check-even
 import {
   CHECK_FN_ID,
   PACE,
+  QUEUE_WAIT_MAX_S,
   STEP_OUTPUT_BYTES,
   createCheckCancelledFn,
   createCheckFn,
@@ -92,7 +93,7 @@ function fakeSteps(clock: { now: number }, script: Script = {}) {
         ? { outcome, at: clock.now, site: script.site ?? SITE_OF_EVENT }
         : { outcome, at: clock.now };
     },
-    discover: async () => ({ seeds: 3, sitemap_urls: 2, at: clock.now }),
+    discover: async () => ({ seeds: 3, sitemap_urls: 2, robots_txt: 'found', at: clock.now }),
     post: async (_e, at) => {
       posts.push({ at });
       const scripted = script.post?.(at, postN++);
@@ -435,6 +436,39 @@ describe('runCheck: polling (D1)', () => {
     expect(sleeps[0]).toEqual(['crawl-1-post-busy-1', 30_000]);
   });
 
+  it('a first crawl batch the worker keeps refusing fails the check capacity_wait_exceeded once the wait budget is spent', async () => {
+    // Each busy answer comes 30 s after the last (the sleep is the only thing that moves the clock).
+    let n = 0;
+    const { ids, result, events, sleeps } = await drive({
+      post: (at) =>
+        at.kind === 'crawl' ? { status: 'busy', at: T0 + PACE.busyWaitS * 1000 * n++ } : undefined,
+    });
+    expect(result).toEqual({ status: 'failed', reason: 'capacity_wait_exceeded' });
+    // The first busy answer starts the wait; it is spent at the answer QUEUE_WAIT_MAX_S later.
+    expect(sleeps).toHaveLength(QUEUE_WAIT_MAX_S / PACE.busyWaitS);
+    expect(ids.slice(-2)).toEqual(['fail', 'emit-failed']);
+    expect(ids).not.toContain('crawl-1-wait-1');
+    expect(events.at(-1)?.payload).toMatchObject({
+      name: 'check.failed',
+      data: { reason: 'capacity_wait_exceeded' },
+    });
+  });
+
+  it('a check whose first batch was taken is not failed for busy answers later: it ends as its window allows', async () => {
+    // 40 busy answers to batch 2, past the 30 the budget holds. (The fake post does not read the
+    // time; the real one answers `none` once the window has closed.)
+    let n = 0;
+    const { result, ids } = await drive({
+      post: (at) =>
+        at.kind === 'crawl' && at.batch === 2 && n < 40
+          ? { status: 'busy', at: T0 + PACE.busyWaitS * 1000 * n++ }
+          : undefined,
+    });
+    expect(n).toBe(40);
+    expect(ids).toContain('crawl-2-read');
+    expect(result).toEqual({ status: 'finished' });
+  });
+
   it('fails the check paused when the worker answers paused', async () => {
     const { ids, result } = await drive({
       post: (at) => (at.batch === 2 ? { status: 'paused' } : undefined),
@@ -632,10 +666,10 @@ describe('createCheckFn (D3)', () => {
       triggers: [{ event: 'check.requested' }],
       concurrency: [{ key: 'event.data.siteId', limit: 1 }, { limit: 2 }],
       idempotency: 'event.data.checkId',
-      timeouts: { finish: '20m' },
+      timeouts: { finish: '37m' },
       cancel: [{ event: 'check.cancel.requested', if: 'event.data.checkId == async.data.checkId' }],
     });
-    expect(PACE.finishS).toBe(20 * 60);
+    expect(PACE.finishS).toBe(37 * 60);
     expect((main!.steps as Record<string, { retries: unknown }>).step!.retries).toEqual({
       attempts: 2,
     });

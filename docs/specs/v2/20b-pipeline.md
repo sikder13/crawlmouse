@@ -30,7 +30,7 @@ A `check.requested` event becomes a finished, persisted, readable check: `reques
 | ---------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `crawlmouse.check.run`       | `check.requested`                                  | runs one check (below)                                                                                                                            |
 | `crawlmouse.check.cancelled` | `inngest/function.cancelled` of the check function | fails `canceled` the check the cancelled run’s event named, or else the check its run claimed; `onFailure` does not fire on a cancel or a timeout |
-| `crawlmouse.check.reaper`    | cron `*/10 * * * *`                                | fails a queued or running check whose heartbeat (or, unclaimed, its queue time) is older than 30 minutes, and releases its posted batches         |
+| `crawlmouse.check.reaper`    | cron `*/10 * * * *`                                | fails a queued or running check whose heartbeat (or, unclaimed, its queue time) is older than 45 minutes, and releases its posted batches         |
 
 Concurrency: one plan cap, `PLAN_CONCURRENCY_CAP = 5` (Inngest Free), which the registered functions’ limits are clamped to, v1’s audit function included (Q3; `pnpm --filter @crawlmouse/web exec vitest run lib/v2/pipeline/functions.test.ts` sweeps them). The check function’s account-wide limit is `INNGEST_CHECK_CONCURRENCY`, default 2. Its per-site key does not keep two checks of a site apart, because Inngest counts executing steps and a sleeping run holds none; the database does (`checks_one_running_per_site`, Q13).
 
@@ -54,20 +54,21 @@ Concurrency: one plan cap, `PLAN_CONCURRENCY_CAP = 5` (Inngest Free), which the 
 
 ## Polling and time
 
-| Bound                                                         | Value                   |
-| ------------------------------------------------------------- | ----------------------- |
-| First poll wait, doubling to                                  | 5 s, 30 s               |
-| A batch is lost after its `max_seconds` plus                  | 60 s                    |
-| A lost batch (`not_found`) is posted again                    | once                    |
-| Wait after the worker answers busy, and busy answers per post | 30 s, 20                |
-| The run’s finish timeout                                      | 1200 s                  |
-| Crawl phase ceiling                                           | 480 s                   |
-| Access stages’ slice                                          | 300 s                   |
-| Reserve for render, build, persist, finalize                  | 180 s                   |
-| A batch that would get less is not posted                     | 60 s                    |
-| Discovery                                                     | 60 s, 5000 sitemap URLs |
-| Crawl batches per check                                       | 40                      |
-| Default page cap                                              | 500                     |
+| Bound                                                                                    | Value                   |
+| ---------------------------------------------------------------------------------------- | ----------------------- |
+| First poll wait, doubling to                                                             | 5 s, 30 s               |
+| A batch is lost after its `max_seconds` plus                                             | 60 s                    |
+| A lost batch (`not_found`) is posted again                                               | once                    |
+| Wait after the worker answers busy                                                       | 30 s                    |
+| Wait budget, before and after the first crawl batch; time after it is added to the crawl | 900 s                   |
+| The run’s finish timeout                                                                 | 2220 s                  |
+| Crawl phase ceiling, from the first crawl batch the worker accepts                       | 480 s                   |
+| Access stages’ slice                                                                     | 300 s                   |
+| Reserve for render, build, persist, finalize                                             | 180 s                   |
+| A batch that would get less is not posted                                                | 60 s                    |
+| Discovery                                                                                | 60 s, 5000 sitemap URLs |
+| Crawl batches per check                                                                  | 40                      |
+| Default page cap                                                                         | 500                     |
 
 | Batch budget | Requests | Bytes   | Seconds (cut to the time left) |
 | ------------ | -------- | ------- | ------------------------------ |
@@ -80,18 +81,19 @@ The worst case these allow fits the finish timeout, and the worst-case step coun
 
 `checks.failure_reason` is readable by the site’s members, so the pipeline writes one of these words. Its stores refuse a word outside the list, and so do `fail_check` and `reap_stalled_checks`, which read it from `check_failure_reasons()`, a SQL function a test holds equal to the list (`pnpm --filter @crawlmouse/web exec vitest run lib/v2/pipeline/store.test.ts __tests__/v2-008-pipeline.test.ts`).
 
-| Reason               | When                                                                                |
-| -------------------- | ----------------------------------------------------------------------------------- |
-| `paused`             | `CRAWL_PAUSED=1` when the check was claimed, or the worker answered `paused`        |
-| `site_busy`          | another check of the site was still running after the claim waited                  |
-| `canceled`           | the run was cancelled or passed its finish timeout (Inngest reports both alike)     |
-| `stalled`            | the reaper found a claimed check with no heartbeat within its bound                 |
-| `not_started`        | the reaper found a check that no run claimed within its bound                       |
-| `worker_redeployed`  | a batch came from another worker release than the check’s first (Q10)               |
-| `worker_unavailable` | no crawl batch could be posted or read, or the worker refused the app’s credentials |
-| `build_failed`       | `buildCheck` threw                                                                  |
-| `persist_failed`     | persisting the built check threw                                                    |
-| `internal`           | anything else                                                                       |
+| Reason                   | When                                                                                                                                 |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `paused`                 | `CRAWL_PAUSED=1` when the check was claimed, or the worker answered `paused`                                                         |
+| `site_busy`              | another check of the site was still running after the claim waited                                                                   |
+| `canceled`               | the run was cancelled or passed its finish timeout (Inngest reports both alike)                                                      |
+| `stalled`                | the reaper found a claimed check with no heartbeat within its bound                                                                  |
+| `not_started`            | the reaper found a check that no run claimed within its bound                                                                        |
+| `worker_redeployed`      | a batch came from another worker release than the check’s first (Q10)                                                                |
+| `worker_unavailable`     | no crawl batch could be posted or read because the worker did not answer, or it refused the app’s credentials                        |
+| `capacity_wait_exceeded` | the worker answered, busy with other checks, for the whole wait budget (900 s): the check never won a slot for its first crawl batch |
+| `build_failed`           | `buildCheck` threw                                                                                                                   |
+| `persist_failed`         | persisting the built check threw                                                                                                     |
+| `internal`               | anything else                                                                                                                        |
 
 ## Requests
 
