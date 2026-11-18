@@ -6,6 +6,8 @@ import {
   CHECK_FN_ID,
   PACE,
   QUEUE_WAIT_MAX_S,
+  type DiscoverOutput,
+  type RunSoFar,
   STEP_OUTPUT_BYTES,
   createCheckCancelledFn,
   createCheckFn,
@@ -80,7 +82,7 @@ interface Script {
 
 /** Fake step bodies; each returns the clock's time where the real one returns its own. */
 function fakeSteps(clock: { now: number }, script: Script = {}) {
-  const posts: { at: BatchAt }[] = [];
+  const posts: { at: BatchAt; so: RunSoFar }[] = [];
   const failed: string[] = [];
   let claimN = 0;
   let pollN = 0;
@@ -94,8 +96,8 @@ function fakeSteps(clock: { now: number }, script: Script = {}) {
         : { outcome, at: clock.now };
     },
     discover: async () => ({ seeds: 3, sitemap_urls: 2, robots_txt: 'found', at: clock.now }),
-    post: async (_e, at) => {
-      posts.push({ at });
+    post: async (_e, at, so) => {
+      posts.push({ at, so });
       const scripted = script.post?.(at, postN++);
       if (scripted) return scripted;
       const crawlPosted = new Set(posts.filter((p) => p.at.kind === 'crawl').map((p) => p.at.batch))
@@ -440,8 +442,12 @@ describe('runCheck: polling (D1)', () => {
     // Each busy answer comes 30 s after the last (the sleep is the only thing that moves the clock).
     let n = 0;
     const { ids, result, events, sleeps } = await drive({
+      // Bounded at 100, past the budget, so a run that wrongly keeps waiting ends and fails here by
+      // name rather than looping (the fake post does not read the time, the real one does).
       post: (at) =>
-        at.kind === 'crawl' ? { status: 'busy', at: T0 + PACE.busyWaitS * 1000 * n++ } : undefined,
+        at.kind === 'crawl' && n < 100
+          ? { status: 'busy', at: T0 + PACE.busyWaitS * 1000 * n++ }
+          : undefined,
     });
     expect(result).toEqual({ status: 'failed', reason: 'capacity_wait_exceeded' });
     // The first busy answer starts the wait; it is spent at the answer QUEUE_WAIT_MAX_S later.
@@ -467,6 +473,52 @@ describe('runCheck: polling (D1)', () => {
     expect(n).toBe(40);
     expect(ids).toContain('crawl-2-read');
     expect(result).toEqual({ status: 'finished' });
+  });
+
+  it('hands each post the run so far: discovery, the wait, the busy time and the crawl clock (CC-42A)', async () => {
+    // Batch 1 is answered busy twice, then taken; batch 2 once, then taken. A busy answer carries
+    // the scripted time; a taken post carries the clock's, which the sleeps move.
+    const busyAt = new Map<number, number>();
+    const { posts } = await drive({
+      post: (at) => {
+        const n = busyAt.get(at.batch) ?? 0;
+        const limit = at.kind === 'crawl' ? (at.batch === 1 ? 2 : at.batch === 2 ? 1 : 0) : 0;
+        if (n >= limit) return undefined;
+        busyAt.set(at.batch, n + 1);
+        return { status: 'busy', at: T0 + PACE.busyWaitS * 1000 * (n + (at.batch === 2 ? 3 : 0)) };
+      },
+    });
+    const crawl = (batch: number) =>
+      posts.filter((p) => p.at.kind === 'crawl' && p.at.batch === batch);
+    // Discovery's findings reach every post, robots.txt included.
+    for (const p of posts)
+      expect(p.so.discovered).toEqual({ sitemap_urls: 2, robots_txt: 'found' });
+    // Batch 1: no crawl clock while waiting; the second busy post is handed the wait's start.
+    const [b1a, b1b, b1c] = crawl(1);
+    expect([b1a!.so.crawlFrom, b1b!.so.crawlFrom, b1c!.so.crawlFrom]).toEqual([null, null, null]);
+    expect(b1b!.so.waitingSince).toBe(T0);
+    expect(b1c!.so.busyMs).toBe(PACE.busyWaitS * 1000);
+    // Batch 2: the clock started when batch 1 was taken, at T0 + 60 s, and the wait before it
+    // (60 s, to the post that was taken) is what the budget paid for it.
+    const [b2a, b2b] = crawl(2);
+    expect(b2a!.so.crawlFrom).toBe(T0 + 2 * PACE.busyWaitS * 1000);
+    expect(b2a!.so.busyBeforeCrawlMs).toBe(2 * PACE.busyWaitS * 1000);
+    expect(b2a!.so.waitingSince).toBeNull();
+    // Batch 2's one busy answer: the gap to the post that was taken is charged too.
+    const b3 = crawl(3)[0]!;
+    expect(b2b!.so.busyMs).toBe(2 * PACE.busyWaitS * 1000);
+    expect(b3.so.busyMs - b3.so.busyBeforeCrawlMs).toBeGreaterThan(0);
+  });
+
+  it('a discover output recorded before robots_txt existed, replayed after the deploy, reads as null', async () => {
+    const clock = { now: T0 };
+    const step = fakeStep(clock);
+    const fake = fakeSteps(clock);
+    // As Inngest replays an output it recorded under the previous release: no robots_txt.
+    fake.steps.discover = async () =>
+      ({ seeds: 3, sitemap_urls: 2, at: clock.now }) as unknown as DiscoverOutput;
+    await runCheck({ event: { data: EVENT }, step: step.tools, runId: 'run-1' }, fake.steps);
+    expect(fake.posts[0]!.so.discovered).toEqual({ sitemap_urls: 2, robots_txt: null });
   });
 
   it('fails the check paused when the worker answers paused', async () => {

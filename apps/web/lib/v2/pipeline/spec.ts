@@ -62,7 +62,7 @@ const REASONS: Readonly<Record<FailureReason, string>> = {
   not_started: 'the reaper found a check that no run claimed within its bound',
   worker_redeployed: 'a batch came from another worker release than the check’s first (Q10)',
   worker_unavailable:
-    'no crawl batch could be posted or read because the worker did not answer, or it refused the app’s credentials',
+    'no crawl batch could be read: the worker did not answer, refused the app’s credentials, or lost a batch twice, or its result could not be read',
   capacity_wait_exceeded: `the worker answered, busy with other checks, for the whole wait budget (${QUEUE_WAIT_MAX_S} s): the check never won a slot for its first crawl batch`,
   build_failed: '`buildCheck` threw',
   persist_failed: 'persisting the built check threw',

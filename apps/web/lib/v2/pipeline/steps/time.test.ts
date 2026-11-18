@@ -76,7 +76,7 @@ describe('the time plan', () => {
     );
   });
 
-  it('busy time after the first accepted batch is added back to the crawl end and the fetch end', () => {
+  it('busy time after the first accepted batch is added back to the crawl end (the fetch end holds the whole budget already)', () => {
     const crawlFrom = T0 + 400 * S;
     const plan = so({ crawlFrom, busyMs: 300 * S, busyBeforeCrawlMs: 100 * S });
     expect(addBackMs(plan)).toBe(200 * S);
@@ -173,6 +173,8 @@ function simulate(opts: {
   busyFirst?: number;
   /** ...and to this many posts of each later batch. */
   busyLater?: number;
+  /** A batch is done this long after its post; unset, `slowBatches` decides. */
+  doneAfterS?: number;
 }) {
   const clock = { now: T0 };
   const ids: string[] = [];
@@ -206,22 +208,27 @@ function simulate(opts: {
       return { seeds: 1, sitemap_urls: 0, robots_txt: 'found', at: clock.now };
     },
     post: async (_e, at, soFar) => {
+      // As the real post step: the time left is read before the worker is asked, so a phase that
+      // has ended answers `none` whether or not the worker would have been busy.
+      const most =
+        at.kind === 'crawl' ? CRAWL_BATCH_BUDGET.max_seconds : ACCESS_BATCH_BUDGET.max_seconds;
+      const seconds = batchSeconds(phaseEndsAt(at, soFar, clock.now), clock.now, most);
+      if (seconds === null) return { status: 'none', why: 'no_time' };
       const busyFor = at.batch === 1 ? (opts.busyFirst ?? 0) : (opts.busyLater ?? 0);
       if ((busyAnswers.get(at.batch) ?? 0) < busyFor) {
         busyAnswers.set(at.batch, (busyAnswers.get(at.batch) ?? 0) + 1);
         return { status: 'busy', at: clock.now };
       }
-      const most =
-        at.kind === 'crawl' ? CRAWL_BATCH_BUDGET.max_seconds : ACCESS_BATCH_BUDGET.max_seconds;
-      const seconds = batchSeconds(phaseEndsAt(at, soFar, clock.now), clock.now, most);
-      if (seconds === null) return { status: 'none', why: 'no_time' };
       posted.set(at.batch, { at: clock.now, seconds });
       return { status: 'posted', urls: 50, at: clock.now, max_seconds: seconds };
     },
     poll: async (_e, at) => {
       const p = posted.get(at.batch)!;
       const deadline = p.at + (p.seconds + PACE.pollGraceS) * S;
-      const done = !opts.slowBatches || clock.now >= deadline - PACE.pollMaxS * S;
+      const done =
+        opts.doneAfterS !== undefined
+          ? clock.now >= p.at + opts.doneAfterS * S
+          : !opts.slowBatches || clock.now >= deadline - PACE.pollMaxS * S;
       return { status: done ? 'done' : 'running', at: clock.now };
     },
     read: async () => ({
@@ -305,6 +312,32 @@ describe('waiting on the worker (CC-42A decisions 1 and 2)', () => {
     const waitedS = run.elapsedS - DISCOVER_S;
     expect(waitedS).toBeGreaterThanOrEqual(QUEUE_WAIT_MAX_S);
     expect(waitedS).toBeLessThan(QUEUE_WAIT_MAX_S + 2 * PACE.busyWaitS);
+  });
+
+  it('every claim wait, then the whole budget waited for the first batch: the crawl reads as many batches as without the wait (review round 1, correctness N1)', async () => {
+    const shape = { latencyS: 1, busyClaims: PACE.claimWaits, slowBatches: false, doneAfterS: 20 };
+    const alone = await simulate(shape);
+    // 29 busy answers, 31 s apart at this latency: 868 s, the most that fit the budget here.
+    const waited = await simulate({ ...shape, busyFirst: QUEUE_WAIT_MAX_S / PACE.busyWaitS - 1 });
+    expect(waited.result).toEqual(alone.result);
+    expect(crawlReads(waited.ids)).toBe(crawlReads(alone.ids));
+    expect(crawlReads(alone.ids)).toBeGreaterThan(5);
+  });
+
+  it('a check whose next wait would pass the budget fails capacity_wait_exceeded rather than being taken late with a shorter crawl', async () => {
+    const shape = { latencyS: 1, busyClaims: PACE.claimWaits, slowBatches: false, doneAfterS: 20 };
+    const alone = await simulate(shape);
+    for (const busyFirst of [28, 29, 30, 31]) {
+      const waited = await simulate({ ...shape, busyFirst });
+      if (waited.result.status === 'failed') {
+        expect(waited.result, String(busyFirst)).toEqual({
+          status: 'failed',
+          reason: 'capacity_wait_exceeded',
+        });
+      } else {
+        expect(crawlReads(waited.ids), String(busyFirst)).toBe(crawlReads(alone.ids));
+      }
+    }
   });
 
   it('every claim wait, the whole budget spent before the first batch, slow batches: still ends within the finish timeout, under the step limit', async () => {

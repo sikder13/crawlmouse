@@ -171,7 +171,7 @@ const ROWS: readonly RowInput[] = [
     trigger: 'inngest/function.cancelled (checkFn)',
     steps: 2,
     stepsHow: 'fail, emit-failed',
-    stepAt: [508, 510],
+    stepAt: [516, 518],
   },
   {
     file: 'inngest/check-reaper.ts',
@@ -553,8 +553,9 @@ export const SHAPES: readonly CheckShape[] = [
 export const MAX_SECONDS = 240;
 
 /**
- * The most busy answers one post can be given and still be waited on: the wait budget
- * (QUEUE_WAIT_MAX_S) in busy waits. A check waits on busy answers for at most that long in all.
+ * The wait budget (QUEUE_WAIT_MAX_S) in busy waits: the busy answers a first crawl post is waited on
+ * through before the check fails `capacity_wait_exceeded`. A later post may be answered busy for
+ * longer, uncredited, until its window closes; the search's uniform shapes stop at this many.
  */
 export const BUSY_PER_POST_MAX = Math.floor(QUEUE_WAIT_MAX_S / PACE.busyWaitS);
 

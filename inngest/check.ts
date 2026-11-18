@@ -34,11 +34,13 @@ export const CHECK_FN_ID = 'crawlmouse.check.run';
 export const CHECK_CANCELLED_FN_ID = 'crawlmouse.check.cancelled';
 
 /**
- * The most a check may spend, in all, waiting on the worker's `busy` answers (CC-42A): the wait for
- * its first crawl batch plus every wait between later batches. Waiting for the first batch does
- * not run the crawl clock, which starts when the worker accepts that batch; a check still without
- * one once the budget is spent fails `capacity_wait_exceeded`. Waiting between later batches is
- * added back to the crawl's end, up to what the budget has left.
+ * The wait budget (CC-42A, rulings-1 §2): the most of a check's waiting on the worker's `busy`
+ * answers that the time plan makes up for, the wait for its first crawl batch and the waits between
+ * later batches together. Waiting for the first batch does not run the crawl clock, which starts
+ * when the worker accepts that batch; a check whose next wait for it would pass the budget fails
+ * `capacity_wait_exceeded`. A wait between later batches is added back to the crawl's end while the
+ * budget lasts. Once it is spent a check may still wait on busy answers, uncredited, until its
+ * window closes (steps/time.ts); the budget bounds what is added back, not what is waited.
  */
 export const QUEUE_WAIT_MAX_S = 900;
 
@@ -55,8 +57,8 @@ export const PACE = {
    */
   pollGraceS: 60,
   /**
-   * The wait after the worker answered busy (it runs BATCH_CONCURRENCY batches at once). How long a
-   * check waits in all is QUEUE_WAIT_MAX_S, not a count of these.
+   * The wait after the worker answered busy (it runs BATCH_CONCURRENCY batches at once). What bounds
+   * the waiting is time (QUEUE_WAIT_MAX_S, and each phase's end), not a count of these.
    */
   busyWaitS: 30,
   /** The wait for the site's running check to end before claiming again, and how many times. */
@@ -104,7 +106,7 @@ export interface RunSoFar {
   /** The first busy answer of the current run of them; null while no post is waiting. */
   waitingSince: number | null;
   /** What discovery found that a visitor can read; null until discovery has ended. */
-  discovered: { sitemap_urls: number; robots_txt: RobotsStatus } | null;
+  discovered: { sitemap_urls: number; robots_txt: RobotsStatus | null } | null;
 }
 
 /** What discovery's robots.txt request answered (the engine's RobotsStatus, RobotsTxtState). */
@@ -262,7 +264,8 @@ export async function runCheck(
   };
   const soFar = (): RunSoFar => ({ ...so, discovered: so.discovered && { ...so.discovered } });
   const found = await run('discover', () => steps.discover(data, soFar()));
-  so.discovered = { sitemap_urls: found.sitemap_urls, robots_txt: found.robots_txt };
+  // `?? null`: a discover output recorded before robots_txt existed, replayed after the deploy.
+  so.discovered = { sitemap_urls: found.sitemap_urls, robots_txt: found.robots_txt ?? null };
 
   // ── one batch: post, poll to its deadline, read; one re-post when the worker lost it ──
   // A busy answer is waited on and posted again. The time from a post's first busy answer to the
@@ -281,7 +284,9 @@ export async function runCheck(
         if (lastBusy !== null) so.busyMs += out.at - lastBusy;
         lastBusy = out.at;
         so.waitingSince ??= out.at;
-        if (so.crawlFrom === null && so.busyMs >= QUEUE_WAIT_MAX_S * 1000) {
+        // Given up before the next wait would pass the budget, so a first batch is never taken
+        // later than the budget plus one step's latency (review round 1, correctness N1).
+        if (so.crawlFrom === null && so.busyMs + PACE.busyWaitS * 1000 > QUEUE_WAIT_MAX_S * 1000) {
           return { status: 'capacity' };
         }
         await step.sleep(`${prefix}-busy-${k + 1}`, PACE.busyWaitS * 1000);

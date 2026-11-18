@@ -145,7 +145,7 @@ describe('the function rows against the code', () => {
   const HAND: Record<string, number> = {
     'inngest/audit.ts': 5, // 357 361 376 378 386
     'inngest/billing.ts': 5, // 65 77 95 116 120
-    'inngest/check.ts': 13, // 228 232 240 284 317 376 442 443 453 454 455 508 510
+    'inngest/check.ts': 13, // 230 234 242 292 325 384 450 451 461 462 463 516 518
     'inngest/check-reaper.ts': 1, // 39
     'inngest/check-expiry.ts': 3, // 51 54 58 (CC-GL D2)
     'inngest/trial-lifecycle.ts': 6, // 87 89 99 102 103 113
@@ -296,7 +296,7 @@ describe('a check against a worker that answers busy, runs long or loses a batch
     expect(await checkExecutions({ ...one, busyPerPost: BUSY_PER_POST_MAX })).toBe(156);
   });
 
-  it('refuses more busy answers than a post retries', async () => {
+  it('refuses a shape with more busy answers a post than BUSY_PER_POST_MAX', async () => {
     await expect(checkExecutions({ ...one, busyPerPost: BUSY_PER_POST_MAX + 1 })).rejects.toThrow();
   });
 
