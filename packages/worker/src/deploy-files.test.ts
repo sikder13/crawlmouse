@@ -454,10 +454,14 @@ describe("the deploy step that reads the machine's size back, against a stand-in
     expect(ok.code).toBe(0);
     expect(ok.log).toContain('machines: shared 2 2048 16 (CPU kind');
     const nulls = check(JSON.stringify([machine('shared', 2, 2048, undefined)]), flyToml, true);
+    expect(nulls.code).toBe(1);
     expect(nulls.log).toContain("::error::a machine runs 'shared 2 2048 null'");
     const old = check(JSON.stringify([shipped, machine('shared', 1, 1024, '4')]), flyToml, true);
+    expect(old.code).toBe(1);
     expect(old.log).toContain("::error::a machine runs 'shared 1 1024 4'");
-    expect(check('[]', flyToml, true).log).toContain('shows no machine');
+    const none = check('[]', flyToml, true);
+    expect(none.code).toBe(1);
+    expect(none.log).toContain('shows no machine');
   });
   it.skipIf(hasJq)('skips the real-jq case: no jq on PATH', () => {});
 });

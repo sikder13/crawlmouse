@@ -27,7 +27,7 @@ describe('jsonBytes', () => {
         fc.array(
           fc.oneof(
             fc.string({ unit: 'binary' }),
-            // Each edge of a class jsonBytes tells apart, so a one-code-point slip is generated.
+            // Class boundaries, mixed into longer strings; the sweep below checks each code unit alone.
             fc.constantFrom(
               '"',
               '\\',
@@ -60,5 +60,26 @@ describe('jsonBytes', () => {
       ),
       { numRuns: 500 },
     );
+  });
+
+  // Every UTF-16 code unit, alone: a miscount of any single one fails here, generated or not. Then
+  // the pairs, where a high surrogate before a low one is one 4-byte character and any other order
+  // is two lone surrogates.
+  it('agrees with JSON.stringify on every code unit, and on surrogates in every order', () => {
+    const wrong: string[] = [];
+    const check = (s: string) => {
+      if (jsonBytes(s) !== stored(s)) wrong.push(JSON.stringify(s));
+    };
+    for (let c = 0; c <= 0xffff; c++) check(String.fromCharCode(c));
+    for (let h = 0xd800; h <= 0xdbff; h++) {
+      for (const l of [0xdc00, 0xdfff]) check(String.fromCharCode(h, l));
+      check(String.fromCharCode(h, 0x61));
+      check(String.fromCharCode(0xdc00, h));
+    }
+    for (let l = 0xdc00; l <= 0xdfff; l++) {
+      for (const h of [0xd800, 0xdbff]) check(String.fromCharCode(h, l));
+      check(String.fromCharCode(l, l));
+    }
+    expect(wrong).toEqual([]);
   });
 });
