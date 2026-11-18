@@ -9,6 +9,7 @@ import {
   CLOSED_FOOTER_GATES,
   FOOTER_COLUMNS,
   FOOTER_COPY,
+  FOOTER_SOCIAL,
   LOG_IN,
   MARKETING_NAV,
   SUPPORT_EMAIL,
@@ -139,6 +140,7 @@ describe('footer-links.ts: the one map of header and footer links', () => {
         'Learn',
         [
           ['Blog', '/blog'],
+          ['Screaming Frog alternatives', '/blog/screaming-frog-alternative'],
           ['Research', '/blog/research'],
           ['Guides', '/guides'],
           ['Docs', 'planned'],
@@ -335,6 +337,35 @@ describe('the footer’s gates on a client page', () => {
         expect(/footer=\{false\}|footerGates=/.test(tag), tag).toBe(true);
     },
   );
+});
+
+describe('the footer’s social links (CC-42A decision 7)', () => {
+  // The brief's link, written out as independent truth.
+  const FACEBOOK = 'https://www.facebook.com/profile.php?id=61596663805615';
+
+  it('is the Facebook page, and nothing else', () => {
+    expect(FOOTER_SOCIAL).toEqual([{ label: 'Facebook', href: FACEBOOK, external: true }]);
+  });
+
+  it('renders each as an external link that opens apart, with noopener, and says so', () => {
+    const out = html();
+    const a = out.match(
+      new RegExp(`<a [^>]*href="${FACEBOOK.replace(/[?.]/g, '\\$&')}"[^>]*>[\\s\\S]*?</a>`),
+    );
+    expect(a, 'the Facebook link').not.toBeNull();
+    expect(a![0]).toMatch(/rel="noopener"/);
+    expect(a![0]).toMatch(/target="_blank"/);
+    expect(a![0]).toContain('Facebook');
+    expect(a![0]).toContain('opens in a new tab');
+  });
+
+  it('is an https address on another host: the internal-link checks do not apply to it', () => {
+    for (const l of FOOTER_SOCIAL) {
+      const u = new URL(l.href);
+      expect(u.protocol).toBe('https:');
+      expect(u.hostname).not.toMatch(/crawlmouse\.com$/);
+    }
+  });
 });
 
 describe('SiteFooter', () => {
