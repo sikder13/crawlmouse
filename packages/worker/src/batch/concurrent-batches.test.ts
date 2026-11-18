@@ -30,6 +30,8 @@ const sitePlan = fc.record({
   // Per-request latency in ms, in virtual time; past 500 the limiter's slow-host rule can apply.
   latencies: fc.array(fc.integer({ min: 0, max: 1500 }), { minLength: 1, maxLength: 8 }),
   notFoundEvery: fc.integer({ min: 0, max: 7 }),
+  // A Crawl-delay in whole seconds in this site's robots.txt, or none: a site's own gap, never another's.
+  crawlDelayS: fc.constantFrom(0, 0, 1, 2),
 });
 
 function page(host: string, n: number, pages: number): string {
@@ -58,6 +60,18 @@ describe('batches at once on distinct sites', () => {
             const startedAt = clock.now();
             await clock.sleep(plan.latencies[call++ % plan.latencies.length]!);
             const path = new URL(url).pathname;
+            if (path === '/robots.txt' && plan.crawlDelayS > 0) {
+              return outcome({
+                url,
+                identity,
+                startedAt,
+                status: 200,
+                finalUrl: url,
+                headers: { 'content-type': 'text/plain' },
+                body: `User-agent: *\nAllow: /\nCrawl-delay: ${plan.crawlDelayS}\n`,
+                maxBytes: limits.maxBytes,
+              });
+            }
             const m = /^\/p\/(\d+)$/.exec(path);
             const missing =
               !m || (plan.notFoundEvery > 0 && Number(m[1]) % plan.notFoundEvery === 0);
@@ -98,10 +112,18 @@ describe('batches at once on distinct sites', () => {
           expect([...starts.keys()].sort()).toEqual(
             plans.map((_, i) => siteKeyOf(`https://${hostOf(i)}/`)).sort(),
           );
-          for (const ts of starts.values()) {
-            for (let k = 1; k < ts.length; k++)
-              expect(ts[k]! - ts[k - 1]!).toBeGreaterThanOrEqual(FLOOR_GAP_MS);
-          }
+          plans.forEach((plan, i) => {
+            const ts = starts.get(siteKeyOf(`https://${hostOf(i)}/`))!;
+            // The floor, and after robots.txt is read this site's own Crawl-delay, never another's.
+            const own = Math.max(FLOOR_GAP_MS, plan.crawlDelayS * 1000);
+            for (let k = 1; k < ts.length; k++) {
+              expect(ts[k]! - ts[k - 1]!).toBeGreaterThanOrEqual(k === 1 ? FLOOR_GAP_MS : own);
+            }
+          });
+          // At the same time, not one after another: every site had started before any had finished.
+          const firsts = [...starts.values()].map((ts) => ts[0]!);
+          const lasts = [...starts.values()].map((ts) => ts.at(-1)!);
+          expect(Math.max(...firsts)).toBeLessThan(Math.min(...lasts));
           // Each batch's rows: its own URLs, each once, under its own check id.
           results.forEach((result, i) => {
             if (result.kind !== 'crawl') throw new Error('crawl');

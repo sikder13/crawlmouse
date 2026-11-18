@@ -11,6 +11,7 @@ import { READER_FILE } from './reader/file.js';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { BUDGET_CEILINGS, MAX_URLS_PER_BATCH, type BatchRequest } from './batch/request.js';
 import { MAX_RESULT_BYTES } from './batch/store.js';
+import { loadCapacity, loadLevels } from './spec/capacity.js';
 import { CRAWLERS } from './identities.js';
 import { startServer, type FixtureServer } from './test-support/http.js';
 
@@ -35,19 +36,22 @@ const ENV = Object.fromEntries(
   ]),
 );
 /**
- * The bound on peak resident memory at each level: the highest peak measured at that level, plus about
- * 35%, rounded up to 10 MiB. Fixed rather than a share of the VM, because the test is here to catch a
- * memory regression. The VM must still hold the largest with room to spare (pinned below).
+ * The levels this file runs and the bound on peak resident memory at each, read from
+ * src/spec/capacity-measured.json, the file the runbook's capacity section is rendered from. A level's
+ * bound is its highest measured peak × 1.35, rounded up to 10 MiB (src/spec/spec.test.ts checks the
+ * file against that rule). Fixed rather than a share of the VM, because the test is here to catch a
+ * memory regression; the VM must still hold the largest with room to spare (pinned below).
  *
- * Measured 2026-11-18 on a workstation, 512 MB heap, the store full at 272 MiB. The highest peak at
- * each level, over these cases and over one run of the cut-short cases with the full time budget
- * (which reads longer, so peaks higher):
- * - 4: 726.2 MiB (brotli, 50 URLs) → 990;
- * - 8: 868.9 MiB (brotli, 50 URLs, full budget; 809.8 cut short) → 1180;
- * - 16: 1167.6 MiB (brotli, 50 URLs, full budget; 910.3 cut short; densest 1104.3) → 1580, which is
- *   77% of the 2 GB VM; the measured peak itself is 57%.
+ * At 8 and 16 the highest peak is from one run of the cut-short cases with the full time budget,
+ * which reads longer and so peaks higher; that run is not repeated here (it takes 4 minutes a case).
+ * What runs here at 16 peaks lower than that bound, so this file holds a regression of the cut-short
+ * shape, and the full-budget figure is re-measured by hand when the bound changes.
  */
-const PEAK_RSS_MIB: Readonly<Record<number, number>> = { 4: 990, 8: 1180, 16: 1580 };
+const CAPACITY = loadCapacity();
+const PEAK_RSS_MIB: Readonly<Record<number, number>> = Object.fromEntries(
+  Object.entries(CAPACITY.worst_case.bound_mib).map(([n, b]) => [Number(n), b]),
+);
+const LEVELS = loadLevels(CAPACITY);
 
 const PAGE_BYTES = 10_000_000;
 const DRIP_MS = 1000;
@@ -234,22 +238,21 @@ async function underLoad(reqs: BatchRequest[]): Promise<ProbeReport> {
   expect(report!.results).toHaveLength(reqs.length);
   for (const r of report!.results) largestResult = Math.max(largestResult, r.json_bytes);
   expect(report!.peak_rss_mib).toBeLessThanOrEqual(PEAK_RSS_MIB[reqs.length]!);
+  // The heap limit kills the process, every batch with it, before resident memory does.
+  expect(report!.sampled_peak_mib.heapUsed!).toBeLessThan(HEAP_MB * 0.9);
   expectLoopFree(report!);
   return report!;
 }
 
-/** The levels measured: MAX_BATCH_CONCURRENCY, and 4 and 8 below it. */
-const LEVELS = [4, 8, MAX_BATCH_CONCURRENCY] as const;
 const mib = (n: number) => `${PEAK_RSS_MIB[n]} MiB`;
 
-/** A batch cut short by its time: a row for every URL, and the reasons a cut-short batch gives. */
+/** A batch cut short by its time: a row for every URL, fewer read, and the time budget among its reasons. */
 function expectCutShort(r: ProbeReport['results'][number]): void {
   expect(r.rows).toBe(MAX_URLS_PER_BATCH);
-  expect(r.complete).toBeLessThanOrEqual(MAX_URLS_PER_BATCH);
-  expect(r.partial).not.toBeNull();
-  for (const reason of (r.partial as { reasons: string[] }).reasons) {
-    expect(['budget_seconds', 'result_size']).toContain(reason);
-  }
+  expect(r.complete).toBeLessThan(MAX_URLS_PER_BATCH);
+  const reasons = (r.partial as { reasons: string[] } | null)?.reasons ?? [];
+  expect(reasons).toContain('budget_seconds');
+  for (const reason of reasons) expect(['budget_seconds', 'result_size']).toContain(reason);
 }
 
 describe.runIf(process.platform === 'linux')('memory under load', () => {
@@ -257,8 +260,7 @@ describe.runIf(process.platform === 'linux')('memory under load', () => {
     expect(ENV.BATCH_CONCURRENCY).toBe(String(MAX_BATCH_CONCURRENCY));
     expect(HOSTS.length).toBe(MAX_BATCH_CONCURRENCY);
     expect(LEVELS.at(-1)).toBe(Number(ENV.BATCH_CONCURRENCY));
-    // A bound for every level a case runs at, and no level without a case.
-    expect(Object.keys(PEAK_RSS_MIB).map(Number)).toEqual([...LEVELS]);
+    expect(LEVELS).toEqual([4, 8, MAX_BATCH_CONCURRENCY]);
   });
 
   it("bounds every level's peak well inside the VM fly.toml sets", () => {
@@ -316,12 +318,18 @@ describe.runIf(process.platform === 'linux')('memory under load', () => {
     }, 300_000);
   }
 
-  // Runs last: it reads the results the cases above measured.
-  it('holds BATCH_CONCURRENCY of the largest result measured, twice over, in the result store', () => {
-    expect(largestResult).toBeGreaterThan(0);
+  it('holds BATCH_CONCURRENCY of the largest result recorded, twice over, in the result store', () => {
+    expect(
+      Number(ENV.BATCH_CONCURRENCY) * CAPACITY.worst_case.largest_result_bytes * 2,
+    ).toBeLessThanOrEqual(MAX_RESULT_BYTES);
+  });
+
+  // Runs last: it reads the results the cases above measured. Under a filter that skips the cases
+  // that make the largest results it passes on less, and the recorded figure above still holds.
+  it('measures no result larger than the one recorded', () => {
     process.stdout.write(
       `load: largest result ${largestResult} bytes (${(largestResult / 1048576).toFixed(2)} MiB)\n`,
     );
-    expect(Number(ENV.BATCH_CONCURRENCY) * largestResult * 2).toBeLessThanOrEqual(MAX_RESULT_BYTES);
+    expect(largestResult).toBeLessThanOrEqual(CAPACITY.worst_case.largest_result_bytes);
   });
 });

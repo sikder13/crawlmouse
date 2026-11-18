@@ -1,9 +1,11 @@
 import type { Clock } from '../clock.js';
 
 /**
- * A clock for many sleepers at once. A sleep waits until `run` moves time to its due moment, and `run`
- * moves time only when every task is waiting on a sleep, so N batches that share the clock interleave
- * exactly as they would in real time, in virtual time, and the test never waits.
+ * A clock for many sleepers at once. A sleep waits until `run` moves time to its due moment. `run`
+ * moves time after letting other work run for 8 turns of the event loop, which is enough when every
+ * wait in the work is a sleep on this clock (a fake fetcher, the inline reader). Work that waits on
+ * real I/O or a real timer can still be pending when time moves, so this clock is for such tests
+ * only.
  *
  * InstantClock (clock.ts here) cannot do this: its sleeps return at once and add to one shared time,
  * so two concurrent sleepers would each push time forward by their own wait.
