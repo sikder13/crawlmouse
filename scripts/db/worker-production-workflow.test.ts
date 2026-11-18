@@ -34,11 +34,12 @@ const staging = readWorkflow('worker-staging.yml');
 const productionText = readFileSync(join(WORKFLOWS_DIR, FILE), 'utf8');
 
 /**
- * sha256 of .github/workflows/worker-staging.yml where this branch left origin/main (dfa3ec37). D1
- * leaves the staging workflow unchanged. To read it again:
- * `git show "$(git merge-base HEAD origin/main)":.github/workflows/worker-staging.yml | sha256sum`.
+ * sha256 of .github/workflows/worker-staging.yml as CC-42B ships it (a 25-minute build job, and the
+ * step that reads the machine's size back). The deploy job above follows it step for step, so a
+ * change to it changes production too, and has to move this pin on purpose. To read it again:
+ * `sha256sum .github/workflows/worker-staging.yml`.
  */
-const STAGING_SHA256 = 'a68c866583fc7ff78a18d3bce479ac37093aa81e51844514c4a2cc7b973725dd';
+const STAGING_SHA256 = '5a13b12bf30aabfb7af9da3c5b87fd75d7b75922302407bffee9584b40bb4a8b';
 
 function job(name: string): Job {
   const found = production.jobs[name];
@@ -60,6 +61,10 @@ function asProduction(run: string): string {
     .replace(
       /worker-runbook\.md, (Before the first deploy|First deploy|Egress address)/g,
       'worker-runbook.md, Production',
+    )
+    .replace(
+      'toml="$GITHUB_WORKSPACE/packages/worker/fly.toml"',
+      'toml="$GITHUB_WORKSPACE/packages/worker/fly.production.toml"',
     )
     .replace(
       '--config "$GITHUB_WORKSPACE/packages/worker/fly.toml" --remote-only --ha=false',
@@ -140,6 +145,9 @@ describe('worker-production.yml: what it reads and runs', () => {
 
   it('runs the build job of worker-staging.yml, step for step', () => {
     expect(job('build').steps).toEqual(staging.jobs.build!.steps);
+    const timeout = (j: Job) => (j as Record<string, unknown>)['timeout-minutes'];
+    expect(timeout(job('build'))).toBe(25);
+    expect(timeout(job('build'))).toBe(timeout(staging.jobs.build!));
   });
 
   it("runs worker-staging.yml's deploy steps after the guard, with the production app and config", () => {
@@ -196,7 +204,7 @@ describe('worker-production.yml: what it reads and runs', () => {
 });
 
 describe('worker-staging.yml', () => {
-  it('is unchanged from where this branch left origin/main', () => {
+  it('is the file this pin was last moved for', () => {
     const text = readFileSync(join(WORKFLOWS_DIR, 'worker-staging.yml'));
     expect(createHash('sha256').update(text).digest('hex')).toBe(STAGING_SHA256);
   });

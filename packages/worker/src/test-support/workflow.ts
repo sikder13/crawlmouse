@@ -28,7 +28,8 @@ export interface FlyctlAnswers {
   ips?: string | null;
   /** `flyctl secrets list --json` prints this, or fails when it is null. */
   secrets?: string | null;
-  machines?: string;
+  /** `flyctl machines list --json` prints this (by default one machine with an id), or fails when it is null. */
+  machines?: string | null;
   /** What each `flyctl ssh console` prints as its last line, in turn (the last repeats); `FAIL` fails it. */
   ssh?: string[];
 }
@@ -82,7 +83,15 @@ const iterate = (v) => {
   process.stderr.write('jq: error: Cannot iterate over ' + (v === null ? 'null' : typeof v) + '\\n');
   process.exit(5);
 };
+// jq's string interpolation, \\(…), spelled without a backslash in this file's template literal.
+const B = String.fromCharCode(92);
+const MACHINE_FIELDS = (x) =>
+  [x.config?.guest?.cpu_kind, x.config?.guest?.cpus, x.config?.guest?.memory_mb, x.config?.env?.BATCH_CONCURRENCY]
+    .map((f) => (f === undefined || f === null ? 'null' : String(f)))
+    .join(' ');
 const FILTERS = {
+  ['.[] | "' + ['.config.guest.cpu_kind', '.config.guest.cpus', '.config.guest.memory_mb', '.config.env.BATCH_CONCURRENCY'].map((f) => B + '(' + f + ')').join(' ') + '"']: (v) =>
+    iterate(v).map(MACHINE_FIELDS),
   '(. // [])[] | (.name // .Name)': (v) => iterate(v ?? []).map((x) => x.name ?? x.Name),
   // The filter before an app with no secrets was handled: kept so a test can tell it apart.
   '.[] | (.name // .Name)': (v) => iterate(v).map((x) => x.name ?? x.Name),
@@ -130,7 +139,8 @@ export function runStep(
     stub('sleep', '#!/usr/bin/env bash\nexit 0\n');
     if (answers.ips != null) writeFileSync(join(dir, 'ips'), answers.ips);
     if (answers.secrets != null) writeFileSync(join(dir, 'secrets'), answers.secrets);
-    writeFileSync(join(dir, 'machines'), answers.machines ?? '[{"id":"m1"}]');
+    if (answers.machines !== null)
+      writeFileSync(join(dir, 'machines'), answers.machines ?? '[{"id":"m1"}]');
     writeFileSync(join(dir, 'ssh'), (answers.ssh ?? ['FAIL']).join('\n'));
     writeFileSync(join(dir, 'flyctl.log'), '');
     writeFileSync(join(dir, 'step.sh'), `exec 2>&1\n${script}`);

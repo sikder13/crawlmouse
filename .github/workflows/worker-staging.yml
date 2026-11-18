@@ -38,7 +38,7 @@ env:
 jobs:
   build:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -126,6 +126,45 @@ jobs:
 
       - name: Health check
         run: curl -fsS --retry 6 --retry-delay 5 --retry-all-errors "https://$FLY_APP.fly.dev/healthz"
+
+      # The machine runs what the toml sets: flyctl deploy applies [[vm]] and [env] to the existing
+      # machine, and this reads them back, so a deploy that left the old size fails here. It prints
+      # the CPU kind and count, the memory and BATCH_CONCURRENCY, none of them a secret.
+      - name: The machine is the size the toml sets
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          set +x -euo pipefail
+          toml="$GITHUB_WORKSPACE/packages/worker/fly.toml"
+          size=$(sed -n 's/^  size = "\(.*\)"$/\1/p' "$toml")
+          memory=$(sed -n 's/^  memory = "\([0-9]*\)mb"$/\1/p' "$toml")
+          batches=$(sed -n 's/^  BATCH_CONCURRENCY = "\([0-9]*\)"$/\1/p' "$toml")
+          kind=''
+          if [[ "$size" =~ ^shared-cpu-([0-9]+)x$ ]]; then
+            kind=shared
+            cpus=${BASH_REMATCH[1]}
+          elif [[ "$size" =~ ^performance-([0-9]+)x$ ]]; then
+            kind=performance
+            cpus=${BASH_REMATCH[1]}
+          fi
+          if [ -z "$kind" ] || ! [[ "$memory" =~ ^[0-9]+$ && "$batches" =~ ^[0-9]+$ ]]; then
+            echo "::error::could not read the VM size, memory and BATCH_CONCURRENCY from the toml"
+            exit 1
+          fi
+          want="$kind $cpus $memory $batches"
+          machines=$(flyctl machines list --app "$FLY_APP" --json)
+          found=$(jq -r '.[] | "\(.config.guest.cpu_kind) \(.config.guest.cpus) \(.config.guest.memory_mb) \(.config.env.BATCH_CONCURRENCY)"' <<< "$machines")
+          if [ -z "$found" ]; then
+            echo "::error::flyctl machines list shows no machine on $FLY_APP"
+            exit 1
+          fi
+          while read -r machine; do
+            if [ "$machine" != "$want" ]; then
+              echo "::error::a machine runs '$machine' (CPU kind, CPUs, memory MB, BATCH_CONCURRENCY), not the toml's '$want'"
+              exit 1
+            fi
+          done <<< "$found"
+          echo "machines: $want (CPU kind, CPUs, memory MB, BATCH_CONCURRENCY), as the toml sets"
 
       # After the first deploy, never before it: a first deploy that finds any address on the app,
       # egress ones included, allocates no ingress address, and the app is unreachable. One pair
