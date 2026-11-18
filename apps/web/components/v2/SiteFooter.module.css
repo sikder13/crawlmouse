@@ -79,6 +79,21 @@
   text-decoration: none;
 }
 
+/* Crawlmouse on other sites, in the brand block: links in the same muted colour as the columns. */
+.social {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.social a {
+  color: var(--v2-mut);
+  text-decoration: none;
+}
+
 .planned {
   color: var(--v2-mut);
 }
@@ -94,6 +109,7 @@
 }
 
 .list a:hover,
+.social a:hover,
 .control:hover {
   color: var(--v2-fg);
   text-decoration: underline;

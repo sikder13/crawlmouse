@@ -34,6 +34,7 @@ import {
   PacketFrameworkSchema,
   PageKindSchema,
   RecommendationClassSchema,
+  RobotsTxtStateSchema,
   SampleMethodSchema,
   SignalKindSchema,
   StepStateSchema,
@@ -221,6 +222,15 @@ export const ProgressSchema = z.strictObject({
   recent_fetches: z.array(
     z.strictObject({ url: HttpUrlSchema, status: HttpStatusSchema, links: CountSchema }),
   ),
+  /**
+   * Since when the check has been waiting for a free crawler: the first of the worker's current run
+   * of `busy` answers. Null while a batch runs, and before the first post.
+   */
+  waiting_since: TimestampSchema.nullable(),
+  /** The sitemap URLs discovery read; null until discovery has ended. */
+  sitemap_urls: CountSchema.nullable(),
+  /** What discovery's robots.txt request answered; null until discovery has ended. */
+  robots_txt: RobotsTxtStateSchema.nullable(),
 });
 
 export const CheckSchema = z

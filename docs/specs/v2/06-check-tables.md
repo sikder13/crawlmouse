@@ -1284,6 +1284,7 @@ The writer parses these with the contract schema (owner default 1). A column a f
 | `PageKind`             | `checks.coverage`                                                                             |
 | `RecommendationClass`  | `checks.signals`                                                                              |
 | `RefusalTrigger`       | `checks.technical_seo`                                                                        |
+| `RobotsTxtState`       | `checks.progress`                                                                             |
 | `SampleMethod`         | `checks.coverage`                                                                             |
 | `SignalKind`           | `checks.signals`                                                                              |
 | `StepState`            | `checks.progress`                                                                             |

@@ -14,9 +14,13 @@ const PHASES = CheckPhaseSchema.options;
 export const phaseOf = (at: BatchAt): Phase =>
   at.kind === 'access' ? 'crawler_tests' : at.batch === 1 ? 'homepage' : 'crawl';
 
+/**
+ * `so.waitingSince` is written as `waiting_since`: the post step passes its own when the worker has
+ * just answered busy, and null once a batch is taken. `so.discovered` is what discovery found.
+ */
 export function progressOf(
   phase: Phase,
-  so: Pick<RunSoFar, 'pagesCrawled' | 'linksFound'>,
+  so: Pick<RunSoFar, 'pagesCrawled' | 'linksFound' | 'discovered' | 'waitingSince'>,
   elapsedMs: number,
 ): Progress {
   const now = PHASES.indexOf(phase);
@@ -31,5 +35,8 @@ export function progressOf(
     elapsed_ms: Math.max(0, Math.round(elapsedMs)),
     // The URLs fetched are in the stored batch results, not in step outputs.
     recent_fetches: [],
+    waiting_since: so.waitingSince === null ? null : new Date(so.waitingSince).toISOString(),
+    sitemap_urls: so.discovered?.sitemap_urls ?? null,
+    robots_txt: so.discovered?.robots_txt ?? null,
   });
 }

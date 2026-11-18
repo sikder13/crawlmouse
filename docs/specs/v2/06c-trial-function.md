@@ -149,6 +149,7 @@ Enums inside jsonb columns, enforced by the same writer (`NESTED`):
 | `PageKind`             | `checks.coverage`                                                                             |
 | `RecommendationClass`  | `checks.signals`                                                                              |
 | `RefusalTrigger`       | `checks.technical_seo`                                                                        |
+| `RobotsTxtState`       | `checks.progress`                                                                             |
 | `SampleMethod`         | `checks.coverage`                                                                             |
 | `SignalKind`           | `checks.signals`                                                                              |
 | `StepState`            | `checks.progress`                                                                             |

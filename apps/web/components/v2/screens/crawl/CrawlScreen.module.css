@@ -158,6 +158,22 @@
   margin-top: 14px;
 }
 
+/* While the check waits for a free crawler: how long it has waited, under the counts. */
+.waiting {
+  margin-top: 6px;
+  font-size: var(--v2-text-micro);
+}
+
+/* What discovery found, under the steps: one short line each. */
+.discovery {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--v2-text-micro);
+  display: grid;
+  gap: 2px;
+}
+
 .step {
   display: flex;
   align-items: center;

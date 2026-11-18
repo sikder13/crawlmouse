@@ -3,16 +3,19 @@
  * the dependency (packages/types cannot import the engine).
  */
 import { readFileSync, readdirSync } from 'node:fs';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, expectTypeOf, it } from 'vitest';
 import {
   FixtureDatasetSchema,
   GradeLetterSchema,
+  RobotsTxtStateSchema,
+  type RobotsTxtState,
   ContentScoreWithheldSchema,
   TechnicalSeoPendingSchema,
   WithheldReasonSchema,
   type FixtureDataset,
 } from '@crawlmouse/types/v2';
 import { scoreToLetter } from '../grade.js';
+import { robotsStatusOf, type RobotsStatus } from '../sitemap.js';
 import { CRAWLER_REGISTRY_V2 } from './crawler-registry.js';
 import { severityOf } from './diff/severity.js';
 import {
@@ -31,6 +34,18 @@ describe('GradeLetter is the engine letter scale', () => {
     const reached = new Set<string>();
     for (let i = 0; i <= 10_000; i++) reached.add(scoreToLetter(i / 100));
     expect([...reached].sort()).toEqual([...GradeLetterSchema.options].sort());
+  });
+});
+
+describe('RobotsTxtState is the engine RobotsStatus', () => {
+  it('is the same type', () => {
+    expectTypeOf<RobotsTxtState>().toEqualTypeOf<RobotsStatus>();
+  });
+
+  it('every status from 100 to 599, and a fetch that threw, maps into it, and every value is reached', () => {
+    const reached = new Set<string>([robotsStatusOf(null)]);
+    for (let status = 100; status <= 599; status++) reached.add(robotsStatusOf(status));
+    expect([...reached].sort()).toEqual([...RobotsTxtStateSchema.options].sort());
   });
 });
 

@@ -236,7 +236,7 @@ describe('the stream of a check anyone with its id may read', () => {
     expect(fold(all).pages_crawled).toBe(3);
     expect(all.at(-1)!.type).toBe('ended');
     // The cursor is past the batch, so a later connection does not try it again.
-    expect(groups.at(-1)!.id).toMatch(/^1\.2\./);
+    expect(groups.at(-1)!.id).toMatch(/^2\.2\./);
     expect(warned.mock.calls).toEqual([
       [`[api/checks/stream] batch 2 was not read in ${BATCH_READ_ATTEMPTS} tries; passed over`],
     ]);

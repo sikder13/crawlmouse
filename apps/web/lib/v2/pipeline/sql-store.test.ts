@@ -11,6 +11,7 @@ import type { CheckRequested } from '../../../../../inngest/check-events';
 import { recordedBuild } from '../../../../../packages/engine/fixtures/v2/build/recorded';
 import { applyAllMigrations, asRole, freshDb } from '../../../__tests__/helpers/pglite-migrations';
 import { putJson } from './evidence';
+import { REAP_AFTER_S } from './limits';
 import { pageVantage, persistBuiltCheck } from './persist';
 import { reapStalled, type StepDeps } from './steps';
 import { finishSteps } from './steps/finish';
@@ -137,34 +138,35 @@ describe('sqlPipelineStore on PGlite (migration 008)', () => {
     expect(await statusOf(db, b)).toEqual({ status: 'failed', failure_reason: 'canceled' });
   });
 
-  it('reaps a heartbeat older than 30 minutes, not one 30:00 or 29:59 old (D13)', async () => {
+  it('reaps a heartbeat older than REAP_AFTER_S, not one exactly that old or a second younger (D13)', async () => {
     const { db, store } = await fresh();
+    const R = REAP_AFTER_S * 1000;
     const young = await check(db, await site(db, 'a.test'), {
       status: 'running',
-      heartbeat: ago(29 * MIN + 59_000),
+      heartbeat: ago(R - 1_000),
       run: 'r1',
     });
     const edge = await check(db, await site(db, 'b.test'), {
       status: 'running',
-      heartbeat: ago(30 * MIN),
+      heartbeat: ago(R),
       run: 'r2',
     });
     const old = await check(db, await site(db, 'c.test'), {
       status: 'running',
-      heartbeat: ago(30 * MIN + 1_000),
+      heartbeat: ago(R + 1_000),
       run: 'r3',
     });
     const never = await check(db, await site(db, 'd.test'), {
       status: 'queued',
       heartbeat: null,
-      queued: ago(31 * MIN),
+      queued: ago(R + MIN),
     });
     await store.upsertBatch({
       check_id: old,
       batch: 1,
       kind: 'crawl',
       nonce: 'n'.repeat(24),
-      posted_at: ago(40 * MIN),
+      posted_at: ago(R + 10 * MIN),
       summary: { urls: 1, max_seconds: 60 },
     });
     const reaped = await reapStalled(store, () => NOW);
@@ -435,6 +437,10 @@ describe('sqlPipelineStore on PGlite (migration 008)', () => {
       pagesCrawled: 0,
       linksFound: 0,
       release: null,
+      busyMs: 0,
+      busyBeforeCrawlMs: 0,
+      waitingSince: null,
+      discovered: null,
     });
     expect(await steps.persist(event)).toEqual({ written: true });
 

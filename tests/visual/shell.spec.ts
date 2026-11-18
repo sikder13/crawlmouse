@@ -2,6 +2,7 @@ import { test, expect, type Page } from './pw';
 import { HEIGHT, openPreview } from './pages';
 import {
   FOOTER_COLUMNS,
+  FOOTER_SOCIAL,
   LOG_IN,
   MARKETING_NAV,
   isGroup,
@@ -256,6 +257,8 @@ test.describe('footer links', () => {
     ...FOOTER_COLUMNS.flatMap((c) => c.items).flatMap((i) =>
       'href' in i && i.href ? [i.href] : [],
     ),
+    // The external links footer-links.ts declares; any other off-site address still fails.
+    ...FOOTER_SOCIAL.map((l) => l.href),
   ]);
 
   for (const p of PAGES) {

@@ -18,6 +18,7 @@ import {
   HttpStatusSchema,
   HttpUrlSchema,
   ProgressSchema,
+  RobotsTxtStateSchema,
   TechnicalSeoSchema,
   VerdictSchema,
 } from '@crawlmouse/types/v2';
@@ -136,6 +137,32 @@ const Graded = z
   })
   .describe("Both grades, in the contract's shapes: the reveal.");
 
+/**
+ * The check is waiting for a free crawler: the worker answered busy. `since_ms` is when the wait
+ * began, on the stream's clock; null when it has ended and a batch is running.
+ */
+const Waiting = z
+  .strictObject({
+    type: z.literal('waiting'),
+    at_ms,
+    since_ms: CountSchema.nullable(),
+  })
+  .describe(
+    'The check is waiting for a free crawler since `since_ms`, or has stopped waiting (null).',
+  );
+
+/** What discovery found that a visitor can read; each null when discovery did not record it. */
+const Discovered = z
+  .strictObject({
+    type: z.literal('discovered'),
+    at_ms,
+    robots_txt: RobotsTxtStateSchema.nullable(),
+    sitemap_urls: CountSchema.nullable(),
+  })
+  .describe(
+    'Discovery has ended: whether robots.txt was found, and how many sitemap URLs it read.',
+  );
+
 const Ended = z
   .strictObject({
     type: z.literal('ended'),
@@ -154,6 +181,8 @@ export const ProgressEventSchema = z.discriminatedUnion('type', [
   CrawlerVerdict,
   Finding,
   Graded,
+  Waiting,
+  Discovered,
   Ended,
 ]);
 
@@ -194,6 +223,10 @@ export interface CrawlState {
   verdicts: Record<string, Omit<VerdictEvent, 'type'>>;
   findings: Omit<FindingEvent, 'type'>[];
   grades: Omit<GradedEvent, 'type' | 'at_ms'> | null;
+  /** When the current wait for a free crawler began; null while not waiting. */
+  waiting_since_ms: number | null;
+  /** What discovery found; null until discovery has ended. */
+  discovery: Omit<z.infer<typeof Discovered>, 'type' | 'at_ms'> | null;
   ended: z.infer<typeof Ended>['status'] | null;
 }
 
@@ -210,6 +243,8 @@ export const INITIAL_STATE: CrawlState = Object.freeze({
   verdicts: {},
   findings: [],
   grades: null,
+  waiting_since_ms: null,
+  discovery: null,
   ended: null,
 }) as CrawlState;
 
@@ -244,7 +279,8 @@ function withoutType<E extends { type: string }>(event: E): Omit<E, 'type'> {
  * after the end; a step out of the contract's order; counts that fall; a page linked from itself or
  * classified before it was fetched; a second verdict for a crawler or finding for a fingerprint;
  * grades twice, or before grading starts; a change to the map (a page added, first linked or
- * classified) once grading has begun; and an end, finished or partial, with a step not done.
+ * classified) once grading has begun; a wait that begins after the event announcing it; discovery
+ * twice; and an end, finished or partial, with a step not done.
  */
 export function reduce(state: CrawlState, event: ProgressEvent): CrawlState {
   if (event.at_ms < state.last_ms) {
@@ -327,12 +363,23 @@ function apply(state: CrawlState, s: CrawlState, event: ProgressEvent): CrawlSta
         ...s,
         grades: { technical_seo: event.technical_seo, ai_readability: event.ai_readability },
       };
+    case 'waiting':
+      if (event.since_ms !== null && event.since_ms > event.at_ms) {
+        throw new Error(`A wait at ${event.at_ms} ms begins later, at ${event.since_ms} ms`);
+      }
+      return { ...s, waiting_since_ms: event.since_ms };
+    case 'discovered':
+      if (state.discovery !== null) throw new Error(`Discovered twice, at ${event.at_ms} ms`);
+      return {
+        ...s,
+        discovery: { robots_txt: event.robots_txt, sitemap_urls: event.sitemap_urls },
+      };
     case 'ended': {
       const open = state.steps.filter((st) => st.state !== 'done').map((st) => st.phase);
       if (event.status !== 'failed' && open.length) {
         throw new Error(`Ended ${event.status} with ${open.join(', ')} not done`);
       }
-      return { ...s, ended: event.status };
+      return { ...s, waiting_since_ms: null, ended: event.status };
     }
   }
 }
@@ -365,7 +412,10 @@ export function stateAt(events: readonly ProgressEvent[], t: number): CrawlState
  */
 export const RECENT_FETCHES_IN_PROGRESS = 3;
 
-/** The state as the contract's Progress snapshot. Identity and timing are not part of it. */
+/**
+ * The state as the contract's Progress snapshot. Identity and timing are not part of it, so
+ * `waiting_since`, an instant, is null: the state holds the wait on the stream's clock only.
+ */
 export function toProgress(state: CrawlState): Progress {
   return {
     steps: state.steps.map(({ phase, state: st }) => ({ phase, state: st })),
@@ -376,5 +426,8 @@ export function toProgress(state: CrawlState): Progress {
     recent_fetches: state.fetches
       .slice(-RECENT_FETCHES_IN_PROGRESS)
       .map(({ url, status, links }) => ({ url, status, links })),
+    waiting_since: null,
+    sitemap_urls: state.discovery?.sitemap_urls ?? null,
+    robots_txt: state.discovery?.robots_txt ?? null,
   };
 }

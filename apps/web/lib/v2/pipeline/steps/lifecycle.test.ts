@@ -116,13 +116,24 @@ describe('discover', () => {
       pagesCrawled: 0,
       linksFound: 0,
       release: null,
+      busyMs: 0,
+      busyBeforeCrawlMs: 0,
+      waitingSince: null,
+      discovered: null,
     });
-    expect(out).toEqual({ seeds: 2, sitemap_urls: 1, at: T0 });
+    // robots.txt answers 404 here.
+    expect(out).toEqual({ seeds: 2, sitemap_urls: 1, robots_txt: 'not_found', at: T0 });
     expect(await getJson(evidence, `anon/${EVENT.siteId}/${EVENT.checkId}/seeds.json.gz`)).toEqual([
       { url: 'https://example.com', source: 'homepage', lastmod: null },
       { url: 'https://example.com/a', source: 'sitemap', lastmod: null },
     ]);
     expect(store.progress).toHaveBeenCalledTimes(1);
+    // What discovery found is on the progress screen before the crawl starts (CC-42A decision 5).
+    expect((store.progress.mock.calls[0] as unknown[])[1]).toMatchObject({
+      sitemap_urls: 1,
+      robots_txt: 'not_found',
+      waiting_since: null,
+    });
   });
 });
 
@@ -183,9 +194,9 @@ describe('failCancelled (finding 4, correctness 2)', () => {
 });
 
 describe('the reaper’s cutoff (D13)', () => {
-  it('is thirty minutes before now', () => {
-    expect(REAP_AFTER_S).toBe(30 * 60);
-    expect(reapCutoff(T0)).toBe('2026-11-08T11:30:00.000Z');
+  it('is forty-five minutes before now', () => {
+    expect(REAP_AFTER_S).toBe(45 * 60);
+    expect(reapCutoff(T0)).toBe('2026-11-08T11:15:00.000Z');
   });
 
   it('fails no check whose run may still be alive: REAP_AFTER_S is above the finish timeout plus the longest wait between heartbeats (correctness 10)', () => {
@@ -210,6 +221,6 @@ describe('the reaper’s cutoff (D13)', () => {
   it('is what reapStalled asks the store for', async () => {
     const reap = vi.fn(async () => []);
     await reapStalled({ reap }, () => T0);
-    expect(reap).toHaveBeenCalledWith('2026-11-08T11:30:00.000Z');
+    expect(reap).toHaveBeenCalledWith('2026-11-08T11:15:00.000Z');
   });
 });
