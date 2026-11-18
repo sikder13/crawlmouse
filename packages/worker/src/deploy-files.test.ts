@@ -1,4 +1,4 @@
-import { DEFAULT_BATCH_CONCURRENCY } from './config.js';
+import { DEFAULT_BATCH_CONCURRENCY, MAX_BATCH_CONCURRENCY } from './config.js';
 import { READER_FILE } from './reader/file.js';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
@@ -7,6 +7,7 @@ import { runStep, stepScript, unmasked } from './test-support/workflow.js';
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
 const workflow = read('../../../.github/workflows/worker-staging.yml');
 const flyToml = read('../fly.toml');
+const flyProductionToml = read('../fly.production.toml');
 const dockerfile = read('../Dockerfile');
 const dockerignore = read('../.dockerignore');
 const runBlocks = [...workflow.matchAll(/run: \|\n((?: {10,}.*\n?)+)/g)].map((m) => m[1]!);
@@ -191,10 +192,18 @@ describe('fly.toml and the Dockerfile', () => {
     expect(section?.[1]).toBe('    type = "requests"\n    soft_limit = 20\n    hard_limit = 25\n');
   });
 
-  it('runs two batches at once, the default, stated where it is deployed', () => {
-    expect(flyToml).toContain(`BATCH_CONCURRENCY = "${DEFAULT_BATCH_CONCURRENCY}"`);
+  // Four, the most the worker allows, in staging and production. The load test of 2026-11-17 (D5,
+  // 40 checks against one machine at 2) failed 18 checks that never won a batch slot, while the
+  // machine peaked at 266 MB of 1,024 MB with its CPU under 3% busy. The code default stays 2: it
+  // is what a worker run without fly.toml's [env] gets.
+  it.each([
+    ['fly.toml', flyToml],
+    ['fly.production.toml', flyProductionToml],
+  ])('%s runs four batches at once, the most the worker allows', (_name, toml) => {
+    expect(toml).toMatch(/\n {2}BATCH_CONCURRENCY = "4"\n/);
+    expect(MAX_BATCH_CONCURRENCY).toBe(4);
     expect(DEFAULT_BATCH_CONCURRENCY).toBe(2);
-    expect(flyToml).not.toContain('MAX_CONCURRENT_BATCHES');
+    expect(toml).not.toContain('MAX_CONCURRENT_BATCHES');
   });
 
   it('carries no address and no secret value', () => {

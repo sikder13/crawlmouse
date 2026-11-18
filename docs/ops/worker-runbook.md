@@ -230,7 +230,7 @@ restart loses the batches that were running, and `GET /batch/{id}` for one of th
   All batches share the one thread, and reads queue in order, so a site whose pages are slow to read
   delays the reads of the batches running beside it. Those batches can then spend their time budget
   and come back partial with `budget_seconds`, which is the worker's limit, not those sites'.
-- **Batches at once.** `BATCH_CONCURRENCY` in fly.toml (2), at most 4 (the worker refuses to start
+- **Batches at once.** `BATCH_CONCURRENCY` in fly.toml (4), at most 4 (the worker refuses to start
   above it). More batches add no CPU on a shared vCPU; they queue behind each other's pages.
 - **CPU throttled.** A `shared-cpu-1x` vCPU is guaranteed 6.25% of a core (5 ms per 80 ms). It runs
   at up to 100% while it has burst balance, which accrues from unused baseline time (starting at
@@ -387,10 +387,19 @@ needs it, so it is recorded here once the first deploy has allocated it. Take th
 "Egress address" above, with `--app crawlmouse-worker`, before and after a
 `flyctl machine restart <id> --app crawlmouse-worker`.
 
-| Family | Address      | Before restart | After restart | Recorded |
-| ------ | ------------ | -------------- | ------------- | -------- |
-| IPv4   | not recorded |                |               |          |
-| IPv6   | not recorded |                |               |          |
+| Family | Address                         | Before restart | After restart | Recorded   |
+| ------ | ------------------------------- | -------------- | ------------- | ---------- |
+| IPv4   | `209.71.119.230`                | the same       | the same      | 2026-11-16 |
+| IPv6   | `2a09:8280:e618:1:0:208:73b7:0` | not read       | not read      | 2026-11-16 |
+
+The restart reading covers IPv4 only; the IPv6 row records the address alone.
+
+Both addresses are the app's `egress_v4` and `egress_v6` in `iad`, read with the read-only token:
+`flyctl ips list --app crawlmouse-worker --json`. The IPv4 columns come from worker-production run
+43789159313, whose deploy job logged "egress: the app's own IPv4, the same before and after a
+restart" with the readings masked. That check reads IPv4 only. The IPv6 readings need the SSH
+console and a restart, which a read-only token cannot do, so they are not taken. The owner ruled
+the address-only IPv6 row enough (2026-11-16).
 
 ### The app's variables
 

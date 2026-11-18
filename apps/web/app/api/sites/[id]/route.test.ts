@@ -319,7 +319,7 @@ describe('PATCH /api/sites/[id]', () => {
 });
 
 describe('DELETE /api/sites/[id]', () => {
-  it('the owner removes the site: removed_at set, history kept, its staging site removed too', async () => {
+  it('the owner removes the site: removed_at set, nothing deleted yet, its staging site removed too', async () => {
     const p = await person(h.db, 'remove');
     const s = await keptSite(h.db, p.accountId);
     const child = await keptSite(h.db, p.accountId, { staging_of_site_id: s.id });

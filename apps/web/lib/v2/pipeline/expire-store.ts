@@ -1,6 +1,8 @@
 /**
  * What the daily expiry reads and deletes in Postgres (CC-22b D8): migration 022b section D's
- * `expired_unkept_sites`, `delete_expired_unkept_sites` and `unsettled_kept_checks`. This is the
+ * `expired_unkept_sites`, `delete_expired_unkept_sites` and `unsettled_kept_checks`, and migration
+ * 20261121000001's `removed_sites_past_keeping`, `removed_site_checks` and
+ * `delete_removed_site_checks` (CC-GL D2). This is the
  * service-role supabase-js implementation; `test-support/sql-expire-store.ts` is the same interface
  * in SQL for PGlite. expire-store.test.ts runs one set of cases against both, this one through a
  * PostgREST stand-in that takes each function's argument names and return shape from the migrated
@@ -31,6 +33,21 @@ export interface Page<T> {
   remaining: number;
 }
 
+/** A kept site removed before the purge's cutoff that still holds a check. */
+export interface RemovedSite {
+  siteId: string;
+  accountId: string;
+}
+
+/** A check of a removed site, with every name its objects can have. */
+export interface RemovedCheck {
+  checkId: string;
+  batches: number[];
+  copiedFor: string[];
+  /** The evidence paths its rows store: batch results, the map, evidence blobs. */
+  paths: string[];
+}
+
 export interface ExpireStore {
   /** `expired_unkept_sites`: up to `limit` sites in id order after `after`. */
   expiredUnkept(
@@ -47,6 +64,43 @@ export interface ExpireStore {
   ): Promise<string[]>;
   /** `unsettled_kept_checks`: up to `limit` checks in id order after `after`. */
   unsettledKept(since: string, after: string | null, limit: number): Promise<Page<KeptCheck>>;
+  /** `removed_sites_past_keeping`: up to `limit` sites in id order after `after`. */
+  removedPastKeeping(
+    before: string,
+    after: string | null,
+    limit: number,
+  ): Promise<Page<RemovedSite>>;
+  /** `removed_site_checks`: up to `limit` of the site's checks in id order after `after`. */
+  removedSiteChecks(
+    siteId: string,
+    after: string | null,
+    limit: number,
+  ): Promise<Page<RemovedCheck>>;
+  /**
+   * `delete_removed_site_checks`: how many of `checkIds` it deleted, with the site's fixes; null
+   * when the site no longer qualified and nothing was deleted.
+   */
+  deleteRemovedChecks(
+    siteId: string,
+    before: string,
+    checkIds: readonly string[],
+  ): Promise<number | null>;
+}
+
+/** A row of `removed_sites_past_keeping`. */
+export interface RemovedSiteRow {
+  site_id: string;
+  account_id: string;
+  remaining: number | string;
+}
+
+/** A row of `removed_site_checks`. */
+export interface RemovedCheckRow {
+  check_id: string;
+  batches: number[];
+  copied_for: string[];
+  paths: string[];
+  remaining: number | string;
 }
 
 /** A row of `expired_unkept_sites`. */
@@ -104,6 +158,25 @@ export function unsettledPage(rows: readonly UnsettledRow[]): Page<KeptCheck> {
   };
 }
 
+export function removedSitesPage(rows: readonly RemovedSiteRow[]): Page<RemovedSite> {
+  return {
+    rows: rows.map((r) => ({ siteId: r.site_id, accountId: r.account_id })),
+    remaining: remainingOf(rows),
+  };
+}
+
+export function removedChecksPage(rows: readonly RemovedCheckRow[]): Page<RemovedCheck> {
+  return {
+    rows: rows.map((r) => ({
+      checkId: r.check_id,
+      batches: r.batches,
+      copiedFor: r.copied_for,
+      paths: r.paths,
+    })),
+    remaining: remainingOf(rows),
+  };
+}
+
 type Result<T> = { data: T | null; error: { message: string } | null };
 
 function must<T>(what: string, { data, error }: Result<T>): T {
@@ -145,6 +218,39 @@ export function supabaseExpireStore(sb: SupabaseClient): ExpireStore {
         await sb.rpc('unsettled_kept_checks', { p_since: since, p_after: after, p_limit: limit }),
       );
       return unsettledPage(rows ?? []);
+    },
+
+    async removedPastKeeping(before, after, limit) {
+      const rows = must<RemovedSiteRow[]>(
+        'removed_sites_past_keeping',
+        await sb.rpc('removed_sites_past_keeping', {
+          p_before: before,
+          p_after: after,
+          p_limit: limit,
+        }),
+      );
+      return removedSitesPage(rows ?? []);
+    },
+
+    async removedSiteChecks(siteId, after, limit) {
+      const rows = must<RemovedCheckRow[]>(
+        'removed_site_checks',
+        await sb.rpc('removed_site_checks', { p_site: siteId, p_after: after, p_limit: limit }),
+      );
+      return removedChecksPage(rows ?? []);
+    },
+
+    async deleteRemovedChecks(siteId, before, checkIds) {
+      if (checkIds.length === 0) return 0;
+      const deleted = must<number | null>(
+        'delete_removed_site_checks',
+        await sb.rpc('delete_removed_site_checks', {
+          p_site: siteId,
+          p_before: before,
+          p_checks: [...checkIds],
+        }),
+      );
+      return deleted ?? null;
     },
   };
 }

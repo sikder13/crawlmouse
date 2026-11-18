@@ -26,7 +26,8 @@ export async function PATCH(req: Request, ctx: Context) {
 }
 
 /**
- * Remove a site: `removed_at` is set and its history kept (CC-26b D6). The body must be
+ * Remove a site: `removed_at` is set (CC-26b D6); the daily expiry deletes its checks and evidence
+ * RESTORE_DAYS days later and keeps the row (CC-GL D2, `purgeRemoved`). The body must be
  * `{confirm: 'remove'}` (a form's ticked box); anything else is 400 `confirm_required`.
  */
 export async function DELETE(req: Request, ctx: Context) {

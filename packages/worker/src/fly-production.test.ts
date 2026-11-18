@@ -145,8 +145,8 @@ describe('the comparison, over a key at each depth and each kind of change', () 
     ['a top-level value', 'primary_region = "iad"', 'primary_region = "ams"', 'primary_region'],
     [
       'a key in a table',
-      'BATCH_CONCURRENCY = "2"',
       'BATCH_CONCURRENCY = "4"',
+      'BATCH_CONCURRENCY = "3"',
       'env.BATCH_CONCURRENCY',
     ],
     [

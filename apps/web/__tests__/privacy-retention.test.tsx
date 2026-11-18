@@ -1,6 +1,7 @@
 /**
  * The privacy page's Data retention list (CC-41 rulings 3): with V2_CHECKS_PUBLIC off, exactly main's
- * list; with it on, v2's: an audit nobody keeps, an audit kept by an account, v1's audits (still
+ * list; with it on, v2's: an audit nobody keeps, an audit kept by an account, a removed site's
+ * audits (CC-GL D2, owner ruling 2026-11-16), v1's audits (still
  * cleaned up after 30 days), the de-identified research records, then main's other three lines. Each number is rendered from its constant (a test
  * gives the constants other values and reads them back).
  */
@@ -45,25 +46,29 @@ describe('the privacy page’s Data retention list', () => {
     const { ANONYMOUS_EXPIRY_HOURS } = await import('../lib/v2/pipeline/limits');
     const { RESTORE_DAYS } = await import('../lib/v2/copy/restore-window');
     const list = items(await retentionList('1'));
-    expect(list).toHaveLength(7);
+    expect(list).toHaveLength(8);
     expect(list[0]).toBe(
       `An audit nobody keeps is deleted, together with its stored evidence, by the daily cleanup once ${ANONYMOUS_EXPIRY_HOURS} hours have passed since it was requested.`,
     );
     expect(list[1]).toBe(
-      `An audit kept by an account stays for as long as the account exists. Deleting the account deletes its audits, once the ${RESTORE_DAYS}-day restore window has passed.`,
+      `An audit kept by an account stays while the account keeps its site. Deleting the account deletes its audits, once the ${RESTORE_DAYS}-day restore window has passed.`,
+    );
+    // The expiry's purge-removed step (lib/v2/pipeline/expire.ts purgeRemoved).
+    expect(list[2]).toBe(
+      `Removing a site deletes its audits and their stored evidence ${RESTORE_DAYS} days later.`,
     );
     // v1's audits are still cleaned up after 30 days (cleanupExpiredAuditsFn, whatever the flags):
     // spec 22b's list names both rules.
-    expect(list[2]).toBe(
+    expect(list[3]).toBe(
       'Free-tier audits made with the earlier version of Crawlmouse are deleted automatically 30 days after they are created.',
     );
-    expect(list[3]).toMatch(/^De-identified research records: /);
-    expect(list[3]).toContain(
+    expect(list[4]).toMatch(/^De-identified research records: /);
+    expect(list[4]).toContain(
       'no account, email, URL or page path, and no time finer than the month',
     );
-    expect(list[3]).toContain('While the audit a record came from exists, the two stay linked');
-    expect(list[3]).toContain('kept indefinitely');
-    expect(list.slice(4)).toEqual(items(MAIN_LIST).slice(1));
+    expect(list[4]).toContain('While the audit a record came from exists, the two stay linked');
+    expect(list[4]).toContain('kept indefinitely');
+    expect(list.slice(5)).toEqual(items(MAIN_LIST).slice(1));
   });
 
   it('renders the hours and the restore days from their constants', async () => {
@@ -75,5 +80,6 @@ describe('the privacy page’s Data retention list', () => {
     const list = items(await retentionList('1'));
     expect(list[0]).toContain('once 37 hours have passed');
     expect(list[1]).toContain('the 11-day restore window');
+    expect(list[2]).toContain('stored evidence 11 days later');
   });
 });

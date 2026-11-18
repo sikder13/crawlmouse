@@ -3,6 +3,8 @@
  * stops each form's submit, as KeepBar does; a live page (`LiveActions`) submits it. The step each
  * entry's `owner` names builds the handler on that same path. lib/v2/view/dashboard.ts re-exports them, where the brief looks for them.
  */
+import { RESTORE_DAYS } from '../copy/restore-window';
+
 type Verb = 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
 
 export interface RouteSpec {
@@ -46,7 +48,7 @@ export const ACCOUNT_ACTIONS = {
     verb: 'DELETE',
     route: '/api/sites/[id]',
     owner: 'CC-26b',
-    guard: 'Signed-in member; sets `removed_at`; history kept.',
+    guard: `Signed-in member; sets \`removed_at\`; the daily expiry deletes its checks and evidence ${RESTORE_DAYS} days later, and keeps the site row.`,
   },
   markDone: {
     verb: 'POST',

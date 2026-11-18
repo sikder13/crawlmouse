@@ -98,7 +98,7 @@ describe('Site page, example-outfitter.com at as_of', () => {
       ['Competitor', 'summitgear.co'],
       ['Staging', 'staging.example-outfitter.dev · on each deploy'],
       ['Public link', 'crawlmouse.com/r/example-outfitter-25oct'],
-      ['Remove this site', 'Its history stays in your account in case you add it back'],
+      ['Remove this site', 'Its history is deleted 7 days after you remove it'],
     ]);
     expect(v.alerts.rows.map((r) => [r.on, r.fired])).toEqual([
       [true, 'fired Fri 06:03'],

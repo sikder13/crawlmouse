@@ -148,9 +148,10 @@ const INVENTORY: [entry: string, why: string][] = [
       '(CC-20a). No string is indexed.',
   ],
   [
-    "apps/web/lib/v2/pipeline/expire.ts :: error: cause instanceof Error ? cause.message.slice(0, 200) : 'not an Error',",
-    'NOT A CUT of crawled text. The message of an error thrown by the evidence store or the database ' +
-      'when the expiry could not delete a site, bounded for the report line. It holds no page text.',
+    "apps/web/lib/v2/pipeline/expire.ts :: cause instanceof Error ? cause.message.slice(0, 200) : 'not an Error';",
+    'NOT A CUT of crawled text. errorSnippet: the message of an error thrown by the evidence store or ' +
+      'the database when the expiry or the removed-site purge (CC-GL D2) could not delete a site, ' +
+      'bounded for the report line. It holds no page text.',
   ],
   [
     'apps/web/lib/v2/pipeline/load.ts :: const chunk = values.slice(i, i + VALUES_PER_REQUEST);',

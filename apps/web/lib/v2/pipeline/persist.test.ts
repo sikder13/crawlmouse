@@ -1007,6 +1007,12 @@ const WRITERS: Readonly<Record<string, readonly string[]>> = {
   'infra/supabase/rollbacks/20261112000001_v2_026b_sites_fixes.revert.sql': PERSIST_BODY,
   // CC-28: record_alert_delivery sets changes.notified when an alert is sent, and no other column.
   'infra/supabase/migrations/20261113000001_v2_028_monitoring.sql': ['changes'],
+  // CC-GL D2: delete_removed_site_checks deletes a removed site's changes and fixes (their events go
+  // by cascade) before its checks, RESTORE_DAYS after the removal. It writes no row it keeps.
+  'infra/supabase/migrations/20261121000001_v2_gl_removed_site_purge.sql': [
+    'changes',
+    'site_fixes',
+  ],
 };
 
 const named = (names: Set<string>) => `(?:"?public"?\\s*\\.\\s*)?"?(${[...names].join('|')})"?\\b`;

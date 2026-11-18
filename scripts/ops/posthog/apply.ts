@@ -55,6 +55,33 @@ export function holds(want: unknown, have: unknown): boolean {
   return Object.is(want, have);
 }
 
+/**
+ * Whether a survey PostHog holds is the one `body` describes, read as PostHog reads a survey back
+ * (measured 2026-11-17, notes/cc-gl/posthog-dry-run.md "Applied"):
+ * - `targeting_flag_filters` is write-only. PostHog keeps it as a `targeting_flag` object, so the
+ *   wanted filters are compared with `targeting_flag.filters`, and no targeting with
+ *   `targeting_flag: null`.
+ * - an `appearance` sent as `null` reads back as PostHog's default, which is PostHog's copy, not ours:
+ *   it is compared only when the spec sets one.
+ * - a launched survey's targeting flag must be active (rulings-5 §2). A survey created with a start
+ *   date left it inactive on the live project, and PostHog's PRs #91921 and #111642 say the SDK treats
+ *   an inactive flag as off, so the survey is not shown, until the survey is saved again. An inactive
+ *   one is therefore a difference, and the update that follows is that save.
+ */
+export function surveyHolds(body: Record<string, unknown>, remote: Remote): boolean {
+  const { targeting_flag_filters: targeting, appearance, ...rest } = body;
+  if (!holds(rest, remote)) return false;
+  const flag = remote.targeting_flag as { filters?: unknown; active?: unknown } | null | undefined;
+  if (targeting === null || targeting === undefined) {
+    if (flag !== null && flag !== undefined) return false;
+  } else if (flag === null || flag === undefined || !holds(targeting, flag.filters)) {
+    return false;
+  } else if (remote.start_date != null && remote.end_date == null && flag.active !== true) {
+    return false;
+  }
+  return appearance === null || appearance === undefined || holds(appearance, remote.appearance);
+}
+
 interface Wanted {
   name: string;
   body: Record<string, unknown>;
@@ -188,7 +215,7 @@ export async function applySpec(
         continue;
       }
       known.set(`${kind}:${w.name}`, match.id);
-      if (holds(w.body, match)) {
+      if (kind === 'survey' ? surveyHolds(w.body, match) : holds(w.body, match)) {
         rows.push({ op: 'unchanged', kind, name: w.name });
       } else {
         rows.push({ op: 'update', kind, name: w.name });

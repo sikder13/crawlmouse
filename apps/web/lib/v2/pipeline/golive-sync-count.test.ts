@@ -1,6 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { FUNCTIONS, registered, type Flag } from '../../../../../scripts/golive/budget';
-import { syncedFunctionCount } from '../../../../../scripts/golive/inngest-sync';
+import {
+  functionCountsByStep,
+  syncedFunctionCount,
+} from '../../../../../scripts/golive/inngest-sync';
 import { STEPS, flagsAfter } from '../../../../../scripts/golive/steps';
 
 // CC-35: the go-live checklist tells the owner how many functions Inngest must list after each step
@@ -47,4 +50,16 @@ describe("golive:check's Inngest functions per step", () => {
     // Each case imports the serve route's whole function graph afresh; under load that took over 5 s.
     30_000,
   );
+});
+
+// CC-GL D2 put the removed-site purge in the expiry's run as a step, not a function of its own. The
+// case above holds the serve route to budget.ts's table; this holds the table to the counts the
+// owner's checklist printed before that change, so a purge registered as a new function (in the
+// route and the table together) fails here.
+describe('the function counts per step, as before CC-GL D2', () => {
+  it('are unchanged', () => {
+    expect(functionCountsByStep()).toBe(
+      'after step 1: 5; after step 2: 12; after step 3: 12; after step 4: 34; after step 5: 36',
+    );
+  });
 });

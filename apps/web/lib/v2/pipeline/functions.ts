@@ -53,7 +53,7 @@ import { ledgerWorkFromEnv } from '../ledger/functions';
 import { putLedgerDraft } from '../ledger/store';
 import { CRAWL_USER_AGENT } from './discover';
 import { supabaseEvidenceStore } from './evidence';
-import { expireUnkept, settleKept, type ExpireDeps } from './expire';
+import { expireUnkept, purgeRemoved, settleKept, type ExpireDeps } from './expire';
 import { supabaseExpireStore } from './expire-store';
 import { supabaseKeepStore } from './keep-store';
 import { supabasePersistDb } from './persist';
@@ -148,6 +148,7 @@ export function inngestFunctions(
     createExpireAnonymousChecksFn({
       expireUnkept: () => expireUnkept(wiring.expiry(env)),
       settleKept: () => settleKept(wiring.expiry(env)),
+      purgeRemoved: () => purgeRemoved(wiring.expiry(env)),
     }),
     // CC-41 D4: the research ledger's writer, after each check, and its six-hourly backfill.
     createLedgerWriteFn(() => ledgerWorkFromEnv(env)),

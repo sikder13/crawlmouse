@@ -31,6 +31,39 @@ interface Request {
   body?: Record<string, unknown>;
 }
 
+/**
+ * A survey as PostHog stores and reads it back, measured on the live project (posthog-dry-run.md,
+ * "Applied", 2026-11-17): `targeting_flag_filters` is write-only, kept as a `targeting_flag` object
+ * whose `filters` carry them (`null` when there is no targeting), and an `appearance` sent as `null`
+ * reads back as PostHog's own default.
+ */
+const POSTHOG_APPEARANCE = {
+  thankYouMessageHeader: 'Thank you for your feedback!',
+  displayThankYouMessage: true,
+};
+function asPostHogStoresSurvey(row: Record<string, unknown>, saved: 'create' | 'update'): void {
+  if (Object.hasOwn(row, 'targeting_flag_filters')) {
+    const f = row.targeting_flag_filters as { groups: Record<string, unknown>[] } | null;
+    row.targeting_flag =
+      f === null
+        ? null
+        : {
+            key: `survey-targeting-${String(row.id)}`,
+            // Measured: a survey created with a start date has its targeting flag inactive. PostHog's
+            // PRs #91921 and #111642 say a later save of a launched survey syncs it active.
+            active: saved === 'update' && row.start_date != null && row.end_date == null,
+            filters: {
+              groups: f.groups.map((g) => ({ ...g, aggregation_group_type_index: null })),
+              aggregation_group_type_index: null,
+            },
+          };
+    delete row.targeting_flag_filters;
+  }
+  if (row.appearance === null || row.appearance === undefined) {
+    row.appearance = { ...POSTHOG_APPEARANCE };
+  }
+}
+
 function fakePostHog(
   opts: { project?: Record<string, unknown>; seed?: Partial<Record<Kind, Remote[]>> } = {},
 ) {
@@ -69,12 +102,17 @@ function fakePostHog(
     }
     if (parts.length === 1 && method === 'POST') {
       const row = { ...body, id: nextId++ } as Remote;
+      if (kind === 'survey') asPostHogStoresSurvey(row, 'create');
       rows.push(row);
       return json(row, 201);
     }
     const row = rows.find((r) => String(r.id) === parts[1]);
     if (!row) return json({ detail: 'not found' }, 404);
-    if (method === 'PATCH') return json(Object.assign(row, body));
+    if (method === 'PATCH') {
+      Object.assign(row, body);
+      if (kind === 'survey') asPostHogStoresSurvey(row, 'update');
+      return json(row);
+    }
     if (method === 'DELETE') {
       rows.splice(rows.indexOf(row), 1);
       return json(null, 204);
@@ -92,16 +130,25 @@ const ops = (rows: PlanRow[]) => rows.map((r) => r.op);
 const allOf = (kind: Kind, f: ReturnType<typeof fakePostHog>) => f.store.get(kind)!;
 
 describe('applySpec', () => {
-  it('creates the spec on an empty project, and a second apply plans and sends no change', async () => {
+  it('creates the spec on an empty project; a second apply re-saves only the targeted surveys (their flags start inactive); a third plans and sends no change', async () => {
     const f = fakePostHog();
     const first = await applySpec(SPEC, clientOf(f.fetch), { dryRun: false, now: NOW });
     expect(ops(first)).not.toContain('unchanged');
     expect(ops(first).filter((o) => o === 'create')).toHaveLength(first.length - 1);
 
-    const writesBefore = f.writes().length;
     const second = await applySpec(SPEC, clientOf(f.fetch), { dryRun: false, now: NOW });
-    expect(second.length).toBe(first.length);
-    expect(new Set(ops(second))).toEqual(new Set(['unchanged']));
+    const targeted = SPEC.surveys.filter((sv) => sv.targeting.length > 0).map((sv) => sv.name);
+    expect(
+      second
+        .filter((r) => r.op !== 'unchanged')
+        .map((r) => `${r.kind}:${r.name}`)
+        .sort(),
+    ).toEqual(targeted.map((n) => `survey:${n}`).sort());
+
+    const writesBefore = f.writes().length;
+    const third = await applySpec(SPEC, clientOf(f.fetch), { dryRun: false, now: NOW });
+    expect(third.length).toBe(first.length);
+    expect(new Set(ops(third))).toEqual(new Set(['unchanged']));
     expect(f.writes()).toHaveLength(writesBefore);
   });
 
@@ -164,6 +211,8 @@ describe('applySpec', () => {
 
   it('updates an object of ours whose definition differs, and puts it back as the spec has it', async () => {
     const f = fakePostHog();
+    // Two applies reach the steady state: the second re-saves the targeted surveys (rulings-5 §2).
+    await applySpec(SPEC, clientOf(f.fetch), { dryRun: false, now: NOW });
     await applySpec(SPEC, clientOf(f.fetch), { dryRun: false, now: NOW });
     const action = allOf('action', f)[0]!;
     action.steps = [{ event: 'home_viewed', properties: [] }];
@@ -283,6 +332,93 @@ describe('applySpec', () => {
       /Unprefixed/,
     );
     expect(f.requests).toEqual([]);
+  });
+});
+
+describe('a survey as PostHog reads it back (rulings-5 §1)', () => {
+  const surveyNamed = (f: ReturnType<typeof fakePostHog>, name: string) =>
+    allOf('survey', f).find((r) => r.name === name)!;
+  const surveyRows = (rows: PlanRow[]) => rows.filter((r) => r.kind === 'survey');
+
+  it('reads back with no targeting_flag_filters, a targeting_flag, and PostHog’s appearance', async () => {
+    const f = fakePostHog();
+    await applySpec(SPEC, clientOf(f.fetch), { dryRun: false, now: NOW });
+    const pmf = surveyNamed(f, '[cm] PMF');
+    expect(Object.hasOwn(pmf, 'targeting_flag_filters')).toBe(false);
+    expect(pmf.targeting_flag).toMatchObject({ active: false, filters: { groups: [{}] } });
+    expect(surveyNamed(f, '[cm] First result').targeting_flag).toBeNull();
+    expect(surveyNamed(f, '[cm] First result').appearance).toEqual(POSTHOG_APPEARANCE);
+  });
+
+  it('plans every survey unchanged when PostHog holds what the spec says, its targeting flag active', async () => {
+    const f = fakePostHog();
+    await applySpec(SPEC, clientOf(f.fetch), { dryRun: false, now: NOW });
+    for (const r of allOf('survey', f)) {
+      if (r.targeting_flag) (r.targeting_flag as { active: boolean }).active = true;
+    }
+    const rows = await applySpec(SPEC, clientOf(f.fetch), { dryRun: true, now: NOW });
+    expect(surveyRows(rows).map((r) => r.op)).toEqual(SPEC.surveys.map(() => 'unchanged'));
+  });
+
+  it('plans an update for a launched survey whose targeting flag is inactive, which re-saves it active; then it is unchanged (rulings-5 §2)', async () => {
+    const f = fakePostHog();
+    await applySpec(SPEC, clientOf(f.fetch), { dryRun: false, now: NOW });
+    const targeted = SPEC.surveys.filter((sv) => sv.targeting.length > 0).map((sv) => sv.name);
+    expect(targeted.length).toBeGreaterThan(0);
+    // As the live project read after the first apply: those surveys' targeting flags are inactive.
+    for (const name of targeted) {
+      expect((surveyNamed(f, name).targeting_flag as { active: boolean }).active).toBe(false);
+    }
+    const second = await applySpec(SPEC, clientOf(f.fetch), { dryRun: false, now: NOW });
+    expect(
+      surveyRows(second)
+        .filter((r) => r.op === 'update')
+        .map((r) => r.name)
+        .sort(),
+    ).toEqual([...targeted].sort());
+    for (const name of targeted) {
+      expect((surveyNamed(f, name).targeting_flag as { active: boolean }).active).toBe(true);
+      // The re-save sends the spec's body; it does not move the start date.
+      expect(surveyNamed(f, name).start_date).toBe(NOW().toISOString());
+    }
+    const third = await applySpec(SPEC, clientOf(f.fetch), { dryRun: true, now: NOW });
+    expect(ops(third).every((op) => op === 'unchanged')).toBe(true);
+  });
+
+  it('still plans an update for a changed question', async () => {
+    const f = fakePostHog();
+    await applySpec(SPEC, clientOf(f.fetch), { dryRun: false, now: NOW });
+    const pmf = surveyNamed(f, '[cm] PMF');
+    (pmf.questions as { question: string }[])[0]!.question = 'Something else?';
+    const rows = await applySpec(SPEC, clientOf(f.fetch), { dryRun: true, now: NOW });
+    expect(surveyRows(rows).find((r) => r.name === '[cm] PMF')?.op).toBe('update');
+  });
+
+  it('still plans an update for a changed targeting condition, and for targeting that should not be there', async () => {
+    const f = fakePostHog();
+    await applySpec(SPEC, clientOf(f.fetch), { dryRun: false, now: NOW });
+    const pmf = surveyNamed(f, '[cm] PMF');
+    const groups = (
+      pmf.targeting_flag as { filters: { groups: { properties: { value: unknown }[] }[] } }
+    ).filters.groups;
+    groups[0]!.properties[0]!.value = 99;
+    surveyNamed(f, '[cm] First result').targeting_flag = {
+      key: 'survey-targeting-x',
+      active: false,
+      filters: { groups: [{ properties: [], rollout_percentage: 100 }] },
+    };
+    const rows = await applySpec(SPEC, clientOf(f.fetch), { dryRun: true, now: NOW });
+    const op = (name: string) => surveyRows(rows).find((r) => r.name === name)?.op;
+    expect(op('[cm] PMF')).toBe('update');
+    expect(op('[cm] First result')).toBe('update');
+  });
+
+  it('still compares an appearance the spec sets', async () => {
+    const f = fakePostHog();
+    await applySpec(SPEC, clientOf(f.fetch), { dryRun: false, now: NOW });
+    surveyNamed(f, '[cm] Feedback').appearance = { ...POSTHOG_APPEARANCE };
+    const rows = await applySpec(SPEC, clientOf(f.fetch), { dryRun: true, now: NOW });
+    expect(surveyRows(rows).find((r) => r.name === '[cm] Feedback')?.op).toBe('update');
   });
 });
 
