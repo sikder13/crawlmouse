@@ -14,8 +14,8 @@ export type PaidTier = Exclude<Tier, 'free'>;
 
 /**
  * Pages read per check on Pro and Agency. Pending re-measurement against the cost model at the load
- * test (CC-39): at the measured 2 requests a second a 2,000-page crawl does not fit the 20-minute
- * check budget (ENGINE-GAP §8.2 proposed 800 on cost grounds).
+ * test (CC-39): at the measured 2 requests a second a 2,000-page crawl (1,000 s) does not fit the
+ * crawl phase's ceiling, CRAWL_CEILING_S (480 s) (ENGINE-GAP §8.2 proposed 800 on cost grounds).
  */
 export const PAID_PAGES_PER_CHECK = 2000;
 export const FREE_PAGES_PER_CHECK = 500;

@@ -404,6 +404,14 @@ const BASE_CHANGES: CopyChange[] = [
     source:
       'FACTS J7 and the owner’s ruling on D8: the result email opens the result for 30 days and nothing else.',
   },
+  {
+    screen: 'crawl',
+    kind: 'ruling',
+    locked: 'Usually about two minutes. You can leave this page; the result keeps building.',
+    rendered: '0:47 elapsed, 128 pages so far. You can leave this page; the result keeps building.',
+    source:
+      'Owner ruling, the CC-42A brief, decision 4 (2026-11-17): the time estimate was false under load (CC-GL D5), so the note is rendered from the elapsed time and the pages so far',
+  },
 ];
 
 export const COPY_CHANGES: CopyChange[] = [

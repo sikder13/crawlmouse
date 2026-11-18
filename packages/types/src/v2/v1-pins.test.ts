@@ -26,10 +26,10 @@ import type {
 import { V1_PINNED_ENUMS } from './index.js';
 
 describe('v2 shapes pinned to their v1 definitions', () => {
-  it('the pinned group is exactly the seven value sets pinned here and in the engine', () => {
+  it('the pinned group is exactly the eight value sets pinned here and in the engine', () => {
     // PageKind, CmsName and RefusalTrigger are pinned below; GradeLetter is pinned to scoreToLetter, and
     // WithheldReason, TechnicalSeoPending and ContentScoreWithheld to the engine's tables of reasons, in
-    // packages/engine/src/v2/contract-pins.test.ts.
+    // packages/engine/src/v2/contract-pins.test.ts, as is RobotsTxtState, to the engine's RobotsStatus.
     // A new entry must come with a new pin.
     expect(Object.keys(V1_PINNED_ENUMS).sort()).toEqual([
       'CmsName',
@@ -37,6 +37,7 @@ describe('v2 shapes pinned to their v1 definitions', () => {
       'GradeLetter',
       'PageKind',
       'RefusalTrigger',
+      'RobotsTxtState',
       'TechnicalSeoPending',
       'WithheldReason',
     ]);

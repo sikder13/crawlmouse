@@ -275,6 +275,18 @@ describe('/audit/[id]: the states around a result', () => {
     expect(primaries(markup)).toHaveLength(1);
   });
 
+  it('a check that never got a crawler says so, blames nothing on the site, and offers a fresh start', () => {
+    const failed = (reason: (typeof FAILURE_REASONS)[number]) =>
+      noticeOf({ ...base, state: 'failed', failedAt: '2026-11-06T12:00:00Z', reason, kept: false });
+    const lines = failed('capacity_wait_exceeded').lines.join(' ');
+    expect(lines).toContain('our crawlers were all busy');
+    expect(lines).toContain('nothing was wrong with your site');
+    expect(lines).toContain('Start it again in a few minutes');
+    // The offer is for this reason only; worker_unavailable keeps its own meaning and lines.
+    expect(failed('worker_unavailable').lines.join(' ')).not.toContain('Start it again');
+    expect(failed('worker_unavailable').lines.join(' ')).toContain('could not be reached');
+  });
+
   it('each reason has its own sentence', () => {
     expect(Object.keys(FAILURE_COPY).sort()).toEqual([...FAILURE_REASONS].sort());
     expect(new Set(Object.values(FAILURE_COPY)).size).toBe(FAILURE_REASONS.length);

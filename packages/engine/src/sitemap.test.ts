@@ -33,6 +33,59 @@ describe('discoverSitemaps', () => {
   });
 });
 
+describe('discoverSitemaps — robotsStatus: what the robots.txt response it already fetched said', () => {
+  const only = (robots: () => Promise<{ status: number; body: string }>) =>
+    vi.fn(async (url: string) =>
+      url.endsWith('/robots.txt') ? robots() : { status: 404, body: '' },
+    );
+
+  it.each([200, 203])('a %i robots.txt is found, even an empty one', async (status) => {
+    const out = await discoverSitemaps('https://example.com', {
+      fetcher: only(async () => ({ status, body: '' })),
+    });
+    expect(out.robotsStatus).toBe('found');
+  });
+
+  it('a robots.txt with rules and a sitemap is found', async () => {
+    const out = await discoverSitemaps('https://example.com', {
+      fetcher: only(async () => ({
+        status: 200,
+        body: 'User-agent: *\nSitemap: https://example.com/s.xml\n',
+      })),
+    });
+    expect(out.robotsStatus).toBe('found');
+  });
+
+  it.each([404, 410])('a %i is not_found', async (status) => {
+    const out = await discoverSitemaps('https://example.com', {
+      fetcher: only(async () => ({ status, body: 'gone' })),
+    });
+    expect(out.robotsStatus).toBe('not_found');
+  });
+
+  it.each([301, 403, 429, 500, 503])('a %i is unreadable', async (status) => {
+    const out = await discoverSitemaps('https://example.com', {
+      fetcher: only(async () => ({ status, body: 'x' })),
+    });
+    expect(out.robotsStatus).toBe('unreadable');
+  });
+
+  it('a fetch that throws (a timeout, a refused address, a passed deadline) is unreadable', async () => {
+    const out = await discoverSitemaps('https://example.com', {
+      fetcher: only(async () => {
+        throw new Error('discovery: deadline passed');
+      }),
+    });
+    expect(out.robotsStatus).toBe('unreadable');
+  });
+
+  it('asks for robots.txt once: the status costs no extra request', async () => {
+    const fetcher = only(async () => ({ status: 200, body: '' }));
+    await discoverSitemaps('https://example.com', { fetcher });
+    expect(fetcher.mock.calls.filter(([u]) => u.endsWith('/robots.txt'))).toHaveLength(1);
+  });
+});
+
 describe('parseSitemapUrls', () => {
   it('parses a simple urlset', async () => {
     const xml = `<?xml version="1.0"?>

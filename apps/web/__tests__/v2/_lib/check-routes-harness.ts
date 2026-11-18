@@ -159,7 +159,7 @@ export async function claim(db: PGlite, h: Harness, ids: Ids, phase: Phase = 'cr
   const outcome = await h.pipeline.claim(
     ids.checkId,
     `run-${ids.checkId}`,
-    progressOf(phase, { pagesCrawled: 0, linksFound: 0 }, 0),
+    progressOf(phase, { pagesCrawled: 0, linksFound: 0, discovered: null, waitingSince: null }, 0),
   );
   if (outcome !== 'claimed') throw new Error(`claim answered ${outcome}`);
   await db.query(`update public.checks set started_at = $2 where id = $1`, [
@@ -210,7 +210,12 @@ export async function storeBatch(
     ids.checkId,
     progressOf(
       'crawl',
-      { pagesCrawled: totals.pages, linksFound: totals.links },
+      {
+        pagesCrawled: totals.pages,
+        linksFound: totals.links,
+        discovered: null,
+        waitingSince: null,
+      },
       h.clock.now - STARTED,
     ),
     at,

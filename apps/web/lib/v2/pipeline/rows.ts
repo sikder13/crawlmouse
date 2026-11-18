@@ -99,7 +99,22 @@ function contractRecord<T>(schema: ObjectSchema<T>, row: Row, derived: Row = {})
   return schema.parse(record);
 }
 
-export const checkFromRow = (row: Row): Check => contractRecord(CheckSchema, row);
+/**
+ * The fields a running check's progress gained after rows were first written with it (CC-42A). A
+ * row written before then lacks them; it is read with each as null, which is what the pipeline
+ * writes when it knows none of them, so a check running across the deploy is still read.
+ */
+const PROGRESS_ADDED = { waiting_since: null, sitemap_urls: null, robots_txt: null } as const;
+
+export function checkFromRow(row: Row): Check {
+  const progress = row.progress;
+  if (typeof progress !== 'object' || progress === null || Array.isArray(progress)) {
+    return contractRecord(CheckSchema, row);
+  }
+  return contractRecord(CheckSchema, row, {
+    progress: { ...PROGRESS_ADDED, ...(progress as Row) },
+  });
+}
 export const pageResultFromRow = (row: Row): PageResult => contractRecord(PageResultSchema, row);
 export const linkEdgeFromRow = (row: Row): LinkEdge => contractRecord(LinkEdgeSchema, row);
 export const accessTestFromRow = (row: Row): AccessTest => contractRecord(AccessTestSchema, row);

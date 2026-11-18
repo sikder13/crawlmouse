@@ -86,6 +86,9 @@ const PROGRESS = {
   links_found: 0,
   elapsed_ms: 0,
   recent_fetches: [],
+  waiting_since: null,
+  sitemap_urls: null,
+  robots_txt: null,
 };
 
 describe('supabasePipelineStore: the race-critical statements are 008’s functions', () => {

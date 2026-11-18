@@ -14,6 +14,8 @@ export const FAILURE_COPY: Record<FailureReason, string> = {
   worker_redeployed:
     'our crawler was updated part-way through, so its results could not be combined',
   worker_unavailable: 'our crawler could not be reached',
+  capacity_wait_exceeded:
+    'our crawlers were all busy with other audits, and yours waited too long for one; nothing was wrong with your site',
   build_failed: 'the pages were crawled, and grading them failed on our side',
   persist_failed: 'the audit was graded, and saving the result failed on our side',
   internal: 'something failed on our side',

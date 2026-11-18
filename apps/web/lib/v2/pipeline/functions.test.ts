@@ -563,6 +563,10 @@ describe('production discovery sends a loopback site nothing (quality 2)', () =>
     pagesCrawled: 0,
     linksFound: 0,
     release: null,
+    busyMs: 0,
+    busyBeforeCrawlMs: 0,
+    waitingSince: null,
+    discovered: null,
   };
   const seedsOf = (evidence: ReturnType<typeof memoryEvidenceStore>) =>
     getJson(evidence, `anon/${SITE.id}/${CHECK_ID}/seeds.json.gz`);

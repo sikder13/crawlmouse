@@ -33,6 +33,17 @@ import {
 export const CHECK_FN_ID = 'crawlmouse.check.run';
 export const CHECK_CANCELLED_FN_ID = 'crawlmouse.check.cancelled';
 
+/**
+ * The wait budget (CC-42A, rulings-1 §2): the most of a check's waiting on the worker's `busy`
+ * answers that the time plan makes up for, the wait for its first crawl batch and the waits between
+ * later batches together. Waiting for the first batch does not run the crawl clock, which starts
+ * when the worker accepts that batch; a check whose next wait for it would pass the budget fails
+ * `capacity_wait_exceeded`. A wait between later batches is added back to the crawl's end while the
+ * budget lasts. Once it is spent a check may still wait on busy answers, uncredited, until its
+ * window closes (steps/time.ts); the budget bounds what is added back, not what is waited.
+ */
+export const QUEUE_WAIT_MAX_S = 900;
+
 /** The orchestration's waits and bounds, in seconds unless named otherwise. */
 export const PACE = {
   /** The first wait before a batch is polled: a small batch is often done within seconds. */
@@ -45,18 +56,33 @@ export const PACE = {
    * result is then stored.
    */
   pollGraceS: 60,
-  /** The wait after the worker answered busy (it runs BATCH_CONCURRENCY batches at once). */
+  /**
+   * The wait after the worker answered busy (it runs BATCH_CONCURRENCY batches at once). What bounds
+   * the waiting is time (QUEUE_WAIT_MAX_S, and each phase's end), not a count of these.
+   */
   busyWaitS: 30,
-  /** Busy answers to one post before the batch is given up: ten minutes of waiting. */
-  busyRetries: 20,
   /** The wait for the site's running check to end before claiming again, and how many times. */
   claimWaitS: 60,
   claimWaits: 5,
-  /** The run's finish timeout: 20 minutes (ARCH-2 §4.2). */
-  finishS: 1200,
+  /** Discovery's bound on reading robots.txt and the sitemaps (DISCOVER_S in the app's limits). */
+  discoverS: 60,
+  /**
+   * The run's finish timeout: 37 minutes. Its parts: every claim wait (300 s), discovery (60 s), the
+   * wait budget (QUEUE_WAIT_MAX_S, 900 s), the crawl (CRAWL_CEILING_S, 480 s), the access slice
+   * (300 s) and the reserve (180 s); steps/time.test.ts recomputes the sum from those constants.
+   */
+  finishS: 2220,
   /** Crawl batches per check: 40 × 50 URLs is 2,000, the largest page cap in FACTS. */
   maxCrawlBatches: 40,
 } as const;
+
+/**
+ * The latest a check's first crawl batch is taken, in seconds from its first claim attempt, for the
+ * finish timeout still to give it a whole crawl window: every claim wait, discovery, then the wait
+ * budget. PACE.finishS is this plus the crawl, the access slice and the reserve (steps/time.test.ts).
+ */
+export const FIRST_ACCEPT_BY_S =
+  PACE.claimWaits * PACE.claimWaitS + PACE.discoverS + QUEUE_WAIT_MAX_S;
 
 /** runCheck's steps return under this many bytes as JSON (`sized`, ARCH-2 §4.2); bulk data is stored. */
 export const STEP_OUTPUT_BYTES = 4096;
@@ -74,13 +100,27 @@ export interface BatchAt {
 export interface RunSoFar {
   /** The first claim attempt's time, ms since the epoch: the time plan's zero. */
   startedAt: number;
-  /** When discovery ended and the crawl phase began; null until then. */
+  /**
+   * When the worker accepted the check's first crawl batch: the crawl clock's zero. Null until then;
+   * waiting for that batch does not run the clock.
+   */
   crawlFrom: number | null;
   pagesCrawled: number;
   linksFound: number;
   /** The worker release of the check's first batch read; null before one is read. */
   release: string | null;
+  /** Milliseconds spent on the worker's busy answers so far, before and after `crawlFrom`. */
+  busyMs: number;
+  /** `busyMs` when the first crawl batch was accepted; what the wait before it cost the budget. */
+  busyBeforeCrawlMs: number;
+  /** The first busy answer of the current run of them; null while no post is waiting. */
+  waitingSince: number | null;
+  /** What discovery found that a visitor can read; null until discovery has ended. */
+  discovered: { sitemap_urls: number; robots_txt: RobotsStatus | null } | null;
 }
+
+/** What discovery's robots.txt request answered (the engine's RobotsStatus, RobotsTxtState). */
+export type RobotsStatus = 'found' | 'not_found' | 'unreadable';
 
 /**
  * The claimed check's site as the database holds it: its row's site, and that site's account, host
@@ -90,7 +130,12 @@ export type ClaimedSite = Pick<CheckRequested, 'siteId' | 'accountId' | 'host' |
 export type ClaimOutput =
   | { outcome: 'claimed'; at: number; site: ClaimedSite }
   | { outcome: 'site_busy' | 'gone' | 'paused'; at: number };
-export type DiscoverOutput = { seeds: number; sitemap_urls: number; at: number };
+export type DiscoverOutput = {
+  seeds: number;
+  sitemap_urls: number;
+  robots_txt: RobotsStatus;
+  at: number;
+};
 export type PostOutput =
   | { status: 'posted'; urls: number; at: number; max_seconds: number }
   | { status: 'busy'; at: number }
@@ -180,6 +225,8 @@ export function sized<T>(id: string, output: T): T {
 type BatchEnd =
   | { end: 'read'; out: Extract<ReadOutput, { status: 'read' }> }
   | { end: 'none' }
+  /** The first crawl batch found no free slot within QUEUE_WAIT_MAX_S. */
+  | { end: 'capacity' }
   | { end: 'paused' }
   | { end: 'failed' };
 
@@ -220,19 +267,60 @@ export async function runCheck(
     pagesCrawled: 0,
     linksFound: 0,
     release: null,
+    busyMs: 0,
+    busyBeforeCrawlMs: 0,
+    waitingSince: null,
+    discovered: null,
   };
-  const soFar = (): RunSoFar => ({ ...so });
-  so.crawlFrom = (await run('discover', () => steps.discover(data, soFar()))).at;
+  const soFar = (): RunSoFar => ({ ...so, discovered: so.discovered && { ...so.discovered } });
+  const found = await run('discover', () => steps.discover(data, soFar()));
+  // `?? null`: a discover output recorded before robots_txt existed, replayed after the deploy.
+  so.discovered = { sitemap_urls: found.sitemap_urls, robots_txt: found.robots_txt ?? null };
 
   // ── one batch: post, poll to its deadline, read; one re-post when the worker lost it ──
-  const post = async (prefix: string, at: BatchAt): Promise<PostOutput> => {
+  // A busy answer is waited on and posted again. The time from a post's first busy answer to the
+  // answer that ends the wait is charged to `busyMs`; the times are step outputs, so a replay
+  // charges the same. The first crawl batch's acceptance starts the crawl clock.
+  const post = async (
+    prefix: string,
+    at: BatchAt,
+  ): Promise<PostOutput | { status: 'capacity' }> => {
+    let lastBusy: number | null = null;
     for (let k = 0; ; k++) {
       const out = await run(k === 0 ? prefix : `${prefix}-${k}`, () =>
         steps.post(data, at, soFar()),
       );
-      if (out.status !== 'busy') return out;
-      if (k === PACE.busyRetries) return { status: 'none', why: 'no_time' };
-      await step.sleep(`${prefix}-busy-${k + 1}`, PACE.busyWaitS * 1000);
+      if (out.status === 'busy') {
+        if (lastBusy !== null) so.busyMs += out.at - lastBusy;
+        lastBusy = out.at;
+        so.waitingSince ??= out.at;
+        // Before its first batch a check gives up when the next wait would pass the budget, or
+        // would bring its next post after FIRST_ACCEPT_BY_S from its start, the latest first batch
+        // that the finish timeout still gives a whole crawl window. The second matters when every
+        // claim wait was used: step latency there is not charged to busyMs (review rounds 1–2,
+        // correctness N1). A first batch that is taken is then taken after either bound by no more
+        // than the taken post's own latency and the sleep's lateness; time.test.ts checks the
+        // crawl it gets at 1, 2, 3 and 5 s a step.
+        const nextPost = out.at + PACE.busyWaitS * 1000;
+        if (
+          so.crawlFrom === null &&
+          (so.busyMs + PACE.busyWaitS * 1000 > QUEUE_WAIT_MAX_S * 1000 ||
+            nextPost > so.startedAt + FIRST_ACCEPT_BY_S * 1000)
+        ) {
+          return { status: 'capacity' };
+        }
+        await step.sleep(`${prefix}-busy-${k + 1}`, PACE.busyWaitS * 1000);
+        continue;
+      }
+      if (out.status === 'posted') {
+        if (lastBusy !== null) so.busyMs += out.at - lastBusy;
+        if (at.kind === 'crawl' && so.crawlFrom === null) {
+          so.crawlFrom = out.at;
+          so.busyBeforeCrawlMs = so.busyMs;
+        }
+      }
+      so.waitingSince = null;
+      return out;
     }
   };
 
@@ -246,6 +334,7 @@ export async function runCheck(
     let reposted = false;
     let polls = 0;
     for (;;) {
+      if (posted.status === 'capacity') return { end: 'capacity' };
       if (posted.status === 'paused') return { end: 'paused' };
       if (posted.status !== 'posted') return reposted ? fail(p, at) : { end: 'none' };
       const deadline = posted.at + (posted.max_seconds + PACE.pollGraceS) * 1000;
@@ -284,6 +373,7 @@ export async function runCheck(
   let crawlRead = 0;
   for (let n = 1; n <= PACE.maxCrawlBatches; n++) {
     const end = await runBatch(`crawl-${n}`, { kind: 'crawl', batch, stage: null });
+    if (end.end === 'capacity') return endFailed('capacity_wait_exceeded');
     if (end.end === 'none') break;
     batch += 1;
     if (end.end === 'paused') return endFailed('paused');
@@ -296,7 +386,8 @@ export async function runCheck(
   // ── access: stage 1, then stage 2 when the post step finds it needed and time is left ──
   for (const stage of [1, 2] as const) {
     const end = await runBatch(`access-${stage}`, { kind: 'access', batch, stage });
-    if (end.end === 'none') break;
+    // `capacity` needs a check with no crawl batch accepted, and the crawl above read one.
+    if (end.end === 'none' || end.end === 'capacity') break;
     batch += 1;
     if (end.end === 'paused') return endFailed('paused');
     if (end.end === 'failed') break;

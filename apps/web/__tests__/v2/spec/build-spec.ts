@@ -7,6 +7,7 @@ import { EVIDENCE_CLASSES, VERDICTS } from '../../../components/v2/verdicts';
 import { PILL_STATES } from '../../../components/v2/pill-states';
 import {
   FOOTER_COLUMNS,
+  FOOTER_SOCIAL,
   LOG_IN,
   MARKETING_NAV,
   isGroup,
@@ -186,6 +187,13 @@ function linkSection(): string {
     table(
       ['Column', 'Item', 'Target', 'Note'],
       FOOTER_COLUMNS.flatMap((c) => c.items.map((i) => [c.title, i.label, target(i), note(i)])),
+    ),
+    '',
+    'In the brand block, links to Crawlmouse on other sites. Each opens in a new tab with `rel="noopener"`; being on another host, none is checked against `apps/web/app` or the sitemap.',
+    '',
+    table(
+      ['Item', 'Target'],
+      FOOTER_SOCIAL.map((l) => [l.label, `\`${l.href}\``]),
     ),
   ].join('\n');
 }

@@ -23,6 +23,9 @@ import * as billingFlags from '../../lib/billing/flags';
 import { FREE_START, TRIAL_DAYS } from '../../lib/billing/state-machine';
 import { agencyStanding, agencyTrialView } from '../../lib/v2/view/agency-trial';
 import { pricingView, type PricingViewer } from '../../lib/v2/view/pricing';
+import { FOOTER_SOCIAL } from '../../components/v2/footer-links';
+
+const SOCIAL: ReadonlySet<string> = new Set(FOOTER_SOCIAL.map((l) => l.href));
 
 type Env = Record<string, string | undefined>;
 const FLAG_FUNCTIONS: Record<string, (env: Env) => boolean> = {
@@ -90,9 +93,13 @@ function targets(html: string): string[] {
       (f) => f.getAttribute('data-endpoint')!,
     ),
   ];
-  return raw
-    .filter((t) => !t.startsWith('#') && !t.startsWith('mailto:'))
-    .map((t) => t.split(/[?#]/)[0]!);
+  return (
+    raw
+      // The footer's links to our pages on other sites, by exact address: no other off-site link
+      // is let through.
+      .filter((t) => !t.startsWith('#') && !t.startsWith('mailto:') && !SOCIAL.has(t))
+      .map((t) => t.split(/[?#]/)[0]!)
+  );
 }
 
 const ENVS: Env[] = [];

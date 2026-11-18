@@ -18,6 +18,7 @@ import {
   batchEvents,
   checkEvents,
   cursorFits,
+  factsOf,
   formatCursor,
   nextEvents,
   parseCursor,
@@ -28,6 +29,7 @@ import {
 } from './stream';
 import { STARTED, crawlResult, edge, row, urlOf, type RowSpec } from './stream.fixtures';
 import { memoryEvidenceStore } from './test-support/memory-evidence';
+import type { StreamSnapshot } from './stream-store';
 
 /** The user agent the recorded crawl rows were fetched with, written out. */
 const CRAWL_UA = 'Mozilla/5.0 (compatible; Crawlmouse/2.0; +https://crawlmouse.com/bot)';
@@ -44,6 +46,8 @@ const running = (now: number, pages: number, links: number, elapsedMs: number): 
   steps: stepsAt(now),
   counts: { pages_crawled: pages, links_found: links },
   elapsedMs,
+  waitingSinceMs: null,
+  discovered: null,
 });
 
 const stage = (phase: string, state: 'now' | 'done', at_ms: number) => ({
@@ -92,7 +96,7 @@ describe('nextEvents, against events written out by hand', () => {
       stage('crawl', 'now', 9000),
       { type: 'counts', at_ms: 9000, pages_crawled: 2, links_found: 3 },
     ]);
-    expect(formatCursor(out.cursor)).toBe('1.1.5.2.3.9000.0');
+    expect(formatCursor(out.cursor)).toBe('2.1.5.2.3.9000.0.0');
   });
 
   it('a page whose links were not read in full is not sent with its partial count', () => {
@@ -113,6 +117,8 @@ describe('nextEvents, against events written out by hand', () => {
         steps: null,
         counts: { pages_crawled: 2, links_found: 1 },
         elapsedMs: 60_000,
+        waitingSinceMs: null,
+        discovered: null,
       },
       startedAtMs: STARTED,
       batches: [
@@ -140,7 +146,7 @@ describe('nextEvents, against events written out by hand', () => {
       'ended',
     ]);
     expect(out.events.at(-1)).toEqual({ type: 'ended', at_ms: 60_000, status: 'finished' });
-    expect(formatCursor(out.cursor)).toBe('1.2.12.2.1.60000.1');
+    expect(formatCursor(out.cursor)).toBe('2.2.12.2.1.60000.1.0');
   });
 
   it('a poll that missed two phases sends the stages between, in order', () => {
@@ -154,7 +160,14 @@ describe('nextEvents, against events written out by hand', () => {
   });
 
   it('a check cancelled while queued sends the end alone', () => {
-    const out = checkEvents(START, { status: 'failed', steps: null, counts: null, elapsedMs: 0 });
+    const out = checkEvents(START, {
+      status: 'failed',
+      steps: null,
+      counts: null,
+      elapsedMs: 0,
+      waitingSinceMs: null,
+      discovered: null,
+    });
     expect(out.events).toEqual([{ type: 'ended', at_ms: 0, status: 'failed' }]);
     expect(out.cursor.ended).toBe(true);
   });
@@ -166,6 +179,8 @@ describe('nextEvents, against events written out by hand', () => {
       steps: null,
       counts: { pages_crawled: 7, links_found: 9 },
       elapsedMs: 6000,
+      waitingSinceMs: null,
+      discovered: null,
     });
     expect(out.events).toEqual([{ type: 'ended', at_ms: 6000, status: 'failed' }]);
     expect(out.cursor.step).toBe(5);
@@ -173,7 +188,14 @@ describe('nextEvents, against events written out by hand', () => {
 
   it('a queued check sends nothing and leaves the cursor as it was', () => {
     const out = nextEvents(START, {
-      check: { status: 'queued', steps: null, counts: null, elapsedMs: 0 },
+      check: {
+        status: 'queued',
+        steps: null,
+        counts: null,
+        elapsedMs: 0,
+        waitingSinceMs: null,
+        discovered: null,
+      },
       startedAtMs: null,
       batches: [],
     });
@@ -203,6 +225,8 @@ describe('nextEvents, against events written out by hand', () => {
       steps: [{ phase: 'grading', state: 'now' }],
       counts: null,
       elapsedMs: 10,
+      waitingSinceMs: null,
+      discovered: null,
     };
     const out = checkEvents(START, facts);
     expect(out.events.at(-1)).toEqual(stage('crawler_tests', 'done', 10));
@@ -220,7 +244,14 @@ describe('nextEvents, against events written out by hand', () => {
       ended: true,
     };
     const out = nextEvents(ended, {
-      check: { status: 'partial', steps: null, counts: null, elapsedMs: 900 },
+      check: {
+        status: 'partial',
+        steps: null,
+        counts: null,
+        elapsedMs: 900,
+        waitingSinceMs: null,
+        discovered: null,
+      },
       startedAtMs: STARTED,
       batches: [{ batch: 2, result: crawlResult([row({ path: '/late', at: 100 })], []) }],
     });
@@ -238,6 +269,127 @@ describe('nextEvents, against events written out by hand', () => {
   });
 });
 
+describe('waiting and discovery (CC-42A decisions 4 and 5)', () => {
+  const found = { robots_txt: 'found' as const, sitemap_urls: 1240 };
+
+  it('what discovery found is sent once, with the stage that says discovery is done', () => {
+    const facts: CheckFacts = { ...running(1, 0, 0, 4000), discovered: found };
+    const first = nextEvents(START, { check: facts, startedAtMs: STARTED, batches: [] });
+    expect(first.events).toEqual([
+      stage('robots_and_sitemap', 'now', 4000),
+      stage('robots_and_sitemap', 'done', 4000),
+      { type: 'discovered', at_ms: 4000, ...found },
+      stage('homepage', 'now', 4000),
+    ]);
+    const again = nextEvents(first.cursor, {
+      check: { ...facts, elapsedMs: 5000 },
+      startedAtMs: STARTED,
+      batches: [],
+    });
+    expect(again.events.filter((e) => e.type === 'discovered')).toEqual([]);
+  });
+
+  it('a row without discovery fields sends no discovery event', () => {
+    const out = nextEvents(START, {
+      check: running(1, 0, 0, 4000),
+      startedAtMs: STARTED,
+      batches: [],
+    });
+    expect(out.events.some((e) => e.type === 'discovered')).toBe(false);
+  });
+
+  it('a wait is sent when it begins and when it ends, once each', () => {
+    const waiting: CheckFacts = { ...running(1, 0, 0, 70_000), waitingSinceMs: 62_000 };
+    const a = nextEvents(START, { check: waiting, startedAtMs: STARTED, batches: [] });
+    expect(a.events.at(-1)).toEqual({ type: 'waiting', at_ms: 70_000, since_ms: 62_000 });
+    expect(formatCursor(a.cursor)).toBe('2.0.3.0.0.70000.0.62001');
+    // Still waiting, the same wait: nothing new.
+    const b = nextEvents(a.cursor, {
+      check: { ...waiting, elapsedMs: 100_000 },
+      startedAtMs: STARTED,
+      batches: [],
+    });
+    expect(b.events).toEqual([]);
+    // The worker took the batch.
+    const c = nextEvents(b.cursor, {
+      check: { ...waiting, elapsedMs: 130_000, waitingSinceMs: null },
+      startedAtMs: STARTED,
+      batches: [],
+    });
+    expect(c.events).toEqual([{ type: 'waiting', at_ms: 130_000, since_ms: null }]);
+    expect(c.cursor.waitingSince).toBeNull();
+  });
+
+  it('a wait whose stored start is later than the event carrying it is clamped to that event', () => {
+    const cursor: Cursor = { ...START, step: 3, at: 50_000 };
+    const out = nextEvents(cursor, {
+      check: { ...running(1, 0, 0, 40_000), waitingSinceMs: 60_000 },
+      startedAtMs: STARTED,
+      batches: [],
+    });
+    const w = out.events.find((e) => e.type === 'waiting')!;
+    expect(w).toEqual({ type: 'waiting', at_ms: 50_000, since_ms: 50_000 });
+  });
+
+  it('an ended check sends no wait', () => {
+    const out = nextEvents(START, {
+      check: { ...running(1, 0, 0, 9000), status: 'failed', waitingSinceMs: 5000 },
+      startedAtMs: STARTED,
+      batches: [],
+    });
+    expect(out.events.some((e) => e.type === 'waiting')).toBe(false);
+  });
+});
+
+describe('factsOf: the wait and discovery from a stored row (CC-42A)', () => {
+  const stored = (
+    progress: Partial<NonNullable<StreamSnapshot['progress']>> | null,
+  ): StreamSnapshot => ({
+    siteId: 's',
+    accountId: null,
+    siteRemoved: false,
+    status: 'running',
+    progress:
+      progress === null
+        ? null
+        : {
+            steps: [],
+            pages_crawled: 0,
+            links_found: 0,
+            waiting_since: null,
+            sitemap_urls: null,
+            robots_txt: null,
+            ...progress,
+          },
+    startedAt: new Date(STARTED).toISOString(),
+    finishedAt: null,
+    expiresAt: null,
+    batches: [],
+  });
+
+  it('gives the wait as ms from the start, and discovery as stored', () => {
+    const facts = factsOf(
+      stored({
+        waiting_since: new Date(STARTED + 62_000).toISOString(),
+        sitemap_urls: 1240,
+        robots_txt: 'found',
+      }),
+      STARTED + 90_000,
+    );
+    expect(facts.waitingSinceMs).toBe(62_000);
+    expect(facts.discovered).toEqual({ robots_txt: 'found', sitemap_urls: 1240 });
+  });
+
+  it('gives no wait and no discovery for a row without them, or an unreadable time', () => {
+    expect(factsOf(stored({}), STARTED)).toMatchObject({ waitingSinceMs: null, discovered: null });
+    expect(factsOf(stored({ waiting_since: 'not a time' }), STARTED).waitingSinceMs).toBeNull();
+    expect(factsOf(stored(null), STARTED)).toMatchObject({
+      waitingSinceMs: null,
+      discovered: null,
+    });
+  });
+});
+
 describe('the cursor as text', () => {
   it('round-trips', () => {
     fc.assert(
@@ -249,6 +401,7 @@ describe('the cursor as text', () => {
           links: fc.nat(10_000_000),
           at: fc.nat(3_600_000),
           ended: fc.boolean(),
+          waitingSince: fc.option(fc.nat(3_600_000), { nil: null }),
         }),
         (c) => {
           expect(parseCursor(formatCursor(c))).toEqual(c);
@@ -262,7 +415,7 @@ describe('the cursor as text', () => {
       '',
       '1',
       '2.0.0.0.0.0.0',
-      '1.0.13.0.0.0.0',
+      '2.0.13.0.0.0.0.0',
       '1.0.0.0.0.0.2',
       '1.-1.0.0.0.0.0',
       '1.0.0.0.0.0.0.0',
@@ -272,6 +425,18 @@ describe('the cursor as text', () => {
     ]) {
       expect(parseCursor(bad), JSON.stringify(bad)).toBeNull();
     }
+  });
+
+  it('still reads a cursor of the format before the wait was carried: no wait sent', () => {
+    expect(parseCursor('1.2.5.40.300.61000.0')).toEqual({
+      batch: 2,
+      step: 5,
+      pages: 40,
+      links: 300,
+      at: 61000,
+      ended: false,
+      waitingSince: null,
+    });
   });
 
   it('fits a check that stores its batch, and says ended only of an ended check', () => {
@@ -306,11 +471,13 @@ interface GenPoll {
   pages: number;
   links: number;
   ms: number;
+  wait: number | null;
 }
 interface GenRun {
   batches: GenBatch[];
   polls: GenPoll[];
   end: 'finished' | 'partial' | 'failed' | null;
+  discovered: { robots_txt: 'found' | 'not_found' | 'unreadable'; sitemap_urls: number } | null;
 }
 
 const rowArb: fc.Arbitrary<GenRow> = fc.record({
@@ -337,10 +504,20 @@ const runArb: fc.Arbitrary<GenRun> = fc
         pages: fc.nat(60),
         links: fc.nat(900),
         ms: fc.nat(90_000),
+        /** The stored wait's start, ms from the check's start; null when not waiting. */
+        wait: fc.option(fc.nat(400_000), { nil: null }),
       }),
       { maxLength: 7 },
     ),
     end: fc.constantFrom('finished', 'partial', 'failed', null),
+    /** What the stored progress says discovery found; null for a row without the fields. */
+    discovered: fc.option(
+      fc.record({
+        robots_txt: fc.constantFrom('found' as const, 'not_found' as const, 'unreadable' as const),
+        sitemap_urls: fc.nat(5000),
+      }),
+      { nil: null },
+    ),
   })
   .filter((r) => r.polls.length > 0 || r.end !== null);
 
@@ -400,6 +577,8 @@ function play(run: GenRun) {
   let pages = 0;
   let links = 0;
   let ms = 0;
+  let lastWait: number | null = null;
+  let discoveredSent = false;
   const poll = (check: CheckFacts, fold = true) => {
     // A reconnect at this point: the cursor goes out as text and comes back.
     cursor = parseCursor(formatCursor(cursor))!;
@@ -423,7 +602,14 @@ function play(run: GenRun) {
   for (const p of run.polls) {
     started ||= p.started;
     if (!started) {
-      poll({ status: 'queued', steps: null, counts: null, elapsedMs: 0 });
+      poll({
+        status: 'queued',
+        steps: null,
+        counts: null,
+        elapsedMs: 0,
+        waitingSinceMs: null,
+        discovered: null,
+      });
       continue;
     }
     phase = Math.min(3, phase + p.phases);
@@ -432,7 +618,13 @@ function play(run: GenRun) {
     pages += p.pages;
     links += p.links;
     ms += p.ms;
-    poll(running(phase, pages, links, ms));
+    const out = poll({
+      ...running(phase, pages, links, ms),
+      waitingSinceMs: p.wait,
+      discovered: run.discovered,
+    });
+    if (out.some((e) => e.type === 'discovered')) discoveredSent = true;
+    lastWait = p.wait;
   }
   let again: ProgressEvent[] | null = null;
   if (run.end !== null) {
@@ -443,13 +635,28 @@ function play(run: GenRun) {
       steps: null,
       counts: started ? { pages_crawled: pages, links_found: links } : null,
       elapsedMs: ms + 1,
+      waitingSinceMs: null,
+      discovered: null,
     };
     started = true;
     poll(facts);
     // A reconnect after the end: what it is sent is checked below, not folded.
     again = poll(facts, false);
   }
-  return { stored, have, state, sent, cursor, phase, pages, links, again, everStarted: started };
+  return {
+    stored,
+    have,
+    state,
+    sent,
+    cursor,
+    phase,
+    pages,
+    links,
+    again,
+    everStarted: started,
+    lastWait,
+    discoveredSent,
+  };
 }
 
 describe('nextEvents over generated runs (fast-check)', () => {
@@ -470,8 +677,38 @@ describe('nextEvents over generated runs (fast-check)', () => {
         expect([state.pages_crawled, state.links_found]).toEqual(ran ? [pages, links] : [0, 0]);
         expect(state.ended).toBe(run.end);
 
-        // No event is sent twice; after the end, a reconnect gets the end alone.
-        expect(new Set(sent.map((e) => JSON.stringify(e))).size).toBe(sent.length);
+        // No event is sent twice; after the end, a reconnect gets the end alone. A wait may begin
+        // again after it ended, so waits are checked apart: each one sent changes the wait.
+        const once = sent.filter((e) => e.type !== 'waiting');
+        expect(new Set(once.map((e) => JSON.stringify(e))).size).toBe(once.length);
+        const waits = sent.flatMap((e) => (e.type === 'waiting' ? [e.since_ms] : []));
+        for (let i = 1; i < waits.length; i++) expect(waits[i]).not.toBe(waits[i - 1]);
+        expect(waits[0]).not.toBeNull();
+
+        // The wait is the last poll's, clamped to the latest event's time, and the viewer's state
+        // and the cursor agree on it; an end clears it.
+        const { lastWait, cursor } = play(run);
+        expect(state.waiting_since_ms).toBe(cursor.waitingSince);
+        if (run.end !== null || !ran || lastWait === null) {
+          expect(state.waiting_since_ms).toBeNull();
+        } else {
+          expect(state.waiting_since_ms).toBe(Math.min(lastWait, cursor.at));
+        }
+
+        // Discovery's findings land once, as stored, exactly when a running poll got past
+        // discovery: worked out from the generated run, not from what the function sent.
+        let reachedDiscovery = false;
+        let begun = false;
+        let at = 0;
+        for (const p of run.polls) {
+          begun ||= p.started;
+          if (!begun) continue;
+          at = Math.min(3, at + p.phases);
+          if (at >= 1) reachedDiscovery = true;
+        }
+        const expectDiscovered = run.discovered !== null && reachedDiscovery;
+        expect(sent.filter((e) => e.type === 'discovered').length).toBe(expectDiscovered ? 1 : 0);
+        expect(state.discovery).toEqual(expectDiscovered ? run.discovered : null);
         if (again) expect(again).toEqual([sent.at(-1)]);
 
         // The map, computed from the generated rows without the function under test: one node for
@@ -506,6 +743,9 @@ describe('nextEvents over generated runs (fast-check)', () => {
       undrawable: 0,
       self: 0,
       failedAt: new Set<number>(),
+      waitEnded: 0,
+      waitAtEnd: 0,
+      discovered: 0,
     };
     fc.assert(
       fc.property(runArb, (run) => {
@@ -515,6 +755,10 @@ describe('nextEvents over generated runs (fast-check)', () => {
         if (run.batches.some((b) => b.rows.some((r) => r.drawable !== 'yes'))) seen.undrawable++;
         if (run.batches.some((b) => b.rows.length > 0 && b.edges.some((e) => e.self))) seen.self++;
         if (run.end === 'failed') seen.failedAt.add(play(run).phase);
+        const ws = run.polls.filter((p) => p.started).map((p) => p.wait);
+        if (ws.some((w, i) => w !== null && ws[i + 1] === null)) seen.waitEnded++;
+        if (run.end !== null && ws.at(-1) != null) seen.waitAtEnd++;
+        if (play(run).discoveredSent) seen.discovered++;
       }),
       { numRuns: 400 },
     );
@@ -524,6 +768,9 @@ describe('nextEvents over generated runs (fast-check)', () => {
     expect(seen.undrawable).toBeGreaterThan(0);
     expect(seen.self).toBeGreaterThan(0);
     expect([...seen.failedAt].sort()).toEqual([0, 1, 2, 3]);
+    expect(seen.waitEnded).toBeGreaterThan(0);
+    expect(seen.waitAtEnd).toBeGreaterThan(0);
+    expect(seen.discovered).toBeGreaterThan(0);
   });
 });
 

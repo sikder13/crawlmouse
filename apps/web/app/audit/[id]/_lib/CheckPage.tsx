@@ -32,6 +32,9 @@ export function noticeOf(read: Extract<CheckRead, { state: 'failed' | 'expired' 
       lines: [
         `What happened: ${FAILURE_COPY[read.reason]}.`,
         `It stopped on ${dateTimeUtc(read.failedAt)}.`,
+        ...(read.reason === 'capacity_wait_exceeded'
+          ? ['Start it again in a few minutes, once a crawler is free. A new audit is free.']
+          : []),
       ],
     };
   }

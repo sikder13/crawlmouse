@@ -9,6 +9,7 @@ import { FOOTER_LINE_CAPABILITIES } from '../../lib/v2/copy/footer-line';
 import {
   FOOTER_COLUMNS,
   FOOTER_COPY,
+  FOOTER_SOCIAL,
   SUPPORT_EMAIL,
   type FooterGates,
   type FooterItem,
@@ -97,6 +98,16 @@ export function SiteFooter({ status, lineMark, gates = footerGates() }: SiteFoot
           </p>
           <p className={layout.mut}>{FOOTER_COPY.company}</p>
           <CopyEmail address={SUPPORT_EMAIL} />
+          <ul className={styles.social} aria-label="Crawlmouse elsewhere">
+            {FOOTER_SOCIAL.map((l) => (
+              <li key={l.href}>
+                <a href={l.href} target="_blank" rel="noopener">
+                  {l.label}
+                  <VisuallyHidden> (opens in a new tab)</VisuallyHidden>
+                </a>
+              </li>
+            ))}
+          </ul>
           {/* The year when the page renders; on a page built statically, the year of the build. */}
           <p className={layout.mut}>
             © <span data-v2-year="">{new Date().getFullYear()}</span>
