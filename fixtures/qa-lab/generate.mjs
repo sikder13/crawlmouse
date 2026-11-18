@@ -1321,7 +1321,8 @@ function siteFiles(site) {
 /**
  * Legacy `routes`, because only they can set a status: cf-blocked answers 403 to any user agent
  * containing "Crawlmouse" (every crawler identity we send carries it), as a WAF rule would. Each host
- * is rewritten into its own folder; nothing else is served (the bare deployment URL is a 404).
+ * is rewritten into its own folder. A last route answers 404 to everything else, so another host and
+ * the bare deployment URL reach no folder (a request no route took would fall through to the files).
  */
 function vercelJson(sites) {
   const routes = [];
@@ -1344,6 +1345,7 @@ function vercelJson(sites) {
       dest: `/sites/${s.label}/$1`,
     });
   }
+  routes.push({ src: '/(.*)', status: 404, dest: '/404.html' });
   return `${JSON.stringify(
     {
       $schema: 'https://openapi.vercel.sh/vercel.json',
@@ -1394,7 +1396,9 @@ function listed(dir) {
 }
 
 const files = await output();
-const generated = ['vercel.json', 'blocked.html', '404.html', ...listed(join(ROOT, 'sites'))];
+/** What is here by hand rather than written by this file; anything else unlisted is stale output. */
+const SOURCES = ['generate.mjs', 'README.md', '.vercelignore'];
+const generated = listed(ROOT).filter((p) => !SOURCES.includes(p) && !p.startsWith('.vercel/'));
 
 if (process.argv.includes('--check')) {
   const stale = Object.entries(files)
