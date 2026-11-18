@@ -43,7 +43,11 @@ describe('sqlStreamStore, on the migrations', () => {
     await pipeline.claim(
       checkId,
       'run-1',
-      progressOf('crawl', { pagesCrawled: 7, linksFound: 40 }, 0),
+      progressOf(
+        'crawl',
+        { pagesCrawled: 7, linksFound: 40, discovered: null, waitingSince: null },
+        0,
+      ),
     );
     const post = (batch: number, kind: 'crawl' | 'access') =>
       pipeline.upsertBatch({
@@ -185,7 +189,14 @@ describe('supabaseStreamStore', () => {
       'checks:select': {
         site_id: 's',
         status: 'running',
-        progress: { steps: [{ phase: 'crawl', state: 'now' }], pages_crawled: 3, links_found: 9 },
+        progress: {
+          steps: [{ phase: 'crawl', state: 'now' }],
+          pages_crawled: 3,
+          links_found: 9,
+          waiting_since: null,
+          sitemap_urls: null,
+          robots_txt: null,
+        },
         started_at: '2026-11-10T10:00:00+00:00',
         finished_at: null,
         expires_at: null,
@@ -207,7 +218,14 @@ describe('supabaseStreamStore', () => {
       accountId: 'acct',
       siteRemoved: false,
       status: 'running',
-      progress: { steps: [{ phase: 'crawl', state: 'now' }], pages_crawled: 3, links_found: 9 },
+      progress: {
+        steps: [{ phase: 'crawl', state: 'now' }],
+        pages_crawled: 3,
+        links_found: 9,
+        waiting_since: null,
+        sitemap_urls: null,
+        robots_txt: null,
+      },
       startedAt: '2026-11-10T10:00:00+00:00',
       finishedAt: null,
       expiresAt: null,

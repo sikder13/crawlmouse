@@ -45,6 +45,8 @@ const running = (now: number, pages: number, elapsedMs: number): CheckFacts => (
   })),
   counts: { pages_crawled: pages, links_found: pages * 2 },
   elapsedMs,
+  waitingSinceMs: null,
+  discovered: null,
 });
 
 /** A run in three polls, as the groups the route frames: [events, cursor after]. */
@@ -75,6 +77,8 @@ function groups(): { events: ProgressEvent[]; cursor: Cursor }[] {
       steps: null,
       counts: { pages_crawled: 3, links_found: 6 },
       elapsedMs: 60_000,
+      waitingSinceMs: null,
+      discovered: null,
     },
     [{ batch: 2, result: crawlResult([row({ path: '/b', at: 30_000 })], [edge('/b', '/')]) }],
   );
