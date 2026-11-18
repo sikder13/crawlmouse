@@ -343,7 +343,8 @@ export const EDGE_OVERHEAD = 128;
  * quotes or backslashes is charged what it costs there, and content features as their JSON. What
  * is not counted exactly: each edge's other fields and keys (EDGE_OVERHEAD), each hreflang alternate's keys, and the page's row (its title, description, redirects
  * and limitations), which every page keeps whether or not its text is recorded. So a result can
- * pass the room by those; src/load.test.ts measures the largest the result store must hold.
+ * pass the room by those. src/load.test.ts measures the largest result its own cases produce, not the
+ * largest a batch can.
  */
 export function pageCost(
   rawText: string,
