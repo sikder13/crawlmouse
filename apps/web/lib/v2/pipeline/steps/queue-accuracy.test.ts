@@ -6,9 +6,12 @@
  *
  * Why BUSY_POLLS: 20 busy answers are 600 s of waiting (PACE.busyWaitS each). Before CC-42A the
  * crawl clock started when discovery ended, so a check that waited 600 s had no crawl window left
- * (CRAWL_CEILING_S is 480 s) and failed `worker_unavailable`. That is the mutation this file is
- * meant to catch: restore the old clock and "a check that waited ... gets the same answer" goes red.
- * 600 s is inside the wait budget (QUEUE_WAIT_MAX_S), so the waited check must still be graded.
+ * (CRAWL_CEILING_S is 480 s) and failed `worker_unavailable`. Restoring that time plan (the clock
+ * from discovery, and no add-back) reddens "a check that waited ... gets the same answer". Moving the
+ * clock alone does not: the add-back then credits the wait. inngest/check.test.ts pins the clock's
+ * start on its own. 600 s is inside the wait budget (QUEUE_WAIT_MAX_S), so the waited check must
+ * still be graded. Waits between later batches are not exercised here; steps/time.test.ts covers
+ * them.
  *
  * The harness is pipeline.test.ts's: the recorded batches, the seeds standing in for discovery,
  * and persistence stubbed to record what it is handed (the built check).
