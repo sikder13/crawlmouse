@@ -7,6 +7,7 @@ import { clock } from '../format';
 import { toneOf } from '../letters';
 import { mapIsComplete, type CheckPhase, type CrawlState, type FetchEvent } from '../progress';
 import { capitalise, count, numberWord, plural } from '../words';
+import { SITEMAP_URL_CAP } from '../sitemap-cap';
 import { FREE_FIXES } from './free-fixes';
 import type { GradeView } from './result';
 
@@ -43,7 +44,6 @@ const HEADINGS: Record<CheckPhase, string> = {
   grading: 'Grading',
 };
 
-/** How many fetch lines the log shows: the locked screen's five. */
 /** What discovery's robots.txt request answered, as the screen says it. */
 const ROBOTS_LINES: Record<
   NonNullable<NonNullable<CrawlState['discovery']>['robots_txt']>,
@@ -54,7 +54,11 @@ const ROBOTS_LINES: Record<
   unreadable: 'robots.txt could not be read',
 };
 
-/** One line for each field discovery recorded; a field it did not record is not named. */
+/**
+ * One line for each field discovery recorded; a field it did not record is not named. The sitemap
+ * count is what discovery read, which stops at SITEMAP_URL_CAP and at its deadline, so the line
+ * says "read", and says so when the cap was reached.
+ */
 function discoveryLines(d: CrawlState['discovery']): string[] {
   if (d === null) return [];
   const lines: string[] = [];
@@ -62,13 +66,16 @@ function discoveryLines(d: CrawlState['discovery']): string[] {
   if (d.sitemap_urls !== null) {
     lines.push(
       d.sitemap_urls === 0
-        ? 'Sitemap: no URLs found'
-        : `Sitemap: ${count(d.sitemap_urls)} ${plural(d.sitemap_urls, 'URL', 'URLs')}`,
+        ? 'Sitemap: no URLs read'
+        : d.sitemap_urls >= SITEMAP_URL_CAP
+          ? `Sitemap: ${count(d.sitemap_urls)} URLs read, the most an audit reads`
+          : `Sitemap: ${count(d.sitemap_urls)} ${plural(d.sitemap_urls, 'URL', 'URLs')} read`,
     );
   }
   return lines;
 }
 
+/** How many fetch lines the log shows: the locked screen's five. */
 export const LOG_LINES = 5;
 
 export interface CrawlContext {

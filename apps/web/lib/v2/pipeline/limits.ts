@@ -24,8 +24,7 @@ export const MIN_BATCH_S = 60;
 export const DISCOVER_S = 60;
 /** One discovery request's socket idle time and its whole time. */
 export const DISCOVER_REQUEST_MS = 10_000;
-/** Sitemap URLs read as seeds at most (ARCH-2 §4.2 step 1). */
-export const SITEMAP_URL_CAP = 5000;
+export { SITEMAP_URL_CAP } from '../sitemap-cap';
 /** The crawl's page cap when a request sets none: v1's free cap. */
 export const DEFAULT_PAGE_CAP = 500;
 /**

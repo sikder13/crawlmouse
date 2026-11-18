@@ -66,7 +66,7 @@ describe('a real check waiting for a crawler, after discovery (CC-42A decisions 
     expect(t).toContain('In line');
     expect(t).toContain('Waiting for a free crawler · 1:00');
     expect(t).toContain('No robots.txt');
-    expect(t).toContain('Sitemap: 1,240 URLs');
+    expect(t).toContain('Sitemap: 1,240 URLs read');
     expect(t).toContain('1:15 elapsed, 0 pages so far.');
     expect(t).not.toMatch(/usually about two minutes/i);
   });

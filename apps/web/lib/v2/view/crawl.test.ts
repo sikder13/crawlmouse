@@ -3,6 +3,7 @@ import fc from 'fast-check';
 import { findCheck, fixture } from '../fixtures';
 import { INITIAL_STATE, reduce } from '../progress';
 import { RECORDING_NAMES, recording, recordingSpec } from '../recordings';
+import { SITEMAP_URL_CAP } from '../sitemap-cap';
 import { LOG_LINES, LOG_LINE_MAX, crawlFrame, shortPath } from './crawl';
 
 const MAX = 24;
@@ -259,18 +260,33 @@ describe('waiting for a free crawler, and what discovery found (CC-42A decisions
   it('shows what discovery found, one line for each field it recorded', () => {
     expect(crawlFrame(discovered, ctx).discovery).toEqual([
       'robots.txt found',
-      'Sitemap: 1,240 URLs',
+      'Sitemap: 1,240 URLs read',
     ]);
     const lines = (
       robots_txt: 'found' | 'not_found' | 'unreadable' | null,
       sitemap_urls: number | null,
     ) => crawlFrame({ ...discovered, discovery: { robots_txt, sitemap_urls } }, ctx).discovery;
-    expect(lines('not_found', 0)).toEqual(['No robots.txt', 'Sitemap: no URLs found']);
-    expect(lines('unreadable', 1)).toEqual(['robots.txt could not be read', 'Sitemap: 1 URL']);
+    expect(lines('not_found', 0)).toEqual(['No robots.txt', 'Sitemap: no URLs read']);
+    expect(lines('unreadable', 1)).toEqual(['robots.txt could not be read', 'Sitemap: 1 URL read']);
     // A field discovery did not record is not named.
-    expect(lines(null, 5)).toEqual(['Sitemap: 5 URLs']);
+    expect(lines(null, 5)).toEqual(['Sitemap: 5 URLs read']);
     expect(lines('found', null)).toEqual(['robots.txt found']);
     expect(crawlFrame(INITIAL_STATE, ctx).discovery).toEqual([]);
+  });
+
+  it('says the sitemap count is what was read, and says so when the read stopped at the cap', () => {
+    const at = (sitemap_urls: number) =>
+      crawlFrame({ ...discovered, discovery: { robots_txt: null, sitemap_urls } }, ctx).discovery;
+    expect(at(SITEMAP_URL_CAP - 1)).toEqual(['Sitemap: 4,999 URLs read']);
+    expect(at(SITEMAP_URL_CAP)).toEqual(['Sitemap: 5,000 URLs read, the most an audit reads']);
+  });
+
+  it('does not put a finished check in line, even from a state that still holds a wait', () => {
+    // The reducer clears the wait on `ended`; the view does not rely on it.
+    const s = { ...discovered, ended: 'partial' as const, waiting_since_ms: 1000 };
+    const f = crawlFrame(s, ctx);
+    expect(f.waiting).toBeNull();
+    expect(f.heading).not.toBe('In line');
   });
 
   it('every robots.txt state has a line of its own', () => {
