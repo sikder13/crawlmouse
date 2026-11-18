@@ -11,8 +11,9 @@ every page says so in its footer (app-shell's footer is built by its script).
   when nothing under this folder changed since the last deployed commit, and builds when that commit
   is unknown.
 - **Routing by host.** `vercel.json` rewrites each host into `sites/<label>/`. The lab's own paths
-  (`/sites/…`, `/blocked.html`, `/404.html`) answer 404 on every host, because Vercel serves a file at
-  the requested path ahead of a rewrite. The bare deployment URL answers 404. Another name under
+  (`/sites/…`, `/blocked.html`, `/404.html`) and any path holding a `%` answer 404 on every host,
+  because Vercel serves a file at the requested path ahead of a rewrite, percent-encoded spellings
+  included. So nothing else may sit at the lab's root (`scripts/qa/accounts.test.ts` holds it). The bare deployment URL answers 404. Another name under
   `*.lab` resolves but has no certificate, so a request to it fails at TLS.
 - **DNS.** One record in Cloudflare zone `crawlmouse.com`: `*.lab` CNAME `cname.vercel-dns.com`, DNS
   only. Vercel issues each host's certificate.

@@ -40,9 +40,12 @@ const allHosts = (): string[] => Object.values(QA_HOSTS).flat();
 const labHosts = (): string[] => allHosts().filter((h) => h.endsWith(LAB_ZONE));
 const label = (host: string): string => host.slice(0, -LAB_ZONE.length);
 
-/** Vercel matches `src` and a `has` value as regular expressions anchored at both ends. */
+/**
+ * Vercel matches `src` and a `has` value as regular expressions anchored at both ends, ignoring case
+ * (measured live: `/SITES/…` and a `CRAWLMOUSE` user agent are matched as their lower-case forms).
+ */
 const whole = (pattern: string, text: string): RegExpExecArray | null =>
-  new RegExp(`^(?:${pattern})$`).exec(text);
+  new RegExp(`^(?:${pattern})$`, 'i').exec(text);
 
 function holds(c: Condition, host: string, userAgent: string): boolean {
   if (c.type === 'host' && c.key === undefined && c.value !== undefined)
@@ -147,7 +150,10 @@ describe('the lab serves every lab host', () => {
     for (const ua of tagged) {
       expect(ua).toMatch(/crawlmouse/i);
       for (const path of PATHS) {
-        expect(routeFor(QA_HOSTS.cfBlocked, path, ua)?.status, `${path} ${ua}`).toBe(403);
+        expect(routeFor(QA_HOSTS.cfBlocked, path, ua), `${path} ${ua}`).toEqual({
+          status: 403,
+          dest: '/blocked.html',
+        });
         for (const host of labHosts().filter((h) => h !== QA_HOSTS.cfBlocked)) {
           expect(routeFor(host, path, ua)?.status, `${host}${path} ${ua}`).toBeUndefined();
         }
@@ -186,12 +192,36 @@ describe('the lab serves every lab host', () => {
           '/sites/healthy/index.html',
           '/blocked.html',
           '/404.html',
+          // Percent-encoded spellings, which Vercel decodes to a file and `src` does not match.
+          '/%73ites/cf-blocked/',
+          '/sites%2fcf-blocked/',
+          '/%62locked.html',
+          '/%34%30%34.html',
         ]) {
           expect(routeFor(host, path, ua), `${host}${path} ${ua}`).toEqual({
             status: 404,
             dest: '/404.html',
           });
         }
+      }
+    }
+  });
+
+  // Vercel serves a file at the lab's root ahead of any host rewrite, and the routes refuse only the
+  // root files they name. So the root may hold no other served file: a root robots.txt, say, would be
+  // served on every host. vercel.json, .vercelignore and the ignored sources are not served (each
+  // answers 404 live).
+  it('serves at the lab root only the files the first route refuses, and ignores the sources', () => {
+    const ignored = readFileSync(join(LAB, '.vercelignore'), 'utf8').split('\n').filter(Boolean);
+    expect(ignored).toEqual(['generate.mjs', 'README.md', '.env*']);
+    const served = readdirSync(LAB)
+      .filter((f) => !['vercel.json', '.vercelignore', 'generate.mjs', 'README.md'].includes(f))
+      .filter((f) => !f.startsWith('.env'))
+      .sort();
+    expect(served).toEqual(['404.html', 'blocked.html', 'sites']);
+    for (const host of labHosts()) {
+      for (const f of ['404.html', 'blocked.html', 'sites/healthy/']) {
+        expect(routeFor(host, `/${f}`, CONTROL.userAgent)?.status, `${host}/${f}`).toBe(404);
       }
     }
   });

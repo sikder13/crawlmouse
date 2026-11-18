@@ -1349,8 +1349,10 @@ function siteFiles(site) {
 function vercelJson(sites) {
   // Vercel serves a file that exists at the requested path ahead of a host rewrite (measured: a
   // lab host answered /sites/<other>/ with the other site), so the lab's own paths are refused first.
+  // It also serves a percent-encoded spelling of one (measured: /%73ites/cf-blocked/ on healthy), which
+  // `src` does not match, so any path holding a % is refused too; no lab page has one.
   const routes = [
-    { src: '/(?:sites/.*|blocked\\.html|404\\.html)', status: 404, dest: '/404.html' },
+    { src: '/(?:sites/.*|blocked\\.html|404\\.html|.*%.*)', status: 404, dest: '/404.html' },
   ];
   for (const s of sites) {
     const host = `${s.label}.${ZONE}`;
