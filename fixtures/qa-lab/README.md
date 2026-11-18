@@ -11,15 +11,15 @@ every page says so in its footer (app-shell's footer is built by its script).
   when nothing under this folder changed since the last deployed commit, and builds when that commit
   is unknown.
 - **Routing by host.** `vercel.json` rewrites each host into `sites/<label>/`. The lab's own paths
-  (`/sites/…`, `/blocked.html`, `/404.html`) and any path holding a `%` answer 404 on every host,
+  (`/sites/…`, `/blocked.html`, `/404.html`, with or without a trailing slash, in any case) and any path holding a `%` answer 404 on every host,
   because Vercel serves a file at the requested path ahead of a rewrite, percent-encoded spellings
   included. So nothing else may sit at the lab's root (`scripts/qa/accounts.test.ts` holds it). The bare deployment URL answers 404. Another name under
   `*.lab` resolves but has no certificate, so a request to it fails at TLS.
 - **Kept out of search** (`docs/OPERATING-RULES.md` §13). Every response carries
-  `X-Robots-Tag: noindex` except to a user agent containing `Crawlmouse`, and every `robots.txt`
-  disallows the search engines (Googlebot, Bingbot and the other major ones) while allowing everyone
-  else. The Crawlmouse exception is load-bearing: the engine drops a `noindex` page from the graded
-  population, so a lab served with the header to our crawler would be refused a grade.
+  `X-Robots-Tag: noindex` except to a user agent containing `Crawlmouse`. The exception is
+  load-bearing: the engine drops a `noindex` page from the graded population, so a lab served with
+  the header to our crawler would be refused a grade. robots.txt does not disallow search engines: a
+  crawler kept out by robots.txt never fetches the page, so never reads the header.
 - **DNS.** One record in Cloudflare zone `crawlmouse.com`: `*.lab` CNAME `cname.vercel-dns.com`, DNS
   only. Vercel issues each host's certificate.
 - **Politeness.** Every lab host shares the politeness key `crawlmouse.com`, so checks of different
@@ -72,3 +72,15 @@ curl -sI https://healthy.lab.crawlmouse.com/sites/cf-blocked/ | head -1
 ```
 
 The loop prints 200 for each host; the next line prints `HTTP/2 403` and the last `HTTP/2 404`.
+
+Check the lab stays out of search and in reach of the crawler:
+
+```bash
+curl -sI https://healthy.lab.crawlmouse.com/ | grep -i x-robots-tag
+curl -sI -A "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)" \
+  https://demo-1.lab.crawlmouse.com/ | grep -i x-robots-tag
+curl -sI -A "CrawlmouseBot/1.0 (+https://crawlmouse.com/bot)" https://healthy.lab.crawlmouse.com/ \
+  | grep -ci x-robots-tag
+```
+
+The first two print `x-robots-tag: noindex`; the third prints `0`.

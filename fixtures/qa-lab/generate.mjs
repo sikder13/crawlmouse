@@ -1237,25 +1237,8 @@ ${body}
 `;
 }
 
-/**
- * Search engines, which robots.txt keeps off the lab so it never competes with crawlmouse.com in
- * search (OPERATING-RULES §13). The registry's search_engine group (Googlebot, Bingbot) and the other
- * major search crawlers. No AI crawler is named here, so the sites' AI-access signals are unchanged.
- */
-const SEARCH_ENGINE_AGENTS = [
-  'Googlebot',
-  'Bingbot',
-  'msnbot',
-  'DuckDuckBot',
-  'YandexBot',
-  'Baiduspider',
-  'Applebot',
-  'Slurp',
-];
-
 function robots(site) {
   const lines = ['User-agent: *', 'Allow: /'];
-  lines.push('', ...SEARCH_ENGINE_AGENTS.map((a) => `User-agent: ${a}`), 'Disallow: /');
   if (site.robots === 'gptbot-blocked') lines.push('', 'User-agent: GPTBot', 'Disallow: /');
   if (site.sitemap) lines.push('', `Sitemap: https://${site.label}.${ZONE}/sitemap.xml`);
   return `${lines.join('\n')}\n`;
@@ -1370,7 +1353,8 @@ function vercelJson(sites) {
   // `src` does not match, so any path holding a % is refused too; no lab page has one.
   //
   // Every response carries `X-Robots-Tag: noindex` except to a user agent containing "Crawlmouse"
-  // (OPERATING-RULES §13: the lab must never compete with crawlmouse.com in search). The exception is
+  // (OPERATING-RULES §13: the lab must never compete with crawlmouse.com in search). robots.txt does
+  // not disallow search engines: one kept out by robots.txt never reads the header (owner ruling). The exception is
   // load-bearing: the engine reads the header and drops a noindex page from the graded population, so
   // without it every lab site would be refused a grade.
   const routes = [
@@ -1380,7 +1364,11 @@ function vercelJson(sites) {
       headers: { 'X-Robots-Tag': 'noindex' },
       continue: true,
     },
-    { src: '/(?:sites/.*|blocked\\.html|404\\.html|.*%.*)', status: 404, dest: '/404.html' },
+    {
+      src: '/(?:(?:sites|blocked\\.html|404\\.html)(?:/.*)?|.*%.*)',
+      status: 404,
+      dest: '/404.html',
+    },
   ];
   for (const s of sites) {
     const host = `${s.label}.${ZONE}`;
@@ -1413,15 +1401,18 @@ function vercelJson(sites) {
   )}\n`;
 }
 
-/** A user agent that discloses Crawlmouse: every identity the engine and the worker send but the control. */
+/**
+ * A user agent that discloses Crawlmouse: the engine's and the worker's, except the worker's browser
+ * control and the engine's render client, which send untagged browser agents.
+ */
 const CRAWLMOUSE_UA = '.*[Cc]rawlmouse.*';
 
 /**
  * Build only when this folder changed since the last deployed commit; when that commit is unknown or
- * not in the clone, build (exit 1 builds, exit 0 skips).
+ * not in the clone (git exits 128), build: any failure becomes exit 1, which builds; exit 0 skips.
  */
 const IGNORE_COMMAND =
-  'if [ -n "$VERCEL_GIT_PREVIOUS_SHA" ]; then git diff --quiet "$VERCEL_GIT_PREVIOUS_SHA" HEAD -- .; else exit 1; fi';
+  'if [ -n "$VERCEL_GIT_PREVIOUS_SHA" ]; then git diff --quiet "$VERCEL_GIT_PREVIOUS_SHA" HEAD -- . || exit 1; else exit 1; fi';
 
 const BLOCKED = `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><title>Access denied</title></head>
@@ -1464,7 +1455,10 @@ function listed(dir) {
 const files = await output();
 /** What is here by hand rather than written by this file; anything else unlisted is stale output. */
 const SOURCES = ['generate.mjs', 'README.md', '.vercelignore'];
-const generated = listed(ROOT).filter((p) => !SOURCES.includes(p) && !p.startsWith('.vercel/'));
+// .vercel/ (written by `vercel link`) and .env* are local, gitignored and never uploaded.
+const generated = listed(ROOT).filter(
+  (p) => !SOURCES.includes(p) && !p.startsWith('.vercel/') && !p.startsWith('.env'),
+);
 
 if (process.argv.includes('--check')) {
   const stale = Object.entries(files)
