@@ -56,8 +56,10 @@ crawlmouse-worker-staging`), which is the least it needs.
 
 Automatic: a push to `main` that touches what the bundle is built from (the workflow's `paths`) runs
 `.github/workflows/worker-staging.yml`: worker tests, typecheck, bundle, then deploy that bundle, a
-health check, the egress allocation if none exists, and the egress check. The egress check restarts
-the machine, so a deploy restarts it twice. It does not wait for `ci.yml`.
+health check, a check that every machine runs the CPU kind and count, memory and
+`BATCH_CONCURRENCY` the toml sets (`flyctl machines list`), the egress allocation if none exists,
+and the egress check. The egress check restarts the machine, so a deploy restarts it twice. It does
+not wait for `ci.yml`. The build job has 25 minutes; the worker's test step took 566 s of a 4-vCPU runner in CI run 44255066523 (`gh run view 44255066523 --log`, job `test (worker)`).
 
 By hand, from the repository root:
 
@@ -448,7 +450,9 @@ differences are below.
    `gh workflow run worker-production.yml --ref main` while logged in as the owner. `authorize`
    checks who dispatched it and from where; `build` runs the worker's tests, typecheck and bundle;
    `deploy` checks again, deploys that bundle with the image labelled with the commit
-   (`--image-label`), checks `/healthz`, allocates the egress pair if the region has no egress IPv4,
+   (`--image-label`), checks `/healthz`, checks that the machine runs the size, memory and
+   `BATCH_CONCURRENCY` `fly.production.toml` sets, allocates the egress pair if the region has no
+   egress IPv4,
    and checks the egress address before and after a restart, masked. A deploy restarts the machine
    twice. If a step fails and you re-run the failed job, re-run it yourself: the owner check reads
    who re-ran it.
