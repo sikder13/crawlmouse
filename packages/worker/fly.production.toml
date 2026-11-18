@@ -11,17 +11,19 @@ kill_timeout = "5s"
 
 [env]
   PORT = "8080"
-  # Batches run at once. Four, the most the worker allows. At two, the load test of 2026-11-17
-  # (40 checks) failed 18 that never won a slot, while the machine peaked at 266 MB with its CPU
-  # under 3% busy. Four is untested at that scale; src/load.test.ts measures four at once.
-  BATCH_CONCURRENCY = "4"
+  # Batches run at once. Sixteen, the most the worker allows. Measured on 2026-11-18 on a machine of
+  # this size, one site per batch: it ran 32 at once without CPU throttling, and src/load.test.ts
+  # holds 16 on 10 MB pages within its bound at the heap below (docs/ops/worker-runbook.md,
+  # "Capacity").
+  BATCH_CONCURRENCY = "16"
   # The engine's page extractor computes AI-legibility signals by default; the worker discards them.
   AI_READINESS_EXTRACTION = "0"
-  # Old space 256 MB, and young-generation semi-spaces of 4 MB, which lowered the peak in each load
-  # case with no visible cost in time. src/load.test.ts runs four batches at once against 10 MB pages
-  # with these options and the result store full, and holds the peak resident memory to a fixed bound
-  # well under the VM below (see PEAK_RSS_MIB there).
-  NODE_OPTIONS = "--max-old-space-size=256 --max-semi-space-size=4"
+  # Old space 512 MB, and young-generation semi-spaces of 4 MB, which lowered the peak in each load
+  # case with no visible cost in time. At 256 MB, 16 batches of 10 MB pages ran the heap out of
+  # memory. src/load.test.ts runs 4, 8 and 16 batches at once against 10 MB pages with these options
+  # and the result store full, and holds the peak resident memory to a fixed bound per level well
+  # under the VM below (see PEAK_RSS_MIB there).
+  NODE_OPTIONS = "--max-old-space-size=512 --max-semi-space-size=4"
 
 [http_service]
   internal_port = 8080
@@ -52,5 +54,5 @@ kill_timeout = "5s"
   policy = "always"
 
 [[vm]]
-  size = "shared-cpu-1x"
-  memory = "1024mb"
+  size = "shared-cpu-2x"
+  memory = "2048mb"

@@ -1,6 +1,9 @@
+import { spawnSync } from 'node:child_process';
 import { DEFAULT_BATCH_CONCURRENCY, MAX_BATCH_CONCURRENCY } from './config.js';
 import { READER_FILE } from './reader/file.js';
-import { readFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { runStep, stepScript, unmasked } from './test-support/workflow.js';
 
@@ -184,7 +187,7 @@ describe('fly.toml and the Dockerfile', () => {
     // Restarted whatever its exit, so a crash cannot leave staging down until the next deploy.
     expect(flyToml).toMatch(/\n\[\[restart\]\]\n {2}policy = "always"\n/);
     // The heap limit is set; src/load.test.ts checks what the process holds under load against the VM.
-    expect(flyToml).toContain('NODE_OPTIONS = "--max-old-space-size=256 --max-semi-space-size=4"');
+    expect(flyToml).toContain('NODE_OPTIONS = "--max-old-space-size=512 --max-semi-space-size=4"');
   });
 
   it('caps the requests the proxy sends the machine at once, so the bodies it buffers are bounded', () => {
@@ -192,16 +195,19 @@ describe('fly.toml and the Dockerfile', () => {
     expect(section?.[1]).toBe('    type = "requests"\n    soft_limit = 20\n    hard_limit = 25\n');
   });
 
-  // Four, the most the worker allows, in staging and production. The load test of 2026-11-17 (D5,
-  // 40 checks against one machine at 2) failed 18 checks that never won a batch slot, while the
-  // machine peaked at 266 MB of 1,024 MB with its CPU under 3% busy. The code default stays 2: it
+  // Sixteen, the most the worker allows, in staging and production (CC-42B rulings-2). Measured on
+  // staging on 2026-11-18: shared-cpu-2x 2 GB ran 32 batches on distinct sites without throttling,
+  // and src/load.test.ts holds 16 on worst-case pages at a 512 MB heap. The code default stays 2: it
   // is what a worker run without fly.toml's [env] gets.
   it.each([
     ['fly.toml', flyToml],
     ['fly.production.toml', flyProductionToml],
-  ])('%s runs four batches at once, the most the worker allows', (_name, toml) => {
-    expect(toml).toMatch(/\n {2}BATCH_CONCURRENCY = "4"\n/);
-    expect(MAX_BATCH_CONCURRENCY).toBe(4);
+  ])('%s runs sixteen batches at once, the most the worker allows', (_name, toml) => {
+    expect(toml).toMatch(/\n {2}BATCH_CONCURRENCY = "16"\n/);
+    expect(MAX_BATCH_CONCURRENCY).toBe(16);
+    // On the machine that measured it: shared-cpu-2x with 2 GB.
+    expect(toml).toMatch(/\n\[\[vm\]\]\n {2}size = "shared-cpu-2x"\n {2}memory = "2048mb"\n/);
+    expect(toml).toContain('NODE_OPTIONS = "--max-old-space-size=512 --max-semi-space-size=4"');
     expect(DEFAULT_BATCH_CONCURRENCY).toBe(2);
     expect(toml).not.toContain('MAX_CONCURRENT_BATCHES');
   });
@@ -325,4 +331,137 @@ describe('the deploy steps, run against stand-ins for flyctl', () => {
     expect(r.code).toBe(1);
     expect(r.log).toContain('::error::could not read the address seen in 15 attempts');
   });
+});
+
+describe("the deploy step that reads the machine's size back, against a stand-in for flyctl", () => {
+  const sizeCheck = stepScript(workflow, 'The machine is the size the toml sets');
+  const machine = (kind: unknown, cpus: unknown, memory: unknown, batches: unknown) => ({
+    id: 'm1',
+    config: {
+      guest: { cpu_kind: kind, cpus, memory_mb: memory },
+      env: { BATCH_CONCURRENCY: batches },
+    },
+  });
+  /** Runs the step with this toml as the workspace's packages/worker/fly.toml. */
+  const check = (machines: string | null, toml = flyToml, realJq = false) => {
+    const ws = mkdtempSync(join(tmpdir(), 'worker-ws-'));
+    try {
+      mkdirSync(join(ws, 'packages/worker'), { recursive: true });
+      writeFileSync(join(ws, 'packages/worker/fly.toml'), toml);
+      return runStep(sizeCheck, { machines, realJq }, { GITHUB_WORKSPACE: ws });
+    } finally {
+      rmSync(ws, { recursive: true, force: true });
+    }
+  };
+  const shipped = machine('shared', 2, 2048, '16');
+
+  it('reads fly.toml, which sets shared-cpu-2x, 2048 MB and 16 batches', () => {
+    expect(flyToml).toContain('\n[[vm]]\n  size = "shared-cpu-2x"\n  memory = "2048mb"\n');
+    expect(flyToml).toContain('\n  BATCH_CONCURRENCY = "16"\n');
+    expect(sizeCheck).toContain('toml="$GITHUB_WORKSPACE/packages/worker/fly.toml"');
+  });
+
+  it('passes when every machine runs what the toml sets, and says what it read', () => {
+    const r = check(JSON.stringify([shipped]));
+    expect(r.code).toBe(0);
+    expect(r.log).toContain(
+      'machines: shared 2 2048 16 (CPU kind, CPUs, memory MB, BATCH_CONCURRENCY), as the toml sets',
+    );
+    expect(r.flyctl).toEqual(['machines list --app crawlmouse-worker-staging --json']);
+  });
+
+  it.each([
+    ['the old size', machine('shared', 1, 1024, '4'), 'shared 1 1024 4'],
+    ['another CPU kind', machine('performance', 2, 2048, '16'), 'performance 2 2048 16'],
+    ['another CPU count', machine('shared', 1, 2048, '16'), 'shared 1 2048 16'],
+    ['other memory', machine('shared', 2, 1024, '16'), 'shared 2 1024 16'],
+    ['another BATCH_CONCURRENCY', machine('shared', 2, 2048, '4'), 'shared 2 2048 4'],
+    ['no BATCH_CONCURRENCY', machine('shared', 2, 2048, undefined), 'shared 2 2048 null'],
+    ['no guest', { id: 'm1', config: { env: { BATCH_CONCURRENCY: '16' } } }, 'null null null 16'],
+  ])('fails when a machine runs %s, naming what it found', (_name, m, found) => {
+    const r = check(JSON.stringify([m]));
+    expect(r.code).toBe(1);
+    expect(r.log).toContain(
+      `::error::a machine runs '${found}' (CPU kind, CPUs, memory MB, BATCH_CONCURRENCY), not the toml's 'shared 2 2048 16'`,
+    );
+  });
+
+  it('fails when one machine of two differs, in either place', () => {
+    const old = machine('shared', 1, 1024, '4');
+    expect(check(JSON.stringify([shipped, old])).code).toBe(1);
+    expect(check(JSON.stringify([old, shipped])).code).toBe(1);
+  });
+
+  it.each([
+    ['the listing fails', null],
+    ['the listing is not JSON', 'Error: unauthorized'],
+  ])('fails when %s', (_name, listing) => {
+    expect(check(listing).code).not.toBe(0);
+  });
+
+  it.each([
+    ['no machine is listed', '[]'],
+    ['the listing prints nothing', ''],
+  ])('fails, saying there is no machine, when %s', (_name, listing) => {
+    const r = check(listing);
+    expect(r.code).toBe(1);
+    expect(r.log).toContain(
+      '::error::flyctl machines list shows no machine on crawlmouse-worker-staging',
+    );
+  });
+
+  it('reads a performance size and other values from the toml, not fixed ones', () => {
+    const toml = flyToml
+      .replace('size = "shared-cpu-2x"', 'size = "performance-1x"')
+      .replace('memory = "2048mb"', 'memory = "4096mb"')
+      .replace('BATCH_CONCURRENCY = "16"', 'BATCH_CONCURRENCY = "8"');
+    expect(check(JSON.stringify([machine('performance', 1, 4096, '8')]), toml).code).toBe(0);
+    expect(check(JSON.stringify([shipped]), toml).code).toBe(1);
+  });
+
+  it.each([
+    ['an unknown size', (t: string) => t.replace('size = "shared-cpu-2x"', 'size = "gpu-a100"')],
+    ['no memory', (t: string) => t.replace('  memory = "2048mb"\n', '')],
+    ['memory not in mb', (t: string) => t.replace('memory = "2048mb"', 'memory = "2gb"')],
+    ['no BATCH_CONCURRENCY', (t: string) => t.replace('  BATCH_CONCURRENCY = "16"\n', '')],
+  ])('fails before asking flyctl when the toml has %s', (_name, edit) => {
+    const toml = edit(flyToml);
+    expect(toml).not.toBe(flyToml);
+    const r = check(JSON.stringify([shipped]), toml);
+    expect(r.code).toBe(1);
+    expect(r.log).toContain(
+      '::error::could not read the VM size, memory and BATCH_CONCURRENCY from the toml',
+    );
+    expect(r.flyctl).toEqual([]);
+  });
+
+  it('runs after the health check and before the egress steps, in a 25-minute build', () => {
+    const at = (name: string) => workflow.indexOf(`- name: ${name}\n`);
+    expect(at('Health check')).toBeGreaterThan(at('Deploy'));
+    expect(at('The machine is the size the toml sets')).toBeGreaterThan(at('Health check'));
+    expect(at("Allocate the app's static egress addresses, once")).toBeGreaterThan(
+      at('The machine is the size the toml sets'),
+    );
+    expect(workflow).toMatch(/\n {2}build:\n {4}runs-on: ubuntu-24\.04\n {4}timeout-minutes: 25\n/);
+  });
+
+  // The stand-in implements the step's filter in JavaScript; this runs the same listings through the
+  // runner's jq, which prints numbers and null in interpolation its own way. CI's ubuntu-24.04 runner
+  // has jq; where none is installed the case is skipped and says so.
+  const hasJq = spawnSync('jq', ['--version']).status === 0;
+  it.runIf(hasJq)('reads the same with the real jq: integers, null and a mismatch', () => {
+    const ok = check(JSON.stringify([shipped]), flyToml, true);
+    expect(ok.code).toBe(0);
+    expect(ok.log).toContain('machines: shared 2 2048 16 (CPU kind');
+    const nulls = check(JSON.stringify([machine('shared', 2, 2048, undefined)]), flyToml, true);
+    expect(nulls.code).toBe(1);
+    expect(nulls.log).toContain("::error::a machine runs 'shared 2 2048 null'");
+    const old = check(JSON.stringify([shipped, machine('shared', 1, 1024, '4')]), flyToml, true);
+    expect(old.code).toBe(1);
+    expect(old.log).toContain("::error::a machine runs 'shared 1 1024 4'");
+    const none = check('[]', flyToml, true);
+    expect(none.code).toBe(1);
+    expect(none.log).toContain('shows no machine');
+  });
+  it.skipIf(hasJq)('skips the real-jq case: no jq on PATH', () => {});
 });

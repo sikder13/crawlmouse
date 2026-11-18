@@ -56,8 +56,10 @@ crawlmouse-worker-staging`), which is the least it needs.
 
 Automatic: a push to `main` that touches what the bundle is built from (the workflow's `paths`) runs
 `.github/workflows/worker-staging.yml`: worker tests, typecheck, bundle, then deploy that bundle, a
-health check, the egress allocation if none exists, and the egress check. The egress check restarts
-the machine, so a deploy restarts it twice. It does not wait for `ci.yml`.
+health check, a check that every machine runs the CPU kind and count, memory and
+`BATCH_CONCURRENCY` the toml sets (`flyctl machines list`), the egress allocation if none exists,
+and the egress check. The egress check restarts the machine, so a deploy restarts it twice. It does
+not wait for `ci.yml`. The build job has 25 minutes; the worker's test step took 566 s of a 4-vCPU runner in CI run 44255066523 (`gh run view 44255066523 --log`, job `test (worker)`).
 
 By hand, from the repository root:
 
@@ -169,17 +171,29 @@ its host.
 
 ## Roll back
 
-List releases with their images, then deploy the previous image:
+List releases with their images, then deploy the previous image **with the fly.toml it shipped
+with**. An image and its toml go together: the toml sets `BATCH_CONCURRENCY`, the heap and the VM, and
+an image refuses to start when `BATCH_CONCURRENCY` is above its own `MAX_BATCH_CONCURRENCY` (its
+`loadConfig` throws at boot, and `[[restart]] policy = "always"` restarts it in a loop). Today's toml
+on an image from before 16 slots is exactly that.
 
 ```bash
 flyctl releases --app crawlmouse-worker-staging --image
 ```
 
+Take the commit from the image's label (the workflow labels each image with it), and write that
+commit's toml to a file outside the checkout:
+
 ```bash
-flyctl deploy --app crawlmouse-worker-staging --config packages/worker/fly.toml --image <image of the previous release> --ha=false
+git show <commit of the previous release>:packages/worker/fly.toml > /tmp/fly.previous.toml
 ```
 
-Then revert the commit on `main`, or the next push deploys it again.
+```bash
+flyctl deploy --app crawlmouse-worker-staging --config /tmp/fly.previous.toml --image <image of the previous release> --ha=false
+```
+
+This also puts back that release's VM size and heap. Then revert the commit on `main`, or the next
+push deploys it again.
 
 ## Logs and metrics
 
@@ -208,7 +222,7 @@ restart loses the batches that were running, and `GET /batch/{id}` for one of th
 `not_found`, so the caller has to send the batch again.
 
 - **Killed for memory.** `flyctl logs` shows the kernel's `Out of memory: Killed process` line, then
-  the machine starting again. The VM has 1 GB (fly.toml `[[vm]]`). `peak_rss_mb` in `GET /metrics`
+  the machine starting again. The VM has 2 GB (fly.toml `[[vm]]`). `peak_rss_mb` in `GET /metrics`
   starts again with the process, so it cannot show the peak that killed it; read it while batches
   run to see how close the process gets.
 - **Running but unhealthy.** Find the machine and restart it by hand:
@@ -230,12 +244,13 @@ restart loses the batches that were running, and `GET /batch/{id}` for one of th
   All batches share the one thread, and reads queue in order, so a site whose pages are slow to read
   delays the reads of the batches running beside it. Those batches can then spend their time budget
   and come back partial with `budget_seconds`, which is the worker's limit, not those sites'.
-- **Batches at once.** `BATCH_CONCURRENCY` in fly.toml (4), at most 4 (the worker refuses to start
-  above it). More batches add no CPU on a shared vCPU; they queue behind each other's pages.
-- **CPU throttled.** A `shared-cpu-1x` vCPU is guaranteed 6.25% of a core (5 ms per 80 ms). It runs
+- **Batches at once.** `BATCH_CONCURRENCY` in fly.toml (16), at most 16 (the worker refuses to start
+  above it). What each level costs in CPU and memory, and where each machine size stops keeping up,
+  is in "Capacity" below.
+- **CPU throttled.** The VM is `shared-cpu-2x`: two shared vCPUs. A shared vCPU is guaranteed 6.25% of a core (5 ms per 80 ms). It runs
   at up to 100% while it has burst balance, which accrues from unused baseline time (starting at
   5 s, at most 500 s; about 533 s of full use from a full balance), then drops back to 6.25%. These
-  are Fly's figures as of 2026-10-31 and Fly says they may change:
+  are Fly's figures for one shared vCPU as of 2026-10-31 (how they scale to `shared-cpu-2x`'s two is not measured here), and Fly says they may change:
   <https://docs.fly.io/machines/cpu-performance>. Throttled, a page read that takes 0.6 s can take
   about 10 s, which is why a read's deadline is 20 s. Signs: `fly_instance_cpu_throttle` rising, and
   the "CPU Quota Balance and Throttling" panel of the Fly Instance dashboard (Managed Grafana) at
@@ -246,6 +261,67 @@ restart loses the batches that were running, and `GET /batch/{id}` for one of th
 - **Crash loop.** If the machine dies again soon after each restart, a batch the caller sends again
   may be the cause. Set `CRAWL_PAUSED=1` (Stop all crawling, below) so `POST /batch` answers 503,
   then read the `batch_accepted` lines before each restart in `flyctl logs` to find it.
+
+## Capacity
+
+How many batches one machine runs at once, measured. Re-measure before changing `BATCH_CONCURRENCY`,
+the VM or the heap: `src/load.test.ts` measures the levels listed at the end of this section, and the
+worker refuses a `BATCH_CONCURRENCY` above `MAX_BATCH_CONCURRENCY`.
+
+<!-- capacity: generated by `pnpm --filter @crawlmouse/worker spec` from src/spec/capacity-measured.json: do not edit by hand -->
+
+**What ships:** `BATCH_CONCURRENCY` 16 (the worker allows at most 16), on shared-cpu-2x with 2048mb and a 512 MB heap, in both fly tomls. The result store keeps 500 batches and 272 MiB of results.
+
+**Realistic pages, on Fly.** Measured 2026-11-18 on `crawlmouse-worker-staging`. One crawl batch in flight per site (cm42b-\*.fly.dev, each its own registrable domain), 50 URLs a batch at most, CRAWL_BATCH_BUDGET, for 240 s per level; heap 256 MB as shipped then. Levels ran one after another, each for 240 s, so a level drew on the CPU burst balance the levels before it left; "Balance min" is Fly's `fly_instance_cpu_balance` at its lowest in the level, as Fly reports it. Loop delay is `monitorEventLoopDelay` less its 20 ms sampling interval. A site's floor is 0.50 s a page.
+
+| Machine             | Batches | vCPU mean / max | Throttle max | Balance min | Peak RSS MiB | Loop delay p50 / p99 / max ms | s a page p50 / p90 / max | Wire gap p1 ms | Wire gaps under 250 ms | Batches done | Partial, refused, timeouts |
+| ------------------- | ------- | --------------- | ------------ | ----------- | ------------ | ----------------------------- | ------------------------ | -------------- | ---------------------- | ------------ | -------------------------- |
+| shared-cpu-1x 1 GB  | 4       | 0.05 / 0.06     | 0            | 5667        | 144          | 0 / 1 / 14                    | 0.52 / 0.61 / 0.9        | 497            | 0 of 1864              | 108 of 108   | 0, 0, 0                    |
+| shared-cpu-1x 1 GB  | 8       | 0.08 / 0.11     | 0            | 5509        | 162          | 0 / 1 / 21                    | 0.52 / 0.67 / 3.5        | 497            | 0 of 3758              | 179 of 179   | 0, 0, 2                    |
+| shared-cpu-1x 1 GB  | 16      | 0.15 / 0.18     | 0            | 3203        | 186          | 0 / 2 / 23                    | 0.52 / 0.60 / 1.1        | 496            | 11 of 7536             | 364 of 364   | 0, 0, 0                    |
+| shared-cpu-1x 1 GB  | 32      | 0.59 / 1.02     | 94           | 1           | 204          | 0 / 463 / 2142                | 0.53 / 1.65 / 5.6        | 486            | 48 of 10682            | 465 of 465   | 0, 0, 1                    |
+| shared-cpu-1x 1 GB  | 64      | 0.86 / 1.02     | 94           | 1           | 218          | 0 / 2941 / 4782               | 4.90 / 18.76 / 22.0      | 288            | 27 of 3159             | 113 of 114   | 7, 1, 335                  |
+| shared-cpu-2x 2 GB  | 4       | 0.06 / 0.09     | 0            | 10115       | 149          | 0 / 1 / 17                    | 0.53 / 0.67 / 1.0        | 498            | 0 of 1878              | 107 of 107   | 0, 0, 0                    |
+| shared-cpu-2x 2 GB  | 8       | 0.09 / 0.11     | 0            | 12519       | 166          | 0 / 1 / 7                     | 0.52 / 0.58 / 0.9        | 497            | 0 of 3824              | 184 of 184   | 0, 0, 0                    |
+| shared-cpu-2x 2 GB  | 16      | 0.17 / 0.21     | 0            | 12557       | 189          | 0 / 1 / 8                     | 0.52 / 0.60 / 1.1        | 497            | 15 of 7580             | 364 of 364   | 0, 0, 0                    |
+| shared-cpu-2x 2 GB  | 32      | 0.31 / 0.40     | 0            | 7865        | 201          | 0 / 2 / 21                    | 0.52 / 0.61 / 1.1        | 496            | 30 of 15228            | 694 of 694   | 0, 0, 0                    |
+| shared-cpu-2x 2 GB  | 64      | 0.93 / 1.96     | 178          | 1           | 226          | 0 / 219 / 1020                | 0.53 / 1.22 / 2.3        | 487            | 84 of 24868            | 1114 of 1114 | 0, 0, 0                    |
+| performance-1x 2 GB | 4       | 0.06 / 0.07     | 0            | 81312       | 142          | 0 / 1 / 16                    | 0.52 / 0.60 / 1.1        | 497            | 0 of 1888              | 108 of 108   | 0, 0, 0                    |
+| performance-1x 2 GB | 8       | 0.08 / 0.11     | 0            | 112662      | 157          | 0 / 1 / 15                    | 0.52 / 0.65 / 0.9        | 497            | 0 of 3754              | 181 of 181   | 0, 0, 0                    |
+| performance-1x 2 GB | 16      | 0.15 / 0.18     | 0            | 143267      | 182          | 0 / 2 / 19                    | 0.52 / 0.59 / 1.1        | 497            | 8 of 7550              | 363 of 363   | 0, 0, 0                    |
+| performance-1x 2 GB | 32      | 0.28 / 0.34     | 0            | 171877      | 197          | 0 / 3 / 26                    | 0.52 / 0.61 / 1.2        | 492            | 32 of 15238            | 693 of 693   | 0, 0, 0                    |
+| performance-1x 2 GB | 64      | 0.25 / 0.63     | 0            | 196667      | 208          | 0 / 5 / 166                   | 0.52 / 0.64 / 1.3        | 486            | 10 of 30228            | 1372 of 1372 | 0, 0, 1                    |
+
+Where each machine's CPU stopped keeping up (the first level Fly throttled it, within a 240 s level):
+
+- **shared-cpu-1x 1 GB:** throttled at 32 (not at 16): loop delay p99 463 ms, p90 1.65 s a page.
+- **shared-cpu-2x 2 GB:** throttled at 64 (not at 32): loop delay p99 219 ms, p90 1.22 s a page.
+- **performance-1x 2 GB:** not throttled at any level, up to 64.
+
+**Gaps under 250 ms on the wire.** The column above counts arrivals at the fixture, not starts in the worker. Re-measured 2026-11-18 on shared-cpu-2x 2 GB at 16 batches over 16 sites: 16 arrival gaps under 250 ms (14 to 126 ms), on 16 sites, and every one was `/robots.txt` then `/`. The worker started those requests at least 499 ms apart (`fetched_at` on the page rows).
+
+The first request to a site opens the connection and the next reuses it. On `cm42b-s-20` alone, robots.txt arrived 61 ms after its start and the next request 5 ms after its start, 500 ms later, so the arrivals were 444 ms apart. In the 16-site run the robots.txt starts were not recorded, so a longer connection setup under load is the explanation the probe supports, not a figure measured for each of those gaps.
+
+**Worst-case pages, in `src/load.test.ts`.** Measured 2026-11-18 at a 512 MB heap, on the test's 10 MB pages, with the result store full. Each peak is the highest of the runs on the date: one run of the file alone, one inside the full worker suite; the full-budget rows ran once. A level's bound is its highest peak × 1.35, rounded up to 10 MiB: 4: 911.4 → 1240 MiB (× 1.36); 8: 868.9 → 1180 MiB (× 1.36); 16: 1167.6 → 1580 MiB (× 1.35).
+
+| Batches | Case                                                | Peak RSS MiB | Heap used MiB | Bound MiB |
+| ------- | --------------------------------------------------- | ------------ | ------------- | --------- |
+| 4       | 10 MB pages, 50 URLs                                | 782.5        | 125.8         | 1240      |
+| 4       | access, 2 pages                                     | 527.6        | 45.4          | 1240      |
+| 4       | brotli, 50 URLs                                     | 743.4        | 123.1         | 1240      |
+| 4       | densest markup, 4 URLs                              | 911.4        | 64.0          | 1240      |
+| 8       | brotli, 50 URLs, cut short at 60 s                  | 825.3        | 177.9         | 1180      |
+| 8       | brotli, 50 URLs, full budget (once, not in CI)      | 868.9        | 224.7         | 1180      |
+| 16      | 10 MB pages, 50 URLs, cut short at 60 s             | 915.1        | 260.5         | 1580      |
+| 16      | 10 MB pages, 50 URLs, full budget (once, not in CI) | 1131.1       | 397.0         | 1580      |
+| 16      | access, 2 pages                                     | 626.3        | 97.7          | 1580      |
+| 16      | brotli, 50 URLs, cut short at 60 s                  | 928.6        | 244.6         | 1580      |
+| 16      | brotli, 50 URLs, full budget (once, not in CI)      | 1167.6       | 401.9         | 1580      |
+| 16      | densest markup, 4 URLs                              | 1108.0       | 165.6         | 1580      |
+
+Levels run: 4, 8, 16. The largest result the load test measured is 8.36 MiB; 16 of them twice over is 267 MiB, which the store's 272 MiB holds.
+
+<!-- end of capacity section -->
 
 ## Rotate the signing secret
 
@@ -374,7 +450,9 @@ differences are below.
    `gh workflow run worker-production.yml --ref main` while logged in as the owner. `authorize`
    checks who dispatched it and from where; `build` runs the worker's tests, typecheck and bundle;
    `deploy` checks again, deploys that bundle with the image labelled with the commit
-   (`--image-label`), checks `/healthz`, allocates the egress pair if the region has no egress IPv4,
+   (`--image-label`), checks `/healthz`, checks that the machine runs the size, memory and
+   `BATCH_CONCURRENCY` `fly.production.toml` sets, allocates the egress pair if the region has no
+   egress IPv4,
    and checks the egress address before and after a restart, masked. A deploy restarts the machine
    twice. If a step fails and you re-run the failed job, re-run it yourself: the owner check reads
    who re-ran it.
@@ -433,22 +511,33 @@ worker first. `pnpm golive:check` reports the two apart. Every dispatch deploys 
 
 ### Roll back
 
-List the releases with their images, then deploy the previous one:
+List the releases with their images, then deploy the previous one **with the
+fly.production.toml it shipped with** (why: "Roll back" above):
 
 ```bash
 flyctl releases --app crawlmouse-worker --image
 ```
 
+For a release the workflow deployed, the image reference ends with the commit it was built from,
+the label it gave the image. Write that commit's toml to a file outside the checkout:
+
 ```bash
-flyctl deploy --app crawlmouse-worker --config packages/worker/fly.production.toml --image <image of the previous release> --ha=false
+git show <commit of the previous release>:packages/worker/fly.production.toml > /tmp/fly.production.previous.toml
 ```
 
-For a release the workflow deployed, the image reference ends with the commit it was built from,
-the label it gave the image. Then fix or revert the change on `main` before the next dispatch, which
-deploys `main`'s head again.
+```bash
+flyctl deploy --app crawlmouse-worker --config /tmp/fly.production.previous.toml --image <image of the previous release> --ha=false
+```
+
+This also puts back that release's VM size and heap. Then fix or revert the change on `main` before
+the next dispatch, which deploys `main`'s head again.
 
 What a rollback does to checks in flight: the deploy restarts the machine, so batches running at
-that moment are lost, and the check sends each one again once. A check that already took a batch
+that moment are lost (up to `BATCH_CONCURRENCY` of them), and the check sends each one again once.
+A deploy restarts the machine twice (the rollout, then the egress check's restart). A batch lost at
+both is given up and its check goes on without it, so it can end with fewer pages, or
+`worker_unavailable` when it read no crawl batch at all (`runBatch` in `inngest/check.ts`). Deploy at
+a quiet hour, or set `CRAWL_PAUSED=1` first ("Stop all crawling"), so fewer are running. A check that already took a batch
 from the release before the rollback and then reads one from the rolled-back release fails with
 `worker_redeployed`: `take` in `inngest/check.ts` refuses a batch whose worker release differs
 from the first one the check read. The same holds for any production deploy. Those checks have to

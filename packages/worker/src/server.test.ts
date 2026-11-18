@@ -529,11 +529,11 @@ describe('configuration', () => {
     ).toThrow();
   });
 
-  it('runs two batches at once unless BATCH_CONCURRENCY says otherwise, and at most four', () => {
+  it('runs two batches at once unless BATCH_CONCURRENCY says otherwise, and at most sixteen', () => {
     const env = { WORKER_SIGNING_SECRET: SECRET, WORKER_JWT_PUBLIC_KEY: keys.publicKeyEnv };
     expect(loadConfig(env).batchConcurrency).toBe(2);
-    expect(loadConfig({ ...env, BATCH_CONCURRENCY: '4' }).batchConcurrency).toBe(4);
-    expect(() => loadConfig({ ...env, BATCH_CONCURRENCY: '5' })).toThrow(/BATCH_CONCURRENCY/);
+    expect(loadConfig({ ...env, BATCH_CONCURRENCY: '16' }).batchConcurrency).toBe(16);
+    expect(() => loadConfig({ ...env, BATCH_CONCURRENCY: '17' })).toThrow(/BATCH_CONCURRENCY/);
     expect(() => loadConfig({ ...env, BATCH_CONCURRENCY: 'two' })).toThrow(/BATCH_CONCURRENCY/);
   });
 
