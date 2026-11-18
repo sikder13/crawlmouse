@@ -3,6 +3,20 @@
   "ignoreCommand": "if [ -n \"$VERCEL_GIT_PREVIOUS_SHA\" ]; then git diff --quiet \"$VERCEL_GIT_PREVIOUS_SHA\" HEAD -- .; else exit 1; fi",
   "routes": [
     {
+      "src": "/(.*)",
+      "missing": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*[Cc]rawlmouse.*"
+        }
+      ],
+      "headers": {
+        "X-Robots-Tag": "noindex"
+      },
+      "continue": true
+    },
+    {
       "src": "/(?:sites/.*|blocked\\.html|404\\.html|.*%.*)",
       "status": 404,
       "dest": "/404.html"

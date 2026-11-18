@@ -11,7 +11,14 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { CANARY, CONTROL, CRAWL, CRAWLERS } from '../../packages/worker/src/identities';
+import { CRAWLER_REGISTRY_V2, isAllowedByRobots, parseRobotsTxt } from '@crawlmouse/engine/worker';
+import {
+  CANARY,
+  CONTROL,
+  CRAWL,
+  CRAWLERS,
+  OUR_ROBOTS_TOKENS,
+} from '../../packages/worker/src/identities';
 import { QA_ACCOUNTS, QA_HOSTS } from './accounts';
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -29,9 +36,12 @@ interface Route {
   dest?: string;
   status?: number;
   has?: Condition[];
+  missing?: Condition[];
+  headers?: Record<string, string>;
+  continue?: boolean;
 }
 
-const ROUTE_KEYS = ['src', 'dest', 'status', 'has'];
+const ROUTE_KEYS = ['src', 'dest', 'status', 'has', 'missing', 'headers', 'continue'];
 
 const routes = (): Route[] =>
   (JSON.parse(readFileSync(join(LAB, 'vercel.json'), 'utf8')) as { routes: Route[] }).routes;
@@ -47,35 +57,55 @@ const label = (host: string): string => host.slice(0, -LAB_ZONE.length);
 const whole = (pattern: string, text: string): RegExpExecArray | null =>
   new RegExp(`^(?:${pattern})$`, 'i').exec(text);
 
-function holds(c: Condition, host: string, userAgent: string): boolean {
+/** `userAgent` undefined is a request that sends no User-Agent header. */
+function holds(c: Condition, host: string, userAgent: string | undefined): boolean {
   if (c.type === 'host' && c.key === undefined && c.value !== undefined)
     return whole(c.value, host) !== null;
   if (c.type === 'header' && c.key === 'user-agent' && c.value !== undefined)
-    return whole(c.value, userAgent) !== null;
+    return userAgent !== undefined && whole(c.value, userAgent) !== null;
   throw new Error(`routeFor does not model the condition ${JSON.stringify(c)}`);
 }
 
+interface Outcome {
+  /** The route that ended the walk; undefined when none did. */
+  final?: { status?: number; dest?: string };
+  /** Headers set by every route the request matched on the way, `continue` routes included. */
+  headers: Record<string, string>;
+}
+
 /**
- * Where a request goes: the first route whose `src` matches the path and whose `has` conditions all
- * hold, with `$1` filled from the match. Undefined when no route takes it.
+ * Vercel's walk: each route whose `src` matches the path, whose `has` conditions all hold and none of
+ * whose `missing` conditions hold, adds its headers; a `continue` route walks on, any other ends the
+ * walk with its status and its `dest` (`$1` filled from the match).
  */
-function routeFor(
-  host: string,
-  path: string,
-  userAgent: string,
-): { status?: number; dest?: string } | undefined {
+function walk(host: string, path: string, userAgent: string | undefined): Outcome {
+  const headers: Record<string, string> = {};
   for (const r of routes()) {
     const unmodelled = Object.keys(r).filter((k) => !ROUTE_KEYS.includes(k));
     if (unmodelled.length) throw new Error(`routeFor does not model ${unmodelled.join(', ')}`);
     const m = whole(r.src, path);
-    if (!m || !(r.has ?? []).every((c) => holds(c, host, userAgent))) continue;
+    if (!m) continue;
+    if (!(r.has ?? []).every((c) => holds(c, host, userAgent))) continue;
+    if ((r.missing ?? []).some((c) => holds(c, host, userAgent))) continue;
+    Object.assign(headers, r.headers ?? {});
+    if (r.continue) continue;
     return {
-      status: r.status,
-      dest: r.dest?.replace(/\$(\d)/g, (_, i: string) => m[Number(i)] ?? ''),
+      final: {
+        status: r.status,
+        dest: r.dest?.replace(/\$(\d)/g, (_, i: string) => m[Number(i)] ?? ''),
+      },
+      headers,
     };
   }
-  return undefined;
+  return { headers };
 }
+
+/** Where a request goes: the route that ends the walk. Undefined when no route takes it. */
+const routeFor = (
+  host: string,
+  path: string,
+  userAgent: string | undefined,
+): { status?: number; dest?: string } | undefined => walk(host, path, userAgent).final;
 
 const PATHS = ['/', '/some/deep/page/', '/robots.txt'];
 
@@ -222,6 +252,54 @@ describe('the lab serves every lab host', () => {
     for (const host of labHosts()) {
       for (const f of ['404.html', 'blocked.html', 'sites/healthy/']) {
         expect(routeFor(host, `/${f}`, CONTROL.userAgent)?.status, `${host}/${f}`).toBe(404);
+      }
+    }
+  });
+
+  it('tells every request but Crawlmouse’s not to index, so the lab stays out of search', () => {
+    const searchEngines = [
+      'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
+      'Mozilla/5.0 (compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm)',
+    ];
+    const paths = [...PATHS, '/sites/healthy/', '/no-such-page/'];
+    for (const host of [...labHosts(), 'crawlmouse-qa-lab.vercel.app']) {
+      for (const path of paths) {
+        for (const ua of [CONTROL.userAgent, undefined, ...searchEngines]) {
+          expect(walk(host, path, ua).headers['X-Robots-Tag'], `${host}${path} ${ua}`).toBe(
+            'noindex',
+          );
+        }
+        for (const ua of taggedUserAgents()) {
+          expect(walk(host, path, ua).headers, `${host}${path} ${ua}`).toEqual({});
+        }
+      }
+    }
+  });
+
+  it('disallows every search engine in each lab robots.txt, and no crawler it did not before', () => {
+    const searchTokens = CRAWLER_REGISTRY_V2.filter((e) => e.group === 'search_engine').map(
+      (e) => e.robots_token ?? e.token,
+    );
+    expect(searchTokens.length).toBeGreaterThan(0);
+    const others = CRAWLER_REGISTRY_V2.filter((e) => e.group !== 'search_engine').map(
+      (e) => e.robots_token ?? e.token,
+    );
+    expect(others).toContain('GPTBot');
+    // The two clients built to block GPTBot (README); every other crawler is allowed everywhere.
+    const blocksGptbot = new Set(['client-3', 'client-6']);
+    for (const host of labHosts()) {
+      const robots = parseRobotsTxt(readFileSync(join(SITES, label(host), 'robots.txt'), 'utf8'));
+      for (const path of ['/', '/some/deep/page/']) {
+        for (const t of searchTokens) {
+          expect(isAllowedByRobots(robots, t, path), `${host} ${t} ${path}`).toBe(false);
+        }
+        for (const t of OUR_ROBOTS_TOKENS) {
+          expect(isAllowedByRobots(robots, t, path), `${host} ${t} ${path}`).toBe(true);
+        }
+        for (const t of others) {
+          const blocked = t === 'GPTBot' && blocksGptbot.has(label(host));
+          expect(isAllowedByRobots(robots, t, path), `${host} ${t} ${path}`).toBe(!blocked);
+        }
       }
     }
   });

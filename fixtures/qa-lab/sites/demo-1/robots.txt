@@ -1,4 +1,14 @@
 User-agent: *
 Allow: /
 
+User-agent: Googlebot
+User-agent: Bingbot
+User-agent: msnbot
+User-agent: DuckDuckBot
+User-agent: YandexBot
+User-agent: Baiduspider
+User-agent: Applebot
+User-agent: Slurp
+Disallow: /
+
 Sitemap: https://demo-1.lab.crawlmouse.com/sitemap.xml

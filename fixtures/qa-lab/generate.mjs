@@ -1237,8 +1237,25 @@ ${body}
 `;
 }
 
+/**
+ * Search engines, which robots.txt keeps off the lab so it never competes with crawlmouse.com in
+ * search (OPERATING-RULES §13). The registry's search_engine group (Googlebot, Bingbot) and the other
+ * major search crawlers. No AI crawler is named here, so the sites' AI-access signals are unchanged.
+ */
+const SEARCH_ENGINE_AGENTS = [
+  'Googlebot',
+  'Bingbot',
+  'msnbot',
+  'DuckDuckBot',
+  'YandexBot',
+  'Baiduspider',
+  'Applebot',
+  'Slurp',
+];
+
 function robots(site) {
   const lines = ['User-agent: *', 'Allow: /'];
+  lines.push('', ...SEARCH_ENGINE_AGENTS.map((a) => `User-agent: ${a}`), 'Disallow: /');
   if (site.robots === 'gptbot-blocked') lines.push('', 'User-agent: GPTBot', 'Disallow: /');
   if (site.sitemap) lines.push('', `Sitemap: https://${site.label}.${ZONE}/sitemap.xml`);
   return `${lines.join('\n')}\n`;
@@ -1351,7 +1368,18 @@ function vercelJson(sites) {
   // lab host answered /sites/<other>/ with the other site), so the lab's own paths are refused first.
   // It also serves a percent-encoded spelling of one (measured: /%73ites/cf-blocked/ on healthy), which
   // `src` does not match, so any path holding a % is refused too; no lab page has one.
+  //
+  // Every response carries `X-Robots-Tag: noindex` except to a user agent containing "Crawlmouse"
+  // (OPERATING-RULES §13: the lab must never compete with crawlmouse.com in search). The exception is
+  // load-bearing: the engine reads the header and drops a noindex page from the graded population, so
+  // without it every lab site would be refused a grade.
   const routes = [
+    {
+      src: '/(.*)',
+      missing: [{ type: 'header', key: 'user-agent', value: CRAWLMOUSE_UA }],
+      headers: { 'X-Robots-Tag': 'noindex' },
+      continue: true,
+    },
     { src: '/(?:sites/.*|blocked\\.html|404\\.html|.*%.*)', status: 404, dest: '/404.html' },
   ];
   for (const s of sites) {
@@ -1361,7 +1389,7 @@ function vercelJson(sites) {
         src: '/(.*)',
         has: [
           { type: 'host', value: host },
-          { type: 'header', key: 'user-agent', value: '.*[Cc]rawlmouse.*' },
+          { type: 'header', key: 'user-agent', value: CRAWLMOUSE_UA },
         ],
         status: 403,
         dest: '/blocked.html',
@@ -1384,6 +1412,9 @@ function vercelJson(sites) {
     2,
   )}\n`;
 }
+
+/** A user agent that discloses Crawlmouse: every identity the engine and the worker send but the control. */
+const CRAWLMOUSE_UA = '.*[Cc]rawlmouse.*';
 
 /**
  * Build only when this folder changed since the last deployed commit; when that commit is unknown or
