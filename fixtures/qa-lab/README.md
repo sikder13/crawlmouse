@@ -15,8 +15,9 @@ every page says so in its footer (app-shell's footer is built by its script).
   because Vercel serves a file at the requested path ahead of a rewrite, percent-encoded spellings
   included. So nothing else may sit at the lab's root (`scripts/qa/accounts.test.ts` holds it). The bare deployment URL answers 404. Another name under
   `*.lab` resolves but has no certificate, so a request to it fails at TLS.
-- **Kept out of search** (`docs/OPERATING-RULES.md` §13). Every response carries
-  `X-Robots-Tag: noindex` except to a user agent containing `Crawlmouse`. The exception is
+- **Kept out of search** (`docs/OPERATING-RULES.md` §13). Every page and 404 the routes answer carries `X-Robots-Tag:
+noindex`, except to a user agent containing `Crawlmouse`. Vercel's own redirects and errors (the
+  308s that add https or collapse `//`, a 400 for a raw `..`) carry none and hold no content. The exception is
   load-bearing: the engine drops a `noindex` page from the graded population, so a lab served with
   the header to our crawler would be refused a grade. robots.txt does not disallow search engines: a
   crawler kept out by robots.txt never fetches the page, so never reads the header.

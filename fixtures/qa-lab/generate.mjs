@@ -5,7 +5,7 @@
  * folder. The output is committed, so what Vercel serves is what review read.
  *
  *   node fixtures/qa-lab/generate.mjs           # rewrite sites/ and vercel.json
- *   node fixtures/qa-lab/generate.mjs --check   # exit 1 if the committed output differs
+ *   node fixtures/qa-lab/generate.mjs --check   # exit 1 if the files on disk differ from its output
  *
  * Output goes through the repository's Prettier config, so CI's format check passes on it as written.
  *
@@ -732,7 +732,7 @@ function buildSites() {
     sites.push(site);
   }
 
-  // client-6 — a roofer: sixty pages, a five-item text nav on every page, deep pages, GPTBot blocked.
+  // client-6 — a roofer: the largest client (57 pages), a five-item text nav on every page, deep pages, GPTBot blocked.
   {
     const site = {
       label: 'client-6',
@@ -1342,7 +1342,7 @@ function siteFiles(site) {
 
 /**
  * Legacy `routes`, because only they can set a status: cf-blocked answers 403 to any user agent
- * containing "Crawlmouse" (every crawler identity we send carries it), as a WAF rule would. Each host
+ * containing "Crawlmouse" (CRAWLMOUSE_UA below), as a WAF rule would. Each host
  * is rewritten into its own folder. A last route answers 404 to everything else, so another host and
  * the bare deployment URL reach no folder (a request no route took would fall through to the files).
  */
@@ -1352,7 +1352,7 @@ function vercelJson(sites) {
   // It also serves a percent-encoded spelling of one (measured: /%73ites/cf-blocked/ on healthy), which
   // `src` does not match, so any path holding a % is refused too; no lab page has one.
   //
-  // Every response carries `X-Robots-Tag: noindex` except to a user agent containing "Crawlmouse"
+  // Every response a route answers carries `X-Robots-Tag: noindex` except to a user agent containing "Crawlmouse"
   // (OPERATING-RULES §13: the lab must never compete with crawlmouse.com in search). robots.txt does
   // not disallow search engines: one kept out by robots.txt never reads the header (owner ruling). The exception is
   // load-bearing: the engine reads the header and drops a noindex page from the graded population, so
@@ -1455,9 +1455,9 @@ function listed(dir) {
 const files = await output();
 /** What is here by hand rather than written by this file; anything else unlisted is stale output. */
 const SOURCES = ['generate.mjs', 'README.md', '.vercelignore'];
-// .vercel/ (written by `vercel link`) and .env* are local, gitignored and never uploaded.
+// `vercel link` writes .vercel/ and .env.local; both are gitignored and never uploaded.
 const generated = listed(ROOT).filter(
-  (p) => !SOURCES.includes(p) && !p.startsWith('.vercel/') && !p.startsWith('.env'),
+  (p) => !SOURCES.includes(p) && !p.startsWith('.vercel/') && p !== '.env.local',
 );
 
 if (process.argv.includes('--check')) {

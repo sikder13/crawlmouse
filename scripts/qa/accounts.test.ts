@@ -42,6 +42,9 @@ interface Route {
   continue?: boolean;
 }
 
+/** Written into the lab folder by `vercel link`; gitignored, never uploaded. */
+const LOCAL_ONLY = ['.vercel', '.env.local'];
+
 const ROUTE_KEYS = ['src', 'dest', 'status', 'has', 'missing', 'headers', 'continue'];
 
 const routes = (): Route[] =>
@@ -52,8 +55,10 @@ const labHosts = (): string[] => allHosts().filter((h) => h.endsWith(LAB_ZONE));
 const label = (host: string): string => host.slice(0, -LAB_ZONE.length);
 
 /**
- * Vercel matches `src` and a `has` value as regular expressions anchored at both ends, ignoring case
- * (measured live: `/SITES/…` and a `CRAWLMOUSE` user agent are matched as their lower-case forms).
+ * `src` and a `has` value as regular expressions anchored at both ends, ignoring case. The case part
+ * is measured live (`/SITES/…` and a `CRAWLMOUSE` user agent match their lower-case forms); the
+ * anchoring follows Vercel's documented route matching and is not measured. Not modelled: query
+ * strings, and Vercel's own 308s for http and `//`, which run before any route.
  */
 const whole = (pattern: string, text: string): RegExpExecArray | null =>
   new RegExp(`^(?:${pattern})$`, 'i').exec(text);
@@ -167,7 +172,7 @@ describe('the lab serves every lab host', () => {
     }
   });
 
-  it('routes each lab host, from a browser, into its own folder, at any path', () => {
+  it('routes each lab host, from a browser, into its own folder, at a root, a deep and a file path', () => {
     for (const host of labHosts()) {
       for (const path of PATHS) {
         expect(routeFor(host, path, CONTROL.userAgent), `${host}${path}`).toEqual({
@@ -178,7 +183,7 @@ describe('the lab serves every lab host', () => {
     }
   });
 
-  it('answers 403 on cf-blocked to every user agent we send that says Crawlmouse, and on no other host', () => {
+  it('answers 403 on cf-blocked to the engine’s and the worker’s Crawlmouse user agents, and on no other host', () => {
     const tagged = taggedUserAgents();
     expect(tagged.length).toBeGreaterThan(3);
     for (const ua of tagged) {
@@ -254,10 +259,11 @@ describe('the lab serves every lab host', () => {
   it('serves at the lab root only the files the first route refuses, and ignores the sources', () => {
     const ignored = readFileSync(join(LAB, '.vercelignore'), 'utf8').split('\n').filter(Boolean);
     expect(ignored).toEqual(['generate.mjs', 'README.md', '.env*']);
-    // .vercel/ (written by `vercel link`) and .env* are local, gitignored and never uploaded.
+    // `vercel link` writes .vercel/ and .env.local; both are gitignored and never uploaded. Any other
+    // dotfile, a committed .env.production say, fails here.
     const served = readdirSync(LAB)
       .filter((f) => !['vercel.json', '.vercelignore', 'generate.mjs', 'README.md'].includes(f))
-      .filter((f) => f !== '.vercel' && !f.startsWith('.env'))
+      .filter((f) => !LOCAL_ONLY.includes(f))
       .sort();
     expect(served).toEqual(['404.html', 'blocked.html', 'sites']);
     for (const host of labHosts()) {
@@ -275,7 +281,8 @@ describe('the lab serves every lab host', () => {
     const paths = [...PATHS, '/sites/healthy/', '/no-such-page/'];
     for (const host of [...labHosts(), 'crawlmouse-qa-lab.vercel.app']) {
       for (const path of paths) {
-        for (const ua of [CONTROL.userAgent, undefined, ...searchEngines]) {
+        // 'Crawl mouse' is a near miss: the exception keys on the whole word.
+        for (const ua of [CONTROL.userAgent, undefined, 'Crawl mouse/1.0', ...searchEngines]) {
           expect(walk(host, path, ua).headers['X-Robots-Tag'], `${host}${path} ${ua}`).toBe(
             'noindex',
           );
@@ -290,26 +297,50 @@ describe('the lab serves every lab host', () => {
 
   // robots.txt must not keep search engines out: one disallowed never fetches a page, so never reads
   // the noindex header above, and could list a linked lab URL without it (owner ruling).
-  it('lets search engines, our crawler and every registry crawler read each lab site, but GPTBot on the two clients built to block it', () => {
-    const searchTokens = CRAWLER_REGISTRY_V2.filter((e) => e.group === 'search_engine').map(
-      (e) => e.robots_token ?? e.token,
-    );
-    expect(searchTokens.length).toBeGreaterThan(0);
-    // The other major search crawlers, written out here rather than read from the generator.
-    searchTokens.push('msnbot', 'DuckDuckBot', 'YandexBot', 'Baiduspider', 'Applebot', 'Slurp');
-    const others = CRAWLER_REGISTRY_V2.filter((e) => e.group !== 'search_engine').map(
-      (e) => e.robots_token ?? e.token,
-    );
-    expect(others).toContain('GPTBot');
+  it('disallows nothing in any lab robots.txt but GPTBot on the two clients built to block it', () => {
     // The two clients built to block GPTBot (README).
     const blocksGptbot = new Set(['client-3', 'client-6']);
     for (const host of labHosts()) {
-      const robots = parseRobotsTxt(readFileSync(join(SITES, label(host), 'robots.txt'), 'utf8'));
-      for (const path of ['/', '/some/deep/page/']) {
-        for (const t of [...searchTokens, ...OUR_ROBOTS_TOKENS]) {
-          expect(isAllowedByRobots(robots, t, path), `${host} ${t} ${path}`).toBe(true);
+      const text = readFileSync(join(SITES, label(host), 'robots.txt'), 'utf8');
+      // Structural: every non-empty Disallow, with the user agents of the group it sits in.
+      const disallows: string[] = [];
+      let agents: string[] = [];
+      let inRules = false;
+      for (const raw of text.split('\n')) {
+        const line = raw.replace(/#.*/, '').trim();
+        const m = /^([a-z-]+)\s*:\s*(.*)$/i.exec(line);
+        if (!m) continue;
+        const [key, value] = [m[1]!.toLowerCase(), m[2]!.trim()];
+        if (key === 'user-agent') {
+          if (inRules) agents = [];
+          inRules = false;
+          agents.push(value);
+        } else if (key === 'disallow' || key === 'allow') {
+          inRules = true;
+          if (key === 'disallow' && value !== '') disallows.push(`${agents.join(',')} ${value}`);
         }
-        for (const t of others) {
+      }
+      expect(disallows, host).toEqual(blocksGptbot.has(label(host)) ? ['GPTBot /'] : []);
+
+      // Behavioural, through the engine's parser, over every page the site serves.
+      const robots = parseRobotsTxt(text);
+      const pages = (dir: string, at: string): string[] =>
+        readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
+          e.isDirectory()
+            ? pages(join(dir, e.name), `${at}${e.name}/`)
+            : e.name === 'index.html'
+              ? [at]
+              : [],
+        );
+      const paths = pages(join(SITES, label(host)), '/');
+      expect(paths).toContain('/');
+      const tokens = [
+        ...CRAWLER_REGISTRY_V2.map((e) => e.robots_token ?? e.token),
+        ...OUR_ROBOTS_TOKENS,
+      ];
+      expect(tokens).toContain('Googlebot');
+      for (const path of paths) {
+        for (const t of tokens) {
           const blocked = t === 'GPTBot' && blocksGptbot.has(label(host));
           expect(isAllowedByRobots(robots, t, path), `${host} ${t} ${path}`).toBe(!blocked);
         }
