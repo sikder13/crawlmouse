@@ -44,6 +44,31 @@ const HEADINGS: Record<CheckPhase, string> = {
 };
 
 /** How many fetch lines the log shows: the locked screen's five. */
+/** What discovery's robots.txt request answered, as the screen says it. */
+const ROBOTS_LINES: Record<
+  NonNullable<NonNullable<CrawlState['discovery']>['robots_txt']>,
+  string
+> = {
+  found: 'robots.txt found',
+  not_found: 'No robots.txt',
+  unreadable: 'robots.txt could not be read',
+};
+
+/** One line for each field discovery recorded; a field it did not record is not named. */
+function discoveryLines(d: CrawlState['discovery']): string[] {
+  if (d === null) return [];
+  const lines: string[] = [];
+  if (d.robots_txt !== null) lines.push(ROBOTS_LINES[d.robots_txt]);
+  if (d.sitemap_urls !== null) {
+    lines.push(
+      d.sitemap_urls === 0
+        ? 'Sitemap: no URLs found'
+        : `Sitemap: ${count(d.sitemap_urls)} ${plural(d.sitemap_urls, 'URL', 'URLs')}`,
+    );
+  }
+  return lines;
+}
+
 export const LOG_LINES = 5;
 
 export interface CrawlContext {
@@ -57,7 +82,16 @@ export interface CrawlFrame {
   title: { eyebrow: string; note: string };
   /** Whether there is still an audit to cancel. */
   cancellable: boolean;
+  /** "In line" while the check waits for a free crawler; otherwise the step under way. */
   heading: string;
+  /**
+   * While the check waits for a free crawler, how long it has waited: "Waiting for a free crawler
+   * · 1:30". No position: the worker serves whichever check asks first once a slot frees, so a
+   * place in a line would be invented. Null when not waiting.
+   */
+  waiting: string | null;
+  /** What discovery found, one line for each field it recorded ("robots.txt found"). */
+  discovery: string[];
   /** "0:47". */
   clock: string;
   /** "0:47 elapsed", or "2:11 in all" once it has ended. */
@@ -186,17 +220,20 @@ export function crawlFrame(state: CrawlState, ctx: CrawlContext): CrawlFrame {
   // (the grades can land a moment before the stream says it has ended).
   const last = state.steps.filter((s) => s.state === 'done').at(-1);
   const finished = state.ended !== null;
+  const waitingSince = finished ? null : state.waiting_since_ms;
   const heading = finished
     ? state.ended === 'partial'
       ? 'Finished, partly'
       : state.ended === 'failed'
         ? 'Stopped'
         : 'Finished'
-    : now
-      ? HEADINGS[now.phase]
-      : last
-        ? HEADINGS[last.phase]
-        : 'Starting';
+    : waitingSince !== null
+      ? 'In line'
+      : now
+        ? HEADINGS[now.phase]
+        : last
+          ? HEADINGS[last.phase]
+          : 'Starting';
   const estimate = state.pages_estimated;
   const recent = state.fetches.slice(-LOG_LINES);
   const pagesText = finished
@@ -222,13 +259,23 @@ export function crawlFrame(state: CrawlState, ctx: CrawlContext): CrawlFrame {
     title: !finished
       ? {
           eyebrow: 'Auditing',
-          note: 'Usually about two minutes. You can leave this page; the result keeps building.',
+          // Rendered from the state: how long it has run and what it has read, never a forecast.
+          note: `${clock(state.elapsed_ms)} elapsed, ${count(state.pages_crawled)} ${plural(
+            state.pages_crawled,
+            'page',
+            'pages',
+          )} so far. You can leave this page; the result keeps building.`,
         }
       : state.ended === 'failed'
         ? { eyebrow: 'Audit stopped', note: 'It stopped before it could finish.' }
         : { eyebrow: 'Audited', note: 'The result is ready.' },
     cancellable: !finished,
     heading,
+    waiting:
+      waitingSince === null
+        ? null
+        : `Waiting for a free crawler · ${clock(Math.max(0, state.elapsed_ms - waitingSince))}`,
+    discovery: discoveryLines(state.discovery),
     clock: clock(state.elapsed_ms),
     elapsed: `${clock(state.elapsed_ms)} ${finished ? 'in all' : 'elapsed'}`,
     finished,

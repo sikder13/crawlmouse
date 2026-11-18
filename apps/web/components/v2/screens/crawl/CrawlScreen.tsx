@@ -432,6 +432,11 @@ function StatusPanel({
           <span className={layout.mut}>{frame.pagesText}</span>
           <span className={layout.mut}>{frame.linksText}</span>
         </div>
+        {frame.waiting ? (
+          <div className={`${layout.mut} ${styles.waiting}`} data-v2-waiting="">
+            {frame.waiting}
+          </div>
+        ) : null}
         {over ? <span className={styles.headCard} aria-hidden="true" data-v2-card="" /> : null}
       </div>
       {/*
@@ -461,6 +466,15 @@ function StatusPanel({
           </div>
         ))}
       </div>
+      {frame.discovery.length > 0 ? (
+        <ul className={styles.discovery} aria-label="From robots.txt and the sitemap">
+          {frame.discovery.map((line) => (
+            <li key={line} className={layout.mut}>
+              {line}
+            </li>
+          ))}
+        </ul>
+      ) : null}
       <div className={styles.found} data-v2-addition="">
         <div className={`${layout.row} ${styles.between}`}>
           <span className={styles.foundTitle}>Found so far</span>

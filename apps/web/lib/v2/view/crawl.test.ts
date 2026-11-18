@@ -205,3 +205,92 @@ describe('the bar at the end', () => {
     expect(crawlFrame(end('finished'), ctx).pagesText).toBe('210 pages crawled');
   });
 });
+
+describe('waiting for a free crawler, and what discovery found (CC-42A decisions 4 and 5)', () => {
+  const ctx = { domain: 'example.test', crawlers: [] };
+  const events = (...es: Parameters<typeof reduce>[1][]) => es.reduce(reduce, INITIAL_STATE);
+  const discovered = events(
+    { type: 'stage', at_ms: 0, phase: 'robots_and_sitemap', state: 'now' },
+    { type: 'stage', at_ms: 4000, phase: 'robots_and_sitemap', state: 'done' },
+    { type: 'discovered', at_ms: 4000, robots_txt: 'found', sitemap_urls: 1240 },
+    { type: 'stage', at_ms: 4000, phase: 'homepage', state: 'now' },
+  );
+
+  it('while the worker is busy, the heading is "In line" with how long it has waited', () => {
+    const s = {
+      ...reduce(discovered, { type: 'waiting', at_ms: 10_000, since_ms: 10_000 }),
+      elapsed_ms: 100_000,
+    };
+    const f = crawlFrame(s, ctx);
+    expect(f.heading).toBe('In line');
+    expect(f.waiting).toBe('Waiting for a free crawler · 1:30');
+  });
+
+  it('names no position in line: nothing it could count is a real order', () => {
+    const s = reduce(discovered, { type: 'waiting', at_ms: 10_000, since_ms: 10_000 });
+    expect(crawlFrame(s, ctx).waiting).not.toMatch(/\d+\s*(ahead|before|in line)|#\d/i);
+  });
+
+  it('once a batch is taken the heading is the step under way again, with no wait line', () => {
+    const s = events(
+      { type: 'stage', at_ms: 0, phase: 'robots_and_sitemap', state: 'now' },
+      { type: 'waiting', at_ms: 1000, since_ms: 1000 },
+      { type: 'waiting', at_ms: 5000, since_ms: null },
+    );
+    const f = crawlFrame(s, ctx);
+    expect(f.heading).toBe('Reading robots.txt');
+    expect(f.waiting).toBeNull();
+  });
+
+  it('the note under the title is the elapsed time and the pages so far, not a promise', () => {
+    const s = {
+      ...reduce(discovered, { type: 'counts', at_ms: 47_000, pages_crawled: 12, links_found: 80 }),
+      elapsed_ms: 47_000,
+    };
+    const { note } = crawlFrame(s, ctx).title;
+    expect(note).toBe(
+      '0:47 elapsed, 12 pages so far. You can leave this page; the result keeps building.',
+    );
+    expect(note).not.toMatch(/usually|about two minutes/i);
+    const one = { ...s, pages_crawled: 1 };
+    expect(crawlFrame(one, ctx).title.note).toContain('1 page so far');
+  });
+
+  it('shows what discovery found, one line for each field it recorded', () => {
+    expect(crawlFrame(discovered, ctx).discovery).toEqual([
+      'robots.txt found',
+      'Sitemap: 1,240 URLs',
+    ]);
+    const lines = (
+      robots_txt: 'found' | 'not_found' | 'unreadable' | null,
+      sitemap_urls: number | null,
+    ) => crawlFrame({ ...discovered, discovery: { robots_txt, sitemap_urls } }, ctx).discovery;
+    expect(lines('not_found', 0)).toEqual(['No robots.txt', 'Sitemap: no URLs found']);
+    expect(lines('unreadable', 1)).toEqual(['robots.txt could not be read', 'Sitemap: 1 URL']);
+    // A field discovery did not record is not named.
+    expect(lines(null, 5)).toEqual(['Sitemap: 5 URLs']);
+    expect(lines('found', null)).toEqual(['robots.txt found']);
+    expect(crawlFrame(INITIAL_STATE, ctx).discovery).toEqual([]);
+  });
+
+  it('every robots.txt state has a line of its own', () => {
+    const states = ['found', 'not_found', 'unreadable'] as const;
+    const seen = states.map(
+      (robots_txt) =>
+        crawlFrame({ ...discovered, discovery: { robots_txt, sitemap_urls: null } }, ctx)
+          .discovery[0],
+    );
+    expect(new Set(seen).size).toBe(states.length);
+  });
+
+  it('an ended check is not in line', () => {
+    const s = reduce(reduce(discovered, { type: 'waiting', at_ms: 10_000, since_ms: 10_000 }), {
+      type: 'ended',
+      at_ms: 20_000,
+      status: 'failed',
+    });
+    const f = crawlFrame(s, ctx);
+    expect(f.heading).toBe('Stopped');
+    expect(f.waiting).toBeNull();
+  });
+});
