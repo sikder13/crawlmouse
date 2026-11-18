@@ -4,8 +4,10 @@
  * seed (./seed.ts) reads it.
  *
  * Every host is in `QA_HOSTS`. Besides the owner's two domains they are subdomains of
- * `lab.nahltech.com`, named by the role the site plays, so a production seed checks no third
- * party's site on a schedule (docs/specs/v2/38-launch-qa.md, Q7).
+ * `lab.crawlmouse.com`, named by the role the site plays, so a production seed checks no third
+ * party's site on a schedule (docs/specs/v2/38-launch-qa.md, Q7). The lab sites are static fixtures
+ * in `fixtures/qa-lab/sites/<label>/`, served by host from the Vercel project `crawlmouse-qa-lab`;
+ * `./accounts.test.ts` holds this list, those folders and their routes to one another.
  */
 
 export const QA_KEYS = [
@@ -22,14 +24,14 @@ export type QaKey = (typeof QA_KEYS)[number];
 export const QA_HOSTS = {
   nahltech: 'nahltech.com',
   crawlmouse: 'crawlmouse.com',
-  healthy: 'healthy.lab.nahltech.com',
-  appShell: 'app-shell.lab.nahltech.com',
-  cfBlocked: 'cf-blocked.lab.nahltech.com',
-  clients: [1, 2, 3, 4, 5, 6].map((n) => `client-${n}.lab.nahltech.com`),
+  healthy: 'healthy.lab.crawlmouse.com',
+  appShell: 'app-shell.lab.crawlmouse.com',
+  cfBlocked: 'cf-blocked.lab.crawlmouse.com',
+  clients: [1, 2, 3, 4, 5, 6].map((n) => `client-${n}.lab.crawlmouse.com`),
   // The Agency trial's client has a host of its own: a Free account's first audit counts against
   // its host's hourly bucket, which qa+agency's first client would otherwise share on every reset.
-  trialClient: 'trial-client-1.lab.nahltech.com',
-  demo: [1, 2, 3].map((n) => `demo-${n}.lab.nahltech.com`),
+  trialClient: 'trial-client-1.lab.crawlmouse.com',
+  demo: [1, 2, 3].map((n) => `demo-${n}.lab.crawlmouse.com`),
 } as const;
 
 /** Where the person's work lives: their own account, a second (agency) account, or a seat on one. */
