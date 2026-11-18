@@ -1,9 +1,11 @@
 -- v2 CC-42A: a failure reason of its own for a check that never won a crawler.
 --
 -- A check waiting on the worker's `busy` answers for its first crawl batch is given QUEUE_WAIT_MAX_S
--- (inngest/check.ts). One whose next wait would pass that budget now fails `capacity_wait_exceeded`,
--- where it used to fail `worker_unavailable`. `worker_unavailable` keeps its meaning: no crawl batch
--- could be read, because the worker did not answer, refused our credentials, or lost a batch twice.
+-- (inngest/check.ts). One whose next wait would pass that budget, or would bring its next post past
+-- FIRST_ACCEPT_BY_S, now fails `capacity_wait_exceeded`, where it used to fail `worker_unavailable`.
+-- `worker_unavailable` keeps its meaning, as inngest/check-events.ts states it: no crawl batch could
+-- be read, because the worker did not answer, refused our credentials, lost a batch twice, kept a
+-- batch running past its deadline, or its result could not be read.
 --
 -- check_failure_reasons() (migration 008) is the closed list fail_check and reap_stalled_checks
 -- refuse to write outside. This replaces it with FAILURE_REASONS in inngest/check-events.ts, in its

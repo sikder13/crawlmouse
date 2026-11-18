@@ -47,12 +47,14 @@ export const FAILURE_REASONS = [
   'worker_redeployed',
   /**
    * No crawl batch could be read: the worker did not answer, refused our credentials, lost a batch
-   * twice, or its result could not be read. Not a worker that answered busy (capacity_wait_exceeded).
+   * twice, kept a batch running past its deadline, or its result could not be read. Not a worker
+   * that answered busy (capacity_wait_exceeded).
    */
   'worker_unavailable',
   /**
-   * The worker answered, and was busy with other checks for the whole wait budget
-   * (QUEUE_WAIT_MAX_S): the check never won a slot for its first crawl batch.
+   * The worker answered, busy with other checks, until the check's next wait for its first crawl
+   * batch would have passed the wait budget (QUEUE_WAIT_MAX_S) or FIRST_ACCEPT_BY_S: the check
+   * never won a slot.
    */
   'capacity_wait_exceeded',
   'build_failed',

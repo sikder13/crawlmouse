@@ -33,6 +33,7 @@ import {
   DEFAULT_PAGE_CAP,
   DEPLOY_BUCKET_S,
   DISCOVER_S,
+  FIRST_ACCEPT_BY_S,
   MANUAL_BUCKET_S,
   MIN_BATCH_S,
   QUEUE_WAIT_MAX_S,
@@ -62,8 +63,8 @@ const REASONS: Readonly<Record<FailureReason, string>> = {
   not_started: 'the reaper found a check that no run claimed within its bound',
   worker_redeployed: 'a batch came from another worker release than the check’s first (Q10)',
   worker_unavailable:
-    'no crawl batch could be read: the worker did not answer, refused the app’s credentials, or lost a batch twice, or its result could not be read',
-  capacity_wait_exceeded: `the worker answered, busy with other checks, for the whole wait budget (${QUEUE_WAIT_MAX_S} s): the check never won a slot for its first crawl batch`,
+    'no crawl batch could be read: the worker did not answer, refused the app’s credentials, lost a batch twice, kept a batch running past its deadline, or its result could not be read',
+  capacity_wait_exceeded: `the worker answered, busy with other checks, until the next wait for the first crawl batch would have passed the wait budget (${QUEUE_WAIT_MAX_S} s) or ${FIRST_ACCEPT_BY_S} s from the start: the check never won a slot`,
   build_failed: '`buildCheck` threw',
   persist_failed: 'persisting the built check threw',
   internal: 'anything else',
@@ -252,6 +253,10 @@ export function buildSpec20b(): string {
         [
           'Wait budget, before and after the first crawl batch; time after it is added to the crawl',
           `${QUEUE_WAIT_MAX_S} s`,
+        ],
+        [
+          'The latest first crawl batch that still gets a whole crawl window, from the first claim',
+          `${FIRST_ACCEPT_BY_S} s`,
         ],
         ['The run’s finish timeout', `${PACE.finishS} s`],
         [

@@ -61,6 +61,7 @@ Concurrency: one plan cap, `PLAN_CONCURRENCY_CAP = 5` (Inngest Free), which the 
 | A lost batch (`not_found`) is posted again                                               | once                    |
 | Wait after the worker answers busy                                                       | 30 s                    |
 | Wait budget, before and after the first crawl batch; time after it is added to the crawl | 900 s                   |
+| The latest first crawl batch that still gets a whole crawl window, from the first claim  | 1260 s                  |
 | The run’s finish timeout                                                                 | 2220 s                  |
 | Crawl phase ceiling, from the first crawl batch the worker accepts                       | 480 s                   |
 | Access stages’ slice                                                                     | 300 s                   |
@@ -81,19 +82,19 @@ The worst case these allow fits the finish timeout, and the worst-case step coun
 
 `checks.failure_reason` is readable by the site’s members, so the pipeline writes one of these words. Its stores refuse a word outside the list, and so do `fail_check` and `reap_stalled_checks`, which read it from `check_failure_reasons()`, a SQL function a test holds equal to the list (`pnpm --filter @crawlmouse/web exec vitest run lib/v2/pipeline/store.test.ts __tests__/v2-008-pipeline.test.ts`).
 
-| Reason                   | When                                                                                                                                           |
-| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| `paused`                 | `CRAWL_PAUSED=1` when the check was claimed, or the worker answered `paused`                                                                   |
-| `site_busy`              | another check of the site was still running after the claim waited                                                                             |
-| `canceled`               | the run was cancelled or passed its finish timeout (Inngest reports both alike)                                                                |
-| `stalled`                | the reaper found a claimed check with no heartbeat within its bound                                                                            |
-| `not_started`            | the reaper found a check that no run claimed within its bound                                                                                  |
-| `worker_redeployed`      | a batch came from another worker release than the check’s first (Q10)                                                                          |
-| `worker_unavailable`     | no crawl batch could be read: the worker did not answer, refused the app’s credentials, or lost a batch twice, or its result could not be read |
-| `capacity_wait_exceeded` | the worker answered, busy with other checks, for the whole wait budget (900 s): the check never won a slot for its first crawl batch           |
-| `build_failed`           | `buildCheck` threw                                                                                                                             |
-| `persist_failed`         | persisting the built check threw                                                                                                               |
-| `internal`               | anything else                                                                                                                                  |
+| Reason                   | When                                                                                                                                                                                      |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `paused`                 | `CRAWL_PAUSED=1` when the check was claimed, or the worker answered `paused`                                                                                                              |
+| `site_busy`              | another check of the site was still running after the claim waited                                                                                                                        |
+| `canceled`               | the run was cancelled or passed its finish timeout (Inngest reports both alike)                                                                                                           |
+| `stalled`                | the reaper found a claimed check with no heartbeat within its bound                                                                                                                       |
+| `not_started`            | the reaper found a check that no run claimed within its bound                                                                                                                             |
+| `worker_redeployed`      | a batch came from another worker release than the check’s first (Q10)                                                                                                                     |
+| `worker_unavailable`     | no crawl batch could be read: the worker did not answer, refused the app’s credentials, lost a batch twice, kept a batch running past its deadline, or its result could not be read       |
+| `capacity_wait_exceeded` | the worker answered, busy with other checks, until the next wait for the first crawl batch would have passed the wait budget (900 s) or 1260 s from the start: the check never won a slot |
+| `build_failed`           | `buildCheck` threw                                                                                                                                                                        |
+| `persist_failed`         | persisting the built check threw                                                                                                                                                          |
+| `internal`               | anything else                                                                                                                                                                             |
 
 ## Requests
 
