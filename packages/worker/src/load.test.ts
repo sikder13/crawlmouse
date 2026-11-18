@@ -76,6 +76,8 @@ const PAGES = {
   links: page((i) => `<p>→ item ${i} <a href="/p/${i}">link → ${i}</a></p>\n`),
   // The densest document measured: an element and a text node for every four bytes.
   dense: page(() => '<p>w'),
+  // Text and anchors of double quotes, each a byte in UTF-8 and two in the result's JSON.
+  quotes: page((i) => `<p>${'"'.repeat(40)} <a href="/q/${i}">${'"'.repeat(20)}</a></p>\n`),
 };
 /**
  * The links page compressed with brotli's largest window (2^24 bytes), which is what a decoder's
@@ -109,7 +111,13 @@ beforeAll(async () => {
       await startServer((req, res) => {
         if (req.url === '/robots.txt') return void ((res.statusCode = 404), res.end());
         const brotli = req.url!.startsWith('/br/');
-        const body = brotli ? BROTLI : req.url!.startsWith('/dense/') ? PAGES.dense : PAGES.links;
+        const body = brotli
+          ? BROTLI
+          : req.url!.startsWith('/dense/')
+            ? PAGES.dense
+            : req.url!.startsWith('/quotes/')
+              ? PAGES.quotes
+              : PAGES.links;
         res.setHeader('content-type', 'text/html; charset=utf-8');
         if (brotli) res.setHeader('content-encoding', 'br');
         res.setHeader('content-length', body.length);
@@ -305,6 +313,21 @@ describe.runIf(process.platform === 'linux')('memory under load', () => {
       }
     }, 600_000);
   }
+
+  // A page can make its batch's result no larger by what it serves: the room counts the text as the
+  // result's JSON holds it, so a page of quotes, two bytes each there, is cut at the same size.
+  it(`4 crawl batches of ${MAX_URLS_PER_BATCH} URLs on 10 MB pages of quotes keep each result within the largest recorded`, async () => {
+    const report = await underLoad(crawl(4, '/quotes/', MAX_URLS_PER_BATCH));
+    for (const r of report.results) {
+      expect(r).toMatchObject({
+        complete: MAX_URLS_PER_BATCH,
+        rows: MAX_URLS_PER_BATCH,
+        partial: { reasons: ['result_size'] },
+        not_served: [],
+      });
+      expect(r.json_bytes).toBeLessThanOrEqual(CAPACITY.worst_case.largest_result_bytes);
+    }
+  }, 600_000);
 
   for (const [n, path] of [
     [8, '/br/'],

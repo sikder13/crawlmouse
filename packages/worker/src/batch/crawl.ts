@@ -34,6 +34,7 @@ import type { Findings } from './findings.js';
 import { isNotRead, type PageRead, type PageReader, type StackHeaders } from '../reader/read.js';
 import { politeFetch, type FetchContext, type NotRequested } from './polite-fetch.js';
 import { pathOf, type BatchRobots, type SiteBlock } from './site-rules.js';
+import { jsonBytes } from './json-bytes.js';
 
 /**
  * A crawl batch: each URL is requested once as our crawl identity, two at a time at most (the site's
@@ -45,8 +46,9 @@ import { pathOf, type BatchRobots, type SiteBlock } from './site-rules.js';
 export const MAX_EDGES_PER_PAGE = 1000;
 /**
  * What one batch may hold in served text and link edges. Pages past it keep their row but not their
- * text or links, and the batch is partial with `result_size`. Response bytes are a separate budget,
- * set by the caller.
+ * text or links, and the batch is partial with `result_size`. Counted in the bytes the result's JSON
+ * takes (json-bytes.ts), not the text's UTF-8 bytes. Response bytes are a separate budget, set by the
+ * caller.
  */
 export const MAX_RESULT_TEXT_BYTES = 8 * 1024 * 1024;
 const CONCURRENT_PAGES = 2;
@@ -292,14 +294,13 @@ async function crawlPage(
     fromUrl !== null &&
     extracted.notRead.tooLong + edges.tooLong + extracted.notRead.pastLimit === 0;
   const featuresBytes = read.features ? Buffer.byteLength(JSON.stringify(read.features)) : 0;
+  // Counted as the store holds it, in JSON (json-bytes.ts): a page of quotes or backslashes costs
+  // what it takes there, so no page can make a result larger than the room plus its rows.
   const cost =
-    Buffer.byteLength(rawText) +
+    jsonBytes(rawText) +
     featuresBytes +
     edges.kept.reduce((n, e) => n + edgeBytes(e), 0) +
-    hreflang.links.reduce(
-      (n, l) => n + Buffer.byteLength(l.hreflang) + Buffer.byteLength(l.href),
-      0,
-    );
+    hreflang.links.reduce((n, l) => n + jsonBytes(l.hreflang) + jsonBytes(l.href), 0);
   const recorded = cost <= room.bytes;
   if (recorded) room.bytes -= cost;
   else {
@@ -337,10 +338,7 @@ async function crawlPage(
 }
 
 const edgeBytes = (e: LinkEdge): number =>
-  Buffer.byteLength(e.from_url) +
-  Buffer.byteLength(e.to_url) +
-  Buffer.byteLength(e.anchor_text) +
-  128;
+  jsonBytes(e.from_url) + jsonBytes(e.to_url) + jsonBytes(e.anchor_text) + 128;
 
 /**
  * One edge per distinct same-host target, in page order; only the first MAX_EDGES_PER_PAGE are built.
