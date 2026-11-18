@@ -184,6 +184,45 @@ describe('supabaseStreamStore', () => {
     expect(await supabaseStreamStore(none.client).setNotifyEmail('c', 'a@example.com')).toBe(false);
   });
 
+  it('reads the wait and what discovery found from the stored progress, leniently (CC-42A)', async () => {
+    const snap = async (progress: Record<string, unknown>) => {
+      const { client } = recordingClient({
+        'checks:select': {
+          site_id: 's',
+          status: 'running',
+          progress: { steps: [], pages_crawled: 0, links_found: 0, ...progress },
+          started_at: '2026-11-10T10:00:00+00:00',
+          finished_at: null,
+          expires_at: null,
+          sites: { account_id: null, removed_at: null },
+        },
+        'crawl_batches:select': [],
+      });
+      return (await supabaseStreamStore(client).snapshot('c'))!.progress;
+    };
+    expect(
+      await snap({
+        waiting_since: '2026-11-10T10:01:00.000Z',
+        sitemap_urls: 1240,
+        robots_txt: 'not_found',
+      }),
+    ).toMatchObject({
+      waiting_since: '2026-11-10T10:01:00.000Z',
+      sitemap_urls: 1240,
+      robots_txt: 'not_found',
+    });
+    // A row written before these fields, and one holding a value outside them, read as null.
+    expect(await snap({})).toMatchObject({
+      waiting_since: null,
+      sitemap_urls: null,
+      robots_txt: null,
+    });
+    expect(await snap({ robots_txt: 'maybe', sitemap_urls: 'many' })).toMatchObject({
+      sitemap_urls: null,
+      robots_txt: null,
+    });
+  });
+
   it('reads one check by its id, then that check’s batch rows in batch order, and does not select the notify address', async () => {
     const { client, queries } = recordingClient({
       'checks:select': {

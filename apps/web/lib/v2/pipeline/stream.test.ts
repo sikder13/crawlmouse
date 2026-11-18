@@ -18,6 +18,7 @@ import {
   batchEvents,
   checkEvents,
   cursorFits,
+  factsOf,
   formatCursor,
   nextEvents,
   parseCursor,
@@ -28,6 +29,7 @@ import {
 } from './stream';
 import { STARTED, crawlResult, edge, row, urlOf, type RowSpec } from './stream.fixtures';
 import { memoryEvidenceStore } from './test-support/memory-evidence';
+import type { StreamSnapshot } from './stream-store';
 
 /** The user agent the recorded crawl rows were fetched with, written out. */
 const CRAWL_UA = 'Mozilla/5.0 (compatible; Crawlmouse/2.0; +https://crawlmouse.com/bot)';
@@ -339,6 +341,55 @@ describe('waiting and discovery (CC-42A decisions 4 and 5)', () => {
   });
 });
 
+describe('factsOf: the wait and discovery from a stored row (CC-42A)', () => {
+  const stored = (
+    progress: Partial<NonNullable<StreamSnapshot['progress']>> | null,
+  ): StreamSnapshot => ({
+    siteId: 's',
+    accountId: null,
+    siteRemoved: false,
+    status: 'running',
+    progress:
+      progress === null
+        ? null
+        : {
+            steps: [],
+            pages_crawled: 0,
+            links_found: 0,
+            waiting_since: null,
+            sitemap_urls: null,
+            robots_txt: null,
+            ...progress,
+          },
+    startedAt: new Date(STARTED).toISOString(),
+    finishedAt: null,
+    expiresAt: null,
+    batches: [],
+  });
+
+  it('gives the wait as ms from the start, and discovery as stored', () => {
+    const facts = factsOf(
+      stored({
+        waiting_since: new Date(STARTED + 62_000).toISOString(),
+        sitemap_urls: 1240,
+        robots_txt: 'found',
+      }),
+      STARTED + 90_000,
+    );
+    expect(facts.waitingSinceMs).toBe(62_000);
+    expect(facts.discovered).toEqual({ robots_txt: 'found', sitemap_urls: 1240 });
+  });
+
+  it('gives no wait and no discovery for a row without them, or an unreadable time', () => {
+    expect(factsOf(stored({}), STARTED)).toMatchObject({ waitingSinceMs: null, discovered: null });
+    expect(factsOf(stored({ waiting_since: 'not a time' }), STARTED).waitingSinceMs).toBeNull();
+    expect(factsOf(stored(null), STARTED)).toMatchObject({
+      waitingSinceMs: null,
+      discovered: null,
+    });
+  });
+});
+
 describe('the cursor as text', () => {
   it('round-trips', () => {
     fc.assert(
@@ -634,19 +685,30 @@ describe('nextEvents over generated runs (fast-check)', () => {
         for (let i = 1; i < waits.length; i++) expect(waits[i]).not.toBe(waits[i - 1]);
         expect(waits[0]).not.toBeNull();
 
-        // The wait is the last poll's, no later than the event carrying it; an end clears it.
-        const { lastWait, discoveredSent } = play(run);
+        // The wait is the last poll's, clamped to the latest event's time, and the viewer's state
+        // and the cursor agree on it; an end clears it.
+        const { lastWait, cursor } = play(run);
+        expect(state.waiting_since_ms).toBe(cursor.waitingSince);
         if (run.end !== null || !ran || lastWait === null) {
           expect(state.waiting_since_ms).toBeNull();
         } else {
-          expect(state.waiting_since_ms).not.toBeNull();
-          expect(state.waiting_since_ms!).toBeLessThanOrEqual(Math.max(lastWait, state.last_ms));
+          expect(state.waiting_since_ms).toBe(Math.min(lastWait, cursor.at));
         }
 
-        // Discovery's findings land once, as stored, if a running poll got past discovery.
-        expect(sent.filter((e) => e.type === 'discovered').length).toBe(discoveredSent ? 1 : 0);
-        expect(state.discovery).toEqual(discoveredSent ? run.discovered : null);
-        if (discoveredSent) expect(run.discovered).not.toBeNull();
+        // Discovery's findings land once, as stored, exactly when a running poll got past
+        // discovery: worked out from the generated run, not from what the function sent.
+        let reachedDiscovery = false;
+        let begun = false;
+        let at = 0;
+        for (const p of run.polls) {
+          begun ||= p.started;
+          if (!begun) continue;
+          at = Math.min(3, at + p.phases);
+          if (at >= 1) reachedDiscovery = true;
+        }
+        const expectDiscovered = run.discovered !== null && reachedDiscovery;
+        expect(sent.filter((e) => e.type === 'discovered').length).toBe(expectDiscovered ? 1 : 0);
+        expect(state.discovery).toEqual(expectDiscovered ? run.discovered : null);
         if (again) expect(again).toEqual([sent.at(-1)]);
 
         // The map, computed from the generated rows without the function under test: one node for
