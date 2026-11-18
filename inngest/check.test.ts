@@ -4,6 +4,7 @@ import { inngest } from './client';
 import { CheckFailure, failureReasonOf, type CheckRequested } from './check-events';
 import {
   CHECK_FN_ID,
+  FIRST_ACCEPT_BY_S,
   PACE,
   QUEUE_WAIT_MAX_S,
   type DiscoverOutput,
@@ -519,6 +520,31 @@ describe('runCheck: polling (D1)', () => {
       ({ seeds: 3, sitemap_urls: 2, at: clock.now }) as unknown as DiscoverOutput;
     await runCheck({ event: { data: EVENT }, step: step.tools, runId: 'run-1' }, fake.steps);
     expect(fake.posts[0]!.so.discovered).toEqual({ sitemap_urls: 2, robots_txt: null });
+  });
+
+  it('a next post that lands exactly at FIRST_ACCEPT_BY_S is still made: it is the latest first batch with a whole window', async () => {
+    // The claim is at T0, so the deadline is T0 + FIRST_ACCEPT_BY_S. One busy answer whose next
+    // post (30 s on) lands on it exactly, then the batch is taken.
+    let n = 0;
+    const { result, sleeps } = await drive({
+      post: (at) =>
+        at.kind === 'crawl' && at.batch === 1 && n++ === 0
+          ? { status: 'busy', at: T0 + (FIRST_ACCEPT_BY_S - PACE.busyWaitS) * 1000 }
+          : undefined,
+    });
+    expect(sleeps[0]).toEqual(['crawl-1-post-busy-1', PACE.busyWaitS * 1000]);
+    expect(result).toEqual({ status: 'finished' });
+  });
+
+  it('a next post that would land one millisecond past FIRST_ACCEPT_BY_S is not: the check fails capacity_wait_exceeded', async () => {
+    let n = 0;
+    const { result } = await drive({
+      post: (at) =>
+        at.kind === 'crawl' && at.batch === 1 && n++ === 0
+          ? { status: 'busy', at: T0 + (FIRST_ACCEPT_BY_S - PACE.busyWaitS) * 1000 + 1 }
+          : undefined,
+    });
+    expect(result).toEqual({ status: 'failed', reason: 'capacity_wait_exceeded' });
   });
 
   it('fails the check paused when the worker answers paused', async () => {

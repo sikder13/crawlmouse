@@ -330,8 +330,9 @@ describe('waiting on the worker (CC-42A decisions 1 and 2)', () => {
     const shape = { latencyS: 1, busyClaims: PACE.claimWaits, slowBatches: false, doneAfterS: 20 };
     const alone = await simulate(shape);
     const n = await mostGraded(shape);
-    // At 1 s a step the deadline (FIRST_ACCEPT_BY_S) costs a few of the budget's 30 waits.
-    expect(n).toBeGreaterThanOrEqual(26);
+    // At 1 s a step, with every claim wait, the deadline (FIRST_ACCEPT_BY_S) costs two of the
+    // budget's 30 waits: measured 28 (review round 3). Pinned, so giving up one wait early fails.
+    expect(n).toBe(28);
     const waited = await simulate({ ...shape, busyFirst: n });
     expect(waited.result).toEqual(alone.result);
     expect(crawlReads(waited.ids)).toBe(crawlReads(alone.ids));
