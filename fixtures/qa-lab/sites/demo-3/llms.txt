@@ -1,0 +1,27 @@
+# Kestrel & Vane Cycle Tours
+
+> Guided bike tours on quiet lanes, with good lunches. (A fictional business: a Crawlmouse QA test site.)
+
+## Tours
+
+- [Three-day valley loop](https://demo-3.lab.crawlmouse.com/tours/three-day-valley-loop/): Three-day valley loop: what we recommend, and why.
+- [Weekend coast ride](https://demo-3.lab.crawlmouse.com/tours/weekend-coast-ride/): Weekend coast ride: what we recommend, and why.
+- [Hill villages tour](https://demo-3.lab.crawlmouse.com/tours/hill-villages-tour/): Hill villages tour: what we recommend, and why.
+- [Family day ride](https://demo-3.lab.crawlmouse.com/tours/family-day-ride/): Family day ride: what we recommend, and why.
+- [Gravel explorer](https://demo-3.lab.crawlmouse.com/tours/gravel-explorer/): Gravel explorer: what we recommend, and why.
+- [Autumn colours tour](https://demo-3.lab.crawlmouse.com/tours/autumn-colours-tour/): Autumn colours tour: what we recommend, and why.
+
+## Plan your trip
+
+- [Choosing a tour](https://demo-3.lab.crawlmouse.com/plan-your-trip/choosing-a-tour/): Choosing a tour: what we recommend, and why.
+- [Fitness levels](https://demo-3.lab.crawlmouse.com/plan-your-trip/fitness-levels/): Fitness levels: what we recommend, and why.
+- [Bike hire](https://demo-3.lab.crawlmouse.com/plan-your-trip/bike-hire/): Bike hire: what we recommend, and why.
+- [What to pack](https://demo-3.lab.crawlmouse.com/plan-your-trip/what-to-pack/): What to pack: what we recommend, and why.
+- [Getting here](https://demo-3.lab.crawlmouse.com/plan-your-trip/getting-here/): Getting here: what we recommend, and why.
+- [Booking terms](https://demo-3.lab.crawlmouse.com/plan-your-trip/booking-terms/): Booking terms: what we recommend, and why.
+
+## About the guides
+
+- [Meet the guides](https://demo-3.lab.crawlmouse.com/about-the-guides/meet-the-guides/): Meet the guides: what we recommend, and why.
+- [Reviews](https://demo-3.lab.crawlmouse.com/about-the-guides/reviews/): Reviews: what we recommend, and why.
+- [Safety](https://demo-3.lab.crawlmouse.com/about-the-guides/safety/): Safety: what we recommend, and why.

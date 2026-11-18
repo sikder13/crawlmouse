@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://trial-client-1.lab.crawlmouse.com/sitemap.xml

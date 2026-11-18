@@ -31,8 +31,11 @@ Measured against the code; the reasoning for each is in `notes/cc-38/questions.m
   creates it applying to the products of the base prices it bills (Q15).
 - **The marker is a table, `qa_accounts`, not account metadata (Q4).** `accounts` has no metadata
   column, and reading `auth.users` from SQL would touch `auth`.
-- **The QA sites are the owner's domains and subdomains of `lab.nahltech.com` (Q7)**, listed in
-  `scripts/qa/accounts.ts` `QA_HOSTS`, so a production seed checks no third party's site.
+- **The QA sites are the owner's domains and subdomains of `lab.crawlmouse.com` (Q7)**, listed in
+  `scripts/qa/accounts.ts` `QA_HOSTS`, so a production seed checks no third party's site. The
+  subdomains are static fixture sites in `fixtures/qa-lab/`, served by host from the Vercel project
+  `crawlmouse-qa-lab` behind one DNS record (`*.lab` CNAME `cname.vercel-dns.com`, DNS only);
+  `fixtures/qa-lab/README.md` says what each site is built to produce.
 - **The walk needed a stand-in of its own.** The proof harnesses F4 names live in the notes folder, not
   the repo. `tests/e2e/harness/` builds on the repo's PGlite PostgREST helper and adds resource
   embedding, Supabase Auth's endpoints, a Stripe stand-in and a worker that finishes requested checks
@@ -56,6 +59,9 @@ Measured against the code; the reasoning for each is in `notes/cc-38/questions.m
 - **About three resets an hour.** A Free account's first audit counts against its host's hourly bucket
   (five an hour, `DOMAIN_AUDITS_PER_HOUR`), and `crawlmouse.com` and `nahltech.com` are sites of more
   than one QA account; a reset past the bound is refused with the time it fits, and exits 1.
+- **The lab hosts share one politeness key.** Every `*.lab.crawlmouse.com` host is politeness-keyed
+  as `crawlmouse.com` (CC-42B Q1), so checks of different lab sites, and of crawlmouse.com itself,
+  wait on one another. QA runs a few checks at a time, so this is accepted, not worked around.
 - **`demo` has no read-only mode.** There is no mechanism for one; `demo` is an ordinary Agency
   account kept for showing.
 - **The paid plans arrive through a Checkout the owner completes (Q2).** The webhook grants a plan
@@ -95,7 +101,8 @@ and what it refuses as unmodelled, is in the header of each file under `tests/e2
 ## Owner steps, in order
 
 1. Set `QA_INBOX` to a mailbox that takes plus-addressing, in the shell that runs the scripts.
-2. Point the hosts in `scripts/qa/accounts.ts` `QA_HOSTS` at the lab zones, or edit the list (Q7).
+2. Confirm the lab answers: `curl -sI https://healthy.lab.crawlmouse.com/` prints 200
+   (`fixtures/qa-lab/README.md` has the check for every host).
 3. `pnpm qa:seed` against production (part a). It prints the addresses it will create and asks for
    `create <n> users at <domain>` first. Steps that wait for a plan say so.
 4. Once Stripe live mode is ready: `pnpm qa:seed --billing --live`, type the phrase it asks for, open

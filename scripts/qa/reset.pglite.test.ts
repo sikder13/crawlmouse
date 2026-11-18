@@ -243,7 +243,7 @@ describe('qa:reset', () => {
       const windowStart = rateLimitWindowStart(Date.now(), 60 * 60 * 1000).toISOString();
       for (let i = 0; i < 5; i++) {
         await w.db.query(`select public.increment_rate_limit($1, $2::timestamptz)`, [
-          'domain:client-1.lab.nahltech.com',
+          'domain:client-1.lab.crawlmouse.com',
           windowStart,
         ]);
       }
@@ -289,7 +289,7 @@ describe('qa:reset', () => {
              join public.accounts a on a.id = s.account_id
              join public.qa_accounts q on q.account_id = a.id
              join public.checks c on c.site_id = s.id
-            where q.qa_key = 'agency' and a.kind = 'agency' and s.host = 'client-1.lab.nahltech.com'`,
+            where q.qa_key = 'agency' and a.kind = 'agency' and s.host = 'client-1.lab.crawlmouse.com'`,
         )
       ).rows[0]!;
       const fix = await w.db.query<{ id: string }>(

@@ -272,19 +272,19 @@ describe('qa:seed part (a)', () => {
       expect(r.rows).toEqual([
         {
           qa_key: 'agency',
-          host: 'client-1.lab.nahltech.com',
+          host: 'client-1.lab.crawlmouse.com',
           cadence: 'monthly',
           checks: 'first_audit:queued',
         },
         {
           qa_key: 'agencytrial',
-          host: 'trial-client-1.lab.nahltech.com',
+          host: 'trial-client-1.lab.crawlmouse.com',
           cadence: 'monthly',
           checks: 'first_audit:queued',
         },
         {
           qa_key: 'demo',
-          host: 'demo-1.lab.nahltech.com',
+          host: 'demo-1.lab.crawlmouse.com',
           cadence: 'monthly',
           checks: 'first_audit:queued',
         },

@@ -1,0 +1,33 @@
+# Quillmoss Plant Notes
+
+> Plain, tested advice for keeping houseplants alive and well. (A fictional business: a Crawlmouse QA test site.)
+
+## Watering
+
+- [Watering ferns](https://healthy.lab.crawlmouse.com/watering/watering-ferns/): Watering ferns: what we recommend, and why.
+- [Watering succulents](https://healthy.lab.crawlmouse.com/watering/watering-succulents/): Watering succulents: what we recommend, and why.
+- [Bottom watering](https://healthy.lab.crawlmouse.com/watering/bottom-watering/): Bottom watering: what we recommend, and why.
+- [Overwatering signs](https://healthy.lab.crawlmouse.com/watering/overwatering-signs/): Overwatering signs: what we recommend, and why.
+- [Watering in winter](https://healthy.lab.crawlmouse.com/watering/watering-in-winter/): Watering in winter: what we recommend, and why.
+- [Humidity trays](https://healthy.lab.crawlmouse.com/watering/humidity-trays/): Humidity trays: what we recommend, and why.
+- [Self-watering pots](https://healthy.lab.crawlmouse.com/watering/self-watering-pots/): Self-watering pots: what we recommend, and why.
+
+## Light and potting
+
+- [North-facing windows](https://healthy.lab.crawlmouse.com/light-and-potting/north-facing-windows/): North-facing windows: what we recommend, and why.
+- [Grow lamps](https://healthy.lab.crawlmouse.com/light-and-potting/grow-lamps/): Grow lamps: what we recommend, and why.
+- [Low-light plants](https://healthy.lab.crawlmouse.com/light-and-potting/low-light-plants/): Low-light plants: what we recommend, and why.
+- [Choosing a pot](https://healthy.lab.crawlmouse.com/light-and-potting/choosing-a-pot/): Choosing a pot: what we recommend, and why.
+- [Repotting season](https://healthy.lab.crawlmouse.com/light-and-potting/repotting-season/): Repotting season: what we recommend, and why.
+- [Mixing potting soil](https://healthy.lab.crawlmouse.com/light-and-potting/mixing-potting-soil/): Mixing potting soil: what we recommend, and why.
+- [Root-bound plants](https://healthy.lab.crawlmouse.com/light-and-potting/root-bound-plants/): Root-bound plants: what we recommend, and why.
+
+## Pests
+
+- [Fungus gnats](https://healthy.lab.crawlmouse.com/pests/fungus-gnats/): Fungus gnats: what we recommend, and why.
+- [Spider mites](https://healthy.lab.crawlmouse.com/pests/spider-mites/): Spider mites: what we recommend, and why.
+- [Mealybugs](https://healthy.lab.crawlmouse.com/pests/mealybugs/): Mealybugs: what we recommend, and why.
+- [Scale insects](https://healthy.lab.crawlmouse.com/pests/scale-insects/): Scale insects: what we recommend, and why.
+- [Neem oil](https://healthy.lab.crawlmouse.com/pests/neem-oil/): Neem oil: what we recommend, and why.
+- [Quarantining new plants](https://healthy.lab.crawlmouse.com/pests/quarantining-new-plants/): Quarantining new plants: what we recommend, and why.
+- [Sticky traps](https://healthy.lab.crawlmouse.com/pests/sticky-traps/): Sticky traps: what we recommend, and why.
