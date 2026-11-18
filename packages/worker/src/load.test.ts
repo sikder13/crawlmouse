@@ -10,19 +10,19 @@ import { MAX_BATCH_CONCURRENCY } from './config.js';
 import { READER_FILE } from './reader/file.js';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { BUDGET_CEILINGS, MAX_URLS_PER_BATCH, type BatchRequest } from './batch/request.js';
+import { MAX_RESULT_BYTES } from './batch/store.js';
 import { CRAWLERS } from './identities.js';
 import { startServer, type FixtureServer } from './test-support/http.js';
 
 /**
  * The worker under load, as it ships: the probe (test-support/load-probe.ts) bundled the way build.ts
  * bundles main.ts, run in a process with fly.toml's heap limit and environment, with the result store
- * already full. Four batches at once (MAX_BATCH_CONCURRENCY, the most BATCH_CONCURRENCY may set,
- * and what fly.toml sets), each on a site of its own serving
- * 10 MB pages, each response dripped over about a second so the requests overlap: access batches,
+ * already full. Batches at once up to MAX_BATCH_CONCURRENCY (the most BATCH_CONCURRENCY may set, and
+ * what fly.toml sets), and at 4 and 8 below it, each on a site of its own serving 10 MB pages, each response dripped over about a second so the requests overlap: access batches,
  * crawl batches of the most URLs a batch may hold on brotli-compressed pages (a decoder's window on
  * top of each page), and crawl batches on the densest markup measured. The pages hold text outside Latin-1, so each
  * decodes to a two-byte string, twice its UTF-8 size. The process must finish, and its peak resident
- * memory (VmHWM) must stay under PEAK_RSS_MIB.
+ * memory (VmHWM) must stay under that level's bound in PEAK_RSS_MIB.
  */
 
 const flyToml = readFileSync(new URL('../fly.toml', import.meta.url), 'utf8');
@@ -35,18 +35,24 @@ const ENV = Object.fromEntries(
   ]),
 );
 /**
- * The bound on peak resident memory: the highest peak measured on this branch, 473.7 MiB (four
- * 50-URL crawl batches of brotli pages, 2026-10-28), plus about 35%. Re-measured 2026-10-31 on a
- * workstation: 472.7 MiB, the same case. Fixed rather than a share of
- * the VM, because the test is here to catch a memory regression, and 90% of the 1 GB VM would let
- * the peak almost double before it failed. The VM must still hold it with room to spare (pinned
- * below).
+ * The bound on peak resident memory at each level: the highest peak measured at that level, plus about
+ * 35%, rounded up to 10 MiB. Fixed rather than a share of the VM, because the test is here to catch a
+ * memory regression. The VM must still hold the largest with room to spare (pinned below).
+ *
+ * Measured 2026-11-18 on a workstation, 512 MB heap, the store full at 272 MiB. The highest peak at
+ * each level, over these cases and over one run of the cut-short cases with the full time budget
+ * (which reads longer, so peaks higher):
+ * - 4: 726.2 MiB (brotli, 50 URLs) → 990;
+ * - 8: 868.9 MiB (brotli, 50 URLs, full budget; 809.8 cut short) → 1180;
+ * - 16: 1167.6 MiB (brotli, 50 URLs, full budget; 910.3 cut short; densest 1104.3) → 1580, which is
+ *   77% of the 2 GB VM; the measured peak itself is 57%.
  */
-const PEAK_RSS_MIB = 640;
+const PEAK_RSS_MIB: Readonly<Record<number, number>> = { 4: 990, 8: 1180, 16: 1580 };
 
 const PAGE_BYTES = 10_000_000;
 const DRIP_MS = 1000;
-const HOSTS = ['127.0.0.2', '127.0.0.3', '127.0.0.4', '127.0.0.5'];
+/** One loopback address per batch, so each batch is a site of its own to the politeness limiter. */
+const HOSTS = Array.from({ length: MAX_BATCH_CONCURRENCY }, (_, i) => `127.0.0.${i + 2}`);
 
 /** About PAGE_BYTES of HTML, from repeating `unit(i)`. */
 function page(unit: (i: number) => string): Buffer {
@@ -130,6 +136,8 @@ interface ProbeReport {
   sampled_peak_mib: Record<string, number>;
   results: Array<{
     kind: string;
+    /** The result as the store holds it: UTF-8 JSON, in bytes. */
+    json_bytes: number;
     complete: number;
     rows: number;
     partial: unknown;
@@ -177,7 +185,7 @@ function expectLoopFree(report: ProbeReport): void {
 }
 
 const common = (i: number) => ({
-  check_id: `00000000-0000-4000-8000-00000000000${i}`,
+  check_id: `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`,
   site_id: '00000000-0000-4000-8000-0000000000a1',
   batch: 1,
   nonce: 'n'.repeat(16),
@@ -185,89 +193,135 @@ const common = (i: number) => ({
   budget: BUDGET_CEILINGS,
 });
 
-const crawl = (path: string, urls: number): BatchRequest[] =>
-  servers.map((s, i) => ({
+/**
+ * The shortest time budget the pipeline posts a batch with (MIN_BATCH_S, apps/web/lib/v2/pipeline/
+ * limits.ts). Above 4 batches at once, fifty 10 MB pages per batch take longer to read than a batch
+ * may run (one reader thread; docs/ops/worker-runbook.md), so those cases run as such a batch does:
+ * until its time is spent, every batch reading, then all finishing together.
+ */
+const SHORT_BUDGET = { ...BUDGET_CEILINGS, max_seconds: 60 };
+
+const crawl = (
+  n: number,
+  path: string,
+  urls: number,
+  budget: BatchRequest['budget'] = BUDGET_CEILINGS,
+): BatchRequest[] =>
+  servers.slice(0, n).map((s, i) => ({
     ...common(i),
+    budget,
     kind: 'crawl',
     urls: Array.from({ length: urls }, (_, u) => `${s.base}${path}${u}`),
   }));
 
+const access = (n: number, pages: number): BatchRequest[] =>
+  servers.slice(0, n).map((s, i) => ({
+    ...common(i),
+    kind: 'access',
+    pages: Array.from({ length: pages }, (_, p) => ({
+      url: `${s.base}/page-${p}`,
+      template_key: '/',
+    })),
+  }));
+
+/** The largest result any case below produced, in bytes; read by the store-bound case at the end. */
+let largestResult = 0;
+
+/** Runs the batches, and checks what every case checks: exit 0, the level's memory bound, a free loop. */
+async function underLoad(reqs: BatchRequest[]): Promise<ProbeReport> {
+  const { code, report, stderr } = await runProbe(reqs);
+  expect({ code, stderr }).toEqual({ code: 0, stderr: '' });
+  expect(report!.results).toHaveLength(reqs.length);
+  for (const r of report!.results) largestResult = Math.max(largestResult, r.json_bytes);
+  expect(report!.peak_rss_mib).toBeLessThanOrEqual(PEAK_RSS_MIB[reqs.length]!);
+  expectLoopFree(report!);
+  return report!;
+}
+
+/** The levels measured: MAX_BATCH_CONCURRENCY, and 4 and 8 below it. */
+const LEVELS = [4, 8, MAX_BATCH_CONCURRENCY] as const;
+const mib = (n: number) => `${PEAK_RSS_MIB[n]} MiB`;
+
+/** A batch cut short by its time: a row for every URL, and the reasons a cut-short batch gives. */
+function expectCutShort(r: ProbeReport['results'][number]): void {
+  expect(r.rows).toBe(MAX_URLS_PER_BATCH);
+  expect(r.complete).toBeLessThanOrEqual(MAX_URLS_PER_BATCH);
+  expect(r.partial).not.toBeNull();
+  for (const reason of (r.partial as { reasons: string[] }).reasons) {
+    expect(['budget_seconds', 'result_size']).toContain(reason);
+  }
+}
+
 describe.runIf(process.platform === 'linux')('memory under load', () => {
-  it(`4 access batches on 10 MB pages finish within ${PEAK_RSS_MIB} MiB at a ${HEAP_MB} MB heap limit`, async () => {
-    const pages = 2;
-    const reqs: BatchRequest[] = servers.map((s, i) => ({
-      ...common(i),
-      kind: 'access',
-      pages: Array.from({ length: pages }, (_, p) => ({
-        url: `${s.base}/page-${p}`,
-        template_key: '/',
-      })),
-    }));
-    const { code, report, stderr } = await runProbe(reqs);
-    expect({ code, stderr }).toEqual({ code: 0, stderr: '' });
-    // The control and every crawler on each page, all served and read.
-    for (const r of report!.results) {
-      expect(r).toMatchObject({
-        complete: pages,
-        rows: pages * (1 + CRAWLERS.length),
-        partial: null,
-      });
-    }
-    expect(report!.peak_rss_mib).toBeLessThanOrEqual(PEAK_RSS_MIB);
-    expectLoopFree(report!);
-  }, 180_000);
-
-  it('bounds the peak well inside the VM fly.toml sets', () => {
-    expect(PEAK_RSS_MIB).toBeLessThanOrEqual(VM_MIB * 0.9);
-  });
-
   it('runs as many batches at once as fly.toml configures, the most the worker allows', () => {
     expect(ENV.BATCH_CONCURRENCY).toBe(String(MAX_BATCH_CONCURRENCY));
     expect(HOSTS.length).toBe(MAX_BATCH_CONCURRENCY);
-    expect(HOSTS.length).toBeGreaterThanOrEqual(Number(ENV.BATCH_CONCURRENCY));
+    expect(LEVELS.at(-1)).toBe(Number(ENV.BATCH_CONCURRENCY));
+    // A bound for every level a case runs at, and no level without a case.
+    expect(Object.keys(PEAK_RSS_MIB).map(Number)).toEqual([...LEVELS]);
   });
 
-  it(`4 crawl batches of ${MAX_URLS_PER_BATCH} URLs on 10 MB pages finish within ${PEAK_RSS_MIB} MiB`, async () => {
-    const { code, report, stderr } = await runProbe(crawl('/page-', MAX_URLS_PER_BATCH));
-    expect({ code, stderr }).toEqual({ code: 0, stderr: '' });
-    for (const r of report!.results) {
-      expect(r).toMatchObject({
-        complete: MAX_URLS_PER_BATCH,
-        rows: MAX_URLS_PER_BATCH,
-        // Fifty pages of a thousand links each pass the batch's 8 MiB for text and links: the pages
-        // past it keep their rows without their text and edges, and say so.
-        partial: { reasons: ['result_size'] },
-        not_served: [],
-      });
-    }
-    expect(report!.peak_rss_mib).toBeLessThanOrEqual(PEAK_RSS_MIB);
-    expectLoopFree(report!);
-  }, 480_000);
+  it("bounds every level's peak well inside the VM fly.toml sets", () => {
+    for (const n of LEVELS) expect(PEAK_RSS_MIB[n]).toBeLessThanOrEqual(VM_MIB * 0.9);
+  });
 
-  it(`4 crawl batches of ${MAX_URLS_PER_BATCH} URLs on 10 MB brotli pages finish within ${PEAK_RSS_MIB} MiB`, async () => {
-    const { code, report, stderr } = await runProbe(crawl('/br/', MAX_URLS_PER_BATCH));
-    expect({ code, stderr }).toEqual({ code: 0, stderr: '' });
-    for (const r of report!.results) {
-      expect(r).toMatchObject({
-        complete: MAX_URLS_PER_BATCH,
-        rows: MAX_URLS_PER_BATCH,
-        // Fifty pages of a thousand links each pass the batch's 8 MiB for text and links: the pages
-        // past it keep their rows without their text and edges, and say so.
-        partial: { reasons: ['result_size'] },
-        not_served: [],
-      });
-    }
-    expect(report!.peak_rss_mib).toBeLessThanOrEqual(PEAK_RSS_MIB);
-    expectLoopFree(report!);
-  }, 480_000);
+  for (const n of [4, MAX_BATCH_CONCURRENCY]) {
+    it(`${n} access batches on 10 MB pages finish within ${mib(n)} at a ${HEAP_MB} MB heap limit`, async () => {
+      const pages = 2;
+      const report = await underLoad(access(n, pages));
+      // The control and every crawler on each page, all served and read.
+      for (const r of report.results) {
+        expect(r).toMatchObject({
+          complete: pages,
+          rows: pages * (1 + CRAWLERS.length),
+          partial: null,
+        });
+      }
+    }, 300_000);
 
-  it(`4 crawl batches on 10 MB pages of the densest markup finish within ${PEAK_RSS_MIB} MiB`, async () => {
-    const { code, report, stderr } = await runProbe(crawl('/dense/', 4));
-    expect({ code, stderr }).toEqual({ code: 0, stderr: '' });
-    for (const r of report!.results) {
-      expect(r).toMatchObject({ complete: 4, rows: 4, partial: null, not_served: [] });
-    }
-    expect(report!.peak_rss_mib).toBeLessThanOrEqual(PEAK_RSS_MIB);
-    expectLoopFree(report!);
-  }, 180_000);
+    it(`${n} crawl batches on 10 MB pages of the densest markup finish within ${mib(n)}`, async () => {
+      const report = await underLoad(crawl(n, '/dense/', 4));
+      for (const r of report.results) {
+        expect(r).toMatchObject({ complete: 4, rows: 4, partial: null, not_served: [] });
+      }
+    }, 300_000);
+  }
+
+  for (const path of ['/page-', '/br/']) {
+    const what = path === '/br/' ? '10 MB brotli pages' : '10 MB pages';
+    it(`4 crawl batches of ${MAX_URLS_PER_BATCH} URLs on ${what} finish within ${mib(4)}`, async () => {
+      const report = await underLoad(crawl(4, path, MAX_URLS_PER_BATCH));
+      for (const r of report.results) {
+        expect(r).toMatchObject({
+          complete: MAX_URLS_PER_BATCH,
+          rows: MAX_URLS_PER_BATCH,
+          // Fifty pages of a thousand links each pass the batch's 8 MiB for text and links: the pages
+          // past it keep their rows without their text and edges, and say so.
+          partial: { reasons: ['result_size'] },
+          not_served: [],
+        });
+      }
+    }, 600_000);
+  }
+
+  for (const [n, path] of [
+    [8, '/br/'],
+    [MAX_BATCH_CONCURRENCY, '/page-'],
+    [MAX_BATCH_CONCURRENCY, '/br/'],
+  ] as const) {
+    const what = path === '/br/' ? '10 MB brotli pages' : '10 MB pages';
+    it(`${n} crawl batches of ${MAX_URLS_PER_BATCH} URLs on ${what}, cut short at ${SHORT_BUDGET.max_seconds} s, stay within ${mib(n)}`, async () => {
+      const report = await underLoad(crawl(n, path, MAX_URLS_PER_BATCH, SHORT_BUDGET));
+      for (const r of report.results) expectCutShort(r);
+    }, 300_000);
+  }
+
+  // Runs last: it reads the results the cases above measured.
+  it('holds BATCH_CONCURRENCY of the largest result measured, twice over, in the result store', () => {
+    expect(largestResult).toBeGreaterThan(0);
+    process.stdout.write(
+      `load: largest result ${largestResult} bytes (${(largestResult / 1048576).toFixed(2)} MiB)\n`,
+    );
+    expect(Number(ENV.BATCH_CONCURRENCY) * largestResult * 2).toBeLessThanOrEqual(MAX_RESULT_BYTES);
+  });
 });

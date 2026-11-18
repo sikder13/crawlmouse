@@ -15,7 +15,7 @@ export interface WorkerConfig {
   /**
    * Batches run at once (BATCH_CONCURRENCY). Default 2 when the variable is unset: on one shared
    * vCPU the reader thread keeps request timers honest but adds no CPU, so more batches only queue
-   * behind each other's pages. Both fly tomls set 4 (see the comment there).
+   * behind each other's pages. Both fly tomls set 16 (see the comment there).
    */
   batchConcurrency: number;
   /** CRAWL_PAUSED, read the way the app reads it (apps/web/lib/crawl-pause.ts): only `1`, whitespace ignored. */
@@ -26,8 +26,8 @@ export interface WorkerConfig {
 
 export const MIN_SECRET_LENGTH = 32;
 export const DEFAULT_BATCH_CONCURRENCY = 2;
-/** The most BATCH_CONCURRENCY may set: src/load.test.ts measures four batches at once in the VM. */
-export const MAX_BATCH_CONCURRENCY = 4;
+/** The most BATCH_CONCURRENCY may set: src/load.test.ts measures sixteen batches at once in the VM. */
+export const MAX_BATCH_CONCURRENCY = 16;
 
 type Env = Readonly<Record<string, string | undefined>>;
 

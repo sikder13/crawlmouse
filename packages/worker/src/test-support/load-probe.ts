@@ -54,6 +54,7 @@ const results = await Promise.all(
     store.finish(`batch:${i}`, result);
     return {
       kind: result.kind,
+      json_bytes: Buffer.byteLength(JSON.stringify(result)),
       requests: result.requests,
       bytes: result.bytes,
       complete: result.coverage.urls_complete,

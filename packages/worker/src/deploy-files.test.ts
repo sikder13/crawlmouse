@@ -184,7 +184,7 @@ describe('fly.toml and the Dockerfile', () => {
     // Restarted whatever its exit, so a crash cannot leave staging down until the next deploy.
     expect(flyToml).toMatch(/\n\[\[restart\]\]\n {2}policy = "always"\n/);
     // The heap limit is set; src/load.test.ts checks what the process holds under load against the VM.
-    expect(flyToml).toContain('NODE_OPTIONS = "--max-old-space-size=256 --max-semi-space-size=4"');
+    expect(flyToml).toContain('NODE_OPTIONS = "--max-old-space-size=512 --max-semi-space-size=4"');
   });
 
   it('caps the requests the proxy sends the machine at once, so the bodies it buffers are bounded', () => {
@@ -192,16 +192,19 @@ describe('fly.toml and the Dockerfile', () => {
     expect(section?.[1]).toBe('    type = "requests"\n    soft_limit = 20\n    hard_limit = 25\n');
   });
 
-  // Four, the most the worker allows, in staging and production. The load test of 2026-11-17 (D5,
-  // 40 checks against one machine at 2) failed 18 checks that never won a batch slot, while the
-  // machine peaked at 266 MB of 1,024 MB with its CPU under 3% busy. The code default stays 2: it
+  // Sixteen, the most the worker allows, in staging and production (CC-42B rulings-2). Measured on
+  // staging on 2026-11-18: shared-cpu-2x 2 GB ran 32 batches on distinct sites without throttling,
+  // and src/load.test.ts holds 16 on worst-case pages at a 512 MB heap. The code default stays 2: it
   // is what a worker run without fly.toml's [env] gets.
   it.each([
     ['fly.toml', flyToml],
     ['fly.production.toml', flyProductionToml],
-  ])('%s runs four batches at once, the most the worker allows', (_name, toml) => {
-    expect(toml).toMatch(/\n {2}BATCH_CONCURRENCY = "4"\n/);
-    expect(MAX_BATCH_CONCURRENCY).toBe(4);
+  ])('%s runs sixteen batches at once, the most the worker allows', (_name, toml) => {
+    expect(toml).toMatch(/\n {2}BATCH_CONCURRENCY = "16"\n/);
+    expect(MAX_BATCH_CONCURRENCY).toBe(16);
+    // On the machine that measured it: shared-cpu-2x with 2 GB.
+    expect(toml).toMatch(/\n\[\[vm\]\]\n {2}size = "shared-cpu-2x"\n {2}memory = "2048mb"\n/);
+    expect(toml).toContain('NODE_OPTIONS = "--max-old-space-size=512 --max-semi-space-size=4"');
     expect(DEFAULT_BATCH_CONCURRENCY).toBe(2);
     expect(toml).not.toContain('MAX_CONCURRENT_BATCHES');
   });

@@ -125,7 +125,7 @@ describe('packages/worker/fly.production.toml', () => {
         'vm',
       ].sort(),
     );
-    expect((staging.vm as Table[])[0]!.memory).toBe('1024mb');
+    expect((staging.vm as Table[])[0]!.memory).toBe('2048mb');
     expect(((staging.http_service as Table).checks as Table[])[0]!.path).toBe('/healthz');
   });
 
@@ -145,14 +145,14 @@ describe('the comparison, over a key at each depth and each kind of change', () 
     ['a top-level value', 'primary_region = "iad"', 'primary_region = "ams"', 'primary_region'],
     [
       'a key in a table',
-      'BATCH_CONCURRENCY = "4"',
-      'BATCH_CONCURRENCY = "3"',
+      'BATCH_CONCURRENCY = "16"',
+      'BATCH_CONCURRENCY = "15"',
       'env.BATCH_CONCURRENCY',
     ],
     [
       'a key in an array of tables, [[vm]] memory',
-      'memory = "1024mb"',
       'memory = "2048mb"',
+      'memory = "1024mb"',
       'vm[0].memory',
     ],
     [
@@ -170,7 +170,7 @@ describe('the comparison, over a key at each depth and each kind of change', () 
     ['a boolean', 'force_https = true', 'force_https = false', 'http_service.force_https'],
     ['a key added', '[[vm]]\n', '[[vm]]\n  cpus = 2\n', 'vm[0].cpus'],
     ['a key removed', '  min_machines_running = 1\n', '', 'http_service.min_machines_running'],
-    ['a table repeated', '[[vm]]\n', '[[vm]]\n  size = "shared-cpu-1x"\n[[vm]]\n', 'vm (length)'],
+    ['a table repeated', '[[vm]]\n', '[[vm]]\n  size = "shared-cpu-2x"\n[[vm]]\n', 'vm (length)'],
   ])('finds %s', (_label, from, to, key) => {
     expect(differingKeys(staging, edited(from, to))).toEqual(['app', key].sort());
   });

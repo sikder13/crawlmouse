@@ -44,7 +44,7 @@ The worker is a Node 22 HTTP service on Fly (`crawlmouse-worker-staging`). The a
 
 | Limit                                                                      | Value                                                                                                                         |
 | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| Batches at once                                                            | 2 unless `BATCH_CONCURRENCY` says otherwise, at most 4; past it, `busy`                                                       |
+| Batches at once                                                            | 2 unless `BATCH_CONCURRENCY` says otherwise, at most 16; past it, `busy`                                                      |
 | Page reader thread old space                                               | 192 MB                                                                                                                        |
 | One page read on the reader thread                                         | 20 s from when the thread reaches it                                                                                          |
 | Element nesting read                                                       | 512 deep; the parse stops past it                                                                                             |
@@ -57,7 +57,7 @@ The worker is a Node 22 HTTP service on Fly (`crawlmouse-worker-staging`). The a
 | Nonce memory                                                               | 10 min                                                                                                                        |
 | JWT lifetime                                                               | 60 min at most; issued up to 60 s ahead                                                                                       |
 | Result kept after a batch finishes                                         | 60 min                                                                                                                        |
-| Results kept                                                               | 500 batches, 64 MiB in all                                                                                                    |
+| Results kept                                                               | 500 batches, 272 MiB in all                                                                                                   |
 | Response body per request (decoded)                                        | read to the first 2 MiB, then reading stops; 10 MiB ceiling                                                                   |
 | Time per request                                                           | 30 s in all, 10 s idle                                                                                                        |
 | Redirects followed per request                                             | 5                                                                                                                             |
