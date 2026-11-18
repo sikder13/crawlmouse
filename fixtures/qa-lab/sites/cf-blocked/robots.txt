@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://cf-blocked.lab.crawlmouse.com/sitemap.xml

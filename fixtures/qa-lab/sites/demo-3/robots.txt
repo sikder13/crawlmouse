@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://demo-3.lab.crawlmouse.com/sitemap.xml

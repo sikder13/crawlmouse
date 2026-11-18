@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://healthy.lab.crawlmouse.com/sitemap.xml

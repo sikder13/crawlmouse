@@ -1,0 +1,152 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "ignoreCommand": "git diff --quiet HEAD^ HEAD -- .",
+  "routes": [
+    {
+      "src": "/(.*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "healthy.lab.crawlmouse.com"
+        }
+      ],
+      "dest": "/sites/healthy/$1"
+    },
+    {
+      "src": "/(.*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "app-shell.lab.crawlmouse.com"
+        }
+      ],
+      "dest": "/sites/app-shell/$1"
+    },
+    {
+      "src": "/(.*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "cf-blocked.lab.crawlmouse.com"
+        },
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*[Cc]rawlmouse.*"
+        }
+      ],
+      "status": 403,
+      "dest": "/blocked.html"
+    },
+    {
+      "src": "/(.*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "cf-blocked.lab.crawlmouse.com"
+        }
+      ],
+      "dest": "/sites/cf-blocked/$1"
+    },
+    {
+      "src": "/(.*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "client-1.lab.crawlmouse.com"
+        }
+      ],
+      "dest": "/sites/client-1/$1"
+    },
+    {
+      "src": "/(.*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "client-2.lab.crawlmouse.com"
+        }
+      ],
+      "dest": "/sites/client-2/$1"
+    },
+    {
+      "src": "/(.*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "client-3.lab.crawlmouse.com"
+        }
+      ],
+      "dest": "/sites/client-3/$1"
+    },
+    {
+      "src": "/(.*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "client-4.lab.crawlmouse.com"
+        }
+      ],
+      "dest": "/sites/client-4/$1"
+    },
+    {
+      "src": "/(.*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "client-5.lab.crawlmouse.com"
+        }
+      ],
+      "dest": "/sites/client-5/$1"
+    },
+    {
+      "src": "/(.*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "client-6.lab.crawlmouse.com"
+        }
+      ],
+      "dest": "/sites/client-6/$1"
+    },
+    {
+      "src": "/(.*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "trial-client-1.lab.crawlmouse.com"
+        }
+      ],
+      "dest": "/sites/trial-client-1/$1"
+    },
+    {
+      "src": "/(.*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "demo-1.lab.crawlmouse.com"
+        }
+      ],
+      "dest": "/sites/demo-1/$1"
+    },
+    {
+      "src": "/(.*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "demo-2.lab.crawlmouse.com"
+        }
+      ],
+      "dest": "/sites/demo-2/$1"
+    },
+    {
+      "src": "/(.*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "demo-3.lab.crawlmouse.com"
+        }
+      ],
+      "dest": "/sites/demo-3/$1"
+    }
+  ]
+}
