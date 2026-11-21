@@ -30,3 +30,26 @@ describe('PricingCards', () => {
     expect(html).toContain('2 months free');
   });
 });
+
+describe('PricingCards while v1 purchases are closed (CC-45 hotfix)', () => {
+  const closed = renderToStaticMarkup(
+    <PricingCards monthlyPriceId="m" yearlyPriceId="y" purchasesOpen={false} />,
+  );
+
+  it('shows no Upgrade button that leads to payment', () => {
+    expect(closed).not.toContain('Upgrade');
+    expect(closed).not.toContain('Starting checkout');
+  });
+
+  it('says paid plans open shortly and offers Start free in the Pro card', () => {
+    const pro = closed.slice(closed.indexOf('Most popular'));
+    expect(pro).toContain('Paid plans open shortly');
+    expect(pro).toMatch(/<a [^>]*href="\/"[^>]*>Start free<\/a>/);
+  });
+
+  it('keeps the Upgrade button when purchases are open (the default)', () => {
+    const open = renderToStaticMarkup(<PricingCards monthlyPriceId="m" yearlyPriceId="y" />);
+    expect(open).toContain('Upgrade — Pro $190/yr');
+    expect(open).not.toContain('Paid plans open shortly');
+  });
+});

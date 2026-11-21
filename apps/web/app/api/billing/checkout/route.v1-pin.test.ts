@@ -57,6 +57,8 @@ async function answer(res: Response) {
 
 beforeEach(() => {
   delete process.env.V2_BILLING;
+  // Both flags off: v1 as it was before go-live. route.v1-closed.test.ts covers V2_CHECKS_PUBLIC=1.
+  delete process.env.V2_CHECKS_PUBLIC;
   process.env.NEXT_PUBLIC_BASE_URL = SITE;
   process.env.STRIPE_PRICE_ID_PRO_MONTHLY = MONTHLY;
   process.env.STRIPE_PRICE_ID_PRO_YEARLY = YEARLY;
@@ -73,7 +75,7 @@ const USERS_READ = [
   ['maybeSingle'],
 ];
 
-describe('POST /api/billing/checkout, V2_BILLING unset (v1, as on main)', () => {
+describe('POST /api/billing/checkout, V2_BILLING and V2_CHECKS_PUBLIC unset (v1, as on main)', () => {
   it('401 auth_required without a session, and nothing read or created', async () => {
     h.state.user = null;
     expect(await answer(await post(JSON.stringify({ priceId: MONTHLY })))).toEqual({
