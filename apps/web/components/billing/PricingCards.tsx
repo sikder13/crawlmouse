@@ -28,9 +28,12 @@ const PRO_FEATURES = [
 export function PricingCards({
   monthlyPriceId,
   yearlyPriceId,
+  purchasesOpen = true,
 }: {
   monthlyPriceId: string;
   yearlyPriceId: string;
+  /** False while v1 purchases are closed (lib/billing/v1-purchases.ts): no Upgrade. */
+  purchasesOpen?: boolean;
 }) {
   const [annual, setAnnual] = useState(true); // annual default
   const [loading, setLoading] = useState(false);
@@ -126,14 +129,27 @@ export function PricingCards({
               </li>
             ))}
           </ul>
-          <Button variant="primary" className="w-full" onClick={upgrade} disabled={loading}>
-            {loading
-              ? 'Starting checkout…'
-              : annual
-                ? 'Upgrade — Pro $190/yr'
-                : 'Upgrade — Pro $19/mo'}
-          </Button>
-          {error && <p className="text-warning text-sm text-center mt-3">{error}</p>}
+          {purchasesOpen ? (
+            <>
+              <Button variant="primary" className="w-full" onClick={upgrade} disabled={loading}>
+                {loading
+                  ? 'Starting checkout…'
+                  : annual
+                    ? 'Upgrade — Pro $190/yr'
+                    : 'Upgrade — Pro $19/mo'}
+              </Button>
+              {error && <p className="text-warning text-sm text-center mt-3">{error}</p>}
+            </>
+          ) : (
+            <>
+              <p className="text-sm text-ink/70 text-center mb-3">
+                Paid plans open shortly. Until then, start free.
+              </p>
+              <a href="/" className={buttonClasses({ variant: 'primary', className: 'w-full' })}>
+                Start free
+              </a>
+            </>
+          )}
         </Card>
       </div>
     </>

@@ -53,7 +53,7 @@ describe('v1’s /pricing, /developers and /r/<slug> pages, as main has them (D1
   // page changes, recompute with
   //   git show origin/main:apps/web/app/<page>/page.tsx | sha256sum
   const MAIN_SHA256 = {
-    'app/pricing/page.tsx': 'abfdc8919682aed4a44b0c48cf39137fa8c505b41b05265a3d588e66d6e0ee1f',
+    'app/pricing/page.tsx': 'bd20886f87daec58fae11dbfa6d2dcb02a792e11378db1d74dacd10efc05cc6c',
     'app/developers/page.tsx': 'becdc256b7c335885adeef5b3b731f53152572ad334d124f139dd98ac354488f',
     'app/r/[slug]/page.tsx': '8b27c68e5bf26b7a014d071fa7a684de809ade03b2e160b1603f90d1ddfe9d00',
   };

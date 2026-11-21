@@ -7,6 +7,7 @@ import { stripe } from '@/lib/stripe';
 import { resolveOrigin } from '@/lib/origin';
 import { checkoutV2, parseCheckout, supabaseCheckoutAccounts } from '@/lib/billing/checkout-v2';
 import { billingV2Enabled } from '@/lib/billing/flags';
+import { v1PurchasesClosed } from '@/lib/billing/v1-purchases';
 import { requestedAccountId } from '@/lib/billing/owner';
 import { chosenInHeader } from '@/lib/v2/account/viewer-cookie';
 import { readBody, refuse, respond } from '@/lib/billing/request-body';
@@ -64,6 +65,15 @@ export async function POST(req: Request) {
     return result.ok
       ? respond(body.kind, result.url)
       : refuse(result.status, result.error, result.detail);
+  }
+
+  // CC-45 hotfix: the v2 product is public and v2 billing is not open, so a v1 purchase would sell an
+  // entitlement the v2 product does not read. Refused before the body is read or Stripe is called.
+  if (v1PurchasesClosed()) {
+    return NextResponse.json(
+      { error: 'purchases_closed', message: 'Paid plans open shortly. Nothing was charged.' },
+      { status: 403 },
+    );
   }
 
   const parsed = schema.safeParse(await req.json().catch(() => ({})));

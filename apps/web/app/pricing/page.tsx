@@ -1,6 +1,7 @@
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 import { PricingCards } from '@/components/billing/PricingCards';
+import { v1PurchasesClosed } from '@/lib/billing/v1-purchases';
 
 export const metadata = {
   title: 'Pricing',
@@ -24,6 +25,7 @@ export default function PricingPage() {
         <PricingCards
           monthlyPriceId={process.env.STRIPE_PRICE_ID_PRO_MONTHLY!}
           yearlyPriceId={process.env.STRIPE_PRICE_ID_PRO_YEARLY!}
+          purchasesOpen={!v1PurchasesClosed()}
         />
       </main>
       <Footer />
