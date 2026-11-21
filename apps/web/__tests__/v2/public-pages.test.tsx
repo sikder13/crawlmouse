@@ -49,9 +49,10 @@ function flags(f: { billing?: boolean; checks?: boolean }) {
 
 describe('v1’s /pricing, /developers and /r/<slug> pages, as main has them (D1)', () => {
   // main's files, pinned by content so the test needs no git ref (a shallow CI checkout has no
-  // origin/main), as live-home.test.tsx pins the home. Taken at origin/main ac9605e5; when main's
-  // page changes, recompute with
-  //   git show origin/main:apps/web/app/<page>/page.tsx | sha256sum
+  // origin/main), as live-home.test.tsx pins the home. Taken at origin/main ac9605e5, except
+  // app/pricing/page.tsx, which CC-45's v1 checkout guard changed (it passes `purchasesOpen`); when
+  // one of these pages changes on purpose, recompute from the branch that changes it with
+  //   sha256sum apps/web/app/<page>/page.tsx
   const MAIN_SHA256 = {
     'app/pricing/page.tsx': 'bd20886f87daec58fae11dbfa6d2dcb02a792e11378db1d74dacd10efc05cc6c',
     'app/developers/page.tsx': 'becdc256b7c335885adeef5b3b731f53152572ad334d124f139dd98ac354488f',

@@ -80,12 +80,15 @@ describe('POST /api/billing/checkout, V2_CHECKS_PUBLIC on and V2_BILLING off', (
     ['the yearly price', JSON.stringify({ priceId: YEARLY })],
     ['a body that is not JSON', 'not json'],
     ['a price that is not one of the env prices', JSON.stringify({ priceId: 'price_other' })],
-  ])('refuses a signed-in purchase (%s) before any read or Stripe call', async (_, body) => {
-    h.state.usersRow = { stripe_customer_id: 'cus_v1_1' };
-    expect(await answer(await post(body))).toEqual(CLOSED);
-    expect(h.calls).toEqual([]);
-    expect(h.create).not.toHaveBeenCalled();
-  });
+  ])(
+    'refuses a signed-in purchase (%s) before the body, the users row or Stripe',
+    async (_, body) => {
+      h.state.usersRow = { stripe_customer_id: 'cus_v1_1' };
+      expect(await answer(await post(body))).toEqual(CLOSED);
+      expect(h.calls).toEqual([]);
+      expect(h.create).not.toHaveBeenCalled();
+    },
+  );
 
   it('still answers 401 auth_required without a session', async () => {
     h.state.user = null;

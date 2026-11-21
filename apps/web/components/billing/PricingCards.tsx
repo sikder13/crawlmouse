@@ -52,6 +52,14 @@ export function PricingCards({
         window.location.href = '/login';
         return;
       }
+      if (res.status === 403) {
+        // A tab loaded before v1 purchases closed (lib/billing/v1-purchases.ts) still shows Upgrade.
+        const { error: code, message } = await res.json().catch(() => ({}));
+        if (code === 'purchases_closed' && typeof message === 'string') {
+          setError(message);
+          return;
+        }
+      }
       if (!res.ok) {
         setError('Could not start checkout. Please try again.');
         return;
