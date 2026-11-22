@@ -151,9 +151,7 @@ export function trialEndView(
   // when the reminder is due, from its day until that day is over in the account's zone, and nothing
   // after.
   const reminderLine =
-    billingOpen &&
-    a.email_prefs.trial_reminder &&
-    (at(reminder) >= at(v.now) || sameDay(reminder, v.now, zone))
+    a.email_prefs.trial_reminder && (at(reminder) >= at(v.now) || sameDay(reminder, v.now, zone))
       ? COPY.reminderDue(dayDate(reminder, zone))
       : null;
   // A trial whose subscription renews at its end charges the card Checkout took, recorded or not

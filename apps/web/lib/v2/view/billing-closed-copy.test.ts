@@ -96,10 +96,10 @@ describe('Settings › Plan with paid plans closed', () => {
     expect(cancel.action).toBeNull();
   });
 
-  it('does not list the trial reminder as a kind of email, and counts what it lists', () => {
+  it('lists the trial reminder, which the clock sends, and no receipts it cannot have', () => {
     const email = settingsView(bad, home, closed).email;
-    expect(email.rows.map((r) => r.kind)).toEqual(['sign_in_link', 'change_note']);
-    expect(email.foot).toMatch(/^Those are the two kinds from us\. There is no newsletter/);
+    expect(email.rows.map((r) => r.kind)).toContain('trial_reminder');
+    expect(email.foot).toMatch(/^Those are the three kinds from us\. There is no newsletter/);
   });
 
   it('lists all three with plans open', () => {
@@ -130,10 +130,10 @@ describe('the first-run dashboard with paid plans closed', () => {
     expect(v.threeKinds!.body).not.toContain('keep Pro');
   });
 
-  it('does not promise a reminder nothing sends yet', () => {
+  it('says the reminder, which the clock sends', () => {
     const v = dashboardView(bad, day0);
-    expect(v.threeKinds!.body).not.toContain('reminder');
-    expect(v.threeKinds!.lead).toBe('You will hear from us two ways and no others:');
+    expect(v.threeKinds!.body).toContain('one reminder on');
+    expect(v.threeKinds!.lead).toBe('You will hear from us three ways and no others:');
   });
 
   it('is as it was with plans open', () => {
@@ -155,16 +155,18 @@ describe('the first-run dashboard with paid plans closed', () => {
   });
 });
 
-describe('the reminder, until something sends it', () => {
-  it('the rail does not promise it', () => {
+describe('the reminder, which the clock sends with paid plans closed', () => {
+  it('the rail says it', () => {
     const note = accountShellView(viewAt(bad, home), 'Sites', { role: 'owner', ...closed }).trial!
       .note;
-    expect(note).not.toContain("We'll email");
+    expect(note).toContain("We'll email you three days before.");
   });
 
-  it('Trial ending does not promise it', () => {
+  it('Trial ending says it', () => {
     const v = trialEndView(bad, trialEndViewer(bad, BAD), closed);
-    expect(v.banner.sub).not.toContain('reminder');
+    expect(v.banner.sub).toBe(
+      'The reminder is due once, on Wed 4 Nov. No card is on file, so nothing is charged.',
+    );
   });
 
   it('both still say it with plans open', () => {
@@ -179,7 +181,8 @@ describe('the reminder, until something sends it', () => {
 describe('Trial ending, other cases with paid plans closed', () => {
   it('a no-card trial is not told "either way", with one way to go', () => {
     const v = trialEndView(bad, trialEndViewer(bad, BAD), closed);
-    expect(v.banner.sub).toBe('No card is on file, so nothing is charged.');
+    expect(v.banner.sub).toContain('No card is on file, so nothing is charged.');
+    expect(v.banner.sub).not.toContain('either way');
   });
 
   it('a card trial is not told to add Pro', () => {

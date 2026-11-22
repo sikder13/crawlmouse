@@ -1048,11 +1048,10 @@ export function dashboardView(
     ...new Set((byCheck ?? []).flatMap((r) => r.verdicts).filter((x): x is Verdict => x !== null)),
   ];
   const free = FREE_SCHEDULE[GATES.free.schedule];
-  // With paid plans closed nothing sends the trial's reminder yet, so it is not promised.
   const plansOpen = checkoutOpen();
   const kinds = COPY.emailKinds(
     v.account.email_prefs.change_notes,
-    plansOpen && trial && v.account.email_prefs.trial_reminder
+    trial && v.account.email_prefs.trial_reminder
       ? dayDate(daysBefore(v.account.trial_ends_at!, 3, zone), zone)
       : null,
   );
