@@ -74,8 +74,11 @@ describe('CookieConsent banner is wired correctly', () => {
   });
 
   it('opts in on allow, opts out on decline, and records the decision', () => {
-    expect(src).toContain('posthog.opt_in_capturing()');
-    expect(src).toContain('posthog.opt_out_capturing()');
+    expect(src).toContain('resumeAnalytics(posthog)');
+    expect(src).toContain('stopAnalytics(posthog)');
+    const control = read('lib/analytics/consent-control.ts');
+    expect(control).toContain('posthog.opt_in_capturing()');
+    expect(control).toContain('posthog.opt_out_capturing()');
     expect(src).toContain('localStorage.setItem(CONSENT_DECISION_STORAGE_KEY');
     expect(src).toContain('document.cookie = consentDecisionCookie(decision)');
     expect(src).toMatch(/granted\s*\?\s*'granted'\s*:\s*'denied'/);

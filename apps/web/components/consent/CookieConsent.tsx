@@ -2,8 +2,8 @@
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react';
 import posthog from 'posthog-js';
 import {
-  clearAnalyticsStorage,
   shouldShowConsentBanner,
+  storedConsent,
   consentDecisionCookie,
   consentDecisionFromCookie,
   CONSENT_DECISION_STORAGE_KEY,
@@ -11,6 +11,7 @@ import {
   CONSENT_GRANTED_EVENT,
   CONSENT_OPEN_EVENT,
 } from '@/lib/consent';
+import { resumeAnalytics, stopAnalytics } from '@/lib/analytics/consent-control';
 import styles from './CookieConsent.module.css';
 
 /**
@@ -50,7 +51,7 @@ export function CookieConsent() {
   }, [visible]);
 
   useEffect(() => {
-    const stored = localStorage.getItem(CONSENT_DECISION_STORAGE_KEY);
+    const stored = storedConsent();
     if (shouldShowConsentBanner(document.cookie, stored)) {
       setVisible(true);
     }
@@ -75,34 +76,24 @@ export function CookieConsent() {
   if (!visible) return null;
 
   const decide = (granted: boolean) => {
+    const decision = granted ? 'granted' : 'denied';
+    // Each step on its own: a full or blocked store must not leave PostHog running after a decline.
     try {
-      const decision = granted ? 'granted' : 'denied';
       localStorage.setItem(CONSENT_DECISION_STORAGE_KEY, decision);
+    } catch {
+      /* the cookie below still records it */
+    }
+    try {
       document.cookie = consentDecisionCookie(decision);
+    } catch {
+      /* noop */
+    }
+    try {
       if (granted) {
-        // Before PostHog has started there is nothing to opt in, and the SDK's opt-in would write
-        // to storage: the grant event below starts it (instrumentation-client.ts).
-        if (posthog.__loaded) {
-          posthog.set_config({
-            disable_persistence: false,
-            opt_out_capturing_by_default: false,
-            disable_surveys: false,
-          });
-          posthog.opt_in_capturing();
-        }
+        resumeAnalytics(posthog);
         window.dispatchEvent(new Event(CONSENT_GRANTED_EVENT));
       } else {
-        if (posthog.__loaded) {
-          posthog.opt_out_capturing();
-          // Surveys skip an opted-out visitor only in cookieless mode, so they are switched off
-          // here. With persistence off and opted-out as the default, the removal below holds.
-          posthog.set_config({
-            disable_surveys: true,
-            disable_persistence: true,
-            opt_out_capturing_by_default: true,
-          });
-        }
-        clearAnalyticsStorage(document, [window.localStorage, window.sessionStorage]);
+        stopAnalytics(posthog);
         window.dispatchEvent(new Event(CONSENT_DENIED_EVENT));
       }
     } catch {

@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   analyticsMayStart,
   clearAnalyticsStorage,
+  posthogApiHost,
   isConsentRequiredCountry,
   consentDecisionCookie,
   consentDecisionFromCookie,
@@ -195,30 +196,99 @@ describe('clearAnalyticsStorage', () => {
       __ph_opt_in_out_phc_x: '0',
       cm_consent: 'denied',
     });
-    clearAnalyticsStorage(doc, [local]);
+    clearAnalyticsStorage(doc, [() => local]);
     expect(written).toEqual([
       'ph_phc_x_posthog=; Max-Age=0; Path=/; SameSite=Lax',
+      'ph_phc_x_posthog=; Max-Age=0; Path=/; Domain=.www.crawlmouse.com; SameSite=Lax',
       'ph_phc_x_posthog=; Max-Age=0; Path=/; Domain=.crawlmouse.com; SameSite=Lax',
       '__ph_opt_in_out_phc_x=; Max-Age=0; Path=/; SameSite=Lax',
+      '__ph_opt_in_out_phc_x=; Max-Age=0; Path=/; Domain=.www.crawlmouse.com; SameSite=Lax',
       '__ph_opt_in_out_phc_x=; Max-Age=0; Path=/; Domain=.crawlmouse.com; SameSite=Lax',
     ]);
     expect(Object.keys(local)).toEqual(['cm_consent']);
   });
 
   it('a store that throws does not stop the others', () => {
-    const bad = {
-      get length(): number {
-        throw new Error('denied');
-      },
-    } as unknown as Storage;
-    const throwing = new Proxy(bad, {
-      ownKeys() {
-        throw new Error('denied');
-      },
-    });
+    const blocked = (): Storage => {
+      throw new DOMException('denied', 'SecurityError');
+    };
     const good = store({ ph_phc_x_posthog: '{}' });
     const doc = { cookie: '', location: { hostname: 'crawlmouse.com' } } as unknown as Document;
-    expect(() => clearAnalyticsStorage(doc, [throwing, good])).not.toThrow();
+    expect(() => clearAnalyticsStorage(doc, [blocked, () => good])).not.toThrow();
     expect(Object.keys(good)).toEqual([]);
+  });
+});
+
+describe('clearAnalyticsStorage, what analytics wrote', () => {
+  it('takes survey state and the first-touch cookie, on a staging host’s parent domain too', () => {
+    const written: string[] = [];
+    const doc = {
+      get cookie() {
+        return 'cm_ft=x; cm_consent=denied; sb-ref-auth-token=keep';
+      },
+      set cookie(v: string) {
+        written.push(v);
+      },
+      location: { hostname: 'staging.crawlmouse.com' },
+    } as unknown as Document;
+    const m: Record<string, string> = {
+      seenSurvey_a: '1',
+      inProgressSurvey_a: '1',
+      abandonedSurvey_a: '1',
+      lastSeenSurveyDate: '1',
+      cm_consent: 'denied',
+      lastSeenSurveyDateX: 'not ours',
+    };
+    Object.defineProperty(m, 'removeItem', {
+      enumerable: false,
+      value: (k: string) => delete m[k],
+    });
+    clearAnalyticsStorage(doc, [() => m as unknown as Storage]);
+    expect(Object.keys(m).sort()).toEqual(['cm_consent', 'lastSeenSurveyDateX']);
+    expect(written).toContain('cm_ft=; Max-Age=0; Path=/; Domain=.crawlmouse.com; SameSite=Lax');
+    expect(written.join()).not.toContain('auth-token');
+    expect(written.join()).not.toContain('cm_consent');
+    expect(written.join()).not.toContain('Domain=.com');
+  });
+});
+
+describe('posthogApiHost (F-049)', () => {
+  it.each([
+    [undefined, '/ingest'],
+    [null, '/ingest'],
+    ['', '/ingest'],
+    ['/ingest', '/ingest'],
+    ['https://us.i.posthog.com', '/ingest'],
+    ['https://eu.i.posthog.com', '/ingest'],
+    ['http://localhost.evil.example:4000/ph', '/ingest'],
+    ['https://localhost:4000/ph', '/ingest'],
+    ['http://127.0.0.1:4010/ph', 'http://127.0.0.1:4010/ph'],
+    ['http://localhost:4010/ph', 'http://localhost:4010/ph'],
+  ])('%s → %s', (env, expected) => {
+    expect(posthogApiHost(env)).toBe(expected);
+  });
+});
+
+describe('isConsentRequiredCountry, what the list used to miss', () => {
+  it('asks in EU territory that has its own country code', () => {
+    for (const c of ['AX', 'GF', 'GP', 'MF', 'MQ', 'RE', 'YT']) {
+      expect(isConsentRequiredCountry(c, false), c).toBe(true);
+    }
+  });
+
+  it('on a deployment, asks a visitor whose country is not known', () => {
+    for (const c of [null, undefined, '', ' ', 'XX', 'xx', 'T1']) {
+      expect(isConsentRequiredCountry(c, true), String(c)).toBe(true);
+    }
+  });
+
+  it('off a deployment there is no geo header, so no country is not a reason to ask', () => {
+    for (const c of [null, undefined, '', 'XX']) {
+      expect(isConsentRequiredCountry(c, false), String(c)).toBe(false);
+    }
+  });
+
+  it('a known country outside the list is not asked, on a deployment either', () => {
+    expect(isConsentRequiredCountry('US', true)).toBe(false);
   });
 });

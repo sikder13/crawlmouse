@@ -182,6 +182,96 @@ describe('no PostHog before consent, or after a decline', () => {
   });
 });
 
+describe('the privacy review’s cases', () => {
+  it('a Decline in another tab stops this one, and it writes and sends nothing more', async () => {
+    const posthog = await load(['cm_consent_required=0']);
+    expect(posthog.__loaded).toBe(true);
+    // Another tab recorded the choice and cleared the shared keys.
+    localStorage.setItem('cm_consent', 'denied');
+    for (const k of Object.keys(localStorage)) if (PH_NAME.test(k)) localStorage.removeItem(k);
+    window.dispatchEvent(new StorageEvent('storage', { key: 'cm_consent', newValue: 'denied' }));
+    await settle();
+    expect(posthog.has_opted_out_capturing()).toBe(true);
+    const sent = requests.length;
+    posthog.capture('from-the-other-tab');
+    posthog.register({ later: 1 });
+    await settle();
+    expect({ ...traces(), scripts: [], requests: [] }).toEqual(NOTHING);
+    expect(requests.length).toBe(sent);
+  });
+
+  it('an Allow in another tab starts PostHog in this one', async () => {
+    const posthog = await load(['cm_consent_required=1']);
+    expect(posthog.__loaded).toBe(false);
+    localStorage.setItem('cm_consent', 'granted');
+    window.dispatchEvent(new StorageEvent('storage', { key: 'cm_consent', newValue: 'granted' }));
+    await settle();
+    expect(posthog.__loaded).toBe(true);
+  });
+
+  it('another key changing in storage does nothing', async () => {
+    const posthog = await load(['cm_consent_required=0']);
+    window.dispatchEvent(new StorageEvent('storage', { key: 'other', newValue: 'denied' }));
+    await settle();
+    expect(posthog.has_opted_out_capturing()).toBe(false);
+  });
+
+  it('an Allow after a client navigation to the console does not start PostHog', async () => {
+    const posthog = await load(['cm_consent_required=1']);
+    const b = await banner();
+    window.history.pushState(null, '', '/internal/accounts/abc');
+    await b.click('Allow analytics');
+    expect(posthog.__loaded).toBe(false);
+    expect(traces()).toEqual(NOTHING);
+    b.done();
+  });
+
+  it('a withdrawal removes the first-touch cookie and survey state too', async () => {
+    await load(['cm_consent_required=1'], undefined);
+    const b = await banner();
+    await b.click('Allow analytics');
+    expect(document.cookie).toContain('cm_ft=');
+    localStorage.setItem('seenSurvey_a', '1');
+    localStorage.setItem('lastSeenSurveyDate', '1');
+    b.open();
+    await b.click('Decline');
+    expect(document.cookie).not.toContain('cm_ft=');
+    expect(localStorage.getItem('seenSurvey_a')).toBeNull();
+    expect(localStorage.getItem('lastSeenSurveyDate')).toBeNull();
+    b.done();
+  });
+
+  it('storage the browser blocks does not stop the page from loading', async () => {
+    const real = Object.getOwnPropertyDescriptor(window, 'localStorage')!;
+    Object.defineProperty(window, 'localStorage', {
+      configurable: true,
+      get() {
+        throw new DOMException('denied', 'SecurityError');
+      },
+    });
+    try {
+      const posthog = await load(['cm_consent_required=1']);
+      expect(posthog.__loaded).toBe(false);
+    } finally {
+      Object.defineProperty(window, 'localStorage', real);
+    }
+  });
+
+  it('a Decline with a full store still stops PostHog and records it in the cookie', async () => {
+    const posthog = await load(['cm_consent_required=0']);
+    const b = await banner();
+    b.open();
+    const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('full', 'QuotaExceededError');
+    });
+    await b.click('Decline');
+    setItem.mockRestore();
+    expect(document.cookie).toContain('cm_consent=denied');
+    expect(posthog.has_opted_out_capturing()).toBe(true);
+    b.done();
+  });
+});
+
 describe('PostHog where it may run', () => {
   it('starts at load outside the consent regions, through /ingest whatever the env says', async () => {
     const posthog = await load(['cm_consent_required=0']);

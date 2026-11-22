@@ -82,16 +82,31 @@ const CONSENT_REQUIRED_COUNTRIES: ReadonlySet<string> = new Set([
   'NO',
   // United Kingdom
   'GB',
+  // EU territory with a country code of its own: Åland, and the outermost regions of France.
+  'AX',
+  'GF',
+  'GP',
+  'MF',
+  'MQ',
+  'RE',
+  'YT',
 ]);
 
+/** What a geo lookup answers when it has no country: `XX` (unknown) and `T1` (Tor). */
+const UNKNOWN_COUNTRIES: ReadonlySet<string> = new Set(['XX', 'T1']);
+
 /**
- * Whether a visitor's country requires prior opt-in consent for non-essential analytics.
- * Missing/unknown country resolves to `false` (US-first default; Vercel reliably provides the
- * country header in production).
+ * Whether a visitor's country requires prior opt-in consent for non-essential analytics. On a Vercel
+ * deployment a visitor whose country is not known is asked, since they may be in the EU (question
+ * 009). Off Vercel (local, CI) there is no geo header at all, so a missing country is "not required".
  */
-export function isConsentRequiredCountry(country?: string | null): boolean {
-  if (!country) return false;
-  return CONSENT_REQUIRED_COUNTRIES.has(country.trim().toUpperCase());
+export function isConsentRequiredCountry(
+  country?: string | null,
+  onVercel: boolean = process.env.VERCEL_ENV !== undefined,
+): boolean {
+  const code = country?.trim().toUpperCase();
+  if (!code || UNKNOWN_COUNTRIES.has(code)) return onVercel;
+  return CONSENT_REQUIRED_COUNTRIES.has(code);
 }
 
 /** Parse the middleware-set consent-required flag from a `document.cookie` string (exact match). */
@@ -133,6 +148,32 @@ export function serverCaptureAllowed(cookieHeader?: string | null): boolean {
   return !consentRequiredFromCookie(cookieHeader);
 }
 
+/** What the banner stored in this browser, or null where storage is blocked. */
+export function storedConsent(): string | null {
+  try {
+    return window.localStorage.getItem(CONSENT_DECISION_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Where the browser's PostHog sends (F-049): the same-origin proxy, whatever
+ * `NEXT_PUBLIC_POSTHOG_HOST` says, except a loopback address: the launch walk's capture stub
+ * (tests/e2e/run.sh), which no deployment can reach.
+ */
+export function posthogApiHost(envHost?: string | null): string {
+  try {
+    const { hostname, protocol } = new URL(envHost ?? '');
+    if (protocol === 'http:' && (hostname === 'localhost' || hostname === '127.0.0.1')) {
+      return envHost!;
+    }
+  } catch {
+    /* not an absolute URL: the proxy */
+  }
+  return '/ingest';
+}
+
 /** The visitor's recorded decision: what the banner stored, else the cookie it writes beside it. */
 export function recordedDecision(
   cookieString?: string | null,
@@ -153,25 +194,41 @@ export function analyticsMayStart(cookieString?: string | null, stored?: string 
   return (cookieString ?? '').split(';').some((c) => c.trim() === `${CONSENT_REQUIRED_COOKIE}=0`);
 }
 
-/** A cookie or storage key of PostHog's: `ph_<key>_posthog`, `__ph_opt_in_out_<key>` and the rest. */
-const POSTHOG_NAME = /^(?:__)?ph_/;
+/**
+ * A cookie or storage key that analytics wrote: PostHog's own (`ph_<key>_posthog`,
+ * `__ph_opt_in_out_<key>`), its survey state (the prefixes in posthog-js's `survey-utils`), and the
+ * first-touch cookie, which is set under the same consent.
+ */
+const ANALYTICS_NAME =
+  /^(?:(?:__)?ph_|seenSurvey_|inProgressSurvey_|abandonedSurvey_|lastSeenSurveyDate$|cm_ft$)/;
+
+/** The host and each parent domain a cookie could have been set on, down to two labels. */
+function cookieDomains(hostname: string): string[] {
+  const domains: string[] = [];
+  for (let host = hostname; host.includes('.'); host = host.replace(/^[^.]*\./, '')) {
+    domains.push(`.${host}`);
+  }
+  return domains;
+}
 
 /**
- * Removes every PostHog cookie and storage key from this browser, and nothing else. Run when
- * analytics may not start, and on a decline. A store that throws (private mode) is skipped.
+ * Removes the cookies and storage keys `ANALYTICS_NAME` matches, and no others. Run when analytics
+ * may not start, and on a decline. Each store is passed as a getter, because reading
+ * `window.localStorage` itself throws where storage is blocked; such a store is skipped.
  */
-export function clearAnalyticsStorage(doc: Document, stores: readonly Storage[]): void {
+export function clearAnalyticsStorage(doc: Document, stores: readonly (() => Storage)[]): void {
   for (const pair of doc.cookie.split(';')) {
     const name = pair.split('=')[0]!.trim();
-    if (!POSTHOG_NAME.test(name)) continue;
+    if (!ANALYTICS_NAME.test(name)) continue;
     doc.cookie = `${name}=; Max-Age=0; Path=/; SameSite=Lax`;
-    // PostHog writes its cookie on the parent domain across subdomains.
-    const parent = doc.location?.hostname.replace(/^www\./, '');
-    if (parent) doc.cookie = `${name}=; Max-Age=0; Path=/; Domain=.${parent}; SameSite=Lax`;
+    for (const domain of cookieDomains(doc.location?.hostname ?? '')) {
+      doc.cookie = `${name}=; Max-Age=0; Path=/; Domain=${domain}; SameSite=Lax`;
+    }
   }
-  for (const store of stores) {
+  for (const read of stores) {
     try {
-      for (const key of Object.keys(store)) if (POSTHOG_NAME.test(key)) store.removeItem(key);
+      const store = read();
+      for (const key of Object.keys(store)) if (ANALYTICS_NAME.test(key)) store.removeItem(key);
     } catch {
       /* a store this browser refuses holds nothing we wrote */
     }

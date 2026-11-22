@@ -1,6 +1,7 @@
 import posthog from 'posthog-js';
 import { beforeSendSampler } from '@/lib/analytics';
 import { sentryBrowserOptions } from '@/lib/auth/sentry-scrub';
+import { BROWSER_STORES, resumeAnalytics, stopAnalytics } from '@/lib/analytics/consent-control';
 import { rememberFirstTouch } from '@/lib/analytics/first-touch';
 import { configureSentry, routerTransitionStart, startSentryWhenIdle } from '@/lib/sentry-lazy';
 import {
@@ -8,6 +9,9 @@ import {
   clearAnalyticsStorage,
   consentRequiredFromCookie,
   CONSENT_DECISION_STORAGE_KEY,
+  posthogApiHost,
+  recordedDecision,
+  storedConsent,
   CONSENT_GRANTED_EVENT,
   surveysOffAtStart,
 } from '@/lib/consent';
@@ -36,22 +40,17 @@ if (
   !/^\/internal(\/|$)/.test(window.location.pathname)
 ) {
   const posthogKey = process.env.NEXT_PUBLIC_POSTHOG_KEY;
-  const storedDecision = () => {
-    try {
-      return localStorage.getItem(CONSENT_DECISION_STORAGE_KEY);
-    } catch {
-      return null;
-    }
-  };
-  const mayStart = () => analyticsMayStart(document.cookie, storedDecision());
+  // The console is checked each time, not only at load: Allow can come after a client navigation.
+  const onConsole = () => /^\/internal(\/|$)/.test(window.location.pathname);
+  const mayStart = () => !onConsole() && analyticsMayStart(document.cookie, storedConsent());
 
   // Consent gate (F-048): PostHog is not started at all until it may be. Its opt-out flag stops
   // capture only: `init` itself writes a cookie and storage and calls /flags/ and config.js.
   const startPostHog = () => {
     if (posthog.__loaded || !mayStart()) return;
     posthog.init(posthogKey, {
-      // Always the proxy, whatever NEXT_PUBLIC_POSTHOG_HOST says (F-049).
-      api_host: '/ingest',
+      // The same-origin proxy, whatever NEXT_PUBLIC_POSTHOG_HOST says (F-049).
+      api_host: posthogApiHost(process.env.NEXT_PUBLIC_POSTHOG_HOST),
       ui_host: 'https://us.posthog.com',
       person_profiles: 'always',
       capture_pageview: true,
@@ -62,7 +61,7 @@ if (
       // posthog-js skips surveys for an opted-out visitor only in cookieless mode, which this is not.
       disable_surveys: surveysOffAtStart(
         consentRequiredFromCookie(document.cookie),
-        storedDecision(),
+        storedConsent(),
       ),
       disable_session_recording: true, // do not record by default
       session_recording: { maskAllInputs: true, maskTextSelector: '[data-ph-mask]' },
@@ -70,9 +69,13 @@ if (
     });
   };
   if (mayStart()) startPostHog();
-  else {
-    // What an earlier version wrote before anyone chose.
-    clearAnalyticsStorage(document, [window.localStorage, window.sessionStorage]);
+  else if (
+    consentRequiredFromCookie(document.cookie) ||
+    recordedDecision(document.cookie, storedConsent()) === 'denied'
+  ) {
+    // What an earlier version wrote before anyone chose. A page with no region cookie holds
+    // analytics but removes nothing: it says nothing about this visitor.
+    clearAnalyticsStorage(document, BROWSER_STORES);
   }
 
   // Error-only replay: start recording the moment something throws, so we capture the lead-up
@@ -109,5 +112,14 @@ if (
   window.addEventListener(CONSENT_GRANTED_EVENT, () => {
     startPostHog();
     firstTouch();
+  });
+  // A choice made in another tab of this site reaches this one.
+  window.addEventListener('storage', (e) => {
+    if (e.key !== CONSENT_DECISION_STORAGE_KEY) return;
+    if (e.newValue === 'denied') stopAnalytics(posthog);
+    if (e.newValue === 'granted') {
+      resumeAnalytics(posthog);
+      startPostHog();
+    }
   });
 }
