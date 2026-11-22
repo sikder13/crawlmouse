@@ -954,6 +954,33 @@ describe('the required checks', () => {
   });
 });
 
+// The journey suite's pure specs run once per push, on the scripts leg of the per-package matrix: they
+// are the only CI check of the production-write guard (tests/journeys/lib/target.ts).
+describe('the journey guard', () => {
+  const steps = (job('test').steps ?? []) as {
+    name?: string;
+    if?: string;
+    env?: Record<string, string>;
+    run?: string;
+  }[];
+  const guard = steps.find((s) => s.name === 'journey guard');
+
+  it('runs the guard and consistency specs, with a placeholder base URL, on the scripts leg', () => {
+    expect(guard?.if).toBe("matrix.package == 'scripts'");
+    expect(guard?.env).toEqual({ JOURNEY_BASE_URL: 'https://journeys.invalid' });
+    expect(guard?.run).toBe(
+      'pnpm --filter @crawlmouse/web exec playwright test -c ../../tests/journeys/playwright.config.ts --project=desktop guard.spec.ts consistency.spec.ts',
+    );
+  });
+
+  it('runs after the package tests, so a guard failure is not hidden behind them', () => {
+    const at = steps.findIndex((s) => s.name === 'journey guard');
+    expect(at).toBeGreaterThan(
+      steps.findIndex((s) => s.run === 'pnpm --filter @crawlmouse/${{ matrix.package }} test'),
+    );
+  });
+});
+
 // test (web) runs in three shards; one job named `test (web)` reports their verdict, so the
 // required check keeps its name. On 2026-11-11 the single job took 13.5 min (run 43056751031) and
 // was cancelled at its 15-minute limit (run 43073710281).
