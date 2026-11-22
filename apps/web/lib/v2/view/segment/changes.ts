@@ -4,7 +4,7 @@
  * the changes it found. A change is reported as first observed at a check, after what we found
  * with it, never as caused by it: a check sees that something differs, not why.
  */
-import { measuredInFull } from '../section-measured';
+import { everySectionMeasured } from '../section-measured';
 import type { Change, Check, EvidenceClass, GradeName, Verdict } from '@crawlmouse/types/v2';
 import type { ViewDataset } from '../../fixtures';
 
@@ -297,7 +297,7 @@ export function changesView(
             label: `${rows.length} ${plural(rows.length, 'change', 'changes')}`,
           },
         }
-      : previous && measuredInFull(d, check) && measuredInFull(d, previous)
+      : previous && everySectionMeasured(check) && everySectionMeasured(previous)
         ? {
             title: `Nothing changed at the ${when} check.`,
             pill: { state: 'neutral', label: 'no changes' },

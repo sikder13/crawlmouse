@@ -1,9 +1,10 @@
 /**
- * The rule behind each clean sentence on the result screens (V2R question 011): every section at each
- * of its levels, on checks the real builder made, and the claims that must not survive below `full`.
+ * What a result screen may say of a section the check read nothing of (V2R questions 011, 012), on
+ * checks the real builder made. A section read only in part counts as read here; saying so is its
+ * own PR (`build/v2r-a2-measured-partial`).
  */
 import { buildCheck } from '@crawlmouse/engine/v2/pipeline';
-import type { Check, CrawlPage, LinkEdge } from '@crawlmouse/types/v2';
+import type { CrawlPage, LinkEdge } from '@crawlmouse/types/v2';
 import { describe, expect, it } from 'vitest';
 import { recordedBuild } from '../../../../../packages/engine/fixtures/v2/build/recorded';
 import {
@@ -15,7 +16,7 @@ import { findCheck, fixture, type ViewDataset } from '../fixtures';
 import { CHECKS } from '../recordings';
 import { linkMapView } from './link-map';
 import { resultView } from './result';
-import { measuredInFull, measuredLevel, noFixWords, pagesRead } from './section-measured';
+import { everySectionMeasured, noFixWords, sectionMeasured } from './section-measured';
 import { accessView } from './segment/access';
 import { changesView } from './segment/changes';
 import { contentView } from './segment/content';
@@ -36,20 +37,6 @@ function built(pages: CrawlPage[], links: LinkEdge[] = []) {
 }
 type Built = ReturnType<typeof built>;
 
-const threeLinked = () =>
-  built(
-    [page('', 200), page('/a', 200), page('/b', 200)],
-    [edge(HOME, `${HOME}/a`), edge(HOME, `${HOME}/b`), edge(`${HOME}/a`, `${HOME}/b`)],
-  );
-/** The three-page site after `edit` to its `/b` row, as a real worker row of that shape reads. */
-function withRowB(edit: Record<string, unknown>) {
-  const b = threeLinked();
-  Object.assign(b.d.page_results.find((p) => p.url.endsWith('/b'))!, edit);
-  return b;
-}
-/** Our reader got no links from `/b`. */
-const readerFailedOnOne = () => withRowB({ links_read: false });
-
 const clean = () => {
   const d = structuredClone(fixture('clean-site')) as ViewDataset;
   return { d, id: CHECKS.cleanFirstAudit, check: findCheck(d, CHECKS.cleanFirstAudit) };
@@ -69,311 +56,180 @@ function everyScreen({ d, id }: Built) {
     signalsView(d, id),
     structureView(d, id, {}, null),
     linkMapView(d, id, { scope: 'all' }),
-  ])
-    .replaceAll('We found nothing to fix in what we measured.', '')
-    .replaceAll('nothing to fix in what was measured', '');
+  ]).replaceAll('We found nothing to fix in what we measured.', '');
 }
 
 const CLEAN_CLAIM =
   /nothing to fix|nothing urgent|every page crawled has|every page is linked|no orphan pages|within three clicks|which is healthy|no page stands out/i;
 
-describe('crawler access', () => {
-  it('is none when no AI crawler was measured', () => {
-    const b = built([page('', 403, 'refused')]);
-    expect(measuredLevel(b.d, b.check, 'crawler_access')).toBe('none');
-  });
-
-  it('is none behind an edge that refused the control', () => {
-    const { d, check } = clean();
-    for (const c of check.crawlers.filter((x) => x.group !== 'search_engine'))
-      c.verdict = 'edge_blocks_automation';
-    expect(measuredLevel(d, check, 'crawler_access')).toBe('none');
-  });
-
-  it('is partial with one of six measured out (C-2), and the footer says so', () => {
-    const { d, id, check } = clean();
-    check.crawlers.find((x) => x.ua === 'GPTBot')!.verdict = 'not_measured';
-    expect(measuredLevel(d, check, 'crawler_access')).toBe('partial');
-    const door = resultView(d, id, { map: null }).doors[0]!;
-    expect(door.footer).toContain('nothing to fix in what was measured');
-  });
-
-  it('is partial when a crawler was measured on fewer than every sampled page', () => {
-    const { d, check } = clean();
-    const sampled = check.coverage!.pages_sampled;
-    check.crawlers.find((x) => x.ua === 'GPTBot')!.pages_measured = sampled - 1;
-    expect(measuredLevel(d, check, 'crawler_access')).toBe('partial');
-  });
-
-  it('is full on every sampled page, when only a search engine is unmeasured', () => {
-    const { d, check } = clean();
-    check.crawlers.find((x) => x.group === 'search_engine')!.verdict = 'not_measured';
-    expect(measuredLevel(d, check, 'crawler_access')).toBe('full');
-  });
-
-  it('does not hold a robots.txt verdict to the page count', () => {
-    const { d, check } = clean();
-    Object.assign(check.crawlers.find((x) => x.ua === 'GPTBot')!, {
-      verdict: 'disallowed_by_robots',
-      evidence_class: 'declared',
-      pages_measured: 0,
-    });
-    expect(measuredLevel(d, check, 'crawler_access')).toBe('full');
-  });
-
-  it('is none with no AI crawler at all', () => {
-    const { d, check } = clean();
-    check.crawlers = check.crawlers.filter((x) => x.group === 'search_engine');
-    expect(measuredLevel(d, check, 'crawler_access')).toBe('none');
-  });
-});
-
-describe('structure', () => {
-  it('is none with no link read', () => {
-    const b = built([page('', 200)]);
-    expect(measuredLevel(b.d, b.check, 'structure')).toBe('none');
-  });
-
-  it('is full on a small site whose score is withheld', () => {
-    const b = threeLinked();
-    expect(b.check.technical_seo!.site_structure_score).toBeNull();
-    expect(measuredLevel(b.d, b.check, 'structure')).toBe('full');
-  });
-
+describe('no screen says a section is clean when it read nothing', () => {
   it.each([
-    ['a redirecting page', { depth: null, kind: 'duplicate', is_orphan: false }],
-    ['an unlinked noindex page', { depth: null, kind: 'utility', is_orphan: false }],
-    ['a real orphan', { depth: null, is_orphan: true }],
-  ])('stays full with %s: a null depth is not a failure to read', (_name, edit) => {
-    const b = withRowB(edit);
-    expect(measuredLevel(b.d, b.check, 'structure')).toBe('full');
+    ['every page refused', () => built([page('', 403, 'refused'), page('/a', 403, 'refused')])],
+    ['every page gone', () => built([page('', 404, 'gone')])],
+    ['one page served, nothing else measured', () => built([page('', 200)])],
+  ])('%s, built by the engine', (_name, make) => {
+    expect(everyScreen(make())).not.toMatch(CLEAN_CLAIM);
   });
 
-  it('is partial when our reader did not read a page’s links', () => {
-    const b = readerFailedOnOne();
-    expect(pagesRead(b.d, b.check)).toEqual({ read: 2, total: 3 });
-    expect(measuredLevel(b.d, b.check, 'structure')).toBe('partial');
+  it('still says it of a section that was read (the sweep can pass only by reading)', () => {
+    const c = clean();
+    expect(JSON.stringify(resultView(c.d, c.id, { map: null }).doors)).toContain('nothing to fix');
   });
 
-  it.each([401, 403, 429, 500, 503])('is partial when a page answered %i', (status_code) => {
-    const b = withRowB({ status_code });
-    expect(measuredLevel(b.d, b.check, 'structure')).toBe('partial');
-  });
-
-  it.each([301, 404, 410])(
-    'stays full when a page answered %i: the site said so',
-    (status_code) => {
-      const b = withRowB({ status_code });
-      expect(measuredLevel(b.d, b.check, 'structure')).toBe('full');
-    },
-  );
-
-  it('is partial when the crawl stopped short of what it found', () => {
-    const b = threeLinked();
-    b.check.coverage!.pages_discovered = 7;
-    expect(measuredLevel(b.d, b.check, 'structure')).toBe('partial');
-  });
-
-  it('does not fall below full on a non-HTML page, which has no links to read', () => {
-    const b = withRowB({ is_html: false, links_read: false });
-    expect(measuredLevel(b.d, b.check, 'structure')).toBe('full');
-  });
-
-  it('counts JS-only links as read (C-3)', () => {
-    const b = built([page('', 200)]);
-    b.check.structure!.js_only_pages = 2;
-    expect(measuredLevel(b.d, b.check, 'structure')).not.toBe('none');
-  });
-
-  it('at partial, makes no claim about every page, and gives the numbers', () => {
-    const b = readerFailedOnOne();
-    expect(everyScreen(b)).not.toMatch(
-      /every page crawled has|every page is linked|no orphan pages|within three clicks|which is healthy/i,
-    );
-    const v = structureView(b.d, b.id, {}, null);
-    expect(v.headline.title).toBe('2 of 3 pages had their links read.');
-    expect(v.orphans.heading).toBe('No orphan among the pages read');
-  });
-
-  it('at partial, shows no zero that reads as none found (M-5)', () => {
-    const b = readerFailedOnOne();
-    expect(resultView(b.d, b.id, { map: null }).map.orphans).toBeNull();
-    expect(linkMapView(b.d, b.id, { scope: 'all' }).filters.map((f) => f.label)).not.toEqual(
-      expect.arrayContaining([expect.stringMatching(/· 0$/)]),
-    );
-    const v = structureView(b.d, b.id, {}, null);
-    expect(v.coverage.tested).toBe(2);
-    expect(v.tiles.find((t) => t.label === 'Orphan pages')!.value).toBe('—');
-    expect(v.tiles.find((t) => t.label === 'Average click depth')!.value).toBe('—');
-  });
-
-  it('at partial, still shows a count that found something', () => {
-    const b = readerFailedOnOne();
-    b.check.structure!.orphan_pages = 2;
-    expect(resultView(b.d, b.id, { map: null }).map.orphans).toBe(2);
-    const v = structureView(b.d, b.id, {}, null);
-    expect(v.tiles.find((t) => t.label === 'Orphan pages')!.value).toBe('2');
-  });
-
-  it('at none, shows no count that reads as none found (C-1)', () => {
+  it('shows no zero that reads as none found when no link was read', () => {
     const b = built([page('', 403, 'refused'), page('/a', 403, 'refused')]);
     expect(resultView(b.d, b.id, { map: null }).map.orphans).toBeNull();
     const map = linkMapView(b.d, b.id, { scope: 'all' });
     expect(map.filters).toEqual([]);
     expect(map.caption).toBe('2 pages crawled; no internal link between them was read.');
     const v = structureView(b.d, b.id, {}, null);
-    expect(v.coverage.tested).toBe(0);
+    expect(v.coverage).toMatchObject({ tested: 0, groups: 0 });
     expect(v.tiles.find((t) => t.label === 'Orphan pages')!.value).toBe('—');
     expect(v.tiles.find((t) => t.label === 'Average click depth')!.value).toBe('—');
     expect(v.orphans.heading).toBe('Orphan pages were not measured');
   });
+
+  it('keeps the counts of a check that read its links', () => {
+    const b = built(
+      [page('', 200), page('/a', 200), page('/b', 200)],
+      [edge(HOME, `${HOME}/a`), edge(HOME, `${HOME}/b`), edge(`${HOME}/a`, `${HOME}/b`)],
+    );
+    expect(resultView(b.d, b.id, { map: null }).map.orphans).toBe(0);
+    expect(linkMapView(b.d, b.id, { scope: 'all' }).filters).toHaveLength(3);
+    expect(structureView(b.d, b.id, {}, null).coverage.tested).toBe(3);
+  });
 });
 
-describe('content', () => {
-  it('is none when no content check evaluated a page', () => {
-    const { d, check } = clean();
+describe('sectionMeasured: anything read counts, and a withheld score does not matter', () => {
+  it('crawler access is not read with no AI crawler measured', () => {
+    const b = built([page('', 403, 'refused')]);
+    expect(sectionMeasured(b.check, 'crawler_access')).toBe(false);
+  });
+
+  it('crawler access is not read behind an edge that refused the control', () => {
+    const { check } = clean();
+    for (const c of check.crawlers.filter((x) => x.group !== 'search_engine'))
+      c.verdict = 'edge_blocks_automation';
+    expect(sectionMeasured(check, 'crawler_access')).toBe(false);
+  });
+
+  it('crawler access is not read with no AI crawler at all', () => {
+    const { check } = clean();
+    check.crawlers = check.crawlers.filter((x) => x.group === 'search_engine');
+    expect(sectionMeasured(check, 'crawler_access')).toBe(false);
+  });
+
+  it('crawler access is read with five of six measured, and says nothing to fix there', () => {
+    const { d, id, check } = clean();
+    check.crawlers.find((x) => x.ua === 'GPTBot')!.verdict = 'not_measured';
+    expect(sectionMeasured(check, 'crawler_access')).toBe(true);
+    expect(resultView(d, id, { map: null }).doors[0]!.footer).toContain('nothing to fix');
+  });
+
+  it('structure is read on a small site whose score is withheld', () => {
+    const b = built(
+      [page('', 200), page('/a', 200), page('/b', 200)],
+      [edge(HOME, `${HOME}/a`), edge(HOME, `${HOME}/b`)],
+    );
+    expect(b.check.technical_seo!.site_structure_score).toBeNull();
+    expect(sectionMeasured(b.check, 'structure')).toBe(true);
+  });
+
+  it('structure is not read with no link, and is with JS-only pages', () => {
+    const b = built([page('', 200)]);
+    expect(sectionMeasured(b.check, 'structure')).toBe(false);
+    b.check.structure!.js_only_pages = 2;
+    expect(sectionMeasured(b.check, 'structure')).toBe(true);
+  });
+
+  it('content is read on the recorded site, though the engine withholds its score', () => {
+    const b = buildCheck(recordedBuild());
+    expect(b.check.content!.score).toBeNull();
+    expect(sectionMeasured(b.check, 'content')).toBe(true);
+  });
+
+  it('content is not read when no content check evaluated a page', () => {
+    const { check } = clean();
     for (const c of check.content!.checks) {
       for (const r of c.by_template) Object.assign(r, { passing: 0, total: 0 });
     }
-    expect(measuredLevel(d, check, 'content')).toBe('none');
+    expect(sectionMeasured(check, 'content')).toBe(false);
     check.content = null;
-    expect(measuredLevel(d, check, 'content')).toBe('none');
+    expect(sectionMeasured(check, 'content')).toBe(false);
   });
 
-  it('is partial when a template holding a gradeable page had none evaluated', () => {
-    const { d, check } = clean();
-    const key = d.page_results.find((p) => p.check_id === check.id)!.template_key;
-    for (const p of d.page_results.filter((x) => x.check_id === check.id && x.template_key === key))
-      Object.assign(p, { kind: 'content', status_code: 200 });
-    for (const c of check.content!.checks) {
-      for (const r of c.by_template.filter((x) => x.template_key === key)) r.total = 0;
-    }
-    expect(measuredLevel(d, check, 'content')).toBe('partial');
-  });
-
-  it('does not count a template with no gradeable page against it', () => {
-    const { d, check } = clean();
-    const key = d.page_results.find((p) => p.check_id === check.id)!.template_key;
-    for (const p of d.page_results.filter((x) => x.check_id === check.id && x.template_key === key))
-      Object.assign(p, { kind: 'thin', status_code: 200 });
-    for (const c of check.content!.checks) {
-      for (const r of c.by_template.filter((x) => x.template_key === key)) r.total = 0;
-    }
-    expect(measuredLevel(d, check, 'content')).toBe('full');
-  });
-
-  it('is full on the recorded site: its unread guides are thin, and the engine withholds its score', () => {
-    const input = recordedBuild();
-    const b = buildCheck(input);
-    const d = datasetOfBuilds(input.site, [b]);
-    expect(b.check.content!.score).toBeNull();
-    expect(measuredLevel(d, b.check, 'content')).toBe('full');
-  });
-
-  it('does not say every section can be quoted when only some were checked (M-4)', () => {
-    const { d, id, check } = clean();
-    const key = d.page_results.find((p) => p.check_id === check.id)!.template_key;
-    for (const p of d.page_results.filter((x) => x.check_id === check.id && x.template_key === key))
-      Object.assign(p, { kind: 'content', status_code: 200 });
-    for (const c of check.content!.checks) {
-      for (const r of c.by_template) {
-        Object.assign(
-          r,
-          r.template_key === key ? { passing: 0, total: 0 } : { passing: 4, total: 4 },
-        );
-      }
-    }
-    const v = contentView(d, id);
-    expect(v.headline.title).not.toContain('every section');
-  });
-});
-
-describe('text without JavaScript', () => {
-  it('is none with no share and full with one', () => {
-    const { d, check } = clean();
-    expect(measuredLevel(d, check, 'without_js')).toBe('full');
+  it('text is read with a share, and not without', () => {
+    const { check } = clean();
+    expect(sectionMeasured(check, 'without_js')).toBe(true);
     check.without_js = null;
-    expect(measuredLevel(d, check, 'without_js')).toBe('none');
+    expect(sectionMeasured(check, 'without_js')).toBe(false);
   });
 
-  it('does not say every template ships its text on a low share', () => {
-    const { d, id, check } = clean();
-    check.without_js = { site_text_share: 0.4 };
-    expect(nojsView(d, id).headline.title).toBe(
-      '40% of the text is in the HTML before JavaScript runs.',
-    );
-    const r = resultView(d, id, { map: null });
-    expect(JSON.stringify([r.first, r.doors])).not.toContain('ships its text');
+  it('words an empty section by whether it was read', () => {
+    const { check } = clean();
+    expect(noFixWords(check, 'without_js')).toBe('nothing to fix');
+    check.without_js = null;
+    expect(noFixWords(check, 'without_js')).toBe('not measured');
   });
 });
 
-describe('the words for an empty section', () => {
+describe('the all-clear card needs each section read', () => {
   it.each([
-    ['full', 'nothing to fix'],
-    ['partial', 'nothing to fix in what was measured'],
-    ['none', 'not measured'],
-  ] as const)('%s', (level, words) => expect(noFixWords(level)).toBe(words));
-});
-
-describe('the clean claims, on checks the real builder made', () => {
-  it.each([
-    ['every page refused', () => built([page('', 403, 'refused'), page('/a', 403, 'refused')])],
-    ['every page gone', () => built([page('', 404, 'gone')])],
-    ['one page served, nothing else measured', () => built([page('', 200)])],
-  ])('%s: no screen says a section is clean', (_name, make) => {
-    expect(everyScreen(make())).not.toMatch(CLEAN_CLAIM);
-  });
-
-  it('the all-clear needs all four sections in full', () => {
+    [
+      'content',
+      (c: ReturnType<typeof clean>['check']) => (c.content = null),
+      'No page’s content was checked.',
+    ],
+    [
+      'structure',
+      (c: ReturnType<typeof clean>['check']) => (c.structure!.internal_links = 0),
+      'No internal link was read.',
+    ],
+    [
+      'text',
+      (c: ReturnType<typeof clean>['check']) => (c.without_js = null),
+      'Text without JavaScript was not measured.',
+    ],
+  ])('is not given with %s unread, and the card names it', (_name, edit, sentence) => {
     const c = clean();
-    expect(measuredInFull(c.d, c.check)).toBe(true);
-    expect(resultView(c.d, c.id, { map: null }).first.kind).toBe('all-clear');
-    const noContent = clean();
-    noContent.check.content = null;
-    const first = resultView(noContent.d, noContent.id, { map: null }).first;
+    expect(everySectionMeasured(c.check)).toBe(true);
+    edit(c.check);
+    const first = resultView(c.d, c.id, { map: null }).first;
     expect(first.kind).toBe('unmeasured');
-    expect(first.kind !== 'fix' && first.body).toContain('No page’s content was checked.');
+    expect(first.kind !== 'fix' && first.body).toContain(sentence);
   });
 
-  it('behind an edge, does not say the crawler tests finished on some pages', () => {
+  it('behind an edge, says no crawler could be tested', () => {
     const c = clean();
     for (const x of c.check.crawlers.filter((y) => y.group !== 'search_engine'))
       x.verdict = 'edge_blocks_automation';
     const first = resultView(c.d, c.id, { map: null }).first;
     expect(first.kind !== 'fix' && first.body).toContain('No crawler could be tested.');
-    expect(first.kind !== 'fix' && first.body).not.toContain('only some');
-  });
-
-  it('still says it of a section measured in full (the sweep can pass only by reading)', () => {
-    const c = clean();
-    expect(JSON.stringify(resultView(c.d, c.id, { map: null }).doors)).toContain('nothing to fix');
   });
 });
 
-describe('"nothing changed" needs both checks measured in full', () => {
-  /** The bad site's re-check with no change rows, and `edit` applied to the check before it. */
-  function recheck(edit: (previous: Check) => void = () => {}) {
+describe('"nothing changed" needs both checks to have read each section', () => {
+  function recheck(edit: (previous: ViewDataset['checks'][number]) => void = () => {}) {
     const d = structuredClone(fixture('bad-site')) as ViewDataset;
     const c = d.checks.find((x) => x.previous_check_id !== null && x.structure)!;
     d.changes = d.changes.filter((x) => x.check_id !== c.id);
     edit(findCheck(d, c.previous_check_id!));
-    const door = resultView(d, c.id, { map: null }).doors.at(-1)!;
-    return { door, page: changesView(d, c.id) };
+    return { door: resultView(d, c.id, { map: null }).doors.at(-1)!, view: changesView(d, c.id) };
   }
 
-  it('says so when both were', () => {
-    const { door, page: v } = recheck();
+  it('says so when both did', () => {
+    const { door, view } = recheck();
     expect(door.pill.label).toBe('no changes');
     expect(door.body).toBe('Nothing changed since the check before this one.');
-    expect(v.state === 'changes' && v.headline.title).toMatch(/^Nothing changed at the /);
+    expect(view.state === 'changes' && view.headline.title).toMatch(/^Nothing changed at the /);
   });
 
-  it('says only what both measured when the earlier one measured less', () => {
-    const { door, page: v } = recheck((p) => {
+  it('says only what both measured when the earlier one read less', () => {
+    const { door, view } = recheck((p) => {
       p.without_js = null;
     });
     expect(door.pill.label).toBe('no measured change');
     expect(door.body).toBe('No change in what both checks measured.');
-    expect(v.state === 'changes' && v.headline.title).toMatch(/^No change in what both checks/);
+    expect(view.state === 'changes' && view.headline.title).toMatch(/^No change in what both/);
   });
 });

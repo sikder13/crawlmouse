@@ -116,12 +116,7 @@ function headline(check: Check, known: string[] | null, rows: readonly PageResul
   if (known === null) {
     return { pill, title: `${percent(share)}% of the text is in the HTML before JavaScript runs.` };
   }
-  // A low share with no thin template is not "every template ships its text": say the number.
-  if (!thin.length) {
-    return share >= READABLE
-      ? { pill, title: 'Every template ships its text without JavaScript.' }
-      : { pill, title: `${percent(share)}% of the text is in the HTML before JavaScript runs.` };
-  }
+  if (!thin.length) return { pill, title: 'Every template ships its text without JavaScript.' };
   const names = listOf(thin.map((k) => templateNoun(labelOf(k)).adjective));
   const measured = rows.filter((r) => thin.includes(r.template_key));
   const keeps = thin.length === 1 ? `template keeps` : `templates keep`;
