@@ -26,14 +26,14 @@ browser steps run against a deployment.
 ## Safety
 
 - **Where a writing step runs.** A step that writes runs only:
-  - on staging's host (`WRITABLE_HOSTS` in `lib/target.ts`);
+  - on staging's host or the staging environment's Vercel alias (`WRITABLE_HOSTS` in `lib/target.ts`);
   - with `JOURNEY_ALLOW_WRITES=1`;
   - after the deployment proves its database. Its Content-Security-Policy, which the build writes from
     `NEXT_PUBLIC_SUPABASE_URL`, must name staging's database host exactly and must not name
     production's project.
 
   The host is an allowlist. Production under any spelling (`crawlmouse.com.`, the
-  `crawlmouse-001.vercel.app` alias), every Vercel preview and localhost are read-only. A dev server can
+  `crawlmouse-001.vercel.app` alias), every other Vercel deployment and localhost are read-only. A dev server can
   hold a copied `.env.local`, and an old preview can still hold production's database keys.
 
 - **Whether a step writes is read from `STEPS.md`**, not declared by the spec. A Writes cell must start
@@ -41,20 +41,20 @@ browser steps run against a deployment.
   must be refused, so they are writes.
 - **Deployment Protection.** Before any step, `global-setup.ts` probes `/api/health`. If the deployment
   answers with a redirect to Vercel's sign-in, or a 401 or 403 from Vercel, the run stops with that
-  reason unless `VERCEL_AUTOMATION_BYPASS_SECRET` is set. The secret is sent as `x-vercel-protection-bypass` only to the deployment's own origin, never to
-  the third-party hosts a page loads (`lib/protection.ts`).
+  reason unless `VERCEL_AUTOMATION_BYPASS_SECRET` is set. The secret is sent once per origin, on a request
+  that does not follow redirects, to get Vercel's bypass cookie; the contexts carry that cookie, scoped
+  to the deployment's host (`lib/protection.ts`). A run with the secret or with writes keeps no trace,
+  because a trace records headers and URLs.
 - **A step that starts a check passes the address through `lib/sites.ts`**, which accepts only
   `*.lab.crawlmouse.com` and `nahltech.com`.
 - **Test accounts exist on staging only** (`lib/accounts.ts`). The admin client is built only when
-  `SUPABASE_URL` is exactly staging's project and `STAGING_PROJECT_REF` agrees; production's project is
-  refused by name. Addresses are `qa+<journey>-<stamp>-<n>@lab.crawlmouse.com`. Sign-in follows the
-  product's own magic-link verify route and sends no mail.
+  `SUPABASE_URL` is staging's project and `STAGING_PROJECT_REF` agrees; production's project is refused
+  by name. Addresses are `qa+<journey>-<stamp>-<n>@lab.crawlmouse.com`. `signIn` goes through the product's
+  own door (the link, then Continue) and throws unless the screen names that address. It asks for a link
+  only after the target passes the write guard and shows staging's database.
 - **The guard is tested.** `guard.spec.ts` varies what each rule reads: case, trailing dots, ports,
-  userinfo, aliases, look-alike hosts and look-alike database hosts. Each refusal in `lib/target.ts` and
-  `lib/accounts.ts`, the rule in `lib/sites.ts` and the protection rule in `lib/protection.ts` has been
-  removed in turn,
-  and each removal turned the spec red. CI enforces the spec; the pinned check is
-  `pnpm --filter @crawlmouse/web exec vitest run __tests__/security/ci-workflow.test.ts`.
+  userinfo, aliases, look-alike hosts and look-alike database hosts. CI enforces the spec; the pinned
+  check is `pnpm --filter @crawlmouse/web exec vitest run __tests__/security/ci-workflow.test.ts`.
 
 ## Expected-fail
 
