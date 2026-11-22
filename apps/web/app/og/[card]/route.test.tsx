@@ -80,7 +80,9 @@ describe('GET /og/<card>', () => {
       height: 630,
       headers: { 'CDN-Cache-Control': 'public, max-age=86400' },
     });
-    const markup = renderToStaticMarkup(res.element!).replace(/&#x27;/g, "'");
+    const markup = renderToStaticMarkup(res.element!)
+      .replace(/&#x27;/g, "'")
+      .replace(/&amp;/g, '&');
     expect(markup).toContain(`>${title}<`);
     expect(markup).toContain(`crawlmouse.com${SOCIAL_CARDS[card]!.path}`);
     expect(markup).not.toMatch(/internal.linking/i);
