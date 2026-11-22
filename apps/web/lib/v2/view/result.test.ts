@@ -529,6 +529,11 @@ describe('the third card when there is no fix', () => {
     expect(some.first.kind === 'not-served' && some.first.body).not.toContain('None of the');
   });
 
+  it('does not call a check with no page served "nothing urgent", whatever its signals show', () => {
+    const signals = answering([403]).doors.find((x) => x.title === 'Agent-readiness signals')!;
+    expect(signals.footer).toBe('Checked by fetch');
+  });
+
   it('gives each kind of answer its own next step', () => {
     const next = (code: number) => {
       const f = answering([code]).first;

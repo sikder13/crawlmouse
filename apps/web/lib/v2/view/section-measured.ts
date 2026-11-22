@@ -1,15 +1,16 @@
 /**
- * Whether a check measured a section of the result, and so what "no fix here" means. No fix on a
- * section that was not measured is not good news: a check that read nothing has no fix. Each place
- * that words an empty section takes its words from `noFixWords`.
+ * Whether a check measured a section of the result, decided from what it read and not from whether a
+ * score was given: the engine withholds scores for reasons unrelated to reading (a content score on
+ * every current build, a structure score on a small site). No fix on a section that read nothing is
+ * not good news. The result, segment and link-map views take their words for an empty section from
+ * `noFixWords`.
  */
 import type { Check, FixSection } from '@crawlmouse/types/v2';
-import { isAi } from '../sentences';
 
 export function sectionMeasured(check: Check, section: FixSection): boolean {
   switch (section) {
     case 'crawler_access': {
-      const ai = check.crawlers.filter(isAi);
+      const ai = check.crawlers.filter((c) => c.group !== 'search_engine');
       return (
         ai.length > 0 &&
         ai.every((c) => c.verdict !== 'not_measured' && c.verdict !== 'edge_blocks_automation')
@@ -18,10 +19,10 @@ export function sectionMeasured(check: Check, section: FixSection): boolean {
     case 'without_js':
       return check.without_js !== null;
     case 'structure':
-      return (check.technical_seo?.site_structure_score ?? null) !== null;
+      // A graph with no link has no orphans, so its zero says nothing about the site.
+      return (check.structure?.internal_links ?? 0) > 0;
     case 'content':
-      // The builder stores a withheld content score as a record whose score is null.
-      return (check.content?.score ?? null) !== null;
+      return (check.content?.checks ?? []).some((c) => c.by_template.some((r) => r.total > 0));
   }
 }
 

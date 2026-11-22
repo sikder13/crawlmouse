@@ -25,7 +25,7 @@ import {
 } from './effect-headline';
 import { openFixes, type FixPlan } from './free-fixes';
 import { noFixKind, servedWord } from './no-fix-card';
-import { noFixWords } from './section-measured';
+import { noFixWords, sectionMeasured } from './section-measured';
 import { SCREEN_SIGNALS, screenSignals, type ScreenSignal } from './screen-signals';
 import { dateTimeUtc, dayTimeUtc, listOf, percent, templateNoun } from '../format';
 import { toneOf } from '../letters';
@@ -390,13 +390,14 @@ function structureDoor(
   isOpen: (f: Fix) => boolean,
   notServed: boolean,
 ): DoorView {
-  if (notServed) {
+  if (notServed || !sectionMeasured(check, 'structure')) {
+    const why = notServed ? 'No page was served' : 'No internal link was read';
     return {
       title: 'Site structure',
       pill: { state: 'neutral', label: 'not measured' },
-      body: 'No page was served, so the structure of the site was not measured.',
-      footer: 'Not measured',
-      coverage: { read: 'No page was served.' },
+      body: `${why}, so the structure of the site was not measured.`,
+      footer: capitalise(fixCount(check, fixes, SECTIONS.structure!, isOpen)),
+      coverage: { read: `${why}.` },
       href: '#',
     };
   }

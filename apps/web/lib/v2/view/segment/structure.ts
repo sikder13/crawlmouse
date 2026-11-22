@@ -3,6 +3,7 @@
  * figures from the check, the crawl's own map drawing, and the orphan pages the record lists.
  * Every sentence is built from those figures (OPERATING-RULES §10).
  */
+import { sectionMeasured } from '../section-measured';
 import type { Check, PageResult } from '@crawlmouse/types/v2';
 import { findCheck } from '../../fixtures';
 import { listOf, percent, templateNoun } from '../../format';
@@ -78,6 +79,8 @@ function dateOf(day: string): string {
   return `${at.getUTCDate()} ${MONTH.format(at)} ${at.getUTCFullYear()}`;
 }
 
+const NOT_MEASURED = 'No internal link was read, so the structure was not measured.';
+
 /** The drawing the crawl screen made of this check, when there is one. */
 export function drawingOf(checkId: string): MapDrawing | null {
   const name = RECORDING_NAMES.find((n) => {
@@ -87,7 +90,9 @@ export function drawingOf(checkId: string): MapDrawing | null {
   return name ? mapDrawing(name) : null;
 }
 
-function headlineTitle(orphans: number): string {
+function headlineTitle(check: Check): string {
+  if (!sectionMeasured(check, 'structure')) return NOT_MEASURED;
+  const orphans = check.structure!.orphan_pages;
   if (orphans === 0) return 'Every page crawled has a link pointing at it.';
   return orphans === 1
     ? 'One page has no links pointing at it.'
@@ -95,6 +100,9 @@ function headlineTitle(orphans: number): string {
 }
 
 function headlineBody(check: Check, rows: readonly PageResult[], map: MapDrawing | null): string {
+  if (!sectionMeasured(check, 'structure')) {
+    return 'The crawl read no internal link, so orphan pages, click depth and hubs are not known for this audit.';
+  }
   const s = check.structure!;
   const parts: string[] = [];
   if (s.orphan_pages > 0) {
@@ -159,6 +167,15 @@ function orphanTable(
 ): Omit<StructureView['orphans'], 'explorerHref'> {
   const total = check.structure!.orphan_pages;
   const aiCount = check.crawlers.filter(isAi).length;
+  if (!sectionMeasured(check, 'structure')) {
+    return {
+      heading: 'Orphan pages were not measured',
+      sub: null,
+      rows: [],
+      unlisted: null,
+      notes: [],
+    };
+  }
   if (total === 0) {
     return { heading: 'No orphan pages', sub: null, rows: [], unlisted: null, notes: [] };
   }
@@ -232,22 +249,32 @@ export function structureView(
   const frame = segmentFrame(d, checkId, 'structure', options);
   const rows = d.page_results.filter((p) => p.check_id === check.id && p.is_orphan);
   const score = check.technical_seo?.site_structure_score ?? null;
+  const measured = sectionMeasured(check, 'structure');
+  const known = (value: string) => (measured ? value : '—');
   return {
     frame,
     headline: {
-      title: headlineTitle(s.orphan_pages),
+      title: headlineTitle(check),
       pill: {
         state: 'neutral',
-        label: score === null ? 'not graded' : `${Math.round(score)} / 100`,
+        label: !measured
+          ? 'not measured'
+          : score === null
+            ? 'not graded'
+            : `${Math.round(score)} / 100`,
       },
       body: headlineBody(check, rows, drawing),
     },
     tiles: [
       { label: 'Pages', value: count(coverage.pages_crawled), note: null },
       { label: 'Internal links', value: count(s.internal_links), note: null },
-      { label: 'Orphan pages', value: count(s.orphan_pages), note: null },
-      { label: 'Reachable only through JavaScript', value: count(s.js_only_pages), note: null },
-      { label: 'Average click depth', value: s.avg_click_depth.toFixed(1), note: null },
+      { label: 'Orphan pages', value: known(count(s.orphan_pages)), note: null },
+      {
+        label: 'Reachable only through JavaScript',
+        value: known(count(s.js_only_pages)),
+        note: null,
+      },
+      { label: 'Average click depth', value: known(s.avg_click_depth.toFixed(1)), note: null },
     ],
     coverage: {
       tested: coverage.pages_crawled,
