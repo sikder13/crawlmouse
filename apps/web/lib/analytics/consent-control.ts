@@ -12,10 +12,24 @@ export const onSupportConsole = (pathname: string = window.location.pathname): b
   /^\/internal(\/|$)/.test(pathname);
 
 /**
- * A decline, on this tab or another: capture stops, surveys and persistence go off, and what analytics
- * stored is removed. With opted-out as the SDK's default, removing its own opt-out key does not turn it
- * back on. Before PostHog has started the SDK is not called, because its opt-out writes to storage.
- * An event already queued when the visitor declined was captured with their consent and may still go.
+ * What opting out leaves running, each with its own switch in posthog-js 1.376.0: `/flags/`, which
+ * the SDK's refresh timer and `reset()` still call and which carries the visitor's ids, and the
+ * surveys, product tours and conversations a project's remote config can turn on. Capture, pageleave,
+ * heatmaps and replay all go through `capture`, which the opt-out stops.
+ */
+const OFF_AFTER_DECLINE = {
+  advanced_disable_flags: true,
+  disable_surveys: true,
+  disable_product_tours: true,
+  disable_conversations: true,
+} as const;
+
+/**
+ * A decline, on this tab or another: capture stops, what `OFF_AFTER_DECLINE` names and persistence go
+ * off, and what analytics stored is removed. With opted-out as the SDK's default, removing its own
+ * opt-out key does not turn it back on. Before PostHog has started the SDK is not called, because its
+ * opt-out writes to storage. An event already queued when the visitor declined was captured with
+ * their consent and may still go.
  */
 export function stopAnalytics(
   posthog: Pick<PostHog, '__loaded' | 'opt_out_capturing' | 'set_config'>,
@@ -23,7 +37,7 @@ export function stopAnalytics(
   if (posthog.__loaded) {
     posthog.opt_out_capturing();
     posthog.set_config({
-      disable_surveys: true,
+      ...OFF_AFTER_DECLINE,
       disable_persistence: true,
       opt_out_capturing_by_default: true,
     });
@@ -42,7 +56,10 @@ export function resumeAnalytics(
   posthog.set_config({
     disable_persistence: false,
     opt_out_capturing_by_default: false,
+    advanced_disable_flags: false,
     disable_surveys: false,
+    disable_product_tours: false,
+    disable_conversations: false,
   });
   posthog.opt_in_capturing();
 }

@@ -29,7 +29,14 @@ describe('stopAnalytics', () => {
       ['opt_out'],
       [
         'set_config',
-        { disable_surveys: true, disable_persistence: true, opt_out_capturing_by_default: true },
+        {
+          advanced_disable_flags: true,
+          disable_surveys: true,
+          disable_product_tours: true,
+          disable_conversations: true,
+          disable_persistence: true,
+          opt_out_capturing_by_default: true,
+        },
       ],
     ]);
   });

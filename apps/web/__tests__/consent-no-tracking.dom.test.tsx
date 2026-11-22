@@ -21,6 +21,8 @@ const PH_NAME = /^(__)?ph_/;
 let requests: string[];
 const added: [string, EventListenerOrEventListenerObject][] = [];
 const addListener = window.addEventListener.bind(window);
+/** Each case's SDK instance, retired when the case ends. */
+const instances: { _send_request: unknown; _send_retriable_request: unknown }[] = [];
 
 function clearAll() {
   for (const pair of document.cookie.split(';')) {
@@ -72,7 +74,9 @@ async function load(cookies: string[], stored?: 'granted' | 'denied') {
   await import('../instrumentation-client');
   vi.mocked(window.addEventListener).mockRestore();
   await settle();
-  return (await import('posthog-js')).default;
+  const posthog = (await import('posthog-js')).default;
+  instances.push(posthog);
+  return posthog;
 }
 
 async function banner() {
@@ -111,6 +115,12 @@ beforeEach(() => {
   });
 });
 afterEach(() => {
+  // A case's SDK is retired with it. Its queue's timer would otherwise post this case's events into
+  // the next case's list, where a slow run reads them as a request made without consent.
+  for (const instance of instances.splice(0)) {
+    instance._send_request = () => undefined;
+    instance._send_retriable_request = () => undefined;
+  }
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
   for (const [type, listener] of added.splice(0)) window.removeEventListener(type, listener);
@@ -184,6 +194,74 @@ describe('no PostHog before consent, or after a decline', () => {
     expect({ ...traces(), scripts: [], requests: [] }).toEqual(NOTHING);
     expect(requests.length).toBe(sent);
     expect(posthog.has_opted_out_capturing()).toBe(true);
+    b.done();
+  });
+});
+
+describe('after a decline, on a page that stays open', () => {
+  const REFRESH_MS = 5 * 60 * 1000;
+  const flags = () => requests.filter((u) => u.includes('/flags'));
+
+  /** Allowed analytics with the remote config loaded: what starts the SDK's refresh timer. */
+  async function running() {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+    const posthog = await load(['cm_consent_required=0']);
+    const config = [...document.querySelectorAll('script')].find((s) =>
+      s.src.includes('config.js'),
+    );
+    config!.dispatchEvent(new Event('load'));
+    await settle();
+    live = posthog;
+    return posthog;
+  }
+  let live: Awaited<ReturnType<typeof load>> | null = null;
+  // A running instance would keep sending into the next case's list.
+  afterEach(async () => {
+    live?.opt_out_capturing();
+    live?.set_config({ advanced_disable_flags: true, disable_persistence: true });
+    live = null;
+    vi.clearAllTimers();
+    vi.useRealTimers();
+    await settle();
+  });
+
+  it('the refresh does call /flags while analytics run (the control)', async () => {
+    await running();
+    const before = flags().length;
+    vi.advanceTimersByTime(REFRESH_MS);
+    await settle();
+    expect(flags().length).toBeGreaterThan(before);
+  });
+
+  it('sends nothing on the refresh timer, on sign-out’s reset, or when asked for flags', async () => {
+    const posthog = await running();
+    const b = await banner();
+    b.open();
+    await b.click('Decline');
+    const sent = requests.length;
+    vi.advanceTimersByTime(REFRESH_MS * 2);
+    await settle();
+    posthog.reset();
+    await settle();
+    posthog.reloadFeatureFlags();
+    await settle();
+    posthog.capture('after-decline');
+    await settle();
+    expect(requests.slice(sent)).toEqual([]);
+    b.done();
+  });
+
+  it('a later Allow turns the refresh back on', async () => {
+    await running();
+    const b = await banner();
+    b.open();
+    await b.click('Decline');
+    b.open();
+    await b.click('Allow analytics');
+    const before = flags().length;
+    vi.advanceTimersByTime(REFRESH_MS);
+    await settle();
+    expect(flags().length).toBeGreaterThan(before);
     b.done();
   });
 });
