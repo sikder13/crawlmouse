@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { DevelopersScreen } from '@/components/v2/screens/developers/DevelopersScreen';
-import { checksPublicEnabled } from '@/lib/auth/flags';
+import { checksPublicEnabled, v2PublicPagesEnabled } from '@/lib/auth/flags';
 import { developersView } from '@/lib/v2/view/developers';
 import { socialCardPath } from '@/lib/v2/social-card';
 import { socialMetadata } from '@/lib/v2/social-metadata';
@@ -26,13 +26,14 @@ export const metadata: Metadata = {
 };
 
 /**
- * The v2 Developers page (CC-29 D5), which `/developers` is rewritten to while V2_CHECKS_PUBLIC is on
+ * The v2 Developers page (CC-29 D5), which `/developers` is rewritten to while V2_CHECKS_PUBLIC or V2_BILLING is on
  * (`V2_REWRITES`, lib/v2/rewrites.ts). The middleware answers a request for this path, in any
  * spelling it can read, as not found; that is the guard on its own address, because the page is
- * prerendered and cannot read the rewrite's header. The flag is read when the site is built: built
- * with it off, the page is a 404.
+ * prerendered and cannot read the rewrite's header. The flags are read when the site is built: built
+ * with both off, the page is a 404. The closing audit form posts to `POST /api/checks`, which answers
+ * only while V2_CHECKS_PUBLIC is on; with that flag off it is a link to the home's audit.
  */
 export default function V2DevelopersPage() {
-  if (!checksPublicEnabled()) return notFound();
-  return <DevelopersScreen data={view} audit="live" />;
+  if (!v2PublicPagesEnabled()) return notFound();
+  return <DevelopersScreen data={view} audit={checksPublicEnabled() ? 'live' : 'home-link'} />;
 }

@@ -13,12 +13,12 @@ describe('V2_REWRITES', () => {
         flag: 'checksPublic',
       });
     for (const p of ['/pricing', '/pricing/'])
-      expect(rewriteOf(p)).toEqual({ from: '/pricing', to: '/v2-pricing', flag: 'checksPublic' });
+      expect(rewriteOf(p)).toEqual({ from: '/pricing', to: '/v2-pricing', flag: 'publicPages' });
     for (const p of ['/developers', '/developers/'])
       expect(rewriteOf(p)).toEqual({
         from: '/developers',
         to: '/v2-developers',
-        flag: 'checksPublic',
+        flag: 'publicPages',
       });
     for (const p of [
       '//',
@@ -104,7 +104,7 @@ describe('V2_REWRITES', () => {
       expect(r.from).toMatch(/^\/[a-z0-9/:-]*$/);
       expect(r.to).toMatch(/^\/[a-z0-9/:-]+$/);
       expect(froms).not.toContain(r.to);
-      expect(['checksPublic', 'billing']).toContain(r.flag);
+      expect(['checksPublic', 'billing', 'publicPages']).toContain(r.flag);
     }
   });
 

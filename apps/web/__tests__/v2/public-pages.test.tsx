@@ -74,11 +74,11 @@ describe('v1’s /pricing, /developers and /r/<slug> pages, as main has them (D1
     },
   );
 
-  it('serves the v2 Developers page from the target the rewrite row names, under the public checks flag', () => {
+  it('serves the v2 Developers page from the target the rewrite row names, under either public flag', () => {
     expect(V2_REWRITES.find((r) => r.from === '/developers')).toEqual({
       from: '/developers',
       to: '/v2-developers',
-      flag: 'checksPublic',
+      flag: 'publicPages',
     });
   });
 });
@@ -146,8 +146,8 @@ describe('/agencies’ first button with billing off (RC-01)', () => {
 describe('/developers, v2 (D5)', () => {
   const load = () => import('../../app/v2-developers/page');
 
-  it('is a 404 with V2_CHECKS_PUBLIC unset, whatever V2_BILLING says', async () => {
-    flags({ billing: true, checks: false });
+  it('is a 404 with both flags off', async () => {
+    flags({ billing: false, checks: false });
     const { default: Page } = await load();
     expect(await digestOf(() => Page())).toContain('404');
   }, 60_000);

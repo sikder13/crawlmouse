@@ -2,11 +2,11 @@
  * /llms.txt's key pages while V2_CHECKS_PUBLIC is on: [label, path, description] for the public
  * pages listed below, the label and description being the page's own title and meta description,
  * read from where its metadata reads them; /developers is labelled by its short name, because its
- * indexed title lists tools that are not shipped. With V2_CHECKS_PUBLIC off, /pricing and /developers
- * are v1's pages and are listed with v1's own metadata.
+ * indexed title lists tools that are not shipped. With both V2_CHECKS_PUBLIC and V2_BILLING off, /pricing and
+ * /developers are v1's pages and are listed with v1's own metadata.
  */
 import type { Metadata } from 'next';
-import { accountDoorEnabled, checksPublicEnabled } from '../auth/flags';
+import { accountDoorEnabled, v2PublicPagesEnabled } from '../auth/flags';
 import { billingV2Enabled } from '../billing/flags';
 import { AGENCY_MONTHLY, AGENCY_YEARLY, PRO_MONTHLY, PRO_YEARLY, usd } from '../billing/prices';
 import { DEVELOPERS_COPY } from '../v2/copy/developers';
@@ -39,8 +39,8 @@ function fromMetadata(path: string, m: Pick<Metadata, 'title' | 'description'>):
 }
 
 export function v2KeyPages(): KeyPage[] {
-  // RC-01: /pricing and /developers are the v2 pages while V2_CHECKS_PUBLIC is on.
-  const v2Served = checksPublicEnabled();
+  // RC-01: /pricing and /developers are the v2 pages while either flag is on.
+  const v2Served = v2PublicPagesEnabled();
   const agencies = agenciesView({
     billing: billingV2Enabled(),
     accountDoor: accountDoorEnabled(),

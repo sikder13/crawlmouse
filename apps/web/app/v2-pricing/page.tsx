@@ -4,7 +4,7 @@ import { headers } from 'next/headers';
 import { notFound } from 'next/navigation';
 import { after } from 'next/server';
 import { PricingScreen } from '@/components/v2/screens/pricing/PricingScreen';
-import { accountDoorEnabled, checksPublicEnabled } from '@/lib/auth/flags';
+import { accountDoorEnabled, checksPublicEnabled, v2PublicPagesEnabled } from '@/lib/auth/flags';
 import { billingV2Enabled } from '@/lib/billing/flags';
 import { CONSENT_REQUIRED_COOKIE, isConsentRequiredCountry } from '@/lib/consent';
 import { PRICING_COPY } from '@/lib/v2/copy/pricing';
@@ -44,8 +44,8 @@ function consentHeader(cookie: string | null, country: string | null): string | 
 }
 
 /**
- * The v2 Pricing page (CC-29 D2), which `/pricing` is rewritten to while V2_CHECKS_PUBLIC is on
- * (`V2_REWRITES`, lib/v2/rewrites.ts; RC-01). A 404 with the flag off, and when the request did not come
+ * The v2 Pricing page (CC-29 D2), which `/pricing` is rewritten to while V2_CHECKS_PUBLIC or V2_BILLING is on
+ * (`V2_REWRITES`, lib/v2/rewrites.ts; RC-01). A 404 with both off, and when the request did not come
  * through that rewrite, so the page has one address, `/pricing`. `pricing_viewed` is sent after the
  * response, with the request's cookie header for the visitor's consent.
  */
@@ -54,7 +54,7 @@ export default async function V2PricingPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  if (!checksPublicEnabled()) return notFound();
+  if (!v2PublicPagesEnabled()) return notFound();
   if (!(await reachedByRewrite())) return notFound();
   const now = new Date();
   const interval = intervalFrom((await searchParams).interval);

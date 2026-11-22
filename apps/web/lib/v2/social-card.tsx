@@ -11,7 +11,7 @@
  * `SOCIAL_CARDS`; nothing from the request is drawn.
  */
 import { ImageResponse } from 'next/og';
-import { checksPublicEnabled } from '../auth/flags';
+import { checksPublicEnabled, v2PublicPagesEnabled } from '../auth/flags';
 import { AGENCIES_COPY } from './copy/agencies';
 import { CHECK_COPY, CHECK_QUESTIONS } from './copy/check-pages';
 import { DEVELOPERS_COPY } from './copy/developers';
@@ -51,13 +51,17 @@ export interface SocialCard {
 }
 
 export const SOCIAL_CARDS: Readonly<Record<string, SocialCard>> = {
-  pricing: { path: '/pricing', title: PRICING_COPY.pageTitle, served: () => checksPublicEnabled() },
+  pricing: {
+    path: '/pricing',
+    title: PRICING_COPY.pageTitle,
+    served: () => v2PublicPagesEnabled(),
+  },
   developers: {
     path: '/developers',
     title: DEVELOPERS_COPY.title,
-    served: () => checksPublicEnabled(),
+    served: () => v2PublicPagesEnabled(),
   },
-  agencies: { path: '/agencies', title: AGENCIES_COPY.title, served: () => checksPublicEnabled() },
+  agencies: { path: '/agencies', title: AGENCIES_COPY.title, served: () => v2PublicPagesEnabled() },
   ...Object.fromEntries(
     CHECK_QUESTIONS.map((q) => [
       `check-${q}`,

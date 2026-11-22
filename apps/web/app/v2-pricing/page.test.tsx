@@ -65,8 +65,9 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllEnvs());
 
 describe('/v2-pricing', () => {
-  it.each(['', 'true', '0'])('is a 404 with V2_CHECKS_PUBLIC=%j, before any read', async (flag) => {
+  it.each(['', 'true', '0'])('is a 404 with both flags at %j, before any read', async (flag) => {
     vi.stubEnv('V2_CHECKS_PUBLIC', flag);
+    vi.stubEnv('V2_BILLING', flag);
     await expect(render()).rejects.toMatchObject({
       digest: expect.stringContaining('NEXT_HTTP_ERROR_FALLBACK;404'),
     });

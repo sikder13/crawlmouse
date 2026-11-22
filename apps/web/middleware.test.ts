@@ -198,16 +198,22 @@ describe('the CC-29 rows: each follows its own flag', () => {
     expect(rewrittenTo(await handleEdge(at(path), refresh))).toBe(to);
   });
 
-  it.each(['/pricing', '/developers'])(
-    'with V2_CHECKS_PUBLIC unset, %s is not rewritten, whatever V2_BILLING says',
-    async (path) => {
-      vi.stubEnv('V2_BILLING', '1');
-      vi.stubEnv('V2_CHECKS_PUBLIC', '');
-      const res = await handleEdge(at(path), refresh);
-      expect(rewrittenTo(res)).toBeNull();
-      expect(res.status).toBe(200);
-    },
-  );
+  it.each(['/pricing', '/developers'])('with both flags off, %s is not rewritten', async (path) => {
+    vi.stubEnv('V2_BILLING', '');
+    vi.stubEnv('V2_CHECKS_PUBLIC', '');
+    const res = await handleEdge(at(path), refresh);
+    expect(rewrittenTo(res)).toBeNull();
+    expect(res.status).toBe(200);
+  });
+
+  it.each([
+    ['/pricing', '/v2-pricing'],
+    ['/developers', '/v2-developers'],
+  ])('RC-01: with V2_BILLING=1 and public checks off, %s is served by %s', async (path, to) => {
+    vi.stubEnv('V2_BILLING', '1');
+    vi.stubEnv('V2_CHECKS_PUBLIC', '');
+    expect(rewrittenTo(await handleEdge(at(path), refresh))).toBe(to);
+  });
 
   it('with V2_CHECKS_PUBLIC=1, a report is served by the report target, with its query string', async () => {
     vi.stubEnv('V2_CHECKS_PUBLIC', '1');
