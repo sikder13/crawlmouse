@@ -41,19 +41,19 @@ browser steps run against a deployment.
   must be refused, so they are writes.
 - **Deployment Protection.** Before any step, `global-setup.ts` probes `/api/health`. If the deployment
   answers with a redirect to Vercel's sign-in, or a 401 or 403 from Vercel, the run stops with that
-  reason unless `VERCEL_AUTOMATION_BYPASS_SECRET` is set. The secret is sent once per origin, on a request
-  that does not follow redirects, to get Vercel's bypass cookie; the contexts carry that cookie, scoped
-  to the deployment's host (`lib/protection.ts`). A run with the secret or with writes keeps no trace,
-  because a trace records headers and URLs.
+  reason unless `VERCEL_AUTOMATION_BYPASS_SECRET` is set. The secret goes on requests that do
+  not follow redirects, to the deployment's origin, to get Vercel's bypass cookie; the contexts carry that
+  cookie for the deployment's host (`lib/protection.ts`). A trace records headers and URLs, so the config
+  turns tracing off for a run with the secret or with writes, and such a run refuses `--trace=on`.
 - **A step that starts a check passes the address through `lib/sites.ts`**, which accepts only
   `*.lab.crawlmouse.com` and `nahltech.com`.
 - **Test accounts exist on staging only** (`lib/accounts.ts`). The admin client is built only when
   `SUPABASE_URL` is staging's project and `STAGING_PROJECT_REF` agrees; production's project is refused
   by name. Addresses are `qa+<journey>-<stamp>-<n>@lab.crawlmouse.com`. `signIn` goes through the product's
-  own door (the link, then Continue) and throws unless the screen names that address. It asks for a link
-  only after the target passes the write guard and shows staging's database.
-- **The guard is tested.** `guard.spec.ts` varies what each rule reads: case, trailing dots, ports,
-  userinfo, aliases, look-alike hosts and look-alike database hosts. CI enforces the spec; the pinned
+  own door (the link, then Continue) and returns only when Supabase confirms the browser's session is that
+  address. It asks for a link only after the target passes the write guard and shows staging's database.
+- **The guard is tested.** For the write guard, `guard.spec.ts` varies case, trailing dots, ports, userinfo,
+  aliases and look-alike hosts. CI enforces the spec; the pinned
   check is `pnpm --filter @crawlmouse/web exec vitest run __tests__/security/ci-workflow.test.ts`.
 
 ## Expected-fail

@@ -3,6 +3,7 @@ import {
   createTestUser,
   isTestAddress,
   signIn,
+  sessionToken,
   signInRefusal,
   stagingAdmin,
   stagingAdminRefusal,
@@ -10,7 +11,7 @@ import {
 } from './lib/accounts';
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { bypassCookies, originHeaders, protectionRefusal } from './lib/protection';
+import { bypassCookies, originHeaders, protectionRefusal, traceRefusal } from './lib/protection';
 import { assertCheckableSite } from './lib/sites';
 import { databaseRefusal, writeRefusal } from './lib/target';
 
@@ -59,6 +60,20 @@ test.describe('the production-write guard', () => {
     ]) {
       expect(on(url), url).toMatch(/is not staging/);
     }
+  });
+  test('refuses a writable host on another port or with userinfo', () => {
+    for (const url of [
+      'https://staging.crawlmouse.com:8443',
+      'https://crawlmouse-001-env-staging-nahl-technologies-projects.vercel.app:8443',
+      'https://u:p@crawlmouse-001-env-staging-nahl-technologies-projects.vercel.app',
+      'https://u@staging.crawlmouse.com',
+    ]) {
+      expect(on(url), url).toMatch(/port or userinfo/);
+    }
+    expect(
+      on('https://staging.crawlmouse.com:443'),
+      'the default port is the same host',
+    ).toBeNull();
   });
   test('refuses staging without JOURNEY_ALLOW_WRITES=1', () => {
     for (const v of ['', '0', 'true', 'yes', ' 1']) {
@@ -240,6 +255,54 @@ test.describe('Vercel Deployment Protection', () => {
       other.close();
     }
   });
+  test('takes only a live bypass cookie', async () => {
+    const answer =
+      (...cookies: string[]) =>
+      async () => {
+        const headers = new Headers();
+        for (const c of cookies) headers.append('set-cookie', c);
+        return new Response('', { status: 200, headers });
+      };
+    const env = { VERCEL_AUTOMATION_BYPASS_SECRET: 'cookie-rule' };
+    for (const [host, line] of [
+      ['a', '_vercel_sso_nonce=x; Path=/'],
+      ['b', '_vercel_jwt=; Path=/'],
+      ['c', '_vercel_jwt=x; Max-Age=0; Path=/'],
+    ] as const) {
+      await expect(
+        bypassCookies(`https://${host}.example.test`, env, answer(line)),
+        line,
+      ).rejects.toThrow(/no bypass cookie/);
+    }
+    const got = await bypassCookies(
+      'https://d.example.test',
+      env,
+      answer('_vercel_sso_nonce=n; Path=/', '_vercel_jwt=good; Path=/; HttpOnly'),
+    );
+    expect(got.map((c) => [c.name, c.value])).toEqual([['_vercel_jwt', 'good']]);
+  });
+  test('reads a rotated secret afresh', async () => {
+    const origin = 'https://rotated.example.test';
+    const answer = (v: string) => async () =>
+      new Response('', { headers: { 'set-cookie': `_vercel_jwt=${v}; Path=/` } });
+    const first = await bypassCookies(
+      origin,
+      { VERCEL_AUTOMATION_BYPASS_SECRET: 'one' },
+      answer('1'),
+    );
+    const second = await bypassCookies(
+      origin,
+      { VERCEL_AUTOMATION_BYPASS_SECRET: 'two' },
+      answer('2'),
+    );
+    expect([first[0]!.value, second[0]!.value]).toEqual(['1', '2']);
+  });
+  test('refuses a run that would record a trace', () => {
+    for (const m of [undefined, 'off', { mode: 'off' }]) expect(traceRefusal(m)).toBeNull();
+    for (const m of ['on', 'retain-on-failure', 'on-first-retry', { mode: 'on' }]) {
+      expect(traceRefusal(m), JSON.stringify(m)).toMatch(/keeps no trace/);
+    }
+  });
   test('stops when a secret is set and the deployment gives no cookie', async () => {
     await expect(
       bypassCookies(
@@ -317,6 +380,7 @@ test.describe('the staging admin client', () => {
           },
           generateLink: async () => ({ data: { properties: null }, error: null }),
         },
+        getUser: async () => ({ data: { user: null }, error: null }),
       },
     });
     await expect(createTestUser('someone@example.test', admin)).rejects.toThrow(/only a journey/);
@@ -336,6 +400,7 @@ test.describe('the staging admin client', () => {
             return { data: { properties: { hashed_token: 'h' } }, error: null };
           },
         },
+        getUser: async () => ({ data: { user: null }, error: null }),
       },
     });
     const a = testAddress('j1', 1, 1_700_000_000_000);
@@ -361,6 +426,168 @@ test.describe('the staging admin client', () => {
       if (was === undefined) delete process.env.JOURNEY_ALLOW_WRITES;
       else process.env.JOURNEY_ALLOW_WRITES = was;
     }
+  });
+  test.describe('the sign-in flow', () => {
+    const address = testAddress('j1', 1, 1_700_000_000_000);
+    const TOKEN = 'SENTINEL-TOKEN-HASH';
+    const host = 'https://staging.crawlmouse.com';
+    const csp = {
+      'content-security-policy': 'connect-src https://qfgkrnnjuiasahspavbc.supabase.co',
+    };
+    const cookie = (email: string) => ({
+      name: 'sb-qfgkrnnjuiasahspavbc-auth-token',
+      value: `base64-${Buffer.from(JSON.stringify({ access_token: `jwt-${email}` })).toString('base64url')}`,
+    });
+    const admin = () => ({
+      auth: {
+        admin: {
+          createUser: async () => ({ data: { user: null }, error: null }),
+          generateLink: async () => ({
+            data: { properties: { hashed_token: TOKEN } },
+            error: null,
+          }),
+        },
+        getUser: async (jwt: string) => ({
+          data: { user: jwt.startsWith('jwt-') ? { email: jwt.slice(4) } : null },
+          error: null,
+        }),
+      },
+    });
+    /** A page that follows the product's door, with each stage changeable. */
+    const door = (o: {
+      name?: string;
+      session?: Array<{ name: string; value: string }>;
+      gotoThrows?: boolean;
+      native?: boolean;
+    }) => {
+      let at = 'about:blank';
+      let clicks = 0;
+      const page = {
+        request: { get: async () => ({ headers: () => csp }) },
+        url: () => at,
+        goto: async (url: string) => {
+          if (o.gotoThrows) throw new Error(`page.goto: net::ERR at ${url}`);
+          at = `${host}/login/verify/continue`;
+        },
+        getByRole: () => ({
+          click: async () => {
+            clicks += 1;
+            if (clicks === 2 || o.native) at = `${host}/dashboard`;
+          },
+        }),
+        getByText: () => ({
+          waitFor: async () => {
+            if (o.native) await new Promise(() => {});
+          },
+          textContent: async () => `Signed in as ${o.name ?? address}.`,
+        }),
+        waitForURL: async (ok: (u: URL) => boolean) => {
+          if (ok(new URL(at))) return;
+          await new Promise(() => {});
+        },
+        context: () => ({ cookies: async () => o.session ?? [cookie(address)] }),
+      };
+      return { page: page as never, clicks: () => clicks };
+    };
+    const off = () => 'off';
+    const withWrites = async (run: () => Promise<void>) => {
+      const was = process.env.JOURNEY_ALLOW_WRITES;
+      process.env.JOURNEY_ALLOW_WRITES = '1';
+      try {
+        await run();
+      } finally {
+        if (was === undefined) delete process.env.JOURNEY_ALLOW_WRITES;
+        else process.env.JOURNEY_ALLOW_WRITES = was;
+      }
+    };
+
+    test('clicks Continue on both screens and returns for the right session', async () => {
+      await withWrites(async () => {
+        const d = door({});
+        await signIn(d.page, host, address, admin, off);
+        expect(d.clicks()).toBe(2);
+      });
+    });
+    test('accepts the no-script path, where the post lands past the naming screen', async () => {
+      await withWrites(async () => {
+        const d = door({ native: true });
+        await signIn(d.page, host, address, admin, off);
+        expect(d.clicks()).toBe(1);
+      });
+    });
+    test('refuses a screen naming someone else', async () => {
+      await withWrites(async () => {
+        await expect(
+          signIn(door({ name: 'qa+j1-x-2@lab.crawlmouse.com' }).page, host, address, admin, off),
+        ).rejects.toThrow(/did not name/);
+      });
+    });
+    test('refuses when the browser holds no session', async () => {
+      await withWrites(async () => {
+        await expect(signIn(door({ session: [] }).page, host, address, admin, off)).rejects.toThrow(
+          /holds no staging session/,
+        );
+      });
+    });
+    test("refuses a session that is someone else's", async () => {
+      await withWrites(async () => {
+        await expect(
+          signIn(
+            door({ session: [cookie('qa+j1-x-2@lab.crawlmouse.com')] }).page,
+            host,
+            address,
+            admin,
+            off,
+          ),
+        ).rejects.toThrow(/is not/);
+      });
+    });
+    test('keeps the token out of the error when the link fails to open', async () => {
+      await withWrites(async () => {
+        const e = await signIn(door({ gotoThrows: true }).page, host, address, admin, off).catch(
+          (x: Error) => x,
+        );
+        expect(String(e)).toMatch(/did not open/);
+        expect(String(e)).not.toContain(TOKEN);
+      });
+    });
+    test('asks for no link while tracing is on', async () => {
+      await withWrites(async () => {
+        let links = 0;
+        const counting = () => {
+          const a = admin();
+          return {
+            auth: {
+              ...a.auth,
+              admin: {
+                ...a.auth.admin,
+                generateLink: async () => {
+                  links += 1;
+                  return a.auth.admin.generateLink();
+                },
+              },
+            },
+          };
+        };
+        await expect(
+          signIn(door({}).page, host, address, counting as never, () => 'on'),
+        ).rejects.toThrow(/keeps no trace/);
+        expect(links).toBe(0);
+      });
+    });
+    test('reads a session cookie whole or split', () => {
+      const whole = cookie('a@b.test');
+      expect(sessionToken([whole])).toBe('jwt-a@b.test');
+      const cut = 12;
+      expect(
+        sessionToken([
+          { name: `${whole.name}.1`, value: whole.value.slice(cut) },
+          { name: `${whole.name}.0`, value: whole.value.slice(0, cut) },
+        ]),
+      ).toBe('jwt-a@b.test');
+      expect(sessionToken([{ name: 'other', value: whole.value }])).toBeNull();
+      expect(sessionToken([{ name: whole.name, value: 'not json' }])).toBeNull();
+    });
   });
   test('refuses a sign-in token for any deployment that is not staging', () => {
     const csp = {

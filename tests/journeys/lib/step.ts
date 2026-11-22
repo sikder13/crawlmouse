@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { test, type APIRequestContext, type BrowserContext, type Page, type TestInfo } from '../pw';
-import { bypassCookies } from './protection';
+import { bypassCookies, bypassSecret, traceRefusal } from './protection';
 import { stepMeta } from './steps-md';
 import { databaseRefusal, writeRefusal } from './target';
 
@@ -52,7 +52,11 @@ export function step(
       ? writeRefusal({ ...process.env, JOURNEY_BASE_URL: baseURL })
       : null;
     test.skip(refused !== null, `writes: ${refused}`);
-    // With a bypass secret, both contexts carry the origin-scoped cookie, not the secret (lib/protection.ts).
+    // With a bypass secret, both contexts carry a cookie for this host, not the secret (lib/protection.ts).
+    if (bypassSecret(process.env)) {
+      const traced = traceRefusal(info.project.use.trace);
+      if (traced) throw new Error(traced);
+    }
     const cookies = await bypassCookies(new URL(baseURL!).origin, process.env);
     if (cookies.length > 0) await context.addCookies(cookies);
     const request = await playwright.request.newContext({

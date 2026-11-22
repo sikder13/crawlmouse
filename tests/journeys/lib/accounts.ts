@@ -13,7 +13,8 @@ import {
   type SupabaseClient,
 } from '../../../apps/web/node_modules/@supabase/supabase-js/dist/index.mjs';
 import { databaseRefusal, PRODUCTION_REF, writeRefusal } from './target';
-import type { Page } from '../pw';
+import { test, type Page } from '../pw';
+import { traceRefusal } from './protection';
 
 export const STAGING_REF = 'qfgkrnnjuiasahspavbc';
 export const STAGING_SUPABASE_URL = `https://${STAGING_REF}.supabase.co`;
@@ -61,6 +62,10 @@ export interface AdminAuth {
         error: Error | null;
       }>;
     };
+    getUser(jwt: string): Promise<{
+      data: { user: { email?: string } | null };
+      error: Error | null;
+    }>;
   };
 }
 
@@ -81,7 +86,7 @@ export async function createTestUser(
 
 /**
  * null when `baseURL` may receive a staging sign-in token: the write guard's host and flag rules, then
- * the deployment's own proof of its database. A staging token never goes to any other deployment.
+ * the deployment's own proof of its database.
  */
 export function signInRefusal(
   baseURL: string,
@@ -91,21 +96,49 @@ export function signInRefusal(
   return writeRefusal({ ...env, JOURNEY_BASE_URL: baseURL }) ?? databaseRefusal(headers);
 }
 
+/** The access token in staging's Supabase session cookie (whole, or split into `.0`, `.1`…), or null. */
+export function sessionToken(
+  cookies: ReadonlyArray<{ name: string; value: string }>,
+): string | null {
+  const name = `sb-${STAGING_REF}-auth-token`;
+  const whole = cookies.find((c) => c.name === name)?.value;
+  const parts = cookies
+    .filter((c) => new RegExp(`^${name}\\.\\d+$`).test(c.name))
+    .sort((x, y) => Number(x.name.split('.').pop()) - Number(y.name.split('.').pop()))
+    .map((c) => c.value);
+  const raw = whole ?? (parts.length > 0 ? parts.join('') : null);
+  if (raw === null) return null;
+  try {
+    const text = raw.startsWith('base64-')
+      ? Buffer.from(raw.slice('base64-'.length), 'base64url').toString('utf8')
+      : decodeURIComponent(raw);
+    const token = (JSON.parse(text) as { access_token?: unknown }).access_token;
+    return typeof token === 'string' && token !== '' ? token : null;
+  } catch {
+    return null;
+  }
+}
+
+const pastSignIn = (u: URL) => !u.pathname.startsWith('/login');
+
 /**
  * Signs `page` in as `address` through the product's own door: the link (GET stores the token and goes to
- * Continue), then Continue's button (POST verifies), then the screen naming the account. Throws unless
- * that screen names `address`. Errors carry no link: Playwright's own goto error quotes the URL.
+ * Continue), then Continue's button (POST verifies). It returns only when Supabase confirms that the
+ * browser's session belongs to `address`. Its errors carry no link: Playwright's goto error quotes the URL.
  */
 export async function signIn(
   page: Page,
   baseURL: string,
   address: string,
   admin: () => AdminAuth = () => stagingAdmin() as unknown as AdminAuth,
+  traceMode: () => unknown = () => test.info().project.use.trace,
 ): Promise<void> {
   if (!isTestAddress(address)) throw new Error('signIn: only a journey test address is allowed');
   const probe = await page.request.get(new URL('/', baseURL).href, { maxRedirects: 0 });
   const refused = signInRefusal(baseURL, probe.headers());
   if (refused) throw new Error(`signIn: ${refused}`);
+  const traced = traceRefusal(traceMode());
+  if (traced) throw new Error(`signIn: ${traced}`);
   const { data, error } = await admin().auth.admin.generateLink({
     type: 'magiclink',
     email: address,
@@ -120,13 +153,29 @@ export async function signIn(
   if (new URL(page.url()).pathname !== '/login/verify/continue') {
     throw new Error(`signIn: the link went to ${new URL(page.url()).pathname}, not Continue`);
   }
-  await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  const named = page.getByText(`Signed in as ${address}.`, { exact: true });
+  const go = page.getByRole('button', { name: 'Continue', exact: true });
+  await go.click();
+  // A click before hydration posts natively and lands past the naming screen, so either may come first.
+  const named = page.getByText(/^Signed in as .+\.$/);
   try {
-    await named.waitFor({ state: 'visible', timeout: 20_000 });
+    await Promise.race([
+      named.waitFor({ state: 'visible', timeout: 20_000 }),
+      page.waitForURL(pastSignIn, { timeout: 20_000 }),
+    ]);
   } catch {
-    throw new Error(`signIn: the Continue screen did not name ${address}`);
+    throw new Error('signIn: Continue led nowhere');
   }
-  await page.getByRole('button', { name: 'Continue', exact: true }).click();
-  await page.waitForURL((u) => !u.pathname.startsWith('/login'), { timeout: 20_000 });
+  if (!pastSignIn(new URL(page.url()))) {
+    if ((await named.textContent())?.trim() !== `Signed in as ${address}.`) {
+      throw new Error(`signIn: the Continue screen did not name ${address}`);
+    }
+    await go.click();
+    await page.waitForURL(pastSignIn, { timeout: 20_000 });
+  }
+  const token = sessionToken(await page.context().cookies());
+  if (!token) throw new Error('signIn: the browser holds no staging session');
+  const who = await admin().auth.getUser(token);
+  if (who.error || who.data.user?.email?.toLowerCase() !== address) {
+    throw new Error(`signIn: the session is not ${address}'s`);
+  }
 }
