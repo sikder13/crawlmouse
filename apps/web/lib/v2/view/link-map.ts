@@ -484,6 +484,8 @@ export function linkMapView(
   const structureLevel = measuredLevel(d, check, 'structure');
   // With no link read, the counts below are zeros that say nothing.
   const noLinkRead = !isGenerated && structureLevel === 'none';
+  // Not read in full, a zero would read as none found; a count above zero is still a finding.
+  const shown = (total: number) => isGenerated || structureLevel === 'full' || total > 0;
   return {
     frame: {
       domain: siteOf(d, check).host,
@@ -516,27 +518,39 @@ export function linkMapView(
     filters: noLinkRead
       ? []
       : [
-          filter(
-            'orphan',
-            'Orphans',
-            ['orphan page', 'orphan pages'],
-            isGenerated ? orphanIds.length : s.orphan_pages,
-            orphanIds,
-          ),
-          filter(
-            'js_only',
-            'JavaScript-only',
-            ['JavaScript-only page', 'JavaScript-only pages'],
-            isGenerated ? jsIds.length : s.js_only_pages,
-            jsIds,
-          ),
-          filter(
-            'deep',
-            'Deeper than 3 clicks',
-            ['page deeper than 3 clicks', 'pages deeper than 3 clicks'],
-            isGenerated ? deepIds.length : s.pages_deeper_than_3,
-            deepIds,
-          ),
+          ...(shown(isGenerated ? orphanIds.length : s.orphan_pages)
+            ? [
+                filter(
+                  'orphan',
+                  'Orphans',
+                  ['orphan page', 'orphan pages'],
+                  isGenerated ? orphanIds.length : s.orphan_pages,
+                  orphanIds,
+                ),
+              ]
+            : []),
+          ...(shown(isGenerated ? jsIds.length : s.js_only_pages)
+            ? [
+                filter(
+                  'js_only',
+                  'JavaScript-only',
+                  ['JavaScript-only page', 'JavaScript-only pages'],
+                  isGenerated ? jsIds.length : s.js_only_pages,
+                  jsIds,
+                ),
+              ]
+            : []),
+          ...(shown(isGenerated ? deepIds.length : s.pages_deeper_than_3)
+            ? [
+                filter(
+                  'deep',
+                  'Deeper than 3 clicks',
+                  ['page deeper than 3 clicks', 'pages deeper than 3 clicks'],
+                  isGenerated ? deepIds.length : s.pages_deeper_than_3,
+                  deepIds,
+                ),
+              ]
+            : []),
         ],
     renderer: nodes.length > EXPLORER_SVG_MAX ? 'canvas' : 'svg',
     label: `Link map of ${count(nodes.length)} pages. Use the arrow keys to move from page to page.`,

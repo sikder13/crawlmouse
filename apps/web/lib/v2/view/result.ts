@@ -29,8 +29,8 @@ import {
   measuredInFull,
   measuredLevel,
   noFixWords,
-  partlyPlaced,
-  placedPages,
+  pagesRead,
+  partlyRead,
   type MeasuredLevel,
 } from './section-measured';
 import { SCREEN_SIGNALS, screenSignals, type ScreenSignal } from './screen-signals';
@@ -203,7 +203,7 @@ const SIGNAL_NAMES: Record<ScreenSignal, string> = {
 };
 
 /** How much of the structure the check read, and of how many pages. */
-type StructureRead = { level: MeasuredLevel; placed: number; total: number };
+type StructureRead = { level: MeasuredLevel; read: number; total: number };
 
 function grade(
   check: Check,
@@ -402,7 +402,10 @@ function withoutJsDoor(
       .map((t) => templateNoun(t.label).inList);
     body = `The ${listOf(thin.map((k) => templateNoun(label(k)).adjective))} ${plural(thin.length, 'template renders', 'templates render')} client-side, so ${count(thinPages)} pages are near-empty to any bot that doesn't run scripts.${fine.length ? ` ${capitalise(listOf(fine))} ${fine.length === 1 ? 'is' : 'are'} fine.` : ''}`;
   } else {
-    body = `Every template ships its text: ${percent(share)}% of what a browser shows is there without JavaScript.`;
+    body =
+      share >= 0.9
+        ? `Every template ships its text: ${percent(share)}% of what a browser shows is there without JavaScript.`
+        : `${percent(share)}% of the text is in the HTML before JavaScript runs.`;
   }
   return {
     title: 'Readable without JavaScript',
@@ -445,7 +448,7 @@ function structureDoor(
       : null,
     s.generic_anchor_share >= 0.25 ? 'anchor text that repeats' : null,
   ].filter(Boolean) as string[];
-  const partly = read.level === 'partial' ? partlyPlaced(read) : null;
+  const partly = read.level === 'partial' ? partlyRead(read) : null;
   const lead = problems.length
     ? [`${capitalise(problems.join(', '))}.`, partly].filter(Boolean).join(' ')
     : (partly ?? 'No orphan pages, every page within three clicks, varied anchor text.');
@@ -459,9 +462,12 @@ function structureDoor(
     footer: `Link map, ${count(crawled)} nodes · ${fixCount(read.level, fixes, SECTIONS.structure!, isOpen)}`,
     coverage: {
       pages: {
-        tested: crawled,
+        tested: read.level === 'partial' ? read.read : crawled,
         total: check.coverage!.pages_discovered,
-        groups: check.coverage!.templates.length,
+        groups:
+          read.level === 'partial'
+            ? Math.min(check.coverage!.templates.length, read.read)
+            : check.coverage!.templates.length,
       },
     },
     href: '#',
@@ -804,7 +810,9 @@ function unmeasuredCard(
       ? `${listOf(out.map((c) => c.ua))} ${plural(out.length, 'was', 'were')} not measured.`
       : levels.access === 'full'
         ? null
-        : 'Crawler tests finished on only some of the sampled pages.',
+        : levels.access === 'none'
+          ? 'No crawler could be tested.'
+          : 'Crawler tests finished on only some of the sampled pages.',
     check.without_js ? null : 'Text without JavaScript was not measured.',
     levels.structure === 'none'
       ? 'No internal link was read.'
@@ -847,7 +855,9 @@ function allClear(check: Check, kept: boolean, cadence: string | null): NoFixCar
     ? ''
     : thin.length
       ? `, and ${listOf(thin)} ${verbFor(thin, 'is', 'are')} empty without JavaScript`
-      : ' and every template ships its text';
+      : check.without_js && check.without_js.site_text_share >= 0.9
+        ? ' and every template ships its text'
+        : `, and ${percent(check.without_js?.site_text_share ?? 0)}% of the text is in the HTML before JavaScript runs`;
   const watch = !kept
     ? 'kept, this audit is re-run monthly and you hear when one lands.'
     : cadence
@@ -1121,7 +1131,7 @@ export function resultView(
     structure: measuredLevel(d, check, 'structure'),
     content: measuredLevel(d, check, 'content'),
   };
-  const structureRead = { level: levels.structure, ...placedPages(d, check) };
+  const structureRead = { level: levels.structure, ...pagesRead(d, check) };
   const grades = grade(check, fixes, isOpen, notServed, structureRead);
   const coverage = check.coverage!;
   const sampled = sampledCoverage(d, check);
@@ -1174,8 +1184,12 @@ export function resultView(
     map: {
       pages: coverage.pages_crawled,
       links: check.structure!.internal_links,
-      // A graph with no link read has no orphans to count.
-      orphans: levels.structure === 'none' ? null : check.structure!.orphan_pages,
+      // A zero from a graph not read in full would read as none found.
+      orphans:
+        levels.structure === 'full' ||
+        (check.structure!.orphan_pages > 0 && levels.structure === 'partial')
+          ? check.structure!.orphan_pages
+          : null,
       href: mapHref,
       ...(map ? { nodes: map.nodes, positions: map.positions } : { nodes: null, positions: null }),
     },
