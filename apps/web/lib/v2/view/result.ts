@@ -12,7 +12,6 @@ import {
   type CrawlerResult,
   type Fix,
   type FixSection,
-  type PageResult,
 } from '@crawlmouse/types/v2';
 import { findCheck, fixesAsOf, siteOf } from '../fixtures';
 import {
@@ -26,6 +25,7 @@ import {
 } from './effect-headline';
 import { openFixes, type FixPlan } from './free-fixes';
 import { noFixKind, servedWord } from './no-fix-card';
+import { noFixWords } from './section-measured';
 import { SCREEN_SIGNALS, screenSignals, type ScreenSignal } from './screen-signals';
 import { dateTimeUtc, dayTimeUtc, listOf, percent, templateNoun } from '../format';
 import { toneOf } from '../letters';
@@ -229,16 +229,15 @@ function grade(
   ];
 }
 
-/** "1 fix open · 7 on Pro", or "nothing to fix". */
+/** "1 fix open · 7 on Pro", or what no fix means here (`noFixWords`). */
 function fixCount(
+  check: Check,
   fixes: readonly Fix[],
   section: FixSection,
   isOpen: (f: Fix) => boolean,
-  /** Whether this section was measured: an unmeasured one has no fix because nothing was read. */
-  measured = true,
 ) {
   const here = fixes.filter((f) => f.section === section);
-  if (!here.length) return measured ? 'nothing to fix' : 'not measured';
+  if (!here.length) return noFixWords(check, section);
   const open = here.filter(isOpen).length;
   const pro = here.length - open;
   return [
@@ -299,7 +298,6 @@ function accessDoor(
   const unmeasured = ai.filter((c) => c.verdict === 'not_measured').length;
   const kept = ai.length - allowed.length - unmeasured;
   const pill = accessPill(check);
-  const accessMeasured = !edge && unmeasured === 0;
   const searchLine = search.every((c) => c.verdict === 'allowed')
     ? `${listOf(search.map((c) => c.ua))} ${plural(search.length, 'is', 'are')} allowed by robots.txt.`
     : `${keptOutClauses(search).join('; ')}.`;
@@ -326,7 +324,7 @@ function accessDoor(
       tone: BAR_TONE_OF_PILL[pill.state],
     },
     body,
-    footer: `${ai.length} AI crawlers (${ai.filter((c) => c.scored).length} scored), ${search.length} search engines by robots.txt · ${fixCount(fixes, SECTIONS.access!, isOpen, accessMeasured)}`,
+    footer: `${ai.length} AI crawlers (${ai.filter((c) => c.scored).length} scored), ${search.length} search engines by robots.txt · ${fixCount(check, fixes, SECTIONS.access!, isOpen)}`,
     coverage: { pages: coverage },
     href: '#',
   };
@@ -342,8 +340,8 @@ function withoutJsDoor(
   // every page leaves Pro nothing more to offer here.
   const footer =
     coverage.tested < coverage.total
-      ? `Every page measured with Pro · ${fixCount(fixes, SECTIONS.withoutJs!, isOpen, check.without_js !== null)}`
-      : fixCount(fixes, SECTIONS.withoutJs!, isOpen, check.without_js !== null);
+      ? `Every page measured with Pro · ${fixCount(check, fixes, SECTIONS.withoutJs!, isOpen)}`
+      : fixCount(check, fixes, SECTIONS.withoutJs!, isOpen);
   // The check holds no site-wide share. Why is not in the check, so the door does not say why.
   if (!check.without_js) {
     return {
@@ -424,7 +422,7 @@ function structureDoor(
     pill: { state: 'neutral', label: score === null ? 'not graded' : `${score} / 100` },
     ...(score === null ? {} : { bar: { percent: score, tone: 'neutral' as const } }),
     body: `${lead} ${hubs}`,
-    footer: `Link map, ${count(crawled)} nodes · ${fixCount(fixes, SECTIONS.structure!, isOpen)}`,
+    footer: `Link map, ${count(crawled)} nodes · ${fixCount(check, fixes, SECTIONS.structure!, isOpen)}`,
     coverage: {
       pages: {
         tested: crawled,
@@ -530,7 +528,7 @@ function schemaSentence(check: Check, rows: readonly ContentRow[]): string | nul
 }
 
 function contentDoor(check: Check, fixes: readonly Fix[], isOpen: (f: Fix) => boolean): DoorView {
-  const footer = `Per-page structure score · ${fixCount(fixes, SECTIONS.content!, isOpen, check.content !== null)}`;
+  const footer = `Per-page structure score · ${fixCount(check, fixes, SECTIONS.content!, isOpen)}`;
   const content = check.content;
   if (!content) {
     return {
@@ -632,7 +630,10 @@ function signalsDoor(check: Check, notServed: boolean): DoorView {
     pill: { state: 'neutral', label },
     bar: { percent: Math.round((present.length / kinds.length) * 100), tone: 'neutral' },
     body,
-    footer: notServed ? 'Checked by fetch' : 'Checked by fetch · nothing urgent',
+    footer:
+      notServed || (!present.length && unknown.length)
+        ? 'Checked by fetch'
+        : 'Checked by fetch · nothing urgent',
     coverage: { read: `Tested ${present.length + absent.length} of ${kinds.length} signals` },
     href: '#',
   };
@@ -708,12 +709,6 @@ function changesDoor(
 type NoFixCard = Exclude<ResultView['first'], { kind: 'fix' }>;
 
 /** "403", "403 or 429", "401, 403 or 429". */
-/** A page row that was read: a 200 with HTML we parsed. A challenge can answer 200 and is not. */
-const wasRead = (p: PageResult) =>
-  p.status_code === 200 &&
-  p.is_html &&
-  (p.links_read || p.title !== null || p.content_simhash !== null);
-
 const eitherOf = (codes: readonly number[]) => {
   const last = codes.at(-1);
   const rest = codes.filter((c) => c !== last);
@@ -742,9 +737,7 @@ function notServedCard(check: Check, statuses: readonly number[]): NoFixCard {
     label: 'Nothing to grade',
     title: refused ? 'Your site refused our requests' : 'Your site did not serve a page',
     body: [
-      codes.includes(200)
-        ? `${count(n)} ${plural(n, 'page', 'pages')} answered ${eitherOf(codes)}, but we could not read ${plural(n, 'its', 'their')} content.`
-        : `${count(n)} ${plural(n, 'page answered our request', 'pages answered our requests')}, with ${eitherOf(codes)}.`,
+      `${count(n)} ${plural(n, 'page answered our request', 'pages answered our requests')}, with ${eitherOf(codes)}.`,
       crawlers,
       next,
     ]
@@ -1056,7 +1049,8 @@ export function resultView(
   const statuses = pageRows.map((p) => p.status_code);
   const noFix = noFixKind({
     pagesAnswered: pageRows.length,
-    pagesServed: pageRows.filter(wasRead).length,
+    pagesServed: statuses.filter((status) => status === 200).length,
+    graded: check.technical_seo!.grade !== null,
     aiUnmeasured: check.crawlers.filter(isAi).filter((c) => c.verdict === 'not_measured').length,
     textMeasured: check.without_js !== null,
   });

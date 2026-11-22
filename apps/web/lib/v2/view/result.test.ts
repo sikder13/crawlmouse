@@ -411,6 +411,8 @@ describe('the third card when there is no fix', () => {
       }));
       c.coverage!.pages_crawled = codes.length;
       c.coverage!.pages_discovered = codes.length;
+      // As the builder leaves a check with no page served: no letter.
+      Object.assign(c.technical_seo!, { grade: null, score: null });
     });
 
   it('says nothing to fix on a check that measured everything', () => {
@@ -455,30 +457,26 @@ describe('the third card when there is no fix', () => {
     expect(v.first.body).toMatch(/^1 page answered our request, with 404\./);
   });
 
-  it('counts a 200 it could not read as not served, and says what it got', () => {
+  it('takes a 200 at its word: a long page whose links were not all read is served', () => {
     const v = view('clean-site', (c, d) => {
-      const template = d.page_results.find((p) => p.check_id === c.id)!;
-      d.page_results = [
-        {
-          ...template,
-          status_code: 200,
-          is_html: true,
-          links_read: false,
-          title: null,
-          content_simhash: null,
-        },
-      ];
-    });
-    if (v.first.kind !== 'not-served') throw new Error(`got ${v.first.kind}`);
-    expect(v.first.body).toContain('answered 200, but we could not read its content');
-    expect(v.grades[0].summary).toBe('No page was served, so nothing was graded.');
-  });
-
-  it('counts a long page whose links were not all read as served', () => {
-    const v = view('clean-site', (c, d) => {
-      for (const p of d.page_results.filter((x) => x.check_id === c.id)) p.links_read = false;
+      for (const p of d.page_results.filter((x) => x.check_id === c.id)) {
+        Object.assign(p, { links_read: false, title: null, content_simhash: null });
+      }
     });
     expect(v.first.kind).toBe('all-clear');
+    expect(v.crawledLine).not.toContain('none served');
+  });
+
+  it('never says nothing was graded beside a letter', () => {
+    const v = view('clean-site', (c, d) => {
+      d.page_results = d.page_results
+        .filter((p) => p.check_id === c.id)
+        .map((p) => ({ ...p, status_code: 403 }));
+      expect(c.technical_seo!.grade).not.toBeNull();
+    });
+    expect(v.first.kind).not.toBe('not-served');
+    expect(v.grades[0].summary).not.toContain('nothing was graded');
+    expect(v.crawledLine).not.toContain('none served');
   });
 
   it.each([301, 302, 304, 399])('does not call a %i served', (code) => {
@@ -487,6 +485,7 @@ describe('the third card when there is no fix', () => {
 
   it('names each status, and reads only this check’s pages', () => {
     const v = view('clean-site', (c, d) => {
+      Object.assign(c.technical_seo!, { grade: null, score: null });
       const template = d.page_results.find((p) => p.check_id === c.id)!;
       d.page_results = [
         ...[401, 403, 429].map((status_code, i) => ({
@@ -510,6 +509,7 @@ describe('the third card when there is no fix', () => {
 
   it('says none of the AI crawlers was measured only when none was', () => {
     const none = view('clean-site', (c, d) => {
+      Object.assign(c.technical_seo!, { grade: null, score: null });
       d.page_results = d.page_results
         .filter((p) => p.check_id === c.id)
         .map((p) => ({ ...p, status_code: 403 }));
@@ -517,6 +517,7 @@ describe('the third card when there is no fix', () => {
         x.verdict = 'not_measured';
     });
     const some = view('clean-site', (c, d) => {
+      Object.assign(c.technical_seo!, { grade: null, score: null });
       d.page_results = d.page_results
         .filter((p) => p.check_id === c.id)
         .map((p) => ({ ...p, status_code: 403 }));
@@ -544,6 +545,7 @@ describe('the third card when there is no fix', () => {
     [
       'a site that served no page',
       (c: Check, d: FixtureDataset) => {
+        Object.assign(c.technical_seo!, { grade: null, score: null });
         d.page_results = d.page_results
           .filter((p) => p.check_id === c.id)
           .map((p) => ({ ...p, status_code: 403 }));
