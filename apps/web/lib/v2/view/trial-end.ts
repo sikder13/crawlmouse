@@ -364,6 +364,7 @@ export function trialEndView(
         staging.length > 0,
         plan,
         !nothingToChoose,
+        site.paused,
       ),
     ].join(' '),
     tables: COPY.tables,
@@ -480,10 +481,17 @@ function staysAndPauses(v: AccountView, plan: string) {
 
   // ── what stays and what pauses ──
   const emails = v.account.email_prefs.change_notes;
+  // The oldest site can only be paused by its owner, and the move to Free leaves it paused
+  // (`apply_entitlement_transition`): it gets no check, so nothing to email about either.
   const alertsByEmail =
-    emails && v.d.alert_rules.some((r) => r.enabled && r.channels.includes('email'));
+    !site.paused &&
+    emails &&
+    v.d.alert_rules.some((r) => r.enabled && r.channels.includes('email'));
   const stays: TrialRowView[] = [
-    { what: site.host, how: COPY.stays.site(free, alertsByEmail) },
+    {
+      what: site.host,
+      how: site.paused ? COPY.stays.sitePaused : COPY.stays.site(free, alertsByEmail),
+    },
     { what: COPY.stays.evidence, how: COPY.stays.kept },
     ...(freeThree.length
       ? [

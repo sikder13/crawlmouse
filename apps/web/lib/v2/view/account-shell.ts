@@ -197,17 +197,20 @@ function trialCard(
   const firstRun = isFirstRun(v);
   const primaries = primarySites(v).length;
   const noCardLead = !v.cardOnFile ? `${COPY.noCard} ` : '';
+  // Paused by the person: the move to Free leaves it paused, with no check.
+  const oldestPaused = primaries > 0 && primarySite(v).paused;
   const whatStays =
     primaries === 0
       ? `${noCardLead}${COPY.trialNoSite(GATES.free.sites, freeSchedule)}`
       : firstRun && primaries === 1
-        ? `${noCardLead}${COPY.trialFirstRun(freeSchedule)}`
+        ? `${noCardLead}${oldestPaused ? COPY.trialFirstRunPaused : COPY.trialFirstRun(freeSchedule)}`
         : `${firstRun ? noCardLead : ''}${COPY.trialLater(
             primarySite(v).host,
             freeSchedule,
             primaries - 1,
             reminderDue ? null : TRIAL_REMINDER_DAYS_BEFORE_END,
             billingOpen,
+            oldestPaused,
           )}`;
   return {
     title,

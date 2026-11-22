@@ -39,6 +39,8 @@ export const TRIAL_END_COPY = {
   stays: {
     site: (schedule: string, email: boolean) =>
       `${schedule} checks${email ? ', email if changed' : ''}`,
+    /** The oldest site, paused by the person: the move to Free does not change it. */
+    sitePaused: 'stays paused, as you left it',
     evidence: 'Every check, every audit, the evidence',
     kept: 'kept',
     freeFixes: (numbers: readonly number[]) =>
@@ -123,8 +125,13 @@ export const TRIAL_END_COPY = {
     staging: boolean,
     plan: string,
     plansOpen = true,
+    oldestPaused = false,
   ) =>
-    `${host} keeps its ${schedule} check${fixes ? ` and its ${numberWord(fixes)} ${plural(fixes, 'fix', 'fixes')}` : ''}.${
+    `${
+      oldestPaused
+        ? `${host} stays paused, as you left it, so no site keeps a scheduled check${fixes ? `, and it keeps its ${numberWord(fixes)} ${plural(fixes, 'fix', 'fixes')}` : ''}`
+        : `${host} keeps its ${schedule} check${fixes ? ` and its ${numberWord(fixes)} ${plural(fixes, 'fix', 'fixes')}` : ''}`
+    }.${
       others || staging
         ? ` ${
             others
