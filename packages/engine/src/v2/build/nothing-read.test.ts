@@ -97,6 +97,16 @@ describe('nothingReadReason: a crawl that got no response from any page', () => 
     expect(nothingReadReason([answered], HOME)).toBe('nothing_read');
   });
 
+  it('is nothing_read when the homepage timed out and answered in a later batch', () => {
+    const later = {
+      ...batch([notRequested()]),
+      robots: [{ origin, status: 503 }],
+    } as unknown as CrawlBatchResult;
+    expect(nothingReadReason([batch([notRequested()], [robots('timeout')]), later], HOME)).toBe(
+      'nothing_read',
+    );
+  });
+
   it('is site_unreachable when the only other origin also got no answer', () => {
     const silent = {
       ...batch([notRequested()], [robots('network')]),

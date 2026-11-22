@@ -450,7 +450,7 @@ describe('the failure reasons', () => {
         siteOf: async () => site,
       };
       const out = await failCheck(store, check, 'nothing_read');
-      expect(out).toEqual({ failed: true, siteId: site, storedAs: 'internal' });
+      expect(out).toEqual({ failed: true, siteId: site, as: 'internal' });
       const { rows } = await d.query<{ status: string; failure_reason: string }>(
         `select status, failure_reason from public.checks where id = $1`,
         [check],

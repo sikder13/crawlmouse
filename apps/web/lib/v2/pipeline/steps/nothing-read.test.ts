@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { GRADE_VERSION } from '@crawlmouse/engine/v2/pipeline';
-import type { CrawlBatchResult, Finding } from '@crawlmouse/types/v2';
+import type { AccessBatchResult, CrawlBatchResult, Finding } from '@crawlmouse/types/v2';
 import {
   CHECK,
   SITE,
+  accessBatch,
   crawlBatch,
   crawlRow,
 } from '../../../../../../packages/engine/fixtures/v2/build/rows';
@@ -27,7 +28,7 @@ const EVENT: CheckRequested = {
 };
 
 /** The build step over one stored crawl batch, on a check that has been claimed. */
-async function buildOver(result: CrawlBatchResult) {
+async function buildOver(result: CrawlBatchResult, access?: AccessBatchResult) {
   const at = '2026-11-22T12:00:00.000Z';
   const { store } = memoryStore(
     { ...recordedInput().site, id: SITE },
@@ -51,6 +52,23 @@ async function buildOver(result: CrawlBatchResult) {
     finished_at: at,
     summary: {},
   } as never);
+  if (access) {
+    const accessPath = `anon/${SITE}/${CHECK}/batch-2.json.gz`;
+    await putJson(evidence, accessPath, access);
+    await store.upsertBatch({
+      check_id: CHECK,
+      batch: 2,
+      kind: 'access',
+      nonce: 'm',
+      posted_at: at,
+    } as never);
+    await store.endBatch(CHECK, 2, {
+      status: 'done',
+      result_path: accessPath,
+      finished_at: at,
+      summary: {},
+    } as never);
+  }
   await putJson(evidence, pathOf(EVENT, 'seeds'), [
     { url: HOME, source: 'homepage', lastmod: null },
   ]);
@@ -81,6 +99,11 @@ describe('the build step, on a crawl that read no page', () => {
     const { error, built } = await buildOver(dead('network'));
     expect(failureReasonOf(error)).toBe('site_unreachable');
     expect(built).toBe(false);
+  });
+
+  it('reads the crawl batches only: an access batch beside them changes nothing', async () => {
+    const { error } = await buildOver(dead('network'), accessBatch(2, []));
+    expect(failureReasonOf(error)).toBe('site_unreachable');
   });
 
   it('fails nothing_read for a host that answered and gave us no page', async () => {
