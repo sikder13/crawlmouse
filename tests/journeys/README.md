@@ -79,7 +79,8 @@ browser steps run against a deployment.
   the step passes.
 
 - **A PR that fixes a defect** deletes that id from `expected-fail.json`. It edits nothing else there.
-- **Judged ids.** Some ids a test cannot observe: positioning, legal wording, a published address.
+- **Judged ids.** Some ids a test cannot observe: positioning, legal wording, a published address, or an
+  event that never leaves our server (F-050, whose evidence is `lib/analytics-server.test.ts`).
   `STEPS.md` marks them "(judged)" and leaves them out of `expected-fail.json`, parent steps included.
   The gate checks them by hand.
 - **Consistency.** `consistency.spec.ts` keeps `expected-fail.json` inside `STEPS.md`:
