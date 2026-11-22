@@ -18,6 +18,13 @@ export const CHANGES_LOG_COPY = {
    */
   newNote: (n: number) =>
     `${capitalise(numberWord(n))} ${plural(n, 'was', 'were')} opened or resolved at a site’s latest check.`,
+  /** One row for what a site's first audit found (F-100): nothing has changed yet. */
+  firstAudit: (n: number) => `First audit: ${count(n)} ${plural(n, 'issue', 'issues')} found.`,
+  firstAuditWhere: 'the whole site',
+  firstAuditCause: 'Nothing to compare yet. The next check of this site is compared with this one.',
+  /** The headline while every row is a first audit: they are not changes. */
+  firstAuditsOnly: (n: number) =>
+    `${capitalise(numberWord(n))} first ${plural(n, 'audit', 'audits')}. Changes appear once a site has been checked again.`,
   noChanges: 'No changes yet.',
   noMatch: 'No change matches these filters.',
   allSites: 'All sites',

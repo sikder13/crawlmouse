@@ -39,7 +39,7 @@ describe('the Changes log, rendered', () => {
       ['Any time', `${CHANGES_LOG_PATH}?kind=opened`],
     ]);
     expect(html.slice(html.indexOf('<main'))).not.toMatch(/<form /);
-    expect(html).toContain('3 of 8 changes match: opened.');
+    expect(html).toContain('2 of 8 changes match: opened.');
   });
 
   it('says so in place of the table when nothing matches', () => {

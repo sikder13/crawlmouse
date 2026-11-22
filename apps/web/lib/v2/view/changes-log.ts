@@ -73,6 +73,46 @@ export function accountChanges(v: AccountView): Change[] {
     .sort((a, b) => instant(b.detected_at) - instant(a.detected_at) || a.id.localeCompare(b.id));
 }
 
+/** One row of the log: a change, or everything one site's first audit found (`findings`). */
+interface LogEntry {
+  change: Change;
+  findings: number | null;
+}
+
+/**
+ * The log's rows (F-100). What a site's first audit found was not a change: nothing came before it.
+ * Its `opened` rows (no previous check) become one `baseline` row per check, where the newest of them
+ * stood; any other row of a first check, such as a deploy audited, stays its own.
+ */
+function logEntries(changes: readonly Change[]): LogEntry[] {
+  const found = new Map<string, Change[]>();
+  const isFinding = (c: Change) => c.kind === 'opened' && c.previous_check_id === null;
+  for (const c of changes) {
+    if (isFinding(c)) found.set(c.check_id, [...(found.get(c.check_id) ?? []), c]);
+  }
+  const placed = new Set<string>();
+  const entries: LogEntry[] = [];
+  for (const c of changes) {
+    if (!isFinding(c)) {
+      entries.push({ change: c, findings: null });
+    } else if (!placed.has(c.check_id)) {
+      placed.add(c.check_id);
+      const group = found.get(c.check_id)!;
+      const change: Change = {
+        ...c,
+        id: `first-audit-${c.check_id}`,
+        kind: 'baseline',
+        fix_id: null,
+        severity: null,
+        grade_deltas: [],
+        notified: group.find((g) => g.notified)?.notified ?? null,
+      };
+      entries.push({ change, findings: group.length });
+    }
+  }
+  return entries;
+}
+
 export function changesLogView(
   d: AccountDataset,
   viewer: Viewer,
@@ -87,23 +127,35 @@ export function changesLogView(
   );
   const hostOf = new Map(sites.map((s) => [s.id, s.host]));
   const siteOfCheck = new Map(v.d.checks.map((c) => [c.id, c.site_id]));
-  const all = accountChanges(v);
+  const all = logEntries(accountChanges(v));
   const site = query.site && hostOf.has(query.site) ? query.site : null;
   const kind = KIND_ORDER.find((k) => k === query.kind) ?? null;
   // The kinds the account's changes hold, and the one asked for even when none has it yet.
-  const kinds = KIND_ORDER.filter((k) => k === kind || all.some((c) => c.kind === k));
+  const kinds = KIND_ORDER.filter((k) => k === kind || all.some((e) => e.change.kind === k));
   const since = CHANGES_LOG_SINCE.find((s) => s.key === query.since) ?? CHANGES_LOG_SINCE[0];
   const set = { site, kind, since: since.key as SinceKey };
 
   const from = since.days === null ? null : instant(v.now) - since.days * DAY_MS;
   const shown = all
-    .filter((c) => site === null || siteOfCheck.get(c.check_id) === site)
-    .filter((c) => kind === null || c.kind === kind)
-    .filter((c) => from === null || instant(c.detected_at) >= from);
+    .filter((e) => site === null || siteOfCheck.get(e.change.check_id) === site)
+    .filter((e) => kind === null || e.change.kind === kind)
+    .filter((e) => from === null || instant(e.change.detected_at) >= from);
 
   const clock = (ts: string) => `${dayDate(ts, zone)} ${hourMinute(ts, zone)}`;
-  const rows = shown.map((c) => ({
+  const rows = shown.map(({ change: c, findings }) => ({
     ...rowOf(c, findCheck(v.d, c.check_id), clock),
+    ...(findings === null
+      ? {}
+      : {
+          summary: COPY.firstAudit(findings),
+          subject: null,
+          where: COPY.firstAuditWhere,
+          pages: null,
+          effect: 'none',
+          verdict: null,
+          cause: COPY.firstAuditCause,
+          diff: [],
+        }),
     site: hostOf.get(siteOfCheck.get(c.check_id)!)!,
   }));
 
@@ -131,7 +183,9 @@ export function changesLogView(
     headline: filtered
       ? COPY.filtered(rows.length, all.length, named)
       : rows.length
-        ? COPY.headline(rows.length, sitesShown)
+        ? shown.every((e) => e.findings !== null)
+          ? COPY.firstAuditsOnly(rows.length)
+          : COPY.headline(rows.length, sitesShown)
         : null,
     newNote: !filtered && fresh > 0 ? COPY.newNote(fresh) : null,
     filters: [

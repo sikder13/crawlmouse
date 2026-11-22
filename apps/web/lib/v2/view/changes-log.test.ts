@@ -16,11 +16,15 @@ const viewer = { accountId: 'a0000000-0000-4000-8000-000000000001', now: bad.as_
 const BASE = '/v2-preview/screens/changes-log';
 const log = (query: Record<string, string> = {}) => changesLogView(bad, viewer, query, BASE);
 const ids = (v: ReturnType<typeof log>) => v.rows.map((r) => r.key.slice(-3));
+/** The check of bad-site's one first-audit finding, change …007. */
+const firstAuditCheck = bad.changes.find((c) => c.id.endsWith('007'))!.check_id;
 
 describe('the Changes log', () => {
   it('lists every change of the account, newest first, the site first, ties by id', () => {
     const v = log();
-    expect(ids(v)).toEqual(['001', '002', '003', '004', '005', '008', '006', '007']);
+    // The last row is example-outfitter.com's first audit, one row for what it found (F-100).
+    expect(ids(v)).toEqual(['001', '002', '003', '004', '005', '008', '006', '001']);
+    expect(v.rows.at(-1)!.key).toBe('first-audit-' + firstAuditCheck);
     expect(v.rows.map((r) => r.site)).toEqual([
       'example-outfitter.com',
       'example-outfitter.com',
@@ -45,14 +49,14 @@ describe('the Changes log', () => {
 
   it('filters by kind, and says how many of how many match', () => {
     const v = log({ kind: 'opened' });
-    expect(ids(v)).toEqual(['001', '002', '007']);
-    expect(v.headline).toBe('3 of 8 changes match: opened.');
+    expect(ids(v)).toEqual(['001', '002']);
+    expect(v.headline).toBe('2 of 8 changes match: opened.');
     expect(v.newNote).toBeNull();
   });
 
   it('filters by site and by since, together', () => {
     const outfitter = '50000000-0000-4000-8000-000000000001';
-    expect(ids(log({ site: outfitter }))).toEqual(['001', '002', '003', '004', '007']);
+    expect(ids(log({ site: outfitter }))).toEqual(['001', '002', '003', '004', '001']);
     // The last 24 hours from Fri 30 Oct 10:05Z: everything detected that morning.
     expect(ids(log({ since: '24h' }))).toEqual(['001', '002', '003', '004', '005', '008']);
     expect(ids(log({ site: outfitter, since: '24h', kind: 'changed' }))).toEqual(['003', '004']);
@@ -94,12 +98,19 @@ describe('the Changes log', () => {
       { kind: 'baseline' },
       BASE,
     );
-    expect(day0.rows).toEqual([]);
+    // That day the account holds its first audit, which is a baseline row and not an opened one.
+    expect(day0.rows.map((r) => r.kind)).toEqual(['baseline']);
     expect(kindLinks(day0).map((l) => [l.label, l.current])).toEqual([
       ['All kinds', false],
-      ['opened', false],
       ['baseline', true],
     ]);
+    const opened = changesLogView(
+      bad,
+      { ...viewer, now: '2026-10-25T02:41:00Z' },
+      { kind: 'opened' },
+      BASE,
+    );
+    expect(opened.rows).toEqual([]);
   });
 
   it('reads a notification sent after now as not yet sent', () => {
@@ -107,5 +118,83 @@ describe('the Changes log', () => {
     const early = changesLogView(bad, { ...viewer, now: '2026-10-30T10:02:30Z' }, {}, BASE);
     expect(early.rows.find((r) => r.key.endsWith('001'))!.told).toBe('nobody was notified');
     expect(log().rows[0]!.told).toBe('email and Slack #seo, Fri 30 Oct 06:03');
+  });
+});
+
+describe('a first audit in the Changes log (F-100)', () => {
+  const FIRST = bad.changes.find((c) => c.id.endsWith('007'))!;
+  /** The fixture with `n` findings on one site's first audit and nothing after it. */
+  function firstAuditOnly(n: number, sites = 1) {
+    const siteIds = bad.sites.slice(0, sites).map((s) => s.id);
+    const checks = siteIds.map((siteId, i) => ({
+      ...bad.checks.find((c) => c.id === FIRST.check_id)!,
+      id: `c0000000-0000-4000-8000-00000000000${i}`,
+      site_id: siteId,
+    }));
+    const changes = checks.flatMap((check, s) =>
+      Array.from({ length: n }, (_, i) => ({
+        ...FIRST,
+        id: `d0000000-0000-4000-8000-0000000${s}${String(i).padStart(4, '0')}`,
+        site_id: check.site_id,
+        check_id: check.id,
+        summary: `finding ${i}`,
+      })),
+    );
+    return { ...bad, checks: [...bad.checks, ...checks], changes };
+  }
+
+  it('is one row for the site, saying how many issues it found', () => {
+    const v = changesLogView(firstAuditOnly(26), viewer, {}, BASE);
+    expect(v.rows).toHaveLength(1);
+    expect(v.rows[0]).toMatchObject({
+      kind: 'baseline',
+      summary: 'First audit: 26 issues found.',
+      subject: null,
+      where: 'the whole site',
+      pages: null,
+      effect: 'none',
+      verdict: null,
+      diff: [],
+      cause: 'Nothing to compare yet. The next check of this site is compared with this one.',
+    });
+  });
+
+  it('says one issue in the singular', () => {
+    expect(changesLogView(firstAuditOnly(1), viewer, {}, BASE).rows[0]!.summary).toBe(
+      'First audit: 1 issue found.',
+    );
+  });
+
+  it('with only first audits, the headline does not call them changes', () => {
+    expect(changesLogView(firstAuditOnly(20, 1), viewer, {}, BASE).headline).toBe(
+      'One first audit. Changes appear once a site has been checked again.',
+    );
+    expect(changesLogView(firstAuditOnly(16, 5), viewer, {}, BASE).headline).toBe(
+      'Five first audits. Changes appear once a site has been checked again.',
+    );
+  });
+
+  it('five sites’ first audits are five rows, one each', () => {
+    const v = changesLogView(firstAuditOnly(16, 5), viewer, {}, BASE);
+    expect(v.rows).toHaveLength(5);
+    expect(new Set(v.rows.map((r) => r.site)).size).toBe(5);
+  });
+
+  it('a change found by a later check stays its own row, and is counted as a change', () => {
+    const v = log();
+    expect(v.rows.filter((r) => r.summary.startsWith('First audit'))).toHaveLength(1);
+    expect(v.rows.filter((r) => r.kind === 'opened').length).toBeGreaterThan(0);
+    expect(v.headline).toBe('8 changes across 4 sites, newest first.');
+  });
+
+  it('a non-finding row of a first check (a deploy audited) is not folded in', () => {
+    expect(log().rows.some((r) => r.key.endsWith('006'))).toBe(true);
+  });
+
+  it('the opened filter leaves first audits out, and the baseline filter finds them', () => {
+    expect(log({ kind: 'opened' }).rows.some((r) => r.key.startsWith('first-audit-'))).toBe(false);
+    expect(log({ kind: 'baseline' }).rows.map((r) => r.key)).toContain(
+      'first-audit-' + firstAuditCheck,
+    );
   });
 });
