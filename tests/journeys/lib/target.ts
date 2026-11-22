@@ -3,8 +3,8 @@
  *
  * A step that writes (a check, an account, a mail) runs only when all three hold; otherwise it is
  * skipped with the reason:
- *   1. the base URL's host, lower-cased and without trailing dots, is in WRITABLE_HOSTS, the host QA's
- *      staging design names;
+ *   1. the base URL's host, lower-cased and without trailing dots, is in WRITABLE_HOSTS (staging's domain
+ *      and its Vercel alias), on the default port and with no userinfo;
  *   2. JOURNEY_ALLOW_WRITES is exactly "1";
  *   3. the deployment itself shows staging's database: its Content-Security-Policy, which the build
  *      writes from NEXT_PUBLIC_SUPABASE_URL (apps/web/next.config.mjs), names STAGING_DB_HOST and not
@@ -49,6 +49,10 @@ export function writeRefusal(env: Env): string | null {
     return `${host} is a Vercel deployment: steps that write run only on staging`;
   if (!WRITABLE_HOSTS.includes(host))
     return `${host} is not staging (WRITABLE_HOSTS): steps that write never run there`;
+  const url = baseUrlOf(env);
+  if (url.port || url.username || url.password) {
+    return `${host} with a port or userinfo is not staging (WRITABLE_HOSTS)`;
+  }
   if (env.JOURNEY_ALLOW_WRITES !== '1') return 'JOURNEY_ALLOW_WRITES is not "1"';
   return null;
 }

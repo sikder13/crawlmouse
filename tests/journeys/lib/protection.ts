@@ -3,7 +3,8 @@
  * (or a 401/403) instead of the app. The suite then needs the Protection Bypass for Automation secret,
  * VERCEL_AUTOMATION_BYPASS_SECRET, sent as `x-vercel-protection-bypass`.
  *
- * The secret is sent once per origin, by `bypassCookies`, on a request that does not follow redirects.
+ * The secret is sent by `bypassCookies` and `global-setup.ts`, each on a request that does not follow
+ * redirects.
  * Vercel answers with a cookie, and the browser and API contexts carry that cookie instead. A header
  * set on a context would go to every host a page loads, and on to the target of any redirect (measured:
  * `route.continue({ headers })` and `extraHTTPHeaders` both delivered it to a second origin after a 302).
@@ -24,6 +25,17 @@ export function originHeaders(
 }
 
 export const SET_COOKIE_HEADER = 'x-vercel-set-bypass-cookie';
+export const BYPASS_COOKIE = '_vercel_jwt';
+
+/**
+ * null unless Playwright would record this run. A trace holds request headers and URLs, so a run with a
+ * bypass cookie or a sign-in link must not keep one, and `--trace=on` overrides the config's `off`.
+ */
+export function traceRefusal(mode: unknown): string | null {
+  const m = typeof mode === 'object' && mode !== null ? (mode as { mode?: unknown }).mode : mode;
+  if (m === undefined || m === 'off') return null;
+  return `tracing is ${String(m)}: a run holding a bypass cookie or a sign-in link keeps no trace`;
+}
 
 export interface BypassCookie {
   name: string;
@@ -37,6 +49,14 @@ export interface BypassCookie {
 }
 
 type Fetch = (url: URL, init: RequestInit) => Promise<Response>;
+
+/** A Set-Cookie line that clears its cookie: a zero or negative Max-Age, or an Expires in the past. */
+function isExpired(line: string): boolean {
+  const age = /;\s*max-age=\s*(-?\d+)/i.exec(line);
+  if (age) return Number(age[1]) <= 0;
+  const expires = /;\s*expires=([^;]+)/i.exec(line);
+  return expires ? Date.parse(expires[1]!) <= Date.now() : false;
+}
 const cached = new Map<string, BypassCookie[]>();
 
 /**
@@ -51,7 +71,8 @@ export async function bypassCookies(
   const headers = originHeaders(env);
   if (Object.keys(headers).length === 0) return [];
   const origin = new URL(originUrl);
-  const known = cached.get(origin.origin);
+  const cacheKey = `${origin.origin}\n${headers[BYPASS_HEADER]}`;
+  const known = cached.get(cacheKey);
   if (known) return known;
   const res = await doFetch(new URL('/api/health', origin), {
     headers: { ...headers, [SET_COOKIE_HEADER]: 'true' },
@@ -59,8 +80,10 @@ export async function bypassCookies(
   });
   const cookies = res.headers
     .getSetCookie()
+    // Only Vercel's bypass cookie (measured: `_vercel_jwt`), and not one that clears it.
+    .filter((line) => !isExpired(line))
     .map((line) => /^([^=;\s]+)=([^;]*)/.exec(line))
-    .filter((m): m is RegExpExecArray => m !== null && m[1]!.startsWith('_vercel'))
+    .filter((m): m is RegExpExecArray => m !== null && m[1] === BYPASS_COOKIE && m[2] !== '')
     .map((m) => ({
       name: m[1]!,
       value: m[2]!,
@@ -74,7 +97,7 @@ export async function bypassCookies(
   if (cookies.length === 0) {
     throw new Error(`the deployment gave no bypass cookie (${res.status})`);
   }
-  cached.set(origin.origin, cookies);
+  cached.set(cacheKey, cookies);
   return cookies;
 }
 
