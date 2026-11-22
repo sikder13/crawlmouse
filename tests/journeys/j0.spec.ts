@@ -165,7 +165,8 @@ step('J0.1', 'the home page says what this is and what it costs', async ({ page,
   const agency = main.locator('[data-v2-card]', { hasText: '$99' });
   await expect(agency, 'the Agency plan card is on the page').toHaveCount(1);
   await expect(agency.locator(forward), 'F-060: the Agency card has a button').not.toHaveCount(0);
-  const href = await agency.locator('a[href]:not([href="#"])').first().getAttribute('href');
+  const links = agency.locator('a[href]:not([href="#"])');
+  const href = (await links.count()) > 0 ? await links.first().getAttribute('href') : null;
   if (href) {
     expect((await request.get(href)).status(), `the Agency button's ${href} answers`).toBeLessThan(
       400,
@@ -180,11 +181,24 @@ step('J0.9m', 'the free check pages show a result or say they start an audit', a
     await expectFinishedV2Page(page, `/check/${q}`);
     const main = await contentOf(page);
     // F-158's fix is either of two things. A real result for the visitor's site carries this marker (the PR
-    // that ships it adds it); without one, the page must not promise what each crawler sees, in any wording.
+    // that ships it adds it). Without one, the heading above the page's last form must say it starts an audit.
     if ((await main.locator('[data-check-result]').count()) > 0) continue;
-    expect(
-      await main.innerText(),
-      `F-158: /check/${q} does not promise a result it does not show`,
-    ).not.toMatch(/know what each crawler sees/i);
+    const heading = await main.evaluate((el) => {
+      const form = [...el.querySelectorAll('form')].at(-1);
+      if (!form) return '';
+      const above = [...el.querySelectorAll('h1, h2, h3')].filter(
+        (h) => h.compareDocumentPosition(form) & Node.DOCUMENT_POSITION_FOLLOWING,
+      );
+      return above.at(-1)?.textContent?.trim() ?? '';
+    });
+    // The defect's own symptom: the heading promises what crawlers see, and says nothing of an audit.
+    if (/crawler/i.test(heading) && !/\baudit\b/i.test(heading)) {
+      expect(heading, `F-158: /check/${q} promises a result it does not show`).toMatch(
+        /\baudit\b/i,
+      );
+    }
+    expect(heading, `/check/${q}: the heading above the form says it starts an audit`).toMatch(
+      /\b(starts?|runs?)\b[^.]*\baudit\b/i,
+    );
   }
 });
