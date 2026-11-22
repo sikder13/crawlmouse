@@ -1,7 +1,7 @@
 'use client';
 
-import * as Sentry from '@sentry/nextjs';
 import { useEffect } from 'react';
+import { reportToSentry } from '@/lib/sentry-lazy';
 
 // Last-resort boundary: renders only when the ROOT layout/template itself throws on the client,
 // so it must ship its own <html>/<body> (the normal layout is gone). It reports the error to
@@ -15,7 +15,7 @@ export default function GlobalError({
   reset: () => void;
 }) {
   useEffect(() => {
-    Sentry.captureException(error);
+    reportToSentry(error);
   }, [error]);
 
   return (

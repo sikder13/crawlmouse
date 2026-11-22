@@ -1,8 +1,8 @@
 import posthog from 'posthog-js';
-import * as Sentry from '@sentry/nextjs';
 import { beforeSendSampler } from '@/lib/analytics';
 import { sentryBrowserOptions } from '@/lib/auth/sentry-scrub';
 import { rememberFirstTouch } from '@/lib/analytics/first-touch';
+import { configureSentry, routerTransitionStart, startSentryWhenIdle } from '@/lib/sentry-lazy';
 import {
   analyticsMayStart,
   clearAnalyticsStorage,
@@ -12,9 +12,10 @@ import {
   surveysOffAtStart,
 } from '@/lib/consent';
 
-// Sentry (client) — moved here from sentry.client.config.ts per @sentry/nextjs v8+ guidance.
-// With no DSN set (local/build), Sentry.init is a safe no-op.
-Sentry.init({
+// Sentry (client) — configured here, fetched when the browser is idle or on the first error, so it
+// is not part of a page's first load (F-045, lib/sentry-lazy.ts). With no DSN set (local/build)
+// nothing is fetched.
+configureSentry({
   dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
   tracesSampleRate: 0.1,
   replaysSessionSampleRate: 0,
@@ -23,7 +24,8 @@ Sentry.init({
   // transaction before it is sent (lib/auth/sentry-scrub.ts).
   ...sentryBrowserOptions(),
 });
-export const onRouterTransitionStart = Sentry.captureRouterTransitionStart;
+if (typeof window !== 'undefined') startSentryWhenIdle(window);
+export const onRouterTransitionStart = routerTransitionStart;
 
 // PostHog — through the same-origin /ingest proxy (ad-blocker resilient); session replay OFF until
 // an error occurs (privacy-masked). Sampling drops noisy autocapture (cost control #6). Not started
