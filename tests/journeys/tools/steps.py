@@ -45,7 +45,7 @@ PARENTS = ['J0.5','J0.8','J0.9','J1.12','J2.4','J4']
 # Ids a step's test cannot observe (a judgement: positioning, legal wording, a published address). They stay in
 # STEPS.md, marked "(judged)", and out of expected-fail.json, so fixing an observable id never forces their deletion.
 JUDGED = {
- 'J0.9d':['F-072'], 'J0.9e':['F-072'], 'J0.9j':['F-153','F-154'], 'J0.9k':['F-033'],
+ 'J0.1':['F-061','F-062'], 'J0.9d':['F-072'], 'J0.9e':['F-072'], 'J0.9j':['F-153','F-154'], 'J0.9k':['F-033'],
 }
 
 def steps_of(fid, col):
