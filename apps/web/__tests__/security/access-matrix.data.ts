@@ -651,9 +651,11 @@ const ROUTES: readonly Spec[] = [
   {
     path: 'api/checks',
     v2: true,
-    identity: 'anyone (Turnstile, per-IP, per-domain and global limits)',
+    identity:
+      'anyone (Turnstile, per-IP, per-domain and global limits); a signed-in seat, in the account its switcher names',
     gate: 'public',
-    detail: 'Starts a check of a public site; returns only the new check’s id.',
+    detail:
+      'Starts a check of a public site; returns only the new check’s id. For a person acting in an account it adds the site through `add_site` (after `seat_may(add_site)` and an unscoped seat) or re-checks a site the seat covers, with the service role, from our own pages only. The cross-account refusals are proved in `apps/web/app/api/checks/route.account.test.ts` (“somebody else’s data (J4)” and “a person with two accounts”).',
     proof: by(
       'app/api/checks/route.test.ts',
       '200 {checkId}, not to be stored, with one site, one check and one event',
@@ -1791,6 +1793,19 @@ const LIBS: readonly Spec[] = [
     calls: 1,
   },
   {
+    path: 'apps/web/app/api/checks/_lib/start-account-deps.ts',
+    v2: true,
+    identity: 'its caller',
+    gate: 'caller',
+    detail:
+      'The signed-in start’s dependencies: `add_site` and `request_capped_check` with the service role, for the account the viewer acts in; every read is the caller’s own session.',
+    callers: ['apps/web/app/api/checks/route.ts'],
+    publicCallers:
+      'its one caller, POST /api/checks, calls it only for a viewer acting in an account, after the session read; the account is the viewer’s own',
+    proof: callerProof,
+    calls: 1,
+  },
+  {
     path: 'apps/web/app/api/checks/_lib/start-deps.ts',
     v2: true,
     identity: 'its caller',
@@ -2034,6 +2049,7 @@ const LIBS: readonly Spec[] = [
       'apps/web/app/api/billing/pro-trial/start/route.ts',
       'apps/web/app/api/billing/seats/route.ts',
       'apps/web/app/api/checks/[id]/_lib/deps.ts',
+      'apps/web/app/api/checks/_lib/start-account-deps.ts',
       'apps/web/app/api/checks/_lib/start-deps.ts',
       'apps/web/app/api/contact/agency-plus/route.ts',
       'apps/web/app/api/developers/route.ts',
