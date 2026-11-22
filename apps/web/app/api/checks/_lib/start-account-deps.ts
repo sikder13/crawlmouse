@@ -9,7 +9,11 @@ import { admitSiteHost } from '../../../../lib/auth/admit-site';
 import { scheduleFor } from '../../../../lib/auth/schedule';
 import { supabaseAdmin } from '../../../../lib/supabase/admin';
 import { verifyTurnstileToken } from '../../../../lib/turnstile';
-import { supabaseAddSite, supabaseRequestRecheck } from '../../../../lib/v2/account/sites-store';
+import {
+  supabaseAddSite,
+  supabaseRequestRecheck,
+  supabaseResendQueued,
+} from '../../../../lib/v2/account/sites-store';
 import type { AccountStartDeps } from './start-account';
 import { sessionAccountStartStore } from './start-account-store';
 import { startLimits } from './start-limits';
@@ -24,6 +28,7 @@ export function accountStartDeps(session: SupabaseClient): AccountStartDeps {
     schedule: scheduleFor,
     addSite: supabaseAddSite(admin),
     recheck: supabaseRequestRecheck(admin),
+    resendQueued: supabaseResendQueued(),
     now: () => new Date(),
   };
 }

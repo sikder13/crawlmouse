@@ -24,6 +24,9 @@ const h = vi.hoisted(() => ({
   /** The switcher cookie's value on this request, or null for none. */
   chosen: null as string | null,
   sent: [] as unknown[],
+  /** How many of the next sends fail, as an Inngest outage does. */
+  failSends: 0,
+  replayAllowed: true,
   captured: [] as unknown[][],
   publicCaptured: [] as unknown[][],
   /** What the address bucket was asked: `[ip, signedIn]`. */
@@ -62,7 +65,15 @@ vi.mock('@/lib/supabase/admin', () => ({
   },
 }));
 vi.mock('../../../../../inngest/client', () => ({
-  inngest: { send: async (e: unknown) => void h.sent.push(e) },
+  inngest: {
+    send: async (e: unknown) => {
+      if (h.failSends > 0) {
+        h.failSends -= 1;
+        throw new Error('inngest is down');
+      }
+      h.sent.push(e);
+    },
+  },
 }));
 vi.mock('@/lib/inngest', () => ({ inngest: { send: async (e: unknown) => void h.sent.push(e) } }));
 vi.mock('@/lib/auth/admit-site', () => ({
@@ -76,7 +87,7 @@ vi.mock('./_lib/start-limits', () => ({
       return { allowed: h.ipAllowed, resetAt: new Date(Date.UTC(2026, 10, 23)) };
     },
     domain: async () => true,
-    replay: async () => true,
+    replay: async () => h.replayAllowed,
   },
 }));
 vi.mock('@/lib/turnstile', () => ({
@@ -119,6 +130,8 @@ beforeEach(() => {
   h.user = null;
   h.chosen = null;
   h.sent.length = 0;
+  h.failSends = 0;
+  h.replayAllowed = true;
   h.captured.length = 0;
   h.publicCaptured.length = 0;
   h.ipAsked.length = 0;
@@ -354,7 +367,8 @@ describe('POST /api/checks, a person acting in an account (F-001)', () => {
     expect(first.status).toBe(200);
     expect(second).toEqual({ status: 200, body: first.body });
     expect(await sitesOf(p.accountId)).toHaveLength(1);
-    expect(h.sent).toHaveLength(1);
+    // The second answer sends the same event id again, which Inngest drops: one run.
+    expect(new Set(h.sent.map((e) => (e as { id: string }).id)).size).toBe(1);
   });
 
   it('a person acting in their agency (the switcher) adds the site to the agency', async () => {
@@ -490,7 +504,7 @@ describe('POST /api/checks, the review’s cases (RC-02 gate)', () => {
     expect([ra.status, rb.status]).toEqual([200, 200]);
     expect(rb.body).toEqual(ra.body);
     expect(await sitesOf(p.accountId)).toHaveLength(1);
-    expect(h.sent).toHaveLength(1);
+    expect(new Set(h.sent.map((e) => (e as { id: string }).id)).size).toBe(1);
   });
 
   it('signed in with no account (a removed seat): the public start, a site no account keeps', async () => {
@@ -683,5 +697,134 @@ describe('POST /api/checks, the test review’s cases (RC-02 gate)', () => {
     expect(logged).not.toContain(requestId);
     expect(await sitesOf(p.accountId)).toEqual([]);
     expect(h.sent).toEqual([]);
+  });
+});
+
+describe('POST /api/checks, a retry after the event could not be sent (QA, inbox 008)', () => {
+  const quiet = () => vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  const checksOf = async (accountId: string) =>
+    (
+      await h.db.query<{ id: string; status: string }>(
+        `select c.id, c.status from public.checks c join public.sites s on s.id = c.site_id
+          where s.account_id = $1`,
+        [accountId],
+      )
+    ).rows;
+  const eventIds = () => h.sent.map((e) => (e as { id: string }).id);
+
+  it('a first audit whose send failed runs on the retry: one check, one event id', async () => {
+    const log = quiet();
+    const p = await person(h.db, 'resend-first');
+    as(p);
+    h.failSends = 1;
+    expect((await POST(home('resend.example'))).status).toBe(500);
+    const [stuck] = await checksOf(p.accountId);
+    expect(stuck).toMatchObject({ status: 'queued' });
+    expect(h.sent).toEqual([]);
+
+    const retry = await read(await POST(home('resend.example')));
+    expect(retry).toEqual({ status: 200, body: { checkId: stuck!.id } });
+    const [site] = await sitesOf(p.accountId);
+    expect(eventIds()).toEqual([`check:${site!.id}:first_audit:${stuck!.id}`]);
+    expect(h.sent[0]).toMatchObject({
+      name: 'check.requested',
+      data: {
+        checkId: stuck!.id,
+        siteId: site!.id,
+        accountId: p.accountId,
+        host: 'resend.example',
+        homepageUrl: 'https://resend.example',
+        trigger: 'first_audit',
+        requestedByUserId: p.id,
+      },
+    });
+
+    await POST(home('resend.example'));
+    expect(new Set(eventIds()).size).toBe(1);
+    expect(await checksOf(p.accountId)).toHaveLength(1);
+    log.mockRestore();
+  });
+
+  it('a re-check whose send failed runs on the retry, under its own event id', async () => {
+    const log = quiet();
+    const p = await person(h.db, 'resend-again');
+    const kept = await keptSite(h.db, p.accountId);
+    await addCheck(kept.id, 'failed');
+    as(p);
+    h.failSends = 1;
+    expect((await POST(home(kept.host))).status).toBe(500);
+    const stuck = (await checksOf(p.accountId)).find((c) => c.status === 'queued')!;
+    const retry = await read(await POST(home(kept.host)));
+    expect(retry).toEqual({ status: 200, body: { checkId: stuck.id } });
+    expect(eventIds()).toHaveLength(1);
+    expect(eventIds()[0]).toMatch(new RegExp(`^check:${kept.id}:manual:\\d+$`));
+    expect((await checksOf(p.accountId)).filter((c) => c.status === 'queued')).toHaveLength(1);
+    log.mockRestore();
+  });
+
+  it('a retry whose own send fails is a 500 again, and the next one still recovers', async () => {
+    const log = quiet();
+    const p = await person(h.db, 'resend-twice');
+    as(p);
+    h.failSends = 2;
+    expect((await POST(home('twice-down.example'))).status).toBe(500);
+    expect((await POST(home('twice-down.example'))).status).toBe(500);
+    expect((await POST(home('twice-down.example'))).status).toBe(200);
+    expect(h.sent).toHaveLength(1);
+    expect(await checksOf(p.accountId)).toHaveLength(1);
+    log.mockRestore();
+  });
+
+  it('repeats over the address’s replay limit are refused, and send nothing', async () => {
+    const p = await person(h.db, 'resend-limit');
+    as(p);
+    const first = await read(await POST(home('limit.example')));
+    expect(first.status).toBe(200);
+    h.sent.length = 0;
+    h.replayAllowed = false;
+    expect(await read(await POST(home('limit.example')))).toEqual({
+      status: 429,
+      body: { code: 'rate_limited', error: 'Too many repeats of this request. Try again later.' },
+    });
+    expect(h.sent).toEqual([]);
+  });
+
+  it('a running check is answered as it is and nothing is sent or counted', async () => {
+    const p = await person(h.db, 'resend-running');
+    const kept = await keptSite(h.db, p.accountId);
+    const running = await addCheck(kept.id, 'running');
+    as(p);
+    h.replayAllowed = false;
+    expect(await read(await POST(home(kept.host)))).toEqual({
+      status: 200,
+      body: { checkId: running },
+    });
+    expect(h.sent).toEqual([]);
+  });
+
+  it('a queued check whose event id cannot be proved is answered, and nothing is sent', async () => {
+    const p = await person(h.db, 'resend-unproved');
+    const kept = await keptSite(h.db, p.accountId);
+    const queued = await addCheck(kept.id, 'queued');
+    as(p);
+    expect(await read(await POST(home(kept.host)))).toEqual({
+      status: 200,
+      body: { checkId: queued },
+    });
+    expect(h.sent).toEqual([]);
+  });
+
+  it('B’s retry never re-sends A’s queued check of the same host', async () => {
+    const a = await person(h.db, 'resend-a');
+    as(a);
+    const mine = await read(await POST(home('shared-host.example')));
+    h.sent.length = 0;
+    const b = await person(h.db, 'resend-b');
+    as(b);
+    const theirs = await read(await POST(home('shared-host.example')));
+    expect(theirs.body.checkId).not.toBe(mine.body.checkId);
+    expect(h.sent.map((e) => (e as { data: { accountId: string } }).data.accountId)).toEqual([
+      b.accountId,
+    ]);
   });
 });

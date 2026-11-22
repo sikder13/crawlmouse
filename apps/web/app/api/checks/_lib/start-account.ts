@@ -5,8 +5,10 @@
  * 1. The host, by the public start's rule (`publicHost`), then the SSRF guard on it. A refusal is
  *    the public start's `invalid_url`.
  * 2. A live site of the account with that host that the caller's seat covers. A paused one is
- *    refused; while its latest check is queued or running, that check is the answer and nothing is
- *    requested. Otherwise it is checked again as the site page's "Run check now" checks it
+ *    refused. While its latest check is running, that check is the answer. While it is queued, it is
+ *    the answer too, and its event is sent again under its own id, since a send that failed leaves
+ *    a queued check nothing runs; Inngest drops the repeat when the first arrived, and repeats count
+ *    in the replay bucket as on the public start. Otherwise it is checked again as the site page's "Run check now" checks it
  *    (`request_capped_check`, under the account's `manualChecksPerSiteDay` and the day's ceiling).
  * 3. No such site: the seat must be one that may add a site, and the account must be under its site
  *    limit. Then the site is added with its first audit by `add_site`, the statement `/api/sites`
@@ -29,7 +31,7 @@ import type { Check } from '@crawlmouse/types/v2';
 import type { SiteSchedule } from '../../../../lib/auth/schedule';
 import type { Tier } from '../../../../lib/entitlement-v2';
 import type { AccountViewer } from '../../../../lib/v2/account/viewer-read';
-import type { AddSiteOutcome, NewSite } from '../../../../lib/v2/account/sites-store';
+import type { AddSiteOutcome, NewSite, ResendQueued } from '../../../../lib/v2/account/sites-store';
 import type { RequestRecheck } from '../../../../lib/v2/account/recheck';
 import { PLAN_NAMES } from '../../../../lib/v2/view/account';
 import { UNAVAILABLE_CODES } from '../../../../lib/v2/unavailable';
@@ -48,7 +50,12 @@ export interface CoveredSite {
   id: string;
   pausedReason: string | null;
   /** The site's most recently queued check, or null for none. */
-  latest: { id: string; status: Check['status'] } | null;
+  latest: {
+    id: string;
+    status: Check['status'];
+    trigger: Check['trigger'];
+    queued_at: string;
+  } | null;
 }
 
 export interface AccountStartDeps extends Pick<StartDeps, 'admit' | 'limits' | 'verifyTurnstile'> {
@@ -61,6 +68,8 @@ export interface AccountStartDeps extends Pick<StartDeps, 'admit' | 'limits' | '
   schedule(tier: Tier, first: boolean, now: Date, timezone: string): SiteSchedule | null;
   addSite(site: NewSite): Promise<AddSiteOutcome>;
   recheck: RequestRecheck;
+  /** Sends a queued check's event again under its own id; false when that id cannot be proved. */
+  resendQueued(queued: ResendQueued): Promise<boolean>;
   now(): Date;
 }
 
@@ -152,8 +161,8 @@ export async function startAccountCheck(
   const gate = () => addressGate(deps, input, async () => true);
   const site = await deps.coveredSite(viewer.account.id, host);
   return site === null
-    ? addSite(deps, viewer, host, gate)
-    : checkAgain(deps, viewer, host, site, gate);
+    ? addSite(deps, viewer, host, gate, input.ip)
+    : checkAgain(deps, viewer, host, site, gate, input.ip);
 }
 
 type Gate = () => Promise<StartRefusal | null>;
@@ -163,6 +172,7 @@ async function addSite(
   viewer: AccountViewer,
   host: string,
   gate: Gate,
+  ip: string,
 ): Promise<AccountStartOutcome> {
   const { account, seat } = viewer;
   if (!(await deps.mayAdd(account.id, seat.id))) return said(403, 'role_refused');
@@ -193,7 +203,9 @@ async function addSite(
       // Added a moment ago by another submit: its check is the answer. A site this seat does not
       // cover reads as none, and is refused without naming it.
       const now = await deps.coveredSite(account.id, host);
-      return now === null ? said(409, 'site_exists') : checkAgain(deps, viewer, host, now, NO_GATE);
+      return now === null
+        ? said(409, 'site_exists')
+        : checkAgain(deps, viewer, host, now, NO_GATE, ip);
     }
     case 'full':
       return limitReached(viewer, await deps.liveSites(account.id));
@@ -223,13 +235,27 @@ async function checkAgain(
   host: string,
   site: CoveredSite,
   gate: Gate,
+  ip: string,
 ): Promise<AccountStartOutcome> {
   if (site.pausedReason !== null) return said(409, 'site_paused');
-  if (
-    site.latest !== null &&
-    (site.latest.status === 'queued' || site.latest.status === 'running')
-  ) {
-    return { ok: true, checkId: site.latest.id, created: false, started: null };
+  const latest = site.latest;
+  if (latest?.status === 'running') {
+    return { ok: true, checkId: latest.id, created: false, started: null };
+  }
+  if (latest?.status === 'queued') {
+    // Its event may never have gone (a send that failed): this repeat is what recovers it. The same
+    // event id, so Inngest runs it once, and counted as the public start counts a repeat.
+    if (ip !== 'unknown' && !(await deps.limits.replay(ip))) {
+      return refuse(429, 'rate_limited', 'Too many repeats of this request. Try again later.');
+    }
+    await deps.resendQueued({
+      siteId: site.id,
+      accountId: viewer.account.id,
+      host,
+      check: latest,
+      requestedByUserId: viewer.userId,
+    });
+    return { ok: true, checkId: latest.id, created: false, started: null };
   }
   const address = await gate();
   if (address !== null) return address;
@@ -259,6 +285,6 @@ async function checkAgain(
       return said(409, 'site_paused');
     case 'removed':
       // Removed between the read above and the request: the account no longer keeps the host.
-      return addSite(deps, viewer, host, NO_GATE);
+      return addSite(deps, viewer, host, NO_GATE, ip);
   }
 }

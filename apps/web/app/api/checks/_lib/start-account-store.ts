@@ -5,7 +5,6 @@
  * `request_capped_check`, through lib/v2/account/sites-store.ts.
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { Check } from '@crawlmouse/types/v2';
 import type { CoveredSite } from './start-account';
 
 export interface AccountStartStore {
@@ -31,7 +30,7 @@ export function sessionAccountStartStore(session: SupabaseClient): AccountStartS
       if (row === null) return null;
       const latest = await session
         .from('checks')
-        .select('id, status')
+        .select('id, status, trigger, queued_at')
         .eq('site_id', row.id)
         .order('queued_at', { ascending: false })
         .limit(1)
@@ -40,7 +39,7 @@ export function sessionAccountStartStore(session: SupabaseClient): AccountStartS
       return {
         id: row.id,
         pausedReason: row.paused_reason,
-        latest: latest.data as { id: string; status: Check['status'] } | null,
+        latest: latest.data as CoveredSite['latest'],
       };
     },
 

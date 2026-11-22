@@ -78,6 +78,10 @@ function deps(
       calls.push(`recheck ${req.siteId} cap=${req.cap}`);
       return rechecks.shift() ?? { queued: true, checkId: 'c-again', created: true };
     },
+    resendQueued: async () => {
+      calls.push('resendQueued');
+      return true;
+    },
     now: () => new Date(Date.UTC(2026, 10, 22)),
   };
   return { d, calls, added };
@@ -86,7 +90,12 @@ function deps(
 const site = (over: Partial<CoveredSite> = {}): CoveredSite => ({
   id: 's-1',
   pausedReason: null,
-  latest: { id: 'c-old', status: 'finished' },
+  latest: {
+    id: 'c-old',
+    status: 'finished',
+    trigger: 'manual',
+    queued_at: '2026-11-20T10:00:00.000Z',
+  },
   ...over,
 });
 
