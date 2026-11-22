@@ -10,7 +10,7 @@ import { instant, type Change, type FixtureDataset, type Verdict } from '@crawlm
 import { TRIAL_REMINDER_DAYS_BEFORE_END } from '../../auth/constants';
 import { AGENCY_MONTHLY, AGENCY_YEARLY, PRO_MONTHLY, PRO_YEARLY } from '../../billing/prices';
 import { GATES } from '../../entitlement-v2';
-import { CANCEL_CLICKS, EVIDENCE_CONDENSED_AFTER_DAYS, SETTINGS_COPY } from '../copy/settings';
+import { CANCEL_CLICKS, SETTINGS_COPY } from '../copy/settings';
 import { ACCOUNT_COPY } from '../copy/account';
 import { TRIAL_END_COPY as COPY } from '../copy/trial-end';
 import { fixesAsOf } from '../fixtures';
@@ -345,7 +345,7 @@ export function trialEndView(
                     dayDate(end, zone),
                     a.billing_period_months === 12 ? 'year' : 'month',
                   ),
-          COPY.terms(CANCEL_CLICKS, EVIDENCE_CONDENSED_AFTER_DAYS),
+          COPY.terms(CANCEL_CLICKS),
         ].join(' '),
     endTitle: nothingToChoose
       ? COPY.whenItEndsTitle
@@ -484,7 +484,7 @@ function staysAndPauses(v: AccountView, plan: string) {
     emails && v.d.alert_rules.some((r) => r.enabled && r.channels.includes('email'));
   const stays: TrialRowView[] = [
     { what: site.host, how: COPY.stays.site(free, alertsByEmail) },
-    { what: COPY.stays.evidence, how: COPY.stays.kept(EVIDENCE_CONDENSED_AFTER_DAYS) },
+    { what: COPY.stays.evidence, how: COPY.stays.kept },
     ...(freeThree.length
       ? [
           {

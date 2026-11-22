@@ -18,12 +18,7 @@ import { AT_ONCE } from '../../billing/cancel';
 import { AGENCY_MONTHLY, AGENCY_YEARLY, PRO_MONTHLY, PRO_YEARLY } from '../../billing/prices';
 import { GATES, PAST_DUE_GRACE_DAYS } from '../../entitlement-v2';
 import { TRIAL_DAYS } from '../copy/account';
-import {
-  CANCEL_CLICKS,
-  DELETE_GRACE_DAYS,
-  EVIDENCE_CONDENSED_AFTER_DAYS,
-  SETTINGS_COPY as COPY,
-} from '../copy/settings';
+import { CANCEL_CLICKS, DELETE_GRACE_DAYS, SETTINGS_COPY as COPY } from '../copy/settings';
 import { calendarDays, dayDate, daysBefore } from '../format';
 import {
   PLAN_NAMES,
@@ -582,32 +577,25 @@ export function settingsView(
         cardTrial && ending !== null
           ? { label: COPY.cancel, text: COPY.trialCancelled(date(ending)), action: null }
           : cardTrial
-            ? cancelRow(
-                COPY.cancelCardTrial(
-                  date(a.trial_ends_at!),
-                  CANCEL_CLICKS,
-                  EVIDENCE_CONDENSED_AFTER_DAYS,
-                ),
-              )
+            ? cancelRow(COPY.cancelCardTrial(date(a.trial_ends_at!), CANCEL_CLICKS))
             : trial
               ? {
                   label: COPY.cancel,
-                  text: COPY.cancelTrial(CANCEL_CLICKS, EVIDENCE_CONDENSED_AFTER_DAYS),
+                  text: COPY.cancelTrial(CANCEL_CLICKS),
                   action: null,
                 }
               : ending !== null
                 ? {
                     label: COPY.cancel,
-                    text: COPY.cancelled(date(ending), EVIDENCE_CONDENSED_AFTER_DAYS),
+                    text: COPY.cancelled(date(ending)),
                     action: null,
                   }
                 : paid
                   ? cancelRow(
                       atOnce
-                        ? COPY.cancelAtOnce(CANCEL_CLICKS, EVIDENCE_CONDENSED_AFTER_DAYS)
+                        ? COPY.cancelAtOnce(CANCEL_CLICKS)
                         : COPY.cancelPaid(
                             CANCEL_CLICKS,
-                            EVIDENCE_CONDENSED_AFTER_DAYS,
                             a.billing_period_months === 12 ? 'year' : 'month',
                           ),
                     )

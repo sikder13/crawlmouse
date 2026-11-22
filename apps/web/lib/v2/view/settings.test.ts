@@ -87,7 +87,7 @@ describe('Settings, the plan', () => {
     expect(p.terms.map((t) => [t.label, t.text, t.action?.label ?? null])).toEqual([
       [
         'Cancel',
-        'Nothing to cancel on a trial; it ends by itself. On Pro or Agency, "Cancel, back to Free" sits here: two clicks, effective at the end of the paid month. Nothing you can see is deleted; evidence older than 90 days is condensed to headers and the parts of pages that changed.',
+        'Nothing to cancel on a trial; it ends by itself. On Pro or Agency, "Cancel, back to Free" sits here: two clicks, effective at the end of the paid month. Nothing you can see is deleted.',
         null,
       ],
       // No card, so no charge yet and no Stripe customer whose portal lists receipts.

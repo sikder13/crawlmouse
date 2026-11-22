@@ -56,10 +56,7 @@ describe('Trial ending, what stays and what pauses', () => {
     // The free three at the primary site's latest result (c…06), by rank: fix 1, fix 2, fix 0.
     expect(view().stays.map((r) => [r.what, r.how])).toEqual([
       ['example-outfitter.com', 'monthly checks, email if changed'],
-      [
-        'Every check, every audit, the evidence',
-        'kept; evidence older than 90 days is condensed to headers and the parts of pages that changed',
-      ],
+      ['Every check, every audit, the evidence', 'kept'],
       ['Fixes 0, 1 and 2, the free three', 'packets stay open'],
       ['Public audit link', 'keeps working'],
       ['Alerts on example-outfitter.com', 'still sent by email, after each monthly check'],
@@ -116,7 +113,7 @@ describe('Trial ending, the two choices', () => {
     const v = view();
     expect(v.keepTitle).toBe('If you keep Pro');
     expect(v.keepText).toBe(
-      '$19 a month, or $190 a year, charged when you choose it and then each month or year. Cancel any day from Settings, in two clicks; the account goes back to Free. Nothing you can see is deleted; evidence older than 90 days is condensed to headers and the parts of pages that changed. Stripe emails the receipts; they are also in Settings › Plan.',
+      '$19 a month, or $190 a year, charged when you choose it and then each month or year. Cancel any day from Settings, in two clicks; the account goes back to Free. Nothing you can see is deleted. Stripe emails the receipts; they are also in Settings › Plan.',
     );
     expect(v.endText).toBe(
       'Nothing to do. On Sat 7 Nov the account is Free: example-outfitter.com keeps its monthly check and its three fixes. The other three sites pause with their history kept, and so does the staging copy; add Pro any time to resume them.',

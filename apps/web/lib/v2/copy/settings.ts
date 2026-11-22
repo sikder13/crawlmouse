@@ -125,17 +125,17 @@ export const SETTINGS_COPY = {
     `The last payment failed on ${failed}. ${plan} stays until ${until}; update the card in the billing portal to keep it.`,
   compare: 'Compare',
   cancel: 'Cancel',
-  /** FACTS A6 (long form) and D5 (two clicks). */
-  cancelTrial: (clicks: number, days: number) =>
-    `Nothing to cancel on a trial; it ends by itself. On Pro or Agency, "Cancel, back to Free" sits here: ${numberWord(clicks)} clicks, effective at the end of the paid month. Nothing you can see is deleted; evidence older than ${days} days is condensed to headers and the parts of pages that changed.`,
+  /** FACTS D5 (two clicks). */
+  cancelTrial: (clicks: number) =>
+    `Nothing to cancel on a trial; it ends by itself. On Pro or Agency, "Cancel, back to Free" sits here: ${numberWord(clicks)} clicks, effective at the end of the paid month. Nothing you can see is deleted.`,
   /** A trial with a card becomes the plan at its end unless it is cancelled (ARCH-2 §3.1). */
-  cancelCardTrial: (date: string, clicks: number, days: number) =>
-    `The trial ends ${date} and the card is charged unless you cancel: ${numberWord(clicks)} clicks, effective when the trial ends. Nothing you can see is deleted; evidence older than ${days} days is condensed to headers and the parts of pages that changed.`,
-  cancelPaid: (clicks: number, days: number, period: 'month' | 'year') =>
-    `${capitalise(numberWord(clicks))} clicks, effective at the end of the paid ${period}. Nothing you can see is deleted; evidence older than ${days} days is condensed to headers and the parts of pages that changed.`,
+  cancelCardTrial: (date: string, clicks: number) =>
+    `The trial ends ${date} and the card is charged unless you cancel: ${numberWord(clicks)} clicks, effective when the trial ends. Nothing you can see is deleted.`,
+  cancelPaid: (clicks: number, period: 'month' | 'year') =>
+    `${capitalise(numberWord(clicks))} clicks, effective at the end of the paid ${period}. Nothing you can see is deleted.`,
   /** A plan whose payment failed is cancelled at once (lib/billing/cancel.ts, `AT_ONCE`). */
-  cancelAtOnce: (clicks: number, days: number) =>
-    `${capitalise(numberWord(clicks))} clicks, effective at once. Nothing you can see is deleted; evidence older than ${days} days is condensed to headers and the parts of pages that changed.`,
+  cancelAtOnce: (clicks: number) =>
+    `${capitalise(numberWord(clicks))} clicks, effective at once. Nothing you can see is deleted.`,
   cancelAction: 'Cancel, back to Free',
   /**
    * Cancel's second click (CC-39 D1): what ends and when, as lib/billing/cancel.ts ends it — a paid
@@ -159,8 +159,8 @@ export const SETTINGS_COPY = {
     `${plan} trial until ${date}, then Free. The card is not charged.`,
   trialCancelled: (date: string) =>
     `Cancelled; the trial ends ${date} and the card is not charged.`,
-  cancelled: (date: string, days: number) =>
-    `Cancelled; it takes effect ${date}. Nothing you can see is deleted; evidence older than ${days} days is condensed to headers and the parts of pages that changed.`,
+  cancelled: (date: string) =>
+    `Cancelled; it takes effect ${date}. Nothing you can see is deleted.`,
   cancelFree: 'Nothing to cancel on Free.',
   receipts: 'Receipts',
   /** FACTS A9. */
@@ -301,9 +301,9 @@ export const SETTINGS_CHANGES: CopyChange[] = [
     screen: 'settings',
     kind: 'facts',
     locked: 'one click, effective at the end of the paid month, nothing deleted.',
-    rendered:
-      'two clicks, effective at the end of the paid month. Nothing you can see is deleted; evidence older than 90 days is condensed to headers and the parts of pages that changed.',
-    source: 'FACTS A6 (long form) and D5 (two clicks)',
+    rendered: 'two clicks, effective at the end of the paid month. Nothing you can see is deleted.',
+    source:
+      'FACTS A6 and D5 (two clicks). The sentence about condensing evidence is out: no job does it (CTO ruling, 2026-11-22)',
   },
   {
     screen: 'settings',

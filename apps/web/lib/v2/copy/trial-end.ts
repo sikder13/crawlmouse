@@ -40,9 +40,7 @@ export const TRIAL_END_COPY = {
     site: (schedule: string, email: boolean) =>
       `${schedule} checks${email ? ', email if changed' : ''}`,
     evidence: 'Every check, every audit, the evidence',
-    /** FACTS A6, long form. */
-    kept: (condensed: number) =>
-      `kept; evidence older than ${condensed} days is condensed to headers and the parts of pages that changed`,
+    kept: 'kept',
     freeFixes: (numbers: readonly number[]) =>
       `${plural(numbers.length, 'Fix', 'Fixes')} ${listOf(numbers.map(String))}, the free ${numberWord(numbers.length)}`,
     packetsOpen: 'packets stay open',
@@ -100,9 +98,9 @@ export const TRIAL_END_COPY = {
   none: 'none',
   keepTitle: (plan: string) => `If you keep ${plan}`,
   doNothingTitle: 'If you do nothing',
-  /** FACTS A6 (long form), D5 (two clicks) and A9 (Stripe emails the receipts). */
-  terms: (clicks: number, condensed: number) =>
-    `Cancel any day from Settings, in ${numberWord(clicks)} clicks; the account goes back to Free. Nothing you can see is deleted; evidence older than ${condensed} days is condensed to headers and the parts of pages that changed. Stripe emails the receipts; they are also in Settings › Plan.`,
+  /** FACTS A6, D5 (two clicks) and A9 (Stripe emails the receipts). */
+  terms: (clicks: number) =>
+    `Cancel any day from Settings, in ${numberWord(clicks)} clicks; the account goes back to Free. Nothing you can see is deleted. Stripe emails the receipts; they are also in Settings › Plan.`,
   /** Keeping a no-card trial is a checkout, which charges when it is made (`/api/billing/checkout`). */
   keepNoCardText: (monthly: number, yearly: number) =>
     `$${monthly} a month, or $${yearly} a year, charged when you choose it and then each month or year.`,
@@ -217,14 +215,6 @@ export const TRIAL_END_CHANGES: CopyChange[] = [
   },
   {
     screen: 'trial-end',
-    kind: 'facts',
-    locked: 'the evidence kept',
-    rendered:
-      'the evidence kept; evidence older than 90 days is condensed to headers and the parts of pages that changed',
-    source: 'FACTS A6 (long form): what Free keeps is what you can see',
-  },
-  {
-    screen: 'trial-end',
     kind: 'fixture',
     locked: 'listed, packets closed',
     rendered: 'listed, 11 packets closed',
@@ -295,8 +285,9 @@ export const TRIAL_END_CHANGES: CopyChange[] = [
     locked:
       'Cancel any day from Settings; the account goes back to Free, nothing is deleted. Receipts are in Settings › Plan, not emailed.',
     rendered:
-      'Cancel any day from Settings, in two clicks; the account goes back to Free. Nothing you can see is deleted; evidence older than 90 days is condensed to headers and the parts of pages that changed. Stripe emails the receipts; they are also in Settings › Plan.',
-    source: 'FACTS A6 (long form), D5 (two clicks) and A9 (Stripe emails the receipts)',
+      'Cancel any day from Settings, in two clicks; the account goes back to Free. Nothing you can see is deleted. Stripe emails the receipts; they are also in Settings › Plan.',
+    source:
+      'FACTS A6, D5 (two clicks) and A9 (Stripe emails the receipts). The sentence about condensing evidence is out: no job does it (CTO ruling, 2026-11-22)',
   },
   {
     screen: 'trial-end',
