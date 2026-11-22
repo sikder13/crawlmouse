@@ -446,8 +446,10 @@ export function settingsView(
   // Each billing form names the account it was rendered for, so it is acted on in that account
   // whichever one the reader has switched to since.
   const billing = { fields: { accountId: v.account.id } };
-  const cancel = owner ? routeAction('cancelPlan', COPY.cancelAction, {}, billing) : null;
-  const portal = owner ? routeAction('billingPortal', COPY.portalAction, {}, billing) : null;
+  const cancel =
+    owner && billingOpen ? routeAction('cancelPlan', COPY.cancelAction, {}, billing) : null;
+  const portal =
+    owner && billingOpen ? routeAction('billingPortal', COPY.portalAction, {}, billing) : null;
   // A card on file or a subscription means a Stripe customer, which the portal opens for.
   const customer = onFile || (subscriptionStatus !== undefined && subscriptionStatus !== null);
   // A cancel ends at once where lib/billing/cancel.ts cancels at once (`AT_ONCE`: past due, unpaid,
@@ -458,15 +460,14 @@ export function settingsView(
   // After the first click the confirm step stands in the Cancel row's place, so the page carries
   // one cancel form at a time.
   const confirming = cancelStep === 'confirm' && cancel !== null && offersCancel;
-  const cancelRow = (text: string) => ({
-    label: COPY.cancel,
-    text,
-    action: confirming ? null : cancel,
-  });
+  const cancelRow = (text: string) =>
+    billingOpen
+      ? { label: COPY.cancel, text, action: confirming ? null : cancel }
+      : { label: COPY.cancel, text: COPY.cancelByEmail, action: null };
 
   return {
     // The plan card carries the plan's terms and its Keep, so the rail's trial card leaves them out.
-    shell: accountShellView(v, 'Settings', { plan: 'page', billingEnd, role }),
+    shell: accountShellView(v, 'Settings', { plan: 'page', billingEnd, role, billingOpen }),
     header: {
       title: COPY.title,
       line: [a.email, trial ? COPY.trialLeft(plan, days!) : plan].join(' · '),
@@ -535,7 +536,7 @@ export function settingsView(
           : trial
             ? `${COPY.ends(date(a.trial_ends_at!))} ${
                 !cardTrial
-                  ? COPY.noCardTerms(plan)
+                  ? COPY.noCardTerms(plan, billingOpen)
                   : withheld
                     ? ACCOUNT_COPY.cardManagedByOwner
                     : COPY.cardTerms(card)
@@ -566,7 +567,7 @@ export function settingsView(
           ? v.tier === 'agency'
             ? COPY.otherYearly(yearly)
             : COPY.other(yearly, AGENCY_MONTHLY, GATES.agency.sites, GATES.agency.seats)
-          : COPY.prices(plan, monthly, yearly),
+          : COPY.prices(v.tier === 'free' ? PLAN_NAMES.pro : plan, monthly, yearly),
         ...(!keepShown && v.tier !== 'agency'
           ? [COPY.agencyLine(AGENCY_MONTHLY, GATES.agency.sites, GATES.agency.seats)]
           : []),
@@ -581,7 +582,7 @@ export function settingsView(
             : trial
               ? {
                   label: COPY.cancel,
-                  text: COPY.cancelTrial(CANCEL_CLICKS),
+                  text: billingOpen ? COPY.cancelTrial(CANCEL_CLICKS) : COPY.cancelTrialClosed,
                   action: null,
                 }
               : ending !== null
@@ -601,7 +602,11 @@ export function settingsView(
                     )
                   : { label: COPY.cancel, text: COPY.cancelFree, action: null },
         customer
-          ? { label: COPY.receipts, text: COPY.receiptsText, action: portal }
+          ? {
+              label: COPY.receipts,
+              text: billingOpen ? COPY.receiptsText : COPY.receiptsClosed,
+              action: portal,
+            }
           : { label: COPY.receipts, text: COPY.noReceipts, action: null },
       ],
       confirm: confirming

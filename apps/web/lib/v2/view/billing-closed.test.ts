@@ -59,7 +59,7 @@ describe('the rail with paid plans closed', () => {
     const t = shell(false).trial!;
     expect(t.keep).toBeNull();
     expect(t.note).toBe(
-      "Then Free: example-outfitter.com keeps monthly checks; the other three sites pause. Nothing you can see is deleted. We'll email you three days before.",
+      'Then Free: example-outfitter.com keeps monthly checks; the other three sites pause. Nothing you can see is deleted.',
     );
   });
 

@@ -47,7 +47,7 @@ describe('noticeLine', () => {
     ['not_eligible', 'This account cannot start a trial: it is on a plan, or has had its trial.'],
     [
       'refused',
-      'A free trial has already been used from this device or network, so another cannot start here. Free keeps working. To ask about it, email support@crawlmouse.com.',
+      'A free trial has already been used with this email address, device or network, so another cannot start here. Free keeps working. To ask about it, email support@crawlmouse.com.',
     ],
     [
       'conflict',

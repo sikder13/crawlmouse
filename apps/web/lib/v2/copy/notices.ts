@@ -59,7 +59,7 @@ export const NOTICE_LINES: Record<NoticeCode, (at: string | null) => string> = {
   not_owner: () => 'Only the account’s owner can start the trial.',
   not_eligible: () => 'This account cannot start a trial: it is on a plan, or has had its trial.',
   refused: () =>
-    `A free trial has already been used from this device or network, so another cannot start here. Free keeps working. To ask about it, email ${SUPPORT_EMAIL}.`,
+    `A free trial has already been used with this email address, device or network, so another cannot start here. Free keeps working. To ask about it, email ${SUPPORT_EMAIL}.`,
   conflict: () =>
     'The account changed while the trial was starting. Reload the page and try again.',
   trial_failed: () => 'The trial did not start. Nothing was changed; try again later.',

@@ -2,6 +2,7 @@
  * Settings' written sentences (Final-Settings): every number a parameter or a named constant. The
  * lock corrections for the artboard follow.
  */
+import { SUPPORT_EMAIL } from './support';
 import { SIGNIN_SENDER, SIGNIN_SENDER_LOCKED } from '../../auth/constants';
 import type { Addition, CopyChange } from '../copy-registry';
 import { listOf } from '../format';
@@ -93,8 +94,10 @@ export const SETTINGS_COPY = {
   trialName: (plan: string) => `${plan}, trial`,
   daysLeft: (n: number) => `${count(n)} ${plural(n, 'day', 'days')} left`,
   ends: (date: string) => `Ends ${date}.`,
-  noCardTerms: (plan: string) =>
-    `No card on file; nothing is charged unless you add one and choose ${plan}.`,
+  noCardTerms: (plan: string, plansOpen = true) =>
+    plansOpen
+      ? `No card on file; nothing is charged unless you add one and choose ${plan}.`
+      : 'No card on file; nothing is charged.',
   /** A card taken at Checkout whose last four digits were not recorded is named without them. */
   cardTerms: (last4: string | null) =>
     `The card ${last4 === null ? 'on file' : `ending ${last4}`} is charged then unless you cancel.`,
@@ -126,6 +129,10 @@ export const SETTINGS_COPY = {
   compare: 'Compare',
   cancel: 'Cancel',
   /** FACTS D5 (two clicks). */
+  cancelTrialClosed:
+    'Nothing to cancel on a trial; it ends by itself. Nothing you can see is deleted.',
+  /** While paid plans are closed the cancel route answers 404, so the way to cancel is a person. */
+  cancelByEmail: `To cancel, email ${SUPPORT_EMAIL}.`,
   cancelTrial: (clicks: number) =>
     `Nothing to cancel on a trial; it ends by itself. On Pro or Agency, "Cancel, back to Free" sits here: ${numberWord(clicks)} clicks, effective at the end of the paid month. Nothing you can see is deleted.`,
   /** A trial with a card becomes the plan at its end unless it is cancelled (ARCH-2 §3.1). */
@@ -167,6 +174,7 @@ export const SETTINGS_COPY = {
   receiptsText: 'Emailed by Stripe after each charge, and listed in the billing portal from here',
   /** Before any charge there is no Stripe customer, so no portal to list them in. */
   noReceipts: 'Emailed by Stripe after each charge; there has been no charge yet.',
+  receiptsClosed: 'Emailed by Stripe after each charge.',
   portalAction: 'Billing portal',
   free: 'Free',
   tables: { email: 'Email kinds', danger: 'Delete', usage: 'Usage', terms: 'Cancel' },

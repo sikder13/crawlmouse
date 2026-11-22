@@ -23,6 +23,7 @@ export const TRIAL_END_COPY = {
    */
   reminderDue: (date: string) => `The reminder is due once, on ${date}.`,
   noCard: 'No card is on file, so nothing is charged either way.',
+  noCardClosed: 'No card is on file, so nothing is charged.',
   /** A trial with a card on file becomes the plan at its end unless it is cancelled (ARCH-2 §3.1). */
   card: (last4: string | null, date: string) =>
     `The card ${last4 === null ? 'on file' : `ending ${last4}`} is charged on ${date} unless you cancel.`,
@@ -151,6 +152,8 @@ export const TRIAL_END_COPY = {
     subPlansClosed: 'Nothing you can see was deleted. Paid plans open shortly.',
     choose: (plan: string, price: number) => `Choose ${plan}, $${price} a month`,
     pausesTitle: (plan: string) => `Paused, until ${plan}`,
+    /** After the end an oldest site may be one the move paused, so who paused it is not said. */
+    sitePaused: 'paused',
   },
   tables: { stays: 'Stays', pauses: 'Pauses', did: 'Trial summary' },
   columns: { what: 'What', how: 'How', item: 'Item', value: 'Count', detail: 'Detail' },

@@ -36,8 +36,12 @@ export const DASHBOARD_COPY = {
     n === 0
       ? 'Everything is set up'
       : `${capitalise(numberWord(n))} ${plural(n, 'thing', 'things')} left to set up`,
-  setupTrialFoot: (n: number) =>
-    `All ${numberWord(n)} stop when the ${TRIAL_DAYS} days end unless you keep Pro. The site, its audits and its monthly check do not.`,
+  setupTrialFoot: (n: number, plansOpen = true, sitePaused = false) =>
+    `All ${numberWord(n)} stop when the ${TRIAL_DAYS} days end${plansOpen ? ' unless you keep Pro' : ''}. ${
+      sitePaused
+        ? 'The site and its audits do not.'
+        : 'The site, its audits and its monthly check do not.'
+    }`,
   /** The kinds of email the account gets, each a clause, read from its preferences. */
   emailKinds: (changeNotes: boolean, reminder: string | null) =>
     [
@@ -46,12 +50,12 @@ export const DASHBOARD_COPY = {
       reminder ? `one reminder on ${reminder}, three days before the trial ends` : null,
     ].filter((k): k is string => k !== null),
   /** "a, b, and c", as the locked page lists them; "a and b" for two. */
-  threeKinds: (kinds: readonly string[]) =>
+  threeKinds: (kinds: readonly string[], plansOpen = true) =>
     `${
       kinds.length > 2
         ? `${kinds.slice(0, -1).join(', ')}, and ${kinds.at(-1)}`
         : kinds.join(' and ')
-    }. If you keep Pro, Stripe sends the receipts.`,
+    }.${plansOpen ? ' If you keep Pro, Stripe sends the receipts.' : ''}`,
   threeKindsLead: (n: number) =>
     `You will hear from us ${numberWord(n)} ${plural(n, 'way', 'ways')} and no others:`,
   startProTitle: (days: number) => `Start ${days} days of Pro`,

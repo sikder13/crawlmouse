@@ -68,6 +68,7 @@ import {
   isFirstRun,
   siteWindow,
   type ShellView,
+  checkoutOpen,
 } from './account-shell';
 
 export {
@@ -646,7 +647,13 @@ function crawlersByCheck(v: AccountView, site: Site): CrawlerByCheckView[] | nul
     }));
 }
 
-function setup(v: AccountView, site: Site, firstRun: boolean, trial: boolean): SetupView | null {
+function setup(
+  v: AccountView,
+  site: Site,
+  firstRun: boolean,
+  trial: boolean,
+  next?: NextChecks,
+): SetupView | null {
   const g = v.gates;
   if (v.tier === 'free') return null;
   const connected = (...kinds: string[]) =>
@@ -729,12 +736,17 @@ function setup(v: AccountView, site: Site, firstRun: boolean, trial: boolean): S
   }
   const left = items.filter((i) => !i.done).length;
   const sch = site.schedule;
+  // The scheduler's own time where it holds one, as the site page and the next-check line say it.
+  const nextAt = next?.get(site.id) ?? null;
+  const time = nextAt
+    ? hourMinute(nextAt, zoneOf(v))
+    : `${String(sch?.hour_local).padStart(2, '0')}:00`;
   const schedule =
     !firstRun && sch?.cadence === 'weekly'
       ? {
           key: 'schedule',
           label: SETUP_COPY.schedule(
-            `${['', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][sch.iso_weekday!]} around ${String(sch.hour_local).padStart(2, '0')}:00`,
+            `${['', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][sch.iso_weekday!]} around ${time}`,
           ),
           done: false,
           action: settings('Set the day'),
@@ -744,7 +756,7 @@ function setup(v: AccountView, site: Site, firstRun: boolean, trial: boolean): S
     title: firstRun && trial ? COPY.setupTrialTitle : COPY.setupLeftTitle(left),
     items,
     schedule,
-    foot: firstRun && trial ? COPY.setupTrialFoot(items.length) : null,
+    foot: firstRun && trial ? COPY.setupTrialFoot(items.length, checkoutOpen(), site.paused) : null,
   };
 }
 
@@ -1036,9 +1048,11 @@ export function dashboardView(
     ...new Set((byCheck ?? []).flatMap((r) => r.verdicts).filter((x): x is Verdict => x !== null)),
   ];
   const free = FREE_SCHEDULE[GATES.free.schedule];
+  // With paid plans closed nothing sends the trial's reminder yet, so it is not promised.
+  const plansOpen = checkoutOpen();
   const kinds = COPY.emailKinds(
     v.account.email_prefs.change_notes,
-    trial && v.account.email_prefs.trial_reminder
+    plansOpen && trial && v.account.email_prefs.trial_reminder
       ? dayDate(daysBefore(v.account.trial_ends_at!, 3, zone), zone)
       : null,
   );
@@ -1095,12 +1109,12 @@ export function dashboardView(
             run: runCheck(false),
           }
         : null,
-    setup: setup(v, primary, firstRun, trial),
+    setup: setup(v, primary, firstRun, trial, next),
     threeKinds:
       firstRun && trial
         ? {
             lead: COPY.threeKindsLead(kinds.length),
-            body: COPY.threeKinds(kinds),
+            body: COPY.threeKinds(kinds, plansOpen),
             settings: action('emailSettings', 'Email settings'),
           }
         : null,

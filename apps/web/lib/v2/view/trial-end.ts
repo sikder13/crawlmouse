@@ -151,7 +151,9 @@ export function trialEndView(
   // when the reminder is due, from its day until that day is over in the account's zone, and nothing
   // after.
   const reminderLine =
-    a.email_prefs.trial_reminder && (at(reminder) >= at(v.now) || sameDay(reminder, v.now, zone))
+    billingOpen &&
+    a.email_prefs.trial_reminder &&
+    (at(reminder) >= at(v.now) || sameDay(reminder, v.now, zone))
       ? COPY.reminderDue(dayDate(reminder, zone))
       : null;
   // A trial whose subscription renews at its end charges the card Checkout took, recorded or not
@@ -159,7 +161,9 @@ export function trialEndView(
   const charges = a.renews_at !== null;
   const cardLine =
     !onFile && !charges
-      ? COPY.noCard
+      ? billingOpen
+        ? COPY.noCard
+        : COPY.noCardClosed
       : card !== null
         ? cancelled
           ? COPY.cardCancelled(card, dayDate(end, zone))
@@ -363,7 +367,7 @@ export function trialEndView(
         others.length,
         staging.length > 0,
         plan,
-        !nothingToChoose,
+        billingOpen,
         site.paused,
       ),
     ].join(' '),
@@ -405,7 +409,7 @@ export function trialEndedView(
   const tier = TRIAL_TIER[before];
   const plan = PLAN_NAMES[tier];
   const zone = a.timezone;
-  const { stays, pauses } = staysAndPauses(v, plan);
+  const { stays, pauses } = staysAndPauses(v, plan, true);
   return {
     shell: accountShellView(v, 'Sites', { plan: 'page', role, billingOpen }),
     header: {
@@ -461,7 +465,7 @@ export function trialPage(
  * copies, the fixes beyond the three and the paid features the account uses pause. Trial ending reads
  * it before the end, and Trial ended after it.
  */
-function staysAndPauses(v: AccountView, plan: string) {
+function staysAndPauses(v: AccountView, plan: string, ended = false) {
   const site = primarySite(v);
   const others = primarySites(v).filter((s) => s.id !== site.id);
   const staging = v.d.sites.filter((s) => s.staging_of_site_id !== null);
@@ -490,7 +494,11 @@ function staysAndPauses(v: AccountView, plan: string) {
   const stays: TrialRowView[] = [
     {
       what: site.host,
-      how: site.paused ? COPY.stays.sitePaused : COPY.stays.site(free, alertsByEmail),
+      how: site.paused
+        ? ended
+          ? COPY.ended.sitePaused
+          : COPY.stays.sitePaused
+        : COPY.stays.site(free, alertsByEmail),
     },
     { what: COPY.stays.evidence, how: COPY.stays.kept },
     ...(freeThree.length

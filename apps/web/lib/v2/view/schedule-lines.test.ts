@@ -9,6 +9,7 @@ import { describe, expect, it } from 'vitest';
 import { ACCOUNT_VIEWERS } from '../../../app/(v2-preview)/v2-preview/_preview/accounts';
 import { fixture } from '../fixtures';
 import { scheduleCell } from './checks';
+import { dashboardView } from './dashboard';
 import { siteView } from './site';
 
 const SITE = '50000000-0000-4000-8000-000000000001';
@@ -44,6 +45,11 @@ describe('the site page', () => {
     expect(scheduleRow(bad, new Map([[SITE, null]])).value).toBe(
       'weekly, Fri around 06:00, America/Indiana/Indianapolis',
     );
+  });
+
+  it('the dashboard’s set-up line says the same time', () => {
+    const line = dashboardView(bad, viewer, next).setup!.schedule!.label;
+    expect(line).toBe('Choose the day and hour the weekly check runs (now Fri around 06:37)');
   });
 
   it('names the zone on the hour field', () => {

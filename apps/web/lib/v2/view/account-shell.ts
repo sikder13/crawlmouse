@@ -208,7 +208,8 @@ function trialCard(
             primarySite(v).host,
             freeSchedule,
             primaries - 1,
-            reminderDue ? null : TRIAL_REMINDER_DAYS_BEFORE_END,
+            // Nothing sends the reminder while paid plans are closed, so it is not promised.
+            reminderDue || !billingOpen ? null : TRIAL_REMINDER_DAYS_BEFORE_END,
             billingOpen,
             oldestPaused,
           )}`;
