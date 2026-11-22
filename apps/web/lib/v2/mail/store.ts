@@ -8,6 +8,7 @@ import type { Fix } from '@crawlmouse/types/v2';
 import { z } from 'zod';
 import { supabaseFixesStore } from '../account/fixes-store';
 import { INVITED_ROLES, type InvitedRole } from '../agency/seats';
+import type { TrialSite } from './after-trial';
 
 export interface AccountLinkRow {
   kind: string;
@@ -84,6 +85,8 @@ export interface MailStore {
   /** `issue_account_link`: mints the link (and a deletion's paired restore link). Never logged or stored. */
   issueAccountLink(tokenId: string): Promise<IssuedLink[]>;
   trialAccount(accountId: string): Promise<TrialAccount | null>;
+  /** The account's sites that have not been removed, for what the trial's end does to them. */
+  trialSites(accountId: string): Promise<TrialSite[]>;
   notifyCheck(checkId: string): Promise<NotifyCheck | null>;
   fixEmailRequest(requestId: string): Promise<FixEmailRequest | null>;
   /** Sets `fix_email_requests.sent_at` when it is not set. */
@@ -302,6 +305,33 @@ export function supabaseMailStore(sb: SupabaseClient): MailStore {
         marked: row.deleted_at !== null || row.deletion_confirmed_at !== null,
         ownerEmail,
       };
+    },
+
+    async trialSites(accountId) {
+      const r = await sb
+        .from('sites')
+        .select('id, host, created_at, paused_reason, staging_of_site_id')
+        .eq('account_id', accountId)
+        .is('removed_at', null);
+      if (r.error) fail('sites', r.error);
+      return z
+        .array(
+          z.object({
+            id: z.string(),
+            host: z.string(),
+            created_at: z.string(),
+            paused_reason: z.string().nullable(),
+            staging_of_site_id: z.string().nullable(),
+          }),
+        )
+        .parse(r.data ?? [])
+        .map((s) => ({
+          id: s.id,
+          host: s.host,
+          createdAt: new Date(s.created_at),
+          pausedReason: s.paused_reason,
+          stagingOfSiteId: s.staging_of_site_id,
+        }));
     },
 
     async notifyCheck(checkId) {

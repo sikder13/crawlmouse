@@ -25,6 +25,56 @@ describe('trial-reminder (D2; account mail, Q8)', () => {
     expect(m.html).not.toMatch(/unsubscribe/i);
   });
 
+  describe('with paid plans closed (wording approved 2026-11-22)', () => {
+    const closed = (after: Parameters<typeof trialReminder>[0]['after']) =>
+      trialReminder({ plan: 'pro', variant: 'no_card', endsAt: ENDS, timezone: 'UTC', after });
+
+    it('reads as approved, for an account with sites', () => {
+      const m = closed({
+        kept: { host: 'example.com', paused: false },
+        othersPausing: 5,
+        stagingPausing: 0,
+      });
+      expect(m.text).toBe(
+        [
+          'Your Pro trial ends on Sun 8 Nov at 02:41 UTC.',
+          'No card is on file, so nothing is charged and there is nothing you need to do. The account then moves to Free.',
+          'example.com stays, with a monthly check and three fixes per audit. Your other 5 sites pause, with their history kept.',
+          'Nothing you can see is deleted.',
+          'Paid plans open shortly.',
+          '',
+          'What stays and what pauses: https://crawlmouse.com/trial-ended',
+          '',
+          'You get this reminder once per trial. Settings can turn it off. https://crawlmouse.com/settings',
+        ].join('\n'),
+      );
+      expect(htmlTargets(m.html)).toEqual([
+        'https://crawlmouse.com/trial-ended',
+        'https://crawlmouse.com/settings',
+      ]);
+      expect(m.html).toContain('Paid plans open shortly.');
+    });
+
+    it('with no site, leaves out the page that would send them to Settings', () => {
+      const m = closed({ kept: null, othersPausing: 0, stagingPausing: 0 });
+      expect(m.text).toContain('This account has no sites yet.');
+      expect(m.text).not.toContain('/trial-ended');
+      expect(htmlTargets(m.html)).toEqual(['https://crawlmouse.com/settings']);
+    });
+
+    it('a card trial is not given this wording', () => {
+      const m = trialReminder({
+        plan: 'agency',
+        variant: 'card_required',
+        endsAt: ENDS,
+        timezone: 'UTC',
+        after: { kept: null, othersPausing: 0, stagingPausing: 0 },
+      });
+      expect(m.text).toContain('the card on file is charged');
+      expect(m.text).toContain('/trial-ended');
+    });
+  });
+
   it('says a trial with a card becomes the plan unless cancelled', () => {
     const m = trialReminder({
       plan: 'agency',

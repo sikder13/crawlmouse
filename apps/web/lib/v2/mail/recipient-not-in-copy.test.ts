@@ -83,6 +83,7 @@ const store: MailStore = {
     marked: false,
     ownerEmail: TO.trialOwner,
   }),
+  trialSites: async () => [],
   notifyCheck: async () => ({
     status: 'finished',
     notifyEmail: TO.visitor,

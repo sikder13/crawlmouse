@@ -58,6 +58,15 @@ function store(over: Partial<MailStore> = {}): MailStore {
         ownerEmail: 'owner@example.com',
       }),
     ),
+    trialSites: vi.fn(async () => [
+      {
+        id: 'site-a',
+        host: 'example.com',
+        createdAt: new Date('2026-11-01T00:00:00.000Z'),
+        pausedReason: null,
+        stagingOfSiteId: null,
+      },
+    ]),
     notifyCheck: vi.fn(
       async (): Promise<NotifyCheck> => ({
         status: 'finished',
@@ -224,6 +233,41 @@ describe('the trial reminder', () => {
     );
     expect(await h.accountEmail(data)).toBe(outcome);
     expect(ledger.claims).toEqual([]);
+  });
+
+  describe('with paid plans closed', () => {
+    const closedSetup = (s: MailStore = store()) => {
+      const ledger = memoryLedger(new Set());
+      const transport = memoryTransport();
+      const mail: MailDeps = { ledger, transport, pepper: PEPPER, now: () => NOW, log: vi.fn() };
+      const h = mailHandlers({ mail, store: s, capture: vi.fn(), plansOpen: () => false });
+      return { h, ledger, transport };
+    };
+
+    it('says what happens to this account’s sites, and offers no plan', async () => {
+      const { h, transport } = closedSetup();
+      expect(await h.accountEmail(data)).toBe('sent');
+      const { text } = transport.sent[0]!;
+      expect(text).toContain('there is nothing you need to do. The account then moves to Free.');
+      expect(text).toContain('example.com stays, with a monthly check and three fixes per audit.');
+      expect(text).toContain('Paid plans open shortly.');
+      expect(text).not.toMatch(/choose a plan|keep pro|add a card|\$/i);
+    });
+
+    it('retries with nothing claimed when the sites cannot be read', async () => {
+      const failing = store({ trialSites: vi.fn(async () => Promise.reject(new Error('down'))) });
+      const { h, ledger } = closedSetup(failing);
+      await expect(h.accountEmail(data)).rejects.toBeInstanceOf(MailRetry);
+      expect(ledger.claims).toEqual([]);
+    });
+  });
+
+  it('with plans open, reads no sites and keeps its wording', async () => {
+    const s = store();
+    const { h, transport } = setup(s);
+    await h.accountEmail(data);
+    expect(s.trialSites).not.toHaveBeenCalled();
+    expect(transport.sent[0]!.text).toContain('Unless you choose a plan');
   });
 });
 
