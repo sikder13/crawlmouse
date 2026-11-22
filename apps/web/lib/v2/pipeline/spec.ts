@@ -66,7 +66,7 @@ const REASONS: Readonly<Record<FailureReason, string>> = {
     'no crawl batch could be read: the worker did not answer, refused the app’s credentials, lost a batch twice, kept a batch running past its deadline, or its result could not be read',
   capacity_wait_exceeded: `the worker answered, busy with other checks, until the next wait for the first crawl batch would have passed the wait budget (${QUEUE_WAIT_MAX_S} s) or ${FIRST_ACCEPT_BY_S} s from the start: the check never won a slot`,
   site_unreachable:
-    'no page was read, robots.txt on the homepage’s origin got no answer (a network failure or a timeout), and no other origin answered',
+    'no page was read, robots.txt on the homepage’s origin got no answer (a network failure or a timeout), and no robots.txt read got a status',
   nothing_read:
     'no page was read for another reason, such as a robots.txt that could not be used or disallows every page, a refused address, a failed request, a spent budget, or another origin of the site that stopped the batch',
   build_failed: '`buildCheck` threw',

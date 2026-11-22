@@ -87,18 +87,18 @@ async function claimedSite(
 const AWAITING_MIGRATION: readonly FailureReason[] = ['site_unreachable', 'nothing_read'];
 const WORD_REFUSED = /the reason is not one of check_failure_reasons\(\)/;
 
-/** `fail_check` with `reason`; `internal` if the database does not list that word yet. */
+/** `fail_check` with `reason`; `internal` if the database does not list that word yet, then `as` says so. */
 async function failWith(
   store: Pick<PipelineStore, 'fail'>,
   checkId: string,
   reason: FailureReason,
-): Promise<{ failed: boolean; storedAs?: FailureReason }> {
+): Promise<{ failed: boolean; as?: FailureReason }> {
   try {
     return { failed: await store.fail(checkId, reason, null) };
   } catch (error) {
     const refused = error instanceof Error && WORD_REFUSED.test(error.message);
     if (!refused || !AWAITING_MIGRATION.includes(reason)) throw error;
-    return { failed: await store.fail(checkId, 'internal', null), storedAs: 'internal' };
+    return { failed: await store.fail(checkId, 'internal', null), as: 'internal' };
   }
 }
 
@@ -112,11 +112,11 @@ export async function failCheck(
   checkId: string,
   reason: FailureReason,
 ): Promise<FailOutput> {
-  const { failed, storedAs } = await failWith(store, checkId, reason);
+  const { failed, as } = await failWith(store, checkId, reason);
   if (!failed) return { failed: false };
   const siteId = await store.siteOf(checkId);
   if (siteId === null) throw new Error(`fail: check ${checkId} has no row after it failed`);
-  return storedAs ? { failed: true, siteId, storedAs } : { failed: true, siteId };
+  return as ? { failed: true, siteId, as } : { failed: true, siteId };
 }
 
 /**

@@ -174,7 +174,7 @@ describe('failCheck, with a word the database refuses', () => {
       await expect(failCheck(store, EVENT.checkId, reason)).resolves.toEqual({
         failed: true,
         siteId: EVENT.siteId,
-        storedAs: 'internal',
+        as: 'internal',
       });
       expect(store.fail.mock.calls.map((c) => c[1])).toEqual([reason, 'internal']);
     },
