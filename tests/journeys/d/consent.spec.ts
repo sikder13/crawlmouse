@@ -22,16 +22,30 @@ const isAnalytics = (url: URL) =>
   url.pathname === '/ingest' ||
   url.pathname.startsWith('/ingest/');
 
+/**
+ * A remote config with the add-ons on, as production's project serves them, so a step about add-ons
+ * can fail: answered `{}`, the SDK loads none of them whatever this site's code does.
+ */
+const REMOTE_CONFIG = {
+  surveys: true,
+  captureDeadClicks: true,
+  capturePerformance: { web_vitals: true, network_timing: true },
+};
+
 /** Answers every analytics request here, and returns the list of them as they happen. */
 async function holdAnalytics(context: BrowserContext): Promise<URL[]> {
   const seen: URL[] = [];
   await context.route(isAnalytics, async (route) => {
     const url = new URL(route.request().url());
     seen.push(url);
-    // The remote config loads as a script: an empty one is what starts the SDK's refresh timer.
-    await (url.pathname.endsWith('/config.js')
-      ? route.fulfill({ status: 200, contentType: 'text/javascript', body: '' })
-      : route.fulfill({ status: 200, contentType: 'application/json', body: '{}' }));
+    // An empty config script makes the SDK ask for the JSON, and starts its refresh timer.
+    if (url.pathname.endsWith('/config.js')) {
+      await route.fulfill({ status: 200, contentType: 'text/javascript', body: '' });
+    } else if (url.pathname.endsWith('/config')) {
+      await route.fulfill({ status: 200, json: REMOTE_CONFIG });
+    } else {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
+    }
   });
   await context.route(
     (url) => url.hostname.endsWith('.sentry.io'),
@@ -58,7 +72,10 @@ async function open(page: Page) {
 /** The names of what PostHog would have left in this browser. */
 async function traces(page: Page, context: BrowserContext): Promise<string[]> {
   const cookies = (await context.cookies()).map((c) => c.name);
-  const stored = await page.evaluate(() => Object.keys(localStorage));
+  const stored = await page.evaluate(() => [
+    ...Object.keys(localStorage),
+    ...Object.keys(sessionStorage),
+  ]);
   return [...cookies, ...stored].filter((n) => PH_NAME.test(n));
 }
 
@@ -111,12 +128,20 @@ step(
     await expect.poll(flags, { message: 'the refresh timer did not run' }).toBeGreaterThan(before);
 
     await page.locator('footer').last().getByRole('button', { name: 'Cookie settings' }).click();
+    const atDecline = seen.length;
     await page.locator(BAR).getByRole('button', { name: 'Decline' }).click();
     await expect(page.locator(BAR)).toBeHidden();
-    // An event queued before the Decline was captured with consent and may still go.
+    // An event queued before the Decline was captured with consent and may still go: only that.
     await page.clock.runFor(QUEUE_MS);
     await page.waitForTimeout(500);
     const sent = seen.length;
+    expect(
+      seen
+        .slice(atDecline, sent)
+        .filter((u) => !/\/e\/?$/.test(u.pathname))
+        .map((u) => u.href),
+      'F-048: Decline itself caused a request',
+    ).toEqual([]);
 
     await page.clock.runFor(REFRESH_MS * 2);
     await page.waitForTimeout(1_000);
@@ -194,7 +219,8 @@ step(
     await holdAnalytics(context);
     await inRegion(context, '1');
     await open(page);
-    await page.locator(BAR).getByRole('button', { name: 'Decline' }).click();
+    // From Allow, so an Escape that recorded a refusal would show.
+    await page.locator(BAR).getByRole('button', { name: 'Allow analytics' }).click();
     await expect(page.locator(BAR)).toBeHidden();
 
     const control = page.locator('footer').last().getByRole('button', { name: 'Cookie settings' });
@@ -207,6 +233,6 @@ step(
     await page.keyboard.press('Escape');
     await expect(page.locator(BAR), 'F-088: Escape did not close the bar').toBeHidden();
     const decision = await page.evaluate(() => localStorage.getItem('cm_consent'));
-    expect(decision, 'F-088: Escape changed the recorded decision').toBe('denied');
+    expect(decision, 'F-088: Escape changed the recorded decision').toBe('granted');
   },
 );
