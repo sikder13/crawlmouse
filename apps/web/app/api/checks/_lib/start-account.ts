@@ -30,6 +30,7 @@ import type { RequestRecheck } from '../../../../lib/v2/account/recheck';
 import { PLAN_NAMES } from '../../../../lib/v2/view/account';
 import { UNAVAILABLE_CODES } from '../../../../lib/v2/unavailable';
 import { numberWord, plural } from '../../../../lib/v2/words';
+import { START_COPY } from '../../../../components/v2/screens/home/start-check';
 import { publicHost } from './host';
 import {
   addressGate,
@@ -65,6 +66,15 @@ export type AccountStarted =
   | { trigger: 'first_audit'; siteId: string; n: number }
   | { trigger: 'manual'; siteId: string };
 
+/** The refusals only a start for an account has; the form says each (`START_COPY`). */
+export type AccountRefusalCode =
+  | 'site_limit'
+  | 'adds_capped'
+  | 'role_refused'
+  | 'site_paused'
+  | 'recently_checked'
+  | 'site_exists';
+
 export type AccountStartRefusal = {
   ok: false;
   status: 403 | 409 | 429 | 503 | StartRefusal['status'];
@@ -81,6 +91,13 @@ const refuse = (
   error: string,
   more: { nextAllowedAt?: string } = {},
 ): AccountStartRefusal => ({ ok: false, status, body: { code, error, ...more } });
+
+/** A refusal whose sentence is the home form's own (`START_COPY`): it holds no number. */
+const said = (
+  status: AccountStartRefusal['status'],
+  code: Exclude<AccountRefusalCode, 'site_limit'>,
+  more: { nextAllowedAt?: string } = {},
+): AccountStartRefusal => refuse(status, code, START_COPY[code], more);
 
 const CAPACITY = refuse(
   503,
@@ -109,17 +126,17 @@ export async function startAccountCheck(
   const address = await addressGate(deps, input, async () => true);
   if (address !== null) return address;
 
-  const { account, seat } = viewer;
-  const site = await deps.coveredSite(account.id, host);
-  if (site !== null) return checkAgain(deps, viewer, site);
+  const site = await deps.coveredSite(viewer.account.id, host);
+  return site === null ? addSite(deps, viewer, host) : checkAgain(deps, viewer, host, site);
+}
 
-  if (!(await deps.mayAdd(account.id, seat.id))) {
-    return refuse(
-      403,
-      'role_refused',
-      'Your seat on this account cannot add a site. Ask the account’s owner to add it.',
-    );
-  }
+async function addSite(
+  deps: AccountStartDeps,
+  viewer: AccountViewer,
+  host: string,
+): Promise<AccountStartOutcome> {
+  const { account, seat } = viewer;
+  if (!(await deps.mayAdd(account.id, seat.id))) return said(403, 'role_refused');
   const now = deps.now();
   const first = (await deps.liveSites(account.id)) === 0;
   const added = await deps.addSite({
@@ -141,21 +158,12 @@ export async function startAccountCheck(
         started: { trigger: 'first_audit', siteId: added.siteId, n: added.n },
       };
     case 'exists':
-      // The account keeps the host, on a site this seat does not cover (or added a moment ago).
-      return refuse(
-        409,
-        'site_exists',
-        'This account already keeps that site. Open it from your dashboard.',
-      );
+      // The account keeps the host, on a site this seat does not cover, or added a moment ago.
+      return said(409, 'site_exists');
     case 'full':
       return refuse(409, 'site_limit', siteLimitSentence(viewer.tier, viewer.limits.sites));
     case 'adds_capped':
-      return refuse(
-        429,
-        'adds_capped',
-        'This account has added as many sites as it may today. Try again tomorrow.',
-        { nextAllowedAt: added.nextAllowedAt },
-      );
+      return said(429, 'adds_capped', { nextAllowedAt: added.nextAllowedAt });
     case 'domain_capped':
       return refuse(
         429,
@@ -171,11 +179,10 @@ export async function startAccountCheck(
 async function checkAgain(
   deps: AccountStartDeps,
   viewer: AccountViewer,
+  host: string,
   site: CoveredSite,
 ): Promise<AccountStartOutcome> {
-  if (site.pausedReason !== null) {
-    return refuse(409, 'site_paused', 'Checks of this site are paused. See its page for why.');
-  }
+  if (site.pausedReason !== null) return said(409, 'site_paused');
   if (
     site.latest !== null &&
     (site.latest.status === 'queued' || site.latest.status === 'running')
@@ -201,18 +208,13 @@ async function checkAgain(
       return { ok: true, checkId: outcome.checkId, created: false, started: null };
     case 'capped':
     case 'recently_checked':
-      return refuse(
-        429,
-        'recently_checked',
-        'This site was checked as often as the plan allows for now. Open its latest audit from your dashboard.',
-        { nextAllowedAt: outcome.nextAllowedAt },
-      );
+      return said(429, 'recently_checked', { nextAllowedAt: outcome.nextAllowedAt });
     case 'capacity':
       return CAPACITY;
     case 'paused':
-      return refuse(409, 'site_paused', 'Checks of this site are paused. See its page for why.');
+      return said(409, 'site_paused');
     case 'removed':
-      // Removed between the read above and the request: answered as a start that did not happen.
-      return refuse(409, 'site_removed', 'That site was just removed from this account.');
+      // Removed between the read above and the request: the account no longer keeps the host.
+      return addSite(deps, viewer, host);
   }
 }
