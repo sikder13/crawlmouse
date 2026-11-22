@@ -106,7 +106,11 @@ const pages = VIEWERS.flatMap(([name, viewer]) =>
         `${name}, ${interval}`,
         renderToStaticMarkup(
           <PricingScreen
-            view={pricingView(viewer, interval, NOW, { accountDoor: true, checksPublic: true })}
+            view={pricingView(viewer, interval, NOW, {
+              accountDoor: true,
+              checksPublic: true,
+              billing: true,
+            })}
           />,
         ),
       ] as const,
@@ -174,6 +178,7 @@ describe('the figures follow GATES and prices.ts, not the values typed today', (
             view={view({ kind: 'signed_out' }, interval, new Date('2026-11-12T12:00:00Z'), {
               accountDoor: true,
               checksPublic: true,
+              billing: true,
             })}
           />,
         ),

@@ -15,7 +15,7 @@ import { pricingView } from '../../../../lib/v2/view/pricing';
 const AT = new Date('2026-10-25T15:00:00Z');
 const ACCOUNT = 'a0000000-0000-4000-8000-00000000000a';
 /** The flags the pages' buttons are designed for: Sign-up and the Pro trial served. */
-const FLAGS = { accountDoor: true, checksPublic: true };
+const FLAGS = { accountDoor: true, checksPublic: true, billing: true };
 
 /** Signed out: Free and Pro go to Sign-up, Agency to the Agency trial. */
 export const pricingSignedOut = () => pricingView({ kind: 'signed_out' }, 'month', AT, FLAGS);

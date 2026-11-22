@@ -46,8 +46,11 @@ export function PricingScreen({ view, contact }: { view: PricingView; contact?: 
       <main>
         <section className={`${layout.wrap} ${styles.hero}`}>
           <Heading level={1} size="xl" className={styles.title}>
-            <Capability item={view.title} comingLabel={view.comingLabel} />
+            {view.h1}
           </Heading>
+          <p className={styles.tagline}>
+            <Capability item={view.title} comingLabel={view.comingLabel} />
+          </p>
           <p className={styles.lead}>
             {view.lead.map((t, i) => (
               <Fragment key={t.text}>

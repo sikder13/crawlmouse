@@ -64,6 +64,9 @@ export function monthsFree(): number {
 
 const trialDays = `${TRIAL_DAYS} days`;
 
+/** What a paid plan says while V2_BILLING is off (RC-01). */
+const OPENS_SHORTLY = 'opens shortly';
+
 /** How many fixes Free shows: a number on Free, or the page's sentences would not hold. */
 function freeFixes(): number {
   const n = GATES.free.fixesVisible;
@@ -106,7 +109,11 @@ const renders = (tier: Tier): PlanRow => ({
  * `proTrial`: whether the page offers Pro's no-card trial (`pricingView` decides it from Pro's
  * button and the flags); without it, Pro's tag says the card is required (SEO R2-N1).
  */
-export function planCopy(interval: Interval, proTrial: boolean): Record<Tier, PlanCopy> {
+export function planCopy(
+  interval: Interval,
+  proTrial: boolean,
+  billing: boolean,
+): Record<Tier, PlanCopy> {
   const { free, pro, agency } = GATES;
   return {
     free: {
@@ -178,7 +185,7 @@ export function planCopy(interval: Interval, proTrial: boolean): Record<Tier, Pl
     },
     agency: {
       name: 'Agency',
-      tag: `${TRIAL_DAYS}-day trial, card required`,
+      tag: billing ? `${TRIAL_DAYS}-day trial, card required` : OPENS_SHORTLY,
       description: {
         text: 'Agencies reporting to clients under their own name.',
         // A client report names the agency in its mail; the page it opens, the sender and the
@@ -225,7 +232,18 @@ export const PRICING_COPY = {
   /** The meta description: built capabilities only, since a search result carries no "coming" mark. */
   description: () =>
     `Every audit is free and complete. Pro is ${usd(PRO_MONTHLY)} a month for every fix the audit finds, on up to ${GATES.pro.sites} sites; Agency is ${usd(AGENCY_MONTHLY)} a month for ${GATES.agency.sites} client sites.`,
-  /** The artboard's h1 (Q33): "watched" is checking again and telling you, which CC-28 builds. */
+  /**
+   * The indexed h1, v1's (OPERATING-RULES §13; assumed, see B question 002). The artboard's sentence
+   * follows it as the tagline.
+   */
+  h1: 'Pricing',
+  /**
+   * The description search engines hold today, kept until question 002 is answered. `description`
+   * below is its replacement, rendered from the prices and `GATES`.
+   */
+  indexedDescription:
+    'Crawlmouse is free forever — audit any site, get a real A–F grade, and one complete fix. Pro is $19/month or $190/year for every fix, CSV export, and bigger crawls.',
+  /** The artboard's line (Q33): "watched" is checking again and telling you, which CC-28 builds. */
   title: {
     text: 'Every audit is free. Pay when you want it watched.',
     capabilities: ['weekly_checks', 'change_emails'],
@@ -252,8 +270,16 @@ export const PRICING_COPY = {
       capabilities: ['observed_crawlers'],
     },
   ],
-  annual: (): Tagged[] => {
+  annual: (billing: boolean): Tagged[] => {
     const [first, second] = ANNUAL_RENEWAL_REMINDER_DAYS;
+    if (!billing) {
+      return [
+        {
+          text: `Annual: Pro ${usd(PRO_YEARLY)}, Agency ${usd(AGENCY_YEARLY)} — ${numberWord(monthsFree())} months free, when paid plans open.`,
+          capabilities: [],
+        },
+      ];
+    }
     return [
       {
         text: `Annual: Pro ${usd(PRO_YEARLY)}, Agency ${usd(AGENCY_YEARLY)} — ${numberWord(monthsFree())} months free, from Settings.`,
@@ -305,6 +331,13 @@ export const PRICING_COPY = {
     },
     unavailable: { note: 'This account cannot choose this plan now' },
     agencyUsed: { note: 'Your agency trial was used, on an agency account since deleted' },
+    /** V2_BILLING off (RC-01): no route here takes a card. */
+    opensShortly: { note: 'Paid plans open shortly' },
+    agencyStartFree: { label: 'Start free', note: `The Agency plan ${OPENS_SHORTLY}` },
+    proTrialBillingOff: {
+      label: `Start with ${trialDays} of Pro`,
+      note: 'Same account, no card; paid plans open shortly',
+    },
     current: { label: 'Your plan', note: 'The plan your account is on now' },
     included: { label: 'Included in your plan', note: 'Agency includes all of Pro' },
     freeBelow: { note: 'If you cancel, from Settings, the account returns to Free' },
@@ -349,24 +382,31 @@ export const PRICING_COPY = {
   },
   after: {
     /** Without Pro's trial on offer, the section is the Agency trial's (`proTrial`, SEO R2-N1). */
-    title: (proTrial: boolean) =>
-      proTrial
+    title: (proTrial: boolean, billing: boolean) =>
+      proTrial || !billing
         ? `What happens when the ${trialDays} end`
         : `What happens when the Agency trial’s ${trialDays} end`,
-    /** FACTS A6 (long form) and A8. */
-    lead: (): Tagged[] => [
+    /**
+     * FACTS A6 (long form) and A8. The reminder is said only with billing on: the function that sends
+     * it is registered only then (`billingFunctions`).
+     */
+    lead: (billing: boolean): Tagged[] => [
       { text: 'Nothing you can see is deleted.', capabilities: [] },
       {
         text: `Evidence older than ${EVIDENCE_CONDENSED_AFTER_DAYS} days is condensed to headers and the parts of pages that changed.`,
         capabilities: ['evidence_condensed'],
       },
-      {
-        text: `We email you ${numberWord(TRIAL_REMINDER_DAYS_BEFORE_END)} days before.`,
-        capabilities: ['trial_reminder'],
-      },
+      ...(billing
+        ? [
+            {
+              text: `We email you ${numberWord(TRIAL_REMINDER_DAYS_BEFORE_END)} days before.`,
+              capabilities: ['trial_reminder'],
+            } as Tagged,
+          ]
+        : []),
     ],
     columns: ['What', 'What happens'] as const,
-    rows: (interval: Interval): [string, Tagged][] => [
+    rows: (interval: Interval, billing: boolean): [string, Tagged][] => [
       [
         'Your first site',
         {
@@ -388,13 +428,17 @@ export const PRICING_COPY = {
           capabilities: ['fix_packets'],
         },
       ],
-      [
-        'Agency trial',
-        {
-          text: `Card on file is charged ${usd(priceOf('agency', interval))} on day ${TRIAL_DAYS + 1} unless you cancel; from the Agency trial page, any day, ${numberWord(CANCEL_CLICKS)} clicks, no call`,
-          capabilities: ['agency_trial', 'cancel'],
-        },
-      ],
+      ...(billing
+        ? ([
+            [
+              'Agency trial',
+              {
+                text: `Card on file is charged ${usd(priceOf('agency', interval))} on day ${TRIAL_DAYS + 1} unless you cancel; from the Agency trial page, any day, ${numberWord(CANCEL_CLICKS)} clicks, no call`,
+                capabilities: ['agency_trial', 'cancel'],
+              },
+            ],
+          ] as [string, Tagged][])
+        : []),
     ],
   },
   why: {
@@ -413,8 +457,35 @@ export const PRICING_COPY = {
   faq: {
     title: 'Questions people ask before paying',
     /** `proTrial`: whether the page offers Pro's no-card trial (SEO R2-N1). */
-    items: (proTrial: boolean): { q: string; a: Tagged }[] => {
+    items: (proTrial: boolean, billing: boolean): { q: string; a: Tagged }[] => {
       const [first, second] = ANNUAL_RENEWAL_REMINDER_DAYS;
+      if (!billing) {
+        return [
+          {
+            q: 'Do I need a card for Pro?',
+            a: {
+              text: proTrial
+                ? `No. The ${trialDays} start with your email. Paid plans open shortly.`
+                : 'Not yet: paid plans open shortly.',
+              capabilities: [],
+            },
+          },
+          {
+            q: 'Which emails will I get?',
+            a: {
+              text: 'A sign-in link, and a note when a check finds a change.',
+              capabilities: ['change_emails'],
+            },
+          },
+          {
+            q: 'Can I cancel?',
+            a: {
+              text: 'There is nothing to cancel yet, because paid plans have not opened. A Pro trial ends by itself and the account goes back to Free; nothing you can see is deleted.',
+              capabilities: [],
+            },
+          },
+        ];
+      }
       const agencyCard =
         'Agency’s trial takes a card at the start, and the plan is charged when the trial ends unless you cancel.';
       return [
