@@ -181,6 +181,14 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/setup
       - run: pnpm --filter @crawlmouse/${{ matrix.package }} test
+      # The journey suite's pure specs (tests/journeys/README.md): the production-write guard, the sites a
+      # journey may check, and the expected-fail list against STEPS.md. They start no browser and reach no
+      # server; the base URL is a placeholder. The rest of the suite runs against a deployment, not here.
+      - name: journey guard
+        if: matrix.package == 'scripts'
+        env:
+          JOURNEY_BASE_URL: https://journeys.invalid
+        run: pnpm --filter @crawlmouse/web exec playwright test -c ../../tests/journeys/playwright.config.ts --project=desktop guard.spec.ts consistency.spec.ts
 
   # The web suite in three vitest shards: as one job it took 13.5 minutes (run 43056751031) and was
   # cancelled at its 15-minute limit (run 43073710281). The required check `test (web)` is the job
