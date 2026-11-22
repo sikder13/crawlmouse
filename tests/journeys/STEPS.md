@@ -8,20 +8,22 @@ the union of its sub-steps. A step passes when a customer would get what the scr
 promised, on the devices listed.
 
 **Generated, not hand-written.** The "Expected to fail today" column and the defect index at the end are computed
-from the CC-45 register (`cc-45/sweep.md` §1, its "Step or stream" column) by the QA session's generator (plan folder, `v2r/qa/tools/steps.py`), then formatted by Prettier. Rows the
+from the CC-45 register (`cc-45/sweep.md` §1, its "Step or stream" column) by `tools/steps.py`, then formatted by Prettier. Rows the
 register names by stream only get a defect-named step, `D.F-nnn`, checked by a dedicated test. Re-generate when the
 register changes; do not edit the columns by hand.
 
-**Expected-fail.** `expected-fail.json` holds the same lists, generated with this file, and it is the only place a
-test reads them from (`lib/step.ts`). A PR that fixes a defect deletes that id from `expected-fail.json`; when a step's
-list is empty the step must pass on that PR's preview. This file's column stays as CC-45 found it.
+**Expected-fail.** `expected-fail.json` holds, for each step, the ids its test can observe; it is generated with
+this file and it is the only list a test reads (`lib/step.ts`). Ids marked "(judged)" here are checked by hand at the
+gate, not by the test. A step's test fails red when it passes while ids are still listed, and when it fails for a
+reason that names none of its listed ids. A PR that fixes a defect deletes that id from `expected-fail.json`. This
+file's column stays as CC-45 found it.
 
 **Writes.** A step marked "yes" changes data (a check, an account, a mail), or needs a check it starts itself.
-The suite is to refuse such a step when the base URL is production, and run it only on staging and on previews that
-use staging. That guard lands with the first tests; until then this file is the list, and nothing runs from it.
-Steps marked "no" may run anywhere.
+`lib/target.ts` runs such a step only on staging's own host, which has its own database; never on production, a
+Vercel preview or localhost. Steps marked "no" may run anywhere.
 
-**Sites checked.** Only `*.lab.crawlmouse.com` and `nahltech.com`.
+**Sites checked.** Only `*.lab.crawlmouse.com` and `nahltech.com`: `lib/sites.ts` refuses any other host for a step
+that starts a check.
 
 ## J0 — Visitor who never signs up
 
@@ -30,7 +32,7 @@ Account: anonymous.
 | Step  | The customer                                                                 | Passes when                                                                                 | Devices                         | Writes | Expected to fail today                                                                                                                                                                                                                |
 | ----- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | ------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | J0.1  | Land on the home page; read it top to bottom                                 | In five seconds it is clear what this is, who it is for and what it costs                   | desktop, phone, Firefox, WebKit | no     | F-060, F-061, F-062, F-146                                                                                                                                                                                                            |
-| J0.2  | Use every header and footer entry once                                       | Every entry opens a finished v2 page (200, v2 shell)                                        | desktop, phone, Firefox, WebKit | no     | F-005, F-007, F-025, F-027                                                                                                                                                                                                            |
+| J0.2  | Use every header and footer entry once                                       | Every entry opens a finished v2 page (200, v2 shell)                                        | desktop, phone, Firefox, WebKit | no     | F-005, F-006, F-007, F-025, F-027                                                                                                                                                                                                     |
 | J0.3  | Start a check from the home form on a lab site                               | A check starts and the live page opens                                                      | desktop, phone, Firefox, WebKit | yes    | —                                                                                                                                                                                                                                     |
 | J0.4  | Watch the live page from start to finish without touching it                 | Progress is visible within 5 s, keeps moving, the graph draws, and the result opens         | desktop, phone, Firefox         | yes    | F-002, F-009                                                                                                                                                                                                                          |
 | J0.5  | Read the result: every card, every tab, the fix, the link map                | Each part below reads true for the site checked                                             | desktop, phone, Firefox         | yes    | F-004, F-012, F-020, F-021, F-022, F-023, F-057, F-135, F-137, F-138, F-139, F-140, F-141, F-142, F-143, F-144, F-145, F-146, F-148, F-149, F-150, F-151, F-152, F-153, F-155, F-156, F-159, F-160, F-161, F-162 (with its sub-steps) |
@@ -55,18 +57,18 @@ Account: anonymous.
 | J0.8g | A slow lab site                                                              | The check finishes inside its stated time, with progress throughout                         | desktop                         | yes    | —                                                                                                                                                                                                                                     |
 | J0.8h | The same site twice in a row                                                 | The second start is explained (reused or refused)                                           | desktop                         | yes    | F-054                                                                                                                                                                                                                                 |
 | J0.8i | Cancel a running check                                                       | The cancel is confirmed and the page says what happened                                     | desktop                         | yes    | F-055                                                                                                                                                                                                                                 |
-| J0.9  | Open each named page (a–m below)                                             | Each is a finished v2 page                                                                  | desktop, phone, Firefox         | no     | F-006, F-007, F-024, F-026, F-027, F-031, F-032, F-033, F-063, F-072, F-153, F-154, F-158 (with its sub-steps)                                                                                                                        |
+| J0.9  | Open each named page (a–m below)                                             | Each is a finished v2 page                                                                  | desktop, phone, Firefox         | no     | F-005, F-006, F-007, F-024, F-026, F-027, F-031, F-032, F-033, F-063, F-072, F-153, F-154, F-158 (with its sub-steps)                                                                                                                 |
 | J0.9a | `/pricing`                                                                   | v2 pricing, numbers from the code                                                           | desktop, phone                  | no     | F-007                                                                                                                                                                                                                                 |
 | J0.9b | `/agencies`, `/agency-trial`                                                 | v2 agency offer                                                                             | desktop, phone                  | no     | F-024                                                                                                                                                                                                                                 |
 | J0.9c | `/help`                                                                      | v2 help                                                                                     | desktop                         | no     | —                                                                                                                                                                                                                                     |
-| J0.9d | `/guides`                                                                    | v2 guides                                                                                   | desktop, phone                  | no     | F-006, F-072                                                                                                                                                                                                                          |
-| J0.9e | A blog post                                                                  | v2 post                                                                                     | desktop, phone                  | no     | F-006, F-072                                                                                                                                                                                                                          |
+| J0.9d | `/guides`                                                                    | v2 guides                                                                                   | desktop, phone                  | no     | F-006, F-072 (judged)                                                                                                                                                                                                                 |
+| J0.9e | A blog post                                                                  | v2 post                                                                                     | desktop, phone                  | no     | F-006, F-072 (judged)                                                                                                                                                                                                                 |
 | J0.9f | The research page                                                            | v2 page                                                                                     | desktop                         | no     | F-006                                                                                                                                                                                                                                 |
 | J0.9g | `/status`                                                                    | v2 status with a real state                                                                 | desktop                         | no     | F-006, F-063                                                                                                                                                                                                                          |
 | J0.9h | `/developers`                                                                | v2 developers page                                                                          | desktop                         | no     | F-027                                                                                                                                                                                                                                 |
 | J0.9i | `/ai-readiness-checker`                                                      | v2 page                                                                                     | desktop                         | no     | F-006, F-032                                                                                                                                                                                                                          |
-| J0.9j | `/bot`                                                                       | v2 page describing exactly what we send, with the published address                         | desktop                         | no     | F-006, F-031, F-153, F-154                                                                                                                                                                                                            |
-| J0.9k | Every legal page (privacy, terms, AUP, subprocessors, refunds, DPA, cookies) | v2 pages; none missing                                                                      | desktop                         | no     | F-006, F-033                                                                                                                                                                                                                          |
+| J0.9j | `/bot`                                                                       | v2 page describing exactly what we send, with the published address                         | desktop                         | no     | F-006, F-031, F-153 (judged), F-154 (judged)                                                                                                                                                                                          |
+| J0.9k | Every legal page (privacy, terms, AUP, subprocessors, refunds, DPA, cookies) | v2 pages; none missing                                                                      | desktop                         | no     | F-005, F-006, F-033 (judged)                                                                                                                                                                                                          |
 | J0.9l | An address that does not exist                                               | v2 404                                                                                      | desktop, phone                  | no     | F-026                                                                                                                                                                                                                                 |
 | J0.9m | `/check/gptbot`, `/check/javascript`, `/check/robots-ai`                     | A real result for the visitor's site, or copy that says it starts an audit                  | desktop                         | no     | F-158                                                                                                                                                                                                                                 |
 
@@ -172,169 +174,169 @@ D.F-010, D.F-011, D.F-017, D.F-018, D.F-019, D.F-028, D.F-029, D.F-030, D.F-034,
 
 Every register row and the steps that prove it closed.
 
-| Defect | Sev     | Steps                                           |
-| ------ | ------- | ----------------------------------------------- |
-| F-001  | blocker | J1.6                                            |
-| F-002  | major   | J0.4                                            |
-| F-003  | major   | J1.3                                            |
-| F-004  | major   | J0.5i                                           |
-| F-005  | major   | J0.2                                            |
-| F-006  | major   | J0.9d, J0.9e, J0.9f, J0.9g, J0.9i, J0.9j, J0.9k |
-| F-007  | blocker | J0.2, J0.9a                                     |
-| F-008  | major   | J1.6                                            |
-| F-009  | major   | J0.4                                            |
-| F-010  | major   | D.F-010                                         |
-| F-011  | major   | D.F-011                                         |
-| F-012  | blocker | J0.5a, J0.5c, J2.4h                             |
-| F-013  | blocker | J0.8f                                           |
-| F-014  | blocker | J0.8e                                           |
-| F-015  | blocker | J0.8c                                           |
-| F-016  | blocker | J2.4d, J2.4e, J2.8, J3.7                        |
-| F-017  | blocker | D.F-017                                         |
-| F-018  | major   | D.F-018                                         |
-| F-019  | major   | D.F-019                                         |
-| F-020  | major   | J0.5a                                           |
-| F-021  | major   | J0.5h                                           |
-| F-022  | major   | J0.5i                                           |
-| F-023  | major   | J0.5b                                           |
-| F-024  | blocker | J0.9b, J3.1                                     |
-| F-025  | major   | J0.2                                            |
-| F-026  | major   | J0.9l                                           |
-| F-027  | major   | J0.2, J0.9h                                     |
-| F-028  | major   | D.F-028                                         |
-| F-029  | major   | D.F-029                                         |
-| F-030  | major   | D.F-030                                         |
-| F-031  | major   | J0.9j                                           |
-| F-032  | major   | J0.9i                                           |
-| F-033  | major   | J0.9k                                           |
-| F-034  | major   | D.F-034                                         |
-| F-035  | major   | D.F-035                                         |
-| F-036  | major   | D.F-036                                         |
-| F-037  | major   | D.F-037                                         |
-| F-038  | major   | D.F-038                                         |
-| F-039  | major   | D.F-039                                         |
-| F-040  | major   | D.F-040                                         |
-| F-041  | major   | D.F-041                                         |
-| F-042  | major   | J0.6                                            |
-| F-043  | major   | D.F-043                                         |
-| F-044  | major   | D.F-044                                         |
-| F-045  | major   | D.F-045                                         |
-| F-046  | major   | D.F-046                                         |
-| F-047  | major   | D.F-047                                         |
-| F-048  | blocker | D.F-048                                         |
-| F-049  | major   | D.F-049                                         |
-| F-050  | major   | D.F-050                                         |
-| F-051  | major   | D.F-051                                         |
-| F-052  | major   | D.F-052                                         |
-| F-053  | minor   | D.F-053                                         |
-| F-054  | minor   | J0.8h                                           |
-| F-055  | minor   | J0.8i                                           |
-| F-056  | minor   | D.F-056                                         |
-| F-057  | minor   | J0.5a                                           |
-| F-058  | minor   | D.F-058                                         |
-| F-059  | minor   | D.F-059                                         |
-| F-060  | minor   | J0.1                                            |
-| F-061  | minor   | J0.1                                            |
-| F-062  | minor   | J0.1                                            |
-| F-063  | minor   | J0.9g                                           |
-| F-064  | minor   | D.F-064                                         |
-| F-065  | minor   | D.F-065                                         |
-| F-066  | minor   | D.F-066                                         |
-| F-067  | minor   | D.F-067                                         |
-| F-068  | minor   | D.F-068                                         |
-| F-069  | minor   | D.F-069                                         |
-| F-070  | minor   | D.F-070                                         |
-| F-071  | minor   | D.F-071                                         |
-| F-072  | minor   | J0.9d, J0.9e                                    |
-| F-073  | minor   | D.F-073                                         |
-| F-074  | minor   | D.F-074                                         |
-| F-075  | minor   | D.F-075                                         |
-| F-076  | minor   | D.F-076                                         |
-| F-077  | minor   | D.F-077                                         |
-| F-078  | minor   | D.F-078                                         |
-| F-079  | minor   | D.F-079                                         |
-| F-080  | minor   | D.F-080                                         |
-| F-081  | minor   | D.F-081                                         |
-| F-082  | minor   | D.F-082                                         |
-| F-083  | minor   | D.F-083                                         |
-| F-084  | minor   | D.F-084                                         |
-| F-085  | minor   | D.F-085                                         |
-| F-086  | minor   | D.F-086                                         |
-| F-087  | minor   | D.F-087                                         |
-| F-088  | minor   | D.F-088                                         |
-| F-089  | minor   | D.F-089                                         |
-| F-090  | minor   | D.F-090                                         |
-| F-091  | minor   | D.F-091                                         |
-| F-092  | minor   | D.F-092                                         |
-| F-093  | minor   | D.F-093                                         |
-| F-094  | blocker | J2.3, J3.1, J3.3, J3.8                          |
-| F-095  | blocker | J2.9, J3.9                                      |
-| F-096  | major   | J2.4e                                           |
-| F-097  | major   | J2.4g                                           |
-| F-098  | major   | J1.1, J3.1                                      |
-| F-099  | major   | J2.4b, J3.7                                     |
-| F-100  | major   | J2.5, J3.7                                      |
-| F-101  | major   | J2.8, J1.9                                      |
-| F-102  | major   | J1.2, J2.1, J2.9, J3.1, J3.9                    |
-| F-103  | major   | J2.2                                            |
-| F-104  | major   | J3.1, J3.3                                      |
-| F-105  | major   | J3.2, J3.9                                      |
-| F-106  | major   | J3.2, J3.3, J3.4, J3.5, J3.6, J3.8              |
-| F-107  | major   | J2.4f                                           |
-| F-108  | major   | J2.7, J3.8                                      |
-| F-109  | major   | J2.4c                                           |
-| F-110  | major   | J2.5                                            |
-| F-111  | major   | J3.4                                            |
-| F-112  | minor   | J1.1                                            |
-| F-113  | minor   | J1.1, J3.7                                      |
-| F-114  | minor   | J1.10                                           |
-| F-115  | minor   | J2.4a, J3.9                                     |
-| F-116  | minor   | J1.2, J2.1                                      |
-| F-117  | minor   | J2.1, J3.1                                      |
-| F-118  | minor   | J2.3, J2.9                                      |
-| F-119  | minor   | J2.7, J3.2                                      |
-| F-120  | minor   | J2.9                                            |
-| F-121  | minor   | J2.4d                                           |
-| F-122  | minor   | J2.6                                            |
-| F-123  | major   | J3.7, J1.11                                     |
-| F-124  | minor   | J3.9                                            |
-| F-125  | minor   | J2.4f                                           |
-| F-126  | minor   | J2.4f                                           |
-| F-127  | major   | J4.2                                            |
-| F-128  | major   | J1.12a                                          |
-| F-129  | major   | J1.5, J1.8                                      |
-| F-130  | minor   | J4.3                                            |
-| F-131  | minor   | J1.14                                           |
-| F-132  | minor   | J1.12a                                          |
-| F-133  | minor   | J4.7                                            |
-| F-134  | minor   | J4.5                                            |
-| F-135  | blocker | J0.5b                                           |
-| F-136  | blocker | J2.4d, J2.5                                     |
-| F-137  | major   | J0.5b                                           |
-| F-138  | major   | J0.5a, J0.5b                                    |
-| F-139  | major   | J0.5a                                           |
-| F-140  | major   | J0.5a                                           |
-| F-141  | major   | J0.5b                                           |
-| F-142  | major   | J0.5a                                           |
-| F-143  | major   | J0.5b                                           |
-| F-144  | minor   | J0.5b                                           |
-| F-145  | major   | J0.5a, J0.5b                                    |
-| F-146  | major   | J0.1, J0.5i                                     |
-| F-147  | major   | J1.10                                           |
-| F-148  | major   | J0.5h                                           |
-| F-149  | major   | J0.5b, J0.5h                                    |
-| F-150  | minor   | J0.5b                                           |
-| F-151  | major   | J0.5h                                           |
-| F-152  | major   | J0.5b                                           |
-| F-153  | major   | J0.5b, J0.9j                                    |
-| F-154  | major   | J0.9j                                           |
-| F-155  | major   | J0.5b                                           |
-| F-156  | major   | J0.5b                                           |
-| F-157  | blocker | J2.3                                            |
-| F-158  | major   | J0.9m                                           |
-| F-159  | major   | J0.5a                                           |
-| F-160  | major   | J0.5a                                           |
-| F-161  | major   | J0.5i                                           |
-| F-162  | minor   | J0.5h                                           |
+| Defect | Sev     | Steps                                                 |
+| ------ | ------- | ----------------------------------------------------- |
+| F-001  | blocker | J1.6                                                  |
+| F-002  | major   | J0.4                                                  |
+| F-003  | major   | J1.3                                                  |
+| F-004  | major   | J0.5i                                                 |
+| F-005  | major   | J0.2, J0.9k                                           |
+| F-006  | major   | J0.2, J0.9d, J0.9e, J0.9f, J0.9g, J0.9i, J0.9j, J0.9k |
+| F-007  | blocker | J0.2, J0.9a                                           |
+| F-008  | major   | J1.6                                                  |
+| F-009  | major   | J0.4                                                  |
+| F-010  | major   | D.F-010                                               |
+| F-011  | major   | D.F-011                                               |
+| F-012  | blocker | J0.5a, J0.5c, J2.4h                                   |
+| F-013  | blocker | J0.8f                                                 |
+| F-014  | blocker | J0.8e                                                 |
+| F-015  | blocker | J0.8c                                                 |
+| F-016  | blocker | J2.4d, J2.4e, J2.8, J3.7                              |
+| F-017  | blocker | D.F-017                                               |
+| F-018  | major   | D.F-018                                               |
+| F-019  | major   | D.F-019                                               |
+| F-020  | major   | J0.5a                                                 |
+| F-021  | major   | J0.5h                                                 |
+| F-022  | major   | J0.5i                                                 |
+| F-023  | major   | J0.5b                                                 |
+| F-024  | blocker | J0.9b, J3.1                                           |
+| F-025  | major   | J0.2                                                  |
+| F-026  | major   | J0.9l                                                 |
+| F-027  | major   | J0.2, J0.9h                                           |
+| F-028  | major   | D.F-028                                               |
+| F-029  | major   | D.F-029                                               |
+| F-030  | major   | D.F-030                                               |
+| F-031  | major   | J0.9j                                                 |
+| F-032  | major   | J0.9i                                                 |
+| F-033  | major   | J0.9k                                                 |
+| F-034  | major   | D.F-034                                               |
+| F-035  | major   | D.F-035                                               |
+| F-036  | major   | D.F-036                                               |
+| F-037  | major   | D.F-037                                               |
+| F-038  | major   | D.F-038                                               |
+| F-039  | major   | D.F-039                                               |
+| F-040  | major   | D.F-040                                               |
+| F-041  | major   | D.F-041                                               |
+| F-042  | major   | J0.6                                                  |
+| F-043  | major   | D.F-043                                               |
+| F-044  | major   | D.F-044                                               |
+| F-045  | major   | D.F-045                                               |
+| F-046  | major   | D.F-046                                               |
+| F-047  | major   | D.F-047                                               |
+| F-048  | blocker | D.F-048                                               |
+| F-049  | major   | D.F-049                                               |
+| F-050  | major   | D.F-050                                               |
+| F-051  | major   | D.F-051                                               |
+| F-052  | major   | D.F-052                                               |
+| F-053  | minor   | D.F-053                                               |
+| F-054  | minor   | J0.8h                                                 |
+| F-055  | minor   | J0.8i                                                 |
+| F-056  | minor   | D.F-056                                               |
+| F-057  | minor   | J0.5a                                                 |
+| F-058  | minor   | D.F-058                                               |
+| F-059  | minor   | D.F-059                                               |
+| F-060  | minor   | J0.1                                                  |
+| F-061  | minor   | J0.1                                                  |
+| F-062  | minor   | J0.1                                                  |
+| F-063  | minor   | J0.9g                                                 |
+| F-064  | minor   | D.F-064                                               |
+| F-065  | minor   | D.F-065                                               |
+| F-066  | minor   | D.F-066                                               |
+| F-067  | minor   | D.F-067                                               |
+| F-068  | minor   | D.F-068                                               |
+| F-069  | minor   | D.F-069                                               |
+| F-070  | minor   | D.F-070                                               |
+| F-071  | minor   | D.F-071                                               |
+| F-072  | minor   | J0.9d, J0.9e                                          |
+| F-073  | minor   | D.F-073                                               |
+| F-074  | minor   | D.F-074                                               |
+| F-075  | minor   | D.F-075                                               |
+| F-076  | minor   | D.F-076                                               |
+| F-077  | minor   | D.F-077                                               |
+| F-078  | minor   | D.F-078                                               |
+| F-079  | minor   | D.F-079                                               |
+| F-080  | minor   | D.F-080                                               |
+| F-081  | minor   | D.F-081                                               |
+| F-082  | minor   | D.F-082                                               |
+| F-083  | minor   | D.F-083                                               |
+| F-084  | minor   | D.F-084                                               |
+| F-085  | minor   | D.F-085                                               |
+| F-086  | minor   | D.F-086                                               |
+| F-087  | minor   | D.F-087                                               |
+| F-088  | minor   | D.F-088                                               |
+| F-089  | minor   | D.F-089                                               |
+| F-090  | minor   | D.F-090                                               |
+| F-091  | minor   | D.F-091                                               |
+| F-092  | minor   | D.F-092                                               |
+| F-093  | minor   | D.F-093                                               |
+| F-094  | blocker | J2.3, J3.1, J3.3, J3.8                                |
+| F-095  | blocker | J2.9, J3.9                                            |
+| F-096  | major   | J2.4e                                                 |
+| F-097  | major   | J2.4g                                                 |
+| F-098  | major   | J1.1, J3.1                                            |
+| F-099  | major   | J2.4b, J3.7                                           |
+| F-100  | major   | J2.5, J3.7                                            |
+| F-101  | major   | J2.8, J1.9                                            |
+| F-102  | major   | J1.2, J2.1, J2.9, J3.1, J3.9                          |
+| F-103  | major   | J2.2                                                  |
+| F-104  | major   | J3.1, J3.3                                            |
+| F-105  | major   | J3.2, J3.9                                            |
+| F-106  | major   | J3.2, J3.3, J3.4, J3.5, J3.6, J3.8                    |
+| F-107  | major   | J2.4f                                                 |
+| F-108  | major   | J2.7, J3.8                                            |
+| F-109  | major   | J2.4c                                                 |
+| F-110  | major   | J2.5                                                  |
+| F-111  | major   | J3.4                                                  |
+| F-112  | minor   | J1.1                                                  |
+| F-113  | minor   | J1.1, J3.7                                            |
+| F-114  | minor   | J1.10                                                 |
+| F-115  | minor   | J2.4a, J3.9                                           |
+| F-116  | minor   | J1.2, J2.1                                            |
+| F-117  | minor   | J2.1, J3.1                                            |
+| F-118  | minor   | J2.3, J2.9                                            |
+| F-119  | minor   | J2.7, J3.2                                            |
+| F-120  | minor   | J2.9                                                  |
+| F-121  | minor   | J2.4d                                                 |
+| F-122  | minor   | J2.6                                                  |
+| F-123  | major   | J3.7, J1.11                                           |
+| F-124  | minor   | J3.9                                                  |
+| F-125  | minor   | J2.4f                                                 |
+| F-126  | minor   | J2.4f                                                 |
+| F-127  | major   | J4.2                                                  |
+| F-128  | major   | J1.12a                                                |
+| F-129  | major   | J1.5, J1.8                                            |
+| F-130  | minor   | J4.3                                                  |
+| F-131  | minor   | J1.14                                                 |
+| F-132  | minor   | J1.12a                                                |
+| F-133  | minor   | J4.7                                                  |
+| F-134  | minor   | J4.5                                                  |
+| F-135  | blocker | J0.5b                                                 |
+| F-136  | blocker | J2.4d, J2.5                                           |
+| F-137  | major   | J0.5b                                                 |
+| F-138  | major   | J0.5a, J0.5b                                          |
+| F-139  | major   | J0.5a                                                 |
+| F-140  | major   | J0.5a                                                 |
+| F-141  | major   | J0.5b                                                 |
+| F-142  | major   | J0.5a                                                 |
+| F-143  | major   | J0.5b                                                 |
+| F-144  | minor   | J0.5b                                                 |
+| F-145  | major   | J0.5a, J0.5b                                          |
+| F-146  | major   | J0.1, J0.5i                                           |
+| F-147  | major   | J1.10                                                 |
+| F-148  | major   | J0.5h                                                 |
+| F-149  | major   | J0.5b, J0.5h                                          |
+| F-150  | minor   | J0.5b                                                 |
+| F-151  | major   | J0.5h                                                 |
+| F-152  | major   | J0.5b                                                 |
+| F-153  | major   | J0.5b, J0.9j                                          |
+| F-154  | major   | J0.9j                                                 |
+| F-155  | major   | J0.5b                                                 |
+| F-156  | major   | J0.5b                                                 |
+| F-157  | blocker | J2.3                                                  |
+| F-158  | major   | J0.9m                                                 |
+| F-159  | major   | J0.5a                                                 |
+| F-160  | major   | J0.5a                                                 |
+| F-161  | major   | J0.5i                                                 |
+| F-162  | minor   | J0.5h                                                 |
 
 Rows in the index: 162. Steps named by the register that are not in the tables above: none.
