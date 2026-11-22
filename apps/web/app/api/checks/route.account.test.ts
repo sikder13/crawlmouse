@@ -416,7 +416,8 @@ describe('POST /api/checks, somebody else’s data (J4)', () => {
       status: 403,
       body: {
         code: 'role_refused',
-        error: 'Your seat on this account cannot add a site. Ask the account’s owner to add it.',
+        error:
+          'Your seat on this account cannot add a site. Switch to your own account to check it there, or ask this account’s owner to add it.',
       },
     });
     const refused = await read(await POST(home(hidden.host)));

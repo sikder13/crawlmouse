@@ -78,7 +78,8 @@ export const START_COPY: Record<StartRefusal, string> = {
   site_limit:
     'This account already keeps as many sites as its plan allows. Open your dashboard to check one of them again.',
   adds_capped: 'This account has added as many sites as it may today. Try again tomorrow.',
-  role_refused: 'Your seat on this account cannot add a site. Ask the account’s owner to add it.',
+  role_refused:
+    'Your seat on this account cannot add a site. Switch to your own account to check it there, or ask this account’s owner to add it.',
   site_paused: 'Checks of this site are paused. Its page on your dashboard says why.',
   recently_checked:
     'This site was checked as often as its plan allows for now. Its latest audit is on your dashboard.',
