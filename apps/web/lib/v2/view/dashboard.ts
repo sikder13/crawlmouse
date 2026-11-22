@@ -929,7 +929,7 @@ export function dashboardView(
 
   const header: HeaderView = firstRun
     ? {
-        title: COPY.kept(primary.host),
+        title: COPY.kept(primarySites(v).map((s) => s.host)),
         line: [
           dayDate(v.now, zone),
           sitesWord,

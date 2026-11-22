@@ -3,6 +3,7 @@
  * the arithmetic), so a test cannot pass by agreeing with the code it checks.
  */
 import { describe, expect, it } from 'vitest';
+import { DASHBOARD_COPY } from '../copy/dashboard';
 import { fixture } from '../fixtures';
 import { firstRunNow } from './account';
 import {
@@ -382,5 +383,29 @@ describe('A site on its first baseline is left out of the health move (owner rul
 
   it('still means every graded site in the value: 791 / 10 = 79', () => {
     expect(h.value).toBe('79');
+  });
+});
+
+describe('the dashboard’s words about the account now', () => {
+  it('names the one site an account keeps (F-118)', () => {
+    expect(DASHBOARD_COPY.kept(['example-outfitter.com'])).toBe('example-outfitter.com is kept.');
+  });
+
+  it('with several, the heading is about the account, not its first site (F-118)', () => {
+    expect(DASHBOARD_COPY.kept(['a.example', 'b.example'])).toBe('Two sites are kept.');
+    expect(DASHBOARD_COPY.kept(['a', 'b', 'c', 'd', 'e'].map((h) => `${h}.example`))).toBe(
+      'Five sites are kept.',
+    );
+  });
+
+  it('says nothing of “the other 0” when no fix is left over (F-120)', () => {
+    const none = DASHBOARD_COPY.topFixesFoot(0, 'on Pro');
+    expect(none).toMatch(/^Each fix page has "Mark done and re-check now", about \d+ minutes\.$/);
+    expect(none).not.toContain('other');
+  });
+
+  it('still says how many are left when some are (F-120)', () => {
+    expect(DASHBOARD_COPY.topFixesFoot(1, 'on Pro')).toContain('The other 1 is on Pro.');
+    expect(DASHBOARD_COPY.topFixesFoot(10, 'on Pro')).toContain('The other 10 are on Pro.');
   });
 });

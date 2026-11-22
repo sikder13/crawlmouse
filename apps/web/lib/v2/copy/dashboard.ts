@@ -11,7 +11,11 @@ import { TRIAL_DAYS } from './account';
 import { formatPlanPrice } from './plan-price';
 
 export const DASHBOARD_COPY = {
-  kept: (host: string) => `${host} is kept.`,
+  /** The heading: the site, or with several, the account's count of them (F-118). */
+  kept: (hosts: readonly string[]) =>
+    hosts.length === 1
+      ? `${hosts[0]} is kept.`
+      : `${capitalise(numberWord(hosts.length))} sites are kept.`,
   /** "Since Thursday's check", or, where a weekday would be ambiguous, "Since the check of Fri 23 Oct". */
   since: (name: { weekday: string } | { date: string }) =>
     'weekday' in name ? `Since ${name.weekday}'s check` : `Since the check of ${name.date}`,
@@ -26,7 +30,7 @@ export const DASHBOARD_COPY = {
     }. Nothing to compare yet.`,
   topFixesTitle: 'Start with the fix that pays most, estimated',
   topFixesFoot: (rest: number, open: string) =>
-    `Each fix page has "Mark done and re-check now", about ${RECHECK_MINUTES} ${plural(RECHECK_MINUTES, 'minute', 'minutes')}. The other ${rest} ${plural(rest, 'is', 'are')} ${open}.`,
+    `Each fix page has "Mark done and re-check now", about ${RECHECK_MINUTES} ${plural(RECHECK_MINUTES, 'minute', 'minutes')}.${rest === 0 ? '' : ` The other ${rest} ${plural(rest, 'is', 'are')} ${open}.`}`,
   setupTrialTitle: 'Worth doing while Pro is on',
   setupLeftTitle: (n: number) =>
     n === 0
