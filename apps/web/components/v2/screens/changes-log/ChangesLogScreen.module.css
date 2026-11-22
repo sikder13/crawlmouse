@@ -45,3 +45,9 @@
   color: var(--v2-mut);
   font-size: var(--v2-text-micro);
 }
+
+.notice {
+  margin: 0 0 12px;
+  color: var(--v2-fg2);
+  font-size: var(--v2-text-ui);
+}

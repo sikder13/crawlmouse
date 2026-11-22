@@ -47,4 +47,12 @@ describe('the Changes log, rendered', () => {
     expect(html).toContain('No change matches these filters.');
     expect(html).not.toContain('<table');
   });
+
+  it('says when a site filter names no site of this account, as a status', () => {
+    const html = render({ site: 'e0000000-0000-4000-8000-000000000001' });
+    expect(html).toContain('role="status"');
+    expect(html).toContain('That site is not in this account');
+    expect(html).not.toContain('e0000000-0000-4000-8000-000000000001');
+    expect(render()).not.toContain('That site is not in this account');
+  });
 });

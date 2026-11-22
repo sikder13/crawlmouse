@@ -2,8 +2,9 @@
  * The account Changes log as data (D3). It has no artboard: its rows are CC-23's change rows
  * (`rowOf`, drawn by `ChangeTable`), over every change of the viewer's account at `now`, newest
  * first, with the site as the first column. Three filters (site, kind, since) are links that set the
- * page's query (ARCH-2 §5: `GET /changes?site=&kind=&since=`). A site the account does not hold, a
- * kind the contract does not name or an unknown since is ignored, as if that filter were not set.
+ * page's query (ARCH-2 §5: `GET /changes?site=&kind=&since=`). A kind the contract does not name or
+ * an unknown since is ignored, as if that filter were not set. A site the account does not hold is
+ * ignored too, and the page says so (F-130), in the same words whether or not the id exists.
  */
 import { instant, type Change } from '@crawlmouse/types/v2';
 import { CHANGES_LOG_COPY as COPY } from '../copy/changes-log';
@@ -53,6 +54,8 @@ export interface ChangesLogView {
   filtersLabel: string;
   /** CC-23's rows, each naming its site. */
   rows: ChangeRowView[];
+  /** Said when the site filter names no site of this account; it does not repeat the id. */
+  notice: string | null;
   /** What the page says in place of the table; null when it has rows. */
   empty: string | null;
   tableLabel: string;
@@ -218,6 +221,7 @@ export function changesLogView(
     ],
     filtersLabel: COPY.filtersLabel,
     rows,
+    notice: query.site !== undefined && site === null ? COPY.siteNotHere : null,
     empty: rows.length ? null : filtered ? COPY.noMatch : COPY.noChanges,
     tableLabel: COPY.table,
   };

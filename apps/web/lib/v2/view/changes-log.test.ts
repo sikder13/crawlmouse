@@ -198,3 +198,32 @@ describe('a first audit in the Changes log (F-100)', () => {
     );
   });
 });
+
+describe('a site filter for a site outside the account (F-130)', () => {
+  const OWN = '50000000-0000-4000-8000-000000000001';
+  const SENTENCE = 'That site is not in this account, so every site’s changes are shown.';
+
+  it('says so, and shows the account’s own changes', () => {
+    const v = log({ site: 'e0000000-0000-4000-8000-000000000001' });
+    expect(v.notice).toBe(SENTENCE);
+    expect(v.rows).toHaveLength(log().rows.length);
+  });
+
+  it('answers the same for one id, another, and a malformed one', () => {
+    const answers = [
+      'e0000000-0000-4000-8000-000000000001',
+      'f0000000-0000-4000-8000-00000000abcd',
+      'not-a-site',
+    ].map((site) => {
+      const { notice, rows, headline } = log({ site });
+      return JSON.stringify({ notice, rows, headline });
+    });
+    expect(new Set(answers).size).toBe(1);
+    expect(answers[0]).not.toContain('e0000000');
+  });
+
+  it('says nothing for a site of the account, or with no filter', () => {
+    expect(log({ site: OWN }).notice).toBeNull();
+    expect(log().notice).toBeNull();
+  });
+});

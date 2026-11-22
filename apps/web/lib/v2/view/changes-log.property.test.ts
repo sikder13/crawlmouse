@@ -64,13 +64,21 @@ describe('the Changes log, generated', () => {
             d.sites.filter((s) => s.account_id === other).map((s) => s.host),
           );
           for (const r of v.rows) expect(otherHosts.has(r.site!)).toBe(false);
+          // A site filter outside the account is said, without repeating the id.
+          expect(v.notice !== null).toBe(site !== undefined && !live.has(site));
           for (const l of siteLinks(v).slice(1)) expect(otherHosts.has(l.label)).toBe(false);
         },
       ),
       { numRuns: 300 },
     );
     expect([...reached].sort()).toEqual(
-      ['a site filter applied', 'another account’s site moved in', 'no rows', 'rows'].sort(),
+      [
+        'a site filter applied',
+        'another account’s site moved in',
+        'no rows',
+        'only first audits',
+        'rows',
+      ].sort(),
     );
   });
 });

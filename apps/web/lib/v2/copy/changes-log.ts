@@ -27,6 +27,8 @@ export const CHANGES_LOG_COPY = {
     `${capitalise(numberWord(n))} first ${plural(n, 'audit', 'audits')}. Changes appear once a site has been checked again.`,
   noChanges: 'No changes yet.',
   noMatch: 'No change matches these filters.',
+  /** A site filter naming no site of this account, whether or not the id exists (F-130). */
+  siteNotHere: 'That site is not in this account, so every site’s changes are shown.',
   allSites: 'All sites',
   allKinds: 'All kinds',
   groups: { site: 'Site', kind: 'Kind', since: 'Time' },

@@ -42,6 +42,11 @@ export function ChangesLogScreen({ data }: { data: ChangesLogView }) {
           ) : null}
         </div>
       </header>
+      {data.notice ? (
+        <p role="status" className={styles.notice}>
+          {data.notice}
+        </p>
+      ) : null}
       <Card className={shared.panel}>
         <nav className={styles.filters} aria-label={data.filtersLabel}>
           {data.filters.map((f) => (
