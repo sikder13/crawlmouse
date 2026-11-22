@@ -63,6 +63,9 @@ export function sessionHeaderOf(viewer: ViewerResult): SessionHeader {
  */
 const SESSION_COOKIE = /^sb-[a-z0-9]+-auth-token(?:\.\d+)?$/;
 
+/** One `name=value` pair of a cookie header: the name is everything before the first `=`. */
+const COOKIE_PAIR = /^([^=]*)=(.*)$/s;
+
 /**
  * Whether a `Cookie` header (or `document.cookie`) holds a non-empty Supabase session cookie. A hint
  * for a prerendered page's header only: see the module comment.
@@ -70,11 +73,8 @@ const SESSION_COOKIE = /^sb-[a-z0-9]+-auth-token(?:\.\d+)?$/;
 export function hasSessionCookie(cookieHeader: string | null | undefined): boolean {
   if (!cookieHeader) return false;
   return cookieHeader.split(';').some((pair) => {
-    const eq = pair.indexOf('=');
-    if (eq < 0) return false;
-    const name = pair.slice(0, eq).trim();
-    const value = pair.slice(eq + 1).trim();
-    return value !== '' && SESSION_COOKIE.test(name);
+    const m = COOKIE_PAIR.exec(pair);
+    return m !== null && m[2]!.trim() !== '' && SESSION_COOKIE.test(m[1]!.trim());
   });
 }
 
