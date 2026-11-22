@@ -178,18 +178,10 @@ export const SITE_CHANGES: CopyChange[] = [
   {
     screen: 'site',
     kind: 'fixture',
-    locked: 'Structure +4 SEO open Packet',
-    rendered: 'Structure +4 SEO open · Pro Packet',
-    source:
-      'The fixture’s Free three at Friday’s check are fixes 1, 2 and 0 (isFreeFix, by rank), so fix 3 is a Pro fix',
-  },
-  {
-    screen: 'site',
-    kind: 'fixture',
     locked: 'Content +1 SEO open · Pro',
-    rendered: 'Content AI after fixes 1 and 2 open · Pro',
+    rendered: 'Content AI after fixes 1 and 2 open',
     source:
-      'The fixture’s fix 4 effect, as points() words it (FACTS I11: its AI effect waits on fixes 1 and 2)',
+      'The fixture’s fix 4 effect, as points() words it (FACTS I11: its AI effect waits on fixes 1 and 2); the account is on Pro, where every fix is plainly open (F-099)',
   },
   {
     screen: 'site',
@@ -200,6 +192,14 @@ export const SITE_CHANGES: CopyChange[] = [
       '5–15 Eleven more: 7 in Structure and 4 in Content — +7 Technical SEO together; AI effect not yet estimated for 4',
     source:
       'The fixture’s fixes 5 to 15, counted by section; the locked topic words (anchors, depth, …) are shorthand for the fixes’ titles, which Show all lists in full, and the grouped effect is the fixes’ own (groupPoints)',
+  },
+  {
+    screen: 'site',
+    kind: 'ruling',
+    locked: 'not yet estimated for 4 open · Pro',
+    rendered: 'not yet estimated for 4 open',
+    source:
+      'F-099 (CC-45 sweep, assigned in the V2R brief): an account on Pro has every fix open, so no row is marked as a Pro fix',
   },
   {
     screen: 'site',

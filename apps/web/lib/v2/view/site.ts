@@ -103,9 +103,10 @@ export interface FixRowView {
   section: string;
   effect: string;
   status: string;
-  /** Outside the three Free shows (BUILD §3: the three largest open fixes). */
+  /** A fix this account's tier does not open: past Free's three, and never on a paid tier. */
   pro: boolean;
-  packet: ActionView;
+  /** Null on a row the tier does not open: the route would refuse it. */
+  packet: ActionView | null;
   /** Mark done, for a fix still to do that the tier opens; a live page shows it. */
   markDone: ActionView | null;
   /** The fix's type, which Mark done's browser event names (`fix_done_confirmed`, CC-41 D8). */
@@ -312,7 +313,7 @@ function noteOf(v: AccountView, f: Fix): string | null {
 
 function fixRow(v: AccountView, result: Check, f: Fix, all: readonly Fix[]): FixRowView {
   const isNew = f.first_seen_check_id === result.id && result.previous_check_id !== null;
-  const pro = !isFreeFix(v.d, result, f);
+  const pro = lockedFix(v, result, f);
   return {
     key: f.id,
     number: f.number,
@@ -325,19 +326,41 @@ function fixRow(v: AccountView, result: Check, f: Fix, all: readonly Fix[]): Fix
     effect: points(f, all),
     status: `${STATUS_LABEL[f.status]}${pro ? ' · Pro' : ''}`,
     pro,
-    packet: action(
-      'packet',
-      'Packet',
-      { checkId: result.id, fixId: f.id },
-      { context: `for fix ${f.number}` },
-    ),
+    packet: pro
+      ? null
+      : action(
+          'packet',
+          'Packet',
+          { checkId: result.id, fixId: f.id },
+          { context: `for fix ${f.number}` },
+        ),
     markDone:
-      todo(f) && (v.gates.fixesVisible === 'all' || !pro)
+      todo(f) && !pro
         ? action('markDone', SITE_COPY.markDone, { id: f.id }, { context: `fix ${f.number}` })
         : null,
     fixType: f.type,
   };
 }
+
+/** A fix this account's tier does not open: on a tier with every fix, none is. */
+const lockedFix = (v: AccountView, result: Check, f: Fix) =>
+  v.gates.fixesVisible !== 'all' && !isFreeFix(v.d, result, f);
+
+/** "4, 6–15": sorted numbers, each unbroken run of three or more as a range. */
+function numberRanges(numbers: readonly number[]): string {
+  const sorted = [...numbers].sort((a, b) => a - b);
+  const runs: number[][] = [];
+  for (const n of sorted) {
+    const run = runs.at(-1);
+    if (run && run.at(-1) === n - 1) run.push(n);
+    else runs.push([n]);
+  }
+  return runs.flatMap((r) => (r.length > 2 ? [`${r[0]}–${r.at(-1)}`] : r.map(String))).join(', ');
+}
+
+/** Whether the address asks for every fix: the "Show all" link's `?fixes=all`. */
+export const wantsAllFixes = (query: Readonly<Record<string, string | string[] | undefined>>) =>
+  query.fixes === 'all';
 
 /** A fix the reader still has to do: open, reopened, or one we could not verify. */
 const todo = (f: Fix) =>
@@ -433,6 +456,7 @@ export function siteView(
   viewer: Viewer,
   siteId: string,
   next?: NextChecks,
+  { allFixes = false }: { allFixes?: boolean } = {},
 ): SiteView {
   const v = viewAt(d, viewer);
   const zone = zoneOf(v);
@@ -477,7 +501,9 @@ export function siteView(
     .join(' · ');
   // The reader's next action is a fix still to do.
   const byRank = (a: Fix, b: Fix) => (a.rank ?? Infinity) - (b.rank ?? Infinity);
-  const target = [...fresh].filter(todo).sort(byRank)[0] ?? fixes.filter(todo).sort(byRank)[0];
+  // And one the tier opens: the button must not lead to a packet the route refuses.
+  const doable = (f: Fix) => todo(f) && !lockedFix(v, result, f);
+  const target = fresh.filter(doable).sort(byRank)[0] ?? fixes.filter(doable).sort(byRank)[0];
   const openLatest = (primary: boolean) =>
     action('openAudit', 'Open the latest audit', { checkId: result.id }, { primary });
   const targetLabel = target
@@ -489,8 +515,15 @@ export function siteView(
   // ── fixes table ──
   const byNumber = [...fixes].sort((a, b) => a.number - b.number);
   const withPackets = byNumber.filter((f) => todo(f) && f.packet !== null);
-  const rows = byNumber.slice(0, SHOWN_FIXES).map((f) => fixRow(v, result, f, fixes));
-  const rest = byNumber.slice(SHOWN_FIXES);
+  // By number, as the locked page lists them, with the fixes this tier opens first, so open and
+  // locked rows do not alternate (F-099). A single fix past the fold is shown, not folded into a row
+  // of one.
+  const inTable = [...byNumber].sort(
+    (a, b) => Number(lockedFix(v, result, a)) - Number(lockedFix(v, result, b)),
+  );
+  const shownFixes = allFixes || fixes.length <= SHOWN_FIXES + 1 ? fixes.length : SHOWN_FIXES;
+  const rows = inTable.slice(0, shownFixes).map((f) => fixRow(v, result, f, fixes));
+  const rest = inTable.slice(shownFixes);
   const sections = Object.entries(
     rest.reduce<Record<string, number>>((m, f) => {
       const k = SECTION_LABEL[f.section];
@@ -498,7 +531,7 @@ export function siteView(
       return m;
     }, {}),
   ).sort(([, a], [, b]) => b - a);
-  const allPro = rest.every((f) => !isFreeFix(v.d, result, f));
+  const allPro = rest.every((f) => lockedFix(v, result, f));
 
   // ── settings ──
   const staging = v.d.sites.find((s) => s.staging_of_site_id === site.id);
@@ -599,7 +632,7 @@ export function siteView(
       rows,
       rest: rest.length
         ? {
-            numbers: `${rest[0]!.number}–${rest.at(-1)!.number}`,
+            numbers: numberRanges(rest.map((f) => f.number)),
             count: rest.length,
             title: `${capitalise(numberWord(rest.length))} more: ${listOf(sections.map(([k, n]) => `${n} in ${k}`))}`,
             effect: groupPoints(rest),
@@ -774,12 +807,13 @@ export function sitePage(
   viewer: Viewer,
   siteId: string,
   next?: NextChecks,
+  options: { allFixes?: boolean } = {},
 ): SitePageView {
   const v = viewAt(d, viewer);
   const site = v.d.sites.find((s) => s.id === siteId);
   if (!site) throw new Error(`Site ${siteId} is not the viewer’s at ${viewer.now}`);
   if (resultChecks(v, site.id).length)
-    return { kind: 'site', site: siteView(d, viewer, siteId, next) };
+    return { kind: 'site', site: siteView(d, viewer, siteId, next, options) };
 
   const zone = zoneOf(v);
   const t = instant(viewer.now);

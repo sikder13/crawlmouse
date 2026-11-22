@@ -73,14 +73,14 @@ describe('Site page, example-outfitter.com at as_of', () => {
     expect(by('GPTBot').changedNow).toBe(false);
   });
 
-  it('lists the fixes by number, marks the new ones and the Pro ones, and groups the rest', () => {
+  it('lists the fixes by number, marks the new ones, and groups the rest; on Pro none is locked', () => {
     expect(v.fixes.title).toBe('Fixes · 16, counting the 3 new');
     expect(v.fixes.rows.map((r) => [r.number, r.isNew, r.pro, r.effect])).toEqual([
       [0, true, false, '+19 AI'],
       [1, false, false, '+24 AI'],
       [2, false, false, '+22 AI'],
-      [3, false, true, '+4 SEO'],
-      [4, false, true, 'AI after fixes 1 and 2'],
+      [3, false, false, '+4 SEO'],
+      [4, false, false, 'AI after fixes 1 and 2'],
     ]);
     expect(v.fixes.rows[0]!.diff).toBe(
       'robots.txt, Thu 19:40 · + User-agent: ClaudeBot · + User-agent: Claude-SearchBot · + Disallow: / · three lines to delete, then mark done',

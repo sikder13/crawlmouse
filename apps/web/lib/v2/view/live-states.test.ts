@@ -237,7 +237,7 @@ describe('the site page’s fix rows', () => {
 
   it('on a paid tier every fix still to do carries Mark done, those past the Free three too', () => {
     // bad-site's account is on the Pro trial: every fix is open to it.
-    expect(v.fixes.rows.some((r) => r.pro && todo.has(status.get(r.key)!))).toBe(true);
+    expect(v.fixes.rows.slice(3).some((r) => todo.has(status.get(r.key)!))).toBe(true);
     for (const r of v.fixes.rows) expect(r.markDone !== null).toBe(todo.has(status.get(r.key)!));
   });
 
