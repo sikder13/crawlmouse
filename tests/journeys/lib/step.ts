@@ -41,7 +41,7 @@ export function step(
 ): void {
   const meta = stepMeta(id);
   // Playwright builds only the fixtures a test names in its first argument, so they are named here.
-  test(`${id} ${title}`, async ({ page, context, playwright, baseURL }, info) => {
+  test(`${id} ${title}`, async ({ page, context, playwright, baseURL, trace }, info) => {
     info.annotations.push({ type: 'step', description: id });
     test.skip(
       !meta.devices.includes(info.project.name),
@@ -53,8 +53,9 @@ export function step(
       : null;
     test.skip(refused !== null, `writes: ${refused}`);
     // With a bypass secret, both contexts carry a cookie for this host, not the secret (lib/protection.ts).
-    if (bypassSecret(process.env)) {
-      const traced = traceRefusal(info.project.use.trace);
+    // The resolved `trace` fixture, so `--trace` and a spec's `test.use` are both seen.
+    if (bypassSecret(process.env) || meta.writes) {
+      const traced = traceRefusal(trace);
       if (traced) throw new Error(traced);
     }
     const cookies = await bypassCookies(new URL(baseURL!).origin, process.env);

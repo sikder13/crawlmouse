@@ -44,7 +44,8 @@ browser steps run against a deployment.
   reason unless `VERCEL_AUTOMATION_BYPASS_SECRET` is set. The secret goes on requests that do
   not follow redirects, to the deployment's origin, to get Vercel's bypass cookie; the contexts carry that
   cookie for the deployment's host (`lib/protection.ts`). A trace records headers and URLs, so the config
-  turns tracing off for a run with the secret or with writes, and such a run refuses `--trace=on`.
+  turns tracing off for a run with the secret or with writes. If tracing is turned back on, a step refuses to
+  run when the secret is set or the step writes, and `signIn` refuses too.
 - **A step that starts a check passes the address through `lib/sites.ts`**, which accepts only
   `*.lab.crawlmouse.com` and `nahltech.com`.
 - **Test accounts exist on staging only** (`lib/accounts.ts`). The admin client is built only when

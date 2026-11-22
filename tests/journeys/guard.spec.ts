@@ -268,6 +268,9 @@ test.describe('Vercel Deployment Protection', () => {
       ['a', '_vercel_sso_nonce=x; Path=/'],
       ['b', '_vercel_jwt=; Path=/'],
       ['c', '_vercel_jwt=x; Max-Age=0; Path=/'],
+      ['e', '_vercel_jwt=x; Max-Age=00; Path=/'],
+      ['f', '_vercel_jwt=x; Max-Age=-1; Path=/'],
+      ['g', '_vercel_jwt=x; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Path=/'],
     ] as const) {
       await expect(
         bypassCookies(`https://${host}.example.test`, env, answer(line)),
@@ -456,7 +459,7 @@ test.describe('the staging admin client', () => {
     /** A page that follows the product's door, with each stage changeable. */
     const door = (o: {
       name?: string;
-      session?: Array<{ name: string; value: string }>;
+      session?: Array<{ name: string; value: string; domain?: string }>;
       gotoThrows?: boolean;
       native?: boolean;
     }) => {
@@ -485,7 +488,12 @@ test.describe('the staging admin client', () => {
           if (ok(new URL(at))) return;
           await new Promise(() => {});
         },
-        context: () => ({ cookies: async () => o.session ?? [cookie(address)] }),
+        context: () => ({
+          cookies: async (url?: string) =>
+            (o.session ?? [cookie(address)]).filter(
+              (c) => !url || !c.domain || c.domain === new URL(url).hostname,
+            ),
+        }),
       };
       return { page: page as never, clicks: () => clicks };
     };
@@ -539,6 +547,21 @@ test.describe('the staging admin client', () => {
             admin,
             off,
           ),
+        ).rejects.toThrow(/is not/);
+      });
+    });
+    test("does not read a session from another host's cookie", async () => {
+      await withWrites(async () => {
+        const elsewhere = { ...cookie(address), domain: 'other.example' };
+        await expect(
+          signIn(door({ session: [elsewhere] }).page, host, address, admin, off),
+        ).rejects.toThrow(/holds no staging session/);
+        const theirs = {
+          ...cookie('qa+j1-x-2@lab.crawlmouse.com'),
+          domain: 'staging.crawlmouse.com',
+        };
+        await expect(
+          signIn(door({ session: [elsewhere, theirs] }).page, host, address, admin, off),
         ).rejects.toThrow(/is not/);
       });
     });

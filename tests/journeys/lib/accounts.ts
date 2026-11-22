@@ -172,7 +172,7 @@ export async function signIn(
     await go.click();
     await page.waitForURL(pastSignIn, { timeout: 20_000 });
   }
-  const token = sessionToken(await page.context().cookies());
+  const token = sessionToken(await page.context().cookies(baseURL));
   if (!token) throw new Error('signIn: the browser holds no staging session');
   const who = await admin().auth.getUser(token);
   if (who.error || who.data.user?.email?.toLowerCase() !== address) {

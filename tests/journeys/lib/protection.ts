@@ -49,6 +49,14 @@ export interface BypassCookie {
 }
 
 type Fetch = (url: URL, init: RequestInit) => Promise<Response>;
+
+/** A Set-Cookie line that clears its cookie: a zero or negative Max-Age, or an Expires in the past. */
+function isExpired(line: string): boolean {
+  const age = /;\s*max-age=\s*(-?\d+)/i.exec(line);
+  if (age) return Number(age[1]) <= 0;
+  const expires = /;\s*expires=([^;]+)/i.exec(line);
+  return expires ? Date.parse(expires[1]!) <= Date.now() : false;
+}
 const cached = new Map<string, BypassCookie[]>();
 
 /**
@@ -73,7 +81,7 @@ export async function bypassCookies(
   const cookies = res.headers
     .getSetCookie()
     // Only Vercel's bypass cookie (measured: `_vercel_jwt`), and not one that clears it.
-    .filter((line) => !/;\s*max-age=0\b/i.test(line))
+    .filter((line) => !isExpired(line))
     .map((line) => /^([^=;\s]+)=([^;]*)/.exec(line))
     .filter((m): m is RegExpExecArray => m !== null && m[1] === BYPASS_COOKIE && m[2] !== '')
     .map((m) => ({
