@@ -5,8 +5,10 @@
 export interface MeasuredFacts {
   /** Pages with a response of any status, as the check's page rows hold them. */
   pagesAnswered: number;
-  /** Of those, pages that answered 200. */
+  /** Of those, pages that answered 200: what the row states, and no more. */
   pagesServed: number;
+  /** The check holds a Technical SEO letter, so it is never described as having graded nothing. */
+  graded: boolean;
   /** AI crawlers whose verdict is `not_measured`. */
   aiUnmeasured: number;
   /** The check holds a site-wide share of the text without JavaScript. */
@@ -16,7 +18,7 @@ export interface MeasuredFacts {
 export type NoFixKind = 'not-served' | 'unmeasured' | 'all-clear';
 
 export function noFixKind(f: MeasuredFacts): NoFixKind {
-  if (f.pagesAnswered > 0 && f.pagesServed === 0) return 'not-served';
+  if (f.pagesAnswered > 0 && f.pagesServed === 0 && !f.graded) return 'not-served';
   return f.pagesServed > 0 && f.aiUnmeasured === 0 && f.textMeasured ? 'all-clear' : 'unmeasured';
 }
 

@@ -12,6 +12,7 @@
  * `generated` replaces the drawing with one that is no audit's (the 2,000-node preview); no page in
  * it has a record. Above EXPLORER_SVG_MAX nodes the screen draws on a canvas.
  */
+import { noFixWords } from './section-measured';
 import type { Check, CrawlerResult, FixtureDataset, PageResult } from '@crawlmouse/types/v2';
 import { findCheck, fixesAsOf, siteOf } from '../fixtures';
 import { dayTimeUtc, percent } from '../format';
@@ -497,7 +498,7 @@ export function linkMapView(
       ],
       back: { label: `Back: ${SEGMENTS.structure.backName}`, href: hrefs.segment('structure') },
       next: {
-        label: `Fixes for site structure · ${anyFix ? `${open} open` : 'nothing to fix'}`,
+        label: `Fixes for site structure · ${anyFix ? `${open} open` : noFixWords(check, 'structure')}`,
         href: `${hrefs.segment('structure')}#fixes`,
       },
     },

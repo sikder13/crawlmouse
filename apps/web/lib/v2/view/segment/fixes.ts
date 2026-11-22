@@ -4,6 +4,7 @@
  * (`freeFixes`, the rule the Result page and the fix page use too), so the sections' open counts
  * add up to the overview's.
  */
+import { noFixWords } from '../section-measured';
 import {
   RecommendationClassSchema,
   type Check,
@@ -84,7 +85,7 @@ export interface ProFixView {
 }
 
 export interface SectionFixesView {
-  /** "1 open · 7 on Pro", or "nothing to fix". */
+  /** "1 open · 7 on Pro", or what no fix means here (`noFixWords`). */
   summary: string;
   open: OpenFixView[];
   pro: ProFixView[];
@@ -390,7 +391,7 @@ export function sectionFixes(
       ? [`${open.length} open`, pro.length ? `${pro.length} on Pro` : null]
           .filter(Boolean)
           .join(' · ')
-      : 'nothing to fix',
+      : noFixWords(check, section),
     open: open.map((f) => openFix(f, siteFixes)),
     pro: rows,
     proCount: pro.length,

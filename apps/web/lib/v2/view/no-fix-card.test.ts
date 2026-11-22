@@ -5,6 +5,7 @@ import { noFixKind, servedWord } from './no-fix-card';
 const facts = fc.record({
   pagesAnswered: fc.nat({ max: 5 }),
   pagesServed: fc.nat({ max: 5 }),
+  graded: fc.boolean(),
   aiUnmeasured: fc.nat({ max: 6 }),
   textMeasured: fc.boolean(),
 });
@@ -19,10 +20,12 @@ describe('what the third card says when a check has no fix', () => {
     );
   });
 
-  it('says not-served exactly when pages answered and none with a 200', () => {
+  it('says not-served exactly when pages answered, none with a 200, and no letter was given', () => {
     fc.assert(
       fc.property(facts, (f) => {
-        expect(noFixKind(f) === 'not-served').toBe(f.pagesAnswered > 0 && f.pagesServed === 0);
+        expect(noFixKind(f) === 'not-served').toBe(
+          f.pagesAnswered > 0 && f.pagesServed === 0 && !f.graded,
+        );
       }),
     );
   });
@@ -30,15 +33,15 @@ describe('what the third card says when a check has no fix', () => {
   it.each([
     [
       'one crawler not measured',
-      { pagesAnswered: 3, pagesServed: 3, aiUnmeasured: 1, textMeasured: true },
+      { pagesAnswered: 3, pagesServed: 3, graded: false, aiUnmeasured: 1, textMeasured: true },
     ],
     [
       'text not measured',
-      { pagesAnswered: 3, pagesServed: 3, aiUnmeasured: 0, textMeasured: false },
+      { pagesAnswered: 3, pagesServed: 3, graded: false, aiUnmeasured: 0, textMeasured: false },
     ],
     [
       'no page rows to read',
-      { pagesAnswered: 0, pagesServed: 0, aiUnmeasured: 0, textMeasured: true },
+      { pagesAnswered: 0, pagesServed: 0, graded: false, aiUnmeasured: 0, textMeasured: true },
     ],
   ])('is unmeasured with %s', (_name, f) => {
     expect(noFixKind(f)).toBe('unmeasured');

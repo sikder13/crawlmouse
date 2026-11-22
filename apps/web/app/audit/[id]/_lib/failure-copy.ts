@@ -37,5 +37,5 @@ export const FAILURE_NEXT: Partial<Record<FailureReason, string>> = {
   site_unreachable:
     'Check the address and that the site is up, then run it again. A new audit is free.',
   nothing_read:
-    'No grade was given. Check that robots.txt and any firewall let crawlers read the site, then run it again. A new audit is free.',
+    'No grade was given. If robots.txt or a firewall keeps crawlers out, that is the first place to look. A new audit is free.',
 };
