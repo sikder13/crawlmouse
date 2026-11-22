@@ -140,7 +140,9 @@ step(
     await expectFinishedV2Page(page, '/agencies', missing('F-024'));
     // Billing off: /agencies offers no start, and /agency-trial comes back to it. Billing on: /agencies links
     // to the trial, which sends a signed-out visitor to sign-in. An offer that loops back starts nothing.
-    const offers = await (await contentOf(page)).locator('a[href^="/agency-trial"]').count();
+    const offers = await (await contentOf(page))
+      .locator('a[href*="/agency-trial"], form[action*="/agency-trial"]')
+      .count();
     const trial = await request.get('/agency-trial', { maxRedirects: 0 });
     if (trial.status() === 404) {
       expect(trial.status(), 'F-024: /agency-trial is a page').not.toBe(404);
