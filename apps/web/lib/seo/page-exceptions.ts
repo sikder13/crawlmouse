@@ -105,7 +105,7 @@ export const LIVE_OUTSIDE_SITEMAP: readonly {
   {
     path: '/agency-trial',
     builds: ['on'],
-    reason: 'noindex; answers while V2_BILLING is on (app/agency-trial/page.tsx)',
+    reason: 'noindex; the page itself while V2_BILLING is on (app/agency-trial/page.tsx)',
   },
 ];
 
