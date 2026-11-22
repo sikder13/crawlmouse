@@ -100,9 +100,7 @@ export function supabaseTrialClockReads(sb: SupabaseClient): TrialClockReads {
         .in('idempotency_key', [...keys])
         .in('status', ['sent', 'suppressed']);
       if (error) throw new Error(`trial clock ledger read failed: ${error.message}`);
-      return new Set(
-        ((data ?? []) as { idempotency_key: string }[]).map((r) => r.idempotency_key),
-      );
+      return new Set(((data ?? []) as { idempotency_key: string }[]).map((r) => r.idempotency_key));
     },
   };
 }
