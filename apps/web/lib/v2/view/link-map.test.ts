@@ -126,7 +126,7 @@ describe('linkMapView: the hubs and their neighbours (Final-LinkMap)', () => {
     expect(access.rows[0]!.qualifier).toBe('by robots.txt');
     expect(access.note).toBe('2 of the 6 AI crawlers’ requests for this page are in the record.');
     expect(access.tagged).toBe(
-      'Tested with tagged user agents from published IPs — crawlmouse.com/bot.',
+      'Tested with tagged user agents from Crawlmouse’s own address, not the crawlers’ — crawlmouse.com/bot.',
     );
   });
 });

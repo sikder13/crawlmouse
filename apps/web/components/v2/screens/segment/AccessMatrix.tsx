@@ -86,7 +86,11 @@ export function AccessMatrix({
               {g.rows.map((r) => (
                 <tr key={r.ua} data-v2-crawler={r.ua}>
                   <th scope="row" className={own.ua}>
-                    {r.ua}
+                    {r.ua}{' '}
+                    <span className={`${styles.small} ${styles.muted}`} data-v2-addition="">
+                      <VisuallyHidden>Confidence: </VisuallyHidden>
+                      {r.confidence}
+                    </span>
                   </th>
                   {r.cells.map((c) => (
                     <td key={c.id} colSpan={c.span > 1 ? c.span : undefined}>

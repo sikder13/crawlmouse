@@ -141,7 +141,7 @@ describe('auditDoc on the contract fixtures', () => {
     expect(access.blocks).toContainEqual({ type: 'text', text: 'by robots.txt, not fetched' });
     expect(access.blocks[0]).toEqual({
       type: 'text',
-      text: 'One of six AI crawlers is blocked, and one is challenged.',
+      text: 'Requests as one of six AI crawlers were refused by user agent, and one was challenged.',
     });
   });
 
@@ -193,13 +193,13 @@ describe('auditDoc on the contract fixtures', () => {
     const partial = auditDoc({ dataset: CHALLENGED, checkId: CHALLENGED_RECHECK }, OPTIONS);
     expect(partial.notMeasured.slice(0, 2)).toEqual([
       'This audit is partial: 44 of the 140 pages found were not crawled.',
-      'The site’s edge blocks all automation, so only one of the four scored crawlers could be measured. Access is somewhere between 0 and 30 of 40.',
+      'The site’s edge refused or challenged our browser-identity request from Crawlmouse’s address, so only one of the four scored crawlers could be measured. Access is somewhere between 0 and 30 of 40.',
     ]);
     expect(tableOf(partial, 'Letter, score and what each rests on').rows[1]).toEqual([
       'AI readability',
       'withheld',
       'withheld',
-      'The site’s edge blocks all automation, so only one of the four scored crawlers could be measured. Access is somewhere between 0 and 30 of 40.',
+      'The site’s edge refused or challenged our browser-identity request from Crawlmouse’s address, so only one of the four scored crawlers could be measured. Access is somewhere between 0 and 30 of 40.',
     ]);
     expect(partial.lines[2]).toBe('96 of 140 pages crawled');
   });
@@ -243,7 +243,7 @@ describe('baselineDoc', () => {
     ]);
     expect(doc.sections[1]!.blocks[0]).toEqual({
       type: 'text',
-      text: 'All six AI crawlers get in.',
+      text: 'Requests with all six AI crawlers’ user agents were served.',
     });
     expect(doc.sections[2]!.blocks[0]).toEqual({
       type: 'text',
@@ -256,7 +256,7 @@ describe('baselineDoc', () => {
     const blocked = baselineDoc({ dataset: BAD, checkId: BAD_FIRST }, OPTIONS);
     expect(blocked.sections[1]!.blocks[0]).toEqual({
       type: 'text',
-      text: 'One of six AI crawlers is blocked, and one is challenged.',
+      text: 'Requests as one of six AI crawlers were refused by user agent, and one was challenged.',
     });
   });
 });

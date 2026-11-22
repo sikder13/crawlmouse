@@ -46,7 +46,7 @@ describe('contentView: headline and tiles', () => {
     expect(v.headline.title).toBe('Whether pages open with a quotable answer was not measured.');
     expect(v.headline.pill).toEqual({ state: 'neutral', label: 'not measured' });
     expect(v.headline.body).toBe(
-      'The site’s edge blocks all automation, so whether the pages open with a quotable answer could not be measured.',
+      'The site’s edge refused or challenged our browser-identity request from Crawlmouse’s address, so whether the pages open with a quotable answer could not be measured.',
     );
     expect(v.grid).toBeNull();
     expect(v.coverage).toEqual({ read: 'No page was read for these checks.' });

@@ -259,7 +259,7 @@ const BASE_CHANGES: CopyChange[] = [
     screen: 'result',
     kind: 'facts',
     locked: '2 of 6 blocked',
-    rendered: '1 blocked · 1 challenged',
+    rendered: '1 refused by user agent · 1 challenged',
     source:
       'FACTS I2 and the crawler-matrix line: under the new vocabulary a challenge is not "blocked", and the headline count is ENGINE-DERIVED.',
   },
@@ -267,14 +267,15 @@ const BASE_CHANGES: CopyChange[] = [
     screen: 'result',
     kind: 'facts',
     locked: 'GPTBot is refused by a firewall rule;',
-    rendered: 'GPTBot is blocked by a firewall rule;',
+    rendered: 'GPTBot was refused by a firewall rule when we sent its user agent;',
     source: 'FACTS I2: "blocked" is the word for blocked_by_ua_rule.',
   },
   {
     screen: 'result',
     kind: 'facts',
     locked: "Google, Bing, Claude and OpenAI's search bot get in.",
-    rendered: 'The other four AI crawlers get in; Googlebot and Bingbot are allowed by robots.txt.',
+    rendered:
+      'Requests with the other four AI crawlers’ user agents were served; Googlebot and Bingbot are allowed by robots.txt.',
     source:
       'FACTS I6: six AI crawlers are tested, and Googlebot and Bingbot are counted by robots.txt, never a live verdict.',
   },

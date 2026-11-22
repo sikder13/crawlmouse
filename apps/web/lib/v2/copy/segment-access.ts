@@ -11,7 +11,7 @@ export const ACCESS_CHANGES: CopyChange[] = [
     locked:
       'Two of six crawlers never get in. blocked GPTBot is refused by a Cloudflare firewall rule on every page. PerplexityBot is served a challenge page instead of your content. Google, Bing, OAI-SearchBot and ClaudeBot reach the site; two of them then hit the JavaScript problem covered in the next section.',
     rendered:
-      'One of six AI crawlers is blocked, and one is challenged. 1 blocked · 1 challenged GPTBot is blocked by a firewall rule; PerplexityBot gets a challenge page. The other four AI crawlers get in; OAI-SearchBot, ChatGPT-User, Claude-SearchBot and ClaudeBot then read product pages empty without JavaScript, covered in the next section. Googlebot and Bingbot are allowed by robots.txt.',
+      'Requests as one of six AI crawlers were refused by user agent, and one was challenged. 1 refused by user agent · 1 challenged GPTBot was refused by a firewall rule when we sent its user agent; PerplexityBot gets a challenge page. Requests with the other four AI crawlers’ user agents were served; OAI-SearchBot, ChatGPT-User, Claude-SearchBot and ClaudeBot then read product pages empty without JavaScript, covered in the next section. Googlebot and Bingbot are allowed by robots.txt.',
     source:
       'FACTS I6 and I2: “two of six crawlers never get in” is ENGINE-DERIVED under the new vocabulary, where a challenge is not “blocked”; the pill is the Result door’s.',
   },
@@ -30,7 +30,7 @@ export const ACCESS_CHANGES: CopyChange[] = [
     locked:
       'Select a cell to see the raw request and response. Tested by user agent; your CDN may treat signed bots differently.',
     rendered:
-      'Each page was requested with the crawler’s own user agent, tagged “Crawlmouse/2.0 (+https://crawlmouse.com/bot)”, from our published IPs. Rules that match the whole string exactly will not fire on the tagged version, so a block can be under-reported here. Verify this site in Settings and we test with the exact strings. Rendering requests come from Cloudflare Browser Rendering, and one untagged browser-identity control fetch per sampled page is part of the method. Select a cell to see the raw request and response.',
+      'Each page was requested with the crawler’s own user agent, tagged “Crawlmouse/2.0 (+https://crawlmouse.com/bot)”, from Crawlmouse’s own address, not the operator’s. A rule matching the exact string will not fire on it, and a site that verifies crawler addresses may refuse it while serving the real crawler. Rendering requests come from Cloudflare Browser Rendering, and one untagged browser-identity control fetch per sampled page is part of the method. Select a cell to see the raw request and response.',
     source: 'FACTS D1, with its L5 correction (FACTS-proposed line 217 points there).',
   },
   {
@@ -136,6 +136,11 @@ export const ACCESS_CHANGES: CopyChange[] = [
 ];
 
 export const ACCESS_ADDITIONS: Addition[] = [
+  {
+    screen: 'segment-access',
+    what: 'How sure each crawler’s verdict is, beside its name',
+    source: 'V2R PR 2a, F-156: the confidence the engine computes, which no screen showed',
+  },
   {
     screen: 'segment-access',
     what: 'The evidence class beside each verdict, the group rows of the matrix, and the footnote on Google and Bing’s rendering',

@@ -17,7 +17,7 @@ describe('nojsView: the headline', () => {
     );
     expect(v.headline.pill).toEqual({ state: 'warn', label: '31% site-wide' });
     expect(v.headline.body).toBe(
-      'OAI-SearchBot, ChatGPT-User, Claude-SearchBot and ClaudeBot read the HTML your server sends and do not run scripts; PerplexityBot and GPTBot would too, once they get in. On the two product pages measured, that HTML holds 134 and 121 words; a browser renders 1,120 and 1,084. All 158 product pages share the template. The homepage, collections and blog are fine, so this is one template, not a site-wide problem. Measured 25 Oct 2026 at 02:33 UTC.',
+      'OAI-SearchBot, ChatGPT-User, Claude-SearchBot and ClaudeBot read the HTML your server sends and do not run scripts; PerplexityBot and GPTBot would too, once they are served. On the two product pages measured, that HTML holds 134 and 121 words; a browser renders 1,120 and 1,084. All 158 product pages share the template. The homepage, collections and blog are fine, so this is one template, not a site-wide problem. Measured 25 Oct 2026 at 02:33 UTC.',
     );
   });
 
@@ -40,7 +40,7 @@ describe('nojsView: the headline', () => {
     const v = view('challenged-site');
     expect(v.headline.title).toBe('71% of the text is in the HTML before JavaScript runs.');
     expect(v.headline.body).toMatch(
-      /^The site’s edge blocks all automation from our published IPs/,
+      /^The site’s edge refused or challenged our browser-identity request from Crawlmouse’s address/,
     );
   });
 });

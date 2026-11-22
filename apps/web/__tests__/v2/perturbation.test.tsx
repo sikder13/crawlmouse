@@ -317,9 +317,15 @@ const PERTURB: Record<string, Record<string, Change[]>> = {
       {
         change: (c) => (crawler(c, 'PerplexityBot').verdict = 'refused_unverified'),
         expect: {
-          Home: ['PerplexityBot is admitted only from verified IPs'],
-          Result: ['PerplexityBot is admitted only from verified IPs'],
-          Crawl: ['PerplexityBot is admitted only from verified IPs'],
+          Home: [
+            'PerplexityBot was refused, as was every other crawler name we sent; this may be IP verification',
+          ],
+          Result: [
+            'PerplexityBot was refused, as was every other crawler name we sent; this may be IP verification',
+          ],
+          Crawl: [
+            'PerplexityBot was refused, as was every other crawler name we sent; this may be IP verification',
+          ],
         },
       },
     ],
@@ -355,7 +361,10 @@ const PERTURB: Record<string, Record<string, Change[]>> = {
         change: (c) => (crawler(c, 'GPTBot').cause = 'robots_txt_disallow'),
         expect: {
           Home: ['a robots.txt rule'],
-          Result: ['One robots.txt rule and one bot setting', 'GPTBot is blocked by a rule;'],
+          Result: [
+            'One robots.txt rule and one bot setting',
+            'GPTBot was refused when we sent its user agent, while another crawler name was served;',
+          ],
         },
       },
     ],
@@ -371,8 +380,8 @@ const PERTURB: Record<string, Record<string, Change[]>> = {
         fixture: 'clean-site',
         change: (c) => (crawler(c, 'OAI-SearchBot').text_share = 0.44),
         expect: {
-          Result: ['read 44% of the text or more', '200 44%'],
-          Crawl: ['read 44% of the text or more'],
+          Result: [', with 44% of the text or more', '200 44%'],
+          Crawl: [', with 44% of the text or more'],
         },
       },
     ],

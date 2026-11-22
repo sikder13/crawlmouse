@@ -530,7 +530,8 @@ describe('the edge that blocks all automation, as rendered', () => {
       renderToStaticMarkup(crawlElement('challenged-site', 'end')),
     ]) {
       expect(html).toContain(EDGE_PILL);
-      expect(html).not.toMatch(/\brefused\b|lets through|challenges every|whoever we said/);
+      // "Refused" is now the word for a refused request (RC-34), so it is not on this list.
+      expect(html).not.toMatch(/lets through|challenges every|whoever we said/);
     }
   });
 });

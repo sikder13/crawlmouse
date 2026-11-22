@@ -16,12 +16,16 @@ import type {
 import { findCheck } from '../../fixtures';
 import { listOf, percent, templateNoun, testedAt, timeOfDay } from '../../format';
 import {
+  EDGE_METHOD,
   EDGE_SENTENCE,
   isAi,
   isAllowed,
   isBlocked,
   isChallenged,
   keptOutClauses,
+  servedAll,
+  servedExtent,
+  servedOthers,
   meetsEdge,
   clientRenderedTemplates,
 } from '../../sentences';
@@ -54,6 +58,8 @@ export interface MatrixRow {
   ua: string;
   /** The crawler's verdict over the whole sample. */
   verdict: Verdict;
+  /** How sure that verdict is: `likely` at most for one that rests on our own requests (F-156). */
+  confidence: CrawlerResult['confidence'];
   cells: MatrixCell[];
   /** "31%", "100%*" (a search engine's own rendering), or "not measured". */
   text: string;
@@ -134,7 +140,7 @@ const CAUSE_MEANS: Record<AccessCause, string> = {
   rate_limit_429: '429 means the site limited how fast this crawler may fetch',
   pay_per_crawl_402: '402 means the site asks this crawler to pay to crawl',
   cross_host_redirect: 'the site sent this crawler to another host',
-  verified_bot_only: 'the site admits this crawler only from its verified IPs',
+  verified_bot_only: 'nothing we sent claiming to be a crawler was served',
 };
 
 /**
@@ -166,6 +172,16 @@ const FOOTNOTE =
   '* Google and Bing render JavaScript; the text share is what a browser renders. Connect Search Console to see Google’s own fetches.';
 
 /** FACTS B2: a crawler allowed by robots.txt alone is said to be, not merely "allowed". */
+/**
+ * A refusal verdict whose status was a 404 or 410 says that status (F-152). Display only: the verdict
+ * and its weight are unchanged until PR 7's panel.
+ */
+const answeredGone = (verdict: Verdict, status: number | null | undefined) =>
+  (verdict === 'blocked_by_ua_rule' || verdict === 'refused_unverified') &&
+  (status === 404 || status === 410)
+    ? `(answered ${status} to our request)`
+    : null;
+
 const qualifierOf = (verdict: Verdict, evidence: EvidenceClass) =>
   verdict === 'allowed' && evidence === 'declared' ? 'by robots.txt' : null;
 
@@ -196,27 +212,40 @@ function evidenceView(
   };
 }
 
-/** "One of six AI crawlers is blocked, and one is challenged." */
+/** "Requests as one of six AI crawlers were refused by user agent, and one was challenged." */
 function headlineTitle(check: Check): string {
   const ai = check.crawlers.filter(isAi);
   if (meetsEdge(check)) return `${EDGE_SENTENCE}.`;
   const n = (keep: (v: Verdict) => boolean) => ai.filter((c) => keep(c.verdict)).length;
   const unmeasured = (v: Verdict) => v === 'not_measured';
-  const kinds: [n: number, one: string, many: string][] = [
-    [n(isBlocked), 'is blocked', 'are blocked'],
-    [n(isChallenged), 'is challenged', 'are challenged'],
+  const is = (x: Verdict) => (v: Verdict) => v === x;
+  // `request`: the fact is about a request we sent, so a first clause says so. A robots.txt rule is
+  // what the site declares, and an unmeasured crawler got no answer to report.
+  const kinds: [n: number, one: string, many: string, request: boolean][] = [
+    [n(is('disallowed_by_robots')), 'is blocked by robots.txt', 'are blocked by robots.txt', false],
+    [n(is('blocked_by_ua_rule')), 'was refused by user agent', 'were refused by user agent', true],
+    [
+      n(is('refused_unverified')),
+      'was refused, as was every crawler name we sent',
+      'were refused, as was every crawler name we sent',
+      true,
+    ],
+    [n(is('challenged_ua')), 'was challenged', 'were challenged', true],
     [
       n((v) => !isAllowed(v) && !isBlocked(v) && !isChallenged(v) && !unmeasured(v)),
       'is kept out another way',
       'are kept out another way',
+      false,
     ],
-    [n(unmeasured), 'was not measured', 'were not measured'],
+    [n(unmeasured), 'was not measured', 'were not measured', false],
   ];
   const present = kinds.filter(([n]) => n > 0);
-  if (!present.length) return `All ${numberWord(ai.length)} AI crawlers get in.`;
-  const clauses = present.map(([n, one, many], i) =>
+  if (!present.length) return `${servedAll(ai.length, 'AI')}${servedExtent(check)}.`;
+  const clauses = present.map(([n, one, many, request], i) =>
     i === 0
-      ? `${capitalise(numberWord(n))} of ${numberWord(ai.length)} AI crawlers ${n === 1 ? one : many}`
+      ? request
+        ? `Requests as ${numberWord(n)} of ${numberWord(ai.length)} AI crawlers ${many}`
+        : `${capitalise(numberWord(n))} of ${numberWord(ai.length)} AI crawlers ${n === 1 ? one : many}`
       : `${numberWord(n)} ${n === 1 ? one : many}`,
   );
   return clauses.length === 1
@@ -236,16 +265,11 @@ function headlineBody(check: Check): string {
   const readers = allowed.filter((c) => c.verdict === 'allowed_thin').map((c) => c.ua);
   const parts: string[] = [];
   if (edge) {
-    parts.push(
-      `${EDGE_SENTENCE} from our published IPs, tagged or not, so what the crawlers themselves get could not be measured.`,
-    );
+    parts.push(EDGE_METHOD);
   }
   if (out.length) parts.push(`${capitalise(out.join('; '))}.`);
   if (allowed.length) {
-    const who =
-      out.length === 0
-        ? `All ${numberWord(ai.length)} AI crawlers get in`
-        : `The other ${allowed.length === 1 ? 'AI crawler gets' : `${numberWord(allowed.length)} AI crawlers get`} in`;
+    const who = `${out.length === 0 ? servedAll(ai.length, 'AI') : servedOthers(allowed.length)}${servedExtent(check)}`;
     parts.push(
       thin.length && readers.length
         ? `${who}; ${listOf(readers)} then read ${listOf(thin)} empty without JavaScript, covered in the next section.`
@@ -268,8 +292,8 @@ function methodSentence(tests: readonly AccessTest[]): string {
   const exact =
     crawlerTests.length > 0 && crawlerTests.every((t) => !t.identity_sent.includes(OUR_TAG));
   const identity = exact
-    ? 'Each page was requested with the crawler’s exact user agent from our published IPs; this site is verified.'
-    : `Each page was requested with the crawler’s own user agent, tagged “${OUR_TAG}”, from our published IPs. Rules that match the whole string exactly will not fire on the tagged version, so a block can be under-reported here. Verify this site in Settings and we test with the exact strings.`;
+    ? 'Each page was requested with the crawler’s exact user agent from Crawlmouse’s address, not the operator’s.'
+    : `Each page was requested with the crawler’s own user agent, tagged “${OUR_TAG}”, from Crawlmouse’s own address, not the operator’s. A rule matching the exact string will not fire on it, and a site that verifies crawler addresses may refuse it while serving the real crawler.`;
   return `${identity} Rendering requests come from Cloudflare Browser Rendering, and one untagged browser-identity control fetch per sampled page is part of the method. Select a cell to see the raw request and response.`;
 }
 
@@ -302,7 +326,7 @@ function rowOf(
           span: 1,
           verdict,
           evidence: c.evidence_class,
-          qualifier: qualifierOf(verdict, c.evidence_class),
+          qualifier: answeredGone(verdict, t?.status) ?? qualifierOf(verdict, c.evidence_class),
           status: t?.status == null ? null : String(t.status),
           evidenceId: testFor(c.ua, col.key)?.id ?? null,
         };
@@ -311,6 +335,7 @@ function rowOf(
   return {
     ua: c.ua,
     verdict: c.verdict,
+    confidence: c.confidence,
     cells,
     text:
       c.text_share === null ? 'not measured' : `${percent(c.text_share)}%${footnoted ? '*' : ''}`,

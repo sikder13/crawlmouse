@@ -37,7 +37,45 @@ export const isChallenged = (v: Verdict) => v === 'challenged_ua' || v === 'refu
  * way (the CC-22 brief's "blocks all automation").
  */
 export const EDGE_PILL = 'blocks all automation';
-export const EDGE_SENTENCE = `The site’s edge ${EDGE_PILL}`;
+export const EDGE_SENTENCE =
+  'The site’s edge refused or challenged our browser-identity request from Crawlmouse’s address';
+/**
+ * What an edge that refuses automation shows, and what follows from it. The request it refused was
+ * our browser-identity control, from our own address (F-145).
+ */
+export const EDGE_METHOD = `${EDGE_SENTENCE}, so the crawler requests were not sent.`;
+
+/** What a served crawler request proves: our request carrying its user agent was served (F-139). */
+export const servedAll = (n: number, kind: 'AI' | 'scored') =>
+  n === 1
+    ? `The request with the one ${kind === 'AI' ? 'AI' : 'scored'} crawler’s user agent was served`
+    : `Requests with all ${numberWord(n)} ${kind} crawlers’ user agents were served`;
+
+export const servedOthers = (n: number) =>
+  n === 1
+    ? 'The request with the other AI crawler’s user agent was served'
+    : `Requests with the other ${numberWord(n)} AI crawlers’ user agents were served`;
+
+/**
+ * How many sampled pages a served verdict rests on, when that is less than the sample: a crawler can
+ * read as served from one page in 25 (V2R question 010). Empty when each was measured on the whole
+ * sample. `short` drops "the" and "sampled", for the pill.
+ */
+export function servedExtent(check: Pick<Check, 'crawlers' | 'coverage'>, short = false): string {
+  const sampled = check.coverage?.pages_sampled ?? 0;
+  const read = check.crawlers
+    .filter((c) => isAi(c) && isAllowed(c.verdict) && c.evidence_class !== 'declared')
+    .map((c) => Math.min(c.pages_measured, sampled));
+  if (!read.length || read.every((n) => n >= sampled)) return '';
+  const low = Math.min(...read);
+  const high = Math.max(...read);
+  const range = low === high ? count(low) : `${count(low)} to ${count(high)}`;
+  const noun = plural(sampled, 'page', 'pages');
+  return short
+    ? `, on ${range} of ${count(sampled)} ${noun}`
+    : `, on ${range} of the ${count(sampled)} sampled ${noun}`;
+}
+
 export const meetsEdge = (check: Pick<Check, 'crawlers'>) =>
   check.crawlers.some((c) => c.verdict === 'edge_blocks_automation');
 
@@ -48,12 +86,21 @@ function keptOut(verdict: Verdict, cause: AccessCause | null): [string, string] 
       return ['is blocked by robots.txt', 'are blocked by robots.txt'];
     case 'blocked_by_ua_rule':
       return cause === 'cloudflare_1020'
-        ? ['is blocked by a firewall rule', 'are blocked by a firewall rule']
-        : ['is blocked by a rule', 'are blocked by a rule'];
+        ? [
+            'was refused by a firewall rule when we sent its user agent',
+            'were refused by a firewall rule when we sent their user agents',
+          ]
+        : [
+            'was refused when we sent its user agent, while another crawler name was served',
+            'were refused when we sent their user agents, while another crawler name was served',
+          ];
     case 'challenged_ua':
       return ['gets a challenge page', 'get a challenge page'];
     case 'refused_unverified':
-      return ['is admitted only from verified IPs', 'are admitted only from verified IPs'];
+      return [
+        'was refused, as was every other crawler name we sent; this may be IP verification',
+        'were refused, as was every other crawler name we sent; this may be IP verification',
+      ];
     case 'rate_limited':
       return ['is rate limited', 'are rate limited'];
     case 'payment_required':
@@ -255,16 +302,14 @@ export function seoSummary(
  * "All four scored crawlers get in and read 98% of the text or more": the share only when every one
  * was measured, and a plain statement when none was tested.
  */
-function allInSentence(scored: readonly CrawlerResult[]): string {
+function allInSentence(scored: readonly CrawlerResult[], extent: string): string {
   if (!scored.length) return 'No scored AI crawler was tested.';
   const shares = scored.map((c) => c.text_share);
   const one = scored.length === 1;
-  const all = one
-    ? 'The one scored crawler gets in'
-    : `All ${numberWord(scored.length)} scored crawlers get in`;
+  const all = `${servedAll(scored.length, 'scored')}${extent}`;
   if (shares.some((x) => x === null)) return `${all}.`;
   const share = percent(Math.min(...(shares as number[])));
-  return `${all} and ${one ? 'reads' : 'read'} ${share}% of the text or more.`;
+  return `${all}, with ${share}% of the text or more.`;
 }
 
 /**
@@ -282,7 +327,7 @@ export function aiSummary(check: Check): string {
     entry.names.push(pagesOf(check, key));
     byReaders.set(uas.join('\n'), entry);
   }
-  if (!out.length && !byReaders.size) return allInSentence(scored);
+  if (!out.length && !byReaders.size) return allInSentence(scored, servedExtent(check));
   const thin = [...byReaders.values()].map(({ uas, names }) => {
     const who =
       uas.length < inside.length
@@ -302,7 +347,7 @@ export function aiSummary(check: Check): string {
 export function aiShortSummary(check: Check): string {
   const out = keptOutClauses(scoredOf(check));
   const thin = thinSentence(check);
-  if (!out.length && !thin) return allInSentence(scoredOf(check));
+  if (!out.length && !thin) return allInSentence(scoredOf(check), servedExtent(check));
   return [out.length ? `${capitalise(out.join('; '))}.` : null, thin].filter(Boolean).join(' ');
 }
 

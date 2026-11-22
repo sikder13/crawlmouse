@@ -11,7 +11,7 @@ export const NOJS_CHANGES: CopyChange[] = [
     locked:
       'ClaudeBot and OAI-SearchBot read the HTML your server sends and do not run scripts; GPTBot and PerplexityBot would too, once they get in.',
     rendered:
-      'OAI-SearchBot, ChatGPT-User, Claude-SearchBot and ClaudeBot read the HTML your server sends and do not run scripts; PerplexityBot and GPTBot would too, once they get in.',
+      'OAI-SearchBot, ChatGPT-User, Claude-SearchBot and ClaudeBot read the HTML your server sends and do not run scripts; PerplexityBot and GPTBot would too, once they are served.',
     source:
       'FACTS I6: six AI crawlers in two groups; the fixture lets four of them in, in the order the check lists them.',
   },

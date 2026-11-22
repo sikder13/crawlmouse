@@ -58,8 +58,10 @@ describe.each(SEGMENT_VARIANTS)(
       if (rows.some((r) => r.verdict === 'edge_blocks_automation')) {
         expect(label).toBe('blocks all automation');
       } else {
-        expect(n(/(\d+) blocked/)).toBe(count(['disallowed_by_robots', 'blocked_by_ua_rule']));
-        expect(n(/(\d+) challenged/)).toBe(count(['challenged_ua', 'refused_unverified']));
+        expect(n(/(\d+) blocked by robots/)).toBe(count(['disallowed_by_robots']));
+        expect(n(/(\d+) refused by user agent/)).toBe(count(['blocked_by_ua_rule']));
+        expect(n(/(\d+) refused, unverified/)).toBe(count(['refused_unverified']));
+        expect(n(/(\d+) challenged/)).toBe(count(['challenged_ua']));
         expect(n(/(\d+) not measured/)).toBe(count(['not_measured']));
       }
     });

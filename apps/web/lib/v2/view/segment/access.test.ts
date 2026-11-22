@@ -118,23 +118,30 @@ describe('accessView: evidence', () => {
 describe('accessView: headline, tiles and the method sentence', () => {
   it('counts what kept the AI crawlers out in the words the Result door uses', () => {
     const v = view('bad-site');
-    expect(v.headline.pill).toEqual({ state: 'bad', label: '1 blocked · 1 challenged' });
-    expect(v.headline.title).toBe('One of six AI crawlers is blocked, and one is challenged.');
+    expect(v.headline.pill).toEqual({
+      state: 'bad',
+      label: '1 refused by user agent · 1 challenged',
+    });
+    expect(v.headline.title).toBe(
+      'Requests as one of six AI crawlers were refused by user agent, and one was challenged.',
+    );
     expect(v.headline.body).toBe(
-      'GPTBot is blocked by a firewall rule; PerplexityBot gets a challenge page. The other four AI crawlers get in; OAI-SearchBot, ChatGPT-User, Claude-SearchBot and ClaudeBot then read product pages empty without JavaScript, covered in the next section. Googlebot and Bingbot are allowed by robots.txt. Tested 25 Oct 2026 at 02:33 UTC.',
+      'GPTBot was refused by a firewall rule when we sent its user agent; PerplexityBot gets a challenge page. Requests with the other four AI crawlers’ user agents were served; OAI-SearchBot, ChatGPT-User, Claude-SearchBot and ClaudeBot then read product pages empty without JavaScript, covered in the next section. Googlebot and Bingbot are allowed by robots.txt. Tested 25 Oct 2026 at 02:33 UTC.',
     );
   });
 
   it('says so when every AI crawler gets in', () => {
     const v = view('clean-site');
-    expect(v.headline.title).toBe('All six AI crawlers get in.');
-    expect(v.headline.pill).toEqual({ state: 'ok', label: '6 of 6 allowed' });
+    expect(v.headline.title).toBe('Requests with all six AI crawlers’ user agents were served.');
+    expect(v.headline.pill).toEqual({ state: 'ok', label: '6 of 6 served' });
   });
 
   it('names the edge once when it blocks all automation', () => {
     const v = view('challenged-site');
     expect(v.headline.pill.label).toBe('blocks all automation');
-    expect(v.headline.title).toBe('The site’s edge blocks all automation.');
+    expect(v.headline.title).toBe(
+      'The site’s edge refused or challenged our browser-identity request from Crawlmouse’s address.',
+    );
   });
 
   it('reads the tiles from the check: crawlers tested, pages fetched, responses kept', () => {
@@ -157,7 +164,7 @@ describe('accessView: headline, tiles and the method sentence', () => {
 
   it('uses the tagged-identity sentence (FACTS D1, with the L5 correction)', () => {
     expect(view('bad-site').method).toBe(
-      'Each page was requested with the crawler’s own user agent, tagged “Crawlmouse/2.0 (+https://crawlmouse.com/bot)”, from our published IPs. Rules that match the whole string exactly will not fire on the tagged version, so a block can be under-reported here. Verify this site in Settings and we test with the exact strings. Rendering requests come from Cloudflare Browser Rendering, and one untagged browser-identity control fetch per sampled page is part of the method. Select a cell to see the raw request and response.',
+      'Each page was requested with the crawler’s own user agent, tagged “Crawlmouse/2.0 (+https://crawlmouse.com/bot)”, from Crawlmouse’s own address, not the operator’s. A rule matching the exact string will not fire on it, and a site that verifies crawler addresses may refuse it while serving the real crawler. Rendering requests come from Cloudflare Browser Rendering, and one untagged browser-identity control fetch per sampled page is part of the method. Select a cell to see the raw request and response.',
     );
   });
 

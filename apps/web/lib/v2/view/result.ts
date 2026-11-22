@@ -39,6 +39,7 @@ import { toneOf } from '../letters';
 import type { LayoutNode, Point } from '../map-layout';
 import type { SegmentKey } from './segment/frame';
 import {
+  EDGE_METHOD,
   EDGE_PILL,
   EDGE_SENTENCE,
   aiSummary,
@@ -48,6 +49,9 @@ import {
   isBlocked,
   isChallenged,
   keptOutClauses,
+  servedAll,
+  servedExtent,
+  servedOthers,
   meetsEdge,
   seoSummary,
   clientRenderedTemplates,
@@ -277,18 +281,31 @@ export function accessPill(check: Check): DoorView['pill'] {
   const allowed = ai.filter((c) => isAllowed(c.verdict));
   const blocked = ai.filter((c) => isBlocked(c.verdict)).length;
   const challenged = ai.filter((c) => isChallenged(c.verdict)).length;
+  // Three states, never two (RC-34): robots.txt, a refusal with a served witness, and a refusal of
+  // every crawler name we sent, which is its own count and is not a challenge.
+  const of = (v: CrawlerResult['verdict']) => ai.filter((c) => c.verdict === v).length;
+  const robots = of('disallowed_by_robots');
+  const refused = of('blocked_by_ua_rule');
+  const unverified = of('refused_unverified');
   // A crawler that could not be measured is neither let in nor kept out.
   const unmeasured = ai.filter((c) => c.verdict === 'not_measured').length;
   const kept = ai.length - allowed.length - unmeasured;
   return meetsEdge(check)
     ? { state: 'bad', label: EDGE_PILL }
     : kept === 0 && unmeasured === 0
-      ? { state: 'ok', label: `${ai.length} of ${ai.length} allowed` }
+      ? servedExtent(check)
+        ? {
+            state: 'unverified',
+            label: `${ai.length} of ${ai.length} served${servedExtent(check, true)}`,
+          }
+        : { state: 'ok', label: `${ai.length} of ${ai.length} served` }
       : {
           state: blocked ? 'bad' : 'unverified',
           label: [
-            blocked ? `${blocked} blocked` : null,
-            challenged ? `${challenged} challenged` : null,
+            robots ? `${robots} blocked by robots.txt` : null,
+            refused ? `${refused} refused by user agent` : null,
+            unverified ? `${unverified} refused, unverified` : null,
+            challenged - unverified ? `${challenged - unverified} challenged` : null,
             kept - blocked - challenged ? `${kept - blocked - challenged} kept out` : null,
             unmeasured ? `${unmeasured} not measured` : null,
           ]
@@ -320,12 +337,12 @@ function accessDoor(
     allowed.length === 0
       ? ''
       : allowed.length === 1
-        ? ' The other AI crawler gets in;'
-        : ` The other ${numberWord(allowed.length)} AI crawlers get in;`;
+        ? ` ${servedOthers(1)}${servedExtent(check)};`
+        : ` ${servedOthers(allowed.length)}${servedExtent(check)};`;
   const body = edge
-    ? `${EDGE_SENTENCE} from our published IPs, tagged or not, so what the crawlers themselves get could not be measured.${out.length ? ` ${capitalise(out.join('; '))}.` : ''}`
+    ? `${EDGE_METHOD}${out.length ? ` ${capitalise(out.join('; '))}.` : ''}`
     : out.length === 0
-      ? `All ${numberWord(ai.length)} AI crawlers get in. ${searchLine}`
+      ? `${servedAll(ai.length, 'AI')}${servedExtent(check)}. ${searchLine}`
       : `${capitalise(out.join('; '))}.${othersIn} ${searchLine}`;
   return {
     title: 'Crawler access',
@@ -818,14 +835,14 @@ function allClear(check: Check, kept: boolean, cadence: string | null): NoFixCar
   const inside = ai.filter((c) => isAllowed(c.verdict));
   const out = keptOutClauses(ai);
   const access = !out.length
-    ? `All ${numberWord(ai.length)} AI crawlers get in`
+    ? `${servedAll(ai.length, 'AI')}${servedExtent(check)}`
     : inside.length
-      ? `${out.join('; ')}; the other ${numberWord(inside.length)} AI crawlers get in`
+      ? `${out.join('; ')}; ${servedOthers(inside.length).replace(/^./, (x) => x.toLowerCase())}${servedExtent(check)}`
       : out.join('; ');
   const thin = (clientRenderedTemplates(check) ?? []).map(
     (k) => templateNoun(check.coverage!.templates.find((t) => t.template_key === k)!.label).pages,
   );
-  // What the crawlers that got in read; with none in, nothing was read to say it of.
+  // What the requests that were served read; with none served, nothing was read to say it of.
   const text = !inside.length
     ? ''
     : thin.length
