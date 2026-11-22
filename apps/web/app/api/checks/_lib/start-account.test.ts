@@ -3,7 +3,9 @@ import { GATES } from '../../../../lib/entitlement-v2';
 import type { AccountViewer } from '../../../../lib/v2/account/viewer-read';
 import type { AddSiteOutcome } from '../../../../lib/v2/account/sites-store';
 import type { RecheckOutcome } from '../../../../lib/v2/account/recheck';
+import { START_COPY, START_REFUSALS } from '../../../../components/v2/screens/home/start-check';
 import {
+  ACCOUNT_SENTENCES,
   siteLimitSentence,
   startAccountCheck,
   type AccountStartDeps,
@@ -219,7 +221,25 @@ describe('a host the account keeps', () => {
   });
 });
 
+describe('the home form’s words', () => {
+  it('the form knows every account refusal, and says the route’s own sentence for each', () => {
+    for (const [code, sentence] of Object.entries(ACCOUNT_SENTENCES)) {
+      expect(START_REFUSALS).toContain(code);
+      expect(START_COPY[code as keyof typeof ACCOUNT_SENTENCES]).toBe(sentence);
+    }
+    expect(START_REFUSALS).toContain('site_limit');
+    // A plan's limit is the account's: the form's sentence names no count of sites.
+    expect(START_COPY.site_limit).not.toMatch(/\d|\b(one|two|three|four|five|ten) sites?\b/i);
+  });
+});
+
 describe('siteLimitSentence', () => {
+  it('says how many an account over its limit keeps (a lapsed plan’s sites)', () => {
+    expect(siteLimitSentence('free', GATES.free.sites, 5)).toBe(
+      'Your Free plan keeps one site, and this account keeps five sites now. Open your dashboard to check one of them again.',
+    );
+  });
+
   it('names the plan and its limit in words, for each tier’s own limit', () => {
     expect(siteLimitSentence('free', GATES.free.sites)).toBe(
       'Your Free plan keeps one site, and this account keeps it already. Open your dashboard to check it again.',

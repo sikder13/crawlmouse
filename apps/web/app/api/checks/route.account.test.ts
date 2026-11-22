@@ -422,3 +422,85 @@ describe('POST /api/checks, somebody else’s data (J4)', () => {
     expect(h.captured).toEqual([]);
   });
 });
+
+describe('POST /api/checks, the review’s cases (RC-02 gate)', () => {
+  const bare = (url: string, headers: Record<string, string>) =>
+    new Request('https://crawlmouse.com/api/checks', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-forwarded-for': IP, ...headers },
+      body: JSON.stringify({ url, requestId: randomUUID() }),
+    });
+
+  it('a start for an account takes our own pages only: no Origin and no Sec-Fetch-Site is a 403', async () => {
+    const p = await person(h.db, 'origin');
+    as(p);
+    expect(await read(await POST(bare('origin.example', {})))).toEqual({
+      status: 403,
+      body: { code: 'cross_site', error: 'Start the audit from crawlmouse.com.' },
+    });
+    expect(
+      (await read(await POST(bare('origin.example', { origin: 'https://evil.example' })))).status,
+    ).toBe(403);
+    expect(await sitesOf(p.accountId)).toEqual([]);
+    expect(h.ipAsked).toEqual([]);
+    // A browser's own-page request with no Origin says so, and passes.
+    expect((await POST(bare('origin.example', { 'sec-fetch-site': 'same-origin' }))).status).toBe(
+      200,
+    );
+  });
+
+  it('a refusal of the account’s own counts against no address bucket', async () => {
+    const p = await person(h.db, 'nocount');
+    await keptSite(h.db, p.accountId);
+    as(p);
+    expect((await POST(home('over.example'))).status).toBe(409);
+    expect(h.ipAsked).toEqual([]);
+  });
+
+  it('an answer with a check already queued counts against no address bucket', async () => {
+    const p = await person(h.db, 'nocount-busy');
+    const kept = await keptSite(h.db, p.accountId);
+    await addCheck(kept.id, 'queued');
+    as(p);
+    expect((await POST(home(kept.host))).status).toBe(200);
+    expect(h.ipAsked).toEqual([]);
+  });
+
+  it('two submits of a new host at once: both are answered with the one check', async () => {
+    const p = await person(h.db, 'race');
+    await makePaid(h.db, p.accountId, 'pro');
+    as(p);
+    const [a, b] = await Promise.all([POST(home('race.example')), POST(home('race.example'))]);
+    const [ra, rb] = [await read(a), await read(b)];
+    expect([ra.status, rb.status]).toEqual([200, 200]);
+    expect(rb.body).toEqual(ra.body);
+    expect(await sitesOf(p.accountId)).toHaveLength(1);
+    expect(h.sent).toHaveLength(1);
+  });
+
+  it('signed in with no account (a removed seat): the public start, a site no account keeps', async () => {
+    const p = await person(h.db, 'noacct');
+    await h.db.query(
+      `update public.seats set status = 'removed', removed_at = now() where account_id = $1`,
+      [p.accountId],
+    );
+    as(p);
+    const { status, body } = await read(await POST(home('noacct.example')));
+    expect(status).toBe(200);
+    expect((await checkRow(body.checkId as string))?.account_id).toBeNull();
+    expect(h.ipAsked).toEqual([[IP, true]]);
+  });
+
+  it('signed in with two accounts and neither chosen: the public start, not a guess', async () => {
+    const p = await person(h.db, 'ambig');
+    const other = await person(h.db, 'ambig-other');
+    await addSeat(h.db, other.accountId, p, 'account_manager');
+    await h.db.query(`update public.users set default_account_id = null where id = $1`, [p.id]);
+    as(p);
+    const { status, body } = await read(await POST(home('ambig.example')));
+    expect(status).toBe(200);
+    expect((await checkRow(body.checkId as string))?.account_id).toBeNull();
+    expect(await sitesOf(p.accountId)).toEqual([]);
+    expect(await sitesOf(other.accountId)).toEqual([]);
+  });
+});

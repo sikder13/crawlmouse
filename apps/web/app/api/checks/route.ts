@@ -5,6 +5,7 @@ import { IdSchema } from '@crawlmouse/types/v2';
 import { checksPublicEnabled, pipelineEnabled } from '@/lib/auth/flags';
 import { getClientIp } from '@/lib/client-ip';
 import { CRAWL_PAUSED_MESSAGE, isCrawlPaused } from '@/lib/crawl-pause';
+import { isSameOrigin } from '@/lib/security/same-origin';
 import { supabaseServer } from '@/lib/supabase/server';
 import { captureFor, checkStarted } from '@/lib/v2/account/events';
 import { viewerFor, type AccountViewer, type ViewerResult } from '@/lib/v2/account/viewer';
@@ -126,6 +127,11 @@ async function startForAccount(
   input: Parameters<typeof startAccountCheck>[2],
   logged: { url: string; requestId: string },
 ): Promise<Response> {
+  // A start for an account writes to it, so it takes `/api/sites`' rule: only our own pages. The
+  // middleware applies this route's lenient rule, which a request with no Origin passes.
+  if (!isSameOrigin(req, new URL(req.url).origin)) {
+    return answer({ code: 'cross_site', error: 'Start the audit from crawlmouse.com.' }, 403);
+  }
   let outcome;
   try {
     outcome = await startAccountCheck(accountStartDeps(session), viewer, input);

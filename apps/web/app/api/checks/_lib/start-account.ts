@@ -4,16 +4,20 @@
  *
  * 1. The host, by the public start's rule (`publicHost`), then the SSRF guard on it. A refusal is
  *    the public start's `invalid_url`.
- * 2. The caller's address bucket, with Turnstile once it is over its limit, at the signed-in limit
- *    (`addressGate`): the home form is never weaker for a signed-in person than it is today.
- * 3. A live site of the account with that host that the caller's seat covers. While its latest check
- *    is queued or running, that check is the answer and nothing is requested (a double submit starts
- *    one crawl). Otherwise it is checked again as the site page's "Run check now" checks it
+ * 2. A live site of the account with that host that the caller's seat covers. A paused one is
+ *    refused; while its latest check is queued or running, that check is the answer and nothing is
+ *    requested. Otherwise it is checked again as the site page's "Run check now" checks it
  *    (`request_capped_check`, under the account's `manualChecksPerSiteDay` and the day's ceiling).
- * 4. No such site: the seat must be one that may add a site, and the site is added with its first
- *    audit by `add_site`, the statement `/api/sites` uses. It counts the account's site limit under
- *    the account's lock, the day's adds, the day's `global:audits:day` ceiling (failing closed) and,
- *    on Free, v1's per-domain hourly bucket. Those are not counted again here.
+ * 3. No such site: the seat must be one that may add a site, and the account must be under its site
+ *    limit. Then the site is added with its first audit by `add_site`, the statement `/api/sites`
+ *    uses: it counts the site limit under the account's lock, the day's adds, the day's
+ *    `global:audits:day` ceiling (failing closed) and, on Free, v1's per-domain hourly bucket. Those
+ *    are not counted again here. Two submits racing for one new host: the one `add_site` answers
+ *    `exists` is answered with the other's check.
+ * 4. Before step 2's or step 3's request, and only then, the caller's address bucket, with Turnstile
+ *    once it is over its limit, at the signed-in limit (`addressGate`): the home form is never weaker
+ *    for a signed-in person than it is today. A caller with no known address is not counted, as on
+ *    the public start.
  *
  * The account is the one the viewer acts in (`loadViewer`: the switcher's choice among the caller's
  * own seats, else their default), so nothing here names an account the caller does not sit on. An
@@ -30,7 +34,6 @@ import type { RequestRecheck } from '../../../../lib/v2/account/recheck';
 import { PLAN_NAMES } from '../../../../lib/v2/view/account';
 import { UNAVAILABLE_CODES } from '../../../../lib/v2/unavailable';
 import { numberWord, plural } from '../../../../lib/v2/words';
-import { START_COPY } from '../../../../components/v2/screens/home/start-check';
 import { publicHost } from './host';
 import {
   addressGate,
@@ -66,7 +69,7 @@ export type AccountStarted =
   | { trigger: 'first_audit'; siteId: string; n: number }
   | { trigger: 'manual'; siteId: string };
 
-/** The refusals only a start for an account has; the form says each (`START_COPY`). */
+/** The refusals only a start for an account has; the home form has words for each. */
 export type AccountRefusalCode =
   | 'site_limit'
   | 'adds_capped'
@@ -92,12 +95,27 @@ const refuse = (
   more: { nextAllowedAt?: string } = {},
 ): AccountStartRefusal => ({ ok: false, status, body: { code, error, ...more } });
 
-/** A refusal whose sentence is the home form's own (`START_COPY`): it holds no number. */
+/**
+ * The sentence of each refusal that holds no number. The home form says the same words for the same
+ * codes (`START_COPY`, components/v2/screens/home/start-check.ts); `start-account.test.ts` holds the
+ * two equal, since a module here may not import the form's.
+ */
+export const ACCOUNT_SENTENCES: Readonly<
+  Record<Exclude<AccountRefusalCode, 'site_limit'>, string>
+> = Object.freeze({
+  adds_capped: 'This account has added as many sites as it may today. Try again tomorrow.',
+  role_refused: 'Your seat on this account cannot add a site. Ask the account’s owner to add it.',
+  site_paused: 'Checks of this site are paused. Its page on your dashboard says why.',
+  recently_checked:
+    'This site was checked as often as its plan allows for now. Its latest audit is on your dashboard.',
+  site_exists: 'This account already keeps that site. Open it from your dashboard.',
+});
+
 const said = (
   status: AccountStartRefusal['status'],
   code: Exclude<AccountRefusalCode, 'site_limit'>,
   more: { nextAllowedAt?: string } = {},
-): AccountStartRefusal => refuse(status, code, START_COPY[code], more);
+): AccountStartRefusal => refuse(status, code, ACCOUNT_SENTENCES[code], more);
 
 const CAPACITY = refuse(
   503,
@@ -105,13 +123,19 @@ const CAPACITY = refuse(
   'We’re at capacity right now. Please try again tomorrow.',
 );
 
-/** "Your Free plan keeps one site, and this account keeps it already." */
-export function siteLimitSentence(tier: Tier, limit: number): string {
-  const sites = `${numberWord(limit)} ${plural(limit, 'site', 'sites')}`;
+/**
+ * "Your Free plan keeps one site, and this account keeps it already." `kept` is the account's live
+ * site count now: an account over its limit (a lapsed plan's sites) is told how many it keeps.
+ */
+export function siteLimitSentence(tier: Tier, limit: number, kept: number = limit): string {
+  const sites = (n: number) => `${numberWord(n)} ${plural(n, 'site', 'sites')}`;
+  const holds =
+    kept === limit
+      ? `this account keeps ${plural(limit, 'it', 'them')} already`
+      : `this account keeps ${sites(kept)} now`;
   return (
-    `Your ${PLAN_NAMES[tier]} plan keeps ${sites}, and this account keeps ` +
-    `${plural(limit, 'it', 'them')} already. Open your dashboard to check ` +
-    `${plural(limit, 'it', 'one of them')} again.`
+    `Your ${PLAN_NAMES[tier]} plan keeps ${sites(limit)}, and ${holds}. Open your dashboard to ` +
+    `check ${plural(kept, 'it', 'one of them')} again.`
   );
 }
 
@@ -122,28 +146,35 @@ export async function startAccountCheck(
 ): Promise<AccountStartOutcome> {
   const host = publicHost(input.url);
   if (host === null || !(await deps.admit(host))) return INVALID_URL;
-
-  const address = await addressGate(deps, input, async () => true);
-  if (address !== null) return address;
-
+  // The address bucket is counted only for a start that would request a check: a refusal of the
+  // account's own, or an answer with a check already queued, counts against nothing.
+  const gate = () => addressGate(deps, input, async () => true);
   const site = await deps.coveredSite(viewer.account.id, host);
-  return site === null ? addSite(deps, viewer, host) : checkAgain(deps, viewer, host, site);
+  return site === null
+    ? addSite(deps, viewer, host, gate)
+    : checkAgain(deps, viewer, host, site, gate);
 }
+
+type Gate = () => Promise<StartRefusal | null>;
 
 async function addSite(
   deps: AccountStartDeps,
   viewer: AccountViewer,
   host: string,
+  gate: Gate,
 ): Promise<AccountStartOutcome> {
   const { account, seat } = viewer;
   if (!(await deps.mayAdd(account.id, seat.id))) return said(403, 'role_refused');
-  const now = deps.now();
-  const first = (await deps.liveSites(account.id)) === 0;
+  const live = await deps.liveSites(account.id);
+  // `add_site` decides under the account's lock; this read only spares the address bucket.
+  if (live >= viewer.limits.sites) return limitReached(viewer, live);
+  const address = await gate();
+  if (address !== null) return address;
   const added = await deps.addSite({
     accountId: account.id,
     ownerSeatId: seat.id,
     host,
-    schedule: deps.schedule(viewer.tier, first, now, account.timezone),
+    schedule: deps.schedule(viewer.tier, live === 0, deps.now(), account.timezone),
     limit: viewer.limits.sites,
     // v1's per-domain hourly bucket leaves paid tiers out (as /api/sites counts it).
     perDomain: viewer.tier === 'free',
@@ -157,11 +188,14 @@ async function addSite(
         created: true,
         started: { trigger: 'first_audit', siteId: added.siteId, n: added.n },
       };
-    case 'exists':
-      // The account keeps the host, on a site this seat does not cover, or added a moment ago.
-      return said(409, 'site_exists');
+    case 'exists': {
+      // Added a moment ago by another submit: its check is the answer. A site this seat does not
+      // cover reads as none, and is refused without naming it.
+      const now = await deps.coveredSite(account.id, host);
+      return now === null ? said(409, 'site_exists') : checkAgain(deps, viewer, host, now, NO_GATE);
+    }
     case 'full':
-      return refuse(409, 'site_limit', siteLimitSentence(viewer.tier, viewer.limits.sites));
+      return limitReached(viewer, await deps.liveSites(account.id));
     case 'adds_capped':
       return said(429, 'adds_capped', { nextAllowedAt: added.nextAllowedAt });
     case 'domain_capped':
@@ -176,11 +210,18 @@ async function addSite(
   }
 }
 
+/** The address was counted already, for the request this answer belongs to. */
+const NO_GATE: Gate = async () => null;
+
+const limitReached = (viewer: AccountViewer, kept: number) =>
+  refuse(409, 'site_limit', siteLimitSentence(viewer.tier, viewer.limits.sites, kept));
+
 async function checkAgain(
   deps: AccountStartDeps,
   viewer: AccountViewer,
   host: string,
   site: CoveredSite,
+  gate: Gate,
 ): Promise<AccountStartOutcome> {
   if (site.pausedReason !== null) return said(409, 'site_paused');
   if (
@@ -189,6 +230,8 @@ async function checkAgain(
   ) {
     return { ok: true, checkId: site.latest.id, created: false, started: null };
   }
+  const address = await gate();
+  if (address !== null) return address;
   const outcome = await deps.recheck({
     siteId: site.id,
     trigger: 'manual',
@@ -215,6 +258,6 @@ async function checkAgain(
       return said(409, 'site_paused');
     case 'removed':
       // Removed between the read above and the request: the account no longer keeps the host.
-      return addSite(deps, viewer, host);
+      return addSite(deps, viewer, host, NO_GATE);
   }
 }
