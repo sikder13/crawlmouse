@@ -1,4 +1,5 @@
 import { expect, test } from './pw';
+import { isTestAddress, stagingAdminRefusal, testAddress } from './lib/accounts';
 import { originHeaders, protectionRefusal } from './lib/protection';
 import { assertCheckableSite } from './lib/sites';
 import { databaseRefusal, writeRefusal } from './lib/target';
@@ -161,5 +162,50 @@ test.describe('Vercel Deployment Protection', () => {
     expect(originHeaders({ VERCEL_AUTOMATION_BYPASS_SECRET: 's3' })).toEqual({
       'x-vercel-protection-bypass': 's3',
     });
+  });
+});
+
+test.describe('the staging admin client', () => {
+  const ok = {
+    SUPABASE_URL: 'https://qfgkrnnjuiasahspavbc.supabase.co',
+    STAGING_PROJECT_REF: 'qfgkrnnjuiasahspavbc',
+    SUPABASE_SERVICE_ROLE_KEY: 'k',
+  };
+  test("allows staging's project, with or without a trailing slash", () => {
+    expect(stagingAdminRefusal(ok)).toBeNull();
+    expect(
+      stagingAdminRefusal({ ...ok, SUPABASE_URL: 'https://qfgkrnnjuiasahspavbc.supabase.co/' }),
+    ).toBeNull();
+  });
+  test("refuses production's project and every other project", () => {
+    expect(
+      stagingAdminRefusal({ ...ok, SUPABASE_URL: 'https://ezspnfeyzwsisymytssm.supabase.co' }),
+    ).toMatch(/production/);
+    expect(
+      stagingAdminRefusal({
+        ...ok,
+        SUPABASE_URL: 'https://qfgkrnnjuiasahspavbc.supabase.co.evil.test',
+      }),
+    ).toMatch(/is not/);
+    expect(
+      stagingAdminRefusal({ ...ok, SUPABASE_URL: 'http://qfgkrnnjuiasahspavbc.supabase.co' }),
+    ).toMatch(/is not/);
+    expect(stagingAdminRefusal({ ...ok, STAGING_PROJECT_REF: 'ezspnfeyzwsisymytssm' })).toMatch(
+      /STAGING_PROJECT_REF/,
+    );
+    expect(stagingAdminRefusal({ ...ok, SUPABASE_SERVICE_ROLE_KEY: '' })).toMatch(/not set/);
+  });
+  test('makes only lab-domain test addresses, and accepts no other', () => {
+    const a = testAddress('j1', 2, 1_700_000_000_000);
+    expect(a).toBe('qa+j1-loyw3v28-2@lab.crawlmouse.com');
+    expect(isTestAddress(a)).toBe(true);
+    for (const x of [
+      'someone@gmail.com',
+      'qa+j1-x-1@lab.crawlmouse.com.evil.test',
+      'qa+j9-x-1@lab.crawlmouse.com',
+    ]) {
+      expect(isTestAddress(x), x).toBe(false);
+    }
+    expect(() => testAddress('j9')).toThrow(/not a journey/);
   });
 });
