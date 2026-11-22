@@ -121,6 +121,22 @@ describe('pricingView with billing off (RC-01)', () => {
     },
   );
 
+  it('says the weekly summary is Pro’s, because Free accounts are not sent one', () => {
+    const faq = pricingView({ kind: 'signed_out' }, 'month', NOW, OFF).faq.items;
+    expect(faq.find((i) => i.q === 'Which emails will I get?')!.a.text).toContain(
+      'on Pro or during its trial, a weekly summary',
+    );
+  });
+
+  it.each([OFF, ON])('Agency lists what is built before what is coming (%j)', (flags) => {
+    const rows = pricingView({ kind: 'signed_out' }, 'month', NOW, flags).plans.find(
+      (p) => p.tier === 'agency',
+    )!.rows;
+    const firstComing = rows.findIndex((r) => r.coming);
+    expect(firstComing).toBeGreaterThan(0);
+    expect(rows.slice(firstComing).every((r) => r.coming)).toBe(true);
+  });
+
   it('tells someone who already pays where to go', () => {
     const faq = pricingView({ kind: 'signed_out' }, 'month', NOW, OFF).faq.items;
     expect(faq.find((i) => i.q === 'Can I cancel?')!.a.text).toContain('support@crawlmouse.com');

@@ -473,7 +473,7 @@ export const PRICING_COPY = {
           {
             q: 'Which emails will I get?',
             a: {
-              text: 'A sign-in link, a note when a check finds a change, and a weekly summary.',
+              text: 'A sign-in link, a note when a check finds a change, and, on Pro or during its trial, a weekly summary when something changed.',
               capabilities: ['change_emails'],
             },
           },
