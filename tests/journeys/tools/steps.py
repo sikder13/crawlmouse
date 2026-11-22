@@ -191,7 +191,7 @@ J = {
  ('J4.3','A\'s changes, alerts, reports, settings, plan, delete, seats, agency, billing','B sees only its own account','desktop','no'),
  ('J4.4','Export files and fix packets; email-developer','404 / 401','desktop','no'),
  ('J4.5','Share links and report pages','Open only what was shared; no pivot','desktop','no'),
- ('J4.6','Every API call in A\'s network log, replayed as B and signed out, with ids changed','Refused; no write crosses accounts','desktop','yes (it replays writes)'),
+ ('J4.6','Every API call in A\'s network log, replayed as B, signed out, and signed in with no v2 account, with ids changed; each also with a random id that does not exist','Refused; no write crosses accounts; an existing private id and a missing id answer the same status and body','desktop','yes (it replays writes)'),
  ('J4.7','v1 API routes','410 or refused','desktop','no'),
 ]),
 }
