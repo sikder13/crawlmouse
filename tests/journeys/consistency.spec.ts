@@ -58,7 +58,10 @@ test('a D step writes unless it is declared with exactly "no"', () => {
   for (const bad of ['| D.F-001 | maybe |', '| D.F-001 |  |', '| D.F-001 | no | extra |']) {
     expect(() => writes(bad), bad).toThrow(/neither yes nor no/);
   }
-  expect(() => parseSteps(`${list}\n| D.F-999 | no |\n`)).toThrow(/not a D step/);
+  for (const row of ['| D.F-999 | no |', '  | D.F-999 | no |']) {
+    expect(() => parseSteps(`${list}\n${row}\n`), row).toThrow(/not a D step/);
+  }
+  expect(() => parseSteps(`${list}\n| D.F-001 | yes |\n| D.F-001 | no |\n`)).toThrow(/twice/);
 });
 
 test('expected-fail.json names only defects the index lists', () => {

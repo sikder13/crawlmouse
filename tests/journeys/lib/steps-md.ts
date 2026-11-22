@@ -43,7 +43,7 @@ export function parseSteps(md: string): Map<string, StepMeta> {
     out.set(id, { id, devices, writes, listed });
   }
   // Defect-named steps (D.F-nnn) have no journey row: every device, and writing unless declared below.
-  const declared = /^\|\s*D\.F-\d{3}\s*\|/;
+  const declared = /^\s*\|\s*D\.F-\d{3}\s*\|/;
   const named = md
     .split('\n')
     .filter((line) => !declared.test(line))
@@ -57,6 +57,7 @@ export function parseSteps(md: string): Map<string, StepMeta> {
     });
   }
   // "D steps that write nothing". Fails closed, as the journey rows do: anything but exactly "no" writes.
+  const seen = new Set<string>();
   for (const line of md.split('\n').filter((l) => declared.test(l))) {
     const cells = line
       .split('|')
@@ -64,6 +65,8 @@ export function parseSteps(md: string): Map<string, StepMeta> {
       .map((c) => c.trim());
     const step = out.get(cells[0]!);
     if (!step) throw new Error(`STEPS.md declares ${cells[0]}, which is not a D step`);
+    if (seen.has(step.id)) throw new Error(`STEPS.md declares ${step.id} twice`);
+    seen.add(step.id);
     if (cells.length !== 2 || !/^(yes|no)\b/.test(cells[1]!)) {
       throw new Error(
         `STEPS.md ${cells[0]}: Writes cell "${cells[1] ?? ''}" is neither yes nor no`,
