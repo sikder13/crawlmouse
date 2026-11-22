@@ -38,10 +38,12 @@ export const V2_REWRITES: readonly V2Rewrite[] = [
   { from: '/', to: '/v2-home', flag: 'checksPublic' },
   // CC-26b: the signed-in dashboard.
   { from: '/dashboard', to: '/dashboard/v2', flag: 'checksPublic' },
-  // CC-29: the pages that sell. Pricing and Developers follow the billing flag; the shared report
-  // follows the public checks, and its target renders v1's page for a report minted by v1.
-  { from: '/pricing', to: '/v2-pricing', flag: 'billing' },
-  { from: '/developers', to: '/v2-developers', flag: 'billing' },
+  // CC-29: the pages that sell. RC-01: Pricing and Developers follow the public checks, not billing,
+  // so v1's pages are not served beside the v2 product; with billing off their paid buttons are
+  // closed (`pricingView`). The shared report also follows the public checks, and its target renders
+  // v1's page for a report minted by v1.
+  { from: '/pricing', to: '/v2-pricing', flag: 'checksPublic' },
+  { from: '/developers', to: '/v2-developers', flag: 'checksPublic' },
   { from: '/r/:slug', to: '/v2-report/:slug', flag: 'checksPublic' },
   // CC-36 D3: the kept v1 public pages, in the v2 shell. Each target, under app/(v2-kept), renders
   // its v1 page's own output with v1's header and footer replaced by v2's, so v1's file is main's.

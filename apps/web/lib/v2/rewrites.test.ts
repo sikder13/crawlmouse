@@ -13,9 +13,13 @@ describe('V2_REWRITES', () => {
         flag: 'checksPublic',
       });
     for (const p of ['/pricing', '/pricing/'])
-      expect(rewriteOf(p)).toEqual({ from: '/pricing', to: '/v2-pricing', flag: 'billing' });
+      expect(rewriteOf(p)).toEqual({ from: '/pricing', to: '/v2-pricing', flag: 'checksPublic' });
     for (const p of ['/developers', '/developers/'])
-      expect(rewriteOf(p)).toEqual({ from: '/developers', to: '/v2-developers', flag: 'billing' });
+      expect(rewriteOf(p)).toEqual({
+        from: '/developers',
+        to: '/v2-developers',
+        flag: 'checksPublic',
+      });
     for (const p of [
       '//',
       '/index',

@@ -1,6 +1,6 @@
 /**
- * /pricing behind V2_BILLING (CC-29 D1, D2): the middleware rewrites /pricing here while the flag is
- * on (lib/v2/rewrites.ts). This page is a 404 with the flag off and when the request did not come
+ * /pricing behind V2_CHECKS_PUBLIC (CC-29 D1, D2; RC-01): the middleware rewrites /pricing here while
+ * the flag is on (lib/v2/rewrites.ts). This page is a 404 with the flag off and when the request did not come
  * through the rewrite; it keeps v1's title and canonical; it reads the viewer per request and sends
  * `pricing_viewed` with the request's cookie header.
  */
@@ -53,12 +53,13 @@ beforeEach(() => {
   h.captured = [];
   h.after = [];
   vi.stubEnv('V2_BILLING', '1');
+  vi.stubEnv('V2_CHECKS_PUBLIC', '1');
 });
 afterEach(() => vi.unstubAllEnvs());
 
 describe('/v2-pricing', () => {
-  it.each(['', 'true', '0'])('is a 404 with V2_BILLING=%j, before any read', async (flag) => {
-    vi.stubEnv('V2_BILLING', flag);
+  it.each(['', 'true', '0'])('is a 404 with V2_CHECKS_PUBLIC=%j, before any read', async (flag) => {
+    vi.stubEnv('V2_CHECKS_PUBLIC', flag);
     await expect(render()).rejects.toMatchObject({
       digest: expect.stringContaining('NEXT_HTTP_ERROR_FALLBACK;404'),
     });
@@ -92,7 +93,7 @@ describe('/v2-pricing', () => {
   // "Log in" is a third /login link either way.
   it.each([
     ['1', 2, 1],
-    ['', 0, 3],
+    ['', 0, 2],
   ])('V2_ACCOUNT_DOOR=%j: %i links to /signup, %i to /login', async (door, signup, login) => {
     vi.stubEnv('V2_ACCOUNT_DOOR', door);
     const html = renderToStaticMarkup(await render());

@@ -17,23 +17,23 @@ import { intervalFrom, pricingView } from '@/lib/v2/view/pricing';
 // Rendered per request: the plan buttons read the session.
 export const dynamic = 'force-dynamic';
 
-// v1's title and canonical (app/pricing/page.tsx); the description is the v2 plans', and it is shared
-// as itself, with its own card (SEO R2-N6).
+// v1's title, description and canonical (app/pricing/page.tsx; B question 002), shared as itself,
+// with its own card (SEO R2-N6).
 export const metadata: Metadata = {
   title: PRICING_COPY.pageTitle,
-  description: PRICING_COPY.description(),
+  description: PRICING_COPY.indexedDescription,
   alternates: { canonical: '/pricing' },
   ...socialMetadata({
     path: '/pricing',
     title: PRICING_COPY.pageTitle,
-    description: PRICING_COPY.description(),
+    description: PRICING_COPY.indexedDescription,
     image: socialCardPath('pricing'),
   }),
 };
 
 /**
- * The v2 Pricing page (CC-29 D2), which `/pricing` is rewritten to while V2_BILLING is on
- * (`V2_REWRITES`, lib/v2/rewrites.ts). A 404 with the flag off, and when the request did not come
+ * The v2 Pricing page (CC-29 D2), which `/pricing` is rewritten to while V2_CHECKS_PUBLIC is on
+ * (`V2_REWRITES`, lib/v2/rewrites.ts; RC-01). A 404 with the flag off, and when the request did not come
  * through that rewrite, so the page has one address, `/pricing`. `pricing_viewed` is sent after the
  * response, with the request's cookie header for the visitor's consent.
  */
@@ -42,7 +42,7 @@ export default async function V2PricingPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  if (!billingV2Enabled()) return notFound();
+  if (!checksPublicEnabled()) return notFound();
   if (!(await reachedByRewrite())) return notFound();
   const now = new Date();
   const interval = intervalFrom((await searchParams).interval);
@@ -53,6 +53,10 @@ export default async function V2PricingPage({
   after(() =>
     capture('pricing_viewed', person, { interval, signedIn: viewer.kind === 'signed_in' }),
   );
-  const flags = { accountDoor: accountDoorEnabled(), checksPublic: checksPublicEnabled() };
+  const flags = {
+    accountDoor: accountDoorEnabled(),
+    checksPublic: checksPublicEnabled(),
+    billing: billingV2Enabled(),
+  };
   return <PricingScreen view={pricingView(viewer, interval, now, flags)} />;
 }
