@@ -10,6 +10,7 @@ import { ALERTS_SENDER } from '../../auth/constants';
 import type { Addition } from '../copy-registry';
 import { dayDate, weekdayTime } from '../format';
 import { noticeOf, type NoticeCode } from '../account/route';
+import { SUPPORT_EMAIL } from './support';
 
 const NEXT_CHECK = 'the next check confirms the fix or reopens it.';
 const capitalised = (t: string) => t[0]!.toUpperCase() + t.slice(1);
@@ -57,7 +58,8 @@ export const NOTICE_LINES: Record<NoticeCode, (at: string | null) => string> = {
     'This sign-in is a member of more than one account and none is set as the one to open.',
   not_owner: () => 'Only the account’s owner can start the trial.',
   not_eligible: () => 'This account cannot start a trial: it is on a plan, or has had its trial.',
-  refused: () => 'A trial could not be started for this account.',
+  refused: () =>
+    `A free trial has already been used from this device or network, so another cannot start here. Free keeps working. To ask about it, email ${SUPPORT_EMAIL}.`,
   conflict: () =>
     'The account changed while the trial was starting. Reload the page and try again.',
   trial_failed: () => 'The trial did not start. Nothing was changed; try again later.',

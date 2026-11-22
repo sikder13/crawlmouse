@@ -883,6 +883,18 @@ function noSiteView(v: AccountView, earlier: EarlierAuditsView | null): Dashboar
  * passes none and the header keeps its weekly stand-in (`nextCheckLine`). `earlier` is the viewer's
  * own v1 audits (`readEarlierAudits`), none by default.
  */
+/**
+ * The page a refused trial comes back to says why (F-104), so it does not offer the same trial beside
+ * that sentence. The refusal is the trial ledger's and is not stored on the account, so a later visit
+ * shows the offer again.
+ */
+export function withoutTrialOffer(
+  view: DashboardView,
+  query: Readonly<Record<string, string | string[] | undefined>>,
+): DashboardView {
+  return query.notice === 'refused' ? { ...view, startPro: null } : view;
+}
+
 export function dashboardView(
   d: AccountDataset,
   viewer: Viewer,

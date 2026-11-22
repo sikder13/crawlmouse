@@ -12,6 +12,7 @@ import {
   moveOver,
   weekdayAmbiguous,
   type DashboardView,
+  withoutTrialOffer,
 } from './dashboard';
 import { CLEAN_VIEWER } from '../../../app/(v2-preview)/v2-preview/_preview/accounts';
 
@@ -407,5 +408,28 @@ describe('the dashboard’s words about the account now', () => {
   it('still says how many are left when some are (F-120)', () => {
     expect(DASHBOARD_COPY.topFixesFoot(1, 'on Pro')).toContain('The other 1 is on Pro.');
     expect(DASHBOARD_COPY.topFixesFoot(10, 'on Pro')).toContain('The other 10 are on Pro.');
+  });
+});
+
+describe('the Pro trial offer after a refusal (F-104)', () => {
+  const offered = () => {
+    const d = fixture('clean-site');
+    return dashboardView(d, CLEAN_VIEWER);
+  };
+
+  it('a refused trial is not offered again on the page that says why', () => {
+    expect(offered().startPro).not.toBeNull();
+    expect(withoutTrialOffer(offered(), { notice: 'refused' }).startPro).toBeNull();
+  });
+
+  it('any other notice, a repeated one, or none leaves the offer', () => {
+    for (const q of [{}, { notice: 'capacity' }, { notice: ['refused', 'refused'] }]) {
+      expect(withoutTrialOffer(offered(), q).startPro).not.toBeNull();
+    }
+  });
+
+  it('changes nothing else on the page', () => {
+    const v = offered();
+    expect(withoutTrialOffer(v, { notice: 'refused' })).toEqual({ ...v, startPro: null });
   });
 });
