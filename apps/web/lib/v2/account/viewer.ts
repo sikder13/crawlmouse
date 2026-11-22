@@ -12,7 +12,7 @@
  * in the result, and the only email in it is the caller's own, from their session.
  *
  * Which account, for a person with several seats: the one their switcher cookie names when it is one
- * of those seats (CC-31 D2b, viewer-cookie.ts), else the default one. Nothing here writes
+ * of those seats (CC-31 D2b, viewer-cookie.ts), else `landingSeat`'s (viewer-read.ts). Nothing here writes
  * `users.default_account_id`, which stays the personal account (`prepare_email_undo` reads it so).
  */
 import 'server-only';
