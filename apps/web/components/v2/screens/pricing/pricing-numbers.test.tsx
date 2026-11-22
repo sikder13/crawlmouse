@@ -12,7 +12,6 @@ import { TRIAL_DAYS, FREE_START } from '@/lib/billing/state-machine';
 import * as PRICES from '@/lib/billing/prices';
 import { GATES } from '@/lib/entitlement-v2';
 import { AGENCY_PLUS, ANNUAL_RENEWAL_REMINDER_DAYS, FREE_PRICE } from '@/lib/v2/copy/pricing';
-import { EVIDENCE_CONDENSED_AFTER_DAYS } from '@/lib/v2/copy/settings';
 import { pricingView, type PricingViewer } from '@/lib/v2/view/pricing';
 import { numberWord } from '@/lib/v2/words';
 import { PricingScreen } from './PricingScreen';
@@ -22,7 +21,6 @@ const NOT_PRICES: Record<string, number> = {
   'Free costs nothing': FREE_PRICE,
   'the Agency trial is charged on the day after it ends': TRIAL_DAYS + 1,
   'the first Agency site sold beyond the plan': GATES.agency.sites + 1,
-  'evidence is condensed after this many days (FACTS A6)': EVIDENCE_CONDENSED_AFTER_DAYS,
   'the first annual renewal reminder (FACTS L6)': ANNUAL_RENEWAL_REMINDER_DAYS[0],
   'the second annual renewal reminder (FACTS L6)': ANNUAL_RENEWAL_REMINDER_DAYS[1],
   'the footer’s copyright year (SiteFooter, the year the page renders)': new Date().getFullYear(),

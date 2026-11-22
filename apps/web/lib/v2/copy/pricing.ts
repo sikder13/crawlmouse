@@ -27,7 +27,7 @@ import { TRIAL_DAYS } from '../../billing/state-machine';
 import { GATES, type Tier } from '../../entitlement-v2';
 import type { Tagged } from './agencies';
 import { AGENCY_PLUS_INBOX_ADDRESS } from './contact-inbox';
-import { CANCEL_CLICKS, EVIDENCE_CONDENSED_AFTER_DAYS } from './settings';
+import { CANCEL_CLICKS } from './settings';
 import { capitalise, count, numberWord, plural } from '../words';
 
 /** FACTS A3: the Agency Plus anchor row. A contact form only; nothing is built behind it. */
@@ -388,10 +388,6 @@ export const PRICING_COPY = {
      */
     lead: (billing: boolean): Tagged[] => [
       { text: 'Nothing you can see is deleted.', capabilities: [] },
-      {
-        text: `Evidence older than ${EVIDENCE_CONDENSED_AFTER_DAYS} days is condensed to headers and the parts of pages that changed.`,
-        capabilities: ['evidence_condensed'],
-      },
       ...(billing
         ? [
             {

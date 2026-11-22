@@ -137,6 +137,14 @@ describe('pricingView with billing off (RC-01)', () => {
     expect(rows.slice(firstComing).every((r) => r.coming)).toBe(true);
   });
 
+  it.each([OFF, ON])('claims no condensing of old evidence, which no job does (%j)', (flags) => {
+    for (const viewer of VIEWERS) {
+      expect(allText(pricingView(viewer, 'month', NOW, flags))).not.toMatch(
+        /condens|older than \d+ days/i,
+      );
+    }
+  });
+
   it('tells someone who already pays where to go', () => {
     const faq = pricingView({ kind: 'signed_out' }, 'month', NOW, OFF).faq.items;
     expect(faq.find((i) => i.q === 'Can I cancel?')!.a.text).toContain('support@crawlmouse.com');
