@@ -14,6 +14,7 @@ const h = vi.hoisted(() => ({
   viewer: { kind: 'signed_out' } as Record<string, unknown>,
   userId: null as string | null,
   cookie: null as string | null,
+  country: null as string | null,
   captured: [] as unknown[][],
   after: [] as (() => unknown)[],
 }));
@@ -27,7 +28,11 @@ vi.mock('@/lib/v2/pricing/read', () => ({
   },
 }));
 vi.mock('next/headers', () => ({
-  headers: async () => new Headers(h.cookie === null ? {} : { cookie: h.cookie }),
+  headers: async () =>
+    new Headers({
+      ...(h.cookie === null ? {} : { cookie: h.cookie }),
+      ...(h.country === null ? {} : { 'x-vercel-ip-country': h.country }),
+    }),
 }));
 vi.mock('next/server', () => ({ after: (fn: () => unknown) => h.after.push(fn) }));
 vi.mock('@/lib/analytics-server', () => ({
@@ -39,6 +44,7 @@ vi.mock('@/lib/analytics-server', () => ({
 }));
 
 import { FREE_START } from '@/lib/billing/state-machine';
+import { serverCaptureAllowed } from '@/lib/consent';
 import V2PricingPage, { dynamic, metadata } from './page';
 
 const render = (searchParams: Record<string, string> = {}) =>
@@ -50,6 +56,7 @@ beforeEach(() => {
   h.viewer = { kind: 'signed_out' };
   h.userId = null;
   h.cookie = null;
+  h.country = null;
   h.captured = [];
   h.after = [];
   vi.stubEnv('V2_BILLING', '1');
@@ -90,7 +97,7 @@ describe('/v2-pricing', () => {
   });
 
   // Q24/Q31: the buttons follow the flags of the routes they reach, read per request. The header's
-  // "Log in" is a third /login link either way.
+  // "Log in" is one /login link either way; with the door off Free is another, and Pro's carries `next`.
   it.each([
     ['1', 2, 1],
     ['', 0, 2],
@@ -100,6 +107,48 @@ describe('/v2-pricing', () => {
     expect(html.split('href="/signup"').length - 1).toBe(signup);
     expect(html.split('href="/login"').length - 1).toBe(login);
   });
+
+  it.each([
+    ['signed out', { kind: 'signed_out' }],
+    [
+      'signed in, trial used',
+      {
+        kind: 'signed_in',
+        account: {
+          id: 'acct-1',
+          owner: true,
+          tier: 'free',
+          snapshot: { ...FREE_START, trialUsedAt: new Date('2026-10-01T00:00:00Z') },
+          customer: 'cus_1',
+        },
+        agency: { held: false, used: null },
+      },
+    ],
+  ])('RC-01: with billing off, %s, the page offers no paid route', async (_name, viewer) => {
+    vi.stubEnv('V2_BILLING', '');
+    h.viewer = viewer;
+    const html = renderToStaticMarkup(await render());
+    expect(html).toContain('Every audit is free. Pay when you want it watched.');
+    expect(html).not.toMatch(/api\/billing\/(?:checkout|portal)|agency-trial/);
+  });
+
+  it.each([
+    ['DE', null, false],
+    ['GB', 'cm_consent_required=0', false],
+    ['DE', 'cm_consent=granted', true],
+    ['DE', 'cm_consent=denied', false],
+    ['US', null, true],
+  ])(
+    'consent for pricing_viewed from %s with cookie %j: allowed %j',
+    async (country, cookie, ok) => {
+      h.country = country;
+      h.cookie = cookie;
+      await render();
+      await Promise.all(h.after.map((fn) => fn()));
+      const sent = h.captured[0]![0] as string | null;
+      expect(serverCaptureAllowed(sent)).toBe(ok);
+    },
+  );
 
   it('sends pricing_viewed after the response, with the request’s cookie header, keyed by the person', async () => {
     h.cookie = 'cm_consent=granted';

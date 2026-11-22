@@ -6,6 +6,7 @@ import { after } from 'next/server';
 import { PricingScreen } from '@/components/v2/screens/pricing/PricingScreen';
 import { accountDoorEnabled, checksPublicEnabled } from '@/lib/auth/flags';
 import { billingV2Enabled } from '@/lib/billing/flags';
+import { CONSENT_REQUIRED_COOKIE, isConsentRequiredCountry } from '@/lib/consent';
 import { PRICING_COPY } from '@/lib/v2/copy/pricing';
 import { pricingCapture } from '@/lib/v2/pricing/events';
 import { readPricingVisit } from '@/lib/v2/pricing/read';
@@ -17,19 +18,30 @@ import { intervalFrom, pricingView } from '@/lib/v2/view/pricing';
 // Rendered per request: the plan buttons read the session.
 export const dynamic = 'force-dynamic';
 
-// v1's title, description and canonical (app/pricing/page.tsx; B question 002), shared as itself,
-// with its own card (SEO R2-N6).
+// v1's title and canonical (app/pricing/page.tsx); the description is the v2 plans', and it is shared
+// as itself, with its own card (SEO R2-N6).
 export const metadata: Metadata = {
   title: PRICING_COPY.pageTitle,
-  description: PRICING_COPY.indexedDescription,
+  description: PRICING_COPY.description(),
   alternates: { canonical: '/pricing' },
   ...socialMetadata({
     path: '/pricing',
     title: PRICING_COPY.pageTitle,
-    description: PRICING_COPY.indexedDescription,
+    description: PRICING_COPY.description(),
     image: socialCardPath('pricing'),
   }),
 };
+
+/**
+ * The cookie header consent is read from. The middleware's region flag is set on the response, so a
+ * first visit does not carry it: this adds it from the request's country, and a recorded decision
+ * still wins (`serverCaptureAllowed`).
+ */
+function consentHeader(cookie: string | null, country: string | null): string | null {
+  if (!isConsentRequiredCountry(country)) return cookie;
+  const flag = `${CONSENT_REQUIRED_COOKIE}=1`;
+  return cookie ? `${cookie}; ${flag}` : flag;
+}
 
 /**
  * The v2 Pricing page (CC-29 D2), which `/pricing` is rewritten to while V2_CHECKS_PUBLIC is on
@@ -47,7 +59,10 @@ export default async function V2PricingPage({
   const now = new Date();
   const interval = intervalFrom((await searchParams).interval);
   const { viewer, userId } = await readPricingVisit(now);
-  const capture = pricingCapture((await headers()).get('cookie'));
+  const requestHeaders = await headers();
+  const capture = pricingCapture(
+    consentHeader(requestHeaders.get('cookie'), requestHeaders.get('x-vercel-ip-country')),
+  );
   const accountId = viewer.kind === 'signed_in' ? (viewer.account?.id ?? null) : null;
   const person = userId === null ? null : { userId, accountId };
   after(() =>
