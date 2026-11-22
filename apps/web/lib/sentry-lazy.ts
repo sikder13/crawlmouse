@@ -34,11 +34,18 @@ export function loadSentry(): Promise<Sentry> | null {
   loading ??= import(
     /* webpackExports: ["init", "captureException", "captureRouterTransitionStart"] */
     '@sentry/nextjs'
-  ).then((sdk) => {
-    sdk.init(configured);
-    loaded = sdk;
-    return sdk;
-  });
+  ).then(
+    (sdk) => {
+      sdk.init(configured);
+      loaded = sdk;
+      return sdk;
+    },
+    (error: unknown) => {
+      // A chunk that failed to load is not remembered, so the next error tries again.
+      loading = null;
+      throw error;
+    },
+  );
   return loading;
 }
 

@@ -241,6 +241,29 @@ describe('the browser’s Sentry', () => {
     expect(await broken.reportToSentry(new Error('y'))).toBeNull();
   });
 
+  it('a failed fetch of the SDK is tried again by the next report', async () => {
+    vi.resetModules();
+    vi.doUnmock('@sentry/nextjs');
+    let attempts = 0;
+    vi.doMock('@sentry/nextjs', () => {
+      attempts += 1;
+      if (attempts === 1) throw new Error('chunk failed');
+      return {
+        init: (o: unknown) => void h.calls.push(['init', o]),
+        captureException: (e: unknown) => {
+          h.calls.push(['captureException', e]);
+          return 'event-id';
+        },
+        captureRouterTransitionStart: () => undefined,
+      };
+    });
+    const s = await import('./sentry-lazy');
+    s.configureSentry({ dsn: DSN });
+    expect(await s.reportToSentry(new Error('first'))).toBeNull();
+    expect(await s.reportToSentry(new Error('second'))).toBe('event-id');
+    expect(names()).toEqual(['init', 'captureException']);
+  });
+
   it('a navigation before it has loaded is ignored; after, it is forwarded', async () => {
     const s = await fresh();
     s.configureSentry({ dsn: DSN });
