@@ -307,12 +307,14 @@ test.describe('Vercel Deployment Protection', () => {
     );
     expect([first[0]!.value, second[0]!.value]).toEqual(['1', '2']);
   });
-  test("prefers the step's resolved trace mode, and forgets it after the step", () => {
-    expect(currentTrace('off')).toBe('off');
+  test("reads the step's resolved trace mode, and refuses when none was recorded", () => {
+    expect(traceRefusal(currentTrace()), 'outside a step').toMatch(/keeps no trace/);
+    noteTrace('off');
+    expect(traceRefusal(currentTrace())).toBeNull();
     noteTrace('on');
-    expect(currentTrace('off')).toBe('on');
+    expect(traceRefusal(currentTrace())).toMatch(/keeps no trace/);
     noteTrace(undefined);
-    expect(currentTrace('off')).toBe('off');
+    expect(traceRefusal(currentTrace()), 'forgotten after the step').toMatch(/keeps no trace/);
   });
   test('refuses a run that would record a trace', () => {
     for (const m of [undefined, 'off', { mode: 'off' }]) expect(traceRefusal(m)).toBeNull();

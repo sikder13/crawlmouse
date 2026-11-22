@@ -13,7 +13,7 @@ import {
   type SupabaseClient,
 } from '../../../apps/web/node_modules/@supabase/supabase-js/dist/index.mjs';
 import { databaseRefusal, PRODUCTION_REF, writeRefusal } from './target';
-import { test, type Page } from '../pw';
+import type { Page } from '../pw';
 import { currentTrace, traceRefusal } from './protection';
 
 export const STAGING_REF = 'qfgkrnnjuiasahspavbc';
@@ -131,7 +131,7 @@ export async function signIn(
   baseURL: string,
   address: string,
   admin: () => AdminAuth = () => stagingAdmin() as unknown as AdminAuth,
-  traceMode: () => unknown = () => currentTrace(test.info().project.use.trace),
+  traceMode: () => unknown = currentTrace,
 ): Promise<void> {
   if (!isTestAddress(address)) throw new Error('signIn: only a journey test address is allowed');
   const probe = await page.request.get(new URL('/', baseURL).href, { maxRedirects: 0 });

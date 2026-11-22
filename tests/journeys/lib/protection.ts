@@ -36,7 +36,8 @@ let resolvedTrace: unknown;
 export const noteTrace = (mode: unknown): void => {
   resolvedTrace = mode;
 };
-export const currentTrace = (fallback: unknown): unknown => resolvedTrace ?? fallback;
+/** Fails closed: outside a step nothing has recorded the mode, and `traceRefusal` refuses this value. */
+export const currentTrace = (): unknown => resolvedTrace ?? 'not recorded';
 
 export function traceRefusal(mode: unknown): string | null {
   const m = typeof mode === 'object' && mode !== null ? (mode as { mode?: unknown }).mode : mode;
