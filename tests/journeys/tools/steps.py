@@ -20,7 +20,7 @@ MANUAL = {
  'F-140':['J0.5a'],'F-141':['J0.5b'],'F-142':['J0.5a'],'F-143':['J0.5b'],'F-144':['J0.5b'],'F-145':['J0.5a','J0.5b'],
  'F-146':['J0.1','J0.5i'],'F-147':['J1.10'],'F-148':['J0.5h'],'F-149':['J0.5b','J0.5h'],'F-150':['J0.5b'],
  'F-151':['J0.5h'],'F-152':['J0.5b'],'F-153':['J0.5b','J0.9j'],'F-154':['J0.9j'],'F-155':['J0.5b'],'F-156':['J0.5b'],
- 'F-157':['J2.3'],'F-158':['J0.9m'],'F-159':['J0.5a'],'F-160':['J0.5a'],'F-161':['J0.5i'],'F-162':['J0.5h'],
+ 'F-157':['J2.3'],'F-163':['J4.6'],'F-158':['J0.9m'],'F-159':['J0.5a'],'F-160':['J0.5a'],'F-161':['J0.5i'],'F-162':['J0.5h'],
 }
 
 # Rows the register files under a parent step (J0.5, J0.8, J0.9, J1.12, J2.4, J4), placed on the sub-step the
@@ -185,9 +185,9 @@ J = {
  ('J3.9','Seeded `+agency`, `+agency-dev`, `+agencytrial`, `+demo`','Each dashboard matches the seed','desktop','no'),
 ]),
 'J4': ('Somebody else\'s data', 'two accounts A and B, A\'s removed member, signed out', [
- ('J4','Every address and request of A tried as B, as A\'s removed member and signed out; ids changed in addresses and bodies','Nothing private shown or changed; refusals say "belongs to an account", not "missing"','desktop','yes (it sends writes that must be refused)'),
+ ('J4','Every address and request of A tried as B, as A\'s removed member and signed out; ids changed in addresses and bodies','Nothing private shown or changed; a refused id and a missing id get the same answer, so neither reveals the id exists','desktop','yes (it sends writes that must be refused)'),
  ('J4.1','A\'s site pages (incl. staging)','B 404 / signed out to sign-in','desktop','no'),
- ('J4.2','A\'s kept results: every tab, map, fixes, checks','Refused, with the right words','desktop','no'),
+ ('J4.2','A\'s kept results: every tab, map, fixes, checks','The one 404 page a missing id gets, offering sign-in; nothing shows the id exists','desktop','no'),
  ('J4.3','A\'s changes, alerts, reports, settings, plan, delete, seats, agency, billing','B sees only its own account','desktop','no'),
  ('J4.4','Export files and fix packets; email-developer','404 / 401','desktop','no'),
  ('J4.5','Share links and report pages','Open only what was shared; no pivot','desktop','no'),
