@@ -700,8 +700,11 @@ function changesDoor(
 type NoFixCard = Exclude<ResultView['first'], { kind: 'fix' }>;
 
 /** "403", "403 or 429", "401, 403 or 429". */
-const eitherOf = (codes: readonly number[]) =>
-  codes.length < 2 ? `${codes[0]}` : `${codes.slice(0, -1).join(', ')} or ${codes.at(-1)}`;
+const eitherOf = (codes: readonly number[]) => {
+  const last = codes.at(-1);
+  const rest = codes.filter((c) => c !== last);
+  return rest.length ? `${rest.join(', ')} or ${last}` : `${last}`;
+};
 
 /** The third card when pages answered and none with a 200: what they answered, and what to do. */
 function notServedCard(check: Check, statuses: readonly number[]): NoFixCard {
