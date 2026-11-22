@@ -43,6 +43,75 @@ step(
   },
 );
 
+step(
+  'J4.3',
+  "B sees only its own account, even naming A's site or forging A's account",
+  async ({ context, baseURL }) => {
+    const A = await person(context, baseURL!, 'j4', 4);
+    const bContext = await freshContext(context, baseURL!);
+    try {
+      const B = await person(bContext, baseURL!, 'j4', 5);
+      const host = labHost();
+      const site = await keptSite(A, host);
+      const secrets = [host, A.email, A.accountId, site];
+      const leaks = (body: string, path: string) =>
+        secrets.filter((m) => !path.includes(m) && body.includes(m));
+      const pages = [
+        '/dashboard',
+        '/changes',
+        '/alerts',
+        '/reports',
+        '/settings',
+        '/settings/plan',
+        '/settings/delete',
+        '/seats',
+      ];
+
+      for (const path of pages) {
+        const r = await B.context.request.get(path);
+        expect(r.status(), `B opens its own ${path}`).toBeLessThan(500);
+        expect(leaks(await r.text(), path), `${path} shows nothing of A`).toEqual([]);
+      }
+      // A forged account cookie must not move B onto A's account.
+      const origin = new URL(baseURL!);
+      await B.context.addCookies([
+        {
+          name: 'cm_account',
+          value: A.accountId,
+          domain: origin.hostname,
+          path: '/',
+          httpOnly: true,
+          secure: true,
+          sameSite: 'Lax',
+        },
+      ]);
+      for (const path of pages) {
+        const r = await B.context.request.get(path);
+        expect(r.status(), `${path} with A's account cookie`).toBeLessThan(500);
+        expect(
+          leaks(await r.text(), path),
+          `${path} with A's account cookie shows nothing of A`,
+        ).toEqual([]);
+      }
+      await B.context.clearCookies({ name: 'cm_account' });
+
+      // F-130: a foreign site id in the filter is dropped without a word.
+      const path = `/changes?site=${site}`;
+      const r = await B.context.request.get(path);
+      const body = await r.text();
+      expect(r.status(), `${path} does not fail`).toBeLessThan(500);
+      expect(leaks(body, path), `${path} shows nothing of A`).toEqual([]);
+      if (r.status() !== 404) {
+        expect(body, 'F-130: /changes says the site is not in this account').toMatch(
+          /not in this account/i,
+        );
+      }
+    } finally {
+      await bContext.close();
+    }
+  },
+);
+
 step('J4.7', 'v1 API routes answer 410 or refuse', async ({ context, baseURL }) => {
   const A = await person(context, baseURL!, 'j4', 3);
   const id = randomUUID();
