@@ -15,12 +15,12 @@
  * Nothing here holds an email, an account id or an account name, so a header built from it cannot
  * show one person's details to another, whatever caches the page.
  *
- * This module has no server-only import, so a client component may import it.
+ * This module has no server-only import, so a client component may import it. It names no label:
+ * the header's entry for each state is the shell's own (`LOG_IN` signed out, the account rail's
+ * first entry signed in), so the words stay where the shell keeps them.
  */
 import type { z } from 'zod';
 import type { ThemeSchema } from '@crawlmouse/types/v2';
-import { LOG_IN } from '../../components/v2/footer-links';
-import { ACCOUNT_NAV } from './view/account-actions';
 import type { ViewerResult } from './account/viewer-read';
 
 type Theme = z.infer<typeof ThemeSchema>;
@@ -32,12 +32,6 @@ export type SessionHeader =
       /** The seat's theme; null where it is not known (a hint, or a person with no account). */
       theme: Theme | null;
     };
-
-/** What the header's account entry is for each state: Log in, or Sites (the dashboard). */
-export const SESSION_ACTION = {
-  signed_out: { label: LOG_IN.label, href: LOG_IN.href },
-  signed_in: { label: ACCOUNT_NAV[0].label, href: ACCOUNT_NAV[0].href },
-} as const satisfies Record<SessionHeader['kind'], { label: string; href: string }>;
 
 export const SIGNED_OUT: SessionHeader = Object.freeze({ kind: 'signed_out' });
 

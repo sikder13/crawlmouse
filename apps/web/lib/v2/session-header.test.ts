@@ -1,30 +1,22 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import type { AccountViewer } from './account/viewer-read';
-import {
-  hasSessionCookie,
-  SESSION_ACTION,
-  sessionHeaderFromCookies,
-  sessionHeaderOf,
-} from './session-header';
+import { hasSessionCookie, sessionHeaderFromCookies, sessionHeaderOf } from './session-header';
 
-// RC-02, F-008: one header answer per person. The labels and links are pinned against the values a
-// person sees today (the v2 home's Log in, the signed-in rail's first entry), written out here.
+// RC-02, F-008: one header answer per person, for every kind of viewer.
 
 const viewer = (theme: AccountViewer['seat']['theme']) =>
   ({ kind: 'viewer', viewer: { seat: { theme } } as AccountViewer }) as const;
 
 describe('sessionHeaderOf', () => {
-  it('a signed-out visitor is offered Log in', () => {
+  it('a signed-out visitor is signed out', () => {
     expect(sessionHeaderOf({ kind: 'signed_out' })).toEqual({ kind: 'signed_out' });
-    expect(SESSION_ACTION.signed_out).toEqual({ label: 'Log in', href: '/login' });
   });
 
-  it('a person in an account is offered Sites, with their seat’s theme', () => {
+  it('a person in an account is signed in, with their seat’s theme', () => {
     for (const theme of ['system', 'light', 'dark'] as const) {
       expect(sessionHeaderOf(viewer(theme))).toEqual({ kind: 'signed_in', theme });
     }
-    expect(SESSION_ACTION.signed_in).toEqual({ label: 'Sites', href: '/dashboard' });
   });
 
   it('a person with no account, or with several and none chosen, is still signed in', () => {
