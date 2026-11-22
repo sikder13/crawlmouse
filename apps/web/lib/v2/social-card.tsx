@@ -12,7 +12,6 @@
  */
 import { ImageResponse } from 'next/og';
 import { checksPublicEnabled } from '../auth/flags';
-import { billingV2Enabled } from '../billing/flags';
 import { AGENCIES_COPY } from './copy/agencies';
 import { CHECK_COPY, CHECK_QUESTIONS } from './copy/check-pages';
 import { DEVELOPERS_COPY } from './copy/developers';
@@ -52,13 +51,13 @@ export interface SocialCard {
 }
 
 export const SOCIAL_CARDS: Readonly<Record<string, SocialCard>> = {
-  pricing: { path: '/pricing', title: PRICING_COPY.pageTitle, served: () => billingV2Enabled() },
+  pricing: { path: '/pricing', title: PRICING_COPY.pageTitle, served: () => checksPublicEnabled() },
   developers: {
     path: '/developers',
     title: DEVELOPERS_COPY.title,
-    served: () => billingV2Enabled(),
+    served: () => checksPublicEnabled(),
   },
-  agencies: { path: '/agencies', title: AGENCIES_COPY.title, served: () => billingV2Enabled() },
+  agencies: { path: '/agencies', title: AGENCIES_COPY.title, served: () => checksPublicEnabled() },
   ...Object.fromEntries(
     CHECK_QUESTIONS.map((q) => [
       `check-${q}`,

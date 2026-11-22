@@ -53,9 +53,9 @@ const ALL_ON = () => {
 describe('GET /og/<card>', () => {
   // Each card's title, independently of the registry: the page's own title source.
   const TITLES: [string, string, string][] = [
-    ['pricing', 'Pricing', 'V2_BILLING'],
-    ['developers', DEVELOPERS_COPY.title, 'V2_BILLING'],
-    ['agencies', AGENCIES_COPY.title, 'V2_BILLING'],
+    ['pricing', 'Pricing', 'V2_CHECKS_PUBLIC'],
+    ['developers', DEVELOPERS_COPY.title, 'V2_CHECKS_PUBLIC'],
+    ['agencies', AGENCIES_COPY.title, 'V2_CHECKS_PUBLIC'],
     ['check-gptbot', CHECK_COPY.gptbot.title, 'V2_CHECKS_PUBLIC'],
     ['check-javascript', CHECK_COPY.javascript.title, 'V2_CHECKS_PUBLIC'],
     ['check-robots-ai', CHECK_COPY['robots-ai'].title, 'V2_CHECKS_PUBLIC'],
