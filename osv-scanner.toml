@@ -3,8 +3,9 @@
 # Scanner summary for that run: Total 52 packages affected by 144 known vulnerabilities (8 Critical, 55 High, 69 Medium, 9 Low, 3 Unknown) from 1 ecosystem.
 # This file started with 113 advisory IDs (144 table rows, 52 package versions); entries are deleted as
 # the upgrades that fix them land, so count the current number with the check below.
-# Each entry expires on 2026-11-26 (scan date + 30 days); after that the advisory fails CI again.
-# Check: grep -c '^ignoreUntil = 2026-11-26$' osv-scanner.toml  and  grep -c '^\[\[IgnoredVulns\]\]$' osv-scanner.toml  print the same number.
+# Each CC-00 entry expires on 2026-11-26 (scan date + 30 days); after that the advisory fails CI again.
+# Entries added later carry their own expiry. Check that every entry has one:
+# grep -c '^ignoreUntil = ' osv-scanner.toml  and  grep -c '^\[\[IgnoredVulns\]\]$' osv-scanner.toml  print the same number.
 # Entries added after CC-00 carry their own date, reason and approval in a comment above them.
 # Any advisory NOT listed here fails CI immediately. Delete an entry when the upgrade that fixes it lands.
 
@@ -442,3 +443,22 @@ reason = "Published 2026-10-31 (medium): minimatch@3.1.5 via eslint, minimatch@9
 id = "GHSA-fc5q-39xc-vjpf"
 ignoreUntil = 2026-11-26
 reason = "Added 2026-11-17 with owner approval: picomatch@2.3.2, picomatch@4.0.4 (no fixed version; build-time tooling only)"
+
+# CC-45 hotfix (PR #96): three advisories in next@15.5.28, published after main's last green run, so
+# they fail main's CI too. Fixed in next 15.5.29, which follows as its own PR right after this one and
+# removes these three entries. Owner approval 2026-11-21 16:49 ET for exactly these three ids, expiring
+# 2026-11-28 (CC-45 inbox 008).
+[[IgnoredVulns]]
+id = "GHSA-7qx7-33qx-rqx2"
+ignoreUntil = 2026-11-28
+reason = "owner-approved 2026-11-21 for the v1 checkout hotfix; `next` 15.5.29 bump follows in the next PR"
+
+[[IgnoredVulns]]
+id = "GHSA-f3mh-rxg3-f5g2"
+ignoreUntil = 2026-11-28
+reason = "owner-approved 2026-11-21 for the v1 checkout hotfix; `next` 15.5.29 bump follows in the next PR"
+
+[[IgnoredVulns]]
+id = "GHSA-pc58-hwjq-p385"
+ignoreUntil = 2026-11-28
+reason = "owner-approved 2026-11-21 for the v1 checkout hotfix; `next` 15.5.29 bump follows in the next PR"
