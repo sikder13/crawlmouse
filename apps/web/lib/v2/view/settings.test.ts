@@ -255,3 +255,36 @@ describe('Settings, billed yearly, and past due on Free', () => {
     expect(p.terms[1]!.action).toMatchObject({ label: 'Billing portal' });
   });
 });
+
+describe('the plan card while paid plans are not open (F-108)', () => {
+  const trialClosed = () =>
+    settingsView(fixture('bad-site'), ACCOUNT_VIEWERS.home(), { billingOpen: false }).plan;
+  const freeClosed = () =>
+    settingsView(fixture('clean-site'), CLEAN_VIEWER, { billingOpen: false }).plan;
+
+  it('a no-card trial has no paid button, and is told how long its trial runs', () => {
+    expect(home().plan.keep).not.toBeNull();
+    const p = trialClosed();
+    expect(p.keep).toBeNull();
+    expect(p.keepNote).toBe('Paid plans open shortly. Your trial runs to Sat 7 Nov.');
+  });
+
+  it('Free has no paid button, and is told paid plans open shortly', () => {
+    expect(free().plan.keep).not.toBeNull();
+    const p = freeClosed();
+    expect(p.keep).toBeNull();
+    expect(p.keepNote).toBe('Paid plans open shortly.');
+  });
+
+  it('with no Keep, the prices still read as prices, not as "Or …" after a button', () => {
+    expect(trialClosed().other).not.toMatch(/^Or /);
+    expect(freeClosed().other).not.toMatch(/^Or /);
+  });
+
+  it('with paid plans open the card is as it was, with no such sentence', () => {
+    expect(home().plan.keepNote).toBeNull();
+    expect(
+      settingsView(fixture('bad-site'), ACCOUNT_VIEWERS.home(), { billingOpen: true }).plan,
+    ).toEqual(home().plan);
+  });
+});

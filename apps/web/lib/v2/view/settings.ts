@@ -280,6 +280,8 @@ export interface SettingsView {
     usageLabel: string;
     usage: [string, string][];
     keep: ActionView | null;
+    /** Said in place of Keep while paid plans are not open; null otherwise. */
+    keepNote: string | null;
     other: string;
     compare: ActionView;
     termsLabel: string;
@@ -319,7 +321,13 @@ export function settingsView(
     notOwnAccount,
     undeliverable = null,
     cancelStep = null,
+    billingOpen = true,
   }: {
+    /**
+     * Whether paid plans can be bought (`V2_BILLING`, read by the live pages). While they cannot, the
+     * card has no button that posts to checkout, and says so (F-108). Left out in a preview.
+     */
+    billingOpen?: boolean;
     /**
      * `confirm` after Cancel's first click (the `cancel` search parameter), when the card offers the
      * second; null otherwise.
@@ -419,25 +427,26 @@ export function settingsView(
   const monthly = v.tier === 'agency' ? AGENCY_MONTHLY : PRO_MONTHLY;
   // A trial with a card becomes the plan at its end, and an account past due on Free gets back by
   // updating its card: neither has a Keep. A trial with no card keeps its plan; Free chooses Pro.
-  const keep = !owner
-    ? null
-    : trial && !cardTrial
-      ? action(
-          'keepPlan',
-          COPY.keep(plan, monthly),
-          {},
-          { fields: { plan: v.tier, interval: 'month', accountId: v.account.id } },
-        )
-      : v.tier === 'free' && !pastDue
+  const keep =
+    !owner || !billingOpen
+      ? null
+      : trial && !cardTrial
         ? action(
             'keepPlan',
-            COPY.choose(PLAN_NAMES.pro, PRO_MONTHLY),
+            COPY.keep(plan, monthly),
             {},
-            {
-              fields: { plan: 'pro', interval: 'month', accountId: v.account.id },
-            },
+            { fields: { plan: v.tier, interval: 'month', accountId: v.account.id } },
           )
-        : null;
+        : v.tier === 'free' && !pastDue
+          ? action(
+              'keepPlan',
+              COPY.choose(PLAN_NAMES.pro, PRO_MONTHLY),
+              {},
+              {
+                fields: { plan: 'pro', interval: 'month', accountId: v.account.id },
+              },
+            )
+          : null;
   const keepShown = keep !== null;
   // Each billing form names the account it was rendered for, so it is acted on in that account
   // whichever one the reader has switched to since.
@@ -552,6 +561,10 @@ export function settingsView(
       ],
       // A trial with a card becomes the plan at its end: there is nothing to keep it by.
       keep,
+      keepNote:
+        !billingOpen && owner && (v.tier === 'free' || (trial && !cardTrial))
+          ? COPY.plansOpenSoon(trial ? date(a.trial_ends_at!) : null)
+          : null,
       // "Or …" follows a Keep; where the card has none, the plan's own prices lead.
       other: [
         keepShown

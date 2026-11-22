@@ -105,6 +105,11 @@ export const SETTINGS_COPY = {
   of: (n: number, of: number) => `${count(n)} of ${count(of)}`,
   keep: (plan: string, price: number) => `Keep ${plan}, $${price} a month`,
   choose: (plan: string, price: number) => `Choose ${plan}, $${price} a month`,
+  /** In place of Keep or Choose while paid plans are not open (F-108); `until` is a trial's end. */
+  plansOpenSoon: (until: string | null) =>
+    until === null
+      ? 'Paid plans open shortly.'
+      : `Paid plans open shortly. Your trial runs to ${until}.`,
   other: (yearly: number, agency: number, sites: number, seats: number) =>
     `Or $${yearly} a year. Agency, $${agency} a month: ${count(sites)} sites, ${count(seats)} seats, reports under your brand.`,
   otherYearly: (yearly: number) => `Or $${yearly} a year.`,
