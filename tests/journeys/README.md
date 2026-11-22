@@ -40,14 +40,19 @@ browser steps run against a deployment.
   with "yes" or "no", and anything but exactly "no" counts as a write. J4 and J4.6 replay writes that
   must be refused, so they are writes.
 - **Deployment Protection.** Before any step, `global-setup.ts` probes `/api/health`. If the deployment
-  is behind Vercel's sign-in, the run stops with that reason unless `VERCEL_AUTOMATION_BYPASS_SECRET` is
-  set. The secret is sent as `x-vercel-protection-bypass` only to the deployment's own origin, never to
+  answers with a redirect to Vercel's sign-in, or a 401 or 403 from Vercel, the run stops with that
+  reason unless `VERCEL_AUTOMATION_BYPASS_SECRET` is set. The secret is sent as `x-vercel-protection-bypass` only to the deployment's own origin, never to
   the third-party hosts a page loads (`lib/protection.ts`).
 - **A step that starts a check passes the address through `lib/sites.ts`**, which accepts only
   `*.lab.crawlmouse.com` and `nahltech.com`.
+- **Test accounts exist on staging only** (`lib/accounts.ts`). The admin client is built only when
+  `SUPABASE_URL` is exactly staging's project and `STAGING_PROJECT_REF` agrees; production's project is
+  refused by name. Addresses are `qa+<journey>-<stamp>-<n>@lab.crawlmouse.com`. Sign-in follows the
+  product's own magic-link verify route and sends no mail.
 - **The guard is tested.** `guard.spec.ts` varies what each rule reads: case, trailing dots, ports,
-  userinfo, aliases, look-alike hosts and look-alike database hosts. Each refusal in `lib/target.ts`,
-  the rule in `lib/sites.ts` and the protection rule in `lib/protection.ts` has been removed in turn,
+  userinfo, aliases, look-alike hosts and look-alike database hosts. Each refusal in `lib/target.ts` and
+  `lib/accounts.ts`, the rule in `lib/sites.ts` and the protection rule in `lib/protection.ts` has been
+  removed in turn,
   and each removal turned the spec red. CI enforces the spec; the pinned check is
   `pnpm --filter @crawlmouse/web exec vitest run __tests__/security/ci-workflow.test.ts`.
 
@@ -102,7 +107,7 @@ JOURNEY_BASE_URL=https://crawlmouse.com ../../apps/web/node_modules/.bin/playwri
 ```
 
 Besides the pure guard and consistency tests, that lists the read-only steps SMOKE.1, 6, 7 and 8,
-J0.2, and J0.9a–l. J0.9m is not yet automated. Every other step in `STEPS.md` is written but not yet
+J0.1, J0.2, and J0.9a–m. Every other step in `STEPS.md` is written but not yet
 automated. Steps that write wait for staging.
 
 ## What it cannot see
