@@ -153,14 +153,14 @@ export function gradeRow(ctx: RowContext, before: Check, after: Check): Change |
 
 /** How a verdict reads in a row's summary. The two unmeasured verdicts never reach a row. */
 export const VERDICT_PHRASE: Readonly<Record<Verdict, string>> = {
-  allowed: 'allowed',
-  allowed_thin: 'allowed, reading little text',
+  allowed: 'our request served',
+  allowed_thin: 'our request served, with little text',
   disallowed_by_robots: 'disallowed by robots.txt',
-  blocked_by_ua_rule: 'blocked by a user-agent rule',
-  challenged_ua: 'challenged',
-  refused_unverified: 'refused as unverified',
-  rate_limited: 'rate limited',
-  payment_required: 'asked to pay',
+  blocked_by_ua_rule: 'our request refused by user agent',
+  challenged_ua: 'our request challenged',
+  refused_unverified: 'our request refused, as was every crawler name we sent',
+  rate_limited: 'our request rate limited',
+  payment_required: 'our request asked to pay',
   edge_blocks_automation: 'blocked our test requests',
   redirected_away: 'redirected away',
   not_measured: 'not measured',

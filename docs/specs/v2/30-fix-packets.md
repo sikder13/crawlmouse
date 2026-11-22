@@ -319,15 +319,15 @@ Documentation cited:
 Fixes of this type in the lab fixture: 1. The first, as stored:
 
 ```text
-title: Let ClaudeBot through the user-agent rule
+title: Find the rule that refused our request as ClaudeBot
 frameworks: generic
 effort: none
 before_after: {"measure":"crawlers_reading_text","today":4,"after":5,"after_bound":"approx","after_is_estimate":true}
 context:
-  `ClaudeBot` was refused on 50 of the 50 sampled pages the audit judged it on, by a rule that matches its user agent.
+  Our request with `ClaudeBot`'s user agent was refused on 50 of the 50 sampled pages the audit judged it on.
   Status of the refused requests: 403 (50 requests).
   The responses name no product: the audit did not identify what holds the rule.
-  On 50 of those pages another identity was served from the same address (`OAI-SearchBot`), so the refusal is aimed at the user agent.
+  On 50 of those pages another identity was served from the same address (`OAI-SearchBot`), so the refusal was not of our address alone; a rule that verifies only `ClaudeBot`'s addresses would look the same.
   The audit sent this user agent with a Crawlmouse tag, from Crawlmouse’s address. What the operator’s own crawler gets is in the site’s logs.
   Pages refused: `https://built-site.test`, `https://built-site.test/blog/camp-cooking-ideas`, `https://built-site.test/blog/campfire-safety-basics`, `https://built-site.test/blog/choosing-tent-pegs`, `https://built-site.test/blog/coming-soon-note` and 45 more pages not shown.
 change (generic):
@@ -1058,7 +1058,7 @@ Per type, values read from the two files as hand-written / engine. “Characters
 #### `edge_rule_blocks_crawler`
 
 - Hand-written command: `curl -s -o /dev/null -w "%{http_code}" -A "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; GPTBot/1.4; +https://openai.com/gptbot" https://example-outfitter.com/`
-- `ua`: GPTBot / ClaudeBot. “See it”: none / yes. Effort: `{"kind":"minutes","minutes":10}` / none. Bodies: 1 / 1. Characters: 1034 / 2496.
+- `ua`: GPTBot / ClaudeBot. “See it”: none / yes. Effort: `{"kind":"minutes","minutes":10}` / none. Bodies: 1 / 1. Characters: 1034 / 2560.
 - Hand-written says: Names the product, the dashboard path, a rule by its name and its expression. More than one crawler in one packet. The command prints the status for the reader to compare with “200 (today: 403)”.
 - Engine says: One crawler per fix. States the pages refused of the pages sampled, the status tally, the identity that was served, and that the request was tagged. Names no product: the lab check recorded no edge vendor. The first step asks whether the crawler should be let in. “See it” prints the status; the exact check exits 0 on a 200 with no challenge header.
 - Why they differ: The record holds no rule name, expression or dashboard location.

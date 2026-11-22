@@ -518,7 +518,7 @@ describe('crawler rows', () => {
       ua: 'ClaudeBot',
       where: 'robots.txt',
       pages_affected: 100,
-      summary: 'ClaudeBot: allowed → disallowed by robots.txt',
+      summary: 'ClaudeBot: our request served → disallowed by robots.txt',
       cause: {
         text: 'robots.txt changed: 2 lines added, 0 removed.',
         changed_at: null,
