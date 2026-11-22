@@ -83,6 +83,37 @@ describe('Settings › Plan with paid plans closed', () => {
     expect(receipts.text).not.toContain('portal');
   });
 
+  it('a seat that is not the owner’s is not told to email about the owner’s plan', () => {
+    const terms = settingsView(paid, home, { ...closed, role: 'account_manager' }).plan.terms;
+    expect(terms.find((t) => t.label === 'Cancel')!.text).toBe('Managed by the account owner.');
+  });
+
+  it('a no-card trial’s Cancel row names no control it does not have', () => {
+    const cancel = settingsView(bad, home, closed).plan.terms.find((t) => t.label === 'Cancel')!;
+    expect(cancel.text).toBe(
+      'Nothing to cancel on a trial; it ends by itself. Nothing you can see is deleted.',
+    );
+    expect(cancel.action).toBeNull();
+  });
+
+  it('does not list the trial reminder as a kind of email, and counts what it lists', () => {
+    const email = settingsView(bad, home, closed).email;
+    expect(email.rows.map((r) => r.kind)).toEqual(['sign_in_link', 'change_note']);
+    expect(email.foot).toMatch(/^Those are the two kinds from us\. There is no newsletter/);
+  });
+
+  it('lists all three with plans open', () => {
+    const email = settingsView(bad, home, { billingOpen: true }).email;
+    expect(email.rows.map((r) => r.kind)).toContain('trial_reminder');
+    expect(email.foot).toContain('Those are the three kinds from us. If you pay');
+  });
+
+  it('passes the closed state to its own frame, whatever the deployment says', () => {
+    vi.stubEnv('V2_BILLING', '1');
+    const note = settingsView(bad, home, closed).shell.trial!.note;
+    expect(note).not.toContain('choose Pro');
+  });
+
   it('offers cancel and the portal with plans open', () => {
     const json = JSON.stringify(settingsView(paid, home, { billingOpen: true }).plan);
     expect(json).toContain('/api/billing/cancel');
@@ -146,6 +177,11 @@ describe('the reminder, until something sends it', () => {
 });
 
 describe('Trial ending, other cases with paid plans closed', () => {
+  it('a no-card trial is not told "either way", with one way to go', () => {
+    const v = trialEndView(bad, trialEndViewer(bad, BAD), closed);
+    expect(v.banner.sub).toBe('No card is on file, so nothing is charged.');
+  });
+
   it('a card trial is not told to add Pro', () => {
     const card = withAccount(bad, { card_last4: '4242', billing_period_months: 1 });
     expect(trialEndView(card, trialEndViewer(card, BAD), closed).endText).not.toContain('add Pro');

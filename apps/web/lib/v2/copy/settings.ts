@@ -50,8 +50,8 @@ export const SETTINGS_COPY = {
   noTrial: 'only during a trial',
   always: 'always',
   /** FACTS A9: Stripe sends the receipts. */
-  emailFoot: (kinds: number) =>
-    `Those are the ${numberWord(kinds)} kinds from us. If you pay, Stripe sends the receipts. There is no newsletter and no product-update mail to unsubscribe from.`,
+  emailFoot: (kinds: number, plansOpen = true) =>
+    `Those are the ${numberWord(kinds)} kinds from us.${plansOpen ? ' If you pay, Stripe sends the receipts.' : ''} There is no newsletter and no product-update mail to unsubscribe from.`,
   /**
    * The member's own address, once a hard bounce or a spam report suppressed it (CC-28 D7): every kind
    * of mail but account mail stops (`email_kind_suppressible`), so what still goes is named.
