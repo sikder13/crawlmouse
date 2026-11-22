@@ -973,7 +973,7 @@ describe('the journey guard', () => {
     );
   });
 
-  it('runs after the package tests, so a guard failure is not hidden behind them', () => {
+  it("runs after the package tests (and, by GitHub's default, only when they pass)", () => {
     const at = steps.findIndex((s) => s.name === 'journey guard');
     expect(at).toBeGreaterThan(
       steps.findIndex((s) => s.run === 'pnpm --filter @crawlmouse/${{ matrix.package }} test'),
