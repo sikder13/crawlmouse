@@ -138,7 +138,9 @@ step(
   'the agency offer is a finished v2 page, and the trial page routes by billing',
   async ({ page, request, baseURL }) => {
     await expectFinishedV2Page(page, '/agencies', missing('F-024'));
-    // Signed out, /agency-trial goes to /agencies with billing off and to sign-in with billing on.
+    // Billing off: /agencies offers no start, and /agency-trial comes back to it. Billing on: /agencies links
+    // to the trial, which sends a signed-out visitor to sign-in. An offer that loops back starts nothing.
+    const offers = await (await contentOf(page)).locator('a[href^="/agency-trial"]').count();
     const trial = await request.get('/agency-trial', { maxRedirects: 0 });
     if (trial.status() === 404) {
       expect(trial.status(), 'F-024: /agency-trial is a page').not.toBe(404);
@@ -147,9 +149,13 @@ step(
       trial.status(),
     );
     const to = new URL(trial.headers()['location'] ?? '', baseURL);
-    const billingOff = to.pathname === '/agencies';
-    const billingOn = to.pathname === '/login' && to.searchParams.get('next') === '/agency-trial';
-    expect(billingOff || billingOn, `/agency-trial goes to ${to.pathname}${to.search}`).toBe(true);
+    expect(to.origin, '/agency-trial stays on this site').toBe(new URL(baseURL!).origin);
+    const toSignIn = to.pathname === '/login' && to.searchParams.get('next') === '/agency-trial';
+    const toOffer = to.pathname === '/agencies';
+    expect(
+      offers > 0 ? toSignIn : toOffer,
+      `/agency-trial goes to ${to.pathname}${to.search}, and /agencies has ${offers} link(s) to it`,
+    ).toBe(true);
   },
 );
 
@@ -198,10 +204,12 @@ step('J0.9m', 'the free check pages show a result or say they start an audit', a
     if ((await main.locator('[data-check-result]').count()) > 0) continue;
     const promise =
       /\b(know|see|find out|learn)\b[^.\n]{0,40}\b(each|every|which|what)\b[^.\n]{0,30}\bcrawlers?\b/i;
-    const visible = await main.innerText();
-    if (promise.test(visible)) {
-      expect(visible, `F-158: /check/${q} promises a result it does not show`).not.toMatch(promise);
-    }
+    const startsAudit = /\b(starts?|runs?|begins?|launch(es)?)\b[^.\n]*\baudit\b/i;
+    // A sentence that says it starts an audit is the register's own fix, whatever it goes on to promise.
+    const promised = (await main.innerText())
+      .split(/[.!?\n]+/)
+      .filter((sentence) => promise.test(sentence) && !startsAudit.test(sentence));
+    expect(promised, `F-158: /check/${q} promises a result it does not show`).toEqual([]);
     const heading = await main.evaluate((el) => {
       const form = [...el.querySelectorAll('form')].at(-1);
       if (!form) return '';
@@ -212,7 +220,7 @@ step('J0.9m', 'the free check pages show a result or say they start an audit', a
       return above.at(-1)?.innerText.trim() ?? '';
     });
     expect(heading, `/check/${q}: the heading above the form says it starts an audit`).toMatch(
-      /\b(starts?|runs?|begins?|launch(es)?)\b[^.]*\baudit\b/i,
+      startsAudit,
     );
   }
 });
