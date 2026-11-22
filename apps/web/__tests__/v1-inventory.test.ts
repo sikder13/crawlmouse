@@ -188,7 +188,6 @@ describe('the finders see what they claim to see', () => {
       'app/(v2-kept)/v2-kept/takedown/page.tsx',
       'app/(v2-kept)/v2-kept/terms/page.tsx',
       'app/(v2-kept)/v2-kept/verify/[id]/page.tsx',
-      'app/agencies/page.tsx',
       'app/agency-trial/page.tsx',
       'app/agency/clients/[siteId]/page.tsx',
       'app/agency/page.tsx',
