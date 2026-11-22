@@ -12,6 +12,7 @@ import {
   type Site,
   type Verdict,
 } from '@crawlmouse/types/v2';
+import { RAW_FORMATS } from '../copy/reports';
 import { TAGGED_UA_LINE, ALERT_LABELS, SITE_COPY } from '../copy/site';
 import { fixesAsOf } from '../fixtures';
 import {
@@ -544,17 +545,26 @@ export function siteView(
       cards: [seoCard(result, prev, zone), aiCard(result, prev, zone)],
       actions: v.gates.exports
         ? [
-            action(
-              'reports',
-              'Compare any two checks',
-              {},
-              { fields: { siteId: site.id, kind: 'compare' } },
-            ),
+            // A link, not a request: the Reports page's compare card names the two checks, and says
+            // so when the site has only one (F-107).
+            {
+              ...action('reports', 'Compare any two checks'),
+              route: '/reports',
+              href: `/reports?site=${encodeURIComponent(site.id)}`,
+              method: 'get' as const,
+            },
             action(
               'reports',
               'Export',
               {},
-              { fields: { siteId: site.id, checkId: result.id, kind: 'raw_export' } },
+              {
+                fields: {
+                  siteId: site.id,
+                  checkId: result.id,
+                  kind: 'raw_export',
+                  format: RAW_FORMATS[0].format,
+                },
+              },
             ),
           ]
         : [],

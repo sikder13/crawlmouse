@@ -1,6 +1,7 @@
 /** The site page's view model against values worked out by hand from the fixtures. */
 import { describe, expect, it } from 'vitest';
 import { fixture } from '../fixtures';
+import { parseReportRequest } from '../reports/generate-request';
 import { axisLabels, move } from './checks';
 import { siteView } from './site';
 
@@ -172,5 +173,29 @@ describe('the history axis across a change of month', () => {
       'Sat 31',
       '1 Nov',
     ]);
+  });
+});
+
+describe('the Grades card’s two buttons (F-107)', () => {
+  const paid = () => {
+    const d = fixture('bad-site');
+    const viewer = { accountId: 'a0000000-0000-4000-8000-000000000001', now: d.as_of };
+    return siteView(d, viewer, '50000000-0000-4000-8000-000000000001');
+  };
+  const button = (label: string) => paid().grades.actions.find((a) => a.label === label)!;
+
+  it('Export posts a request the reports route accepts, for a file it can make', () => {
+    const a = button('Export');
+    expect(a.method).toBe('post');
+    expect(a.route).toBe('/api/reports');
+    const request = parseReportRequest(a.fields);
+    expect(request).toMatchObject({ kind: 'raw_export', format: 'csv' });
+  });
+
+  it('Compare opens the Reports page for this site, where the two checks are compared', () => {
+    const a = button('Compare any two checks');
+    expect(a.method).toBe('get');
+    expect(a.href).toBe('/reports?site=50000000-0000-4000-8000-000000000001');
+    expect(a.fields).toEqual({});
   });
 });
