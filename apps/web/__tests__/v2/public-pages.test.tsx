@@ -95,6 +95,8 @@ describe('/agencies (D4)', () => {
       expect(markup).toContain('The agency trial opens soon');
       expect(markup).toContain('href="mailto:support@crawlmouse.com"');
       expect(markup).not.toContain('/agency-trial');
+      expect(markup).not.toMatch(/card required|charged|-day trial/i);
+      expect(String((await load()).metadata.description)).not.toMatch(/-day trial|charged/i);
       vi.resetModules();
     }
   }, 60_000);
@@ -118,6 +120,27 @@ describe('/agencies (D4)', () => {
     expect(markup).not.toContain('name="url"');
     expect(markup).toContain('href="/"');
   }, 60_000);
+});
+
+describe('/agencies’ first button with billing off (RC-01)', () => {
+  it.each([
+    ['1', '/signup'],
+    ['', '/login'],
+  ])(
+    'with V2_ACCOUNT_DOOR=%j it starts free at %s',
+    async (door, href) => {
+      vi.resetModules();
+      flags({ billing: false, checks: true });
+      vi.stubEnv('V2_ACCOUNT_DOOR', door);
+      const { default: Page } = await import('../../app/agencies/page');
+      const { document } = new JSDOM(renderToStaticMarkup(Page() as ReactElement)).window;
+      const start = [...document.querySelectorAll('main a')].find(
+        (a) => a.textContent === 'Start free',
+      );
+      expect(start?.getAttribute('href')).toBe(href);
+    },
+    60_000,
+  );
 });
 
 describe('/developers, v2 (D5)', () => {

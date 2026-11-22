@@ -149,7 +149,7 @@ export function planCopy(
     },
     pro: {
       name: 'Pro',
-      tag: proTrial ? `free for ${trialDays}, no card` : 'card required',
+      tag: proTrial ? `free for ${trialDays}, no card` : billing ? 'card required' : OPENS_SHORTLY,
       description: {
         text: `Freelancers and in-house developers watching up to ${pro.sites} sites. ${capitalise(numberWord(pro.seats))} ${plural(pro.seats, 'seat', 'seats')}.`,
         capabilities: ['sites', 'weekly_checks', 'seats'],
@@ -234,15 +234,9 @@ export const PRICING_COPY = {
   description: () =>
     `Every audit is free and complete. Pro is ${usd(PRO_MONTHLY)} a month for every fix the audit finds, on up to ${GATES.pro.sites} sites; Agency is ${usd(AGENCY_MONTHLY)} a month for ${GATES.agency.sites} client sites.`,
   /**
-   * The indexed h1, v1's (OPERATING-RULES §13; assumed, see B question 002). The artboard's sentence
-   * follows it as the tagline.
+   * The indexed h1, v1's (OPERATING-RULES §13). The artboard's sentence follows it as the tagline.
    */
   h1: 'Pricing',
-  /**
-   * The description search engines hold today, kept until question 002 is answered. `description`
-   * below is its replacement, rendered from the prices and `GATES`.
-   */
-  indexedDescription: `Crawlmouse is free forever — audit any site, get a real A–F grade, and one complete fix. Pro is ${usd(PRO_MONTHLY)}/month or ${usd(PRO_YEARLY)}/year for every fix, CSV export, and bigger crawls.`,
   /** The artboard's line (Q33): "watched" is checking again and telling you, which CC-28 builds. */
   title: {
     text: 'Every audit is free. Pay when you want it watched.',
@@ -341,6 +335,8 @@ export const PRICING_COPY = {
     current: { label: 'Your plan', note: 'The plan your account is on now' },
     included: { label: 'Included in your plan', note: 'Agency includes all of Pro' },
     freeBelow: { note: 'If you cancel, from Settings, the account returns to Free' },
+    /** V2_BILLING off: the cancel route answers 404, and a trial ends by itself. */
+    freeBelowBillingOff: { note: 'When a trial ends, the account returns to Free' },
     notOwner: { note: 'Only the account owner changes its plan' },
   },
   agencyPlus: {
@@ -417,14 +413,18 @@ export const PRICING_COPY = {
       [
         'Other sites',
         {
-          text: 'Pause until you choose Pro or remove them; their history stays',
+          text: billing
+            ? 'Pause until you choose Pro or remove them; their history stays'
+            : 'Pause until paid plans open or you remove them; their history stays',
           capabilities: ['sites'],
         },
       ],
       [
         `Fixes beyond the first ${numberWord(freeFixes())}`,
         {
-          text: 'Stay listed with their estimated effect; the packets reopen with Pro',
+          text: billing
+            ? 'Stay listed with their estimated effect; the packets reopen with Pro'
+            : 'Stay listed with their estimated effect; the packets reopen with Pro, when paid plans open',
           capabilities: ['fix_packets'],
         },
       ],
@@ -473,14 +473,14 @@ export const PRICING_COPY = {
           {
             q: 'Which emails will I get?',
             a: {
-              text: 'A sign-in link, and a note when a check finds a change.',
+              text: 'A sign-in link, a note when a check finds a change, and a weekly summary.',
               capabilities: ['change_emails'],
             },
           },
           {
             q: 'Can I cancel?',
             a: {
-              text: 'There is nothing to cancel yet, because paid plans have not opened. A Pro trial ends by itself and the account goes back to Free; nothing you can see is deleted.',
+              text: `New paid plans have not opened. A Pro trial ends by itself and the account goes back to Free; nothing you can see is deleted. If you already pay for Pro, write to ${AGENCY_PLUS_INBOX_ADDRESS} to change or end it.`,
               capabilities: [],
             },
           },

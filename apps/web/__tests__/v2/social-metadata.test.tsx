@@ -12,7 +12,6 @@ import type { PublicReportRow } from '@/lib/reports';
 import { CHECK_COPY, CHECK_QUESTIONS } from '../../lib/v2/copy/check-pages';
 import { helpArticles } from '../../lib/v2/help/articles';
 import { HELP_COPY } from '../../lib/v2/help/copy';
-import { DEVELOPERS_COPY } from '../../lib/v2/copy/developers';
 import { PRICING_COPY } from '../../lib/v2/copy/pricing';
 import { SOCIAL_CARDS, socialCardPath } from '../../lib/v2/social-card';
 import { fixture } from '../../lib/v2/fixtures';
@@ -80,7 +79,7 @@ describe('social metadata of the CC-29 public pages', () => {
     expectOwn(metadata, {
       url: '/pricing',
       title: 'Pricing' + SUFFIX,
-      description: PRICING_COPY.indexedDescription,
+      description: PRICING_COPY.description(),
       card: 'pricing',
     });
   });
@@ -91,7 +90,7 @@ describe('social metadata of the CC-29 public pages', () => {
     expectOwn(metadata, {
       url: '/developers',
       title: v.title + SUFFIX,
-      description: DEVELOPERS_COPY.indexedDescription,
+      description: v.description,
       card: 'developers',
     });
   });

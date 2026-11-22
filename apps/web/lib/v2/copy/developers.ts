@@ -21,13 +21,10 @@
 export const READ_API = { requestsPerMinute: 60, keyPrefix: 'cm_ro_' } as const;
 
 export const DEVELOPERS_COPY = {
-  /** The indexed title and h1, v1's (OPERATING-RULES §13; assumed, see B question 002). */
+  /** The indexed title and h1, v1's (OPERATING-RULES §13). */
   title: 'Crawlmouse for developers — CLI, GitHub Action & webhooks',
   /** The page's short name, where the indexed title's list of tools would overstate it. */
   navLabel: 'Developers',
-  /** The description search engines hold today, kept until question 002 is answered. */
-  indexedDescription:
-    'A CLI, GitHub Action, and webhooks built on the same engine as the web audit. Grade internal linking from your terminal or CI — join the waitlist.',
   description:
     'A read-only API for your Crawlmouse audits is planned for Pro: the latest audit of each of your sites as JSON. See the response it will return, what comes after it, and join the developer list.',
   h1: 'Crawlmouse for developers',

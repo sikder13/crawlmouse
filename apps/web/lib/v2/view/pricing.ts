@@ -6,7 +6,7 @@
  * A button is offered only where the route it reaches would act (correctness B2, Q24):
  * - Signed out, Free and Pro go to Sign-up (one email creates the account and starts the Pro trial)
  *   while V2_ACCOUNT_DOOR serves it, and to v1's sign-in (`/login`) otherwise; Agency goes to the
- *   Agency trial page.
+ *   Agency trial page, or with V2_BILLING off to the same free start.
  * - Signed in, the default account's tier is "Your plan", and only the account's owner changes it.
  *   Pro offers its trial when `trialRefusal` lets the account start one and V2_CHECKS_PUBLIC serves
  *   the trial's route. Otherwise a paid plan is decided by CC-03's `checkoutRefusal`: no refusal is
@@ -188,7 +188,10 @@ function freeAction(viewer: PricingViewer, flags: PricingFlags): Unranked {
       : link(LOGIN, COPY.buttons.freeSignIn);
   }
   if (account.tier === 'free') return { kind: 'current', ...COPY.buttons.current };
-  return { kind: 'note', note: COPY.buttons.freeBelow.note };
+  return {
+    kind: 'note',
+    note: flags.billing ? COPY.buttons.freeBelow.note : COPY.buttons.freeBelowBillingOff.note,
+  };
 }
 
 /**
@@ -293,6 +296,10 @@ function ranked(actions: Record<Tier, Unranked>): Record<Tier, PlanAction> {
   return out;
 }
 
+/** Agency's rows with what is built first, so its "coming" marks sit together at the end. */
+const builtFirst = <R extends { coming: boolean }>(tier: Tier, rows: R[]): R[] =>
+  tier === 'agency' ? [...rows.filter((r) => !r.coming), ...rows.filter((r) => r.coming)] : rows;
+
 export function pricingView(
   viewer: PricingViewer,
   interval: Interval,
@@ -324,7 +331,10 @@ export function pricingView(
       name: copy[tier].name,
       tag: copy[tier].tag,
       description: tagged(copy[tier].description),
-      rows: copy[tier].rows.map((r) => ({ label: r.label, ...tagged(r) })),
+      rows: builtFirst(
+        tier,
+        copy[tier].rows.map((r) => ({ label: r.label, ...tagged(r) })),
+      ),
       price: usd(priceOf(tier, interval)),
       per: per(interval),
       action: actions[tier],

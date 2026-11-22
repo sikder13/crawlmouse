@@ -227,7 +227,7 @@ describe('PageShell header', () => {
     expect(nav).toMatch(/<button [^>]*aria-expanded="false"[^>]*>Learn/);
   });
 
-  it('renders a planned top-level item as text, never as a dead link', () => {
+  it('links For agencies to its page, and renders no dead link', () => {
     expect(nav).toMatch(/<a [^>]*href="\/agencies"[^>]*>For agencies<\/a>/);
     expect(nav).not.toMatch(/href="#?"/);
   });

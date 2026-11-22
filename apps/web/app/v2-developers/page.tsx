@@ -2,7 +2,6 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { DevelopersScreen } from '@/components/v2/screens/developers/DevelopersScreen';
 import { checksPublicEnabled } from '@/lib/auth/flags';
-import { DEVELOPERS_COPY } from '@/lib/v2/copy/developers';
 import { developersView } from '@/lib/v2/view/developers';
 import { socialCardPath } from '@/lib/v2/social-card';
 import { socialMetadata } from '@/lib/v2/social-metadata';
@@ -11,17 +10,17 @@ import '@/styles/v2/tokens.css';
 const view = developersView();
 
 /**
- * The title, description and canonical are v1's (B question 002): the address this page serves.
+ * The title and canonical are v1's: the address this page serves. The description is the v2 page's.
  * Indexable (the root layout's robots apply).
  */
 export const metadata: Metadata = {
   title: view.title,
-  description: DEVELOPERS_COPY.indexedDescription,
+  description: view.description,
   alternates: { canonical: '/developers' },
   ...socialMetadata({
     path: '/developers',
     title: view.title,
-    description: DEVELOPERS_COPY.indexedDescription,
+    description: view.description,
     image: socialCardPath('developers'),
   }),
 };

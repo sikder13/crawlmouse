@@ -30,6 +30,15 @@ const VIEWERS: PricingViewer[] = [
     agency: { held: false, used: { account: { id: 'a2', snapshot: FREE_START, customer: null } } },
   },
   { kind: 'signed_in', account: account('agency'), agency: { held: true, used: null } },
+  // A subscription is kept, so with billing on Pro's button is the portal.
+  {
+    kind: 'signed_in',
+    account: {
+      ...account('free'),
+      snapshot: { ...FREE_START, trialUsedAt: NOW, subscriptionId: 'sub_1' },
+    },
+    agency: { held: false, used: null },
+  },
   // The Pro trial is used, so with billing on Pro's button is the paid checkout.
   {
     kind: 'signed_in',
@@ -41,14 +50,22 @@ const VIEWERS: PricingViewer[] = [
 const targets = (a: PlanAction): string[] =>
   a.kind === 'link' ? [a.href] : a.kind === 'form' ? [a.action] : [];
 
+const taggedText = (t: { text: string }) => t.text;
 const allText = (v: ReturnType<typeof pricingView>) =>
   [
-    ...v.after.lead.map((t) => t.text),
+    taggedText(v.title),
+    ...v.lead.map(taggedText),
+    ...v.crawlers.map(taggedText),
+    ...v.annual.map(taggedText),
+    v.after.title,
+    ...v.after.lead.map(taggedText),
     ...v.after.rows.map(([, t]) => t.text),
+    ...v.why.text.map(taggedText),
     ...v.faq.items.map((i) => i.a.text),
-    ...v.annual.map((t) => t.text),
     ...v.plans.flatMap((p) => [
       p.tag,
+      p.description.text,
+      ...p.rows.map(taggedText),
       p.action.note,
       ...(p.action.kind === 'note' ? [] : [p.action.label]),
     ]),
@@ -92,9 +109,40 @@ describe('pricingView with billing off (RC-01)', () => {
     expect(pro(OFF)).toEqual({ kind: 'note', note: 'Paid plans open shortly' });
   });
 
-  it('promises no reminder email, card charge or renewal while billing is off', () => {
-    const text = allText(pricingView({ kind: 'signed_out' }, 'month', NOW, OFF));
-    expect(text).not.toMatch(/days before|charged|renews|renewal|card on file|card required/i);
+  it.each(VIEWERS.map((v, i) => [i, v] as const))(
+    'viewer %i: promises no reminder, charge, renewal or self-serve cancel',
+    (_i, viewer) => {
+      for (const interval of ['month', 'year'] as const) {
+        const text = allText(pricingView(viewer, interval, NOW, OFF));
+        expect(text).not.toMatch(
+          /days before|remind|charge|renew|billed|card on file|card required|card (?:is )?taken|takes the card|if you cancel|nothing to cancel/i,
+        );
+      }
+    },
+  );
+
+  it('tells someone who already pays where to go', () => {
+    const faq = pricingView({ kind: 'signed_out' }, 'month', NOW, OFF).faq.items;
+    expect(faq.find((i) => i.q === 'Can I cancel?')!.a.text).toContain('support@crawlmouse.com');
+  });
+
+  it('the portal is reached with billing on and not with it off', () => {
+    const viewer = VIEWERS[VIEWERS.length - 2]!;
+    const pro = (f: typeof OFF) =>
+      pricingView(viewer, 'month', NOW, f).plans.find((p) => p.tier === 'pro')!.action;
+    expect(targets(pro(ON))).toEqual(['/api/billing/portal']);
+    expect(targets(pro(OFF))).toEqual([]);
+  });
+
+  it.each([
+    [true, '/signup'],
+    [false, '/login'],
+  ])('with the account door %j, Agency starts free at %s', (accountDoor, href) => {
+    const agency = pricingView({ kind: 'signed_out' }, 'month', NOW, {
+      ...OFF,
+      accountDoor,
+    }).plans.find((p) => p.tier === 'agency')!;
+    expect(targets(agency.action)).toEqual([href]);
   });
 
   it('offers the Agency Plus form only when its route answers', () => {

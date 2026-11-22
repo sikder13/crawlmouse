@@ -149,8 +149,8 @@
 }
 
 .contact {
-  margin-top: 16px;
   padding: 22px 24px;
+  border-top: 1px solid var(--v2-line);
 }
 
 .form {
