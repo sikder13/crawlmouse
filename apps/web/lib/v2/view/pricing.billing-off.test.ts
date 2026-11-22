@@ -30,6 +30,12 @@ const VIEWERS: PricingViewer[] = [
     agency: { held: false, used: { account: { id: 'a2', snapshot: FREE_START, customer: null } } },
   },
   { kind: 'signed_in', account: account('agency'), agency: { held: true, used: null } },
+  // The Pro trial is used, so with billing on Pro's button is the paid checkout.
+  {
+    kind: 'signed_in',
+    account: { ...account('free'), snapshot: { ...FREE_START, trialUsedAt: NOW } },
+    agency: { held: false, used: null },
+  },
 ];
 
 const targets = (a: PlanAction): string[] =>
@@ -76,6 +82,14 @@ describe('pricingView with billing off (RC-01)', () => {
     const viewer = VIEWERS[2]!;
     const pro = pricingView(viewer, 'month', NOW, OFF).plans.find((p) => p.tier === 'pro')!;
     expect(pro.action).toMatchObject({ kind: 'form', action: '/api/billing/pro-trial/start' });
+  });
+
+  it('the viewer whose Pro trial is used reaches checkout with billing on, and not with it off', () => {
+    const viewer = VIEWERS[VIEWERS.length - 1]!;
+    const pro = (f: typeof OFF) =>
+      pricingView(viewer, 'month', NOW, f).plans.find((p) => p.tier === 'pro')!.action;
+    expect(targets(pro(ON))).toEqual(['/api/billing/checkout']);
+    expect(pro(OFF)).toEqual({ kind: 'note', note: 'Paid plans open shortly' });
   });
 
   it('promises no reminder email, card charge or renewal while billing is off', () => {
