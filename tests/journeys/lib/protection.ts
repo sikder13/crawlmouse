@@ -31,6 +31,13 @@ export const BYPASS_COOKIE = '_vercel_jwt';
  * null unless Playwright would record this run. A trace holds request headers and URLs, so a run with a
  * bypass cookie or a sign-in link must not keep one, and `--trace=on` overrides the config's `off`.
  */
+let resolvedTrace: unknown;
+/** `step()` records Playwright's resolved `trace` option here: `project.use` misses a spec's `test.use`. */
+export const noteTrace = (mode: unknown): void => {
+  resolvedTrace = mode;
+};
+export const currentTrace = (fallback: unknown): unknown => resolvedTrace ?? fallback;
+
 export function traceRefusal(mode: unknown): string | null {
   const m = typeof mode === 'object' && mode !== null ? (mode as { mode?: unknown }).mode : mode;
   if (m === undefined || m === 'off') return null;

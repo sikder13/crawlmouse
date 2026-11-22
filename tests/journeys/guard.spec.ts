@@ -11,7 +11,14 @@ import {
 } from './lib/accounts';
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { bypassCookies, originHeaders, protectionRefusal, traceRefusal } from './lib/protection';
+import {
+  bypassCookies,
+  currentTrace,
+  noteTrace,
+  originHeaders,
+  protectionRefusal,
+  traceRefusal,
+} from './lib/protection';
 import { assertCheckableSite } from './lib/sites';
 import { databaseRefusal, writeRefusal } from './lib/target';
 
@@ -299,6 +306,13 @@ test.describe('Vercel Deployment Protection', () => {
       answer('2'),
     );
     expect([first[0]!.value, second[0]!.value]).toEqual(['1', '2']);
+  });
+  test("prefers the step's resolved trace mode, and forgets it after the step", () => {
+    expect(currentTrace('off')).toBe('off');
+    noteTrace('on');
+    expect(currentTrace('off')).toBe('on');
+    noteTrace(undefined);
+    expect(currentTrace('off')).toBe('off');
   });
   test('refuses a run that would record a trace', () => {
     for (const m of [undefined, 'off', { mode: 'off' }]) expect(traceRefusal(m)).toBeNull();
