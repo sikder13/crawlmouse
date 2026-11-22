@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Check, Fix, FixtureDataset } from '@crawlmouse/types/v2';
 import { findCheck, fixture, type FixtureName } from '../fixtures';
 import { CHECKS } from '../recordings';
-import { resultView, type DoorView, type ResultView } from './result';
+import { partialNotice, resultView, type DoorView, type ResultView } from './result';
 import { pagesReadableText } from './effect-headline';
 
 const NO_MAP = { nodes: [], positions: {} };
@@ -396,6 +396,104 @@ describe('the tables’ labels', () => {
     expect(new Set(rows.map((r) => want(r.key)))).toContain('SEO not estimated');
     expect(new Set(rows.map((r) => want(r.key)))).toContain('AI not yet estimated');
     expect(rows.map((r) => r.points)).toEqual(rows.map((r) => want(r.key)));
+  });
+});
+
+describe('the third card when there is no fix', () => {
+  /** The clean site with its page rows answering `codes`, and every other row removed. */
+  const answering = (codes: number[]) =>
+    view('clean-site', (c, d) => {
+      const template = d.page_results.find((p) => p.check_id === c.id)!;
+      d.page_results = codes.map((status_code, i) => ({
+        ...template,
+        url: `https://example.test/${i}`,
+        status_code,
+      }));
+      c.coverage!.pages_crawled = codes.length;
+      c.coverage!.pages_discovered = codes.length;
+    });
+
+  it('says nothing to fix on a check that measured everything', () => {
+    expect(view('clean-site').first.kind).toBe('all-clear');
+  });
+
+  it('does not say all-clear, or that templates ship text, when text was not measured', () => {
+    const v = view('clean-site', (c) => {
+      c.without_js = null;
+    });
+    if (v.first.kind !== 'unmeasured') throw new Error(`got ${v.first.kind}`);
+    expect(v.first.title).toBe('Not everything was measured');
+    expect(v.first.body).toBe(
+      'We found nothing to fix in what we measured. Text without JavaScript was not measured.',
+    );
+    expect(JSON.stringify(v.first)).not.toMatch(/ships its text|get in|Keep it that way/);
+  });
+
+  it('names the AI crawlers that were not measured, from the check', () => {
+    const v = view('clean-site', (c) => {
+      for (const ua of ['GPTBot', 'ClaudeBot']) {
+        c.crawlers.find((x) => x.ua === ua)!.verdict = 'not_measured';
+      }
+    });
+    if (v.first.kind !== 'unmeasured') throw new Error(`got ${v.first.kind}`);
+    expect(v.first.body).toContain('GPTBot and ClaudeBot were not measured.');
+    expect(v.first.body).not.toContain('Text without JavaScript');
+  });
+
+  it('says the site refused when every page answered a refusal, with the status', () => {
+    const v = answering([403, 403]);
+    if (v.first.kind !== 'not-served') throw new Error(`got ${v.first.kind}`);
+    expect(v.first.title).toBe('Your site refused our requests');
+    expect(v.first.body).toMatch(/^The 2 pages we requested answered 403\./);
+    expect(v.first.action).toBeNull();
+  });
+
+  it('does not call a 404 a refusal', () => {
+    const v = answering([404]);
+    if (v.first.kind !== 'not-served') throw new Error(`got ${v.first.kind}`);
+    expect(v.first.title).toBe('Your site did not serve a page');
+    expect(v.first.body).toMatch(/^The 1 page we requested answered 404\./);
+  });
+
+  it('claims nothing about structure on a check where no page was served', () => {
+    const v = answering([403]);
+    expect(v.crawledLine).toBe('1 page requested, none served');
+    expect(v.grades[0].summary).toBe('No page was served, so nothing was graded.');
+    const structure = door(v, 'Site structure');
+    expect(structure.pill.label).toBe('not measured');
+    expect(structure.body).not.toMatch(/orphan|linked|hub/i);
+  });
+});
+
+describe('the partial notice', () => {
+  const noticeOf = (edit: (c: Check, d: FixtureDataset) => void) => {
+    const d = structuredClone(fixture('clean-site'));
+    const c = findCheck(d, CHECK_OF['clean-site']);
+    c.status = 'partial';
+    edit(c, d);
+    return partialNotice(d, c.id);
+  };
+
+  it('states the crawler tests that did not finish, in numbers', () => {
+    const notice = noticeOf((c, d) => {
+      const template = d.page_results.find((p) => p.check_id === c.id)!;
+      d.page_results = [0, 1, 2].map((i) => ({
+        ...template,
+        url: `https://example.test/${i}`,
+        sampled: true,
+        crawlers_reached: i === 0 ? 6 : null,
+      }));
+    });
+    expect(notice).toBe(
+      'This audit is partial: crawler tests did not finish on 2 of the 3 sampled pages.',
+    );
+  });
+
+  it('does not give unmeasured text as the reason a check is partial', () => {
+    const notice = noticeOf((c) => {
+      c.without_js = null;
+    });
+    expect(notice).not.toContain('text without JavaScript');
   });
 });
 

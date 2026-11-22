@@ -24,6 +24,7 @@ import {
   pagesReadable,
 } from './effect-headline';
 import { openFixes, type FixPlan } from './free-fixes';
+import { noFixKind, servedWord } from './no-fix-card';
 import { SCREEN_SIGNALS, screenSignals, type ScreenSignal } from './screen-signals';
 import { dateTimeUtc, dayTimeUtc, listOf, percent, templateNoun } from '../format';
 import { toneOf } from '../letters';
@@ -128,11 +129,16 @@ export interface ResultView {
   /** When an unkept result expires, as a timestamp; null once kept. */
   keptUntil: string | null;
   grades: [GradeView, GradeView];
-  /** The third card: the one fix to make today, or what keeps a clean site clean. */
+  /**
+   * The third card: the one fix to make today; with no fix, what that rests on (`noFixKind`): a clean
+   * bill, a check that did not measure everything, or a site that served no page.
+   */
   first:
     | { kind: 'fix'; title: string; body: string; href: string }
     | {
-        kind: 'all-clear';
+        kind: 'all-clear' | 'unmeasured' | 'not-served';
+        label: string;
+        title: string;
         body: string;
         /** The way to start watching an audit nobody has kept; null once it is kept. */
         action: { label: string; href: string } | null;
@@ -187,6 +193,7 @@ function grade(
   check: Check,
   fixes: readonly Fix[],
   isOpen: (f: Fix) => boolean,
+  notServed: boolean,
 ): [GradeView, GradeView] {
   const t = check.technical_seo!;
   const ai = check.ai_readability!;
@@ -197,7 +204,9 @@ function grade(
       score: t.score,
       tone: t.grade ? toneOf(t.grade) : 'default',
       withheld: t.grade === null,
-      summary: seoSummary(check, fixes, isOpen),
+      summary: notServed
+        ? 'No page was served, so nothing was graded.'
+        : seoSummary(check, fixes, isOpen),
     },
     ai.withheld
       ? {
@@ -369,7 +378,22 @@ function withoutJsDoor(
   };
 }
 
-function structureDoor(check: Check, fixes: readonly Fix[], isOpen: (f: Fix) => boolean): DoorView {
+function structureDoor(
+  check: Check,
+  fixes: readonly Fix[],
+  isOpen: (f: Fix) => boolean,
+  notServed: boolean,
+): DoorView {
+  if (notServed) {
+    return {
+      title: 'Site structure',
+      pill: { state: 'neutral', label: 'not measured' },
+      body: 'No page was served, so the structure of the site was not measured.',
+      footer: 'Not measured',
+      coverage: { read: 'No page was served.' },
+      href: '#',
+    };
+  }
   const s = check.structure!;
   const raw = check.technical_seo!.site_structure_score;
   const score = raw === null ? null : Math.round(raw);
@@ -673,15 +697,64 @@ function changesDoor(
   };
 }
 
+type NoFixCard = Exclude<ResultView['first'], { kind: 'fix' }>;
+
+/** "403", "403 or 429", "401, 403 or 429". */
+const eitherOf = (codes: readonly number[]) =>
+  codes.length < 2 ? `${codes[0]}` : `${codes.slice(0, -1).join(', ')} or ${codes.at(-1)}`;
+
+/** The third card when pages answered and none with a 200: what they answered, and what to do. */
+function notServedCard(check: Check, statuses: readonly number[]): NoFixCard {
+  const codes = [...new Set(statuses)].sort((a, b) => a - b);
+  const refused = servedWord(codes) === 'refused';
+  const ai = check.crawlers.filter(isAi);
+  const crawlers = meetsEdge(check)
+    ? 'The site’s edge refused or challenged our browser-identity request from Crawlmouse’s address, so the crawler requests were not sent.'
+    : ai.every((c) => c.verdict === 'not_measured')
+      ? `None of the ${numberWord(ai.length)} AI crawlers could be measured.`
+      : null;
+  const next = refused
+    ? 'If you did not mean to refuse automated requests, find the firewall or bot rule that answered them, then run this audit again.'
+    : 'Once the site serves its pages, run this audit again.';
+  const n = statuses.length;
+  return {
+    kind: 'not-served',
+    label: 'Nothing to grade',
+    title: refused ? 'Your site refused our requests' : 'Your site did not serve a page',
+    body: [
+      `The ${count(n)} ${plural(n, 'page', 'pages')} we requested answered ${eitherOf(codes)}.`,
+      crawlers,
+      next,
+    ]
+      .filter(Boolean)
+      .join(' '),
+    action: null,
+  };
+}
+
+/** The third card when no fix was found and not everything was measured: it names what was not. */
+function unmeasuredCard(check: Check, kept: boolean): NoFixCard {
+  const out = check.crawlers.filter(isAi).filter((c) => c.verdict === 'not_measured');
+  const parts = [
+    out.length
+      ? `${listOf(out.map((c) => c.ua))} ${plural(out.length, 'was', 'were')} not measured.`
+      : null,
+    check.without_js ? null : 'Text without JavaScript was not measured.',
+  ].filter(Boolean);
+  return {
+    kind: 'unmeasured',
+    label: 'No fix found',
+    title: 'Not everything was measured',
+    body: ['We found nothing to fix in what we measured.', ...parts].join(' '),
+    action: kept ? null : { label: 'Watch this site', href: '#keep' },
+  };
+}
+
 /**
  * The third card when there is nothing to fix: what the AI crawlers' verdicts and the templates
  * show, what would change it, and how the site is watched.
  */
-function allClear(
-  check: Check,
-  kept: boolean,
-  cadence: string | null,
-): Extract<ResultView['first'], { kind: 'all-clear' }> {
+function allClear(check: Check, kept: boolean, cadence: string | null): NoFixCard {
   const ai = check.crawlers.filter(isAi);
   const inside = ai.filter((c) => isAllowed(c.verdict));
   const out = keptOutClauses(ai);
@@ -706,6 +779,8 @@ function allClear(
       : 'no re-check is scheduled.';
   return {
     kind: 'all-clear',
+    label: 'Nothing to fix today',
+    title: 'Keep it that way',
     body: `${capitalise(access)}${text}. What changes that is a deploy, a plugin or a new firewall rule; ${watch}`,
     action: kept ? null : { label: 'Watch this site', href: '#keep' },
   };
@@ -873,8 +948,10 @@ function crawlerRows(check: Check): CrawlerRowView[] {
 }
 
 /** "All 214 pages crawled", or "96 of 140 pages crawled" when the crawl stopped short. */
-function crawledLine(check: Check) {
+function crawledLine(check: Check, notServed: boolean) {
   const { pages_crawled: crawled, pages_discovered: found } = check.coverage!;
+  if (notServed)
+    return `${count(crawled)} ${plural(crawled, 'page', 'pages')} requested, none served`;
   return crawled === found
     ? `All ${count(found)} ${plural(found, 'page', 'pages')} crawled`
     : `${count(crawled)} of ${count(found)} pages crawled`;
@@ -953,7 +1030,15 @@ export function resultView(
   const siteFixes = d.fixes.filter((x) => x.site_id === check.site_id);
   const opened = new Set(openFixes(d, check, plan).map((f) => f.id));
   const isOpen = (f: Fix) => opened.has(f.id);
-  const grades = grade(check, fixes, isOpen);
+  const statuses = d.page_results.filter((p) => p.check_id === check.id).map((p) => p.status_code);
+  const noFix = noFixKind({
+    pagesAnswered: statuses.length,
+    pagesServed: statuses.filter((s) => s === 200).length,
+    aiUnmeasured: check.crawlers.filter(isAi).filter((c) => c.verdict === 'not_measured').length,
+    textMeasured: check.without_js !== null,
+  });
+  const notServed = noFix === 'not-served';
+  const grades = grade(check, fixes, isOpen, notServed);
   const coverage = check.coverage!;
   const sampled = sampledCoverage(d, check);
   const withheld = check.ai_readability!.withheld;
@@ -966,7 +1051,7 @@ export function resultView(
     state: 'result',
     variant: withheld ? 'withheld' : clean ? 'clean' : 'issues',
     domain: site.host,
-    crawledLine: crawledLine(check),
+    crawledLine: crawledLine(check, notServed),
     crawledAt: dateTimeUtc(check.finished_at!),
     keptUntil: keptUntil ? dayTimeUtc(keptUntil) : null,
     grades,
@@ -977,11 +1062,15 @@ export function resultView(
           body: fixFirstBody(check, fixes[0], siteFixes),
           href: fixHref(fixes[0].id),
         }
-      : allClear(check, kept, cadence),
+      : notServed
+        ? notServedCard(check, statuses)
+        : noFix === 'unmeasured'
+          ? unmeasuredCard(check, kept)
+          : allClear(check, kept, cadence),
     doors: [
       accessDoor(check, fixes, isOpen, sampled),
       withoutJsDoor(check, fixes, isOpen, sampled),
-      structureDoor(check, fixes, isOpen),
+      structureDoor(check, fixes, isOpen, notServed),
       contentDoor(check, fixes, isOpen),
       signalsDoor(check),
       changesDoor(d, check, kept, cadence),
@@ -1009,15 +1098,18 @@ export function resultView(
 }
 
 /**
- * What a partial check did not measure, in one sentence built from its own figures; null for a
+ * What a partial check did not finish, in one sentence built from its own figures; null for a
  * finished check. The parts: pages found and not crawled, AI crawlers with no measurement, and
- * the text share when no page was rendered.
+ * sampled pages with a crawler test that measured nothing. Text without JavaScript is not one: a
+ * finished check can lack it too, so it is not why a check is partial.
  */
 export function partialNotice(d: ViewDataset, checkId: string): string | null {
   const check = findCheck(d, checkId);
   if (check.status !== 'partial' || !check.coverage) return null;
   const { pages_crawled: crawled, pages_discovered: found } = check.coverage;
   const unmeasured = check.crawlers.filter(isAi).filter((c) => c.verdict === 'not_measured');
+  const sampled = d.page_results.filter((p) => p.check_id === check.id && p.sampled);
+  const untested = sampled.filter((p) => p.crawlers_reached === null).length;
   const parts = [
     crawled < found
       ? `${count(found - crawled)} of the ${count(found)} ${plural(found, 'page', 'pages')} found ${plural(found - crawled, 'was', 'were')} not crawled`
@@ -1025,7 +1117,9 @@ export function partialNotice(d: ViewDataset, checkId: string): string | null {
     unmeasured.length
       ? `${listOf(unmeasured.map((c) => c.ua))} ${plural(unmeasured.length, 'was', 'were')} not measured`
       : null,
-    check.without_js ? null : 'text without JavaScript was not measured',
+    untested
+      ? `crawler tests did not finish on ${count(untested)} of the ${count(sampled.length)} sampled ${plural(sampled.length, 'page', 'pages')}`
+      : null,
   ].filter((x): x is string => x !== null);
   return parts.length
     ? `This audit is partial: ${parts.join('; ')}.`

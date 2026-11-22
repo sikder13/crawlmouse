@@ -45,6 +45,7 @@ import {
 } from '../../../../components/v2/screens/result/AuditPage';
 import { LiveCrawl } from '../_crawl/LiveCrawl';
 import { CheckPage, noticeOf, resultOf } from './CheckPage';
+import { partialNotice } from '../../../../lib/v2/view/result';
 import { FAILURE_COPY } from './failure-copy';
 import { auditHrefs } from './hrefs';
 import type { ReadyCheck } from './page-data';
@@ -196,7 +197,9 @@ describe('/audit/[id]: the result of a measured check, read by a visitor', () =>
     const markup = html(<CheckPage read={two} />);
     expect(markup).toContain('This audit is partial: ');
     for (const c of unmeasured) expect(markup).toContain(c.ua);
-    expect(markup).toContain('text without JavaScript was not measured');
+    // Not why it is partial (a finished check can lack it too): the door says it, the notice does not.
+    expect(partialNotice(two.dataset, SECOND)).not.toContain('JavaScript');
+    expect(markup).toContain('was not measured in this audit');
     expect(html(<CheckPage read={one} />)).not.toContain('This audit is partial');
   });
 
