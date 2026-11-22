@@ -166,10 +166,23 @@ Account: two accounts A and B, A's removed member, signed out.
 
 ## D — defects with no journey step
 
-64 register rows name a stream, not a journey step. Each gets a dedicated test named `D.F-nnn`, written by
+66 register rows name a stream, not a journey step. Each gets a dedicated test named `D.F-nnn`, written by
 the session that fixes it (RULES §3 step 2), under `tests/journeys/d/`.
 
-D.F-010, D.F-011, D.F-017, D.F-018, D.F-019, D.F-028, D.F-029, D.F-030, D.F-034, D.F-035, D.F-036, D.F-037, D.F-038, D.F-039, D.F-040, D.F-041, D.F-043, D.F-044, D.F-045, D.F-046, D.F-047, D.F-048, D.F-049, D.F-050, D.F-051, D.F-052, D.F-053, D.F-056, D.F-058, D.F-059, D.F-064, D.F-065, D.F-066, D.F-067, D.F-068, D.F-069, D.F-070, D.F-071, D.F-073, D.F-074, D.F-075, D.F-076, D.F-077, D.F-078, D.F-079, D.F-080, D.F-081, D.F-082, D.F-083, D.F-084, D.F-085, D.F-086, D.F-087, D.F-088, D.F-089, D.F-090, D.F-091, D.F-092, D.F-093, D.F-164, D.F-165, D.F-166, D.F-167, D.F-168
+D.F-010, D.F-011, D.F-017, D.F-018, D.F-019, D.F-028, D.F-029, D.F-030, D.F-034, D.F-035, D.F-036, D.F-037, D.F-038, D.F-039, D.F-040, D.F-041, D.F-043, D.F-044, D.F-045, D.F-046, D.F-047, D.F-048, D.F-049, D.F-050, D.F-051, D.F-052, D.F-053, D.F-056, D.F-058, D.F-059, D.F-064, D.F-065, D.F-066, D.F-067, D.F-068, D.F-069, D.F-070, D.F-071, D.F-073, D.F-074, D.F-075, D.F-076, D.F-077, D.F-078, D.F-079, D.F-080, D.F-081, D.F-082, D.F-083, D.F-084, D.F-085, D.F-086, D.F-087, D.F-088, D.F-089, D.F-090, D.F-091, D.F-092, D.F-093, D.F-164, D.F-165, D.F-166, D.F-167, D.F-168, D.F-169, D.F-170
+
+### D steps that write nothing
+
+A D step counts as writing, and runs only on staging, unless this table says exactly `no`. The session that writes
+the test asks QA to list it here.
+
+| Step    | Writes |
+| ------- | ------ |
+| D.F-045 | no     |
+| D.F-048 | no     |
+| D.F-049 | no     |
+| D.F-067 | no     |
+| D.F-088 | no     |
 
 ## Defect index
 
@@ -345,5 +358,7 @@ Every register row and the steps that prove it closed.
 | F-166  | major   | D.F-166                                               |
 | F-167  | major   | D.F-167                                               |
 | F-168  | major   | D.F-168                                               |
+| F-169  | major   | D.F-169                                               |
+| F-170  | major   | D.F-170                                               |
 
-Rows in the index: 168. Steps named by the register that are not in the tables above: none.
+Rows in the index: 170. Steps named by the register that are not in the tables above: none.
