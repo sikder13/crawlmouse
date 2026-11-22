@@ -78,6 +78,12 @@ export function CookieConsent() {
   const decide = (granted: boolean) => {
     const decision = granted ? 'granted' : 'denied';
     // Each step on its own: a full or blocked store must not leave PostHog running after a decline.
+    // The cookie first, so another tab that hears the storage change reads this decision.
+    try {
+      document.cookie = consentDecisionCookie(decision);
+    } catch {
+      /* noop */
+    }
     try {
       localStorage.setItem(CONSENT_DECISION_STORAGE_KEY, decision);
     } catch {
@@ -87,11 +93,6 @@ export function CookieConsent() {
       } catch {
         /* a blocked store holds no old value */
       }
-    }
-    try {
-      document.cookie = consentDecisionCookie(decision);
-    } catch {
-      /* noop */
     }
     try {
       if (granted) {

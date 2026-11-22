@@ -80,11 +80,12 @@ export function startSentryWhenIdle(win: Window & typeof globalThis): void {
   const onRejection = (e: PromiseRejectionEvent) => hold(e.reason);
   const start = () => {
     loadSentry()
-      ?.then((sdk) => {
+      ?.then(() => {
         // The SDK's own handlers are installed now, so these stop here.
         win.removeEventListener('error', onError);
         win.removeEventListener('unhandledrejection', onRejection);
-        for (const error of held.splice(0)) sdk.captureException(error);
+        // Through the one reporter, so a boundary reporting the same error later gets this id.
+        for (const error of held.splice(0)) void reportToSentry(error);
       })
       .catch(() => undefined);
   };

@@ -215,6 +215,18 @@ describe('the browser’s Sentry', () => {
     expect(names().filter((n) => n === 'captureException')).toHaveLength(1);
   });
 
+  it('an error held before load, then reported by a boundary, is one report with one id', async () => {
+    const s = await fresh();
+    s.configureSentry({ dsn: DSN });
+    s.startSentryWhenIdle(window);
+    const boom = new Error('held then boundary');
+    window.dispatchEvent(new ErrorEvent('error', { error: boom }));
+    await s.loadSentry();
+    await settle();
+    expect(await s.reportToSentry(boom)).toBe('event-id');
+    expect(names().filter((n) => n === 'captureException')).toHaveLength(1);
+  });
+
   it('with no DSN, or an SDK that will not load, it answers null and does not throw', async () => {
     const none = await fresh();
     none.configureSentry({ dsn: undefined });

@@ -311,6 +311,65 @@ describe('the privacy review’s cases', () => {
     b.done();
   });
 
+  it('a Decline in a tab whose store is full still stops this one (no new value in the event)', async () => {
+    const posthog = await load(['cm_consent_required=0']);
+    document.cookie = 'cm_consent=denied; Path=/';
+    localStorage.removeItem('cm_consent');
+    window.dispatchEvent(new StorageEvent('storage', { key: 'cm_consent', newValue: null }));
+    await settle();
+    expect(posthog.has_opted_out_capturing()).toBe(true);
+  });
+
+  it('a late grant event does nothing once the recorded decision is a decline', async () => {
+    const posthog = await load(['cm_consent_required=0']);
+    const b = await banner();
+    b.open();
+    await b.click('Decline');
+    const sent = requests.length;
+    window.dispatchEvent(new StorageEvent('storage', { key: 'cm_consent', newValue: 'granted' }));
+    await settle();
+    expect(posthog.has_opted_out_capturing()).toBe(true);
+    expect(requests.length).toBe(sent);
+    b.done();
+  });
+
+  it('a page restored from the back/forward cache catches up with a Decline made meanwhile', async () => {
+    const posthog = await load(['cm_consent_required=0']);
+    localStorage.setItem('cm_consent', 'denied');
+    const restored = new Event('pageshow') as PageTransitionEvent;
+    Object.defineProperty(restored, 'persisted', { value: true });
+    window.dispatchEvent(restored);
+    await settle();
+    expect(posthog.has_opted_out_capturing()).toBe(true);
+    expect({ ...traces(), scripts: [], requests: [] }).toEqual(NOTHING);
+  });
+
+  it('a repeated storage event announces a choice once', async () => {
+    await load(['cm_consent_required=0']);
+    const heard = vi.fn();
+    window.addEventListener('cm:consent-denied', heard);
+    localStorage.setItem('cm_consent', 'denied');
+    for (let i = 0; i < 3; i++) {
+      window.dispatchEvent(new StorageEvent('storage', { key: 'cm_consent', newValue: 'denied' }));
+    }
+    window.removeEventListener('cm:consent-denied', heard);
+    expect(heard).toHaveBeenCalledTimes(1);
+  });
+
+  it('the banner writes the cookie before storage, so another tab never reads the old cookie', async () => {
+    await load(['cm_consent_required=1'], 'granted');
+    const b = await banner();
+    b.open();
+    let cookieAtWrite = '';
+    const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      cookieAtWrite = document.cookie;
+    });
+    await b.click('Decline');
+    setItem.mockRestore();
+    expect(cookieAtWrite).toContain('cm_consent=denied');
+    b.done();
+  });
+
   it('another key changing in storage does nothing', async () => {
     const posthog = await load(['cm_consent_required=0']);
     window.dispatchEvent(new StorageEvent('storage', { key: 'other', newValue: 'denied' }));

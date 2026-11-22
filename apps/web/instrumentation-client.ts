@@ -118,17 +118,27 @@ if (
     startPostHog();
     firstTouch();
   });
-  // A choice made in another tab of this site reaches this one, and the page's own listeners
-  // (the Feedback button, IdentifyPerson, the grant listener above) hear it as they would here.
-  window.addEventListener('storage', (e) => {
-    if (e.key !== CONSENT_DECISION_STORAGE_KEY) return;
-    if (e.newValue === 'denied') {
+  // A choice made in another tab of this site reaches this one, and the page's own listeners (the
+  // Feedback button, IdentifyPerson, the grant listener above) hear it as they would here. It acts
+  // on the recorded decision, not the event's value: a full store records it in the cookie alone,
+  // and a late event may be older than the decision. A page restored from the back/forward cache
+  // has missed the events, so it catches up the same way.
+  const followRecordedDecision = () => {
+    const decision = recordedDecision(document.cookie, storedConsent());
+    const stopped = !posthog.__loaded || posthog.has_opted_out_capturing();
+    if (decision === 'denied' && !stopped) {
       stopAnalytics(posthog);
       window.dispatchEvent(new Event(CONSENT_DENIED_EVENT));
     }
-    if (e.newValue === 'granted') {
+    if (decision === 'granted' && stopped) {
       resumeAnalytics(posthog);
       window.dispatchEvent(new Event(CONSENT_GRANTED_EVENT));
     }
+  };
+  window.addEventListener('storage', (e) => {
+    if (e.key === CONSENT_DECISION_STORAGE_KEY) followRecordedDecision();
+  });
+  window.addEventListener('pageshow', (e) => {
+    if (e.persisted) followRecordedDecision();
   });
 }
