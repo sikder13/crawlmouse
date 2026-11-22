@@ -1,6 +1,7 @@
 import { expect, test } from './pw';
+import { originHeaders, protectionRefusal } from './lib/protection';
 import { assertCheckableSite } from './lib/sites';
-import { writeRefusal } from './lib/target';
+import { databaseRefusal, writeRefusal } from './lib/target';
 
 // The production-write guard (lib/target.ts) and the check-target rule (lib/sites.ts). Pure: no browser,
 // no server. The spellings vary what the matcher reads: case, trailing dots, aliases, ports, userinfo.
@@ -78,5 +79,69 @@ test.describe('the sites a journey may check', () => {
     ]) {
       expect(() => assertCheckableSite(a), a).toThrow(/journeys check no other site/);
     }
+  });
+});
+
+test.describe("the deployment's database, read from its own headers", () => {
+  const csp = (v: string) => ({ 'content-security-policy': v });
+  test('allows a policy naming staging and not production', () => {
+    expect(
+      databaseRefusal(csp("connect-src 'self' https://qfgkrnnjuiasahspavbc.supabase.co")),
+    ).toBeNull();
+    expect(
+      databaseRefusal({
+        'Content-Security-Policy-Report-Only':
+          'connect-src https://qfgkrnnjuiasahspavbc.supabase.co',
+      }),
+    ).toBeNull();
+  });
+  test("refuses a policy naming production's project, even beside staging's", () => {
+    for (const v of [
+      'connect-src https://ezspnfeyzwsisymytssm.supabase.co',
+      'connect-src https://qfgkrnnjuiasahspavbc.supabase.co https://ezspnfeyzwsisymytssm.supabase.co',
+    ]) {
+      expect(databaseRefusal(csp(v)), v).toMatch(/production/);
+    }
+  });
+  test('refuses no policy, or one naming no staging database', () => {
+    expect(databaseRefusal({})).toMatch(/no Content-Security-Policy/);
+    expect(databaseRefusal(csp("default-src 'self'"))).toMatch(/does not name staging/);
+    for (const v of [
+      'connect-src https://qfgkrnnjuiasahspavbc.supabase.co.evil.test',
+      'connect-src https://xqfgkrnnjuiasahspavbc.supabase.co',
+      'connect-src https://qfgkrnnjuiasahspavbc.supabase.com',
+    ]) {
+      expect(databaseRefusal(csp(v)), v).toMatch(/does not name staging/);
+    }
+    expect(
+      databaseRefusal(
+        csp(
+          'connect-src https://qfgkrnnjuiasahspavbc.supabase.co wss://qfgkrnnjuiasahspavbc.supabase.co;',
+        ),
+      ),
+    ).toBeNull();
+  });
+});
+
+test.describe('Vercel Deployment Protection', () => {
+  const vercel = { server: 'Vercel' };
+  test('stops a run against a protected deployment, saying why', () => {
+    expect(protectionRefusal(401, vercel, false)).toMatch(/set VERCEL_AUTOMATION_BYPASS_SECRET/);
+    expect(protectionRefusal(403, { 'x-vercel-id': 'iad1::x' }, false)).toMatch(
+      /Deployment Protection/,
+    );
+    expect(protectionRefusal(401, vercel, true)).toMatch(/refused the bypass secret/);
+  });
+  test('lets the app through, and leaves other refusals to the steps', () => {
+    expect(protectionRefusal(200, vercel, false)).toBeNull();
+    expect(protectionRefusal(429, vercel, false)).toBeNull();
+    expect(protectionRefusal(401, { server: 'nginx' }, false)).toBeNull();
+  });
+  test('sends the bypass only when a secret is set', () => {
+    expect(originHeaders({})).toEqual({});
+    expect(originHeaders({ VERCEL_AUTOMATION_BYPASS_SECRET: '  ' })).toEqual({});
+    expect(originHeaders({ VERCEL_AUTOMATION_BYPASS_SECRET: 's3' })).toEqual({
+      'x-vercel-protection-bypass': 's3',
+    });
   });
 });

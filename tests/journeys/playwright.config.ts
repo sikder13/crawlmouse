@@ -10,6 +10,8 @@ const base = baseUrlOf(process.env).origin;
 export default defineConfig({
   testDir: '.',
   testMatch: /.*\.spec\.ts$/,
+  // Stops a run against a protected deployment with its reason (lib/protection.ts).
+  globalSetup: './global-setup.ts',
   timeout: 240_000,
   expect: { timeout: 20_000 },
   retries: 0,
