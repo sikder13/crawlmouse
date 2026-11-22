@@ -9,17 +9,15 @@ export interface MeasuredFacts {
   pagesServed: number;
   /** The check holds a Technical SEO letter, so it is never described as having graded nothing. */
   graded: boolean;
-  /** AI crawlers whose verdict is `not_measured`. */
-  aiUnmeasured: number;
-  /** The check holds a site-wide share of the text without JavaScript. */
-  textMeasured: boolean;
+  /** Each section of the result was measured in full (`measuredInFull`). */
+  measuredInFull: boolean;
 }
 
 export type NoFixKind = 'not-served' | 'unmeasured' | 'all-clear';
 
 export function noFixKind(f: MeasuredFacts): NoFixKind {
   if (f.pagesAnswered > 0 && f.pagesServed === 0 && !f.graded) return 'not-served';
-  return f.pagesServed > 0 && f.aiUnmeasured === 0 && f.textMeasured ? 'all-clear' : 'unmeasured';
+  return f.pagesServed > 0 && f.measuredInFull ? 'all-clear' : 'unmeasured';
 }
 
 /** The statuses that are a server saying no to the request. A 404 or a 500 is not one. */

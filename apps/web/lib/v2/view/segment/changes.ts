@@ -4,6 +4,7 @@
  * the changes it found. A change is reported as first observed at a check, after what we found
  * with it, never as caused by it: a check sees that something differs, not why.
  */
+import { measuredInFull } from '../section-measured';
 import type { Change, Check, EvidenceClass, GradeName, Verdict } from '@crawlmouse/types/v2';
 import type { ViewDataset } from '../../fixtures';
 
@@ -296,10 +297,16 @@ export function changesView(
             label: `${rows.length} ${plural(rows.length, 'change', 'changes')}`,
           },
         }
-      : {
-          title: `Nothing changed at the ${when} check.`,
-          pill: { state: 'neutral', label: 'no changes' },
-        },
+      : previous && measuredInFull(d, check) && measuredInFull(d, previous)
+        ? {
+            title: `Nothing changed at the ${when} check.`,
+            pill: { state: 'neutral', label: 'no changes' },
+          }
+        : {
+            // The diff skips what either check did not measure.
+            title: `No change in what both checks measured at the ${when} check.`,
+            pill: { state: 'neutral', label: 'no measured change' },
+          },
     body: 'Each row says what changed, where, what it did to the grades, what we found with it, and who was told.',
     tiles: tiles({ label: 'Changes at this check', value: String(rows.length), note: null }),
     rows,

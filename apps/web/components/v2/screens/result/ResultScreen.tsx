@@ -342,9 +342,12 @@ export function ResultScreen({
           <strong className={styles.doorTitle}>Explore the link map</strong>
           <div className={`${layout.mut} ${styles.small} ${styles.mapSummary}`}>
             {count(map.pages)} {plural(map.pages, 'page', 'pages')}, {count(map.links)}{' '}
-            {plural(map.links, 'link', 'links')}, {count(map.orphans)}{' '}
-            {plural(map.orphans, 'orphan', 'orphans')}. Select any page to see what links to it,
-            what it links to, and which crawlers can reach it.
+            {plural(map.links, 'link', 'links')}
+            {map.orphans === null
+              ? ''
+              : `, ${count(map.orphans)} ${plural(map.orphans, 'orphan', 'orphans')}`}
+            . Select any page to see what links to it, what it links to, and which crawlers can
+            reach it.
             {map.nodes
               ? ''
               : ' No drawing was stored with this audit; the map is laid out when it opens.'}

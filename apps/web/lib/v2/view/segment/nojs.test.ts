@@ -149,8 +149,9 @@ describe('nojsView: which templates arrive empty, by the one shared rule', () =>
     const v = nojsView(d, id, { asFirstSeen: true });
     const door = resultView(d, id, { map: { nodes: [], positions: {} }, asFirstSeen: true })
       .doors[1]!;
-    expect(v.headline.title).toBe('Every template ships its text without JavaScript.');
-    expect(door.body).toMatch(/^Every template ships its text/);
+    // No template reads thin, and the share is low: the title says the number, not "every".
+    expect(v.headline.title).toBe('31% of the text is in the HTML before JavaScript runs.');
+    expect(door.body).toMatch(/^Every template ships its text: 31%/);
   });
 });
 
