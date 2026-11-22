@@ -1,14 +1,27 @@
 import { expect } from './pw';
-import { contentOf, expectFinishedV2Page, pageStatus } from './lib/pages';
-import { step } from './lib/step';
+import {
+  contentOf,
+  expectFinishedV2Page,
+  pageStatus,
+  statusWhy,
+  V1_MARKER,
+  type PageDefects,
+} from './lib/pages';
+import { expectedFailOf, RedFailure, step } from './lib/step';
 
 // J0 — visitor who never signs up (STEPS.md). The steps here write nothing; J0.3–J0.8 start checks and
-// land with staging. Each assertion that encodes a registered defect names it (lib/step.ts).
+// land with staging. An assertion names a registered defect only when the page shows that defect's own
+// symptom (lib/pages.ts), so any other failure is red.
 
-/** Why a header or footer entry does not open a finished v2 page today, by path (CC-45 J0.2). */
-const ENTRY = {
-  status: { '/login': 'F-025', '/signup': 'F-025' } as Record<string, string>,
-  shell: { '/pricing': 'F-007', '/developers': 'F-027' } as Record<string, string>,
+/**
+ * Why a header or footer entry does not open a finished v2 page today, by path, with the symptom that
+ * shows it (CC-45 J0.2): the Vercel checkpoint answers sign-in with 429 (F-025); v1 pages (F-007, F-027).
+ */
+const ENTRY: Record<string, PageDefects> = {
+  '/login': { status: { id: 'F-025', got: 429 } },
+  '/signup': { status: { id: 'F-025', got: 429 } },
+  '/pricing': { shell: 'F-007' },
+  '/developers': { shell: 'F-027' },
 };
 
 step(
@@ -30,43 +43,55 @@ step(
       .filter((u) => origins.includes(u.origin) && !u.hash)
       .map((u) => u.pathname + u.search);
     expect(paths.length, 'header and footer have internal entries').toBeGreaterThan(0);
-    const unexplained: string[] = [];
-    const explained: string[] = [];
+    const unexplained: [id: string, what: string][] = [];
+    const explained: [id: string, what: string][] = [];
     for (const path of [...new Set(paths)]) {
       const res = await page.goto(path);
       const status = pageStatus(res);
-      const v2 = (await page.locator('[data-v2-shell]').count()) > 0;
-      const kept = (await page.locator('[data-v2-kept]').count()) > 0;
-      const problem =
-        status !== 200
-          ? [ENTRY.status[path], `${path} → ${status}`]
-          : !v2
-            ? [ENTRY.shell[path], `${path} is not in the v2 shell`]
-            : kept
-              ? ['F-006', `${path} is a kept v1 body`]
-              : null;
-      if (problem)
-        (problem[0] ? explained : unexplained).push(
-          problem[0] ? `${problem[0]}: ${problem[1]}` : problem[1],
-        );
+      const known = ENTRY[path] ?? {};
+      let problem: [id: string, what: string] | null = null;
+      if (status !== 200) problem = [statusWhy(status, known.status), `${path} → ${status}`];
+      else if ((await page.locator('[data-v2-shell]').count()) === 0) {
+        const v1 = (await page.locator(V1_MARKER).count()) > 0;
+        problem = [
+          v1 && known.shell ? known.shell : 'unregistered',
+          `${path} is not in the v2 shell`,
+        ];
+      } else if ((await page.locator('[data-v2-kept]').count()) > 0) {
+        problem = ['F-006', `${path} is a kept v1 body`];
+      }
+      if (problem) (problem[0] === 'unregistered' ? unexplained : explained).push(problem);
     }
-    expect(unexplained, 'entries that fail for no registered reason').toEqual([]);
+    expect(
+      unexplained.map(([, w]) => w),
+      'entries that fail for no registered reason',
+    ).toEqual([]);
     // An entry rendered as plain "planned" text opens nothing (F-005).
     const planned = await shell.locator('[data-v2-planned]').count();
-    if (planned > 0) explained.push(`F-005: ${planned} entries open nothing`);
-    expect(explained, explained.join('; ')).toEqual([]);
+    if (planned > 0) explained.push(['F-005', `${planned} entries open nothing`]);
+    // J0.2 sees every cause at once, so a listed id it no longer sees is stale and must be deleted.
+    const seen = new Set(explained.map(([f]) => f));
+    const stale = expectedFailOf('J0.2').filter((f) => !seen.has(f));
+    if (stale.length > 0) {
+      throw new RedFailure(
+        `J0.2 no longer fails on ${stale.join(', ')}: delete them from expected-fail.json`,
+      );
+    }
+    const text = explained.map(([f, w]) => `${f}: ${w}`);
+    expect(text, text.join('; ')).toEqual([]);
   },
 );
 
-type Page9 = [path: string, ids?: { status?: string; shell?: string; kept?: string }];
+type Page9 = [path: string, ids?: PageDefects];
+const missing = (id: string): PageDefects => ({ status: { id, got: 404 } });
 const pages: [id: string, title: string, paths: Page9[]][] = [
   ['J0.9a', 'pricing', [['/pricing', { shell: 'F-007' }]]],
   [
     'J0.9b',
     'the agency pages',
     [
-      ['/agencies', { status: 'F-024' }],
-      ['/agency-trial', { status: 'F-024' }],
+      ['/agencies', missing('F-024')],
+      ['/agency-trial', missing('F-024')],
     ],
   ],
   ['J0.9c', 'help', [['/help']]],
@@ -83,8 +108,8 @@ const pages: [id: string, title: string, paths: Page9[]][] = [
       ['/aup', { kept: 'F-006' }],
       ['/subprocessors', { kept: 'F-006' }],
       // The footer names Refunds and DPA as planned entries with no page yet (F-005).
-      ['/refunds', { status: 'F-005' }],
-      ['/dpa', { status: 'F-005' }],
+      ['/refunds', missing('F-005')],
+      ['/dpa', missing('F-005')],
     ],
   ],
 ];
@@ -98,7 +123,9 @@ step('J0.9g', 'status shows the product, not internals', async ({ page }) => {
   await expectFinishedV2Page(page, '/status', { kept: 'F-006' });
   const text = await (await contentOf(page)).innerText();
   expect(text, 'F-063: no "not monitored" parts').not.toMatch(/not monitored/i);
-  expect(text, 'F-063: no version number').not.toMatch(/\bv?\d+\.\d+\.\d+\b/);
+  // The page prints "version 0.0.1, commit 8a72eb…" (CC-45); an IP address or a date is not that.
+  expect(text, 'F-063: no version number').not.toMatch(/\bversion\s+v?\d+\.\d+\.\d+/i);
+  expect(text, 'F-063: no commit').not.toMatch(/\bcommit\s+[0-9a-f]{7,40}\b/i);
 });
 
 step('J0.9i', 'the AI-readiness checker describes what a v2 check returns', async ({ page }) => {

@@ -31,6 +31,20 @@ test('each step lists only ids its STEPS.md row names', () => {
   expect(stray).toEqual([]);
 });
 
+test('a defect-named step lists exactly its own defect', () => {
+  const wrong = Object.entries(EXPECTED).filter(
+    ([k, ids]) => k.startsWith('D.') && (ids.length !== 1 || ids[0] !== k.slice(2)),
+  );
+  expect(wrong).toEqual([]);
+});
+
+test('every step that is not plainly "no" writes, J4 included', () => {
+  expect(STEPS.get('J4')?.writes).toBe(true);
+  expect(STEPS.get('J4.6')?.writes).toBe(true);
+  expect(STEPS.get('J4.1')?.writes).toBe(false);
+  expect(STEPS.get('D.F-010')?.writes).toBe(true);
+});
+
 test('expected-fail.json names only defects the index lists', () => {
   const ids = Object.values(EXPECTED).flat();
   expect(ids.length).toBeGreaterThan(0);

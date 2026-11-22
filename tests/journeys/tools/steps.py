@@ -75,6 +75,9 @@ for fid, ss in index.items():
 def subs_of(p):
     return [s_ for s_ in all_steps if s_ != p and (s_.startswith(p) and re.fullmatch(re.escape(p) + (r'\.\d+' if p == 'J4' else r'[a-z]'), s_))]
 
+def sub_any(parent, f):
+    return next((sub for sub in subs_of(parent) if f in JUDGED.get(sub, [])), parent)
+
 def mark(step, f):
     return f + ' (judged)' if f in JUDGED.get(step, []) else f
 
@@ -83,6 +86,8 @@ def xf(step):
     if step in PARENTS:
         own = ids
         union = sorted(set(own) | {f for sub in subs_of(step) for f in by_step.get(sub, [])})
+        judged = {f for sub in subs_of(step) for f in JUDGED.get(sub, [])}
+        union = [mark(sub_any(step, f), f) if f in judged else f for f in union]
         tail = ' (with its sub-steps)' if union != sorted(own) else ''
         return (', '.join(union) if union else '—') + tail
     return ', '.join(ids) if ids else '—'
@@ -180,13 +185,13 @@ J = {
  ('J3.9','Seeded `+agency`, `+agency-dev`, `+agencytrial`, `+demo`','Each dashboard matches the seed','desktop','no'),
 ]),
 'J4': ('Somebody else\'s data', 'two accounts A and B, A\'s removed member, signed out', [
- ('J4','Every address and request of A tried as B, as A\'s removed member and signed out; ids changed in addresses and bodies','Nothing private shown or changed; refusals say "belongs to an account", not "missing"','desktop','no (reads; refused writes)'),
+ ('J4','Every address and request of A tried as B, as A\'s removed member and signed out; ids changed in addresses and bodies','Nothing private shown or changed; refusals say "belongs to an account", not "missing"','desktop','yes (it sends writes that must be refused)'),
  ('J4.1','A\'s site pages (incl. staging)','B 404 / signed out to sign-in','desktop','no'),
  ('J4.2','A\'s kept results: every tab, map, fixes, checks','Refused, with the right words','desktop','no'),
  ('J4.3','A\'s changes, alerts, reports, settings, plan, delete, seats, agency, billing','B sees only its own account','desktop','no'),
  ('J4.4','Export files and fix packets; email-developer','404 / 401','desktop','no'),
  ('J4.5','Share links and report pages','Open only what was shared; no pivot','desktop','no'),
- ('J4.6','Every API call in A\'s network log, replayed as B and signed out, with ids changed','Refused; no write crosses accounts','desktop','no'),
+ ('J4.6','Every API call in A\'s network log, replayed as B and signed out, with ids changed','Refused; no write crosses accounts','desktop','yes (it replays writes)'),
  ('J4.7','v1 API routes','410 or refused','desktop','no'),
 ]),
 }
@@ -223,9 +228,10 @@ w('gate, not by the test. A step\'s test fails red when it passes while ids are 
 w('reason that names none of its listed ids. A PR that fixes a defect deletes that id from `expected-fail.json`. This')
 w('file\'s column stays as CC-45 found it.')
 w('')
-w('**Writes.** A step marked "yes" changes data (a check, an account, a mail), or needs a check it starts itself.')
-w('`lib/target.ts` runs such a step only on staging\'s own host, which has its own database; never on production, a')
-w('Vercel preview or localhost. Steps marked "no" may run anywhere.')
+w('**Writes.** A step whose cell is anything but exactly "no" is treated as writing: it changes data (a check, an')
+w('account, a mail), needs a check it starts itself, or sends writes that must be refused. `lib/target.ts` runs such')
+w('a step only on staging\'s host, and only after the deployment\'s own headers show staging\'s database; never on')
+w('production, a Vercel preview or localhost. Steps marked "no" may run anywhere.')
 w('')
 w('**Sites checked.** Only `*.lab.crawlmouse.com` and `nahltech.com`: `lib/sites.ts` refuses any other host for a step')
 w('that starts a check.')
@@ -271,7 +277,8 @@ import json, os
 expected = {}
 for sid in all_steps + [x for x,*_ in SMOKE] + [d for d in by_step if d.startswith('D.')]:
     ids = sorted(set(by_step.get(sid, [])) | ({f for sub in subs_of(sid) for f in by_step.get(sub, [])} if sid in PARENTS else set()))
-    ids = [f for f in ids if f not in JUDGED.get(sid, [])]
+    judged = set(JUDGED.get(sid, [])) | ({f for sub in subs_of(sid) for f in JUDGED.get(sub, [])} if sid in PARENTS else set())
+    ids = [f for f in ids if f not in judged]
     if ids: expected[sid] = ids
 json.dump(expected, open(os.path.join(os.path.dirname(out), 'expected-fail.json'), 'w'), indent=2, sort_keys=True)
 open(os.path.join(os.path.dirname(out), 'expected-fail.json'), 'a').write('\n')
