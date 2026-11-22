@@ -212,7 +212,7 @@ describe('the all-clear card needs each section read', () => {
     expect(first.kind !== 'fix' && first.body).toContain(sentence);
   });
 
-  it('says nothing was measured when no section was read', () => {
+  it('claims no more than "not everything" when no section was read', () => {
     const c = clean();
     for (const x of c.check.crawlers.filter((y) => y.group !== 'search_engine'))
       x.verdict = 'not_measured';
@@ -221,16 +221,20 @@ describe('the all-clear card needs each section read', () => {
     Object.assign(c.check.structure!, { internal_links: 0, orphan_pages: 0, js_only_pages: 0 });
     const first = resultView(c.d, c.id, { map: null }).first;
     if (first.kind !== 'unmeasured') throw new Error(`got ${first.kind}`);
-    expect(first.title).toBe('Nothing was measured');
+    // The same page still reports robots.txt and the signals, so "nothing" would be false beside them.
+    expect(
+      c.check.crawlers.some((x) => x.group === 'search_engine' && x.verdict !== 'not_measured'),
+    ).toBe(true);
+    expect(first.title).toBe('Not everything was measured');
     expect(first.body).not.toContain('in what we measured');
   });
 
-  it('behind an edge, says no crawler could be tested', () => {
+  it('behind an edge, says no AI crawler could be tested, not that no crawler was', () => {
     const c = clean();
     for (const x of c.check.crawlers.filter((y) => y.group !== 'search_engine'))
       x.verdict = 'edge_blocks_automation';
     const first = resultView(c.d, c.id, { map: null }).first;
-    expect(first.kind !== 'fix' && first.body).toContain('No crawler could be tested.');
+    expect(first.kind !== 'fix' && first.body).toContain('No AI crawler could be tested.');
   });
 });
 

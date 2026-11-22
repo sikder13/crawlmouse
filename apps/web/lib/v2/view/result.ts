@@ -768,7 +768,7 @@ function unmeasuredCard(check: Check, kept: boolean): NoFixCard {
       ? `${listOf(out.map((c) => c.ua))} ${plural(out.length, 'was', 'were')} not measured.`
       : sectionMeasured(check, 'crawler_access')
         ? null
-        : 'No crawler could be tested.',
+        : 'No AI crawler could be tested.',
     check.without_js ? null : 'Text without JavaScript was not measured.',
     sectionMeasured(check, 'structure') ? null : 'No internal link was read.',
     sectionMeasured(check, 'content') ? null : 'No page’s content was checked.',
@@ -776,7 +776,7 @@ function unmeasuredCard(check: Check, kept: boolean): NoFixCard {
   return {
     kind: 'unmeasured',
     label: 'No fix found',
-    title: anySectionMeasured(check) ? 'Not everything was measured' : 'Nothing was measured',
+    title: 'Not everything was measured',
     body: [
       ...(anySectionMeasured(check) ? ['We found nothing to fix in what we measured.'] : []),
       ...parts,
