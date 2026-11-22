@@ -79,6 +79,30 @@ async function claimedSite(
 }
 
 /**
+ * The words migration 20261122000002 adds. The app deploys on merge and the owner applies the
+ * migration after it, so for a while `fail_check` refuses them. A check thrown out of its build has
+ * onFailure as its one writer: without this it would stay `running`, holding its site, until the
+ * reaper. Delete this once the migration is applied in production.
+ */
+const AWAITING_MIGRATION: readonly FailureReason[] = ['site_unreachable', 'nothing_read'];
+const WORD_REFUSED = /the reason is not one of check_failure_reasons\(\)/;
+
+/** `fail_check` with `reason`; `internal` if the database does not list that word yet. */
+async function failWith(
+  store: Pick<PipelineStore, 'fail'>,
+  checkId: string,
+  reason: FailureReason,
+): Promise<{ failed: boolean; storedAs?: FailureReason }> {
+  try {
+    return { failed: await store.fail(checkId, reason, null) };
+  } catch (error) {
+    const refused = error instanceof Error && WORD_REFUSED.test(error.message);
+    if (!refused || !AWAITING_MIGRATION.includes(reason)) throw error;
+    return { failed: await store.fail(checkId, 'internal', null), storedAs: 'internal' };
+  }
+}
+
+/**
  * Fails the check by its id unless it has ended; what runCheck's `fail` and onFailure run. A failed
  * check's site is read from its row, so check.failed names the site the database holds it under,
  * whatever the event said (security 6).
@@ -88,10 +112,11 @@ export async function failCheck(
   checkId: string,
   reason: FailureReason,
 ): Promise<FailOutput> {
-  if (!(await store.fail(checkId, reason, null))) return { failed: false };
+  const { failed, storedAs } = await failWith(store, checkId, reason);
+  if (!failed) return { failed: false };
   const siteId = await store.siteOf(checkId);
   if (siteId === null) throw new Error(`fail: check ${checkId} has no row after it failed`);
-  return { failed: true, siteId };
+  return storedAs ? { failed: true, siteId, storedAs } : { failed: true, siteId };
 }
 
 /**

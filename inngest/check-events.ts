@@ -57,9 +57,9 @@ export const FAILURE_REASONS = [
    * never won a slot.
    */
   'capacity_wait_exceeded',
-  /** No page was read, and robots.txt, the first request to the host, got no answer. */
+  /** No page was read, robots.txt on the homepage's origin got no answer, and no other origin did. */
   'site_unreachable',
-  /** No page was read for any other reason: the host answered, or our own rules stopped the crawl. */
+  /** No page was read for any other reason (nothingReadReason in the engine). */
   'nothing_read',
   'build_failed',
   'persist_failed',

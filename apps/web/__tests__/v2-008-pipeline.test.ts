@@ -11,6 +11,7 @@ import {
   SITE_SCHEDULE_COLUMNS,
 } from '../lib/v2/pipeline/columns';
 import { FAILURE_REASONS } from '../lib/v2/pipeline/limits';
+import { failCheck } from '../lib/v2/pipeline/steps/lifecycle';
 import { catalogSnapshot } from './helpers/catalog-snapshot';
 import {
   applyAllMigrations,
@@ -420,6 +421,45 @@ describe('the failure reasons', () => {
       expect(await stateOf(check)).toEqual(before);
     },
   );
+
+  it('a check failing with a word the database does not list yet ends `internal`, and does not hang', async () => {
+    const site = await aSite();
+    const check = await aQueuedCheck(site);
+    await claim(check, 'run-before-the-migration');
+    const d = (await db.clone()) as PGlite;
+    try {
+      // The list as production holds it until migration 20261122000002 is applied.
+      await d.exec(`create or replace function public.check_failure_reasons() returns text[]
+        language sql immutable set search_path = pg_catalog, public, pg_temp as $$
+        select array['paused', 'site_busy', 'canceled', 'stalled', 'not_started', 'worker_redeployed',
+          'worker_unavailable', 'capacity_wait_exceeded', 'build_failed', 'persist_failed',
+          'internal']::text[] $$`);
+      const store = {
+        fail: async (id: string | null, reason: string, run: string | null) => {
+          try {
+            const { rows } = await d.query<{ r: boolean }>(
+              `select public.fail_check($1, $2, $3) as r`,
+              [id, reason, run],
+            );
+            return rows[0]!.r;
+          } catch (e) {
+            // As the real store's `must` rethrows an RPC error.
+            throw new Error(`pipeline store: fail_check: ${(e as Error).message}`);
+          }
+        },
+        siteOf: async () => site,
+      };
+      const out = await failCheck(store, check, 'nothing_read');
+      expect(out).toEqual({ failed: true, siteId: site, storedAs: 'internal' });
+      const { rows } = await d.query<{ status: string; failure_reason: string }>(
+        `select status, failure_reason from public.checks where id = $1`,
+        [check],
+      );
+      expect(rows[0]).toEqual({ status: 'failed', failure_reason: 'internal' });
+    } finally {
+      await d.close();
+    }
+  });
 
   it('reap_stalled_checks refuses, and writes nothing, when a reason it writes is not in the list', async () => {
     const d = (await db.clone()) as PGlite;
