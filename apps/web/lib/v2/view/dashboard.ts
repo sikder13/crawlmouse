@@ -868,7 +868,18 @@ function noSiteView(v: AccountView, earlier: EarlierAuditsView | null): Dashboar
       note: `0 of ${v.account.limits.sites} on ${PLAN_NAMES[v.tier]}`,
       upsell: null,
       rows: [],
-      foot: adds ? COPY.noSiteNote : COPY.noSiteSeatNote,
+      foot: !adds
+        ? COPY.noSiteSeatNote
+        : trial
+          ? `${COPY.noSiteTrial(
+              PLAN_NAMES[v.tier],
+              dayDate(v.account.trial_ends_at!, zone),
+              GATES[v.tier].schedule,
+              v.account.limits.competitors_per_site,
+              v.account.limits.sites,
+              !v.cardOnFile && v.account.renews_at === null,
+            )} ${COPY.noSiteNote}`
+          : COPY.noSiteNote,
     },
     topFixes: null,
     setup: null,

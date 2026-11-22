@@ -64,7 +64,7 @@ describe('dashboardView with no site: day 0', () => {
     expect(v.setup).toBeNull();
     expect(v.sites.rows).toEqual([]);
     expect(v.sites.note).toBe('0 of 5 on Pro');
-    expect(v.sites.foot).toMatch(/^Adding a site starts its first check/);
+    expect(v.sites.foot).toMatch(/ Adding a site starts its first check/);
     expect(v.shell.nav.find((n) => n.label === 'Sites')!.count).toBe('0');
   });
 

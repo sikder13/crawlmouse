@@ -195,6 +195,20 @@ function trialCard(
   const reminderDue =
     instant(daysBefore(end, TRIAL_REMINDER_DAYS_BEFORE_END, zone)) <= instant(v.now);
   const firstRun = isFirstRun(v);
+  const primaries = primarySites(v).length;
+  const noCardLead = !v.cardOnFile ? `${COPY.noCard} ` : '';
+  const whatStays =
+    primaries === 0
+      ? `${noCardLead}${COPY.trialNoSite(GATES.free.sites, freeSchedule)}`
+      : firstRun && primaries === 1
+        ? `${noCardLead}${COPY.trialFirstRun(freeSchedule)}`
+        : `${firstRun ? noCardLead : ''}${COPY.trialLater(
+            primarySite(v).host,
+            freeSchedule,
+            primaries - 1,
+            reminderDue ? null : TRIAL_REMINDER_DAYS_BEFORE_END,
+            billingOpen,
+          )}`;
   return {
     title,
     left,
@@ -202,15 +216,7 @@ function trialCard(
       ? withheld
         ? COPY.cardManagedByOwner
         : COPY.cardCharged(a.card_last4, dayDate(end, zone))
-      : firstRun
-        ? `${!v.cardOnFile ? `${COPY.noCard} ` : ''}${COPY.trialFirstRun(freeSchedule)}`
-        : COPY.trialLater(
-            primarySite(v).host,
-            freeSchedule,
-            primarySites(v).length - 1,
-            reminderDue ? null : TRIAL_REMINDER_DAYS_BEFORE_END,
-            billingOpen,
-          ),
+      : whatStays,
     // Billing and Keep are the owner's: Settings › Plan and the checkout refuse anyone else.
     billing: owner && firstRun ? action('plan', 'Billing') : null,
     // A trial that charges its card becomes the plan at its end: there is nothing to keep it by.

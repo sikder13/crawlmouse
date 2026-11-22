@@ -13,6 +13,9 @@ export const ACCOUNT_COPY = {
   /** The first run: FACTS A6, short form. */
   trialFirstRun: (schedule: string) =>
     `When it ends, this site stays on Free with ${schedule} checks. Nothing you can see is deleted.`,
+  /** The first run with no site yet: there is no "this site" to keep (F-103). */
+  trialNoSite: (sites: number, schedule: string) =>
+    `When it ends, the account moves to Free: ${numberWord(sites)} ${plural(sites, 'site', 'sites')}, with ${schedule} checks. Nothing you can see is deleted.`,
   /**
    * After the first run: FACTS A6, and A8 while the reminder is still ahead (`reminderDays` before
    * the end); once it is due the sentence about it is left out, since it would no longer be true.

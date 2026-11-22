@@ -67,6 +67,16 @@ export const DASHBOARD_COPY = {
     'Sites are added by the account’s owner, or by a manager whose seat covers every client. When a site you can see is added, its first check and its results appear here.',
   noSiteNote:
     'Adding a site starts its first check. Its grades, crawlers and fixes appear here when that check ends.',
+  /** What a trial with no site yet includes (F-103), every limit read from the account. */
+  noSiteTrial: (
+    plan: string,
+    until: string,
+    schedule: string,
+    competitors: number,
+    sites: number,
+    noCard: boolean,
+  ) =>
+    `You have ${plan} until ${until}: ${schedule} checks, every fix with its packet, Slack alerts and ${numberWord(competitors)} ${plural(competitors, 'competitor', 'competitors')} per site, on up to ${sites} sites.${noCard ? ' No card.' : ''}`,
   /** The email-a-developer form's one field, on a live page. */
   developerField: { label: 'Developer’s email', placeholder: 'dev@example.com' },
   /** Copy fix on a live page: what the status line says. */
