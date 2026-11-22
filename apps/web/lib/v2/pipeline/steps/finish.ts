@@ -19,6 +19,7 @@ import {
   buildCheck,
   checkMap,
   GRADE_VERSION,
+  nothingReadReason,
   renderCandidates,
   renderCheck,
   sample,
@@ -93,6 +94,10 @@ export function finishSteps(
       ]);
       const release = releaseOfAll(results);
       if (!results.some(isCrawl) || release === null) throw new CheckFailure('worker_unavailable');
+      // A crawl that read no page has nothing to grade: it fails here, before anything is stored, so
+      // it cannot become a baseline or move the site's fixes.
+      const unread = nothingReadReason(results.filter(isCrawl));
+      if (unread !== null) throw new CheckFailure(unread);
       const [previous, fixes, render] = await Promise.all([
         deps.store.previousGraded(event.siteId, event.checkId),
         deps.store.fixes(event.siteId),
