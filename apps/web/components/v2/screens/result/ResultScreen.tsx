@@ -181,8 +181,8 @@ export function ResultScreen({
           ) : (
             <Card tone="sunken" className={`${styles.gradeCard} ${styles.fixFirst}`}>
               <div>
-                <div className={`${layout.mut} ${styles.small}`}>Nothing to fix today</div>
-                <div className={styles.fixFirstTitle}>Keep it that way</div>
+                <div className={`${layout.mut} ${styles.small}`}>{first.label}</div>
+                <div className={styles.fixFirstTitle}>{first.title}</div>
                 <div className={styles.fixFirstBody}>{first.body}</div>
               </div>
               {first.action ? (
