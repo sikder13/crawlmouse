@@ -41,7 +41,8 @@ test('a defect-named step lists exactly its own defect', () => {
 test('every step that is not plainly "no" writes, J4 included', () => {
   expect(STEPS.get('J4')?.writes).toBe(true);
   expect(STEPS.get('J4.6')?.writes).toBe(true);
-  expect(STEPS.get('J4.1')?.writes).toBe(false);
+  expect(STEPS.get('J4.1')?.writes).toBe(true);
+  expect(STEPS.get('J0.1')?.writes).toBe(false);
   expect(STEPS.get('D.F-010')?.writes).toBe(true);
 });
 
