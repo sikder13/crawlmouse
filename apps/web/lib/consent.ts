@@ -133,6 +133,51 @@ export function serverCaptureAllowed(cookieHeader?: string | null): boolean {
   return !consentRequiredFromCookie(cookieHeader);
 }
 
+/** The visitor's recorded decision: what the banner stored, else the cookie it writes beside it. */
+export function recordedDecision(
+  cookieString?: string | null,
+  stored?: string | null,
+): ConsentDecision | null {
+  if (stored === 'granted' || stored === 'denied') return stored;
+  return consentDecisionFromCookie(cookieString);
+}
+
+/**
+ * Whether PostHog may start in this browser now (F-048). A recorded decision decides. With none, it
+ * may only when the middleware's region cookie says consent is not required (`0`): no cookie is
+ * treated as "required", so a page the middleware did not stamp holds rather than tracks.
+ */
+export function analyticsMayStart(cookieString?: string | null, stored?: string | null): boolean {
+  const decision = recordedDecision(cookieString, stored);
+  if (decision !== null) return decision === 'granted';
+  return (cookieString ?? '').split(';').some((c) => c.trim() === `${CONSENT_REQUIRED_COOKIE}=0`);
+}
+
+/** A cookie or storage key of PostHog's: `ph_<key>_posthog`, `__ph_opt_in_out_<key>` and the rest. */
+const POSTHOG_NAME = /^(?:__)?ph_/;
+
+/**
+ * Removes every PostHog cookie and storage key from this browser, and nothing else. Run when
+ * analytics may not start, and on a decline. A store that throws (private mode) is skipped.
+ */
+export function clearAnalyticsStorage(doc: Document, stores: readonly Storage[]): void {
+  for (const pair of doc.cookie.split(';')) {
+    const name = pair.split('=')[0]!.trim();
+    if (!POSTHOG_NAME.test(name)) continue;
+    doc.cookie = `${name}=; Max-Age=0; Path=/; SameSite=Lax`;
+    // PostHog writes its cookie on the parent domain across subdomains.
+    const parent = doc.location?.hostname.replace(/^www\./, '');
+    if (parent) doc.cookie = `${name}=; Max-Age=0; Path=/; Domain=.${parent}; SameSite=Lax`;
+  }
+  for (const store of stores) {
+    try {
+      for (const key of Object.keys(store)) if (POSTHOG_NAME.test(key)) store.removeItem(key);
+    } catch {
+      /* a store this browser refuses holds nothing we wrote */
+    }
+  }
+}
+
 /**
  * Whether PostHog starts with surveys off (CC-41 D8): when capture starts opted out (a region that
  * needs prior consent, with no grant), and whenever the visitor's recorded decision is a decline,

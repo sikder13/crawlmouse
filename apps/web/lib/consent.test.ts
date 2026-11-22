@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
+  analyticsMayStart,
+  clearAnalyticsStorage,
   isConsentRequiredCountry,
   consentDecisionCookie,
   consentDecisionFromCookie,
@@ -136,5 +138,87 @@ describe('surveysOffAtStart', () => {
     [true, 'denied', true],
   ] as const)('consent required %s, decision %s → off %s', (required, decision, off) => {
     expect(surveysOffAtStart(required, decision)).toBe(off);
+  });
+});
+
+describe('analyticsMayStart (F-048)', () => {
+  it.each([
+    // cookies, stored decision, may start
+    ['cm_consent_required=0', null, true],
+    ['cm_consent_required=1', null, false],
+    ['', null, false],
+    [null, null, false],
+    ['other=1', null, false],
+    ['cm_consent_required=00', null, false],
+    ['xcm_consent_required=0', null, false],
+    ['cm_consent_required=1', 'granted', true],
+    ['cm_consent_required=0', 'denied', false],
+    ['', 'granted', true],
+    ['', 'denied', false],
+    ['cm_consent_required=1; cm_consent=granted', null, true],
+    ['cm_consent_required=0; cm_consent=denied', null, false],
+    // What the banner stored wins over a cookie that disagrees with it.
+    ['cm_consent_required=0; cm_consent=granted', 'denied', false],
+    ['cm_consent_required=1; cm_consent=denied', 'granted', true],
+    // A stored value that is not a decision is no decision.
+    ['cm_consent_required=1', 'maybe', false],
+    ['cm_consent_required=0', 'maybe', true],
+  ] as const)('%s with %s stored: %s', (cookies, stored, expected) => {
+    expect(analyticsMayStart(cookies, stored)).toBe(expected);
+  });
+});
+
+describe('clearAnalyticsStorage', () => {
+  /** A `Storage` whose own enumerable keys are its entries, as a browser's is. */
+  function store(entries: Record<string, string>): Storage {
+    const m = { ...entries };
+    Object.defineProperty(m, 'removeItem', {
+      enumerable: false,
+      value: (k: string) => delete m[k],
+    });
+    return m as unknown as Storage;
+  }
+
+  it('removes PostHog’s keys and cookies, on the host and its parent domain, and nothing else', () => {
+    const written: string[] = [];
+    const doc = {
+      get cookie() {
+        return 'ph_phc_x_posthog=1; cm_consent=denied; __ph_opt_in_out_phc_x=0; graph_x=1';
+      },
+      set cookie(v: string) {
+        written.push(v);
+      },
+      location: { hostname: 'www.crawlmouse.com' },
+    } as unknown as Document;
+    const local = store({
+      ph_phc_x_posthog: '{}',
+      __ph_opt_in_out_phc_x: '0',
+      cm_consent: 'denied',
+    });
+    clearAnalyticsStorage(doc, [local]);
+    expect(written).toEqual([
+      'ph_phc_x_posthog=; Max-Age=0; Path=/; SameSite=Lax',
+      'ph_phc_x_posthog=; Max-Age=0; Path=/; Domain=.crawlmouse.com; SameSite=Lax',
+      '__ph_opt_in_out_phc_x=; Max-Age=0; Path=/; SameSite=Lax',
+      '__ph_opt_in_out_phc_x=; Max-Age=0; Path=/; Domain=.crawlmouse.com; SameSite=Lax',
+    ]);
+    expect(Object.keys(local)).toEqual(['cm_consent']);
+  });
+
+  it('a store that throws does not stop the others', () => {
+    const bad = {
+      get length(): number {
+        throw new Error('denied');
+      },
+    } as unknown as Storage;
+    const throwing = new Proxy(bad, {
+      ownKeys() {
+        throw new Error('denied');
+      },
+    });
+    const good = store({ ph_phc_x_posthog: '{}' });
+    const doc = { cookie: '', location: { hostname: 'crawlmouse.com' } } as unknown as Document;
+    expect(() => clearAnalyticsStorage(doc, [throwing, good])).not.toThrow();
+    expect(Object.keys(good)).toEqual([]);
   });
 });
