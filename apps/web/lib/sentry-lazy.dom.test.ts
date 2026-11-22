@@ -154,6 +154,15 @@ describe('the browser’s Sentry', () => {
     expect(await s.reportToSentry(new Error('x'))).toBe('event-id');
   });
 
+  it('one error object reported twice is one report, with one id', async () => {
+    const s = await fresh();
+    s.configureSentry({ dsn: DSN });
+    const boom = new Error('twice');
+    const [a, b] = await Promise.all([s.reportToSentry(boom), s.reportToSentry(boom)]);
+    expect(b).toBe(a);
+    expect(names().filter((n) => n === 'captureException')).toHaveLength(1);
+  });
+
   it('with no DSN, or an SDK that will not load, it answers null and does not throw', async () => {
     const none = await fresh();
     none.configureSentry({ dsn: undefined });

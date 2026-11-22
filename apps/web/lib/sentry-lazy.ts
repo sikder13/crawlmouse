@@ -20,6 +20,8 @@ export const IDLE_TIMEOUT_MS = 5000;
 let options: SentryOptions | null = null;
 let loading: Promise<Sentry> | null = null;
 let loaded: Sentry | null = null;
+/** The event id each error object was reported under. */
+const reported = new WeakMap<object, string>();
 
 export function configureSentry(next: SentryOptions): void {
   options = next;
@@ -47,7 +49,13 @@ export function loadSentry(): Promise<Sentry> | null {
 export async function reportToSentry(error: unknown): Promise<string | null> {
   try {
     const sdk = await loadSentry();
-    return sdk ? sdk.captureException(error) : null;
+    if (!sdk) return null;
+    // The SDK drops a repeat of one error object but still mints an id for it: an id no event has.
+    const known = typeof error === 'object' && error !== null ? reported.get(error) : undefined;
+    if (known !== undefined) return known;
+    const id = sdk.captureException(error);
+    if (typeof error === 'object' && error !== null) reported.set(error, id);
+    return id;
   } catch {
     return null;
   }
