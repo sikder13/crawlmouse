@@ -411,7 +411,7 @@ export const PRICING_COPY = {
         {
           text: billing
             ? 'Pause until you choose Pro or remove them; their history stays'
-            : 'Pause until paid plans open or you remove them; their history stays',
+            : 'Scheduled checks stop until paid plans open; their history stays',
           capabilities: ['sites'],
         },
       ],
