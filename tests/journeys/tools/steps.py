@@ -23,6 +23,9 @@ MANUAL = {
  'F-157':['J2.3'],'F-163':['J4.6'],'F-158':['J0.9m'],'F-159':['J0.5a'],'F-160':['J0.5a'],'F-161':['J0.5i'],'F-162':['J0.5h'],
 }
 
+# D steps declared read-only by the session writing them (A1 question 016, the consent PR).
+D_NO_WRITES = ['D.F-045', 'D.F-048', 'D.F-049', 'D.F-067', 'D.F-088']
+
 # Rows the register files under a parent step (J0.5, J0.8, J0.9, J1.12, J2.4, J4), placed on the sub-step the
 # CC-45 scorecard (sweep.md §3) names for them. A parent step's own list is the union of its sub-steps'.
 SUBMAP = {
@@ -260,6 +263,18 @@ w(f'{len(dsteps)} register rows name a stream, not a journey step. Each gets a d
 w('the session that fixes it (RULES §3 step 2), under `tests/journeys/d/`.')
 w('')
 w(', '.join(dsteps))
+w('')
+missing = [d for d in D_NO_WRITES if d not in dsteps]
+assert not missing, f'D_NO_WRITES names no D step: {missing}'
+w('### D steps that write nothing')
+w('')
+w('A D step counts as writing, and runs only on staging, unless this table says exactly `no`. The session that writes')
+w('the test asks QA to list it here.')
+w('')
+w('| Step | Writes |')
+w('| --- | --- |')
+for d in D_NO_WRITES:
+    w(f'| {d} | no |')
 w('')
 w('## Defect index')
 w('')
