@@ -242,8 +242,7 @@ export const PRICING_COPY = {
    * The description search engines hold today, kept until question 002 is answered. `description`
    * below is its replacement, rendered from the prices and `GATES`.
    */
-  indexedDescription:
-    'Crawlmouse is free forever — audit any site, get a real A–F grade, and one complete fix. Pro is $19/month or $190/year for every fix, CSV export, and bigger crawls.',
+  indexedDescription: `Crawlmouse is free forever — audit any site, get a real A–F grade, and one complete fix. Pro is ${usd(PRO_MONTHLY)}/month or ${usd(PRO_YEARLY)}/year for every fix, CSV export, and bigger crawls.`,
   /** The artboard's line (Q33): "watched" is checking again and telling you, which CC-28 builds. */
   title: {
     text: 'Every audit is free. Pay when you want it watched.',
