@@ -45,7 +45,8 @@ browser steps run against a deployment.
   not follow redirects, to the deployment's origin, to get Vercel's bypass cookie; the contexts carry that
   cookie for the deployment's host (`lib/protection.ts`). A trace records headers and URLs, so the config
   turns tracing off for a run with the secret or with writes. If tracing is turned back on, a step refuses to
-  run when the secret is set or the step writes, and `signIn` refuses too.
+  run when the secret is set or the step writes. `signIn` refuses too, and refuses outside a step unless the
+  test records its `trace` fixture with `noteTrace`.
 - **A step that starts a check passes the address through `lib/sites.ts`**, which accepts only
   `*.lab.crawlmouse.com` and `nahltech.com`.
 - **Test accounts exist on staging only** (`lib/accounts.ts`). The admin client is built only when
@@ -79,8 +80,9 @@ browser steps run against a deployment.
   the step passes.
 
 - **A PR that fixes a defect** deletes that id from `expected-fail.json`. It edits nothing else there.
-- **Judged ids.** Some ids a test cannot observe: positioning, legal wording, a published address, or an
-  event that never leaves our server (F-050, whose evidence is `lib/analytics-server.test.ts`).
+- **Judged ids.** Some ids a test cannot observe: positioning, legal wording, a published address, or a
+  server-side PostHog event a browser step cannot see (F-050). Judged is not closed: F-050 stays open in the
+  register until its fix has evidence for both halves, the bot rule and the internal marker.
   `STEPS.md` marks them "(judged)" and leaves them out of `expected-fail.json`, parent steps included.
   The gate checks them by hand.
 - **Consistency.** `consistency.spec.ts` keeps `expected-fail.json` inside `STEPS.md`:

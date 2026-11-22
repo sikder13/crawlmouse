@@ -45,8 +45,8 @@ SUBMAP = {
 }
 PARENTS = ['J0.5','J0.8','J0.9','J1.12','J2.4','J4']
 
-# Ids a step's test cannot observe (a judgement: positioning, legal wording, a published address; or an event that
-# never leaves our server, F-050, whose evidence is lib/analytics-server.test.ts). They stay in
+# Ids a step's test cannot observe (a judgement: positioning, legal wording, a published address; or F-050, a
+# server-side PostHog event a browser step cannot see). They stay in
 # STEPS.md, marked "(judged)", and out of expected-fail.json, so fixing an observable id never forces their deletion.
 JUDGED = {
  'D.F-050':['F-050'], 'J0.1':['F-061','F-062'], 'J0.9d':['F-072'], 'J0.9e':['F-072'], 'J0.9j':['F-153','F-154'], 'J0.9k':['F-033'],
