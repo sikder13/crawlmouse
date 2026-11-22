@@ -8,7 +8,7 @@ import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { PGlite } from '@electric-sql/pglite';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { applyAllMigrations, freshDb } from '../../../__tests__/helpers/pglite-migrations';
 import { postgrestOver } from '../../../__tests__/helpers/postgrest-pglite';
 import {
@@ -63,11 +63,44 @@ let db: PGlite;
 let world: World;
 let store: LedgerStore;
 
+/**
+ * The backfill tests read drafts by `created_at` in fixed windows in 2001, and they share this
+ * database with every other test in the file. A draft keeps the column's default, `now()`, unless
+ * something moves it, and the backfill counts a wall-clock draft whenever its window covers the time
+ * the suite runs (nightly 44721082091, dispatch 44997211412). The windows are in 2001, so a draft
+ * dated by the wall clock is outside them; the rest guards a future test whose window is not.
+ * `parkDrafts` moves every draft dated on or after WALL_CLOCK_FLOOR to PARKED; it runs after the
+ * file's seed, inside `endedCheck` and in the guard. The backfill tests move their own drafts into
+ * their windows. The guard runs before and after each test and fails it when a draft dated on or
+ * after WALL_CLOCK_FLOOR is in the database.
+ */
+const PARKED = '2000-01-01T00:00:00Z';
+const WALL_CLOCK_FLOOR = '2002-01-01T00:00:00Z';
+
+const parkDrafts = () =>
+  db.query(`update public.check_ledger_drafts set created_at = $1 where created_at >= $2`, [
+    PARKED,
+    WALL_CLOCK_FLOOR,
+  ]);
+
+async function noWallClockDrafts(): Promise<void> {
+  const { rows } = await db.query<{ check_id: string; created_at: string }>(
+    `select check_id::text, created_at::text from public.check_ledger_drafts where created_at >= $1`,
+    [WALL_CLOCK_FLOOR],
+  );
+  // Parked before the assertion, so a draft one test leaves does not fail the tests after it.
+  await parkDrafts();
+  expect(rows, 'a draft left with the wall-clock time').toEqual([]);
+}
+beforeEach(noWallClockDrafts);
+afterEach(noWallClockDrafts);
+
 beforeAll(async () => {
   db = await freshDb();
   await applyAllMigrations(db);
   await prepareMeasurement(db);
   world = await seedWorld(db, 'ledger');
+  await parkDrafts();
   store = supabaseLedgerStore(postgrestOver(db));
 }, 120_000);
 
@@ -111,6 +144,7 @@ async function endedCheck(
         : row,
   );
   if (opts.draft !== false) await putLedgerDraft(postgrestOver(db), check, DRAFT);
+  await parkDrafts();
   return check;
 }
 
@@ -284,15 +318,15 @@ describe('backfillLedger', () => {
 
   it('writes the drafts stored in the six hours that ended an hour before its slot, even when it starts late', async () => {
     // Slot 12:41: the window is [05:41, 11:41). The run starts 40 minutes late.
-    const now = new Date('2026-11-20T13:21:00Z');
+    const now = new Date('2001-11-20T13:21:00Z');
     const inside = await endedCheck();
     const tooNew = await endedCheck();
     const tooOld = await endedCheck();
     const edge = await endedCheck();
-    await at(inside, '2026-11-20T10:30:00Z');
-    await at(tooNew, '2026-11-20T11:41:00Z');
-    await at(tooOld, '2026-11-20T05:40:59Z');
-    await at(edge, '2026-11-20T05:41:00Z');
+    await at(inside, '2001-11-20T10:30:00Z');
+    await at(tooNew, '2001-11-20T11:41:00Z');
+    await at(tooOld, '2001-11-20T05:40:59Z');
+    await at(edge, '2001-11-20T05:41:00Z');
     const failures: string[] = [];
     const r = await backfillLedger(
       { store, secret: SECRET, onFailure: (id) => failures.push(id) },
@@ -307,13 +341,13 @@ describe('backfillLedger', () => {
   });
 
   it('counts a failure without stopping, says when the window held more than its bound, and drops a spent draft', async () => {
-    const now = new Date('2026-11-21T12:41:00Z');
+    const now = new Date('2001-11-21T12:41:00Z');
     const a = await endedCheck();
     const b = await endedCheck();
     const c = await endedCheck();
-    await at(a, '2026-11-21T06:10:00Z');
-    await at(b, '2026-11-21T08:20:00Z');
-    await at(c, '2026-11-21T10:30:00Z');
+    await at(a, '2001-11-21T06:10:00Z');
+    await at(b, '2001-11-21T08:20:00Z');
+    await at(c, '2001-11-21T10:30:00Z');
     const failing: LedgerStore = {
       ...store,
       record: async (id, run, obs) => {
@@ -335,20 +369,20 @@ describe('backfillLedger', () => {
   });
 
   it('drops the draft of a check the retry finds not ended', async () => {
-    const now = new Date('2026-11-23T12:41:00Z');
+    const now = new Date('2001-11-23T12:41:00Z');
     const queued = await endedCheck({ status: 'queued' });
-    await at(queued, '2026-11-23T08:00:00Z');
+    await at(queued, '2001-11-23T08:00:00Z');
     const r = await backfillLedger({ store, secret: SECRET, onFailure: () => {} }, now);
     expect(r.outcomes).toEqual({ not_ended: 1 });
     expect(await draftsOf(queued)).toBe(0);
   });
 
   it('drops the draft of a check the retry finds already linked', async () => {
-    const now = new Date('2026-11-22T12:41:00Z');
+    const now = new Date('2001-11-22T12:41:00Z');
     const linked = await endedCheck();
     await writeLedger({ store, secret: SECRET }, linked);
     await putLedgerDraft(postgrestOver(db), linked, DRAFT);
-    await at(linked, '2026-11-22T08:00:00Z');
+    await at(linked, '2001-11-22T08:00:00Z');
     const r = await backfillLedger({ store, secret: SECRET, onFailure: () => {} }, now);
     expect(r.outcomes).toEqual({ already_linked: 1 });
     expect(await draftsOf(linked)).toBe(0);
