@@ -24,6 +24,13 @@ export const START_REFUSALS = [
   'paused',
   'unavailable',
   'capacity',
+  // A person signed in and acting in an account (RC-02): the check is of a site that account keeps.
+  'site_limit',
+  'adds_capped',
+  'role_refused',
+  'site_paused',
+  'recently_checked',
+  'site_exists',
 ] as const;
 export type StartRefusal = (typeof START_REFUSALS)[number] | 'failed';
 
@@ -67,6 +74,15 @@ export const START_COPY: Record<StartRefusal, string> = {
   paused: 'New audits are paused for the moment. Try again later.',
   unavailable: 'Audits are not running at the moment. Try again later.',
   capacity: "Today's audits are used up. Try again tomorrow.",
+  // No number in these: the plan's limits are the account's, and the route's own `error` names them.
+  site_limit:
+    'This account already keeps as many sites as its plan allows. Open your dashboard to check one of them again.',
+  adds_capped: 'This account has added as many sites as it may today. Try again tomorrow.',
+  role_refused: 'Your seat on this account cannot add a site. Ask the account’s owner to add it.',
+  site_paused: 'Checks of this site are paused. Its page on your dashboard says why.',
+  recently_checked:
+    'This site was checked as often as its plan allows for now. Its latest audit is on your dashboard.',
+  site_exists: 'This account already keeps that site. Open it from your dashboard.',
   failed: 'The audit could not be started. Try again.',
 };
 
