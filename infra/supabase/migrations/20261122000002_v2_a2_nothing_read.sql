@@ -1,8 +1,11 @@
 -- v2 V2R A2 (RC-04): two failure reasons for a check that read no page of the site.
 --
--- A crawl that read no page used to end `partial`, with a result screen about nothing. It now fails:
--- `site_unreachable` when robots.txt, the first request to the host, got no answer, and
--- `nothing_read` for any other way to read no page (inngest/check-events.ts).
+-- A crawl that read no page used to end `partial` or `finished`, with a result screen about nothing.
+-- It now fails: `site_unreachable` when robots.txt on the homepage's origin got no answer and no other
+-- origin answered, and `nothing_read` for any other way to read no page (inngest/check-events.ts).
+--
+-- Until this is applied, fail_check refuses both words and failCheck
+-- (apps/web/lib/v2/pipeline/steps/lifecycle.ts) stores `internal` instead.
 --
 -- check_failure_reasons() (migration 008, replaced by 042a) is the closed list fail_check and
 -- reap_stalled_checks refuse to write outside. This replaces it with FAILURE_REASONS in

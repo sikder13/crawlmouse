@@ -1,8 +1,9 @@
 -- Revert of infra/supabase/migrations/20261122000002_v2_a2_nothing_read.sql. It restores 042a's list
 -- of failure reasons, without `site_unreachable` and `nothing_read`. A check already failed with
--- either word keeps it. With the list reverted, fail_check raises on the words: the run's `fail` step
--- throws, and once its retries are spent the function's onFailure fails the check `internal` instead
--- (inngest/check.ts, failureReasonOf). Deploy an app without the reasons before reverting.
+-- either word keeps it. With the list reverted, fail_check raises on the words and failCheck
+-- (apps/web/lib/v2/pipeline/steps/lifecycle.ts) stores `internal`, for as long as the app holds that
+-- fallback. Once the fallback is deleted, deploy an app without the reasons before reverting: without
+-- both, a check that read no page stays `running` until the reaper.
 create or replace function public.check_failure_reasons()
 returns text[]
 language sql
