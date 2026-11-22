@@ -12,6 +12,7 @@ import {
   type CrawlerResult,
   type Fix,
   type FixSection,
+  type PageResult,
 } from '@crawlmouse/types/v2';
 import { findCheck, fixesAsOf, siteOf } from '../fixtures';
 import {
@@ -229,9 +230,15 @@ function grade(
 }
 
 /** "1 fix open · 7 on Pro", or "nothing to fix". */
-function fixCount(fixes: readonly Fix[], section: FixSection, isOpen: (f: Fix) => boolean) {
+function fixCount(
+  fixes: readonly Fix[],
+  section: FixSection,
+  isOpen: (f: Fix) => boolean,
+  /** Whether this section was measured: an unmeasured one has no fix because nothing was read. */
+  measured = true,
+) {
   const here = fixes.filter((f) => f.section === section);
-  if (!here.length) return 'nothing to fix';
+  if (!here.length) return measured ? 'nothing to fix' : 'not measured';
   const open = here.filter(isOpen).length;
   const pro = here.length - open;
   return [
@@ -292,6 +299,7 @@ function accessDoor(
   const unmeasured = ai.filter((c) => c.verdict === 'not_measured').length;
   const kept = ai.length - allowed.length - unmeasured;
   const pill = accessPill(check);
+  const accessMeasured = !edge && unmeasured === 0;
   const searchLine = search.every((c) => c.verdict === 'allowed')
     ? `${listOf(search.map((c) => c.ua))} ${plural(search.length, 'is', 'are')} allowed by robots.txt.`
     : `${keptOutClauses(search).join('; ')}.`;
@@ -318,7 +326,7 @@ function accessDoor(
       tone: BAR_TONE_OF_PILL[pill.state],
     },
     body,
-    footer: `${ai.length} AI crawlers (${ai.filter((c) => c.scored).length} scored), ${search.length} search engines by robots.txt · ${fixCount(fixes, SECTIONS.access!, isOpen)}`,
+    footer: `${ai.length} AI crawlers (${ai.filter((c) => c.scored).length} scored), ${search.length} search engines by robots.txt · ${fixCount(fixes, SECTIONS.access!, isOpen, accessMeasured)}`,
     coverage: { pages: coverage },
     href: '#',
   };
@@ -334,8 +342,8 @@ function withoutJsDoor(
   // every page leaves Pro nothing more to offer here.
   const footer =
     coverage.tested < coverage.total
-      ? `Every page measured with Pro · ${fixCount(fixes, SECTIONS.withoutJs!, isOpen)}`
-      : fixCount(fixes, SECTIONS.withoutJs!, isOpen);
+      ? `Every page measured with Pro · ${fixCount(fixes, SECTIONS.withoutJs!, isOpen, check.without_js !== null)}`
+      : fixCount(fixes, SECTIONS.withoutJs!, isOpen, check.without_js !== null);
   // The check holds no site-wide share. Why is not in the check, so the door does not say why.
   if (!check.without_js) {
     return {
@@ -522,7 +530,7 @@ function schemaSentence(check: Check, rows: readonly ContentRow[]): string | nul
 }
 
 function contentDoor(check: Check, fixes: readonly Fix[], isOpen: (f: Fix) => boolean): DoorView {
-  const footer = `Per-page structure score · ${fixCount(fixes, SECTIONS.content!, isOpen)}`;
+  const footer = `Per-page structure score · ${fixCount(fixes, SECTIONS.content!, isOpen, check.content !== null)}`;
   const content = check.content;
   if (!content) {
     return {
@@ -585,7 +593,7 @@ function contentDoor(check: Check, fixes: readonly Fix[], isOpen: (f: Fix) => bo
   };
 }
 
-function signalsDoor(check: Check): DoorView {
+function signalsDoor(check: Check, notServed: boolean): DoorView {
   const kinds = SCREEN_SIGNALS;
   const shown = screenSignals(check);
   const by = (state: string) => shown.filter((s) => s.state === state);
@@ -624,7 +632,7 @@ function signalsDoor(check: Check): DoorView {
     pill: { state: 'neutral', label },
     bar: { percent: Math.round((present.length / kinds.length) * 100), tone: 'neutral' },
     body,
-    footer: 'Checked by fetch · nothing urgent',
+    footer: notServed ? 'Checked by fetch' : 'Checked by fetch · nothing urgent',
     coverage: { read: `Tested ${present.length + absent.length} of ${kinds.length} signals` },
     href: '#',
   };
@@ -700,6 +708,12 @@ function changesDoor(
 type NoFixCard = Exclude<ResultView['first'], { kind: 'fix' }>;
 
 /** "403", "403 or 429", "401, 403 or 429". */
+/** A page row that was read: a 200 with HTML we parsed. A challenge can answer 200 and is not. */
+const wasRead = (p: PageResult) =>
+  p.status_code === 200 &&
+  p.is_html &&
+  (p.links_read || p.title !== null || p.content_simhash !== null);
+
 const eitherOf = (codes: readonly number[]) => {
   const last = codes.at(-1);
   const rest = codes.filter((c) => c !== last);
@@ -710,6 +724,7 @@ const eitherOf = (codes: readonly number[]) => {
 function notServedCard(check: Check, statuses: readonly number[]): NoFixCard {
   const codes = [...new Set(statuses)].sort((a, b) => a - b);
   const refused = servedWord(codes) === 'refused';
+  const moved = codes.every((c) => c >= 300 && c < 400);
   const ai = check.crawlers.filter(isAi);
   const crawlers = meetsEdge(check)
     ? 'The site’s edge refused or challenged our browser-identity request from Crawlmouse’s address, so the crawler requests were not sent.'
@@ -718,14 +733,18 @@ function notServedCard(check: Check, statuses: readonly number[]): NoFixCard {
       : null;
   const next = refused
     ? 'If you did not mean to refuse automated requests, find the firewall or bot rule that answered them, then run this audit again.'
-    : 'Once the site serves its pages, run this audit again.';
+    : moved
+      ? 'If the site has moved, run this audit on its new address.'
+      : 'Once the site serves its pages, run this audit again.';
   const n = statuses.length;
   return {
     kind: 'not-served',
     label: 'Nothing to grade',
     title: refused ? 'Your site refused our requests' : 'Your site did not serve a page',
     body: [
-      `The ${count(n)} ${plural(n, 'page', 'pages')} we requested answered ${eitherOf(codes)}.`,
+      codes.includes(200)
+        ? `${count(n)} ${plural(n, 'page', 'pages')} answered ${eitherOf(codes)}, but we could not read ${plural(n, 'its', 'their')} content.`
+        : `${count(n)} ${plural(n, 'page answered our request', 'pages answered our requests')}, with ${eitherOf(codes)}.`,
       crawlers,
       next,
     ]
@@ -951,10 +970,10 @@ function crawlerRows(check: Check): CrawlerRowView[] {
 }
 
 /** "All 214 pages crawled", or "96 of 140 pages crawled" when the crawl stopped short. */
-function crawledLine(check: Check, notServed: boolean) {
+function crawledLine(check: Check, answeredIfNoneServed: number | null) {
   const { pages_crawled: crawled, pages_discovered: found } = check.coverage!;
-  if (notServed)
-    return `${count(crawled)} ${plural(crawled, 'page', 'pages')} requested, none served`;
+  if (answeredIfNoneServed !== null)
+    return `${count(answeredIfNoneServed)} ${plural(answeredIfNoneServed, 'page', 'pages')} answered, none served`;
   return crawled === found
     ? `All ${count(found)} ${plural(found, 'page', 'pages')} crawled`
     : `${count(crawled)} of ${count(found)} pages crawled`;
@@ -1033,10 +1052,11 @@ export function resultView(
   const siteFixes = d.fixes.filter((x) => x.site_id === check.site_id);
   const opened = new Set(openFixes(d, check, plan).map((f) => f.id));
   const isOpen = (f: Fix) => opened.has(f.id);
-  const statuses = d.page_results.filter((p) => p.check_id === check.id).map((p) => p.status_code);
+  const pageRows = d.page_results.filter((p) => p.check_id === check.id);
+  const statuses = pageRows.map((p) => p.status_code);
   const noFix = noFixKind({
-    pagesAnswered: statuses.length,
-    pagesServed: statuses.filter((s) => s === 200).length,
+    pagesAnswered: pageRows.length,
+    pagesServed: pageRows.filter(wasRead).length,
     aiUnmeasured: check.crawlers.filter(isAi).filter((c) => c.verdict === 'not_measured').length,
     textMeasured: check.without_js !== null,
   });
@@ -1054,7 +1074,7 @@ export function resultView(
     state: 'result',
     variant: withheld ? 'withheld' : clean ? 'clean' : 'issues',
     domain: site.host,
-    crawledLine: crawledLine(check, notServed),
+    crawledLine: crawledLine(check, notServed ? pageRows.length : null),
     crawledAt: dateTimeUtc(check.finished_at!),
     keptUntil: keptUntil ? dayTimeUtc(keptUntil) : null,
     grades,
@@ -1075,7 +1095,7 @@ export function resultView(
       withoutJsDoor(check, fixes, isOpen, sampled),
       structureDoor(check, fixes, isOpen, notServed),
       contentDoor(check, fixes, isOpen),
-      signalsDoor(check),
+      signalsDoor(check, notServed),
       changesDoor(d, check, kept, cadence),
     ].map((door, i) =>
       // The keep door asks for an email; every other door opens its segment.
