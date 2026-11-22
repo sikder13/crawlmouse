@@ -151,7 +151,7 @@ describe('nojsView: which templates arrive empty, by the one shared rule', () =>
       .doors[1]!;
     // No template reads thin, and the share is low: the title says the number, not "every".
     expect(v.headline.title).toBe('31% of the text is in the HTML before JavaScript runs.');
-    expect(door.body).toMatch(/^Every template ships its text: 31%/);
+    expect(door.body).toMatch(/^31% of the text is in the HTML before JavaScript runs/);
   });
 });
 

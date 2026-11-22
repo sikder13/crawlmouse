@@ -457,13 +457,13 @@ describe('the third card when there is no fix', () => {
     expect(v.first.body).toMatch(/^1 page answered our request, with 404\./);
   });
 
-  it('takes a 200 at its word: a long page whose links were not all read is served', () => {
+  it('calls a page whose links were not all read served, and does not call the check clean', () => {
     const v = view('clean-site', (c, d) => {
       for (const p of d.page_results.filter((x) => x.check_id === c.id)) {
         Object.assign(p, { links_read: false, title: null, content_simhash: null });
       }
     });
-    expect(v.first.kind).toBe('all-clear');
+    expect(v.first.kind).toBe('unmeasured');
     expect(v.crawledLine).not.toContain('none served');
   });
 

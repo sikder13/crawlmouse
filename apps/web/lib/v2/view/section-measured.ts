@@ -18,9 +18,11 @@ export const SECTIONS_MEASURED: readonly FixSection[] = [
 export type PageRows = {
   page_results: readonly Pick<
     PageResult,
-    'check_id' | 'status_code' | 'depth' | 'is_orphan' | 'js_only'
+    'check_id' | 'status_code' | 'is_html' | 'links_read' | 'kind' | 'template_key'
   >[];
 };
+
+const rowsOf = (d: PageRows, check: Check) => d.page_results.filter((p) => p.check_id === check.id);
 
 function accessLevel(check: Check): MeasuredLevel {
   const ai = check.crawlers.filter((c) => c.group !== 'search_engine');
@@ -31,34 +33,48 @@ function accessLevel(check: Check): MeasuredLevel {
   const sampled = check.coverage?.pages_sampled ?? 0;
   // A verdict robots.txt states holds for the site; one from our requests rests on its pages.
   const enough = (c: Check['crawlers'][number]) =>
-    c.evidence_class === 'declared' || c.pages_measured * 2 >= sampled;
+    c.evidence_class === 'declared' || c.pages_measured >= sampled;
   return answered.length === ai.length && ai.every(enough) ? 'full' : 'partial';
 }
 
-/** Of the pages that answered 200, those the graph accounts for: reached, orphaned or JS-only. */
-export function placedPages(d: PageRows, check: Check) {
-  const served = d.page_results.filter((p) => p.check_id === check.id && p.status_code === 200);
-  const placed = served.filter((p) => p.depth !== null || p.is_orphan || p.js_only);
-  return { placed: placed.length, total: served.length };
+/** A status that means we were kept from the page. A 3xx, 404 or 410 is the site's own answer. */
+const keptFromPage = (status: number) =>
+  status === 401 || status === 403 || status === 429 || status >= 500;
+
+/** Pages whose links we read in full, of the pages the crawl found. */
+export function pagesRead(d: PageRows, check: Check) {
+  const rows = rowsOf(d, check);
+  // Counted from the pages known not read: a stored record can hold fewer rows than were crawled.
+  const unread = rows.filter((p) => !(p.status_code === 200 && p.is_html && p.links_read)).length;
+  const crawled = check.coverage?.pages_crawled ?? rows.length;
+  return {
+    read: Math.max(crawled - unread, 0),
+    total: check.coverage?.pages_discovered ?? crawled,
+  };
 }
 
 function structureLevel(d: PageRows, check: Check): MeasuredLevel {
   const s = check.structure;
   // A graph with no link has no orphans, so its zero says nothing about the site.
   if (!s || (s.internal_links === 0 && s.js_only_pages === 0)) return 'none';
-  const { placed, total } = placedPages(d, check);
-  return placed === total ? 'full' : 'partial';
+  const rows = rowsOf(d, check);
+  const coverage = check.coverage;
+  const short = !!coverage && coverage.pages_crawled < coverage.pages_discovered;
+  const kept = rows.some((p) => keptFromPage(p.status_code));
+  const unread = rows.some((p) => p.status_code === 200 && p.is_html && !p.links_read);
+  return short || kept || unread ? 'partial' : 'full';
 }
 
-function contentLevel(check: Check): MeasuredLevel {
+function contentLevel(d: PageRows, check: Check): MeasuredLevel {
   const read = new Set(
     (check.content?.checks ?? []).flatMap((c) =>
       c.by_template.filter((r) => r.total > 0).map((r) => r.template_key),
     ),
   );
   if (!read.size) return 'none';
-  const templates = check.coverage?.templates ?? [];
-  return templates.every((t) => read.has(t.template_key)) ? 'full' : 'partial';
+  // Thin, archive, 404 and non-HTML pages are never evaluated, so only gradeable pages count.
+  const eligible = rowsOf(d, check).filter((p) => p.kind === 'content' && p.status_code === 200);
+  return eligible.every((p) => read.has(p.template_key)) ? 'full' : 'partial';
 }
 
 export function measuredLevel(d: PageRows, check: Check, section: FixSection): MeasuredLevel {
@@ -70,7 +86,7 @@ export function measuredLevel(d: PageRows, check: Check, section: FixSection): M
     case 'structure':
       return structureLevel(d, check);
     case 'content':
-      return contentLevel(check);
+      return contentLevel(d, check);
   }
 }
 
@@ -86,5 +102,5 @@ export const noFixWords = (level: MeasuredLevel) =>
       : 'not measured';
 
 /** The structure sentence at `partial`, in the check's own numbers. */
-export const partlyPlaced = ({ placed, total }: { placed: number; total: number }) =>
-  `${count(placed)} of ${count(total)} pages could be placed through the links we read.`;
+export const partlyRead = ({ read, total }: { read: number; total: number }) =>
+  `${count(read)} of ${count(total)} pages had their links read.`;

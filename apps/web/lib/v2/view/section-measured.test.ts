@@ -15,7 +15,7 @@ import { findCheck, fixture, type ViewDataset } from '../fixtures';
 import { CHECKS } from '../recordings';
 import { linkMapView } from './link-map';
 import { resultView } from './result';
-import { measuredInFull, measuredLevel, noFixWords, placedPages } from './section-measured';
+import { measuredInFull, measuredLevel, noFixWords, pagesRead } from './section-measured';
 import { accessView } from './segment/access';
 import { changesView } from './segment/changes';
 import { contentView } from './segment/content';
@@ -41,16 +41,15 @@ const threeLinked = () =>
     [page('', 200), page('/a', 200), page('/b', 200)],
     [edge(HOME, `${HOME}/a`), edge(HOME, `${HOME}/b`), edge(`${HOME}/a`, `${HOME}/b`)],
   );
-/** The three-page site with one page the graph cannot account for. */
-function onePageUnplaced() {
+/** The three-page site after `edit` to its `/b` row, as a real worker row of that shape reads. */
+function withRowB(edit: Record<string, unknown>) {
   const b = threeLinked();
-  Object.assign(b.d.page_results.find((p) => p.url.endsWith('/b'))!, {
-    depth: null,
-    is_orphan: false,
-    js_only: false,
-  });
+  Object.assign(b.d.page_results.find((p) => p.url.endsWith('/b'))!, edit);
   return b;
 }
+/** Our reader got no links from `/b`. */
+const readerFailedOnOne = () => withRowB({ links_read: false });
+
 const clean = () => {
   const d = structuredClone(fixture('clean-site')) as ViewDataset;
   return { d, id: CHECKS.cleanFirstAudit, check: findCheck(d, CHECKS.cleanFirstAudit) };
@@ -99,17 +98,15 @@ describe('crawler access', () => {
     expect(door.footer).toContain('nothing to fix in what was measured');
   });
 
-  it('is partial when a crawler was measured on under half its sampled pages', () => {
+  it('is partial when a crawler was measured on fewer than every sampled page', () => {
     const { d, check } = clean();
     const sampled = check.coverage!.pages_sampled;
-    check.crawlers.find((x) => x.ua === 'GPTBot')!.pages_measured = Math.ceil(sampled / 2) - 1;
+    check.crawlers.find((x) => x.ua === 'GPTBot')!.pages_measured = sampled - 1;
     expect(measuredLevel(d, check, 'crawler_access')).toBe('partial');
   });
 
-  it('is full at exactly half, and when only a search engine is unmeasured', () => {
+  it('is full on every sampled page, when only a search engine is unmeasured', () => {
     const { d, check } = clean();
-    const sampled = check.coverage!.pages_sampled;
-    check.crawlers.find((x) => x.ua === 'GPTBot')!.pages_measured = Math.ceil(sampled / 2);
     check.crawlers.find((x) => x.group === 'search_engine')!.verdict = 'not_measured';
     expect(measuredLevel(d, check, 'crawler_access')).toBe('full');
   });
@@ -143,18 +140,42 @@ describe('structure', () => {
     expect(measuredLevel(b.d, b.check, 'structure')).toBe('full');
   });
 
-  it('is partial when a served page is neither reached, orphaned nor JS-only', () => {
-    const b = onePageUnplaced();
-    expect(placedPages(b.d, b.check)).toEqual({ placed: 2, total: 3 });
+  it.each([
+    ['a redirecting page', { depth: null, kind: 'duplicate', is_orphan: false }],
+    ['an unlinked noindex page', { depth: null, kind: 'utility', is_orphan: false }],
+    ['a real orphan', { depth: null, is_orphan: true }],
+  ])('stays full with %s: a null depth is not a failure to read', (_name, edit) => {
+    const b = withRowB(edit);
+    expect(measuredLevel(b.d, b.check, 'structure')).toBe('full');
+  });
+
+  it('is partial when our reader did not read a page’s links', () => {
+    const b = readerFailedOnOne();
+    expect(pagesRead(b.d, b.check)).toEqual({ read: 2, total: 3 });
     expect(measuredLevel(b.d, b.check, 'structure')).toBe('partial');
   });
 
-  it('counts a real orphan as placed: it is a finding, not a gap', () => {
+  it.each([401, 403, 429, 500, 503])('is partial when a page answered %i', (status_code) => {
+    const b = withRowB({ status_code });
+    expect(measuredLevel(b.d, b.check, 'structure')).toBe('partial');
+  });
+
+  it.each([301, 404, 410])(
+    'stays full when a page answered %i: the site said so',
+    (status_code) => {
+      const b = withRowB({ status_code });
+      expect(measuredLevel(b.d, b.check, 'structure')).toBe('full');
+    },
+  );
+
+  it('is partial when the crawl stopped short of what it found', () => {
     const b = threeLinked();
-    Object.assign(b.d.page_results.find((p) => p.url.endsWith('/b'))!, {
-      depth: null,
-      is_orphan: true,
-    });
+    b.check.coverage!.pages_discovered = 7;
+    expect(measuredLevel(b.d, b.check, 'structure')).toBe('partial');
+  });
+
+  it('does not fall below full on a non-HTML page, which has no links to read', () => {
+    const b = withRowB({ is_html: false, links_read: false });
     expect(measuredLevel(b.d, b.check, 'structure')).toBe('full');
   });
 
@@ -165,13 +186,33 @@ describe('structure', () => {
   });
 
   it('at partial, makes no claim about every page, and gives the numbers', () => {
-    const b = onePageUnplaced();
+    const b = readerFailedOnOne();
     expect(everyScreen(b)).not.toMatch(
       /every page crawled has|every page is linked|no orphan pages|within three clicks|which is healthy/i,
     );
     const v = structureView(b.d, b.id, {}, null);
-    expect(v.headline.title).toBe('2 of 3 pages could be placed through the links we read.');
-    expect(v.orphans.heading).toBe('No orphan among the pages placed');
+    expect(v.headline.title).toBe('2 of 3 pages had their links read.');
+    expect(v.orphans.heading).toBe('No orphan among the pages read');
+  });
+
+  it('at partial, shows no zero that reads as none found (M-5)', () => {
+    const b = readerFailedOnOne();
+    expect(resultView(b.d, b.id, { map: null }).map.orphans).toBeNull();
+    expect(linkMapView(b.d, b.id, { scope: 'all' }).filters.map((f) => f.label)).not.toEqual(
+      expect.arrayContaining([expect.stringMatching(/· 0$/)]),
+    );
+    const v = structureView(b.d, b.id, {}, null);
+    expect(v.coverage.tested).toBe(2);
+    expect(v.tiles.find((t) => t.label === 'Orphan pages')!.value).toBe('—');
+    expect(v.tiles.find((t) => t.label === 'Average click depth')!.value).toBe('—');
+  });
+
+  it('at partial, still shows a count that found something', () => {
+    const b = readerFailedOnOne();
+    b.check.structure!.orphan_pages = 2;
+    expect(resultView(b.d, b.id, { map: null }).map.orphans).toBe(2);
+    const v = structureView(b.d, b.id, {}, null);
+    expect(v.tiles.find((t) => t.label === 'Orphan pages')!.value).toBe('2');
   });
 
   it('at none, shows no count that reads as none found (C-1)', () => {
@@ -199,21 +240,51 @@ describe('content', () => {
     expect(measuredLevel(d, check, 'content')).toBe('none');
   });
 
-  it('is partial when a template had no page evaluated', () => {
+  it('is partial when a template holding a gradeable page had none evaluated', () => {
     const { d, check } = clean();
-    const key = check.coverage!.templates[0]!.template_key;
+    const key = d.page_results.find((p) => p.check_id === check.id)!.template_key;
+    for (const p of d.page_results.filter((x) => x.check_id === check.id && x.template_key === key))
+      Object.assign(p, { kind: 'content', status_code: 200 });
     for (const c of check.content!.checks) {
       for (const r of c.by_template.filter((x) => x.template_key === key)) r.total = 0;
     }
     expect(measuredLevel(d, check, 'content')).toBe('partial');
   });
 
-  it('is read on the recorded site, though the engine withholds its score (its guides are not)', () => {
+  it('does not count a template with no gradeable page against it', () => {
+    const { d, check } = clean();
+    const key = d.page_results.find((p) => p.check_id === check.id)!.template_key;
+    for (const p of d.page_results.filter((x) => x.check_id === check.id && x.template_key === key))
+      Object.assign(p, { kind: 'thin', status_code: 200 });
+    for (const c of check.content!.checks) {
+      for (const r of c.by_template.filter((x) => x.template_key === key)) r.total = 0;
+    }
+    expect(measuredLevel(d, check, 'content')).toBe('full');
+  });
+
+  it('is full on the recorded site: its unread guides are thin, and the engine withholds its score', () => {
     const input = recordedBuild();
     const b = buildCheck(input);
     const d = datasetOfBuilds(input.site, [b]);
     expect(b.check.content!.score).toBeNull();
-    expect(measuredLevel(d, b.check, 'content')).toBe('partial');
+    expect(measuredLevel(d, b.check, 'content')).toBe('full');
+  });
+
+  it('does not say every section can be quoted when only some were checked (M-4)', () => {
+    const { d, id, check } = clean();
+    const key = d.page_results.find((p) => p.check_id === check.id)!.template_key;
+    for (const p of d.page_results.filter((x) => x.check_id === check.id && x.template_key === key))
+      Object.assign(p, { kind: 'content', status_code: 200 });
+    for (const c of check.content!.checks) {
+      for (const r of c.by_template) {
+        Object.assign(
+          r,
+          r.template_key === key ? { passing: 0, total: 0 } : { passing: 4, total: 4 },
+        );
+      }
+    }
+    const v = contentView(d, id);
+    expect(v.headline.title).not.toContain('every section');
   });
 });
 
@@ -231,6 +302,8 @@ describe('text without JavaScript', () => {
     expect(nojsView(d, id).headline.title).toBe(
       '40% of the text is in the HTML before JavaScript runs.',
     );
+    const r = resultView(d, id, { map: null });
+    expect(JSON.stringify([r.first, r.doors])).not.toContain('ships its text');
   });
 });
 
@@ -260,6 +333,15 @@ describe('the clean claims, on checks the real builder made', () => {
     const first = resultView(noContent.d, noContent.id, { map: null }).first;
     expect(first.kind).toBe('unmeasured');
     expect(first.kind !== 'fix' && first.body).toContain('No page’s content was checked.');
+  });
+
+  it('behind an edge, does not say the crawler tests finished on some pages', () => {
+    const c = clean();
+    for (const x of c.check.crawlers.filter((y) => y.group !== 'search_engine'))
+      x.verdict = 'edge_blocks_automation';
+    const first = resultView(c.d, c.id, { map: null }).first;
+    expect(first.kind !== 'fix' && first.body).toContain('No crawler could be tested.');
+    expect(first.kind !== 'fix' && first.body).not.toContain('only some');
   });
 
   it('still says it of a section measured in full (the sweep can pass only by reading)', () => {

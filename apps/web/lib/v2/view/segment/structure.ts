@@ -3,7 +3,7 @@
  * figures from the check, the crawl's own map drawing, and the orphan pages the record lists.
  * Every sentence is built from those figures (OPERATING-RULES §10).
  */
-import { measuredLevel, partlyPlaced, placedPages, type MeasuredLevel } from '../section-measured';
+import { measuredLevel, pagesRead, partlyRead, type MeasuredLevel } from '../section-measured';
 import type { Check, PageResult } from '@crawlmouse/types/v2';
 import { findCheck } from '../../fixtures';
 import { listOf, percent, templateNoun } from '../../format';
@@ -190,7 +190,7 @@ function orphanTable(
   }
   if (total === 0) {
     return {
-      heading: level === 'partial' ? 'No orphan among the pages placed' : 'No orphan pages',
+      heading: level === 'partial' ? 'No orphan among the pages read' : 'No orphan pages',
       sub: null,
       rows: [],
       unlisted: null,
@@ -269,8 +269,10 @@ export function structureView(
   const score = check.technical_seo?.site_structure_score ?? null;
   const level = measuredLevel(d, check, 'structure');
   const measured = level !== 'none';
-  const partly = partlyPlaced(placedPages(d, check));
-  const known = (value: string) => (measured ? value : '—');
+  const linksRead = pagesRead(d, check);
+  const partly = partlyRead(linksRead);
+  // Not read in full, a zero would read as none found; a count above zero is still a finding.
+  const counted = (n: number) => (level === 'full' || (measured && n > 0) ? count(n) : '—');
   return {
     frame,
     headline: {
@@ -288,18 +290,27 @@ export function structureView(
     tiles: [
       { label: 'Pages', value: count(coverage.pages_crawled), note: null },
       { label: 'Internal links', value: count(s.internal_links), note: null },
-      { label: 'Orphan pages', value: known(count(s.orphan_pages)), note: null },
+      { label: 'Orphan pages', value: counted(s.orphan_pages), note: null },
       {
         label: 'Reachable only through JavaScript',
-        value: known(count(s.js_only_pages)),
+        value: counted(s.js_only_pages),
         note: null,
       },
-      { label: 'Average click depth', value: known(s.avg_click_depth.toFixed(1)), note: null },
+      {
+        label: 'Average click depth',
+        value: level === 'full' ? s.avg_click_depth.toFixed(1) : '—',
+        note: null,
+      },
     ],
     coverage: {
-      tested: measured ? coverage.pages_crawled : 0,
+      tested: level === 'full' ? coverage.pages_crawled : level === 'partial' ? linksRead.read : 0,
       total: coverage.pages_discovered,
-      groups: measured ? coverage.templates.length : 0,
+      groups:
+        level === 'full'
+          ? coverage.templates.length
+          : level === 'partial'
+            ? Math.min(coverage.templates.length, linksRead.read)
+            : 0,
     },
     map: mapView(check, drawing, options.hrefs?.map?.all ?? '#'),
     orphans: { ...orphanTable(check, rows, level), explorerHref: options.hrefs?.map?.hubs ?? '#' },

@@ -3,6 +3,7 @@
  * section, the pages in the record that fail each, and the first words a crawler reads of one of
  * them. Sentences about the checks are built from their counts.
  */
+import { measuredLevel, type MeasuredLevel } from '../section-measured';
 import type { Check, ContentCheck } from '@crawlmouse/types/v2';
 import { ContentCheckSchema } from '@crawlmouse/types/v2';
 import { findCheck, fixesAsOf } from '../../fixtures';
@@ -118,7 +119,7 @@ function firstWords(text: string, n: number): string {
 
 const lower = (s: string) => s.replace(/^./u, (c) => c.toLowerCase());
 
-function headline(check: Check, rows: readonly Row[]): string {
+function headline(check: Check, rows: readonly Row[], level: MeasuredLevel): string {
   const multi = rows.filter((r) => r.total > 1);
   const nameOf = (r: Row) =>
     templateNoun(check.coverage!.templates.find((t) => t.template_key === r.template_key)!.label)
@@ -127,8 +128,11 @@ function headline(check: Check, rows: readonly Row[]): string {
   // A one-page section (the homepage) is named only when it fails, so it cannot hide behind the rest.
   const worst = rows.filter((r) => r.passing / r.total < SOME);
   if (!multi.length) return 'Whether pages open with a direct answer was not checked.';
-  if (best.length === multi.length && !worst.length)
-    return 'Answer engines can quote every section.';
+  if (best.length === multi.length && !worst.length) {
+    return level === 'full'
+      ? 'Answer engines can quote every section.'
+      : 'Answer engines can quote the sections we checked.';
+  }
   if (!best.length) return `Few pages open with an answer an engine can quote.`;
   return worst.length
     ? `Answer engines can quote your ${listOf(best.map(nameOf))}. Not your ${listOf(worst.map(nameOf))}.`
@@ -323,7 +327,7 @@ export function contentView(
   return {
     frame,
     headline: {
-      title: headline(check, direct),
+      title: headline(check, direct, measuredLevel(d, check, 'content')),
       pill:
         content.score === null
           ? { state: 'neutral', label: 'not scored yet' }

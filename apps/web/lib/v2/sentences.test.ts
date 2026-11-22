@@ -32,7 +32,7 @@ const check = findCheck(d, CHECKS.badFirstAudit);
 const fixes = fixesAsOf(d, check);
 const isOpen = (f: (typeof fixes)[number]) => fixes.indexOf(f) < 3;
 
-const READ_IN_FULL = { level: 'full', placed: 1, total: 1 } as const;
+const READ_IN_FULL = { level: 'full', read: 1, total: 1 } as const;
 
 describe('the sentences about a check', () => {
   it('words the fixes to the next band by how many are open', () => {
