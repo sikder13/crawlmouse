@@ -46,6 +46,7 @@ export function DevelopersScreen({
           <Heading level={1} size="xl" className={styles.title}>
             {data.h1}
           </Heading>
+          <p className={styles.tagline}>{data.tagline}</p>
           <p className={styles.sub}>{data.intro}</p>
         </section>
 

@@ -21,10 +21,17 @@
 export const READ_API = { requestsPerMinute: 60, keyPrefix: 'cm_ro_' } as const;
 
 export const DEVELOPERS_COPY = {
-  title: 'Developers',
+  /** The indexed title and h1, v1's (OPERATING-RULES §13; assumed, see B question 002). */
+  title: 'Crawlmouse for developers — CLI, GitHub Action & webhooks',
+  /** The page's short name, where the indexed title's list of tools would overstate it. */
+  navLabel: 'Developers',
+  /** The description search engines hold today, kept until question 002 is answered. */
+  indexedDescription:
+    'A CLI, GitHub Action, and webhooks built on the same engine as the web audit. Grade internal linking from your terminal or CI — join the waitlist.',
   description:
     'A read-only API for your Crawlmouse audits is planned for Pro: the latest audit of each of your sites as JSON. See the response it will return, what comes after it, and join the developer list.',
-  h1: 'A read-only API for your audits, then the audit as a tool your agent can call.',
+  h1: 'Crawlmouse for developers',
+  tagline: 'A read-only API for your audits, then the audit as a tool your agent can call.',
   intro:
     'Pro accounts will create a read-only key and pull the latest audit of any of their sites as JSON: grades, the crawler table, fixes with packets, the link map as an edge list. That comes first. The write side — start an audit, mark a fix done, re-check — and an MCP server, a CLI and a GitHub check are planned after it, with no dates. This page says what exists now and what does not.',
   sample: {
