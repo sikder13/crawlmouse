@@ -177,7 +177,10 @@ describe('the consent banner', () => {
     b.click('Decline');
     expect(ph.opt_out_capturing).toHaveBeenCalledTimes(1);
     expect(ph.set_config).toHaveBeenCalledWith({
+      advanced_disable_flags: true,
       disable_surveys: true,
+      disable_product_tours: true,
+      disable_conversations: true,
       disable_persistence: true,
       opt_out_capturing_by_default: true,
     });
@@ -207,7 +210,10 @@ describe('the consent banner', () => {
     expect(ph.set_config).toHaveBeenCalledWith({
       disable_persistence: false,
       opt_out_capturing_by_default: false,
+      advanced_disable_flags: false,
       disable_surveys: false,
+      disable_product_tours: false,
+      disable_conversations: false,
     });
     expect(ph.opt_in_capturing).toHaveBeenCalledTimes(1);
     expect(heard).toHaveBeenCalledTimes(1);
