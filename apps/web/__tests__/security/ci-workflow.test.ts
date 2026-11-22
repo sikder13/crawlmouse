@@ -153,8 +153,10 @@ describe('the changes job and the jobs it gates', () => {
   });
 
   // Q51 (CC-31): one `next dev` holding every preview route crossed Next's restart line while
-  // warming, so each shard runs once per half of the routes, on its own runner (tests/visual/part.ts).
-  describe('the visual shards split the preview routes in two', () => {
+  // warming, so each shard runs once per share of the routes, on its own runner (tests/visual/part.ts).
+  // Two shares were enough until part 1 of shard 2 crossed the same line mid-run (CC-45 question 009:
+  // run 44960197647, "approaching the used memory threshold, restarting"), so there are three.
+  describe('the visual shards split the preview routes in three', () => {
     const shard = job('visual-shard') as Job & { strategy?: { matrix?: Record<string, unknown> } };
     const step = (name: string) => {
       const found = (shard.steps ?? []).find((s) => s.name === name);
@@ -162,15 +164,15 @@ describe('the changes job and the jobs it gates', () => {
       return found;
     };
 
-    it('has a part axis of 1 and 2 beside the six shards', () => {
+    it('has a part axis of 1, 2 and 3 beside the six shards', () => {
       expect(shard.strategy?.matrix?.shard).toEqual([1, 2, 3, 4, 5, 6]);
-      expect(shard.strategy?.matrix?.part).toEqual([1, 2]);
+      expect(shard.strategy?.matrix?.part).toEqual([1, 2, 3]);
     });
 
     it.each(['Visual, layout and accessibility checks', 'Propose baselines from this run'])(
-      '"%s" checks the job\'s half, so it proposes for the tests it ran',
+      '"%s" checks the job\'s share, so it proposes for the tests it ran',
       (name) => {
-        expect(step(name).env?.VISUAL_PART).toBe('${{ matrix.part }}/2');
+        expect(step(name).env?.VISUAL_PART).toBe('${{ matrix.part }}/3');
       },
     );
 
@@ -194,7 +196,7 @@ describe('the changes job and the jobs it gates', () => {
       }
     });
 
-    it('names each artifact by its shard and its part, so the two halves do not collide', () => {
+    it('names each artifact by its shard and its part, so the shares do not collide', () => {
       expect(step('Upload proposed baselines and diffs').with?.name).toBe(
         'visual-${{ github.run_id }}-${{ github.run_attempt }}-shard${{ matrix.shard }}-part${{ matrix.part }}',
       );
