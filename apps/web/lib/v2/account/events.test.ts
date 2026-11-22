@@ -66,3 +66,17 @@ describe('captureFor', () => {
     for (const e of SERVER_EVENTS) expect(FUNNEL_EVENTS).toContain(e);
   });
 });
+
+describe('captureFor, the browser’s bot rule (F-050)', () => {
+  it('sends nothing for a headless browser’s request', async () => {
+    const send = vi.fn(async () => undefined);
+    const headless = new Request('https://crawlmouse.com/api/sites', {
+      method: 'POST',
+      headers: {
+        'user-agent': 'Mozilla/5.0 (X11; Linux x86_64) HeadlessChrome/131.0.0.0 Safari/537.36',
+      },
+    });
+    await captureFor(headless, send)('site_added', { accountId: 'acc-1' }, { n: 1 });
+    expect(send).not.toHaveBeenCalled();
+  });
+});
