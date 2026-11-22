@@ -130,6 +130,9 @@ const stripeWrites = () => h.log.filter((l) => l.includes('stripe'));
 
 beforeEach(() => {
   process.env.V2_BILLING = '1';
+  // Production's combination once billing opens. The v1 purchase guard (CC-45) applies only while
+  // V2_BILLING is off, so every case below must answer as it did before the guard.
+  process.env.V2_CHECKS_PUBLIC = '1';
   process.env.NEXT_PUBLIC_BASE_URL = SITE;
   h.log.length = 0;
   h.state.user = { id: 'u1', email: 'owner@example.com' };
