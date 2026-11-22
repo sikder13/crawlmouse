@@ -116,7 +116,8 @@ describe('the signed-in layouts identify the browser', () => {
 });
 
 describe('a signed-in layout refuses under the same flag as every page beneath it', () => {
-  const GATE = /if \(!(\w+Enabled)\(\)\) return notFound\(\);/;
+  // RC-01: the Agency trial's refusal is a redirect to For agencies; the flag must still match.
+  const GATE = /if \(!(\w+Enabled)\(\)\) (?:return notFound\(\)|redirect\('\/agencies'\));/;
   const APP = join(__dirname, '../app');
   const layouts = [
     'agency',
