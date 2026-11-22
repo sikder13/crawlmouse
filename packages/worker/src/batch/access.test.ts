@@ -122,7 +122,7 @@ describe('the five discriminator sites, from their recorded POC shapes', () => {
     const row = rows.find((r) => r.ua === 'GPTBot')!;
     expect(row.witness).toEqual({ role: 'canary', ua: 'Googlebot' });
     expect(row.limitations.join(' ')).toContain(
-      'The tagged Googlebot request was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address.',
+      'The tagged Googlebot request was served on this page from the same address, so this refusal was not of our address alone; a rule that verifies only this crawler’s addresses would look the same.',
     );
     expect(row.limitations.join(' ')).toContain('No other tested crawler was served on this page.');
   });

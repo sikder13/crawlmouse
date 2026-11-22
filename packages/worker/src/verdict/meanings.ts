@@ -20,7 +20,7 @@ export const VERDICT_MEANINGS: Record<Verdict, { means: string; evidence: string
   },
   blocked_by_ua_rule: {
     means:
-      'The crawler was refused while another tested crawler, or the tagged Googlebot canary, was served on the same page from the same address: a refusal of the address would have refused that one too, so this refusal is aimed at the user agent.',
+      'The crawler was refused while another tested crawler, or the tagged Googlebot canary, was served on the same page from the same address: a refusal of the address alone would have refused that one too. A rule that verifies only this crawler’s addresses would look the same.',
     evidence:
       "The crawler's response; its `witness` names the identity served, and that identity's own row is on the same page.",
   },

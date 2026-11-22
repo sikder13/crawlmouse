@@ -232,7 +232,7 @@ export interface WitnessName {
 
 /**
  * For a refusal: what decided it, and which other tested crawlers were served on the same page. With
- * a witness, the refusal is aimed at the user agent (verdict/table.ts, the witness rule); with none,
+ * a witness, the refusal was not of our address alone (verdict/table.ts, the witness rule); with none,
  * it cannot be told apart from a site that refuses unverified crawler addresses.
  */
 export function witnessReading(
@@ -251,7 +251,7 @@ export function witnessReading(
   const who = witness.role === 'canary' ? 'The tagged Googlebot request' : witness.ua;
   const so = hedged
     ? 'so this refusal is likely aimed at the user agent rather than at an unverified address'
-    : 'so this refusal is aimed at the user agent, not at an unverified address';
+    : 'so this refusal was not of our address alone; a rule that verifies only this crawler’s addresses would look the same';
   return `${who} was served on this page from the same address, ${so}.${tail}`;
 }
 
