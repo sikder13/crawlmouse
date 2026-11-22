@@ -40,11 +40,17 @@ export function loadSentry(): Promise<Sentry> | null {
   return loading;
 }
 
-/** Reports an error, loading the SDK if it has not loaded. A failed load is not the page's problem. */
-export function reportToSentry(error: unknown): void {
-  loadSentry()
-    ?.then((sdk) => void sdk.captureException(error))
-    .catch(() => undefined);
+/**
+ * Reports an error, loading the SDK if it has not loaded, and answers with the event's id. Null when
+ * there is no DSN or the SDK could not load: there is then no event to refer to.
+ */
+export async function reportToSentry(error: unknown): Promise<string | null> {
+  try {
+    const sdk = await loadSentry();
+    return sdk ? sdk.captureException(error) : null;
+  } catch {
+    return null;
+  }
 }
 
 /** Next's router hook: a navigation before the SDK has loaded is not traced. */

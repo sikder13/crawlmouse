@@ -14,10 +14,13 @@ import type { SegmentErrorProps } from '../../components/v2/screens/support/Segm
 
 const sentry = vi.hoisted(() => ({ id: '' }));
 const nav = vi.hoisted(() => ({ path: '/' }));
-const captureException = vi.hoisted(() => vi.fn(() => sentry.id));
+const captureException = vi.hoisted(() => vi.fn((_error: unknown) => sentry.id));
 const calls = vi.hoisted(() => [] as string[]);
 const refresh = vi.hoisted(() => vi.fn(() => void calls.push('refresh')));
-vi.mock('@sentry/nextjs', () => ({ captureException }));
+// The boundary reports through the lazy client (F-045; lib/sentry-lazy.dom.test.ts runs it).
+vi.mock('../../lib/sentry-lazy', () => ({
+  reportToSentry: async (error: unknown) => captureException(error),
+}));
 // React's own startTransition, with a mark in `calls` before and after the callback runs.
 vi.mock('react', async (importOriginal) => {
   const real = await importOriginal<typeof import('react')>();
@@ -48,11 +51,12 @@ afterEach(() => {
   calls.length = 0;
 });
 
-function mount(Boundary: ComponentType<SegmentErrorProps>, props: SegmentErrorProps) {
+async function mount(Boundary: ComponentType<SegmentErrorProps>, props: SegmentErrorProps) {
   const host = document.createElement('div');
   document.body.appendChild(host);
   root = createRoot(host);
-  act(() => root!.render(<Boundary {...props} />));
+  // Async, so the report's id, which arrives after the SDK has loaded, is on the screen.
+  await act(async () => root!.render(<Boundary {...props} />));
   return host;
 }
 
@@ -71,7 +75,7 @@ describe.each(BOUNDARIES)('app/%s/error.tsx', (_segment, path, load) => {
     sentry.id = EVENT;
     nav.path = path;
     const error = Object.assign(new Error('boom'), { digest: DIGEST });
-    const host = mount(Boundary, { error, reset: vi.fn() });
+    const host = await mount(Boundary, { error, reset: vi.fn() });
     expect(captureException).toHaveBeenCalledWith(error);
     expect(host.querySelectorAll('h1')).toHaveLength(1);
     expect(host.querySelector('h1')!.textContent).toBe(SUPPORT_COPY.error.title);
@@ -102,7 +106,7 @@ describe.each(BOUNDARIES)('app/%s/error.tsx', (_segment, path, load) => {
     sentry.id = EVENT;
     nav.path = path;
     const reset = vi.fn(() => void calls.push('reset'));
-    const host = mount(Boundary, { error: new Error('boom'), reset });
+    const host = await mount(Boundary, { error: new Error('boom'), reset });
     const retry = [...host.querySelectorAll('button')].find(
       (b) => b.textContent === SUPPORT_COPY.error.retry,
     )!;
@@ -117,7 +121,7 @@ describe.each(BOUNDARIES)('app/%s/error.tsx', (_segment, path, load) => {
     const { default: Boundary } = await load();
     sentry.id = '';
     nav.path = path;
-    const host = mount(Boundary, { error: new Error('boom'), reset: vi.fn() });
+    const host = await mount(Boundary, { error: new Error('boom'), reset: vi.fn() });
     expect(host.textContent).not.toContain('Reference:');
   });
 });

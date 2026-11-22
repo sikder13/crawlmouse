@@ -15,7 +15,7 @@ export default function GlobalError({
   reset: () => void;
 }) {
   useEffect(() => {
-    reportToSentry(error);
+    void reportToSentry(error);
   }, [error]);
 
   return (

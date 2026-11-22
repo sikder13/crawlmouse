@@ -24,7 +24,10 @@ async function fresh() {
     h.fetched += 1;
     return {
       init: (o: unknown) => void h.calls.push(['init', o]),
-      captureException: (e: unknown) => void h.calls.push(['captureException', e]),
+      captureException: (e: unknown) => {
+        h.calls.push(['captureException', e]);
+        return 'event-id';
+      },
       captureRouterTransitionStart: (...a: unknown[]) => void h.calls.push(['transition', ...a]),
     };
   });
@@ -143,6 +146,26 @@ describe('the browser’s Sentry', () => {
     await settle();
     expect(names()).toEqual(['init', 'captureException']);
     expect(h.calls[1]![1]).toBe(boom);
+  });
+
+  it('reportToSentry answers with the event’s id, for the support link', async () => {
+    const s = await fresh();
+    s.configureSentry({ dsn: DSN });
+    expect(await s.reportToSentry(new Error('x'))).toBe('event-id');
+  });
+
+  it('with no DSN, or an SDK that will not load, it answers null and does not throw', async () => {
+    const none = await fresh();
+    none.configureSentry({ dsn: undefined });
+    expect(await none.reportToSentry(new Error('x'))).toBeNull();
+
+    vi.resetModules();
+    vi.doMock('@sentry/nextjs', () => {
+      throw new Error('chunk failed');
+    });
+    const broken = await import('./sentry-lazy');
+    broken.configureSentry({ dsn: DSN });
+    expect(await broken.reportToSentry(new Error('y'))).toBeNull();
   });
 
   it('a navigation before it has loaded is ignored; after, it is forwarded', async () => {
