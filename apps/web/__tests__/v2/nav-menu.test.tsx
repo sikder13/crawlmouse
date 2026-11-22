@@ -228,7 +228,7 @@ describe('PageShell header', () => {
   });
 
   it('renders a planned top-level item as text, never as a dead link', () => {
-    expect(nav).toMatch(/<span [^>]*data-v2-planned=""[^>]*>For agencies<\/span>/);
+    expect(nav).toMatch(/<a [^>]*href="\/agencies"[^>]*>For agencies<\/a>/);
     expect(nav).not.toMatch(/href="#?"/);
   });
 

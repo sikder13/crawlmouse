@@ -28,12 +28,17 @@ export const PAGE_EXCEPTIONS: readonly PageException[] = [
   {
     path: '/agencies',
     rule: 'no-in-link',
-    builds: ['on'],
-    reason: `${OUTSIDE}; "For agencies" is a planned, unlinked item in components/v2/footer-links.ts`,
+    builds: ['off'],
+    reason: `${OUTSIDE}; with the flags off v1's header and footer serve, and neither links it`,
   },
   // v1 home (app/page.tsx): the feature cards' h3s follow the h1 with no h2 between.
   { path: '/', rule: 'heading-skip', builds: ['off'], reason: OUTSIDE },
-  { path: '/pricing', rule: 'description-length', builds: ['off'], reason: OUTSIDE },
+  {
+    path: '/pricing',
+    rule: 'description-length',
+    builds: BOTH,
+    reason: 'owner: the indexed description is kept until B question 002 is answered',
+  },
   // v1's home sets no description of its own; the v2 home's own (D2) leaves the 'on' build clean.
   { path: '/', rule: 'description-duplicate', builds: ['off'], reason: LAYOUT_DESCRIPTION },
   ...['/status', '/privacy', '/terms', '/aup', '/subprocessors', '/takedown'].map(
@@ -58,12 +63,6 @@ export const PAGE_EXCEPTIONS: readonly PageException[] = [
     builds: BOTH,
     reason:
       'owner: the title is also the H1; a shorter search-result title is a `seoTitle` the owner has not ruled',
-  },
-  {
-    path: '/developers',
-    rule: 'description-length',
-    builds: ['on'],
-    reason: `${OUTSIDE}; the v2 page's description is lib/v2/view/developers.ts`,
   },
   { path: '/help/audit-expired', rule: 'description-length', builds: ['on'], reason: HELP_COPY },
   {

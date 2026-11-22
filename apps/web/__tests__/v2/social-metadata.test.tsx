@@ -12,6 +12,7 @@ import type { PublicReportRow } from '@/lib/reports';
 import { CHECK_COPY, CHECK_QUESTIONS } from '../../lib/v2/copy/check-pages';
 import { helpArticles } from '../../lib/v2/help/articles';
 import { HELP_COPY } from '../../lib/v2/help/copy';
+import { DEVELOPERS_COPY } from '../../lib/v2/copy/developers';
 import { PRICING_COPY } from '../../lib/v2/copy/pricing';
 import { SOCIAL_CARDS, socialCardPath } from '../../lib/v2/social-card';
 import { fixture } from '../../lib/v2/fixtures';
@@ -64,7 +65,7 @@ function expectOwn(
 describe('social metadata of the CC-29 public pages', () => {
   it('/agencies', async () => {
     const { metadata } = await import('../../app/agencies/page');
-    const v = agenciesView();
+    const v = agenciesView({ billing: false, accountDoor: false });
     expectOwn(metadata, {
       url: '/agencies',
       title: v.title + SUFFIX,
@@ -79,7 +80,7 @@ describe('social metadata of the CC-29 public pages', () => {
     expectOwn(metadata, {
       url: '/pricing',
       title: 'Pricing' + SUFFIX,
-      description: PRICING_COPY.description(),
+      description: PRICING_COPY.indexedDescription,
       card: 'pricing',
     });
   });
@@ -90,7 +91,7 @@ describe('social metadata of the CC-29 public pages', () => {
     expectOwn(metadata, {
       url: '/developers',
       title: v.title + SUFFIX,
-      description: v.description,
+      description: DEVELOPERS_COPY.indexedDescription,
       card: 'developers',
     });
   });

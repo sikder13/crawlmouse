@@ -26,6 +26,7 @@ import {
 import { TRIAL_DAYS } from '../../billing/state-machine';
 import { GATES, type Tier } from '../../entitlement-v2';
 import type { Tagged } from './agencies';
+import { AGENCY_PLUS_INBOX_ADDRESS } from './contact-inbox';
 import { CANCEL_CLICKS, EVIDENCE_CONDENSED_AFTER_DAYS } from './settings';
 import { capitalise, count, numberWord, plural } from '../words';
 
@@ -354,7 +355,7 @@ export const PRICING_COPY = {
      * (AGENCY_PLUS_INBOX; pinned equal in lib/v2/view/pricing.test.ts). A literal, because this copy
      * reaches client components and email-change.ts does not.
      */
-    inbox: 'support@crawlmouse.com',
+    inbox: AGENCY_PLUS_INBOX_ADDRESS,
     inboxBefore: 'Write to',
     inboxAfter: 'with your agency’s name and how many client sites you run.',
     /** The request is mailed to this inbox (`agency_plus_contact`, AGENCY_PLUS_INBOX). */
