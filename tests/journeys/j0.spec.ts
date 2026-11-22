@@ -145,38 +145,46 @@ step('J0.9l', 'an unknown address is the v2 404', async ({ page }) => {
   await expectFinishedV2Page(page, '/this-page-does-not-exist-journeys', { shell: 'F-026' }, 404);
 });
 
-step(
-  'J0.1',
-  'the home page says what this is, who it is for and what it costs',
-  async ({ page }) => {
-    await expectFinishedV2Page(page, '/');
-    const main = await contentOf(page);
-    // Within five seconds of load (CC-45's five-second test): a heading, and a free price with its page limit.
-    await expect(main.locator('h1').first(), 'a heading says what this is').toBeVisible({
-      timeout: 5_000,
-    });
-    const text = await main.innerText();
-    expect(text, 'the free plan and its page limit').toMatch(/free/i);
-    expect(text, 'the free plan and its page limit').toMatch(/500 pages/i);
-    // F-060: the Agency plan card (the $99 one) offers no way forward, while Free and Pro each do.
-    const agency = main.locator('[data-v2-card]', { hasText: '$99' });
-    await expect(agency, 'the Agency plan card is on the page').toHaveCount(1);
-    await expect(
-      agency.locator('a[href], button'),
-      'F-060: the Agency card has a button',
-    ).not.toHaveCount(0);
-    // F-146: the method line claims "published IPs", and no address is published.
-    expect(text, 'F-146: no claim of published IPs').not.toMatch(/published IPs/i);
-  },
-);
+step('J0.1', 'the home page says what this is and what it costs', async ({ page, request }) => {
+  await expectFinishedV2Page(page, '/');
+  const main = await contentOf(page);
+  // CC-45's five-second test, for the heading. Who the page is for is judged by hand at the gate.
+  await expect(main.locator('h1').first(), 'a heading says what this is').toBeVisible({
+    timeout: 5_000,
+  });
+  const text = await main.innerText();
+  expect(text, 'the free offer states its page limit').toMatch(/free[^\n]{0,40}500 pages/i);
+  // F-060 is Agency alone lacking a way forward, so Free and Pro must have theirs first: when every card
+  // has lost its button, that is a wider break and fails red.
+  const forward = 'a[href]:not([href="#"]), button';
+  for (const price of ['$0', '$19']) {
+    const card = main.locator('[data-v2-card]', { hasText: price });
+    await expect(card, `the ${price} plan card is on the page`).toHaveCount(1);
+    await expect(card.locator(forward), `the ${price} plan has a button`).not.toHaveCount(0);
+  }
+  const agency = main.locator('[data-v2-card]', { hasText: '$99' });
+  await expect(agency, 'the Agency plan card is on the page').toHaveCount(1);
+  await expect(agency.locator(forward), 'F-060: the Agency card has a button').not.toHaveCount(0);
+  const href = await agency.locator('a[href]:not([href="#"])').first().getAttribute('href');
+  if (href) {
+    expect((await request.get(href)).status(), `the Agency button's ${href} answers`).toBeLessThan(
+      400,
+    );
+  }
+  // F-146: the method line claims "published IPs", and no address is published.
+  expect(text, 'F-146: no claim of published IPs').not.toMatch(/published IPs/i);
+});
 
 step('J0.9m', 'the free check pages show a result or say they start an audit', async ({ page }) => {
   for (const q of ['gptbot', 'javascript', 'robots-ai']) {
     await expectFinishedV2Page(page, `/check/${q}`);
-    const text = await (await contentOf(page)).innerText();
-    // F-158: the page promises "what each crawler sees" but shows a static fixture, not the visitor's site.
-    expect(text, `F-158: /check/${q} does not promise a result it does not show`).not.toMatch(
-      /Two minutes from now you.ll know what each crawler sees/,
-    );
+    const main = await contentOf(page);
+    // F-158's fix is either of two things. A real result for the visitor's site carries this marker (the PR
+    // that ships it adds it); without one, the page must not promise what each crawler sees, in any wording.
+    if ((await main.locator('[data-check-result]').count()) > 0) continue;
+    expect(
+      await main.innerText(),
+      `F-158: /check/${q} does not promise a result it does not show`,
+    ).not.toMatch(/know what each crawler sees/i);
   }
 });
