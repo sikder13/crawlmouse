@@ -6,7 +6,7 @@ Status: proposed 26 Oct 2026. It replaces `context/FACTS.md` once UD approves it
 
 Scored crawlers (I6, which overrides R7's B8 strings): OAI-SearchBot, ChatGPT-User, PerplexityBot, Claude-SearchBot. Shown but unscored ("blocking these is your choice"): GPTBot, ClaudeBot. Robots.txt, control and Search Console only, never a live verdict: Googlebot, Bingbot.
 
-Verdict vocabulary (I2), eleven states: `allowed`, `allowed_thin`, `disallowed_by_robots`, `blocked_by_ua_rule`, `challenged_ua`, `refused_unverified`, `rate_limited`, `payment_required`, `edge_blocks_automation`, `redirected_away`, `not_measured`. The word "blocked" is used only for `disallowed_by_robots` and `blocked_by_ua_rule`. `challenged_ua` and `refused_unverified` read "challenged: the real crawler may pass" with the ○ glyph.
+Verdict vocabulary (I2), eleven states: `allowed`, `allowed_thin`, `disallowed_by_robots`, `blocked_by_ua_rule`, `challenged_ua`, `refused_unverified`, `rate_limited`, `payment_required`, `edge_blocks_automation`, `redirected_away`, `not_measured`. The word "blocked" is used only for `disallowed_by_robots` and `blocked_by_ua_rule`. `refused_unverified` reads "refused to every crawler name (unverified)" (F-137); `challenged_ua` reads "challenged: the real crawler may pass" with the ○ glyph.
 
 ---
 
