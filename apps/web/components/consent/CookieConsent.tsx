@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react';
 import posthog from 'posthog-js';
 import {
   clearAnalyticsStorage,
@@ -11,6 +11,7 @@ import {
   CONSENT_GRANTED_EVENT,
   CONSENT_OPEN_EVENT,
 } from '@/lib/consent';
+import styles from './CookieConsent.module.css';
 
 /**
  * Geo-gated analytics consent banner. Shown ONLY to visitors whose region requires prior opt-in
@@ -20,6 +21,33 @@ import {
  */
 export function CookieConsent() {
   const [visible, setVisible] = useState(false);
+  const bar = useRef<HTMLDivElement>(null);
+  // The control it was opened from: focus goes into the bar then, and back to it on closing. Shown
+  // by itself on a first visit, the bar leaves focus where the visitor has it.
+  const opener = useRef<HTMLElement | null>(null);
+
+  const close = () => {
+    setVisible(false);
+    opener.current?.focus();
+    opener.current = null;
+  };
+
+  // While open, the page keeps room for the bar, so the end of the page can be scrolled clear of it.
+  useLayoutEffect(() => {
+    if (!visible || !bar.current) return;
+    const el = bar.current;
+    const before = document.body.style.paddingBottom;
+    const reserve = () => {
+      document.body.style.paddingBottom = `${el.offsetHeight}px`;
+    };
+    reserve();
+    window.addEventListener('resize', reserve);
+    if (opener.current) el.querySelector('button')?.focus();
+    return () => {
+      window.removeEventListener('resize', reserve);
+      document.body.style.paddingBottom = before;
+    };
+  }, [visible]);
 
   useEffect(() => {
     const stored = localStorage.getItem(CONSENT_DECISION_STORAGE_KEY);
@@ -35,7 +63,11 @@ export function CookieConsent() {
     }
     // Re-open on demand (footer "Cookie settings") so any visitor can change or WITHDRAW a prior
     // decision as easily as they gave it (GDPR Art. 7(3)) — works regardless of region/decision.
-    const open = () => setVisible(true);
+    const open = () => {
+      opener.current =
+        document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      setVisible(true);
+    };
     window.addEventListener(CONSENT_OPEN_EVENT, open);
     return () => window.removeEventListener(CONSENT_OPEN_EVENT, open);
   }, []);
@@ -76,37 +108,33 @@ export function CookieConsent() {
     } catch {
       /* noop */
     }
-    setVisible(false);
+    close();
+  };
+
+  // Escape leaves the choice unmade: nothing is recorded, and analytics stay as they were.
+  const onKeyDown = (e: KeyboardEvent) => {
+    if (e.key === 'Escape') close();
   };
 
   return (
     <div
+      ref={bar}
       role="dialog"
       aria-label="Analytics consent"
-      className="fixed inset-x-0 bottom-0 z-50 border-t border-oat bg-cream/95 px-4 py-4 shadow-lg backdrop-blur"
+      className={styles.bar}
+      onKeyDown={onKeyDown}
     >
-      <div className="mx-auto flex max-w-3xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-sm text-ink/80">
+      <div className={styles.inner}>
+        <p className={styles.text}>
           We use privacy-friendly analytics (PostHog) to make Crawlmouse better. Allow non-essential
           analytics? You can change your mind anytime &mdash; see our{' '}
-          <a className="text-peach underline" href="/privacy">
-            Privacy Policy
-          </a>
-          .
+          <a href="/privacy">Privacy Policy</a>.
         </p>
-        <div className="flex shrink-0 gap-2">
-          <button
-            type="button"
-            onClick={() => decide(false)}
-            className="rounded-lg border border-oat px-4 py-2 text-sm font-semibold text-ink hover:bg-oat/50"
-          >
+        <div className={styles.actions}>
+          <button type="button" onClick={() => decide(false)} className={styles.choice}>
             Decline
           </button>
-          <button
-            type="button"
-            onClick={() => decide(true)}
-            className="rounded-lg bg-ink px-4 py-2 text-sm font-semibold text-cream hover:bg-ink/90"
-          >
+          <button type="button" onClick={() => decide(true)} className={styles.choice}>
             Allow analytics
           </button>
         </div>
