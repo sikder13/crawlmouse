@@ -131,11 +131,29 @@ test.describe('Vercel Deployment Protection', () => {
       /Deployment Protection/,
     );
     expect(protectionRefusal(401, vercel, true)).toMatch(/refused the bypass secret/);
+    // As measured on an old preview on 2026-11-22, 15:19 ET.
+    const sso = {
+      server: 'Vercel',
+      location: 'https://vercel.com/sso-api?url=https%3A%2F%2Fx.vercel.app&nonce=1',
+    };
+    expect(protectionRefusal(302, sso, false)).toMatch(/Deployment Protection \(302\)/);
+    expect(protectionRefusal(307, sso, true)).toMatch(/refused the bypass secret/);
   });
   test('lets the app through, and leaves other refusals to the steps', () => {
     expect(protectionRefusal(200, vercel, false)).toBeNull();
     expect(protectionRefusal(429, vercel, false)).toBeNull();
     expect(protectionRefusal(401, { server: 'nginx' }, false)).toBeNull();
+    // A redirect elsewhere (a site's own) is not protection.
+    expect(
+      protectionRefusal(308, { server: 'Vercel', location: 'https://crawlmouse.com/' }, false),
+    ).toBeNull();
+    expect(
+      protectionRefusal(
+        302,
+        { server: 'Vercel', location: 'https://vercel.com.evil.test/sso' },
+        false,
+      ),
+    ).toBeNull();
   });
   test('sends the bypass only when a secret is set', () => {
     expect(originHeaders({})).toEqual({});

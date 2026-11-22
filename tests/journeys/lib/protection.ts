@@ -1,6 +1,6 @@
 /**
- * Vercel Deployment Protection. A protected preview answers a stranger with 401 and Vercel's sign-in page
- * instead of the app. The suite then needs the Protection Bypass for Automation secret,
+ * Vercel Deployment Protection. A protected preview answers a stranger with a redirect to Vercel's sign-in
+ * (or a 401/403) instead of the app. The suite then needs the Protection Bypass for Automation secret,
  * VERCEL_AUTOMATION_BYPASS_SECRET, sent as `x-vercel-protection-bypass`.
  *
  * The header goes only to the deployment's own origin: a page also fetches fonts, analytics and other
@@ -34,7 +34,11 @@ export function protectionRefusal(
   const vercel =
     /vercel/i.test(headers['server'] ?? '') ||
     Object.keys(headers).some((k) => k.startsWith('x-vercel'));
-  if (!vercel || (status !== 401 && status !== 403)) return null;
+  // Vercel Authentication answers a stranger with a redirect to its sign-in (measured 2026-11-22: 302 to
+  // https://vercel.com/sso-api?...), or with 401/403.
+  const toSignIn =
+    status >= 300 && status < 400 && /^https:\/\/vercel\.com\/sso/.test(headers['location'] ?? '');
+  if (!vercel || !(status === 401 || status === 403 || toSignIn)) return null;
   return hasSecret
     ? `the deployment refused the bypass secret (${status}): VERCEL_AUTOMATION_BYPASS_SECRET is wrong for this project`
     : `the deployment is behind Vercel Deployment Protection (${status}): set VERCEL_AUTOMATION_BYPASS_SECRET`;
