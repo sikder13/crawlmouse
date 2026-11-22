@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import posthog from 'posthog-js';
 import {
+  clearAnalyticsStorage,
   shouldShowConsentBanner,
   consentDecisionCookie,
   consentDecisionFromCookie,
@@ -14,7 +15,7 @@ import {
 /**
  * Geo-gated analytics consent banner. Shown ONLY to visitors whose region requires prior opt-in
  * (cm_consent_required=1, set by middleware) and who have not yet decided. Until they choose,
- * instrumentation-client keeps PostHog opted out, so nothing non-essential fires. The decision
+ * instrumentation-client does not start PostHog, so nothing non-essential is stored or sent. The decision
  * logic is the pure, unit-tested shouldShowConsentBanner(); this component is the thin UI shell.
  */
 export function CookieConsent() {
@@ -47,12 +48,29 @@ export function CookieConsent() {
       localStorage.setItem(CONSENT_DECISION_STORAGE_KEY, decision);
       document.cookie = consentDecisionCookie(decision);
       if (granted) {
-        posthog.opt_in_capturing();
+        // Before PostHog has started there is nothing to opt in, and the SDK's opt-in would write
+        // to storage: the grant event below starts it (instrumentation-client.ts).
+        if (posthog.__loaded) {
+          posthog.set_config({
+            disable_persistence: false,
+            opt_out_capturing_by_default: false,
+            disable_surveys: false,
+          });
+          posthog.opt_in_capturing();
+        }
         window.dispatchEvent(new Event(CONSENT_GRANTED_EVENT));
       } else {
-        posthog.opt_out_capturing();
-        // Surveys skip an opted-out visitor only in cookieless mode, so they are switched off here.
-        posthog.set_config({ disable_surveys: true });
+        if (posthog.__loaded) {
+          posthog.opt_out_capturing();
+          // Surveys skip an opted-out visitor only in cookieless mode, so they are switched off
+          // here. With persistence off and opted-out as the default, the removal below holds.
+          posthog.set_config({
+            disable_surveys: true,
+            disable_persistence: true,
+            opt_out_capturing_by_default: true,
+          });
+        }
+        clearAnalyticsStorage(document, [window.localStorage, window.sessionStorage]);
         window.dispatchEvent(new Event(CONSENT_DENIED_EVENT));
       }
     } catch {
