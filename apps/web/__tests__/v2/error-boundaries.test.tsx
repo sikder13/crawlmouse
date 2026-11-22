@@ -117,6 +117,23 @@ describe.each(BOUNDARIES)('app/%s/error.tsx', (_segment, path, load) => {
     expect(calls).toEqual(['transition:start', 'refresh', 'reset', 'transition:end']);
   });
 
+  it('an id that arrives after the error has changed is not shown for the new one', async () => {
+    const { default: Boundary } = await load();
+    nav.path = path;
+    const answers: ((id: string) => void)[] = [];
+    captureException.mockImplementationOnce(
+      () => new Promise<string>((r) => answers.push(r)) as unknown as string,
+    );
+    sentry.id = 'second-event-id';
+    const reset = vi.fn();
+    const host = await mount(Boundary, { error: new Error('first'), reset });
+    await act(async () => root!.render(<Boundary error={new Error('second')} reset={reset} />));
+    expect(host.textContent).toContain('Reference: second-event-id');
+    await act(async () => answers[0]!('first-event-id'));
+    expect(host.textContent).toContain('Reference: second-event-id');
+    expect(host.textContent).not.toContain('first-event-id');
+  });
+
   it('shows no reference while Sentry has given none', async () => {
     const { default: Boundary } = await load();
     sentry.id = '';

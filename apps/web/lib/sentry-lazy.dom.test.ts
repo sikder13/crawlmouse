@@ -34,7 +34,11 @@ async function fresh() {
   return import('./sentry-lazy');
 }
 
+/** A listener of the test's own: with none, Vitest reports a dispatched ErrorEvent as uncaught. */
+const quiet = () => undefined;
+
 beforeEach(() => {
+  window.addEventListener('error', quiet);
   h.fetched = 0;
   h.calls.length = 0;
   idle = null;
@@ -49,6 +53,7 @@ beforeEach(() => {
   });
 });
 afterEach(() => {
+  window.removeEventListener('error', quiet);
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
   for (const [t, l] of added.splice(0)) window.removeEventListener(t, l);
@@ -135,6 +140,53 @@ describe('the browser’s Sentry', () => {
     window.dispatchEvent(new ErrorEvent('error', { error: new Error('later') }));
     await settle();
     expect(h.calls).toEqual([]);
+  });
+
+  it('an error event with no error object is reported by its message', async () => {
+    const s = await fresh();
+    s.configureSentry({ dsn: DSN });
+    s.startSentryWhenIdle(window);
+    window.dispatchEvent(new ErrorEvent('error', { message: 'Script error.' }));
+    await s.loadSentry();
+    await settle();
+    expect(h.calls[1]).toEqual(['captureException', 'Script error.']);
+  });
+
+  it('once loaded a rejection is left to the SDK too', async () => {
+    const s = await fresh();
+    s.configureSentry({ dsn: DSN });
+    s.startSentryWhenIdle(window);
+    idle!();
+    await s.loadSentry();
+    await settle();
+    h.calls.length = 0;
+    const event = new Event('unhandledrejection') as PromiseRejectionEvent;
+    Object.defineProperty(event, 'reason', { value: 'later' });
+    window.dispatchEvent(event);
+    await settle();
+    expect(h.calls).toEqual([]);
+  });
+
+  it('asks the browser for idle time with a deadline, so a busy page still gets it', async () => {
+    const asked = vi.fn();
+    vi.stubGlobal('requestIdleCallback', asked);
+    const s = await fresh();
+    s.configureSentry({ dsn: DSN });
+    s.startSentryWhenIdle(window);
+    expect(asked.mock.calls[0]![1]).toEqual({ timeout: s.IDLE_TIMEOUT_MS });
+  });
+
+  it('where the browser has no idle callback, it loads after the same delay', async () => {
+    vi.stubGlobal('requestIdleCallback', undefined);
+    const later = vi.spyOn(window, 'setTimeout');
+    const s = await fresh();
+    s.configureSentry({ dsn: DSN });
+    s.startSentryWhenIdle(window);
+    const call = later.mock.calls.find((c) => c[1] === s.IDLE_TIMEOUT_MS)!;
+    expect(h.fetched).toBe(0);
+    (call[0] as () => void)();
+    await s.loadSentry();
+    expect(h.fetched).toBe(1);
   });
 
   it('reportToSentry loads it and captures, in that order', async () => {

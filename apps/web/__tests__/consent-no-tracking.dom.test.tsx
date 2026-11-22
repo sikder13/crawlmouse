@@ -264,6 +264,53 @@ describe('the privacy review’s cases', () => {
     expect(next.__loaded).toBe(false);
   });
 
+  it('a recorded decline outside the EU removes what an earlier version left behind', async () => {
+    document.cookie = `ph_${KEY}_posthog=%7B%7D; Path=/`;
+    localStorage.setItem(`ph_${KEY}_posthog`, '{}');
+    await load(['cm_consent_required=0'], 'denied');
+    expect(traces()).toEqual(NOTHING);
+  });
+
+  it('a page with no region cookie holds analytics and removes nothing', async () => {
+    localStorage.setItem(`ph_${KEY}_posthog`, '{}');
+    const posthog = await load([]);
+    expect(posthog.__loaded).toBe(false);
+    expect(localStorage.getItem(`ph_${KEY}_posthog`)).toBe('{}');
+  });
+
+  it('after a Decline, a later error starts no recording', async () => {
+    const posthog = await load(['cm_consent_required=0']);
+    const record = vi.spyOn(posthog, 'startSessionRecording').mockImplementation(() => undefined);
+    const b = await banner();
+    b.open();
+    await b.click('Decline');
+    window.dispatchEvent(new Event('error'));
+    await settle();
+    expect(record).not.toHaveBeenCalled();
+    b.done();
+  });
+
+  it('with Allow, an error starts the recording: the check above can fail', async () => {
+    const posthog = await load(['cm_consent_required=0']);
+    const record = vi.spyOn(posthog, 'startSessionRecording').mockImplementation(() => undefined);
+    window.dispatchEvent(new Event('error'));
+    await settle();
+    expect(record).toHaveBeenCalledTimes(1);
+  });
+
+  it('a Decline here and an Allow in another tab leaves this tab capturing again', async () => {
+    const posthog = await load(['cm_consent_required=0']);
+    const b = await banner();
+    b.open();
+    await b.click('Decline');
+    expect(posthog.has_opted_out_capturing()).toBe(true);
+    localStorage.setItem('cm_consent', 'granted');
+    window.dispatchEvent(new StorageEvent('storage', { key: 'cm_consent', newValue: 'granted' }));
+    await settle();
+    expect(posthog.has_opted_out_capturing()).toBe(false);
+    b.done();
+  });
+
   it('another key changing in storage does nothing', async () => {
     const posthog = await load(['cm_consent_required=0']);
     window.dispatchEvent(new StorageEvent('storage', { key: 'other', newValue: 'denied' }));

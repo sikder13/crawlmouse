@@ -77,6 +77,35 @@ describe('the consent banner', () => {
     expect(document.activeElement).toBe(opener);
   });
 
+  it('only Escape closes it: Tab and the rest leave it open, with no choice recorded', () => {
+    mount();
+    openFromSettings();
+    for (const key of ['Tab', 'Enter', ' ', 'a', 'ArrowDown']) {
+      act(
+        () =>
+          void document.activeElement!.dispatchEvent(
+            new KeyboardEvent('keydown', { key, bubbles: true }),
+          ),
+      );
+      expect(dialog(), key).not.toBeNull();
+    }
+    expect(localStorage.getItem('cm_consent')).toBeNull();
+  });
+
+  it('keeps room for itself when the window changes size', () => {
+    mount();
+    openFromSettings();
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(160);
+    act(() => void window.dispatchEvent(new Event('resize')));
+    expect(document.body.style.paddingBottom).toBe('160px');
+  });
+
+  it('copies a decision made before the cookie existed to the cookie, for the server', () => {
+    localStorage.setItem('cm_consent', 'denied');
+    mount();
+    expect(document.cookie).toContain('cm_consent=denied');
+  });
+
   it('a choice closes it and returns focus to the control', () => {
     mount();
     openFromSettings();
