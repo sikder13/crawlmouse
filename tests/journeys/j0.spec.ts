@@ -86,14 +86,6 @@ type Page9 = [path: string, ids?: PageDefects];
 const missing = (id: string): PageDefects => ({ status: { id, got: 404 } });
 const pages: [id: string, title: string, paths: Page9[]][] = [
   ['J0.9a', 'pricing', [['/pricing', { shell: 'F-007' }]]],
-  [
-    'J0.9b',
-    'the agency pages',
-    [
-      ['/agencies', missing('F-024')],
-      ['/agency-trial', missing('F-024')],
-    ],
-  ],
   ['J0.9c', 'help', [['/help']]],
   ['J0.9d', 'guides', [['/guides', { kept: 'F-006' }]]],
   ['J0.9e', 'a blog post', [['/blog/screaming-frog-alternative', { kept: 'F-006' }]]],
@@ -141,6 +133,26 @@ step('J0.9j', '/bot describes the v2 crawler', async ({ page }) => {
   expect(text, 'F-031: no v1 crawler name').not.toContain('CrawlmouseBot/1.0');
 });
 
+step(
+  'J0.9b',
+  'the agency offer is a finished v2 page, and the trial page routes by billing',
+  async ({ page, request, baseURL }) => {
+    await expectFinishedV2Page(page, '/agencies', missing('F-024'));
+    // Signed out, /agency-trial goes to /agencies with billing off and to sign-in with billing on.
+    const trial = await request.get('/agency-trial', { maxRedirects: 0 });
+    if (trial.status() === 404) {
+      expect(trial.status(), 'F-024: /agency-trial is a page').not.toBe(404);
+    }
+    expect([302, 303, 307, 308], '/agency-trial redirects a signed-out visitor').toContain(
+      trial.status(),
+    );
+    const to = new URL(trial.headers()['location'] ?? '', baseURL);
+    const billingOff = to.pathname === '/agencies';
+    const billingOn = to.pathname === '/login' && to.searchParams.get('next') === '/agency-trial';
+    expect(billingOff || billingOn, `/agency-trial goes to ${to.pathname}${to.search}`).toBe(true);
+  },
+);
+
 step('J0.9l', 'an unknown address is the v2 404', async ({ page }) => {
   await expectFinishedV2Page(page, '/this-page-does-not-exist-journeys', { shell: 'F-026' }, 404);
 });
@@ -156,7 +168,7 @@ step('J0.1', 'the home page says what this is and what it costs', async ({ page,
   expect(text, 'the free offer states its page limit').toMatch(/free[^\n]{0,40}500 pages/i);
   // F-060 is Agency alone lacking a way forward, so Free and Pro must have theirs first: when every card
   // has lost its button, that is a wider break and fails red.
-  const forward = 'a[href]:not([href="#"]), button';
+  const forward = 'a[href]:not([href="#"]), button:not([disabled]):not([aria-disabled="true"])';
   for (const price of ['$0', '$19']) {
     const card = main.locator('[data-v2-card]', { hasText: price });
     await expect(card, `the ${price} plan card is on the page`).toHaveCount(1);
@@ -181,24 +193,26 @@ step('J0.9m', 'the free check pages show a result or say they start an audit', a
     await expectFinishedV2Page(page, `/check/${q}`);
     const main = await contentOf(page);
     // F-158's fix is either of two things. A real result for the visitor's site carries this marker (the PR
-    // that ships it adds it). Without one, the heading above the page's last form must say it starts an audit.
+    // that ships it adds it). Without one, the visible page must not promise what each crawler sees, and the
+    // heading above its last form must say the form starts an audit.
     if ((await main.locator('[data-check-result]').count()) > 0) continue;
+    const promise =
+      /\b(know|see|find out|learn)\b[^.\n]{0,40}\b(each|every|which|what)\b[^.\n]{0,30}\bcrawlers?\b/i;
+    const visible = await main.innerText();
+    if (promise.test(visible)) {
+      expect(visible, `F-158: /check/${q} promises a result it does not show`).not.toMatch(promise);
+    }
     const heading = await main.evaluate((el) => {
       const form = [...el.querySelectorAll('form')].at(-1);
       if (!form) return '';
-      const above = [...el.querySelectorAll('h1, h2, h3')].filter(
-        (h) => h.compareDocumentPosition(form) & Node.DOCUMENT_POSITION_FOLLOWING,
+      const above = [...el.querySelectorAll<HTMLElement>('h1, h2, h3')].filter(
+        (h) =>
+          h.checkVisibility() && h.compareDocumentPosition(form) & Node.DOCUMENT_POSITION_FOLLOWING,
       );
-      return above.at(-1)?.textContent?.trim() ?? '';
+      return above.at(-1)?.innerText.trim() ?? '';
     });
-    // The defect's own symptom: the heading promises what crawlers see, and says nothing of an audit.
-    if (/crawler/i.test(heading) && !/\baudit\b/i.test(heading)) {
-      expect(heading, `F-158: /check/${q} promises a result it does not show`).toMatch(
-        /\baudit\b/i,
-      );
-    }
     expect(heading, `/check/${q}: the heading above the form says it starts an audit`).toMatch(
-      /\b(starts?|runs?)\b[^.]*\baudit\b/i,
+      /\b(starts?|runs?|begins?|launch(es)?)\b[^.]*\baudit\b/i,
     );
   }
 });
