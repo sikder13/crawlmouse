@@ -31,6 +31,8 @@ const h = vi.hoisted(() => ({
   ipAllowed: true,
   turnstile: [] as unknown[][],
   refused: new Set<string>(),
+  /** An admin rpc that throws, to drive the 500 path. */
+  failRpc: null as string | null,
 }));
 
 vi.mock('server-only', () => ({}));
@@ -47,7 +49,18 @@ vi.mock('next/headers', () => ({
 vi.mock('@/lib/supabase/server', () => ({
   supabaseServer: async () => sessionOver(h.db, h.user),
 }));
-vi.mock('@/lib/supabase/admin', () => ({ supabaseAdmin: () => adminOver(h.db) }));
+vi.mock('@/lib/supabase/admin', () => ({
+  supabaseAdmin: () => {
+    const admin = adminOver(h.db);
+    return {
+      from: (table: string) => admin.from(table),
+      rpc: (fn: string, args: object) => {
+        if (fn === h.failRpc) throw new Error(`${fn} failed for ${JSON.stringify(args)}`);
+        return admin.rpc(fn, args);
+      },
+    };
+  },
+}));
 vi.mock('../../../../../inngest/client', () => ({
   inngest: { send: async (e: unknown) => void h.sent.push(e) },
 }));
@@ -112,6 +125,7 @@ beforeEach(() => {
   h.ipAllowed = true;
   h.turnstile.length = 0;
   h.refused = new Set(['private.example']);
+  h.failRpc = null;
   vi.stubEnv('V2_CHECKS_PUBLIC', '1');
   vi.stubEnv('V2_PIPELINE', '1');
   vi.stubEnv('CRAWL_PAUSED', '');
@@ -502,5 +516,171 @@ describe('POST /api/checks, the review’s cases (RC-02 gate)', () => {
     expect((await checkRow(body.checkId as string))?.account_id).toBeNull();
     expect(await sitesOf(p.accountId)).toEqual([]);
     expect(await sitesOf(other.accountId)).toEqual([]);
+  });
+});
+
+describe('POST /api/checks, the test review’s cases (RC-02 gate)', () => {
+  it('a person with two accounts: a host one keeps is not touched from the other (the account filter)', async () => {
+    const p = await person(h.db, 'two-accts');
+    const personal = await keptSite(h.db, p.accountId);
+    await addCheck(personal.id, 'failed');
+    const agency = await agencyAccount(h.db, p, 'Two Accounts Agency');
+    const before = await snapshot(p.accountId);
+    as(p);
+    h.chosen = agency.accountId;
+    const { status, body } = await read(await POST(home(personal.host)));
+    expect(status).toBe(200);
+    const row = await checkRow(body.checkId as string);
+    expect(row?.account_id).toBe(agency.accountId);
+    expect(row?.trigger).toBe('first_audit');
+    expect(await snapshot(p.accountId)).toEqual(before);
+  });
+
+  it('a scoped account manager may not add a site: the scope decides, not the role', async () => {
+    const owner = await person(h.db, 'sm-owner');
+    await makePaid(h.db, owner.accountId, 'agency');
+    const covered = await keptSite(h.db, owner.accountId);
+    const hidden = await keptSite(h.db, owner.accountId);
+    const manager = await person(h.db, 'sm-manager');
+    await addSeat(h.db, owner.accountId, manager, 'account_manager', [covered.id]);
+    as(manager);
+    h.chosen = owner.accountId;
+    const before = await snapshot(owner.accountId);
+    for (const host of ['brand-new.example', hidden.host]) {
+      expect(await read(await POST(home(host)))).toMatchObject({
+        status: 403,
+        body: { code: 'role_refused' },
+      });
+    }
+    expect(await snapshot(owner.accountId)).toEqual(before);
+    // The client it covers is checked again.
+    const again = await read(await POST(home(covered.host)));
+    expect(again.status).toBe(200);
+    expect((await checkRow(again.body.checkId as string))?.site_id).toBe(covered.id);
+  });
+
+  it('an unscoped developer may not add a site: the role decides, not the scope', async () => {
+    const owner = await person(h.db, 'ud-owner');
+    await makePaid(h.db, owner.accountId, 'agency');
+    const dev = await person(h.db, 'ud-dev');
+    await addSeat(h.db, owner.accountId, dev, 'developer');
+    as(dev);
+    h.chosen = owner.accountId;
+    expect(await read(await POST(home('dev-new.example')))).toMatchObject({
+      status: 403,
+      body: { code: 'role_refused' },
+    });
+    expect(await sitesOf(owner.accountId)).toEqual([]);
+  });
+
+  it('the busy answer reads the latest check: an old failed one and a newer queued one start nothing', async () => {
+    const p = await person(h.db, 'latest');
+    const kept = await keptSite(h.db, p.accountId);
+    await addCheck(kept.id, 'failed');
+    const queued = randomUUID();
+    await h.db.query(
+      `insert into public.checks (id, site_id, status, trigger, grade_version, queued_at)
+       values ($1, $2, 'queued', 'manual', '2.0.0', now())`,
+      [queued, kept.id],
+    );
+    as(p);
+    expect(await read(await POST(home(kept.host)))).toEqual({
+      status: 200,
+      body: { checkId: queued },
+    });
+    expect(h.sent).toEqual([]);
+  });
+
+  it('the host is matched as it is stored: case, a path and a trailing dot reach the kept site', async () => {
+    const p = await person(h.db, 'spelling');
+    const kept = await keptSite(h.db, p.accountId);
+    await addCheck(kept.id, 'failed');
+    as(p);
+    const { body } = await read(await POST(home(`https://${kept.host.toUpperCase()}./a/b?c=1`)));
+    expect((await checkRow(body.checkId as string))?.site_id).toBe(kept.id);
+    expect(await sitesOf(p.accountId)).toHaveLength(1);
+  });
+
+  it('a removed site’s host is added again as a new site', async () => {
+    const p = await person(h.db, 'removed');
+    const gone = await keptSite(h.db, p.accountId, { removed_at: new Date().toISOString() });
+    as(p);
+    const { status, body } = await read(await POST(home(gone.host)));
+    expect(status).toBe(200);
+    const row = await checkRow(body.checkId as string);
+    expect(row?.site_id).not.toBe(gone.id);
+    expect(row?.trigger).toBe('first_audit');
+  });
+
+  it('a host that was removed once and kept again is checked on the live site', async () => {
+    const p = await person(h.db, 'removed-again');
+    await makePaid(h.db, p.accountId, 'pro');
+    const live = await keptSite(h.db, p.accountId);
+    await addCheck(live.id, 'failed');
+    await h.db.query(
+      `insert into public.sites (id, account_id, host, removed_at) values ($1, $2, $3, now())`,
+      [randomUUID(), p.accountId, live.host],
+    );
+    as(p);
+    const { status, body } = await read(await POST(home(live.host)));
+    expect(status).toBe(200);
+    expect((await checkRow(body.checkId as string))?.site_id).toBe(live.id);
+  });
+
+  it('a staging site’s host is checked again on the staging site', async () => {
+    const p = await person(h.db, 'staging');
+    await makePaid(h.db, p.accountId, 'pro');
+    const primary = await keptSite(h.db, p.accountId);
+    const staging = await keptSite(h.db, p.accountId, { staging_of_site_id: primary.id });
+    await addCheck(staging.id, 'failed');
+    as(p);
+    const { status, body } = await read(await POST(home(staging.host)));
+    expect(status).toBe(200);
+    expect((await checkRow(body.checkId as string))?.site_id).toBe(staging.id);
+  });
+
+  it('an agency’s second site sends site_added with n = 2 and no first_client_added', async () => {
+    const p = await person(h.db, 'second');
+    const agency = await agencyAccount(h.db, p, 'Second Site Agency');
+    as(p);
+    h.chosen = agency.accountId;
+    await POST(home('one.example'));
+    await settle();
+    h.captured.length = 0;
+    await POST(home('two.example'));
+    await settle();
+    expect(h.captured.map((c) => [c[0], c[2]])).toEqual([
+      ['site_added', { n: 2 }],
+      ['check_started', expect.objectContaining({ trigger: 'first_audit' })],
+    ]);
+  });
+
+  it('a store that fails is a fixed 500, logged with neither the request id nor the check id', async () => {
+    const p = await person(h.db, 'fails');
+    as(p);
+    h.failRpc = 'add_site';
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const requestId = randomUUID();
+    const res = await POST(
+      new Request('https://crawlmouse.com/api/checks', {
+        method: 'POST',
+        headers: {
+          origin: 'https://crawlmouse.com',
+          'content-type': 'application/json',
+          'x-forwarded-for': IP,
+        },
+        body: JSON.stringify({ url: 'fails.example', requestId }),
+      }),
+    );
+    expect(await read(res)).toEqual({
+      status: 500,
+      body: { code: 'start_failed', error: 'The audit could not be started. Try again.' },
+    });
+    const logged = JSON.stringify(errors.mock.calls);
+    errors.mockRestore();
+    expect(logged).toContain('account start failed');
+    expect(logged).not.toContain(requestId);
+    expect(await sitesOf(p.accountId)).toEqual([]);
+    expect(h.sent).toEqual([]);
   });
 });

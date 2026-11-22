@@ -47,7 +47,10 @@ const userIdOf = (viewer: ViewerResult): string | null =>
  * person acting in an account gets a check of a site that account keeps (`startAccountCheck`,
  * F-001). Anyone else — signed out, or signed in with no v2 account or with several and none chosen
  * — gets the public start as before (`startPublicCheck`): a site no account keeps, claimed on
- * sign-up. The steps of each, and their order, are those functions'.
+ * sign-up. The steps of each, and their order, are those functions'. The session is read for every
+ * start whose body parsed, before either branch, so `startPublicCheck`'s own laziness about it (no
+ * session read for a caller with no known address, or one stopped by the ceiling) holds for that
+ * function and not for this route.
  *
  * Events are sent once the response has gone (`after`), so the answer does not wait on PostHog: the
  * public start's `check_started` when this call queued the check, and for an account the events

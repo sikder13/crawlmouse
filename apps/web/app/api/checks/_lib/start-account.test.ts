@@ -48,6 +48,7 @@ function deps(
   } = {},
 ) {
   const calls: string[] = [];
+  const added: unknown[] = [];
   const rechecks = [...(over.rechecks ?? [])];
   const d: AccountStartDeps = {
     admit: async () => true,
@@ -68,8 +69,9 @@ function deps(
     },
     liveSites: async () => 0,
     schedule: () => null,
-    addSite: async () => {
+    addSite: async (site) => {
       calls.push('addSite');
+      added.push(site);
       return over.added ?? { outcome: 'created', siteId: 's-new', checkId: 'c-new', n: 1 };
     },
     recheck: async (req) => {
@@ -78,7 +80,7 @@ function deps(
     },
     now: () => new Date(Date.UTC(2026, 10, 22)),
   };
-  return { d, calls };
+  return { d, calls, added };
 }
 
 const site = (over: Partial<CoveredSite> = {}): CoveredSite => ({
@@ -89,6 +91,28 @@ const site = (over: Partial<CoveredSite> = {}): CoveredSite => ({
 });
 
 describe('a new host', () => {
+  it('asks add_site for the account, its seat, the host, the plan’s limit, the domain bucket on Free only, and the person', async () => {
+    const free = deps();
+    await startAccountCheck(free.d, VIEWER, INPUT);
+    const pro = deps();
+    const proViewer = {
+      ...VIEWER,
+      tier: 'pro',
+      gates: GATES.pro,
+      limits: { ...VIEWER.limits, sites: GATES.pro.sites },
+    } as AccountViewer;
+    await startAccountCheck(pro.d, proViewer, INPUT);
+    const common = {
+      accountId: 'acct-1',
+      ownerSeatId: 'seat-1',
+      host: 'shop.example',
+      schedule: null,
+      requestedByUserId: 'u-1',
+    };
+    expect(free.added).toEqual([{ ...common, limit: GATES.free.sites, perDomain: true }]);
+    expect(pro.added).toEqual([{ ...common, limit: GATES.pro.sites, perDomain: false }]);
+  });
+
   it.each<[AddSiteOutcome, number, string, string, string | undefined]>([
     [
       { outcome: 'exists', siteId: 's-hidden' },
