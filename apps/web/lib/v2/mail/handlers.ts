@@ -47,6 +47,7 @@ import { fixToDeveloper } from './templates/fix-to-developer';
 import { reportConfirm } from './templates/report-confirm';
 import { seatInvite } from './templates/seat-invite';
 import { trialReminder } from './templates/trial-reminder';
+import { trialReminderKey } from './trial-key';
 import type { RenderedMail } from './types';
 
 /**
@@ -136,7 +137,7 @@ export function mailHandlers(d: MailHandlerDeps): MailHandlers {
     return send(mail, {
       kind: 'trial_reminder',
       to: a.ownerEmail,
-      idempotencyKey: `trial_reminder:${accountId}:${endsAt.toISOString()}`,
+      idempotencyKey: trialReminderKey(accountId, endsAt),
       accountId,
       render: async () =>
         trialReminder({
