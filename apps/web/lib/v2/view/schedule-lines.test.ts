@@ -52,6 +52,12 @@ describe('the site page', () => {
     expect(line).toBe('Choose the day and hour the weekly check runs (now Fri around 06:37)');
   });
 
+  it('the dashboard’s set-up line keeps the chosen hour with no scheduler time', () => {
+    expect(dashboardView(bad, viewer).setup!.schedule!.label).toBe(
+      'Choose the day and hour the weekly check runs (now Fri around 06:00)',
+    );
+  });
+
   it('names the zone on the hour field', () => {
     const hour = scheduleRow(bad).action!.inputs!.find((i) => i.name === 'hour')!;
     expect(hour.label).toBe('Hour, America/Indiana/Indianapolis');

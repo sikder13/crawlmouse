@@ -394,6 +394,9 @@ export function settingsView(
     },
   };
 
+  // With paid plans closed nothing sends the trial's reminder yet, so it is not offered as a kind.
+  const emailKinds = EMAIL_KINDS.filter((k) => billingOpen || k !== 'trial_reminder');
+
   // The largest site: the most pages its latest result crawled.
   const largest = Math.max(
     0,
@@ -463,7 +466,11 @@ export function settingsView(
   const cancelRow = (text: string) =>
     billingOpen
       ? { label: COPY.cancel, text, action: confirming ? null : cancel }
-      : { label: COPY.cancel, text: COPY.cancelByEmail, action: null };
+      : {
+          label: COPY.cancel,
+          text: owner ? COPY.cancelByEmail : ACCOUNT_COPY.cardManagedByOwner,
+          action: null,
+        };
 
   return {
     // The plan card carries the plan's terms and its Keep, so the rail's trial card leaves them out.
@@ -498,8 +505,8 @@ export function settingsView(
     email: {
       title: COPY.emailTitle,
       tableLabel: COPY.tables.email,
-      rows: EMAIL_KINDS.map((k) => rowOf[k]()),
-      foot: COPY.emailFoot(EMAIL_KINDS.length),
+      rows: emailKinds.map((k) => rowOf[k]()),
+      foot: COPY.emailFoot(emailKinds.length, billingOpen),
       undeliverable:
         undeliverable === null
           ? null
