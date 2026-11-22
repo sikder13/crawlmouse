@@ -491,13 +491,15 @@ jobs:
   # reached its 60-minute limit: 45.4 min of checks, then "Propose baselines" cancelled at 13.8 min,
   # so the run left no artifact (CC-28, owner ruling 4).
   #
-  # Each shard runs twice, once per half of the preview routes (`part`, VISUAL_PART in
+  # Each shard runs three times, once per third of the preview routes (`part`, VISUAL_PART in
   # tests/visual/part.ts), each on its own runner and its own `next dev`. The harness keeps every
   # compiled route, and one server holding all 149 crossed Next's restart line (used heap above 80% of
   # its limit) while warming, in every shard of dispatches 43399235243 and 43421508188: measured at
-  # CI's heap limit, ~57 MB of live heap per route, a restart after route 132 (CC-31, Q51). The specs
-  # that do not loop over the previews run in part 1 only; the production-build steps run on shard 1,
-  # part 1, over every route.
+  # CI's heap limit, ~57 MB of live heap per route, a restart after route 132 (CC-31, Q51). Halves were
+  # enough until part 1 of shard 2 crossed the same line mid-run ("approaching the used memory
+  # threshold, restarting" in run 44960197647; CC-45 question 009), so the routes are split in three.
+  # The specs that do not loop over the previews run in part 1 only; the production-build steps run on
+  # shard 1, part 1, over every route.
   #
   # Skipped when the `changes` job finds nothing on the branch that can affect rendering.
   visual-shard:
@@ -511,7 +513,7 @@ jobs:
       fail-fast: false
       matrix:
         shard: [1, 2, 3, 4, 5, 6]
-        part: [1, 2]
+        part: [1, 2, 3]
     container:
       image: mcr.microsoft.com/playwright:v1.60.0-noble@sha256:9bd26ad900bb5e0f4dee75839e957a89ae89c2b7ab1e76050e559790e946b948
     # Steps in a container job default to sh, which has no `set -o pipefail`.
@@ -526,7 +528,7 @@ jobs:
       - name: Visual, layout and accessibility checks
         working-directory: apps/web
         env:
-          VISUAL_PART: ${{ matrix.part }}/2
+          VISUAL_PART: ${{ matrix.part }}/3
         run: |
           set -euo pipefail
           set -a
@@ -614,7 +616,7 @@ jobs:
         if: failure()
         working-directory: apps/web
         env:
-          VISUAL_PART: ${{ matrix.part }}/2
+          VISUAL_PART: ${{ matrix.part }}/3
         run: |
           set -uo pipefail
           set -a
