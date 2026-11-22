@@ -7,6 +7,10 @@ export const BROWSER_STORES: readonly (() => Storage)[] = [
   () => window.sessionStorage,
 ];
 
+/** The support console, where the browser's analytics never run (owner ruling, CC-33). */
+export const onSupportConsole = (pathname: string = window.location.pathname): boolean =>
+  /^\/internal(\/|$)/.test(pathname);
+
 /**
  * A decline, on this tab or another: capture stops, surveys and persistence go off, and what analytics
  * stored is removed. With opted-out as the SDK's default, removing its own opt-out key does not turn it
@@ -27,11 +31,14 @@ export function stopAnalytics(
   clearAnalyticsStorage(document, BROWSER_STORES);
 }
 
-/** A grant on a page where PostHog already runs. Where it has not started, the grant event starts it. */
+/**
+ * A grant on a page where PostHog already runs. Where it has not started, the grant event starts it.
+ * On the support console nothing is turned back on, since opting in itself sends an event.
+ */
 export function resumeAnalytics(
   posthog: Pick<PostHog, '__loaded' | 'opt_in_capturing' | 'set_config'>,
 ) {
-  if (!posthog.__loaded) return;
+  if (!posthog.__loaded || onSupportConsole()) return;
   posthog.set_config({
     disable_persistence: false,
     opt_out_capturing_by_default: false,

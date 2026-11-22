@@ -1,7 +1,12 @@
 import posthog from 'posthog-js';
 import { beforeSendSampler } from '@/lib/analytics';
 import { sentryBrowserOptions } from '@/lib/auth/sentry-scrub';
-import { BROWSER_STORES, resumeAnalytics, stopAnalytics } from '@/lib/analytics/consent-control';
+import {
+  BROWSER_STORES,
+  onSupportConsole,
+  resumeAnalytics,
+  stopAnalytics,
+} from '@/lib/analytics/consent-control';
 import { rememberFirstTouch } from '@/lib/analytics/first-touch';
 import { configureSentry, routerTransitionStart, startSentryWhenIdle } from '@/lib/sentry-lazy';
 import {
@@ -9,6 +14,7 @@ import {
   clearAnalyticsStorage,
   consentRequiredFromCookie,
   CONSENT_DECISION_STORAGE_KEY,
+  CONSENT_DENIED_EVENT,
   posthogApiHost,
   recordedDecision,
   storedConsent,
@@ -41,8 +47,7 @@ if (
 ) {
   const posthogKey = process.env.NEXT_PUBLIC_POSTHOG_KEY;
   // The console is checked each time, not only at load: Allow can come after a client navigation.
-  const onConsole = () => /^\/internal(\/|$)/.test(window.location.pathname);
-  const mayStart = () => !onConsole() && analyticsMayStart(document.cookie, storedConsent());
+  const mayStart = () => !onSupportConsole() && analyticsMayStart(document.cookie, storedConsent());
 
   // Consent gate (F-048): PostHog is not started at all until it may be. Its opt-out flag stops
   // capture only: `init` itself writes a cookie and storage and calls /flags/ and config.js.
@@ -113,13 +118,17 @@ if (
     startPostHog();
     firstTouch();
   });
-  // A choice made in another tab of this site reaches this one.
+  // A choice made in another tab of this site reaches this one, and the page's own listeners
+  // (the Feedback button, IdentifyPerson, the grant listener above) hear it as they would here.
   window.addEventListener('storage', (e) => {
     if (e.key !== CONSENT_DECISION_STORAGE_KEY) return;
-    if (e.newValue === 'denied') stopAnalytics(posthog);
+    if (e.newValue === 'denied') {
+      stopAnalytics(posthog);
+      window.dispatchEvent(new Event(CONSENT_DENIED_EVENT));
+    }
     if (e.newValue === 'granted') {
       resumeAnalytics(posthog);
-      startPostHog();
+      window.dispatchEvent(new Event(CONSENT_GRANTED_EVENT));
     }
   });
 }

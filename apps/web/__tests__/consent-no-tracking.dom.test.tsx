@@ -46,6 +46,12 @@ const traces = () => ({
 });
 const NOTHING = { cookies: [], local: [], session: [], scripts: [], requests: [] };
 
+/** The PostHog keys only, so a next load in one case starts from the visitor's own choice. */
+function clearPostHogOnly() {
+  for (const k of Object.keys(localStorage)) if (PH_NAME.test(k)) localStorage.removeItem(k);
+  for (const k of Object.keys(sessionStorage)) if (PH_NAME.test(k)) sessionStorage.removeItem(k);
+}
+
 const settle = () => new Promise((r) => setTimeout(r, 60));
 
 async function load(cookies: string[], stored?: 'granted' | 'denied') {
@@ -207,6 +213,55 @@ describe('the privacy review’s cases', () => {
     window.dispatchEvent(new StorageEvent('storage', { key: 'cm_consent', newValue: 'granted' }));
     await settle();
     expect(posthog.__loaded).toBe(true);
+  });
+
+  it('a choice in another tab is announced to this page’s listeners', async () => {
+    await load(['cm_consent_required=0']);
+    const heard: string[] = [];
+    const denied = () => heard.push('denied');
+    const granted = () => heard.push('granted');
+    window.addEventListener('cm:consent-denied', denied);
+    window.addEventListener('cm:consent-granted', granted);
+    localStorage.setItem('cm_consent', 'denied');
+    window.dispatchEvent(new StorageEvent('storage', { key: 'cm_consent', newValue: 'denied' }));
+    localStorage.setItem('cm_consent', 'granted');
+    window.dispatchEvent(new StorageEvent('storage', { key: 'cm_consent', newValue: 'granted' }));
+    window.removeEventListener('cm:consent-denied', denied);
+    window.removeEventListener('cm:consent-granted', granted);
+    expect(heard).toEqual(['denied', 'granted']);
+  });
+
+  it('a grant on the console sends nothing, with PostHog already loaded', async () => {
+    const posthog = await load(['cm_consent_required=0']);
+    const b = await banner();
+    b.open();
+    await b.click('Decline');
+    const sent = requests.length;
+    window.history.pushState(null, '', '/internal/accounts/abc');
+    localStorage.setItem('cm_consent', 'granted');
+    window.dispatchEvent(new StorageEvent('storage', { key: 'cm_consent', newValue: 'granted' }));
+    await settle();
+    expect(requests.length).toBe(sent);
+    expect(posthog.has_opted_out_capturing()).toBe(true);
+    b.done();
+  });
+
+  it('a Decline with a full store is not undone by an earlier grant still in it', async () => {
+    const posthog = await load(['cm_consent_required=1'], 'granted');
+    expect(posthog.__loaded).toBe(true);
+    const b = await banner();
+    b.open();
+    const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('full', 'QuotaExceededError');
+    });
+    await b.click('Decline');
+    setItem.mockRestore();
+    expect(localStorage.getItem('cm_consent')).toBeNull();
+    expect(document.cookie).toContain('cm_consent=denied');
+    b.done();
+    clearPostHogOnly();
+    const next = await load([]);
+    expect(next.__loaded).toBe(false);
   });
 
   it('another key changing in storage does nothing', async () => {

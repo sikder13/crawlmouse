@@ -81,7 +81,12 @@ export function CookieConsent() {
     try {
       localStorage.setItem(CONSENT_DECISION_STORAGE_KEY, decision);
     } catch {
-      /* the cookie below still records it */
+      // A full store keeps the old value, which would outrank the cookie and undo this choice.
+      try {
+        localStorage.removeItem(CONSENT_DECISION_STORAGE_KEY);
+      } catch {
+        /* a blocked store holds no old value */
+      }
     }
     try {
       document.cookie = consentDecisionCookie(decision);
