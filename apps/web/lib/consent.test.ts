@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   analyticsMayStart,
   clearAnalyticsStorage,
@@ -272,23 +272,27 @@ describe('posthogApiHost (F-049)', () => {
 describe('isConsentRequiredCountry, what the list used to miss', () => {
   it('asks in EU territory that has its own country code', () => {
     for (const c of ['AX', 'GF', 'GP', 'MF', 'MQ', 'RE', 'YT']) {
-      expect(isConsentRequiredCountry(c, false), c).toBe(true);
+      expect(isConsentRequiredCountry(c), c).toBe(true);
     }
   });
 
-  it('on a deployment, asks a visitor whose country is not known', () => {
-    for (const c of [null, undefined, '', ' ', 'XX', 'xx', 'T1']) {
-      expect(isConsentRequiredCountry(c, true), String(c)).toBe(true);
+  it('asks when the geo lookup answers that it has no country', () => {
+    for (const c of ['XX', 'xx', ' XX ', 'T1']) {
+      expect(isConsentRequiredCountry(c), c).toBe(true);
     }
   });
 
-  it('off a deployment there is no geo header, so no country is not a reason to ask', () => {
-    for (const c of [null, undefined, '', 'XX']) {
-      expect(isConsentRequiredCountry(c, false), String(c)).toBe(false);
+  it('a missing header is not a reason to ask, whatever the environment says', () => {
+    for (const env of [undefined, 'preview', 'production']) {
+      vi.stubEnv('VERCEL_ENV', env as string);
+      for (const c of [null, undefined, '', ' ']) {
+        expect(isConsentRequiredCountry(c), `${env}:${String(c)}`).toBe(false);
+      }
     }
+    vi.unstubAllEnvs();
   });
 
-  it('a known country outside the list is not asked, on a deployment either', () => {
-    expect(isConsentRequiredCountry('US', true)).toBe(false);
+  it('a known country outside the list is not asked', () => {
+    expect(isConsentRequiredCountry('US')).toBe(false);
   });
 });

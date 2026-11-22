@@ -96,17 +96,15 @@ const CONSENT_REQUIRED_COUNTRIES: ReadonlySet<string> = new Set([
 const UNKNOWN_COUNTRIES: ReadonlySet<string> = new Set(['XX', 'T1']);
 
 /**
- * Whether a visitor's country requires prior opt-in consent for non-essential analytics. On a Vercel
- * deployment a visitor whose country is not known is asked, since they may be in the EU (question
- * 009). Off Vercel (local, CI) there is no geo header at all, so a missing country is "not required".
+ * Whether a visitor's country requires prior opt-in consent for non-essential analytics. A geo answer
+ * of "no country" (`XX`, `T1`) is asked, since the visitor may be in the EU. A missing header is not:
+ * it is what local, CI and the launch walk send (CTO ruling on question 010, which also measures how
+ * often production sees one).
  */
-export function isConsentRequiredCountry(
-  country?: string | null,
-  onVercel: boolean = process.env.VERCEL_ENV !== undefined,
-): boolean {
+export function isConsentRequiredCountry(country?: string | null): boolean {
   const code = country?.trim().toUpperCase();
-  if (!code || UNKNOWN_COUNTRIES.has(code)) return onVercel;
-  return CONSENT_REQUIRED_COUNTRIES.has(code);
+  if (!code) return false;
+  return UNKNOWN_COUNTRIES.has(code) || CONSENT_REQUIRED_COUNTRIES.has(code);
 }
 
 /** Parse the middleware-set consent-required flag from a `document.cookie` string (exact match). */
