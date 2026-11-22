@@ -135,6 +135,19 @@ describe('sectionMeasured: anything read counts, and a withheld score does not m
     expect(sectionMeasured(b.check, 'structure')).toBe(true);
   });
 
+  it('structure is read on a site with real orphans and no link: that is a finding', () => {
+    const b = built([page('', 200), page('/a', 200), page('/b', 200)]);
+    expect(b.check.structure!.internal_links).toBe(0);
+    expect(b.check.structure!.orphan_pages).toBeGreaterThan(0);
+    expect(sectionMeasured(b.check, 'structure')).toBe(true);
+    const v = structureView(b.d, b.id, {}, null);
+    expect(v.headline.title).toMatch(/no links pointing at/);
+    expect(v.tiles.find((t) => t.label === 'Orphan pages')!.value).toBe(
+      String(b.check.structure!.orphan_pages),
+    );
+    expect(resultView(b.d, b.id, { map: null }).map.orphans).toBe(b.check.structure!.orphan_pages);
+  });
+
   it('structure is not read with no link, and is with JS-only pages', () => {
     const b = built([page('', 200)]);
     expect(sectionMeasured(b.check, 'structure')).toBe(false);
@@ -197,6 +210,19 @@ describe('the all-clear card needs each section read', () => {
     const first = resultView(c.d, c.id, { map: null }).first;
     expect(first.kind).toBe('unmeasured');
     expect(first.kind !== 'fix' && first.body).toContain(sentence);
+  });
+
+  it('says nothing was measured when no section was read', () => {
+    const c = clean();
+    for (const x of c.check.crawlers.filter((y) => y.group !== 'search_engine'))
+      x.verdict = 'not_measured';
+    c.check.without_js = null;
+    c.check.content = null;
+    Object.assign(c.check.structure!, { internal_links: 0, orphan_pages: 0, js_only_pages: 0 });
+    const first = resultView(c.d, c.id, { map: null }).first;
+    if (first.kind !== 'unmeasured') throw new Error(`got ${first.kind}`);
+    expect(first.title).toBe('Nothing was measured');
+    expect(first.body).not.toContain('in what we measured');
   });
 
   it('behind an edge, says no crawler could be tested', () => {

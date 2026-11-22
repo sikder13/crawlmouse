@@ -16,9 +16,12 @@ export function sectionMeasured(check: Check, section: FixSection): boolean {
     case 'without_js':
       return check.without_js !== null;
     case 'structure':
-      // A graph with no link has no orphans, so its zero says nothing about the site.
+      // No link and no orphan is a graph that says nothing. Orphans with no link are a finding: the
+      // pages were read and none links to another.
       return (
-        (check.structure?.internal_links ?? 0) > 0 || (check.structure?.js_only_pages ?? 0) > 0
+        (check.structure?.internal_links ?? 0) > 0 ||
+        (check.structure?.js_only_pages ?? 0) > 0 ||
+        (check.structure?.orphan_pages ?? 0) > 0
       );
     case 'content':
       return (check.content?.checks ?? []).some((c) => c.by_template.some((r) => r.total > 0));
@@ -26,6 +29,10 @@ export function sectionMeasured(check: Check, section: FixSection): boolean {
 }
 
 const SECTIONS: readonly FixSection[] = ['crawler_access', 'without_js', 'structure', 'content'];
+
+/** The check read something of at least one section of the result. */
+export const anySectionMeasured = (check: Check) =>
+  SECTIONS.some((section) => sectionMeasured(check, section));
 
 /** The check read something of each section of the result. */
 export const everySectionMeasured = (check: Check) =>

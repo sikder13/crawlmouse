@@ -25,7 +25,12 @@ import {
 } from './effect-headline';
 import { openFixes, type FixPlan } from './free-fixes';
 import { noFixKind, servedWord } from './no-fix-card';
-import { everySectionMeasured, noFixWords, sectionMeasured } from './section-measured';
+import {
+  anySectionMeasured,
+  everySectionMeasured,
+  noFixWords,
+  sectionMeasured,
+} from './section-measured';
 import { SCREEN_SIGNALS, screenSignals, type ScreenSignal } from './screen-signals';
 import { dateTimeUtc, dayTimeUtc, listOf, percent, templateNoun } from '../format';
 import { toneOf } from '../letters';
@@ -771,8 +776,11 @@ function unmeasuredCard(check: Check, kept: boolean): NoFixCard {
   return {
     kind: 'unmeasured',
     label: 'No fix found',
-    title: 'Not everything was measured',
-    body: ['We found nothing to fix in what we measured.', ...parts].join(' '),
+    title: anySectionMeasured(check) ? 'Not everything was measured' : 'Nothing was measured',
+    body: [
+      ...(anySectionMeasured(check) ? ['We found nothing to fix in what we measured.'] : []),
+      ...parts,
+    ].join(' '),
     action: kept ? null : { label: 'Watch this site', href: '#keep' },
   };
 }
