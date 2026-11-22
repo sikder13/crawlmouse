@@ -17,10 +17,18 @@ export const ACCOUNT_COPY = {
    * After the first run: FACTS A6, and A8 while the reminder is still ahead (`reminderDays` before
    * the end); once it is due the sentence about it is left out, since it would no longer be true.
    */
-  trialLater: (host: string, schedule: string, others: number, reminderDays: number | null) =>
+  trialLater: (
+    host: string,
+    schedule: string,
+    others: number,
+    reminderDays: number | null,
+    plansOpen = true,
+  ) =>
     `Then Free: ${host} keeps ${schedule} checks${
       others
-        ? `; the other ${numberWord(others)} ${plural(others, 'site pauses', 'sites pause')} until you choose Pro or remove ${plural(others, 'it', 'them')}`
+        ? `; the other ${numberWord(others)} ${plural(others, 'site pauses', 'sites pause')}${
+            plansOpen ? ` until you choose Pro or remove ${plural(others, 'it', 'them')}` : ''
+          }`
         : ''
     }. Nothing you can see is deleted.${
       reminderDays === null ? '' : ` We'll email you ${numberWord(reminderDays)} days before.`

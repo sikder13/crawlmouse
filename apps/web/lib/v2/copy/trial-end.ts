@@ -109,6 +109,9 @@ export const TRIAL_END_COPY = {
   keepCardText: (last4: string, price: number, date: string, period: 'month' | 'year') =>
     `The card ending ${last4} is charged $${price} on ${date}, then each ${period}.`,
   endTitle: 'If you let it end',
+  /** In place of the two choices while paid plans are not open (F-108). */
+  plansTitle: 'Paid plans',
+  whenItEndsTitle: 'When it ends',
   cancelTitle: 'If you cancel',
   endNothing: (date: string) => `Nothing to do. On ${date} the account is Free:`,
   endCancel: (date: string, clicks: number) =>
@@ -121,6 +124,7 @@ export const TRIAL_END_COPY = {
     others: number,
     staging: boolean,
     plan: string,
+    plansOpen = true,
   ) =>
     `${host} keeps its ${schedule} check${fixes ? ` and its ${numberWord(fixes)} ${plural(fixes, 'fix', 'fixes')}` : ''}.${
       others || staging
@@ -128,7 +132,7 @@ export const TRIAL_END_COPY = {
             others
               ? `The other ${numberWord(others)} ${plural(others, 'site pauses', 'sites pause')} with ${plural(others, 'its', 'their')} history kept${staging ? ', and so does the staging copy' : ''}`
               : 'The staging copy pauses with its history kept'
-          }; add ${plan} any time to resume ${others ? 'them' : 'it'}.`
+          }${plansOpen ? `; add ${plan} any time to resume ${others ? 'them' : 'it'}` : ''}.`
         : ''
     }`,
   /** After the end, on Free (CC-27b D8; ARCH-2 §5 "free after trial"). */
@@ -138,6 +142,8 @@ export const TRIAL_END_COPY = {
       `${plan} ended ${date}. Here is what stays, and what is paused.`,
     sub: (plan: string) =>
       `Nothing you can see was deleted. Choose ${plan} any time to resume what is paused.`,
+    /** In place of `sub` while paid plans are not open (F-108). */
+    subPlansClosed: 'Nothing you can see was deleted. Paid plans open shortly.',
     choose: (plan: string, price: number) => `Choose ${plan}, $${price} a month`,
     pausesTitle: (plan: string) => `Paused, until ${plan}`,
   },
