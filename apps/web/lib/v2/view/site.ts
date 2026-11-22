@@ -381,7 +381,7 @@ const WEEKDAY_NAMES = [
  * weekday `dow` and local `hour`. The day and hour are always sent, so the form works without
  * script; with "none" the parser drops them. Weekly is offered only to a tier whose gates open it.
  */
-function scheduleInputs(s: Site, weekly: boolean): ActionInput[] {
+function scheduleInputs(s: Site, weekly: boolean, zone: string): ActionInput[] {
   const sch = s.schedule;
   const cadence = sch && sch.cadence !== 'on_deploy' ? sch.cadence : 'none';
   const f = SITE_COPY.fields;
@@ -407,7 +407,7 @@ function scheduleInputs(s: Site, weekly: boolean): ActionInput[] {
     {
       kind: 'select',
       name: 'hour',
-      label: f.hour,
+      label: f.hour(zone),
       value: String(sch?.hour_local ?? 6),
       options: Array.from({ length: 24 }, (_, h) => ({
         value: String(h),
@@ -417,11 +417,16 @@ function scheduleInputs(s: Site, weekly: boolean): ActionInput[] {
   ];
 }
 
-function scheduleValue(s: Site, zone: string): string {
+/**
+ * The schedule's line. Where the scheduler holds a time for the site it is that time, hour and fixed
+ * minute, so this line and the next check's cannot differ (F-115); otherwise the chosen hour.
+ */
+function scheduleValue(s: Site, zone: string, nextAt: string | null): string {
   const sch = s.schedule;
   if (!sch || s.paused || sch.cadence === 'on_deploy') return scheduleCell(s);
+  const time = nextAt ? hourMinute(nextAt, zone) : `${String(sch.hour_local).padStart(2, '0')}:00`;
   // FACTS H4 (Site settings): the account's zone by its own name.
-  return `${scheduleCell(s)} around ${String(sch.hour_local).padStart(2, '0')}:00, ${zone}`;
+  return `${scheduleCell(s)} around ${time}, ${zone}`;
 }
 
 /** Each site's `sites.next_check_at` (CC-28 D4's column), by site id, as a live page reads it. */
@@ -645,10 +650,10 @@ export function siteView(
       rows: [
         {
           label: 'Schedule',
-          value: scheduleValue(site, zone),
+          value: scheduleValue(site, zone, next?.get(site.id) ?? null),
           mono: false,
           muted: false,
-          action: edit('Change', scheduleInputs(site, v.gates.schedule === 'weekly')),
+          action: edit('Change', scheduleInputs(site, v.gates.schedule === 'weekly', zone)),
         },
         {
           label: 'Page cap',

@@ -45,7 +45,7 @@ export const SITE_COPY = {
   fields: {
     cadence: 'How often',
     weekday: 'Day',
-    hour: 'Hour, in the account’s zone',
+    hour: (zone: string) => `Hour, ${zone}`,
     competitors: { label: 'Competitor sites', placeholder: 'competitor.example, another.example' },
     staging: { label: 'Staging URL (empty for none)', placeholder: 'staging.example.com' },
     removeConfirm: 'Yes, remove this site',
