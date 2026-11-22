@@ -246,10 +246,11 @@ describe('after a decline, on a page that stays open', () => {
     posthog.reloadFeatureFlags();
     await settle();
     posthog.capture('after-decline');
-    await settle();
+    // Longer than the SDK's send queue holds an event, so a capture that got through would show.
+    await new Promise((r) => setTimeout(r, 3_500));
     expect(requests.slice(sent)).toEqual([]);
     b.done();
-  });
+  }, 15_000);
 
   it('a later Allow turns the refresh back on', async () => {
     await running();

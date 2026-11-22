@@ -178,6 +178,7 @@ describe('the consent banner', () => {
     expect(ph.opt_out_capturing).toHaveBeenCalledTimes(1);
     expect(ph.set_config).toHaveBeenCalledWith({
       advanced_disable_flags: true,
+      disable_external_dependency_loading: true,
       disable_surveys: true,
       disable_product_tours: true,
       disable_conversations: true,
@@ -211,6 +212,7 @@ describe('the consent banner', () => {
       disable_persistence: false,
       opt_out_capturing_by_default: false,
       advanced_disable_flags: false,
+      disable_external_dependency_loading: false,
       disable_surveys: false,
       disable_product_tours: false,
       disable_conversations: false,

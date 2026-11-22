@@ -12,13 +12,14 @@ export const onSupportConsole = (pathname: string = window.location.pathname): b
   /^\/internal(\/|$)/.test(pathname);
 
 /**
- * What opting out leaves running, each with its own switch in posthog-js 1.376.0: `/flags/`, which
- * the SDK's refresh timer and `reset()` still call and which carries the visitor's ids, and the
- * surveys, product tours and conversations a project's remote config can turn on. Capture, pageleave,
- * heatmaps and replay all go through `capture`, which the opt-out stops.
+ * What opting out leaves able to send, each with its own switch in posthog-js 1.376.0: `/flags/`,
+ * which the SDK's refresh timer and `reset()` still call with the visitor's ids; the add-on scripts a
+ * remote config arriving after the decline would fetch; and surveys, product tours and conversations.
+ * These switches stop new loads. A conversations widget already polling is stopped by its `reset()`.
  */
 const OFF_AFTER_DECLINE = {
   advanced_disable_flags: true,
+  disable_external_dependency_loading: true,
   disable_surveys: true,
   disable_product_tours: true,
   disable_conversations: true,
@@ -32,7 +33,7 @@ const OFF_AFTER_DECLINE = {
  * their consent and may still go.
  */
 export function stopAnalytics(
-  posthog: Pick<PostHog, '__loaded' | 'opt_out_capturing' | 'set_config'>,
+  posthog: Pick<PostHog, '__loaded' | 'opt_out_capturing' | 'set_config' | 'conversations'>,
 ) {
   if (posthog.__loaded) {
     posthog.opt_out_capturing();
@@ -41,6 +42,7 @@ export function stopAnalytics(
       disable_persistence: true,
       opt_out_capturing_by_default: true,
     });
+    posthog.conversations?.reset();
   }
   clearAnalyticsStorage(document, BROWSER_STORES);
 }
@@ -57,6 +59,7 @@ export function resumeAnalytics(
     disable_persistence: false,
     opt_out_capturing_by_default: false,
     advanced_disable_flags: false,
+    disable_external_dependency_loading: false,
     disable_surveys: false,
     disable_product_tours: false,
     disable_conversations: false,

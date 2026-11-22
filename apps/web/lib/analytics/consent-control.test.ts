@@ -11,6 +11,7 @@ function fake(loaded: boolean) {
       opt_out_capturing: () => void calls.push(['opt_out']),
       opt_in_capturing: () => void calls.push(['opt_in']),
       set_config: (c: object) => void calls.push(['set_config', c]),
+      conversations: { reset: () => void calls.push(['conversations_reset']) },
     } as unknown as Parameters<typeof stopAnalytics>[0] & Parameters<typeof resumeAnalytics>[0],
   };
 }
@@ -31,6 +32,7 @@ describe('stopAnalytics', () => {
         'set_config',
         {
           advanced_disable_flags: true,
+          disable_external_dependency_loading: true,
           disable_surveys: true,
           disable_product_tours: true,
           disable_conversations: true,
@@ -38,6 +40,7 @@ describe('stopAnalytics', () => {
           opt_out_capturing_by_default: true,
         },
       ],
+      ['conversations_reset'],
     ]);
   });
 
