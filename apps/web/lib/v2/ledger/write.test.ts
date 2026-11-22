@@ -67,10 +67,12 @@ let store: LedgerStore;
  * The backfill tests read drafts by `created_at` in fixed windows in 2001, and they share this
  * database with every other test in the file. A draft keeps the column's default, `now()`, unless
  * something moves it, and the backfill counts a wall-clock draft whenever its window covers the time
- * the suite runs (nightly 44721082091, dispatch 44997211412). `parkDrafts` moves every draft dated on
- * or after WALL_CLOCK_FLOOR to PARKED; it runs after the file's seed and inside `endedCheck`. The
- * backfill tests move their own drafts into their windows. The guard runs before and after each test
- * and fails it when a draft dated on or after WALL_CLOCK_FLOOR is in the database.
+ * the suite runs (nightly 44721082091, dispatch 44997211412). The windows are in 2001, so a draft
+ * dated by the wall clock is outside them; the rest guards a future test whose window is not.
+ * `parkDrafts` moves every draft dated on or after WALL_CLOCK_FLOOR to PARKED; it runs after the
+ * file's seed, inside `endedCheck` and in the guard. The backfill tests move their own drafts into
+ * their windows. The guard runs before and after each test and fails it when a draft dated on or
+ * after WALL_CLOCK_FLOOR is in the database.
  */
 const PARKED = '2000-01-01T00:00:00Z';
 const WALL_CLOCK_FLOOR = '2002-01-01T00:00:00Z';
@@ -86,7 +88,7 @@ async function noWallClockDrafts(): Promise<void> {
     `select check_id::text, created_at::text from public.check_ledger_drafts where created_at >= $1`,
     [WALL_CLOCK_FLOOR],
   );
-  // Parked before the assertion, so the next test starts clean and only the leaking test fails.
+  // Parked before the assertion, so a draft one test leaves does not fail the tests after it.
   await parkDrafts();
   expect(rows, 'a draft left with the wall-clock time').toEqual([]);
 }
