@@ -167,7 +167,7 @@ export function createWorkerClient(opts: WorkerClientOptions): WorkerClient {
     });
   }
 
-  async function postBatch(batch: BatchPost): Promise<{ batch_id: string }> {
+  async function postBatch(batch: BatchPost): Promise<{ batch_id: string; signals: boolean }> {
     const batchId = batchIdOf(batch.check_id, batch.batch);
     if (!ROUTABLE_BATCH_ID.test(batchId)) throw new WorkerError('invalid', null, null);
     const at = now();
@@ -216,7 +216,8 @@ export function createWorkerClient(opts: WorkerClientOptions): WorkerClient {
     if (!isRecord(accepted) || accepted.batch_id !== batchId) {
       throw new WorkerError('server', res.status, null);
     }
-    return { batch_id: batchId };
+    // Only the literal `true`: a worker that does not say so is polled as it always was.
+    return { batch_id: batchId, signals: accepted.signals === true };
   }
 
   async function pollBatch(batchId: string): Promise<PollResult> {
