@@ -15,6 +15,9 @@ every page says so in its footer (app-shell's footer is built by its script).
   because Vercel serves a file at the requested path ahead of a rewrite, percent-encoded spellings
   included. So nothing else may sit at the lab's root (`scripts/qa/accounts.test.ts` holds it). The bare deployment URL answers 404. Another name under
   `*.lab` resolves but has no certificate, so a request to it fails at TLS.
+- **One function.** A static file cannot answer late, so `slow.lab.crawlmouse.com` is rewritten to `api/slow.mjs`,
+  which serves the files of `sites/slow/` by looking the path up in that folder's list. Its host must be added to
+  the Vercel project before it answers; `/api/*` answers 404 on every host when requested directly.
 - **Kept out of search** (`docs/OPERATING-RULES.md` §13). Every page and 404 the routes answer carries `X-Robots-Tag:
 noindex`, except to a user agent containing `Crawlmouse`. Vercel's own redirects and errors (the
   308s that add https or collapse `//`, a 400 for a raw `..`) carry none and hold no content. The exception is
@@ -48,19 +51,20 @@ _grades_ it is measured, not written here; to read it:
 pnpm smoke -- --url=https://healthy.lab.crawlmouse.com
 ```
 
-| Host             | Built to show                                                                                     |
-| ---------------- | ------------------------------------------------------------------------------------------------- |
-| `healthy`        | a well-linked guide site: no orphans, depth ≤ 3, varied anchors, sitemap, `llms.txt`, JSON-LD     |
-| `app-shell`      | a client-rendered app: the HTML is an empty `<div id="root">` and a script                        |
-| `cf-blocked`     | a firewall block: 403 to a user agent containing `Crawlmouse`, 200 to a browser                   |
-| `client-1`       | sitemap-only orphan pages; one repeated anchor into each section; no JSON-LD                      |
-| `client-2`       | a deep chain of pages; "Read more" links; a few orphans                                           |
-| `client-3`       | two broken internal links (404); a deep chain; no sitemap; robots.txt disallows GPTBot            |
-| `client-4`       | a larger, mostly sound site whose text nav links three sections with the same words on every page |
-| `client-5`       | many orphans, generic anchors and deep pages on a small site; no JSON-LD                          |
-| `client-6`       | a five-item text nav on every page, deep pages, orphans; robots.txt disallows GPTBot              |
-| `trial-client-1` | a middling site for the Agency trial: some orphans, "Learn more" links                            |
-| `demo-1` … `3`   | polished fictional businesses with a few fixes that read well                                     |
+| Host             | Built to show                                                                                       |
+| ---------------- | --------------------------------------------------------------------------------------------------- |
+| `healthy`        | a well-linked guide site: no orphans, depth ≤ 3, varied anchors, sitemap, `llms.txt`, JSON-LD       |
+| `app-shell`      | a client-rendered app: the HTML is an empty `<div id="root">` and a script                          |
+| `cf-blocked`     | a firewall block: 403 to a user agent containing `Crawlmouse`, 200 to a browser                     |
+| `client-1`       | sitemap-only orphan pages; one repeated anchor into each section; no JSON-LD                        |
+| `client-2`       | a deep chain of pages; "Read more" links; a few orphans                                             |
+| `client-3`       | two broken internal links (404); a deep chain; no sitemap; robots.txt disallows GPTBot              |
+| `client-4`       | a larger, mostly sound site whose text nav links three sections with the same words on every page   |
+| `client-5`       | many orphans, generic anchors and deep pages on a small site; no JSON-LD                            |
+| `client-6`       | a five-item text nav on every page, deep pages, orphans; robots.txt disallows GPTBot                |
+| `trial-client-1` | a middling site for the Agency trial: some orphans, "Learn more" links                              |
+| `demo-1` … `3`   | polished fictional businesses with a few fixes that read well                                       |
+| `slow`           | an ordinary small site whose HTML pages each answer after 3 seconds (`api/slow.mjs`, journey J0.8g) |
 
 Check every host answers:
 
