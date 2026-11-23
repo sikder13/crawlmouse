@@ -151,8 +151,10 @@ describe('every required field is load-bearing', () => {
       .flatMap((s) => nodes(s))
       .filter((n) => schemaType(n.schema) === 'optional')
       .map((n) => n.path);
-    expect(optional.length).toBeGreaterThan(0);
-    expect(optional.filter((p) => !/(^|\.)crawlers\[\]\.pages_served$/.test(p))).toEqual([]);
+    expect([...new Set(optional)].sort()).toEqual([
+      'checks[].crawlers[].pages_served',
+      'crawlers[].pages_served',
+    ]);
   });
 
   it('every object anywhere in the contract rejects keys it does not declare', () => {
