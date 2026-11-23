@@ -49,19 +49,27 @@ export class HostLimited extends Error {
   }
 }
 
-const LAB_CLIENTS = [1, 2, 3, 4, 5, 6].map((n) => `client-${n}.lab.crawlmouse.com`);
+// A host takes five checks an hour. Steps that need no fix start on the sites the fix steps do not use, so that one
+// full run of J4 stays inside that limit.
+const LAB_CLIENTS = [
+  'client-5',
+  'client-6',
+  'demo-1',
+  'demo-2',
+  'trial-client-1',
+  'client-1',
+  'client-2',
+].map((h) => `${h}.lab.crawlmouse.com`);
 
 /**
- * Keeps one of the lab's client sites on `who`'s account, starting at a random one and moving on only when a host
+ * Keeps one of the lab's sites on `who`'s account, in the listed order, moving on only when a host
  * is at its hourly limit, so that a second run within the hour does not fail on the limit. Any other failure throws.
  */
 export async function keptLabSite(
   who: Person,
   hosts: readonly string[] = LAB_CLIENTS,
 ): Promise<{ site: string; host: string }> {
-  const start = Math.floor(Math.random() * hosts.length);
-  for (let i = 0; i < hosts.length; i++) {
-    const host = hosts[(start + i) % hosts.length]!;
+  for (const host of hosts) {
     try {
       return { site: await keptSite(who, host), host };
     } catch (e) {
@@ -105,7 +113,9 @@ export async function keptSite(who: Person, host: string): Promise<string> {
 }
 
 /** The lab sites whose crawl produces fixes, so a step about a fix has a real one. */
-const LAB_WITH_FIXES = [1, 2, 3, 4].map((n) => `client-${n}.lab.crawlmouse.com`);
+const LAB_WITH_FIXES = ['client-1', 'client-2', 'client-3', 'client-4', 'demo-3', 'healthy'].map(
+  (h) => `${h}.lab.crawlmouse.com`,
+);
 
 /** A kept site whose first check has really finished, with one of its fixes. */
 export async function finishedLabSite(
@@ -113,7 +123,7 @@ export async function finishedLabSite(
 ): Promise<{ site: string; host: string; check: string; fix: string }> {
   const { site, host } = await keptLabSite(who, LAB_WITH_FIXES);
   const db = stagingAdmin();
-  const deadline = Date.now() + 240_000;
+  const deadline = Date.now() + 330_000;
   for (;;) {
     const { data, error } = await db
       .from('checks')
