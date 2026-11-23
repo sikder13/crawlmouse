@@ -71,6 +71,7 @@ describe('the public link control (F-123)', () => {
     ['check_partial', 409, COPY.notFinished],
     ['check_not_finished', 409, COPY.notFinished],
     ['auth_required', 401, COPY.signedOut],
+    ['host_taken_down', 409, COPY.withdrawn],
     ['role_refused', 403, COPY.failed],
     ['could not mint', 500, COPY.failed],
   ])('a refusal of %s says so and does not reload', async (error, status, sentence) => {

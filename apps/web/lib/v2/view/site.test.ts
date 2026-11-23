@@ -264,7 +264,7 @@ describe('the site’s public link (F-123)', () => {
 
   it('after a link is withdrawn, an owner is told so and offered no new one', () => {
     const r = siteView(noLinks, { accountId: BAD_ACCOUNT, now: bad.as_of }, OUTFITTER, undefined, {
-      linkGate: 'withdrawn',
+      link: { gate: 'withdrawn', hiddenCheckIds: [] },
     }).settings.rows.find((x) => x.label === 'Public link')!;
     expect(r.value).toBe(SITE_COPY.publicLink.withdrawn);
     expect(r.publicLink).toEqual({ url: null, mintCheckId: null });
@@ -272,15 +272,31 @@ describe('the site’s public link (F-123)', () => {
 
   it('when the check could not be made, it says so and offers none', () => {
     const r = siteView(noLinks, { accountId: BAD_ACCOUNT, now: bad.as_of }, OUTFITTER, undefined, {
-      linkGate: 'unknown',
+      link: { gate: 'unknown', hiddenCheckIds: [] },
     }).settings.rows.find((x) => x.label === 'Public link')!;
     expect(r.value).toBe(SITE_COPY.publicLink.unknown);
     expect(r.publicLink).toEqual({ url: null, mintCheckId: null });
   });
 
+  it('after a hide of an earlier check’s link, a new one is offered for the latest', () => {
+    const r = siteView(noLinks, { accountId: BAD_ACCOUNT, now: bad.as_of }, OUTFITTER, undefined, {
+      link: { gate: 'open', hiddenCheckIds: ['an-earlier-check'] },
+    }).settings.rows.find((x) => x.label === 'Public link')!;
+    expect(r.value).toBe(SITE_COPY.publicLink.none);
+    expect(r.publicLink).toEqual({ url: null, mintCheckId: latestCheck.id });
+  });
+
+  it('when the latest check’s own link is hidden, it says a later check can have one', () => {
+    const r = siteView(noLinks, { accountId: BAD_ACCOUNT, now: bad.as_of }, OUTFITTER, undefined, {
+      link: { gate: 'open', hiddenCheckIds: [latestCheck.id] },
+    }).settings.rows.find((x) => x.label === 'Public link')!;
+    expect(r.value).toBe(SITE_COPY.publicLink.hiddenLatest);
+    expect(r.publicLink).toEqual({ url: null, mintCheckId: null });
+  });
+
   it('a live link beside a withdrawn one is shown, and no new one is offered', () => {
     const r = siteView(bad, { accountId: BAD_ACCOUNT, now: bad.as_of }, OUTFITTER, undefined, {
-      linkGate: 'withdrawn',
+      link: { gate: 'withdrawn', hiddenCheckIds: [] },
     }).settings.rows.find((x) => x.label === 'Public link')!;
     expect(r.publicLink?.url).toContain('/r/example-outfitter-25oct');
     expect(r.publicLink?.mintCheckId).toBeNull();
@@ -292,7 +308,7 @@ describe('the site’s public link (F-123)', () => {
       { accountId: BAD_ACCOUNT, now: bad.as_of, seatId: owner.id },
       OUTFITTER,
       undefined,
-      { linkGate: 'withdrawn' },
+      { link: { gate: 'withdrawn', hiddenCheckIds: [] } },
     );
     expect(v.settings.rows.find((x) => x.label === 'Public link')).toBeUndefined();
   });

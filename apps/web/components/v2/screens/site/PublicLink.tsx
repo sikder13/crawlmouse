@@ -14,6 +14,7 @@ const COPY = SITE_COPY.publicLink;
 /** What a refused mint says: the codes with a remedy of their own, and a general sentence. */
 function refusal(code: unknown): string {
   if (code === 'auth_required') return COPY.signedOut;
+  if (code === 'host_taken_down') return COPY.withdrawn;
   if (code === 'captcha_required' || code === 'captcha_failed') return COPY.capped;
   if (code === 'check_partial' || code === 'check_not_finished') return COPY.notFinished;
   return COPY.failed;

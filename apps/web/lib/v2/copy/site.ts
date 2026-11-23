@@ -58,6 +58,7 @@ export const SITE_COPY = {
     none: 'None yet. A link shows this check to anyone who has it. A new one is unlisted, and search engines are told not to index it.',
     withdrawn: `A public report of this domain was withdrawn, so a new link cannot be made here. Email ${SUPPORT_EMAIL} if you think that is a mistake.`,
     unknown: 'Public links could not be checked just now. Reload this page to try again.',
+    hiddenLatest: 'This check’s link is hidden. A new link can be made after the next check.',
     create: 'Create a public link',
     update: 'New link for the latest check',
     copy: 'Copy link',

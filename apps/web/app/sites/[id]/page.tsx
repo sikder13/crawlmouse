@@ -73,7 +73,9 @@ export default async function SitePage({
   const host = d.sites.find((s) => s.id === id)?.host;
   const page = sitePage(d, viewer, id, await readNextChecks(supabaseAdmin(), [id]), {
     allFixes: wantsAllFixes(query),
-    linkGate: host ? await siteLinkGate(supabaseAdmin(), site.accountId, { id, host }) : 'unknown',
+    link: host
+      ? await siteLinkGate(supabaseAdmin(), site.accountId, { id, host })
+      : { gate: 'unknown', hiddenCheckIds: [] },
   });
   const notice = noticeLine(query, d.accounts[0]!.timezone);
   const account = viewAt(d, viewer);

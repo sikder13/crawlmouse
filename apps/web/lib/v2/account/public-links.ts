@@ -62,17 +62,25 @@ export async function mintedLinks(
 /** Whether a seat that may publish can be offered a new link for this site. */
 export type LinkGate = 'open' | 'withdrawn' | 'unknown';
 
+export interface LinkState {
+  gate: LinkGate;
+  /** Checks of this site whose link the owner hid: a mint of one answers the hidden link again. */
+  hiddenCheckIds: readonly string[];
+}
+
+const HIDDEN_READ = 200;
+
 /**
  * A takedown is about a host, so one on any report of this domain closes it: a v1 report (which has
  * no site id), a site removed and added again, a `www.` sibling, another account's site. A hide is
- * the site's own: anyone can mint and hide a v1 report for a domain, so a hide elsewhere must not
- * close it for its owner. `unknown` when a read fails, which offers no new link either.
+ * the owner's own reversible choice about one link, so it closes nothing: a later check can have a
+ * new link (owner ruling, question 022). `unknown` when a read fails, which offers no new link.
  */
 export async function siteLinkGate(
   admin: SupabaseClient,
   accountId: string,
   site: { id: string; host: string },
-): Promise<LinkGate> {
+): Promise<LinkState> {
   const [takenDown, hidden] = await Promise.all([
     admin
       .from('public_reports')
@@ -82,12 +90,18 @@ export async function siteLinkGate(
       .limit(1),
     admin
       .from('public_reports')
-      .select('slug')
+      .select('check_id')
       .eq('site_id', site.id)
       .eq('account_id', accountId)
       .not('hidden_at', 'is', null)
-      .limit(1),
+      .order('created_at', { ascending: false })
+      .limit(HIDDEN_READ),
   ]);
-  if (takenDown.error || hidden.error) return 'unknown';
-  return (takenDown.data ?? []).length + (hidden.data ?? []).length > 0 ? 'withdrawn' : 'open';
+  if (takenDown.error || hidden.error) return { gate: 'unknown', hiddenCheckIds: [] };
+  return {
+    gate: (takenDown.data ?? []).length > 0 ? 'withdrawn' : 'open',
+    hiddenCheckIds: ((hidden.data ?? []) as { check_id: string | null }[]).flatMap((r) =>
+      r.check_id ? [r.check_id] : [],
+    ),
+  };
 }

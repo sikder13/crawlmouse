@@ -310,21 +310,23 @@ describe('the public links a v2 mint wrote (F-123)', () => {
     };
 
     it('is open with nothing withdrawn', async () => {
-      expect(await siteLinkGate(admin(), owner.accountId, await newSite('clear.example'))).toBe(
-        'open',
-      );
+      const site = await newSite('clear.example');
+      expect(await siteLinkGate(admin(), owner.accountId, site)).toEqual({
+        gate: 'open',
+        hiddenCheckIds: [],
+      });
     });
 
     it('a takedown closes the host, on a v1 row with no site id', async () => {
       const site = await newSite('taken-v1.example');
       await report('v1-down', 'taken-v1.example', 'takedown_requested_at', null, null);
-      expect(await siteLinkGate(admin(), owner.accountId, site)).toBe('withdrawn');
+      expect((await siteLinkGate(admin(), owner.accountId, site)).gate).toBe('withdrawn');
     });
 
     it('a takedown closes a www sibling', async () => {
       await report('www-down', 'sibling.example', 'takedown_requested_at', null, null);
       const www = await newSite('www.sibling.example');
-      expect(await siteLinkGate(admin(), owner.accountId, www)).toBe('withdrawn');
+      expect((await siteLinkGate(admin(), owner.accountId, www)).gate).toBe('withdrawn');
     });
 
     it('a takedown closes a host added again under a new site id', async () => {
@@ -338,25 +340,34 @@ describe('the public links a v2 mint wrote (F-123)', () => {
       );
       await db.query(`update public.sites set removed_at = now() where id = $1`, [first.id]);
       const again = await newSite('readded.example');
-      expect(await siteLinkGate(admin(), owner.accountId, again)).toBe('withdrawn');
+      expect((await siteLinkGate(admin(), owner.accountId, again)).gate).toBe('withdrawn');
     });
 
-    it('a live link of the site leaves it open', async () => {
-      const site = await newSite('live-only.example');
-      await mint('live-only-link', site.id, owner.accountId);
-      expect(await siteLinkGate(admin(), owner.accountId, site)).toBe('open');
-    });
-
-    it('a site’s own hidden link closes it', async () => {
+    it('a hide closes nothing, and names the check whose link is hidden', async () => {
       const site = await newSite('hidden-own.example');
-      await report('own-hidden', 'hidden-own.example', 'hidden_at', site.id, owner.accountId);
-      expect(await siteLinkGate(admin(), owner.accountId, site)).toBe('withdrawn');
+      const checkId = await mint('own-hidden', site.id, owner.accountId, 'hidden_at');
+      expect(await siteLinkGate(admin(), owner.accountId, site)).toEqual({
+        gate: 'open',
+        hiddenCheckIds: [checkId],
+      });
     });
 
-    it('someone else’s hide of the same domain does not close it for its owner', async () => {
+    it('someone else’s hide of the same domain changes nothing', async () => {
       const site = await newSite('hidden-elsewhere.example');
       await report('v1-hidden', 'hidden-elsewhere.example', 'hidden_at', null, null);
-      expect(await siteLinkGate(admin(), owner.accountId, site)).toBe('open');
+      expect(await siteLinkGate(admin(), owner.accountId, site)).toEqual({
+        gate: 'open',
+        hiddenCheckIds: [],
+      });
+    });
+
+    it('a live link of the site leaves it open, with nothing hidden', async () => {
+      const site = await newSite('live-only.example');
+      await mint('live-only-link', site.id, owner.accountId);
+      expect(await siteLinkGate(admin(), owner.accountId, site)).toEqual({
+        gate: 'open',
+        hiddenCheckIds: [],
+      });
     });
 
     it.each(['takedown_requested_at', 'hidden_at'])(
@@ -372,13 +383,14 @@ describe('the public links a v2 mint wrote (F-123)', () => {
               broken = column === failing;
               return q;
             };
+            q.order = () => q;
             q.limit = async () =>
               broken ? { data: null, error: { message: 'down' } } : { data: [], error: null };
             return q;
           },
         } as unknown as ReturnType<typeof admin>;
         expect(
-          await siteLinkGate(client, owner.accountId, { id: OTHER_SITE, host: 'x.example' }),
+          (await siteLinkGate(client, owner.accountId, { id: OTHER_SITE, host: 'x.example' })).gate,
         ).toBe('unknown');
       },
     );
