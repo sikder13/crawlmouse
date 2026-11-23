@@ -41,7 +41,7 @@ export type NotRequested =
  * before its target could be checked: the response received is kept, and the reason goes alongside.
  */
 export type Requested =
-  /** `answeredBy`: the URL of the last request that got a response, the one `fetch` holds. */
+  /** `answeredBy`: the URL of the last request made, whose outcome is the one `fetch` holds. */
   { fetch: FetchOutcome; cut?: NotRequested; answeredBy: string } | { notRequested: NotRequested };
 
 /** Whether a redirect target may be requested, and if not, why. */

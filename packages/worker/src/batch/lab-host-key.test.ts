@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { Fetcher } from '../fetch/fetcher.js';
+import { CRAWL, type Identity } from '../identities.js';
 import { FLOOR_GAP_MS } from '../politeness/limiter.js';
 import { Sites } from '../politeness/sites.js';
 import { outcome } from '../test-support/outcome.js';
 import { VirtualClock } from '../test-support/virtual-clock.js';
+import { Budget } from './budget.js';
+import { politeFetch } from './polite-fetch.js';
 import { BUDGET_CEILINGS, type BatchRequest } from './request.js';
 import { runBatch } from './run.js';
 import { RobotsCache } from './site-rules.js';
@@ -289,6 +292,64 @@ describe('a chain cut short counts against the host that answered', () => {
     };
     for (const [i, host] of HOSTS.entries()) await clock.run(runBatch(make(host, i + 1, 3), deps));
     expect(atB).toBeLessThanOrEqual(4);
+  });
+});
+
+describe('answeredBy names the request whose outcome the row holds', () => {
+  const ctxOf = (fetcher: Fetcher, clock: VirtualClock, sites: Sites) => ({
+    sites,
+    fetcher,
+    budget: new Budget(BUDGET_CEILINGS, clock),
+    abort: new AbortController(),
+  });
+  const hop = (url: string, identity: Identity, maxBytes: number, to: string) =>
+    outcome({
+      url,
+      identity,
+      finalUrl: url,
+      maxBytes,
+      status: 301,
+      headers: { location: to },
+      body: '',
+    });
+
+  it('a later hop refused by a stop: the hop before it, which answered', async () => {
+    const clock = new VirtualClock();
+    const sites = new Sites(clock, true);
+    for (let i = 0; i < 3; i++) sites.record429(B);
+    const fetcher: Fetcher = async (url, identity, limits) =>
+      hop(url, identity, limits.maxBytes, `https://${B}/next`);
+    const r = await clock.run(
+      politeFetch(ctxOf(fetcher, clock, sites), `https://${A}/x`, CRAWL, { offSite: 'stop' }),
+    );
+    if ('notRequested' in r) throw new Error('the first hop was requested');
+    expect(r.cut).toMatchObject({ reason: 'site_stopped', site: B });
+    expect(r.answeredBy).toBe(`https://${A}/x`);
+  });
+
+  it('a hop that failed: the URL that failed, so its host’s challenge run is the one reset', async () => {
+    const clock = new VirtualClock();
+    const fetcher: Fetcher = async (url, identity, limits) =>
+      new URL(url).hostname === A
+        ? hop(url, identity, limits.maxBytes, `https://${B}/next`)
+        : outcome({
+            url,
+            identity,
+            status: null,
+            finalUrl: null,
+            body: '',
+            bytes: 0,
+            maxBytes: limits.maxBytes,
+            error: 'network',
+          });
+    const r = await clock.run(
+      politeFetch(ctxOf(fetcher, clock, new Sites(clock, true)), `https://${A}/x`, CRAWL, {
+        offSite: 'stop',
+      }),
+    );
+    if ('notRequested' in r) throw new Error('requested');
+    expect(r.fetch.error).toBe('network');
+    expect(r.answeredBy).toBe(`https://${B}/next`);
   });
 });
 

@@ -61,7 +61,7 @@ export const NOT_REQUESTED_ROW = {
 interface Probe {
   identity: Identity;
   fetch: FetchOutcome | null;
-  /** The URL of the last request that got a response; absent when none was made. */
+  /** The URL of the last request made, whose outcome `fetch` holds; absent when none was. */
   answeredBy?: string;
   observed: Observed;
   reading: ResponseReading | null;
