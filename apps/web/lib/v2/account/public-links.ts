@@ -64,7 +64,7 @@ export type LinkGate = 'open' | 'withdrawn' | 'unknown';
 
 export interface LinkState {
   gate: LinkGate;
-  /** Checks of this site whose link the owner hid: a mint of one answers the hidden link again. */
+  /** Checks of this site whose link is hidden: a mint of one answers the hidden link again. */
   hiddenCheckIds: readonly string[];
 }
 
@@ -73,8 +73,8 @@ const HIDDEN_READ = 200;
 /**
  * A takedown is about a host, so one on any report of this domain closes it: a v1 report (which has
  * no site id), a site removed and added again, a `www.` sibling, another account's site. A hide is
- * the owner's own reversible choice about one link, so it closes nothing: a later check can have a
- * new link (owner ruling, question 022). `unknown` when a read fails, which offers no new link.
+ * about one link, so it closes nothing: a later check can have a new link (CTO ruling, question
+ * 022). `unknown` when a read fails, which offers no new link.
  */
 export async function siteLinkGate(
   admin: SupabaseClient,

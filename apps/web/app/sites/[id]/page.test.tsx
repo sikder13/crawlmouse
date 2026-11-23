@@ -49,6 +49,7 @@ vi.mock('@/lib/v2/pipeline/load', () => ({
 
 import { FirstCheckScreen } from '@/components/v2/screens/site/FirstCheckScreen';
 import { SiteScreen } from '@/components/v2/screens/site/SiteScreen';
+import { SITE_COPY } from '@/lib/v2/copy/site';
 import { siteOfCaller } from '@/lib/v2/account/pages';
 import { agencyAccount } from '@/lib/v2/agency/test-support';
 import type { ShellView } from '@/lib/v2/view/account-shell';
@@ -168,6 +169,32 @@ describe('/sites/[id] with V2_CHECKS_PUBLIC=1', () => {
     );
     expect((await row())?.publicLink?.mintCheckId).toBeNull();
     await db.query(`delete from public.public_reports where slug = 'page-test-down'`);
+  });
+
+  it('the latest check’s own link hidden: the page offers no new one, and says why', async () => {
+    vi.stubEnv('V2_CHECKS_PUBLIC', '1');
+    const { rows } = await db.query<{ id: string; account_id: string }>(
+      `select c.id, s.account_id from public.checks c join public.sites s on s.id = c.site_id
+        where c.site_id = $1 and c.status = 'finished' order by c.finished_at desc limit 1`,
+      [kept],
+    );
+    await db.query(
+      `insert into public.public_reports (slug, check_id, site_id, account_id, domain, hidden_at)
+       values ('page-test-hidden', $1, $2, $3, 'hidden-page.example', now())`,
+      [rows[0]!.id, kept, rows[0]!.account_id],
+    );
+    const page = children(await open(kept));
+    await db.query(`delete from public.public_reports where slug = 'page-test-hidden'`);
+    const { data } = page.props as unknown as {
+      data: {
+        settings: {
+          rows: { label: string; value: string; publicLink?: { mintCheckId: string | null } }[];
+        };
+      };
+    };
+    const row = data.settings.rows.find((r) => r.label === 'Public link')!;
+    expect(row.publicLink?.mintCheckId).toBeNull();
+    expect(row.value).toBe(SITE_COPY.publicLink.hiddenLatest);
   });
 
   it('names the next check at the time sites.next_check_at holds (CC-28 D8)', async () => {
