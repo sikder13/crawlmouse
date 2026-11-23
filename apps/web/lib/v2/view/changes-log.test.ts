@@ -140,9 +140,16 @@ describe('a first audit in the Changes log (F-100)', () => {
         summary: `finding ${i}`,
       })),
     );
-    // The fixture's own checks of these sites go, so "nothing after it" is true of each.
-    const others = bad.checks.filter((c) => !siteIds.includes(c.site_id));
-    return { ...bad, checks: [...others, ...checks], changes };
+    // Only these sites, each with this one check, so "nothing after it" is true of the account.
+    return {
+      ...bad,
+      sites: bad.sites.filter((s) => siteIds.includes(s.id)),
+      checks,
+      changes,
+      fixes: [],
+      fix_events: [],
+      reports: [],
+    };
   }
 
   it('is one row for the site, saying how many issues it found', () => {
@@ -179,7 +186,9 @@ describe('a first audit in the Changes log (F-100)', () => {
   it('once a site has been checked again, it no longer says the next check will compare', () => {
     const v = log();
     const row = v.rows.find((r) => r.key.startsWith('first-audit-'))!;
-    expect(row.cause).toBe('The baseline this site’s later checks are compared with.');
+    expect(row.cause).toBe(
+      'What the first audit found. Each later check is compared with the one before it.',
+    );
   });
 
   it('two identical checks: a first audit, and no later change', () => {
@@ -198,7 +207,60 @@ describe('a first audit in the Changes log (F-100)', () => {
     };
     const v = changesLogView({ ...d, checks: [...d.checks, again] }, viewer, {}, BASE);
     expect(v.headline).toBe('One first audit. No later check has found a change.');
-    expect(v.rows[0]!.cause).toBe('The baseline this site’s later checks are compared with.');
+    expect(v.rows[0]!.cause).toBe(
+      'What the first audit found. Each later check is compared with the one before it.',
+    );
+  });
+
+  /** `d` with a second, identical check of its `i`th first-audited site. */
+  function checkedAgain(d: ReturnType<typeof firstAuditOnly>, i: number) {
+    const site = d.sites[i]!;
+    const first = d.checks.find((c) => c.site_id === site.id)!;
+    const again = {
+      ...first,
+      id: `c9000000-0000-4000-8000-00000000000${i}`,
+      trigger: 'manual' as const,
+      previous_check_id: first.id,
+      queued_at: viewer.now,
+      started_at: viewer.now,
+      finished_at: viewer.now,
+    };
+    return { ...d, checks: [...d.checks, again] };
+  }
+
+  it('one of five sites checked again, with no change: all five, and no later change', () => {
+    const v = changesLogView(checkedAgain(firstAuditOnly(3, 5), 2), viewer, {}, BASE);
+    expect(v.headline).toBe('Five first audits. No later check has found a change.');
+  });
+
+  it('a clean first audit has no row, and still counts as a first audit', () => {
+    const d = firstAuditOnly(3, 5);
+    const clean = d.checks.find((c) => c.site_id === d.sites[4]!.id)!;
+    const v = changesLogView(
+      { ...d, changes: d.changes.filter((c) => c.check_id !== clean.id) },
+      viewer,
+      {},
+      BASE,
+    );
+    expect(v.rows).toHaveLength(4);
+    expect(v.headline).toBe(
+      'Five first audits. Changes appear once a site has been checked again.',
+    );
+  });
+
+  it('counts only the sites with a change, not those with just a first audit', () => {
+    const d = checkedAgain(firstAuditOnly(3, 2), 0);
+    const later = d.checks.find((c) => c.previous_check_id !== null && c.id.startsWith('c9'))!;
+    const real = {
+      ...d.changes[0]!,
+      id: 'd9000000-0000-4000-8000-000000000001',
+      check_id: later.id,
+      previous_check_id: later.previous_check_id,
+      detected_at: viewer.now,
+      summary: 'a real change',
+    };
+    const v = changesLogView({ ...d, changes: [...d.changes, real] }, viewer, {}, BASE);
+    expect(v.headline).toBe('1 change across 1 site, newest first.');
   });
 
   it('five sites’ first audits are five rows, one each', () => {

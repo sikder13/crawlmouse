@@ -25,7 +25,8 @@ export const CHANGES_LOG_COPY = {
   firstAuditWhere: 'the whole site',
   firstAuditCause: 'Nothing to compare yet. The next check of this site is compared with this one.',
   /** The same row once the site has been checked again. */
-  firstAuditCauseLater: 'The baseline this site’s later checks are compared with.',
+  firstAuditCauseLater:
+    'What the first audit found. Each later check is compared with the one before it.',
   /** The headline while every row is a first audit: they are not changes. */
   firstAuditsOnly: (n: number) =>
     `${capitalise(numberWord(n))} first ${plural(n, 'audit', 'audits')}. Changes appear once a site has been checked again.`,

@@ -191,9 +191,9 @@ export function changesLogView(
   // A first audit is an entry in the log and not a change: the headline counts changes only.
   const changesShown = shown.filter((e) => e.findings === null);
   const sitesChanged = new Set(changesShown.map((e) => siteOfCheck.get(e.change.check_id))).size;
-  const anyRechecked = shown.some(
-    (e) => resultChecks(v, siteOfCheck.get(e.change.check_id)!).length > 1,
-  );
+  // With no change to show, the headline counts the sites audited: a clean first audit has no row.
+  const audited = sites.map((s) => resultChecks(v, s.id).length).filter((n) => n > 0);
+  const anyRechecked = audited.some((n) => n > 1);
 
   return {
     shell: accountShellView(v, 'Changes', { role: readerRole(v) ?? 'developer' }),
@@ -208,8 +208,8 @@ export function changesLogView(
       : rows.length
         ? changesShown.length === 0
           ? anyRechecked
-            ? COPY.firstAuditsNoChange(rows.length)
-            : COPY.firstAuditsOnly(rows.length)
+            ? COPY.firstAuditsNoChange(audited.length)
+            : COPY.firstAuditsOnly(audited.length)
           : COPY.headline(changesShown.length, sitesChanged)
         : null,
     newNote: !filtered && fresh > 0 ? COPY.newNote(fresh) : null,
