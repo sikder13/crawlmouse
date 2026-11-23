@@ -58,6 +58,7 @@ export function routesNamedIn(source: string): string[] {
 /** Specs that do not loop over the previews: they run in the first share only, not once per share. */
 export const ONCE_SPECS = [
   'copy.spec.ts',
+  'site-settings-fit.spec.ts',
   'frames.spec.ts',
   'motion.spec.ts',
   'parity.spec.ts',
