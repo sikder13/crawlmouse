@@ -55,10 +55,14 @@ describe('the Changes log, generated', () => {
             reached.add('another account’s site moved in');
           const filtered = kind !== undefined || since !== 'all' || (site && live.has(site));
           if (v.rows.length && !filtered && v.rows.every((r) => r.key.startsWith('first-audit-'))) {
-            expect(v.headline).toMatch(/first audits?\. Changes appear/);
-            reached.add('only first audits');
+            // Rare in generated accounts, so not required below: changes-log.test.ts pins this case.
+            expect(v.headline).toMatch(/first audits?\. (Changes appear|No later check)/);
           } else if (v.rows.length) {
-            expect(v.headline).toMatch(new RegExp(`^${v.rows.length}\\b`));
+            // Filtered, it counts the rows it shows; unfiltered, only the changes among them.
+            const counted = filtered
+              ? v.rows.length
+              : v.rows.filter((r) => !r.key.startsWith('first-audit-')).length;
+            expect(v.headline).toMatch(new RegExp(`^${counted}\\b`));
           } else expect(v.empty).not.toBeNull();
           const otherHosts = new Set(
             d.sites.filter((s) => s.account_id === other).map((s) => s.host),
@@ -72,13 +76,7 @@ describe('the Changes log, generated', () => {
       { numRuns: 300 },
     );
     expect([...reached].sort()).toEqual(
-      [
-        'a site filter applied',
-        'another account’s site moved in',
-        'no rows',
-        'only first audits',
-        'rows',
-      ].sort(),
+      ['a site filter applied', 'another account’s site moved in', 'no rows', 'rows'].sort(),
     );
   });
 });

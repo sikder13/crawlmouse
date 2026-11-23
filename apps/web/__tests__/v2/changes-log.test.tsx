@@ -39,7 +39,7 @@ describe('the Changes log, rendered', () => {
       ['Any time', `${CHANGES_LOG_PATH}?kind=opened`],
     ]);
     expect(html.slice(html.indexOf('<main'))).not.toMatch(/<form /);
-    expect(html).toContain('2 of 8 changes match: opened.');
+    expect(html).toContain('2 of 8 entries match: opened.');
   });
 
   it('says so in place of the table when nothing matches', () => {
@@ -51,8 +51,8 @@ describe('the Changes log, rendered', () => {
   it('says when a site filter names no site of this account, as a status', () => {
     const html = render({ site: 'e0000000-0000-4000-8000-000000000001' });
     expect(html).toContain('role="status"');
-    expect(html).toContain('That site is not in this account');
+    expect(html).toContain('That site is not one you can see here');
     expect(html).not.toContain('e0000000-0000-4000-8000-000000000001');
-    expect(render()).not.toContain('That site is not in this account');
+    expect(render()).not.toContain('That site is not one you can see here');
   });
 });

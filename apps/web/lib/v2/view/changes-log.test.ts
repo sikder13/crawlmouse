@@ -35,7 +35,7 @@ describe('the Changes log', () => {
       'staging.example-outfitter.dev',
       'example-outfitter.com',
     ]);
-    expect(v.headline).toBe('8 changes across 4 sites, newest first.');
+    expect(v.headline).toBe('7 changes across 4 sites, newest first.');
     // The rail's "3 new": Claude-SearchBot, ClaudeBot (opened) and nahltech's orphans (resolved).
     expect(v.newNote).toBe('Three were opened or resolved at a site’s latest check.');
     expect(v.shell.nav.find((n) => n.current)!.label).toBe('Changes');
@@ -50,7 +50,7 @@ describe('the Changes log', () => {
   it('filters by kind, and says how many of how many match', () => {
     const v = log({ kind: 'opened' });
     expect(ids(v)).toEqual(['001', '002']);
-    expect(v.headline).toBe('2 of 8 changes match: opened.');
+    expect(v.headline).toBe('2 of 8 entries match: opened.');
     expect(v.newNote).toBeNull();
   });
 
@@ -140,7 +140,9 @@ describe('a first audit in the Changes log (F-100)', () => {
         summary: `finding ${i}`,
       })),
     );
-    return { ...bad, checks: [...bad.checks, ...checks], changes };
+    // The fixture's own checks of these sites go, so "nothing after it" is true of each.
+    const others = bad.checks.filter((c) => !siteIds.includes(c.site_id));
+    return { ...bad, checks: [...others, ...checks], changes };
   }
 
   it('is one row for the site, saying how many issues it found', () => {
@@ -174,6 +176,31 @@ describe('a first audit in the Changes log (F-100)', () => {
     );
   });
 
+  it('once a site has been checked again, it no longer says the next check will compare', () => {
+    const v = log();
+    const row = v.rows.find((r) => r.key.startsWith('first-audit-'))!;
+    expect(row.cause).toBe('The baseline this site’s later checks are compared with.');
+  });
+
+  it('two identical checks: a first audit, and no later change', () => {
+    const d = firstAuditOnly(3, 1);
+    const site = d.checks.find(
+      (c) => c.previous_check_id === null && d.changes.some((x) => x.check_id === c.id),
+    )!;
+    const again = {
+      ...site,
+      id: 'c9000000-0000-4000-8000-000000000001',
+      trigger: 'manual' as const,
+      previous_check_id: site.id,
+      queued_at: viewer.now,
+      started_at: viewer.now,
+      finished_at: viewer.now,
+    };
+    const v = changesLogView({ ...d, checks: [...d.checks, again] }, viewer, {}, BASE);
+    expect(v.headline).toBe('One first audit. No later check has found a change.');
+    expect(v.rows[0]!.cause).toBe('The baseline this site’s later checks are compared with.');
+  });
+
   it('five sites’ first audits are five rows, one each', () => {
     const v = changesLogView(firstAuditOnly(16, 5), viewer, {}, BASE);
     expect(v.rows).toHaveLength(5);
@@ -184,7 +211,7 @@ describe('a first audit in the Changes log (F-100)', () => {
     const v = log();
     expect(v.rows.filter((r) => r.summary.startsWith('First audit'))).toHaveLength(1);
     expect(v.rows.filter((r) => r.kind === 'opened').length).toBeGreaterThan(0);
-    expect(v.headline).toBe('8 changes across 4 sites, newest first.');
+    expect(v.headline).toBe('7 changes across 4 sites, newest first.');
   });
 
   it('a non-finding row of a first check (a deploy audited) is not folded in', () => {
@@ -201,7 +228,7 @@ describe('a first audit in the Changes log (F-100)', () => {
 
 describe('a site filter for a site outside the account (F-130)', () => {
   const OWN = '50000000-0000-4000-8000-000000000001';
-  const SENTENCE = 'That site is not in this account, so every site’s changes are shown.';
+  const SENTENCE = 'That site is not one you can see here, so the filter on it is not applied.';
 
   it('says so, and shows the account’s own changes', () => {
     const v = log({ site: 'e0000000-0000-4000-8000-000000000001' });
@@ -222,8 +249,37 @@ describe('a site filter for a site outside the account (F-130)', () => {
     expect(answers[0]).not.toContain('e0000000');
   });
 
-  it('says nothing for a site of the account, or with no filter', () => {
+  it('answers the same for a real site of another account as for an id that names nothing', () => {
+    const FOREIGN = 'e0000000-0000-4000-8000-0000000000aa';
+    const own = bad.sites.find((s) => s.id === OWN)!;
+    const withForeign = {
+      ...bad,
+      sites: [
+        ...bad.sites,
+        {
+          ...own,
+          id: FOREIGN,
+          account_id: 'a0000000-0000-4000-8000-0000000000ff',
+          host: 'someone-else.example',
+        },
+      ],
+    };
+    const read = (site: string) => {
+      const { notice, rows, headline, filters } = changesLogView(
+        withForeign,
+        viewer,
+        { site },
+        BASE,
+      );
+      return JSON.stringify({ notice, rows, headline, filters }).replaceAll(site, 'ID');
+    };
+    expect(read(FOREIGN)).toBe(read('f0000000-0000-4000-8000-00000000abcd'));
+    expect(read(FOREIGN)).not.toContain('someone-else');
+  });
+
+  it('says nothing for a site of the account, with no filter, or with an empty one', () => {
     expect(log({ site: OWN }).notice).toBeNull();
     expect(log().notice).toBeNull();
+    expect(log({ site: '' }).notice).toBeNull();
   });
 });

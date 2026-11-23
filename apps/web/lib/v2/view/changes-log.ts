@@ -10,7 +10,14 @@ import { instant, type Change } from '@crawlmouse/types/v2';
 import { CHANGES_LOG_COPY as COPY } from '../copy/changes-log';
 import { findCheck } from '../fixtures';
 import { dayDate, hourMinute } from '../format';
-import { readerRole, viewAt, type AccountDataset, type AccountView, type Viewer } from './account';
+import {
+  readerRole,
+  resultChecks,
+  viewAt,
+  type AccountDataset,
+  type AccountView,
+  type Viewer,
+} from './account';
 import { accountShellView, newChanges, type ShellView } from './account-shell';
 import { rowOf, type ChangeRowView } from './segment/changes';
 
@@ -156,7 +163,10 @@ export function changesLogView(
           pages: null,
           effect: 'none',
           verdict: null,
-          cause: COPY.firstAuditCause,
+          cause:
+            resultChecks(v, siteOfCheck.get(c.check_id)!).length > 1
+              ? COPY.firstAuditCauseLater
+              : COPY.firstAuditCause,
           diff: [],
         }),
     site: hostOf.get(siteOfCheck.get(c.check_id)!)!,
@@ -178,17 +188,29 @@ export function changesLogView(
     ...(since.days !== null ? [since.label.toLowerCase()] : []),
   ];
   const fresh = newChanges(v).length;
-  const sitesShown = new Set(rows.map((r) => r.site)).size;
+  // A first audit is an entry in the log and not a change: the headline counts changes only.
+  const changesShown = shown.filter((e) => e.findings === null);
+  const sitesChanged = new Set(changesShown.map((e) => siteOfCheck.get(e.change.check_id))).size;
+  const anyRechecked = shown.some(
+    (e) => resultChecks(v, siteOfCheck.get(e.change.check_id)!).length > 1,
+  );
 
   return {
     shell: accountShellView(v, 'Changes', { role: readerRole(v) ?? 'developer' }),
     title: COPY.title,
     headline: filtered
-      ? COPY.filtered(rows.length, all.length, named)
+      ? COPY.filtered(
+          rows.length,
+          all.length,
+          named,
+          all.some((e) => e.findings !== null),
+        )
       : rows.length
-        ? shown.every((e) => e.findings !== null)
-          ? COPY.firstAuditsOnly(rows.length)
-          : COPY.headline(rows.length, sitesShown)
+        ? changesShown.length === 0
+          ? anyRechecked
+            ? COPY.firstAuditsNoChange(rows.length)
+            : COPY.firstAuditsOnly(rows.length)
+          : COPY.headline(changesShown.length, sitesChanged)
         : null,
     newNote: !filtered && fresh > 0 ? COPY.newNote(fresh) : null,
     filters: [
@@ -221,7 +243,7 @@ export function changesLogView(
     ],
     filtersLabel: COPY.filtersLabel,
     rows,
-    notice: query.site !== undefined && site === null ? COPY.siteNotHere : null,
+    notice: query.site && site === null ? COPY.siteNotHere : null,
     empty: rows.length ? null : filtered ? COPY.noMatch : COPY.noChanges,
     tableLabel: COPY.table,
   };
