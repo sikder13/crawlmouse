@@ -732,6 +732,20 @@ const ROUTES: readonly Spec[] = [
     calls: 1,
   },
   {
+    path: 'api/webhooks/worker',
+    v2: true,
+    identity: 'the crawl worker',
+    gate: 'signature',
+    detail:
+      'Sends the event that wakes a run waiting on a batch, after `verifySignal` passes. Reads and returns no data.',
+    check: at('app/api/webhooks/worker/route.ts', 'verifySignal'),
+    proof: by(
+      'app/api/webhooks/worker/route.test.ts',
+      'refuses a signature made for a batch post or a read',
+    ),
+    calls: 0,
+  },
+  {
     path: 'api/contact/agency-plus',
     v2: true,
     identity: 'anyone (Turnstile when enforced, per-IP and per-address limits)',

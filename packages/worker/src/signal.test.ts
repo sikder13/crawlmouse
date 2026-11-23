@@ -83,8 +83,31 @@ describe('the done signal', () => {
     expect(JSON.stringify(h.logged)).not.toContain('app.example.test');
   });
 
+  it('does not follow a redirect, which would carry the signature elsewhere', async () => {
+    const h = harness();
+    h.signal(ENDED);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(h.post.mock.calls[0]![1].redirect).toBe('error');
+  });
+
+  it('logs an answer that refused it, with ids and the status only', async () => {
+    const h = harness(vi.fn(async () => ({ status: 401 })));
+    h.signal(ENDED);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(h.logged).toEqual([
+      { event: 'signal_refused', check_id: ENDED.check_id, batch: 3, status: 401 },
+    ]);
+  });
+
+  it('logs nothing for an answer that took it', async () => {
+    const h = harness(vi.fn(async () => ({ status: 204 })));
+    h.signal(ENDED);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(h.logged).toEqual([]);
+  });
+
   it('gives each request a deadline', async () => {
-    const h = harness(vi.fn(() => new Promise<unknown>(() => undefined)));
+    const h = harness(vi.fn(() => new Promise<void>(() => undefined)));
     h.signal(ENDED);
     await vi.advanceTimersByTimeAsync(0);
     const { signal } = h.post.mock.calls[0]![1] as { signal: AbortSignal };

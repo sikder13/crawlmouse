@@ -1,6 +1,11 @@
 import { inngest } from '../../../../../../inngest/client';
 import { parseWorkerNote } from '../../../../lib/v2/pipeline/worker-note';
-import { SIGNATURE_HEADER, TS_HEADER, verifySignal } from '../../../../lib/worker-client/sign';
+import {
+  SIGNAL_MAX_SKEW_MS,
+  SIGNATURE_HEADER,
+  TS_HEADER,
+  verifySignal,
+} from '../../../../lib/worker-client/sign';
 
 export const runtime = 'nodejs';
 
@@ -11,6 +16,15 @@ export const runtime = 'nodejs';
  * wait's timeout, so a failure here is answered and not retried.
  */
 const MAX_BYTES = 512;
+
+/** Whether these headers could pass `verifySignal`: a recent time and a whole hex signature. */
+function headersCanPass(ts: string, signature: string, now: number): boolean {
+  return (
+    /^\d{1,15}$/.test(ts) &&
+    Math.abs(now - Number(ts)) <= SIGNAL_MAX_SKEW_MS &&
+    /^[0-9a-f]{64}$/i.test(signature)
+  );
+}
 
 /** The body as text, or null past MAX_BYTES, whatever Content-Length said. */
 async function bounded(req: Request): Promise<string | null> {
@@ -33,12 +47,16 @@ async function bounded(req: Request): Promise<string | null> {
 }
 
 export async function POST(req: Request): Promise<Response> {
-  const raw = await bounded(req);
-  if (raw === null) return new Response(null, { status: 413 });
   const secret = process.env.WORKER_SIGNING_SECRET;
   const ts = req.headers.get(TS_HEADER) ?? '';
   const signature = req.headers.get(SIGNATURE_HEADER) ?? '';
-  if (!secret || !verifySignal(secret, ts, raw, signature, Date.now())) {
+  // Before the body: a request that cannot pass does not get to hold the connection open.
+  if (!secret || !headersCanPass(ts, signature, Date.now())) {
+    return new Response(null, { status: 401 });
+  }
+  const raw = await bounded(req);
+  if (raw === null) return new Response(null, { status: 413 });
+  if (!verifySignal(secret, ts, raw, signature, Date.now())) {
     return new Response(null, { status: 401 });
   }
   const note = parseWorkerNote(raw);

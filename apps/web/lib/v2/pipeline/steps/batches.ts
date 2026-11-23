@@ -226,7 +226,7 @@ export function batchSteps(
       if (got.status === 'not_found') return { status: 'not_found' };
       // Read on a signal that came early: nothing is lost, and the run goes back to polling it.
       if (got.status === 'running') return { status: 'running' };
-      if (got.status !== 'done') throw new Error(`batch ${at.batch} is ${got.status} at read`);
+      if (got.status === 'failed') return { status: 'failed' };
       const parsed = BatchResultSchema.safeParse(got.result);
       if (!parsed.success) throw new CheckFailure('internal', { cause: parsed.error });
       const result = parsed.data;

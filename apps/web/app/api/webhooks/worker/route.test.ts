@@ -91,7 +91,24 @@ describe('POST /api/webhooks/worker', () => {
 
   it('fails closed with no secret', async () => {
     vi.stubEnv('WORKER_SIGNING_SECRET', '');
-    expect((await call(JSON.stringify(BODY))).status).toBe(401);
+    const raw = JSON.stringify(BODY);
+    // Signed with the empty key, which is what a route with no secret would otherwise accept.
+    expect((await call(raw, { sig: signSignal('', String(NOW), raw) })).status).toBe(401);
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it('refuses a request that cannot pass without reading its body', async () => {
+    const cancelled = vi.fn();
+    const body = new ReadableStream({ cancel: cancelled });
+    const res = await POST(
+      new Request(URL_, {
+        method: 'POST',
+        headers: { 'x-crawlmouse-ts': String(NOW), 'x-crawlmouse-signature': 'nope' },
+        body,
+        duplex: 'half',
+      } as RequestInit),
+    );
+    expect(res.status).toBe(401);
     expect(send).not.toHaveBeenCalled();
   });
 

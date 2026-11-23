@@ -26,8 +26,10 @@ export type SignalPost = (
     headers: Record<string, string>;
     body: string;
     signal: AbortSignal;
+    /** Refused, so a redirect cannot carry the signature to another address. */
+    redirect: 'error';
   },
-) => Promise<unknown>;
+) => Promise<{ status?: number } | void>;
 
 /** Its own context, so a signature here is not one for a batch post or a read. */
 export const signSignal = (secret: string, ts: string, raw: string): string =>
@@ -50,7 +52,7 @@ export function createDoneSignal(deps: DoneSignalDeps): (ended: BatchEnded) => v
     const timer = setTimeout(() => deadline.abort(), SIGNAL_REQUEST_MS);
     timer.unref?.();
     try {
-      await post(deps.url, {
+      const answer = await post(deps.url, {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
@@ -59,7 +61,16 @@ export function createDoneSignal(deps: DoneSignalDeps): (ended: BatchEnded) => v
         },
         body: raw,
         signal: deadline.signal,
+        redirect: 'error',
       });
+      if (answer?.status !== undefined && (answer.status < 200 || answer.status >= 300)) {
+        deps.log({
+          event: 'signal_refused',
+          check_id: ended.check_id,
+          batch: ended.batch,
+          status: answer.status,
+        });
+      }
     } catch {
       // Never the error's text: it can hold the address.
       deps.log({ event: 'signal_failed', check_id: ended.check_id, batch: ended.batch });
