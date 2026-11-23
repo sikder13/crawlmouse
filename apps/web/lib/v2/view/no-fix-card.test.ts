@@ -6,14 +6,15 @@ const facts = fc.record({
   pagesAnswered: fc.nat({ max: 5 }),
   pagesServed: fc.nat({ max: 5 }),
   graded: fc.boolean(),
-  measuredInFull: fc.boolean(),
+  aiUnmeasured: fc.nat({ max: 6 }),
+  everySectionMeasured: fc.boolean(),
 });
 
 describe('what the third card says when a check has no fix', () => {
   it('says all-clear exactly when a page was served and everything was measured', () => {
     fc.assert(
       fc.property(facts, (f) => {
-        const measured = f.pagesServed > 0 && f.measuredInFull;
+        const measured = f.pagesServed > 0 && f.aiUnmeasured === 0 && f.everySectionMeasured;
         expect(noFixKind(f) === 'all-clear').toBe(measured);
       }),
     );
@@ -29,13 +30,38 @@ describe('what the third card says when a check has no fix', () => {
     );
   });
 
-  it('is unmeasured when not every section was measured in full', () => {
-    const f = { pagesAnswered: 3, pagesServed: 3, graded: true, measuredInFull: false };
-    expect(noFixKind(f)).toBe('unmeasured');
-  });
-
-  it('is unmeasured with no page rows to read', () => {
-    const f = { pagesAnswered: 0, pagesServed: 0, graded: false, measuredInFull: true };
+  it.each([
+    [
+      'one crawler not measured',
+      {
+        pagesAnswered: 3,
+        pagesServed: 3,
+        graded: false,
+        aiUnmeasured: 1,
+        everySectionMeasured: true,
+      },
+    ],
+    [
+      'text not measured',
+      {
+        pagesAnswered: 3,
+        pagesServed: 3,
+        graded: false,
+        aiUnmeasured: 0,
+        everySectionMeasured: false,
+      },
+    ],
+    [
+      'no page rows to read',
+      {
+        pagesAnswered: 0,
+        pagesServed: 0,
+        graded: false,
+        aiUnmeasured: 0,
+        everySectionMeasured: true,
+      },
+    ],
+  ])('is unmeasured with %s', (_name, f) => {
     expect(noFixKind(f)).toBe('unmeasured');
   });
 });

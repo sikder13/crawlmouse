@@ -17,7 +17,7 @@ import {
   type Verdict,
 } from '@crawlmouse/types/v2';
 import { AI_WAITING } from './view/effect-headline';
-import { partlyRead, type MeasuredLevel } from './view/section-measured';
+import { sectionMeasured } from './view/section-measured';
 import { letterFor, nextBandFloor } from './letters';
 import { listOf, percent, templateNoun } from './format';
 import { capitalise, count, numberWord, plural } from './words';
@@ -273,15 +273,9 @@ export function structureWord(score: number): string {
 }
 
 /** Locked Result: "Sound structure; seven pages nobody links to. Three fixes take it to A-; …" */
-export function seoSummary(
-  check: Check,
-  fixes: readonly Fix[],
-  isOpen: (f: Fix) => boolean,
-  structure: { level: MeasuredLevel; read: number; total: number },
-) {
+export function seoSummary(check: Check, fixes: readonly Fix[], isOpen: (f: Fix) => boolean) {
   const t = check.technical_seo!;
-  if (structure.level === 'none') return NO_LINK_READ;
-  if (structure.level === 'partial') return partlyRead(structure);
+  if (!sectionMeasured(check, 'structure')) return NO_LINK_READ;
   const orphans = check.structure!.orphan_pages;
   const linked = orphans
     ? `${numberWord(orphans)} ${plural(orphans, 'page nobody links to', 'pages nobody links to')}`

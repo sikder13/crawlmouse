@@ -32,8 +32,6 @@ const check = findCheck(d, CHECKS.badFirstAudit);
 const fixes = fixesAsOf(d, check);
 const isOpen = (f: (typeof fixes)[number]) => fixes.indexOf(f) < 3;
 
-const READ_IN_FULL = { level: 'full', read: 1, total: 1 } as const;
-
 describe('the sentences about a check', () => {
   it('words the fixes to the next band by how many are open', () => {
     const [a, b] = [
@@ -66,7 +64,7 @@ describe('the sentences about a check', () => {
         site_structure_score: null,
       },
     };
-    const s = seoSummary(refused, fixes, isOpen, READ_IN_FULL);
+    const s = seoSummary(refused, fixes, isOpen);
     expect(s).toBe('Seven pages nobody links to.');
     expect(s).not.toMatch(/structure/i);
   });
@@ -194,7 +192,7 @@ describe('the Technical SEO sentence with nothing to fix', () => {
     const c = findCheck(clean, CHECKS.cleanFirstAudit);
     const none = fixesAsOf(clean, c);
     expect(none).toHaveLength(0);
-    const said = seoSummary(c, none, () => true, READ_IN_FULL);
+    const said = seoSummary(c, none, () => true);
     expect(said).toMatch(/No fix in this audit raises it\.$/);
     expect(said).not.toMatch(/lowers/);
   });
