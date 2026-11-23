@@ -186,8 +186,10 @@ recorded consent), cancel and portal, the Stripe account webhook, the trial and 
 | --- | ------------------------------------------------------------------ | ----------------------------------------------------------------------- |
 | 1   | Open `/pricing`                                                    | the v2 pricing page with the prices in `apps/web/lib/billing/prices.ts` |
 | 2   | Signed in, start Pro checkout                                      | Stripe Checkout in live mode at the Pro price; close it unpaid          |
-| 3   | Open `/agency-trial`, tick the consent, continue                   | Stripe Checkout for the Agency trial; close it unpaid                   |
+| 3   | Signed in, open `/agency-trial`                                    | `404`: Agency is closed while `V2_AGENCY_SALES` is unset                |
 | 4   | `curl -si -X POST https://crawlmouse.com/api/billing/agency-trial` | `404`                                                                   |
+| 5   | Signed in, send `POST /api/billing/checkout` with `plan: "agency"` | `403` with `agency_not_open`, and no Checkout opens                     |
+| 6   | Open `/pricing` and `/agencies`                                    | Agency reads as coming, with the waitlist and no button to buy it       |
 
 **Search.** Step 5 rewrites `/pricing` and `/developers` and adds `/agencies` to the sitemap (OPERATING-RULES
 §13): record Search Console impressions and the indexed-URL list before it, and run `pnpm indexnow` only

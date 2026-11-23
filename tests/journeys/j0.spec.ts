@@ -135,29 +135,18 @@ step('J0.9j', '/bot describes the v2 crawler', async ({ page }) => {
 
 step(
   'J0.9b',
-  'the agency offer is a finished v2 page, and the trial page routes by billing',
-  async ({ page, request, baseURL }) => {
+  'the agency offer is a finished v2 page that says Agency is coming and sells nothing',
+  async ({ page, request }) => {
     await expectFinishedV2Page(page, '/agencies', missing('F-024'));
-    // Billing off: /agencies offers no start, and /agency-trial comes back to it. Billing on: /agencies links
-    // to the trial, which sends a signed-out visitor to sign-in. An offer that loops back starts nothing.
-    const offers = await (await contentOf(page))
+    // Agency is closed for launch (F-205): the page says so, links to no trial, and the trial is gone.
+    const main = await contentOf(page);
+    const offers = await main
       .locator('a[href*="/agency-trial"], form[action*="/agency-trial"]')
       .count();
+    expect(offers, 'F-205: /agencies links to the closed Agency trial').toBe(0);
+    expect(await main.innerText(), 'F-205: /agencies says Agency is coming').toMatch(/\bcoming\b/i);
     const trial = await request.get('/agency-trial', { maxRedirects: 0 });
-    if (trial.status() === 404) {
-      expect(trial.status(), 'F-024: /agency-trial is a page').not.toBe(404);
-    }
-    expect([302, 303, 307, 308], '/agency-trial redirects a signed-out visitor').toContain(
-      trial.status(),
-    );
-    const to = new URL(trial.headers()['location'] ?? '', baseURL);
-    expect(to.origin, '/agency-trial stays on this site').toBe(new URL(baseURL!).origin);
-    const toSignIn = to.pathname === '/login' && to.searchParams.get('next') === '/agency-trial';
-    const toOffer = to.pathname === '/agencies';
-    expect(
-      offers > 0 ? toSignIn : toOffer,
-      `/agency-trial goes to ${to.pathname}${to.search}, and /agencies has ${offers} link(s) to it`,
-    ).toBe(true);
+    expect(trial.status(), 'F-205: /agency-trial answers 404 while Agency is closed').toBe(404);
   },
 );
 
