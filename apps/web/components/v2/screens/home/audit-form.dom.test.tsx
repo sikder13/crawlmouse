@@ -178,7 +178,7 @@ describe('the Home form, starting an audit', () => {
     'site_exists',
   ] as const;
 
-  it('fits every sentence the route can write, on every plan and count', () => {
+  it('fits the route’s fixed sentences and a sample of its site-limit sentences', () => {
     const sentences = [
       ...Object.values(ACCOUNT_SENTENCES),
       ...(['free', 'pro', 'agency'] as const).flatMap((tier) =>
@@ -206,6 +206,14 @@ describe('the Home form, starting an audit', () => {
     expect(alertOf(host)).toBe(error);
   });
 
+  it('shows a sentence of exactly the longest length it accepts', async () => {
+    const host = form();
+    const error = 'a'.repeat(300);
+    answers.push(json(409, { code: 'site_limit', error }));
+    await submit(host, 'example.com');
+    expect(alertOf(host)).toBe(error);
+  });
+
   it.each(WORDED)('for %s shows hostile text as text, never as markup', async (code) => {
     const host = form();
     const error = '<img src=x onerror="alert(1)"><a href="//evil.example">Upgrade</a>';
@@ -218,9 +226,20 @@ describe('the Home form, starting an audit', () => {
 
   it.each(
     WORDED.flatMap((code) =>
-      [undefined, null, 5, {}, ['x'], '', '   ', 'a'.repeat(301), 'line one\nline two'].map(
-        (error) => [code, error] as const,
-      ),
+      [
+        undefined,
+        null,
+        5,
+        {},
+        ['x'],
+        '',
+        '   ',
+        'a'.repeat(301),
+        'line one\nline two',
+        'a\rb',
+        'a\u0000b',
+        'a\u007fb',
+      ].map((error) => [code, error] as const),
     ),
   )('for %s with error %j falls back to the fixed sentence', async (code, error) => {
     const host = form();
