@@ -89,6 +89,10 @@ const INVENTORY: [entry: string, why: string][] = [
     "ARRAY slice of a URL pathname's segments (drops the empty one before the leading slash); segments are shaped or replaced, never cut (CC-41).",
   ],
   [
+    "apps/web/lib/analytics/ingest-proxy.ts :: const path = pathname.slice(PREFIX.length) || '/';",
+    'Not crawled text: a `URL.pathname` of a request to our own proxy, which is percent-encoded ASCII, cut after the fixed `/ingest` prefix the line above it has just checked.',
+  ],
+  [
     "apps/web/lib/analytics/first-touch.ts :: return d.toISOString().replace(/\\.\\d{3}Z$/, 'Z');",
     'Not a cut of crawled text: an ISO timestamp of our own clock with its milliseconds removed (CC-41).',
   ],
