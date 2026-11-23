@@ -94,6 +94,29 @@ describe('claimCheck', () => {
     ).toBe(1);
   });
 
+  it('clears the expiry of every check on the site it takes, and of no other site', async () => {
+    const user = await signUp(db, 'keeper-all@example.com');
+    const { checkId, siteId } = await anonymousCheck(db, 'keeps-all.example.com', LATER);
+    await db.query(
+      `insert into public.checks
+         (site_id, status, trigger, grade_version, expires_at, started_at, finished_at, failure_reason)
+       values ($1, 'failed', 'first_audit', '1.0.0', $2, now(), now(), 'crawl_failed')`,
+      [siteId, LATER],
+    );
+    const other = await anonymousCheck(db, 'keeps-none.example.com', LATER);
+    expect(await claimCheck(deps(), { checkId, userId: user })).toEqual({ ok: true, siteId });
+    expect(
+      await count(db, `select 1 from public.checks where site_id = $1 and expires_at is not null`, [
+        siteId,
+      ]),
+    ).toBe(0);
+    expect(
+      await count(db, `select 1 from public.checks where id = $1 and expires_at is not null`, [
+        other.checkId,
+      ]),
+    ).toBe(1);
+  });
+
   it('a second claim of the same check is a 409', async () => {
     const user = await signUp(db, 'twice@example.com');
     const { checkId } = await anonymousCheck(db, 'twice.example.com', LATER);
