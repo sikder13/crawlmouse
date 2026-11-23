@@ -26,6 +26,7 @@ function harness(
   perLabHost: boolean,
   answer: (host: string, path: string) => 'ok' | '429' | 'challenge' | { redirect: string },
   robots = (_host: string) => '',
+  robotsRedirect: (host: string) => string | null = () => null,
 ) {
   const clock = new VirtualClock();
   const seen = new Map<string, number[]>();
@@ -40,6 +41,16 @@ function harness(
       finalUrl: url,
       maxBytes: limits.maxBytes,
     };
+    const movedTo = u.pathname === '/robots.txt' ? robotsRedirect(u.hostname) : null;
+    if (movedTo)
+      return outcome({ ...common, status: 301, headers: { location: movedTo }, body: '' });
+    if (u.pathname === '/robots.txt' && u.hostname === 'elsewhere.test')
+      return outcome({
+        ...common,
+        status: 429,
+        headers: { 'content-type': 'text/plain' },
+        body: 'slow down',
+      });
     if (u.pathname === '/robots.txt')
       return outcome({
         ...common,
@@ -227,4 +238,95 @@ describe('off-site does not move with the setting on', () => {
     await h.run([request(A, 1, 1)]);
     expect(h.seen.get('elsewhere.test')).toBeUndefined();
   });
+});
+
+describe('a chain cut short counts against the host that answered', () => {
+  const HOSTS = ['c', 'd', 'e', 'f', 'g'].map((x) => `${x}.lab.crawlmouse.com`);
+
+  it.each([
+    ['crawl', request],
+    ['access', accessRequest],
+  ] as const)('%s: a challenged redirect to another domain stops that host', async (_k, make) => {
+    const clock = new VirtualClock();
+    let atB = 0;
+    const fetcher: Fetcher = async (url, identity, limits) => {
+      const u = new URL(url);
+      const common = {
+        url,
+        identity,
+        startedAt: clock.now(),
+        finalUrl: url,
+        maxBytes: limits.maxBytes,
+      };
+      if (u.pathname === '/robots.txt')
+        return outcome({
+          ...common,
+          status: 200,
+          headers: { 'content-type': 'text/plain' },
+          body: 'User-agent: *\nAllow: /\n',
+        });
+      if (u.hostname === B) {
+        atB += 1;
+        return outcome({
+          ...common,
+          status: 302,
+          headers: { location: 'https://elsewhere.test/x', 'cf-mitigated': 'challenge' },
+          body: '',
+        });
+      }
+      return outcome({
+        ...common,
+        status: 301,
+        headers: { location: `https://${B}${u.pathname}` },
+        body: '',
+      });
+    };
+    const deps = {
+      clock,
+      sites: new Sites(clock, true),
+      fetcher,
+      robotsCache: new RobotsCache(clock),
+    };
+    for (const [i, host] of HOSTS.entries()) await clock.run(runBatch(make(host, i + 1, 3), deps));
+    expect(atB).toBeLessThanOrEqual(4);
+  });
+});
+
+describe('which stops a batch reports', () => {
+  it('not one on a site it never requested, from a batch running beside it', async () => {
+    const h = harness(true, (host) => (host === 'crawlmouse.com' ? '429' : 'ok'));
+    const [mine] = await h.run([request(A, 1, 6), request('crawlmouse.com', 2, 6)]);
+    expect(stops(mine!)).toEqual([]);
+  });
+
+  it('one on a host it named but sent nothing to, with robots.txt already read', async () => {
+    const h = harness(
+      true,
+      (host, path) => (host === A && path.startsWith('/p/') ? '429' : 'ok'),
+      () => 'Disallow: /private\n',
+    );
+    await h.run([{ ...request(A, 1, 1), urls: [`https://${A}/open`] } as BatchRequest]);
+    const named = {
+      ...request(A, 2, 1),
+      urls: [`https://${A}/private`, ...Array.from({ length: 6 }, (_, k) => `https://${B}/q/${k}`)],
+    } as BatchRequest;
+    const [, result] = await h.run([request(A, 3, 6), named]);
+    expect(stops(result!)).toContain(A);
+  });
+
+  it.each([true, false])(
+    'not one on another domain that robots.txt redirected to (setting %s)',
+    async (on) => {
+      const h = harness(
+        on,
+        (host) => (host === 'elsewhere.test' ? '429' : 'ok'),
+        () => '',
+        (host) => (host === 'elsewhere.test' ? null : 'https://elsewhere.test/robots.txt'),
+      );
+      // Three answers stop that domain, and no later request is refused, so no finding is owed.
+      const urls = ['a', 'b', 'c'].map((x) => `https://${x}.lab.crawlmouse.com/p/0`);
+      const [result] = await h.run([{ ...request(A, 1, 1), urls } as BatchRequest]);
+      expect(stops(result!)).not.toContain('elsewhere.test');
+    },
+  );
 });

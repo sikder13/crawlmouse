@@ -13,7 +13,7 @@ import { BODY_TIEBREAK_BYTES, readResponse, type ResponseReading } from '../verd
 import { decide, isRefusal, type Cell, type Observed, type Row } from '../verdict/table.js';
 import type { Vantage } from '../vantage.js';
 import type { Findings } from './findings.js';
-import { answeredUrl, politeFetch, type FetchContext, type NotRequested } from './polite-fetch.js';
+import { politeFetch, type FetchContext, type NotRequested } from './polite-fetch.js';
 import { pathOf, type BatchRobots, type SiteBlock } from './site-rules.js';
 
 /**
@@ -61,6 +61,8 @@ export const NOT_REQUESTED_ROW = {
 interface Probe {
   identity: Identity;
   fetch: FetchOutcome | null;
+  /** The URL of the last request that got a response; absent when none was made. */
+  answeredBy?: string;
   observed: Observed;
   reading: ResponseReading | null;
   words: number | null;
@@ -115,6 +117,7 @@ async function probe(run: AccessRun, url: string, identity: Identity): Promise<P
   return {
     identity,
     fetch,
+    answeredBy: r.answeredBy,
     observed: reading.class,
     reading,
     words: counted.words,
@@ -250,7 +253,7 @@ async function accessPage(run: AccessRun, page: AccessPage): Promise<AccessTest[
   const control = oursAllowed ? await probe(run, page.url, CONTROL) : skipped(CONTROL);
   if (control.fetch)
     run.ctx.sites.recordPage(
-      run.ctx.sites.keyOf(answeredUrl(control.fetch, page.url)),
+      run.ctx.sites.keyOf(control.answeredBy ?? page.url),
       control.observed === 'challenged',
     );
 

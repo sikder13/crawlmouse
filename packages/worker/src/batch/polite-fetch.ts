@@ -41,8 +41,8 @@ export type NotRequested =
  * before its target could be checked: the response received is kept, and the reason goes alongside.
  */
 export type Requested =
-  | { fetch: FetchOutcome; cut?: NotRequested }
-  | { notRequested: NotRequested };
+  /** `answeredBy`: the URL of the last request that got a response, the one `fetch` holds. */
+  { fetch: FetchOutcome; cut?: NotRequested; answeredBy: string } | { notRequested: NotRequested };
 
 /** Whether a redirect target may be requested, and if not, why. */
 export type RedirectGate =
@@ -114,10 +114,6 @@ async function oneRequest(
   return { reason: 'budget', budget: ctx.budget.exhausted! };
 }
 
-/** The URL whose host gave this response: where its chain landed, or the URL asked for. */
-export const answeredUrl = (f: FetchOutcome, requested: string): string =>
-  f.redirectStop === null && f.status !== null && f.finalUrl !== null ? f.finalUrl : requested;
-
 function refusal(ctx: FetchContext, site: string): NotRequested | null {
   const stop = ctx.sites.stopOf(site);
   if (stop) return { reason: 'site_stopped', site, stop };
@@ -131,6 +127,18 @@ export async function politeFetch(
   identity: Identity,
   policy: RequestPolicy,
 ): Promise<Requested> {
+  let answeredBy = url;
+  const r = await followChain(ctx, url, identity, policy, (u) => (answeredBy = u));
+  return 'notRequested' in r ? r : { ...r, answeredBy };
+}
+
+async function followChain(
+  ctx: FetchContext,
+  url: string,
+  identity: Identity,
+  policy: RequestPolicy,
+  answered: (url: string) => void,
+): Promise<{ fetch: FetchOutcome; cut?: NotRequested } | { notRequested: NotRequested }> {
   const hops: Hop[] = [];
   let current = url;
   // The redirect response that led to `current`, once there is one.
@@ -156,6 +164,7 @@ export async function politeFetch(
       };
       return { fetch, cut: r };
     }
+    answered(current);
     if (policy.follow === false) return { fetch: { ...r, url, hops } };
     const location = locationOf(r);
     let next: string | null = null;

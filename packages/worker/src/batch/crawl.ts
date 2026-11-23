@@ -31,7 +31,7 @@ import { readResponse, type ResponseClass } from '../verdict/response.js';
 import { LOCAL_VANTAGE, type Vantage } from '../vantage.js';
 import type { Findings } from './findings.js';
 import { isNotRead, type PageRead, type PageReader, type StackHeaders } from '../reader/read.js';
-import { answeredUrl, politeFetch, type FetchContext, type NotRequested } from './polite-fetch.js';
+import { politeFetch, type FetchContext, type NotRequested } from './polite-fetch.js';
 import { pathOf, type BatchRobots, type SiteBlock } from './site-rules.js';
 import { jsonBytes } from './json-bytes.js';
 
@@ -186,10 +186,7 @@ async function crawlPage(
   // A chain stopped at a redirect never requested its last Location, so it has not landed there.
   const landed = f.redirectStop === null && f.status !== null ? f.finalUrl : null;
   const reading = readResponse(f);
-  run.ctx.sites.recordPage(
-    run.ctx.sites.keyOf(answeredUrl(f, url)),
-    reading.class === 'challenged',
-  );
+  run.ctx.sites.recordPage(run.ctx.sites.keyOf(r.answeredBy), reading.class === 'challenged');
   const limitations = [
     ...(f.error ? [say.requestFailed(f)] : []),
     ...(f.redirectStop ? [say.redirectStopped(f.redirectStop, r.cut ?? null)] : []),
