@@ -25,6 +25,7 @@ export const DERIVED_TABLES = [
   'frontier',
   'frontier_politeness',
   'public_reports',
+  'render_reservations',
   'usage_events',
 ];
 
