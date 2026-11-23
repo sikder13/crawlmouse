@@ -105,16 +105,20 @@ export function renderedPills(markup: string) {
  * labelled "Footer", is cut with the footer and not on its own.
  */
 export const SHELL = [
-  // RC-20: the skip link, which the locked artboards predate.
-  /<a href="#v2-content"[^>]*>Skip to content<\/a>/,
-  /<span id="v2-content"[^>]*><\/span>/,
   /<nav\b[^>]*aria-label="Primary"[^>]*>[\s\S]*?<\/nav>/g,
   /<footer\b[\s\S]*?<\/footer>/g,
 ];
 
+/** RC-20: the shell's skip link and its target, which the locked artboards predate. */
+const SKIP_LINK = /<a href="#v2-content"[^>]*>Skip to content<\/a>/;
+const SKIP_TARGET = /<span id="v2-content"[^>]*><\/span>/;
+
+export const withoutSkipLink = (markup: string) =>
+  markup.replace(SKIP_LINK, '').replace(SKIP_TARGET, '');
+
 export function withoutShell(markup: string): { rest: string; cut: string[] } {
   const cut: string[] = [];
-  let rest = markup;
+  let rest = withoutSkipLink(markup);
   for (const re of SHELL) {
     rest = rest.replace(re, (m) => {
       cut.push(m);
