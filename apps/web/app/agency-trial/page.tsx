@@ -2,7 +2,7 @@ import '../../styles/v2/tokens.css';
 import type { Metadata } from 'next';
 import { notFound, redirect } from 'next/navigation';
 import { AgencyTrialScreen } from '@/components/v2/screens/agency-trial/AgencyTrialScreen';
-import { billingV2Enabled } from '@/lib/billing/flags';
+import { agencySalesOpen, billingV2Enabled } from '@/lib/billing/flags';
 import { supabasePortalAccounts } from '@/lib/billing/portal-v2';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { supabaseServer } from '@/lib/supabase/server';
@@ -36,6 +36,7 @@ export default async function AgencyTrialPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   if (!billingV2Enabled()) return notFound();
+  if (!agencySalesOpen()) return notFound();
   const params = await searchParams;
   const interval = intervalFrom(params.interval);
   const r = await loadViewer();

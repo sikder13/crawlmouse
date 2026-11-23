@@ -2,7 +2,7 @@ import * as Sentry from '@sentry/nextjs';
 import { after } from 'next/server';
 import { agencyTrial } from '@/lib/billing/agency-trial';
 import { supabaseCheckoutAccounts } from '@/lib/billing/checkout-v2';
-import { billingV2Enabled } from '@/lib/billing/flags';
+import { agencySalesOpen, billingV2Enabled } from '@/lib/billing/flags';
 import { refuse } from '@/lib/billing/request-body';
 import { stripeAccount } from '@/lib/billing/stripe-account';
 import { accountCatalog } from '@/lib/billing/stripe-catalog';
@@ -40,6 +40,7 @@ export async function POST(req: Request) {
   } = await sb.auth.getUser();
   if (!user) return refuse(401, 'auth_required');
   if (!billingV2Enabled()) return refuse(404, 'not_found');
+  if (!agencySalesOpen()) return refuse(404, 'not_found');
 
   const admin = supabaseAdmin();
   const checkouts = agencyCheckouts(admin);

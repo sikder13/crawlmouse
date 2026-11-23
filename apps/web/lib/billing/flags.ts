@@ -14,3 +14,12 @@ type Env = Readonly<Record<string, string | undefined>>;
 export function billingV2Enabled(env: Env = process.env): boolean {
   return env.V2_BILLING?.trim() === '1';
 }
+
+/**
+ * Whether Agency is on sale. While it is labelled "coming", V2_BILLING alone must not sell it: the
+ * checkout refuses `plan: 'agency'`, and `/agency-trial` and its route answer 404. On for the value
+ * `1` only, whitespace ignored.
+ */
+export function agencySalesOpen(env: Env = process.env): boolean {
+  return env.V2_AGENCY_SALES?.trim() === '1';
+}

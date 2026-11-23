@@ -65,12 +65,21 @@ beforeEach(() => {
   h.rows = [];
   h.used = null;
   vi.stubEnv('V2_BILLING', '1');
+  vi.stubEnv('V2_AGENCY_SALES', '1');
 });
 afterEach(() => vi.unstubAllEnvs());
 
 describe('/agency-trial', () => {
   it.each(['', 'true'])('is a 404 with V2_BILLING=%j, before any read', async (flag) => {
     vi.stubEnv('V2_BILLING', flag);
+    await expect(render()).rejects.toMatchObject({
+      digest: expect.stringContaining('NEXT_HTTP_ERROR_FALLBACK;404'),
+    });
+    expect(h.reads).toBe(0);
+  });
+
+  it('is a 404 with Agency not on sale, before any read, signed in or not', async () => {
+    vi.stubEnv('V2_AGENCY_SALES', '');
     await expect(render()).rejects.toMatchObject({
       digest: expect.stringContaining('NEXT_HTTP_ERROR_FALLBACK;404'),
     });
