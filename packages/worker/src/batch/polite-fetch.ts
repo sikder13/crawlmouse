@@ -26,6 +26,8 @@ export interface FetchContext {
   sites: Sites;
   fetcher: Fetcher;
   budget: Budget;
+  /** Each politeness key this batch requested, with its registrable domain (`batch/run.ts`). */
+  asked?: Map<string, string>;
   /** Aborted once a budget is spent, so the batch's queued requests are dropped without a start. */
   abort: AbortController;
 }
@@ -39,8 +41,8 @@ export type NotRequested =
  * before its target could be checked: the response received is kept, and the reason goes alongside.
  */
 export type Requested =
-  | { fetch: FetchOutcome; cut?: NotRequested }
-  | { notRequested: NotRequested };
+  /** `answeredBy`: the URL of the last request made, whose outcome is the one `fetch` holds. */
+  { fetch: FetchOutcome; cut?: NotRequested; answeredBy: string } | { notRequested: NotRequested };
 
 /** Whether a redirect target may be requested, and if not, why. */
 export type RedirectGate =
@@ -81,7 +83,7 @@ async function oneRequest(
   keepBytes: number | undefined,
   countsTowardStop: boolean,
 ): Promise<FetchOutcome | NotRequested> {
-  const site = siteKeyOf(url);
+  const site = ctx.sites.keyOf(url);
   const before = refusal(ctx, site);
   if (before) return before;
   const scheduled = await ctx.sites.limiter(site).schedule(async () => {
@@ -92,6 +94,7 @@ async function oneRequest(
       ctx.abort.abort();
       return { reason: 'budget', budget: spent } satisfies NotRequested;
     }
+    ctx.asked?.set(site, siteKeyOf(url));
     const limits = ctx.budget.requestLimits();
     const f = await ctx.fetcher(url, identity, {
       ...limits,
@@ -124,6 +127,18 @@ export async function politeFetch(
   identity: Identity,
   policy: RequestPolicy,
 ): Promise<Requested> {
+  let answeredBy = url;
+  const r = await followChain(ctx, url, identity, policy, (u) => (answeredBy = u));
+  return 'notRequested' in r ? r : { ...r, answeredBy };
+}
+
+async function followChain(
+  ctx: FetchContext,
+  url: string,
+  identity: Identity,
+  policy: RequestPolicy,
+  answered: (url: string) => void,
+): Promise<{ fetch: FetchOutcome; cut?: NotRequested } | { notRequested: NotRequested }> {
   const hops: Hop[] = [];
   let current = url;
   // The redirect response that led to `current`, once there is one.
@@ -149,6 +164,7 @@ export async function politeFetch(
       };
       return { fetch, cut: r };
     }
+    answered(current);
     if (policy.follow === false) return { fetch: { ...r, url, hops } };
     const location = locationOf(r);
     let next: string | null = null;

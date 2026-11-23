@@ -3,7 +3,6 @@ import type { Clock } from '../clock.js';
 import type { FetchOutcome } from '../fetch/fetcher.js';
 import { CANARY, CONTROL, CRAWLERS, type Identity } from '../identities.js';
 import { oursAllow, tokenAllows } from '../politeness/robots.js';
-import { siteKeyOf } from '../politeness/site-key.js';
 import { accessTestRow } from '../rows/access-test.js';
 import { detached } from '../rows/detached.js';
 import { isHtml, mediaTypeOf, NOT_HTML } from '../rows/text.js';
@@ -62,6 +61,8 @@ export const NOT_REQUESTED_ROW = {
 interface Probe {
   identity: Identity;
   fetch: FetchOutcome | null;
+  /** The URL of the last request made, whose outcome `fetch` holds; absent when none was. */
+  answeredBy?: string;
   observed: Observed;
   reading: ResponseReading | null;
   words: number | null;
@@ -116,6 +117,7 @@ async function probe(run: AccessRun, url: string, identity: Identity): Promise<P
   return {
     identity,
     fetch,
+    answeredBy: r.answeredBy,
     observed: reading.class,
     reading,
     words: counted.words,
@@ -250,7 +252,10 @@ async function accessPage(run: AccessRun, page: AccessPage): Promise<AccessTest[
 
   const control = oursAllowed ? await probe(run, page.url, CONTROL) : skipped(CONTROL);
   if (control.fetch)
-    run.ctx.sites.recordPage(siteKeyOf(page.url), control.observed === 'challenged');
+    run.ctx.sites.recordPage(
+      run.ctx.sites.keyOf(control.answeredBy ?? page.url),
+      control.observed === 'challenged',
+    );
 
   const crawlers: Probe[] = [];
   for (const identity of CRAWLERS) {

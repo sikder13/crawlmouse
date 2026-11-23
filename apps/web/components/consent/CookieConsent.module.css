@@ -1,0 +1,86 @@
+/*
+ * The consent bar. It renders on every page from the root layout, v2's and the v1 pages still kept,
+ * so each colour is a v2 token with its light value as the fallback for a page without the tokens.
+ */
+
+.bar {
+  position: fixed;
+  inset: auto 0 0;
+  z-index: 50;
+  box-sizing: border-box;
+  padding: 14px 16px;
+  border-top: 1px solid var(--v2-line, #e2e6eb);
+  background: var(--v2-s1, #ffffff);
+  color: var(--v2-fg, #13161b);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.inner {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.text {
+  margin: 0;
+  color: var(--v2-fg2, #3d4654);
+}
+
+.text a {
+  color: var(--v2-fg, #13161b);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 8px;
+}
+
+/* One class for both choices: neither is the more prominent. */
+.choice {
+  flex: 1;
+  min-height: var(--v2-control-h, 44px);
+  padding: 0 16px;
+  border: 1px solid var(--v2-ctl, #808996);
+  border-radius: var(--v2-radius-control, 5px);
+  background: var(--v2-s1, #ffffff);
+  color: var(--v2-fg, #13161b);
+  font: inherit;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.choice:hover {
+  border-color: var(--v2-fg, #13161b);
+}
+
+.choice:focus-visible,
+.text a:focus-visible {
+  outline: 2px solid var(--v2-fg, #13161b);
+  outline-offset: 2px;
+}
+
+@media (min-width: 640px) {
+  .inner {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+  }
+
+  .choice {
+    flex: none;
+  }
+}
+
+@media print {
+  .bar {
+    display: none;
+  }
+}

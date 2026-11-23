@@ -5,6 +5,8 @@
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { captureServerEvent } from '../../analytics-server';
+import { normalizeDomain } from '../../domain';
+import { hostTakenDown } from '../../host-takedown';
 import { MINT_REPORTS_PER_DAY } from '../../limits';
 import { checkRateLimit } from '../../rate-limit';
 
@@ -55,6 +57,15 @@ export function supabaseMintDeps(
     },
     rateLimit: (key) => checkRateLimit(key, MINT_REPORTS_PER_DAY, DAY_MS),
     verifyTurnstile: verifyTurnstileToken,
+    async hostTakenDown(siteId) {
+      const { data, error } = await admin
+        .from('sites')
+        .select('host')
+        .eq('id', siteId)
+        .maybeSingle();
+      if (error || !data) throw new Error('mint: reading the site for its takedown failed');
+      return hostTakenDown(admin, normalizeDomain(data.host as string));
+    },
     async slugForCheck(checkId) {
       const { data, error } = await admin
         .from('public_reports')

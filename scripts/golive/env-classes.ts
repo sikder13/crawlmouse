@@ -121,6 +121,8 @@ export const WORKER_FLY_ENV: Why = {
   WORKER_JWT_PUBLIC_KEY:
     "Fly secret, the public half of the app's WORKER_JWT_PRIVATE_KEY_PKCS8_B64",
   BATCH_CONCURRENCY: 'fly.toml [env]',
+  FLY_APP_NAME: 'set by Fly on the Machine; only LAB_HOST_POLITENESS reads it',
+  LAB_HOST_POLITENESS: 'staging worker only, a Fly secret (docs/ops/worker-runbook.md, F-018)',
   CRAWL_PAUSED: 'Fly secret, set only to pause the worker',
   PORT: 'fly.toml [env]',
   FLY_REGION: 'set by Fly',
