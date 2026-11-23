@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { after } from 'next/server';
 import { checksPublicEnabled, pipelineEnabled } from '@/lib/auth/flags';
 import { scheduleFor } from '@/lib/auth/schedule';
 import { getClientIp } from '@/lib/client-ip';
@@ -38,20 +39,22 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 /**
- * The add that made this site may have failed at its send, leaving its first check queued with
- * nothing to run it. A repeat add recovers it, through the caller's own session: `queuedEventId`'s
- * id, and a check already sent runs once (`inngest/check.ts` is idempotent on `checkId`). A paused
- * site is left alone, as the other starts refuse one. A repeat is counted as the public start counts
- * one, and over that limit it sends nothing.
+ * The add that made this site may have failed at its send, leaving its check queued with nothing to
+ * run it. A repeat add recovers it. The reads run here, through the caller's own session; what they
+ * answer is the work to do after the response, so a slow or failing send cannot hold back the 409.
+ * It re-sends under `queuedEventId`'s id, and a check already sent runs once (`inngest/check.ts` is
+ * idempotent on `checkId`). A paused site is left alone, as the other starts refuse one, and so is a
+ * site whose row this session cannot read. A repeat is counted as the public start counts one, and
+ * over that limit it sends nothing.
  */
-async function resendStranded(
+async function strandedResend(
   sb: SupabaseClient,
   req: Request,
   site: Omit<ResendQueued, 'check'>,
-): Promise<void> {
+): Promise<(() => Promise<void>) | null> {
   const row = await sb.from('sites').select('paused_reason').eq('id', site.siteId).maybeSingle();
-  if (row.error) throw new Error(`sites read failed: ${row.error.message}`);
-  if ((row.data as { paused_reason: string | null } | null)?.paused_reason !== null) return;
+  if (row.error) throw new Error('sites read failed');
+  if ((row.data as { paused_reason: string | null } | null)?.paused_reason !== null) return null;
   const latest = await sb
     .from('checks')
     .select('id, status, trigger, queued_at')
@@ -59,12 +62,19 @@ async function resendStranded(
     .order('queued_at', { ascending: false })
     .limit(1)
     .maybeSingle();
-  if (latest.error) throw new Error(`checks read failed: ${latest.error.message}`);
+  if (latest.error) throw new Error('checks read failed');
   const check = latest.data as (QueuedCheckRef & { status: string }) | null;
-  if (check?.status !== 'queued' || queuedEventId(site.siteId, check) === null) return;
+  if (check?.status !== 'queued' || queuedEventId(site.siteId, check) === null) return null;
   const ip = getClientIp(req);
-  if (ip !== 'unknown' && !(await startLimits.replay(ip))) return;
-  await supabaseResendQueued()({ ...site, check });
+  return async () => {
+    try {
+      if (ip !== 'unknown' && !(await startLimits.replay(ip))) return;
+      await supabaseResendQueued()({ ...site, check });
+    } catch {
+      // A fixed sentence: an upstream error's text can echo the event it was sent.
+      console.error('[api/sites] a repeat add could not re-send its check (send)');
+    }
+  };
 }
 
 /**
@@ -81,7 +91,7 @@ async function resendStranded(
  * client matrix when it was posted from there; JSON with its ids. A refused form goes back to the
  * page it came from, the dashboard or the matrix, with its notice. The first site an agency account
  * adds also sends `first_client_added` (CC-31 D10). A host the account already keeps is a 409, and
- * sends its first check's event again while that check is queued and the site is not paused.
+ * after answering, sends the event of a check still queued on it, unless the site is paused.
  */
 export async function POST(req: Request) {
   if (!checksPublicEnabled()) return notFound();
@@ -157,16 +167,16 @@ export async function POST(req: Request) {
     }
     case 'exists':
       try {
-        await resendStranded(sb, req, {
+        const resend = await strandedResend(sb, req, {
           siteId: added.siteId,
           accountId: account.id,
           host: admitted.host,
           requestedByUserId: user.id,
         });
-      } catch (cause) {
-        // The answer is still that the site is there: a failed recovery must not turn it into a 500.
-        const message = cause instanceof Error ? cause.message : String(cause);
-        console.error('[api/sites] a repeat add could not re-send its check:', message);
+        if (resend) after(resend);
+      } catch {
+        // The answer is still that the site is there. A fixed sentence, as for the send.
+        console.error('[api/sites] a repeat add could not re-send its check (read)');
       }
       return refuseTo(req, back, 409, 'site_exists', { siteId: added.siteId });
     case 'full':

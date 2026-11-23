@@ -1,3 +1,4 @@
+import { inspect } from 'node:util';
 import type { PGlite } from '@electric-sql/pglite';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { applyAllMigrations, freshDb } from '@/__tests__/helpers/pglite-migrations';
@@ -29,9 +30,20 @@ const h = vi.hoisted(() => ({
   refused: new Set<string>(),
   /** The switcher cookie's value on this request, or null for none. */
   chosen: null as string | null,
+  /** Work the route deferred with `after`, run by `settle`. */
+  after: [] as (() => unknown)[],
+  /** A session read of exactly these columns answers this instead of the database. */
+  broken: null as {
+    columns: string;
+    answer: { data: null; error: { message: string } | null };
+  } | null,
 }));
 
 vi.mock('server-only', () => ({}));
+vi.mock('next/server', async (original) => ({
+  ...(await original<typeof import('next/server')>()),
+  after: (fn: () => unknown) => void h.after.push(fn),
+}));
 vi.mock('next/headers', () => ({
   cookies: async () => ({
     get: (name: string) =>
@@ -41,7 +53,27 @@ vi.mock('next/headers', () => ({
 vi.mock('@/lib/supabase/server', () => ({
   supabaseServer: async () => {
     h.log.push('supabaseServer');
-    return sessionOver(h.db, h.user);
+    const session = sessionOver(h.db, h.user);
+    const from = session.from.bind(session);
+    session.from = ((table: string) => {
+      const query = from(table);
+      const select = query.select.bind(query);
+      query.select = ((columns: string, ...rest: unknown[]) => {
+        if (h.broken?.columns !== columns) {
+          return (select as (...a: unknown[]) => unknown)(columns, ...rest);
+        }
+        const answer = h.broken.answer;
+        const chain: Record<string, unknown> = {
+          eq: () => chain,
+          order: () => chain,
+          limit: () => chain,
+          maybeSingle: async () => answer,
+        };
+        return chain;
+      }) as typeof query.select;
+      return query;
+    }) as typeof session.from;
+    return session;
   },
 }));
 vi.mock('@/lib/supabase/admin', () => ({
@@ -90,6 +122,8 @@ beforeEach(() => {
   h.log.length = 0;
   h.user = null;
   h.chosen = null;
+  h.after.length = 0;
+  h.broken = null;
   h.send.mockClear();
   h.capture.mockClear();
   h.agencyCapture.mockClear();
@@ -352,6 +386,12 @@ describe('POST /api/sites', () => {
       if (ip !== null) req.headers.set('x-forwarded-for', ip);
       return req;
     };
+    /** A repeat add, with the work it deferred run afterwards. */
+    const repeat = async (req: Request) => {
+      const res = await POST(req);
+      for (const work of h.after.splice(0)) await work();
+      return res;
+    };
     const eventOf = (call: number) =>
       h.send.mock.calls[call]![0] as { id: string; name: string; data: { checkId: string } };
     /** A site added while the send fails: it and its queued check are there, the event is not. */
@@ -376,7 +416,7 @@ describe('POST /api/sites', () => {
 
     it('adding it again answers 409 and sends the same event, so it runs once', async () => {
       const { url, lost, site } = await stranded('strand');
-      const res = await POST(from(null, url));
+      const res = await repeat(from(null, url));
       expect(res.status).toBe(409);
       expect(await res.json()).toEqual({ code: 'site_exists', siteId: site.id });
       expect(h.send).toHaveBeenCalledTimes(1);
@@ -389,7 +429,7 @@ describe('POST /api/sites', () => {
       const ip = '203.0.113.10';
       const { url } = await stranded('strandcount');
       const before = await replayCount(ip);
-      await POST(from(ip, url));
+      await repeat(from(ip, url));
       expect((await replayCount(ip)) - before).toBe(1);
     });
 
@@ -402,7 +442,7 @@ describe('POST /api/sites', () => {
         },
         START_REPLAYS_PER_IP_PER_HOUR,
       );
-      const res = await POST(from(IP, url));
+      const res = await repeat(from(IP, url));
       await restore();
       expect(res.status).toBe(409);
       expect(await res.json()).toEqual({ code: 'site_exists', siteId: site.id });
@@ -421,31 +461,75 @@ describe('POST /api/sites', () => {
           where site_id = $1`,
         [site.id, status],
       );
-      const res = await POST(from(null, url));
+      const res = await repeat(from(null, url));
       expect(res.status).toBe(409);
       expect(h.send).not.toHaveBeenCalled();
     });
 
-    it('sends nothing for a paused site, so a repeat cannot start its crawl', async () => {
-      const { url, site } = await stranded('strandpaused');
-      await h.db.query(`update public.sites set paused_reason = 'user' where id = $1`, [site.id]);
-      const res = await POST(from(null, url));
-      expect(res.status).toBe(409);
+    it.each(['user', 'trial_ended', 'over_limit'])(
+      'sends nothing for a site paused as %s, so a repeat cannot start its crawl',
+      async (reason) => {
+        const { url, site } = await stranded(`strandpaused${reason.replace('_', '')}`);
+        await h.db.query(`update public.sites set paused_reason = $2 where id = $1`, [
+          site.id,
+          reason,
+        ]);
+        const res = await repeat(from(null, url));
+        expect(res.status).toBe(409);
+        expect(h.send).not.toHaveBeenCalled();
+      },
+    );
+
+    it('sends nothing for a site row the session cannot read', async () => {
+      const { url } = await stranded('strandunread');
+      h.broken = { columns: 'paused_reason', answer: { data: null, error: null } };
+      expect((await repeat(from(null, url))).status).toBe(409);
       expect(h.send).not.toHaveBeenCalled();
     });
 
-    it('still answers 409 when the send fails again, as JSON and as a form', async () => {
+    it.each(['paused_reason', 'id, status, trigger, queued_at'])(
+      'a failed read of %s still answers 409, sends nothing and logs no upstream text',
+      async (columns) => {
+        const { url, site } = await stranded(`strandread${columns.length}`);
+        const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+        h.broken = { columns, answer: { data: null, error: { message: `SENTINEL ${site.id}` } } };
+        const res = await repeat(from(null, url));
+        const logged = inspect(error.mock.calls, { depth: 5 });
+        error.mockRestore();
+        expect(res.status).toBe(409);
+        expect(h.send).not.toHaveBeenCalled();
+        expect(logged).toContain('could not re-send');
+        expect(logged).not.toContain('SENTINEL');
+        expect(logged).not.toContain(site.id);
+      },
+    );
+
+    it('answers before the send: a send that never settles does not hold the 409', async () => {
+      const { url } = await stranded('strandhang');
+      h.send.mockImplementationOnce(() => new Promise<undefined>(() => undefined));
+      const res = await POST(from(null, url));
+      expect(res.status).toBe(409);
+      expect(h.send).not.toHaveBeenCalled();
+      expect(h.after).toHaveLength(1);
+      void h.after.splice(0)[0]!();
+      await vi.waitFor(() => expect(h.send).toHaveBeenCalledTimes(1));
+    });
+
+    it('still answers 409 when the send fails again, and logs no upstream text', async () => {
       const { url, site } = await stranded('strandagain');
       const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-      h.send.mockRejectedValueOnce(new Error('inngest still down'));
-      const res = await POST(from(null, url));
+      h.send.mockRejectedValueOnce(new Error(`SENTINEL ${site.id}`));
+      const res = await repeat(from(null, url));
       expect(res.status).toBe(409);
       expect(await res.json()).toEqual({ code: 'site_exists', siteId: site.id });
-      h.send.mockRejectedValueOnce(new Error('inngest still down'));
-      const back = await POST(form(url, '/dashboard'));
+      h.send.mockRejectedValueOnce(new Error(`SENTINEL ${site.id}`));
+      const back = await repeat(form(url, '/dashboard'));
       expect(back.status).toBe(303);
+      const logged = inspect(error.mock.calls, { depth: 5 });
       expect(error).toHaveBeenCalledTimes(2);
       error.mockRestore();
+      expect(logged).not.toContain('SENTINEL');
+      expect(logged).not.toContain(site.id);
     });
 
     it('reads the newest check, not an older one', async () => {
@@ -457,14 +541,14 @@ describe('POST /api/sites', () => {
            now() - interval '2 days', now() - interval '2 days', 'crawl_failed')`,
         [site.id],
       );
-      await POST(from(null, url));
+      await repeat(from(null, url));
       expect(h.send).toHaveBeenCalledTimes(1);
     });
 
     it('an address it cannot read is not counted in a shared bucket', async () => {
       const { url } = await stranded('strandunknown');
       const before = await replayCount('unknown');
-      await POST(from(null, url));
+      await repeat(from(null, url));
       expect(h.send).toHaveBeenCalledTimes(1);
       expect(await replayCount('unknown')).toBe(before);
     });
@@ -475,7 +559,7 @@ describe('POST /api/sites', () => {
       await h.db.query(`update public.checks set trigger = 'scheduled' where site_id = $1`, [
         site.id,
       ]);
-      await POST(from(ip, url));
+      await repeat(from(ip, url));
       expect(await replayCount(ip)).toBe(0);
     });
 
@@ -484,7 +568,7 @@ describe('POST /api/sites', () => {
       await h.db.query(`update public.checks set trigger = 'scheduled' where site_id = $1`, [
         site.id,
       ]);
-      const res = await POST(from(null, url));
+      const res = await repeat(from(null, url));
       expect(res.status).toBe(409);
       expect(h.send).not.toHaveBeenCalled();
     });
