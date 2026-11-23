@@ -118,10 +118,16 @@ describe('which trials the clock picks up', () => {
   });
 
   it('a trial on Stripe’s clock, with a card, is left out of both', async () => {
-    const id = await noCardTrial();
-    await db.query(`update public.accounts set trial_variant = 'card_required' where id = $1`, [
-      id,
-    ]);
+    const id = await newAccount();
+    const r = await applyEntitlementTransition(store, id, {
+      type: 'trial_started',
+      at: new Date(T),
+      variant: 'card_required',
+      trialEnd: new Date(END),
+      subscriptionId: 'sub_card',
+      subscriptionStatus: 'trialing',
+    });
+    expect(r.transition.outcome).toBe('applied');
     expect(await kindOf(id, REMINDER + HOUR)).toBeNull();
     expect(await kindOf(id, END)).toBeNull();
   });
