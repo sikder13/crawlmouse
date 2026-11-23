@@ -1,5 +1,6 @@
 import type { Clock } from '../clock.js';
 import { SiteLimiter } from './limiter.js';
+import { politenessKeyOf } from './site-key.js';
 
 /**
  * Per-site state shared by every batch in the process: the limiter, and the rule that stops all
@@ -38,7 +39,16 @@ class Site {
 export class Sites {
   private readonly sites = new Map<string, Site>();
 
-  constructor(private readonly clock: Clock) {}
+  constructor(
+    private readonly clock: Clock,
+    /** LAB_HOST_POLITENESS: each lab host is a site of its own (politenessKeyOf). */
+    private readonly perLabHost: boolean = false,
+  ) {}
+
+  /** The key this process's limiter and stop rules hold a URL's site under. */
+  keyOf(url: string | URL): string {
+    return politenessKeyOf(url, this.perLabHost);
+  }
 
   private site(key: string): Site {
     let s = this.sites.get(key);

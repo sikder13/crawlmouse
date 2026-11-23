@@ -267,7 +267,13 @@ describe('/audit/[id]: the states around a result', () => {
       kept: false,
     };
     const markup = html(<CheckPage read={read} />);
-    expect(markup).toContain('This audit did not finish');
+    const heading =
+      reason === 'site_unreachable'
+        ? 'We could not reach this site'
+        : reason === 'nothing_read'
+          ? 'We could not read this site'
+          : 'This audit did not finish';
+    expect(markup).toContain(heading);
     expect(markup).not.toContain('before it could grade');
     expect(markup).toContain(`What happened: ${FAILURE_COPY[reason]}.`);
     expect(markup).toContain('6 Nov 2026');

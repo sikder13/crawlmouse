@@ -1,7 +1,8 @@
 import type { Clock } from '../clock.js';
 
 /**
- * Request pacing for one site (one registrable domain), shared by every batch in the process.
+ * Request pacing for one site (one `Sites.keyOf` key: its registrable domain, or on a worker with
+ * LAB_HOST_POLITENESS one lab host), shared by every batch in the process.
  *
  * - Request STARTS are at least `gapMs()` apart, measured start to start, never from a response.
  *   The floor is 500 ms, which is 2 requests per second.

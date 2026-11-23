@@ -1,3 +1,4 @@
+import { SIGNAL_REPEAT_MS, SIGNAL_REQUEST_MS } from '../signal.js';
 import { DEFAULT_BATCH_CONCURRENCY, MAX_BATCH_CONCURRENCY } from '../config.js';
 import { READ_DEADLINE_MS, READER_HEAP_MB } from '../reader/thread-reader.js';
 import { format, resolveConfig } from 'prettier';
@@ -259,8 +260,11 @@ export function renderSpec(): string {
 
     "Each access row names its identity: `identity_role` is `control`, `crawler` or `canary` (`render` is CC-14's), and only a `crawler` row has a `ua`, the crawler its verdict is about. `tagged` says whether the request the row shows carried the tag: never the control's; a crawler row whose evidence is the robots.txt read shows that read, made as our crawler, so it is tagged. robots.txt evidence on a batch result records the `identity_sent` it was read with, always our crawler's.",
 
+    '## The done signal',
+    `- With \`APP_SIGNAL_URL\` set to an https address, the worker's \`202\` says \`signals: true\`, and when a batch ends it posts \`{ check_id, batch, status }\` to that address, signed with its HMAC secret in a context of its own, and once more ${SIGNAL_REPEAT_MS / 1000} s later. Each request has a ${SIGNAL_REQUEST_MS / 1000} s deadline. A signal that fails is logged and changes nothing about the batch. Without the setting the worker sends none and runs poll as before (\`src/signal.test.ts\`).`,
+    '',
     '## Politeness',
-    `- Request starts at least ${FLOOR_GAP_MS} ms apart per registrable domain (eTLD+1, Public Suffix List with its private section), shared by every batch in the process, measured start to start.`,
+    `- Request starts at least ${FLOOR_GAP_MS} ms apart per registrable domain (eTLD+1, Public Suffix List with its private section), shared by every batch in the process, measured start to start. On the staging app only, \`LAB_HOST_POLITENESS=1\` makes each host under \`lab.crawlmouse.com\` its own key for the limiter and the stops; off-site is still the registrable domain.`,
     `- One request in flight per site; two when the median latency of the last ${SLOW_WINDOW} responses is over ${SLOW_MEDIAN_MS} ms and no Crawl-delay raised the gap.`,
     `- Crawl-delay: the largest that applies to any identity the batch sends, honoured in full up to ${MAX_CRAWL_DELAY_S} s. From ${SLOW_CRAWL_DELAY_S} s the batch is partial (\`crawl_delay_10s_or_more\`) with its coverage; above ${MAX_CRAWL_DELAY_S} s nothing but robots.txt is requested (\`crawl_delay_over_limit\`).`,
     `- A site is stopped for ${seconds(STOP_COOLDOWN_MS)} after ${STOP_AFTER_429S} responses of 429, or ${STOP_AFTER_CHALLENGED_PAGES} consecutive challenged pages (in a crawl batch, a challenged fetch; in an access batch, a challenged control). A batch records a stop it met or caused as a finding; it is partial with \`site_stopped\` only when the stop refused one of its requests.`,

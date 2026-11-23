@@ -1,6 +1,7 @@
 import { Inngest, EventSchemas } from 'inngest';
 import type { AccountState } from '@crawlmouse/types/v2';
 import type {
+  CheckBatchEnded,
   CheckCancelRequested,
   CheckNotifyRequested,
   CheckFailed,
@@ -65,6 +66,7 @@ type Events = {
   'account.restored': { data: { userId: string; subscriptionIds: string[] } };
   // The v2 check pipeline (CC-20b, check.ts). Registered only when V2_PIPELINE=1.
   'check.requested': { data: CheckRequested };
+  'check.batch.ended': { data: CheckBatchEnded };
   'check.finished': { data: CheckFinished };
   'check.failed': { data: CheckFailed };
   'check.cancel.requested': { data: CheckCancelRequested };

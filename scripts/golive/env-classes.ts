@@ -120,7 +120,12 @@ export const WORKER_FLY_ENV: Why = {
   WORKER_SIGNING_SECRET: 'Fly secret, the pair of the app variable of the same name',
   WORKER_JWT_PUBLIC_KEY:
     "Fly secret, the public half of the app's WORKER_JWT_PRIVATE_KEY_PKCS8_B64",
+  APP_SIGNAL_URL: "Fly secret, the app's route for a batch's end (PR 5a); unset means polling",
+  APP_SIGNAL_PROTECTION_BYPASS:
+    'Fly secret on the staging worker only, to reach a protected staging app; ignored on production',
   BATCH_CONCURRENCY: 'fly.toml [env]',
+  FLY_APP_NAME: 'set by Fly on the Machine; only the staging-only settings read it',
+  LAB_HOST_POLITENESS: 'staging worker only, a Fly secret (docs/ops/worker-runbook.md, F-018)',
   CRAWL_PAUSED: 'Fly secret, set only to pause the worker',
   PORT: 'fly.toml [env]',
   FLY_REGION: 'set by Fly',
