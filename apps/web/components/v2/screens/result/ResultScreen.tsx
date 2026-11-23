@@ -185,13 +185,16 @@ export function ResultScreen({
                 <div className={styles.fixFirstTitle}>{first.title}</div>
                 <div className={styles.fixFirstBody}>{first.body}</div>
               </div>
-              {first.letIn ? (
-                <div className={styles.letIn}>
+              {first.logIdentity ? (
+                <div className={styles.logIdentity}>
                   <div className={styles.fixFirstBody}>
-                    In your firewall or CDN logs, our crawl appears as:
-                    <code className={styles.agent}>{first.letIn.agent}</code>
+                    In your firewall or CDN logs, our page requests appear as:
+                    <code className={styles.agent}>{first.logIdentity.agent}</code>
+                    {first.logIdentity.untaggedControl
+                      ? 'The browser-identity request carries no Crawlmouse tag, so it will not match this.'
+                      : null}
                   </div>
-                  <a href={first.letIn.href}>How our crawler identifies itself</a>
+                  <a href={first.logIdentity.href}>How our crawler identifies itself</a>
                 </div>
               ) : null}
               {first.action ? (

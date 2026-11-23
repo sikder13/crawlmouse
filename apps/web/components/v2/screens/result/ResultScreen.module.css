@@ -451,8 +451,8 @@
   }
 }
 
-/* A refused check's next step: what to allow, then run it again. */
-.letIn {
+/* A refused check's next step: how our requests appear in the logs, then what to do. */
+.logIdentity {
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -466,6 +466,6 @@
   overflow-wrap: anywhere;
 }
 
-.letIn a {
+.logIdentity a {
   text-decoration: underline;
 }

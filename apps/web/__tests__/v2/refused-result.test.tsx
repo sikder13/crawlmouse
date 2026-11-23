@@ -56,14 +56,19 @@ const COMPETITOR = 'Is a competitor this readable?';
 
 describe('the next step on a refused check', () => {
   it.each([401, 403, 429])('%i: names our crawl’s exact user agent, and /bot', (code) => {
-    expect(card(answered(code)).letIn).toEqual({ agent: CRAWL.userAgent, href: '/bot' });
+    expect(card(answered(code)).logIdentity).toEqual({
+      agent: CRAWL.userAgent,
+      href: '/bot',
+      untaggedControl: false,
+    });
     expect(CRAWL_USER_AGENT).toBe(CRAWL.userAgent);
   });
 
   it.each([401, 403, 429, 451])('%i: names it for the logs, and advises no allow rule', (code) => {
     const out = html(answered(code));
-    expect(out).toContain('In your firewall or CDN logs, our crawl appears as:');
-    expect(out).not.toMatch(/\ballow this\b|\bwhitelist\b|let our crawl in/i);
+    expect(out).toContain('In your firewall or CDN logs, our page requests appear as:');
+    expect(card(answered(code)).body).not.toMatch(/\ballow|whitelist|exception/i);
+    expect(out).not.toContain('carries no Crawlmouse tag');
   });
 
   it('says the same on a check the edge refused', () => {
@@ -75,8 +80,36 @@ describe('the next step on a refused check', () => {
       for (const x of c.crawlers.filter((x) => x.group !== 'search_engine'))
         Object.assign(x, { verdict: 'edge_blocks_automation', status: 403 });
     });
-    expect(card(v).letIn).toEqual({ agent: CRAWL.userAgent, href: '/bot' });
-    expect(html(v)).not.toMatch(/let our crawl in/i);
+    expect(card(v).logIdentity).toEqual({
+      agent: CRAWL.userAgent,
+      href: '/bot',
+      untaggedControl: true,
+    });
+    expect(html(v)).toContain('carries no Crawlmouse tag');
+    expect(card(v).body).not.toMatch(/\ballow|whitelist|exception/i);
+  });
+
+  it.each([
+    [401, 'a login or password requirement'],
+    [403, 'a firewall or bot rule'],
+    [429, 'a rate limit'],
+    [451, 'a legal or regional restriction'],
+  ])('%i names only its own cause', (code, cause) => {
+    const body = card(answered(code)).body;
+    expect(body).toContain(`look for ${cause},`);
+    for (const other of ['login', 'firewall', 'rate limit', 'legal'])
+      if (!cause.includes(other)) expect(body).not.toContain(other);
+  });
+
+  it('a mix of refusals names each cause', () => {
+    const v = view((c, d) => {
+      Object.assign(c.technical_seo!, { grade: null, score: null });
+      const rows = d.page_results.filter((p) => p.check_id === c.id);
+      d.page_results = rows.map((p, i) => ({ ...p, status_code: i ? 403 : 401 }));
+    });
+    expect(card(v).body).toContain(
+      'look for a login or password requirement or a firewall or bot rule,',
+    );
   });
 
   it('the body’s next step matches the button', () => {
@@ -91,8 +124,8 @@ describe('the next step on a refused check', () => {
     expect(card(kept).body).toContain('then run it again from Sites.');
   });
 
-  it.each([404, 500, 301])('%i is not a refusal, so it offers no way in', (code) => {
-    expect(card(answered(code)).letIn).toBeUndefined();
+  it.each([404, 500, 301])('%i is not a refusal, so it names no user agent', (code) => {
+    expect(card(answered(code)).logIdentity).toBeUndefined();
     expect(html(answered(code))).not.toContain('How our crawler identifies itself');
   });
 
@@ -239,7 +272,19 @@ describe('the crawler table’s Status', () => {
   });
 
   it('a verdict read from robots.txt still names it', () => {
-    expect(statusOf('Googlebot', { status: null, verdict: 'allowed' })).toBe('robots.txt');
+    expect(
+      statusOf('Googlebot', { status: null, verdict: 'allowed', evidence_class: 'declared' }),
+    ).toBe('robots.txt');
+  });
+
+  it('a request sent with no standard status is not called robots.txt', () => {
+    expect(
+      statusOf('GPTBot', {
+        status: null,
+        verdict: 'blocked_by_ua_rule',
+        evidence_class: 'simulated',
+      }),
+    ).toBe('no standard status');
   });
 
   it('a measured status is shown, whatever the verdict', () => {

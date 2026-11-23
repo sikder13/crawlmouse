@@ -541,7 +541,7 @@ describe('the third card when there is no fix', () => {
       const f = answering([code]).first;
       return f.kind === 'not-served' ? f.body : '';
     };
-    expect(next(403)).toContain('find the firewall or bot rule that answered them');
+    expect(next(403)).toContain('look for a firewall or bot rule');
     expect(next(404)).toContain('Once the site serves its pages');
     expect(next(404)).not.toContain('firewall');
     expect(next(301)).toContain('If the site has moved, run this audit on its new address');

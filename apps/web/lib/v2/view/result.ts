@@ -151,7 +151,7 @@ export interface ResultView {
         /** The way to start watching an audit nobody has kept; null once it is kept. */
         action: { label: string; href: string } | null;
         /** A refused check: the user agent to look for in the logs, and where our crawler is described. */
-        letIn?: { agent: string; href: string };
+        logIdentity?: { agent: string; href: string; untaggedControl: boolean };
       };
   doors: DoorView[];
   fixes: { total: number; open: number; pro: number; rows: FixRowView[] } | null;
@@ -748,6 +748,21 @@ const eitherOf = (codes: readonly number[]) => {
 const statusName = (code: number) =>
   code === 429 ? '429 (“too many requests”: the site is limiting requests)' : `${code}`;
 
+/** What each refusal status points to. Built from the codes a check holds, so no other is named. */
+const REFUSAL_CAUSES: Readonly<Record<number, string>> = {
+  401: 'a login or password requirement',
+  403: 'a firewall or bot rule',
+  429: 'a rate limit',
+  451: 'a legal or regional restriction',
+};
+
+const causesOf = (codes: readonly number[]) => {
+  const causes = [...new Set(codes.map((c) => REFUSAL_CAUSES[c] ?? 'what refused the request'))];
+  const last = causes.at(-1);
+  const rest = causes.slice(0, -1);
+  return rest.length ? `${rest.join(', ')} or ${last}` : `${last}`;
+};
+
 const SITES_ACTION = { label: 'Open Sites', href: ACCOUNT_NAV[0].href };
 const NEW_AUDIT_ACTION = { label: 'Run a new audit', href: '/' };
 
@@ -763,7 +778,7 @@ function notServedCard(check: Check, statuses: readonly number[], kept: boolean)
       ? `None of the ${numberWord(ai.length)} AI crawlers could be measured.`
       : null;
   const next = refused
-    ? `If you did not mean to refuse automated requests, find the firewall or bot rule that answered them, then ${kept ? 'run it again from Sites' : 'run a new audit'}.`
+    ? `If this was not intended, look for ${causesOf(codes)}, then ${kept ? 'run it again from Sites' : 'run a new audit'}.`
     : moved
       ? 'If the site has moved, run this audit on its new address.'
       : 'Once the site serves its pages, run this audit again.';
@@ -781,9 +796,13 @@ function notServedCard(check: Check, statuses: readonly number[], kept: boolean)
       .join(' '),
     // An audit page has no re-run route: a kept site re-runs from Sites, an unkept one is a new audit.
     action: refused ? (kept ? SITES_ACTION : NEW_AUDIT_ACTION) : null,
-    // Named so the owner can find our requests in their logs. It is not advice to allow it: a 401 or
-    // a 451 is not fixed that way, and a user agent is a string anyone can send.
-    ...(refused ? { letIn: { agent: CRAWL_USER_AGENT, href: '/bot' } } : {}),
+    // The page requests' user agent, named so the owner can find them in their logs. It is not advice
+    // to allow it. The edge's browser-identity request carries no Crawlmouse tag, and the card says so.
+    ...(refused
+      ? {
+          logIdentity: { agent: CRAWL_USER_AGENT, href: '/bot', untaggedControl: meetsEdge(check) },
+        }
+      : {}),
   };
 }
 
@@ -1004,13 +1023,15 @@ function crawlerRows(check: Check): CrawlerRowView[] {
         : `${GROUP_NAMES[c.group]}, ${c.scored ? 'scored' : 'not scored'}`,
     verdict: c.verdict,
     evidence: c.evidence_class,
-    // A null status is a robots.txt reading only when robots.txt gave a verdict.
+    // A null status is a robots.txt reading only when the verdict was declared by robots.txt.
     status:
       c.status !== null
         ? String(c.status)
         : c.verdict === 'not_measured'
           ? 'not measured'
-          : 'robots.txt',
+          : c.evidence_class === 'declared'
+            ? 'robots.txt'
+            : 'no standard status',
     text: c.text_share === null ? 'not measured' : `${percent(c.text_share)}%`,
   }));
 }
