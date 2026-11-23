@@ -426,6 +426,59 @@ describe('POST /api/sites', () => {
       expect(h.send).not.toHaveBeenCalled();
     });
 
+    it('sends nothing for a paused site, so a repeat cannot start its crawl', async () => {
+      const { url, site } = await stranded('strandpaused');
+      await h.db.query(`update public.sites set paused_reason = 'user' where id = $1`, [site.id]);
+      const res = await POST(from(null, url));
+      expect(res.status).toBe(409);
+      expect(h.send).not.toHaveBeenCalled();
+    });
+
+    it('still answers 409 when the send fails again, as JSON and as a form', async () => {
+      const { url, site } = await stranded('strandagain');
+      const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      h.send.mockRejectedValueOnce(new Error('inngest still down'));
+      const res = await POST(from(null, url));
+      expect(res.status).toBe(409);
+      expect(await res.json()).toEqual({ code: 'site_exists', siteId: site.id });
+      h.send.mockRejectedValueOnce(new Error('inngest still down'));
+      const back = await POST(form(url, '/dashboard'));
+      expect(back.status).toBe(303);
+      expect(error).toHaveBeenCalledTimes(2);
+      error.mockRestore();
+    });
+
+    it('reads the newest check, not an older one', async () => {
+      const { url, site } = await stranded('strandnewest');
+      await h.db.query(
+        `insert into public.checks (site_id, status, trigger, grade_version, queued_at, started_at,
+           finished_at, failure_reason)
+         values ($1, 'failed', 'first_audit', '1.0.0', now() - interval '2 days',
+           now() - interval '2 days', now() - interval '2 days', 'crawl_failed')`,
+        [site.id],
+      );
+      await POST(from(null, url));
+      expect(h.send).toHaveBeenCalledTimes(1);
+    });
+
+    it('an address it cannot read is not counted in a shared bucket', async () => {
+      const { url } = await stranded('strandunknown');
+      const before = await replayCount('unknown');
+      await POST(from(null, url));
+      expect(h.send).toHaveBeenCalledTimes(1);
+      expect(await replayCount('unknown')).toBe(before);
+    });
+
+    it('a check it would not re-send spends no replay count', async () => {
+      const ip = '203.0.113.11';
+      const { url, site } = await stranded('strandnospend');
+      await h.db.query(`update public.checks set trigger = 'scheduled' where site_id = $1`, [
+        site.id,
+      ]);
+      await POST(from(ip, url));
+      expect(await replayCount(ip)).toBe(0);
+    });
+
     it('sends nothing for a queued scheduled check, whose retry is the scheduler’s', async () => {
       const { url, site } = await stranded('strandsched');
       await h.db.query(`update public.checks set trigger = 'scheduled' where site_id = $1`, [

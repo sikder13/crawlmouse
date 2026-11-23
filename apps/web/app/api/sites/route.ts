@@ -1,3 +1,4 @@
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { checksPublicEnabled, pipelineEnabled } from '@/lib/auth/flags';
 import { scheduleFor } from '@/lib/auth/schedule';
 import { getClientIp } from '@/lib/client-ip';
@@ -16,9 +17,11 @@ import {
 } from '@/lib/v2/account/route';
 import { admittedHost, parseAddBody } from '@/lib/v2/account/sites';
 import {
+  queuedEventId,
   supabaseAddSite,
   supabaseResendQueued,
   type QueuedCheckRef,
+  type ResendQueued,
 } from '@/lib/v2/account/sites-store';
 import { loadViewer } from '@/lib/v2/account/viewer';
 import { agencyCaptureFor } from '@/lib/v2/agency/events';
@@ -35,6 +38,36 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 /**
+ * The add that made this site may have failed at its send, leaving its first check queued with
+ * nothing to run it. A repeat add recovers it, through the caller's own session: `queuedEventId`'s
+ * id, and a check already sent runs once (`inngest/check.ts` is idempotent on `checkId`). A paused
+ * site is left alone, as the other starts refuse one. A repeat is counted as the public start counts
+ * one, and over that limit it sends nothing.
+ */
+async function resendStranded(
+  sb: SupabaseClient,
+  req: Request,
+  site: Omit<ResendQueued, 'check'>,
+): Promise<void> {
+  const row = await sb.from('sites').select('paused_reason').eq('id', site.siteId).maybeSingle();
+  if (row.error) throw new Error(`sites read failed: ${row.error.message}`);
+  if ((row.data as { paused_reason: string | null } | null)?.paused_reason !== null) return;
+  const latest = await sb
+    .from('checks')
+    .select('id, status, trigger, queued_at')
+    .eq('site_id', site.siteId)
+    .order('queued_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (latest.error) throw new Error(`checks read failed: ${latest.error.message}`);
+  const check = latest.data as (QueuedCheckRef & { status: string }) | null;
+  if (check?.status !== 'queued' || queuedEventId(site.siteId, check) === null) return;
+  const ip = getClientIp(req);
+  if (ip !== 'unknown' && !(await startLimits.replay(ip))) return;
+  await supabaseResendQueued()({ ...site, check });
+}
+
+/**
  * Add a site to the account the caller acts in (CC-26b D6, ARCH-2 §5 "First-run dashboard"):
  * `{url}`. A 404 with V2_CHECKS_PUBLIC unset; 503 while crawls are paused or the pipeline is off,
  * since adding a site requests its first audit, and 503 `capacity` when the day's
@@ -48,7 +81,7 @@ export const dynamic = 'force-dynamic';
  * client matrix when it was posted from there; JSON with its ids. A refused form goes back to the
  * page it came from, the dashboard or the matrix, with its notice. The first site an agency account
  * adds also sends `first_client_added` (CC-31 D10). A host the account already keeps is a 409, and
- * sends its first check's event again while that check is queued.
+ * sends its first check's event again while that check is queued and the site is not paused.
  */
 export async function POST(req: Request) {
   if (!checksPublicEnabled()) return notFound();
@@ -122,33 +155,20 @@ export async function POST(req: Request) {
         ? respond('form', back === MATRIX ? MATRIX : `/sites/${added.siteId}`)
         : Response.json({ siteId: added.siteId, checkId: added.checkId }, { status: 201 });
     }
-    case 'exists': {
-      // The add that made this site may have failed at its send, leaving its check queued with
-      // nothing to run it. This repeat recovers it: the same event id, so Inngest runs it once,
-      // counted as the public start counts a repeat. Over that limit it sends nothing.
-      const latest = await sb
-        .from('checks')
-        .select('id, status, trigger, queued_at')
-        .eq('site_id', added.siteId)
-        .order('queued_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (latest.error) throw new Error(`checks read failed: ${latest.error.message}`);
-      const check = latest.data as (QueuedCheckRef & { status: string }) | null;
-      if (check?.status === 'queued') {
-        const ip = getClientIp(req);
-        if (ip === 'unknown' || (await startLimits.replay(ip))) {
-          await supabaseResendQueued()({
-            siteId: added.siteId,
-            accountId: account.id,
-            host: admitted.host,
-            check,
-            requestedByUserId: user.id,
-          });
-        }
+    case 'exists':
+      try {
+        await resendStranded(sb, req, {
+          siteId: added.siteId,
+          accountId: account.id,
+          host: admitted.host,
+          requestedByUserId: user.id,
+        });
+      } catch (cause) {
+        // The answer is still that the site is there: a failed recovery must not turn it into a 500.
+        const message = cause instanceof Error ? cause.message : String(cause);
+        console.error('[api/sites] a repeat add could not re-send its check:', message);
       }
       return refuseTo(req, back, 409, 'site_exists', { siteId: added.siteId });
-    }
     case 'full':
       return refuseTo(req, back, 402, 'upgrade_required', { gate: 'sites' });
     case 'adds_capped':
