@@ -55,16 +55,18 @@ describe('printing a legal page', () => {
     join(__dirname, '../../app/(v2-kept)/_lib/LegalShell.module.css'),
     'utf8',
   );
-  const print = css.slice(css.indexOf('@media print'));
+  const print = css.slice(css.indexOf('@media print'), css.indexOf('@media (max-width'));
 
   it('hides the header and footer, and prints dark text', () => {
+    expect(css.indexOf('@media print')).toBeLessThan(css.indexOf('@media (max-width'));
     expect(print).toMatch(/\.frame > \[data-v2-shell\] > header/);
     expect(print).toMatch(/\.frame > \[data-v2-shell\] > \[data-v2-footer\]/);
     expect(print).toMatch(/display:\s*none/);
     expect(print).toMatch(
-      /\.legal \*,[^{]*\{[^}]*color: #13161b !important;[^}]*background: transparent !important/,
+      /\.legal \*,[^{]*\{[^}]*[\s;{]color: #13161b !important;[^}]*background: transparent !important/,
     );
     expect(print).toMatch(/\.frame > \[data-v2-shell\] \{[^}]*--v2-line: #e2e6eb/);
+    expect(print).toMatch(/\.frame > \[data-v2-shell\] \{[^}]*--v2-ctl: #808996/);
     expect(print).toMatch(/\.frame > \[data-v2-shell\] \{[^}]*background: #fff !important/);
     expect(print).toMatch(/\.frame > \[data-v2-shell\] \{[^}]*color-scheme: light !important/);
     expect(print).toMatch(/\.legal input::placeholder/);
