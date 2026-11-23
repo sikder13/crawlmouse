@@ -199,7 +199,7 @@ export const SITE_CHANGES: CopyChange[] = [
     locked: 'not yet estimated for 4 open · Pro',
     rendered: 'not yet estimated for 4 open',
     source:
-      'F-099 (CC-45 sweep, assigned in the V2R brief): an account on Pro has every fix open, so no row is marked as a Pro fix',
+      'V2R register, F-099 (CC-45 sweep): an account on Pro has every fix open, so no row is marked as a Pro fix',
   },
   {
     screen: 'site',
