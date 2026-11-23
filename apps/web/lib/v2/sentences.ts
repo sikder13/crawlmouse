@@ -15,6 +15,7 @@ import {
   type CrawlerResult,
   type Fix,
   type Verdict,
+  type WithheldReason,
 } from '@crawlmouse/types/v2';
 import { AI_WAITING } from './view/effect-headline';
 import { sectionMeasured } from './view/section-measured';
@@ -303,12 +304,15 @@ export function aiShortSummary(check: Check): string {
 /** FACTS I4: the scored crawlers a grade needs measured. The engine's MIN_MEASURED_CRAWLERS. */
 export const I4_MEASURED_CRAWLERS = 2;
 
-/** The parts of the AI grade a static crawl can score, as a sentence names them. */
-const MEASURED_PARTS = [
-  ['access', 'crawler access'],
-  ['quotable', 'content'],
-  ['signals', 'AI signals'],
-] as const;
+/** What each unmeasured part of the AI grade is called, in a sentence about one audit. */
+const MISSING_PART: Partial<Record<WithheldReason, string>> = {
+  readable_unmeasured: 'the JavaScript comparison',
+  quotable_unmeasured: 'a content score',
+  signals_unmeasured: 'the schema.org and Content Signals checks',
+};
+
+const orList = (xs: readonly string[]) =>
+  xs.length < 2 ? (xs[0] ?? '') : `${xs.slice(0, -1).join(', ')} or ${xs.at(-1)}`;
 
 /**
  * The withheld AI readability grade, said plainly (FACTS I4). `measured` is the contract's count
@@ -333,22 +337,33 @@ export function aiWithheldSummary(check: Check, measured: number): string {
   const edge = meetsEdge(check);
   const few = `${measured === 0 ? 'none' : `only ${numberWord(measured)}`} of the ${numberWord(scored)} scored crawlers could be measured`;
   const counted = edge ? `${EDGE_SENTENCE}, so ${few}.` : `${capitalise(few)}.`;
+  // A site's own robots.txt withholds the grade by choice: measuring more would not give it one.
+  const missing = reasons.includes('blocked_by_choice')
+    ? []
+    : reasons.flatMap((r) => MISSING_PART[r] ?? []);
   const why = !byCount
-    ? `${AI_WAITING[reasons[0]!]}.`
+    ? missing.length && MISSING_PART[reasons[0]!]
+      ? ''
+      : `${AI_WAITING[reasons[0]!]}.`
     : measured < I4_MEASURED_CRAWLERS
       ? counted
       : `${edge ? `${EDGE_SENTENCE}. ` : ''}${AI_WAITING.too_few_crawlers_measured}.`;
-  // Rendering is off, so this is the reason on every check today (F-012): say what was measured,
-  // from the parts that hold a score, so a part that has none cannot be named.
-  const waitsOnJs = reasons.includes('readable_unmeasured');
-  const comparison = `${AI_WAITING.readable_unmeasured}.`;
-  const coming = waitsOnJs && why !== comparison ? comparison : '';
-  const parts = MEASURED_PARTS.filter(([key]) => ai.components[key].score !== null);
-  const measuredParts =
-    waitsOnJs && parts.length
-      ? `This audit measured ${listOf(parts.map(([, name]) => name))}.`
-      : '';
+  // Said of this audit and built from what it holds, so a minted report's copy stays true (F-012).
+  const unmeasured = missing.length
+    ? `This audit did not measure ${orList(missing)}, which the AI readability grade needs.`
+    : '';
+  const { access: accessPart, quotable, signals } = ai.components;
+  const tested = [
+    accessPart.score === null
+      ? null
+      : measured < scored
+        ? `crawler access for ${numberWord(measured)} of the ${numberWord(scored)} scored crawlers`
+        : 'crawler access',
+    quotable.score === null ? null : 'content',
+    signals.score === null ? null : 'AI signals',
+  ].filter((x): x is string => x !== null);
+  const testedSentence = missing.length && tested.length ? `It tested ${listOf(tested)}.` : '';
   const range = ai.access_range;
   const access = range ? `Access is somewhere between ${range.min} and ${range.max} of 40.` : '';
-  return [why, coming, measuredParts, access].filter(Boolean).join(' ');
+  return [why, unmeasured, testedSentence, access].filter(Boolean).join(' ');
 }
