@@ -34,9 +34,9 @@ export const isChallenged = (v: Verdict) => v === 'challenged_ua' || v === 'refu
 
 /**
  * `edge_blocks_automation` in words: the access pill's, so a result names that one condition one
- * way (the CC-22 brief's "blocks all automation").
+ * way. It says what our test saw: the request refused was our own control (F-145).
  */
-export const EDGE_PILL = 'blocks all automation';
+export const EDGE_PILL = 'refused our test requests';
 export const EDGE_SENTENCE =
   'The site’s edge refused or challenged our browser-identity request from Crawlmouse’s address';
 /**
@@ -113,20 +113,32 @@ function keptOut(verdict: Verdict, cause: AccessCause | null): [string, string] 
             'were refused when we sent their user agents, while another crawler name was served',
           ];
     case 'challenged_ua':
-      return ['gets a challenge page', 'get a challenge page'];
+      return [
+        'was challenged when we sent its user agent',
+        'were challenged when we sent their user agents',
+      ];
     case 'refused_unverified':
       return [
         'was refused, and no other crawler name was served on the same pages; this may be IP verification',
         'were refused, and no other crawler name was served on the same pages; this may be IP verification',
       ];
     case 'rate_limited':
-      return ['is rate limited', 'are rate limited'];
+      return [
+        'was rate limited when we sent its user agent',
+        'were rate limited when we sent their user agents',
+      ];
     case 'payment_required':
-      return ['is asked to pay (402)', 'are asked to pay (402)'];
+      return [
+        'was asked to pay (402) when we sent its user agent',
+        'were asked to pay (402) when we sent their user agents',
+      ];
     case 'edge_blocks_automation':
-      return [`meets an edge that ${EDGE_PILL}`, `meet an edge that ${EDGE_PILL}`];
+      return [`met an edge that ${EDGE_PILL}`, `met an edge that ${EDGE_PILL}`];
     case 'redirected_away':
-      return ['is sent to another host', 'are sent to another host'];
+      return [
+        'was sent to another host when we sent its user agent',
+        'were sent to another host when we sent their user agents',
+      ];
     case 'not_measured':
       return ['could not be measured', 'could not be measured'];
     case 'allowed':
@@ -136,7 +148,7 @@ function keptOut(verdict: Verdict, cause: AccessCause | null): [string, string] 
 }
 
 /**
- * "GPTBot is blocked by a firewall rule; PerplexityBot gets a challenge page": one clause per way
+ * "GPTBot was refused by a firewall rule when we sent its user agent; PerplexityBot was challenged when we sent its user agent": one clause per way
  * crawlers were kept out, in the contract's order of verdicts (`VerdictSchema`), crawlers sharing a
  * way grouped in the order they are listed.
  * A verdict resting on the site's own logs says so.
@@ -186,7 +198,7 @@ export function thinTemplates(check: Check, crawlers: readonly Reader[]): string
 /**
  * The client-rendered templates, as the AI crawlers' verdicts show them (`thinTemplates` over every
  * AI crawler), or null when some template was read by no AI crawler (all kept out of it, or the
- * edge blocks all automation): the verdicts then cannot say whether that template arrives empty,
+ * edge refused our test requests): the verdicts then cannot say whether that template arrives empty,
  * so they are not used to say which do. Every screen that names those templates reads them here,
  * so a door and its segment cannot differ.
  */

@@ -233,8 +233,8 @@ function headlineTitle(check: Check): string {
     [n(is('challenged_ua')), 'was challenged', 'were challenged', true],
     [
       n((v) => !isAllowed(v) && !isBlocked(v) && !isChallenged(v) && !unmeasured(v)),
-      'is kept out another way',
-      'are kept out another way',
+      'was not served',
+      'were not served',
       false,
     ],
     [n(unmeasured), 'was not measured', 'were not measured', false],
@@ -286,14 +286,25 @@ function headlineBody(check: Check): string {
   return parts.join(' ');
 }
 
+/** The worker requests a crawler only after our control was served: an edge that refused it stops them. */
+const noCrawlerRequest = (ai: readonly CrawlerResult[]): boolean =>
+  ai.some((c) => c.verdict === 'edge_blocks_automation') &&
+  ai.every((c) => c.verdict === 'edge_blocks_automation' || c.verdict === 'not_measured');
+
 /** FACTS D1, with the L5 correction; the exact-string variant when the evidence carries no tag. */
-function methodSentence(tests: readonly AccessTest[]): string {
+function methodSentence(tests: readonly AccessTest[], ai: readonly CrawlerResult[]): string {
   const crawlerTests = tests.filter((t) => t.ua !== null && t.source_ip_class === 'fly_egress');
   const exact =
     crawlerTests.length > 0 && crawlerTests.every((t) => !t.identity_sent.includes(OUR_TAG));
-  const identity = exact
+  const stated = exact
     ? 'Each page was requested with the crawler’s exact user agent from Crawlmouse’s address, not the operator’s.'
     : `Each page was requested with the crawler’s own user agent, tagged “${OUR_TAG}”, from Crawlmouse’s own address, not the operator’s. A rule matching the exact string will not fire on it, and a site that verifies crawler addresses may refuse it while serving the real crawler.`;
+  const edge = ai.some((c) => c.verdict === 'edge_blocks_automation');
+  const identity = noCrawlerRequest(ai)
+    ? 'No crawler request was sent, because the site’s edge refused or challenged our browser-identity control first.'
+    : edge
+      ? `Where our browser-identity control was served, ${stated.replace(/^E/, 'e')}`
+      : stated;
   return `${identity} Rendering requests come from Cloudflare Browser Rendering, and one untagged browser-identity control fetch per sampled page is part of the method. Select a cell to see the raw request and response.`;
 }
 
@@ -409,9 +420,10 @@ export function accessView(
       },
       {
         label: 'Pages fetched per crawler',
-        value: `${count(coverage.pages_sampled)} of ${count(coverage.pages_discovered)}`,
-        note:
-          coverage.sample_strategy.method === 'census'
+        value: `${count(noCrawlerRequest(ai) ? 0 : coverage.pages_sampled)} of ${count(coverage.pages_discovered)}`,
+        note: noCrawlerRequest(ai)
+          ? 'no crawler request was sent'
+          : coverage.sample_strategy.method === 'census'
             ? coverage.pages_sampled === coverage.pages_discovered
               ? 'every page'
               : 'every page crawled'
@@ -423,7 +435,7 @@ export function accessView(
         note: null,
       },
     ],
-    method: methodSentence(tests),
+    method: methodSentence(tests, ai),
     columns,
     groups,
     footnote: groups.some((g) => g.rows.some((r) => r.text.endsWith('*'))) ? FOOTNOTE : null,

@@ -122,7 +122,7 @@ describe('auditDoc on the contract fixtures', () => {
           'AI readability',
           'D',
           '41',
-          'PerplexityBot gets a challenge page; product pages are empty to the other three.',
+          'PerplexityBot was challenged when we sent its user agent; product pages are empty to the other three.',
         ],
       ],
     });

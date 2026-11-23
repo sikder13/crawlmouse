@@ -6,6 +6,7 @@ import { VERDICTS } from '../../../components/v2/verdicts';
 import { isAi, keptOutClauses, servedExtent } from '../sentences';
 import { accessPill, resultView } from './result';
 import { accessView } from './segment/access';
+import { buildPublicSnapshot } from '../reports/build-snapshot';
 
 /** The sentences a reader meets first, on every graded check of every fixture. */
 const graded = FIXTURE_NAMES.flatMap((name) => {
@@ -332,5 +333,78 @@ describe('how many pages a crawler was served on (pages_served)', () => {
     out.verdict = 'blocked_by_ua_rule';
     delete out.pages_served;
     expect(servedExtent(c)).toBe('');
+  });
+});
+
+describe('every crawler sentence says what our request got (review 2 of PR 2a)', () => {
+  const edged = (served: number) => {
+    const c = withVerdicts([]);
+    c.crawlers.filter(isAi).forEach((x, i) => {
+      x.verdict = i < served ? 'allowed' : 'edge_blocks_automation';
+      x.evidence_class = 'simulated';
+      x.pages_served = i < served ? x.pages_measured : 0;
+    });
+    return c;
+  };
+
+  it('states each refusal as what our request got, not as a fact about the crawler', () => {
+    const c = withVerdicts([
+      'challenged_ua',
+      'rate_limited',
+      'payment_required',
+      'redirected_away',
+    ]);
+    const said = keptOutClauses(c.crawlers.filter(isAi)).join('; ');
+    expect(said).toContain('was challenged when we sent its user agent');
+    expect(said).toContain('was rate limited when we sent its user agent');
+    expect(said).toContain('was asked to pay (402) when we sent its user agent');
+    expect(said).toContain('was sent to another host when we sent its user agent');
+    expect(said).not.toMatch(/gets a challenge|is rate limited|is asked to pay|is sent to/);
+  });
+
+  it('does not say the site blocks all automation while crawler requests were served', () => {
+    const c = edged(5);
+    expect(accessPill(c)).toEqual({ state: 'unverified', label: '5 of 6 served · 1 not measured' });
+    const body = JSON.stringify(resultView(fixtureOf(c), c.id, { map: null }).doors);
+    expect(body).toContain('Requests with the other five AI crawlers’ user agents were served');
+  });
+
+  it('says what an edge that refused every request did, in what our test saw', () => {
+    const c = edged(0);
+    expect(accessPill(c)).toEqual({ state: 'bad', label: 'refused our test requests' });
+    expect(VERDICTS.edge_blocks_automation.label).toBe('refused our test requests');
+  });
+
+  it('does not say crawler requests were sent where none was', () => {
+    const c = edged(0);
+    const v = accessView(fixtureOf(c), c.id);
+    expect(v.method).not.toMatch(/^Each page was requested/);
+    expect(v.method).toContain('No crawler request was sent');
+    const tile = v.tiles.find((t) => t.label === 'Pages fetched per crawler')!;
+    expect(tile.value).toBe(`0 of ${c.coverage!.pages_discovered.toLocaleString('en-US')}`);
+  });
+
+  it('limits the method line to pages our control was served on, when an edge refused some', () => {
+    const c = edged(5);
+    expect(accessView(fixtureOf(c), c.id).method).toMatch(
+      /^Where our browser-identity control was served, each page was requested/,
+    );
+  });
+
+  it('mints a headline with the served wording and its extent, and no search engine', () => {
+    const c = withVerdicts([]);
+    c.coverage!.pages_sampled = 5;
+    for (const x of c.crawlers.filter(isAi)) {
+      x.verdict = 'allowed';
+      x.evidence_class = 'simulated';
+      x.pages_measured = 5;
+      x.pages_served = 1;
+      x.text_share = 1;
+    }
+    const { headline } = buildPublicSnapshot(fixtureOf(c), c.id, '2026-11-23T12:00:00.000Z');
+    expect(headline).toBe(
+      'Requests with all six AI crawlers’ user agents were served, on 1 of the 5 sampled pages.',
+    );
+    expect(headline).not.toMatch(/Every crawler|Googlebot|Bingbot/);
   });
 });

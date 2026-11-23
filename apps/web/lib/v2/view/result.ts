@@ -287,7 +287,22 @@ export function accessPill(check: Check): DoorView['pill'] {
   // A crawler that could not be measured is neither let in nor kept out.
   const unmeasured = ai.filter((c) => c.verdict === 'not_measured').length;
   const kept = ai.length - allowed.length - unmeasured;
-  return meetsEdge(check)
+  const edged = of('edge_blocks_automation');
+  // An edge that refused our control on some pages does not stop the requests served on the others.
+  if (edged && allowed.length) {
+    const others = ai.length - allowed.length - edged - unmeasured;
+    return {
+      state: 'unverified',
+      label: [
+        `${allowed.length} of ${ai.length} served`,
+        others ? `${others} not served` : null,
+        `${edged + unmeasured} not measured`,
+      ]
+        .filter(Boolean)
+        .join(' · '),
+    };
+  }
+  return edged
     ? { state: 'bad', label: EDGE_PILL }
     : kept === 0 && unmeasured === 0
       ? servedCountMissing(check)
@@ -305,7 +320,7 @@ export function accessPill(check: Check): DoorView['pill'] {
             refused ? `${refused} refused by user agent` : null,
             unverified ? `${unverified} refused, unverified` : null,
             challenged - unverified ? `${challenged - unverified} challenged` : null,
-            kept - blocked - challenged ? `${kept - blocked - challenged} kept out` : null,
+            kept - blocked - challenged ? `${kept - blocked - challenged} not served` : null,
             unmeasured ? `${unmeasured} not measured` : null,
           ]
             .filter(Boolean)
@@ -338,7 +353,13 @@ function accessDoor(
         ? ` ${servedOthers(1)}${servedExtent(check)};`
         : ` ${servedOthers(allowed.length)}${servedExtent(check)};`;
   const body = edge
-    ? `${EDGE_METHOD}${out.length ? ` ${capitalise(out.join('; '))}.` : ''}`
+    ? [
+        EDGE_METHOD,
+        out.length ? `${capitalise(out.join('; '))}.` : null,
+        allowed.length ? `${servedOthers(allowed.length)}${servedExtent(check)}.` : null,
+      ]
+        .filter(Boolean)
+        .join(' ')
     : out.length === 0
       ? `${servedAll(ai.length, 'AI')}${servedExtent(check)}. ${searchLine}`
       : `${capitalise(out.join('; '))}.${othersIn} ${searchLine}`;

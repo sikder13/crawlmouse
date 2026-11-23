@@ -76,7 +76,7 @@ export const VERDICTS: Record<Verdict, VerdictStyle> = {
   },
   edge_blocks_automation: {
     state: 'bad',
-    label: 'blocks all automation',
+    label: 'refused our test requests',
     glyphFromFacts: false,
     labelFromFacts: false,
   },

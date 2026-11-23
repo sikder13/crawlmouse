@@ -411,7 +411,7 @@ From `apps/web/components/v2/verdicts.ts`. "FACTS" means `docs/design/v2/FACTS-p
 | `refused_unverified`     | unverified | ○      | FACTS        | refused, no crawler name served (unverified) | FACTS        |
 | `rate_limited`           | warn       | ▲      | proposed     | rate limited                                 | proposed     |
 | `payment_required`       | warn       | ▲      | proposed     | payment required                             | proposed     |
-| `edge_blocks_automation` | bad        | ■      | proposed     | blocks all automation                        | proposed     |
+| `edge_blocks_automation` | bad        | ■      | proposed     | refused our test requests                    | proposed     |
 | `redirected_away`        | warn       | ▲      | proposed     | redirected away                              | proposed     |
 | `not_measured`           | neutral    | (none) | proposed     | not measured                                 | proposed     |
 

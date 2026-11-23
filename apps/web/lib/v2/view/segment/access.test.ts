@@ -126,7 +126,7 @@ describe('accessView: headline, tiles and the method sentence', () => {
       'Requests as one of six AI crawlers were refused by user agent, and one was challenged.',
     );
     expect(v.headline.body).toBe(
-      'GPTBot was refused by a firewall rule when we sent its user agent; PerplexityBot gets a challenge page. Requests with the other four AI crawlers’ user agents were served; OAI-SearchBot, ChatGPT-User, Claude-SearchBot and ClaudeBot then read product pages empty without JavaScript, covered in the next section. Googlebot and Bingbot are allowed by robots.txt. Tested 25 Oct 2026 at 02:33 UTC.',
+      'GPTBot was refused by a firewall rule when we sent its user agent; PerplexityBot was challenged when we sent its user agent. Requests with the other four AI crawlers’ user agents were served; OAI-SearchBot, ChatGPT-User, Claude-SearchBot and ClaudeBot then read product pages empty without JavaScript, covered in the next section. Googlebot and Bingbot are allowed by robots.txt. Tested 25 Oct 2026 at 02:33 UTC.',
     );
   });
 
@@ -136,9 +136,9 @@ describe('accessView: headline, tiles and the method sentence', () => {
     expect(v.headline.pill).toEqual({ state: 'ok', label: '6 of 6 served' });
   });
 
-  it('names the edge once when it blocks all automation', () => {
+  it('names the edge once when it refused our test requests', () => {
     const v = view('challenged-site');
-    expect(v.headline.pill.label).toBe('blocks all automation');
+    expect(v.headline.pill.label).toBe('refused our test requests');
     expect(v.headline.title).toBe(
       'The site’s edge refused or challenged our browser-identity request from Crawlmouse’s address.',
     );
@@ -194,13 +194,13 @@ describe('accessView: edges of the data', () => {
     expect(v.headline.body).not.toContain('robots.txt.');
   });
 
-  it('counts crawlers kept out another way, and ones not measured, in the title', () => {
+  it('counts crawlers not served, and ones not measured, in the title', () => {
     const v = view('bad-site', (c) => {
       c.crawlers.find((x) => x.ua === 'GPTBot')!.verdict = 'rate_limited';
       c.crawlers.find((x) => x.ua === 'PerplexityBot')!.verdict = 'not_measured';
     });
     expect(v.headline.title).toBe(
-      'One of six AI crawlers is kept out another way, and one was not measured.',
+      'One of six AI crawlers was not served, and one was not measured.',
     );
   });
 

@@ -6,7 +6,7 @@
  * (`build-snapshot.test.ts` walks every string to prove it).
  */
 import type { Check } from '@crawlmouse/types/v2';
-import { keptOutClauses, thinSentence } from '../sentences';
+import { isAi, keptOutClauses, servedAll, servedExtent, thinSentence } from '../sentences';
 import { capitalise } from '../words';
 import { findCheck, siteOf, type ViewDataset } from '../fixtures';
 import { CAUSE_SHORT } from '../view/segment/access';
@@ -14,7 +14,8 @@ import { crawlerRows, resultView } from '../view/result';
 import { freeFixes } from '../view/free-fixes';
 import { PublicSnapshotV2Schema, type PublicSnapshotV2 } from './snapshot';
 
-function headline(check: Check, host: string): string {
+function headline(check: Check): string {
+  const ai = check.crawlers.filter(isAi);
   const keptOut = keptOutClauses(check.crawlers);
   const thin = thinSentence(check);
   const sentences = [
@@ -23,7 +24,7 @@ function headline(check: Check, host: string): string {
   ];
   return sentences.length
     ? sentences.map(capitalise).join(' ')
-    : `Every crawler we tested reads ${host}.`;
+    : `${servedAll(ai.length, 'AI')}${servedExtent(check, false, ai)}.`;
 }
 
 /**
@@ -44,7 +45,7 @@ export function buildPublicSnapshot(
     host: siteOf(d, check).host,
     checkedAt: check.finished_at,
     mintedAt,
-    headline: headline(check, view.domain),
+    headline: headline(check),
     grades: view.grades.map(({ label, letter, score, withheld, summary }) => ({
       label,
       letter,

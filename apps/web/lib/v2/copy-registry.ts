@@ -118,7 +118,7 @@ const BASE_CHANGES: CopyChange[] = [
     screen: 'home',
     kind: 'facts',
     locked: 'GPTBot is blocked by a firewall rule; PerplexityBot gets a challenge page.',
-    rendered: 'PerplexityBot gets a challenge page.',
+    rendered: 'PerplexityBot was challenged when we sent its user agent.',
     source:
       'FACTS I6: the AI readability grade counts the four scored crawlers; GPTBot is not one.',
   },
@@ -243,7 +243,7 @@ const BASE_CHANGES: CopyChange[] = [
     screen: 'result',
     kind: 'facts',
     locked: "Two AI crawlers never get past Cloudflare's bot defences;",
-    rendered: 'PerplexityBot gets a challenge page;',
+    rendered: 'PerplexityBot was challenged when we sent its user agent;',
     source:
       'FACTS I6 (the grade counts the four scored crawlers; GPTBot is not one) and I2 (a challenge is not blocked); FACTS marks this count and verb ENGINE-DERIVED, and of the four the fixture challenges one.',
   },
@@ -269,6 +269,13 @@ const BASE_CHANGES: CopyChange[] = [
     locked: 'GPTBot is refused by a firewall rule;',
     rendered: 'GPTBot was refused by a firewall rule when we sent its user agent;',
     source: 'FACTS I2: "blocked" is the word for blocked_by_ua_rule.',
+  },
+  {
+    screen: 'result',
+    kind: 'facts',
+    locked: 'PerplexityBot gets a challenge page.',
+    rendered: 'PerplexityBot was challenged when we sent its user agent.',
+    source: 'FACTS I2 and F-135: what our tagged request got, not a fact about the real crawler.',
   },
   {
     screen: 'result',

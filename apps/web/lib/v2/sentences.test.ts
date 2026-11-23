@@ -89,7 +89,10 @@ describe('the sentences about a check', () => {
         c('C', 'disallowed_by_robots'),
         c('D', 'allowed'),
       ]),
-    ).toEqual(['B and C are blocked by robots.txt', 'A gets a challenge page']);
+    ).toEqual([
+      'B and C are blocked by robots.txt',
+      'A was challenged when we sent its user agent',
+    ]);
   });
 });
 
@@ -118,15 +121,15 @@ describe('thin templates, counted per crawler', () => {
     // The scored crawlers read every template in full; only unscored ClaudeBot reads one thin.
     const c = variant((c) => SCORED_THIN.forEach((ua) => readsAll(c, ua)));
     expect(crawler(c, 'ClaudeBot').by_template.map((t) => t.verdict)).toContain('allowed_thin');
-    expect(aiSummary(c)).toBe('PerplexityBot gets a challenge page.');
+    expect(aiSummary(c)).toBe('PerplexityBot was challenged when we sent its user agent.');
     expect(thinSentence(c)).toBeNull();
-    expect(aiShortSummary(c)).toBe('PerplexityBot gets a challenge page.');
+    expect(aiShortSummary(c)).toBe('PerplexityBot was challenged when we sent its user agent.');
   });
 
   it('says how many read it thin, and which, when not all the crawlers that got in do', () => {
     const c = variant((c) => readsAll(c, 'OAI-SearchBot'));
     expect(aiSummary(c)).toBe(
-      'PerplexityBot gets a challenge page; product pages are empty to ChatGPT-User and Claude-SearchBot.',
+      'PerplexityBot was challenged when we sent its user agent; product pages are empty to ChatGPT-User and Claude-SearchBot.',
     );
     // One scored crawler reads the product template in full, so it is not "empty without JavaScript".
     expect(thinSentence(c)).toBeNull();
@@ -183,7 +186,7 @@ describe('thin templates, counted per crawler', () => {
     });
     expect(thinSentence(c)).toBe('The homepage is empty without JavaScript.');
     expect(aiSummary(c)).toBe(
-      'PerplexityBot gets a challenge page; the homepage is empty to the other three.',
+      'PerplexityBot was challenged when we sent its user agent; the homepage is empty to the other three.',
     );
     for (const [label, noun] of Object.entries(TEMPLATE_NOUNS)) {
       expect(isSingularNoun(noun.pages), label).toBe(label === 'Homepage');

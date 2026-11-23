@@ -11,7 +11,7 @@ export const ACCESS_CHANGES: CopyChange[] = [
     locked:
       'Two of six crawlers never get in. blocked GPTBot is refused by a Cloudflare firewall rule on every page. PerplexityBot is served a challenge page instead of your content. Google, Bing, OAI-SearchBot and ClaudeBot reach the site; two of them then hit the JavaScript problem covered in the next section.',
     rendered:
-      'Requests as one of six AI crawlers were refused by user agent, and one was challenged. 1 refused by user agent · 1 challenged GPTBot was refused by a firewall rule when we sent its user agent; PerplexityBot gets a challenge page. Requests with the other four AI crawlers’ user agents were served; OAI-SearchBot, ChatGPT-User, Claude-SearchBot and ClaudeBot then read product pages empty without JavaScript, covered in the next section. Googlebot and Bingbot are allowed by robots.txt.',
+      'Requests as one of six AI crawlers were refused by user agent, and one was challenged. 1 refused by user agent · 1 challenged GPTBot was refused by a firewall rule when we sent its user agent; PerplexityBot was challenged when we sent its user agent. Requests with the other four AI crawlers’ user agents were served; OAI-SearchBot, ChatGPT-User, Claude-SearchBot and ClaudeBot then read product pages empty without JavaScript, covered in the next section. Googlebot and Bingbot are allowed by robots.txt.',
     source:
       'FACTS I6 and I2: “two of six crawlers never get in” is ENGINE-DERIVED under the new vocabulary, where a challenge is not “blocked”; the pill is the Result door’s.',
   },
