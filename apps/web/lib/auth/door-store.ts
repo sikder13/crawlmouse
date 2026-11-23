@@ -72,7 +72,8 @@ export interface DoorStore {
   loadCheck(checkId: string): Promise<CheckForClaim | null>;
   /** Sets the owner where there is none; 'not_unowned' when another claim got there first. */
   takeSite(siteId: string, site: Omit<NewSite, 'host'>): Promise<TakeSiteResult>;
-  clearExpiry(checkId: string): Promise<void>;
+  /** Clears the expiry of every check on a site the claim took, as `keep_check` does. */
+  clearExpiry(siteId: string): Promise<void>;
   /**
    * The account's first-touch row (`public.account_attribution`, CC-41 D2), written once: a row
    * already there is left as it is (`on conflict do nothing`).

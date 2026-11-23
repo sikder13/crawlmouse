@@ -70,6 +70,7 @@ export async function capturePublicEvent<E extends PublicServerEvent>(
       distinctId: visitorDistinctId(cookie, userId, `check:${ref}`),
       accountId,
       properties: { ...properties, check_ref: ref },
+      userAgent: req.headers.get('user-agent'),
     },
     send,
     lookup,

@@ -25,6 +25,8 @@ async function startsAt(path: string): Promise<boolean> {
   vi.resetModules();
   h.init.mockClear();
   vi.stubEnv('NEXT_PUBLIC_POSTHOG_KEY', ['phc', 'test'].join('_'));
+  // The region cookie the middleware sets outside the consent regions: without it PostHog holds.
+  document.cookie = 'cm_consent_required=0; Path=/';
   window.history.replaceState(null, '', path);
   await import('../instrumentation-client');
   return h.init.mock.calls.length > 0;

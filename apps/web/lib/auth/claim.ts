@@ -102,7 +102,7 @@ export async function claimCheck(
     // Our site, but the check still expires: an earlier claim stopped between its two writes. That
     // claim tested the expiry before it took the site, so it is finished now, whatever the time.
     // This assumes the claim is the one writer that gives an account's site a check with an expiry.
-    await store.clearExpiry(check.checkId);
+    await store.clearExpiry(check.siteId);
     return kept(deps, check, input.userId);
   }
 
@@ -133,7 +133,7 @@ export async function claimCheck(
       : refuse('not_found');
   }
   // `keep_check` cleared the expiry in the transaction that took the site.
-  if (!deps.keep) await store.clearExpiry(check.checkId);
+  if (!deps.keep) await store.clearExpiry(check.siteId);
   return kept(deps, check, input.userId);
 }
 

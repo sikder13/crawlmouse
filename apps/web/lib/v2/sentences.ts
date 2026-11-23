@@ -17,6 +17,7 @@ import {
   type Verdict,
 } from '@crawlmouse/types/v2';
 import { AI_WAITING } from './view/effect-headline';
+import { sectionMeasured } from './view/section-measured';
 import { letterFor, nextBandFloor } from './letters';
 import { listOf, percent, templateNoun } from './format';
 import { capitalise, count, numberWord, plural } from './words';
@@ -202,6 +203,9 @@ export function nextBandSentence(
   return `${head}; ${numberWord(open)} of them ${open === 1 ? 'is' : 'are'} open now.`;
 }
 
+/** What a Technical SEO summary says of a check that read no internal link. */
+const NO_LINK_READ = 'No internal link was read, so the structure was not measured.';
+
 /** Locked Home stage: "7 orphan pages. Three fixes take it to A-." */
 export function seoShortSummary(check: Check, fixes: readonly Fix[], isOpen: (f: Fix) => boolean) {
   const t = check.technical_seo!;
@@ -224,6 +228,7 @@ export function structureWord(score: number): string {
 /** Locked Result: "Sound structure; seven pages nobody links to. Three fixes take it to A-; …" */
 export function seoSummary(check: Check, fixes: readonly Fix[], isOpen: (f: Fix) => boolean) {
   const t = check.technical_seo!;
+  if (!sectionMeasured(check, 'structure')) return NO_LINK_READ;
   const orphans = check.structure!.orphan_pages;
   const linked = orphans
     ? `${numberWord(orphans)} ${plural(orphans, 'page nobody links to', 'pages nobody links to')}`

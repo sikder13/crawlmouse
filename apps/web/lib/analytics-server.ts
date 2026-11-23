@@ -15,6 +15,10 @@
  * check routes run it after their response (`after`, app/api/checks/route.ts and
  * app/api/checks/[id]/_lib/deps.ts), so the wait is not the visitor's.
  *
+ * Bots (F-050). An event whose caller passes the request's `User-Agent` is dropped when PostHog's own
+ * browser rule (`isBlockedUA`) names it a bot, so the server does not count a visit the browser's
+ * SDK would have dropped. The list is PostHog's, so a script with a plain agent (`curl`) is not on it.
+ *
  * Internal accounts (CC-33 D1). An event about an account marked internal carries `internal: true`.
  * Whether it is about one is read from its distinct id and its `accountId`, when the caller passes
  * one (`isInternalEvent`, lib/v2/ops/internal-marker.ts), only for an event consent lets through.
@@ -23,6 +27,7 @@
  * The account axis (CC-41 D1). An event whose caller passes `accountId` carries it as `account_id`;
  * that property is this module's too, so a caller's own `account_id` is dropped.
  */
+import { isBlockedUA } from 'posthog-js/lib/src/utils/blocked-uas';
 import type { FunnelEvent } from './analytics-events';
 import { serverCaptureAllowed } from './consent';
 import { isInternalEvent, type InternalLookup } from './v2/ops/internal-marker';
@@ -34,6 +39,11 @@ export interface ServerEvent {
   /** The account the event is about, when its distinct id does not name it. */
   accountId?: string | null;
   properties?: Readonly<Record<string, unknown>>;
+  /**
+   * The request's `User-Agent`, for a caller that holds one. It is read for the bot rule and is not
+   * put in the event. A caller with no request (a step, a cron, a webhook) passes none.
+   */
+  userAgent?: string | null;
 }
 
 /** What is posted to PostHog's capture endpoint, less the project key. */
@@ -148,11 +158,12 @@ export function visitorDistinctId(
 
 export async function captureServerEvent(
   cookieHeader: string | null,
-  { event, distinctId, accountId, properties = {} }: ServerEvent,
+  { event, distinctId, accountId, properties = {}, userAgent }: ServerEvent,
   send: SendCapture = posthogSend,
   lookup?: InternalLookup,
 ): Promise<void> {
   if (!serverCaptureAllowed(cookieHeader)) return;
+  if (isBlockedUA(userAgent ?? undefined)) return;
   const own = Object.fromEntries(
     Object.entries(properties).filter(([k]) => !OWNED_PROPERTIES.has(k)),
   );
