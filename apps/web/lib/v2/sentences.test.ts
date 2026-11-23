@@ -251,18 +251,22 @@ describe('the wording at each threshold and form', () => {
     }
     waiting.ai_readability!.withheld_reasons = ['readable_unmeasured'];
     waiting.ai_readability!.access_range = null;
+    // No part holds a score here, so the sentence is the reason alone.
+    for (const part of ['access', 'quotable', 'signals'] as const) {
+      waiting.ai_readability!.components[part].score = null;
+    }
     expect(aiWithheldSummary(waiting, 4)).toBe(
-      'AI readability is graded once each template has a page read in a browser.',
+      'The AI readability grade needs the JavaScript comparison, which is coming.',
     );
     // Three of four measured is enough for Access (the engine scores it from two): the count is
     // still not why, and the grade's reason is given.
     expect(aiWithheldSummary(waiting, 3)).toBe(
-      'AI readability is graded once each template has a page read in a browser.',
+      'The AI readability grade needs the JavaScript comparison, which is coming.',
     );
     // Of two reasons, the first.
     waiting.ai_readability!.withheld_reasons = ['quotable_unmeasured', 'readable_unmeasured'];
     expect(aiWithheldSummary(waiting, 3)).toBe(
-      'AI readability is graded once its content part can be measured.',
+      'AI readability is graded once its content part can be measured. The AI readability grade needs the JavaScript comparison, which is coming.',
     );
   });
 
@@ -283,6 +287,9 @@ describe('the wording at each threshold and form', () => {
       }
       c.ai_readability!.withheld_reasons = reasons;
       c.ai_readability!.access_range = null;
+      for (const part of ['access', 'quotable', 'signals'] as const) {
+        c.ai_readability!.components[part].score = null;
+      }
       return { check: c, measured: scoredCrawlersMeasured(c.crawlers) };
     }
     const said = (v: Verdict[], r: WithheldReason[], unscoredAtEdge = false) => {
@@ -334,7 +341,7 @@ describe('the wording at each threshold and form', () => {
       expect(
         said(['challenged_ua', 'challenged_ua', 'edge_blocks_automation', 'not_measured'], COUNT),
       ).toEqual([2, `The site’s edge blocks all automation. ${WAITS}`]);
-      const READ = 'AI readability is graded once each template has a page read in a browser.';
+      const READ = 'The AI readability grade needs the JavaScript comparison, which is coming.';
       // One scored crawler unmeasured at the edge, three served, and the grade waits for Readable.
       expect(
         said(['allowed', 'allowed', 'allowed', 'edge_blocks_automation'], ['readable_unmeasured']),
@@ -351,7 +358,10 @@ describe('the wording at each threshold and form', () => {
           ['allowed', 'not_measured', 'not_measured', 'not_measured'],
           ['readable_unmeasured', 'too_few_crawlers_measured'],
         ),
-      ).toEqual([1, 'Only one of the four scored crawlers could be measured.']);
+      ).toEqual([
+        1,
+        'Only one of the four scored crawlers could be measured. The AI readability grade needs the JavaScript comparison, which is coming.',
+      ]);
     });
 
     it('a withheld grade that names no reason is refused, as CheckSchema refuses it', () => {
@@ -394,5 +404,56 @@ describe('the vocabulary', () => {
         }
       }
     }
+  });
+});
+
+describe('a withheld AI readability grade says what was measured', () => {
+  const COMING = 'The AI readability grade needs the JavaScript comparison, which is coming.';
+  const withheld = (
+    reasons: WithheldReason[],
+    scores: { access?: number | null; quotable?: number | null; signals?: number | null },
+  ) => {
+    const c = structuredClone(findCheck(fixture('clean-site'), CHECKS.cleanFirstAudit)) as Check;
+    const ai = c.ai_readability!;
+    Object.assign(ai, { withheld: true, withheld_reasons: reasons, total: null, grade: null });
+    ai.components.readable.score = null;
+    ai.components.access.score = scores.access ?? null;
+    ai.components.quotable.score = scores.quotable ?? null;
+    ai.components.signals.score = scores.signals ?? null;
+    return c;
+  };
+
+  it('names each part that has a score, and that the comparison is coming', () => {
+    const c = withheld(['readable_unmeasured'], { access: 40, quotable: 12, signals: 5 });
+    expect(aiWithheldSummary(c, 4)).toBe(
+      `${COMING} This audit measured crawler access, content and AI signals.`,
+    );
+  });
+
+  it('names only the parts that were measured', () => {
+    const c = withheld(['readable_unmeasured', 'quotable_unmeasured'], { access: 40, signals: 5 });
+    const said = aiWithheldSummary(c, 4);
+    expect(said).toContain('This audit measured crawler access and AI signals.');
+    expect(said).not.toMatch(/content/);
+  });
+
+  it('claims no measurement when no part has a score', () => {
+    const c = withheld(['readable_unmeasured', 'quotable_unmeasured', 'signals_unmeasured'], {});
+    expect(aiWithheldSummary(c, 4)).not.toContain('This audit measured');
+  });
+
+  it('still says the comparison is coming when another reason comes first', () => {
+    const c = withheld(['too_few_crawlers_measured', 'readable_unmeasured'], { signals: 5 });
+    const said = aiWithheldSummary(c, 1);
+    expect(said).toContain(COMING);
+    expect(said).toContain('This audit measured AI signals.');
+  });
+
+  it('does not mention the comparison when it is not what the grade waits on', () => {
+    const c = withheld(['quotable_unmeasured'], { access: 40, signals: 5 });
+    c.ai_readability!.components.readable.score = 20;
+    const said = aiWithheldSummary(c, 4);
+    expect(said).not.toContain('JavaScript comparison');
+    expect(said).not.toContain('This audit measured');
   });
 });

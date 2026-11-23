@@ -303,6 +303,13 @@ export function aiShortSummary(check: Check): string {
 /** FACTS I4: the scored crawlers a grade needs measured. The engine's MIN_MEASURED_CRAWLERS. */
 export const I4_MEASURED_CRAWLERS = 2;
 
+/** The parts of the AI grade a static crawl can score, as a sentence names them. */
+const MEASURED_PARTS = [
+  ['access', 'crawler access'],
+  ['quotable', 'content'],
+  ['signals', 'AI signals'],
+] as const;
+
 /**
  * The withheld AI readability grade, said plainly (FACTS I4). `measured` is the contract's count
  * (`scoredCrawlersMeasured`: a scored crawler with a verdict). The engine withholds by a count of
@@ -331,7 +338,17 @@ export function aiWithheldSummary(check: Check, measured: number): string {
     : measured < I4_MEASURED_CRAWLERS
       ? counted
       : `${edge ? `${EDGE_SENTENCE}. ` : ''}${AI_WAITING.too_few_crawlers_measured}.`;
+  // Rendering is off, so this is the reason on every check today (F-012): say what was measured,
+  // from the parts that hold a score, so a part that has none cannot be named.
+  const waitsOnJs = reasons.includes('readable_unmeasured');
+  const comparison = `${AI_WAITING.readable_unmeasured}.`;
+  const coming = waitsOnJs && why !== comparison ? comparison : '';
+  const parts = MEASURED_PARTS.filter(([key]) => ai.components[key].score !== null);
+  const measuredParts =
+    waitsOnJs && parts.length
+      ? `This audit measured ${listOf(parts.map(([, name]) => name))}.`
+      : '';
   const range = ai.access_range;
   const access = range ? `Access is somewhere between ${range.min} and ${range.max} of 40.` : '';
-  return [why, access].filter(Boolean).join(' ');
+  return [why, coming, measuredParts, access].filter(Boolean).join(' ');
 }
