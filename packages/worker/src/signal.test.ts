@@ -22,7 +22,7 @@ const NOW = 1_800_000_000_000;
 beforeEach(() => vi.useFakeTimers({ now: NOW }));
 afterEach(() => vi.useRealTimers());
 
-function harness(post: SignalPost = vi.fn(async () => undefined)) {
+function harness(post: SignalPost = vi.fn(async () => undefined), protectionBypass?: string) {
   const logged: Record<string, unknown>[] = [];
   const signal = createDoneSignal({
     url: URL_,
@@ -30,6 +30,7 @@ function harness(post: SignalPost = vi.fn(async () => undefined)) {
     now: () => Date.now(),
     post,
     log: (e) => logged.push(e),
+    ...(protectionBypass !== undefined && { protectionBypass }),
   });
   return { signal, post: post as ReturnType<typeof vi.fn>, logged };
 }
@@ -56,6 +57,46 @@ describe('the done signal', () => {
     const expected = createHmac('sha256', key).update(`${ts}.${init.body}`).digest('hex');
     expect(init.headers['x-crawlmouse-signature']).toBe(expected);
     expect(signSignal(SECRET, ts, init.body)).toBe(expected);
+  });
+
+  describe('through a protected staging deployment', () => {
+    const BYPASS = 'b'.repeat(32);
+
+    it('sends the bypass as its own header, and signs the same note', async () => {
+      const h = harness(undefined, BYPASS);
+      h.signal(ENDED);
+      await vi.advanceTimersByTimeAsync(0);
+      const [url, init] = h.post.mock.calls[0]!;
+      expect(init.headers['x-vercel-protection-bypass']).toBe(BYPASS);
+      expect(url).not.toContain(BYPASS);
+      expect(init.body).not.toContain(BYPASS);
+      expect(init.headers['x-crawlmouse-signature']).toBe(
+        signSignal(SECRET, init.headers['x-crawlmouse-ts'], init.body),
+      );
+    });
+
+    it('sends no such header without one', async () => {
+      const h = harness();
+      h.signal(ENDED);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(h.post.mock.calls[0]![1].headers).not.toHaveProperty('x-vercel-protection-bypass');
+    });
+
+    it.each([
+      ['refused', async () => ({ status: 401 })],
+      [
+        'failed',
+        async () => {
+          throw new Error(`refused with ${BYPASS}`);
+        },
+      ],
+    ])('never logs it when the post is %s', async (_name, answer) => {
+      const h = harness(vi.fn(answer) as unknown as SignalPost, BYPASS);
+      h.signal(ENDED);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(h.logged.length).toBeGreaterThan(0);
+      expect(JSON.stringify(h.logged)).not.toContain(BYPASS);
+    });
   });
 
   it('cannot be replayed as a signature for a batch post or a read', () => {

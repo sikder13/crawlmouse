@@ -150,6 +150,7 @@ export function createWorker(deps: WorkerDeps): Worker {
         now,
         log,
         ...(deps.signalPost && { post: deps.signalPost }),
+        ...(config.appSignalBypass && { protectionBypass: config.appSignalBypass }),
       })
     : null;
   const store = new BatchStore(now);

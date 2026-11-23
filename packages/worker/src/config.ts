@@ -27,6 +27,12 @@ export interface WorkerConfig {
    * https address; the worker then sends no signal and says so, and runs poll as they always have.
    */
   appSignalUrl: string | null;
+  /**
+   * APP_SIGNAL_PROTECTION_BYPASS: sent with the done signal so it can reach a staging app behind
+   * Vercel Deployment Protection. Null except on the staging worker, for a `*.vercel.app` address,
+   * because the value opens every non-production deployment. A secret: never logged.
+   */
+  appSignalBypass: string | null;
 }
 
 export const MIN_SECRET_LENGTH = 32;
@@ -62,6 +68,14 @@ function httpsUrl(raw: string | undefined): string | null {
   }
 }
 
+const STAGING_APP = 'crawlmouse-worker-staging';
+
+function signalBypass(env: Env, url: string | null): string | null {
+  const value = env.APP_SIGNAL_PROTECTION_BYPASS?.trim();
+  if (!value || !url || env.FLY_APP_NAME !== STAGING_APP) return null;
+  return new URL(url).hostname.endsWith('.vercel.app') ? value : null;
+}
+
 export function loadConfig(env: Env): WorkerConfig {
   const signingSecret = env.WORKER_SIGNING_SECRET ?? '';
   if (signingSecret.length < MIN_SECRET_LENGTH) {
@@ -87,5 +101,6 @@ export function loadConfig(env: Env): WorkerConfig {
     paused: isCrawlPaused(env),
     vantage: vantageOf(env, RELEASE),
     appSignalUrl: httpsUrl(env.APP_SIGNAL_URL),
+    appSignalBypass: signalBypass(env, httpsUrl(env.APP_SIGNAL_URL)),
   };
 }

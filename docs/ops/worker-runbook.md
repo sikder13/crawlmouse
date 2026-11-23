@@ -335,7 +335,18 @@ flyctl secrets set APP_SIGNAL_URL=https://<the app's host>/api/webhooks/worker -
 
 Until it is set the worker sends nothing and checks poll as before, so the app and the worker can deploy
 in either order. To turn it off, unset the secret. Verify:
-`pnpm --filter @crawlmouse/worker exec vitest run src/signal.test.ts`.
+`pnpm --filter @crawlmouse/worker exec vitest run src/signal.test.ts src/signal-config.test.ts`.
+
+**Staging only.** The staging app is behind Vercel Deployment Protection, which answers the worker's
+POST with 401 before it reaches the route. Give the staging worker the automation bypass as its own
+secret, from standard input so it stays out of the shell history. The worker sends it as the
+`x-vercel-protection-bypass` header and never logs it. It ignores the value unless it is the staging
+worker and the signal's address is on `*.vercel.app`. Never put it in `APP_SIGNAL_URL`, and do not set
+it on production.
+
+```bash
+printf 'APP_SIGNAL_PROTECTION_BYPASS=%s\n' "$VERCEL_AUTOMATION_BYPASS_SECRET" | flyctl secrets import --app crawlmouse-worker-staging
+```
 
 ## Rotate the signing secret
 

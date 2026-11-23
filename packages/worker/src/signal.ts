@@ -49,6 +49,8 @@ export interface DoneSignalDeps {
   now(): number;
   post?: SignalPost;
   log(e: Record<string, string | number>): void;
+  /** Sent as `x-vercel-protection-bypass`, on staging only (config.ts). Never logged. */
+  protectionBypass?: string;
 }
 
 export function createDoneSignal(deps: DoneSignalDeps): (ended: BatchEnded) => void {
@@ -66,6 +68,7 @@ export function createDoneSignal(deps: DoneSignalDeps): (ended: BatchEnded) => v
           'content-type': 'application/json',
           [TS_HEADER]: ts,
           [SIGNATURE_HEADER]: signSignal(deps.secret, ts, raw),
+          ...(deps.protectionBypass && { 'x-vercel-protection-bypass': deps.protectionBypass }),
         },
         body: raw,
         signal: deadline.signal,
