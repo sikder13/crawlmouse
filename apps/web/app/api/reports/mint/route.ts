@@ -5,6 +5,7 @@ import { supabaseServer } from '@/lib/supabase/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { newReportSlug } from '@/lib/slug';
 import { normalizeDomain } from '@/lib/domain';
+import { hostTakenDown } from '@/lib/host-takedown';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { verifyTurnstileToken } from '@/lib/turnstile';
 import { getClientIp } from '@/lib/client-ip';
@@ -126,6 +127,10 @@ export async function POST(req: Request) {
   if (!audit.grade) return NextResponse.json({ error: 'audit not gradeable' }, { status: 400 });
 
   const domain = normalizeDomain(audit.url);
+  // A takedown is about the host: another audit of it may not publish it again.
+  if (await hostTakenDown(sb, domain)) {
+    return NextResponse.json({ error: 'host_taken_down' }, { status: 409 });
+  }
 
   // Already public? (fast path; the retry below also covers the double-submit race.)
   const { data: existing } = await sb

@@ -14,6 +14,7 @@ import { fixture } from '../fixtures';
 import { FIRST_AUDIT } from '../view/segment/test-helpers';
 import { buildPublicSnapshot } from './build-snapshot';
 import { normalizeDomain } from '../../domain';
+import { hostTakenDown } from '../../host-takedown';
 import { mintV2, type MintV2Deps } from './mint';
 
 // The claim route's own modules, for the claim below: the session is `claimant`, its service-role
@@ -90,6 +91,13 @@ function deps(caller: string, w: World, edit: Partial<MintV2Deps> = {}): MintV2D
       }),
     rateLimit: async () => ({ allowed: true }),
     verifyTurnstile: async () => true,
+    hostTakenDown: async (siteId) => {
+      const { rows } = await db.query<{ host: string }>(
+        'select host from public.sites where id = $1',
+        [siteId],
+      );
+      return hostTakenDown(postgrestOver(db), normalizeDomain(rows[0]!.host));
+    },
     slugForCheck: (checkId) =>
       asRole(db, 'service_role', null, async (tx) => {
         const { rows } = await tx.query<{ slug: string }>(
@@ -186,6 +194,29 @@ describe('mintV2 on Postgres', () => {
       '9.9.9.9',
     );
     expect(out).toEqual({ status: 200, body: { slug: 'fresh-slug', alreadyPublic: false } });
+  });
+
+  it('a v1 report of the same host, taken down, stops this account publishing it', async () => {
+    const checkId = checkOf(theirs, 'site2');
+    const { rows } = await db.query<{ host: string }>(
+      'select host from public.sites where id = $1',
+      [theirs.site2],
+    );
+    const domain = normalizeDomain(rows[0]!.host);
+    const reports = async () =>
+      (await db.query('select slug from public.public_reports where domain = $1', [domain])).rows
+        .length;
+    await db.query(
+      `insert into public.public_reports (slug, domain, takedown_requested_at)
+       values ('v1-taken-down', $1, now())`,
+      [domain],
+    );
+    const before = await reports();
+    const out = await mintV2(deps(theirs.ownerId, theirs), { checkId }, '9.9.9.9');
+    const after = await reports();
+    await db.query(`delete from public.public_reports where slug = 'v1-taken-down'`);
+    expect(out).toEqual({ status: 409, body: { error: 'host_taken_down' } });
+    expect(after).toBe(before);
   });
 
   it('another account’s check is a 404 under RLS, and writes nothing', async () => {
