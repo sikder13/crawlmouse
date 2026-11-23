@@ -84,6 +84,7 @@ const store: MailStore = {
     ownerEmail: TO.trialOwner,
   }),
   trialSites: async () => [],
+  trialOtherSeats: async () => 0,
   notifyCheck: async () => ({
     status: 'finished',
     notifyEmail: TO.visitor,

@@ -530,7 +530,19 @@ function staysAndPauses(v: AccountView, plan: string, ended = false) {
       ? [COPY.pauses.features.exports]
       : []),
   ];
+  // Free keeps one seat; after the end the others are already gone.
+  const otherSeats = ended
+    ? 0
+    : v.d.seats.filter((s) => s.accepted_at !== null && s.role !== 'owner').length;
   const pauses: TrialRowView[] = [
+    ...(otherSeats
+      ? [
+          {
+            what: COPY.pauses.seats(otherSeats),
+            how: otherSeats === 1 ? COPY.pauses.seatsHow : COPY.pauses.seatsHowMany,
+          },
+        ]
+      : []),
     ...(others.length
       ? [{ what: listOf(others.map((s) => s.host)), how: COPY.pauses.sitesHow }]
       : []),

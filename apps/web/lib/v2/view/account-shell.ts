@@ -208,7 +208,10 @@ function trialCard(
             primarySite(v).host,
             freeSchedule,
             primaries - 1,
-            reminderDue ? null : TRIAL_REMINDER_DAYS_BEFORE_END,
+            // The mail goes to the owner, unless they turned it off.
+            reminderDue || !owner || !a.email_prefs.trial_reminder
+              ? null
+              : TRIAL_REMINDER_DAYS_BEFORE_END,
             billingOpen,
             oldestPaused,
           )}`;

@@ -87,6 +87,8 @@ export interface MailStore {
   trialAccount(accountId: string): Promise<TrialAccount | null>;
   /** The account's sites that have not been removed, for what the trial's end does to them. */
   trialSites(accountId: string): Promise<TrialSite[]>;
+  /** How many active seats the account has besides its owner's. */
+  trialOtherSeats(accountId: string): Promise<number>;
   notifyCheck(checkId: string): Promise<NotifyCheck | null>;
   fixEmailRequest(requestId: string): Promise<FixEmailRequest | null>;
   /** Sets `fix_email_requests.sent_at` when it is not set. */
@@ -332,6 +334,17 @@ export function supabaseMailStore(sb: SupabaseClient): MailStore {
           pausedReason: s.paused_reason,
           stagingOfSiteId: s.staging_of_site_id,
         }));
+    },
+
+    async trialOtherSeats(accountId) {
+      const r = await sb
+        .from('seats')
+        .select('id')
+        .eq('account_id', accountId)
+        .eq('status', 'active')
+        .neq('role', 'owner');
+      if (r.error) fail('seats', r.error);
+      return (r.data ?? []).length;
     },
 
     async notifyCheck(checkId) {

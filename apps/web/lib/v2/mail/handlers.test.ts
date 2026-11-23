@@ -67,6 +67,7 @@ function store(over: Partial<MailStore> = {}): MailStore {
         stagingOfSiteId: null,
       },
     ]),
+    trialOtherSeats: vi.fn(async () => 0),
     notifyCheck: vi.fn(
       async (): Promise<NotifyCheck> => ({
         status: 'finished',
@@ -252,6 +253,14 @@ describe('the trial reminder', () => {
       expect(text).toContain('example.com stays, with a monthly check and three fixes per audit.');
       expect(text).toContain('Paid plans open shortly.');
       expect(text).not.toMatch(/choose a plan|keep pro|add a card|\$/i);
+    });
+
+    it('says when another person loses their seat', async () => {
+      const { h, transport } = closedSetup(store({ trialOtherSeats: vi.fn(async () => 1) }));
+      await h.accountEmail(data);
+      expect(transport.sent[0]!.text).toContain(
+        'The 1 other person with a seat on this account loses access.',
+      );
     });
 
     it('retries with nothing claimed when the sites cannot be read', async () => {

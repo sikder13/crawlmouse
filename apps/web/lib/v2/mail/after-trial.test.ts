@@ -72,6 +72,21 @@ describe('the counts', () => {
   });
 });
 
+describe('the seats the move to Free removes', () => {
+  it('says nothing with no other seat', () => {
+    expect(afterTrialSentence(afterTrial([oldest()], 0))).toBe(KEEPS);
+  });
+
+  it('names one person, and several', () => {
+    expect(afterTrialSentence(afterTrial([oldest()], 1))).toBe(
+      `${KEEPS} The 1 other person with a seat on this account loses access.`,
+    );
+    expect(afterTrialSentence(afterTrial([], 2))).toContain(
+      'The 2 other people with seats on this account lose access.',
+    );
+  });
+});
+
 describe('against the rule the database applies', () => {
   const reasons: (PausedReason | null)[] = [null, null, 'user', 'over_limit'];
 

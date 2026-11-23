@@ -15,7 +15,9 @@ import type { SweepRow } from './clock';
 
 const DAY_MS = 86_400_000;
 /** Rows read at a time when looking for reminders still to send. */
-export const REMINDER_PAGE = 200;
+export const REMINDER_PAGE = 50;
+/** `claim_email_send` tries a mail this many times, then answers that it is done. */
+const MAIL_ATTEMPTS = 3;
 
 export interface TrialClockReads {
   /** No-card Pro trials not marked for deletion that ended at or before `by`, oldest first. */
@@ -25,7 +27,7 @@ export interface TrialClockReads {
    * first, the `size` rows after the first `offset`.
    */
   endingBetween(from: Date, to: Date, offset: number, size: number): Promise<SweepRow[]>;
-  /** Which of these reminder keys the ledger holds as sent or suppressed. */
+  /** Which of these reminder keys the ledger is finished with: sent, suppressed, or out of tries. */
   remindersDone(keys: readonly string[]): Promise<ReadonlySet<string>>;
 }
 
@@ -41,16 +43,22 @@ export async function trialClockDue(
   }));
   const from = new Date(at.getTime() + 1);
   const to = new Date(at.getTime() + TRIAL_REMINDER_DAYS_BEFORE_END * DAY_MS + 1);
-  for (let offset = 0; due.length < limit; offset += REMINDER_PAGE) {
-    const page = await reads.endingBetween(from, to, offset, REMINDER_PAGE);
-    if (page.length === 0) break;
-    const done = await reads.remindersDone(page.map((r) => trialReminderKey(r.accountId, r.at)));
-    for (const r of page) {
-      if (due.length < limit && !done.has(trialReminderKey(r.accountId, r.at))) {
-        due.push({ accountId: r.accountId, kind: 'remind' });
+  try {
+    for (let offset = 0; due.length < limit; offset += REMINDER_PAGE) {
+      const page = await reads.endingBetween(from, to, offset, REMINDER_PAGE);
+      if (page.length === 0) break;
+      const done = await reads.remindersDone(page.map((r) => trialReminderKey(r.accountId, r.at)));
+      for (const r of page) {
+        if (due.length < limit && !done.has(trialReminderKey(r.accountId, r.at))) {
+          due.push({ accountId: r.accountId, kind: 'remind' });
+        }
       }
+      if (page.length < REMINDER_PAGE) break;
     }
-    if (page.length < REMINDER_PAGE) break;
+  } catch (error) {
+    // Trials that have ended still end. With none, the step fails and Inngest retries it.
+    if (!due.some((d) => d.kind === 'expire')) throw error;
+    console.error('[trial-clock] the reminder read failed; the next run reads it again');
   }
   return due;
 }
@@ -96,11 +104,16 @@ export function supabaseTrialClockReads(sb: SupabaseClient): TrialClockReads {
     async remindersDone(keys) {
       const { data, error } = await sb
         .from('email_sends')
-        .select('idempotency_key')
-        .in('idempotency_key', [...keys])
-        .in('status', ['sent', 'suppressed']);
+        .select('idempotency_key, status, attempts')
+        .in('idempotency_key', [...keys]);
       if (error) throw new Error(`trial clock ledger read failed: ${error.message}`);
-      return new Set(((data ?? []) as { idempotency_key: string }[]).map((r) => r.idempotency_key));
+      return new Set(
+        ((data ?? []) as { idempotency_key: string; status: string; attempts: number }[])
+          .filter(
+            (r) => r.status === 'sent' || r.status === 'suppressed' || r.attempts >= MAIL_ATTEMPTS,
+          )
+          .map((r) => r.idempotency_key),
+      );
     },
   };
 }

@@ -55,6 +55,10 @@ export const TRIAL_END_COPY = {
   pauses: {
     sitesHow: 'no checks; history kept, nothing you can see deleted',
     stagingHow: 'no deploy checks on Free; history kept',
+    /** Free keeps one seat: the move removes the others. */
+    seats: (n: number) => `${count(n)} other ${plural(n, 'seat', 'seats')}`,
+    seatsHow: 'loses access',
+    seatsHowMany: 'lose access',
     fixes: (range: string, n: number, plan: string) =>
       `${plural(n, 'Fix', 'Fixes')} ${range}, ${numberWord(n)} on ${plan}`,
     fixesHow: (packets: number) =>

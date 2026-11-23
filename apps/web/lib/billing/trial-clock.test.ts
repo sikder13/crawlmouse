@@ -72,18 +72,16 @@ async function addSite(accountId: string, minute: number, pausedReason: string |
   return id;
 }
 
-async function ledger(accountId: string, status: 'sent' | 'suppressed' | 'failed') {
+async function ledger(
+  accountId: string,
+  status: 'sent' | 'suppressed' | 'failed',
+  attempts = status === 'suppressed' ? 0 : 1,
+) {
   await db.query(
     `insert into public.email_sends
        (idempotency_key, kind, address_hash, account_id, status, attempts, claimed_at, sent_at, updated_at)
      values ($1, 'trial_reminder', $2, $3, $4, $5, now(), case when $4 = 'sent' then now() end, now())`,
-    [
-      trialReminderKey(accountId, new Date(END)),
-      'a'.repeat(64),
-      accountId,
-      status,
-      status === 'suppressed' ? 0 : 1,
-    ],
+    [trialReminderKey(accountId, new Date(END)), 'a'.repeat(64), accountId, status, attempts],
   );
 }
 
@@ -147,6 +145,12 @@ describe('which trials the clock picks up', () => {
     expect(await kindOf(id, REMINDER + HOUR)).toBe('remind');
   });
 
+  it('a reminder out of tries is not picked up again', async () => {
+    const id = await noCardTrial();
+    await ledger(id, 'failed', 3);
+    expect(await kindOf(id, REMINDER + HOUR)).toBeNull();
+  });
+
   it('an account that turned the reminder off gets none, and still ends', async () => {
     const id = await noCardTrial();
     await db.query(`update public.accounts set email_trial_reminder = false where id = $1`, [id]);
@@ -203,6 +207,30 @@ describe('looking past reminders already sent', () => {
   });
 });
 
+describe('when the reminder read fails', () => {
+  const failing = (ended: { accountId: string; at: Date }[]): TrialClockReads => ({
+    ended: async () => ended,
+    endingBetween: async () => {
+      throw new Error('down');
+    },
+    remindersDone: async () => new Set(),
+  });
+
+  it('trials that have ended still end', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const accountId = '00000000-0000-4000-8000-000000000001';
+    expect(
+      await trialClockDue(failing([{ accountId, at: new Date(END) }]), new Date(END), 10),
+    ).toEqual([{ accountId, kind: 'expire' }]);
+    expect(error).toHaveBeenCalledTimes(1);
+    error.mockRestore();
+  });
+
+  it('with none, the step fails so Inngest retries it', async () => {
+    await expect(trialClockDue(failing([]), new Date(END), 10)).rejects.toThrow('down');
+  });
+});
+
 describe('the hourly function on the real machine', () => {
   type Handler = (ctx: { step: unknown }) => Promise<unknown>;
   const step = { run: async (_id: string, fn: () => unknown) => fn() };
@@ -252,7 +280,7 @@ describe('the hourly function on the real machine', () => {
     expect(rows[0]!.state).toBe('pro_trial');
   });
 
-  it('two runs ask with the same event id, which Inngest and the ledger send once', async () => {
+  it('two runs ask with the same event id', async () => {
     await noCardTrial();
     const first = run(REMINDER + HOUR);
     await first.go();

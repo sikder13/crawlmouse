@@ -34,6 +34,7 @@ describe('trial-reminder (D2; account mail, Q8)', () => {
         kept: { host: 'example.com', paused: false },
         othersPausing: 5,
         stagingPausing: 0,
+        otherSeats: 0,
       });
       expect(m.text).toBe(
         [
@@ -56,7 +57,7 @@ describe('trial-reminder (D2; account mail, Q8)', () => {
     });
 
     it('with no site, leaves out the page that would send them to Settings', () => {
-      const m = closed({ kept: null, othersPausing: 0, stagingPausing: 0 });
+      const m = closed({ kept: null, othersPausing: 0, stagingPausing: 0, otherSeats: 0 });
       expect(m.text).toContain('This account has no sites yet.');
       expect(m.text).not.toContain('/trial-ended');
       expect(htmlTargets(m.html)).toEqual(['https://crawlmouse.com/settings']);
@@ -68,7 +69,7 @@ describe('trial-reminder (D2; account mail, Q8)', () => {
         variant: 'card_required',
         endsAt: ENDS,
         timezone: 'UTC',
-        after: { kept: null, othersPausing: 0, stagingPausing: 0 },
+        after: { kept: null, othersPausing: 0, stagingPausing: 0, otherSeats: 0 },
       });
       expect(m.text).toContain('the card on file is charged');
       expect(m.text).toContain('/trial-ended');

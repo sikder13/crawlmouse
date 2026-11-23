@@ -26,9 +26,11 @@ export interface AfterTrial {
   othersPausing: number;
   /** Staging copies running now that the move to Free pauses. */
   stagingPausing: number;
+  /** Active seats other than the owner's: Free keeps one seat, so the move removes these. */
+  otherSeats: number;
 }
 
-export function afterTrial(sites: readonly TrialSite[]): AfterTrial {
+export function afterTrial(sites: readonly TrialSite[], otherSeats = 0): AfterTrial {
   const primary = oldestFirst(sites.filter((s) => s.stagingOfSiteId === null));
   const [oldest, ...others] = primary;
   return {
@@ -36,6 +38,7 @@ export function afterTrial(sites: readonly TrialSite[]): AfterTrial {
     othersPausing: others.filter((s) => s.pausedReason === null).length,
     stagingPausing: sites.filter((s) => s.stagingOfSiteId !== null && s.pausedReason === null)
       .length,
+    otherSeats,
   };
 }
 
@@ -54,8 +57,22 @@ function pausesSentence(others: number, staging: number): string | null {
     : `Your ${copies} pause, with their history kept.`;
 }
 
-/** The reminder's paragraph on what stays and what pauses. */
-export function afterTrialSentence({ kept, othersPausing, stagingPausing }: AfterTrial): string {
+/** The reminder's paragraph on what stays, what pauses and who loses access. */
+export function afterTrialSentence(after: AfterTrial): string {
+  const seats = seatsSentence(after.otherSeats);
+  const sites = sitesSentence(after);
+  return seats ? `${sites} ${seats}` : sites;
+}
+
+/** "The 1 other person with a seat on this account loses access."; null with none. */
+function seatsSentence(n: number): string | null {
+  if (n === 0) return null;
+  return n === 1
+    ? 'The 1 other person with a seat on this account loses access.'
+    : `The ${n} other people with seats on this account lose access.`;
+}
+
+function sitesSentence({ kept, othersPausing, stagingPausing }: AfterTrial): string {
   const fixes = GATES.free.fixesVisible;
   const free = `a ${FREE_SCHEDULE[GATES.free.schedule]} check and ${
     fixes === 'all' ? 'all' : numberWord(fixes)

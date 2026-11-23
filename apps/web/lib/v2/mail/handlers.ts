@@ -133,7 +133,12 @@ export function mailHandlers(d: MailHandlerDeps): MailHandlers {
     if (a.ownerEmail === null) return 'no_owner';
     // Read before the claim, so a failed read is retried with nothing claimed.
     const closed = a.trialVariant === 'no_card' && d.plansOpen?.() === false;
-    const after = closed ? afterTrial(await read(store.trialSites(accountId))) : undefined;
+    const after = closed
+      ? afterTrial(
+          await read(store.trialSites(accountId)),
+          await read(store.trialOtherSeats(accountId)),
+        )
+      : undefined;
     return send(mail, {
       kind: 'trial_reminder',
       to: a.ownerEmail,

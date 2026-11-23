@@ -162,6 +162,26 @@ describe('the reminder, which the clock sends with paid plans closed', () => {
     expect(note).toContain("We'll email you three days before.");
   });
 
+  it('the rail does not promise it to a seat that will not get it', () => {
+    const note = accountShellView(viewAt(bad, home), 'Sites', {
+      role: 'developer',
+      ...closed,
+    }).trial!.note;
+    expect(note).not.toContain("We'll email");
+  });
+
+  it('the rail does not promise it to an owner who turned it off', () => {
+    const off = withAccount(bad, {
+      email_prefs: {
+        ...bad.accounts.find((a) => a.id === BAD)!.email_prefs,
+        trial_reminder: false,
+      },
+    });
+    const note = accountShellView(viewAt(off, home), 'Sites', { role: 'owner', ...closed }).trial!
+      .note;
+    expect(note).not.toContain("We'll email");
+  });
+
   it('Trial ending says it', () => {
     const v = trialEndView(bad, trialEndViewer(bad, BAD), closed);
     expect(v.banner.sub).toBe(
@@ -183,6 +203,27 @@ describe('Trial ending, other cases with paid plans closed', () => {
     const v = trialEndView(bad, trialEndViewer(bad, BAD), closed);
     expect(v.banner.sub).toContain('No card is on file, so nothing is charged.');
     expect(v.banner.sub).not.toContain('either way');
+  });
+
+  it('names the seats the move to Free removes, and not an invitation', () => {
+    const owner = bad.seats.find((s) => s.account_id === BAD && s.role === 'owner')!;
+    const seat = (id: string, accepted: string | null) => ({
+      ...owner,
+      id,
+      role: 'developer' as const,
+      email: `${id.slice(-4)}@example.com`,
+      accepted_at: accepted,
+    });
+    const withSeats: FixtureDataset = {
+      ...bad,
+      seats: [
+        ...bad.seats.filter((s) => s.account_id !== BAD || s.role === 'owner'),
+        seat('c0000000-0000-4000-8000-000000000091', owner.accepted_at),
+        seat('c0000000-0000-4000-8000-000000000092', null),
+      ],
+    };
+    const rows = trialEndView(withSeats, trialEndViewer(withSeats, BAD), closed).pauses;
+    expect(rows[0]).toEqual({ what: '1 other seat', how: 'loses access' });
   });
 
   it('a card trial is not told to add Pro', () => {
