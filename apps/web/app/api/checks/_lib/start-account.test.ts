@@ -45,6 +45,7 @@ function deps(
     mayAdd?: boolean;
     added?: AddSiteOutcome;
     rechecks?: RecheckOutcome[];
+    live?: number;
   } = {},
 ) {
   const calls: string[] = [];
@@ -67,7 +68,7 @@ function deps(
       calls.push('mayAdd');
       return over.mayAdd ?? true;
     },
-    liveSites: async () => 0,
+    liveSites: async () => over.live ?? 0,
     schedule: () => null,
     addSite: async (site) => {
       calls.push('addSite');
@@ -267,21 +268,62 @@ describe('the home form’s words', () => {
 });
 
 describe('siteLimitSentence', () => {
+  it('tells an account manager the limit of the account they act in, not “your” plan', async () => {
+    const manager = {
+      ...VIEWER,
+      seat: { ...VIEWER.seat, role: 'account_manager' },
+      tier: 'agency',
+      gates: GATES.agency,
+      limits: { ...VIEWER.limits, sites: GATES.agency.sites },
+    } as unknown as AccountViewer;
+    const { d } = deps({ added: { outcome: 'full' } as AddSiteOutcome, live: GATES.agency.sites });
+    const out = await startAccountCheck(d, manager, INPUT);
+    expect(out).toMatchObject({
+      ok: false,
+      status: 409,
+      body: {
+        code: 'site_limit',
+        error:
+          'This account’s Agency plan keeps 25 sites, and they are already taken. Open your dashboard to check one of them again.',
+      },
+    });
+  });
+
   it('says how many an account over its limit keeps (a lapsed plan’s sites)', () => {
     expect(siteLimitSentence('free', GATES.free.sites, 5)).toBe(
-      'Your Free plan keeps one site, and this account keeps five sites now. Open your dashboard to check one of them again.',
+      'This account’s Free plan keeps one site, and the account has five sites now. Open your dashboard to check one of them again.',
     );
+  });
+
+  it.each([
+    ['free', 0],
+    ['pro', 3],
+    ['agency', 24],
+  ] as const)(
+    'with fewer kept than %s’s limit (a removal raced the add) names no count',
+    (tier, kept) => {
+      const sentence = siteLimitSentence(tier, GATES[tier].sites, kept);
+      expect(sentence).toBe('This account’s site limit changed. Try again.');
+    },
+  );
+
+  it('never calls the plan the reader’s own, since a manager acts in a client’s account', () => {
+    for (const tier of ['free', 'pro', 'agency'] as const) {
+      for (const kept of [0, GATES[tier].sites, GATES[tier].sites + 1]) {
+        expect(siteLimitSentence(tier, GATES[tier].sites, kept)).not.toMatch(/\byour \w+ plan\b/i);
+      }
+    }
   });
 
   it('names the plan and its limit in words, for each tier’s own limit', () => {
     expect(siteLimitSentence('free', GATES.free.sites)).toBe(
-      'Your Free plan keeps one site, and this account keeps it already. Open your dashboard to check it again.',
+      'This account’s Free plan keeps one site, and it is already taken. Open your dashboard to check it again.',
     );
     expect(siteLimitSentence('pro', GATES.pro.sites)).toBe(
-      'Your Pro plan keeps five sites, and this account keeps them already. Open your dashboard to check one of them again.',
+      'This account’s Pro plan keeps five sites, and they are already taken. Open your dashboard to check one of them again.',
     );
     expect(siteLimitSentence('agency', GATES.agency.sites)).toBe(
-      'Your Agency plan keeps 25 sites, and this account keeps them already. Open your dashboard to check one of them again.',
+      'This account’s Agency plan keeps 25 sites, and they are already taken. Open your dashboard to check one of them again.',
     );
   });
 });

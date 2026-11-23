@@ -134,18 +134,21 @@ const CAPACITY = refuse(
 );
 
 /**
- * "Your Free plan keeps one site, and this account keeps it already." `kept` is the account's live
- * site count now: an account over its limit (a lapsed plan's sites) is told how many it keeps.
+ * "This account’s Free plan keeps one site, and it is already taken." `kept` is the account's live
+ * site count now: an account over its limit (a lapsed plan's sites) is told how many it has.
  */
 export function siteLimitSentence(tier: Tier, limit: number, kept: number = limit): string {
+  // A site was removed between the refused add and this count: there is no limit to explain.
+  if (kept < limit) return 'This account’s site limit changed. Try again.';
   const sites = (n: number) => `${numberWord(n)} ${plural(n, 'site', 'sites')}`;
   const holds =
     kept === limit
-      ? `this account keeps ${plural(limit, 'it', 'them')} already`
-      : `this account keeps ${sites(kept)} now`;
+      ? `${plural(limit, 'it is', 'they are')} already taken`
+      : `the account has ${sites(kept)} now`;
+  // "This account’s", not "Your": a manager acts in a client’s account, on a plan they do not hold.
   return (
-    `Your ${PLAN_NAMES[tier]} plan keeps ${sites(limit)}, and ${holds}. Open your dashboard to ` +
-    `check ${plural(kept, 'it', 'one of them')} again.`
+    `This account’s ${PLAN_NAMES[tier]} plan keeps ${sites(limit)}, and ${holds}. Open your ` +
+    `dashboard to check ${plural(kept, 'it', 'one of them')} again.`
   );
 }
 
