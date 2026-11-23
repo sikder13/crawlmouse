@@ -4,10 +4,14 @@
  */
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { ReactElement } from 'react';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { JSDOM } from 'jsdom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { PageShell } from '../../components/v2/PageShell';
 import { FOOTER_COLUMNS, MARKETING_NAV } from '../../components/v2/footer-links';
+import { NotFoundIsland } from '../../components/v2/screens/not-found/NotFoundIsland';
+import { NotFoundScreen } from '../../components/v2/screens/not-found/NotFoundScreen';
 import NotFound, { metadata } from '../../app/not-found';
 
 afterEach(() => vi.unstubAllEnvs());
@@ -15,15 +19,37 @@ afterEach(() => vi.unstubAllEnvs());
 const docOf = (el: ReactElement) => new JSDOM(renderToStaticMarkup(el)).window.document;
 
 describe('the site 404', () => {
-  it('with public checks on is the v2 shell, one h1, with ways on and no v1 mark', () => {
-    vi.stubEnv('V2_CHECKS_PUBLIC', '1');
-    const doc = docOf(NotFound() as ReactElement);
+  it('the v2 screen is the shell, one h1, with ways on and no v1 mark', () => {
+    const doc = docOf(<NotFoundScreen />);
     expect(doc.querySelector('[data-v2-shell]')).not.toBeNull();
     expect(doc.querySelectorAll('h1')).toHaveLength(1);
     expect(doc.querySelector('footer')).not.toBeNull();
     const main = [...doc.querySelectorAll('main a')].map((a) => a.getAttribute('href'));
     expect(main).toEqual(['/', '/pricing', '/help']);
     expect(doc.body.innerHTML).not.toContain('bg-cream');
+    // The footer is drawn in the browser, where the flags cannot be read.
+    expect(doc.querySelector('footer a[href="/check/gptbot"]')).not.toBeNull();
+  });
+
+  it('with public checks on, the root 404 is the island and not the shell', () => {
+    vi.stubEnv('V2_CHECKS_PUBLIC', '1');
+    const el = NotFound() as ReactElement;
+    expect(el.type).toBe(NotFoundIsland);
+    const doc = docOf(el);
+    expect(doc.querySelector('[data-v2-shell]')).toBeNull();
+    expect(doc.body.innerHTML).not.toContain('bg-cream');
+  });
+
+  it('the root 404 imports neither the screen nor the v2 stylesheet directly', () => {
+    const source = readFileSync(join(__dirname, '../../app/not-found.tsx'), 'utf8');
+    expect(source).not.toMatch(/NotFoundScreen|styles\/v2/);
+    const island = readFileSync(
+      join(__dirname, '../../components/v2/screens/not-found/NotFoundIsland.tsx'),
+      'utf8',
+    );
+    expect(island).toMatch(/import\('\.\/NotFoundScreen'\)/);
+    expect(island).toMatch(/ssr: false/);
+    expect(island).not.toMatch(/^import .*NotFoundScreen/m);
   });
 
   it('with public checks off stays v1’s', () => {
@@ -36,6 +62,9 @@ describe('the site 404', () => {
   it('does not inherit the home page’s title or canonical', () => {
     expect(metadata.title).toBe('Page not found');
     expect(metadata.alternates?.canonical).toBeNull();
+    expect(metadata.openGraph).toBeNull();
+    expect(metadata.twitter).toBeNull();
+    expect(metadata.robots).toEqual({ index: false, follow: true });
   });
 });
 

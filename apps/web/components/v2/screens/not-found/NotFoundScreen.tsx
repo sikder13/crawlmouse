@@ -5,12 +5,18 @@ import { PageShell } from '../../PageShell';
 import { LOG_IN, MARKETING_NAV } from '../../footer-links';
 import layout from '../../layout.module.css';
 import styles from './NotFoundScreen.module.css';
+import '@/styles/v2/tokens.css';
+
+const OPEN_GATES = Object.freeze({ checksPublic: true });
 
 /** The site's 404 in the v2 shell (RC-20, F-026): where you are, and three ways on. */
 export function NotFoundScreen() {
   return (
     <PageShell
       nav={MARKETING_NAV}
+      // Rendered in the browser, which cannot read the server's flags. The v2 404 is shown only
+      // while V2_CHECKS_PUBLIC is on (app/not-found.tsx), so the gated links are open.
+      footerGates={OPEN_GATES}
       actions={
         <Button variant="quiet" href={LOG_IN.href}>
           {LOG_IN.label}
