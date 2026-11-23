@@ -47,8 +47,9 @@ export interface StepDeps {
 }
 
 /**
- * How long the render step may render, of the function's 300 s (`maxDuration`). The rest is for
- * loading what the step reads and storing its outcome.
+ * How long the render step may render, counted from the step's start, of the function's 300 s
+ * (`maxDuration`). The rest is for settling the budget and storing the outcome. Chosen, not measured:
+ * check it against a real render on staging before rendering is turned on.
  */
 export const RENDER_STEP_MS = 240_000;
 

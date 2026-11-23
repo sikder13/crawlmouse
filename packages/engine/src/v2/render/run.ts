@@ -69,6 +69,13 @@ export const RENDER_RETRY = { attempts: 5, base_ms: 2000, max_ms: 60_000 } as co
  */
 export const RESERVE_PER_RENDER_MS = REQUEST_TIMEOUT_MS;
 
+/**
+ * How long the synchronous measuring of a page's two replies is allowed for, by their size: 18.5 s
+ * was measured for two 10 MiB replies (20 MiB), rounded up to 1 s per MiB. It blocks the event loop,
+ * so no timer can stop it once it starts. Not measured on Vercel's CPU.
+ */
+export const measureAllowanceMs = (chars: number): number => (chars / (1024 * 1024)) * 1000;
+
 /** Why a picked page has no `without_js`, and what each reason means (the spec renders this). */
 export const NOT_RENDERED = {
   not_configured: 'The environment holds no Browser Run account or token.',
@@ -255,6 +262,27 @@ async function renderPhase(
   /** Whether work that may take `ms` ends by the step's deadline. */
   const fits = (ms: number) => input.deadlineAt === undefined || now() + ms <= input.deadlineAt;
 
+  /**
+   * `work`, or `'late'` once a page could no longer finish by the deadline. Admission has no timeout
+   * of its own. What it decides is not changed: a page it has not admitted is not rendered.
+   */
+  async function beforeDeadline<T>(work: Promise<T>): Promise<T | 'late'> {
+    if (input.deadlineAt === undefined) return work;
+    // A refusal that lands after the wait ended has nobody to hear it.
+    work.catch(() => undefined);
+    const left = input.deadlineAt - PAGE_RESERVE_MS - now();
+    if (left < 0) return 'late';
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const late = new Promise<'late'>((resolve) => {
+      timer = setTimeout(() => resolve('late'), left);
+    });
+    try {
+      return await Promise.race([work, late]);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
   const notRendered = (p: Picked, reason: NotRenderedReason, detail?: string): RenderedPage =>
     detail === undefined
       ? { ...p, rendered: false, reason }
@@ -314,7 +342,9 @@ async function renderPhase(
   async function renderPage(p: Picked, allowanceMs: number): Promise<RenderedPage> {
     if (stopped) return notRendered(p, stopped);
     try {
-      await admit(p.url);
+      if ((await beforeDeadline(admit(p.url))) === 'late') {
+        return notRendered(p, (stopped = 'out_of_time'));
+      }
     } catch (e) {
       return notRendered(p, 'not_admitted', e instanceof NotAdmitted ? e.rule : 'error');
     }
@@ -338,6 +368,9 @@ async function renderPhase(
     if (!fits(REQUEST_TIMEOUT_MS)) return notRendered(p, 'out_of_time');
     const renderedSide = await side(p.url, 'rendered', used);
     if (!renderedSide.ok) return notRendered(p, renderedSide.reason);
+    if (!fits(measureAllowanceMs(staticSide.html.length + renderedSide.html.length))) {
+      return notRendered(p, 'out_of_time');
+    }
     let m: ReturnType<typeof measurePage>;
     try {
       m = measurePage({

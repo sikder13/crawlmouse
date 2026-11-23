@@ -258,6 +258,28 @@ describe('checkSteps under runCheck, on the recorded worker batches', () => {
     expect(pages.filter((p) => p.reason === 'out_of_time').length).toBeGreaterThan(0);
   });
 
+  it('counts the deadline from the start of the step, so slow loads shorten the render', async () => {
+    let reserves = 0;
+    const { evidence } = await runRecorded((clock) => ({
+      admit: async () => undefined,
+      // Called once the step has loaded what it reads: those loads took almost the whole allowance.
+      dailyFor: () => {
+        clock.now += RENDER_STEP_MS - 1;
+        return {
+          reserve: async () => {
+            reserves++;
+            return true;
+          },
+          settle: async () => undefined,
+        };
+      },
+    }));
+    expect(reserves).toBe(0);
+    const pages = await renderedPages(evidence);
+    expect(pages.length).toBeGreaterThan(0);
+    for (const p of pages) expect(p).toMatchObject({ rendered: false, reason: 'out_of_time' });
+  });
+
   it('hands persistence the built check, every page’s vantage and the map’s path', async () => {
     await runRecorded();
     expect(persisted).toHaveLength(1);
