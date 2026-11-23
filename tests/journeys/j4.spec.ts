@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { expect, type Page } from './pw';
 import { stagingAdmin } from './lib/accounts';
 import {
@@ -415,6 +415,169 @@ step(
       expect(await state(), "no request changed A's site, check, fix or seat").toBe(before);
     } finally {
       for (const c of contexts) await c.close();
+    }
+  },
+);
+
+step(
+  'J4.5',
+  'A share link opens only what was shared, and a public report shows no more',
+  async ({ context, baseURL }, info) => {
+    info.setTimeout(420_000);
+    const A = await person(context, baseURL!, 'j4', 14);
+    const bContext = await freshContext(context, baseURL!);
+    const sContext = await freshContext(context, baseURL!);
+    const db = stagingAdmin();
+    const stored: string[] = [];
+    try {
+      const B = await person(bContext, baseURL!, 'j4', 15);
+      const S = await sContext.newPage();
+      const { site, check, host } = await finishedLabSite(A);
+      const { data: seatRow } = await db
+        .from('seats')
+        .select('id')
+        .eq('account_id', A.accountId)
+        .eq('user_id', A.userId)
+        .single();
+
+      // Two stored reports of A's: the link opens the first, and nothing may reach the second.
+      const report = async (marker: string) => {
+        const id = randomUUID();
+        const path = `${A.accountId}/${id}.pdf`;
+        const bytes = Buffer.from(`%PDF-1.4\n% ${marker}\n`);
+        const up = await db.storage
+          .from('reports')
+          .upload(path, bytes, { contentType: 'application/pdf' });
+        if (up.error) throw new Error(`could not store the test report: ${up.error.message}`);
+        stored.push(path);
+        const { data, error } = await db
+          .from('reports')
+          .insert({
+            id,
+            account_id: A.accountId,
+            site_id: site,
+            kind: 'audit_pdf',
+            format: 'pdf',
+            status: 'ready',
+            made_by: 'user',
+            covers_check_ids: [check],
+            byte_count: bytes.length,
+            owner_seat_id: seatRow!.id,
+            storage_path: path,
+            file_state: 'stored',
+          })
+          .select('id')
+          .single();
+        if (error || !data) throw new Error(`could not add the test report: ${error?.message}`);
+        return data.id as string;
+      };
+      const sharedMark = `shared-${randomUUID()}`;
+      const shared = await report(sharedMark);
+      const other = await report(`private-${randomUUID()}`);
+      const token = randomBytes(16).toString('base64url');
+      const tokenHash = createHash('sha256').update(token, 'utf8').digest('hex');
+      const expires = new Date(Date.now() + 86_400_000).toISOString();
+      const link = await db.from('share_links').insert({
+        token_hash: tokenHash,
+        report_id: shared,
+        expires_at: expires,
+        created_by: A.userId,
+      });
+      if (link.error) throw new Error(`could not add the share link: ${link.error.message}`);
+      await db.from('reports').update({ share_expires_at: expires }).eq('id', shared);
+
+      // The holder of the link gets that file.
+      const open = await sContext.request.get(`/s/${token}`, { maxRedirects: 0 });
+      expect(open.status(), 'the link redirects to its file').toBeGreaterThanOrEqual(300);
+      expect(open.status(), 'the link redirects to its file').toBeLessThan(400);
+      const location = open.headers()['location'] ?? '';
+      const file = await fetch(new URL(location, baseURL));
+      expect(file.status, 'the shared file opens').toBe(200);
+      expect(await file.text(), 'it is the shared file').toContain(sharedMark);
+      expect(open.headers()['set-cookie'] ?? '', 'a file link sets no cookie').not.toMatch(
+        /(^|\n)(sb-|cm_account)/,
+      );
+
+      // Nothing else opens: another token, either report's view page, or A's report through B.
+      const wrong = await sContext.request.get(`/s/${randomBytes(16).toString('base64url')}`);
+      expect(wrong.status(), 'a token no link holds').toBe(404);
+      for (const id of [shared, other]) {
+        const view = await sContext.request.get(`/s/view/${id}`);
+        expect(view.status(), 'a report page without its link').toBe(404);
+      }
+      await Promise.all([B.page.goto('/help'), S.goto('/help')]);
+      const missing = randomUUID();
+      for (const [method, tail, body] of [
+        ['GET', 'download', undefined],
+        ['POST', 'share', {}],
+        ['DELETE', 'share', undefined],
+      ] as const) {
+        for (const id of [shared, other]) {
+          const asB = await call(B.page, method, `/api/report-files/${id}/${tail}`, body);
+          const none = await call(B.page, method, `/api/report-files/${missing}/${tail}`, body);
+          expect(asB.status, `B: ${method} ${tail}`).toBe(404);
+          expect(asB.text.replaceAll(id, 'ID'), `B: ${tail} reads as missing`).toBe(
+            none.text.replaceAll(missing, 'ID'),
+          );
+          const out = await call(S, method, `/api/report-files/${id}/${tail}`, body);
+          expect(out.status, `signed out: ${method} ${tail}`).toBe(401);
+        }
+      }
+      const { count: links } = await db
+        .from('share_links')
+        .select('*', { count: 'exact', head: true })
+        .in('report_id', [shared, other]);
+      expect(links, "B made no link to A's reports, and removed none").toBe(1);
+
+      // A public report: open to anyone, and it names nothing but the site.
+      await A.page.goto('/dashboard');
+      const mint = await call(A.page, 'POST', '/api/reports/mint', { checkId: check });
+      expect(mint.status, `control: A publishes its result (${mint.text})`).toBe(200);
+      const slug = (JSON.parse(mint.text) as { slug: string }).slug;
+      const page = await sContext.request.get(`/r/${slug}`);
+      expect(page.status(), 'the public report opens signed out').toBe(200);
+      const html = await page.text();
+      expect(html, 'control: the report names the site').toContain(host);
+      for (const secret of [A.email, A.accountId, A.userId, check, site]) {
+        expect(html, 'the public report names nothing private').not.toContain(secret);
+      }
+      const row = () =>
+        db
+          .from('public_reports')
+          .select('listed, indexable, white_label')
+          .eq('slug', slug)
+          .single()
+          .then((r) => JSON.stringify(r.data));
+      const reportBefore = await row();
+      for (const [method, tail, body] of [
+        ['POST', 'visibility', { indexable: true }],
+        ['POST', 'white-label', { enabled: false }],
+      ] as const) {
+        const asB = await call(B.page, method, `/api/reports/${slug}/${tail}`, body);
+        expect(
+          [401, 402, 403, 404],
+          `B cannot change the report: ${tail} (${asB.status})`,
+        ).toContain(asB.status);
+      }
+
+      expect(await row(), "B changed nothing on A's report").toBe(reportBefore);
+
+      // An expired link stops opening.
+      await db
+        .from('share_links')
+        .update({ expires_at: new Date(Date.now() - 60_000).toISOString() })
+        .eq('token_hash', tokenHash);
+      const late = await sContext.request.get(`/s/${token}`, { maxRedirects: 0 });
+      expect(late.status(), 'an expired link').toBe(410);
+
+      // F-134, last so that everything above has run: the file is served from another host.
+      expect(new URL(location, baseURL).hostname, 'F-134: the link leaves crawlmouse.com').toBe(
+        new URL(baseURL!).hostname,
+      );
+    } finally {
+      if (stored.length > 0) await db.storage.from('reports').remove(stored);
+      await bContext.close();
+      await sContext.close();
     }
   },
 );
