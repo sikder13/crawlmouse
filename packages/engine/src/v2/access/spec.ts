@@ -91,6 +91,8 @@ const MATRIX_FIELDS: Readonly<Record<keyof CrawlerAccess, string>> = {
   status:
     'The status the crawler’s own request got on most deciding cells, the lower on a tie; a declared cell’s status is the robots.txt read’s and is not counted.',
   pages_measured: 'Cells with a measured verdict.',
+  pages_served:
+    'Of the pages our own request answered, those it was served on. Optional: a row stored before this field existed has none.',
   cause: 'The cause the deciding cells name, when they all name the same one (none counts as one).',
   confidence: 'Below.',
   by_template: 'The same rules applied to each template’s cells.',
