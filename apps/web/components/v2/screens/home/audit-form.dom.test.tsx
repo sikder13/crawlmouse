@@ -182,7 +182,7 @@ describe('the Home form, starting an audit', () => {
     const sentences = [
       ...Object.values(ACCOUNT_SENTENCES),
       ...(['free', 'pro', 'agency'] as const).flatMap((tier) =>
-        [0, 1, 2, GATES[tier].sites].map((kept) =>
+        [0, GATES[tier].sites, GATES[tier].sites + 1, GATES.agency.maxSites + 1].map((kept) =>
           siteLimitSentence(tier, GATES[tier].sites, kept),
         ),
       ),

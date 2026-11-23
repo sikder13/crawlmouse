@@ -276,7 +276,7 @@ describe('siteLimitSentence', () => {
       gates: GATES.agency,
       limits: { ...VIEWER.limits, sites: GATES.agency.sites },
     } as unknown as AccountViewer;
-    const { d } = deps({ added: { outcome: 'full' } as AddSiteOutcome, live: GATES.agency.sites });
+    const { d } = deps({ live: GATES.agency.sites });
     const out = await startAccountCheck(d, manager, INPUT);
     expect(out).toMatchObject({
       ok: false,
@@ -306,6 +306,17 @@ describe('siteLimitSentence', () => {
       expect(sentence).toBe('This account’s site limit changed. Try again.');
     },
   );
+
+  it('when the add answers full but a removal has freed a site, names no count', async () => {
+    const { d, calls } = deps({ added: { outcome: 'full' }, live: 0 });
+    const out = await startAccountCheck(d, VIEWER, INPUT);
+    expect(calls).toContain('addSite');
+    expect(out).toMatchObject({
+      ok: false,
+      status: 409,
+      body: { code: 'site_limit', error: 'This account’s site limit changed. Try again.' },
+    });
+  });
 
   it('never calls the plan the reader’s own, since a manager acts in a client’s account', () => {
     for (const tier of ['free', 'pro', 'agency'] as const) {
