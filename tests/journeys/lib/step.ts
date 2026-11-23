@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { test, type APIRequestContext, type BrowserContext, type Page, type TestInfo } from '../pw';
-import { originHeaders } from './protection';
+import { bypassCookies, bypassSecret, noteTrace, traceRefusal } from './protection';
 import { stepMeta } from './steps-md';
 import { databaseRefusal, writeRefusal } from './target';
 
@@ -41,7 +41,7 @@ export function step(
 ): void {
   const meta = stepMeta(id);
   // Playwright builds only the fixtures a test names in its first argument, so they are named here.
-  test(`${id} ${title}`, async ({ page, context, playwright, baseURL }, info) => {
+  test(`${id} ${title}`, async ({ page, context, playwright, baseURL, trace }, info) => {
     info.annotations.push({ type: 'step', description: id });
     test.skip(
       !meta.devices.includes(info.project.name),
@@ -52,16 +52,19 @@ export function step(
       ? writeRefusal({ ...process.env, JOURNEY_BASE_URL: baseURL })
       : null;
     test.skip(refused !== null, `writes: ${refused}`);
-    // The bypass secret, when set, goes only to the deployment's own origin (lib/protection.ts).
-    const origin = new URL(baseURL!).origin;
-    const headers = originHeaders(process.env);
-    if (Object.keys(headers).length > 0) {
-      await context.route(
-        (url) => url.origin === origin,
-        (route) => route.continue({ headers: { ...route.request().headers(), ...headers } }),
-      );
+    // With a bypass secret, both contexts carry a cookie for this host, not the secret (lib/protection.ts).
+    // The resolved `trace` fixture, so `--trace` and a spec's `test.use` are both seen.
+    noteTrace(trace);
+    if (bypassSecret(process.env) || meta.writes) {
+      const traced = traceRefusal(trace);
+      if (traced) throw new Error(traced);
     }
-    const request = await playwright.request.newContext({ baseURL, extraHTTPHeaders: headers });
+    const cookies = await bypassCookies(new URL(baseURL!).origin, process.env);
+    if (cookies.length > 0) await context.addCookies(cookies);
+    const request = await playwright.request.newContext({
+      baseURL,
+      storageState: { cookies, origins: [] },
+    });
     try {
       if (meta.writes) {
         const db = databaseRefusal((await request.get('/', { maxRedirects: 0 })).headers());
@@ -88,6 +91,7 @@ export function step(
         );
       }
     } finally {
+      noteTrace(undefined);
       await request.dispose();
     }
   });

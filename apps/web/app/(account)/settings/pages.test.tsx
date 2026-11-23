@@ -314,6 +314,7 @@ describe('/settings of an account that is not the caller’s own personal accoun
 
   it('acting in their own account: the address can be changed and Delete… is offered, as before', async () => {
     as(boss);
+    h.chosen = boss.accountId;
     const html = await settings();
     expect(html.match(NEW_EMAIL)![0]).not.toMatch(/readonly/i);
     expect(html).toContain('href="/settings/delete"');
@@ -347,7 +348,7 @@ describe('/settings of an account that is not the caller’s own personal accoun
     as(boss);
     h.chosen = agencyId;
     await expect(DeletePage(q())).rejects.toMatchObject(redirectTo('/settings'));
-    h.chosen = null;
+    h.chosen = boss.accountId;
     expect(screen(await DeletePage(q())).type).toBe(DeleteScreen);
   });
 
