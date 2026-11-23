@@ -3,6 +3,7 @@
  * fixes, its settings and the alert rules that apply to it, all as the viewer's account holds them
  * at `now`.
  */
+import { siteUrl } from '../../site-url';
 import {
   instant,
   scoredCrawlersMeasured,
@@ -464,12 +465,18 @@ export function nextCheckLine(
   return `${dayDateOf(at)} around ${hourMinute(at, zoneOf(v))}`;
 }
 
+export interface SiteOptions {
+  allFixes?: boolean;
+  /** A link of this site was hidden or taken down (`siteLinkWithdrawn`): no new one is offered. */
+  linkWithdrawn?: boolean;
+}
+
 export function siteView(
   d: AccountDataset,
   viewer: Viewer,
   siteId: string,
   next?: NextChecks,
-  { allFixes = false }: { allFixes?: boolean } = {},
+  { allFixes = false, linkWithdrawn = false }: SiteOptions = {},
 ): SiteView {
   const v = viewAt(d, viewer);
   const zone = zoneOf(v);
@@ -561,6 +568,7 @@ export function siteView(
   // Only a finished check mints, and `seat_may('mint_report')` holds for the roles that run sites.
   const mintCheckId =
     manage &&
+    !linkWithdrawn &&
     result.status === 'finished' &&
     !publicLinks.some((r) => r.covers_check_ids.includes(result.id))
       ? result.id
@@ -723,22 +731,22 @@ export function siteView(
               },
             ]
           : []),
-        ...(publicLink?.public_slug || mintCheckId
+        ...(publicLink?.public_slug || mintCheckId || (manage && linkWithdrawn)
           ? [
               {
                 label: 'Public link',
                 value: publicLink?.public_slug
                   ? `crawlmouse.com/r/${publicLink.public_slug}`
-                  : SITE_COPY.publicLink.none,
+                  : linkWithdrawn
+                    ? SITE_COPY.publicLink.withdrawn
+                    : SITE_COPY.publicLink.none,
                 mono: Boolean(publicLink?.public_slug),
                 muted: false,
                 action: publicLink?.public_slug
                   ? action('publicReport', 'Open', { slug: publicLink.public_slug })
                   : null,
                 publicLink: {
-                  url: publicLink?.public_slug
-                    ? `https://crawlmouse.com/r/${publicLink.public_slug}`
-                    : null,
+                  url: publicLink?.public_slug ? siteUrl(`/r/${publicLink.public_slug}`) : null,
                   mintCheckId,
                 },
               },
@@ -841,7 +849,7 @@ export function sitePage(
   viewer: Viewer,
   siteId: string,
   next?: NextChecks,
-  options: { allFixes?: boolean } = {},
+  options: SiteOptions = {},
 ): SitePageView {
   const v = viewAt(d, viewer);
   const site = v.d.sites.find((s) => s.id === siteId);

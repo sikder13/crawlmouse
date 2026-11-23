@@ -29,35 +29,10 @@ import {
 } from '../pipeline/rows';
 import type { CheckReader } from '../pipeline/types';
 import { cardFor } from './card';
+import { mintedLinks } from './public-links';
 import { sitesInScope } from '../agency/guard';
 import { agencyTrialConsentAt } from './trial-consent';
 import { accountFromRow, alertRuleFromRow, reportFromRow, seatsFromRows } from './rows';
-
-/** A `public_reports` row of a v2 mint, as the one kind of report these views read. */
-function mintedLink(r: Row, accountId: string): AccountDataset['reports'][number] {
-  const checkId = r.check_id as string;
-  return {
-    id: checkId,
-    account_id: accountId,
-    site_id: r.site_id as string,
-    kind: 'public_link',
-    format: 'html',
-    status: 'ready',
-    made_by: 'user',
-    created_at: new Date(r.created_at as string).toISOString(),
-    covers_check_ids: [checkId],
-    byte_count: null,
-    share_expires_at: null,
-    public_slug: r.slug as string,
-    scheduled_for: null,
-    sent_at: null,
-    recipient_email: null,
-    owner_seat_id: null,
-    headline: null,
-    open_tracking: false,
-    opened_at: null,
-  };
-}
 
 export interface DatasetDeps {
   /** The caller's own client: row security applies. */
@@ -195,17 +170,7 @@ export async function loadAccountDataset(
             .in('site_id', siteIds)
             .eq('kind', 'public_link'),
         ),
-        rows(
-          'public_reports read',
-          admin
-            .from('public_reports')
-            .select('slug, check_id, site_id, created_at')
-            .in('site_id', siteIds)
-            .eq('account_id', accountId)
-            .not('check_id', 'is', null)
-            .is('hidden_at', null)
-            .is('takedown_requested_at', null),
-        ),
+        mintedLinks(admin, accountId, siteIds),
       ])
     : [[], [], [], [], [], [], [], []];
   const eventRows = fixRows.length
@@ -247,7 +212,7 @@ export async function loadAccountDataset(
     fix_events: eventRows.map(fixEventFromRow),
     changes: changeRows.map(changeFromRow),
     alert_rules: [...accountRules, ...siteRules].map(alertRuleFromRow),
-    reports: [...links.map(reportFromRow), ...minted.map((r) => mintedLink(r, accountId))],
+    reports: [...links.map(reportFromRow), ...minted],
     lineages: [],
     usage_events: [],
     withheld: [],

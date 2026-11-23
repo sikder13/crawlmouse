@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { fixture } from '../fixtures';
 import { parseReportRequest } from '../reports/generate-request';
+import { SITE_COPY } from '../copy/site';
 import { axisLabels, move } from './checks';
 import { siteView } from './site';
 
@@ -221,6 +222,7 @@ describe('the site’s public link (F-123)', () => {
   it('with none, the owner is offered one for the latest check, and told what it does', () => {
     const r = row(noLinks)!;
     expect(r.value).toContain('anyone who has it');
+    expect(r.value).toContain('unlisted');
     expect(r.value).toContain('told not to index it');
     expect(r.action).toBeNull();
     expect(r.publicLink).toEqual({ url: null, mintCheckId: latestCheck.id });
@@ -257,6 +259,33 @@ describe('the site’s public link (F-123)', () => {
       url: 'https://crawlmouse.com/r/newest-link',
       mintCheckId: null,
     });
+  });
+
+  it('after a link is withdrawn, an owner is told so and offered no new one', () => {
+    const r = siteView(noLinks, { accountId: BAD_ACCOUNT, now: bad.as_of }, OUTFITTER, undefined, {
+      linkWithdrawn: true,
+    }).settings.rows.find((x) => x.label === 'Public link')!;
+    expect(r.value).toBe(SITE_COPY.publicLink.withdrawn);
+    expect(r.publicLink).toEqual({ url: null, mintCheckId: null });
+  });
+
+  it('a live link beside a withdrawn one is shown, and no new one is offered', () => {
+    const r = siteView(bad, { accountId: BAD_ACCOUNT, now: bad.as_of }, OUTFITTER, undefined, {
+      linkWithdrawn: true,
+    }).settings.rows.find((x) => x.label === 'Public link')!;
+    expect(r.publicLink?.url).toContain('/r/example-outfitter-25oct');
+    expect(r.publicLink?.mintCheckId).toBeNull();
+  });
+
+  it('a developer is not told about a withdrawn link', () => {
+    const v = siteView(
+      asRole(noLinks, 'developer'),
+      { accountId: BAD_ACCOUNT, now: bad.as_of, seatId: owner.id },
+      OUTFITTER,
+      undefined,
+      { linkWithdrawn: true },
+    );
+    expect(v.settings.rows.find((x) => x.label === 'Public link')).toBeUndefined();
   });
 
   it('a partial latest check cannot be published, so none is offered', () => {

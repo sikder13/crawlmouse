@@ -35,6 +35,8 @@ import {
 import { dashboardView } from '../view/dashboard';
 import { sitePage, siteView } from '../view/site';
 import { loadAccountDataset } from './dataset';
+import { siteLinkWithdrawn } from './public-links';
+import { loadSettingsDataset } from './settings-dataset';
 
 let db: PGlite;
 let built: BuiltCheck;
@@ -253,6 +255,14 @@ describe('the public links a v2 mint wrote (F-123)', () => {
     await mint('hidden-link', mainSite, owner.accountId, 'hidden_at');
     await mint('taken-down-link', mainSite, owner.accountId, 'takedown_requested_at');
     await mint('scoped-link', OTHER_SITE, owner.accountId);
+    // A row on this site carrying another account, and a v1-shaped row with no check.
+    const elsewhere = await signUp(db, `elsewhere-${randomUUID().slice(0, 8)}@example.com`);
+    await mint('wrong-account-link', mainSite, (await personalAccount(db, elsewhere)).accountId);
+    await db.query(
+      `insert into public.public_reports (slug, audit_id, site_id, account_id, domain)
+       values ('no-check-link', null, $1, $2, 'link.example')`,
+      [mainSite, owner.accountId],
+    );
     const stranger = await signUp(db, `stranger-${randomUUID().slice(0, 8)}@example.com`);
     const theirs = await personalAccount(db, stranger);
     const theirSite = randomUUID();
@@ -274,6 +284,33 @@ describe('the public links a v2 mint wrote (F-123)', () => {
       account_id: owner.accountId,
       covers_check_ids: [shown],
     });
+  });
+
+  it('Trial ending’s dataset reads the same live links', async () => {
+    const { d } = await loadSettingsDataset(
+      {
+        session: postgrestOver(db, { as: { userId: owner.userId } }),
+        admin: postgrestOver(db),
+        records: pgliteCheckReader(db),
+      },
+      owner.accountId,
+      NOW,
+    );
+    expect(d.reports.map((r) => r.public_slug).sort()).toEqual(['scoped-link', 'shown-link']);
+  });
+
+  it('knows when one of a site’s links was withdrawn, and says so when it cannot read', async () => {
+    const admin = postgrestOver(db);
+    expect(await siteLinkWithdrawn(admin, owner.accountId, mainSite)).toBe(true);
+    expect(await siteLinkWithdrawn(admin, owner.accountId, OTHER_SITE)).toBe(false);
+    const broken = {
+      from: () => ({
+        select: () => ({
+          eq: () => ({ eq: async () => ({ data: null, error: { message: 'down' } }) }),
+        }),
+      }),
+    } as unknown as typeof admin;
+    expect(await siteLinkWithdrawn(broken, owner.accountId, OTHER_SITE)).toBe(true);
   });
 
   it('a seat scoped to one site reads only that site’s link', async () => {

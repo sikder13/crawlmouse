@@ -10,6 +10,7 @@ import { seedDefaultAlertRules } from '@/lib/v2/monitor/alert-defaults';
 import { supabaseServer } from '@/lib/supabase/server';
 import { isId } from '@/lib/v2/account/route';
 import { readAccount, siteOfCaller } from '@/lib/v2/account/pages';
+import { siteLinkWithdrawn } from '@/lib/v2/account/public-links';
 import { readNextChecks } from '@/lib/v2/account/sites-store';
 import { chosenFromRequest, readViewer } from '@/lib/v2/account/viewer';
 import { readerRole, viewAt } from '@/lib/v2/view/account';
@@ -71,6 +72,7 @@ export default async function SitePage({
   const query = await searchParams;
   const page = sitePage(d, viewer, id, await readNextChecks(supabaseAdmin(), [id]), {
     allFixes: wantsAllFixes(query),
+    linkWithdrawn: await siteLinkWithdrawn(supabaseAdmin(), site.accountId, id),
   });
   const notice = noticeLine(query, d.accounts[0]!.timezone);
   const account = viewAt(d, viewer);

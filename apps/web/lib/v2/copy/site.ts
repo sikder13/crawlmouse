@@ -6,6 +6,7 @@ import type { AlertRule } from '@crawlmouse/types/v2';
 import type { Addition, CopyChange } from '../copy-registry';
 import { RECHECK_MINUTES } from '../recheck';
 import { RESTORE_DAYS } from './restore-window';
+import { SUPPORT_EMAIL } from './support';
 import { plural } from '../words';
 import { railChanges } from './dashboard';
 
@@ -54,13 +55,15 @@ export const SITE_COPY = {
   markDone: 'Mark done',
   /** The site's public link (F-123). A v2 mint is unlisted and noindex (`lib/v2/reports/mint.ts`). */
   publicLink: {
-    none: 'None yet. A link shows this check to anyone who has it; search engines are told not to index it.',
+    none: 'None yet. A link shows this check to anyone who has it. A new one is unlisted, and search engines are told not to index it.',
+    withdrawn: `A public link for this site was withdrawn, so a new one cannot be made here. Email ${SUPPORT_EMAIL} to restore it.`,
     create: 'Create a public link',
     update: 'New link for the latest check',
     copy: 'Copy link',
     capped: 'You have made today’s links. Try again tomorrow.',
     notFinished: 'Only a finished check can be published.',
     failed: 'The link could not be made. Try again.',
+    signedOut: 'Your session has ended. Sign in again to make a link.',
   },
 };
 

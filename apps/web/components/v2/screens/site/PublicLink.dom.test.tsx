@@ -70,6 +70,7 @@ describe('the public link control (F-123)', () => {
     ['captcha_failed', 429, COPY.capped],
     ['check_partial', 409, COPY.notFinished],
     ['check_not_finished', 409, COPY.notFinished],
+    ['auth_required', 401, COPY.signedOut],
     ['role_refused', 403, COPY.failed],
     ['could not mint', 500, COPY.failed],
   ])('a refusal of %s says so and does not reload', async (error, status, sentence) => {
@@ -78,6 +79,19 @@ describe('the public link control (F-123)', () => {
     await click(COPY.create);
     expect(host.querySelector('[role="status"]')?.textContent).toBe(sentence);
     expect(reload).not.toHaveBeenCalled();
+  });
+
+  it('a second click while the first is in flight posts nothing more', async () => {
+    let finish: (r: Response) => void = () => undefined;
+    const fetcher = vi.fn(
+      (_url: string, _init: RequestInit) => new Promise<Response>((done) => (finish = done)),
+    );
+    vi.stubGlobal('fetch', fetcher);
+    await draw(CHECK);
+    await click(COPY.create);
+    await click(COPY.create);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    await act(async () => finish(new Response('{}', { status: 200 })));
   });
 
   it('a network failure says so', async () => {
