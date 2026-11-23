@@ -40,8 +40,8 @@ const sevenFirst = (d: FixtureDataset): FixtureDataset => ({
 describe('on Pro', () => {
   const t = () => siteView(bad, viewer, SITE).fixes;
 
-  it('lists the fixes by number', () => {
-    expect(t().rows.map((r) => r.number)).toEqual([0, 1, 2, 3, 4]);
+  it('lists the fixes in impact order, by the engine’s rank', () => {
+    expect(t().rows.map((r) => r.number)).toEqual([1, 2, 0, 3, 5]);
   });
 
   it('does not mark any row as Pro, and every row has its packet', () => {
@@ -51,7 +51,7 @@ describe('on Pro', () => {
   });
 
   it('names the numbers it folds', () => {
-    expect(t().rest).toMatchObject({ numbers: '5–15', count: 11 });
+    expect(t().rest).toMatchObject({ numbers: '4, 6–15', count: 11 });
   });
 });
 
@@ -60,9 +60,9 @@ describe('on Free', () => {
 
   it('lists the three it opens first, even when a locked fix has a lower number', () => {
     expect(view(onFree(sevenFirst(bad))).fixes.rows.map((r) => [r.number, r.pro])).toEqual([
+      [7, false],
       [1, false],
       [2, false],
-      [7, false],
       [0, true],
       [3, true],
     ]);
@@ -78,7 +78,7 @@ describe('on Free', () => {
 
   it('offers no packet or Mark done on a locked row', () => {
     const rows = view().fixes.rows;
-    expect(rows.filter((x) => x.pro).map((r) => r.number)).toEqual([3, 4]);
+    expect(rows.filter((x) => x.pro).map((r) => r.number)).toEqual([3, 5]);
     for (const r of rows.filter((x) => x.pro)) {
       expect(r.packet).toBeNull();
       expect(r.markDone).toBeNull();
@@ -118,7 +118,7 @@ describe('the folded row', () => {
       fixes: bad.fixes.filter((f) => f.site_id !== SITE || live.has(f.number)),
     };
     const t = siteView(six, viewer, SITE).fixes;
-    expect(t.rows.map((r) => r.number)).toEqual([0, 1, 2, 3, 4, 5]);
+    expect(t.rows.map((r) => r.number)).toEqual([1, 2, 0, 3, 5, 4]);
     expect(t.rest).toBeNull();
   });
 
