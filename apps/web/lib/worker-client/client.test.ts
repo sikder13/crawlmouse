@@ -129,6 +129,40 @@ describe('against the worker, in process', () => {
     expect(await client.readProgress(`${CHECK}:424242`)).toBeNull();
   });
 
+  it.each([
+    ['a negative count', { pages: -1, links: 0 }],
+    ['a fraction', { pages: 1.5, links: 0 }],
+    ['a string', { pages: '3', links: 0 }],
+    ['a missing field, as an older worker sends', { urls_done: 1 }],
+  ])('takes no live counts from a progress with %s', async (_name, progress) => {
+    const id = `${CHECK}:1`;
+    const client = createWorkerClient({
+      url: 'http://127.0.0.1:1',
+      signingSecret: 's'.repeat(48),
+      privateKey: generateKeyPairSync('ed25519').privateKey,
+      fetch: async () =>
+        new Response(JSON.stringify({ batch_id: id, status: 'running', progress })),
+    });
+    expect(await client.readProgress(id)).toBeNull();
+  });
+
+  it('takes no live counts from an answer about another batch', async () => {
+    const client = createWorkerClient({
+      url: 'http://127.0.0.1:1',
+      signingSecret: 's'.repeat(48),
+      privateKey: generateKeyPairSync('ed25519').privateKey,
+      fetch: async () =>
+        new Response(
+          JSON.stringify({
+            batch_id: `${CHECK}:2`,
+            status: 'running',
+            progress: { pages: 1, links: 1 },
+          }),
+        ),
+    });
+    expect(await client.readProgress(`${CHECK}:1`)).toBeNull();
+  });
+
   it('answers null, never throwing, when the progress read fails or stalls', async () => {
     const down = createWorkerClient({
       url: 'http://127.0.0.1:1',
@@ -210,7 +244,7 @@ describe('against the worker, in process', () => {
     await client.postBatch(batch);
     expect(await client.pollBatch(batchIdOf(CHECK, batch.batch))).toEqual({
       status: 'running',
-      progress: { urls_done: 0, urls_total: 2, requests: 0 },
+      progress: { urls_done: 0, urls_total: 2, requests: 0, pages: 0, links: 0 },
     });
     slow.release();
     expect(await client.pollBatch(`${CHECK}:424242`)).toEqual({ status: 'not_found' });
