@@ -260,6 +260,59 @@ describe('Trial ending, other cases with paid plans closed', () => {
     }
   });
 
+  describe('a member reads what the end does to their own seat', () => {
+    const roles = ['account_manager', 'developer'] as const;
+    const END = 'Sat 7 Nov';
+    const read = (d: FixtureDataset, reading: Parameters<typeof trialEndView>[2]) =>
+      trialEndView(d, trialEndViewer(d, BAD), reading);
+    const card = withAccount(bad, {
+      card_last4: '4242',
+      billing_period_months: 1,
+      renews_at: '2026-11-07T00:00:00.000Z',
+    });
+
+    it.each(roles)('%s, no card, plans closed: the access ends', (role) => {
+      expect(read(bad, { ...closed, role }).endText).toContain(
+        `Your access to this account ends on ${END}.`,
+      );
+    });
+
+    it.each(roles)('%s, no card, plans open: it ends unless the owner keeps Pro', (role) => {
+      expect(read(bad, { billingOpen: true, role }).endText).toContain(
+        `Your access to this account ends on ${END} unless the owner keeps Pro.`,
+      );
+    });
+
+    it.each(roles)('%s, a card that will be charged: only if the owner cancels', (role) => {
+      const text = read(card, { billingOpen: true, role }).endText;
+      expect(text).toContain(`If the owner cancels, your access to this account ends on ${END}.`);
+      expect(text).not.toContain(`Your access to this account ends`);
+    });
+
+    it.each(roles)('%s, a card trial set to cancel: the access ends', (role) => {
+      const text = read(card, {
+        billingOpen: true,
+        role,
+        billingEnd: '2026-11-07T00:00:00.000Z',
+      }).endText;
+      expect(text).toContain(`Your access to this account ends on ${END}`);
+      expect(text).not.toContain('If the owner cancels');
+    });
+
+    it('the owner keeps their seat, and is not told otherwise', () => {
+      for (const d of [bad, card]) {
+        expect(read(d, { ...closed, role: 'owner' }).endText).not.toMatch(/your access/i);
+      }
+    });
+
+    it('only the owner is told a reminder is due, since only the owner is sent it', () => {
+      const banner = (role: 'owner' | 'developer' | 'account_manager') =>
+        read(bad, { ...closed, role }).banner.sub;
+      expect(banner('owner')).toContain('The reminder is due once');
+      for (const role of roles) expect(banner(role)).not.toContain('reminder');
+    });
+  });
+
   it('a card trial is not told to add Pro', () => {
     const card = withAccount(bad, { card_last4: '4242', billing_period_months: 1 });
     expect(trialEndView(card, trialEndViewer(card, BAD), closed).endText).not.toContain('add Pro');

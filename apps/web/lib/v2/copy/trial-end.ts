@@ -125,6 +125,12 @@ export const TRIAL_END_COPY = {
     n === 1
       ? 'The 1 other person with a seat on this account loses access.'
       : `The ${n} other people with seats on this account lose access.`,
+  /** To a member: Free removes their seat. `plan` when the owner can still keep it. */
+  yourSeatEnds: (date: string, plan: string | null) =>
+    `Your access to this account ends on ${date}${plan ? ` unless the owner keeps ${plan}` : ''}.`,
+  /** To a member of a trial that will be charged: the seat goes only if the owner cancels. */
+  yourSeatIfCancelled: (date: string) =>
+    `If the owner cancels, your access to this account ends on ${date}.`,
   /** What Free keeps and pauses, from the sites and the free fixes the account holds. */
   endKeeps: (
     host: string,

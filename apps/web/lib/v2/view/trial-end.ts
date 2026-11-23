@@ -152,7 +152,9 @@ export function trialEndView(
   // when the reminder is due, from its day until that day is over in the account's zone, and nothing
   // after.
   const reminderLine =
-    a.email_prefs.trial_reminder && (at(reminder) >= at(v.now) || sameDay(reminder, v.now, zone))
+    owner &&
+    a.email_prefs.trial_reminder &&
+    (at(reminder) >= at(v.now) || sameDay(reminder, v.now, zone))
       ? COPY.reminderDue(dayDate(reminder, zone))
       : null;
   // A trial whose subscription renews at its end charges the card Checkout took, recorded or not
@@ -369,8 +371,16 @@ export function trialEndView(
         billingOpen,
         site.paused,
       ),
-      // Written from the owner's side: to anyone else, "other" would mean the owner, who keeps access.
-      ...(owner && otherSeats > 0 ? [COPY.seatsLost(otherSeats)] : []),
+      // Free keeps only the owner's seat, so each reader is told what happens to theirs or to others'.
+      ...(owner
+        ? otherSeats > 0
+          ? [COPY.seatsLost(otherSeats)]
+          : []
+        : [
+            charges && billingEnd === null
+              ? COPY.yourSeatIfCancelled(dayDate(end, zone))
+              : COPY.yourSeatEnds(dayDate(end, zone), billingOpen ? plan : null),
+          ]),
     ].join(' '),
     tables: COPY.tables,
     columns: COPY.columns,
