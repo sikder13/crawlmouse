@@ -175,7 +175,7 @@ export type PersistOutput = { written: boolean };
  * Whether the check is failed with the reason asked for (by this call, or by an earlier one with the
  * same reason that this call retries), and if so the site the database holds it under.
  */
-export type FailOutput = { failed: false } | { failed: true; siteId: string };
+export type FailOutput = { failed: false } | { failed: true; siteId: string; as?: FailureReason };
 type Empty = Record<string, never>;
 
 /**
@@ -477,7 +477,7 @@ function failedEvent(
   return {
     id: checkFailedEventId(checkId),
     name: 'check.failed' as const,
-    data: { checkId, siteId: out.siteId, reason },
+    data: { checkId, siteId: out.siteId, reason: out.as ?? reason },
   };
 }
 

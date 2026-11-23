@@ -282,6 +282,15 @@ describe('runCheck: claim', () => {
     expect(step.events[0]!.payload).toMatchObject({ data: { siteId: DB_SITE } });
   });
 
+  it('says in check.failed the word the database stored, when it is not the one asked for', async () => {
+    const clock = { now: T0 };
+    const step = fakeStep(clock);
+    const fake = fakeSteps(clock, { site: { ...SITE_OF_EVENT, siteId: DB_SITE } });
+    fake.steps.fail = async () => ({ failed: true, siteId: DB_SITE, as: 'persist_failed' });
+    await runCheck({ event: { data: EVENT }, step: step.tools, runId: 'r' }, fake.steps);
+    expect(step.events[0]!.payload).toMatchObject({ data: { reason: 'persist_failed' } });
+  });
+
   it('gives the steps after the claim the host, account and homepage the database holds (security 6)', async () => {
     const site: ClaimedSite = {
       siteId: EVENT.siteId,

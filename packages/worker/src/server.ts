@@ -22,7 +22,6 @@ import { systemClock, type Clock } from './clock.js';
 import type { WorkerConfig } from './config.js';
 import { createDoneSignal, type SignalPost } from './signal.js';
 import { createFetcher, type Fetcher } from './fetch/fetcher.js';
-import { siteKeyOf } from './politeness/site-key.js';
 import { Sites } from './politeness/sites.js';
 import { REFUSALS, type Refusal } from './routes.js';
 
@@ -133,7 +132,7 @@ export function createWorker(deps: WorkerDeps): Worker {
   const clock = deps.clock ?? systemClock;
   const log = deps.log ?? ((e: LogEvent) => void process.stdout.write(`${JSON.stringify(e)}\n`));
   const now = () => clock.now();
-  const sites = new Sites(clock);
+  const sites = new Sites(clock, config.labHostPoliteness);
   const batchDeps = {
     clock,
     sites,
@@ -189,7 +188,7 @@ export function createWorker(deps: WorkerDeps): Worker {
         event: 'batch_done',
         batch_id: id,
         kind: req.kind,
-        site: siteKeyOf(urlsOf(req)[0]!),
+        site: sites.keyOf(urlsOf(req)[0]!),
         requests: result.requests,
         partial: result.partial ? result.partial.reasons : null,
       });

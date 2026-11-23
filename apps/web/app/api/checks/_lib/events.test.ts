@@ -137,3 +137,36 @@ describe('capturePublicEvent', () => {
     expect(FUNNEL_EVENTS).toContain('check_finished');
   });
 });
+
+describe('capturePublicEvent, the browser’s bot rule (F-050)', () => {
+  const asBrowser = (userAgent: string) =>
+    new Request('https://crawlmouse.com/api/checks', {
+      method: 'POST',
+      headers: { 'user-agent': userAgent },
+    });
+
+  it('a headless browser’s check sends no event; a person’s does', async () => {
+    const send = vi.fn(async () => undefined);
+    const lookup = async () => false;
+    const visitor = { accountId: null, userId: null };
+    const check = '0b9d3c52-7c1e-4f0a-9a44-1f2e3d4c5b6a';
+    await capturePublicEvent(
+      asBrowser('Mozilla/5.0 (X11; Linux x86_64) HeadlessChrome/131.0.0.0 Safari/537.36'),
+      'check_started',
+      check,
+      { trigger: 'first_audit' },
+      visitor,
+      { send, lookup },
+    );
+    expect(send).not.toHaveBeenCalled();
+    await capturePublicEvent(
+      asBrowser('Mozilla/5.0 (Macintosh) AppleWebKit/537.36 Chrome/131.0.0.0 Safari/537.36'),
+      'check_started',
+      check,
+      { trigger: 'first_audit' },
+      visitor,
+      { send, lookup },
+    );
+    expect(send).toHaveBeenCalledTimes(1);
+  });
+});

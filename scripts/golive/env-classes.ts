@@ -124,9 +124,10 @@ export const WORKER_FLY_ENV: Why = {
   APP_SIGNAL_PROTECTION_BYPASS:
     'Fly secret on the staging worker only, to reach a protected staging app; ignored on production',
   BATCH_CONCURRENCY: 'fly.toml [env]',
+  FLY_APP_NAME: 'set by Fly on the Machine; only the staging-only settings read it',
+  LAB_HOST_POLITENESS: 'staging worker only, a Fly secret (docs/ops/worker-runbook.md, F-018)',
   CRAWL_PAUSED: 'Fly secret, set only to pause the worker',
   PORT: 'fly.toml [env]',
-  FLY_APP_NAME: 'set by Fly on the Machine; only the staging-only settings read it',
   FLY_REGION: 'set by Fly',
   FLY_MACHINE_ID: 'set by Fly',
 };

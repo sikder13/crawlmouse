@@ -33,6 +33,11 @@ export interface WorkerConfig {
    * because the value opens every non-production deployment. A secret: never logged.
    */
   appSignalBypass: string | null;
+  /**
+   * LAB_HOST_POLITENESS: each host under lab.crawlmouse.com has its own limiter and stop, for the
+   * load test on staging (F-018). Only `1`, and only on the staging app.
+   */
+  labHostPoliteness: boolean;
 }
 
 export const MIN_SECRET_LENGTH = 32;
@@ -43,6 +48,9 @@ export const MAX_BATCH_CONCURRENCY = 16;
 type Env = Readonly<Record<string, string | undefined>>;
 
 export const isCrawlPaused = (env: Env): boolean => env.CRAWL_PAUSED?.trim() === '1';
+
+/** The one Fly app that may use LAB_HOST_POLITENESS; any other name, or none, ignores it. */
+const LAB_HOST_POLITENESS_APP = 'crawlmouse-worker-staging';
 
 function intIn(
   raw: string | undefined,
@@ -68,11 +76,9 @@ function httpsUrl(raw: string | undefined): string | null {
   }
 }
 
-const STAGING_APP = 'crawlmouse-worker-staging';
-
 function signalBypass(env: Env, url: string | null): string | null {
   const value = env.APP_SIGNAL_PROTECTION_BYPASS?.trim();
-  if (!value || !url || env.FLY_APP_NAME !== STAGING_APP) return null;
+  if (!value || !url || env.FLY_APP_NAME !== LAB_HOST_POLITENESS_APP) return null;
   return new URL(url).hostname.endsWith('.vercel.app') ? value : null;
 }
 
@@ -102,5 +108,7 @@ export function loadConfig(env: Env): WorkerConfig {
     vantage: vantageOf(env, RELEASE),
     appSignalUrl: httpsUrl(env.APP_SIGNAL_URL),
     appSignalBypass: signalBypass(env, httpsUrl(env.APP_SIGNAL_URL)),
+    labHostPoliteness:
+      env.LAB_HOST_POLITENESS?.trim() === '1' && env.FLY_APP_NAME === LAB_HOST_POLITENESS_APP,
   };
 }

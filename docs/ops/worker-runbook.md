@@ -348,6 +348,19 @@ it on production.
 printf 'APP_SIGNAL_PROTECTION_BYPASS=%s\n' "$VERCEL_AUTOMATION_BYPASS_SECRET" | flyctl secrets import --app crawlmouse-worker-staging
 ```
 
+### Lab hosts on staging (F-018)
+
+The worker keys its limiter and its stop on the registrable domain, so every `*.lab.crawlmouse.com` host
+shares one 2 requests a second. A load test of many lab hosts would measure that one limiter. To give each
+lab host its own, set this once on the staging worker:
+
+```bash
+flyctl secrets set LAB_HOST_POLITENESS=1 --app crawlmouse-worker-staging
+```
+
+Only a host under `lab.crawlmouse.com` changes, and "off-site" does not. The production app ignores the
+setting. Verify: `pnpm --filter @crawlmouse/worker exec vitest run src/config.test.ts src/politeness/site-key.test.ts src/batch/lab-host-key.test.ts`.
+
 ## Rotate the signing secret
 
 The worker holds one signing secret at a time, so a rotation has a short window in which requests
