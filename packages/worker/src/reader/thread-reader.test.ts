@@ -71,8 +71,9 @@ const PAGES = {
 
 /** A read without how long it took, which differs from one run to the next. */
 const untimed = (r: object) => {
-  const { readMs: _readMs, ...rest } = r as { readMs?: number };
-  return rest;
+  const copy: { readMs?: number } = { ...r };
+  delete copy.readMs;
+  return copy;
 };
 
 describe('the page reader thread', () => {
