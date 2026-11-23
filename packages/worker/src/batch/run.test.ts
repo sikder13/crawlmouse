@@ -11,6 +11,8 @@ import { fakeFetcher, type FakeResponse } from '../test-support/fake-fetcher.js'
 import { whoSent } from '../test-support/discriminators.js';
 import { startServer, type FixtureServer } from '../test-support/http.js';
 import type { BatchRequest } from './request.js';
+import { livePageOf } from './crawl.js';
+import type { CrawlPage } from '../rows/crawl-page.js';
 import { runBatch, type BatchResult, type LivePage, type Progress } from './run.js';
 import { MAX_ROBOTS_BYTES, MAX_ROBOTS_RULES } from '../politeness/robots.js';
 import { siteKeyOf } from '../politeness/site-key.js';
@@ -1730,6 +1732,20 @@ describe('round 5: redirect targets', () => {
 });
 
 describe('progress while a batch runs', () => {
+  it('never reports a page the result does not count as fetched, whatever else it holds', () => {
+    const row = {
+      url: 'https://site.test/a',
+      outcome: 'fetched',
+      status_code: 200,
+      timing: { total_ms: 5 },
+      links_read: true,
+      links_out: 0,
+      identity_sent: 'browser',
+    } as unknown as CrawlPage;
+    expect(livePageOf(row, [])).not.toBeNull();
+    expect(livePageOf({ ...row, outcome: 'not_requested' } as CrawlPage, [])).toBeNull();
+  });
+
   it('reports a finished page as the stored result will hold it, and none that was not read', async () => {
     const s = await serve({ robots: robotsText('User-agent: *\nDisallow: /b\n') });
     const seen: LivePage[] = [];

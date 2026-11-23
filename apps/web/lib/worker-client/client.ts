@@ -5,6 +5,8 @@
  * status and a code looked up in WORKER_REFUSALS, so no header, body, JWT or key goes into it.
  */
 import type { KeyObject } from 'node:crypto';
+import { CountSchema, HttpStatusSchema, HttpUrlSchema } from '@crawlmouse/types/v2';
+import { z } from 'zod';
 import { loadPrivateKey, mintBatchJwt, PRIVATE_KEY_ENV } from './jwt';
 import { SIGNATURE_HEADER, TS_HEADER, signBody, signRead } from './sign';
 import {
@@ -14,8 +16,28 @@ import {
   type PollResult,
   type WorkerClient,
   type WorkerErrorKind,
-  type LiveCounts,
+  type LiveProgress,
 } from './types';
+
+/** The worker's text is checked here: these URLs reach a visitor's screen. */
+const LiveAnswerSchema = z.object({
+  progress: z.object({ pages: CountSchema, links: CountSchema }),
+  pages_total: CountSchema,
+  live_pages: z
+    .array(
+      z.object({
+        url: HttpUrlSchema,
+        status: HttpStatusSchema,
+        ms: CountSchema,
+        links: CountSchema,
+        identity: z.string().min(1).max(64),
+        edges: z
+          .array(z.object({ from: HttpUrlSchema, to: HttpUrlSchema, js_only: z.boolean() }))
+          .max(20),
+      }),
+    )
+    .max(25),
+});
 
 export const WORKER_URL_ENV = 'CRAWL_WORKER_URL';
 export const SIGNING_SECRET_ENV = 'WORKER_SIGNING_SECRET';
@@ -246,11 +268,11 @@ export function createWorkerClient(opts: WorkerClientOptions): WorkerClient {
     throw new WorkerError('server', res.status, null);
   }
 
-  async function readProgress(batchId: string): Promise<LiveCounts | null> {
+  async function readProgress(batchId: string, after = 0): Promise<LiveProgress | null> {
     if (!ROUTABLE_BATCH_ID.test(batchId)) return null;
     try {
       const res = await signedGet(
-        `/batch/${batchId}/progress`,
+        `/batch/${batchId}/progress?after=${after}`,
         `progress:${batchId}`,
         PROGRESS_TIMEOUT_MS,
       );
@@ -259,9 +281,14 @@ export function createWorkerClient(opts: WorkerClientOptions): WorkerClient {
       if (!isRecord(answer) || answer.batch_id !== batchId || answer.status !== 'running') {
         return null;
       }
-      const progress = answer.progress;
-      if (!isRecord(progress) || !isCount(progress.pages) || !isCount(progress.links)) return null;
-      return { pages: progress.pages, links: progress.links };
+      const live = LiveAnswerSchema.safeParse(answer);
+      if (!live.success) return null;
+      return {
+        pages: live.data.progress.pages,
+        links: live.data.progress.links,
+        total: live.data.pages_total,
+        fresh: live.data.live_pages,
+      };
     } catch {
       return null;
     }
@@ -277,8 +304,6 @@ export function createWorkerClient(opts: WorkerClientOptions): WorkerClient {
 
   return { postBatch, pollBatch, readProgress, readMetrics };
 }
-
-const isCount = (v: unknown): v is number => Number.isSafeInteger(v) && (v as number) >= 0;
 
 const present = (v: string | undefined): v is string => v !== undefined && v.trim() !== '';
 

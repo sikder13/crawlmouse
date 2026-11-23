@@ -307,6 +307,13 @@ function apply(state: CrawlState, s: CrawlState, event: ProgressEvent): CrawlSta
       return { ...s, pages_estimated: event.pages };
     case 'page_fetched': {
       const fetch = withoutType(event);
+      // A crawl page is sent as it finishes and again when its batch is read: one line, one node.
+      if (
+        fetch.purpose === 'crawl' &&
+        state.fetches.some((f) => f.purpose === 'crawl' && f.url === fetch.url)
+      ) {
+        return s;
+      }
       const isNew = fetch.purpose === 'crawl' && !state.nodes.some((n) => n.url === fetch.url);
       const link = state.first_links[fetch.url];
       const node: MapNode = {

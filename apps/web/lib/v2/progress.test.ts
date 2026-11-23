@@ -416,3 +416,28 @@ describe('the projection onto the contract Progress', () => {
     expect(Object.keys(p.recent_fetches[0]!).sort()).toEqual(['links', 'status', 'url']);
   });
 });
+
+describe('a page sent live and again when its batch is read', () => {
+  const at = (ms: number, url = URL_A, purpose: 'crawl' | 'test' = 'crawl'): ProgressEvent => ({
+    type: 'page_fetched',
+    at_ms: ms,
+    url,
+    identity: 'browser',
+    purpose,
+    status: 200,
+    ms: 10,
+    links: 1,
+  });
+
+  it('is one line in the log and one node on the map', () => {
+    const state = [at(1), at(2), at(3, URL_B)].reduce(reduce, INITIAL_STATE);
+    expect(state.fetches.map((f) => f.url)).toEqual([URL_A, URL_B]);
+    expect(state.nodes.map((n) => n.url)).toEqual([URL_A, URL_B]);
+    expect(state.last_ms).toBe(3);
+  });
+
+  it('still logs each crawler test of a page the crawl already fetched', () => {
+    const state = [at(1), at(2, URL_A, 'test'), at(3, URL_A, 'test')].reduce(reduce, INITIAL_STATE);
+    expect(state.fetches.map((f) => f.purpose)).toEqual(['crawl', 'test', 'test']);
+  });
+});

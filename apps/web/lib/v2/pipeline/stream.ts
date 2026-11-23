@@ -3,7 +3,9 @@
  * check's stored rows imply, and the cursor that says which of them a viewer has been sent.
  *
  * Sources. A crawl batch's stored result gives `page_fetched` and `page_linked`; the check's row
- * gives `stage`, `counts` and `ended`. No `pages_estimated`, `page_classified`, `crawler_verdict`,
+ * gives `stage`, `counts` and `ended`. While a crawl batch runs, the worker's progress gives the same
+ * `page_fetched` and `page_linked` early (`liveEvents`) and adds to `counts` (`withLiveCounts`). No
+ * `pages_estimated`, `page_classified`, `crawler_verdict`,
  * `finding` or `graded` event is derived: nothing stored while a check runs holds them.
  *
  * Order within one poll: each new batch's events (`batchEvents`), then the row's (`checkEvents`),
@@ -24,6 +26,7 @@ import {
 import { PHASES, type ProgressEvent } from '../progress';
 import type { StreamBatch, StreamSnapshot } from './stream-store';
 import type { EvidenceStore } from './types';
+import type { LivePage } from '../../worker-client/types';
 
 /** What a viewer has been sent. It travels as the SSE `id:` and comes back as `Last-Event-ID`. */
 export interface Cursor {
@@ -183,6 +186,41 @@ export function withLiveCounts(
       links_found: (facts.counts?.links_found ?? 0) + live.links,
     },
   };
+}
+
+/**
+ * The pages a running batch has finished, as the events its stored result will give: `page_fetched`,
+ * then a `page_linked` for each page it links to first. The reducer takes a repeat of either as
+ * nothing, so these can be sent again after a reconnect and when the batch is read.
+ */
+export function liveEvents(cursor: Cursor, pages: readonly LivePage[], elapsedMs: number): Emitted {
+  const at = Math.max(cursor.at, Math.round(elapsedMs));
+  const events: ProgressEvent[] = [];
+  const linked = new Set<string>();
+  for (const page of pages) {
+    events.push({
+      type: 'page_fetched',
+      at_ms: at,
+      url: page.url,
+      identity: page.identity,
+      purpose: 'crawl',
+      status: page.status,
+      ms: page.ms,
+      links: page.links,
+    });
+    for (const edge of page.edges) {
+      if (edge.from === edge.to || linked.has(edge.to)) continue;
+      linked.add(edge.to);
+      events.push({
+        type: 'page_linked',
+        at_ms: at,
+        url: edge.to,
+        from: edge.from,
+        via: edge.js_only ? 'javascript' : 'link',
+      });
+    }
+  }
+  return events.length === 0 ? { events, cursor } : { events, cursor: { ...cursor, at } };
 }
 
 /** A stored `waiting_since` as ms from the check's start; null without both, or unreadable. */

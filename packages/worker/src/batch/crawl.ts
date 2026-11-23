@@ -89,7 +89,7 @@ const LIVE_EDGES_PER_PAGE = 20;
 const LIVE_URL_CHARS = 512;
 
 /** The page for the live screen; null where the stream could not fill a `page_fetched` from it. */
-function livePageOf(page: CrawlPage, edges: readonly LinkEdge[]): LivePage | null {
+export function livePageOf(page: CrawlPage, edges: readonly LinkEdge[]): LivePage | null {
   if (page.outcome !== 'fetched' || page.status_code === null || page.timing === null) return null;
   if (!page.links_read || page.links_out === null || page.url.length > LIVE_URL_CHARS) return null;
   return {

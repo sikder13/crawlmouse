@@ -10,6 +10,10 @@
  * id. A browser reconnects with the last id it saw, so a group cut short is sent again whole; the
  * crawl screen applies a group when its id arrives (app/audit/[id]/_crawl/live-source.ts).
  *
+ * While a crawl batch runs, the stream also reads that batch's progress from the worker, at most
+ * every LIVE_READ_MS, and sends the pages finished so far. It costs no Inngest step or database
+ * write, and a worker that does not answer leaves the stream on the stored rows.
+ *
  * Limits. A poll every POLL_MS; the stream closes itself STREAM_CLOSE_MS after it opened, before
  * the route's `maxDuration`, and the browser reconnects; STREAM_OPENS_PER_IP_PER_HOUR opens an hour
  * for one address, which is also what bounds the streams one address holds open at once
@@ -23,6 +27,7 @@ import {
   cursorFits,
   factsOf,
   formatCursor,
+  liveEvents,
   parseCursor,
   readBatch,
   runningCrawlBatch,
@@ -34,7 +39,7 @@ import {
 import type { StreamSnapshot, StreamStore } from '../../../../../lib/v2/pipeline/stream-store';
 import type { CheckReader, EvidenceStore } from '../../../../../lib/v2/pipeline/types';
 import type { ProgressEvent } from '../../../../../lib/v2/progress';
-import { batchIdOf, type LiveCounts } from '../../../../../lib/worker-client/types';
+import { batchIdOf, type LiveProgress } from '../../../../../lib/worker-client/types';
 import type { PublicServerEvents } from '../../_lib/events';
 import type { CheckRouteLimits } from '../_lib/limit-keys';
 
@@ -62,8 +67,11 @@ export interface StreamDeps {
     properties: PublicServerEvents['check_finished'],
     accountId: string | null,
   ): Promise<void>;
-  /** The running batch's counts from the worker; absent or null leaves the database's totals. */
-  liveCounts?(batchId: string): Promise<LiveCounts | null>;
+  /**
+   * The running batch's counts and the pages it finished from `after`, from the worker. Absent or
+   * null leaves the database's totals, and the map fills when the batch is read.
+   */
+  liveProgress?(batchId: string, after: number): Promise<LiveProgress | null>;
   clientIp(req: Request): string;
   now(): number;
   sleep(ms: number): Promise<void>;
@@ -134,7 +142,9 @@ export async function serveStream(
       const openedAt = deps.now();
       let cursor = resumed;
       let snapshot: StreamSnapshot | null = first;
-      let live = null as { batch: number; counts: LiveCounts } | null;
+      let live = null as { batch: number; counts: { pages: number; links: number } } | null;
+      /** How many of the running batch's finished pages this connection has sent. */
+      let liveSent = 0;
       let liveReadAt = -Infinity;
       write(`retry: ${RETRY_MS}\n\n`);
       try {
@@ -162,14 +172,31 @@ export async function serveStream(
           }
           if (!open) break;
           const runningBatch = runningCrawlBatch(snapshot);
-          if (live?.batch !== runningBatch) live = null;
-          if (runningBatch !== null && deps.liveCounts && deps.now() - liveReadAt >= LIVE_READ_MS) {
+          if (live?.batch !== runningBatch) {
+            live = null;
+            liveSent = 0;
+          }
+          if (
+            runningBatch !== null &&
+            deps.liveProgress &&
+            deps.now() - liveReadAt >= LIVE_READ_MS
+          ) {
             liveReadAt = deps.now();
-            const counts = await deps
-              .liveCounts(batchIdOf(checkId, runningBatch))
+            const got = await deps
+              .liveProgress(batchIdOf(checkId, runningBatch), liveSent)
               .catch(() => null);
-            if (counts) live = { batch: runningBatch, counts };
             if (!open) break;
+            if (got) {
+              live = { batch: runningBatch, counts: { pages: got.pages, links: got.links } };
+              if (got.total < liveSent) {
+                // The worker lost the batch and it was posted again: its list starts over.
+                liveSent = 0;
+              } else {
+                const sent = liveEvents(cursor, got.fresh, factsOf(snapshot, deps.now()).elapsedMs);
+                send(sent.events, sent.cursor);
+                liveSent += got.fresh.length;
+              }
+            }
           }
           const facts = withLiveCounts(factsOf(snapshot, deps.now()), live?.counts ?? null);
           const out = checkEvents(cursor, facts);

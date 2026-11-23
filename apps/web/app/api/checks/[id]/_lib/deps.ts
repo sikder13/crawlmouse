@@ -42,10 +42,10 @@ export function checkRouteDeps(
         userId: viewer.userId,
       }),
     send: (event) => inngest.send(event),
-    liveCounts: async (batchId) => {
+    liveProgress: async (batchId, after) => {
       try {
         worker ??= workerClientFromEnv(process.env);
-        return (await worker?.readProgress(batchId)) ?? null;
+        return (await worker?.readProgress(batchId, after)) ?? null;
       } catch {
         // A client that cannot be built (a bad key) leaves the stream on the database's totals.
         return null;

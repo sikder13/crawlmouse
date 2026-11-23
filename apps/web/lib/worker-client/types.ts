@@ -39,10 +39,24 @@ export type PollResult =
   | { status: 'failed' }
   | { status: 'not_found' };
 
+/** A page a running batch has finished, with the fields its stored row will hold. */
+export interface LivePage {
+  url: string;
+  status: number;
+  ms: number;
+  links: number;
+  identity: string;
+  edges: { from: string; to: string; js_only: boolean }[];
+}
+
 /** What a running batch has read so far, counted as its result will count it. */
-export interface LiveCounts {
+export interface LiveProgress {
   pages: number;
   links: number;
+  /** How many finished pages the worker holds for this batch. */
+  total: number;
+  /** The finished pages from the offset asked for, a bounded number at a time. */
+  fresh: LivePage[];
 }
 
 export interface WorkerClient {
@@ -51,10 +65,11 @@ export interface WorkerClient {
   postBatch(batch: BatchPost): Promise<{ batch_id: string; signals: boolean }>;
   pollBatch(batchId: string): Promise<PollResult>;
   /**
-   * A running batch's counts for the live screen; null for anything else, a failed read included.
-   * It never throws and waits at most PROGRESS_TIMEOUT_MS, so a slow worker cannot stall a stream.
+   * A running batch's counts and the pages it finished from `after`, for the live screen; null for
+   * anything else, a failed read included. It never throws and waits at most PROGRESS_TIMEOUT_MS,
+   * so a slow worker cannot stall a stream.
    */
-  readProgress(batchId: string): Promise<LiveCounts | null>;
+  readProgress(batchId: string, after?: number): Promise<LiveProgress | null>;
   readMetrics(): Promise<unknown>;
 }
 
