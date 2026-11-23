@@ -307,12 +307,14 @@ function apply(state: CrawlState, s: CrawlState, event: ProgressEvent): CrawlSta
       return { ...s, pages_estimated: event.pages };
     case 'page_fetched': {
       const fetch = withoutType(event);
-      // A crawl page is sent as it finishes and again when its batch is read: one line, one node.
-      if (
-        fetch.purpose === 'crawl' &&
-        state.fetches.some((f) => f.purpose === 'crawl' && f.url === fetch.url)
-      ) {
-        return s;
+      // A crawl page is sent as it finishes and again when its batch is read: one line, one node,
+      // holding the later version, which is the stored row once the batch has been read.
+      const seen =
+        fetch.purpose === 'crawl'
+          ? state.fetches.findIndex((f) => f.purpose === 'crawl' && f.url === fetch.url)
+          : -1;
+      if (seen !== -1) {
+        return { ...s, fetches: state.fetches.map((f, i) => (i === seen ? fetch : f)) };
       }
       const isNew = fetch.purpose === 'crawl' && !state.nodes.some((n) => n.url === fetch.url);
       const link = state.first_links[fetch.url];

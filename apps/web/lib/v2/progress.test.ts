@@ -9,6 +9,7 @@ import {
   reduce,
   stateAt,
   toProgress,
+  type FetchEvent,
   type ProgressEvent,
 } from './progress';
 
@@ -418,7 +419,7 @@ describe('the projection onto the contract Progress', () => {
 });
 
 describe('a page sent live and again when its batch is read', () => {
-  const at = (ms: number, url = URL_A, purpose: 'crawl' | 'test' = 'crawl'): ProgressEvent => ({
+  const at = (ms: number, url = URL_A, purpose: 'crawl' | 'test' = 'crawl'): FetchEvent => ({
     type: 'page_fetched',
     at_ms: ms,
     url,
@@ -434,6 +435,16 @@ describe('a page sent live and again when its batch is read', () => {
     expect(state.fetches.map((f) => f.url)).toEqual([URL_A, URL_B]);
     expect(state.nodes.map((n) => n.url)).toEqual([URL_A, URL_B]);
     expect(state.last_ms).toBe(3);
+  });
+
+  it('takes the later version of the page, in its place in the log', () => {
+    const later: FetchEvent = { ...at(3), status: 503, links: 0, ms: 99 };
+    const state = [at(1), at(2, URL_B), later].reduce(reduce, INITIAL_STATE);
+    expect(state.fetches.map((f) => [f.url, f.status, f.links])).toEqual([
+      [URL_A, 503, 0],
+      [URL_B, 200, 1],
+    ]);
+    expect(state.nodes.map((n) => n.url)).toEqual([URL_A, URL_B]);
   });
 
   it('still logs each crawler test of a page the crawl already fetched', () => {
