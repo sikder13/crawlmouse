@@ -321,10 +321,30 @@ describe('the public links a v2 mint wrote (F-123)', () => {
       expect(await siteLinkGate(admin(), owner.accountId, site)).toBe('withdrawn');
     });
 
-    it('a takedown closes a www sibling and a host added again under a new id', async () => {
+    it('a takedown closes a www sibling', async () => {
       await report('www-down', 'sibling.example', 'takedown_requested_at', null, null);
       const www = await newSite('www.sibling.example');
       expect(await siteLinkGate(admin(), owner.accountId, www)).toBe('withdrawn');
+    });
+
+    it('a takedown closes a host added again under a new site id', async () => {
+      const first = await newSite('readded.example');
+      await report(
+        're-down',
+        'readded.example',
+        'takedown_requested_at',
+        first.id,
+        owner.accountId,
+      );
+      await db.query(`update public.sites set removed_at = now() where id = $1`, [first.id]);
+      const again = await newSite('readded.example');
+      expect(await siteLinkGate(admin(), owner.accountId, again)).toBe('withdrawn');
+    });
+
+    it('a live link of the site leaves it open', async () => {
+      const site = await newSite('live-only.example');
+      await mint('live-only-link', site.id, owner.accountId);
+      expect(await siteLinkGate(admin(), owner.accountId, site)).toBe('open');
     });
 
     it('a site’s own hidden link closes it', async () => {
@@ -339,18 +359,29 @@ describe('the public links a v2 mint wrote (F-123)', () => {
       expect(await siteLinkGate(admin(), owner.accountId, site)).toBe('open');
     });
 
-    it('a failed read is unknown, not open', async () => {
-      const failing = () => {
-        const q: Record<string, unknown> = {};
-        for (const m of ['select', 'eq', 'not']) q[m] = () => q;
-        q.limit = async () => ({ data: null, error: { message: 'down' } });
-        return q;
-      };
-      const broken = { from: failing } as unknown as ReturnType<typeof admin>;
-      expect(
-        await siteLinkGate(broken, owner.accountId, { id: OTHER_SITE, host: 'x.example' }),
-      ).toBe('unknown');
-    });
+    it.each(['takedown_requested_at', 'hidden_at'])(
+      'a failed read of %s alone is unknown, not open',
+      async (failing) => {
+        const client = {
+          from: () => {
+            let broken = false;
+            const q: Record<string, unknown> = {};
+            q.select = () => q;
+            q.eq = () => q;
+            q.not = (column: string) => {
+              broken = column === failing;
+              return q;
+            };
+            q.limit = async () =>
+              broken ? { data: null, error: { message: 'down' } } : { data: [], error: null };
+            return q;
+          },
+        } as unknown as ReturnType<typeof admin>;
+        expect(
+          await siteLinkGate(client, owner.accountId, { id: OTHER_SITE, host: 'x.example' }),
+        ).toBe('unknown');
+      },
+    );
   });
 
   it('a seat scoped to one site reads only that site’s link', async () => {

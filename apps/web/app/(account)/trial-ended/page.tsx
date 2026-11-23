@@ -23,11 +23,12 @@ export default async function TrialEndedPage() {
   if (page.kind === 'signed_out') redirect('/login');
   if (page.kind === 'none') notFound();
   // The links a v2 mint wrote, for this reader's sites: the page says those keep working.
+  // One optional row on this page, so a failed read leaves it out rather than failing the page.
   const links = await mintedLinks(
     supabaseAdmin(),
     page.viewer.accountId,
     page.d.sites.map((s) => s.id),
-  );
+  ).catch(() => []);
   const shown = trialPage({ ...page.d, reports: [...page.d.reports, ...links] }, page.viewer, {
     billingEnd: page.billingEnd,
     role: page.role,
