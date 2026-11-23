@@ -126,7 +126,7 @@ export async function runCrawl(run: CrawlRun, urls: readonly string[]): Promise<
         pages: page.outcome === 'fetched' ? 1 : 0,
         links: edges.length,
         live: livePageOf(page, edges),
-        homepage: i === 0 && page.outcome === 'fetched',
+        homepage: i === 0 && page.response === 'served',
       });
     }
   };

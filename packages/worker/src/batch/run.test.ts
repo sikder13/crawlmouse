@@ -1803,6 +1803,31 @@ describe('progress while a batch runs', () => {
     expect(seen.at(-1)!.homepage_read).toBe(expected);
   });
 
+  it.each([403, 404, 429, 503])('does not call a homepage that answered %i read', async (code) => {
+    const s = await serve({
+      robots: robotsText('User-agent: *\nAllow: /\n'),
+      page: (path, _ua, res) => {
+        res.statusCode = path === '/a' ? code : 200;
+        res.setHeader('content-type', 'text/html');
+        res.end(`<html><body><p>page ${path}</p></body></html>`);
+      },
+    });
+    const seen: Progress[] = [];
+    const clock = new InstantClock();
+    await runBatch(
+      crawlReq(s.base, ['/a', '/b']),
+      {
+        clock,
+        sites: new Sites(clock),
+        fetcher: createFetcher(clock, { bypassSsrf: true }),
+        robotsCache: new RobotsCache(clock),
+      },
+      (p) => seen.push(p),
+    );
+    expect(seen.at(-1)!.pages).toBe(2);
+    expect(seen.at(-1)!.homepage_read).toBe(false);
+  });
+
   it('counts pages and links by the rule the result is counted by', async () => {
     const s = await serve({ robots: robotsText('User-agent: *\nDisallow: /b\n') });
     const seen: Progress[] = [];
