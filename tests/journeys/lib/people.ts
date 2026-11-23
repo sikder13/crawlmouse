@@ -42,10 +42,10 @@ export async function person(
   return { context, page, email, userId, accountId: data.account_id as string };
 }
 
-/** The product's per-host limit answered 429: this host has had its checks for the hour. */
-export class HostLimited extends Error {
-  constructor(host: string) {
-    super(`could not add ${host}: 429`);
+/** This host cannot be added now: it is at the product's hourly limit, or the account already keeps it. */
+export class HostUnavailable extends Error {
+  constructor(host: string, status: number) {
+    super(`could not add ${host}: ${status}`);
   }
 }
 
@@ -63,7 +63,8 @@ const LAB_CLIENTS = [
 
 /**
  * Keeps one of the lab's sites on `who`'s account, in the listed order, moving on only when a host
- * is at its hourly limit, so that a second run within the hour does not fail on the limit. Any other failure throws.
+ * is at its hourly limit or this account already keeps it, so that a second run within the hour does not fail on the
+ * limit. Any other failure throws.
  */
 export async function keptLabSite(
   who: Person,
@@ -73,10 +74,10 @@ export async function keptLabSite(
     try {
       return { site: await keptSite(who, host), host };
     } catch (e) {
-      if (!(e instanceof HostLimited)) throw e;
+      if (!(e instanceof HostUnavailable)) throw e;
     }
   }
-  throw new Error('every lab client host is at its hourly limit');
+  throw new Error('every lab host in the list is at its hourly limit or already kept');
 }
 
 /**
@@ -96,8 +97,10 @@ export async function keptSite(who: Person, host: string): Promise<string> {
     const answer = (await r.json().catch(() => null)) as { code?: unknown } | null;
     return { status: r.status, code: answer?.code };
   }, `https://${host}`);
-  // Only the per-host limit moves on to another host. Any other 429 is a failure of its own.
-  if (status === 429 && code === 'domain_capped') throw new HostLimited(host);
+  // Only the per-host limit, or a host this account already keeps, moves on to another host. Any other answer is a
+  // failure of its own.
+  if (status === 429 && code === 'domain_capped') throw new HostUnavailable(host, status);
+  if (status === 409 && code === 'site_exists') throw new HostUnavailable(host, status);
   if (status !== 201 && status !== 500) {
     throw new Error(`could not add ${host}: ${status} ${String(code)}`);
   }
