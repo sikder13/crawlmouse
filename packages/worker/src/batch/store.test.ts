@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { BatchResult } from './run.js';
-import { BatchStore, MAX_RECORDS, MAX_RESULT_BYTES, RESULT_TTL_MS } from './store.js';
+import {
+  BatchStore,
+  LIVE_PAGES_PER_READ,
+  MAX_RECORDS,
+  MAX_RESULT_BYTES,
+  RESULT_TTL_MS,
+} from './store.js';
 
 const progress = { urls_done: 0, urls_total: 1, requests: 0, pages: 0, links: 0 };
 /** A result whose JSON is about `bytes` long, with non-Latin-1 text, so a UTF-16 string would double it. */
@@ -46,5 +52,38 @@ describe('BatchStore', () => {
     t += RESULT_TTL_MS;
     expect(store.get('c:0')).toBeUndefined();
     expect(store.get('run')?.status).toBe('running');
+  });
+});
+
+describe('the pages a running batch has finished', () => {
+  const live = (n: number) => ({
+    url: `https://site.test/${n}`,
+    status: 200,
+    ms: 5,
+    links: 0,
+    identity: 'browser',
+    edges: [],
+  });
+  const counts = { urls_done: 1, urls_total: 3, requests: 1, pages: 1, links: 0 };
+
+  it('hands them out from an offset, at most LIVE_PAGES_PER_READ at a time', () => {
+    const store = new BatchStore(() => 0);
+    store.start('b', { ...counts, urls_done: 0, pages: 0 });
+    for (let i = 0; i < LIVE_PAGES_PER_READ + 5; i++) store.progress('b', counts, live(i));
+    const first = store.livePages('b', 0);
+    expect(first.total).toBe(LIVE_PAGES_PER_READ + 5);
+    expect(first.pages).toHaveLength(LIVE_PAGES_PER_READ);
+    expect(store.livePages('b', LIVE_PAGES_PER_READ).pages.map((p) => p.url)).toEqual(
+      [0, 1, 2, 3, 4].map((n) => `https://site.test/${LIVE_PAGES_PER_READ + n}`),
+    );
+  });
+
+  it('gives nothing for a batch that is not running', () => {
+    const store = new BatchStore(() => 0);
+    expect(store.livePages('none', 0)).toEqual({ total: 0, pages: [] });
+    store.start('b', counts);
+    store.progress('b', counts, live(0));
+    store.fail('b');
+    expect(store.livePages('b', 0)).toEqual({ total: 0, pages: [] });
   });
 });

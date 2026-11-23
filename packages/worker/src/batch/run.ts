@@ -52,16 +52,29 @@ export interface Progress {
   links: number;
 }
 
+/** A finished page as the live screen shows it, with the fields its stored row will hold. */
+export interface LivePage {
+  url: string;
+  status: number;
+  ms: number;
+  links: number;
+  identity: string;
+  /** Its first links, bounded (crawl.ts); the stored batch brings the rest. */
+  edges: { from: string; to: string; js_only: boolean }[];
+}
+
 /** What one finished page adds to `Progress`. An access batch reads no page into the map. */
 export interface PageCounts {
   pages: number;
   links: number;
+  /** Null for a page the map would not draw: not fetched, or its links not read. */
+  live: LivePage | null;
 }
 
 export async function runBatch(
   req: BatchRequest,
   deps: BatchDeps,
-  onProgress: (p: Progress) => void = () => undefined,
+  onProgress: (p: Progress, live?: LivePage) => void = () => undefined,
 ): Promise<BatchResult> {
   const startedAt = deps.clock.now();
   const budget = new Budget(req.budget, deps.clock);
@@ -82,13 +95,16 @@ export async function runBatch(
   const pageDone = (read?: PageCounts) => {
     pagesRead += read?.pages ?? 0;
     linksRead += read?.links ?? 0;
-    onProgress({
-      urls_done: ++urlsDone,
-      urls_total: requested.length,
-      requests: budget.used.requests,
-      pages: pagesRead,
-      links: linksRead,
-    });
+    onProgress(
+      {
+        urls_done: ++urlsDone,
+        urls_total: requested.length,
+        requests: budget.used.requests,
+        pages: pagesRead,
+        links: linksRead,
+      },
+      read?.live ?? undefined,
+    );
   };
   // robots.txt for every origin first: one that blocks the site keeps the whole batch from fetching.
   const blocked = await robots.preload(requested);

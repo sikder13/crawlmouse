@@ -35,7 +35,7 @@ import { REFUSALS, type Refusal } from './routes.js';
 
 export const MAX_BODY_BYTES = 1024 * 1024;
 const BATCH_ID = /^\/batch\/([0-9a-f-]{36}:\d{1,7})$/;
-const BATCH_PROGRESS = /^\/batch\/([0-9a-f-]{36}:\d{1,7})\/progress$/;
+const BATCH_PROGRESS = /^\/batch\/([0-9a-f-]{36}:\d{1,7})\/progress(?:\?after=(\d{1,6}))?$/;
 
 export type LogEvent = Record<string, string | number | boolean | null | string[]>;
 
@@ -182,7 +182,7 @@ export function createWorker(deps: WorkerDeps): Worker {
 
   async function run(id: string, req: BatchRequest): Promise<void> {
     try {
-      const result = await runBatch(req, batchDeps, (p) => store.progress(id, p));
+      const result = await runBatch(req, batchDeps, (p, live) => store.progress(id, p, live));
       store.finish(id, result);
       signal?.({ check_id: req.check_id, batch: req.batch, status: 'done' });
       log({
@@ -273,13 +273,25 @@ export function createWorker(deps: WorkerDeps): Worker {
   }
 
   /** A batch's state and counts, never its result: cheap to answer however large the result is. */
-  function getProgress(req: http.IncomingMessage, res: http.ServerResponse, id: string): void {
+  function getProgress(
+    req: http.IncomingMessage,
+    res: http.ServerResponse,
+    id: string,
+    after: number,
+  ): void {
     const signature = readSigned(req, `progress:${id}`);
     if (signature) return refuse(res, signature);
     const r = store.get(id);
     if (!r) return refuse(res, 'not_found');
     if (r.status === 'running') {
-      return json(res, 200, { batch_id: id, status: r.status, progress: r.progress });
+      const live = store.livePages(id, after);
+      return json(res, 200, {
+        batch_id: id,
+        status: r.status,
+        progress: r.progress,
+        pages_total: live.total,
+        live_pages: live.pages,
+      });
     }
     json(res, 200, { batch_id: id, status: r.status });
   }
@@ -309,7 +321,7 @@ export function createWorker(deps: WorkerDeps): Worker {
       const batch = req.method === 'GET' ? BATCH_ID.exec(url) : null;
       if (batch) return getBatch(req, res, batch[1]!);
       const progress = req.method === 'GET' ? BATCH_PROGRESS.exec(url) : null;
-      if (progress) return getProgress(req, res, progress[1]!);
+      if (progress) return getProgress(req, res, progress[1]!, Number(progress[2] ?? 0));
       if (req.method === 'POST' && url === '/batch') return postBatch(req, res);
       refuse(res, 'not_found');
     };

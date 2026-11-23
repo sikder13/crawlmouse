@@ -11,7 +11,7 @@ import { fakeFetcher, type FakeResponse } from '../test-support/fake-fetcher.js'
 import { whoSent } from '../test-support/discriminators.js';
 import { startServer, type FixtureServer } from '../test-support/http.js';
 import type { BatchRequest } from './request.js';
-import { runBatch, type BatchResult, type Progress } from './run.js';
+import { runBatch, type BatchResult, type LivePage, type Progress } from './run.js';
 import { MAX_ROBOTS_BYTES, MAX_ROBOTS_RULES } from '../politeness/robots.js';
 import { siteKeyOf } from '../politeness/site-key.js';
 import { MAX_DOM_DEPTH, READ_IN_PART, TOO_DEEP } from '../rows/text.js';
@@ -1730,6 +1730,42 @@ describe('round 5: redirect targets', () => {
 });
 
 describe('progress while a batch runs', () => {
+  it('reports a finished page as the stored result will hold it, and none that was not read', async () => {
+    const s = await serve({ robots: robotsText('User-agent: *\nDisallow: /b\n') });
+    const seen: LivePage[] = [];
+    const clock = new InstantClock();
+    const result = await runBatch(
+      crawlReq(s.base, ['/a', '/b', '/c']),
+      {
+        clock,
+        sites: new Sites(clock),
+        fetcher: createFetcher(clock, { bypassSsrf: true }),
+        robotsCache: new RobotsCache(clock),
+      },
+      (_p, live) => {
+        if (live) seen.push(live);
+      },
+    );
+    if (result.kind !== 'crawl') throw new Error('expected a crawl result');
+    const fetched = result.pages.filter((p) => p.outcome === 'fetched');
+    expect(seen.map((p) => p.url).sort()).toEqual(fetched.map((p) => p.url).sort());
+    for (const page of fetched) {
+      const live = seen.find((p) => p.url === page.url)!;
+      expect(live).toMatchObject({
+        status: page.status_code,
+        ms: page.timing!.total_ms,
+        links: page.links_out,
+        identity: page.identity_sent,
+      });
+      expect(live.edges.map((e) => e.to).sort()).toEqual(
+        result.link_edges
+          .filter((e) => e.from_url === page.url)
+          .map((e) => e.to_url)
+          .sort(),
+      );
+    }
+  });
+
   it('counts pages and links by the rule the result is counted by', async () => {
     const s = await serve({ robots: robotsText('User-agent: *\nDisallow: /b\n') });
     const seen: Progress[] = [];
