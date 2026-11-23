@@ -9,7 +9,12 @@
  * `requestCheck` reaches its send, so a refused request sends nothing.
  */
 import { randomUUID } from 'node:crypto';
-import { AlertRuleKindSchema, ChannelSchema, type AlertRuleKind } from '@crawlmouse/types/v2';
+import {
+  AlertRuleKindSchema,
+  ChannelSchema,
+  type AlertRuleKind,
+  type Check,
+} from '@crawlmouse/types/v2';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { z } from 'zod';
 import { inngest } from '../../../../../inngest/client';
@@ -19,8 +24,9 @@ import type { TierGates } from '../../entitlement-v2';
 import { normalizeDomain } from '../../domain';
 import { DOMAIN_AUDITS_PER_HOUR, GLOBAL_AUDITS_BUCKET, GLOBAL_AUDITS_PER_DAY } from '../../limits';
 import { MAX_RATE_LIMIT_WINDOW_MS, rateLimitWindowStart } from '../../rate-limit-window';
-import { MANUAL_BUCKET_S } from '../pipeline/limits';
-import { requestCheck, type RequestDeps } from '../pipeline/request';
+import { bucketedKey, checkIdOfKey, freshKey } from '../pipeline/ids';
+import { DEFAULT_PAGE_CAP, MANUAL_BUCKET_S } from '../pipeline/limits';
+import { homepageOf, requestCheck, type RequestDeps } from '../pipeline/request';
 import { supabasePipelineStore, type QueuedCheck } from '../pipeline/store';
 import type { RecheckOutcome, RequestRecheck } from './recheck';
 
@@ -155,6 +161,67 @@ export function supabaseRequestRecheck(
       if (e instanceof NotQueued) return e.outcome;
       throw e;
     }
+  };
+}
+
+// ─── a queued check whose event did not go ───────────────────────────────────────────────────────
+
+export interface QueuedCheckRef {
+  id: string;
+  trigger: Check['trigger'];
+  queued_at: string;
+}
+
+/**
+ * The event id a kept site's queued check was requested under, or null when it cannot be proved.
+ * Inngest drops a second event with one id, so re-sending that id is safe whether or not the first
+ * send arrived; any other id could start a second run. A first audit's id names its check. A re-check's
+ * names its bucket, the one it was queued in or the next (`requestCheck`, D11), and is accepted only if
+ * it gives back this check's id. A scheduled check's depends on the site's schedule at the time, and
+ * the scheduler owns its retry.
+ */
+export function queuedEventId(siteId: string, check: QueuedCheckRef): string | null {
+  if (check.trigger === 'first_audit') return freshKey({ siteId, kept: true }, check.id);
+  if (check.trigger !== 'manual' && check.trigger !== 'fix_recheck') return null;
+  const at = Date.parse(check.queued_at);
+  for (const now of [at, at + MANUAL_BUCKET_S * 1000]) {
+    const key = bucketedKey({ siteId, kept: true, trigger: check.trigger, now, nextCheckAt: null });
+    if (key !== null && checkIdOfKey(key) === check.id) return key;
+  }
+  return null;
+}
+
+export interface ResendQueued {
+  siteId: string;
+  accountId: string;
+  host: string;
+  check: QueuedCheckRef;
+  requestedByUserId: string;
+}
+
+/**
+ * Sends a queued check's event again, under its own id (QA on #101): after a send that failed the
+ * check is queued with nothing to run it, and a retry is what recovers it. Answers whether it sent.
+ */
+export function supabaseResendQueued(send: Send = sendWithInngest) {
+  return async ({ siteId, accountId, host, check, requestedByUserId }: ResendQueued) => {
+    const id = queuedEventId(siteId, check);
+    if (id === null) return false;
+    await send({
+      id,
+      name: 'check.requested',
+      data: {
+        checkId: check.id,
+        siteId,
+        accountId,
+        host,
+        homepageUrl: homepageOf(host),
+        trigger: check.trigger,
+        pageCap: DEFAULT_PAGE_CAP,
+        requestedByUserId,
+      },
+    });
+    return true;
   };
 }
 
