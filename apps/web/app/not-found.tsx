@@ -10,8 +10,9 @@ export const metadata: Metadata = {
   description: NOT_FOUND_COPY.lead,
   alternates: { canonical: null },
   robots: { index: false, follow: true },
-  openGraph: null,
-  twitter: null,
+  // Empty, not null: Next re-applies the root's opengraph-image over a null.
+  openGraph: { images: [] },
+  twitter: { images: [] },
 };
 
 /** The v2 404 while V2_CHECKS_PUBLIC serves the v2 site (RC-20); v1's with the flag off. */

@@ -1,5 +1,6 @@
 'use client';
 
+import type { ComponentType } from 'react';
 import dynamic from 'next/dynamic';
 import { NOT_FOUND_COPY as COPY } from '@/lib/v2/copy/not-found';
 
@@ -14,7 +15,18 @@ function NotFoundFallback() {
   );
 }
 
-const Screen = dynamic(() => import('./NotFoundScreen').then((m) => m.NotFoundScreen), {
+/**
+ * The v2 screen, or the plain 404 when its chunk cannot load (a dropped connection, a stale
+ * deployment): a rejected load would otherwise replace the 404 with the global error page.
+ */
+export const loadNotFoundScreen = (
+  load: () => Promise<{ NotFoundScreen: ComponentType }> = () => import('./NotFoundScreen'),
+): Promise<ComponentType> =>
+  load()
+    .then((m) => m.NotFoundScreen)
+    .catch(() => NotFoundFallback);
+
+const Screen = dynamic(() => loadNotFoundScreen(), {
   ssr: false,
   loading: NotFoundFallback,
 });
