@@ -105,6 +105,9 @@ export function renderedPills(markup: string) {
  * labelled "Footer", is cut with the footer and not on its own.
  */
 export const SHELL = [
+  // RC-20: the skip link, which the locked artboards predate.
+  /<a href="#v2-content"[^>]*>Skip to content<\/a>/,
+  /<span id="v2-content"[^>]*><\/span>/,
   /<nav\b[^>]*aria-label="Primary"[^>]*>[\s\S]*?<\/nav>/g,
   /<footer\b[\s\S]*?<\/footer>/g,
 ];
