@@ -86,14 +86,6 @@ type Page9 = [path: string, ids?: PageDefects];
 const missing = (id: string): PageDefects => ({ status: { id, got: 404 } });
 const pages: [id: string, title: string, paths: Page9[]][] = [
   ['J0.9a', 'pricing', [['/pricing', { shell: 'F-007' }]]],
-  [
-    'J0.9b',
-    'the agency pages',
-    [
-      ['/agencies', missing('F-024')],
-      ['/agency-trial', missing('F-024')],
-    ],
-  ],
   ['J0.9c', 'help', [['/help']]],
   ['J0.9d', 'guides', [['/guides', { kept: 'F-006' }]]],
   ['J0.9e', 'a blog post', [['/blog/screaming-frog-alternative', { kept: 'F-006' }]]],
@@ -141,6 +133,96 @@ step('J0.9j', '/bot describes the v2 crawler', async ({ page }) => {
   expect(text, 'F-031: no v1 crawler name').not.toContain('CrawlmouseBot/1.0');
 });
 
+step(
+  'J0.9b',
+  'the agency offer is a finished v2 page, and the trial page routes by billing',
+  async ({ page, request, baseURL }) => {
+    await expectFinishedV2Page(page, '/agencies', missing('F-024'));
+    // Billing off: /agencies offers no start, and /agency-trial comes back to it. Billing on: /agencies links
+    // to the trial, which sends a signed-out visitor to sign-in. An offer that loops back starts nothing.
+    const offers = await (await contentOf(page))
+      .locator('a[href*="/agency-trial"], form[action*="/agency-trial"]')
+      .count();
+    const trial = await request.get('/agency-trial', { maxRedirects: 0 });
+    if (trial.status() === 404) {
+      expect(trial.status(), 'F-024: /agency-trial is a page').not.toBe(404);
+    }
+    expect([302, 303, 307, 308], '/agency-trial redirects a signed-out visitor').toContain(
+      trial.status(),
+    );
+    const to = new URL(trial.headers()['location'] ?? '', baseURL);
+    expect(to.origin, '/agency-trial stays on this site').toBe(new URL(baseURL!).origin);
+    const toSignIn = to.pathname === '/login' && to.searchParams.get('next') === '/agency-trial';
+    const toOffer = to.pathname === '/agencies';
+    expect(
+      offers > 0 ? toSignIn : toOffer,
+      `/agency-trial goes to ${to.pathname}${to.search}, and /agencies has ${offers} link(s) to it`,
+    ).toBe(true);
+  },
+);
+
 step('J0.9l', 'an unknown address is the v2 404', async ({ page }) => {
   await expectFinishedV2Page(page, '/this-page-does-not-exist-journeys', { shell: 'F-026' }, 404);
+});
+
+step('J0.1', 'the home page says what this is and what it costs', async ({ page, request }) => {
+  await expectFinishedV2Page(page, '/');
+  const main = await contentOf(page);
+  // CC-45's five-second test, for the heading. Who the page is for is judged by hand at the gate.
+  await expect(main.locator('h1').first(), 'a heading says what this is').toBeVisible({
+    timeout: 5_000,
+  });
+  const text = await main.innerText();
+  expect(text, 'the free offer states its page limit').toMatch(/free[^\n]{0,40}500 pages/i);
+  // F-060 is Agency alone lacking a way forward, so Free and Pro must have theirs first: when every card
+  // has lost its button, that is a wider break and fails red.
+  const forward = 'a[href]:not([href="#"]), button:not([disabled]):not([aria-disabled="true"])';
+  for (const price of ['$0', '$19']) {
+    const card = main.locator('[data-v2-card]', { hasText: price });
+    await expect(card, `the ${price} plan card is on the page`).toHaveCount(1);
+    await expect(card.locator(forward), `the ${price} plan has a button`).not.toHaveCount(0);
+  }
+  const agency = main.locator('[data-v2-card]', { hasText: '$99' });
+  await expect(agency, 'the Agency plan card is on the page').toHaveCount(1);
+  await expect(agency.locator(forward), 'F-060: the Agency card has a button').not.toHaveCount(0);
+  const links = agency.locator('a[href]:not([href="#"])');
+  const href = (await links.count()) > 0 ? await links.first().getAttribute('href') : null;
+  if (href) {
+    expect((await request.get(href)).status(), `the Agency button's ${href} answers`).toBeLessThan(
+      400,
+    );
+  }
+  // F-146: the method line claims "published IPs", and no address is published.
+  expect(text, 'F-146: no claim of published IPs').not.toMatch(/published IPs/i);
+});
+
+step('J0.9m', 'the free check pages show a result or say they start an audit', async ({ page }) => {
+  for (const q of ['gptbot', 'javascript', 'robots-ai']) {
+    await expectFinishedV2Page(page, `/check/${q}`);
+    const main = await contentOf(page);
+    // F-158's fix is either of two things. A real result for the visitor's site carries this marker (the PR
+    // that ships it adds it). Without one, the visible page must not promise what each crawler sees, and the
+    // heading above its last form must say the form starts an audit.
+    if ((await main.locator('[data-check-result]').count()) > 0) continue;
+    const promise =
+      /\b(know|see|find out|learn)\b[^.\n]{0,40}\b(each|every|which|what)\b[^.\n]{0,30}\bcrawlers?\b/i;
+    const startsAudit = /\b(starts?|runs?|begins?|launch(es)?)\b[^.\n]*\baudit\b/i;
+    // A sentence that says it starts an audit is the register's own fix, whatever it goes on to promise.
+    const promised = (await main.innerText())
+      .split(/[.!?\n]+/)
+      .filter((sentence) => promise.test(sentence) && !startsAudit.test(sentence));
+    expect(promised, `F-158: /check/${q} promises a result it does not show`).toEqual([]);
+    const heading = await main.evaluate((el) => {
+      const form = [...el.querySelectorAll('form')].at(-1);
+      if (!form) return '';
+      const above = [...el.querySelectorAll<HTMLElement>('h1, h2, h3')].filter(
+        (h) =>
+          h.checkVisibility() && h.compareDocumentPosition(form) & Node.DOCUMENT_POSITION_FOLLOWING,
+      );
+      return above.at(-1)?.innerText.trim() ?? '';
+    });
+    expect(heading, `/check/${q}: the heading above the form says it starts an audit`).toMatch(
+      startsAudit,
+    );
+  }
 });
