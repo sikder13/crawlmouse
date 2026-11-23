@@ -1138,6 +1138,18 @@ const ROUTES: readonly Spec[] = [
     ),
   },
   {
+    path: 'ingest/[...path]',
+    v2: false,
+    identity: 'anyone',
+    gate: 'public',
+    detail:
+      'The PostHog proxy: passes a fixed list of headers, no cookie or referrer, to PostHog’s two hosts. Reads no data.',
+    proof: by(
+      'app/ingest/[...path]/route.test.ts',
+      'a signed-in browser’s cookie and page address do not reach PostHog',
+    ),
+  },
+  {
     path: 'embed/[domain]',
     v2: false,
     identity: 'anyone',

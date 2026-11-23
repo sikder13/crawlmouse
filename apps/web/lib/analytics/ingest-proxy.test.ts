@@ -33,6 +33,7 @@ describe('what the proxy sends to PostHog', () => {
         accept: '*/*',
         'user-agent': 'Mozilla/5.0',
         'x-forwarded-for': '203.0.113.9',
+        'if-none-match': '"v1"',
       }),
       f,
     );
@@ -40,6 +41,7 @@ describe('what the proxy sends to PostHog', () => {
       accept: '*/*',
       'content-encoding': 'gzip',
       'content-type': 'text/plain',
+      'if-none-match': '"v1"',
       'user-agent': 'Mozilla/5.0',
       'x-forwarded-for': '203.0.113.9',
     });
@@ -79,6 +81,12 @@ describe('what the proxy sends to PostHog', () => {
     for (const [url] of f.mock.calls) {
       expect(['us.i.posthog.com', 'us-assets.i.posthog.com']).toContain(new URL(String(url)).host);
     }
+  });
+
+  it('gives the upstream call a time limit', async () => {
+    const f = upstream();
+    await proxyIngest(post('/ingest/e/'), f);
+    expect(f.mock.calls[0]![1]!.signal).toBeInstanceOf(AbortSignal);
   });
 
   it('does not follow a redirect', async () => {

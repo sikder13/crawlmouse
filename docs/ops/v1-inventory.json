@@ -1035,15 +1035,15 @@
       "path": "app/ingest/[...path]/route.ts",
       "ruling": "keep",
       "reason": "same-origin PostHog proxy, in place of a rewrite that forwarded cookies",
-      "evidence": "apps/web/lib/analytics/ingest-proxy.ts:46",
+      "evidence": "apps/web/lib/analytics/ingest-proxy.ts:55",
       "checks": {
-        "input": "pass — the path is joined to a fixed origin and the result's origin checked (apps/web/lib/analytics/ingest-proxy.ts:27)",
-        "output": "pass — only the listed response headers return, so no Set-Cookie (apps/web/lib/analytics/ingest-proxy.ts:54)",
+        "input": "pass — the path is joined to a fixed origin and the result's origin checked (apps/web/lib/analytics/ingest-proxy.ts:36)",
+        "output": "pass — only the listed response headers return, so no Set-Cookie (apps/web/lib/analytics/ingest-proxy.ts:63)",
         "cache": "pass — the upstream's cache headers, on a dynamic route",
-        "redirect": "pass — an upstream redirect is not followed (apps/web/lib/analytics/ingest-proxy.ts:48)",
-        "errors": "pass — 502 with no body and a fixed log line (apps/web/lib/analytics/ingest-proxy.ts:58)",
+        "redirect": "pass — an upstream redirect is not followed (apps/web/lib/analytics/ingest-proxy.ts:57)",
+        "errors": "pass — 502 with no body and a fixed log line (apps/web/lib/analytics/ingest-proxy.ts:67)",
         "escaping": "n/a — bytes passed through",
-        "abuse": "pass — reaches two fixed PostHog hosts only, with no cookie or referrer (apps/web/lib/analytics/ingest-proxy.ts:46)"
+        "abuse": "n/a — reads no data and reaches two fixed PostHog hosts; no rate limit, as under the rewrite, and each request is now a function call"
       }
     },
     {
