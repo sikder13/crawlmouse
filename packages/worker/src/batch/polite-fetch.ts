@@ -81,7 +81,7 @@ async function oneRequest(
   keepBytes: number | undefined,
   countsTowardStop: boolean,
 ): Promise<FetchOutcome | NotRequested> {
-  const site = siteKeyOf(url);
+  const site = ctx.sites.keyOf(url);
   const before = refusal(ctx, site);
   if (before) return before;
   const scheduled = await ctx.sites.limiter(site).schedule(async () => {

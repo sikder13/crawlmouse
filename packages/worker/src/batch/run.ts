@@ -3,7 +3,6 @@ import { BatchPartialSchema, type BatchResult, type RobotsEvidence } from '@craw
 import type { Clock } from '../clock.js';
 import type { Fetcher } from '../fetch/fetcher.js';
 import { CANARY, CRAWL, CRAWLERS } from '../identities.js';
-import { siteKeyOf } from '../politeness/site-key.js';
 import type { Sites } from '../politeness/sites.js';
 import { bounded, CAPS } from '../rows/bounded.js';
 import { bodyExcerpt, storedUrl, userAgentOf } from '../rows/evidence.js';
@@ -93,7 +92,7 @@ export async function runBatch(
   const origins = (await robots.all()).filter((o): o is OriginRules => !('reason' in o));
   for (const o of origins) findings.origin(o);
   if (budget.exhausted) findings.budgetSpent(budget.exhausted);
-  for (const site of new Set(requested.map(siteKeyOf))) {
+  for (const site of new Set(requested.map((u) => deps.sites.keyOf(u)))) {
     const stop = deps.sites.stopOf(site);
     if (stop && stop.at >= startedAt) findings.stopped(site, stop);
   }

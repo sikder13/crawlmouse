@@ -9,7 +9,6 @@ import type { Clock } from '../clock.js';
 import type { FetchOutcome } from '../fetch/fetcher.js';
 import { CRAWL } from '../identities.js';
 import { oursAllow, PathMatch, searchVerdicts } from '../politeness/robots.js';
-import { siteKeyOf } from '../politeness/site-key.js';
 import { CrawlPageSchema, type CrawlPage } from '../rows/crawl-page.js';
 import { bounded, CAPS, MAX_URL_LENGTH } from '../rows/bounded.js';
 import {
@@ -187,7 +186,7 @@ async function crawlPage(
   // A chain stopped at a redirect never requested its last Location, so it has not landed there.
   const landed = f.redirectStop === null && f.status !== null ? f.finalUrl : null;
   const reading = readResponse(f);
-  run.ctx.sites.recordPage(siteKeyOf(url), reading.class === 'challenged');
+  run.ctx.sites.recordPage(run.ctx.sites.keyOf(url), reading.class === 'challenged');
   const limitations = [
     ...(f.error ? [say.requestFailed(f)] : []),
     ...(f.redirectStop ? [say.redirectStopped(f.redirectStop, r.cut ?? null)] : []),

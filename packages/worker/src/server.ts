@@ -130,7 +130,7 @@ export function createWorker(deps: WorkerDeps): Worker {
   const clock = deps.clock ?? systemClock;
   const log = deps.log ?? ((e: LogEvent) => void process.stdout.write(`${JSON.stringify(e)}\n`));
   const now = () => clock.now();
-  const sites = new Sites(clock);
+  const sites = new Sites(clock, config.labHostPoliteness);
   const batchDeps = {
     clock,
     sites,

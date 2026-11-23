@@ -546,7 +546,7 @@ describe('configuration', () => {
     expect(main).toMatch(/createWorker\(\{ config, reader \}\)/);
   });
 
-  it('reads no environment variable but its own five: no database or Inngest key can reach it', () => {
+  it('reads no environment variable but its own seven: no database or Inngest key can reach it', () => {
     const read = new Set<string>();
     for (const file of ['main.ts', 'config.ts', 'server.ts']) {
       const source = readFileSync(new URL(file, import.meta.url), 'utf8');
@@ -556,6 +556,8 @@ describe('configuration', () => {
     expect([...read].sort()).toEqual([
       'BATCH_CONCURRENCY',
       'CRAWL_PAUSED',
+      'FLY_APP_NAME',
+      'LAB_HOST_POLITENESS',
       'PORT',
       'WORKER_JWT_PUBLIC_KEY',
       'WORKER_SIGNING_SECRET',
