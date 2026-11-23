@@ -37,6 +37,12 @@ vi.mock('@/lib/supabase/server', () => ({
     },
   }),
 }));
+// The viewer of a caller with no v2 account: these cases are the public start's. A person acting in
+// an account takes the other branch (route.account.test.ts, with the real viewer).
+vi.mock('@/lib/v2/account/viewer', () => ({
+  viewerFor: async (_session: unknown, user: { id: string } | null) =>
+    user === null ? { kind: 'signed_out' } : { kind: 'no_account', userId: user.id },
+}));
 vi.mock('./_lib/start-deps', () => ({
   startDeps: (signedIn: StartDeps['signedIn']) => {
     h.built += 1;
