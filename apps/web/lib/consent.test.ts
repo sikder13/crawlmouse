@@ -137,8 +137,16 @@ describe('surveysOffAtStart', () => {
     [true, null, true],
     [true, 'granted', false],
     [true, 'denied', true],
-  ] as const)('consent required %s, decision %s → off %s', (required, decision, off) => {
-    expect(surveysOffAtStart(required, decision)).toBe(off);
+  ] as const)('signed in, consent required %s, decision %s → off %s', (required, decision, off) => {
+    expect(surveysOffAtStart(required, decision, true)).toBe(off);
+  });
+
+  it.each([
+    [false, null],
+    [false, 'granted'],
+    [true, 'granted'],
+  ] as const)('signed out, consent required %s, decision %s → off', (required, decision) => {
+    expect(surveysOffAtStart(required, decision, false)).toBe(true);
   });
 });
 

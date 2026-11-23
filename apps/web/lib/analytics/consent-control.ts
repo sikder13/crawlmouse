@@ -1,5 +1,6 @@
 import type { PostHog } from 'posthog-js';
 import { clearAnalyticsStorage } from '../consent';
+import { hasSessionCookie } from '../v2/session-header';
 
 /** The browser's two stores, each read when it is used: reading one can throw (lib/consent.ts). */
 export const BROWSER_STORES: readonly (() => Storage)[] = [
@@ -60,7 +61,8 @@ export function resumeAnalytics(
     opt_out_capturing_by_default: false,
     advanced_disable_flags: false,
     disable_external_dependency_loading: false,
-    disable_surveys: false,
+    // The one survey is the account shell's Feedback: a signed-out page has no use for its script.
+    disable_surveys: !hasSessionCookie(document.cookie),
     disable_product_tours: false,
     disable_conversations: false,
   });

@@ -57,6 +57,9 @@ function clearCookies() {
   }
 }
 
+/** A Supabase session cookie's name and a value: what `hasSessionCookie` reads as signed in. */
+const SESSION = 'sb-testref-auth-token=x';
+
 /** The window listeners each load of instrumentation-client adds, removed after each case. */
 const added: [string, EventListenerOrEventListenerObject][] = [];
 const addListener = window.addEventListener.bind(window);
@@ -89,8 +92,13 @@ afterEach(() => {
 });
 
 describe('instrumentation-client', () => {
-  it('starts PostHog with surveys on, and writes cm_ft, when consent is not required', async () => {
-    await load('/blog/x?utm_source=linkedin', ['cm_consent_required=0']);
+  it('leaves surveys off for a signed-out visitor, whose page has no survey to open', async () => {
+    await load('/blog/x', ['cm_consent_required=0']);
+    expect(ph.init.mock.calls[0]![1]).toMatchObject({ disable_surveys: true });
+  });
+
+  it('starts PostHog with surveys on when signed in, and writes cm_ft, with no consent needed', async () => {
+    await load('/blog/x?utm_source=linkedin', ['cm_consent_required=0', SESSION]);
     expect(ph.init.mock.calls[0]![1]).toMatchObject({ disable_surveys: false });
     expect(firstTouchFromCookies(document.cookie)).toMatchObject({
       utm_source: 'linkedin',
@@ -124,7 +132,7 @@ describe('instrumentation-client', () => {
     );
     act(() => allow!.click());
     expect(ph.init).toHaveBeenCalledTimes(1);
-    expect(ph.init.mock.calls[0]![1]).toMatchObject({ disable_surveys: false });
+    expect(ph.init.mock.calls[0]![1]).toMatchObject({ disable_surveys: true });
     // Before `init` the SDK's opt-in writes to storage, so the banner does not call it.
     expect(ph.opt_in_capturing).not.toHaveBeenCalled();
     expect(firstTouchFromCookies(document.cookie)).toMatchObject({
@@ -202,7 +210,16 @@ describe('the consent banner', () => {
     b.done();
   });
 
+  it('on allow once PostHog runs, a signed-out visitor’s surveys stay off', async () => {
+    ph.loaded = true;
+    const b = await banner();
+    b.click('Allow analytics');
+    expect(ph.set_config).toHaveBeenCalledWith(expect.objectContaining({ disable_surveys: true }));
+    b.done();
+  });
+
   it('on allow once PostHog runs, turns it back on and opts in', async () => {
+    document.cookie = `${SESSION}; Path=/`;
     ph.loaded = true;
     const heard = vi.fn();
     window.addEventListener('cm:consent-granted', heard);

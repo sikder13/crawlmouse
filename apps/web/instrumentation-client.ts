@@ -21,6 +21,7 @@ import {
   CONSENT_GRANTED_EVENT,
   surveysOffAtStart,
 } from '@/lib/consent';
+import { hasSessionCookie } from '@/lib/v2/session-header';
 
 // Sentry (client) — configured here, fetched when the browser is idle or on the first error, so it
 // is not part of a page's first load (F-045, lib/sentry-lazy.ts). With no DSN set (local/build)
@@ -67,6 +68,7 @@ if (
       disable_surveys: surveysOffAtStart(
         consentRequiredFromCookie(document.cookie),
         storedConsent(),
+        hasSessionCookie(document.cookie),
       ),
       disable_session_recording: true, // do not record by default
       session_recording: { maskAllInputs: true, maskTextSelector: '[data-ph-mask]' },
