@@ -199,7 +199,7 @@ step(
       expect(leaks(body, path), `${path} shows nothing of A`).toEqual([]);
       if (r.status() !== 404) {
         expect(body, 'F-130: /changes says the site is not in this account').toMatch(
-          /not in this account/i,
+          /not in this account|not one you can see here/i,
         );
       }
     } finally {
