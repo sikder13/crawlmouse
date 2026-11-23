@@ -80,7 +80,7 @@ export function createTrialClockFn(clock: () => TrialClockPorts) {
           `trial clock: ${failed.length} of ${due.length} accounts failed: ${failed.join(', ')}`,
         );
       }
-      // After the expiries, so a read that keeps failing cannot hold them up or go unnoticed.
+      // After the expiries, so a read that keeps failing does not hold them up. The run ends failed.
       if (reminderReadFailed) {
         throw new NonRetriableError('trial clock: the reminders could not be read this run');
       }

@@ -253,6 +253,11 @@ describe('Trial ending, other cases with paid plans closed', () => {
     expect(v.endText).toContain('The 1 other person with a seat on this account loses access.');
     // Not under "Pauses, until Pro": choosing Pro later does not bring the seat back.
     expect(JSON.stringify(v.pauses)).not.toContain('seat');
+    // The page serves any member, and to a member "the other person" would be the owner.
+    for (const role of ['account_manager', 'developer'] as const) {
+      const read = trialEndView(withSeats, trialEndViewer(withSeats, BAD), { ...closed, role });
+      expect(read.endText).not.toContain('loses access');
+    }
   });
 
   it('a card trial is not told to add Pro', () => {

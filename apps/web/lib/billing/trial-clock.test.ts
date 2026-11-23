@@ -250,6 +250,17 @@ describe('the mail’s seat count, against what the move to Free removes', () =>
        values ($1, 'invited@example.com', 'developer', 'invited')`,
       [id],
     );
+    await db.query(
+      `insert into public.seats (account_id, user_id, invited_email, role, status, accepted_at, removed_at)
+       values ($1, $2, 'gone@example.com', 'developer', 'removed', now(), now())`,
+      [id, await person()],
+    );
+    const elsewhere = await noCardTrial();
+    await db.query(
+      `insert into public.seats (account_id, user_id, invited_email, role, status, accepted_at)
+       values ($1, $2, 'elsewhere@example.com', 'developer', 'active', now())`,
+      [elsewhere, await person()],
+    );
     const counted = await supabaseMailStore(postgrestOver(db)).trialOtherSeats(id);
     expect(counted).toBe(1);
     await applyEntitlementTransition(store, id, { type: 'trial_expired', at: new Date(END) });

@@ -369,7 +369,8 @@ export function trialEndView(
         billingOpen,
         site.paused,
       ),
-      ...(otherSeats > 0 ? [COPY.seatsLost(otherSeats)] : []),
+      // Written from the owner's side: to anyone else, "other" would mean the owner, who keeps access.
+      ...(owner && otherSeats > 0 ? [COPY.seatsLost(otherSeats)] : []),
     ].join(' '),
     tables: COPY.tables,
     columns: COPY.columns,
