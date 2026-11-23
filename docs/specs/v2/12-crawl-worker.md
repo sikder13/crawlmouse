@@ -105,7 +105,7 @@ Each access row names its identity: `identity_role` is `control`, `crawler` or `
 
 ## Politeness
 
-- Request starts at least 500 ms apart per registrable domain (eTLD+1, Public Suffix List with its private section), shared by every batch in the process, measured start to start.
+- Request starts at least 500 ms apart per registrable domain (eTLD+1, Public Suffix List with its private section), shared by every batch in the process, measured start to start. On the staging app only, `LAB_HOST_POLITENESS=1` makes each host under `lab.crawlmouse.com` its own key for the limiter and the stops; off-site is still the registrable domain.
 
 - One request in flight per site; two when the median latency of the last 20 responses is over 500 ms and no Crawl-delay raised the gap.
 

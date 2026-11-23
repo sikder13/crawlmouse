@@ -24,6 +24,7 @@ export type {
   SampledPage,
   Seed,
 } from './build/index.js';
+export { nothingReadReason } from './build/nothing-read.js';
 export type { CheckSide } from './diff/types.js';
 export { stableId } from './diff/ids.js';
 export { GRADE_VERSION } from './grade/weights.js';
