@@ -148,7 +148,10 @@ export async function serveStream(
       const openedAt = deps.now();
       let cursor = resumed;
       let snapshot: StreamSnapshot | null = first;
-      let live = null as { batch: number; counts: { pages: number; links: number } } | null;
+      let live = null as {
+        batch: number;
+        counts: { pages: number; links: number; homepageRead: boolean };
+      } | null;
       /** How many of the running batch's finished pages this connection has sent. */
       let liveSent = 0;
       let liveReadAt = -Infinity;
@@ -178,6 +181,8 @@ export async function serveStream(
             }
           }
           if (!open) break;
+          // Sent with this poll's counts as one group, so a cut connection cannot keep one alone.
+          let liveGroup: ProgressEvent[] = [];
           const runningBatch = runningCrawlBatch(snapshot);
           if (live?.batch !== runningBatch) {
             live = null;
@@ -194,13 +199,17 @@ export async function serveStream(
               .catch(() => null);
             if (!open) break;
             if (got) {
-              live = { batch: runningBatch, counts: { pages: got.pages, links: got.links } };
+              live = {
+                batch: runningBatch,
+                counts: { pages: got.pages, links: got.links, homepageRead: got.homepageRead },
+              };
               if (got.total < liveSent) {
                 // The worker lost the batch and it was posted again: its list starts over.
                 liveSent = 0;
               } else {
                 const sent = liveEvents(cursor, got.fresh, factsOf(snapshot, deps.now()).elapsedMs);
-                send(sent.events, sent.cursor);
+                liveGroup = sent.events;
+                cursor = sent.cursor;
                 liveSent += got.fresh.length;
               }
             }
@@ -212,7 +221,7 @@ export async function serveStream(
           }
           const facts = withLiveCounts(factsOf(snapshot, deps.now()), live?.counts ?? null);
           const out = checkEvents(cursor, facts);
-          send(out.events, out.cursor);
+          send([...liveGroup, ...out.events], out.cursor);
           if (cursor.ended) {
             if (!before.ended) {
               await finished(req, checkId, access.trigger, facts, accountId, deps);

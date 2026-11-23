@@ -77,7 +77,13 @@ const postBatch = (h: Harness, ids: Ids, n: number, kind: 'crawl' | 'access' = '
 const countsIn = (events: ProgressEvent[]) =>
   events.flatMap((e) => (e.type === 'counts' ? [[e.pages_crawled, e.links_found]] : []));
 
-const liveOf = (pages: number, links: number) => ({ pages, links, total: 0, fresh: [] });
+const liveOf = (pages: number, links: number) => ({
+  pages,
+  links,
+  homepageRead: false,
+  total: 0,
+  fresh: [],
+});
 
 describe('counts from the batch the worker is crawling', () => {
   it('adds the running batch to the stored totals, by that batch id', async () => {
@@ -125,6 +131,7 @@ describe('counts from the batch the worker is crawling', () => {
     h.deps.liveProgress = async () => ({
       pages: 25,
       links: 25,
+      homepageRead: false,
       total: 1,
       fresh: [finishedPage('/lost', '/gone')],
     });
@@ -154,11 +161,32 @@ describe('counts from the batch the worker is crawling', () => {
     expect(restarts(await (await open(h, ids, anonymous, held)).text())).toHaveLength(1);
   });
 
+  it('sends a live page and the count that includes it as one group', async () => {
+    const h = harness(db);
+    const ids = await running(db, h, 'live-together.example');
+    await postBatch(h, ids, 1);
+    h.deps.liveProgress = async () => ({
+      pages: 1,
+      links: 1,
+      homepageRead: true,
+      total: 1,
+      fresh: [finishedPage('/', '/a')],
+    });
+    h.betweenPolls.push(cancelled(h, ids));
+    const { groups } = groupsOf(await (await open(h, ids)).text());
+    const withPage = groups.find((g) => g.events.some((e) => e.type === 'page_fetched'))!;
+    expect(withPage.events.some((e) => e.type === 'counts')).toBe(true);
+  });
+
   it('does not restart an ordinary run', async () => {
     const h = harness(db);
     const ids = await running(db, h, 'live-ordinary.example');
     await postBatch(h, ids, 1);
     h.deps.liveProgress = async () => liveOf(2, 2);
+    // Polls with the batch still running and its live count already sent: stored rows alone are
+    // below what the viewer holds, and that is no reason to restart.
+    h.betweenPolls.push(async () => undefined);
+    h.betweenPolls.push(async () => undefined);
     h.betweenPolls.push(async () => {
       h.deps.liveProgress = async () => null;
       await storeBatch(h, ids, 1, one, { pages: 2, links: 2 });
@@ -229,6 +257,7 @@ describe('counts from the batch the worker is crawling', () => {
     h.deps.liveProgress = async () => ({
       pages: 1,
       links: 1,
+      homepageRead: false,
       total: 1,
       fresh: [finishedPage('/', '/a')],
     });
@@ -248,7 +277,7 @@ describe('counts from the batch the worker is crawling', () => {
     const pages = [finishedPage('/', '/a'), finishedPage('/a', '/')];
     h.deps.liveProgress = async (_id, after) => {
       offsets.push(after);
-      return { pages: 2, links: 2, total: 2, fresh: pages.slice(after) };
+      return { pages: 2, links: 2, homepageRead: false, total: 2, fresh: pages.slice(after) };
     };
     h.betweenPolls.push(async () => undefined);
     h.betweenPolls.push(async () => undefined);
@@ -269,9 +298,15 @@ describe('counts from the batch the worker is crawling', () => {
     await postBatch(h, ids, 1);
     const offsets: number[] = [];
     const answers = [
-      { pages: 2, links: 2, total: 2, fresh: [finishedPage('/', '/a'), finishedPage('/a', '/')] },
-      { pages: 1, links: 1, total: 1, fresh: [] },
-      { pages: 1, links: 1, total: 1, fresh: [finishedPage('/', '/a')] },
+      {
+        pages: 2,
+        links: 2,
+        homepageRead: false,
+        total: 2,
+        fresh: [finishedPage('/', '/a'), finishedPage('/a', '/')],
+      },
+      { pages: 1, links: 1, homepageRead: false, total: 1, fresh: [] },
+      { pages: 1, links: 1, homepageRead: false, total: 1, fresh: [finishedPage('/', '/a')] },
     ];
     h.deps.liveProgress = async (_id, after) => {
       offsets.push(after);
