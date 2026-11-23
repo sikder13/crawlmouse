@@ -1,4 +1,5 @@
-import { signRead, SIGNATURE_HEADER, TS_HEADER } from './auth/hmac.js';
+import { createHmac } from 'node:crypto';
+import { SIGNATURE_HEADER, TS_HEADER } from './auth/hmac.js';
 
 /**
  * The worker's one call to the app: "this batch has ended", so a run waiting on it can read it now
@@ -31,9 +32,16 @@ export type SignalPost = (
   },
 ) => Promise<{ status?: number } | void>;
 
-/** Its own context, so a signature here is not one for a batch post or a read. */
-export const signSignal = (secret: string, ts: string, raw: string): string =>
-  signRead(secret, ts, `signal:${raw}`);
+/**
+ * Signed under a key of its own derived from the shared secret, so a batch or read signature is made
+ * with a different key. The label does not start with digits and a dot, so no batch or read signature
+ * (`${ts}.…`) can equal the derived key. Same rule as apps/web/lib/worker-client/sign.ts.
+ */
+const SIGNAL_KEY_LABEL = 'crawlmouse-worker-signal-v1';
+export const signSignal = (secret: string, ts: string, raw: string): string => {
+  const key = createHmac('sha256', secret).update(SIGNAL_KEY_LABEL).digest();
+  return createHmac('sha256', key).update(`${ts}.`).update(raw).digest('hex');
+};
 
 export interface DoneSignalDeps {
   url: string;

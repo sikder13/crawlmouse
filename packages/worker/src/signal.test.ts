@@ -52,7 +52,8 @@ describe('the done signal', () => {
     const init = h.post.mock.calls[0]![1];
     const ts = init.headers['x-crawlmouse-ts'];
     expect(ts).toBe(String(NOW));
-    const expected = createHmac('sha256', SECRET).update(`${ts}.signal:${init.body}`).digest('hex');
+    const key = createHmac('sha256', SECRET).update('crawlmouse-worker-signal-v1').digest();
+    const expected = createHmac('sha256', key).update(`${ts}.${init.body}`).digest('hex');
     expect(init.headers['x-crawlmouse-signature']).toBe(expected);
     expect(signSignal(SECRET, ts, init.body)).toBe(expected);
   });
@@ -61,6 +62,8 @@ describe('the done signal', () => {
     const raw = JSON.stringify(ENDED);
     const ts = String(NOW);
     expect(signSignal(SECRET, ts, raw)).not.toBe(signBatch(SECRET, ts, raw));
+    expect(signSignal(SECRET, ts, raw)).not.toBe(signBatch(SECRET, ts, `signal:${raw}`));
+    expect(signSignal(SECRET, ts, raw)).not.toBe(signRead(SECRET, ts, `signal:${raw}`));
     expect(signSignal(SECRET, ts, raw)).not.toBe(signRead(SECRET, ts, raw));
   });
 
