@@ -3,18 +3,21 @@
  *
  * A step that writes (a check, an account, a mail) runs only when all three hold; otherwise it is
  * skipped with the reason:
- *   1. the base URL's host, lower-cased and without trailing dots, is in WRITABLE_HOSTS, the host QA's
- *      staging design names;
+ *   1. the base URL's host, lower-cased and without trailing dots, is in WRITABLE_HOSTS (staging's domain
+ *      and its Vercel alias), on the default port and with no userinfo;
  *   2. JOURNEY_ALLOW_WRITES is exactly "1";
  *   3. the deployment itself shows staging's database: its Content-Security-Policy, which the build
  *      writes from NEXT_PUBLIC_SUPABASE_URL (apps/web/next.config.mjs), names STAGING_DB_HOST and not
  *      production's project (databaseRefusal). A name is not proof of what a deployment holds; this is.
  * It is an allowlist, so every other host is read-only, whatever it is called: production under any
- * spelling or alias (`crawlmouse.com.`, `crawlmouse-001.vercel.app`), a Vercel preview, localhost (a dev
+ * spelling or alias (`crawlmouse.com.`, `crawlmouse-001.vercel.app`), a Vercel preview or branch alias
+ * (the staging environment's own alias is the one listed exception), localhost (a dev
  * server may hold a copied `.env.local`). The production and preview refusals are named first so the
  * skip says why. guard.spec.ts varies the spellings.
  */
-export const WRITABLE_HOSTS: readonly string[] = ['staging.crawlmouse.com'];
+/** Vercel's alias for the `staging` custom environment, used until staging.crawlmouse.com has its DNS record. */
+export const STAGING_ALIAS = 'crawlmouse-001-env-staging-nahl-technologies-projects.vercel.app';
+export const WRITABLE_HOSTS: readonly string[] = ['staging.crawlmouse.com', STAGING_ALIAS];
 export const PRODUCTION_HOSTS: readonly string[] = ['crawlmouse.com', 'www.crawlmouse.com'];
 /** crawlmouse-staging's database host, and production's project ref (scripts/db/target.ts PRODUCTION_REF). */
 export const STAGING_DB_HOST = 'qfgkrnnjuiasahspavbc.supabase.co';
@@ -42,10 +45,14 @@ export function writeRefusal(env: Env): string | null {
   const host = canonicalHost(baseUrlOf(env).hostname);
   if (PRODUCTION_HOSTS.includes(host))
     return `${host} is production: steps that write never run there`;
-  if (host.endsWith('.vercel.app'))
+  if (host.endsWith('.vercel.app') && !WRITABLE_HOSTS.includes(host))
     return `${host} is a Vercel deployment: steps that write run only on staging`;
   if (!WRITABLE_HOSTS.includes(host))
     return `${host} is not staging (WRITABLE_HOSTS): steps that write never run there`;
+  const url = baseUrlOf(env);
+  if (url.port || url.username || url.password) {
+    return `${host} with a port or userinfo is not staging (WRITABLE_HOSTS)`;
+  }
   if (env.JOURNEY_ALLOW_WRITES !== '1') return 'JOURNEY_ALLOW_WRITES is not "1"';
   return null;
 }
