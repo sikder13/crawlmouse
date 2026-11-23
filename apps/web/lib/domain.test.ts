@@ -54,4 +54,10 @@ describe('normalizeDomain', () => {
     expect(() => normalizeDomain('not a domain')).toThrow();
     expect(() => normalizeDomain('')).toThrow();
   });
+
+  it('throws on a host of nothing but dots, rather than answering an empty key', () => {
+    for (const written of ['.', '..', '...', 'https://../', '。。']) {
+      expect(() => normalizeDomain(written), written).toThrow();
+    }
+  });
 });
