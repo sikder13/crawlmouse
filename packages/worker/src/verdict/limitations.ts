@@ -90,7 +90,11 @@ const UNREACHABLE: Record<UnreachableReason, string> = {
 };
 
 export const robotsUnreachable = (origin: string, why: UnreachableReason): string =>
-  `robots.txt unreachable at ${origin}: ${UNREACHABLE[why]}. The site was treated as fully disallowed for this batch, so nothing was requested. The request shown is that robots.txt read.`;
+  `robots.txt unreachable at ${origin}: ${UNREACHABLE[why]}. ${
+    why === 'network' || why === 'timeout'
+      ? 'This origin was treated as fully disallowed for this batch, so nothing was requested from this origin.'
+      : 'The site was treated as fully disallowed for this batch, so nothing was requested.'
+  } The request shown is that robots.txt read.`;
 
 const TOO_LARGE: Record<TooLargeReason, string> = {
   bytes: `it is larger than the ${MAX_ROBOTS_BYTES / 1024} KiB this worker reads`,

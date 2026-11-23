@@ -15,7 +15,7 @@ import { decide, isRefusal, type Cell, type Observed, type Row } from '../verdic
 import type { Vantage } from '../vantage.js';
 import type { Findings } from './findings.js';
 import { politeFetch, type FetchContext, type NotRequested } from './polite-fetch.js';
-import { pathOf, type BatchRobots, type SiteBlock } from './site-rules.js';
+import { originBlock, pathOf, type BatchRobots, type SiteBlock } from './site-rules.js';
 
 /**
  * An access batch: for each sampled page, one untagged browser control request, then each testable
@@ -243,6 +243,9 @@ async function accessPage(run: AccessRun, page: AccessPage): Promise<AccessTest[
 
   const rules = await run.robots.forUrl(page.url);
   if ('reason' in rules) return notMeasured(say.notRequested(rules));
+  // A dead origin of the batch: this page is its, and the rest of the batch goes on (F-165).
+  const own = originBlock(rules);
+  if (own) return siteBlockedRows({ block: own, rules }, row);
   const robotsFetch = rules.reading.fetch;
   const parsed = rules.reading.state === 'rules' ? rules.reading.rules : null;
   const path = pathOf(page.url);

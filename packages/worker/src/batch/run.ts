@@ -73,7 +73,8 @@ export async function runBatch(
       urls_total: requested.length,
       requests: budget.used.requests,
     });
-  // robots.txt for every origin first: one that blocks the site keeps the whole batch from fetching.
+  // robots.txt for every origin first: one that blocks the site keeps the whole batch from fetching,
+  // except a dead origin, which costs only its own URLs (F-165).
   const blocked = await robots.preload(requested);
   if (blocked && 'reason' in blocked) findings.notRequested(blocked);
   const run = {

@@ -33,7 +33,7 @@ import { LOCAL_VANTAGE, type Vantage } from '../vantage.js';
 import type { Findings } from './findings.js';
 import { isNotRead, type PageRead, type PageReader, type StackHeaders } from '../reader/read.js';
 import { politeFetch, type FetchContext, type NotRequested } from './polite-fetch.js';
-import { pathOf, type BatchRobots, type SiteBlock } from './site-rules.js';
+import { originBlock, pathOf, type BatchRobots, type SiteBlock } from './site-rules.js';
 import { jsonBytes } from './json-bytes.js';
 
 /**
@@ -150,11 +150,12 @@ async function crawlPage(
       searchVerdicts(null, path),
     );
   }
-  if (blocked) {
-    const outcome = blocked.block === 'site_refused' ? 'failed' : 'not_requested';
-    const search = searchVerdicts(blocked.rules.reading, path);
-    return without(outcome, say.siteBlocked(blocked), blocked.rules.reading.fetch, false, search);
-  }
+  const siteBlocked = (b: SiteBlock) => {
+    const outcome = b.block === 'site_refused' ? 'failed' : 'not_requested';
+    const search = searchVerdicts(b.rules.reading, path);
+    return without(outcome, say.siteBlocked(b), b.rules.reading.fetch, false, search);
+  };
+  if (blocked) return siteBlocked(blocked);
   const rules = await run.robots.forUrl(url);
   if ('reason' in rules) {
     return without(
@@ -165,6 +166,9 @@ async function crawlPage(
       searchVerdicts(null, path),
     );
   }
+  // A dead origin of the batch: this URL is its, and the rest of the batch goes on (F-165).
+  const own = originBlock(rules);
+  if (own) return siteBlocked({ block: own, rules });
   // What robots.txt says to the search engines, from the same reading our requests obey, each group
   // matched once for both.
   const parsed = rules.reading.state === 'rules' ? rules.reading.rules : null;

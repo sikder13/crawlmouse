@@ -23,7 +23,8 @@ import {
  * and reading stops at the first origin that blocks the site (unreachable, too large to evaluate,
  * refused by the SSRF guard, or a Crawl-delay above MAX_CRAWL_DELAY_S): then the whole batch fetches
  * no page. The owner's rule is per site, and a batch may hold both the www and the bare origin, or
- * both schemes. A redirect to another origin of the site reads that origin's robots.txt first; once a
+ * both schemes. The exception is an origin that gave no answer at all (`deadOrigin`): nobody there
+ * stated a rule, so it costs only its own URLs (F-165). A redirect to another origin of the site reads that origin's robots.txt first; once a
  * batch has read MAX_ROBOTS_ORIGINS of them, a redirect to one more is recorded, not followed.
  *
  * Readings that state rules, that there are none, or that the file is too large to evaluate are
@@ -66,6 +67,14 @@ export function originBlock(rules: OriginRules): OriginBlock | null {
   }
   return null;
 }
+
+/**
+ * An origin whose robots.txt request got no answer: the host did not resolve, the connection failed
+ * or it timed out. A 5xx or a challenge is a live server saying "not now" and still stops the batch.
+ */
+export const deadOrigin = (rules: OriginRules): boolean =>
+  rules.reading.state === 'unreachable' &&
+  (rules.reading.why === 'network' || rules.reading.why === 'timeout');
 
 /** The origin whose robots.txt keeps the batch from fetching any page, and why. */
 export interface SiteBlock {
@@ -187,14 +196,14 @@ export class BatchRobots {
   /**
    * Reads robots.txt for every origin of these URLs, in order. Returns the first origin that blocks
    * the site, or why a read could not be made (a spent budget, a stopped site); null when pages may
-   * be requested.
+   * be requested. A dead origin blocks only its own URLs, which each page's own reading turns away.
    */
   async preload(urls: readonly string[]): Promise<SiteBlock | NotRequested | null> {
     for (const url of urls) {
       const rules = await this.forUrl(url);
       if ('reason' in rules) return rules;
       const block = originBlock(rules);
-      if (block) return { block, rules };
+      if (block && !deadOrigin(rules)) return { block, rules };
     }
     return null;
   }

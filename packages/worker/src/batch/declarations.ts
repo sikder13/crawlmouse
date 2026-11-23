@@ -10,7 +10,7 @@ import { oursAllow } from '../politeness/robots.js';
 import { bounded, CAPS } from '../rows/bounded.js';
 import { standardStatus } from '../rows/evidence.js';
 import { politeFetch, type FetchContext, type NotRequested } from './polite-fetch.js';
-import { ROBOTS_TTL_MS, type BatchRobots, type SiteBlock } from './site-rules.js';
+import { originBlock, ROBOTS_TTL_MS, type BatchRobots, type SiteBlock } from './site-rules.js';
 
 /**
  * The declaration files (DECLARATION_PATHS): in each crawl batch, after its pages, on the origin of
@@ -130,6 +130,8 @@ export async function fetchDeclarations(
   }
   const rules = await run.robots.forUrl(firstUrl);
   if ('reason' in rules) return DECLARATION_PATHS.map((p) => notRequested(recorded, p, why(rules)));
+  if (originBlock(rules))
+    return DECLARATION_PATHS.map((p) => notRequested(recorded, p, 'site_blocked'));
   const parsed = rules.reading.state === 'rules' ? rules.reading.rules : null;
   const out: DeclarationFetch[] = [];
   for (const path of DECLARATION_PATHS) {
