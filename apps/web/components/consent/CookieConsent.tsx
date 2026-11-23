@@ -118,7 +118,8 @@ export function CookieConsent() {
       ref={bar}
       role="dialog"
       aria-label="Analytics consent"
-      className={styles.bar}
+      // PostHog autocapture sees a click before this bar's handler: the bar is never recorded.
+      className={`${styles.bar} ph-no-capture`}
       onKeyDown={onKeyDown}
     >
       <div className={styles.inner}>

@@ -24,6 +24,25 @@ const addListener = window.addEventListener.bind(window);
 /** Each case's SDK instance, retired when the case ends. */
 const instances: { _send_request: unknown; _send_retriable_request: unknown }[] = [];
 
+/**
+ * What the network answers. The SDK keeps the first `fetch` it was loaded with, so a case changes
+ * this rather than stubbing `fetch` again.
+ */
+let status = 200;
+/** The events a send to `/e/` carries, for a case that has to tell them apart. */
+let sentEvents: string[] = [];
+function eventNames(body: unknown): string[] {
+  if (typeof body !== 'string') return [];
+  try {
+    type Sent = { event?: string; batch?: Sent[] };
+    const parsed = JSON.parse(body) as Sent | Sent[];
+    const list = Array.isArray(parsed) ? parsed : (parsed.batch ?? [parsed]);
+    return list.flatMap((e) => (e.event ? [e.event] : []));
+  } catch {
+    return [];
+  }
+}
+
 function clearAll() {
   for (const pair of document.cookie.split(';')) {
     const name = pair.split('=')[0]!.trim();
@@ -102,9 +121,12 @@ beforeEach(() => {
   vi.stubEnv('NEXT_PUBLIC_POSTHOG_KEY', KEY);
   vi.stubEnv('NEXT_PUBLIC_POSTHOG_HOST', 'https://us.i.posthog.com');
   window.history.replaceState(null, '', '/');
-  vi.stubGlobal('fetch', async (input: RequestInfo | URL) => {
+  sentEvents = [];
+  status = 200;
+  vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
     requests.push(String(input instanceof Request ? input.url : input));
-    return new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } });
+    sentEvents.push(...eventNames(init?.body));
+    return new Response('{}', { status, headers: { 'content-type': 'application/json' } });
   });
   Object.defineProperty(navigator, 'sendBeacon', {
     configurable: true,
@@ -251,6 +273,68 @@ describe('after a decline, on a page that stays open', () => {
     expect(requests.slice(sent)).toEqual([]);
     b.done();
   }, 15_000);
+
+  it('an event queued when the visitor declines never leaves', async () => {
+    const posthog = await running();
+    const b = await banner();
+    b.open();
+    posthog.capture('queued-at-the-decline');
+    await b.click('Decline');
+    const sent = requests.length;
+    await new Promise((r) => setTimeout(r, 3_500));
+    expect(sentEvents).not.toContain('queued-at-the-decline');
+    expect(requests.slice(sent)).toEqual([]);
+    b.done();
+  }, 15_000);
+
+  it('a send that failed is not retried after the decline', async () => {
+    const posthog = await running();
+    status = 503;
+    const before = sentEvents.length;
+    posthog.capture('sent-and-refused');
+    // The send queue flushes at most 3 seconds on, and the failure then waits for its retry.
+    for (let waited = 0; waited < 6_000 && sentEvents.length === before; waited += 50) {
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    expect(sentEvents.slice(before)).toContain('sent-and-refused');
+    await settle();
+    const b = await banner();
+    b.open();
+    await b.click('Decline');
+    const sent = requests.length;
+    // Longer than the SDK's first retry waits (`pickNextRetryDelay`: 3 seconds, with jitter).
+    await new Promise((r) => setTimeout(r, 6_000));
+    expect(requests.slice(sent)).toEqual([]);
+    b.done();
+  }, 20_000);
+
+  it('autocapture skips the banner, whose click it sees before the banner’s handler', async () => {
+    const { autocapturePropertiesForElement } = await import('posthog-js/lib/src/autocapture');
+    await load(['cm_consent_required=0']);
+    const b = await banner();
+    b.open();
+    const decline = [...document.querySelectorAll('button')].find(
+      (x) => x.textContent === 'Decline',
+    )!;
+    const elsewhere = document.createElement('button');
+    elsewhere.textContent = 'Something else';
+    document.body.append(elsewhere);
+    const refused = (target: Element) => {
+      const e = new MouseEvent('click', { bubbles: true });
+      Object.defineProperty(e, 'target', { value: target });
+      return Boolean(
+        autocapturePropertiesForElement(target, {
+          e,
+          maskAllElementAttributes: false,
+          maskAllText: false,
+          elementsChainAsString: false,
+        }).explicitNoCapture,
+      );
+    };
+    expect(refused(elsewhere)).toBe(false);
+    expect(refused(decline)).toBe(true);
+    b.done();
+  });
 
   it('a later Allow turns the refresh back on', async () => {
     await running();

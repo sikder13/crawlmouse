@@ -1,5 +1,5 @@
 import type { BrowserContext, Page } from '../pw';
-import { expect } from '../pw';
+import { expect, test } from '../pw';
 import { step } from '../lib/step';
 
 // RC-15's defects, read from a real browser. Nothing here reaches PostHog or Sentry: their hosts and
@@ -131,25 +131,125 @@ step(
     const atDecline = seen.length;
     await page.locator(BAR).getByRole('button', { name: 'Decline' }).click();
     await expect(page.locator(BAR)).toBeHidden();
-    // An event queued before the Decline was captured with consent and may still go: only that.
     await page.clock.runFor(QUEUE_MS);
     await page.waitForTimeout(500);
-    const sent = seen.length;
-    expect(
-      seen
-        .slice(atDecline, sent)
-        .filter((u) => !/\/e\/?$/.test(u.pathname))
-        .map((u) => u.href),
-      'F-048: Decline itself caused a request',
-    ).toEqual([]);
-
     await page.clock.runFor(REFRESH_MS * 2);
     await page.waitForTimeout(1_000);
     expect(
-      seen.slice(sent).map((u) => u.href),
+      seen.slice(atDecline).map((u) => u.href),
       'F-048: PostHog sent a request after Decline',
     ).toEqual([]);
     expect(await traces(page, context), 'F-048: PostHog left storage after Decline').toEqual([]);
+  },
+);
+
+/** Quick Allow-then-Decline trials, and how many run at once. */
+const QUICK_TRIALS = 50;
+const AT_ONCE = 5;
+/** Longer than the SDK's 3-second send queue, so an event still held would show. */
+const AFTER_DECLINE_MS = 3_600;
+const REAL_BROWSER_UA =
+  'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
+
+/**
+ * Records in the page each analytics send as it is made, and the moment of the Decline click, on one
+ * clock. The SDK drops events from a browser that looks automated, so this one does not.
+ */
+function recordSends() {
+  Object.defineProperty(navigator, 'webdriver', { get: () => false });
+  Object.defineProperty(navigator, 'userAgentData', { get: () => undefined });
+  const log: { at: number; url: string }[] = [];
+  const state = window as unknown as { __sends: typeof log; __declinedAt: number | null };
+  state.__sends = log;
+  state.__declinedAt = null;
+  const note = (url: unknown) => {
+    const text = String(url instanceof Request ? url.url : url);
+    if (text.includes('/ingest') || text.includes('posthog.com')) {
+      log.push({ at: Date.now(), url: text });
+    }
+  };
+  const realFetch = window.fetch.bind(window);
+  window.fetch = (input, init) => {
+    note(input);
+    return realFetch(input, init);
+  };
+  const realBeacon = navigator.sendBeacon.bind(navigator);
+  navigator.sendBeacon = (url, data) => {
+    note(url);
+    return realBeacon(url, data);
+  };
+  const realOpen = XMLHttpRequest.prototype.open;
+  XMLHttpRequest.prototype.open = function (this: XMLHttpRequest, ...args: unknown[]) {
+    note(args[1]);
+    return (realOpen as (...a: unknown[]) => void).apply(this, args);
+  } as typeof realOpen;
+  document.addEventListener(
+    'click',
+    (e) => {
+      if ((e.target as Element | null)?.textContent?.trim() === 'Decline') {
+        state.__declinedAt = Date.now();
+      }
+    },
+    { capture: true },
+  );
+}
+
+step(
+  'D.F-048',
+  'a quick Allow then Decline: nothing leaves after the Decline click, over 50 trials',
+  async ({ context, baseURL }) => {
+    test.setTimeout(420_000);
+    const browser = context.browser()!;
+    const cookies = await context.cookies();
+    const trial = async (n: number) => {
+      const c = await browser.newContext({
+        baseURL,
+        userAgent: REAL_BROWSER_UA,
+        viewport: { width: 1280, height: 800 },
+      });
+      try {
+        await c.addCookies(cookies);
+        await holdAnalytics(c);
+        await inRegion(c, '1');
+        await c.addInitScript(recordSends);
+        const p = await c.newPage();
+        await p.goto('/');
+        await p.locator(BAR).getByRole('button', { name: 'Allow analytics' }).click();
+        // Across the window QA measured: an event captured here is still in the send queue.
+        await p.waitForTimeout(150 + (n % 8) * 50);
+        await p.locator('footer').last().getByRole('button', { name: 'Cookie settings' }).click();
+        await p.locator(BAR).getByRole('button', { name: 'Decline' }).click();
+        await p.mouse.click(640, 300);
+        await p.mouse.wheel(0, 500);
+        await p.waitForTimeout(AFTER_DECLINE_MS);
+        return await p.evaluate(() => {
+          const w = window as unknown as {
+            __sends: { at: number; url: string }[];
+            __declinedAt: number | null;
+          };
+          return {
+            declined: w.__declinedAt !== null,
+            sentBefore: w.__sends.filter((x) => x.at < (w.__declinedAt ?? 0)).length,
+            after: w.__sends.filter((x) => x.at >= (w.__declinedAt ?? 0)).map((x) => x.url),
+          };
+        });
+      } finally {
+        await c.close();
+      }
+    };
+    const results: Awaited<ReturnType<typeof trial>>[] = [];
+    for (let n = 0; n < QUICK_TRIALS; n += AT_ONCE) {
+      const batch = Array.from({ length: AT_ONCE }, (_, i) => trial(n + i));
+      results.push(...(await Promise.all(batch)));
+    }
+    expect(results).toHaveLength(QUICK_TRIALS);
+    expect(results.every((r) => r.declined)).toBe(true);
+    // The control: analytics were running, so a trial had something it could have sent.
+    expect(results.some((r) => r.sentBefore > 0)).toBe(true);
+    expect(
+      results.flatMap((r) => r.after),
+      'F-048: a request left after the Decline click',
+    ).toEqual([]);
   },
 );
 
