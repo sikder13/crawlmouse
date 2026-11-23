@@ -53,6 +53,12 @@ export async function expectFinishedV2Page(
     actual,
     `${actual === status ? '' : statusWhy(actual, ids.status)}: ${path} answers ${status}`,
   ).toBe(status);
+  // The 404's shell is loaded on demand, so it can arrive just after the response. A v1 page still fails below.
+  await page
+    .locator('[data-v2-shell]')
+    .first()
+    .waitFor({ timeout: 5000 })
+    .catch(() => {});
   if ((await page.locator('[data-v2-shell]').count()) === 0) {
     const v1 = (await page.locator(V1_MARKER).count()) > 0;
     throw new Error(
