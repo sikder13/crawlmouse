@@ -20,6 +20,32 @@ describe('normalizeDomain', () => {
     expect(normalizeDomain('example.com.')).toBe('example.com');
   });
 
+  // The SSRF guard strips one dot and resolves the rest, so `host..` reaches the same server as
+  // `host`. As a key it has to be the same key, or a takedown of `host` does not match it.
+  it('drops a run of trailing dots, with or without www.', () => {
+    for (const written of [
+      'example.com..',
+      'example.com...',
+      'www.example.com..',
+      'https://Example.COM../x',
+    ]) {
+      expect(normalizeDomain(written), written).toBe('example.com');
+    }
+  });
+
+  it('keys an IDN host by its punycode, however it is written', () => {
+    for (const written of [
+      'bücher.de',
+      'BÜCHER.de',
+      'bu\u0308cher.de',
+      'xn--bcher-kva.de',
+      'XN--BCHER-KVA.de',
+      'bücher.de.',
+    ]) {
+      expect(normalizeDomain(written), written).toBe('xn--bcher-kva.de');
+    }
+  });
+
   it('only strips a leading www., not www inside the label', () => {
     expect(normalizeDomain('wwwexample.com')).toBe('wwwexample.com');
   });
