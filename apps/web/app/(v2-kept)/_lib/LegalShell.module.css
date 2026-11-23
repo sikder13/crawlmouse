@@ -1,0 +1,108 @@
+/* The v1 legal pages' markup on v2's tokens. Selectors reach v1's utility classes on purpose. */
+.legal {
+  flex: 1;
+  color: var(--v2-fg2);
+  font-size: var(--v2-text-body);
+  line-height: var(--v2-line-body);
+}
+
+.legal :global(main) {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 72px 24px 120px;
+}
+
+.legal h1 {
+  margin: 0 0 24px;
+  font-family: var(--v2-font-display);
+  font-size: var(--v2-text-xl);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  color: var(--v2-fg);
+}
+
+.legal h2 {
+  margin-top: 40px;
+  font-family: var(--v2-font-display);
+  font-size: var(--v2-text-m);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  color: var(--v2-fg);
+}
+
+.legal h3 {
+  font-family: var(--v2-font-display);
+  font-weight: 600;
+  color: var(--v2-fg);
+}
+
+.legal strong,
+.legal th,
+.legal :global(.text-ink) {
+  color: var(--v2-fg);
+}
+
+.legal a {
+  color: var(--v2-fg);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.legal :global([class*='text-ink/']) {
+  color: var(--v2-fg2);
+}
+
+.legal :global([class*='border-oat']) {
+  border-color: var(--v2-line);
+}
+
+.legal :global([class*='bg-oat']) {
+  background: var(--v2-line2);
+}
+
+/* The takedown form's v1 card, fields and button. */
+.legal :global(.bg-surface-raised) {
+  background: var(--v2-s1);
+  border-color: var(--v2-line);
+}
+
+.legal input[class],
+.legal textarea[class] {
+  background: var(--v2-bg);
+  border-color: var(--v2-ctl);
+  color: var(--v2-fg);
+}
+
+.legal input::placeholder,
+.legal textarea::placeholder {
+  color: var(--v2-mut);
+}
+
+.legal button[type='submit'] {
+  min-height: var(--v2-control-h);
+  padding: 0 18px;
+  border-radius: var(--v2-radius-control);
+  background: var(--v2-acc);
+  color: var(--v2-on-acc);
+  font-size: var(--v2-text-ui);
+}
+
+.legal label {
+  color: var(--v2-mut);
+}
+
+@media (max-width: 760px) {
+  .legal :global(main) {
+    padding: 40px 20px 80px;
+  }
+
+  .legal h1 {
+    font-size: var(--v2-text-xl-phone);
+  }
+
+  .legal h2 {
+    font-size: var(--v2-text-m-phone);
+  }
+}
