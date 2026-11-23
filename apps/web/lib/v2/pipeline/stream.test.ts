@@ -17,6 +17,7 @@ import {
   START,
   batchEvents,
   checkEvents,
+  overshot,
   withLiveCounts,
   cursorFits,
   factsOf,
@@ -218,6 +219,50 @@ describe('nextEvents, against events written out by hand', () => {
     expect(checkEvents(at, running(2, 40, 500, 200)).events).toEqual([
       { type: 'counts', at_ms: 200, pages_crawled: 50, links_found: 500 },
     ]);
+  });
+
+  describe('whether the viewer holds more than the check can stand behind', () => {
+    const batch = (n: number, status: 'done' | 'failed' | 'posted', pages: number, links: number) =>
+      ({ batch: n, kind: 'crawl', status, resultPath: null, pages, links }) as const;
+    const row = (pages: number, links: number) =>
+      ({ pages_crawled: pages, links_found: links }) as StreamSnapshot['progress'];
+
+    it('says nothing while a running batch has not answered', () => {
+      const s = {
+        progress: row(2, 2),
+        batches: [batch(1, 'done', 2, 2), batch(2, 'posted', 0, 0)],
+      };
+      expect(overshot({ pages: 9, links: 9 }, s, 2, null)).toBe(false);
+    });
+
+    it('compares with the stored totals plus what the running batch reports', () => {
+      const s = {
+        progress: row(2, 2),
+        batches: [batch(1, 'done', 2, 2), batch(2, 'posted', 0, 0)],
+      };
+      expect(overshot({ pages: 9, links: 9 }, s, 2, { pages: 7, links: 7 })).toBe(false);
+      expect(overshot({ pages: 9, links: 9 }, s, 2, { pages: 6, links: 7 })).toBe(true);
+      expect(overshot({ pages: 9, links: 9 }, s, 2, { pages: 7, links: 6 })).toBe(true);
+    });
+
+    it('counts a failed batch as nothing once none is running', () => {
+      const s = {
+        progress: row(2, 2),
+        batches: [batch(1, 'done', 2, 2), batch(2, 'failed', 9, 9)],
+      };
+      expect(overshot({ pages: 3, links: 2 }, s, null, null)).toBe(true);
+      expect(overshot({ pages: 2, links: 2 }, s, null, null)).toBe(false);
+    });
+
+    it('does not read a batch row written just before the check row as a fall', () => {
+      const s = { progress: row(2, 2), batches: [batch(1, 'done', 2, 2), batch(2, 'done', 3, 4)] };
+      expect(overshot({ pages: 5, links: 6 }, s, null, null)).toBe(false);
+    });
+
+    it('does not read a check row ahead of its batch rows as a fall', () => {
+      const s = { progress: row(5, 6), batches: [batch(1, 'done', 2, 2)] };
+      expect(overshot({ pages: 5, links: 6 }, s, null, null)).toBe(false);
+    });
   });
 
   describe('the homepage step, while the first batch runs', () => {

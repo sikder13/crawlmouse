@@ -28,6 +28,7 @@ import {
   factsOf,
   formatCursor,
   liveEvents,
+  overshot,
   parseCursor,
   readBatch,
   runningCrawlBatch,
@@ -48,6 +49,11 @@ export const POLL_MS = 1500;
 export const STREAM_CLOSE_MS = 240_000;
 /** One stream reads the worker's running batch at most this often. */
 export const LIVE_READ_MS = 3000;
+/**
+ * A named event, so it is not a ProgressEvent and a tab on an older bundle ignores it. The screen
+ * opens a new connection, which is sent the run from its beginning.
+ */
+export const RESTART_FRAME = 'event: restart\ndata: {}\n\n';
 /** How long a browser waits before it reconnects. */
 const RETRY_MS = 2000;
 
@@ -146,6 +152,7 @@ export async function serveStream(
       /** How many of the running batch's finished pages this connection has sent. */
       let liveSent = 0;
       let liveReadAt = -Infinity;
+      let restartSent = false;
       write(`retry: ${RETRY_MS}\n\n`);
       try {
         while (open) {
@@ -197,6 +204,11 @@ export async function serveStream(
                 liveSent += got.fresh.length;
               }
             }
+          }
+          // Once a connection: the stream stays open, so a tab that ignores it is not told each poll.
+          if (!restartSent && overshot(cursor, snapshot, runningBatch, live?.counts ?? null)) {
+            restartSent = true;
+            write(RESTART_FRAME);
           }
           const facts = withLiveCounts(factsOf(snapshot, deps.now()), live?.counts ?? null);
           const out = checkEvents(cursor, facts);

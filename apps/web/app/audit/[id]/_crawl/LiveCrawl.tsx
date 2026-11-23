@@ -85,6 +85,13 @@ export function LiveCrawl({ checkId, host, crawlers = NO_CRAWLERS }: LiveCrawlPr
         es.close();
         refresh.current();
       };
+      // The server holds fewer pages than it showed (a batch failed). A new EventSource sends no
+      // Last-Event-ID, so the run is sent again from the stored rows, and `onopen` starts over.
+      es.addEventListener('restart', () => {
+        es.close();
+        source.interrupted();
+        connect();
+      });
       es.onerror = () => {
         source.interrupted();
         // Still connecting: the browser is reconnecting by itself, with its last event id.

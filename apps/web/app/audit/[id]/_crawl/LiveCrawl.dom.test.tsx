@@ -27,8 +27,12 @@ class FakeEventSource {
   onopen: (() => void) | null = null;
   onmessage: ((e: { data: string; lastEventId: string }) => void) | null = null;
   onerror: (() => void) | null = null;
+  readonly named = new Map<string, () => void>();
   constructor(readonly url: string) {
     FakeEventSource.made.push(this);
+  }
+  addEventListener(name: string, fn: () => void) {
+    this.named.set(name, fn);
   }
   close() {
     this.readyState = FakeEventSource.CLOSED;
@@ -209,6 +213,20 @@ describe('LiveCrawl', () => {
       act(() => void vi.advanceTimersByTime(1));
       expect(host.textContent).toContain(LOST);
     });
+  });
+
+  it('starts over on a new connection when the server says its counts were too high', () => {
+    const first = source();
+    act(() => first.onopen?.());
+    act(() => first.send(crawling.events, crawling.cursor));
+    expect(text()).toContain('3 pages');
+    act(() => first.named.get('restart')?.());
+    expect(first.readyState).toBe(FakeEventSource.CLOSED);
+    expect(FakeEventSource.made).toHaveLength(2);
+    // What is drawn stays until the new connection is accepted.
+    expect(text()).toContain('3 pages');
+    act(() => FakeEventSource.made[1]!.onopen?.());
+    expect(text()).not.toContain('3 pages');
   });
 
   it('says so when the server refuses the stream, keeps the last counts, and tries again later', () => {

@@ -10,7 +10,7 @@ import {
   readOfFixes,
 } from '../../../../../lib/v2/pipeline/persist';
 import { checkRef } from '../../../../../lib/v2/pipeline/public';
-import { BATCH_GZIP_BYTES } from '../../../../../lib/v2/pipeline/stream';
+import { BATCH_GZIP_BYTES, START, formatCursor } from '../../../../../lib/v2/pipeline/stream';
 import { crawlResult, edge, row, urlOf } from '../../../../../lib/v2/pipeline/stream.fixtures';
 import {
   pglitePersistDb,
@@ -96,7 +96,10 @@ describe('counts from the batch the worker is crawling', () => {
     expect(countsIn(groups.flatMap((g) => g.events))).toEqual([[5, 7]]);
   });
 
-  it('never shows a lower number when the batch is then read', async () => {
+  const restarts = (body: string) =>
+    body.split('\n\n').filter((b) => b.startsWith('event: restart'));
+
+  it('does not lower a number on the open screen, and tells it to start over', async () => {
     const h = harness(db);
     const ids = await running(db, h, 'live-falls.example');
     await postBatch(h, ids, 1);
@@ -105,10 +108,63 @@ describe('counts from the batch the worker is crawling', () => {
       h.deps.liveProgress = async () => null;
       await storeBatch(h, ids, 1, one, { pages: 2, links: 2 });
     });
+    h.betweenPolls.push(async () => undefined);
     h.betweenPolls.push(cancelled(h, ids));
-    const { groups } = groupsOf(await (await open(h, ids)).text());
-    const state = fold(groups.flatMap((g) => g.events));
+    const body = await (await open(h, ids)).text();
+    const state = fold(groupsOf(body).groups.flatMap((g) => g.events));
     expect([state.pages_crawled, state.links_found]).toEqual([9, 9]);
+    // Once per connection, so a tab that cannot act on it is not told at every poll.
+    expect(restarts(body)).toHaveLength(1);
+  });
+
+  it('after a batch fails, a fresh connection shows only what the check recorded', async () => {
+    const h = harness(db);
+    const ids = await running(db, h, 'live-failed.example');
+    await storeBatch(h, ids, 1, one, { pages: 2, links: 2 });
+    await postBatch(h, ids, 2);
+    h.deps.liveProgress = async () => ({
+      pages: 25,
+      links: 25,
+      total: 1,
+      fresh: [finishedPage('/lost', '/gone')],
+    });
+    h.betweenPolls.push(() =>
+      h.pipeline.endBatch(ids.checkId, 2, {
+        status: 'failed',
+        finished_at: new Date(h.clock.now).toISOString(),
+      }),
+    );
+    h.betweenPolls.push(cancelled(h, ids));
+    const first = await (await open(h, ids)).text();
+    expect(fold(groupsOf(first).groups.flatMap((g) => g.events)).pages_crawled).toBe(27);
+    expect(restarts(first)).toHaveLength(1);
+
+    const again = groupsOf(await (await open(h, ids)).text());
+    const state = fold(again.groups.flatMap((g) => g.events));
+    expect([state.pages_crawled, state.links_found]).toEqual([2, 2]);
+    expect(state.nodes.map((n) => n.url)).not.toContain(urlOf('/lost'));
+  });
+
+  it('tells a viewer who reconnects holding a count the check no longer has', async () => {
+    const h = harness(db);
+    const ids = await running(db, h, 'live-resume.example');
+    await storeBatch(h, ids, 1, one, { pages: 2, links: 2 });
+    const held = formatCursor({ ...START, batch: 1, step: 5, pages: 27, links: 26, at: 10 });
+    h.betweenPolls.push(cancelled(h, ids));
+    expect(restarts(await (await open(h, ids, anonymous, held)).text())).toHaveLength(1);
+  });
+
+  it('does not restart an ordinary run', async () => {
+    const h = harness(db);
+    const ids = await running(db, h, 'live-ordinary.example');
+    await postBatch(h, ids, 1);
+    h.deps.liveProgress = async () => liveOf(2, 2);
+    h.betweenPolls.push(async () => {
+      h.deps.liveProgress = async () => null;
+      await storeBatch(h, ids, 1, one, { pages: 2, links: 2 });
+    });
+    h.betweenPolls.push(cancelled(h, ids));
+    expect(restarts(await (await open(h, ids)).text())).toHaveLength(0);
   });
 
   it('carries on from the database when the worker read fails', async () => {

@@ -235,6 +235,32 @@ export function liveEvents(cursor: Cursor, pages: readonly LivePage[], elapsedMs
   return events.length === 0 ? { events, cursor } : { events, cursor: { ...cursor, at } };
 }
 
+/**
+ * Whether the viewer holds a higher count than the check can stand behind: a batch failed or was
+ * posted again after its pages were shown. A count on screen cannot fall, so the stream tells the
+ * screen to start over from the stored rows. While a batch runs and has not answered, what it has
+ * read is unknown, so this says nothing. The stored total is the larger of the row's and the batch
+ * rows', which are read a moment apart, so a write landing between them does not read as a fall.
+ */
+export function overshot(
+  cursor: Pick<Cursor, 'pages' | 'links'>,
+  s: Pick<StreamSnapshot, 'progress' | 'batches'>,
+  runningBatch: number | null,
+  live: { pages: number; links: number } | null,
+): boolean {
+  if (runningBatch !== null && live === null) return false;
+  const read = s.batches.filter((b) => b.status === 'done');
+  const pages = Math.max(
+    s.progress?.pages_crawled ?? 0,
+    read.reduce((n, b) => n + b.pages, 0),
+  );
+  const links = Math.max(
+    s.progress?.links_found ?? 0,
+    read.reduce((n, b) => n + b.links, 0),
+  );
+  return cursor.pages > pages + (live?.pages ?? 0) || cursor.links > links + (live?.links ?? 0);
+}
+
 /** A stored `waiting_since` as ms from the check's start; null without both, or unreadable. */
 function waitedFrom(since: string | null, started: number | null): number | null {
   if (since === null || started === null) return null;
