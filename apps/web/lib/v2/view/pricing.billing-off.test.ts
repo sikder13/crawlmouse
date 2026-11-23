@@ -4,6 +4,9 @@
  */
 import { describe, expect, it } from 'vitest';
 import { FREE_START } from '../../billing/state-machine';
+import { GATES } from '../../entitlement-v2';
+import { AUDIT_TTL_DAYS } from '../../limits';
+import { numberWord } from '../words';
 import { pricingView, type PlanAction, type PricingViewer } from './pricing';
 
 const NOW = new Date('2026-11-22T12:00:00Z');
@@ -148,7 +151,9 @@ describe('pricingView with billing off (RC-01)', () => {
   it('does not say checks come back by themselves when paid plans open', () => {
     const rows = pricingView({ kind: 'signed_out' }, 'month', NOW, OFF).after.rows;
     const other = rows.find(([what]) => what === 'Other sites')![1].text;
-    expect(other).toContain('choosing Pro, once paid plans open, restarts them');
+    expect(other).toContain(
+      `choosing Pro, once paid plans open, restarts up to ${numberWord(GATES.pro.sites)}`,
+    );
     expect(other).not.toMatch(/stop until/i);
   });
 
@@ -159,7 +164,9 @@ describe('pricingView with billing off (RC-01)', () => {
         (p) => p.tier === 'free',
       )!;
       const kept = free.rows.find((r) => r.label === 'kept')!.text;
-      expect(kept).toBe('Your site’s audits, evidence and link map, kept');
+      expect(kept).toBe(
+        `Audits of the site you keep, with evidence and link map; audits from the earlier version last ${AUDIT_TTL_DAYS} days`,
+      );
     },
   );
 

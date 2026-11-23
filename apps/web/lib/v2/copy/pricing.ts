@@ -25,6 +25,7 @@ import {
 } from '../../billing/prices';
 import { TRIAL_DAYS } from '../../billing/state-machine';
 import { GATES, type Tier } from '../../entitlement-v2';
+import { AUDIT_TTL_DAYS } from '../../limits';
 import type { Tagged } from './agencies';
 import { AGENCY_PLUS_INBOX_ADDRESS } from './contact-inbox';
 import { CANCEL_CLICKS } from './settings';
@@ -142,7 +143,7 @@ export function planCopy(
         },
         {
           label: 'kept',
-          text: 'Your site’s audits, evidence and link map, kept',
+          text: `Audits of the site you keep, with evidence and link map; audits from the earlier version last ${AUDIT_TTL_DAYS} days`,
           capabilities: ['free_audit'],
         },
       ],
@@ -412,7 +413,7 @@ export const PRICING_COPY = {
         {
           text: billing
             ? 'Pause until you choose Pro or remove them; their history stays'
-            : 'Scheduled checks stop; choosing Pro, once paid plans open, restarts them. Their history stays',
+            : `Scheduled checks stop; choosing Pro, once paid plans open, restarts up to ${numberWord(GATES.pro.sites)}. Their history stays`,
           capabilities: ['sites'],
         },
       ],
