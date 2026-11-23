@@ -93,6 +93,8 @@ export const NOT_RENDERED = {
   challenged: 'A side of the render matches a challenge title or marker listed in challenge.ts.',
   nothing_rendered: 'The rendered side has no words, so there is no share.',
   measure_failed: 'Counting the words of the two renders threw.',
+  out_of_time:
+    "The render step's deadline left too little time for this page's renders, so it was not started or not finished.",
   phase_threw:
     "A page of the empty-root phase threw out of the render; each page of that phase is left unrendered, and the graded phase's pages stand.",
 } as const;
@@ -155,6 +157,12 @@ export interface RenderCheckInput {
   /** Requests open at once; from inFlightFromEnv. An invalid number is read as the default. */
   inFlight?: number;
   sleep?: (ms: number) => Promise<void>;
+  /**
+   * When the step must be done, on `now`'s clock. A page, a side or a retry that could run past it is
+   * not started, and the page records `out_of_time`. No deadline when left out.
+   */
+  deadlineAt?: number;
+  now?: () => number;
 }
 
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -243,6 +251,10 @@ async function renderPhase(
         ? 'caps_not_configured'
         : stoppedBefore;
 
+  const now = input.now ?? Date.now;
+  /** Whether work that may take `ms` ends by the step's deadline. */
+  const fits = (ms: number) => input.deadlineAt === undefined || now() + ms <= input.deadlineAt;
+
   const notRendered = (p: Picked, reason: NotRenderedReason, detail?: string): RenderedPage =>
     detail === undefined
       ? { ...p, rendered: false, reason }
@@ -250,6 +262,8 @@ async function renderPhase(
 
   /** One side of a page, retried on 429. Every reply's browser time is added to the page's `used`. */
   async function side(url: string, s: RenderSide, used: { ms: number }) {
+    // A retry must leave room for this side and, from the static side, the rendered one after it.
+    const sidesLeft = s === 'static' ? 2 : 1;
     for (let attempt = 0; ; attempt += 1) {
       let reply: RenderReply;
       try {
@@ -269,6 +283,7 @@ async function renderPhase(
       const waitMs =
         reply.retryAfterMs ?? Math.min(RENDER_RETRY.base_ms * 2 ** attempt, RENDER_RETRY.max_ms);
       if (waitMs > RENDER_RETRY.max_ms) return reply;
+      if (!fits(waitMs + sidesLeft * REQUEST_TIMEOUT_MS)) return reply;
       await sleep(waitMs);
     }
   }
@@ -285,6 +300,7 @@ async function renderPhase(
   async function reserve(allowanceMs: number): Promise<NotRenderedReason | null> {
     for (;;) {
       if (stopped) return stopped;
+      if (!fits(PAGE_RESERVE_MS)) return (stopped = 'out_of_time');
       if (checkHeld + PAGE_RESERVE_MS <= allowanceMs) {
         checkHeld += PAGE_RESERVE_MS;
         rendering += 1;
@@ -319,6 +335,7 @@ async function renderPhase(
   async function renderReserved(p: Picked, used: { ms: number }): Promise<RenderedPage> {
     const staticSide = await side(p.url, 'static', used);
     if (!staticSide.ok) return notRendered(p, staticSide.reason);
+    if (!fits(REQUEST_TIMEOUT_MS)) return notRendered(p, 'out_of_time');
     const renderedSide = await side(p.url, 'rendered', used);
     if (!renderedSide.ok) return notRendered(p, renderedSide.reason);
     let m: ReturnType<typeof measurePage>;
@@ -351,6 +368,8 @@ async function renderPhase(
   const allowanceMs = allowanceFor(sample.length);
   let settleFailed = false;
   if (!stopped && sample.length > 0 && allowanceMs < PAGE_RESERVE_MS) stopped = 'check_cap';
+  // Before the budget is asked, so a phase with no time to render reserves nothing.
+  if (!stopped && sample.length > 0 && !fits(PAGE_RESERVE_MS)) stopped = 'out_of_time';
   let reserved = false;
   let stoppedAtBudget: NotRenderedReason | null = null;
   if (!stopped && sample.length > 0) {

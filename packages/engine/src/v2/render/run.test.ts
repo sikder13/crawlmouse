@@ -648,3 +648,114 @@ describe('the reasons a page is not rendered', () => {
     for (const f of RENDER_FAILURES) expect(Object.keys(NOT_RENDERED)).toContain(f);
   });
 });
+
+describe('the step deadline', () => {
+  /** A client whose every render takes `ms` of a clock the test reads. */
+  function timedClient(ms: number, forced?: RenderReply) {
+    const clock = { now: 1_000_000 };
+    const client = fakeClient(FIXTURES.values(), {
+      before: () => {
+        clock.now += ms;
+        return forced;
+      },
+    });
+    return { client, clock, calls: client.calls };
+  }
+  const WORST_PAGE = 2 * REQUEST_TIMEOUT_MS;
+
+  it('starts no page that could run past the deadline, and asks the budget for nothing', async () => {
+    const { client, clock, calls } = timedClient(1_000);
+    const daily = memoryDailyBudget();
+    const reserve = vi.spyOn(daily, 'reserve');
+    const out = await renderCheck(
+      input({ client, daily, now: () => clock.now, deadlineAt: clock.now + WORST_PAGE - 1 }),
+    );
+    expect(calls).toEqual([]);
+    expect(reserve).not.toHaveBeenCalled();
+    expect(out.pages.map((p) => (p.rendered ? 'rendered' : p.reason))).toEqual(
+      out.pages.map(() => 'out_of_time'),
+    );
+  });
+
+  it('keeps the pages it rendered and marks the rest, settling what it used', async () => {
+    const pageMs = 2 * 10_000;
+    const { client, clock } = timedClient(10_000);
+    const daily = memoryDailyBudget();
+    const settle = vi.spyOn(daily, 'settle');
+    const out = await renderCheck(
+      input({
+        client,
+        daily,
+        inFlight: 1,
+        now: () => clock.now,
+        // Room to start the first page, and not the second after it has run.
+        deadlineAt: clock.now + WORST_PAGE + pageMs - 1,
+      }),
+    );
+    expect(out.pages[0]).toMatchObject({ rendered: true });
+    const rest = out.pages.slice(1);
+    expect(rest.length).toBeGreaterThan(0);
+    for (const p of rest) expect(p).toMatchObject({ rendered: false, reason: 'out_of_time' });
+    expect(settle).toHaveBeenCalledTimes(1);
+    expect(out.browser_ms).toBeGreaterThan(0);
+  });
+
+  it('does not wait out a rate limit that would end past the deadline', async () => {
+    const limited: RenderReply = {
+      ok: false,
+      reason: 'rate_limited',
+      retryAfterMs: 30_000,
+      browserMs: 0,
+    } as RenderReply;
+    const { client, clock, calls } = timedClient(0, limited);
+    const sleep = vi.fn(async (ms: number) => {
+      clock.now += ms;
+    });
+    const out = await renderCheck(
+      input({
+        client,
+        sleep,
+        inFlight: 1,
+        maxRenders: 1,
+        now: () => clock.now,
+        deadlineAt: clock.now + WORST_PAGE + 1,
+      }),
+    );
+    expect(sleep).not.toHaveBeenCalled();
+    expect(calls).toHaveLength(1);
+    expect(out.pages[0]).toMatchObject({ rendered: false, reason: 'rate_limited' });
+  });
+
+  it('starts the second side only when it can finish by the deadline', async () => {
+    const fits = timedClient(REQUEST_TIMEOUT_MS);
+    const first = await renderCheck(
+      input({
+        client: fits.client,
+        inFlight: 1,
+        maxRenders: 1,
+        now: () => fits.clock.now,
+        deadlineAt: fits.clock.now + WORST_PAGE,
+      }),
+    );
+    expect(first.pages[0]).toMatchObject({ rendered: true });
+    const late = timedClient(REQUEST_TIMEOUT_MS + 1);
+    const second = await renderCheck(
+      input({
+        client: late.client,
+        inFlight: 1,
+        maxRenders: 1,
+        now: () => late.clock.now,
+        deadlineAt: late.clock.now + WORST_PAGE,
+      }),
+    );
+    expect(late.calls).toHaveLength(1);
+    expect(second.pages[0]).toMatchObject({ rendered: false, reason: 'out_of_time' });
+  });
+
+  it('with no deadline renders as before', async () => {
+    const { client, clock } = timedClient(10_000);
+    const out = await renderCheck(input({ client, now: () => clock.now }));
+    expect(out.pages.some((p) => p.rendered)).toBe(true);
+    expect(out.pages.every((p) => p.rendered || p.reason !== 'out_of_time')).toBe(true);
+  });
+});
