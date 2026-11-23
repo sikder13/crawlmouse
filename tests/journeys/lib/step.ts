@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { test, type APIRequestContext, type BrowserContext, type Page, type TestInfo } from '../pw';
-import { bypassCookies, bypassSecret, traceRefusal } from './protection';
+import { bypassCookies, bypassSecret, noteTrace, traceRefusal } from './protection';
 import { stepMeta } from './steps-md';
 import { databaseRefusal, writeRefusal } from './target';
 
@@ -54,6 +54,7 @@ export function step(
     test.skip(refused !== null, `writes: ${refused}`);
     // With a bypass secret, both contexts carry a cookie for this host, not the secret (lib/protection.ts).
     // The resolved `trace` fixture, so `--trace` and a spec's `test.use` are both seen.
+    noteTrace(trace);
     if (bypassSecret(process.env) || meta.writes) {
       const traced = traceRefusal(trace);
       if (traced) throw new Error(traced);
@@ -90,6 +91,7 @@ export function step(
         );
       }
     } finally {
+      noteTrace(undefined);
       await request.dispose();
     }
   });
