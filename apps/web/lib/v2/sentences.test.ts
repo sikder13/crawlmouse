@@ -429,22 +429,25 @@ describe('a withheld AI readability grade says what was measured', () => {
   it('names both parts the grade waits on, and what was tested', () => {
     const c = withheld(['readable_unmeasured', 'quotable_unmeasured'], { access: 40, signals: 5 });
     expect(aiWithheldSummary(c, 4)).toBe(
-      `This audit did not measure the JavaScript comparison or a content score, ${NEEDS} It tested crawler access and AI signals.`,
+      `This audit did not measure the JavaScript comparison or a content score, ${NEEDS} It tested crawler access for at least two of the four scored crawlers and AI signals.`,
     );
   });
 
   it('names one missing part alone', () => {
     const c = withheld(['readable_unmeasured'], { access: 40, quotable: 12, signals: 5 });
     expect(aiWithheldSummary(c, 4)).toBe(
-      `This audit did not measure the JavaScript comparison, ${NEEDS} It tested crawler access, content and AI signals.`,
+      `This audit did not measure the JavaScript comparison, ${NEEDS} It tested crawler access for at least two of the four scored crawlers, content and AI signals.`,
     );
   });
 
-  it('says how many crawlers its access rests on when that is fewer than the scored', () => {
+  it('claims no exact count where the grade does not store one', () => {
     const c = withheld(['readable_unmeasured', 'quotable_unmeasured'], { access: 40, signals: 5 });
-    expect(aiWithheldSummary(c, 2)).toContain(
-      'It tested crawler access for two of the four scored crawlers and AI signals.',
-    );
+    // Two crawlers may hold a verdict and not count toward Access, so the verdict count is not used.
+    for (const measured of [2, 3, 4]) {
+      expect(aiWithheldSummary(c, measured)).toContain(
+        'It tested crawler access for at least two of the four scored crawlers and AI signals.',
+      );
+    }
   });
 
   it('counts the crawlers Access was scored from, not the ones with a verdict', () => {
