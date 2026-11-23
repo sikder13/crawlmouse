@@ -630,8 +630,64 @@
       "kind": "metadata",
       "path": "app/audit/[id]/overview/not-found.tsx",
       "ruling": "keep",
-      "reason": "404 of a v2 check's overview (CC-22b): the site 404 page while V2_CHECKS_PUBLIC is off, and with it on the wording for an audit that does not exist or has expired",
-      "evidence": "apps/web/app/audit/[id]/overview/not-found.tsx:17"
+      "reason": "404 of a v2 check's overview (CC-22b, F-127): the site 404 page while V2_CHECKS_PUBLIC is off, and with it on one neutral page for an id the viewer may not read and for one that names nothing",
+      "evidence": "apps/web/app/audit/[id]/overview/not-found.tsx:15"
+    },
+    {
+      "kind": "metadata",
+      "path": "app/audit/[id]/access/not-found.tsx",
+      "ruling": "keep",
+      "reason": "404 of a v2 check's access tab (F-127): re-exports the overview's, so a private result and a missing id read alike",
+      "evidence": "apps/web/app/audit/[id]/access/not-found.tsx:1"
+    },
+    {
+      "kind": "metadata",
+      "path": "app/audit/[id]/changes/not-found.tsx",
+      "ruling": "keep",
+      "reason": "404 of a v2 check's changes tab (F-127): re-exports the overview's, so a private result and a missing id read alike",
+      "evidence": "apps/web/app/audit/[id]/changes/not-found.tsx:1"
+    },
+    {
+      "kind": "metadata",
+      "path": "app/audit/[id]/content/not-found.tsx",
+      "ruling": "keep",
+      "reason": "404 of a v2 check's content tab (F-127): re-exports the overview's, so a private result and a missing id read alike",
+      "evidence": "apps/web/app/audit/[id]/content/not-found.tsx:1"
+    },
+    {
+      "kind": "metadata",
+      "path": "app/audit/[id]/fix/[fixId]/not-found.tsx",
+      "ruling": "keep",
+      "reason": "404 of a v2 check's fix page (F-127): re-exports the overview's, so a private result and a missing id read alike",
+      "evidence": "apps/web/app/audit/[id]/fix/[fixId]/not-found.tsx:1"
+    },
+    {
+      "kind": "metadata",
+      "path": "app/audit/[id]/map/not-found.tsx",
+      "ruling": "keep",
+      "reason": "404 of a v2 check's map tab (F-127): re-exports the overview's, so a private result and a missing id read alike",
+      "evidence": "apps/web/app/audit/[id]/map/not-found.tsx:1"
+    },
+    {
+      "kind": "metadata",
+      "path": "app/audit/[id]/nojs/not-found.tsx",
+      "ruling": "keep",
+      "reason": "404 of a v2 check's nojs tab (F-127): re-exports the overview's, so a private result and a missing id read alike",
+      "evidence": "apps/web/app/audit/[id]/nojs/not-found.tsx:1"
+    },
+    {
+      "kind": "metadata",
+      "path": "app/audit/[id]/signals/not-found.tsx",
+      "ruling": "keep",
+      "reason": "404 of a v2 check's signals tab (F-127): re-exports the overview's, so a private result and a missing id read alike",
+      "evidence": "apps/web/app/audit/[id]/signals/not-found.tsx:1"
+    },
+    {
+      "kind": "metadata",
+      "path": "app/audit/[id]/structure/not-found.tsx",
+      "ruling": "keep",
+      "reason": "404 of a v2 check's structure tab (F-127): re-exports the overview's, so a private result and a missing id read alike",
+      "evidence": "apps/web/app/audit/[id]/structure/not-found.tsx:1"
     },
     {
       "kind": "metadata",
