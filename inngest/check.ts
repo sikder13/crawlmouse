@@ -344,8 +344,8 @@ export async function runCheck(
   };
 
   // Whether this run still waits on the worker's signal, and whether one has reached it. Both come
-  // from step outputs, so a replay agrees. One missed signal puts the run back on polling, so a
-  // signal that cannot arrive costs one wait and not one per batch.
+  // from step outputs, so a replay agrees. The first batch to finish after a missed signal puts the
+  // run back on polling, so a signal that cannot arrive costs that batch's waits and no later one's.
   let listening = true;
   let heard = false;
 

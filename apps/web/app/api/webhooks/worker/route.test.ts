@@ -270,6 +270,63 @@ describe('POST /api/webhooks/worker', () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 
+  it('cancels a body that went over the limit', async () => {
+    const cancel = vi.fn();
+    const body = new ReadableStream({
+      start(c) {
+        c.enqueue(bytes('x'.repeat(513)));
+      },
+      cancel,
+    });
+    expect((await streamed(body)).status).toBe(413);
+    expect(cancel).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves no timer behind when the sender disconnects', async () => {
+    const body = new ReadableStream({
+      pull(c) {
+        c.error(new Error('aborted'));
+      },
+    });
+    await streamed(body);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  /** Rejections nothing handled while `act` ran, after a real turn of the event loop. */
+  async function unhandledDuring(act: () => Promise<unknown>): Promise<unknown[]> {
+    const seen: unknown[] = [];
+    const on = (e: unknown) => seen.push(e);
+    process.on('unhandledRejection', on);
+    try {
+      await act();
+      vi.useRealTimers();
+      await new Promise((r) => setTimeout(r, 30));
+    } finally {
+      process.off('unhandledRejection', on);
+    }
+    return seen;
+  }
+
+  it('a cancel that rejects on the over-limit path is not an unhandled rejection', async () => {
+    const body = new ReadableStream({
+      start(c) {
+        c.enqueue(bytes('x'.repeat(513)));
+      },
+      cancel: () => Promise.reject(new Error('rejected')),
+    });
+    expect(await unhandledDuring(() => streamed(body))).toEqual([]);
+  });
+
+  it('a cancel that rejects on the timeout path is not an unhandled rejection', async () => {
+    const body = new ReadableStream({ cancel: () => Promise.reject(new Error('rejected')) });
+    const seen = await unhandledDuring(async () => {
+      const pending = streamed(body);
+      await vi.advanceTimersByTimeAsync(5_000);
+      await pending;
+    });
+    expect(seen).toEqual([]);
+  });
+
   it('answers 502 when the event cannot be sent; the run falls back to polling', async () => {
     send.mockRejectedValueOnce(new Error('down'));
     expect((await call(JSON.stringify(BODY))).status).toBe(502);
