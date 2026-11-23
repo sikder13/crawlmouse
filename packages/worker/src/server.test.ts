@@ -533,10 +533,21 @@ describe('GET /batch/{id}/progress', () => {
     });
   });
 
-  it('refuses an offset that is not a number', async () => {
-    await start();
-    const id = `${CHECK}:1`;
+  it('refuses an offset that is not a number, on a batch that is running', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const clock = new InstantClock();
+    const slow: Fetcher = async (url, identity, limits) => {
+      await gate;
+      return fakeFetcher(clock, () => ({ status: 404, body: '' }))(url, identity, limits);
+    };
+    const { worker } = await start({}, slow);
+    const { body } = await post(batchBody());
+    const id = String(body.batch_id);
+    expect((await get(`/batch/${id}/progress?after=1`, `progress:${id}`)).status).toBe(200);
     expect((await get(`/batch/${id}/progress?after=x`, `progress:${id}`)).status).toBe(404);
+    release();
+    await worker.idle();
   });
 
   it('never carries the result of a finished batch', async () => {

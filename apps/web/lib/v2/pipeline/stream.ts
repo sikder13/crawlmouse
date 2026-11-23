@@ -202,8 +202,9 @@ export function withLiveCounts(
 
 /**
  * The pages a running batch has finished, as the events its stored result will give: `page_fetched`,
- * then a `page_linked` for each page it links to first. The reducer takes a repeat of either as
- * nothing, so these can be sent again after a reconnect and when the batch is read.
+ * then a `page_linked` for each page it links to first. The reducer replaces a crawl page's line when
+ * its `page_fetched` repeats and ignores a later link to a page already placed, so these can be sent
+ * again after a reconnect and when the batch is read.
  */
 export function liveEvents(cursor: Cursor, pages: readonly LivePage[], elapsedMs: number): Emitted {
   const at = Math.max(cursor.at, Math.round(elapsedMs));

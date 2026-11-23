@@ -1,3 +1,4 @@
+import { generateKeyPairSync } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { checkRef } from '../../../../../lib/v2/pipeline/public';
 
@@ -22,6 +23,9 @@ vi.mock('../../../../../../../inngest/client', () => ({
 }));
 
 import { checkRouteDeps } from './deps';
+import { SIGNING_SECRET_ENV, WORKER_URL_ENV } from '../../../../../lib/worker-client/client';
+import { PRIVATE_KEY_ENV } from '../../../../../lib/worker-client/jwt';
+import { SIGNATURE_HEADER, TS_HEADER, signRead } from '../../../../../lib/worker-client/sign';
 
 const CHECK = '0b0e7a52-5f0b-4b53-9c0e-0d4a3a1f2c11';
 const req = () => new Request(`https://crawlmouse.test/api/checks/${CHECK}/stream`);
@@ -77,5 +81,52 @@ describe('checkRouteDeps().captureFinished', () => {
     answer(new Response('{}'));
     await captured;
     expect(fetched.map((b) => b.event)).toEqual(['check_finished']);
+  });
+});
+
+describe('checkRouteDeps().liveProgress', () => {
+  const BATCH = `${CHECK}:2`;
+  const SECRET = 's'.repeat(32);
+
+  function plantWorker() {
+    const key = generateKeyPairSync('ed25519').privateKey.export({ format: 'der', type: 'pkcs8' });
+    vi.stubEnv(WORKER_URL_ENV, 'https://worker.test');
+    vi.stubEnv(SIGNING_SECRET_ENV, SECRET);
+    vi.stubEnv(PRIVATE_KEY_ENV, key.toString('base64'));
+  }
+
+  it('reads the running batch from the worker, signed for progress, and returns its answer', async () => {
+    plantWorker();
+    const calls: Array<{ url: string; headers: Headers }> = [];
+    vi.stubGlobal('fetch', async (url: string, init: RequestInit) => {
+      calls.push({ url: String(url), headers: new Headers(init.headers) });
+      return Response.json({
+        batch_id: BATCH,
+        status: 'running',
+        progress: { pages: 2, links: 3, homepage_read: true },
+        pages_total: 5,
+        live_pages: [],
+      });
+    });
+
+    const got = await checkRouteDeps({} as never, { userId: null }).liveProgress!(BATCH, 3);
+
+    expect(got).toEqual({ pages: 2, links: 3, homepageRead: true, total: 5, fresh: [] });
+    expect(calls.map((c) => c.url)).toEqual([
+      `https://worker.test/batch/${BATCH}/progress?after=3`,
+    ]);
+    const ts = calls[0]!.headers.get(TS_HEADER)!;
+    expect(calls[0]!.headers.get(SIGNATURE_HEADER)).toBe(signRead(SECRET, ts, `progress:${BATCH}`));
+  });
+
+  it('leaves the stream on the database when the worker is not configured', async () => {
+    vi.stubEnv(WORKER_URL_ENV, '');
+    const calls: unknown[] = [];
+    vi.stubGlobal('fetch', async (url: string) => {
+      calls.push(url);
+      return Response.json({});
+    });
+    expect(await checkRouteDeps({} as never, { userId: null }).liveProgress!(BATCH, 0)).toBeNull();
+    expect(calls).toEqual([]);
   });
 });
