@@ -1828,6 +1828,48 @@ describe('progress while a batch runs', () => {
     expect(seen.at(-1)!.homepage_read).toBe(false);
   });
 
+  it.each<[string, (res: http.ServerResponse) => void]>([
+    [
+      'a challenge',
+      (res) => {
+        res.statusCode = 403;
+        res.setHeader('cf-mitigated', 'challenge');
+        res.end();
+      },
+    ],
+    [
+      'a redirect to another site',
+      (res) => {
+        res.statusCode = 302;
+        res.setHeader('location', 'https://other-site.example/');
+        res.end();
+      },
+    ],
+  ])('does not call a homepage that answered with %s read', async (_name, answer) => {
+    const s = await serve({
+      robots: robotsText('User-agent: *\nAllow: /\n'),
+      page: (path, _ua, res) => {
+        if (path === '/a') return answer(res);
+        res.setHeader('content-type', 'text/html');
+        res.end(`<html><body><p>page ${path}</p></body></html>`);
+      },
+    });
+    const seen: Progress[] = [];
+    const clock = new InstantClock();
+    await runBatch(
+      crawlReq(s.base, ['/a', '/b']),
+      {
+        clock,
+        sites: new Sites(clock),
+        fetcher: createFetcher(clock, { bypassSsrf: true }),
+        robotsCache: new RobotsCache(clock),
+      },
+      (p) => seen.push(p),
+    );
+    expect(seen.at(-1)!.pages).toBeGreaterThan(0);
+    expect(seen.at(-1)!.homepage_read).toBe(false);
+  });
+
   it('counts pages and links by the rule the result is counted by', async () => {
     const s = await serve({ robots: robotsText('User-agent: *\nDisallow: /b\n') });
     const seen: Progress[] = [];

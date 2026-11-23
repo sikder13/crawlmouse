@@ -119,6 +119,18 @@ describe('checkRouteDeps().liveProgress', () => {
     expect(calls[0]!.headers.get(SIGNATURE_HEADER)).toBe(signRead(SECRET, ts, `progress:${BATCH}`));
   });
 
+  it('leaves the stream on the database when the worker key cannot be read', async () => {
+    plantWorker();
+    vi.stubEnv(PRIVATE_KEY_ENV, 'not-a-key');
+    const calls: unknown[] = [];
+    vi.stubGlobal('fetch', async (url: string) => {
+      calls.push(url);
+      return Response.json({});
+    });
+    expect(await checkRouteDeps({} as never, { userId: null }).liveProgress!(BATCH, 0)).toBeNull();
+    expect(calls).toEqual([]);
+  });
+
   it('leaves the stream on the database when the worker is not configured', async () => {
     vi.stubEnv(WORKER_URL_ENV, '');
     const calls: unknown[] = [];

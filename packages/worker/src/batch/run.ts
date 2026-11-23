@@ -50,7 +50,7 @@ export interface Progress {
   pages: number;
   /** Link edges read so far: the result's `link_edges`, as they arrive. */
   links: number;
-  /** Whether the batch's first URL has been fetched: the homepage, in a check's first batch. */
+  /** Whether the batch's first URL was served to us: the homepage, in a check's first batch. */
   homepage_read: boolean;
 }
 
@@ -71,7 +71,7 @@ export interface PageCounts {
   links: number;
   /** Null for a page the map would not draw: not fetched, or its links not read. */
   live: LivePage | null;
-  /** This is the batch's first URL, and it was fetched. */
+  /** This is the batch's first URL, and it was served to us. */
   homepage: boolean;
 }
 
