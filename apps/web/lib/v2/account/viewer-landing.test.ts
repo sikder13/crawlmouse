@@ -140,6 +140,35 @@ describe('landing with several seats and no choice recorded', () => {
       [accountId, NOW],
     );
     expect(await landsIn(p)).toBe(p.personal);
+    // Row security is what leaves it out: the caller's own read no longer returns that seat.
+    const seats = await postgrestOver(db, { as: { userId: p.id } })
+      .from('seats')
+      .select('account_id')
+      .eq('user_id', p.id)
+      .eq('status', 'active');
+    expect((seats.data as { account_id: string }[]).map((s) => s.account_id)).toEqual([p.personal]);
+  });
+
+  it('a personal account marked for deletion: the one account left, their agency', async () => {
+    const p = await person();
+    const { accountId } = await agencyAccount(db, p);
+    await db.query(
+      `update public.accounts set deletion_confirmed_at = $2,
+              purge_after = $2::timestamptz + interval '7 days' where id = $1`,
+      [p.personal, NOW],
+    );
+    expect(await landsIn(p)).toBe(accountId);
+  });
+
+  it('both marked for deletion: no account', async () => {
+    const p = await person();
+    const { accountId } = await agencyAccount(db, p);
+    await db.query(
+      `update public.accounts set deletion_confirmed_at = $1,
+              purge_after = $1::timestamptz + interval '7 days' where id = any($2::uuid[])`,
+      [NOW, [p.personal, accountId]],
+    );
+    expect(await landsIn(p)).toBe('no_account');
   });
 
   it('a default that is not a personal account stays the default', async () => {

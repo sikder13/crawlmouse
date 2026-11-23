@@ -203,7 +203,9 @@ export async function readEntitlement(
  * Where a person with several seats lands when nothing recorded chooses (F-105): their personal
  * account if it holds a site, else the one agency they own, else the default. An account they only
  * hold a seat on is not chosen for them, because the account landed in is the one their next site
- * is added to. Read with the caller's own client, and nothing is written.
+ * is added to. Read with the caller's own client, and nothing is written. An account marked for
+ * deletion is never among `mine`: `seats` is read through row security, whose `is_member` is false
+ * once `deletion_confirmed_at` is set, and the caller's grant does not include that column.
  */
 async function landingSeat(
   deps: ViewerDeps,
