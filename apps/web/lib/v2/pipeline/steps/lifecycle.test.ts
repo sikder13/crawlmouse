@@ -5,7 +5,7 @@ import { DISCOVER_S, PACE, REAP_AFTER_S, RESERVE_S } from '../limits';
 import type { PipelineStore } from '../store';
 import { memoryEvidenceStore } from '../test-support/memory-evidence';
 import type { StepDeps } from './deps';
-import { failCancelled, lifecycleSteps, reapCutoff, reapStalled } from './lifecycle';
+import { failCancelled, failCheck, lifecycleSteps, reapCutoff, reapStalled } from './lifecycle';
 
 const EVENT: CheckRequested = {
   checkId: 'c0000000-0000-4000-8000-000000000001',
@@ -153,6 +153,45 @@ describe('fail', () => {
       siteId: 's-in-db',
     });
     expect(store.siteOf).toHaveBeenCalledWith(EVENT.checkId);
+  });
+});
+
+describe('failCheck, with a word the database refuses', () => {
+  const refusing = (message: string) => {
+    const fail = vi.fn(async (_id: string | null, reason: string) => {
+      if (reason !== 'internal') throw new Error(message);
+      return true;
+    });
+    return { fail, siteOf: vi.fn(async () => EVENT.siteId) };
+  };
+  const REFUSED =
+    'pipeline store: fail_check: fail_check: the reason is not one of check_failure_reasons()';
+
+  it.each(['site_unreachable', 'nothing_read'] as const)(
+    'stores %s as internal until the migration is applied, and says so',
+    async (reason) => {
+      const store = refusing(REFUSED);
+      await expect(failCheck(store, EVENT.checkId, reason)).resolves.toEqual({
+        failed: true,
+        siteId: EVENT.siteId,
+        as: 'internal',
+      });
+      expect(store.fail.mock.calls.map((c) => c[1])).toEqual([reason, 'internal']);
+    },
+  );
+
+  it('does not swallow another error from the database', async () => {
+    const store = refusing('pipeline store: fail_check: connection reset');
+    await expect(failCheck(store, EVENT.checkId, 'nothing_read')).rejects.toThrow(
+      /connection reset/,
+    );
+    expect(store.fail).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not fall back for a word the database has always listed', async () => {
+    const store = refusing(REFUSED);
+    await expect(failCheck(store, EVENT.checkId, 'build_failed')).rejects.toThrow(/not one of/);
+    expect(store.fail).toHaveBeenCalledTimes(1);
   });
 });
 
