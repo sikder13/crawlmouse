@@ -2,9 +2,9 @@
  * The routes under `/audit/[id]` (CC-22b D1, D4, plan-review 2 and 14): what each answers with
  * V2_CHECKS_PUBLIC off and on, the metadata each sets, and what the v1 page may import.
  */
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
-import type { ReactElement } from 'react';
+import type { ReactElement, ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { CheckRead } from '../../../lib/v2/pipeline/public';
@@ -240,14 +240,57 @@ describe('with V2_CHECKS_PUBLIC on', () => {
     },
   );
 
-  it('the overview’s 404 page says the audit does not exist or has expired', async () => {
+  it('the 404 page does not say a kept result is gone, and offers a way in', async () => {
     flag(true);
     const { default: AuditNotFound } = await import('./overview/not-found');
     const markup = renderToStaticMarkup(<AuditNotFound />);
-    expect(markup).toContain('This audit does not exist, or it has expired.');
+    expect(markup).toContain('It may belong to an account, or it may have expired.');
+    expect(markup).not.toContain('does not exist');
     expect(markup).toContain('24 hours');
+    expect(markup).toContain('href="/login"');
     expect(markup).toContain('href="/"');
   });
+
+  it('the 404 page takes nothing, so a private result and a missing id cannot read differently', async () => {
+    const { default: AuditNotFound } = await import('./overview/not-found');
+    expect(AuditNotFound.length).toBe(0);
+    const source = readFileSync(join(HERE, 'overview/not-found.tsx'), 'utf8');
+    expect(source).not.toMatch(/params|readAudit|supabase|cookies\(|headers\(/);
+  });
+
+  const NOT_FOUND_PAGES: Record<string, () => Promise<{ default: () => ReactNode }>> = {
+    access: () => import('./access/not-found'),
+    changes: () => import('./changes/not-found'),
+    content: () => import('./content/not-found'),
+    'fix/[fixId]': () => import('./fix/[fixId]/not-found'),
+    map: () => import('./map/not-found'),
+    nojs: () => import('./nojs/not-found'),
+    signals: () => import('./signals/not-found'),
+    structure: () => import('./structure/not-found'),
+  };
+
+  /** Each folder under the audit that holds a page of its own, the overview's excepted. */
+  const tabs = (dir = ''): string[] =>
+    readdirSync(join(HERE, dir), { withFileTypes: true })
+      .filter((e) => e.isDirectory() && !e.name.startsWith('_') && e.name !== 'overview')
+      .flatMap((e) => {
+        const sub = join(dir, e.name);
+        return [...(existsSync(join(HERE, sub, 'page.tsx')) ? [sub] : []), ...tabs(sub)];
+      });
+
+  it('lists every tab on disk, so a new tab cannot miss the page below', () => {
+    expect(tabs().sort()).toEqual(Object.keys(NOT_FOUND_PAGES).sort());
+  });
+
+  it.each(Object.keys(NOT_FOUND_PAGES))(
+    '%s answers a refused or missing id with the same page',
+    async (tab) => {
+      flag(true);
+      const { default: Overview } = await import('./overview/not-found');
+      const { default: Tab } = await NOT_FOUND_PAGES[tab]!();
+      expect(renderToStaticMarkup(<Tab />)).toBe(renderToStaticMarkup(<Overview />));
+    },
+  );
 });
 
 describe('what the v1 page and its 404 import', () => {
