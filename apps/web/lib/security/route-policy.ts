@@ -522,6 +522,13 @@ export const ROUTE_POLICIES: readonly RoutePolicy[] = [
     origin: 'any',
   },
   {
+    route: 'ingest/[...path]',
+    methods: ['GET', 'POST'],
+    class: 'public',
+    reason: 'same-origin PostHog proxy; forwards a fixed list of headers, no cookie or referrer',
+    origin: 'any',
+  },
+  {
     route: 'api/webhooks/worker',
     methods: ['POST'],
     class: 'webhook',

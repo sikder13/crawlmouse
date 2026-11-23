@@ -28,7 +28,7 @@ describe('Settings, a paid plan set to end at its period’s end', () => {
     expect(p.note).toBe('Agency until Thu 10 Dec, then Free. Nothing more is charged.');
     expect(p.terms[0]).toEqual({
       label: 'Cancel',
-      text: 'Cancelled; it takes effect Thu 10 Dec. Nothing you can see is deleted; evidence older than 90 days is condensed to headers and the parts of pages that changed.',
+      text: 'Cancelled; it takes effect Thu 10 Dec. Nothing you can see is deleted.',
       action: null,
     });
   });

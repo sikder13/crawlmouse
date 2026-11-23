@@ -20,7 +20,14 @@ import { ThreadReader } from '../reader/thread-reader.js';
 
 const reqs = JSON.parse(process.argv[2]!) as BatchRequest[];
 const store = new BatchStore(() => systemClock.now());
-const progress = { urls_done: 0, urls_total: 0, requests: 0 };
+const progress = {
+  urls_done: 0,
+  urls_total: 0,
+  requests: 0,
+  pages: 0,
+  links: 0,
+  homepage_read: false,
+};
 
 // Full, as it can be when the batches start: results of 1 MiB each, up to the store's limit.
 const filler = { pad: 'x'.repeat(1024 * 1024 - 16) } as unknown as BatchResult;

@@ -83,11 +83,11 @@ show up through the items that use them (A-7, B-F8).
 | --- | ---: | ---: | ---: | ---: |
 | page | 20 | 6 | 0 | 26 |
 | metadata | 23 | 0 | 0 | 23 |
-| route | 29 | 9 | 0 | 38 |
+| route | 30 | 9 | 0 | 39 |
 | inngest | 2 | 2 | 0 | 4 |
 | cron | 1 | 1 | 0 | 2 |
 | table | 11 | 7 | 0 | 18 |
-| **all** | 86 | 25 | 0 | 111 |
+| **all** | 87 | 25 | 0 | 112 |
 <!-- /v1-inventory:counts -->
 <!-- prettier-ignore-end -->
 
@@ -196,6 +196,7 @@ rows that matter here are reproduced below so this repository holds the basis of
 | route | `app/api/billing/status/route.ts` | keep | kept with new bodies; CC-03 owns these files | ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md "6.2 URLs") |
 | route | `app/api/developers/route.ts` | keep | waitlist form behind /developers, kept | ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md "6.2 URLs") |
 | route | `app/api/health/route.ts` | keep | liveness probe | apps/web/app/api/health/route.ts:1 |
+| route | `app/ingest/[...path]/route.ts` | keep | same-origin PostHog proxy, in place of a rewrite that forwarded cookies | apps/web/lib/analytics/ingest-proxy.ts:55 |
 | route | `app/api/reports/hide/route.ts` | keep | /api/reports/* kept as is | ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md "6.2 URLs") |
 | route | `app/api/reports/mint/route.ts` | keep | /api/reports/* kept as is | ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md "6.2 URLs") |
 | route | `app/api/reports/[slug]/claim/route.ts` | keep | /api/reports/* kept as is | ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md "6.2 URLs") |
@@ -306,6 +307,7 @@ is the verdict word; the full verdict with its evidence is the entry's `checks` 
 | `app/api/billing/status/route.ts` | keep | n/a | pass | pass | n/a | n/a | n/a | n/a |
 | `app/api/developers/route.ts` | keep | pass | pass | pass | n/a | pass | n/a | pass |
 | `app/api/health/route.ts` | keep | n/a | pass | pass | n/a | n/a | n/a | n/a |
+| `app/ingest/[...path]/route.ts` | keep | pass | pass | pass | pass | pass | n/a | n/a |
 | `app/api/reports/hide/route.ts` | keep | pass | pass | pass | n/a | pass | n/a | pass |
 | `app/api/reports/mint/route.ts` | keep | pass | pass | pass | n/a | pass | n/a | pass |
 | `app/api/reports/[slug]/claim/route.ts` | keep | pass | pass | pass | n/a | pass | n/a | pass |

@@ -5,9 +5,16 @@ import type { AddressInfo } from 'node:net';
 import { afterEach, describe, expect, it } from 'vitest';
 import { REFUSALS } from '../../../../packages/worker/src/routes';
 import type { Fetcher } from '../../../../packages/worker/src/fetch/fetcher';
+import { CRAWL } from '../../../../packages/worker/src/identities';
 import { InstantClock } from '../../../../packages/worker/src/test-support/clock';
+import { fakeFetcher } from '../../../../packages/worker/src/test-support/fake-fetcher';
 import { pageFetcher, startWorker, type InProcessWorker } from './__tests__/in-process-worker';
-import { createWorkerClient, WORKER_REFUSALS, workerClientFromEnv } from './client';
+import {
+  createWorkerClient,
+  PROGRESS_TIMEOUT_MS,
+  WORKER_REFUSALS,
+  workerClientFromEnv,
+} from './client';
 import { batchIdOf, WorkerError, type BatchPost, type WorkerErrorKind } from './types';
 
 const CHECK = '00000000-0000-4000-8000-0000000000c9';
@@ -102,6 +109,239 @@ describe('against the worker, in process', () => {
     await w.worker.idle();
   });
 
+  it('reads a running batch from the real worker as live counts, and nothing once it is done', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const w = await worker({}, (clock) => {
+      const page = pageFetcher(clock);
+      return async (url, identity, limits) => {
+        await gate;
+        return page(url, identity, limits);
+      };
+    });
+    const client = clientOf(w);
+    const batch = crawl();
+    await client.postBatch(batch);
+    const id = batchIdOf(CHECK, batch.batch);
+    const whileRunning = await client.readProgress(id);
+    release();
+    await w.worker.idle();
+    expect(whileRunning).toEqual({
+      pages: 0,
+      links: 0,
+      homepageRead: false,
+      total: 0,
+      fresh: [],
+    });
+    expect(await client.readProgress(id)).toBeNull();
+    expect(await client.readProgress(`${CHECK}:424242`)).toBeNull();
+  });
+
+  it.each([
+    ['a negative count', { pages: -1, links: 0 }],
+    ['a fraction', { pages: 1.5, links: 0 }],
+    ['a string', { pages: '3', links: 0 }],
+    ['a missing field, as an older worker sends', { urls_done: 1 }],
+  ])('takes no live counts from a progress with %s', async (_name, progress) => {
+    const id = `${CHECK}:1`;
+    const client = createWorkerClient({
+      url: 'http://127.0.0.1:1',
+      signingSecret: 's'.repeat(48),
+      privateKey: generateKeyPairSync('ed25519').privateKey,
+      fetch: async () =>
+        new Response(
+          JSON.stringify({
+            batch_id: id,
+            status: 'running',
+            progress,
+            pages_total: 0,
+            live_pages: [],
+          }),
+        ),
+    });
+    expect(await client.readProgress(id)).toBeNull();
+  });
+
+  it('carries a real finished page from the worker, with its bounds', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const long = `/${'l'.repeat(600)}`;
+    const links = [long, ...Array.from({ length: 30 }, (_, i) => `/p${i}`)]
+      .map((href) => `<a href="${href}">x</a>`)
+      .join('');
+    const w = await worker({}, (clock) => {
+      const page = fakeFetcher(clock, (url) =>
+        url.endsWith('/robots.txt')
+          ? { status: 404, body: '' }
+          : { status: 200, body: `<html><body>${links}</body></html>` },
+      );
+      return async (url, identity, limits) => {
+        if (url.endsWith('/a')) await gate;
+        return page(url, identity, limits);
+      };
+    });
+    const client = clientOf(w);
+    const batch = crawl();
+    await client.postBatch(batch);
+    const id = batchIdOf(CHECK, batch.batch);
+    let live: Awaited<ReturnType<typeof client.readProgress>> = null;
+    for (let i = 0; i < 400 && !live?.total; i++) {
+      live = await client.readProgress(id);
+      await new Promise((r) => setTimeout(r, 5));
+    }
+    release();
+    await w.worker.idle();
+    expect(live).toMatchObject({ pages: 1, total: 1 });
+    const [page] = live!.fresh;
+    // The real crawl identity is the user agent, longer than a short token.
+    expect(page!.identity).toBe(CRAWL.userAgent);
+    expect(page!.identity.length).toBeGreaterThan(64);
+    expect(page!.edges).toHaveLength(20);
+    for (const e of page!.edges) expect(e.to.length).toBeLessThanOrEqual(512);
+  });
+
+  it('asks from the offset it is given, and hands back the pages finished since', async () => {
+    const id = `${CHECK}:1`;
+    const page = {
+      url: 'https://site.test/a',
+      status: 200,
+      ms: 12,
+      links: 1,
+      identity: 'browser',
+      edges: [{ from: 'https://site.test/a', to: 'https://site.test/b', js_only: false }],
+    };
+    const asked: string[] = [];
+    const client = createWorkerClient({
+      url: 'http://127.0.0.1:1',
+      signingSecret: 's'.repeat(48),
+      privateKey: generateKeyPairSync('ed25519').privateKey,
+      fetch: async (url) => {
+        asked.push(String(url));
+        return new Response(
+          JSON.stringify({
+            batch_id: id,
+            status: 'running',
+            progress: { pages: 4, links: 9, homepage_read: true },
+            pages_total: 4,
+            live_pages: [page],
+          }),
+        );
+      },
+    });
+    expect(await client.readProgress(id, 3)).toEqual({
+      pages: 4,
+      links: 9,
+      homepageRead: true,
+      total: 4,
+      fresh: [page],
+    });
+    expect(asked).toEqual([`http://127.0.0.1:1/batch/${id}/progress?after=3`]);
+  });
+
+  it.each([
+    ['a URL that is not one', { url: 'javascript:alert(1)' }],
+    ['a status that is no status', { status: 9999 }],
+    [
+      'an edge to something that is no URL',
+      { edges: [{ from: 'https://s.test/', to: 'x', js_only: false }] },
+    ],
+  ])('takes nothing from a live page with %s', async (_name, over) => {
+    const id = `${CHECK}:1`;
+    const page = {
+      url: 'https://site.test/a',
+      status: 200,
+      ms: 1,
+      links: 0,
+      identity: 'browser',
+      edges: [],
+      ...over,
+    };
+    const client = createWorkerClient({
+      url: 'http://127.0.0.1:1',
+      signingSecret: 's'.repeat(48),
+      privateKey: generateKeyPairSync('ed25519').privateKey,
+      fetch: async () =>
+        new Response(
+          JSON.stringify({
+            batch_id: id,
+            status: 'running',
+            progress: { pages: 1, links: 0 },
+            pages_total: 1,
+            live_pages: [page],
+          }),
+        ),
+    });
+    expect(await client.readProgress(id)).toBeNull();
+  });
+
+  it('reads a worker that does not say whether the homepage was read as not read', async () => {
+    const id = `${CHECK}:1`;
+    const client = createWorkerClient({
+      url: 'http://127.0.0.1:1',
+      signingSecret: 's'.repeat(48),
+      privateKey: generateKeyPairSync('ed25519').privateKey,
+      fetch: async () =>
+        new Response(
+          JSON.stringify({
+            batch_id: id,
+            status: 'running',
+            progress: { pages: 1, links: 0 },
+            pages_total: 0,
+            live_pages: [],
+          }),
+        ),
+    });
+    expect(await client.readProgress(id)).toMatchObject({ homepageRead: false });
+  });
+
+  it('takes no live counts from an answer about another batch', async () => {
+    const client = createWorkerClient({
+      url: 'http://127.0.0.1:1',
+      signingSecret: 's'.repeat(48),
+      privateKey: generateKeyPairSync('ed25519').privateKey,
+      fetch: async () =>
+        new Response(
+          JSON.stringify({
+            batch_id: `${CHECK}:2`,
+            status: 'running',
+            progress: { pages: 1, links: 1 },
+            pages_total: 0,
+            live_pages: [],
+          }),
+        ),
+    });
+    expect(await client.readProgress(`${CHECK}:1`)).toBeNull();
+  });
+
+  it('answers null, never throwing, when the progress read fails or stalls', async () => {
+    const down = createWorkerClient({
+      url: 'http://127.0.0.1:1',
+      signingSecret: 's'.repeat(48),
+      privateKey: generateKeyPairSync('ed25519').privateKey,
+      fetch: async () => {
+        throw new Error('unreachable');
+      },
+    });
+    expect(await down.readProgress(`${CHECK}:1`)).toBeNull();
+    const asked: (AbortSignal | null | undefined)[] = [];
+    const stalled = createWorkerClient({
+      url: 'http://127.0.0.1:1',
+      signingSecret: 's'.repeat(48),
+      privateKey: generateKeyPairSync('ed25519').privateKey,
+      timeoutMs: 60_000,
+      fetch: (_url, init) => {
+        asked.push(init?.signal);
+        return new Promise((_resolve, reject) =>
+          init!.signal!.addEventListener('abort', () => reject(init!.signal!.reason)),
+        );
+      },
+    });
+    const before = Date.now();
+    expect(await stalled.readProgress(`${CHECK}:1`)).toBeNull();
+    expect(asked).toHaveLength(1);
+    expect(Date.now() - before).toBeLessThan(PROGRESS_TIMEOUT_MS + 1000);
+  });
+
   it('posts a crawl batch it accepts, polls it to done, and reads metrics', async () => {
     const w = await worker();
     const client = clientOf(w);
@@ -154,7 +394,14 @@ describe('against the worker, in process', () => {
     await client.postBatch(batch);
     expect(await client.pollBatch(batchIdOf(CHECK, batch.batch))).toEqual({
       status: 'running',
-      progress: { urls_done: 0, urls_total: 2, requests: 0 },
+      progress: {
+        urls_done: 0,
+        urls_total: 2,
+        requests: 0,
+        pages: 0,
+        links: 0,
+        homepage_read: false,
+      },
     });
     slow.release();
     expect(await client.pollBatch(`${CHECK}:424242`)).toEqual({ status: 'not_found' });
