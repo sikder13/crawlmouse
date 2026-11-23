@@ -323,6 +323,20 @@ Levels run: 4, 8, 16. The largest result the load test measured is 8.36 MiB; 16 
 
 <!-- end of capacity section -->
 
+### The done signal (PR 5a)
+
+The worker can tell the app when a batch ends, so a check reads it at once instead of at its next poll.
+Set the app's route as a secret on each worker. The address differs per worker, so it cannot live in
+`fly.toml`, which must match `fly.production.toml`:
+
+```bash
+flyctl secrets set APP_SIGNAL_URL=https://<the app's host>/api/webhooks/worker --app <the worker's app>
+```
+
+Until it is set the worker sends nothing and checks poll as before, so the app and the worker can deploy
+in either order. To turn it off, unset the secret. Verify:
+`pnpm --filter @crawlmouse/worker exec vitest run src/signal.test.ts`.
+
 ## Rotate the signing secret
 
 The worker holds one signing secret at a time, so a rotation has a short window in which requests
