@@ -1,12 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import { expect, type Page } from './pw';
 import { stagingAdmin } from './lib/accounts';
-import { freshContext, keptSite, person } from './lib/people';
+import { freshContext, keptLabSite, person } from './lib/people';
 import { step } from './lib/step';
 
 // J4: somebody else's data. Each step makes its own people on staging; the guards in lib/step.ts and
 // lib/accounts.ts refuse to do that anywhere else.
-const labHost = () => `client-${1 + Math.floor(Math.random() * 6)}.lab.crawlmouse.com`;
 
 step(
   'J4.1',
@@ -17,8 +16,7 @@ step(
     const sContext = await freshContext(context, baseURL!);
     try {
       const B = await person(bContext, baseURL!, 'j4', 2);
-      const host = labHost();
-      const site = await keptSite(A, host);
+      const { site, host } = await keptLabSite(A);
       const path = `/sites/${site}`;
 
       const own = await A.context.request.get(path);
@@ -54,8 +52,7 @@ step(
     try {
       const B = await person(bContext, baseURL!, 'j4', 7);
       const S = await sContext.newPage();
-      const host = labHost();
-      const site = await keptSite(A, host);
+      const { site, host } = await keptLabSite(A);
       const { data } = await stagingAdmin()
         .from('checks')
         .select('id')
@@ -127,8 +124,7 @@ step(
     const bContext = await freshContext(context, baseURL!);
     try {
       const B = await person(bContext, baseURL!, 'j4', 5);
-      const host = labHost();
-      const site = await keptSite(A, host);
+      const { site, host } = await keptLabSite(A);
       const secrets = [host, A.email, A.accountId, site];
       const leaks = (body: string, path: string) =>
         secrets.filter((m) => !path.includes(m) && body.includes(m));
