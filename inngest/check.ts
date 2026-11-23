@@ -12,9 +12,10 @@
  * Step order: claim (with `claim-wait-{i}` / `claim-{i}` while the site is busy) → discover → crawl
  * batches `crawl-{n}` → access batches `access-{stage}` → render → build → persist → emit →
  * finalize. A batch is `{p}-post` (busy: `{p}-post-busy-{k}`, `{p}-post-{k}`), then `{p}-wait-{i}` and
- * `{p}-poll-{i}` until the batch is done, failed or past its deadline, then `{p}-read`. A batch the
- * worker lost is posted once more (`{p}-repost`), read as `{p}-read-2`; a second loss or the deadline
- * is `{p}-fail`, and the phase ends there. Batch numbers are one sequence over the check.
+ * `{p}-poll-{i}` until the batch is done, failed or past its deadline, then `{p}-read`. A worker
+ * that signals a batch's end replaces the wait with `{p}-done-{i}`, and a poll follows only a wait
+ * that timed out. A batch the worker lost is posted once more (`{p}-repost`), and a later read is
+ * `{p}-read-{n}`; a second loss or the deadline is `{p}-fail`, and the phase ends there. Batch numbers are one sequence over the check.
  */
 import { NonRetriableError } from 'inngest';
 import { inngest } from './client';
@@ -25,6 +26,7 @@ import {
   checkFinishedEventId,
   failureReasonOf,
   type CheckFailed,
+  type CheckBatchEnded,
   type CheckFinished,
   type CheckRequested,
   type FailureReason,
@@ -50,6 +52,8 @@ export const PACE = {
   pollStartS: 5,
   /** The wait doubles up to this and stays there: a long batch costs one poll per 30 s. */
   pollMaxS: 30,
+  /** The longest a run waits on a worker's done signal before it polls once (PR 5a). */
+  signalWaitS: 60,
   /**
    * A batch is lost once it is past its max_seconds by this much: the worker starts no request after
    * max_seconds, the one in flight has up to its 30 s ceiling (worker MAX_REQUEST_MS), and the
@@ -137,7 +141,8 @@ export type DiscoverOutput = {
   at: number;
 };
 export type PostOutput =
-  | { status: 'posted'; urls: number; at: number; max_seconds: number }
+  /** `signals`: the worker said it will signal this batch's end, so the run can wait for that. */
+  | { status: 'posted'; urls: number; at: number; max_seconds: number; signals?: true }
   | { status: 'busy'; at: number }
   | { status: 'paused' }
   /** Nothing to post: the crawl is done, stage 2 is not needed, or too little time is left. */
@@ -158,7 +163,11 @@ export type ReadOutput =
       release: string | null;
     }
   /** The worker no longer holds the batch (restarted, or its 60-minute TTL passed). */
-  | { status: 'not_found' };
+  | { status: 'not_found' }
+  /** Read on a signal while the worker still runs the batch: nothing is lost, and nothing is read. */
+  | { status: 'running' }
+  /** Read on a stale signal, and the worker says this batch failed: as a failed poll. */
+  | { status: 'failed' };
 export type RenderOutput = { rendered: number; not_rendered: number };
 export type BuildOutput = { status: 'finished' | 'partial'; pages: number; fixes: number };
 export type PersistOutput = { written: boolean };
@@ -166,7 +175,7 @@ export type PersistOutput = { written: boolean };
  * Whether the check is failed with the reason asked for (by this call, or by an earlier one with the
  * same reason that this call retries), and if so the site the database holds it under.
  */
-export type FailOutput = { failed: false } | { failed: true; siteId: string };
+export type FailOutput = { failed: false } | { failed: true; siteId: string; as?: FailureReason };
 type Empty = Record<string, never>;
 
 /**
@@ -197,6 +206,11 @@ export interface CheckStepTools {
   run<T>(id: string, fn: () => Promise<T>): Promise<T>;
   /** `ms` milliseconds. */
   sleep(id: string, ms: number): Promise<void>;
+  /** The batch's done signal, or null at the timeout. Absent where no signal can arrive. */
+  waitForEvent?(
+    id: string,
+    opts: { event: 'check.batch.ended'; timeout: string; if: string },
+  ): Promise<{ data: CheckBatchEnded } | null>;
   sendEvent(
     id: string,
     payload:
@@ -329,10 +343,17 @@ export async function runCheck(
     return { end: 'failed' };
   };
 
+  // Whether this run still waits on the worker's signal, and whether one has reached it. Both come
+  // from step outputs, so a replay agrees. The first batch to finish after a missed signal puts the
+  // run back on polling, so a signal that cannot arrive costs that batch's waits and no later one's.
+  let listening = true;
+  let heard = false;
+
   const runBatch = async (p: string, at: BatchAt): Promise<BatchEnd> => {
     let posted = await post(`${p}-post`, at);
     let reposted = false;
     let polls = 0;
+    let reads = 0;
     for (;;) {
       if (posted.status === 'capacity') return { end: 'capacity' };
       if (posted.status === 'paused') return { end: 'paused' };
@@ -340,18 +361,50 @@ export async function runCheck(
       const deadline = posted.at + (posted.max_seconds + PACE.pollGraceS) * 1000;
       let wait: number = PACE.pollStartS;
       let poll: PollOutput;
+      let lastAt = posted.at;
       do {
         polls += 1;
-        await step.sleep(`${p}-wait-${polls}`, wait * 1000);
-        wait = Math.min(wait * 2, PACE.pollMaxS);
-        poll = await run(`${p}-poll-${polls}`, () => steps.poll(data, at, soFar()));
+        const listens = listening && posted.signals === true && step.waitForEvent !== undefined;
+        const ended =
+          listens && step.waitForEvent
+            ? await step.waitForEvent(`${p}-done-${polls}`, {
+                event: 'check.batch.ended',
+                // Never past the deadline: the time plan allows one poll wait after it. Until a
+                // signal has reached this run, no longer than a poll would have waited.
+                timeout: `${Math.max(1, Math.min(heard ? PACE.signalWaitS : PACE.pollMaxS, Math.ceil((deadline - lastAt) / 1000)))}s`,
+                if: `event.data.checkId == async.data.checkId && async.data.batch == ${at.batch}`,
+              })
+            : null;
+        if (!listens) {
+          await step.sleep(`${p}-wait-${polls}`, wait * 1000);
+          wait = Math.min(wait * 2, PACE.pollMaxS);
+        }
+        // A signal of `done` goes straight to the read; anything else is the poll's to decide.
+        poll =
+          ended?.data.status === 'done'
+            ? { status: 'done', at: lastAt }
+            : await run(`${p}-poll-${polls}`, () => steps.poll(data, at, soFar()));
+        lastAt = poll.at;
+        if (ended !== null) heard = true;
+        // A `failed` note is the poll's to confirm, once. A wait that timed out on a finished batch
+        // is a signal that did not arrive. Either way the rest of the run polls.
+        if (ended?.data.status === 'failed' || (listens && !ended && poll.status === 'done')) {
+          listening = false;
+        }
       } while ((poll.status === 'running' || poll.status === 'unreachable') && poll.at < deadline);
 
       if (poll.status === 'done') {
-        const read = await run(reposted ? `${p}-read-2` : `${p}-read`, () =>
-          steps.read(data, at, soFar()),
-        );
+        // A read after a re-post is at least the second, whether or not the first post was read.
+        reads = Math.max(reads + 1, reposted ? 2 : 1);
+        const readId = reads === 1 ? `${p}-read` : `${p}-read-${reads}`;
+        const read = await run(readId, () => steps.read(data, at, soFar()));
         if (read.status === 'read') return { end: 'read', out: read };
+        if (read.status === 'failed') return fail(p, at);
+        if (read.status === 'running') {
+          // Signalled early: back to polling, which also bounds a run's steps.
+          listening = false;
+          continue;
+        }
       }
       const lost = poll.status === 'not_found' || poll.status === 'done';
       if (!lost || reposted) return fail(p, at);
@@ -424,7 +477,7 @@ function failedEvent(
   return {
     id: checkFailedEventId(checkId),
     name: 'check.failed' as const,
-    data: { checkId, siteId: out.siteId, reason },
+    data: { checkId, siteId: out.siteId, reason: out.as ?? reason },
   };
 }
 
@@ -480,6 +533,7 @@ export function createCheckFn(
           step: {
             run: <T>(id: string, fn: () => Promise<T>) => step.run(id, fn) as Promise<T>,
             sleep: (id, ms) => step.sleep(id, ms),
+            waitForEvent: (id, opts) => step.waitForEvent(id, opts),
             sendEvent: (id, payload) => step.sendEvent(id, payload),
           },
         },

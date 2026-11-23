@@ -3,7 +3,9 @@
  * check's stored rows imply, and the cursor that says which of them a viewer has been sent.
  *
  * Sources. A crawl batch's stored result gives `page_fetched` and `page_linked`; the check's row
- * gives `stage`, `counts` and `ended`. No `pages_estimated`, `page_classified`, `crawler_verdict`,
+ * gives `stage`, `counts` and `ended`. While a crawl batch runs, the worker's progress gives the same
+ * `page_fetched` and `page_linked` early (`liveEvents`) and adds to `counts` (`withLiveCounts`). No
+ * `pages_estimated`, `page_classified`, `crawler_verdict`,
  * `finding` or `graded` event is derived: nothing stored while a check runs holds them.
  *
  * Order within one poll: each new batch's events (`batchEvents`), then the row's (`checkEvents`),
@@ -24,6 +26,7 @@ import {
 import { PHASES, type ProgressEvent } from '../progress';
 import type { StreamBatch, StreamSnapshot } from './stream-store';
 import type { EvidenceStore } from './types';
+import type { LivePage } from '../../worker-client/types';
 
 /** What a viewer has been sent. It travels as the SSE `id:` and comes back as `Last-Event-ID`. */
 export interface Cursor {
@@ -159,6 +162,104 @@ export function factsOf(s: StreamSnapshot, now: number): CheckFacts {
         ? { robots_txt: s.progress.robots_txt, sitemap_urls: s.progress.sitemap_urls }
         : null,
   };
+}
+
+/** The crawl batch the worker holds now: posted and not yet read. An access batch adds no page. */
+export const runningCrawlBatch = (s: Pick<StreamSnapshot, 'status' | 'batches'>): number | null =>
+  s.status === 'running'
+    ? (s.batches.find((b) => b.kind === 'crawl' && b.status === 'posted')?.batch ?? null)
+    : null;
+
+/**
+ * The row's totals plus what the running batch has read so far. The stored totals leave a batch out
+ * until it is read, so the two do not overlap; `checkEvents` keeps the result from ever falling.
+ */
+export function withLiveCounts(
+  facts: CheckFacts,
+  live: { pages: number; links: number; homepageRead: boolean } | null,
+): CheckFacts {
+  if (live === null) return facts;
+  // Stored progress calls the whole first batch "homepage": it ends when the homepage was read.
+  const onHomepage = facts.steps?.some((s) => s.phase === 'homepage' && s.state === 'now');
+  return {
+    ...facts,
+    steps:
+      live.homepageRead && onHomepage
+        ? facts.steps!.map((s) =>
+            s.phase === 'homepage'
+              ? { ...s, state: 'done' }
+              : s.phase === 'crawl'
+                ? { ...s, state: 'now' }
+                : s,
+          )
+        : facts.steps,
+    counts: {
+      pages_crawled: (facts.counts?.pages_crawled ?? 0) + live.pages,
+      links_found: (facts.counts?.links_found ?? 0) + live.links,
+    },
+  };
+}
+
+/**
+ * The pages a running batch has finished, as the events its stored result will give: `page_fetched`,
+ * then a `page_linked` for each page it links to first. The reducer replaces a crawl page's line when
+ * its `page_fetched` repeats and ignores a later link to a page already placed, so these can be sent
+ * again after a reconnect and when the batch is read.
+ */
+export function liveEvents(cursor: Cursor, pages: readonly LivePage[], elapsedMs: number): Emitted {
+  const at = Math.max(cursor.at, Math.round(elapsedMs));
+  const events: ProgressEvent[] = [];
+  const linked = new Set<string>();
+  for (const page of pages) {
+    events.push({
+      type: 'page_fetched',
+      at_ms: at,
+      url: page.url,
+      identity: page.identity,
+      purpose: 'crawl',
+      status: page.status,
+      ms: page.ms,
+      links: page.links,
+    });
+    for (const edge of page.edges) {
+      if (edge.from === edge.to || linked.has(edge.to)) continue;
+      linked.add(edge.to);
+      events.push({
+        type: 'page_linked',
+        at_ms: at,
+        url: edge.to,
+        from: edge.from,
+        via: edge.js_only ? 'javascript' : 'link',
+      });
+    }
+  }
+  return events.length === 0 ? { events, cursor } : { events, cursor: { ...cursor, at } };
+}
+
+/**
+ * Whether the viewer holds a higher count than the check can stand behind: a batch failed or was
+ * posted again after its pages were shown. A count on screen cannot fall, so the stream tells the
+ * screen to start over from the stored rows. While a batch runs and has not answered, what it has
+ * read is unknown, so this says nothing. The stored total is the larger of the row's and the batch
+ * rows', which are read a moment apart, so a write landing between them does not read as a fall.
+ */
+export function overshot(
+  cursor: Pick<Cursor, 'pages' | 'links'>,
+  s: Pick<StreamSnapshot, 'progress' | 'batches'>,
+  runningBatch: number | null,
+  live: { pages: number; links: number } | null,
+): boolean {
+  if (runningBatch !== null && live === null) return false;
+  const read = s.batches.filter((b) => b.status === 'done');
+  const pages = Math.max(
+    s.progress?.pages_crawled ?? 0,
+    read.reduce((n, b) => n + b.pages, 0),
+  );
+  const links = Math.max(
+    s.progress?.links_found ?? 0,
+    read.reduce((n, b) => n + b.links, 0),
+  );
+  return cursor.pages > pages + (live?.pages ?? 0) || cursor.links > links + (live?.links ?? 0);
 }
 
 /** A stored `waiting_since` as ms from the check's start; null without both, or unreadable. */

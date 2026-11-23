@@ -734,6 +734,20 @@ const ROUTES: readonly Spec[] = [
     calls: 1,
   },
   {
+    path: 'api/webhooks/worker',
+    v2: true,
+    identity: 'the crawl worker',
+    gate: 'signature',
+    detail:
+      'Sends the event that wakes a run waiting on a batch, after `verifySignal` passes. Reads and returns no data.',
+    check: at('app/api/webhooks/worker/route.ts', 'verifySignal'),
+    proof: by(
+      'app/api/webhooks/worker/route.test.ts',
+      'refuses a signature made for a batch post or a read',
+    ),
+    calls: 0,
+  },
+  {
     path: 'api/contact/agency-plus',
     v2: true,
     identity: 'anyone (Turnstile when enforced, per-IP and per-address limits)',
@@ -1135,6 +1149,18 @@ const ROUTES: readonly Spec[] = [
     proof: by(
       'app/api/health/route.test.ts',
       'depends on next/server and the health module only, which depends on package.json only, and neither calls fetch (a liveness probe must not reach Supabase or the network)',
+    ),
+  },
+  {
+    path: 'ingest/[...path]',
+    v2: false,
+    identity: 'anyone',
+    gate: 'public',
+    detail:
+      'The PostHog proxy: passes a fixed list of headers, no cookie or referrer, to PostHog’s two hosts. Reads no data.',
+    proof: by(
+      'app/ingest/[...path]/route.test.ts',
+      'a signed-in browser’s cookie and page address do not reach PostHog',
     ),
   },
   {

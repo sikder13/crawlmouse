@@ -46,12 +46,39 @@ export interface Progress {
   urls_done: number;
   urls_total: number;
   requests: number;
+  /** Pages fetched so far, counted as the result counts them: `outcome === 'fetched'`. */
+  pages: number;
+  /** Link edges read so far: the result's `link_edges`, as they arrive. */
+  links: number;
+  /** Whether the batch's first URL was served to us: the homepage, in a check's first batch. */
+  homepage_read: boolean;
+}
+
+/** A finished page as the live screen shows it, with the fields its stored row will hold. */
+export interface LivePage {
+  url: string;
+  status: number;
+  ms: number;
+  links: number;
+  identity: string;
+  /** Its first links, bounded (crawl.ts); the stored batch brings the rest. */
+  edges: { from: string; to: string; js_only: boolean }[];
+}
+
+/** What one finished page adds to `Progress`. An access batch reads no page into the map. */
+export interface PageCounts {
+  pages: number;
+  links: number;
+  /** Null for a page the map would not draw: not fetched, or its links not read. */
+  live: LivePage | null;
+  /** This is the batch's first URL, and it was served to us. */
+  homepage: boolean;
 }
 
 export async function runBatch(
   req: BatchRequest,
   deps: BatchDeps,
-  onProgress: (p: Progress) => void = () => undefined,
+  onProgress: (p: Progress, live?: LivePage) => void = () => undefined,
 ): Promise<BatchResult> {
   const startedAt = deps.clock.now();
   const budget = new Budget(req.budget, deps.clock);
@@ -59,6 +86,7 @@ export async function runBatch(
     sites: deps.sites,
     fetcher: deps.fetcher,
     budget,
+    asked: new Map(),
     abort: new AbortController(),
   };
   const findings = new Findings();
@@ -67,12 +95,25 @@ export async function runBatch(
   const robots = new BatchRobots(ctx, deps.robotsCache, tokens);
   const requested = urlsOf(req);
   let urlsDone = 0;
-  const pageDone = () =>
-    onProgress({
-      urls_done: ++urlsDone,
-      urls_total: requested.length,
-      requests: budget.used.requests,
-    });
+  let pagesRead = 0;
+  let linksRead = 0;
+  let homepageRead = false;
+  const pageDone = (read?: PageCounts) => {
+    pagesRead += read?.pages ?? 0;
+    linksRead += read?.links ?? 0;
+    homepageRead ||= read?.homepage ?? false;
+    onProgress(
+      {
+        urls_done: ++urlsDone,
+        urls_total: requested.length,
+        requests: budget.used.requests,
+        pages: pagesRead,
+        links: linksRead,
+        homepage_read: homepageRead,
+      },
+      read?.live ?? undefined,
+    );
+  };
   // robots.txt for every origin first: one that blocks the site keeps the whole batch from fetching.
   const blocked = await robots.preload(requested);
   if (blocked && 'reason' in blocked) findings.notRequested(blocked);
@@ -93,7 +134,11 @@ export async function runBatch(
   const origins = (await robots.all()).filter((o): o is OriginRules => !('reason' in o));
   for (const o of origins) findings.origin(o);
   if (budget.exhausted) findings.budgetSpent(budget.exhausted);
-  for (const site of new Set(requested.map(siteKeyOf))) {
+  // The batch's own sites, and any other key of those sites a redirect reached (F-018).
+  const ownSites = new Set(requested.map((u) => siteKeyOf(u)));
+  const keys = new Set(requested.map((u) => deps.sites.keyOf(u)));
+  for (const [key, site] of ctx.asked!) if (ownSites.has(site)) keys.add(key);
+  for (const site of keys) {
     const stop = deps.sites.stopOf(site);
     if (stop && stop.at >= startedAt) findings.stopped(site, stop);
   }
