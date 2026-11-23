@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { signSignal as workerSignSignal } from '../../../../../../packages/worker/src/signal';
 import { signBody, signRead, signSignal } from '../../../../lib/worker-client/sign';
 
 const send = vi.hoisted(() => vi.fn(async () => ({ ids: ['e'] })));
@@ -124,6 +125,149 @@ describe('POST /api/webhooks/worker', () => {
     await vi.advanceTimersByTimeAsync(5_000);
     expect((await pending).status).toBe(408);
     expect(send).not.toHaveBeenCalled();
+  });
+
+  it('accepts what the worker itself signs, and the signature is the one computed outside this code', async () => {
+    const raw = JSON.stringify(BODY);
+    const ts = String(NOW);
+    // Python: hmac(hmac(secret, label), f"{ts}.{raw}"), so app and worker cannot agree on a wrong rule.
+    const independent = 'af2ff4a937a0618390629af814a6dbaf71aff4a98a399fef9f61955e24716ea5';
+    expect(workerSignSignal(SECRET, ts, raw)).toBe(independent);
+    expect(signSignal(SECRET, ts, raw)).toBe(independent);
+    expect((await call(raw, { sig: independent })).status).toBe(204);
+  });
+
+  it('refuses a batch or read signature over the body a signal context would prefix', async () => {
+    const raw = JSON.stringify(BODY);
+    const ts = String(NOW);
+    for (const sig of [
+      signBody(SECRET, ts, `signal:${raw}`),
+      signRead(SECRET, ts, `signal:${raw}`),
+    ]) {
+      expect((await call(raw, { sig })).status).toBe(401);
+    }
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  const streamed = (body: ReadableStream, ts = String(NOW), sig = 'a'.repeat(64)) =>
+    POST(
+      new Request(URL_, {
+        method: 'POST',
+        headers: { 'x-crawlmouse-ts': ts, 'x-crawlmouse-signature': sig },
+        body,
+        duplex: 'half',
+      } as RequestInit),
+    );
+  const bytes = (text: string) => new TextEncoder().encode(text);
+
+  it('answers a stale time without waiting on the body, even with a well-formed signature', async () => {
+    const pull = vi.fn();
+    const stale = String(NOW - 5 * 60_000 - 1);
+    const body = new ReadableStream({ pull }, { highWaterMark: 0 });
+    expect((await streamed(body, stale)).status).toBe(401);
+    expect(pull).not.toHaveBeenCalled();
+  });
+
+  it('answers 400, and does not throw, when the sender disconnects mid-body', async () => {
+    const body = new ReadableStream({
+      pull(c) {
+        c.error(new Error('aborted'));
+      },
+    });
+    expect((await streamed(body)).status).toBe(400);
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it('answers 413 at once even if cancelling the over-long body never settles', async () => {
+    const body = new ReadableStream({
+      start(c) {
+        c.enqueue(bytes('x'.repeat(513)));
+      },
+      cancel: () => new Promise(() => undefined),
+    });
+    expect((await streamed(body)).status).toBe(413);
+  });
+
+  it('reads exactly 512 bytes and refuses 513', async () => {
+    const of = (n: number) =>
+      new ReadableStream({
+        start(c) {
+          c.enqueue(bytes('x'.repeat(n)));
+          c.close();
+        },
+      });
+    expect((await streamed(of(512))).status).toBe(401);
+    expect((await streamed(of(513))).status).toBe(413);
+  });
+
+  it('refuses on a false Content-Length without reading the body', async () => {
+    const pull = vi.fn();
+    const res = await POST(
+      new Request(URL_, {
+        method: 'POST',
+        headers: {
+          'x-crawlmouse-ts': String(NOW),
+          'x-crawlmouse-signature': 'a'.repeat(64),
+          'content-length': '513',
+        },
+        body: new ReadableStream({ pull }, { highWaterMark: 0 }),
+        duplex: 'half',
+      } as RequestInit),
+    );
+    expect(res.status).toBe(413);
+    expect(pull).not.toHaveBeenCalled();
+  });
+
+  it('takes a real note that arrives just inside the deadline', async () => {
+    const raw = JSON.stringify(BODY);
+    let finish!: () => void;
+    const body = new ReadableStream({
+      start(c) {
+        finish = () => {
+          c.enqueue(bytes(raw));
+          c.close();
+        };
+      },
+    });
+    const pending = streamed(body, String(NOW), signSignal(SECRET, String(NOW), raw));
+    await vi.advanceTimersByTimeAsync(4_999);
+    finish();
+    await vi.advanceTimersByTimeAsync(0);
+    expect((await pending).status).toBe(204);
+  });
+
+  it('refuses a note that went stale while its body was arriving', async () => {
+    const raw = JSON.stringify(BODY);
+    const ts = String(NOW - 5 * 60_000 + 1_000);
+    let finish!: () => void;
+    const body = new ReadableStream({
+      start(c) {
+        finish = () => {
+          c.enqueue(bytes(raw));
+          c.close();
+        };
+      },
+    });
+    const pending = streamed(body, ts, signSignal(SECRET, ts, raw));
+    await vi.advanceTimersByTimeAsync(2_000);
+    finish();
+    await vi.advanceTimersByTimeAsync(0);
+    expect((await pending).status).toBe(401);
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it('stops reading a body that missed the deadline and leaves no timer behind', async () => {
+    const cancel = vi.fn();
+    const pending = streamed(new ReadableStream({ cancel }));
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect((await pending).status).toBe(408);
+    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('leaves no timer behind when the body arrives', async () => {
+    await call(JSON.stringify(BODY));
+    expect(vi.getTimerCount()).toBe(0);
   });
 
   it('answers 502 when the event cannot be sent; the run falls back to polling', async () => {
