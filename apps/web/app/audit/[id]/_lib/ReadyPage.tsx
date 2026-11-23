@@ -139,10 +139,14 @@ export function MapBody({ read, scope }: { read: ReadyCheck; scope: 'hubs' | 'al
     return (
       <AuditNotice
         domain={read.host}
-        title="This audit has no page to draw"
-        lines={[
-          'The link map draws the pages a link path from the homepage reaches, and the orphan and JavaScript-only pages beside them. This audit holds none of those.',
-        ]}
+        title={data.noneServed ? data.title : 'This audit has no page to draw'}
+        lines={
+          data.noneServed
+            ? [data.caption]
+            : [
+                'The link map draws the pages a link path from the homepage reaches, and the orphan and JavaScript-only pages beside them. This audit holds none of those.',
+              ]
+        }
         action={{ label: 'Back to the result', href: auditHrefs(read.checkId).overview }}
       />
     );

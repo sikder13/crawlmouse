@@ -40,6 +40,10 @@ export const REASON_COUNTED: Readonly<Record<FailureReason, true | { notCounted:
   worker_redeployed: true,
   worker_unavailable: true,
   capacity_wait_exceeded: true,
+  // Usually the site's, but a worker that lost its network fails every check with these words, and
+  // this line is what would show it.
+  site_unreachable: true,
+  nothing_read: true,
   build_failed: true,
   persist_failed: true,
   internal: true,

@@ -12,6 +12,8 @@
  * `generated` replaces the drawing with one that is no audit's (the 2,000-node preview); no page in
  * it has a record. Above EXPLORER_SVG_MAX nodes the screen draws on a canvas.
  */
+import { noPageServed } from './no-fix-card';
+import { noFixWords, sectionMeasured } from './section-measured';
 import type { Check, CrawlerResult, FixtureDataset, PageResult } from '@crawlmouse/types/v2';
 import { findCheck, fixesAsOf, siteOf } from '../fixtures';
 import { dayTimeUtc, percent } from '../format';
@@ -108,6 +110,8 @@ export interface MapFilter {
 }
 
 export interface LinkMapView {
+  /** Pages answered and none was served: `title` and `caption` say so, and nothing is drawn. */
+  noneServed: boolean;
   frame: {
     domain: string;
     overview: string;
@@ -366,9 +370,14 @@ export function linkMapView(
   let drawnScope: 'hubs' | 'all' | 'generated';
   // Whether `all` was laid out here from the record, which leaves out a page no link path reaches.
   let fromRecord = false;
+  // Pages that answered without serving anything are not a map of the site.
+  const noneServed = !generated && noPageServed(records.map((p) => p.status_code));
   if (generated) {
     drawing = generated;
     drawnScope = 'generated';
+  } else if (noneServed) {
+    drawing = { nodes: [], positions: {} };
+    drawnScope = 'all';
   } else if (scope === 'hubs' && records.length) {
     if (stored) {
       drawing = stored;
@@ -480,7 +489,10 @@ export function linkMapView(
   const structureFixes = sectionFixes(d, check, 'structure', plan);
   const open = structureFixes.open.length;
   const anyFix = structureFixes.open.length + structureFixes.proCount > 0;
+  // With no link read, the counts below are zeros that say nothing.
+  const noLinkRead = !isGenerated && !sectionMeasured(check, 'structure');
   return {
+    noneServed,
     frame: {
       domain: siteOf(d, check).host,
       overview: hrefs.overview,
@@ -497,39 +509,47 @@ export function linkMapView(
       ],
       back: { label: `Back: ${SEGMENTS.structure.backName}`, href: hrefs.segment('structure') },
       next: {
-        label: `Fixes for site structure · ${anyFix ? `${open} open` : 'nothing to fix'}`,
+        label: `Fixes for site structure · ${anyFix ? `${open} open` : noFixWords(check, 'structure')}`,
         href: `${hrefs.segment('structure')}#fixes`,
       },
     },
-    title: `${count(pageCount)} ${plural(pageCount, 'page', 'pages')}, ${count(linkCount)} ${plural(linkCount, 'link', 'links')}.`,
-    caption,
+    title: noneServed
+      ? 'No page was served.'
+      : `${count(pageCount)} ${plural(pageCount, 'page', 'pages')}, ${count(linkCount)} ${plural(linkCount, 'link', 'links')}.`,
+    caption: noneServed
+      ? `${count(records.length)} ${plural(records.length, 'page', 'pages')} answered, none served, so there is no link map.`
+      : noLinkRead
+        ? `${count(crawled)} ${plural(crawled, 'page', 'pages')} crawled; no internal link between them was read.`
+        : caption,
     explore:
-      drawnScope === 'hubs'
+      drawnScope === 'hubs' && !noneServed
         ? { label: `Explore all ${count(crawled)}`, href: hrefs.map?.all ?? '#' }
         : null,
-    filters: [
-      filter(
-        'orphan',
-        'Orphans',
-        ['orphan page', 'orphan pages'],
-        isGenerated ? orphanIds.length : s.orphan_pages,
-        orphanIds,
-      ),
-      filter(
-        'js_only',
-        'JavaScript-only',
-        ['JavaScript-only page', 'JavaScript-only pages'],
-        isGenerated ? jsIds.length : s.js_only_pages,
-        jsIds,
-      ),
-      filter(
-        'deep',
-        'Deeper than 3 clicks',
-        ['page deeper than 3 clicks', 'pages deeper than 3 clicks'],
-        isGenerated ? deepIds.length : s.pages_deeper_than_3,
-        deepIds,
-      ),
-    ],
+    filters: noLinkRead
+      ? []
+      : [
+          filter(
+            'orphan',
+            'Orphans',
+            ['orphan page', 'orphan pages'],
+            isGenerated ? orphanIds.length : s.orphan_pages,
+            orphanIds,
+          ),
+          filter(
+            'js_only',
+            'JavaScript-only',
+            ['JavaScript-only page', 'JavaScript-only pages'],
+            isGenerated ? jsIds.length : s.js_only_pages,
+            jsIds,
+          ),
+          filter(
+            'deep',
+            'Deeper than 3 clicks',
+            ['page deeper than 3 clicks', 'pages deeper than 3 clicks'],
+            isGenerated ? deepIds.length : s.pages_deeper_than_3,
+            deepIds,
+          ),
+        ],
     renderer: nodes.length > EXPLORER_SVG_MAX ? 'canvas' : 'svg',
     label: `Link map of ${count(nodes.length)} pages. Use the arrow keys to move from page to page.`,
     nodes,

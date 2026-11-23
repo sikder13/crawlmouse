@@ -22,6 +22,7 @@ let state: {
   existing: (string | null)[];
   insertErrors: (WriteError | null)[];
   accountId: string | null;
+  takenDown: boolean;
 };
 let slugs: string[];
 let inserted: Record<string, unknown>[];
@@ -48,6 +49,7 @@ function deps(): MintV2Deps {
       verified.push([token, ip]);
       return state.turnstileOk;
     }),
+    hostTakenDown: log('hostTakenDown', async () => state.takenDown),
     slugForCheck: log('slugForCheck', async () => state.existing.shift() ?? null),
     snapshotOf: log('snapshotOf', async () => ({ snapshot, accountId: state.accountId })),
     insert: log('insert', async (row: Record<string, unknown>) => {
@@ -61,7 +63,7 @@ function deps(): MintV2Deps {
 }
 
 /** The service-role dependencies: none may run before the caller's membership is known. */
-const SERVICE_ROLE = ['slugForCheck', 'snapshotOf', 'insert'];
+const SERVICE_ROLE = ['hostTakenDown', 'slugForCheck', 'snapshotOf', 'insert'];
 
 const mint = (token?: string, ip = '9.9.9.9') =>
   mintV2(deps(), token ? { checkId: CHECK, turnstileToken: token } : { checkId: CHECK }, ip);
@@ -78,6 +80,7 @@ beforeEach(() => {
     existing: [],
     insertErrors: [],
     accountId: ACCOUNT,
+    takenDown: false,
   };
   slugs = ['slug-a', 'slug-b', 'slug-c', 'slug-d'];
   inserted = [];
@@ -155,6 +158,31 @@ describe('mintV2', () => {
       expect(await mint()).toEqual({ status: 409, body: { error: 'check_not_finished' } });
     }
     expect(inserted).toEqual([]);
+  });
+
+  it('a host with a taken-down report is 409, before any read of a report, and writes nothing', async () => {
+    state.takenDown = true;
+    const r = await mint();
+    expect(r).toEqual({ status: 409, body: { error: 'host_taken_down' } });
+    expect(inserted).toEqual([]);
+    expect(calls).not.toContain('slugForCheck');
+    expect(calls).not.toContain('snapshotOf');
+  });
+
+  it('the same for a check of it already minted: its old slug is not answered', async () => {
+    state.takenDown = true;
+    state.existing = ['the-old-slug'];
+    expect((await mint()).body).toEqual({ error: 'host_taken_down' });
+  });
+
+  it('a caller who may not mint is not told the host was taken down', async () => {
+    state.takenDown = true;
+    state.mayMint = false;
+    expect((await mint()).status).toBe(403);
+    state.mayMint = true;
+    state.member = false;
+    expect((await mint()).status).toBe(404);
+    expect(calls).not.toContain('hostTakenDown');
   });
 
   it('a check already minted answers its slug, with no second row', async () => {
