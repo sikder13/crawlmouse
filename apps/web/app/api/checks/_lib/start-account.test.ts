@@ -303,7 +303,7 @@ describe('siteLimitSentence', () => {
     'with fewer kept than %s’s limit (a removal raced the add) names no count',
     (tier, kept) => {
       const sentence = siteLimitSentence(tier, GATES[tier].sites, kept);
-      expect(sentence).toBe('This account’s site limit changed. Try again.');
+      expect(sentence).toBe('A site on this account was just removed. Try again.');
     },
   );
 
@@ -314,7 +314,7 @@ describe('siteLimitSentence', () => {
     expect(out).toMatchObject({
       ok: false,
       status: 409,
-      body: { code: 'site_limit', error: 'This account’s site limit changed. Try again.' },
+      body: { code: 'site_limit', error: 'A site on this account was just removed. Try again.' },
     });
   });
 

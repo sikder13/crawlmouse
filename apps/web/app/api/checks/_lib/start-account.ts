@@ -139,7 +139,7 @@ const CAPACITY = refuse(
  */
 export function siteLimitSentence(tier: Tier, limit: number, kept: number = limit): string {
   // A site was removed between the refused add and this count: there is no limit to explain.
-  if (kept < limit) return 'This account’s site limit changed. Try again.';
+  if (kept < limit) return 'A site on this account was just removed. Try again.';
   const sites = (n: number) => `${numberWord(n)} ${plural(n, 'site', 'sites')}`;
   const holds =
     kept === limit
