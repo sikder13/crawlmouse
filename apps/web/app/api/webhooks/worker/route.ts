@@ -17,6 +17,9 @@ export const runtime = 'nodejs';
  */
 const MAX_BYTES = 512;
 const BODY_DEADLINE_MS = 5_000;
+const TOO_LARGE = Symbol('too_large');
+const TIMED_OUT = Symbol('timeout');
+const ABORTED = Symbol('aborted');
 
 /** Whether these headers could pass `verifySignal`: a recent time and a whole hex signature. */
 function headersCanPass(ts: string, signature: string, now: number): boolean {
@@ -30,10 +33,13 @@ function headersCanPass(ts: string, signature: string, now: number): boolean {
 /**
  * The body as text; `too_large` past MAX_BYTES, whatever Content-Length said; `timeout` when it has
  * not ended within BODY_DEADLINE_MS, so a sender with a well-formed forged signature cannot hold the
- * route open by never finishing its body.
+ * route open by never finishing its body; `aborted` when the sender went away, which is answered
+ * here so an anonymous disconnect does not reach error reporting.
  */
-async function bounded(req: Request): Promise<string | 'too_large' | 'timeout'> {
-  if (Number(req.headers.get('content-length') ?? 0) > MAX_BYTES) return 'too_large';
+async function bounded(
+  req: Request,
+): Promise<string | typeof TOO_LARGE | typeof TIMED_OUT | typeof ABORTED> {
+  if (Number(req.headers.get('content-length') ?? 0) > MAX_BYTES) return TOO_LARGE;
   if (!req.body) return '';
   const reader = req.body.getReader();
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -47,16 +53,18 @@ async function bounded(req: Request): Promise<string | 'too_large' | 'timeout'> 
       const next = await Promise.race([reader.read(), deadline]);
       if (next === 'timeout') {
         void reader.cancel().catch(() => undefined);
-        return 'timeout';
+        return TIMED_OUT;
       }
       if (next.done) break;
       size += next.value.byteLength;
       if (size > MAX_BYTES) {
-        await reader.cancel();
-        return 'too_large';
+        void reader.cancel().catch(() => undefined);
+        return TOO_LARGE;
       }
       chunks.push(next.value);
     }
+  } catch {
+    return ABORTED;
   } finally {
     clearTimeout(timer);
   }
@@ -72,8 +80,9 @@ export async function POST(req: Request): Promise<Response> {
     return new Response(null, { status: 401 });
   }
   const raw = await bounded(req);
-  if (raw === 'too_large') return new Response(null, { status: 413 });
-  if (raw === 'timeout') return new Response(null, { status: 408 });
+  if (raw === TOO_LARGE) return new Response(null, { status: 413 });
+  if (raw === TIMED_OUT) return new Response(null, { status: 408 });
+  if (raw === ABORTED) return new Response(null, { status: 400 });
   if (!verifySignal(secret, ts, raw, signature, Date.now())) {
     return new Response(null, { status: 401 });
   }

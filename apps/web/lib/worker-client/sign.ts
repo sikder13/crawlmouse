@@ -22,9 +22,17 @@ export const signRead = (secret: string, ts: string, purpose: string): string =>
 /** How far a signal's timestamp may be from the app's clock, either way: the worker's own window. */
 export const SIGNAL_MAX_SKEW_MS = 5 * 60_000;
 
-/** The worker's "this batch ended" call: its own context, so no batch or read signature fits it. */
-export const signSignal = (secret: string, ts: string, raw: string): string =>
-  signRead(secret, ts, `signal:${raw}`);
+/**
+ * The worker's "this batch ended" call, signed under a key of its own derived from the shared secret,
+ * so a batch or read signature is made with a different key. The label does not start with digits
+ * and a dot, so no batch or read signature (`${ts}.…`) can equal the derived key. Same rule as
+ * packages/worker/src/signal.ts.
+ */
+const SIGNAL_KEY_LABEL = 'crawlmouse-worker-signal-v1';
+export const signSignal = (secret: string, ts: string, raw: string): string => {
+  const key = createHmac('sha256', secret).update(SIGNAL_KEY_LABEL).digest();
+  return createHmac('sha256', key).update(`${ts}.`).update(raw).digest('hex');
+};
 
 /** Whether a signal is the worker's, and recent. Compared in constant time. */
 export function verifySignal(
