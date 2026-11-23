@@ -25,7 +25,7 @@ const CrawlerSnapshotSchema = z.strictObject({
   group: Text,
   scored: z.boolean(),
   verdict: Text,
-  /** The status that decided the verdict, or "robots.txt". */
+  /** The status that decided the verdict, "robots.txt", or "not measured". */
   status: Text,
   /** "31%", or "not measured". */
   text: Text,

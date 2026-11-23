@@ -187,15 +187,20 @@ export function ResultScreen({
               </div>
               {first.letIn ? (
                 <div className={styles.letIn}>
-                  <div className={styles.fixFirstBody}>
-                    Our requests carry <code>{first.letIn.agent}</code> in the user agent.{' '}
-                    <a href={first.letIn.href}>How our crawler identifies itself</a>
-                  </div>
-                  <div className={`${layout.row} ${styles.actions}`}>
-                    <AuditLink to="rerun" variant="primary">
-                      Run this audit again
-                    </AuditLink>
-                  </div>
+                  {first.letIn.agent ? (
+                    <div className={styles.fixFirstBody}>
+                      To let our crawl in, allow this exact user agent:
+                      <code className={styles.agent}>{first.letIn.agent}</code>
+                      Match the whole string. Our AI crawler tests carry part of it, so a partial
+                      match could let them past a block the real crawlers still meet.
+                    </div>
+                  ) : (
+                    <div className={styles.fixFirstBody}>
+                      A user agent rule will not clear this: the site’s edge also refused a request
+                      that did not name Crawlmouse.
+                    </div>
+                  )}
+                  <a href={first.letIn.href}>How our crawler identifies itself</a>
                 </div>
               ) : null}
               {first.action ? (

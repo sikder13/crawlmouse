@@ -7,7 +7,10 @@ import { describe, expect, it } from 'vitest';
 import type { Check, FixtureDataset } from '@crawlmouse/types/v2';
 import { ResultScreen } from '../../components/v2/screens/result/ResultScreen';
 import { fixture } from '../../lib/v2/fixtures';
-import { CRAWLER_TAG } from '../../lib/v2/help/pinned';
+import { AuditPageProvider } from '../../components/v2/screens/result/AuditPage';
+import { auditPage } from '../../app/audit/[id]/_lib/page-data';
+import { CONTROL, CRAWL, CRAWLERS } from '../../../../packages/worker/src/identities';
+import { CRAWL_USER_AGENT } from '../../lib/v2/help/pinned';
 import { CHECKS } from '../../lib/v2/recordings';
 import { resultView, type ResultView } from '../../lib/v2/view/result';
 
@@ -42,13 +45,45 @@ const card = (v: ResultView) => {
   return v.first;
 };
 const signals = (v: ResultView) => v.doors.find((x) => x.title === 'Agent-readiness signals')!;
-const html = (v: ResultView) => renderToStaticMarkup(<ResultScreen data={v} checkId={ID} />);
+/** As a real audit page renders it: with that page's links, which hold no re-run route. */
+const html = (v: ResultView) =>
+  renderToStaticMarkup(
+    <AuditPageProvider page={auditPage(ID, 'result')}>
+      <ResultScreen data={v} checkId={ID} />
+    </AuditPageProvider>,
+  );
 const COMPETITOR = 'Is a competitor this readable?';
 
 describe('the next step on a refused check', () => {
-  it.each([401, 403, 429])('%i: names the token every request carries, and /bot', (code) => {
-    expect(card(answered(code)).letIn).toEqual({ agent: 'Crawlmouse/2.0', href: '/bot' });
-    expect(CRAWLER_TAG.startsWith('Crawlmouse/2.0 ')).toBe(true);
+  it.each([401, 403, 429])('%i: names our crawl’s exact user agent, and /bot', (code) => {
+    expect(card(answered(code)).letIn).toEqual({ agent: CRAWL.userAgent, href: '/bot' });
+    expect(CRAWL_USER_AGENT).toBe(CRAWL.userAgent);
+  });
+
+  it('the string it tells an owner to allow is on no crawler test or control request', () => {
+    const agent = card(answered(429)).letIn!.agent!;
+    for (const identity of [...CRAWLERS, CONTROL]) expect(identity.userAgent).not.toContain(agent);
+  });
+
+  it('warns against a partial match', () => {
+    expect(html(answered(429))).toContain('Match the whole string.');
+  });
+
+  it('gives no user agent when the edge refused our browser request too', () => {
+    const v = view((c, d) => {
+      Object.assign(c.technical_seo!, { grade: null, score: null });
+      d.page_results = d.page_results
+        .filter((p) => p.check_id === c.id)
+        .map((p) => ({ ...p, status_code: 403 }));
+      for (const x of c.crawlers.filter((x) => x.group !== 'search_engine'))
+        Object.assign(x, { verdict: 'edge_blocks_automation', status: 403 });
+    });
+    if (card(v).letIn!.agent === null) {
+      expect(html(v)).toContain('A user agent rule will not clear this');
+      expect(html(v)).not.toContain('Match the whole string.');
+    } else {
+      throw new Error('the fixture did not reach the edge state');
+    }
   });
 
   it.each([404, 500, 301])('%i is not a refusal, so it offers no way in', (code) => {
@@ -58,9 +93,22 @@ describe('the next step on a refused check', () => {
 
   it('draws the token, the link and Run this audit again', () => {
     const out = html(answered(429));
-    expect(out).toContain('<code>Crawlmouse/2.0</code>');
+    expect(out).toContain(CRAWL.userAgent);
     expect(out).toMatch(/<a href="\/bot">How our crawler identifies itself<\/a>/);
-    expect(out).toContain('Run this audit again');
+    expect(out).toMatch(
+      /<a [^>]*href="\/"[^>]*data-v2-primary[^>]*>Run a new audit<|<a [^>]*data-v2-primary[^>]*href="\/"[^>]*>Run a new audit</,
+    );
+  });
+
+  it('offers Sites on a kept audit', () => {
+    const v = view((c, d) => {
+      Object.assign(c.technical_seo!, { grade: null, score: null });
+      d.page_results = d.page_results
+        .filter((p) => p.check_id === c.id)
+        .map((p) => ({ ...p, status_code: 429 }));
+      keep(c, d);
+    });
+    expect(card(v).action).toEqual({ label: 'Open Sites', href: '/dashboard' });
   });
 
   it('has one primary button, kept or not', () => {
@@ -83,6 +131,17 @@ describe('the next step on a refused check', () => {
 });
 
 describe('429 in words', () => {
+  it('labels only 429 when two statuses are named', () => {
+    const v = view((c, d) => {
+      Object.assign(c.technical_seo!, { grade: null, score: null });
+      const rows = d.page_results.filter((p) => p.check_id === c.id);
+      d.page_results = rows.map((p, i) => ({ ...p, status_code: i ? 451 : 429 }));
+    });
+    expect(card(v).body).toContain(
+      'with 429 (“too many requests”: the site is limiting requests) or 451.',
+    );
+  });
+
   it('is explained once', () => {
     expect(card(answered(429)).body.match(/too many requests/g)).toHaveLength(1);
   });
@@ -131,6 +190,30 @@ describe('the signals card', () => {
 
   it('a check that read no page counts what it tested', () => {
     expect(signals(refusedWithPeriods).pill.label).toBe('0 found, 1 of 7 tested');
+  });
+
+  it('says Not tested when nothing was', () => {
+    const v = view((c, d) => {
+      Object.assign(c.technical_seo!, { grade: null, score: null });
+      d.page_results = d.page_results
+        .filter((p) => p.check_id === c.id)
+        .map((p) => ({ ...p, status_code: 429 }));
+      c.signals = [];
+    });
+    expect(signals(v).pill.label).toBe('Not tested');
+  });
+
+  it('groups evidence that differs only by its full stop', () => {
+    const v = view((c) => {
+      c.signals = (['llms_txt', 'mcp_server_card'] as const).map((signal, i) => ({
+        signal,
+        state: 'indeterminate',
+        evidence: i ? 'not requested' : 'not requested.',
+        counts_toward_grade: false,
+        recommendation_class: 'experimental',
+      })) as Check['signals'];
+    });
+    expect(signals(v).body.match(/not requested/g)).toHaveLength(1);
   });
 
   it('a check that read pages keeps its count', () => {

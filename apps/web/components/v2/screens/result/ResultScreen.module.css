@@ -458,6 +458,14 @@
   gap: 12px;
 }
 
-.letIn a:not([data-v2-primary]) {
+.agent {
+  display: block;
+  margin: 6px 0;
+  font-family: var(--v2-font-mono);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.letIn a {
   text-decoration: underline;
 }

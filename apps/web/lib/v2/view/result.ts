@@ -31,7 +31,8 @@ import {
   noFixWords,
   sectionMeasured,
 } from './section-measured';
-import { CRAWLER_TAG } from '../help/pinned';
+import { CRAWL_USER_AGENT } from '../help/pinned';
+import { ACCOUNT_NAV } from './account-actions';
 import { SCREEN_SIGNALS, screenSignals, type ScreenSignal } from './screen-signals';
 import { dateTimeUtc, dayTimeUtc, listOf, percent, templateNoun } from '../format';
 import { toneOf } from '../letters';
@@ -150,7 +151,7 @@ export interface ResultView {
         /** The way to start watching an audit nobody has kept; null once it is kept. */
         action: { label: string; href: string } | null;
         /** A refused check: what to allow, and where our crawler is described. */
-        letIn?: { agent: string; href: string };
+        letIn?: { agent: string | null; href: string };
       };
   doors: DoorView[];
   fixes: { total: number; open: number; pro: number; rows: FixRowView[] } | null;
@@ -616,14 +617,18 @@ function signalsDoor(check: Check, notServed: boolean): DoorView {
   const tested = present.length + absent.length;
   // On a check that read no page, "0 of 7 present" would read as seven signals looked for and missing.
   const label = notServed
-    ? `${present.length} found, ${tested} of ${kinds.length} tested`
+    ? tested === 0
+      ? 'Not tested'
+      : `${present.length} found, ${tested} of ${kinds.length} tested`
     : `${present.length} of ${kinds.length} present`;
   const names = (xs: { signal: ScreenSignal }[]) => xs.map((s) => SIGNAL_NAMES[s.signal]);
   const counting = shown.filter((s) => s.counts_toward_grade);
   // What could not be tested is said in the check's own words, grouped where the words agree.
   const untested = new Map<string, string[]>();
-  for (const s of unknown)
-    untested.set(s.evidence, [...(untested.get(s.evidence) ?? []), SIGNAL_NAMES[s.signal]]);
+  for (const s of unknown) {
+    const evidence = s.evidence.replace(/\.$/, '');
+    untested.set(evidence, [...(untested.get(evidence) ?? []), SIGNAL_NAMES[s.signal]]);
+  }
   const body = [
     present.length
       ? `${listOf(names(present))} ${present.length === 1 ? 'is' : 'are'} there.`
@@ -635,7 +640,7 @@ function signalsDoor(check: Check, notServed: boolean): DoorView {
             .join(', '),
         )}.`
       : null,
-    ...[...untested].map(([evidence, ns]) => `${listOf(ns)}: ${evidence.replace(/\.$/, '')}.`),
+    ...[...untested].map(([evidence, ns]) => `${listOf(ns)}: ${evidence}.`),
     counting.length
       ? `${listOf(names(counting))} count; the other ${numberWord(kinds.length - counting.length)} do not yet.`
       : null,
@@ -733,19 +738,21 @@ type NoFixCard = Exclude<ResultView['first'], { kind: 'fix' }>;
 
 /** "403", "403 or 429", "401, 403 or 429". */
 const eitherOf = (codes: readonly number[]) => {
-  const last = codes.at(-1);
-  const rest = codes.filter((c) => c !== last);
+  const names = codes.map(statusName);
+  const last = names.at(-1);
+  const rest = names.slice(0, -1);
   return rest.length ? `${rest.join(', ')} or ${last}` : `${last}`;
 };
 
-/** 429 in words, said once, where the card names the status. */
-const TOO_MANY = ' (“too many requests”: the site is limiting automated visitors)';
+/** A status as the card names it: 429 is said in words, beside the code it belongs to. */
+const statusName = (code: number) =>
+  code === 429 ? '429 (“too many requests”: the site is limiting requests)' : `${code}`;
 
-/** The part of our user agent every request carries, which a firewall rule can match. */
-const OUR_AGENT = CRAWLER_TAG.split(' ')[0]!;
+const SITES_ACTION = { label: 'Open Sites', href: ACCOUNT_NAV[0].href };
+const NEW_AUDIT_ACTION = { label: 'Run a new audit', href: '/' };
 
 /** The third card when pages answered and none with a 200: what they answered, and what to do. */
-function notServedCard(check: Check, statuses: readonly number[]): NoFixCard {
+function notServedCard(check: Check, statuses: readonly number[], kept: boolean): NoFixCard {
   const codes = [...new Set(statuses)].sort((a, b) => a - b);
   const refused = servedWord(codes) === 'refused';
   const moved = codes.every((c) => c >= 300 && c < 400);
@@ -766,14 +773,19 @@ function notServedCard(check: Check, statuses: readonly number[]): NoFixCard {
     label: 'Nothing to grade',
     title: refused ? 'Your site refused our requests' : 'Your site did not serve a page',
     body: [
-      `${count(n)} ${plural(n, 'page answered our request', 'pages answered our requests')}, with ${eitherOf(codes)}${codes.includes(429) ? TOO_MANY : ''}.`,
+      `${count(n)} ${plural(n, 'page answered our request', 'pages answered our requests')}, with ${eitherOf(codes)}.`,
       crawlers,
       next,
     ]
       .filter(Boolean)
       .join(' '),
-    action: null,
-    ...(refused ? { letIn: { agent: OUR_AGENT, href: '/bot' } } : {}),
+    // An audit page has no re-run route: a kept site re-runs from Sites, an unkept one is a new audit.
+    action: refused ? (kept ? SITES_ACTION : NEW_AUDIT_ACTION) : null,
+    // The crawl's exact user agent, never the shared token: the crawler tests carry that too. When
+    // the edge refused our untagged browser request as well, no user agent rule clears it.
+    ...(refused
+      ? { letIn: { agent: meetsEdge(check) ? null : CRAWL_USER_AGENT, href: '/bot' } }
+      : {}),
   };
 }
 
@@ -1123,7 +1135,7 @@ export function resultView(
           href: fixHref(fixes[0].id),
         }
       : notServed
-        ? notServedCard(check, statuses)
+        ? notServedCard(check, statuses, kept)
         : noFix === 'unmeasured'
           ? unmeasuredCard(check, kept)
           : allClear(check, kept, cadence),

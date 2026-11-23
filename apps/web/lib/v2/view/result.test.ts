@@ -447,7 +447,7 @@ describe('the third card when there is no fix', () => {
     if (v.first.kind !== 'not-served') throw new Error(`got ${v.first.kind}`);
     expect(v.first.title).toBe('Your site refused our requests');
     expect(v.first.body).toMatch(/^2 pages answered our requests, with 403\./);
-    expect(v.first.action).toBeNull();
+    expect(v.first.action).toEqual({ label: 'Run a new audit', href: '/' });
   });
 
   it('does not call a 404 a refusal', () => {
