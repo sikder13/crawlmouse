@@ -224,6 +224,58 @@ describe('post (finding 2)', () => {
     ).rejects.toMatchObject({ name: 'WorkerError', kind: 'network' });
   });
 
+  describe('the done signal (PR 5a)', () => {
+    const says = (s: Awaited<ReturnType<typeof setup>>, signals: boolean) => {
+      const real = s.worker.postBatch;
+      s.worker.postBatch = async (b) => ({ ...(await real(b)), signals });
+    };
+
+    it('passes on that the worker will signal this batch', async () => {
+      const s = await setup();
+      says(s, true);
+      expect(await s.steps.post(EVENT, CRAWL_1, SO)).toMatchObject({
+        status: 'posted',
+        signals: true,
+      });
+    });
+
+    it('claims nothing when the worker did not say so', async () => {
+      const s = await setup();
+      expect(await s.steps.post(EVENT, CRAWL_1, SO)).not.toHaveProperty('signals');
+    });
+
+    it('claims nothing on a retry whose first post the worker took: it may have ended', async () => {
+      const s = await setup();
+      const real = s.worker.postBatch;
+      s.worker.postBatch = async (b) => {
+        await real(b);
+        throw new WorkerError('timeout', null, null);
+      };
+      expect(await s.steps.post(EVENT, CRAWL_1, SO)).not.toHaveProperty('signals');
+    });
+
+    it('claims nothing on a batch the worker already holds', async () => {
+      const s = await setup();
+      s.worker.postBatch = async () => {
+        throw new WorkerError('batch_exists', 409, 'batch_exists');
+      };
+      expect(await s.steps.post(EVENT, CRAWL_1, SO)).not.toHaveProperty('signals');
+    });
+
+    it.each(['running', 'failed'] as const)(
+      'a read that finds the batch %s says so',
+      async (status) => {
+        const s = await setup();
+        await s.steps.post(EVENT, CRAWL_1, SO);
+        s.worker.pollBatch = async () =>
+          status === 'running'
+            ? { status, progress: { urls_done: 1, urls_total: 2, requests: 1 } }
+            : { status };
+        expect(await s.steps.read(EVENT, CRAWL_1, SO)).toEqual({ status });
+      },
+    );
+  });
+
   it('fails the check on a refusal that a retry cannot change', async () => {
     const s = await setup();
     s.refuse.push('unauthorized', 'invalid');
