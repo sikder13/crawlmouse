@@ -34,7 +34,35 @@ export const START_REFUSALS = [
 ] as const;
 export type StartRefusal = (typeof START_REFUSALS)[number] | 'failed';
 
-export type StartOutcome = { ok: true; checkId: string } | { ok: false; code: StartRefusal };
+/**
+ * The refusals whose sentence the route builds from the account's plan (RC-02), so the form shows
+ * that sentence. Every other refusal keeps its fixed one: an upstream message is never shown.
+ */
+export const SERVER_WORDED_REFUSALS: readonly StartRefusal[] = [
+  'site_limit',
+  'adds_capped',
+  'role_refused',
+  'site_paused',
+  'recently_checked',
+  'site_exists',
+];
+
+/** The longest server sentence the form shows; anything longer is not one of the route's. */
+const MAX_SERVER_SENTENCE = 300;
+
+/** The route's sentence for `code`, or null when it is not a short single line of text. */
+function serverSentence(code: StartRefusal, error: unknown): string | null {
+  if (!SERVER_WORDED_REFUSALS.includes(code) || typeof error !== 'string') return null;
+  const text = error.trim();
+  if (text === '' || text.length > MAX_SERVER_SENTENCE) return null;
+  // eslint-disable-next-line no-control-regex
+  return /[\u0000-\u001f\u007f]/.test(text) ? null : text;
+}
+
+export type StartOutcome =
+  | { ok: true; checkId: string }
+  /** `sentence`: the route's own words, shown as text, in place of `START_COPY[code]`. */
+  | { ok: false; code: StartRefusal; sentence?: string };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -49,7 +77,11 @@ export async function startCheck(body: StartRequest): Promise<StartOutcome> {
   } catch {
     return { ok: false, code: 'failed' };
   }
-  const answer = (await res.json().catch(() => ({}))) as { checkId?: unknown; code?: unknown };
+  const answer = (await res.json().catch(() => ({}))) as {
+    checkId?: unknown;
+    code?: unknown;
+    error?: unknown;
+  };
   if (res.ok) {
     // The id goes into a path, so an answer that is not a uuid is not followed.
     return typeof answer.checkId === 'string' && UUID.test(answer.checkId)
@@ -59,7 +91,8 @@ export async function startCheck(body: StartRequest): Promise<StartOutcome> {
   const code = (START_REFUSALS as readonly unknown[]).includes(answer.code)
     ? (answer.code as StartRefusal)
     : 'failed';
-  return { ok: false, code };
+  const sentence = serverSentence(code, answer.error);
+  return sentence === null ? { ok: false, code } : { ok: false, code, sentence };
 }
 
 /** What the form says for each refusal. `captcha_required` is said while the person check runs. */
@@ -74,7 +107,8 @@ export const START_COPY: Record<StartRefusal, string> = {
   paused: 'New audits are paused for the moment. Try again later.',
   unavailable: 'Audits are not running at the moment. Try again later.',
   capacity: "Today's audits are used up. Try again tomorrow.",
-  // No number in these: the plan's limits are the account's, and the route's own `error` names them.
+  // The fallbacks for the six server-worded refusals. No number in these: the plan's limits are the
+  // account's, and the route's own `error` names them.
   site_limit:
     'This account already keeps as many sites as its plan allows. Open your dashboard to check one of them again.',
   adds_capped: 'This account has added as many sites as it may today. Try again tomorrow.',
