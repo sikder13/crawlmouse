@@ -82,7 +82,7 @@ export function ClientScreen({
                     ) : null}
                   </span>,
                   f.effect,
-                  <ActionControl key="p" action={f.packet} variant="quiet" />,
+                  f.packet ? <ActionControl key="p" action={f.packet} variant="quiet" /> : null,
                 ],
               }))}
             />

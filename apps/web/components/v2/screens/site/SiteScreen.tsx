@@ -173,7 +173,7 @@ export function SiteScreen({
                   </span>,
                   <span key="p">
                     {f.markDone ? <MarkDone action={f.markDone} fixType={f.fixType} /> : null}
-                    <ActionControl action={f.packet} variant="quiet" />
+                    {f.packet ? <ActionControl action={f.packet} variant="quiet" /> : null}
                   </span>,
                 ],
               })),

@@ -435,11 +435,11 @@ const INVENTORY: [entry: string, why: string][] = [
     'ARRAY slice over fix records in the CC-26 account previews (development-only, never persisted): no string is indexed, so no surrogate pair can be split. The three fixes the first-run dashboard starts with; the line under them states how many more there are.',
   ],
   [
-    'apps/web/lib/v2/view/site.ts :: const rest = byNumber.slice(SHOWN_FIXES);',
+    'apps/web/lib/v2/view/site.ts :: const rest = inTable.slice(shownFixes);',
     'ARRAY slice over fix records in the CC-26 account previews (development-only, never persisted): no string is indexed, so no surrogate pair can be split. Every fix after the five the site page lists, shown as one row that states their count, sections and summed effect.',
   ],
   [
-    'apps/web/lib/v2/view/site.ts :: const rows = byNumber.slice(0, SHOWN_FIXES).map((f) => fixRow(v, result, f, fixes));',
+    'apps/web/lib/v2/view/site.ts :: const rows = inTable.slice(0, shownFixes).map((f) => fixRow(v, result, f, fixes));',
     'ARRAY slice over fix records in the CC-26 account previews (development-only, never persisted): no string is indexed, so no surrogate pair can be split. The five fixes the site page lists by number; the rest are the row above.',
   ],
   [
