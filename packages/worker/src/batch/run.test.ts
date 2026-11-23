@@ -1782,6 +1782,27 @@ describe('progress while a batch runs', () => {
     }
   });
 
+  it.each([
+    ['read', 'User-agent: *\nDisallow: /b\n', true],
+    ['not read, though other pages were', 'User-agent: *\nDisallow: /a\n', false],
+  ])('says the batch’s first page was %s', async (_name, robots, expected) => {
+    const s = await serve({ robots: robotsText(robots) });
+    const seen: Progress[] = [];
+    const clock = new InstantClock();
+    await runBatch(
+      crawlReq(s.base, ['/a', '/b', '/c']),
+      {
+        clock,
+        sites: new Sites(clock),
+        fetcher: createFetcher(clock, { bypassSsrf: true }),
+        robotsCache: new RobotsCache(clock),
+      },
+      (p) => seen.push(p),
+    );
+    expect(seen.at(-1)!.pages).toBeGreaterThan(0);
+    expect(seen.at(-1)!.homepage_read).toBe(expected);
+  });
+
   it('counts pages and links by the rule the result is counted by', async () => {
     const s = await serve({ robots: robotsText('User-agent: *\nDisallow: /b\n') });
     const seen: Progress[] = [];

@@ -465,7 +465,14 @@ describe('GET /batch/{id}/progress', () => {
     expect((await get(`/batch/${id}/progress`, `progress:${id}`)).body).toEqual({
       batch_id: id,
       status: 'running',
-      progress: { urls_done: 0, urls_total: 2, requests: 0, pages: 0, links: 0 },
+      progress: {
+        urls_done: 0,
+        urls_total: 2,
+        requests: 0,
+        pages: 0,
+        links: 0,
+        homepage_read: false,
+      },
       pages_total: 0,
       live_pages: [],
     });
@@ -574,7 +581,14 @@ describe('GET /batch/{id}', () => {
     expect((await get(`/batch/${id}`, `batch:${id}`)).body).toEqual({
       batch_id: id,
       status: 'running',
-      progress: { urls_done: 0, urls_total: 2, requests: 0, pages: 0, links: 0 },
+      progress: {
+        urls_done: 0,
+        urls_total: 2,
+        requests: 0,
+        pages: 0,
+        links: 0,
+        homepage_read: false,
+      },
     });
     release();
   });

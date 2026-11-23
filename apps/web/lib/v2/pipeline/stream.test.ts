@@ -280,12 +280,21 @@ describe('nextEvents, against events written out by hand', () => {
     };
 
     it('stays until a page has been read', () => {
-      const out = checkEvents(START, withLiveCounts(onHomepage, { pages: 0, links: 0 }));
+      const live = { pages: 0, links: 0, homepageRead: false };
+      const out = checkEvents(START, withLiveCounts(onHomepage, live));
       expect(out.events.at(-1)).toEqual(stage('homepage', 'now', 10));
     });
 
-    it('ends when the first page is read, and the crawl is under way', () => {
-      const out = checkEvents(START, withLiveCounts(onHomepage, { pages: 1, links: 0 }));
+    it('stays when other pages were read and the homepage was not', () => {
+      const live = { pages: 38, links: 40, homepageRead: false };
+      const out = checkEvents(START, withLiveCounts(onHomepage, live));
+      const stages = out.events.filter((e) => e.type === 'stage');
+      expect(stages.at(-1)).toEqual(stage('homepage', 'now', 10));
+    });
+
+    it('ends when the homepage is read, and the crawl is under way', () => {
+      const live = { pages: 1, links: 0, homepageRead: true };
+      const out = checkEvents(START, withLiveCounts(onHomepage, live));
       const stages = out.events.filter((e) => e.type === 'stage');
       expect(stages.at(-2)).toEqual(stage('homepage', 'done', 10));
       expect(stages.at(-1)).toEqual(stage('crawl', 'now', 10));
@@ -300,7 +309,9 @@ describe('nextEvents, against events written out by hand', () => {
           { phase: 'crawler_tests', state: 'now' },
         ],
       };
-      expect(withLiveCounts(later, { pages: 3, links: 0 }).steps).toEqual(later.steps);
+      expect(withLiveCounts(later, { pages: 3, links: 0, homepageRead: true }).steps).toEqual(
+        later.steps,
+      );
     });
   });
 

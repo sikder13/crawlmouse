@@ -8,7 +8,14 @@ import {
   RESULT_TTL_MS,
 } from './store.js';
 
-const progress = { urls_done: 0, urls_total: 1, requests: 0, pages: 0, links: 0 };
+const progress = {
+  urls_done: 0,
+  urls_total: 1,
+  requests: 0,
+  pages: 0,
+  links: 0,
+  homepage_read: false,
+};
 /** A result whose JSON is about `bytes` long, with non-Latin-1 text, so a UTF-16 string would double it. */
 const result = (bytes: number) =>
   ({ kind: 'access', note: '’'.repeat(Math.floor(bytes / 3)) }) as unknown as BatchResult;
@@ -64,7 +71,14 @@ describe('the pages a running batch has finished', () => {
     identity: 'browser',
     edges: [],
   });
-  const counts = { urls_done: 1, urls_total: 3, requests: 1, pages: 1, links: 0 };
+  const counts = {
+    urls_done: 1,
+    urls_total: 3,
+    requests: 1,
+    pages: 1,
+    links: 0,
+    homepage_read: false,
+  };
 
   it('hands them out from an offset, at most LIVE_PAGES_PER_READ at a time', () => {
     const store = new BatchStore(() => 0);

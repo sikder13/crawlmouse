@@ -126,7 +126,13 @@ describe('against the worker, in process', () => {
     const whileRunning = await client.readProgress(id);
     release();
     await w.worker.idle();
-    expect(whileRunning).toEqual({ pages: 0, links: 0, total: 0, fresh: [] });
+    expect(whileRunning).toEqual({
+      pages: 0,
+      links: 0,
+      homepageRead: false,
+      total: 0,
+      fresh: [],
+    });
     expect(await client.readProgress(id)).toBeNull();
     expect(await client.readProgress(`${CHECK}:424242`)).toBeNull();
   });
@@ -215,7 +221,7 @@ describe('against the worker, in process', () => {
           JSON.stringify({
             batch_id: id,
             status: 'running',
-            progress: { pages: 4, links: 9 },
+            progress: { pages: 4, links: 9, homepage_read: true },
             pages_total: 4,
             live_pages: [page],
           }),
@@ -225,6 +231,7 @@ describe('against the worker, in process', () => {
     expect(await client.readProgress(id, 3)).toEqual({
       pages: 4,
       links: 9,
+      homepageRead: true,
       total: 4,
       fresh: [page],
     });
@@ -265,6 +272,26 @@ describe('against the worker, in process', () => {
         ),
     });
     expect(await client.readProgress(id)).toBeNull();
+  });
+
+  it('reads a worker that does not say whether the homepage was read as not read', async () => {
+    const id = `${CHECK}:1`;
+    const client = createWorkerClient({
+      url: 'http://127.0.0.1:1',
+      signingSecret: 's'.repeat(48),
+      privateKey: generateKeyPairSync('ed25519').privateKey,
+      fetch: async () =>
+        new Response(
+          JSON.stringify({
+            batch_id: id,
+            status: 'running',
+            progress: { pages: 1, links: 0 },
+            pages_total: 0,
+            live_pages: [],
+          }),
+        ),
+    });
+    expect(await client.readProgress(id)).toMatchObject({ homepageRead: false });
   });
 
   it('takes no live counts from an answer about another batch', async () => {
@@ -367,7 +394,14 @@ describe('against the worker, in process', () => {
     await client.postBatch(batch);
     expect(await client.pollBatch(batchIdOf(CHECK, batch.batch))).toEqual({
       status: 'running',
-      progress: { urls_done: 0, urls_total: 2, requests: 0, pages: 0, links: 0 },
+      progress: {
+        urls_done: 0,
+        urls_total: 2,
+        requests: 0,
+        pages: 0,
+        links: 0,
+        homepage_read: false,
+      },
     });
     slow.release();
     expect(await client.pollBatch(`${CHECK}:424242`)).toEqual({ status: 'not_found' });

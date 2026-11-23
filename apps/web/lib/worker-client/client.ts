@@ -21,7 +21,11 @@ import {
 
 /** The worker's text is checked here: these URLs reach a visitor's screen. */
 const LiveAnswerSchema = z.object({
-  progress: z.object({ pages: CountSchema, links: CountSchema }),
+  progress: z.object({
+    pages: CountSchema,
+    links: CountSchema,
+    homepage_read: z.boolean().default(false),
+  }),
   pages_total: CountSchema,
   live_pages: z
     .array(
@@ -287,6 +291,7 @@ export function createWorkerClient(opts: WorkerClientOptions): WorkerClient {
       return {
         pages: live.data.progress.pages,
         links: live.data.progress.links,
+        homepageRead: live.data.progress.homepage_read,
         total: live.data.pages_total,
         fresh: live.data.live_pages,
       };

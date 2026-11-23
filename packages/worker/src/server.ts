@@ -253,6 +253,7 @@ export function createWorker(deps: WorkerDeps): Worker {
       requests: 0,
       pages: 0,
       links: 0,
+      homepage_read: false,
     });
     const p: Promise<void> = run(id, body).finally(() => running.delete(p));
     running.add(p);

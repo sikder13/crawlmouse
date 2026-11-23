@@ -176,15 +176,15 @@ export const runningCrawlBatch = (s: Pick<StreamSnapshot, 'status' | 'batches'>)
  */
 export function withLiveCounts(
   facts: CheckFacts,
-  live: { pages: number; links: number } | null,
+  live: { pages: number; links: number; homepageRead: boolean } | null,
 ): CheckFacts {
   if (live === null) return facts;
-  // Stored progress calls the whole first batch "homepage": it ends when a page has been read.
+  // Stored progress calls the whole first batch "homepage": it ends when the homepage was read.
   const onHomepage = facts.steps?.some((s) => s.phase === 'homepage' && s.state === 'now');
   return {
     ...facts,
     steps:
-      live.pages > 0 && onHomepage
+      live.homepageRead && onHomepage
         ? facts.steps!.map((s) =>
             s.phase === 'homepage'
               ? { ...s, state: 'done' }

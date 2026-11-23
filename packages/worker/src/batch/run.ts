@@ -50,6 +50,8 @@ export interface Progress {
   pages: number;
   /** Link edges read so far: the result's `link_edges`, as they arrive. */
   links: number;
+  /** Whether the batch's first URL has been fetched: the homepage, in a check's first batch. */
+  homepage_read: boolean;
 }
 
 /** A finished page as the live screen shows it, with the fields its stored row will hold. */
@@ -69,6 +71,8 @@ export interface PageCounts {
   links: number;
   /** Null for a page the map would not draw: not fetched, or its links not read. */
   live: LivePage | null;
+  /** This is the batch's first URL, and it was fetched. */
+  homepage: boolean;
 }
 
 export async function runBatch(
@@ -92,9 +96,11 @@ export async function runBatch(
   let urlsDone = 0;
   let pagesRead = 0;
   let linksRead = 0;
+  let homepageRead = false;
   const pageDone = (read?: PageCounts) => {
     pagesRead += read?.pages ?? 0;
     linksRead += read?.links ?? 0;
+    homepageRead ||= read?.homepage ?? false;
     onProgress(
       {
         urls_done: ++urlsDone,
@@ -102,6 +108,7 @@ export async function runBatch(
         requests: budget.used.requests,
         pages: pagesRead,
         links: linksRead,
+        homepage_read: homepageRead,
       },
       read?.live ?? undefined,
     );
