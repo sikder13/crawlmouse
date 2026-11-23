@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import { expect } from './pw';
+import { expect, type Page } from './pw';
+import { stagingAdmin } from './lib/accounts';
 import { freshContext, keptSite, person } from './lib/people';
 import { step } from './lib/step';
 
@@ -36,6 +37,81 @@ step(
       expect(new URL(out.headers()['location'] ?? '', baseURL).pathname, 'to sign-in').toBe(
         '/login',
       );
+    } finally {
+      await bContext.close();
+      await sContext.close();
+    }
+  },
+);
+
+step(
+  'J4.2',
+  "A's result on every tab: B and signed out get the one 404 a missing id gets",
+  async ({ context, baseURL }) => {
+    const A = await person(context, baseURL!, 'j4', 6);
+    const bContext = await freshContext(context, baseURL!);
+    const sContext = await freshContext(context, baseURL!);
+    try {
+      const B = await person(bContext, baseURL!, 'j4', 7);
+      const S = await sContext.newPage();
+      const host = labHost();
+      const site = await keptSite(A, host);
+      const { data } = await stagingAdmin()
+        .from('checks')
+        .select('id')
+        .eq('site_id', site)
+        .single();
+      const id = data!.id as string;
+      const missing = randomUUID();
+      const fix = randomUUID();
+      const tabs = [
+        '',
+        '/overview',
+        '/access',
+        '/nojs',
+        '/structure',
+        '/content',
+        '/signals',
+        '/changes',
+        '/map',
+        `/fix/${fix}`,
+      ];
+
+      const own = await A.page.goto(`/audit/${id}/overview`);
+      expect(own?.status(), 'control: A opens its own result').toBe(200);
+
+      const read = async (page: Page, path: string) => {
+        const res = await page.goto(path);
+        const main = page.locator('main').first();
+        return {
+          status: res?.status(),
+          text: (await main.innerText()).replace(/\s+/g, ' ').trim(),
+          signIn: await main.locator('a[href^="/login"]').count(),
+          start: await main.locator('a[href="/"]').count(),
+        };
+      };
+      for (const [who, page] of [
+        ['B', B.page],
+        ['signed out', S],
+      ] as const) {
+        for (const tab of tabs) {
+          const theirs = await read(page, `/audit/${id}${tab}`);
+          const none = await read(page, `/audit/${missing}${tab}`);
+          const where = `${who} on ${tab || '/'}`;
+          // F-127's own symptom: the page tells the owner of a kept result that it is gone.
+          if (theirs.status === 404 && /does not exist, or it has expired/i.test(theirs.text)) {
+            expect(theirs.text, `F-127: ${where} says the result is gone`).not.toMatch(
+              /does not exist, or it has expired/i,
+            );
+          }
+          expect(theirs.status, `${where}: a private id is a 404`).toBe(404);
+          expect(none.status, `${where}: a missing id is a 404`).toBe(404);
+          expect(theirs.text, `${where}: private and missing read alike`).toBe(none.text);
+          expect(theirs.text, `${where}: names nothing of A`).not.toContain(host);
+          expect(theirs.signIn, `${where}: offers sign-in`).toBeGreaterThan(0);
+          expect(theirs.start, `${where}: offers a new audit`).toBeGreaterThan(0);
+        }
+      }
     } finally {
       await bContext.close();
       await sContext.close();
