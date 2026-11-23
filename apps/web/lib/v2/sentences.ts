@@ -312,7 +312,9 @@ const MISSING_PART: Partial<Record<WithheldReason, string>> = {
 };
 
 const orList = (xs: readonly string[]) =>
-  xs.length < 2 ? (xs[0] ?? '') : `${xs.slice(0, -1).join(', ')} or ${xs.at(-1)}`;
+  xs.length < 2
+    ? (xs[0] ?? '')
+    : `${xs.filter((_, i) => i < xs.length - 1).join(', ')} or ${xs.at(-1)}`;
 
 /**
  * The withheld AI readability grade, said plainly (FACTS I4). `measured` is the contract's count
