@@ -3,6 +3,7 @@ import type { ChangeRowView } from '../../../../lib/v2/view/segment/changes';
 import { StatusPill } from '../../StatusPill';
 import { Table, type TableColumn } from '../../Table';
 import { VerdictCell } from '../../VerdictCell';
+import shared from '../account/AccountScreen.module.css';
 import segment from '../segment/ChangesScreen.module.css';
 import styles from './ChangesLogScreen.module.css';
 
@@ -24,6 +25,7 @@ export function ChangesLogTable({ label, rows }: { label: string; rows: ChangeRo
       label={label}
       columns={columns}
       rowHeader
+      className={shared.rowHeaded}
       rows={rows.map((r) => ({
         key: r.key,
         cells: [

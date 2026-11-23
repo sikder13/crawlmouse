@@ -32,7 +32,9 @@ describe('the Changes log, rendered', () => {
       }
       if (r.pages !== null) expect(html).toContain(r.pages);
       if (r.subject) expect(html).toContain(`· ${text(r.subject)}`);
-      for (const l of r.diff) expect(html).toContain(text(l.line).replace(/'/g, '&#x27;'));
+      for (const l of r.diff) {
+        expect(html).toContain(`${l.sign} ${text(l.line).replace(/'/g, '&#x27;')}`);
+      }
       if (r.told !== null) {
         expect(html).toContain(text(CHANGES_LOG_COPY.told(r.told)).replace(/'/g, '&#x27;'));
       }
