@@ -102,7 +102,7 @@ export async function readViewer(
   if (seats.error) failed('seats read', seats.error);
   const mine = z.array(SeatRow).parse(seats.data);
   const picked = chosen === null ? undefined : mine.find((s) => s.account_id === chosen);
-  const seat = picked ?? (mine.length <= 1 ? mine[0] : await defaultSeat(deps, user.id, mine));
+  const seat = picked ?? (mine.length <= 1 ? mine[0] : await landingSeat(deps, user.id, mine));
   if (seat === null) return { kind: 'ambiguous', userId: user.id };
   if (seat === undefined) return { kind: 'no_account', userId: user.id };
 
@@ -197,6 +197,51 @@ export async function readEntitlement(
       competitorsPerSite: stored ? row.competitor_limit : GATES[tier].competitorsPerSite,
     },
   };
+}
+
+/**
+ * Where a person with several seats lands when nothing recorded chooses (F-105): their personal
+ * account if it holds a site, else the one agency they own, else the default. An account they only
+ * hold a seat on is not chosen for them, because the account landed in is the one their next site
+ * is added to. Read with the caller's own client, and nothing is written. An account marked for
+ * deletion is never among `mine`: `seats` is read through row security, whose `is_member` is false
+ * once `deletion_confirmed_at` is set, and the caller's grant does not include that column.
+ */
+async function landingSeat(
+  deps: ViewerDeps,
+  userId: string,
+  mine: z.infer<typeof SeatRow>[],
+): Promise<z.infer<typeof SeatRow> | null> {
+  const home = await defaultSeat(deps, userId, mine);
+  if (home === null) return null;
+  const owned = mine.filter((s) => s.role === 'owner' && s.account_id !== home.account_id);
+  if (owned.length === 0) return home;
+
+  const accounts = await deps.session
+    .from('accounts')
+    .select('id, kind')
+    .in('id', [home.account_id, ...owned.map((s) => s.account_id)])
+    .is('deleted_at', null);
+  if (accounts.error) failed('accounts kinds', accounts.error);
+  const kinds = new Map(
+    z
+      .array(z.object({ id: z.string(), kind: z.string() }))
+      .parse(accounts.data)
+      .map((a) => [a.id, a.kind]),
+  );
+  if (kinds.get(home.account_id) !== 'personal') return home;
+  const agencies = owned.filter((s) => kinds.get(s.account_id) === 'agency');
+  if (agencies.length !== 1) return home;
+
+  const sites = await deps.session
+    .from('sites')
+    .select('id')
+    .eq('account_id', home.account_id)
+    .is('staging_of_site_id', null)
+    .is('removed_at', null)
+    .limit(1);
+  if (sites.error) failed('personal sites', sites.error);
+  return sites.data.length > 0 ? home : agencies[0]!;
 }
 
 /** The seat on the caller's default account, or null when the default is none of their seats. */

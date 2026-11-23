@@ -245,7 +245,7 @@ describe('/agency for a person with a seat on an agency account', () => {
 
   it('acting in their own account: one button, Open <agency>, which is the switch', async () => {
     for (const p of [boss, colleague]) {
-      const screen = await open(p);
+      const screen = await open(p, p.accountId);
       expect(screen.props.data).toMatchObject({
         kind: 'open',
         agencies: [
