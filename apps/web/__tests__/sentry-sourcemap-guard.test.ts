@@ -31,7 +31,9 @@ describe('Sentry source-map upload invariant (next.config.mjs)', () => {
       'next.config must import { withSentryConfig } from "@sentry/nextjs"',
     ).toBe(true);
     expect(
-      /export\s+default\s+withSentryConfig\s*\(\s*nextConfig\s*,\s*sentryBuildOptions\s*\)/.test(cfg),
+      /export\s+default\s+withSentryConfig\s*\(\s*nextConfig\s*,\s*sentryBuildOptions\s*\)/.test(
+        cfg,
+      ),
       'the default export must be withSentryConfig(nextConfig, sentryBuildOptions)',
     ).toBe(true);
   });
@@ -58,7 +60,10 @@ describe('Sentry source-map upload invariant (next.config.mjs)', () => {
     // Value: the option is wired to exactly the env var (whatever its value, incl. undefined locally).
     expect(sentryBuildOptions.authToken).toBe(process.env.SENTRY_AUTH_TOKEN);
     // Source: never commit a real token. sntrys_ = org token, sntryu_ = user token.
-    expect(/sntrys_|sntryu_/.test(readConfigSource()), 'next.config must not contain a hard-coded Sentry token').toBe(false);
+    expect(
+      /sntrys_|sntryu_/.test(readConfigSource()),
+      'next.config must not contain a hard-coded Sentry token',
+    ).toBe(false);
   });
 
   it('uploads a complete client map set (widenClientFileUpload)', () => {
@@ -75,7 +80,10 @@ describe('Sentry source-map upload invariant (next.config.mjs)', () => {
     // the top level kills the whole plugin; inside `sourcemaps` it kills upload — both revert prod to
     // minified traces while every other knob looks fine. `disable` is intentionally absent from the
     // committed options, so widen the (compile-time only) type to read the runtime value either way.
-    const opts = sentryBuildOptions as unknown as { disable?: unknown; sourcemaps?: { disable?: unknown } };
+    const opts = sentryBuildOptions as unknown as {
+      disable?: unknown;
+      sourcemaps?: { disable?: unknown };
+    };
     expect(opts.disable, 'top-level plugin disable must be falsy').toBeFalsy();
     expect(opts.sourcemaps?.disable, 'sourcemaps.disable must be falsy').toBeFalsy();
   });
@@ -98,7 +106,10 @@ describe('Sentry source-map upload invariant (next.config.mjs)', () => {
         undefined,
       ];
       for (const e of inputs) {
-        expect(() => sentryBuildOptions.errorHandler?.(e as Error), `errorHandler threw on ${String(e)}`).not.toThrow();
+        expect(
+          () => sentryBuildOptions.errorHandler?.(e as Error),
+          `errorHandler threw on ${String(e)}`,
+        ).not.toThrow();
       }
     } finally {
       warn.mockRestore();
@@ -118,7 +129,10 @@ describe('Sentry source-map upload invariant (next.config.mjs)', () => {
 describe('Sentry global error handler (app/global-error.tsx)', () => {
   function readGlobalError(): string {
     let source = readFileSync(resolve(WEB_DIR, 'app/global-error.tsx'), 'utf8');
-    expect(source.trim().length, 'app/global-error.tsx is empty or whitespace-only').toBeGreaterThan(0);
+    expect(
+      source.trim().length,
+      'app/global-error.tsx is empty or whitespace-only',
+    ).toBeGreaterThan(0);
     // Strip block + line comments so commented-out code / doc-comments don't satisfy the regexes.
     source = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
     return source;
@@ -126,23 +140,35 @@ describe('Sentry global error handler (app/global-error.tsx)', () => {
 
   it('exists as a Client Component', () => {
     const src = readGlobalError();
-    expect(/^\s*['"]use client['"]/m.test(src), 'global-error must declare the "use client" directive').toBe(true);
-  });
-
-  it('reports the error to Sentry', () => {
-    const src = readGlobalError();
-    expect(/from\s*['"]@sentry\/nextjs['"]/.test(src), 'global-error must import @sentry/nextjs').toBe(true);
     expect(
-      /Sentry\.captureException\s*\(\s*error\s*\)/.test(src),
-      'global-error must call Sentry.captureException(error) so client render errors reach Sentry',
+      /^\s*['"]use client['"]/m.test(src),
+      'global-error must declare the "use client" directive',
     ).toBe(true);
   });
 
-  it('runs captureException from inside the useEffect (not dead code outside the effect)', () => {
+  it('reports the error to Sentry, through the lazy client (F-045)', () => {
     const src = readGlobalError();
     expect(
-      /useEffect\(\s*\(\s*\)\s*=>\s*\{[\s\S]*?Sentry\.captureException\(\s*error\s*\)[\s\S]*?\}\s*,\s*\[/.test(src),
-      'Sentry.captureException(error) must execute inside the useEffect',
+      /from\s*['"]@\/lib\/sentry-lazy['"]/.test(src),
+      'global-error must import reportToSentry from lib/sentry-lazy',
+    ).toBe(true);
+    expect(
+      /from\s*['"]@sentry\/nextjs['"]/.test(src),
+      'a static SDK import here puts Sentry back in every page’s first load',
+    ).toBe(false);
+    expect(
+      /reportToSentry\s*\(\s*error\s*\)/.test(src),
+      'global-error must call reportToSentry(error) so client render errors reach Sentry',
+    ).toBe(true);
+  });
+
+  it('reports from inside the useEffect (not dead code outside the effect)', () => {
+    const src = readGlobalError();
+    expect(
+      /useEffect\(\s*\(\s*\)\s*=>\s*\{[\s\S]*?reportToSentry\(\s*error\s*\)[\s\S]*?\}\s*,\s*\[/.test(
+        src,
+      ),
+      'reportToSentry(error) must execute inside the useEffect',
     ).toBe(true);
   });
 

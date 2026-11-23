@@ -170,7 +170,7 @@ Every interface the segment view modules export, read through the TypeScript com
 
 | Field           | Type                                                                                          | Note                                                               |
 | --------------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| `summary`       | `string`                                                                                      | "1 open · 7 on Pro", or "nothing to fix".                          |
+| `summary`       | `string`                                                                                      | "1 open · 7 on Pro", or what no fix means here (`noFixWords`).     |
 | `open`          | `OpenFixView[]`                                                                               |                                                                    |
 | `pro`           | `ProFixView[]`                                                                                |                                                                    |
 | `proCount`      | `number`                                                                                      |                                                                    |
@@ -252,7 +252,7 @@ Every interface the segment view modules export, read through the TypeScript com
 | `coverage.total`      | `number`                                                                                      |                                                                                     |
 | `coverage.groups`     | `number`                                                                                      |                                                                                     |
 | `fixes`               | `object`                                                                                      |                                                                                     |
-| `fixes.summary`       | `string`                                                                                      | "1 open · 7 on Pro", or "nothing to fix".                                           |
+| `fixes.summary`       | `string`                                                                                      | "1 open · 7 on Pro", or what no fix means here (`noFixWords`).                      |
 | `fixes.open`          | `OpenFixView[]`                                                                               |                                                                                     |
 | `fixes.pro`           | `ProFixView[]`                                                                                |                                                                                     |
 | `fixes.proCount`      | `number`                                                                                      |                                                                                     |
@@ -315,7 +315,7 @@ Every interface the segment view modules export, read through the TypeScript com
 | `coverage.total`      | `number`                                                                                      |                                                                                     |
 | `coverage.groups`     | `number`                                                                                      |                                                                                     |
 | `fixes`               | `object`                                                                                      |                                                                                     |
-| `fixes.summary`       | `string`                                                                                      | "1 open · 7 on Pro", or "nothing to fix".                                           |
+| `fixes.summary`       | `string`                                                                                      | "1 open · 7 on Pro", or what no fix means here (`noFixWords`).                      |
 | `fixes.open`          | `OpenFixView[]`                                                                               |                                                                                     |
 | `fixes.pro`           | `ProFixView[]`                                                                                |                                                                                     |
 | `fixes.proCount`      | `number`                                                                                      |                                                                                     |
@@ -382,7 +382,7 @@ Every interface the segment view modules export, read through the TypeScript com
 | `orphans.unlisted`     | `string \| null`                                                                              | "0 of 2 orphan pages are listed in this record", when the record lists fewer.       |
 | `orphans.notes`        | `string[]`                                                                                    |                                                                                     |
 | `fixes`                | `object`                                                                                      |                                                                                     |
-| `fixes.summary`        | `string`                                                                                      | "1 open · 7 on Pro", or "nothing to fix".                                           |
+| `fixes.summary`        | `string`                                                                                      | "1 open · 7 on Pro", or what no fix means here (`noFixWords`).                      |
 | `fixes.open`           | `OpenFixView[]`                                                                               |                                                                                     |
 | `fixes.pro`            | `ProFixView[]`                                                                                |                                                                                     |
 | `fixes.proCount`       | `number`                                                                                      |                                                                                     |
@@ -434,7 +434,7 @@ Every interface the segment view modules export, read through the TypeScript com
 | `noFailing`           | `string`                                                                                                                 | Said for a selected cell with no failing page in the record.                        |
 | `coverage`            | `{ pages: CoverageView; } \| { read: string; }`                                                                          |                                                                                     |
 | `fixes`               | `object`                                                                                                                 |                                                                                     |
-| `fixes.summary`       | `string`                                                                                                                 | "1 open · 7 on Pro", or "nothing to fix".                                           |
+| `fixes.summary`       | `string`                                                                                                                 | "1 open · 7 on Pro", or what no fix means here (`noFixWords`).                      |
 | `fixes.open`          | `OpenFixView[]`                                                                                                          |                                                                                     |
 | `fixes.pro`           | `ProFixView[]`                                                                                                           |                                                                                     |
 | `fixes.proCount`      | `number`                                                                                                                 |                                                                                     |

@@ -159,8 +159,12 @@ export function supabaseDoorStore(sb: SupabaseClient): DoorStore {
       return (data ?? []).length === 1 ? 'taken' : 'not_unowned';
     },
 
-    async clearExpiry(checkId) {
-      const { error } = await sb.from('checks').update({ expires_at: null }).eq('id', checkId);
+    async clearExpiry(siteId) {
+      const { error } = await sb
+        .from('checks')
+        .update({ expires_at: null })
+        .eq('site_id', siteId)
+        .not('expires_at', 'is', null);
       if (error) fail('checks expiry write', error);
     },
 

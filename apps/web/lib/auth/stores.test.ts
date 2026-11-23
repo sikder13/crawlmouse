@@ -34,6 +34,7 @@ function fakeSb(answers: Answer[]) {
         'is',
         'in',
         'gt',
+        'not',
         'maybeSingle',
         'single',
       ]) {
@@ -119,6 +120,17 @@ describe('supabaseDoorStore', () => {
       schedule: null,
     });
     expect(f.calls[0]!.ops).toContainEqual(['is', ['account_id', null]]);
+  });
+
+  it('clearExpiry clears every check of the site that still expires, as keep_check does', async () => {
+    const f = fakeSb([{ data: null }]);
+    await supabaseDoorStore(f.sb).clearExpiry('site-1');
+    expect(f.calls[0]!.table).toBe('checks');
+    expect(f.calls[0]!.ops).toEqual([
+      ['update', [{ expires_at: null }]],
+      ['eq', ['site_id', 'site-1']],
+      ['not', ['expires_at', 'is', null]],
+    ]);
   });
 
   it('loadMember is null for a user with no default account, and never queries accounts then', async () => {

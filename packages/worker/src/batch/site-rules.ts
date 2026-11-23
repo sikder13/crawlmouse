@@ -8,7 +8,6 @@ import {
   tokenAllows,
   type RobotsReading,
 } from '../politeness/robots.js';
-import { siteKeyOf } from '../politeness/site-key.js';
 import {
   politeFetch,
   type FetchContext,
@@ -232,7 +231,7 @@ export class BatchRobots {
     const crawlDelayS =
       reading.state === 'rules' ? crawlDelaySeconds(reading.rules, this.tokens) : null;
     if (crawlDelayS !== null && crawlDelayS <= MAX_CRAWL_DELAY_S) {
-      this.ctx.sites.limiter(siteKeyOf(origin)).raiseGapMs(crawlDelayS * 1000);
+      this.ctx.sites.limiter(this.ctx.sites.keyOf(origin)).raiseGapMs(crawlDelayS * 1000);
     }
     return { origin, reading, fromCache, crawlDelayS };
   }
