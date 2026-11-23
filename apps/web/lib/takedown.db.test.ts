@@ -10,7 +10,6 @@ import { postgrestOver } from '../__tests__/helpers/postgrest-pglite';
 const { purgePublicReport } = vi.hoisted(() => ({ purgePublicReport: vi.fn() }));
 vi.mock('./reports', () => ({ purgePublicReport }));
 
-import { hostTakenDown } from './host-takedown';
 import { processTakedown } from './takedown';
 
 let db: PGlite;
@@ -38,8 +37,8 @@ async function seed() {
   ]) {
     await db.query(
       `insert into public.takedown_requests (public_report_slug, domain, requester_email, reason, status)
-       values ($1, 'taken.example', 'owner@example.com', 'mine', $2)`,
-      [slug, status],
+       values ($1, $2, 'owner@example.com', 'mine', $3)`,
+      [slug, slug === 'other-host' ? 'other.example' : 'taken.example', status],
     );
   }
 }
@@ -112,14 +111,42 @@ describe('processTakedown closes the host', () => {
     expect(await down()).toEqual(['named', 'older', 'oldest']);
   });
 
-  it('a slug that names no report changes nothing', async () => {
-    await processTakedown(postgrestOver(db), 'no-such-slug');
+  it('a slug that names no report changes nothing, and purges nothing', async () => {
+    expect(await processTakedown(postgrestOver(db), 'no-such-slug')).toBe(0);
     expect(await down()).toEqual([]);
+    expect(purgePublicReport).not.toHaveBeenCalled();
+    expect(await status('named')).toBe('pending');
   });
 
-  it('the host then reads as taken down', async () => {
-    await processTakedown(postgrestOver(db), 'older');
-    expect(await hostTakenDown(postgrestOver(db), 'taken.example')).toBe(true);
-    expect(await hostTakenDown(postgrestOver(db), 'other.example')).toBe(false);
+  it('answers how many reports the host has, for the audit log', async () => {
+    expect(await processTakedown(postgrestOver(db), 'named')).toBe(3);
+  });
+
+  it('closes a host with more reports than one read returns', async () => {
+    const capped = postgrestOver(db, { maxRows: 2 });
+    await processTakedown(capped, 'named');
+    expect(await down()).toEqual(['named', 'older', 'oldest']);
+    expect(purgePublicReport.mock.calls.map(([s]) => s).sort()).toEqual([
+      'named',
+      'older',
+      'oldest',
+    ]);
+    expect(await status('older')).toBe('removed');
+  });
+
+  it('still purges each report when the queue write fails', async () => {
+    const real = postgrestOver(db);
+    const failing = {
+      from: (table: string) =>
+        table === 'takedown_requests'
+          ? {
+              update: () => ({
+                eq: () => ({ in: async () => ({ error: new Error('queue down') }) }),
+              }),
+            }
+          : real.from(table),
+    } as unknown as typeof real;
+    await expect(processTakedown(failing, 'named')).rejects.toThrow(/queue down/);
+    expect(purgePublicReport).toHaveBeenCalledTimes(3);
   });
 });

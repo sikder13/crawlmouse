@@ -16,6 +16,7 @@ function makeSb(errs: { public_reports?: Error; takedown_requests?: Error } = {}
     table: string;
     update?: Record<string, unknown>;
     filters: [string, string, unknown][];
+    from?: number;
   };
   const calls: Call[] = [];
   const sb = {
@@ -32,12 +33,14 @@ function makeSb(errs: { public_reports?: Error; takedown_requests?: Error } = {}
         eq: (col: string, val: unknown) => (rec.filters.push(['eq', col, val]), chain),
         is: (col: string, val: unknown) => (rec.filters.push(['is', col, val]), chain),
         in: (col: string, val: unknown) => (rec.filters.push(['in', col, val]), chain),
+        order: () => chain,
+        range: (from: number) => ((rec.from = from), chain),
         maybeSingle: async () => ({ data: { domain: 'taken.example' }, error: null }),
         then: (resolve: (r: unknown) => unknown) =>
           resolve(
             rec.update
               ? { error: errs[table as keyof typeof errs] ?? null }
-              : { data: [{ slug: 'abc123' }, { slug: 'older' }], error: null },
+              : { data: rec.from ? [] : [{ slug: 'abc123' }, { slug: 'older' }], error: null },
           ),
       };
       return chain;
@@ -70,10 +73,10 @@ describe('processTakedown', () => {
     // a stray `processed_at` (the column does not exist on takedown_requests) or any extra
     // field would be caught here at the unit level before it fails against the live schema.
     expect(reqUpdate?.update).toEqual({ status: 'removed' });
-    // The queue update is keyed on the host's slugs, and scoped to OPEN statuses so it advances
+    // The queue update is keyed on the host, and scoped to OPEN statuses so it advances
     // only undecided requests and never rewrites a decided ('rejected') row's moderation history.
     expect(reqUpdate?.filters).toEqual([
-      ['in', 'public_report_slug', ['abc123', 'older']],
+      ['eq', 'domain', 'taken.example'],
       ['in', 'status', ['pending', 'verified']],
     ]);
     expect(purgePublicReport).toHaveBeenCalledWith('abc123');
