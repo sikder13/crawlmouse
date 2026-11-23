@@ -19,7 +19,7 @@ function NotFoundFallback() {
  * The v2 screen, or the plain 404 when its chunk cannot load (a dropped connection, a stale
  * deployment): a rejected load would otherwise replace the 404 with the global error page.
  */
-export const loadNotFoundScreen = (
+const loadNotFoundScreen = (
   load: () => Promise<{ NotFoundScreen: ComponentType }> = () => import('./NotFoundScreen'),
 ): Promise<ComponentType> =>
   load()

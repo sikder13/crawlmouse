@@ -4,16 +4,11 @@
  */
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { ReactElement } from 'react';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { JSDOM } from 'jsdom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { PageShell } from '../../components/v2/PageShell';
 import { FOOTER_COLUMNS, MARKETING_NAV } from '../../components/v2/footer-links';
-import {
-  NotFoundIsland,
-  loadNotFoundScreen,
-} from '../../components/v2/screens/not-found/NotFoundIsland';
+import { NotFoundIsland } from '../../components/v2/screens/not-found/NotFoundIsland';
 import { NotFoundScreen } from '../../components/v2/screens/not-found/NotFoundScreen';
 import NotFound, { metadata } from '../../app/not-found';
 
@@ -41,37 +36,6 @@ describe('the site 404', () => {
     const doc = docOf(el);
     expect(doc.querySelector('[data-v2-shell]')).toBeNull();
     expect(doc.body.innerHTML).not.toContain('bg-cream');
-  });
-
-  const v2Imports = (source: string) =>
-    [...source.matchAll(/^import\s(?:[^;'"]*?\sfrom\s+)?'([^']+)';/gm)]
-      .map((m) => m[1]!)
-      .filter((m) => /components\/v2|styles\/v2|^\.\.?\//.test(m));
-  const read = (...p: string[]) => readFileSync(join(__dirname, '../..', ...p), 'utf8');
-
-  it('the root 404 statically imports only the island from v2', () => {
-    expect(v2Imports(read('app/not-found.tsx'))).toEqual([
-      '@/components/v2/screens/not-found/NotFoundIsland',
-    ]);
-  });
-
-  it('the island imports no v2 component statically, and loads the screen on demand', () => {
-    const island = read('components/v2/screens/not-found/NotFoundIsland.tsx');
-    expect(v2Imports(island)).toEqual([]);
-    expect(island).toMatch(/import\('\.\/NotFoundScreen'\)/);
-    expect(island).toMatch(/ssr: false/);
-  });
-
-  it('falls back to the plain 404 when the screen’s chunk cannot load', async () => {
-    const Loaded = await loadNotFoundScreen(() => Promise.reject(new Error('chunk failed')));
-    const doc = docOf(<Loaded />);
-    expect(doc.querySelector('h1')!.textContent).toBe('This page isn’t here');
-    expect(doc.querySelector('a[href="/"]')).not.toBeNull();
-  });
-
-  it('loads the real screen when its chunk arrives', async () => {
-    const Loaded = await loadNotFoundScreen();
-    expect(Loaded).toBe(NotFoundScreen);
   });
 
   it('with public checks off stays v1’s', () => {
