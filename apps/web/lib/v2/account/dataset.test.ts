@@ -9,6 +9,7 @@ import type { PGlite } from '@electric-sql/pglite';
 import { buildCheck, type BuiltCheck } from '@crawlmouse/engine/v2/pipeline';
 import {
   AccountSchema,
+  ReportSchema,
   ChangeSchema,
   CheckSchema,
   FixEventSchema,
@@ -213,6 +214,70 @@ describe('an account with no site', () => {
     expect(d.sites).toEqual([]);
     const v = dashboardView(d, { accountId, seatId, now: NOW.toISOString() });
     expect(v.header.title).toBe('Add the site to watch');
+  });
+});
+
+describe('the public links a v2 mint wrote (F-123)', () => {
+  const failedCheck = async (siteId: string) =>
+    (
+      await db.query<{ id: string }>(
+        `insert into public.checks
+           (site_id, status, trigger, grade_version, queued_at, started_at, finished_at, failure_reason)
+         values ($1, 'failed', 'manual', '1.0.0', now(), now(), now(), 'crawl_failed') returning id`,
+        [siteId],
+      )
+    ).rows[0]!.id;
+  const mint = async (
+    slug: string,
+    siteId: string,
+    accountId: string,
+    extra: 'hidden_at' | 'takedown_requested_at' | null = null,
+  ) => {
+    const checkId = await failedCheck(siteId);
+    await db.query(
+      `insert into public.public_reports (slug, check_id, site_id, account_id, domain${
+        extra ? `, ${extra}` : ''
+      }) values ($1, $2, $3, $4, 'link.example'${extra ? ', now()' : ''})`,
+      [slug, checkId, siteId, accountId],
+    );
+    return checkId;
+  };
+  const slugs = (d: Awaited<ReturnType<typeof load>>) => d.reports.map((r) => r.public_slug).sort();
+
+  let mainSite: string;
+  let shown: string;
+
+  beforeAll(async () => {
+    mainSite = built.check.site_id;
+    shown = await mint('shown-link', mainSite, owner.accountId);
+    await mint('hidden-link', mainSite, owner.accountId, 'hidden_at');
+    await mint('taken-down-link', mainSite, owner.accountId, 'takedown_requested_at');
+    await mint('scoped-link', OTHER_SITE, owner.accountId);
+    const stranger = await signUp(db, `stranger-${randomUUID().slice(0, 8)}@example.com`);
+    const theirs = await personalAccount(db, stranger);
+    const theirSite = randomUUID();
+    await db.query(
+      `insert into public.sites (id, account_id, host) values ($1, $2, 'theirs.example')`,
+      [theirSite, theirs.accountId],
+    );
+    await mint('their-link', theirSite, theirs.accountId);
+  });
+
+  it('reads a live link as a public_link report of its check', async () => {
+    const d = await load(owner.userId);
+    expect(slugs(d)).toEqual(['scoped-link', 'shown-link']);
+    const link = d.reports.find((r) => r.public_slug === 'shown-link')!;
+    expect(ReportSchema.safeParse(link).success).toBe(true);
+    expect(link).toMatchObject({
+      kind: 'public_link',
+      site_id: mainSite,
+      account_id: owner.accountId,
+      covers_check_ids: [shown],
+    });
+  });
+
+  it('a seat scoped to one site reads only that site’s link', async () => {
+    expect(slugs(await load(devUserId))).toEqual(['scoped-link']);
   });
 });
 

@@ -141,6 +141,15 @@
   }
 }
 
+/* F-123: Copy, Open and Create, and what a refused Create says. */
+.publicLink {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 4px;
+}
+
 /* Forced colours repaint backgrounds: the switch keeps a border, and its knob and on state their own
    system colours. */
 @media (forced-colors: active) {

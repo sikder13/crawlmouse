@@ -199,3 +199,73 @@ describe('the Grades card’s two buttons (F-107)', () => {
     expect(a.fields).toEqual({});
   });
 });
+
+describe('the site’s public link (F-123)', () => {
+  const noLinks = { ...bad, reports: bad.reports.filter((r) => r.kind !== 'public_link') };
+  const owner = bad.seats.find((x) => x.account_id === BAD_ACCOUNT && x.role === 'owner')!;
+  const asRole = (d: typeof bad, role: 'owner' | 'account_manager' | 'developer') => ({
+    ...d,
+    seats: d.seats.map((x) => (x.id === owner.id ? { ...x, role } : x)),
+  });
+  const row = (d: typeof bad, seatId?: string) =>
+    siteView(
+      d,
+      { accountId: BAD_ACCOUNT, now: bad.as_of, ...(seatId ? { seatId } : {}) },
+      OUTFITTER,
+    ).settings.rows.find((r) => r.label === 'Public link');
+  const latest = siteView(bad, { accountId: BAD_ACCOUNT, now: bad.as_of }, OUTFITTER);
+  const latestCheck = bad.checks
+    .filter((c) => c.site_id === OUTFITTER && c.finished_at !== null)
+    .sort((x, y) => Date.parse(y.finished_at!) - Date.parse(x.finished_at!))[0]!;
+
+  it('with none, the owner is offered one for the latest check, and told what it does', () => {
+    const r = row(noLinks)!;
+    expect(r.value).toContain('anyone who has it');
+    expect(r.value).toContain('told not to index it');
+    expect(r.action).toBeNull();
+    expect(r.publicLink).toEqual({ url: null, mintCheckId: latestCheck.id });
+  });
+
+  it('a developer, who may not publish, has no row when there is no link', () => {
+    expect(row(asRole(noLinks, 'developer'), owner.id)).toBeUndefined();
+  });
+
+  it('a developer sees a link that exists and is offered no new one', () => {
+    const r = row(asRole(bad, 'developer'), owner.id)!;
+    expect(r.publicLink?.url).toBe('https://crawlmouse.com/r/example-outfitter-25oct');
+    expect(r.publicLink?.mintCheckId).toBeNull();
+  });
+
+  it('a link of an earlier check is shown, with a new one offered for the latest', () => {
+    expect(latest.settings.rows.find((r) => r.label === 'Public link')!.publicLink).toEqual({
+      url: 'https://crawlmouse.com/r/example-outfitter-25oct',
+      mintCheckId: latestCheck.id,
+    });
+  });
+
+  it('a link of the latest check offers no second one, and the newest link is the one shown', () => {
+    const old = bad.reports.find((r) => r.kind === 'public_link')!;
+    const newest = {
+      ...old,
+      id: '60000000-0000-4000-8000-0000000000f1',
+      public_slug: 'newest-link',
+      created_at: latestCheck.finished_at!,
+      covers_check_ids: [latestCheck.id],
+    };
+    const r = row({ ...bad, reports: [...bad.reports, newest] })!;
+    expect(r.publicLink).toEqual({
+      url: 'https://crawlmouse.com/r/newest-link',
+      mintCheckId: null,
+    });
+  });
+
+  it('a partial latest check cannot be published, so none is offered', () => {
+    const partial = {
+      ...noLinks,
+      checks: noLinks.checks.map((c) =>
+        c.id === latestCheck.id ? { ...c, status: 'partial' as const } : c,
+      ),
+    };
+    expect(row(partial)).toBeUndefined();
+  });
+});

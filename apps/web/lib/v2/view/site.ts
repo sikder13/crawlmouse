@@ -113,6 +113,12 @@ export interface FixRowView {
   fixType: Fix['type'];
 }
 
+/** The site's newest public link, and the check a seat that may publish can make one for. */
+export interface SitePublicLink {
+  url: string | null;
+  mintCheckId: string | null;
+}
+
 export interface SiteView {
   header: { title: string; line: string; actions: ActionView[] };
   grades: {
@@ -145,6 +151,8 @@ export interface SiteView {
       mono: boolean;
       muted: boolean;
       action: ActionView | null;
+      /** The public link row's controls (F-123). */
+      publicLink?: SitePublicLink;
     }[];
   };
   alerts: {
@@ -540,12 +548,23 @@ export function siteView(
 
   // ── settings ──
   const staging = v.d.sites.find((s) => s.staging_of_site_id === site.id);
-  const publicLink = v.d.reports.find((r) => r.site_id === site.id && r.kind === 'public_link');
+  // Newest first: a link is a snapshot of one check, and the older ones keep working.
+  const publicLinks = v.d.reports
+    .filter((r) => r.site_id === site.id && r.kind === 'public_link')
+    .sort((x, y) => Date.parse(y.created_at) - Date.parse(x.created_at));
+  const publicLink = publicLinks[0];
   // The reader edits and removes only when their seat runs sites (owner or account manager).
   const manage = runsSites(v);
   const edit = (label: string, inputs: readonly ActionInput[]) =>
     manage ? action('editSite', label, { id: site.id }, { inputs }) : null;
   const canCompete = v.gates.competitorsPerSite > 0;
+  // Only a finished check mints, and `seat_may('mint_report')` holds for the roles that run sites.
+  const mintCheckId =
+    manage &&
+    result.status === 'finished' &&
+    !publicLinks.some((r) => r.covers_check_ids.includes(result.id))
+      ? result.id
+      : null;
 
   // ── alerts ──
   const siteChecks = new Set(v.d.checks.filter((c) => c.site_id === site.id).map((c) => c.id));
@@ -704,14 +723,24 @@ export function siteView(
               },
             ]
           : []),
-        ...(publicLink?.public_slug
+        ...(publicLink?.public_slug || mintCheckId
           ? [
               {
                 label: 'Public link',
-                value: `crawlmouse.com/r/${publicLink.public_slug}`,
-                mono: true,
+                value: publicLink?.public_slug
+                  ? `crawlmouse.com/r/${publicLink.public_slug}`
+                  : SITE_COPY.publicLink.none,
+                mono: Boolean(publicLink?.public_slug),
                 muted: false,
-                action: action('publicReport', 'Open', { slug: publicLink.public_slug }),
+                action: publicLink?.public_slug
+                  ? action('publicReport', 'Open', { slug: publicLink.public_slug })
+                  : null,
+                publicLink: {
+                  url: publicLink?.public_slug
+                    ? `https://crawlmouse.com/r/${publicLink.public_slug}`
+                    : null,
+                  mintCheckId,
+                },
               },
             ]
           : []),
