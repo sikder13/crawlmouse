@@ -52,7 +52,7 @@ export const JOURNEYS = [
     n: 4,
     name: 'agency',
     walks:
-      'Agency trial → six clients → a developer scoped to one, who sees only that one → client report → share link → proof page → revoke; the developer sees no card digits and cannot publish a report, the owner can',
+      'while `V2_AGENCY_SALES` is unset, the server refuses Agency (one test); with it set to `1`, Agency trial → six clients → a developer scoped to one, who sees only that one → client report → share link → proof page → revoke; the developer sees no card digits and cannot publish a report, the owner can',
   },
   { n: 5, name: 'settings', walks: 'settings: email change, delete and restore' },
   {
