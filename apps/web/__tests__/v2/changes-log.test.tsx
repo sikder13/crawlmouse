@@ -15,7 +15,7 @@ import {
 const render = (q = {}) => renderToStaticMarkup(<ChangesLogScreen data={changesLogPreview(q)} />);
 
 describe('the Changes log, rendered', () => {
-  it('draws its rows in five columns, with nothing the eight-column table showed left out', () => {
+  it('draws its rows in five columns, each row’s site, time, change, place, effect, cause and notice', () => {
     const data = changesLogPreview();
     const html = render();
     expect([...html.matchAll(/<th scope="col"[^>]*>([^<]*)</g)].map((m) => m[1])).toEqual([
@@ -31,10 +31,21 @@ describe('the Changes log, rendered', () => {
         expect(html).toContain(text(v).replace(/'/g, '&#x27;'));
       }
       if (r.pages !== null) expect(html).toContain(r.pages);
+      if (r.subject) expect(html).toContain(`· ${text(r.subject)}`);
+      for (const l of r.diff) expect(html).toContain(text(l.line).replace(/'/g, '&#x27;'));
       if (r.told !== null) {
         expect(html).toContain(text(CHANGES_LOG_COPY.told(r.told)).replace(/'/g, '&#x27;'));
       }
     }
+  });
+
+  it('names each row by its first cell, and keeps a verdict on a crawler’s row', () => {
+    const data = changesLogPreview();
+    const html = render();
+    expect([...html.matchAll(/<th scope="row"/g)]).toHaveLength(data.rows.length);
+    const judged = data.rows.filter((r) => r.verdict !== null);
+    expect(judged.length).toBeGreaterThan(0);
+    for (const r of judged) expect(html).toContain(`data-v2-verdict="${r.verdict!.verdict}"`);
   });
 
   it('marks Changes in the rail and has no orange element', () => {

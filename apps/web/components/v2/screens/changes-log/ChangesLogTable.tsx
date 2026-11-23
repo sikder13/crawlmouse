@@ -23,6 +23,7 @@ export function ChangesLogTable({ label, rows }: { label: string; rows: ChangeRo
     <Table
       label={label}
       columns={columns}
+      rowHeader
       rows={rows.map((r) => ({
         key: r.key,
         cells: [
@@ -41,8 +42,10 @@ export function ChangesLogTable({ label, rows }: { label: string; rows: ChangeRo
             <span className={styles.host}>{r.where}</span>
             {r.pages !== null ? <span className={styles.under}>{r.pages}</span> : null}
           </span>,
-          r.effect,
-          <span key="k" className={styles.cause}>
+          <span key="e" className={styles.effect}>
+            {r.effect}
+          </span>,
+          <div key="k" className={styles.cause}>
             {r.cause}
             {r.diff.length ? (
               <pre className={segment.diff}>
@@ -50,7 +53,7 @@ export function ChangesLogTable({ label, rows }: { label: string; rows: ChangeRo
               </pre>
             ) : null}
             {r.told !== null ? <span className={styles.under}>{COPY.told(r.told)}</span> : null}
-          </span>,
+          </div>,
         ],
       }))}
     />
