@@ -55,7 +55,6 @@ function serverSentence(code: StartRefusal, error: unknown): string | null {
   if (!SERVER_WORDED_REFUSALS.includes(code) || typeof error !== 'string') return null;
   const text = error.trim();
   if (text === '' || text.length > MAX_SERVER_SENTENCE) return null;
-  // eslint-disable-next-line no-control-regex
   return /[\u0000-\u001f\u007f]/.test(text) ? null : text;
 }
 
