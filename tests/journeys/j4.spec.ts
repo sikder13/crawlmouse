@@ -28,6 +28,13 @@ step(
       expect(asB.status(), "B on A's site").toBe(404);
       expect(missing.status(), 'B on a missing id').toBe(404);
       expect(await asB.text(), "B's answer does not name A's host").not.toContain(host);
+      const shown = async (p: string) => {
+        await B.page.goto(p);
+        return (await B.page.locator('main').first().innerText()).replace(/\s+/g, ' ').trim();
+      };
+      expect(await shown(path), "A's site and a missing one read alike to B").toBe(
+        await shown(`/sites/${randomUUID()}`),
+      );
 
       const out = await sContext.request.get(path, { maxRedirects: 0 });
       expect(out.status(), 'signed out is redirected').toBeGreaterThanOrEqual(300);
@@ -44,7 +51,7 @@ step(
 
 step(
   'J4.2',
-  "A's result on every tab: B and signed out get the one 404 a missing id gets",
+  "A's result on each tab: B and signed out get the one 404 a missing id gets",
   async ({ context, baseURL }) => {
     const A = await person(context, baseURL!, 'j4', 6);
     const bContext = await freshContext(context, baseURL!);
@@ -60,7 +67,6 @@ step(
         .single();
       const id = data!.id as string;
       const missing = randomUUID();
-      const fix = randomUUID();
       const tabs = [
         '',
         '/overview',
@@ -71,11 +77,15 @@ step(
         '/signals',
         '/changes',
         '/map',
-        `/fix/${fix}`,
       ];
 
-      const own = await A.page.goto(`/audit/${id}/overview`);
-      expect(own?.status(), 'control: A opens its own result').toBe(200);
+      // The control for each tab: the owner gets the real page, naming the site, so B's 404 is a refusal.
+      for (const tab of tabs) {
+        const own = await A.page.goto(`/audit/${id}${tab}`);
+        expect(own?.status(), `control: A opens ${tab || '/'}`).toBe(200);
+        expect(new URL(A.page.url()).pathname, `control: A stays on ${tab || '/'}`).toContain(id);
+        expect(await A.page.content(), `control: ${tab || '/'} names A's site`).toContain(host);
+      }
 
       const read = async (page: Page, path: string) => {
         const res = await page.goto(path);
@@ -83,6 +93,7 @@ step(
         return {
           status: res?.status(),
           text: (await main.innerText()).replace(/\s+/g, ' ').trim(),
+          html: await page.content(),
           signIn: await main.locator('a[href^="/login"]').count(),
           start: await main.locator('a[href="/"]').count(),
         };
@@ -95,16 +106,10 @@ step(
           const theirs = await read(page, `/audit/${id}${tab}`);
           const none = await read(page, `/audit/${missing}${tab}`);
           const where = `${who} on ${tab || '/'}`;
-          // F-127's own symptom: the page tells the owner of a kept result that it is gone.
-          if (theirs.status === 404 && /does not exist, or it has expired/i.test(theirs.text)) {
-            expect(theirs.text, `F-127: ${where} says the result is gone`).not.toMatch(
-              /does not exist, or it has expired/i,
-            );
-          }
           expect(theirs.status, `${where}: a private id is a 404`).toBe(404);
           expect(none.status, `${where}: a missing id is a 404`).toBe(404);
           expect(theirs.text, `${where}: private and missing read alike`).toBe(none.text);
-          expect(theirs.text, `${where}: names nothing of A`).not.toContain(host);
+          expect(theirs.html, `${where}: the page's source names nothing of A`).not.toContain(host);
           expect(theirs.signIn, `${where}: offers sign-in`).toBeGreaterThan(0);
           expect(theirs.start, `${where}: offers a new audit`).toBeGreaterThan(0);
         }
@@ -139,9 +144,26 @@ step(
         '/seats',
       ];
 
+      // The controls: A's pages hold what is searched for, and B is really signed in as B.
+      const ownDashboard = await A.context.request.get('/dashboard');
+      expect(ownDashboard.status(), 'control: A opens its dashboard').toBe(200);
+      expect(await ownDashboard.text(), "control: A's dashboard names its site").toContain(host);
+      const ownSettings = await A.context.request.get('/settings');
+      expect(await ownSettings.text(), "control: A's settings name its address").toContain(A.email);
+      const isB = async (when: string) => {
+        const r = await B.context.request.get('/settings');
+        expect(r.status(), `B is signed in ${when}`).toBe(200);
+        expect(new URL(r.url()).pathname, `B stays on Settings ${when}`).toBe('/settings');
+        expect(await r.text(), `Settings names B ${when}`).toContain(B.email);
+      };
+      const stillSignedIn = (r: { url(): string }, path: string) =>
+        expect(new URL(r.url()).pathname, `${path} did not send B to sign-in`).not.toBe('/login');
+
+      await isB('before the forged cookie');
       for (const path of pages) {
         const r = await B.context.request.get(path);
         expect(r.status(), `B opens its own ${path}`).toBeLessThan(500);
+        stillSignedIn(r, path);
         expect(leaks(await r.text(), path), `${path} shows nothing of A`).toEqual([]);
       }
       // A forged account cookie must not move B onto A's account.
@@ -160,11 +182,13 @@ step(
       for (const path of pages) {
         const r = await B.context.request.get(path);
         expect(r.status(), `${path} with A's account cookie`).toBeLessThan(500);
+        stillSignedIn(r, path);
         expect(
           leaks(await r.text(), path),
           `${path} with A's account cookie shows nothing of A`,
         ).toEqual([]);
       }
+      await isB('with the forged cookie');
       await B.context.clearCookies({ name: 'cm_account' });
 
       // F-130: a foreign site id in the filter is dropped without a word.

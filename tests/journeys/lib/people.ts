@@ -76,16 +76,20 @@ export async function keptLabSite(who: Person): Promise<{ site: string; host: st
 export async function keptSite(who: Person, host: string): Promise<string> {
   assertCheckableSite(host);
   await who.page.goto('/dashboard');
-  const status = await who.page.evaluate(async (url) => {
+  const { status, code } = await who.page.evaluate(async (url) => {
     const r = await fetch('/api/sites', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ url }),
     });
-    return r.status;
+    const answer = (await r.json().catch(() => null)) as { code?: unknown } | null;
+    return { status: r.status, code: answer?.code };
   }, `https://${host}`);
-  if (status === 429) throw new HostLimited(host);
-  if (status !== 201 && status !== 500) throw new Error(`could not add ${host}: ${status}`);
+  // Only the per-host limit moves on to another host. Any other 429 is a failure of its own.
+  if (status === 429 && code === 'domain_capped') throw new HostLimited(host);
+  if (status !== 201 && status !== 500) {
+    throw new Error(`could not add ${host}: ${status} ${String(code)}`);
+  }
   const { data } = await stagingAdmin()
     .from('sites')
     .select('id')
