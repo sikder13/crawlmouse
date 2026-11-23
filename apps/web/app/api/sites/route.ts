@@ -1,5 +1,8 @@
+import type { SupabaseClient } from '@supabase/supabase-js';
+import { after } from 'next/server';
 import { checksPublicEnabled, pipelineEnabled } from '@/lib/auth/flags';
 import { scheduleFor } from '@/lib/auth/schedule';
+import { getClientIp } from '@/lib/client-ip';
 import { isCrawlPaused } from '@/lib/crawl-pause';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { supabaseServer } from '@/lib/supabase/server';
@@ -14,9 +17,16 @@ import {
   tooSoonTo,
 } from '@/lib/v2/account/route';
 import { admittedHost, parseAddBody } from '@/lib/v2/account/sites';
-import { supabaseAddSite } from '@/lib/v2/account/sites-store';
+import {
+  queuedEventId,
+  supabaseAddSite,
+  supabaseResendQueued,
+  type QueuedCheckRef,
+  type ResendQueued,
+} from '@/lib/v2/account/sites-store';
 import { loadViewer } from '@/lib/v2/account/viewer';
 import { agencyCaptureFor } from '@/lib/v2/agency/events';
+import { startLimits } from '../checks/_lib/start-limits';
 
 /**
  * The pages a form posts this from, and is sent back to when it is refused: the dashboard, and for
@@ -27,6 +37,45 @@ const MATRIX = '/agency';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+
+/**
+ * The add that made this site may have failed at its send, leaving its check queued with nothing to
+ * run it. A repeat add recovers it. The reads run here, through the caller's own session; what they
+ * answer is the work to do after the response, so a slow or failing send cannot hold back the 409.
+ * It re-sends under `queuedEventId`'s id, and a check already sent runs once (`inngest/check.ts` is
+ * idempotent on `checkId`). A paused site is left alone, as the other starts refuse one, and so is a
+ * site whose row this session cannot read. A repeat is counted as the public start counts one, and
+ * over that limit it sends nothing.
+ */
+async function strandedResend(
+  sb: SupabaseClient,
+  req: Request,
+  site: Omit<ResendQueued, 'check'>,
+): Promise<(() => Promise<void>) | null> {
+  const row = await sb.from('sites').select('paused_reason').eq('id', site.siteId).maybeSingle();
+  if (row.error) throw new Error('sites read failed');
+  if ((row.data as { paused_reason: string | null } | null)?.paused_reason !== null) return null;
+  const latest = await sb
+    .from('checks')
+    .select('id, status, trigger, queued_at')
+    .eq('site_id', site.siteId)
+    .order('queued_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (latest.error) throw new Error('checks read failed');
+  const check = latest.data as (QueuedCheckRef & { status: string }) | null;
+  if (check?.status !== 'queued' || queuedEventId(site.siteId, check) === null) return null;
+  const ip = getClientIp(req);
+  return async () => {
+    try {
+      if (ip !== 'unknown' && !(await startLimits.replay(ip))) return;
+      await supabaseResendQueued()({ ...site, check });
+    } catch {
+      // A fixed sentence: an upstream error's text can echo the event it was sent.
+      console.error('[api/sites] a repeat add could not re-send its check (send)');
+    }
+  };
+}
 
 /**
  * Add a site to the account the caller acts in (CC-26b D6, ARCH-2 §5 "First-run dashboard"):
@@ -41,7 +90,8 @@ export const dynamic = 'force-dynamic';
  * transaction (`add_site`). A form is answered with a 303 to the new site's page, or back to the
  * client matrix when it was posted from there; JSON with its ids. A refused form goes back to the
  * page it came from, the dashboard or the matrix, with its notice. The first site an agency account
- * adds also sends `first_client_added` (CC-31 D10).
+ * adds also sends `first_client_added` (CC-31 D10). A host the account already keeps is a 409, and
+ * after answering, sends the event of a check still queued on it, unless the site is paused.
  */
 export async function POST(req: Request) {
   if (!checksPublicEnabled()) return notFound();
@@ -116,6 +166,18 @@ export async function POST(req: Request) {
         : Response.json({ siteId: added.siteId, checkId: added.checkId }, { status: 201 });
     }
     case 'exists':
+      try {
+        const resend = await strandedResend(sb, req, {
+          siteId: added.siteId,
+          accountId: account.id,
+          host: admitted.host,
+          requestedByUserId: user.id,
+        });
+        if (resend) after(resend);
+      } catch {
+        // The answer is still that the site is there. A fixed sentence, as for the send.
+        console.error('[api/sites] a repeat add could not re-send its check (read)');
+      }
       return refuseTo(req, back, 409, 'site_exists', { siteId: added.siteId });
     case 'full':
       return refuseTo(req, back, 402, 'upgrade_required', { gate: 'sites' });
