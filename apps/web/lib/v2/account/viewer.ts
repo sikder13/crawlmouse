@@ -42,6 +42,17 @@ export async function loadViewer(): Promise<ViewerResult> {
   const {
     data: { user },
   } = await session.auth.getUser();
+  return viewerFor(session, user);
+}
+
+/**
+ * The viewer for a user a route has already read from `session` (`auth.getUser()`), with this
+ * request's switcher cookie: `loadViewer` without its own session read.
+ */
+export async function viewerFor(
+  session: SupabaseClient,
+  user: { id: string; email?: string | null } | null,
+): Promise<ViewerResult> {
   if (!user) return { kind: 'signed_out' };
   return readViewer(
     { session, admin: supabaseAdmin(), now: () => new Date() },
