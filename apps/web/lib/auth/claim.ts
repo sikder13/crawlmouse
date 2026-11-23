@@ -65,7 +65,7 @@ export const CLAIM_REFUSALS = {
   },
   no_account: {
     status: 409,
-    when: 'the caller has no v2 account (a user from before migration 001)',
+    when: 'the caller has no v2 account (a user from before migration 001), for a check no account keeps',
   },
   expired: { status: 410, when: 'the check expired before anyone kept it' },
 } as const;
@@ -86,19 +86,23 @@ export async function claimCheck(
   input: { checkId: string; userId: string },
 ): Promise<ClaimResult> {
   const { store } = deps;
+  // Both are read before either is judged, and ownership before the caller's account, so a caller
+  // with no account cannot tell a check of someone else's site from an id that names nothing.
   const check = await store.loadCheck(input.checkId);
-  if (check === null) return refuse('not_found');
   const member = await store.loadMember(input.userId);
+  if (check === null) return refuse('not_found');
+  if (check.siteAccountId !== null && check.siteAccountId !== member?.accountId) {
+    return refuse('not_found');
+  }
   if (member === null) return refuse('no_account');
 
   const now = deps.now();
   if (check.siteAccountId !== null) {
-    if (check.siteAccountId !== member.accountId) return refuse('not_found');
     if (check.expiresAt === null) return refuse('already_claimed');
     // Our site, but the check still expires: an earlier claim stopped between its two writes. That
     // claim tested the expiry before it took the site, so it is finished now, whatever the time.
     // This assumes the claim is the one writer that gives an account's site a check with an expiry.
-    await store.clearExpiry(check.checkId);
+    await store.clearExpiry(check.siteId);
     return kept(deps, check, input.userId);
   }
 
@@ -129,7 +133,7 @@ export async function claimCheck(
       : refuse('not_found');
   }
   // `keep_check` cleared the expiry in the transaction that took the site.
-  if (!deps.keep) await store.clearExpiry(check.checkId);
+  if (!deps.keep) await store.clearExpiry(check.siteId);
   return kept(deps, check, input.userId);
 }
 

@@ -536,11 +536,28 @@ describe('POST /api/seats', () => {
     );
     expect(await seatsOf(agency.accountId)).toHaveLength(2);
 
-    // A cookie naming an account the caller holds no seat on reads as no choice: their own account.
+    // A cookie naming an account the caller holds no seat on reads as no choice. With an empty
+    // personal account and one owned agency, no choice lands in the agency (F-105), so the invite
+    // goes there: never into the stranger's account.
     h.chosen = stranger.accountId;
     const res = await invite({ email: 'b@example.com', role: 'developer', scope: 'all' });
-    expect(res.status).toBe(402);
+    expect(res.status).toBe(201);
+    expect(await seatsOf(agency.accountId)).toHaveLength(3);
     expect(await seatsOf(stranger.accountId)).toHaveLength(1);
+  });
+
+  it('a person whose personal account holds a site: no choice stays there, as before', async () => {
+    const owner = await person(h.db, 'two-with-site');
+    const agency = await agencyAccount(h.db, owner);
+    await h.db.query(`insert into public.sites (account_id, host) values ($1, $2)`, [
+      owner.accountId,
+      `${owner.id.slice(0, 8)}.example.com`,
+    ]);
+    as(owner);
+    h.chosen = null;
+    const res = await invite({ email: 'c@example.com', role: 'developer', scope: 'all' });
+    expect(res.status).toBe(402);
+    expect(await seatsOf(agency.accountId)).toHaveLength(1);
   });
 });
 

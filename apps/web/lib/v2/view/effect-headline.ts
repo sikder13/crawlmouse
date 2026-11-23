@@ -75,7 +75,11 @@ export const NO_EFFECT_SHORT = 'No measurable effect';
  * One figure of a fix's effect as every view prints it: "+3" above zero; null at or below zero,
  * which a view prints as no measurable effect, never with a minus sign.
  */
-export const formatPoints = (n: number): string | null => (n > 0 ? `+${n}` : null);
+export const formatPoints = (n: number): string | null => {
+  // To two decimals: a sum of effects is a float, and "+6.909999999999998" is not a number to read.
+  const shown = Math.round(n * 100) / 100;
+  return shown > 0 ? `+${shown}` : null;
+};
 
 /**
  * "Makes 3 pages readable without JavaScript", singular for one page; for a count from an earlier

@@ -176,14 +176,21 @@ describe('the SDK options that run the scrubber', () => {
 
   // instrumentation-client.ts runs Sentry.init and posthog.init when it is imported, so its source
   // is read (as __tests__/replay-privacy.test.ts does), with comments taken out first.
-  it('instrumentation-client.ts spreads the browser’s options into its one Sentry.init', () => {
-    const source = readFileSync(resolve(__dirname, '../../instrumentation-client.ts'), 'utf8')
-      .replace(/\/\*[\s\S]*?\*\//g, '')
-      .replace(/(^|[^:])\/\/[^\n]*/g, '$1');
-    const inits = source.match(/Sentry\.init\(\{[\s\S]*?\}\);/g) ?? [];
-    expect(inits).toHaveLength(1);
-    expect(inits[0]).toMatch(/\.\.\.sentryBrowserOptions\(\),\s*\}\);$/);
-    expect(inits[0]).not.toMatch(/beforeSend/);
+  it('instrumentation-client.ts spreads the browser’s options into its one Sentry configuration', () => {
+    const strip = (src: string) =>
+      src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+    const source = strip(
+      readFileSync(resolve(__dirname, '../../instrumentation-client.ts'), 'utf8'),
+    );
+    const configs = source.match(/configureSentry\(\{[\s\S]*?\}\);/g) ?? [];
+    expect(configs).toHaveLength(1);
+    expect(configs[0]).toMatch(/\.\.\.sentryBrowserOptions\(\),\s*\}\);$/);
+    expect(configs[0]).not.toMatch(/beforeSend/);
+    expect(source).not.toMatch(/Sentry\.init\(/);
+    // The lazy client initialises the SDK once, with exactly those options.
+    const lazy = strip(readFileSync(resolve(__dirname, '../sentry-lazy.ts'), 'utf8'));
+    expect(lazy.match(/\.init\(/g)).toHaveLength(1);
+    expect(lazy).toMatch(/sdk\.init\(configured\);/);
   });
 });
 

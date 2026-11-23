@@ -71,7 +71,7 @@ A site named on Sign-up is attached at any sign-in with room (a first login or a
 | `already_claimed` | 409    | the account owns the check’s site and the check no longer expires                             |
 | `host_kept`       | 409    | the account already keeps a site with that host                                               |
 | `site_limit`      | 409    | the account keeps as many sites as its limit, read at its tier now (an expired trial is Free) |
-| `no_account`      | 409    | the caller has no v2 account (a user from before migration 001)                               |
+| `no_account`      | 409    | the caller has no v2 account (a user from before migration 001), for a check no account keeps |
 | `expired`         | 410    | the check expired before anyone kept it                                                       |
 
 With `V2_CHECKS_PUBLIC=1` (CC-22b D7) the two writes are one transaction, `keep_check` (migration 022b), which also refuses a check that has expired on the database’s clock, and the check’s evidence objects move from `anon/` to the account (`apps/web/lib/v2/pipeline/keep.ts`). A claim whose check failed, and a site named on Sign-up, get a first audit when `V2_PIPELINE=1` as well (`apps/web/lib/v2/pipeline/first-audit.ts`).

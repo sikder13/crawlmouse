@@ -520,11 +520,11 @@ export function siteView(
   // ── fixes table ──
   const byNumber = [...fixes].sort((a, b) => a.number - b.number);
   const withPackets = byNumber.filter((f) => todo(f) && f.packet !== null);
-  // By number, as the locked page lists them, with the fixes this tier opens first, so open and
-  // locked rows do not alternate (F-099). A single fix past the fold is shown, not folded into a row
-  // of one.
+  // The fixes this tier opens first, so open and locked rows do not alternate, and each in the
+  // engine's order of impact, as the dashboard and the main button read them (F-099). A single fix
+  // past the fold is shown, not folded into a row of one.
   const inTable = [...byNumber].sort(
-    (a, b) => Number(lockedFix(v, result, a)) - Number(lockedFix(v, result, b)),
+    (a, b) => Number(lockedFix(v, result, a)) - Number(lockedFix(v, result, b)) || byRank(a, b),
   );
   const shownFixes = allFixes || fixes.length <= SHOWN_FIXES + 1 ? fixes.length : SHOWN_FIXES;
   const rows = inTable.slice(0, shownFixes).map((f) => fixRow(v, result, f, fixes));

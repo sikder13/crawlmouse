@@ -340,3 +340,48 @@ describe('distinct ids by who the event is about (CC-41 D1)', () => {
     expect(visitorDistinctId(`${cookie}; cm_consent=denied`, null, 'check:r')).toBe('check:r');
   });
 });
+
+describe('captureServerEvent, the browser’s bot rule (F-050)', () => {
+  const HEADLESS =
+    'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/131.0.0.0 Safari/537.36';
+  const CHROME =
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
+  const lookup = async () => false;
+
+  it.each([
+    ['a headless browser', HEADLESS],
+    [
+      'an AI crawler',
+      'Mozilla/5.0 AppleWebKit/537.36 (compatible; GPTBot/1.1; +https://openai.com/gptbot)',
+    ],
+    [
+      'a search crawler',
+      'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
+    ],
+  ])('%s sends nothing', async (_, userAgent) => {
+    const send = vi.fn(async () => undefined);
+    await captureServerEvent(
+      null,
+      { event: 'check_started', distinctId: 'd', userAgent },
+      send,
+      lookup,
+    );
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['a browser', CHROME],
+    ['no user agent', null],
+    ['a caller that has no request', undefined],
+  ])('%s is sent, and the user agent is not in the event', async (_, userAgent) => {
+    const send = vi.fn(async (_b: unknown) => undefined);
+    await captureServerEvent(
+      null,
+      { event: 'check_started', distinctId: 'd', userAgent },
+      send,
+      lookup,
+    );
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(send.mock.calls[0]![0])).not.toContain('Chrome');
+  });
+});
