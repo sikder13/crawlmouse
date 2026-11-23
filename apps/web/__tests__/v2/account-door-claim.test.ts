@@ -197,6 +197,78 @@ describe('claimCheck', () => {
     });
   });
 
+  describe('a caller with no v2 account learns nothing about an id (A2’s review)', () => {
+    const MISSING = '0b9d3c52-7c1e-4f0a-9a44-1f2e3d4c5b6a';
+    const NOT_FOUND = { ok: false, status: 404, code: 'not_found' };
+
+    async function privateCheck(tag: string) {
+      const owner = await signUp(db, `owner-${tag}@example.com`);
+      const { checkId } = await anonymousCheck(db, `${tag}.example.com`, LATER);
+      expect((await claimCheck(deps(), { checkId, userId: owner })).ok).toBe(true);
+      return checkId;
+    }
+
+    it('with no default account: a private id and a missing id get the same answer', async () => {
+      const checkId = await privateCheck('oracle-a');
+      const user = await signUp(db, 'no-account@example.com');
+      await db.query(`update public.users set default_account_id = null where id = $1`, [user]);
+      const held = await claimCheck(deps(), { checkId, userId: user });
+      const missing = await claimCheck(deps(), { checkId: MISSING, userId: user });
+      expect(held).toEqual(NOT_FOUND);
+      expect(missing).toEqual(held);
+    });
+
+    it('with an account marked for deletion: the same', async () => {
+      const checkId = await privateCheck('oracle-b');
+      const user = await signUp(db, 'deleting@example.com');
+      const a = await accountOf(db, user);
+      await db.query(
+        `update public.accounts set deletion_confirmed_at = $2,
+                purge_after = $2::timestamptz + interval '7 days' where id = $1`,
+        [a.id, NOW],
+      );
+      const held = await claimCheck(deps(), { checkId, userId: user });
+      expect(held).toEqual(NOT_FOUND);
+      expect(await claimCheck(deps(), { checkId: MISSING, userId: user })).toEqual(held);
+    });
+
+    it('the store is asked the same two questions either way', async () => {
+      const checkId = await privateCheck('oracle-c');
+      const user = await signUp(db, 'no-account-2@example.com');
+      await db.query(`update public.users set default_account_id = null where id = $1`, [user]);
+      const asked = async (id: string) => {
+        const log: string[] = [];
+        const real = deps();
+        const store = new Proxy(real.store, {
+          get(target, prop, receiver) {
+            const value = Reflect.get(target, prop, receiver) as unknown;
+            if (typeof value !== 'function') return value;
+            return (...args: unknown[]) => {
+              log.push(String(prop));
+              return (value as (...a: unknown[]) => unknown).apply(target, args);
+            };
+          },
+        });
+        await claimCheck({ ...real, store }, { checkId: id, userId: user });
+        return log;
+      };
+      const forPrivate = await asked(checkId);
+      expect(forPrivate).toEqual(['loadCheck', 'loadMember']);
+      expect(await asked(MISSING)).toEqual(forPrivate);
+    });
+
+    it('an unkept check, which the id alone may claim, still says the account is missing', async () => {
+      const user = await signUp(db, 'no-account-3@example.com');
+      await db.query(`update public.users set default_account_id = null where id = $1`, [user]);
+      const { checkId } = await anonymousCheck(db, 'unkept-oracle.example.com', LATER);
+      expect(await claimCheck(deps(), { checkId, userId: user })).toEqual({
+        ok: false,
+        status: 409,
+        code: 'no_account',
+      });
+    });
+  });
+
   it('an account marked for deletion is a 409 no_account, and its site stays unowned (spec 27b)', async () => {
     const user = await signUp(db, 'leaving@example.com');
     const a = await accountOf(db, user);

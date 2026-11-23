@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { expect, test } from './pw';
-import { STEPS } from './lib/steps-md';
+import { parseSteps, STEPS } from './lib/steps-md';
 
 // expected-fail.json against STEPS.md. Pure: no browser, no server.
 const EXPECTED: Record<string, string[]> = JSON.parse(
@@ -43,6 +43,25 @@ test('every step that is not plainly "no" writes, J4 included', () => {
   expect(STEPS.get('J4.6')?.writes).toBe(true);
   expect(STEPS.get('J4.1')?.writes).toBe(false);
   expect(STEPS.get('D.F-010')?.writes).toBe(true);
+});
+
+test('a D step writes unless it is declared with exactly "no"', () => {
+  for (const id of ['D.F-045', 'D.F-048', 'D.F-049', 'D.F-067', 'D.F-088']) {
+    expect(STEPS.get(id)?.writes, id).toBe(false);
+  }
+  const list = 'D.F-001, D.F-002';
+  const writes = (row: string) => parseSteps(`${list}\n${row}\n`).get('D.F-001')?.writes;
+  expect(writes('| D.F-002 | no |'), 'an undeclared step').toBe(true);
+  expect(writes('| D.F-001 | no |')).toBe(false);
+  expect(writes('| D.F-001 | yes |')).toBe(true);
+  expect(writes('| D.F-001 | no, it reads |'), 'anything but exactly no').toBe(true);
+  for (const bad of ['| D.F-001 | maybe |', '| D.F-001 |  |', '| D.F-001 | no | extra |']) {
+    expect(() => writes(bad), bad).toThrow(/neither yes nor no/);
+  }
+  for (const row of ['| D.F-999 | no |', '  | D.F-999 | no |']) {
+    expect(() => parseSteps(`${list}\n${row}\n`), row).toThrow(/not a D step/);
+  }
+  expect(() => parseSteps(`${list}\n| D.F-001 | yes |\n| D.F-001 | no |\n`)).toThrow(/twice/);
 });
 
 test('expected-fail.json names only defects the index lists', () => {
