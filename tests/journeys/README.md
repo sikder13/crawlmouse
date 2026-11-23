@@ -26,30 +26,37 @@ browser steps run against a deployment.
 ## Safety
 
 - **Where a writing step runs.** A step that writes runs only:
-  - on staging's host (`WRITABLE_HOSTS` in `lib/target.ts`);
+  - on staging's host or the staging environment's Vercel alias (`WRITABLE_HOSTS` in `lib/target.ts`);
   - with `JOURNEY_ALLOW_WRITES=1`;
   - after the deployment proves its database. Its Content-Security-Policy, which the build writes from
     `NEXT_PUBLIC_SUPABASE_URL`, must name staging's database host exactly and must not name
     production's project.
 
   The host is an allowlist. Production under any spelling (`crawlmouse.com.`, the
-  `crawlmouse-001.vercel.app` alias), every Vercel preview and localhost are read-only. A dev server can
+  `crawlmouse-001.vercel.app` alias), every other Vercel deployment and localhost are read-only. A dev server can
   hold a copied `.env.local`, and an old preview can still hold production's database keys.
 
 - **Whether a step writes is read from `STEPS.md`**, not declared by the spec. A Writes cell must start
   with "yes" or "no", and anything but exactly "no" counts as a write. J4 and J4.6 replay writes that
   must be refused, so they are writes.
 - **Deployment Protection.** Before any step, `global-setup.ts` probes `/api/health`. If the deployment
-  is behind Vercel's sign-in, the run stops with that reason unless `VERCEL_AUTOMATION_BYPASS_SECRET` is
-  set. The secret is sent as `x-vercel-protection-bypass` only to the deployment's own origin, never to
-  the third-party hosts a page loads (`lib/protection.ts`).
+  answers with a redirect to Vercel's sign-in, or a 401 or 403 from Vercel, the run stops with that
+  reason unless `VERCEL_AUTOMATION_BYPASS_SECRET` is set. The secret goes on requests that do
+  not follow redirects, to the deployment's origin, to get Vercel's bypass cookie; the contexts carry that
+  cookie for the deployment's host (`lib/protection.ts`). A trace records headers and URLs, so the config
+  turns tracing off for a run with the secret or with writes. If tracing is turned back on, a step refuses to
+  run when the secret is set or the step writes. `signIn` refuses too, and refuses outside a step unless the
+  test records its `trace` fixture with `noteTrace`.
 - **A step that starts a check passes the address through `lib/sites.ts`**, which accepts only
   `*.lab.crawlmouse.com` and `nahltech.com`.
-- **The guard is tested.** `guard.spec.ts` varies what each rule reads: case, trailing dots, ports,
-  userinfo, aliases, look-alike hosts and look-alike database hosts. Each refusal in `lib/target.ts`,
-  the rule in `lib/sites.ts` and the protection rule in `lib/protection.ts` has been removed in turn,
-  and each removal turned the spec red. CI enforces the spec; the pinned check is
-  `pnpm --filter @crawlmouse/web exec vitest run __tests__/security/ci-workflow.test.ts`.
+- **Test accounts exist on staging only** (`lib/accounts.ts`). The admin client is built only when
+  `SUPABASE_URL` is staging's project and `STAGING_PROJECT_REF` agrees; production's project is refused
+  by name. Addresses are `qa+<journey>-<stamp>-<n>@lab.crawlmouse.com`. `signIn` goes through the product's
+  own door (the link, then Continue) and returns only when Supabase confirms the browser's session is that
+  address. It asks for a link only after the target passes the write guard and shows staging's database.
+- **The guard is tested.** For the write guard, `guard.spec.ts` varies case, trailing dots, ports, userinfo,
+  aliases and look-alike hosts. CI enforces the spec; the pinned
+  check is `pnpm --filter @crawlmouse/web exec vitest run __tests__/security/ci-workflow.test.ts`.
 
 ## Expected-fail
 
@@ -73,7 +80,9 @@ browser steps run against a deployment.
   the step passes.
 
 - **A PR that fixes a defect** deletes that id from `expected-fail.json`. It edits nothing else there.
-- **Judged ids.** Some ids a test cannot observe: positioning, legal wording, a published address.
+- **Judged ids.** Some ids a test cannot observe: positioning, legal wording, a published address, or a
+  server-side PostHog event a browser step cannot see (F-050). Judged is not closed: F-050 stays open in the
+  register until its fix has evidence for both halves, the bot rule and the internal marker.
   `STEPS.md` marks them "(judged)" and leaves them out of `expected-fail.json`, parent steps included.
   The gate checks them by hand.
 - **Consistency.** `consistency.spec.ts` keeps `expected-fail.json` inside `STEPS.md`:
@@ -102,7 +111,7 @@ JOURNEY_BASE_URL=https://crawlmouse.com ../../apps/web/node_modules/.bin/playwri
 ```
 
 Besides the pure guard and consistency tests, that lists the read-only steps SMOKE.1, 6, 7 and 8,
-J0.2, and J0.9a–l. J0.9m is not yet automated. Every other step in `STEPS.md` is written but not yet
+J0.1, J0.2, and J0.9a–m. Every other step in `STEPS.md` is written but not yet
 automated. Steps that write wait for staging.
 
 ## What it cannot see
