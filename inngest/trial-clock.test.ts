@@ -71,7 +71,9 @@ function inngestLike(attempts = 3) {
 function fakeClock(due: TrialClockDue[], over: Partial<TrialClockPorts> = {}) {
   return {
     now: vi.fn<TrialClockPorts['now']>(over.now ?? (() => Date.parse(NOW))),
-    due: vi.fn<TrialClockPorts['due']>(over.due ?? (async () => due)),
+    due: vi.fn<TrialClockPorts['due']>(
+      over.due ?? (async () => ({ due, reminderReadFailed: false })),
+    ),
     remind: vi.fn<TrialClockPorts['remind']>(
       over.remind ?? (async (id) => applied(`remind:${id}`)),
     ),
@@ -129,6 +131,16 @@ describe('trialClockFn steps', () => {
       [[{ kind: 'send', id: `remind:${B}` }]],
     ]);
     expect(result).toEqual({ out: { handled: 2, applied: 2, ignored: 0 } });
+  });
+
+  it('after a failed reminder read, handles the expiries and then ends failed', async () => {
+    const clock = fakeClock([], {
+      due: async () => ({ due: [{ accountId: A, kind: 'expire' }], reminderReadFailed: true }),
+    });
+    const result = await inngestLike().execute(handlerOf(clock));
+    expect(clock.expire).toHaveBeenCalledTimes(1);
+    expect(clock.dispatch).toHaveBeenCalledTimes(1);
+    expect((result as { error: Error }).error.message).toContain('reminders could not be read');
   });
 
   it('counts what the machine ignored as ignored', async () => {

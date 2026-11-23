@@ -11,6 +11,7 @@ import { createTrialClockFn, type TrialClockPorts } from '../../../../inngest/tr
 import { asRole } from '../../__tests__/helpers/pglite-migrations';
 import { postgrestOver } from '../../__tests__/helpers/postgrest-pglite';
 import { doorDb, pgliteEntitlementStore } from '../../__tests__/v2/_lib/door-pglite';
+import { supabaseMailStore } from '../v2/mail/store';
 import { trialReminderKey } from '../v2/mail/trial-key';
 import { billingClock, supabaseDeletionState, supabaseSweepReads } from './clock';
 import type { EffectSinks, InngestSend } from './effects';
@@ -86,7 +87,8 @@ async function ledger(
 }
 
 const reads = () => supabaseTrialClockReads(postgrestOver(db));
-const dueAt = (ms: number, limit = 100) => trialClockDue(reads(), new Date(ms), limit);
+const dueAt = async (ms: number, limit = 100) =>
+  (await trialClockDue(reads(), new Date(ms), limit)).due;
 const kindOf = async (id: string, ms: number) =>
   (await dueAt(ms)).find((d) => d.accountId === id)?.kind ?? null;
 
@@ -201,7 +203,7 @@ describe('looking past reminders already sent', () => {
       remindersDone: async (keys) =>
         new Set(keys.filter((k) => !k.includes(rows.at(-1)!.accountId))),
     };
-    expect(await trialClockDue(fake, at, 10)).toEqual([
+    expect((await trialClockDue(fake, at, 10)).due).toEqual([
       { accountId: rows.at(-1)!.accountId, kind: 'remind' },
     ]);
   });
@@ -216,18 +218,47 @@ describe('when the reminder read fails', () => {
     remindersDone: async () => new Set(),
   });
 
-  it('trials that have ended still end', async () => {
-    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  it('trials that have ended still end, and the failure is reported', async () => {
     const accountId = '00000000-0000-4000-8000-000000000001';
     expect(
       await trialClockDue(failing([{ accountId, at: new Date(END) }]), new Date(END), 10),
-    ).toEqual([{ accountId, kind: 'expire' }]);
-    expect(error).toHaveBeenCalledTimes(1);
-    error.mockRestore();
+    ).toEqual({ due: [{ accountId, kind: 'expire' }], reminderReadFailed: true });
   });
 
   it('with none, the step fails so Inngest retries it', async () => {
     await expect(trialClockDue(failing([]), new Date(END), 10)).rejects.toThrow('down');
+  });
+});
+
+describe('the mail’s seat count, against what the move to Free removes', () => {
+  it('counts the active seats besides the owner’s, and the expiry removes exactly those', async () => {
+    const id = await noCardTrial();
+    const person = async () =>
+      (
+        await db.query<{ id: string }>(
+          `insert into auth.users (id, email) values (gen_random_uuid(), gen_random_uuid() || '@example.com')
+           returning id`,
+        )
+      ).rows[0]!.id;
+    await db.query(
+      `insert into public.seats (account_id, user_id, invited_email, role, status, accepted_at)
+       values ($1, $2, 'dev@example.com', 'developer', 'active', now())`,
+      [id, await person()],
+    );
+    await db.query(
+      `insert into public.seats (account_id, invited_email, role, status)
+       values ($1, 'invited@example.com', 'developer', 'invited')`,
+      [id],
+    );
+    const counted = await supabaseMailStore(postgrestOver(db)).trialOtherSeats(id);
+    expect(counted).toBe(1);
+    await applyEntitlementTransition(store, id, { type: 'trial_expired', at: new Date(END) });
+    const { rows } = await db.query<{ n: number }>(
+      `select count(*)::int as n from public.seats
+        where account_id = $1 and status = 'removed' and invited_email = 'dev@example.com'`,
+      [id],
+    );
+    expect(rows[0]!.n).toBe(counted);
   });
 });
 

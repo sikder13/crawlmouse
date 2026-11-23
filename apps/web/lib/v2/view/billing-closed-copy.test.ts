@@ -170,6 +170,33 @@ describe('the reminder, which the clock sends with paid plans closed', () => {
     expect(note).not.toContain("We'll email");
   });
 
+  it('the first-run dashboard does not promise it to a seat that will not get it', () => {
+    const owner = bad.seats.find((s) => s.account_id === BAD && s.role === 'owner')!;
+    const devId = 'c0000000-0000-4000-8000-000000000093';
+    const d: FixtureDataset = {
+      ...bad,
+      seats: [...bad.seats, { ...owner, id: devId, role: 'developer', email: 'dev@example.com' }],
+    };
+    const v = dashboardView(d, { ...day0, seatId: devId });
+    expect(v.threeKinds!.body).not.toContain('reminder');
+  });
+
+  it('the first-run dashboard does not name a reminder day that has passed', () => {
+    const late = { ...day0, now: '2026-11-07T15:00:00.000Z' };
+    const firstOnly: FixtureDataset = {
+      ...bad,
+      checks: bad.sites.flatMap((s) => {
+        const first = bad.checks
+          .filter((c) => c.site_id === s.id && c.finished_at !== null)
+          .sort((x, y) => Date.parse(x.finished_at!) - Date.parse(y.finished_at!))[0];
+        return first ? [first] : [];
+      }),
+    };
+    const v = dashboardView(firstOnly, late);
+    expect(v.firstRun).toBe(true);
+    expect(v.threeKinds!.body).not.toContain('reminder');
+  });
+
   it('the rail does not promise it to an owner who turned it off', () => {
     const off = withAccount(bad, {
       email_prefs: {
@@ -222,8 +249,10 @@ describe('Trial ending, other cases with paid plans closed', () => {
         seat('c0000000-0000-4000-8000-000000000092', null),
       ],
     };
-    const rows = trialEndView(withSeats, trialEndViewer(withSeats, BAD), closed).pauses;
-    expect(rows[0]).toEqual({ what: '1 other seat', how: 'loses access' });
+    const v = trialEndView(withSeats, trialEndViewer(withSeats, BAD), closed);
+    expect(v.endText).toContain('The 1 other person with a seat on this account loses access.');
+    // Not under "Pauses, until Pro": choosing Pro later does not bring the seat back.
+    expect(JSON.stringify(v.pauses)).not.toContain('seat');
   });
 
   it('a card trial is not told to add Pro', () => {

@@ -127,6 +127,7 @@ export function trialEndView(
   const owner = role === 'owner';
   // No card and no checkout: the trial simply ends, so there is nothing to choose between.
   const nothingToChoose = !billingOpen && !onFile && a.renews_at === null;
+  const otherSeats = v.d.seats.filter((s) => s.accepted_at !== null && s.role !== 'owner').length;
   const hostOf = new Map(v.d.sites.map((s) => [s.id, s.host]));
   const checkSite = new Map(v.d.checks.map((c) => [c.id, c.site_id]));
 
@@ -368,6 +369,7 @@ export function trialEndView(
         billingOpen,
         site.paused,
       ),
+      ...(otherSeats > 0 ? [COPY.seatsLost(otherSeats)] : []),
     ].join(' '),
     tables: COPY.tables,
     columns: COPY.columns,
@@ -530,19 +532,7 @@ function staysAndPauses(v: AccountView, plan: string, ended = false) {
       ? [COPY.pauses.features.exports]
       : []),
   ];
-  // Free keeps one seat; after the end the others are already gone.
-  const otherSeats = ended
-    ? 0
-    : v.d.seats.filter((s) => s.accepted_at !== null && s.role !== 'owner').length;
   const pauses: TrialRowView[] = [
-    ...(otherSeats
-      ? [
-          {
-            what: COPY.pauses.seats(otherSeats),
-            how: otherSeats === 1 ? COPY.pauses.seatsHow : COPY.pauses.seatsHowMany,
-          },
-        ]
-      : []),
     ...(others.length
       ? [{ what: listOf(others.map((s) => s.host)), how: COPY.pauses.sitesHow }]
       : []),

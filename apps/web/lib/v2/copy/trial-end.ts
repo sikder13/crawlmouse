@@ -55,10 +55,6 @@ export const TRIAL_END_COPY = {
   pauses: {
     sitesHow: 'no checks; history kept, nothing you can see deleted',
     stagingHow: 'no deploy checks on Free; history kept',
-    /** Free keeps one seat: the move removes the others. */
-    seats: (n: number) => `${count(n)} other ${plural(n, 'seat', 'seats')}`,
-    seatsHow: 'loses access',
-    seatsHowMany: 'lose access',
     fixes: (range: string, n: number, plan: string) =>
       `${plural(n, 'Fix', 'Fixes')} ${range}, ${numberWord(n)} on ${plan}`,
     fixesHow: (packets: number) =>
@@ -121,6 +117,14 @@ export const TRIAL_END_COPY = {
   endNothing: (date: string) => `Nothing to do. On ${date} the account is Free:`,
   endCancel: (date: string, clicks: number) =>
     `Cancel before ${date} from Settings › Plan, in ${numberWord(clicks)} clicks, and on ${date} the account is Free:`,
+  /**
+   * Free keeps one seat, so the move removes the others, and choosing a plan later does not bring
+   * them back: said in what happens, not in the table of what pauses until the plan.
+   */
+  seatsLost: (n: number) =>
+    n === 1
+      ? 'The 1 other person with a seat on this account loses access.'
+      : `The ${n} other people with seats on this account lose access.`,
   /** What Free keeps and pauses, from the sites and the free fixes the account holds. */
   endKeeps: (
     host: string,

@@ -8,7 +8,7 @@
  * re-apply it for the three days it stays in the window.
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { TrialClockDue } from '../../../../inngest/trial-clock';
+import type { TrialClockDue, TrialClockList } from '../../../../inngest/trial-clock';
 import { TRIAL_REMINDER_DAYS_BEFORE_END } from '../auth/constants';
 import { trialReminderKey } from '../v2/mail/trial-key';
 import type { SweepRow } from './clock';
@@ -36,7 +36,7 @@ export async function trialClockDue(
   reads: TrialClockReads,
   at: Date,
   limit: number,
-): Promise<TrialClockDue[]> {
+): Promise<TrialClockList> {
   const due: TrialClockDue[] = (await reads.ended(at, limit)).map((r) => ({
     accountId: r.accountId,
     kind: 'expire',
@@ -56,11 +56,12 @@ export async function trialClockDue(
       if (page.length < REMINDER_PAGE) break;
     }
   } catch (error) {
-    // Trials that have ended still end. With none, the step fails and Inngest retries it.
+    // Trials that have ended still end, and the run then ends failed. With none, this step fails
+    // and Inngest retries it.
     if (!due.some((d) => d.kind === 'expire')) throw error;
-    console.error('[trial-clock] the reminder read failed; the next run reads it again');
+    return { due: due.filter((d) => d.kind === 'expire'), reminderReadFailed: true };
   }
-  return due;
+  return { due, reminderReadFailed: false };
 }
 
 /** The reads through PostgREST; `sb` must be the service-role client. */

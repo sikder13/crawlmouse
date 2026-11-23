@@ -13,7 +13,8 @@
  *
  * An account whose step still fails after Inngest's retries does not hold up the others: its error is
  * caught, the rest are handled, and the run then ends failed, naming it. The next hour's run reads it
- * again if it is still due.
+ * again if it is still due. A reminder read that fails beside due expiries ends the run failed too,
+ * after the expiries are done.
  */
 import { NonRetriableError } from 'inngest';
 import { inngest } from './client';
@@ -29,11 +30,19 @@ export interface TrialClockDue {
   kind: 'remind' | 'expire';
 }
 
+export interface TrialClockList {
+  due: TrialClockDue[];
+  reminderReadFailed: boolean;
+}
+
 export interface TrialClockPorts {
   /** The time now, in ms since the epoch. */
   now(): number;
-  /** At most `limit` accounts due at `at`: those whose trial has ended first. */
-  due(at: Date, limit: number): Promise<TrialClockDue[]>;
+  /**
+   * At most `limit` accounts due at `at`, those whose trial has ended first. `reminderReadFailed`:
+   * ended trials were listed but the reminders could not be read.
+   */
+  due(at: Date, limit: number): Promise<TrialClockList>;
   /** Applies `trial_reminder_due` at `at` to the account as it is read now. */
   remind(accountId: string, at: Date): Promise<ClockDecision>;
   /** Applies `trial_expired` at `at` to the account as it is read now. */
@@ -49,7 +58,9 @@ export function createTrialClockFn(clock: () => TrialClockPorts) {
     { cron: '20 * * * *' },
     async ({ step }) => {
       const at = new Date(await step.run('now', async () => new Date(clock().now()).toISOString()));
-      const due = await step.run('due', () => clock().due(at, TRIAL_CLOCK_LIMIT));
+      const { due, reminderReadFailed } = await step.run('due', () =>
+        clock().due(at, TRIAL_CLOCK_LIMIT),
+      );
 
       const decided = { applied: 0, ignored: 0 };
       const failed: string[] = [];
@@ -68,6 +79,10 @@ export function createTrialClockFn(clock: () => TrialClockPorts) {
         throw new NonRetriableError(
           `trial clock: ${failed.length} of ${due.length} accounts failed: ${failed.join(', ')}`,
         );
+      }
+      // After the expiries, so a read that keeps failing cannot hold them up or go unnoticed.
+      if (reminderReadFailed) {
+        throw new NonRetriableError('trial clock: the reminders could not be read this run');
       }
       return { handled: due.length, ...decided };
     },

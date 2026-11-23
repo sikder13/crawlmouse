@@ -7,6 +7,7 @@
  */
 import { oldestFirst } from '../../billing/state-machine-sites';
 import { GATES } from '../../entitlement-v2';
+import { TRIAL_END_COPY } from '../copy/trial-end';
 import { FREE_SCHEDULE } from '../view/account-shell';
 import { numberWord, plural } from '../words';
 
@@ -59,17 +60,8 @@ function pausesSentence(others: number, staging: number): string | null {
 
 /** The reminder's paragraph on what stays, what pauses and who loses access. */
 export function afterTrialSentence(after: AfterTrial): string {
-  const seats = seatsSentence(after.otherSeats);
   const sites = sitesSentence(after);
-  return seats ? `${sites} ${seats}` : sites;
-}
-
-/** "The 1 other person with a seat on this account loses access."; null with none. */
-function seatsSentence(n: number): string | null {
-  if (n === 0) return null;
-  return n === 1
-    ? 'The 1 other person with a seat on this account loses access.'
-    : `The ${n} other people with seats on this account lose access.`;
+  return after.otherSeats > 0 ? `${sites} ${TRIAL_END_COPY.seatsLost(after.otherSeats)}` : sites;
 }
 
 function sitesSentence({ kept, othersPausing, stagingPausing }: AfterTrial): string {
