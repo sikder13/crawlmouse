@@ -813,6 +813,57 @@ describe('the step deadline', () => {
     expect(seen).toEqual([]);
   });
 
+  it('a refusal already past the deadline is not an unhandled rejection', async () => {
+    const seen: unknown[] = [];
+    const on = (e: unknown) => seen.push(e);
+    process.on('unhandledRejection', on);
+    try {
+      const { client, clock } = timedClient(1_000);
+      const out = await renderCheck(
+        input({
+          client,
+          maxRenders: 1,
+          inFlight: 1,
+          // The clock passes the deadline while admission is asked, and it then refuses.
+          admit: async () => {
+            clock.now += 1;
+            throw new NotAdmitted('private');
+          },
+          now: () => clock.now,
+          deadlineAt: clock.now + WORST_PAGE,
+        }),
+      );
+      expect(out.pages[0]).toMatchObject({ rendered: false, reason: 'out_of_time' });
+      await new Promise((r) => setTimeout(r, 30));
+    } finally {
+      process.off('unhandledRejection', on);
+    }
+    expect(seen).toEqual([]);
+  });
+
+  it('allows for measuring both replies, not one', async () => {
+    const big = 'x'.repeat(2 * 1024 * 1024);
+    const html = `<html><body><p>${big}</p></body></html>`;
+    const { clock } = timedClient(0);
+    const client = fakeClient(FIXTURES.values(), {
+      before: () => {
+        clock.now += REQUEST_TIMEOUT_MS;
+        return { ok: true, html, browserMs: 5 };
+      },
+    });
+    const out = await renderCheck(
+      input({
+        client,
+        maxRenders: 1,
+        inFlight: 1,
+        now: () => clock.now,
+        // Enough to measure one reply, and one millisecond short of both.
+        deadlineAt: clock.now + WORST_PAGE + measureAllowanceMs(2 * html.length) - 1,
+      }),
+    );
+    expect(out.pages[0]).toMatchObject({ rendered: false, reason: 'out_of_time' });
+  });
+
   it('does not measure a page whose replies could not be measured in the time left', async () => {
     const big = 'x'.repeat(2 * 1024 * 1024);
     const { clock } = timedClient(0);

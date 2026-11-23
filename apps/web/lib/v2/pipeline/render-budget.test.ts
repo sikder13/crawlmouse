@@ -51,6 +51,15 @@ describe('the daily render budget, per check', () => {
     expect(rpc).toHaveBeenCalledTimes(1);
   });
 
+  it('does not settle an earlier reservation after a later one was refused', async () => {
+    const { rpc, sb } = client([R1, null]);
+    const budget = supabaseRenderBudget(sb, CHECK);
+    expect(await budget.reserve(1, 2)).toBe(true);
+    expect(await budget.reserve(1, 2)).toBe(false);
+    await budget.settle(1, 1);
+    expect(rpc).toHaveBeenCalledTimes(2);
+  });
+
   it('throws on a database error, which the engine records as no budget', async () => {
     const reserving = supabaseRenderBudget(client([], { message: 'down' }).sb, CHECK);
     await expect(reserving.reserve(1, 2)).rejects.toThrow(/render budget/);

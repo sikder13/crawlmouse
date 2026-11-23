@@ -206,6 +206,14 @@ describe('keeping the reservations table small', () => {
     );
     expect(day[0]!.ms).toBe('777');
   });
+  it('keeps a reservation that is less than a week old', async () => {
+    await db.exec(`
+      insert into public.render_reservations (check_id, day, reserved_ms, created_at)
+      values (gen_random_uuid(), '2020-01-01', 10, now() - interval '6 days');
+    `);
+    await reserve(randomUUID(), 10, 1000);
+    expect(await reservations()).toBe(2);
+  });
 });
 
 describe('who can reach it', () => {
