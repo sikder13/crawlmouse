@@ -9,7 +9,7 @@ import { ResultScreen } from '../../components/v2/screens/result/ResultScreen';
 import { fixture } from '../../lib/v2/fixtures';
 import { AuditPageProvider } from '../../components/v2/screens/result/AuditPage';
 import { auditPage } from '../../app/audit/[id]/_lib/page-data';
-import { CONTROL, CRAWL, CRAWLERS } from '../../../../packages/worker/src/identities';
+import { CRAWL } from '../../../../packages/worker/src/identities';
 import { CRAWL_USER_AGENT } from '../../lib/v2/help/pinned';
 import { CHECKS } from '../../lib/v2/recordings';
 import { resultView, type ResultView } from '../../lib/v2/view/result';
@@ -60,16 +60,13 @@ describe('the next step on a refused check', () => {
     expect(CRAWL_USER_AGENT).toBe(CRAWL.userAgent);
   });
 
-  it('the string it tells an owner to allow is on no crawler test or control request', () => {
-    const agent = card(answered(429)).letIn!.agent!;
-    for (const identity of [...CRAWLERS, CONTROL]) expect(identity.userAgent).not.toContain(agent);
+  it.each([401, 403, 429, 451])('%i: names it for the logs, and advises no allow rule', (code) => {
+    const out = html(answered(code));
+    expect(out).toContain('In your firewall or CDN logs, our crawl appears as:');
+    expect(out).not.toMatch(/\ballow this\b|\bwhitelist\b|let our crawl in/i);
   });
 
-  it('warns against a partial match', () => {
-    expect(html(answered(429))).toContain('Match the whole string.');
-  });
-
-  it('gives no user agent when the edge refused our browser request too', () => {
+  it('says the same on a check the edge refused', () => {
     const v = view((c, d) => {
       Object.assign(c.technical_seo!, { grade: null, score: null });
       d.page_results = d.page_results
@@ -78,12 +75,20 @@ describe('the next step on a refused check', () => {
       for (const x of c.crawlers.filter((x) => x.group !== 'search_engine'))
         Object.assign(x, { verdict: 'edge_blocks_automation', status: 403 });
     });
-    if (card(v).letIn!.agent === null) {
-      expect(html(v)).toContain('A user agent rule will not clear this');
-      expect(html(v)).not.toContain('Match the whole string.');
-    } else {
-      throw new Error('the fixture did not reach the edge state');
-    }
+    expect(card(v).letIn).toEqual({ agent: CRAWL.userAgent, href: '/bot' });
+    expect(html(v)).not.toMatch(/let our crawl in/i);
+  });
+
+  it('the body’s next step matches the button', () => {
+    expect(card(answered(429, true)).body).toContain('then run a new audit.');
+    const kept = view((c, d) => {
+      Object.assign(c.technical_seo!, { grade: null, score: null });
+      d.page_results = d.page_results
+        .filter((p) => p.check_id === c.id)
+        .map((p) => ({ ...p, status_code: 429 }));
+      keep(c, d);
+    });
+    expect(card(kept).body).toContain('then run it again from Sites.');
   });
 
   it.each([404, 500, 301])('%i is not a refusal, so it offers no way in', (code) => {
@@ -91,7 +96,7 @@ describe('the next step on a refused check', () => {
     expect(html(answered(code))).not.toContain('How our crawler identifies itself');
   });
 
-  it('draws the token, the link and Run this audit again', () => {
+  it('draws the user agent, the link and a working button', () => {
     const out = html(answered(429));
     expect(out).toContain(CRAWL.userAgent);
     expect(out).toMatch(/<a href="\/bot">How our crawler identifies itself<\/a>/);

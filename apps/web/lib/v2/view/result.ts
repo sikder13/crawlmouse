@@ -150,8 +150,8 @@ export interface ResultView {
         body: string;
         /** The way to start watching an audit nobody has kept; null once it is kept. */
         action: { label: string; href: string } | null;
-        /** A refused check: what to allow, and where our crawler is described. */
-        letIn?: { agent: string | null; href: string };
+        /** A refused check: the user agent to look for in the logs, and where our crawler is described. */
+        letIn?: { agent: string; href: string };
       };
   doors: DoorView[];
   fixes: { total: number; open: number; pro: number; rows: FixRowView[] } | null;
@@ -763,7 +763,7 @@ function notServedCard(check: Check, statuses: readonly number[], kept: boolean)
       ? `None of the ${numberWord(ai.length)} AI crawlers could be measured.`
       : null;
   const next = refused
-    ? 'If you did not mean to refuse automated requests, find the firewall or bot rule that answered them, then run this audit again.'
+    ? `If you did not mean to refuse automated requests, find the firewall or bot rule that answered them, then ${kept ? 'run it again from Sites' : 'run a new audit'}.`
     : moved
       ? 'If the site has moved, run this audit on its new address.'
       : 'Once the site serves its pages, run this audit again.';
@@ -781,11 +781,9 @@ function notServedCard(check: Check, statuses: readonly number[], kept: boolean)
       .join(' '),
     // An audit page has no re-run route: a kept site re-runs from Sites, an unkept one is a new audit.
     action: refused ? (kept ? SITES_ACTION : NEW_AUDIT_ACTION) : null,
-    // The crawl's exact user agent, never the shared token: the crawler tests carry that too. When
-    // the edge refused our untagged browser request as well, no user agent rule clears it.
-    ...(refused
-      ? { letIn: { agent: meetsEdge(check) ? null : CRAWL_USER_AGENT, href: '/bot' } }
-      : {}),
+    // Named so the owner can find our requests in their logs. It is not advice to allow it: a 401 or
+    // a 451 is not fixed that way, and a user agent is a string anyone can send.
+    ...(refused ? { letIn: { agent: CRAWL_USER_AGENT, href: '/bot' } } : {}),
   };
 }
 
