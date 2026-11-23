@@ -164,7 +164,7 @@ describe('accessView: headline, tiles and the method sentence', () => {
 
   it('uses the tagged-identity sentence (FACTS D1, with the L5 correction)', () => {
     expect(view('bad-site').method).toBe(
-      'Sampled pages were requested with the crawler’s own user agent, tagged “Crawlmouse/2.0 (+https://crawlmouse.com/bot)”, from Crawlmouse’s own address, not the operator’s, only where our browser-identity control got a normal answer and robots.txt allowed that crawler. A rule matching the exact string will not fire on it, and a site that verifies crawler addresses may refuse it while serving the real crawler. Rendering requests come from Cloudflare Browser Rendering. One untagged browser-identity control fetch per sampled page is part of the method. Select a cell to see the raw request and response.',
+      'We request a sampled page with the crawler’s own user agent, tagged “Crawlmouse/2.0 (+https://crawlmouse.com/bot)”, from Crawlmouse’s own address, not the operator’s, only where our browser-identity control gets a normal answer and robots.txt allows that crawler. A rule matching the exact string will not fire on it, and a site that verifies crawler addresses may refuse it while serving the real crawler. Rendering requests come from Cloudflare Browser Rendering. One untagged browser-identity control fetch per sampled page is part of the method. Select a cell to see the raw request and response.',
     );
   });
 

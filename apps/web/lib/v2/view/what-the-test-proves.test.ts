@@ -376,18 +376,22 @@ describe('every crawler sentence says what our request got (review 2 of PR 2a)',
     expect(VERDICTS.edge_blocks_automation.label).toBe('refused or challenged our tests');
   });
 
-  it('does not say crawler requests were sent where none was', () => {
+  it('states the rule for requesting a page, and does not claim none was sent', () => {
     const c = edged(0);
     const v = accessView(fixtureOf(c), c.id);
-    expect(v.method).not.toMatch(/^Sampled pages were requested/);
-    expect(v.method).toContain('No crawler request was sent');
+    expect(v.method).toMatch(/^We request a sampled page/);
+    expect(v.method).toContain('only where our browser-identity control gets a normal answer');
+    expect(v.method).not.toMatch(/No crawler request was sent/);
     const tile = v.tiles.find((t) => t.label === 'Pages sampled per crawler')!;
-    expect(tile.value).toBe(`0 of ${c.coverage!.pages_discovered.toLocaleString('en-US')}`);
+    expect(tile.value).toBe(
+      `${c.coverage!.pages_sampled.toLocaleString('en-US')} of ${c.coverage!.pages_discovered.toLocaleString('en-US')}`,
+    );
+    expect(tile.note).toBe('no crawler request was measured');
   });
 
   it('limits the method line to pages our control was served on, when an edge refused some', () => {
     const c = edged(5);
-    expect(accessView(fixtureOf(c), c.id).method).toMatch(/^Sampled pages were requested/);
+    expect(accessView(fixtureOf(c), c.id).method).toMatch(/^We request a sampled page/);
   });
 
   it('mints a headline with the served wording and its extent, and no search engine', () => {
