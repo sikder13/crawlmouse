@@ -320,6 +320,10 @@ describe('how many pages a crawler was served on (pages_served)', () => {
     const c = served(5, 5);
     delete c.crawlers.filter(isAi)[0]!.pages_served;
     expect(servedExtent(c)).toBe(OLD_ROW);
+    expect(accessPill(c)).toEqual({
+      state: 'unverified',
+      label: 'Served on at least half of pages answered',
+    });
   });
 
   it('does not ask a row that was not served for its count', () => {
