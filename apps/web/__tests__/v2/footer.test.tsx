@@ -24,6 +24,7 @@ import { CookieSettings } from '../../components/v2/CookieSettings';
 import { PageShell } from '../../components/v2/PageShell';
 import { CONSENT_OPEN_EVENT } from '../../lib/consent';
 import { allPostSlugs } from '../../lib/blog/posts';
+import { CHECK_QUESTIONS, checkPath } from '../../lib/v2/copy/check-pages';
 
 // Under jsdom, import.meta.url is not a file URL, so _lib/tokens-css's WEB_ROOT cannot be used here.
 const WEB_ROOT = join(__dirname, '..', '..');
@@ -151,9 +152,9 @@ describe('footer-links.ts: the one map of header and footer links', () => {
       [
         'Free checks',
         [
-          ['Is GPTBot blocked?', '/ai-readiness-checker'],
-          ['JavaScript-only content?', '/blog/can-ai-crawlers-see-javascript'],
-          ['robots.txt for AI', '/blog/block-ai-crawlers-robots-txt'],
+          ['Is GPTBot blocked?', 'checksPublic:/check/gptbot'],
+          ['JavaScript-only content?', 'checksPublic:/check/javascript'],
+          ['robots.txt for AI', 'checksPublic:/check/robots-ai'],
         ],
       ],
       [
@@ -219,17 +220,12 @@ describe('footer-links.ts: the one map of header and footer links', () => {
     expect(terms).not.toMatch(/\bid=/);
   });
 
-  it('says what the checker reads, and the checker page still says it', () => {
-    expect(noteOf('Is GPTBot blocked?')).toMatch(/access matrix/);
-    const checker = appSource('ai-readiness-checker', 'AiReadinessChecker.tsx');
-    expect(checker).toMatch(/per-crawler access matrix/);
-    expect(checker).toMatch(/GPTBot/);
-  });
-
   it('serves a live page at every href, header and footer', () => {
     const hrefs = [...liveLinks(footerItems), ...liveLinks(navLinks), LOG_IN].map((l) => l.href);
     expect(hrefs.length).toBeGreaterThan(15);
-    expect(hrefs.filter((h) => !served(h))).toEqual([]);
+    // The three /check pages are one dynamic route, whose questions are CHECK_QUESTIONS.
+    const checks = new Set<string>(CHECK_QUESTIONS.map(checkPath));
+    expect(hrefs.filter((h) => !served(h) && !checks.has(h))).toEqual([]);
   });
 
   it('tells a path the app does not serve from one it does, on each branch of the check', () => {
@@ -272,8 +268,11 @@ describe('footer-links.ts: the one map of header and footer links', () => {
 
     // Questions Q3, plan review M13: /help is served only while V2_CHECKS_PUBLIC is on, so its
     // footer entry is a link then and text otherwise, and the rule above holds in each state.
-    it('names /help as the one gated entry, gated on V2_CHECKS_PUBLIC', () => {
+    it('names the three checks and /help as the gated entries, on V2_CHECKS_PUBLIC', () => {
       expect(gatedOf(footerItems).map((l) => [l.href, (l as { gate: string }).gate])).toEqual([
+        ['/check/gptbot', 'checksPublic'],
+        ['/check/javascript', 'checksPublic'],
+        ['/check/robots-ai', 'checksPublic'],
         ['/help', 'checksPublic'],
       ]);
     });

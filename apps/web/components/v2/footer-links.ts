@@ -134,21 +134,9 @@ export const FOOTER_COLUMNS: FooterColumn[] = [
   {
     title: 'Free checks',
     items: [
-      {
-        label: 'Is GPTBot blocked?',
-        href: '/ai-readiness-checker',
-        note: 'The checker reads robots.txt and builds the per-crawler access matrix, GPTBot included.',
-      },
-      {
-        label: 'JavaScript-only content?',
-        href: '/blog/can-ai-crawlers-see-javascript',
-        note: 'An article on how to check, until a dedicated check exists.',
-      },
-      {
-        label: 'robots.txt for AI',
-        href: '/blog/block-ai-crawlers-robots-txt',
-        note: 'An article: the robots.txt guide for GPTBot, ClaudeBot and the rest.',
-      },
+      { label: 'Is GPTBot blocked?', href: '/check/gptbot', gate: 'checksPublic' },
+      { label: 'JavaScript-only content?', href: '/check/javascript', gate: 'checksPublic' },
+      { label: 'robots.txt for AI', href: '/check/robots-ai', gate: 'checksPublic' },
     ],
   },
   {
