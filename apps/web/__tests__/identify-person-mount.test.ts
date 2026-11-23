@@ -116,8 +116,10 @@ describe('the signed-in layouts identify the browser', () => {
 });
 
 describe('a signed-in layout refuses under the same flag as every page beneath it', () => {
-  // RC-01: the Agency trial's refusal is a redirect to For agencies; the flag must still match.
-  const GATE = /if \(!(\w+Enabled)\(\)\) (?:return notFound\(\)|redirect\('\/agencies'\));/;
+  // RC-01: the Agency trial alone refuses with a redirect to For agencies. A layout and its pages
+  // must agree on both the flag and the refusal.
+  const GATE = /if \(!(\w+Enabled)\(\)\) (return notFound\(\)|redirect\('\/agencies'\));/;
+  const REDIRECTS = new Set(['agency-trial']);
   const APP = join(__dirname, '../app');
   const layouts = [
     'agency',
@@ -135,13 +137,17 @@ describe('a signed-in layout refuses under the same flag as every page beneath i
       .map((f) => join(dir, f));
 
   it.each(layouts)('%s', (dir) => {
-    const own = readFileSync(join(APP, dir, 'layout.tsx'), 'utf8').match(GATE)?.[1];
-    expect(own, `${dir}/layout.tsx refuses on no flag`).toBeDefined();
+    const gate = readFileSync(join(APP, dir, 'layout.tsx'), 'utf8').match(GATE);
+    expect(gate?.[1], `${dir}/layout.tsx refuses on no flag`).toBeDefined();
+    const [, own, refusal] = gate!;
+    expect(refusal!.startsWith('redirect'), `${dir}/layout.tsx refusal`).toBe(REDIRECTS.has(dir));
     const pages = pagesUnder(dir);
     expect(pages.length).toBeGreaterThan(0);
     for (const page of pages) {
       // Without the same gate, the layout would 404 a page that serves with its own flag on.
-      expect(readFileSync(join(APP, page), 'utf8').match(GATE)?.[1], page).toBe(own);
+      const pageGate = readFileSync(join(APP, page), 'utf8').match(GATE);
+      expect(pageGate?.[1], page).toBe(own);
+      expect(pageGate?.[2], page).toBe(refusal);
     }
   });
 });
