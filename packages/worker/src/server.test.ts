@@ -3,11 +3,12 @@ import { setFlagsFromString } from 'node:v8';
 import { runInNewContext } from 'node:vm';
 import type { AddressInfo } from 'node:net';
 import { DECLARATION_PATHS } from '@crawlmouse/types/v2';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { inlineReader, type PageReader } from './reader/read.js';
 import { signBatch, signRead } from './auth/hmac.js';
 import { RESULT_TTL_MS } from './batch/store.js';
 import { loadConfig, isCrawlPaused, type WorkerConfig } from './config.js';
+import type { SignalPost } from './signal.js';
 import type { Fetcher } from './fetch/fetcher.js';
 import { BODY_DEADLINE_MS, createWorker, type LogEvent, type Worker } from './server.js';
 import { InstantClock } from './test-support/clock.js';
@@ -40,6 +41,7 @@ async function start(
   over: Partial<WorkerConfig> = {},
   fetcher?: Fetcher,
   reader?: PageReader,
+  signalPost?: SignalPost,
 ): Promise<Running> {
   const clock = new InstantClock(1_800_000_000_000);
   const logs: LogEvent[] = [];
@@ -57,6 +59,7 @@ async function start(
       ),
     log: (e) => logs.push(e),
     reader,
+    signalPost,
   });
   await new Promise<void>((r) => worker.server.listen(0, '127.0.0.1', r));
   current = {
@@ -146,6 +149,50 @@ describe('POST /batch: accepted', () => {
       (await post(batchBody({ urls: ['https://example.com/', 'https://www.example.com/x'] })))
         .status,
     ).toBe(202);
+  });
+});
+
+describe('the done signal (PR 5a)', () => {
+  const URL_ = 'https://app.example.test/api/webhooks/worker';
+
+  it('with no address, the 202 is as it was and nothing is sent', async () => {
+    const { worker } = await start();
+    const body = batchBody();
+    expect(await post(body)).toEqual({
+      status: 202,
+      body: { batch_id: `${CHECK}:${body.batch}` },
+    });
+    await worker.idle();
+  });
+
+  it('with an address, says so in the 202 and signals the batch once it is stored', async () => {
+    const sent: unknown[] = [];
+    let readable: number | null = null;
+    const { worker } = await start(
+      { appSignalUrl: URL_ },
+      undefined,
+      undefined,
+      async (_u, init) => {
+        sent.push(JSON.parse(init.body));
+        readable = (await get(`/batch/${CHECK}:${nonceSeq}`, `batch:${CHECK}:${nonceSeq}`)).status;
+      },
+    );
+    const body = batchBody();
+    const accepted = await post(body);
+    expect(accepted.body).toEqual({ batch_id: `${CHECK}:${body.batch}`, signals: true });
+    await worker.idle();
+    await vi.waitFor(() => expect(readable).toBe(200));
+    expect(sent[0]).toEqual({ check_id: CHECK, batch: body.batch, status: 'done' });
+  });
+
+  it('a signal that fails does not fail the batch', async () => {
+    const { worker } = await start({ appSignalUrl: URL_ }, undefined, undefined, async () => {
+      throw new Error('down');
+    });
+    const body = batchBody();
+    const id = String((await post(body)).body.batch_id);
+    await worker.idle();
+    expect((await get(`/batch/${id}`, `batch:${id}`)).body).toMatchObject({ status: 'done' });
   });
 });
 
@@ -546,7 +593,7 @@ describe('configuration', () => {
     expect(main).toMatch(/createWorker\(\{ config, reader \}\)/);
   });
 
-  it('reads no environment variable but its own five: no database or Inngest key can reach it', () => {
+  it('reads no environment variable but its own six: no database or Inngest key can reach it', () => {
     const read = new Set<string>();
     for (const file of ['main.ts', 'config.ts', 'server.ts']) {
       const source = readFileSync(new URL(file, import.meta.url), 'utf8');
@@ -554,6 +601,7 @@ describe('configuration', () => {
       expect(source.match(/process\.env\.[A-Z_]/g)).toBeNull();
     }
     expect([...read].sort()).toEqual([
+      'APP_SIGNAL_URL',
       'BATCH_CONCURRENCY',
       'CRAWL_PAUSED',
       'PORT',

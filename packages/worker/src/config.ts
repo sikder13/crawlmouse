@@ -22,6 +22,11 @@ export interface WorkerConfig {
   paused: boolean;
   /** Where requests leave from (FLY_REGION, FLY_MACHINE_ID) and the build; see vantage.ts. */
   vantage: Vantage;
+  /**
+   * APP_SIGNAL_URL: the app's route for "this batch has ended" (signal.ts). Null when unset or not an
+   * https address; the worker then sends no signal and says so, and runs poll as they always have.
+   */
+  appSignalUrl: string | null;
 }
 
 export const MIN_SECRET_LENGTH = 32;
@@ -45,6 +50,16 @@ function intIn(
   if (!Number.isInteger(n) || n < min || n > max)
     throw new Error(`${name} must be an integer from ${min} to ${max}`);
   return n;
+}
+
+function httpsUrl(raw: string | undefined): string | null {
+  if (!raw) return null;
+  try {
+    const u = new URL(raw.trim());
+    return u.protocol === 'https:' && u.username === '' && u.password === '' ? u.toString() : null;
+  } catch {
+    return null;
+  }
 }
 
 export function loadConfig(env: Env): WorkerConfig {
@@ -71,5 +86,6 @@ export function loadConfig(env: Env): WorkerConfig {
     ),
     paused: isCrawlPaused(env),
     vantage: vantageOf(env, RELEASE),
+    appSignalUrl: httpsUrl(env.APP_SIGNAL_URL),
   };
 }
