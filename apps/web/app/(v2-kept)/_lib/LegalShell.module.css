@@ -107,10 +107,6 @@
   font-size: var(--v2-text-ui);
 }
 
-.legal label {
-  color: var(--v2-mut);
-}
-
 .legal button[type='submit']:focus-visible {
   --tw-ring-offset-color: var(--v2-s1);
 }
@@ -127,6 +123,8 @@
     min-height: 0;
     background: #fff !important;
     color-scheme: light !important;
+    --v2-line: #e2e6eb;
+    --v2-ctl: #808996;
   }
 
   .legal,

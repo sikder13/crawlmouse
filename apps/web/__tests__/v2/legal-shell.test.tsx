@@ -61,7 +61,10 @@ describe('printing a legal page', () => {
     expect(print).toMatch(/\.frame > \[data-v2-shell\] > header/);
     expect(print).toMatch(/\.frame > \[data-v2-shell\] > \[data-v2-footer\]/);
     expect(print).toMatch(/display:\s*none/);
-    expect(print).toMatch(/color: #13161b !important/);
+    expect(print).toMatch(
+      /\.legal \*,[^{]*\{[^}]*color: #13161b !important;[^}]*background: transparent !important/,
+    );
+    expect(print).toMatch(/\.frame > \[data-v2-shell\] \{[^}]*--v2-line: #e2e6eb/);
     expect(print).toMatch(/\.frame > \[data-v2-shell\] \{[^}]*background: #fff !important/);
     expect(print).toMatch(/\.frame > \[data-v2-shell\] \{[^}]*color-scheme: light !important/);
     expect(print).toMatch(/\.legal input::placeholder/);
