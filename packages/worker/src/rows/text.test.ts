@@ -4,6 +4,7 @@ import { MAX_KEPT_BYTES } from '../fetch/fetcher.js';
 import { outcome } from '../test-support/outcome.js';
 import {
   isHtml,
+  MAX_ATTRIBUTES_PER_TAG,
   MAX_DOM_DEPTH,
   NOT_HTML,
   MAX_READ_TAGS,
@@ -242,5 +243,50 @@ describe('isHtml', () => {
     expect(of({}, '<?xml version="1.0"?><rss></rss>')).toBe(false);
     expect(of({}, '  <?XML version="1.0"?><feed/>')).toBe(false);
     expect(of({}, 'plain words')).toBe(false);
+  });
+});
+
+describe('tags too complex for the second parse', () => {
+  const read = (html: string) => readHtml({ body: html, bodyCut: false });
+  const attrs = (n: number) => Array.from({ length: n }, (_, i) => `a${i}=1`).join(' ');
+
+  it('leaves a page at the limit alone', () => {
+    const r = read(`<html><body><div ${attrs(MAX_ATTRIBUTES_PER_TAG)}>x</div></body></html>`);
+    expect(r.tooComplex).toBe(false);
+  });
+
+  it('flags a tag past the limit, and still reads the page', () => {
+    const r = read(`<html><body><div ${attrs(MAX_ATTRIBUTES_PER_TAG + 1)}>x</div></body></html>`);
+    expect(r.tooComplex).toBe(true);
+    expect(r.note).toBeNull();
+    expect(r.$!('div').text()).toBe('x');
+  });
+
+  it('counts per tag, not across the page', () => {
+    const tag = `<div ${attrs(MAX_ATTRIBUTES_PER_TAG)}>x</div>`;
+    expect(read(`<html><body>${tag.repeat(3)}</body></html>`).tooComplex).toBe(false);
+  });
+
+  it('counts repeated names, which the parsed element keeps only once', () => {
+    const r = read(
+      `<html><body><div ${'a=1 '.repeat(MAX_ATTRIBUTES_PER_TAG + 1)}>x</div></body></html>`,
+    );
+    expect(r.tooComplex).toBe(true);
+  });
+
+  it('flags attributes on a closing tag, which the second parse also scans', () => {
+    const r = read(`<html><body><div>x</div ${attrs(5000)}></body></html>`);
+    expect(r.tooComplex).toBe(true);
+  });
+
+  it.each([
+    ['a long value on a normal tag', `<img src="data:image/png;base64,${'A'.repeat(100_000)}">`],
+    [
+      'a closing tag inside script text',
+      `<script>var a = "</div" + "${'x'.repeat(5000)}>";</script>`,
+    ],
+    ['a closing tag with a space', '<div>x</div >'],
+  ])('does not flag %s', (_name, body) => {
+    expect(read(`<html><body>${body}</body></html>`).tooComplex).toBe(false);
   });
 });

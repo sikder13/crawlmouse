@@ -11,6 +11,7 @@ import { Sites } from '../politeness/sites.js';
 import { TOO_DEEP } from '../rows/text.js';
 import { InstantClock } from '../test-support/clock.js';
 import { fakeFetcher } from '../test-support/fake-fetcher.js';
+import { FEATURES_TOO_COMPLEX, type PageRead } from './read.js';
 import { ThreadReader } from './thread-reader.js';
 
 /**
@@ -100,3 +101,26 @@ it('reads the hostile page in under 2 s, and every page of the batches beside it
   ]);
   expect(reader.restarts).toBe(0);
 }, 60_000);
+
+it('a tag of 60,000 attributes skips the second parse: its links and text are read at once', async () => {
+  const attrs = Array.from({ length: 60_000 }, (_, i) => `a${i}=1`).join(' ');
+  const html = `<html><body><div ${attrs}>some words</div><a href="/next">next</a></body></html>`;
+  const started = Date.now();
+  const r = (await reader.page(html, false, 'https://site.test/')) as PageRead;
+  // It took 15.8 s through the second parse. Bounded generously for a loaded CI runner.
+  expect(Date.now() - started).toBeLessThan(5_000);
+  expect(r.read?.words).toBe(2 + 1);
+  expect(r.read?.links.links.length).toBeGreaterThan(0);
+  expect(r.read?.features).toBeNull();
+  expect(r.read?.featuresNote).toBe(FEATURES_TOO_COMPLEX);
+}, 30_000);
+
+it('reports how long a read took, for the breaker', async () => {
+  const r = (await reader.page(
+    '<html><body>x</body></html>',
+    false,
+    'https://site.test/',
+  )) as PageRead;
+  expect(r.readMs).toEqual(expect.any(Number));
+  expect(r.readMs).toBeGreaterThanOrEqual(0);
+});

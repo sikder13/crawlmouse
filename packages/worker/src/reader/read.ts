@@ -39,6 +39,8 @@ export interface WordCount {
 }
 
 export interface PageRead {
+  /** How long the reader spent on this page, for the breaker (batch/reader-breaker.ts). */
+  readMs?: number;
   /** What limits the read, when something does. */
   note: string | null;
   /** Null when the page was not read (nested too deep). */
@@ -99,6 +101,8 @@ export type ReaderFailure = 'reader_thread_crashed' | 'reader_deadline';
 
 export interface NotRead {
   failed: ReaderFailure;
+  /** How long the reader had been on this page when it failed. */
+  readMs?: number;
 }
 
 /** A read that throws rejects, on the thread as inline, and is not a NotRead. */
@@ -153,10 +157,13 @@ export function contentFeatures(body: string): {
 export const FEATURES_OVER_BOUNDS =
   "This page's content features were not kept: its JSON-LD is past the row's bounds, or names a type that cannot be stored as written, so the content checks treat it as not read.";
 
+export const FEATURES_TOO_COMPLEX =
+  "This page's content features were not read: one of its tags carries more attributes than the worker reads, so they are not measured. Its links and text were read.";
+
 export function readPage(
   req: PageRequest & { finalUrl: string; stackHeaders?: StackHeaders | null },
 ): PageRead {
-  const { $, note } = readHtml(req);
+  const { $, note, tooComplex } = readHtml(req);
   if (!$) return { note, read: null };
   const {
     mainTextStart,
@@ -173,7 +180,11 @@ export function readPage(
   };
   const text = servedText($);
   const whole = note === null;
-  const features = whole ? contentFeatures(req.body) : { features: null, note: null };
+  const features = !whole
+    ? { features: null, note: null }
+    : tooComplex
+      ? { features: null, note: FEATURES_TOO_COMPLEX }
+      : contentFeatures(req.body);
   return {
     note,
     read: {
@@ -199,6 +210,9 @@ export function readPage(
 
 export const inlineReader: PageReader = {
   words: async (body, bodyCut) => readWords({ body, bodyCut }),
-  page: async (body, bodyCut, finalUrl, stackHeaders = null) =>
-    readPage({ body, bodyCut, finalUrl, stackHeaders }),
+  page: async (body, bodyCut, finalUrl, stackHeaders = null) => {
+    const started = performance.now();
+    const read = readPage({ body, bodyCut, finalUrl, stackHeaders });
+    return { ...read, readMs: performance.now() - started };
+  },
 };

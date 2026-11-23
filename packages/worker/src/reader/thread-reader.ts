@@ -67,6 +67,8 @@ export class ThreadReader implements PageReader {
   /** Unanswered reads, oldest first: all sent to the current thread. */
   private readonly queue: Read[] = [];
   private deadline: NodeJS.Timeout | null = null;
+  /** When the thread began the read at the head of the queue. */
+  private readStartedAt = 0;
   /** The current thread has loaded its entry; a read's deadline does not count the thread's boot. */
   private ready = false;
   private nextId = 0;
@@ -141,6 +143,7 @@ export class ThreadReader implements PageReader {
   private arm(): void {
     this.disarm();
     if (this.queue.length === 0 || !this.ready) return;
+    this.readStartedAt = Date.now();
     this.deadline = setTimeout(() => this.fail('reader_deadline'), this.deadlineMs);
   }
 
@@ -151,12 +154,13 @@ export class ThreadReader implements PageReader {
 
   /** The read the thread is on fails; the thread is dropped, and the rest go to a new one. */
   private fail(reason: ReaderFailure): void {
+    const readMs = this.ready ? Date.now() - this.readStartedAt : 0;
     this.disarm();
     const thread = this.thread;
     this.thread = null;
     // Stopped, for a deadline; already gone, for a crash. Its exit is ignored either way.
     if (reason === 'reader_deadline') void thread?.terminate();
-    this.queue.shift()?.resolve({ failed: reason });
+    this.queue.shift()?.resolve({ failed: reason, readMs });
     if (this.queue.length === 0) return;
     const next = this.ensure();
     for (const read of this.queue) this.post(next, read);
@@ -180,11 +184,12 @@ export class ThreadReader implements PageReader {
       }
       const read = this.queue[0];
       if (read?.id !== reply.id) return;
+      const readMs = Date.now() - this.readStartedAt;
       this.queue.shift();
       if (this.queue.length === 0) thread.unref();
       this.arm();
       if ('error' in reply) read.reject(new Error(reply.error));
-      else read.resolve(reply.result);
+      else read.resolve(read.ask.kind === 'page' ? { ...reply.result, readMs } : reply.result);
     });
     thread.on('error', died);
     thread.on('exit', died);

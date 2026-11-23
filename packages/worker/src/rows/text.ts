@@ -157,14 +157,36 @@ class TooDeep extends Error {}
  */
 class DepthLimitedHandler extends DomHandler {
   private depth = 0;
+  private attributes = 0;
+  /** A tag past MAX_ATTRIBUTES_PER_TAG, or a closing tag past MAX_END_TAG_CHARS. */
+  tooComplex = false;
+  private tokens: Pick<Parser, 'startIndex' | 'endIndex'> | null = null;
+
+  override onparserinit(parser: Parser): void {
+    super.onparserinit(parser);
+    this.tokens = parser;
+  }
+
+  /** Each attribute as it is tokenized, a repeated name included: the element keeps only the first. */
+  onattribute(): void {
+    if (++this.attributes > MAX_ATTRIBUTES_PER_TAG) this.tooComplex = true;
+  }
 
   override onopentag(name: string, attribs: Record<string, string>): void {
+    this.attributes = 0;
     super.onopentag(name, attribs);
     if (this.tagStack[this.tagStack.length - 1]!.type === 'tag' && ++this.depth > MAX_DOM_DEPTH)
       throw new TooDeep();
   }
 
-  override onclosetag(): void {
+  /** A written closing tag's length: htmlparser2 skips attributes on one, and parse5 scans them. */
+  override onclosetag(_name?: string, implied?: boolean): void {
+    if (
+      !implied &&
+      this.tokens &&
+      this.tokens.endIndex - this.tokens.startIndex >= MAX_END_TAG_CHARS
+    )
+      this.tooComplex = true;
     if (this.tagStack[this.tagStack.length - 1]!.type === 'tag') this.depth--;
     super.onclosetag();
   }
@@ -173,19 +195,32 @@ class DepthLimitedHandler extends DomHandler {
 const PARSE_OPTIONS = { xmlMode: false, decodeEntities: true };
 
 /**
+ * The most attributes one tag may carry and still go to the content features' parse (parse5), which
+ * compares each new attribute with those before it, so one tag costs the square of its attributes:
+ * 40,000 took 5.7 s. The most on any of the 643 corpus pages is 9.
+ */
+export const MAX_ATTRIBUTES_PER_TAG = 256;
+/** A written closing tag as long as this may hold attributes, which parse5 scans the same way. */
+export const MAX_END_TAG_CHARS = 256;
+
+/**
  * Parses HTML the way the v1 crawler does (Crawlee's CheerioCrawler): htmlparser2 in HTML mode, which
  * is linear in nesting depth where cheerio's default parser is not. Null when the document nests deeper
  * than MAX_DOM_DEPTH, found while parsing.
  */
 export function parseHtml(html: string): cheerio.CheerioAPI | null {
+  return parseBounded(html).$;
+}
+
+function parseBounded(html: string): { $: cheerio.CheerioAPI | null; tooComplex: boolean } {
   const handler = new DepthLimitedHandler(null, PARSE_OPTIONS);
   try {
     new Parser(handler, PARSE_OPTIONS).end(html);
   } catch (e) {
-    if (e instanceof TooDeep) return null;
+    if (e instanceof TooDeep) return { $: null, tooComplex: handler.tooComplex };
     throw e;
   }
-  return cheerio.load(handler.root, { xml: PARSE_OPTIONS });
+  return { $: cheerio.load(handler.root, { xml: PARSE_OPTIONS }), tooComplex: handler.tooComplex };
 }
 
 /**
@@ -217,15 +252,17 @@ function pastTagLimit(html: string): number {
 export function readHtml(f: Pick<FetchOutcome, 'body' | 'bodyCut'>): {
   $: cheerio.CheerioAPI | null;
   note: string | null;
+  /** A tag past the limits above: the page is read, and not given to the content features' parse. */
+  tooComplex: boolean;
 } {
   const over = f.body.length > MAX_KEPT_BYTES;
   let html = over ? f.body.slice(0, MAX_KEPT_BYTES) : f.body;
   const past = pastTagLimit(html);
   if (past !== -1) html = html.slice(0, past);
-  const $ = parseHtml(html);
-  if (!$) return { $: null, note: TOO_DEEP };
-  if (past !== -1) return { $, note: READ_IN_PART_TAGS };
-  return { $, note: f.bodyCut || over ? READ_IN_PART : null };
+  const { $, tooComplex } = parseBounded(html);
+  if (!$) return { $: null, note: TOO_DEEP, tooComplex };
+  if (past !== -1) return { $, note: READ_IN_PART_TAGS, tooComplex };
+  return { $, note: f.bodyCut || over ? READ_IN_PART : null, tooComplex };
 }
 
 export const NOT_HTML = 'The response was not HTML, so it carries no page text: 0 words.';

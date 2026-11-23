@@ -69,14 +69,41 @@ const PAGES = {
   notTagged: 'just words, no tags at all',
 };
 
+/** A read without how long it took, which differs from one run to the next. */
+const untimed = (r: object) => {
+  const { readMs: _readMs, ...rest } = r as { readMs?: number };
+  return rest;
+};
+
 describe('the page reader thread', () => {
+  it('reports how long the thread was on a page, read or failed', async () => {
+    const r = reader(undefined, 5_000, standIn);
+    const read = (await r.page('busy:60', false, 'https://example.com/')) as { readMs: number };
+    expect(read.readMs).toBeGreaterThanOrEqual(50);
+    const failed = (await r.page('exit', false, 'https://example.com/')) as {
+      failed: string;
+      readMs: number;
+    };
+    expect(failed.failed).toBe('reader_thread_crashed');
+    expect(failed.readMs).toEqual(expect.any(Number));
+  });
+
+  it('does not count the wait behind another read as this page’s time', async () => {
+    const r = reader(undefined, 5_000, standIn);
+    const [, second] = (await Promise.all([
+      r.page('busy:200', false, 'https://example.com/a'),
+      r.page('quick', false, 'https://example.com/b'),
+    ])) as { readMs: number }[];
+    expect(second!.readMs).toBeLessThan(150);
+  });
+
   it('reads a page as the inline reader does', async () => {
     const r = reader();
     for (const [name, body] of Object.entries(PAGES)) {
       for (const bodyCut of [false, true]) {
         const url = 'https://example.com/a';
-        expect(await r.page(body, bodyCut, url), name).toEqual(
-          await inlineReader.page(body, bodyCut, url),
+        expect(untimed(await r.page(body, bodyCut, url)), name).toEqual(
+          untimed(await inlineReader.page(body, bodyCut, url)),
         );
         expect(await r.words(body, bodyCut), name).toEqual(await inlineReader.words(body, bodyCut));
       }
@@ -96,10 +123,10 @@ describe('the page reader thread', () => {
     // A heap too small for this page, and big enough for a small one.
     const r = reader({ maxOldGenerationSizeMb: 24, maxYoungGenerationSizeMb: 4 });
     const big = `<body>${'<p>w</p>'.repeat(MAX_READ_TAGS / 2)}</body>`;
-    expect(await r.page(big, false, 'https://example.com/')).toEqual({
+    expect(await r.page(big, false, 'https://example.com/')).toMatchObject({
       failed: 'reader_thread_crashed',
     });
-    expect(await r.words(big, false)).toEqual({ failed: 'reader_thread_crashed' });
+    expect(await r.words(big, false)).toMatchObject({ failed: 'reader_thread_crashed' });
     expect(await r.words('<p>two words</p>', false)).toEqual({ words: 2, note: null });
     expect(r.restarts).toBe(2);
   }, 60_000);
@@ -113,7 +140,7 @@ describe('the page reader thread', () => {
       r.words('<p>one two</p>', false),
       r.words('<p>three</p>', false),
     ]);
-    expect(killed).toEqual({ failed: 'reader_thread_crashed' });
+    expect(killed).toMatchObject({ failed: 'reader_thread_crashed' });
     expect([after, last]).toEqual([
       { words: 2, note: null },
       { words: 1, note: null },
@@ -139,7 +166,7 @@ describe('the page reader thread', () => {
     const answers = await Promise.all(['a', 'hang', 'bb', 'ccc'].map((b) => r.words(b, false)));
     expect(terminate).toHaveBeenCalledTimes(1); // the hung thread, which would otherwise spin on
     terminate.mockRestore();
-    expect(answers).toEqual([
+    expect(answers).toMatchObject([
       { words: 1, note: null },
       { failed: 'reader_deadline' },
       { words: 2, note: null },
@@ -163,14 +190,14 @@ describe('the page reader thread', () => {
     const r = reader(undefined, 400, slowBoot);
     expect(await r.words('a', false)).toEqual({ words: 1, note: null });
     const answers = await Promise.all(['hang', 'bb'].map((b) => r.words(b, false)));
-    expect(answers).toEqual([{ failed: 'reader_deadline' }, { words: 2, note: null }]);
+    expect(answers).toMatchObject([{ failed: 'reader_deadline' }, { words: 2, note: null }]);
     expect(r.restarts).toBe(1);
   });
 
   it('fails only the read in progress when the thread exits, and reads the rest on a new thread', async () => {
     const r = reader(undefined, 5_000, standIn);
     const answers = await Promise.all(['a', 'exit', 'bb'].map((b) => r.words(b, false)));
-    expect(answers).toEqual([
+    expect(answers).toMatchObject([
       { words: 1, note: null },
       { failed: 'reader_thread_crashed' },
       { words: 2, note: null },
