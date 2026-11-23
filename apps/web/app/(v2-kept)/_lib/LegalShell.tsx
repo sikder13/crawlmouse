@@ -13,17 +13,19 @@ import styles from './LegalShell.module.css';
  */
 export function legalPage(page: ReactNode) {
   return (
-    <PageShell
-      nav={MARKETING_NAV}
-      actions={
-        <Button variant="quiet" href={LOG_IN.href}>
-          {LOG_IN.label}
-        </Button>
-      }
-    >
-      <div className={styles.legal} data-v2-legal="" data-v1-content="">
-        {withoutV1Chrome(page, [LegalPage])}
-      </div>
-    </PageShell>
+    <div className={styles.frame} data-v2-legal-frame="">
+      <PageShell
+        nav={MARKETING_NAV}
+        actions={
+          <Button variant="quiet" href={LOG_IN.href}>
+            {LOG_IN.label}
+          </Button>
+        }
+      >
+        <div className={styles.legal} data-v2-legal="" data-v1-content="">
+          {withoutV1Chrome(page, [LegalPage])}
+        </div>
+      </PageShell>
+    </div>
   );
 }

@@ -1,4 +1,9 @@
 /* The v1 legal pages' markup on v2's tokens. Selectors reach v1's utility classes on purpose. */
+/* No box of its own: it is here so print can reach the shell's header and footer. */
+.frame {
+  display: contents;
+}
+
 .legal {
   flex: 1;
   color: var(--v2-fg2);
@@ -32,6 +37,10 @@
   color: var(--v2-fg);
 }
 
+.legal :global(.space-y-4) > h2:not([hidden]) {
+  margin-top: 40px;
+}
+
 .legal h3 {
   font-family: var(--v2-font-display);
   font-weight: 600;
@@ -42,6 +51,15 @@
 .legal th,
 .legal :global(.text-ink) {
   color: var(--v2-fg);
+}
+
+.legal th,
+.legal :global(.font-bold) {
+  font-weight: 600;
+}
+
+.legal :global(.text-warning) {
+  color: var(--v2-bad);
 }
 
 .legal a {
@@ -91,6 +109,24 @@
 
 .legal label {
   color: var(--v2-mut);
+}
+
+.legal button[type='submit']:focus-visible {
+  --tw-ring-offset-color: var(--v2-s1);
+}
+
+/* A printed policy is its content, dark on paper, whatever the screen's theme. */
+@media print {
+  .frame > [data-v2-shell] > header,
+  .frame > [data-v2-shell] > [data-v2-footer] {
+    display: none;
+  }
+
+  .legal,
+  .legal * {
+    color: #13161b !important;
+    background: transparent !important;
+  }
 }
 
 @media (max-width: 760px) {
