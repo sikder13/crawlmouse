@@ -318,13 +318,13 @@ const PERTURB: Record<string, Record<string, Change[]>> = {
         change: (c) => (crawler(c, 'PerplexityBot').verdict = 'refused_unverified'),
         expect: {
           Home: [
-            'PerplexityBot was refused, and no other crawler name was served on the same pages; this may be IP verification',
+            'PerplexityBot was refused on pages where no other crawler name was served; this may be IP verification',
           ],
           Result: [
-            'PerplexityBot was refused, and no other crawler name was served on the same pages; this may be IP verification',
+            'PerplexityBot was refused on pages where no other crawler name was served; this may be IP verification',
           ],
           Crawl: [
-            'PerplexityBot was refused, and no other crawler name was served on the same pages; this may be IP verification',
+            'PerplexityBot was refused on pages where no other crawler name was served; this may be IP verification',
           ],
         },
       },
@@ -333,9 +333,9 @@ const PERTURB: Record<string, Record<string, Change[]>> = {
       {
         change: (c) => (crawler(c, 'PerplexityBot').evidence_class = 'observed'),
         expect: {
-          Home: ['PerplexityBot gets a challenge page, in the site’s own logs'],
-          Result: ['PerplexityBot gets a challenge page, in the site’s own logs'],
-          Crawl: ['PerplexityBot gets a challenge page, in the site’s own logs'],
+          Home: ['PerplexityBot was challenged, in the site’s own logs'],
+          Result: ['PerplexityBot was challenged, in the site’s own logs'],
+          Crawl: ['PerplexityBot was challenged, in the site’s own logs'],
         },
       },
     ],

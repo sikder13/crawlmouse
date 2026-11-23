@@ -93,7 +93,7 @@ describe('a request in a crawler’s name is reported as that request', () => {
     const c = withVerdicts(['refused_unverified']);
     const [clause] = keptOutClauses(c.crawlers.filter((x) => x.verdict === 'refused_unverified'));
     expect(clause).toMatch(
-      /was refused, and no other crawler name was served on the same pages; this may be IP verification$/,
+      /was refused on pages where no other crawler name was served; this may be IP verification$/,
     );
   });
 });
@@ -189,6 +189,7 @@ describe('how many pages a served verdict rests on', () => {
 
   it('reads a count above the sample as the whole sample', () => {
     expect(servedExtent(measuredOn([25, 214]).c)).toBe('');
+    expect(servedExtent(measuredOn([3, 214]).c)).toBe(', on 3 to 25 of the 25 sampled pages');
   });
 
   it('counts only the crawlers that were served', () => {
@@ -249,7 +250,7 @@ describe('what the crawler sentences may claim (review of PR 2a)', () => {
     ];
     expect(said.join(' ')).not.toMatch(/as was every|refused to every/);
     expect(keptOutClauses(c.crawlers.filter(isAi)).join(' ')).toContain(
-      'no other crawler name was served on the same pages',
+      'on pages where no other crawler name was served',
     );
     expect(VERDICTS.refused_unverified.label).not.toMatch(/every/);
   });
@@ -258,7 +259,7 @@ describe('what the crawler sentences may claim (review of PR 2a)', () => {
     const c = withVerdicts(['edge_blocks_automation']);
     const headline = JSON.stringify(accessView(fixtureOf(c), c.id).headline);
     expect(headline).not.toContain('were not sent');
-    expect(headline).toContain('no crawler request was measured on those pages');
+    expect(headline).toContain('no crawler request was measured where it did');
     expect(headline).toMatch(/the other \w+ AI crawlers/);
     expect(headline).not.toMatch(/Requests with all /);
   });
@@ -378,16 +379,18 @@ describe('every crawler sentence says what our request got (review 2 of PR 2a)',
   it('does not say crawler requests were sent where none was', () => {
     const c = edged(0);
     const v = accessView(fixtureOf(c), c.id);
-    expect(v.method).not.toMatch(/^Each page was requested/);
+    expect(v.method).not.toMatch(
+      /^Each sampled page where our browser-identity control was served was requested/,
+    );
     expect(v.method).toContain('No crawler request was sent');
-    const tile = v.tiles.find((t) => t.label === 'Pages fetched per crawler')!;
+    const tile = v.tiles.find((t) => t.label === 'Pages sampled per crawler')!;
     expect(tile.value).toBe(`0 of ${c.coverage!.pages_discovered.toLocaleString('en-US')}`);
   });
 
   it('limits the method line to pages our control was served on, when an edge refused some', () => {
     const c = edged(5);
     expect(accessView(fixtureOf(c), c.id).method).toMatch(
-      /^Where our browser-identity control was served, each page was requested/,
+      /^Each sampled page where our browser-identity control was served was requested/,
     );
   });
 
@@ -406,5 +409,47 @@ describe('every crawler sentence says what our request got (review 2 of PR 2a)',
       'Requests with all six AI crawlers’ user agents were served, on 1 of the 5 sampled pages.',
     );
     expect(headline).not.toMatch(/Every crawler|Googlebot|Bingbot/);
+  });
+});
+
+describe('claims the third review of PR 2a found', () => {
+  it('does not say we sent a request for a row read from the site’s own logs', () => {
+    const c = withVerdicts(['challenged_ua']);
+    c.crawlers.filter(isAi)[0]!.evidence_class = 'observed';
+    const [clause] = keptOutClauses(c.crawlers.filter(isAi));
+    expect(clause).toContain('was challenged, in the site’s own logs');
+    expect(clause).not.toContain('when we sent');
+  });
+
+  it('claims only that some pages of a refusal had no other crawler name served', () => {
+    const c = withVerdicts(['refused_unverified']);
+    expect(keptOutClauses(c.crawlers.filter(isAi)).join(' ')).toContain(
+      'was refused on pages where no other crawler name was served',
+    );
+    expect(VERDICTS.refused_unverified.label).toBe('refused, unverified');
+    expect(JSON.stringify(accessView(fixtureOf(c), c.id).headline)).not.toContain('on the same');
+  });
+
+  it('says a crawler behind an edge could not be tested, not that it met the edge', () => {
+    const c = withVerdicts(['edge_blocks_automation']);
+    const [clause] = keptOutClauses(c.crawlers.filter(isAi));
+    expect(clause).toContain('could not be tested: the site’s edge refused our control request');
+    expect(clause).not.toContain('met an edge');
+  });
+
+  it('names rendering requests only on a check that holds a render', () => {
+    const none = withVerdicts([]);
+    none.without_js = null;
+    expect(accessView(fixtureOf(none), none.id).method).not.toContain('Rendering requests');
+    const rendered = withVerdicts([]);
+    rendered.without_js = rendered.without_js ?? ({} as never);
+    expect(accessView(fixtureOf(rendered), rendered.id).method).toContain('Rendering requests');
+  });
+
+  it('keeps a later refusal a statement about our request when robots.txt comes first', () => {
+    const c = withVerdicts(['disallowed_by_robots', 'blocked_by_ua_rule']);
+    expect(JSON.stringify(accessView(fixtureOf(c), c.id).headline)).toContain(
+      'requests as one were refused by user agent',
+    );
   });
 });

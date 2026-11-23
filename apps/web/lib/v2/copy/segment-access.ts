@@ -20,7 +20,7 @@ export const ACCESS_CHANGES: CopyChange[] = [
     kind: 'facts',
     locked: 'Crawlers tested 6 Pages requested per crawler 214 Responses kept as evidence 1,284',
     rendered:
-      'AI crawlers tested 6 Pages fetched per crawler 50 of 214 Responses kept as evidence 408',
+      'AI crawlers tested 6 Pages sampled per crawler 50 of 214 Responses kept as evidence 408',
     source:
       'FACTS B2 (the tiles, FACTS-proposed line 215) and I1; 408 is the fixture’s count of the responses this audit kept (`withheld.total`).',
   },
@@ -30,7 +30,7 @@ export const ACCESS_CHANGES: CopyChange[] = [
     locked:
       'Select a cell to see the raw request and response. Tested by user agent; your CDN may treat signed bots differently.',
     rendered:
-      'Each page was requested with the crawler’s own user agent, tagged “Crawlmouse/2.0 (+https://crawlmouse.com/bot)”, from Crawlmouse’s own address, not the operator’s. A rule matching the exact string will not fire on it, and a site that verifies crawler addresses may refuse it while serving the real crawler. Rendering requests come from Cloudflare Browser Rendering, and one untagged browser-identity control fetch per sampled page is part of the method. Select a cell to see the raw request and response.',
+      'Each sampled page where our browser-identity control was served was requested with the crawler’s own user agent, tagged “Crawlmouse/2.0 (+https://crawlmouse.com/bot)”, from Crawlmouse’s own address, not the operator’s. A rule matching the exact string will not fire on it, and a site that verifies crawler addresses may refuse it while serving the real crawler. Rendering requests come from Cloudflare Browser Rendering. One untagged browser-identity control fetch per sampled page is part of the method. Select a cell to see the raw request and response.',
     source: 'FACTS D1, with its L5 correction (FACTS-proposed line 217 points there).',
   },
   {

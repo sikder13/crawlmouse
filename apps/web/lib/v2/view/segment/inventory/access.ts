@@ -25,7 +25,7 @@ export const ACCESS_INVENTORY = [
   entry(
     'access-tiles',
     ['access'],
-    'Pages fetched per crawler, of pages found, and the sample’s limit',
+    'Pages sampled per crawler, of pages found, and the sample’s limit',
     [
       'checks[].coverage.pages_sampled',
       'checks[].coverage.pages_discovered',

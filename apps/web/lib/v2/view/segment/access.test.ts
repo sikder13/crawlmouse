@@ -148,14 +148,14 @@ describe('accessView: headline, tiles and the method sentence', () => {
     expect(view('bad-site').tiles).toEqual([
       { label: 'AI crawlers tested', value: '6', note: '4 scored' },
       {
-        label: 'Pages fetched per crawler',
+        label: 'Pages sampled per crawler',
         value: '50 of 214',
         note: 'at most 50, across every template',
       },
       { label: 'Responses kept as evidence', value: '408', note: null },
     ]);
     expect(view('clean-site').tiles[1]).toEqual({
-      label: 'Pages fetched per crawler',
+      label: 'Pages sampled per crawler',
       value: '38 of 38',
       note: 'every page',
     });
@@ -164,7 +164,7 @@ describe('accessView: headline, tiles and the method sentence', () => {
 
   it('uses the tagged-identity sentence (FACTS D1, with the L5 correction)', () => {
     expect(view('bad-site').method).toBe(
-      'Each page was requested with the crawler’s own user agent, tagged “Crawlmouse/2.0 (+https://crawlmouse.com/bot)”, from Crawlmouse’s own address, not the operator’s. A rule matching the exact string will not fire on it, and a site that verifies crawler addresses may refuse it while serving the real crawler. Rendering requests come from Cloudflare Browser Rendering, and one untagged browser-identity control fetch per sampled page is part of the method. Select a cell to see the raw request and response.',
+      'Each sampled page where our browser-identity control was served was requested with the crawler’s own user agent, tagged “Crawlmouse/2.0 (+https://crawlmouse.com/bot)”, from Crawlmouse’s own address, not the operator’s. A rule matching the exact string will not fire on it, and a site that verifies crawler addresses may refuse it while serving the real crawler. Rendering requests come from Cloudflare Browser Rendering. One untagged browser-identity control fetch per sampled page is part of the method. Select a cell to see the raw request and response.',
     );
   });
 
@@ -200,7 +200,7 @@ describe('accessView: edges of the data', () => {
       c.crawlers.find((x) => x.ua === 'PerplexityBot')!.verdict = 'not_measured';
     });
     expect(v.headline.title).toBe(
-      'One of six AI crawlers was not served, and one was not measured.',
+      'Requests as one of six AI crawlers were not served, and one was not measured.',
     );
   });
 

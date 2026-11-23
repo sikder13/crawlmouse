@@ -58,7 +58,7 @@ export const VERDICTS: Record<Verdict, VerdictStyle> = {
   },
   refused_unverified: {
     state: 'unverified',
-    label: 'refused, no crawler name served (unverified)',
+    label: 'refused, unverified',
     glyphFromFacts: true,
     labelFromFacts: true,
   },

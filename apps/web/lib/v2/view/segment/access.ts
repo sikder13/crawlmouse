@@ -226,8 +226,8 @@ function headlineTitle(check: Check): string {
     [n(is('blocked_by_ua_rule')), 'was refused by user agent', 'were refused by user agent', true],
     [
       n(is('refused_unverified')),
-      'was refused, with no other crawler name served on the same pages',
-      'were refused, with no other crawler name served on the same pages',
+      'was refused on pages where no other crawler name was served',
+      'were refused on pages where no other crawler name was served',
       true,
     ],
     [n(is('challenged_ua')), 'was challenged', 'were challenged', true],
@@ -235,7 +235,7 @@ function headlineTitle(check: Check): string {
       n((v) => !isAllowed(v) && !isBlocked(v) && !isChallenged(v) && !unmeasured(v)),
       'was not served',
       'were not served',
-      false,
+      true,
     ],
     [n(unmeasured), 'was not measured', 'were not measured', false],
   ];
@@ -246,7 +246,9 @@ function headlineTitle(check: Check): string {
       ? request
         ? `Requests as ${numberWord(n)} of ${numberWord(ai.length)} AI crawlers ${many}`
         : `${capitalise(numberWord(n))} of ${numberWord(ai.length)} AI crawlers ${n === 1 ? one : many}`
-      : `${numberWord(n)} ${n === 1 ? one : many}`,
+      : request && !present[0]![3]
+        ? `requests as ${numberWord(n)} ${many}`
+        : `${numberWord(n)} ${n === 1 ? one : many}`,
   );
   return clauses.length === 1
     ? `${clauses[0]}.`
@@ -292,20 +294,22 @@ const noCrawlerRequest = (ai: readonly CrawlerResult[]): boolean =>
   ai.every((c) => c.verdict === 'edge_blocks_automation' || c.verdict === 'not_measured');
 
 /** FACTS D1, with the L5 correction; the exact-string variant when the evidence carries no tag. */
-function methodSentence(tests: readonly AccessTest[], ai: readonly CrawlerResult[]): string {
+function methodSentence(
+  tests: readonly AccessTest[],
+  ai: readonly CrawlerResult[],
+  rendered: boolean,
+): string {
   const crawlerTests = tests.filter((t) => t.ua !== null && t.source_ip_class === 'fly_egress');
   const exact =
     crawlerTests.length > 0 && crawlerTests.every((t) => !t.identity_sent.includes(OUR_TAG));
   const stated = exact
-    ? 'Each page was requested with the crawler’s exact user agent from Crawlmouse’s address, not the operator’s.'
-    : `Each page was requested with the crawler’s own user agent, tagged “${OUR_TAG}”, from Crawlmouse’s own address, not the operator’s. A rule matching the exact string will not fire on it, and a site that verifies crawler addresses may refuse it while serving the real crawler.`;
-  const edge = ai.some((c) => c.verdict === 'edge_blocks_automation');
+    ? 'Each sampled page where our browser-identity control was served was requested with the crawler’s exact user agent from Crawlmouse’s address, not the operator’s.'
+    : `Each sampled page where our browser-identity control was served was requested with the crawler’s own user agent, tagged “${OUR_TAG}”, from Crawlmouse’s own address, not the operator’s. A rule matching the exact string will not fire on it, and a site that verifies crawler addresses may refuse it while serving the real crawler.`;
   const identity = noCrawlerRequest(ai)
     ? 'No crawler request was sent, because the site’s edge refused or challenged our browser-identity control first.'
-    : edge
-      ? `Where our browser-identity control was served, ${stated.replace(/^E/, 'e')}`
-      : stated;
-  return `${identity} Rendering requests come from Cloudflare Browser Rendering, and one untagged browser-identity control fetch per sampled page is part of the method. Select a cell to see the raw request and response.`;
+    : stated;
+  const render = rendered ? ' Rendering requests come from Cloudflare Browser Rendering.' : '';
+  return `${identity}${render} One untagged browser-identity control fetch per sampled page is part of the method. Select a cell to see the raw request and response.`;
 }
 
 function rowOf(
@@ -419,7 +423,7 @@ export function accessView(
         note: `${ai.filter((c) => c.scored).length} scored`,
       },
       {
-        label: 'Pages fetched per crawler',
+        label: 'Pages sampled per crawler',
         value: `${count(noCrawlerRequest(ai) ? 0 : coverage.pages_sampled)} of ${count(coverage.pages_discovered)}`,
         note: noCrawlerRequest(ai)
           ? 'no crawler request was sent'
@@ -435,7 +439,7 @@ export function accessView(
         note: null,
       },
     ],
-    method: methodSentence(tests, ai),
+    method: methodSentence(tests, ai, check.without_js !== null),
     columns,
     groups,
     footnote: groups.some((g) => g.rows.some((r) => r.text.endsWith('*'))) ? FOOTNOTE : null,

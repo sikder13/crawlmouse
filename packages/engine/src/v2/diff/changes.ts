@@ -158,7 +158,7 @@ export const VERDICT_PHRASE: Readonly<Record<Verdict, string>> = {
   disallowed_by_robots: 'disallowed by robots.txt',
   blocked_by_ua_rule: 'our request refused by user agent',
   challenged_ua: 'our request challenged',
-  refused_unverified: 'our request refused, no other crawler name served on the same pages',
+  refused_unverified: 'our request refused, unverified',
   rate_limited: 'our request rate limited',
   payment_required: 'our request asked to pay',
   edge_blocks_automation: 'blocked our test requests',

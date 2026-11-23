@@ -43,7 +43,7 @@ export const EDGE_SENTENCE =
  * What an edge that refuses automation shows, and what follows from it. The request it refused was
  * our browser-identity control, from our own address (F-145).
  */
-export const EDGE_METHOD = `${EDGE_SENTENCE}, so no crawler request was measured on those pages.`;
+export const EDGE_METHOD = `${EDGE_SENTENCE}, so no crawler request was measured where it did.`;
 
 /** What a served crawler request proves: our request carrying its user agent was served (F-139). */
 export const servedAll = (n: number, kind: 'AI' | 'scored') =>
@@ -98,6 +98,8 @@ export const meetsEdge = (check: Pick<Check, 'crawlers'>) =>
   check.crawlers.some((c) => c.verdict === 'edge_blocks_automation');
 
 /** What happened to a crawler that did not get in, singular and plural. */
+const OUR_REQUEST = / when we sent (?:its user agent|their user agents)/;
+
 function keptOut(verdict: Verdict, cause: AccessCause | null): [string, string] {
   switch (verdict) {
     case 'disallowed_by_robots':
@@ -119,8 +121,8 @@ function keptOut(verdict: Verdict, cause: AccessCause | null): [string, string] 
       ];
     case 'refused_unverified':
       return [
-        'was refused, and no other crawler name was served on the same pages; this may be IP verification',
-        'were refused, and no other crawler name was served on the same pages; this may be IP verification',
+        'was refused on pages where no other crawler name was served; this may be IP verification',
+        'were refused on pages where no other crawler name was served; this may be IP verification',
       ];
     case 'rate_limited':
       return [
@@ -133,7 +135,10 @@ function keptOut(verdict: Verdict, cause: AccessCause | null): [string, string] 
         'were asked to pay (402) when we sent their user agents',
       ];
     case 'edge_blocks_automation':
-      return [`met an edge that ${EDGE_PILL}`, `met an edge that ${EDGE_PILL}`];
+      return [
+        'could not be tested: the site’s edge refused our control request',
+        'could not be tested: the site’s edge refused our control request',
+      ];
     case 'redirected_away':
       return [
         'was sent to another host when we sent its user agent',
@@ -165,8 +170,11 @@ export function keptOutClauses(crawlers: readonly Crawler[]): string[] {
     .sort((a, b) => order(a) - order(b))
     .map((g) => {
       const [one, many] = keptOut(g[0]!.verdict, g[0]!.cause);
-      const seen = g[0]!.evidence_class === 'observed' ? ', in the site’s own logs' : '';
-      return `${listOf(g.map((c) => c.ua))} ${g.length === 1 ? one : many}${seen}`;
+      const observed = g[0]!.evidence_class === 'observed';
+      const clause = g.length === 1 ? one : many;
+      // An observed row is the site's log of the real crawler: we sent nothing in its name.
+      const said = observed ? clause.replace(OUR_REQUEST, '') : clause;
+      return `${listOf(g.map((c) => c.ua))} ${said}${observed ? ', in the site’s own logs' : ''}`;
     });
 }
 
