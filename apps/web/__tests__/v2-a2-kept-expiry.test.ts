@@ -1,6 +1,7 @@
 /**
  * A check inserted while its site is being kept (session B's question 011): the interleaving on
- * PGlite with every migration, through the real requestCheck, keep_check and the store's insert.
+ * PGlite with every migration, through the real requestCheck and keep_check, and the test store's
+ * insert, which writes the same row.
  * PGlite has one connection, so this runs the two in the order that loses. The row lock that holds
  * the order under real concurrency is tested on a real Postgres: scripts/db/kept-expiry-race.test.ts.
  */

@@ -27,6 +27,7 @@ begin
 end;
 $$;
 
+alter function public.checks_kept_site_has_no_expiry() owner to postgres;
 revoke all on function public.checks_kept_site_has_no_expiry() from public, anon, authenticated, service_role;
 
 drop trigger if exists checks_kept_site_has_no_expiry on public.checks;
