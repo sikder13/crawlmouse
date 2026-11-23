@@ -82,6 +82,47 @@ describe('ops_recent_checks', () => {
     }
   });
 
+  it.each([
+    ['a fraction', 7.5],
+    ['a whole number written as a decimal', '7.0::jsonb'],
+    ['text', 'abc'],
+    ['a boolean', true],
+    ['a list', [1]],
+    ['a number past an integer', 2147483648],
+  ])('one row whose pages are %s reads as null and breaks no other row', async (_name, bad) => {
+    const clone = (await db.clone()) as PGlite;
+    try {
+      const { checkId } = await anonymousCheck(clone, 'bad-pages-view.example', later());
+      await clone.exec(`alter table public.checks drop constraint checks_coverage`);
+      const value = bad === '7.0::jsonb' ? '7.0' : JSON.stringify(bad);
+      await clone.query(
+        `update public.checks
+            set coverage = jsonb_build_object('pages_crawled', $1::jsonb), queued_at = now() - interval '300 days'
+          where id = $2`,
+        [value, checkId],
+      );
+      await expect(
+        clone.query(`select * from public.ops_recent_checks limit 1`),
+      ).resolves.toBeDefined();
+      const { rows } = await clone.query<{ pages_read: number | null }>(
+        `select pages_read from public.ops_recent_checks where check_id = $1`,
+        [checkId],
+      );
+      expect(rows[0]!.pages_read).toBeNull();
+    } finally {
+      await clone.close();
+    }
+  });
+
+  it('grants one thing: SELECT, to the service role', async () => {
+    const { rows } = await db.query<{ grantee: string; privilege_type: string }>(
+      `select grantee, privilege_type from information_schema.role_table_grants
+        where table_schema = 'public' and table_name = 'ops_recent_checks'
+          and grantee <> 'postgres'`,
+    );
+    expect(rows).toEqual([{ grantee: 'service_role', privilege_type: 'SELECT' }]);
+  });
+
   it('gives the plan of the account that keeps the site', async () => {
     const user = await signUp(db, 'ops-view@example.com');
     const account = await accountOf(db, user);

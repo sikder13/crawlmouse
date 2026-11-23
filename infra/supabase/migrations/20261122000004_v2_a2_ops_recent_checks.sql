@@ -14,7 +14,14 @@ select s.host,
        c.trigger,
        c.queued_at,
        c.finished_at,
-       (c.coverage ->> 'pages_crawled')::integer as pages_read,
+       -- A value that is not a plain whole number reads as null: a bare cast would make one bad row
+       -- fail every read of the view.
+       case
+         when jsonb_typeof(c.coverage -> 'pages_crawled') = 'number'
+          and (c.coverage ->> 'pages_crawled') ~ '^[0-9]{1,9}$'
+         then (c.coverage ->> 'pages_crawled')::integer
+       end as pages_read,
+       -- The stored tier: an expired no-card trial can still read as the tier it trialled.
        coalesce(a.tier::text, 'no account') as plan,
        c.id as check_id
   from public.checks c
@@ -23,5 +30,5 @@ select s.host,
  order by c.queued_at desc, c.id desc;
 
 alter view public.ops_recent_checks owner to postgres;
-revoke all on public.ops_recent_checks from public, anon, authenticated;
+revoke all on public.ops_recent_checks from public, anon, authenticated, service_role;
 grant select on public.ops_recent_checks to service_role;
