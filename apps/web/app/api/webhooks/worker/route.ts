@@ -12,10 +12,11 @@ export const runtime = 'nodejs';
 /**
  * The crawl worker's note that a batch ended (PR 5a). The worker holds no Inngest key, so it signs
  * this and the app sends the event. It wakes a run's wait and carries no data: the run still reads
- * the result from the worker, so at worst a note costs one read. A note that fails costs the run a
+ * the result from the worker, so at worst a note costs one read, or puts that run back on polling. A note that fails costs the run a
  * wait's timeout, so a failure here is answered and not retried.
  */
 const MAX_BYTES = 512;
+const BODY_DEADLINE_MS = 5_000;
 
 /** Whether these headers could pass `verifySignal`: a recent time and a whole hex signature. */
 function headersCanPass(ts: string, signature: string, now: number): boolean {
@@ -26,22 +27,38 @@ function headersCanPass(ts: string, signature: string, now: number): boolean {
   );
 }
 
-/** The body as text, or null past MAX_BYTES, whatever Content-Length said. */
-async function bounded(req: Request): Promise<string | null> {
-  if (Number(req.headers.get('content-length') ?? 0) > MAX_BYTES) return null;
+/**
+ * The body as text; `too_large` past MAX_BYTES, whatever Content-Length said; `timeout` when it has
+ * not ended within BODY_DEADLINE_MS, so a sender with a well-formed forged signature cannot hold the
+ * route open by never finishing its body.
+ */
+async function bounded(req: Request): Promise<string | 'too_large' | 'timeout'> {
+  if (Number(req.headers.get('content-length') ?? 0) > MAX_BYTES) return 'too_large';
   if (!req.body) return '';
   const reader = req.body.getReader();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<'timeout'>((resolve) => {
+    timer = setTimeout(() => resolve('timeout'), BODY_DEADLINE_MS);
+  });
   const chunks: Uint8Array[] = [];
   let size = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    size += value.byteLength;
-    if (size > MAX_BYTES) {
-      await reader.cancel();
-      return null;
+  try {
+    for (;;) {
+      const next = await Promise.race([reader.read(), deadline]);
+      if (next === 'timeout') {
+        void reader.cancel().catch(() => undefined);
+        return 'timeout';
+      }
+      if (next.done) break;
+      size += next.value.byteLength;
+      if (size > MAX_BYTES) {
+        await reader.cancel();
+        return 'too_large';
+      }
+      chunks.push(next.value);
     }
-    chunks.push(value);
+  } finally {
+    clearTimeout(timer);
   }
   return Buffer.concat(chunks).toString('utf8');
 }
@@ -50,12 +67,13 @@ export async function POST(req: Request): Promise<Response> {
   const secret = process.env.WORKER_SIGNING_SECRET;
   const ts = req.headers.get(TS_HEADER) ?? '';
   const signature = req.headers.get(SIGNATURE_HEADER) ?? '';
-  // Before the body: a request that cannot pass does not get to hold the connection open.
+  // Before the body, so an impossible request is answered without reading it.
   if (!secret || !headersCanPass(ts, signature, Date.now())) {
     return new Response(null, { status: 401 });
   }
   const raw = await bounded(req);
-  if (raw === null) return new Response(null, { status: 413 });
+  if (raw === 'too_large') return new Response(null, { status: 413 });
+  if (raw === 'timeout') return new Response(null, { status: 408 });
   if (!verifySignal(secret, ts, raw, signature, Date.now())) {
     return new Response(null, { status: 401 });
   }

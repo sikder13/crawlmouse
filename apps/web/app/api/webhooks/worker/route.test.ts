@@ -112,6 +112,20 @@ describe('POST /api/webhooks/worker', () => {
     expect(send).not.toHaveBeenCalled();
   });
 
+  it('a well-formed forged signature cannot hold the route open with a body that never ends', async () => {
+    const pending = POST(
+      new Request(URL_, {
+        method: 'POST',
+        headers: { 'x-crawlmouse-ts': String(NOW), 'x-crawlmouse-signature': 'a'.repeat(64) },
+        body: new ReadableStream(),
+        duplex: 'half',
+      } as RequestInit),
+    );
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect((await pending).status).toBe(408);
+    expect(send).not.toHaveBeenCalled();
+  });
+
   it('answers 502 when the event cannot be sent; the run falls back to polling', async () => {
     send.mockRejectedValueOnce(new Error('down'));
     expect((await call(JSON.stringify(BODY))).status).toBe(502);

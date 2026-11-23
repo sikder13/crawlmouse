@@ -185,6 +185,26 @@ describe('the done signal (PR 5a)', () => {
     expect(sent[0]).toEqual({ check_id: CHECK, batch: body.batch, status: 'done' });
   });
 
+  it('signals a batch that failed, so the run polls it at once', async () => {
+    const sent: unknown[] = [];
+    const { worker } = await start(
+      { appSignalUrl: URL_ },
+      async () => {
+        throw new Error('fetcher broke');
+      },
+      undefined,
+      async (_u, init) => {
+        sent.push(JSON.parse(init.body));
+      },
+    );
+    const body = batchBody();
+    await post(body);
+    await worker.idle();
+    await vi.waitFor(() =>
+      expect(sent[0]).toEqual({ check_id: CHECK, batch: body.batch, status: 'failed' }),
+    );
+  });
+
   it('a signal that fails does not fail the batch', async () => {
     const { worker } = await start({ appSignalUrl: URL_ }, undefined, undefined, async () => {
       throw new Error('down');
