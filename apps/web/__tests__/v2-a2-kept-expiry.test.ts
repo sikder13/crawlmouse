@@ -1,8 +1,8 @@
 /**
  * A check inserted while its site is being kept (session B's question 011): the interleaving on
  * PGlite with every migration, through the real requestCheck, keep_check and the store's insert.
- * PGlite has one connection, so this runs the two in the order that loses; the row lock that holds
- * the order under real concurrency is read from the migration, and is not exercised here.
+ * PGlite has one connection, so this runs the two in the order that loses. The row lock that holds
+ * the order under real concurrency is tested on a real Postgres: scripts/db/kept-expiry-race.test.ts.
  */
 import { randomUUID } from 'node:crypto';
 import type { PGlite } from '@electric-sql/pglite';
