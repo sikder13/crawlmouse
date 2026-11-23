@@ -96,6 +96,14 @@ an applied migration.
 To apply files whose pull request was merged earlier, give `dry_run_pr` the number of a merged
 pull request whose passed dry run applied those files.
 
+**One migration pull request at a time.** `dry_run_pr` takes one number, and the gate needs one dry
+run that applied every pending file. A pull request's dry run applies the files pending in its own
+tree, so two migration pull requests that each ran before the other merged cannot pass under either
+number. Merge one and apply it before the next. If two are already merged, open a pull request from
+`main` that touches `infra/supabase` or `scripts/db`, without changing a migration file, check that
+its dry run lists every pending file, merge it, and give its number. The refusal and this advice are
+tested by `pnpm --filter @crawlmouse/scripts exec vitest run db/production.test.ts`.
+
 Until CC-REPO merged, a merge that changed a migration started this workflow and the `apply` job waited
 for the owner's approval on the `production` environment. Now nothing starts on a merge: the owner
 dispatches the run (step 4), then approves the environment (step 5). GitHub enforces required

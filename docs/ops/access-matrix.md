@@ -27,8 +27,8 @@ when:
 Not read: anything outside those roots, `scripts/` included. The files there that name the
 service-role factory or key: `grep -rlE "supabaseAdmin|SUPABASE_SERVICE_ROLE_KEY" scripts`.
 
-Rows: 90 route handlers, 56 server entry files that read data, 114 files that
-open a service-role client. By gate: caller 23, capability 65, member 29, member_for_site 26, operator 7, own_rows 42, public 33, seat_may 26, signature 9. Open holes: none.
+Rows: 91 route handlers, 56 server entry files that read data, 114 files that
+open a service-role client. By gate: caller 23, capability 65, member 29, member_for_site 26, operator 7, own_rows 42, public 33, seat_may 26, signature 10. Open holes: none.
 
 What this cannot see: a signed-in seat calling PostgREST or an RPC directly with its own session,
 which row security and grants decide (`infra/supabase/migrations`, tested by the `v2-0*` suites);
@@ -95,6 +95,7 @@ Regenerate: `pnpm --filter @crawlmouse/web exec tsx __tests__/security/access-ma
 | `api/checks/[id]/stream` | holder of an unkept check’s id, or a member of the account that keeps it | capability | `readableCheck` in `apps/web/app/api/checks/[id]/stream/serve.ts` | Streams the progress of a check `readableCheck` lets the caller read. | `apps/web/app/api/checks/[id]/stream/serve.test.ts` › a kept check: 404 with no event and no evidence read for a visitor and for another account |
 | `api/unsubscribe` | a mail recipient, by a signed link | signature | `verifyUnsubscribeRequest` in `apps/web/app/api/unsubscribe/route.ts` | Turns off the mail kind the HMAC-signed token names for its seat. | `apps/web/app/api/unsubscribe/route.test.ts` › with no EMAIL_LINK_SECRET, verifies nothing and changes nothing |
 | `api/webhooks/stripe-account` | Stripe | signature | `constructEvent` in `apps/web/app/api/webhooks/stripe-account/route.ts` | Applies a v2 billing event after `constructEvent` verifies its signature. | `apps/web/app/api/webhooks/stripe-account/route.test.ts` › a signature made with another secret: 400 |
+| `api/webhooks/worker` | the crawl worker | signature | `verifySignal` in `apps/web/app/api/webhooks/worker/route.ts` | Sends the event that wakes a run waiting on a batch, after `verifySignal` passes. Reads and returns no data. | `apps/web/app/api/webhooks/worker/route.test.ts` › refuses a signature made for a batch post or a read |
 | `api/contact/agency-plus` | anyone (Turnstile when enforced, per-IP and per-address limits) | public | — | Stores a contact request; reads nothing back. | `apps/web/app/api/contact/agency-plus/route.test.ts` › counts each address in a daily bucket and refuses past it with 429 |
 | `api/internal/search` | an operator (a signed-in user `is_operator()` answers true for) | operator | `requireOperator` in `apps/web/app/api/internal/search/route.ts` | The support console’s search: resolves the query (an address, a host or a check id) to account ids through the service role (`consoleStore`) and records its kind and count, not the query. `requireOperator` runs first; anyone else is a 404. | `apps/web/app/api/internal/search/route.test.ts` › signed in |
 | `api/internal/checks/[id]/rerun` | an operator (a signed-in user `is_operator()` answers true for) | operator | `requireOperator` in `apps/web/app/api/internal/checks/[id]/rerun/route.ts` | Re-runs a failed check through the member re-check’s start path, under the site’s own account’s cap, and records the re-run or its refusal in `operator_actions`. `requireOperator` runs first; anyone else is a 404. | `apps/web/app/api/internal/checks/[id]/rerun/route.test.ts` › signed in |
