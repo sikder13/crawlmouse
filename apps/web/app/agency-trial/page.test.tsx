@@ -1,5 +1,5 @@
 /**
- * /agency-trial (CC-29 D3): a 404 unless V2_BILLING is on, before any read; signed out, a redirect to
+ * /agency-trial (CC-29 D3): a 404 unless V2_BILLING and V2_AGENCY_SALES are on, before any read; signed out, a redirect to
  * sign in that returns here; never indexed; the form for a new trialist, the reason and no form for
  * a used trial, and the "did not finish" note for an agency account a Checkout left (Q16).
  */
@@ -84,6 +84,14 @@ describe('/agency-trial', () => {
       digest: expect.stringContaining('NEXT_HTTP_ERROR_FALLBACK;404'),
     });
     expect(h.reads).toBe(0);
+  });
+
+  it('its layout is a 404 with Agency not on sale too', async () => {
+    const { default: Layout } = await import('./layout');
+    vi.stubEnv('V2_AGENCY_SALES', '');
+    expect(() => Layout({ children: null })).toThrow(/NEXT_HTTP_ERROR_FALLBACK;404/);
+    vi.stubEnv('V2_AGENCY_SALES', '1');
+    expect(() => Layout({ children: null })).not.toThrow();
   });
 
   it.each([

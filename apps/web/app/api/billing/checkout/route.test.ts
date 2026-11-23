@@ -196,15 +196,17 @@ describe('POST /api/billing/checkout, V2_BILLING=1', () => {
       async (interval) => {
         const res = await json({ plan: 'agency', interval });
         expect([res.status, await res.json()]).toEqual([403, { error: 'agency_not_open' }]);
-        expect(stripeWrites()).toEqual([]);
+        // The session alone was read: the refusal comes before the account's role is asked.
+        expect(h.log).toEqual(['getUser']);
         expect(h.sessionsCreate).not.toHaveBeenCalled();
       },
     );
 
     it('refuses a form post too', async () => {
       const res = await form('plan=agency&interval=month');
+      expect([res.status, await res.json()]).toEqual([403, { error: 'agency_not_open' }]);
+      expect(h.log).toEqual(['getUser']);
       expect(h.sessionsCreate).not.toHaveBeenCalled();
-      expect(res.status).toBeGreaterThanOrEqual(300);
     });
 
     it('still sells Pro', async () => {

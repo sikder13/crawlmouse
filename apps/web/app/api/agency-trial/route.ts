@@ -30,7 +30,8 @@ const report = (message: string, extra: Readonly<Record<string, string>>) => {
 
 /**
  * Start the Agency trial (CC-29 D3): the second account, its first site, then CC-03's Checkout.
- * The caller's own session first (401 without one), then V2_BILLING (404 while it is off); the
+ * The caller's own session first (401 without one), then V2_BILLING and V2_AGENCY_SALES (404 while
+ * either is off); the
  * service-role client is made only after both. What follows: ./_lib/start.ts.
  */
 export async function POST(req: Request) {

@@ -3,7 +3,8 @@
  * ignored, like the account door's flags. Not a NEXT_PUBLIC_ variable, so a client bundle that
  * imported this would read undefined and see it off.
  *
- * V2_BILLING=1 serves the v2 checkout, agency trial, cancel and portal handlers, the
+ * V2_BILLING=1 serves the v2 checkout, cancel and portal handlers (the Agency trial and an Agency
+ * checkout also need `agencySalesOpen`), the
  * /api/webhooks/stripe-account endpoint, the trial and past-due functions and the reconcile's v2 mode,
  * and dispatches the first-login trial's effects. Unset, every v1 billing route answers as before and
  * the new routes are 404s.

@@ -441,6 +441,16 @@ export const PRECONDITIONS: readonly Precondition[] = [
     check: manual,
   },
   {
+    id: 'agency-offers-closed',
+    mustBeTrue:
+      'V2_AGENCY_SALES is unset in Production, and pricing, /agencies, the structured data and llms.txt show Agency as coming, with no button to buy it',
+    why: 'with sales closed the checkout and the trial refuse Agency, so a button that still offers it is a dead end',
+    source: 'apps/web/lib/billing/flags.ts:24',
+    gates: 5,
+    owner: 'CTO',
+    check: manual,
+  },
+  {
     id: 'stripe-reconcile-livemode-true',
     mustBeTrue: 'Vercel Production has STRIPE_RECONCILE_LIVEMODE=true',
     why: "unset, the reconcile's livemode guard does not run (v1 inventory C-7); 'false' with the live key refuses every reconcile. vercel-env-step-5 sees the name only: its probe reads no value",
