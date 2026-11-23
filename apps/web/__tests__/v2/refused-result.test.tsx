@@ -52,6 +52,13 @@ const html = (v: ResultView) =>
       <ResultScreen data={v} checkId={ID} />
     </AuditPageProvider>,
   );
+/** The rendered log block, where advice to allow something would sit. */
+const logBlock = (out: string) =>
+  out.slice(
+    out.indexOf('our page requests appear as'),
+    out.indexOf('How our crawler identifies itself'),
+  );
+const ADVICE = /\ballow|whitelist|exception/i;
 const COMPETITOR = 'Is a competitor this readable?';
 
 describe('the next step on a refused check', () => {
@@ -67,7 +74,9 @@ describe('the next step on a refused check', () => {
   it.each([401, 403, 429, 451])('%i: names it for the logs, and advises no allow rule', (code) => {
     const out = html(answered(code));
     expect(out).toContain('In your firewall or CDN logs, our page requests appear as:');
-    expect(card(answered(code)).body).not.toMatch(/\ballow|whitelist|exception/i);
+    expect(card(answered(code)).body).not.toMatch(ADVICE);
+    expect(logBlock(out).length).toBeGreaterThan(0);
+    expect(logBlock(out)).not.toMatch(ADVICE);
     expect(out).not.toContain('carries no Crawlmouse tag');
   });
 
@@ -86,7 +95,8 @@ describe('the next step on a refused check', () => {
       untaggedControl: true,
     });
     expect(html(v)).toContain('carries no Crawlmouse tag');
-    expect(card(v).body).not.toMatch(/\ballow|whitelist|exception/i);
+    expect(card(v).body).not.toMatch(ADVICE);
+    expect(logBlock(html(v))).not.toMatch(ADVICE);
   });
 
   it.each([
@@ -274,6 +284,17 @@ describe('the crawler table’s Status', () => {
   it('a verdict read from robots.txt still names it', () => {
     expect(
       statusOf('Googlebot', { status: null, verdict: 'allowed', evidence_class: 'declared' }),
+    ).toBe('robots.txt');
+  });
+
+  it('a robots.txt block still names robots.txt', () => {
+    expect(
+      statusOf('GPTBot', {
+        status: null,
+        verdict: 'disallowed_by_robots',
+        evidence_class: 'declared',
+        cause: 'robots_txt_disallow',
+      }),
     ).toBe('robots.txt');
   });
 
