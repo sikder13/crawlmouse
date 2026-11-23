@@ -37,17 +37,26 @@ export interface StepDeps {
   render: {
     client: RenderInput['client'];
     caps: RenderInput['caps'];
+    /** Used when `dailyFor` is absent. */
     daily: DailyBudget;
+    /** The durable budget for one check; production wires it (render-budget.ts). */
+    dailyFor?: (checkId: string) => DailyBudget;
     inFlight: number;
   };
   discover: DiscoverDeps;
 }
 
 /**
- * Q7: no durable daily render budget exists yet, and one kept in memory would count per Vercel
- * instance, not per day. The pipeline passes this one, which throws, so renderCheck renders nothing:
- * a sampled page records `daily_budget_unavailable`, or a reason renderCheck finds before it asks the
- * budget (`not_configured`, `caps_not_configured`, `check_cap`).
+ * How long the render step may render, of the function's 300 s (`maxDuration`). The rest is for
+ * loading what the step reads and storing its outcome.
+ */
+export const RENDER_STEP_MS = 240_000;
+
+/**
+ * The budget for a wiring with no durable one: it throws, so renderCheck renders nothing. A sampled
+ * page records `daily_budget_unavailable`, or a reason renderCheck finds before it asks the budget
+ * (`not_configured`, `caps_not_configured`, `check_cap`). One kept in memory would count per Vercel
+ * instance, not per day.
  */
 export const NO_DAILY_BUDGET: DailyBudget = {
   reserve: async () => {

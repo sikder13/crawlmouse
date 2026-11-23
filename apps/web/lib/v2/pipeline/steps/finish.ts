@@ -1,9 +1,8 @@
 /**
  * The steps after the batches: render, build, persist, finalize.
  *
- * render runs CC-14's renderCheck over renderCandidates with the daily budget it is given; today that
- * budget throws (Q7, NO_DAILY_BUDGET), so nothing renders. renderCheck has no deadline of its own
- * yet, which rendering needs before it is enabled (RESERVE_S).
+ * render runs CC-14's renderCheck over renderCandidates with the check's daily budget, and stops
+ * RENDER_STEP_MS after the step began. With the two render caps unset, nothing renders.
  *
  * build calls buildCheck on what the check stored and what the database holds (finding 14: the
  * engine SHA is VERCEL_GIT_COMMIT_SHA, 40 hex, or the step fails; the worker release is the batches'
@@ -32,7 +31,7 @@ import { storeLedgerDraft } from '../../ledger/draft-step';
 import { getJson, putJson } from '../evidence';
 import { pageVantage, persistBuiltCheck, readOfFixes } from '../persist';
 import type { FixRead, PageVantage } from '../types';
-import type { StepDeps } from './deps';
+import { RENDER_STEP_MS, type StepDeps } from './deps';
 import {
   assembledSoFar,
   isCrawl,
@@ -59,6 +58,7 @@ export function finishSteps(
 ): Pick<CheckSteps, 'render' | 'build' | 'persist' | 'finalize'> {
   return {
     async render(event) {
+      const startedAt = deps.now();
       const [seeds, results] = await Promise.all([
         loadSeeds(deps, event),
         loadResults(deps, event),
@@ -70,9 +70,13 @@ export function finishSteps(
         deps.store.previousGraded(event.siteId, event.checkId),
       ]);
       const states = previous ? await deps.store.pageStates(previous.check.id) : new Map();
+      const { dailyFor, ...render } = deps.render;
       const outcome = await renderCheck({
         ...renderCandidates(assembled, [...sampled.stage1, ...sampled.stage2], fixes, states),
-        ...deps.render,
+        ...render,
+        daily: dailyFor?.(event.checkId) ?? render.daily,
+        deadlineAt: startedAt + RENDER_STEP_MS,
+        now: deps.now,
       });
       await putJson(deps.evidence, pathOf(event, 'render'), outcome);
       const rendered = outcome.pages.filter((p) => p.rendered).length;

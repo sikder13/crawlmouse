@@ -44,7 +44,7 @@ Concurrency: one plan cap, `PLAN_CONCURRENCY_CAP = 5` (Inngest Free), which the 
 | `crawl-{n}-wait-{i}`, `crawl-{n}-poll-{i}`   | the worker’s `GET /batch/{id}`                                                                                                               | `checks.heartbeat_at`, `progress`                                                                                |
 | `crawl-{n}-read`                             | the result, parsed with `BatchResultSchema`                                                                                                  | `batch-{n}.json.gz`; `crawl_batches` done                                                                        |
 | `access-{s}-…`                               | stored batches → `assemble` → `sample` (stage 2 only when needed)                                                                            | as crawl; batch numbers continue the crawl’s                                                                     |
-| `render`                                     | `renderCandidates`, the previous check’s page states                                                                                         | `render.json.gz` (Q7: the daily budget refuses)                                                                  |
+| `render`                                     | `renderCandidates`, the previous check’s page states                                                                                         | `render.json.gz`                                                                                                 |
 | `build`                                      | everything above, the previous graded check and its `diff_inputs`, the site’s fixes and events                                               | `built.json.gz`, `map.json.gz` (`checkMap`)                                                                      |
 | `persist`                                    | `built.json.gz`                                                                                                                              | staged chunks, then `persist_built_check` in one transaction (Q11)                                               |
 | `emit`                                       |                                                                                                                                              | `check.finished`, under the id `check-finished:{check_id}`                                                       |
@@ -121,7 +121,7 @@ A bucketed key’s check id is the engine’s `stableId` of the key, so two requ
 - **Cancel and timeout** are caught by a function of their own, since `onFailure` does not see them.
 - **Sitemaps are read by the app** (Q8); the worker reads robots.txt for itself and the sitemap’s status only.
 - **Persistence is staged** (Q11): the bulk rows go in chunks while the check runs, and one transaction moves them and flips the status.
-- **No rendering in production yet** (Q7): the daily budget refuses until a durable one exists.
+- **No rendering in production yet:** it needs Browser Run credentials and the two caps, which are unset. The daily budget is durable (`render-budget.ts`), and the render step stops `RENDER_STEP_MS` after it began.
 
 ## Differences from the brief
 

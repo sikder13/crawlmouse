@@ -15,6 +15,7 @@ import {
 import { getJson, putJson } from '../evidence';
 import { fakeWorker, memoryStore, queuedCheck } from '../test-support/fakes';
 import { memoryEvidenceStore } from '../test-support/memory-evidence';
+import { RENDER_STEP_MS } from './deps';
 import { NO_DAILY_BUDGET, checkSteps, type StepDeps } from './index';
 
 // persist.ts and checkMap are workstreams A's and D's: stand-ins here, so this test is about the
@@ -74,7 +75,7 @@ function recordedFromOne(): Map<number, BatchResult> {
   );
 }
 
-async function runRecorded() {
+async function runRecorded(renderOver: (clock: { now: number }) => object = () => ({})) {
   persisted.length = 0;
   const clock = { now: T0 };
   const iso = () => new Date(clock.now).toISOString();
@@ -106,6 +107,7 @@ async function runRecorded() {
       caps: { perCheckMs: 3_600_000, perDayMs: 36_000_000 },
       daily: NO_DAILY_BUDGET,
       inFlight: 2,
+      ...renderOver(clock),
     },
     discover: { fetch: (async () => ({})) as never, userAgent: 'UA', now: () => clock.now },
   };
@@ -209,6 +211,51 @@ describe('checkSteps under runCheck, on the recorded worker batches', () => {
     expect(render.pages.length).toBeGreaterThan(0);
     for (const p of render.pages)
       expect(p).toMatchObject({ rendered: false, reason: 'daily_budget_unavailable' });
+  });
+
+  const renderedPages = async (evidence: Awaited<ReturnType<typeof runRecorded>>['evidence']) =>
+    (
+      (await getJson(evidence, `anon/${SITE_ID}/${CHECK}/render.json.gz`)) as {
+        pages: { rendered: boolean; reason?: string }[];
+      }
+    ).pages;
+
+  it('asks the budget of this check when one is wired', async () => {
+    const asked: string[] = [];
+    const { evidence } = await runRecorded(() => ({
+      dailyFor: (checkId: string) => {
+        asked.push(checkId);
+        return { reserve: async () => false, settle: async () => undefined };
+      },
+    }));
+    expect(asked).toEqual([CHECK]);
+    const pages = await renderedPages(evidence);
+    expect(pages.length).toBeGreaterThan(0);
+    for (const p of pages) expect(p).toMatchObject({ rendered: false, reason: 'daily_cap' });
+  });
+
+  it(`stops rendering ${RENDER_STEP_MS / 1000} s after the render step began`, async () => {
+    let contents = 0;
+    const { evidence } = await runRecorded((clock) => ({
+      admit: async () => undefined,
+      client: {
+        content: async () => {
+          contents++;
+          return { ok: false, reason: 'page_failed', retryAfterMs: null, browserMs: 1 };
+        },
+      },
+      dailyFor: () => ({
+        reserve: async () => {
+          clock.now += RENDER_STEP_MS;
+          return true;
+        },
+        settle: async () => undefined,
+      }),
+    }));
+    expect(contents).toBe(0);
+    const pages = await renderedPages(evidence);
+    expect(pages.length).toBeGreaterThan(0);
+    expect(pages.filter((p) => p.reason === 'out_of_time').length).toBeGreaterThan(0);
   });
 
   it('hands persistence the built check, every page’s vantage and the map’s path', async () => {

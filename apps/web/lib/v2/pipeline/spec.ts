@@ -219,11 +219,7 @@ export function buildSpec20b(): string {
           'stored batches → `assemble` → `sample` (stage 2 only when needed)',
           'as crawl; batch numbers continue the crawl’s',
         ],
-        [
-          '`render`',
-          '`renderCandidates`, the previous check’s page states',
-          '`render.json.gz` (Q7: the daily budget refuses)',
-        ],
+        ['`render`', '`renderCandidates`, the previous check’s page states', '`render.json.gz`'],
         [
           '`build`',
           'everything above, the previous graded check and its `diff_inputs`, the site’s fixes and events',
@@ -329,7 +325,7 @@ export function buildSpec20b(): string {
     '- **Cancel and timeout** are caught by a function of their own, since `onFailure` does not see them.',
     '- **Sitemaps are read by the app** (Q8); the worker reads robots.txt for itself and the sitemap’s status only.',
     '- **Persistence is staged** (Q11): the bulk rows go in chunks while the check runs, and one transaction moves them and flips the status.',
-    '- **No rendering in production yet** (Q7): the daily budget refuses until a durable one exists.',
+    '- **No rendering in production yet:** it needs Browser Run credentials and the two caps, which are unset. The daily budget is durable (`render-budget.ts`), and the render step stops `RENDER_STEP_MS` after it began.',
     '',
     '## Differences from the brief',
     '',
