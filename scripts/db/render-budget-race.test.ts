@@ -64,10 +64,10 @@ async function reserveAtOnce(sql: Sql) {
   const answers = await Promise.all(
     Array.from(
       { length: 20 },
-      () => sql`select public.reserve_render_ms(${randomUUID()}::uuid, 1, 100, 1000) as ok`,
+      () => sql`select public.reserve_render_ms(${randomUUID()}::uuid, 100, 1000) as id`,
     ),
   );
-  return answers.filter(([r]) => r!.ok === true).length;
+  return answers.filter(([r]) => r!.id !== null).length;
 }
 
 describe.skipIf(!URL_ENV)('the daily render budget, on a real Postgres', () => {
@@ -114,15 +114,16 @@ describe.skipIf(!URL_ENV)('the daily render budget, on a real Postgres', () => {
   );
 
   it(
-    'counts one phase once when the same call arrives twice at once',
+    'counts one settle once when the same call arrives several times at once',
     async () => {
       await real`truncate public.render_reservations`;
       await real`truncate public.render_budget_days`;
-      const check = randomUUID();
-      await Promise.allSettled(
+      const [r] =
+        await real`select public.reserve_render_ms(${randomUUID()}::uuid, 600, 1000) as id`;
+      await Promise.all(
         Array.from(
           { length: 6 },
-          () => real`select public.reserve_render_ms(${check}::uuid, 1, 100, 1000)`,
+          () => real`select public.settle_render_ms(${r!.id as string}::uuid, 100)`,
         ),
       );
       expect(await committed(real)).toBe(100);

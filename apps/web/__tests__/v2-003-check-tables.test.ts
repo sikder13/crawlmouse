@@ -242,7 +242,7 @@ async function freshRow(table: NewTable): Promise<Record<string, unknown>> {
         new Date(Date.UTC(2021, 0, ++renderBudgetDay)).toISOString().slice(0, 10),
       );
     case 'render_reservations':
-      return ROWS.render_reservations(check, '2021-01-01');
+      return ROWS.render_reservations(randomUUID(), check, '2021-01-01');
   }
 }
 

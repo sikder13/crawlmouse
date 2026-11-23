@@ -438,9 +438,9 @@ export const ROWS = {
   // V2R A2: a day's committed browser time, and one render phase's reservation; service only. They
   // name no account: the budget is the whole product's.
   render_budget_days: (day: string): Row => ({ day, committed_ms: 100 }),
-  render_reservations: (checkId: string, day: string): Row => ({
+  render_reservations: (id: string, checkId: string, day: string): Row => ({
+    id,
     check_id: checkId,
-    phase_no: 1,
     day,
     reserved_ms: 100,
   }),
@@ -945,11 +945,11 @@ export async function seedWorld(db: Db, tag: string): Promise<World> {
     // A day of its own per world, since the day is the key.
     const day = new Date(Date.UTC(2020, 0, n)).toISOString().slice(0, 10);
     await put('render_budget_days', ROWS.render_budget_days(day), { day }, 'account');
-    const checkId = randomUUID();
+    const id = randomUUID();
     await put(
       'render_reservations',
-      ROWS.render_reservations(checkId, day),
-      { check_id: checkId, phase_no: 1 },
+      ROWS.render_reservations(id, randomUUID(), day),
+      { id },
       'account',
     );
   }
