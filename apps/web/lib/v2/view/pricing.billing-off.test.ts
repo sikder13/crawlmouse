@@ -145,6 +145,24 @@ describe('pricingView with billing off (RC-01)', () => {
     }
   });
 
+  it('does not say checks come back by themselves when paid plans open', () => {
+    const rows = pricingView({ kind: 'signed_out' }, 'month', NOW, OFF).after.rows;
+    const other = rows.find(([what]) => what === 'Other sites')![1].text;
+    expect(other).toContain('choosing Pro, once paid plans open, restarts them');
+    expect(other).not.toMatch(/stop until/i);
+  });
+
+  it.each([OFF, ON])(
+    'Free promises to keep its own site’s audits, not every audit (%j)',
+    (flags) => {
+      const free = pricingView({ kind: 'signed_out' }, 'month', NOW, flags).plans.find(
+        (p) => p.tier === 'free',
+      )!;
+      const kept = free.rows.find((r) => r.label === 'kept')!.text;
+      expect(kept).toBe('Your site’s audits, evidence and link map, kept');
+    },
+  );
+
   it('tells someone who already pays where to go', () => {
     const faq = pricingView({ kind: 'signed_out' }, 'month', NOW, OFF).faq.items;
     expect(faq.find((i) => i.q === 'Can I cancel?')!.a.text).toContain('support@crawlmouse.com');

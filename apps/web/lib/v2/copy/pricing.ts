@@ -142,7 +142,7 @@ export function planCopy(
         },
         {
           label: 'kept',
-          text: 'Every audit, its evidence and link map, kept',
+          text: 'Your site’s audits, evidence and link map, kept',
           capabilities: ['free_audit'],
         },
       ],
@@ -383,8 +383,9 @@ export const PRICING_COPY = {
         ? `What happens when the ${trialDays} end`
         : `What happens when the Agency trial’s ${trialDays} end`,
     /**
-     * FACTS A6 (long form) and A8. The reminder is said only with billing on: the function that sends
-     * it is registered only then (`billingFunctions`).
+     * FACTS A6 and A8, without A6's clause on condensing old evidence, which no job does. The reminder
+     * is said only with billing on: the function that sends it is registered only then
+     * (`billingFunctions`).
      */
     lead: (billing: boolean): Tagged[] => [
       { text: 'Nothing you can see is deleted.', capabilities: [] },
@@ -411,7 +412,7 @@ export const PRICING_COPY = {
         {
           text: billing
             ? 'Pause until you choose Pro or remove them; their history stays'
-            : 'Scheduled checks stop until paid plans open; their history stays',
+            : 'Scheduled checks stop; choosing Pro, once paid plans open, restarts them. Their history stays',
           capabilities: ['sites'],
         },
       ],
