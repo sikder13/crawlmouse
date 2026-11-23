@@ -32,7 +32,7 @@ Account: anonymous.
 
 | Step  | The customer                                                                 | Passes when                                                                                 | Devices                         | Writes | Expected to fail today                                                                                                                                                                                                                |
 | ----- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | ------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| J0.1  | Land on the home page; read it top to bottom                                 | In five seconds it is clear what this is, who it is for and what it costs                   | desktop, phone, Firefox, WebKit | no     | F-060, F-061, F-062, F-146                                                                                                                                                                                                            |
+| J0.1  | Land on the home page; read it top to bottom                                 | In five seconds it is clear what this is, who it is for and what it costs                   | desktop, phone, Firefox, WebKit | no     | F-060, F-061 (judged), F-062 (judged), F-146                                                                                                                                                                                          |
 | J0.2  | Use every header and footer entry once                                       | Every entry opens a finished v2 page (200, v2 shell)                                        | desktop, phone, Firefox, WebKit | no     | F-005, F-006, F-007, F-025, F-027                                                                                                                                                                                                     |
 | J0.3  | Start a check from the home form on a lab site                               | A check starts and the live page opens                                                      | desktop, phone, Firefox, WebKit | yes    | —                                                                                                                                                                                                                                     |
 | J0.4  | Watch the live page from start to finish without touching it                 | Progress is visible within 5 s, keeps moving, the graph draws, and the result opens         | desktop, phone, Firefox         | yes    | F-002, F-009                                                                                                                                                                                                                          |
@@ -138,18 +138,18 @@ Account: a new Agency trial; seeded `+agency`, `+agency-dev`, `+agencytrial`, `+
 
 ## J4 — Somebody else's data
 
-Account: two accounts A and B, A's removed member, signed out.
+Account: two accounts A and B, A's removed member, a user with no v2 account, signed out.
 
-| Step | The customer                                                                                                         | Passes when                                                                           | Devices | Writes                                     | Expected to fail today                          |
-| ---- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- | ------- | ------------------------------------------ | ----------------------------------------------- |
-| J4   | Every address and request of A tried as B, as A's removed member and signed out; ids changed in addresses and bodies | Nothing private shown or changed; refusals say "belongs to an account", not "missing" | desktop | yes (it sends writes that must be refused) | F-127, F-130, F-133, F-134 (with its sub-steps) |
-| J4.1 | A's site pages (incl. staging)                                                                                       | B 404 / signed out to sign-in                                                         | desktop | no                                         | —                                               |
-| J4.2 | A's kept results: every tab, map, fixes, checks                                                                      | Refused, with the right words                                                         | desktop | no                                         | F-127                                           |
-| J4.3 | A's changes, alerts, reports, settings, plan, delete, seats, agency, billing                                         | B sees only its own account                                                           | desktop | no                                         | F-130                                           |
-| J4.4 | Export files and fix packets; email-developer                                                                        | 404 / 401                                                                             | desktop | no                                         | —                                               |
-| J4.5 | Share links and report pages                                                                                         | Open only what was shared; no pivot                                                   | desktop | no                                         | F-134                                           |
-| J4.6 | Every API call in A's network log, replayed as B and signed out, with ids changed                                    | Refused; no write crosses accounts                                                    | desktop | yes (it replays writes)                    | —                                               |
-| J4.7 | v1 API routes                                                                                                        | 410 or refused                                                                        | desktop | no                                         | F-133                                           |
+| Step | The customer                                                                                                                                                                                  | Passes when                                                                                                           | Devices | Writes                                     | Expected to fail today                                 |
+| ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ------- | ------------------------------------------ | ------------------------------------------------------ |
+| J4   | Every address and request of A tried as B, as A's removed member, signed in with no v2 account (a user with no active seat) and signed out; ids changed in addresses and bodies               | Nothing private shown or changed; a refused id and a missing id get the same answer, so neither reveals the id exists | desktop | yes (it sends writes that must be refused) | F-127, F-130, F-133, F-134, F-163 (with its sub-steps) |
+| J4.1 | A's site pages (incl. staging)                                                                                                                                                                | B 404 / signed out to sign-in                                                                                         | desktop | yes (it creates test accounts)             | —                                                      |
+| J4.2 | A's kept results: every tab, map, fixes, checks                                                                                                                                               | The one 404 page a missing id gets, offering sign-in; nothing shows the id exists                                     | desktop | yes (it creates test accounts)             | F-127                                                  |
+| J4.3 | A's changes, alerts, reports, settings, plan, delete, seats, agency, billing                                                                                                                  | B sees only its own account                                                                                           | desktop | yes (it creates test accounts)             | F-130                                                  |
+| J4.4 | Export files and fix packets; email-developer                                                                                                                                                 | 404 / 401                                                                                                             | desktop | yes (it creates test accounts)             | —                                                      |
+| J4.5 | Share links and report pages                                                                                                                                                                  | Open only what was shared; no pivot                                                                                   | desktop | yes (it creates test accounts)             | F-134                                                  |
+| J4.6 | Every API call in A's network log, replayed as B, signed out, and signed in with no v2 account (a user with no active seat), with ids changed; each also with a random id that does not exist | Refused; no write crosses accounts; an existing private id and a missing id answer the same status and body           | desktop | yes (it replays writes)                    | F-163                                                  |
+| J4.7 | v1 API routes                                                                                                                                                                                 | 410 or refused                                                                                                        | desktop | yes (it creates test accounts)             | F-133                                                  |
 
 ## SMOKE — run on every gate
 
@@ -166,10 +166,25 @@ Account: two accounts A and B, A's removed member, signed out.
 
 ## D — defects with no journey step
 
-59 register rows name a stream, not a journey step. Each gets a dedicated test named `D.F-nnn`, written by
+66 register rows name a stream, not a journey step. Each, except a judged id, gets a dedicated test named `D.F-nnn`, written by
 the session that fixes it (RULES §3 step 2), under `tests/journeys/d/`.
 
-D.F-010, D.F-011, D.F-017, D.F-018, D.F-019, D.F-028, D.F-029, D.F-030, D.F-034, D.F-035, D.F-036, D.F-037, D.F-038, D.F-039, D.F-040, D.F-041, D.F-043, D.F-044, D.F-045, D.F-046, D.F-047, D.F-048, D.F-049, D.F-050, D.F-051, D.F-052, D.F-053, D.F-056, D.F-058, D.F-059, D.F-064, D.F-065, D.F-066, D.F-067, D.F-068, D.F-069, D.F-070, D.F-071, D.F-073, D.F-074, D.F-075, D.F-076, D.F-077, D.F-078, D.F-079, D.F-080, D.F-081, D.F-082, D.F-083, D.F-084, D.F-085, D.F-086, D.F-087, D.F-088, D.F-089, D.F-090, D.F-091, D.F-092, D.F-093
+D.F-010, D.F-011, D.F-017, D.F-018, D.F-019, D.F-028, D.F-029, D.F-030, D.F-034, D.F-035, D.F-036, D.F-037, D.F-038, D.F-039, D.F-040, D.F-041, D.F-043, D.F-044, D.F-045, D.F-046, D.F-047, D.F-048, D.F-049, D.F-050, D.F-051, D.F-052, D.F-053, D.F-056, D.F-058, D.F-059, D.F-064, D.F-065, D.F-066, D.F-067, D.F-068, D.F-069, D.F-070, D.F-071, D.F-073, D.F-074, D.F-075, D.F-076, D.F-077, D.F-078, D.F-079, D.F-080, D.F-081, D.F-082, D.F-083, D.F-084, D.F-085, D.F-086, D.F-087, D.F-088, D.F-089, D.F-090, D.F-091, D.F-092, D.F-093, D.F-164, D.F-165, D.F-166, D.F-167, D.F-168, D.F-169, D.F-170
+
+Judged, so checked by hand at the gate and absent from `expected-fail.json`: D.F-050 (F-050, judged).
+
+### D steps that write nothing
+
+A D step counts as writing, and runs only on staging, unless this table says exactly `no`. The session that writes
+the test asks QA to list it here.
+
+| Step    | Writes |
+| ------- | ------ |
+| D.F-045 | no     |
+| D.F-048 | no     |
+| D.F-049 | no     |
+| D.F-067 | no     |
+| D.F-088 | no     |
 
 ## Defect index
 
@@ -339,5 +354,13 @@ Every register row and the steps that prove it closed.
 | F-160  | major   | J0.5a                                                 |
 | F-161  | major   | J0.5i                                                 |
 | F-162  | minor   | J0.5h                                                 |
+| F-163  | major   | J4.6                                                  |
+| F-164  | major   | D.F-164                                               |
+| F-165  | major   | D.F-165                                               |
+| F-166  | major   | D.F-166                                               |
+| F-167  | major   | D.F-167                                               |
+| F-168  | major   | D.F-168                                               |
+| F-169  | major   | D.F-169                                               |
+| F-170  | major   | D.F-170                                               |
 
-Rows in the index: 162. Steps named by the register that are not in the tables above: none.
+Rows in the index: 170. Steps named by the register that are not in the tables above: none.

@@ -332,33 +332,44 @@ export function ResultScreen({
         </div>
       )}
 
-      <Card href={map.href} className={styles.mapDoor}>
-        {map.nodes ? (
-          <div className={styles.mapThumb}>
-            <MapSvg nodes={map.nodes} positions={map.positions} className={styles.mapSvg} />
+      {map.served ? (
+        <Card href={map.href} className={styles.mapDoor}>
+          {map.nodes ? (
+            <div className={styles.mapThumb}>
+              <MapSvg nodes={map.nodes} positions={map.positions} className={styles.mapSvg} />
+            </div>
+          ) : null}
+          <div className={styles.mapText}>
+            <strong className={styles.doorTitle}>Explore the link map</strong>
+            <div className={`${layout.mut} ${styles.small} ${styles.mapSummary}`}>
+              {count(map.pages)} {plural(map.pages, 'page', 'pages')}, {count(map.links)}{' '}
+              {plural(map.links, 'link', 'links')}
+              {map.orphans === null
+                ? ''
+                : `, ${count(map.orphans)} ${plural(map.orphans, 'orphan', 'orphans')}`}
+              . Select any page to see what links to it, what it links to, and which crawlers can
+              reach it.
+              {map.nodes
+                ? ''
+                : ' No drawing was stored with this audit; the map is laid out when it opens.'}
+            </div>
           </div>
-        ) : null}
-        <div className={styles.mapText}>
-          <strong className={styles.doorTitle}>Explore the link map</strong>
-          <div className={`${layout.mut} ${styles.small} ${styles.mapSummary}`}>
-            {count(map.pages)} {plural(map.pages, 'page', 'pages')}, {count(map.links)}{' '}
-            {plural(map.links, 'link', 'links')}
-            {map.orphans === null
-              ? ''
-              : `, ${count(map.orphans)} ${plural(map.orphans, 'orphan', 'orphans')}`}
-            . Select any page to see what links to it, what it links to, and which crawlers can
-            reach it.
-            {map.nodes
-              ? ''
-              : ' No drawing was stored with this audit; the map is laid out when it opens.'}
+          <div className={styles.mapOpen}>
+            <Button presentational size="sm">
+              Open
+            </Button>
           </div>
-        </div>
-        <div className={styles.mapOpen}>
-          <Button presentational size="sm">
-            Open
-          </Button>
-        </div>
-      </Card>
+        </Card>
+      ) : (
+        <Card className={styles.mapDoor}>
+          <div className={styles.mapText}>
+            <strong className={styles.doorTitle}>No link map</strong>
+            <div className={`${layout.mut} ${styles.small} ${styles.mapSummary}`}>
+              No page was served, so there is no link map.
+            </div>
+          </div>
+        </Card>
+      )}
     </ResultShell>
   );
 }

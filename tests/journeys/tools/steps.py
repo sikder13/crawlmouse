@@ -20,8 +20,11 @@ MANUAL = {
  'F-140':['J0.5a'],'F-141':['J0.5b'],'F-142':['J0.5a'],'F-143':['J0.5b'],'F-144':['J0.5b'],'F-145':['J0.5a','J0.5b'],
  'F-146':['J0.1','J0.5i'],'F-147':['J1.10'],'F-148':['J0.5h'],'F-149':['J0.5b','J0.5h'],'F-150':['J0.5b'],
  'F-151':['J0.5h'],'F-152':['J0.5b'],'F-153':['J0.5b','J0.9j'],'F-154':['J0.9j'],'F-155':['J0.5b'],'F-156':['J0.5b'],
- 'F-157':['J2.3'],'F-158':['J0.9m'],'F-159':['J0.5a'],'F-160':['J0.5a'],'F-161':['J0.5i'],'F-162':['J0.5h'],
+ 'F-157':['J2.3'],'F-163':['J4.6'],'F-158':['J0.9m'],'F-159':['J0.5a'],'F-160':['J0.5a'],'F-161':['J0.5i'],'F-162':['J0.5h'],
 }
+
+# D steps declared read-only by the session writing them (A1 question 016, the consent PR).
+D_NO_WRITES = ['D.F-045', 'D.F-048', 'D.F-049', 'D.F-067', 'D.F-088']
 
 # Rows the register files under a parent step (J0.5, J0.8, J0.9, J1.12, J2.4, J4), placed on the sub-step the
 # CC-45 scorecard (sweep.md §3) names for them. A parent step's own list is the union of its sub-steps'.
@@ -42,10 +45,11 @@ SUBMAP = {
 }
 PARENTS = ['J0.5','J0.8','J0.9','J1.12','J2.4','J4']
 
-# Ids a step's test cannot observe (a judgement: positioning, legal wording, a published address). They stay in
+# Ids a step's test cannot observe (a judgement: positioning, legal wording, a published address; or F-050, a
+# server-side PostHog event a browser step cannot see). They stay in
 # STEPS.md, marked "(judged)", and out of expected-fail.json, so fixing an observable id never forces their deletion.
 JUDGED = {
- 'J0.9d':['F-072'], 'J0.9e':['F-072'], 'J0.9j':['F-153','F-154'], 'J0.9k':['F-033'],
+ 'D.F-050':['F-050'], 'J0.1':['F-061','F-062'], 'J0.9d':['F-072'], 'J0.9e':['F-072'], 'J0.9j':['F-153','F-154'], 'J0.9k':['F-033'],
 }
 
 def steps_of(fid, col):
@@ -184,15 +188,15 @@ J = {
  ('J3.8','Plan, seats and billing screens: extra seats, extra sites','They say what applies','desktop','no'),
  ('J3.9','Seeded `+agency`, `+agency-dev`, `+agencytrial`, `+demo`','Each dashboard matches the seed','desktop','no'),
 ]),
-'J4': ('Somebody else\'s data', 'two accounts A and B, A\'s removed member, signed out', [
- ('J4','Every address and request of A tried as B, as A\'s removed member and signed out; ids changed in addresses and bodies','Nothing private shown or changed; refusals say "belongs to an account", not "missing"','desktop','yes (it sends writes that must be refused)'),
- ('J4.1','A\'s site pages (incl. staging)','B 404 / signed out to sign-in','desktop','no'),
- ('J4.2','A\'s kept results: every tab, map, fixes, checks','Refused, with the right words','desktop','no'),
- ('J4.3','A\'s changes, alerts, reports, settings, plan, delete, seats, agency, billing','B sees only its own account','desktop','no'),
- ('J4.4','Export files and fix packets; email-developer','404 / 401','desktop','no'),
- ('J4.5','Share links and report pages','Open only what was shared; no pivot','desktop','no'),
- ('J4.6','Every API call in A\'s network log, replayed as B and signed out, with ids changed','Refused; no write crosses accounts','desktop','yes (it replays writes)'),
- ('J4.7','v1 API routes','410 or refused','desktop','no'),
+'J4': ('Somebody else\'s data', 'two accounts A and B, A\'s removed member, a user with no v2 account, signed out', [
+ ('J4','Every address and request of A tried as B, as A\'s removed member, signed in with no v2 account (a user with no active seat) and signed out; ids changed in addresses and bodies','Nothing private shown or changed; a refused id and a missing id get the same answer, so neither reveals the id exists','desktop','yes (it sends writes that must be refused)'),
+ ('J4.1','A\'s site pages (incl. staging)','B 404 / signed out to sign-in','desktop','yes (it creates test accounts)'),
+ ('J4.2','A\'s kept results: every tab, map, fixes, checks','The one 404 page a missing id gets, offering sign-in; nothing shows the id exists','desktop','yes (it creates test accounts)'),
+ ('J4.3','A\'s changes, alerts, reports, settings, plan, delete, seats, agency, billing','B sees only its own account','desktop','yes (it creates test accounts)'),
+ ('J4.4','Export files and fix packets; email-developer','404 / 401','desktop','yes (it creates test accounts)'),
+ ('J4.5','Share links and report pages','Open only what was shared; no pivot','desktop','yes (it creates test accounts)'),
+ ('J4.6','Every API call in A\'s network log, replayed as B, signed out, and signed in with no v2 account (a user with no active seat), with ids changed; each also with a random id that does not exist','Refused; no write crosses accounts; an existing private id and a missing id answer the same status and body','desktop','yes (it replays writes)'),
+ ('J4.7','v1 API routes','410 or refused','desktop','yes (it creates test accounts)'),
 ]),
 }
 SMOKE = [
@@ -256,10 +260,25 @@ w('')
 dsteps = sorted(s for s in by_step if s.startswith('D.'))
 w('## D — defects with no journey step')
 w('')
-w(f'{len(dsteps)} register rows name a stream, not a journey step. Each gets a dedicated test named `D.F-nnn`, written by')
+w(f'{len(dsteps)} register rows name a stream, not a journey step. Each, except a judged id, gets a dedicated test named `D.F-nnn`, written by')
 w('the session that fixes it (RULES §3 step 2), under `tests/journeys/d/`.')
 w('')
 w(', '.join(dsteps))
+w('')
+judged_d = sorted(k for k in JUDGED if k.startswith('D.'))
+w('Judged, so checked by hand at the gate and absent from `expected-fail.json`: ' + ', '.join(f'{d} ({", ".join(JUDGED[d])}, judged)' for d in judged_d) + '.')
+w('')
+missing = [d for d in D_NO_WRITES if d not in dsteps]
+assert not missing, f'D_NO_WRITES names no D step: {missing}'
+w('### D steps that write nothing')
+w('')
+w('A D step counts as writing, and runs only on staging, unless this table says exactly `no`. The session that writes')
+w('the test asks QA to list it here.')
+w('')
+w('| Step | Writes |')
+w('| --- | --- |')
+for d in D_NO_WRITES:
+    w(f'| {d} | no |')
 w('')
 w('## Defect index')
 w('')

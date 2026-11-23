@@ -11,7 +11,8 @@
  * may not publish the client (a developer) is 403 `role_refused` (CC-37 Q16). Only a `finished` check mints: a partial one is 409 `check_partial` (the snapshot has no place
  * for what was not measured), any other status 409 `check_not_finished`.
  *
- * Then, with the service role: the report already minted for the check is answered with its slug;
+ * Then, with the service role: a host with a taken-down report is 409 `host_taken_down`, whichever
+ * account or check that report was of. The report already minted for the check is answered with its slug;
  * otherwise the check is read back and its snapshot built (`buildPublicSnapshot`), and one row is
  * inserted, its `domain` the snapshot's host through `normalizeDomain`. The row sets neither `listed` nor `indexable`, so the column defaults make it unlisted
  * and noindex (`mint.db.test.ts` reads them back). A unique violation on the check
@@ -47,6 +48,8 @@ export interface MintV2Deps {
   /** Counts one mint against `key`'s bucket: MINT_REPORTS_PER_DAY a day, as v1's mint. */
   rateLimit(key: string): Promise<{ allowed: boolean }>;
   verifyTurnstile(token: string, ip?: string): Promise<boolean>;
+  /** Whether a public report of this site's host was taken down (`hostTakenDown`). Service role. */
+  hostTakenDown(siteId: string): Promise<boolean>;
   /** The slug of the report already minted for this check, or null. Service role. */
   slugForCheck(checkId: string): Promise<string | null>;
   /** The finished check read back and its snapshot built, with its site's account. Service role. */
@@ -102,6 +105,8 @@ export async function mintV2(
   if (!(await deps.mayMint(check.siteId))) return refuse(403, 'role_refused');
   if (check.status === 'partial') return refuse(409, 'check_partial');
   if (check.status !== 'finished') return refuse(409, 'check_not_finished');
+  // A takedown is about the host, so a later check of it may not publish it again.
+  if (await deps.hostTakenDown(check.siteId)) return refuse(409, 'host_taken_down');
 
   const existing = await deps.slugForCheck(checkId);
   if (existing) return answer(existing, true);

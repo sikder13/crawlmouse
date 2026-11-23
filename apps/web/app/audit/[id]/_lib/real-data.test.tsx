@@ -739,6 +739,24 @@ describe('/audit/[id]/map', () => {
     expect(dead(markup)).toEqual([]);
   });
 
+  it('a check whose pages all answered and none served says so, with no explorer', () => {
+    const refused: ReadyCheck = {
+      ...one,
+      dataset: {
+        ...one.dataset,
+        page_results: one.dataset.page_results.map((p) => ({ ...p, status_code: 403 })),
+      },
+    };
+    for (const scope of ['hubs', 'all'] as const) {
+      const markup = html(<MapBody read={refused} scope={scope} />);
+      expect(markup).toContain('No page was served.');
+      expect(markup).toContain('none served, so there is no link map');
+      expect(markup).not.toContain('pages crawled');
+      expect(markup).not.toContain('Find a page');
+      expect(dead(markup)).toEqual([]);
+    }
+  });
+
   it('a check with no page to draw shows a notice, with the way back', () => {
     const empty: ReadyCheck = {
       ...one,

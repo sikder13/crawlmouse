@@ -12,7 +12,7 @@
  * in the result, and the only email in it is the caller's own, from their session.
  *
  * Which account, for a person with several seats: the one their switcher cookie names when it is one
- * of those seats (CC-31 D2b, viewer-cookie.ts), else the default one. Nothing here writes
+ * of those seats (CC-31 D2b, viewer-cookie.ts), else `landingSeat`'s (viewer-read.ts). Nothing here writes
  * `users.default_account_id`, which stays the personal account (`prepare_email_undo` reads it so).
  */
 import 'server-only';
@@ -42,6 +42,17 @@ export async function loadViewer(): Promise<ViewerResult> {
   const {
     data: { user },
   } = await session.auth.getUser();
+  return viewerFor(session, user);
+}
+
+/**
+ * The viewer for a user a route has already read from `session` (`auth.getUser()`), with this
+ * request's switcher cookie: `loadViewer` without its own session read.
+ */
+export async function viewerFor(
+  session: SupabaseClient,
+  user: { id: string; email?: string | null } | null,
+): Promise<ViewerResult> {
   if (!user) return { kind: 'signed_out' };
   return readViewer(
     { session, admin: supabaseAdmin(), now: () => new Date() },
