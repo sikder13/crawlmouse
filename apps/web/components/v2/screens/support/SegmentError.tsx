@@ -1,8 +1,8 @@
 'use client';
 
-import * as Sentry from '@sentry/nextjs';
 import { usePathname, useRouter } from 'next/navigation';
 import { startTransition, useEffect, useState } from 'react';
+import { reportToSentry } from '../../../../lib/sentry-lazy';
 import { idsInPath, supportMailto } from '../../../../lib/v2/support/mailto';
 import { ErrorScreen } from './ErrorScreen';
 
@@ -27,7 +27,13 @@ export function SegmentError({ error, reset }: SegmentErrorProps) {
   const path = usePathname();
   const router = useRouter();
   useEffect(() => {
-    setEventId(Sentry.captureException(error));
+    let current = true;
+    void reportToSentry(error).then((id) => {
+      if (current) setEventId(id);
+    });
+    return () => {
+      current = false;
+    };
   }, [error]);
   const support = supportMailto({
     topic: 'error',

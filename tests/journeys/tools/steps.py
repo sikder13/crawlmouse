@@ -190,13 +190,13 @@ J = {
 ]),
 'J4': ('Somebody else\'s data', 'two accounts A and B, A\'s removed member, a user with no v2 account, signed out', [
  ('J4','Every address and request of A tried as B, as A\'s removed member, signed in with no v2 account (a user with no active seat) and signed out; ids changed in addresses and bodies','Nothing private shown or changed; a refused id and a missing id get the same answer, so neither reveals the id exists','desktop','yes (it sends writes that must be refused)'),
- ('J4.1','A\'s site pages (incl. staging)','B 404 / signed out to sign-in','desktop','no'),
- ('J4.2','A\'s kept results: every tab, map, fixes, checks','The one 404 page a missing id gets, offering sign-in; nothing shows the id exists','desktop','no'),
- ('J4.3','A\'s changes, alerts, reports, settings, plan, delete, seats, agency, billing','B sees only its own account','desktop','no'),
- ('J4.4','Export files and fix packets; email-developer','404 / 401','desktop','no'),
- ('J4.5','Share links and report pages','Open only what was shared; no pivot','desktop','no'),
+ ('J4.1','A\'s site pages (incl. staging)','B 404 / signed out to sign-in','desktop','yes (it creates test accounts)'),
+ ('J4.2','A\'s kept results: every tab, map, fixes, checks','The one 404 page a missing id gets, offering sign-in; nothing shows the id exists','desktop','yes (it creates test accounts)'),
+ ('J4.3','A\'s changes, alerts, reports, settings, plan, delete, seats, agency, billing','B sees only its own account','desktop','yes (it creates test accounts)'),
+ ('J4.4','Export files and fix packets; email-developer','404 / 401','desktop','yes (it creates test accounts)'),
+ ('J4.5','Share links and report pages','Open only what was shared; no pivot','desktop','yes (it creates test accounts)'),
  ('J4.6','Every API call in A\'s network log, replayed as B, signed out, and signed in with no v2 account (a user with no active seat), with ids changed; each also with a random id that does not exist','Refused; no write crosses accounts; an existing private id and a missing id answer the same status and body','desktop','yes (it replays writes)'),
- ('J4.7','v1 API routes','410 or refused','desktop','no'),
+ ('J4.7','v1 API routes','410 or refused','desktop','yes (it creates test accounts)'),
 ]),
 }
 SMOKE = [
