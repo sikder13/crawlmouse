@@ -8,7 +8,8 @@ import { openPreview } from './pages';
  * measured with a long one in the staging row, as a field and as its value.
  */
 const LIVE = '/v2-preview/screens/site?live=1';
-const LONG_HOST = 'staging.northwindoutfitterscompany-and-sons.myshopify.com';
+// No hyphen: a browser may already break a line at one, so a hyphenated host proves nothing here.
+const LONG_HOST = 'staging.northwindoutfitterscompanyandsons.myshopify.com';
 const WIDTHS = [390, 700, 760, 761, 900, 1000, 1280, 1301, 1366, 1440, 1536, 1600, 1602, 1920];
 
 async function measure(page: Page, host: string | null) {
