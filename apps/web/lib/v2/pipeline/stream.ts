@@ -179,8 +179,20 @@ export function withLiveCounts(
   live: { pages: number; links: number } | null,
 ): CheckFacts {
   if (live === null) return facts;
+  // Stored progress calls the whole first batch "homepage": it ends when a page has been read.
+  const onHomepage = facts.steps?.some((s) => s.phase === 'homepage' && s.state === 'now');
   return {
     ...facts,
+    steps:
+      live.pages > 0 && onHomepage
+        ? facts.steps!.map((s) =>
+            s.phase === 'homepage'
+              ? { ...s, state: 'done' }
+              : s.phase === 'crawl'
+                ? { ...s, state: 'now' }
+                : s,
+          )
+        : facts.steps,
     counts: {
       pages_crawled: (facts.counts?.pages_crawled ?? 0) + live.pages,
       links_found: (facts.counts?.links_found ?? 0) + live.links,

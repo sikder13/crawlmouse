@@ -17,6 +17,7 @@ import {
   START,
   batchEvents,
   checkEvents,
+  withLiveCounts,
   cursorFits,
   factsOf,
   formatCursor,
@@ -217,6 +218,45 @@ describe('nextEvents, against events written out by hand', () => {
     expect(checkEvents(at, running(2, 40, 500, 200)).events).toEqual([
       { type: 'counts', at_ms: 200, pages_crawled: 50, links_found: 500 },
     ]);
+  });
+
+  describe('the homepage step, while the first batch runs', () => {
+    const onHomepage: CheckFacts = {
+      status: 'running',
+      steps: [
+        { phase: 'robots_and_sitemap', state: 'done' },
+        { phase: 'homepage', state: 'now' },
+        { phase: 'crawl', state: 'next' },
+      ],
+      counts: null,
+      elapsedMs: 10,
+      waitingSinceMs: null,
+      discovered: null,
+    };
+
+    it('stays until a page has been read', () => {
+      const out = checkEvents(START, withLiveCounts(onHomepage, { pages: 0, links: 0 }));
+      expect(out.events.at(-1)).toEqual(stage('homepage', 'now', 10));
+    });
+
+    it('ends when the first page is read, and the crawl is under way', () => {
+      const out = checkEvents(START, withLiveCounts(onHomepage, { pages: 1, links: 0 }));
+      const stages = out.events.filter((e) => e.type === 'stage');
+      expect(stages.at(-2)).toEqual(stage('homepage', 'done', 10));
+      expect(stages.at(-1)).toEqual(stage('crawl', 'now', 10));
+    });
+
+    it('leaves a later step alone', () => {
+      const later: CheckFacts = {
+        ...onHomepage,
+        steps: [
+          { phase: 'homepage', state: 'done' },
+          { phase: 'crawl', state: 'done' },
+          { phase: 'crawler_tests', state: 'now' },
+        ],
+      };
+      expect(withLiveCounts(later, { pages: 3, links: 0 }).steps).toEqual(later.steps);
+    });
   });
 
   it('a running check is not taken past the crawler tests, whatever its stored steps say', () => {
