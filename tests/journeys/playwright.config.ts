@@ -22,7 +22,15 @@ export default defineConfig({
     ['list'],
     ['json', { outputFile: '../../apps/web/test-results/journeys/results.json' }],
   ],
-  use: { baseURL: base, trace: 'retain-on-failure', screenshot: 'only-on-failure' },
+  use: {
+    baseURL: base,
+    // A trace records request headers and URLs, so a run that holds a bypass cookie or sign-in links keeps none.
+    trace:
+      process.env.VERCEL_AUTOMATION_BYPASS_SECRET || process.env.JOURNEY_ALLOW_WRITES
+        ? 'off'
+        : 'retain-on-failure',
+    screenshot: 'only-on-failure',
+  },
   projects: [
     {
       name: 'desktop',
