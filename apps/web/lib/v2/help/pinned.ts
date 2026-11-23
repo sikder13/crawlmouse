@@ -36,7 +36,7 @@ export const VERDICT_LABELS: Readonly<
 > = {
   disallowed_by_robots: 'blocked by robots.txt',
   blocked_by_ua_rule: 'blocked by a rule',
-  refused_unverified: 'refused to every crawler name (unverified)',
+  refused_unverified: 'refused, no crawler name served (unverified)',
 };
 
 /** The robots.txt groups that bind the worker's requests. */

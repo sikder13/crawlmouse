@@ -755,7 +755,7 @@ function notServedCard(check: Check, statuses: readonly number[]): NoFixCard {
   const moved = codes.every((c) => c >= 300 && c < 400);
   const ai = check.crawlers.filter(isAi);
   const crawlers = meetsEdge(check)
-    ? 'The site’s edge refused or challenged our browser-identity request from Crawlmouse’s address, so the crawler requests were not sent.'
+    ? EDGE_METHOD
     : ai.every((c) => c.verdict === 'not_measured')
       ? `None of the ${numberWord(ai.length)} AI crawlers could be measured.`
       : null;

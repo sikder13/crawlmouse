@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Check, Verdict } from '@crawlmouse/types/v2';
 import { FIXTURE_NAMES, findCheck, fixture, type ViewDataset } from '../fixtures';
 import { CHECKS } from '../recordings';
+import { VERDICTS } from '../../../components/v2/verdicts';
 import { isAi, keptOutClauses, servedExtent } from '../sentences';
 import { accessPill, resultView } from './result';
 import { accessView } from './segment/access';
@@ -39,6 +40,13 @@ function withVerdicts(verdicts: Verdict[]): Check {
   });
   return c;
 }
+
+/** The clean-site dataset with this check in the place of its own. */
+const fixtureOf = (c: Check): ViewDataset => {
+  const d = structuredClone(fixture('clean-site')) as ViewDataset;
+  d.checks = d.checks.map((x) => (x.id === c.id ? c : x));
+  return d;
+};
 
 describe('a request in a crawler’s name is reported as that request', () => {
   it('reads every graded fixture check (the sweep is live)', () => {
@@ -84,7 +92,7 @@ describe('a request in a crawler’s name is reported as that request', () => {
     const c = withVerdicts(['refused_unverified']);
     const [clause] = keptOutClauses(c.crawlers.filter((x) => x.verdict === 'refused_unverified'));
     expect(clause).toMatch(
-      /was refused, as was every other crawler name we sent; this may be IP verification$/,
+      /was refused, and no other crawler name was served on the same pages; this may be IP verification$/,
     );
   });
 });
@@ -206,5 +214,48 @@ describe('the method line, on the Access screen', () => {
 
   it('promises no exact-string mode, which does not exist', () => {
     expect(method).not.toMatch(/Settings|exact strings/);
+  });
+});
+
+describe('what the crawler sentences may claim (review of PR 2a)', () => {
+  it('takes the extent of the crawlers the sentence names', () => {
+    const c = withVerdicts([]);
+    c.coverage!.pages_sampled = 5;
+    for (const x of c.crawlers.filter(isAi)) {
+      x.verdict = 'allowed';
+      x.evidence_class = 'simulated';
+      x.pages_measured = x.scored ? 5 : 2;
+    }
+    expect(c.crawlers.some((x) => isAi(x) && !x.scored)).toBe(true);
+    expect(
+      servedExtent(
+        c,
+        false,
+        c.crawlers.filter((x) => x.scored),
+      ),
+    ).toBe('');
+    expect(servedExtent(c)).toBe(', on 2 to 5 of the 5 sampled pages');
+  });
+
+  it('does not say every other crawler name was refused: only that none was served', () => {
+    const c = withVerdicts(['refused_unverified', 'challenged_ua', 'rate_limited']);
+    const said = [
+      ...keptOutClauses(c.crawlers.filter(isAi)),
+      JSON.stringify(accessView(fixtureOf(c), c.id).headline),
+    ];
+    expect(said.join(' ')).not.toMatch(/as was every|refused to every/);
+    expect(keptOutClauses(c.crawlers.filter(isAi)).join(' ')).toContain(
+      'no other crawler name was served on the same pages',
+    );
+    expect(VERDICTS.refused_unverified.label).not.toMatch(/every/);
+  });
+
+  it('does not say the crawler requests were not sent, or count an unmeasured crawler as served', () => {
+    const c = withVerdicts(['edge_blocks_automation']);
+    const headline = JSON.stringify(accessView(fixtureOf(c), c.id).headline);
+    expect(headline).not.toContain('were not sent');
+    expect(headline).toContain('no crawler request was measured on those pages');
+    expect(headline).toMatch(/the other \w+ AI crawlers/);
+    expect(headline).not.toMatch(/Requests with all /);
   });
 });

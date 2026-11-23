@@ -43,7 +43,7 @@ export const EDGE_SENTENCE =
  * What an edge that refuses automation shows, and what follows from it. The request it refused was
  * our browser-identity control, from our own address (F-145).
  */
-export const EDGE_METHOD = `${EDGE_SENTENCE}, so the crawler requests were not sent.`;
+export const EDGE_METHOD = `${EDGE_SENTENCE}, so no crawler request was measured on those pages.`;
 
 /** What a served crawler request proves: our request carrying its user agent was served (F-139). */
 export const servedAll = (n: number, kind: 'AI' | 'scored') =>
@@ -59,12 +59,16 @@ export const servedOthers = (n: number) =>
 /**
  * How many sampled pages a served verdict rests on, when that is less than the sample: a crawler can
  * read as served from one page in 25 (V2R question 010). Empty when each was measured on the whole
- * sample. `short` drops "the" and "sampled", for the pill.
+ * sample. `among` is the crawlers the sentence names. `short` drops "the" and "sampled", for the pill.
  */
-export function servedExtent(check: Pick<Check, 'crawlers' | 'coverage'>, short = false): string {
+export function servedExtent(
+  check: Pick<Check, 'crawlers' | 'coverage'>,
+  short = false,
+  among: readonly CrawlerResult[] = check.crawlers.filter(isAi),
+): string {
   const sampled = check.coverage?.pages_sampled ?? 0;
-  const read = check.crawlers
-    .filter((c) => isAi(c) && isAllowed(c.verdict) && c.evidence_class !== 'declared')
+  const read = among
+    .filter((c) => isAllowed(c.verdict) && c.evidence_class !== 'declared')
     .map((c) => Math.min(c.pages_measured, sampled));
   if (!read.length || read.every((n) => n >= sampled)) return '';
   const low = Math.min(...read);
@@ -98,8 +102,8 @@ function keptOut(verdict: Verdict, cause: AccessCause | null): [string, string] 
       return ['gets a challenge page', 'get a challenge page'];
     case 'refused_unverified':
       return [
-        'was refused, as was every other crawler name we sent; this may be IP verification',
-        'were refused, as was every other crawler name we sent; this may be IP verification',
+        'was refused, and no other crawler name was served on the same pages; this may be IP verification',
+        'were refused, and no other crawler name was served on the same pages; this may be IP verification',
       ];
     case 'rate_limited':
       return ['is rate limited', 'are rate limited'];
@@ -321,7 +325,9 @@ export function aiSummary(check: Check): string {
     entry.names.push(pagesOf(check, key));
     byReaders.set(uas.join('\n'), entry);
   }
-  if (!out.length && !byReaders.size) return allInSentence(scored, servedExtent(check));
+  if (!out.length && !byReaders.size) {
+    return allInSentence(scored, servedExtent(check, false, scored));
+  }
   const thin = [...byReaders.values()].map(({ uas, names }) => {
     const who =
       uas.length < inside.length
@@ -341,7 +347,10 @@ export function aiSummary(check: Check): string {
 export function aiShortSummary(check: Check): string {
   const out = keptOutClauses(scoredOf(check));
   const thin = thinSentence(check);
-  if (!out.length && !thin) return allInSentence(scoredOf(check), servedExtent(check));
+  if (!out.length && !thin) {
+    const scored = scoredOf(check);
+    return allInSentence(scored, servedExtent(check, false, scored));
+  }
   return [out.length ? `${capitalise(out.join('; '))}.` : null, thin].filter(Boolean).join(' ');
 }
 

@@ -401,19 +401,19 @@ Text for screen readers only. It is in the DOM and read in order, but takes no s
 
 From `apps/web/components/v2/verdicts.ts`. "FACTS" means `docs/design/v2/FACTS-proposed.md` sets it; "proposed" means it is not set there yet and changes in that file on a design ruling.
 
-| Verdict                  | Pill       | Glyph  | Glyph source | Label                                      | Label source |
-| ------------------------ | ---------- | ------ | ------------ | ------------------------------------------ | ------------ |
-| `allowed`                | ok         | ●      | FACTS        | allowed                                    | proposed     |
-| `allowed_thin`           | warn       | ▲      | FACTS        | allowed, thin                              | proposed     |
-| `disallowed_by_robots`   | bad        | ■      | FACTS        | blocked by robots.txt                      | proposed     |
-| `blocked_by_ua_rule`     | bad        | ■      | FACTS        | blocked by a rule                          | proposed     |
-| `challenged_ua`          | unverified | ○      | FACTS        | challenged: the real crawler may pass      | FACTS        |
-| `refused_unverified`     | unverified | ○      | FACTS        | refused to every crawler name (unverified) | FACTS        |
-| `rate_limited`           | warn       | ▲      | proposed     | rate limited                               | proposed     |
-| `payment_required`       | warn       | ▲      | proposed     | payment required                           | proposed     |
-| `edge_blocks_automation` | bad        | ■      | proposed     | blocks all automation                      | proposed     |
-| `redirected_away`        | warn       | ▲      | proposed     | redirected away                            | proposed     |
-| `not_measured`           | neutral    | (none) | proposed     | not measured                               | proposed     |
+| Verdict                  | Pill       | Glyph  | Glyph source | Label                                        | Label source |
+| ------------------------ | ---------- | ------ | ------------ | -------------------------------------------- | ------------ |
+| `allowed`                | ok         | ●      | FACTS        | allowed                                      | proposed     |
+| `allowed_thin`           | warn       | ▲      | FACTS        | allowed, thin                                | proposed     |
+| `disallowed_by_robots`   | bad        | ■      | FACTS        | blocked by robots.txt                        | proposed     |
+| `blocked_by_ua_rule`     | bad        | ■      | FACTS        | blocked by a rule                            | proposed     |
+| `challenged_ua`          | unverified | ○      | FACTS        | challenged: the real crawler may pass        | FACTS        |
+| `refused_unverified`     | unverified | ○      | FACTS        | refused, no crawler name served (unverified) | FACTS        |
+| `rate_limited`           | warn       | ▲      | proposed     | rate limited                                 | proposed     |
+| `payment_required`       | warn       | ▲      | proposed     | payment required                             | proposed     |
+| `edge_blocks_automation` | bad        | ■      | proposed     | blocks all automation                        | proposed     |
+| `redirected_away`        | warn       | ▲      | proposed     | redirected away                              | proposed     |
+| `not_measured`           | neutral    | (none) | proposed     | not measured                                 | proposed     |
 
 | Evidence class | Meaning                                           |
 | -------------- | ------------------------------------------------- |

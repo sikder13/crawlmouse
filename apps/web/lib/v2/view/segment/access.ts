@@ -226,8 +226,8 @@ function headlineTitle(check: Check): string {
     [n(is('blocked_by_ua_rule')), 'was refused by user agent', 'were refused by user agent', true],
     [
       n(is('refused_unverified')),
-      'was refused, as was every crawler name we sent',
-      'were refused, as was every crawler name we sent',
+      'was refused, with no other crawler name served on the same pages',
+      'were refused, with no other crawler name served on the same pages',
       true,
     ],
     [n(is('challenged_ua')), 'was challenged', 'were challenged', true],
@@ -269,7 +269,7 @@ function headlineBody(check: Check): string {
   }
   if (out.length) parts.push(`${capitalise(out.join('; '))}.`);
   if (allowed.length) {
-    const who = `${out.length === 0 ? servedAll(ai.length, 'AI') : servedOthers(allowed.length)}${servedExtent(check)}`;
+    const who = `${allowed.length === ai.length ? servedAll(ai.length, 'AI') : servedOthers(allowed.length)}${servedExtent(check)}`;
     parts.push(
       thin.length && readers.length
         ? `${who}; ${listOf(readers)} then read ${listOf(thin)} empty without JavaScript, covered in the next section.`

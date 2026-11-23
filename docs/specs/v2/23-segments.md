@@ -35,19 +35,19 @@ From `apps/web/app/(v2-preview)/v2-preview/_preview/registry.ts` and `segments.t
 
 From `apps/web/components/v2/verdicts.ts` and `pill-states.ts`, in the contract’s order. The phrase sits beside every cell of the crawler matrix; a verdict known from robots.txt alone (`allowed`, `declared`) adds “by robots.txt” (FACTS B2). `apps/web/__tests__/v2/verdict-copy-guard.test.tsx` renders every segment page for every fixture and fails if “blocked” appears beside any verdict but the two marked here, or if a verdict lacks its phrase or glyph.
 
-| Verdict                  | Glyph | Phrase                                     | Says “blocked” | Phrase set by                     |
-| ------------------------ | ----- | ------------------------------------------ | -------------- | --------------------------------- |
-| `allowed`                | ●     | allowed                                    | no             | proposed here (R7 §4 design item) |
-| `allowed_thin`           | ▲     | allowed, thin                              | no             | proposed here (R7 §4 design item) |
-| `disallowed_by_robots`   | ■     | blocked by robots.txt                      | yes            | proposed here (R7 §4 design item) |
-| `blocked_by_ua_rule`     | ■     | blocked by a rule                          | yes            | proposed here (R7 §4 design item) |
-| `challenged_ua`          | ○     | challenged: the real crawler may pass      | no             | FACTS                             |
-| `refused_unverified`     | ○     | refused to every crawler name (unverified) | no             | FACTS                             |
-| `rate_limited`           | ▲     | rate limited                               | no             | proposed here (R7 §4 design item) |
-| `payment_required`       | ▲     | payment required                           | no             | proposed here (R7 §4 design item) |
-| `edge_blocks_automation` | ■     | blocks all automation                      | no             | proposed here (R7 §4 design item) |
-| `redirected_away`        | ▲     | redirected away                            | no             | proposed here (R7 §4 design item) |
-| `not_measured`           | none  | not measured                               | no             | proposed here (R7 §4 design item) |
+| Verdict                  | Glyph | Phrase                                       | Says “blocked” | Phrase set by                     |
+| ------------------------ | ----- | -------------------------------------------- | -------------- | --------------------------------- |
+| `allowed`                | ●     | allowed                                      | no             | proposed here (R7 §4 design item) |
+| `allowed_thin`           | ▲     | allowed, thin                                | no             | proposed here (R7 §4 design item) |
+| `disallowed_by_robots`   | ■     | blocked by robots.txt                        | yes            | proposed here (R7 §4 design item) |
+| `blocked_by_ua_rule`     | ■     | blocked by a rule                            | yes            | proposed here (R7 §4 design item) |
+| `challenged_ua`          | ○     | challenged: the real crawler may pass        | no             | FACTS                             |
+| `refused_unverified`     | ○     | refused, no crawler name served (unverified) | no             | FACTS                             |
+| `rate_limited`           | ▲     | rate limited                                 | no             | proposed here (R7 §4 design item) |
+| `payment_required`       | ▲     | payment required                             | no             | proposed here (R7 §4 design item) |
+| `edge_blocks_automation` | ■     | blocks all automation                        | no             | proposed here (R7 §4 design item) |
+| `redirected_away`        | ▲     | redirected away                              | no             | proposed here (R7 §4 design item) |
+| `not_measured`           | none  | not measured                                 | no             | proposed here (R7 §4 design item) |
 
 ## Recommendation classes
 
