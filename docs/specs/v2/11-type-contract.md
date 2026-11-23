@@ -1235,7 +1235,7 @@ What limited a batch, once each; `kind` names the variant.
 | RobotsWhy      | `client_error`, `html_soft_404`, `server_error`, `timeout`, `network`, `challenged`, `byte_budget`, `redirect_status`, `bytes`, `rules` |
 | SiteStopReason | `three_429_responses`, `four_consecutive_challenged_pages`                                                                              |
 | BudgetKind     | `requests`, `bytes`, `seconds`                                                                                                          |
-| NotReadReason  | `parse_depth_exceeded`, `reader_thread_crashed`, `reader_deadline`, `reader_error`                                                      |
+| NotReadReason  | `parse_depth_exceeded`, `reader_thread_crashed`, `reader_deadline`, `reader_error`, `reader_stopped_for_host`                           |
 
 ## Fields added beyond the brief
 
