@@ -1,3 +1,7 @@
+/** Pages answered and none with a 200: there was no page to read, so no link map to draw. */
+export const noPageServed = (statuses: readonly (number | null)[]): boolean =>
+  statuses.length > 0 && !statuses.includes(200);
+
 /**
  * What the Result page's third card may say when a check has no fix. "No fix" alone proves nothing: a
  * check that read nothing has none. So the card says all-clear only on what was measured.

@@ -12,6 +12,7 @@
  * `generated` replaces the drawing with one that is no audit's (the 2,000-node preview); no page in
  * it has a record. Above EXPLORER_SVG_MAX nodes the screen draws on a canvas.
  */
+import { noPageServed } from './no-fix-card';
 import { noFixWords, sectionMeasured } from './section-measured';
 import type { Check, CrawlerResult, FixtureDataset, PageResult } from '@crawlmouse/types/v2';
 import { findCheck, fixesAsOf, siteOf } from '../fixtures';
@@ -109,6 +110,8 @@ export interface MapFilter {
 }
 
 export interface LinkMapView {
+  /** Pages answered and none was served: `title` and `caption` say so, and nothing is drawn. */
+  noneServed: boolean;
   frame: {
     domain: string;
     overview: string;
@@ -367,9 +370,14 @@ export function linkMapView(
   let drawnScope: 'hubs' | 'all' | 'generated';
   // Whether `all` was laid out here from the record, which leaves out a page no link path reaches.
   let fromRecord = false;
+  // Pages that answered without serving anything are not a map of the site.
+  const noneServed = !generated && noPageServed(records.map((p) => p.status_code));
   if (generated) {
     drawing = generated;
     drawnScope = 'generated';
+  } else if (noneServed) {
+    drawing = { nodes: [], positions: {} };
+    drawnScope = 'all';
   } else if (scope === 'hubs' && records.length) {
     if (stored) {
       drawing = stored;
@@ -484,6 +492,7 @@ export function linkMapView(
   // With no link read, the counts below are zeros that say nothing.
   const noLinkRead = !isGenerated && !sectionMeasured(check, 'structure');
   return {
+    noneServed,
     frame: {
       domain: siteOf(d, check).host,
       overview: hrefs.overview,
@@ -504,12 +513,16 @@ export function linkMapView(
         href: `${hrefs.segment('structure')}#fixes`,
       },
     },
-    title: `${count(pageCount)} ${plural(pageCount, 'page', 'pages')}, ${count(linkCount)} ${plural(linkCount, 'link', 'links')}.`,
-    caption: noLinkRead
-      ? `${count(crawled)} ${plural(crawled, 'page', 'pages')} crawled; no internal link between them was read.`
-      : caption,
+    title: noneServed
+      ? 'No page was served.'
+      : `${count(pageCount)} ${plural(pageCount, 'page', 'pages')}, ${count(linkCount)} ${plural(linkCount, 'link', 'links')}.`,
+    caption: noneServed
+      ? `${count(records.length)} ${plural(records.length, 'page', 'pages')} answered, none served, so there is no link map.`
+      : noLinkRead
+        ? `${count(crawled)} ${plural(crawled, 'page', 'pages')} crawled; no internal link between them was read.`
+        : caption,
     explore:
-      drawnScope === 'hubs'
+      drawnScope === 'hubs' && !noneServed
         ? { label: `Explore all ${count(crawled)}`, href: hrefs.map?.all ?? '#' }
         : null,
     filters: noLinkRead

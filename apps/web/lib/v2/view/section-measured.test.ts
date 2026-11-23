@@ -81,7 +81,7 @@ describe('no screen says a section is clean when it read nothing', () => {
     expect(resultView(b.d, b.id, { map: null }).map.orphans).toBeNull();
     const map = linkMapView(b.d, b.id, { scope: 'all' });
     expect(map.filters).toEqual([]);
-    expect(map.caption).toBe('2 pages crawled; no internal link between them was read.');
+    expect(map.caption).toBe('2 pages answered, none served, so there is no link map.');
     const v = structureView(b.d, b.id, {}, null);
     expect(v.coverage).toMatchObject({ tested: 0, groups: 0 });
     expect(v.tiles.find((t) => t.label === 'Orphan pages')!.value).toBe('—');

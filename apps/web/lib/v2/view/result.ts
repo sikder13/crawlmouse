@@ -24,7 +24,7 @@ import {
   pagesReadable,
 } from './effect-headline';
 import { openFixes, type FixPlan } from './free-fixes';
-import { noFixKind, servedWord } from './no-fix-card';
+import { noFixKind, noPageServed, servedWord } from './no-fix-card';
 import {
   anySectionMeasured,
   everySectionMeasured,
@@ -153,6 +153,8 @@ export interface ResultView {
   fixes: { total: number; open: number; pro: number; rows: FixRowView[] } | null;
   crawlers: CrawlerRowView[] | null;
   map: {
+    /** False when pages answered and none was served: there is no link map to offer. */
+    served: boolean;
     pages: number;
     links: number;
     /** Null when no link was read: zero would read as none found. */
@@ -344,8 +346,9 @@ function withoutJsDoor(
 ): DoorView {
   // FACTS K9: the free result measures a sample; Pro measures every page. A sample that was
   // every page leaves Pro nothing more to offer here.
+  // On a section that was not measured there is no measurement for Pro to extend.
   const footer =
-    coverage.tested < coverage.total
+    check.without_js && coverage.tested < coverage.total
       ? `Every page measured with Pro · ${fixCount(check, fixes, SECTIONS.withoutJs!, isOpen)}`
       : fixCount(check, fixes, SECTIONS.withoutJs!, isOpen);
   // The check holds no site-wide share. Why is not in the check, so the door does not say why.
@@ -1125,6 +1128,7 @@ export function resultView(
       : null,
     crawlers: clean || withheld ? crawlerRows(check) : null,
     map: {
+      served: !noPageServed(statuses),
       pages: coverage.pages_crawled,
       links: check.structure!.internal_links,
       // With no link read, a zero would read as none found.
