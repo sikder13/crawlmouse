@@ -3,6 +3,8 @@ import { notFound, redirect } from 'next/navigation';
 import { LiveActions } from '@/components/v2/screens/account/LiveActions';
 import { TrialEndedScreen, TrialEndScreen } from '@/components/v2/screens/trial-end/TrialEndScreen';
 import { checksPublicEnabled } from '@/lib/auth/flags';
+import { supabaseAdmin } from '@/lib/supabase/admin';
+import { mintedLinks } from '@/lib/v2/account/public-links';
 import { readSettingsPage } from '@/lib/v2/account/settings-pages';
 import { trialPage } from '@/lib/v2/view/trial-end';
 
@@ -20,7 +22,16 @@ export default async function TrialEndedPage() {
   const page = await readSettingsPage();
   if (page.kind === 'signed_out') redirect('/login');
   if (page.kind === 'none') notFound();
-  const shown = trialPage(page.d, page.viewer, { billingEnd: page.billingEnd, role: page.role });
+  // The links a v2 mint wrote, for this reader's sites: the page says those keep working.
+  const links = await mintedLinks(
+    supabaseAdmin(),
+    page.viewer.accountId,
+    page.d.sites.map((s) => s.id),
+  );
+  const shown = trialPage({ ...page.d, reports: [...page.d.reports, ...links] }, page.viewer, {
+    billingEnd: page.billingEnd,
+    role: page.role,
+  });
   if (shown === null) redirect(page.role === 'owner' ? '/settings/plan' : '/dashboard');
   return (
     <LiveActions>

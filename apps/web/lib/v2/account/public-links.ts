@@ -3,6 +3,7 @@
  * caller establishes the account and its site ids through their own session first.
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { normalizeDomain } from '../../domain';
 import type { AccountDataset } from '../view/account';
 
 type Report = AccountDataset['reports'][number];
@@ -58,23 +59,35 @@ export async function mintedLinks(
   return ((data ?? []) as MintedRow[]).map((r) => asReport(r, accountId));
 }
 
+/** Whether a seat that may publish can be offered a new link for this site. */
+export type LinkGate = 'open' | 'withdrawn' | 'unknown';
+
 /**
- * Whether a link of this site was hidden or taken down. The page then offers no new one: a mint
- * would publish the host again, and for the withdrawn check it would answer the old slug and change
- * nothing. Answers true when it cannot tell, so a failed read cannot offer a republication.
+ * A takedown is about a host, so one on any report of this domain closes it: a v1 report (which has
+ * no site id), a site removed and added again, a `www.` sibling, another account's site. A hide is
+ * the site's own: anyone can mint and hide a v1 report for a domain, so a hide elsewhere must not
+ * close it for its owner. `unknown` when a read fails, which offers no new link either.
  */
-export async function siteLinkWithdrawn(
+export async function siteLinkGate(
   admin: SupabaseClient,
   accountId: string,
-  siteId: string,
-): Promise<boolean> {
-  const { data, error } = await admin
-    .from('public_reports')
-    .select('hidden_at, takedown_requested_at')
-    .eq('site_id', siteId)
-    .eq('account_id', accountId);
-  if (error) return true;
-  return (
-    (data ?? []) as { hidden_at: string | null; takedown_requested_at: string | null }[]
-  ).some((r) => r.hidden_at !== null || r.takedown_requested_at !== null);
+  site: { id: string; host: string },
+): Promise<LinkGate> {
+  const [takenDown, hidden] = await Promise.all([
+    admin
+      .from('public_reports')
+      .select('slug')
+      .eq('domain', normalizeDomain(site.host))
+      .not('takedown_requested_at', 'is', null)
+      .limit(1),
+    admin
+      .from('public_reports')
+      .select('slug')
+      .eq('site_id', site.id)
+      .eq('account_id', accountId)
+      .not('hidden_at', 'is', null)
+      .limit(1),
+  ]);
+  if (takenDown.error || hidden.error) return 'unknown';
+  return (takenDown.data ?? []).length + (hidden.data ?? []).length > 0 ? 'withdrawn' : 'open';
 }

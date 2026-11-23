@@ -35,8 +35,7 @@ import {
 import { dashboardView } from '../view/dashboard';
 import { sitePage, siteView } from '../view/site';
 import { loadAccountDataset } from './dataset';
-import { siteLinkWithdrawn } from './public-links';
-import { loadSettingsDataset } from './settings-dataset';
+import { siteLinkGate } from './public-links';
 
 let db: PGlite;
 let built: BuiltCheck;
@@ -286,31 +285,72 @@ describe('the public links a v2 mint wrote (F-123)', () => {
     });
   });
 
-  it('Trial ending’s dataset reads the same live links', async () => {
-    const { d } = await loadSettingsDataset(
-      {
-        session: postgrestOver(db, { as: { userId: owner.userId } }),
-        admin: postgrestOver(db),
-        records: pgliteCheckReader(db),
-      },
-      owner.accountId,
-      NOW,
-    );
-    expect(d.reports.map((r) => r.public_slug).sort()).toEqual(['scoped-link', 'shown-link']);
-  });
+  describe('whether a new link may be offered', () => {
+    const admin = () => postgrestOver(db);
+    const report = (
+      slug: string,
+      domain: string,
+      column: string,
+      siteId: string | null,
+      accountId: string | null,
+    ) =>
+      db.query(
+        `insert into public.public_reports (slug, site_id, account_id, domain, ${column})
+         values ($1, $2, $3, $4, now())`,
+        [slug, siteId, accountId, domain],
+      );
+    const newSite = async (host: string) => {
+      const id = randomUUID();
+      await db.query(`insert into public.sites (id, account_id, host) values ($1, $2, $3)`, [
+        id,
+        owner.accountId,
+        host,
+      ]);
+      return { id, host };
+    };
 
-  it('knows when one of a site’s links was withdrawn, and says so when it cannot read', async () => {
-    const admin = postgrestOver(db);
-    expect(await siteLinkWithdrawn(admin, owner.accountId, mainSite)).toBe(true);
-    expect(await siteLinkWithdrawn(admin, owner.accountId, OTHER_SITE)).toBe(false);
-    const broken = {
-      from: () => ({
-        select: () => ({
-          eq: () => ({ eq: async () => ({ data: null, error: { message: 'down' } }) }),
-        }),
-      }),
-    } as unknown as typeof admin;
-    expect(await siteLinkWithdrawn(broken, owner.accountId, OTHER_SITE)).toBe(true);
+    it('is open with nothing withdrawn', async () => {
+      expect(await siteLinkGate(admin(), owner.accountId, await newSite('clear.example'))).toBe(
+        'open',
+      );
+    });
+
+    it('a takedown closes the host, on a v1 row with no site id', async () => {
+      const site = await newSite('taken-v1.example');
+      await report('v1-down', 'taken-v1.example', 'takedown_requested_at', null, null);
+      expect(await siteLinkGate(admin(), owner.accountId, site)).toBe('withdrawn');
+    });
+
+    it('a takedown closes a www sibling and a host added again under a new id', async () => {
+      await report('www-down', 'sibling.example', 'takedown_requested_at', null, null);
+      const www = await newSite('www.sibling.example');
+      expect(await siteLinkGate(admin(), owner.accountId, www)).toBe('withdrawn');
+    });
+
+    it('a site’s own hidden link closes it', async () => {
+      const site = await newSite('hidden-own.example');
+      await report('own-hidden', 'hidden-own.example', 'hidden_at', site.id, owner.accountId);
+      expect(await siteLinkGate(admin(), owner.accountId, site)).toBe('withdrawn');
+    });
+
+    it('someone else’s hide of the same domain does not close it for its owner', async () => {
+      const site = await newSite('hidden-elsewhere.example');
+      await report('v1-hidden', 'hidden-elsewhere.example', 'hidden_at', null, null);
+      expect(await siteLinkGate(admin(), owner.accountId, site)).toBe('open');
+    });
+
+    it('a failed read is unknown, not open', async () => {
+      const failing = () => {
+        const q: Record<string, unknown> = {};
+        for (const m of ['select', 'eq', 'not']) q[m] = () => q;
+        q.limit = async () => ({ data: null, error: { message: 'down' } });
+        return q;
+      };
+      const broken = { from: failing } as unknown as ReturnType<typeof admin>;
+      expect(
+        await siteLinkGate(broken, owner.accountId, { id: OTHER_SITE, host: 'x.example' }),
+      ).toBe('unknown');
+    });
   });
 
   it('a seat scoped to one site reads only that site’s link', async () => {

@@ -467,8 +467,8 @@ export function nextCheckLine(
 
 export interface SiteOptions {
   allFixes?: boolean;
-  /** A link of this site was hidden or taken down (`siteLinkWithdrawn`): no new one is offered. */
-  linkWithdrawn?: boolean;
+  /** Whether a new public link may be offered (`siteLinkGate`). Only `open` offers one. */
+  linkGate?: 'open' | 'withdrawn' | 'unknown';
 }
 
 export function siteView(
@@ -476,7 +476,7 @@ export function siteView(
   viewer: Viewer,
   siteId: string,
   next?: NextChecks,
-  { allFixes = false, linkWithdrawn = false }: SiteOptions = {},
+  { allFixes = false, linkGate = 'open' }: SiteOptions = {},
 ): SiteView {
   const v = viewAt(d, viewer);
   const zone = zoneOf(v);
@@ -568,7 +568,7 @@ export function siteView(
   // Only a finished check mints, and `seat_may('mint_report')` holds for the roles that run sites.
   const mintCheckId =
     manage &&
-    !linkWithdrawn &&
+    linkGate === 'open' &&
     result.status === 'finished' &&
     !publicLinks.some((r) => r.covers_check_ids.includes(result.id))
       ? result.id
@@ -731,15 +731,15 @@ export function siteView(
               },
             ]
           : []),
-        ...(publicLink?.public_slug || mintCheckId || (manage && linkWithdrawn)
+        ...(publicLink?.public_slug || mintCheckId || (manage && linkGate !== 'open')
           ? [
               {
                 label: 'Public link',
                 value: publicLink?.public_slug
                   ? `crawlmouse.com/r/${publicLink.public_slug}`
-                  : linkWithdrawn
-                    ? SITE_COPY.publicLink.withdrawn
-                    : SITE_COPY.publicLink.none,
+                  : linkGate === 'open'
+                    ? SITE_COPY.publicLink.none
+                    : SITE_COPY.publicLink[linkGate],
                 mono: Boolean(publicLink?.public_slug),
                 muted: false,
                 action: publicLink?.public_slug

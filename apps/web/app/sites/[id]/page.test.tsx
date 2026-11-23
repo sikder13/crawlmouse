@@ -145,6 +145,31 @@ describe('/sites/[id] with V2_CHECKS_PUBLIC=1', () => {
     expect(page.type).toBe(SiteScreen);
   });
 
+  it('a taken-down report of this host: the page offers no new public link', async () => {
+    vi.stubEnv('V2_CHECKS_PUBLIC', '1');
+    const row = async () => {
+      const page = children(await open(kept));
+      const { data } = page.props as unknown as {
+        data: {
+          settings: { rows: { label: string; publicLink?: { mintCheckId: string | null } }[] };
+        };
+      };
+      return data.settings.rows.find((r) => r.label === 'Public link');
+    };
+    expect((await row())?.publicLink?.mintCheckId).toEqual(expect.any(String));
+    const { rows } = await db.query<{ host: string }>(
+      `select host from public.sites where id = $1`,
+      [kept],
+    );
+    await db.query(
+      `insert into public.public_reports (slug, domain, takedown_requested_at)
+       values ('page-test-down', $1, now())`,
+      [rows[0]!.host],
+    );
+    expect((await row())?.publicLink?.mintCheckId).toBeNull();
+    await db.query(`delete from public.public_reports where slug = 'page-test-down'`);
+  });
+
   it('names the next check at the time sites.next_check_at holds (CC-28 D8)', async () => {
     vi.stubEnv('V2_CHECKS_PUBLIC', '1');
     await db.query(

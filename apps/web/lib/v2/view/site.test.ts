@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { fixture } from '../fixtures';
 import { parseReportRequest } from '../reports/generate-request';
+import { siteUrl } from '../../site-url';
 import { SITE_COPY } from '../copy/site';
 import { axisLabels, move } from './checks';
 import { siteView } from './site';
@@ -234,13 +235,13 @@ describe('the site’s public link (F-123)', () => {
 
   it('a developer sees a link that exists and is offered no new one', () => {
     const r = row(asRole(bad, 'developer'), owner.id)!;
-    expect(r.publicLink?.url).toBe('https://crawlmouse.com/r/example-outfitter-25oct');
+    expect(r.publicLink?.url).toBe(siteUrl('/r/example-outfitter-25oct'));
     expect(r.publicLink?.mintCheckId).toBeNull();
   });
 
   it('a link of an earlier check is shown, with a new one offered for the latest', () => {
     expect(latest.settings.rows.find((r) => r.label === 'Public link')!.publicLink).toEqual({
-      url: 'https://crawlmouse.com/r/example-outfitter-25oct',
+      url: siteUrl('/r/example-outfitter-25oct'),
       mintCheckId: latestCheck.id,
     });
   });
@@ -256,22 +257,30 @@ describe('the site’s public link (F-123)', () => {
     };
     const r = row({ ...bad, reports: [...bad.reports, newest] })!;
     expect(r.publicLink).toEqual({
-      url: 'https://crawlmouse.com/r/newest-link',
+      url: siteUrl('/r/newest-link'),
       mintCheckId: null,
     });
   });
 
   it('after a link is withdrawn, an owner is told so and offered no new one', () => {
     const r = siteView(noLinks, { accountId: BAD_ACCOUNT, now: bad.as_of }, OUTFITTER, undefined, {
-      linkWithdrawn: true,
+      linkGate: 'withdrawn',
     }).settings.rows.find((x) => x.label === 'Public link')!;
     expect(r.value).toBe(SITE_COPY.publicLink.withdrawn);
     expect(r.publicLink).toEqual({ url: null, mintCheckId: null });
   });
 
+  it('when the check could not be made, it says so and offers none', () => {
+    const r = siteView(noLinks, { accountId: BAD_ACCOUNT, now: bad.as_of }, OUTFITTER, undefined, {
+      linkGate: 'unknown',
+    }).settings.rows.find((x) => x.label === 'Public link')!;
+    expect(r.value).toBe(SITE_COPY.publicLink.unknown);
+    expect(r.publicLink).toEqual({ url: null, mintCheckId: null });
+  });
+
   it('a live link beside a withdrawn one is shown, and no new one is offered', () => {
     const r = siteView(bad, { accountId: BAD_ACCOUNT, now: bad.as_of }, OUTFITTER, undefined, {
-      linkWithdrawn: true,
+      linkGate: 'withdrawn',
     }).settings.rows.find((x) => x.label === 'Public link')!;
     expect(r.publicLink?.url).toContain('/r/example-outfitter-25oct');
     expect(r.publicLink?.mintCheckId).toBeNull();
@@ -283,7 +292,7 @@ describe('the site’s public link (F-123)', () => {
       { accountId: BAD_ACCOUNT, now: bad.as_of, seatId: owner.id },
       OUTFITTER,
       undefined,
-      { linkWithdrawn: true },
+      { linkGate: 'withdrawn' },
     );
     expect(v.settings.rows.find((x) => x.label === 'Public link')).toBeUndefined();
   });

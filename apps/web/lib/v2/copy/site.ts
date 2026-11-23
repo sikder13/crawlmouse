@@ -56,7 +56,8 @@ export const SITE_COPY = {
   /** The site's public link (F-123). A v2 mint is unlisted and noindex (`lib/v2/reports/mint.ts`). */
   publicLink: {
     none: 'None yet. A link shows this check to anyone who has it. A new one is unlisted, and search engines are told not to index it.',
-    withdrawn: `A public link for this site was withdrawn, so a new one cannot be made here. Email ${SUPPORT_EMAIL} to restore it.`,
+    withdrawn: `A public link for this site was withdrawn, so a new one cannot be made here. Email ${SUPPORT_EMAIL} if you think that is a mistake.`,
+    unknown: 'Public links could not be checked just now. Reload this page to try again.',
     create: 'Create a public link',
     update: 'New link for the latest check',
     copy: 'Copy link',

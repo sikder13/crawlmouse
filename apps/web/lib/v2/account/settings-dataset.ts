@@ -39,7 +39,6 @@ import { cardFor, type CardsOnFile } from './card';
 import { sitesInScope } from '../agency/guard';
 import { agencyTrialConsentAt } from './trial-consent';
 import { accountFromRow, seatsFromRows } from './rows';
-import { mintedLinks } from './public-links';
 
 export interface SettingsDatasetDeps {
   /** The caller's own client: row security applies. */
@@ -246,7 +245,7 @@ export async function loadSettingsDataset(
     fix_events: eventRows.map(fixEventFromRow),
     changes: changeRows.map(changeFromRow),
     alert_rules: [...accountRules, ...siteRules].map(alertRuleFromRow),
-    reports: [...reportRows.map(reportFromRow), ...(await mintedLinks(admin, accountId, siteIds))],
+    reports: reportRows.map(reportFromRow),
     lineages: [],
     usage_events: [],
     withheld: [],
