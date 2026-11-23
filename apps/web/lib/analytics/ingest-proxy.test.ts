@@ -83,10 +83,23 @@ describe('what the proxy sends to PostHog', () => {
     }
   });
 
-  it('gives the upstream call a time limit', async () => {
-    const f = upstream();
-    await proxyIngest(post('/ingest/e/'), f);
-    expect(f.mock.calls[0]![1]!.signal).toBeInstanceOf(AbortSignal);
+  it('gives up on an upstream that does not answer within ten seconds', async () => {
+    const clock = new AbortController();
+    const timeout = vi.spyOn(AbortSignal, 'timeout').mockReturnValue(clock.signal);
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const f = vi.fn(
+      (_url: string | URL | Request, init?: RequestInit) =>
+        new Promise<Response>((_, reject) => {
+          init!.signal!.addEventListener('abort', () => reject(new Error('timed out')));
+        }),
+    );
+    const answer = proxyIngest(post('/ingest/e/'), f);
+    await vi.waitFor(() => expect(f).toHaveBeenCalledTimes(1));
+    expect(timeout).toHaveBeenCalledWith(10_000);
+    clock.abort();
+    expect((await answer).status).toBe(502);
+    timeout.mockRestore();
+    logged.mockRestore();
   });
 
   it('does not follow a redirect', async () => {
