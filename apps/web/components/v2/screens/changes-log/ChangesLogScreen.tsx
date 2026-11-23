@@ -1,7 +1,7 @@
 import { Card } from '../../Card';
 import type { ChangesLogView, FilterLinkView } from '../../../../lib/v2/view/changes-log';
 import { AccountFrame } from '../account/AccountFrame';
-import { ChangeTable } from '../segment/ChangesScreen';
+import { ChangesLogTable } from './ChangesLogTable';
 import shared from '../account/AccountScreen.module.css';
 import styles from './ChangesLogScreen.module.css';
 
@@ -56,7 +56,7 @@ export function ChangesLogScreen({ data }: { data: ChangesLogView }) {
       </Card>
       <Card as="section" className={shared.panel}>
         {data.rows.length ? (
-          <ChangeTable label={data.tableLabel} rows={data.rows} />
+          <ChangesLogTable label={data.tableLabel} rows={data.rows} />
         ) : (
           <p className={styles.empty}>{data.empty}</p>
         )}

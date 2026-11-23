@@ -51,3 +51,48 @@
   color: var(--v2-fg2);
   font-size: var(--v2-text-ui);
 }
+
+/* F-100: five columns that fit beside the rail from 1101px. Narrower, each keeps a readable width
+   and the table scrolls in its region (DESIGN-LOCK §7.7). */
+.stack {
+  display: grid;
+  gap: 2px;
+  min-width: 8rem;
+}
+
+.host {
+  overflow-wrap: anywhere;
+}
+
+.under {
+  display: block;
+  color: var(--v2-mut);
+  font-size: var(--v2-text-micro);
+}
+
+.what {
+  min-width: 12rem;
+}
+
+.cause {
+  display: block;
+  min-width: 14rem;
+}
+
+.cause .under {
+  margin-top: 6px;
+}
+
+@media (min-width: 1101px) {
+  .stack {
+    min-width: 10rem;
+  }
+
+  .what {
+    min-width: 10rem;
+  }
+
+  .cause {
+    min-width: 11rem;
+  }
+}

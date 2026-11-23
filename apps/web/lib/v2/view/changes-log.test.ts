@@ -187,7 +187,7 @@ describe('a first audit in the Changes log (F-100)', () => {
     const v = log();
     const row = v.rows.find((r) => r.key.startsWith('first-audit-'))!;
     expect(row.cause).toBe(
-      'What the first audit found. Each later check is compared with the one before it.',
+      'What the first audit found. Later changes are listed as their own rows.',
     );
   });
 
@@ -208,7 +208,7 @@ describe('a first audit in the Changes log (F-100)', () => {
     const v = changesLogView({ ...d, checks: [...d.checks, again] }, viewer, {}, BASE);
     expect(v.headline).toBe('One first audit. No later check has found a change.');
     expect(v.rows[0]!.cause).toBe(
-      'What the first audit found. Each later check is compared with the one before it.',
+      'What the first audit found. Later changes are listed as their own rows.',
     );
   });
 

@@ -25,8 +25,7 @@ export const CHANGES_LOG_COPY = {
   firstAuditWhere: 'the whole site',
   firstAuditCause: 'Nothing to compare yet. The next check of this site is compared with this one.',
   /** The same row once the site has been checked again. */
-  firstAuditCauseLater:
-    'What the first audit found. Each later check is compared with the one before it.',
+  firstAuditCauseLater: 'What the first audit found. Later changes are listed as their own rows.',
   /** The headline while every row is a first audit: they are not changes. */
   firstAuditsOnly: (n: number) =>
     `${capitalise(numberWord(n))} first ${plural(n, 'audit', 'audits')}. Changes appear once a site has been checked again.`,
@@ -42,4 +41,13 @@ export const CHANGES_LOG_COPY = {
   groups: { site: 'Site', kind: 'Kind', since: 'Time' },
   filtersLabel: 'Filters',
   table: 'Changes across the account',
+  /** The log's five columns (F-100): each names what its cell holds. */
+  columns: {
+    site: 'Site and time',
+    what: 'What changed',
+    where: 'Where',
+    effect: 'Effect',
+    cause: 'Cause, and who was told',
+  },
+  told: (who: string) => `Who was told: ${who}`,
 };

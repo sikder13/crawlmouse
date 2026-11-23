@@ -1,12 +1,12 @@
 /**
  * The account Changes log as rendered (D3): no artboard, so no lock comparison. What is pinned
- * instead is that its table is CC-23's change table with the site first, that its filters are links
+ * instead is that its five columns carry every value of a change row, that its filters are links
  * back to the page, and that it has nothing orange.
  */
 import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { ChangesLogScreen } from '../../components/v2/screens/changes-log/ChangesLogScreen';
-import { ChangeTable } from '../../components/v2/screens/segment/ChangesScreen';
+import { CHANGES_LOG_COPY } from '../../lib/v2/copy/changes-log';
 import {
   CHANGES_LOG_PATH,
   changesLogPreview,
@@ -15,13 +15,26 @@ import {
 const render = (q = {}) => renderToStaticMarkup(<ChangesLogScreen data={changesLogPreview(q)} />);
 
 describe('the Changes log, rendered', () => {
-  it('draws its rows with CC-23’s change table, the site as the first column', () => {
+  it('draws its rows in five columns, with nothing the eight-column table showed left out', () => {
     const data = changesLogPreview();
-    const table = renderToStaticMarkup(<ChangeTable label={data.tableLabel} rows={data.rows} />);
-    expect(render()).toContain(table);
-    expect(table).toMatch(
-      /<thead[^>]*><tr><th scope="col"[^>]*>Site<\/th><th scope="col"[^>]*>When</,
-    );
+    const html = render();
+    expect([...html.matchAll(/<th scope="col"[^>]*>([^<]*)</g)].map((m) => m[1])).toEqual([
+      'Site and time',
+      'What changed',
+      'Where',
+      'Effect',
+      'Cause, and who was told',
+    ]);
+    const text = (v: string) => v.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+    for (const r of data.rows) {
+      for (const v of [r.site!, r.when, r.summary, r.where, r.effect, r.cause]) {
+        expect(html).toContain(text(v).replace(/'/g, '&#x27;'));
+      }
+      if (r.pages !== null) expect(html).toContain(r.pages);
+      if (r.told !== null) {
+        expect(html).toContain(text(CHANGES_LOG_COPY.told(r.told)).replace(/'/g, '&#x27;'));
+      }
+    }
   });
 
   it('marks Changes in the rail and has no orange element', () => {
