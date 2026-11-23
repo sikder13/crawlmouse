@@ -55,10 +55,13 @@ const LAB_CLIENTS = [1, 2, 3, 4, 5, 6].map((n) => `client-${n}.lab.crawlmouse.co
  * Keeps one of the lab's client sites on `who`'s account, starting at a random one and moving on only when a host
  * is at its hourly limit, so that a second run within the hour does not fail on the limit. Any other failure throws.
  */
-export async function keptLabSite(who: Person): Promise<{ site: string; host: string }> {
-  const start = Math.floor(Math.random() * LAB_CLIENTS.length);
-  for (let i = 0; i < LAB_CLIENTS.length; i++) {
-    const host = LAB_CLIENTS[(start + i) % LAB_CLIENTS.length]!;
+export async function keptLabSite(
+  who: Person,
+  hosts: readonly string[] = LAB_CLIENTS,
+): Promise<{ site: string; host: string }> {
+  const start = Math.floor(Math.random() * hosts.length);
+  for (let i = 0; i < hosts.length; i++) {
+    const host = hosts[(start + i) % hosts.length]!;
     try {
       return { site: await keptSite(who, host), host };
     } catch (e) {
@@ -99,4 +102,73 @@ export async function keptSite(who: Person, host: string): Promise<string> {
     .maybeSingle();
   if (!data) throw new Error(`no kept site for ${host}`);
   return data.id as string;
+}
+
+/** The lab sites whose crawl produces fixes, so a step about a fix has a real one. */
+const LAB_WITH_FIXES = [1, 2, 3, 4].map((n) => `client-${n}.lab.crawlmouse.com`);
+
+/** A kept site whose first check has really finished, with one of its fixes. */
+export async function finishedLabSite(
+  who: Person,
+): Promise<{ site: string; host: string; check: string; fix: string }> {
+  const { site, host } = await keptLabSite(who, LAB_WITH_FIXES);
+  const db = stagingAdmin();
+  const deadline = Date.now() + 240_000;
+  for (;;) {
+    const { data, error } = await db
+      .from('checks')
+      .select('id, status')
+      .eq('site_id', site)
+      .order('queued_at', { ascending: false })
+      .limit(1)
+      .single();
+    if (error || !data) throw new Error(`no check for ${host}: ${error?.message ?? 'none'}`);
+    if (data.status === 'finished' || data.status === 'partial') {
+      const fixes = await db.from('site_fixes').select('id').eq('site_id', site).limit(1);
+      if (fixes.error || !fixes.data?.[0]) throw new Error(`${host} finished with no fix`);
+      return { site, host, check: data.id as string, fix: fixes.data[0].id as string };
+    }
+    if (data.status === 'failed') throw new Error(`the check of ${host} failed`);
+    if (Date.now() > deadline) throw new Error(`the check of ${host} is still ${data.status}`);
+    await new Promise((r) => setTimeout(r, 4000));
+  }
+}
+
+/** A signed-in person whose only seat has been removed: an account with no active v2 seat. */
+export async function personWithNoSeat(
+  context: BrowserContext,
+  baseURL: string,
+  journey: string,
+  n: number,
+): Promise<Person> {
+  const who = await person(context, baseURL, journey, n);
+  const { error } = await stagingAdmin()
+    .from('seats')
+    .update({ status: 'removed', removed_at: new Date().toISOString() })
+    .eq('user_id', who.userId);
+  if (error) throw new Error(`could not remove the seat: ${error.message}`);
+  return who;
+}
+
+/** A person with a seat of their own who was once a member of `of`, and has been removed from it. */
+export async function removedMember(
+  context: BrowserContext,
+  baseURL: string,
+  of: Person,
+  journey: string,
+  n: number,
+): Promise<Person> {
+  const who = await person(context, baseURL, journey, n);
+  const now = new Date().toISOString();
+  const { error } = await stagingAdmin().from('seats').insert({
+    account_id: of.accountId,
+    user_id: who.userId,
+    invited_email: who.email,
+    role: 'developer',
+    status: 'removed',
+    accepted_at: now,
+    removed_at: now,
+  });
+  if (error) throw new Error(`could not add the removed seat: ${error.message}`);
+  return who;
 }
