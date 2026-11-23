@@ -20,15 +20,14 @@ function read(rel: string): string {
 describe('instrumentation-client gates PostHog on consent', () => {
   const src = read('instrumentation-client.ts');
 
-  it('derives the opt-out default from the consent cookie + stored decision', () => {
-    expect(src).toContain('consentRequiredFromCookie(document.cookie)');
+  it('decides from the consent rule, over the cookies and the stored decision', () => {
+    expect(src).toContain('analyticsMayStart(document.cookie');
     expect(src).toContain('CONSENT_DECISION_STORAGE_KEY');
-    // The opt-out default must be load-bearing: required region AND not yet granted.
-    expect(src).toMatch(/optOutByDefault\s*=\s*consentRequired\s*&&\s*decision\s*!==\s*'granted'/);
   });
 
-  it('passes opt_out_capturing_by_default into posthog.init (not a hardcoded false)', () => {
-    expect(src).toContain('opt_out_capturing_by_default: optOutByDefault');
+  it('calls posthog.init in one place, behind the consent rule (F-048)', () => {
+    expect(src.match(/posthog\.init\(/g)).toHaveLength(1);
+    expect(src).toMatch(/if \(posthog\.__loaded \|\| !mayStart\(\)\) return;\s*posthog\.init\(/);
     expect(src).not.toContain('opt_out_capturing_by_default: false');
   });
 
@@ -75,8 +74,11 @@ describe('CookieConsent banner is wired correctly', () => {
   });
 
   it('opts in on allow, opts out on decline, and records the decision', () => {
-    expect(src).toContain('posthog.opt_in_capturing()');
-    expect(src).toContain('posthog.opt_out_capturing()');
+    expect(src).toContain('resumeAnalytics(posthog)');
+    expect(src).toContain('stopAnalytics(posthog)');
+    const control = read('lib/analytics/consent-control.ts');
+    expect(control).toContain('posthog.opt_in_capturing()');
+    expect(control).toContain('posthog.opt_out_capturing()');
     expect(src).toContain('localStorage.setItem(CONSENT_DECISION_STORAGE_KEY');
     expect(src).toContain('document.cookie = consentDecisionCookie(decision)');
     expect(src).toMatch(/granted\s*\?\s*'granted'\s*:\s*'denied'/);
