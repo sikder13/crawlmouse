@@ -53,7 +53,7 @@ export interface LivePage {
 export interface LiveProgress {
   pages: number;
   links: number;
-  /** Whether the batch's first URL was fetched; false from a worker that does not say. */
+  /** Whether the batch's first URL was served to us; false from a worker that does not say. */
   homepageRead: boolean;
   /** How many finished pages the worker holds for this batch. */
   total: number;
