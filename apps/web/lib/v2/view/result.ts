@@ -31,6 +31,7 @@ import {
   noFixWords,
   sectionMeasured,
 } from './section-measured';
+import { CRAWLER_TAG } from '../help/pinned';
 import { SCREEN_SIGNALS, screenSignals, type ScreenSignal } from './screen-signals';
 import { dateTimeUtc, dayTimeUtc, listOf, percent, templateNoun } from '../format';
 import { toneOf } from '../letters';
@@ -148,6 +149,8 @@ export interface ResultView {
         body: string;
         /** The way to start watching an audit nobody has kept; null once it is kept. */
         action: { label: string; href: string } | null;
+        /** A refused check: what to allow, and where our crawler is described. */
+        letIn?: { agent: string; href: string };
       };
   doors: DoorView[];
   fixes: { total: number; open: number; pro: number; rows: FixRowView[] } | null;
@@ -610,7 +613,11 @@ function signalsDoor(check: Check, notServed: boolean): DoorView {
   const unknown = by('indeterminate');
   // The pill counts what is known present. A signal the check could not determine, or did not
   // record, is not tested, and the coverage line says how many were.
-  const label = `${present.length} of ${kinds.length} present`;
+  const tested = present.length + absent.length;
+  // On a check that read no page, "0 of 7 present" would read as seven signals looked for and missing.
+  const label = notServed
+    ? `${present.length} found, ${tested} of ${kinds.length} tested`
+    : `${present.length} of ${kinds.length} present`;
   const names = (xs: { signal: ScreenSignal }[]) => xs.map((s) => SIGNAL_NAMES[s.signal]);
   const counting = shown.filter((s) => s.counts_toward_grade);
   // What could not be tested is said in the check's own words, grouped where the words agree.
@@ -628,7 +635,7 @@ function signalsDoor(check: Check, notServed: boolean): DoorView {
             .join(', '),
         )}.`
       : null,
-    ...[...untested].map(([evidence, ns]) => `${listOf(ns)}: ${evidence}.`),
+    ...[...untested].map(([evidence, ns]) => `${listOf(ns)}: ${evidence.replace(/\.$/, '')}.`),
     counting.length
       ? `${listOf(names(counting))} count; the other ${numberWord(kinds.length - counting.length)} do not yet.`
       : null,
@@ -644,7 +651,7 @@ function signalsDoor(check: Check, notServed: boolean): DoorView {
       notServed || (!present.length && unknown.length)
         ? 'Checked by fetch'
         : 'Checked by fetch · nothing urgent',
-    coverage: { read: `Tested ${present.length + absent.length} of ${kinds.length} signals` },
+    coverage: { read: `Tested ${tested} of ${kinds.length} signals` },
     href: '#',
   };
 }
@@ -731,6 +738,12 @@ const eitherOf = (codes: readonly number[]) => {
   return rest.length ? `${rest.join(', ')} or ${last}` : `${last}`;
 };
 
+/** 429 in words, said once, where the card names the status. */
+const TOO_MANY = ' (“too many requests”: the site is limiting automated visitors)';
+
+/** The part of our user agent every request carries, which a firewall rule can match. */
+const OUR_AGENT = CRAWLER_TAG.split(' ')[0]!;
+
 /** The third card when pages answered and none with a 200: what they answered, and what to do. */
 function notServedCard(check: Check, statuses: readonly number[]): NoFixCard {
   const codes = [...new Set(statuses)].sort((a, b) => a - b);
@@ -753,13 +766,14 @@ function notServedCard(check: Check, statuses: readonly number[]): NoFixCard {
     label: 'Nothing to grade',
     title: refused ? 'Your site refused our requests' : 'Your site did not serve a page',
     body: [
-      `${count(n)} ${plural(n, 'page answered our request', 'pages answered our requests')}, with ${eitherOf(codes)}.`,
+      `${count(n)} ${plural(n, 'page answered our request', 'pages answered our requests')}, with ${eitherOf(codes)}${codes.includes(429) ? TOO_MANY : ''}.`,
       crawlers,
       next,
     ]
       .filter(Boolean)
       .join(' '),
     action: null,
+    ...(refused ? { letIn: { agent: OUR_AGENT, href: '/bot' } } : {}),
   };
 }
 
@@ -980,7 +994,13 @@ function crawlerRows(check: Check): CrawlerRowView[] {
         : `${GROUP_NAMES[c.group]}, ${c.scored ? 'scored' : 'not scored'}`,
     verdict: c.verdict,
     evidence: c.evidence_class,
-    status: c.status === null ? 'robots.txt' : String(c.status),
+    // A null status is a robots.txt reading only when robots.txt gave a verdict.
+    status:
+      c.status !== null
+        ? String(c.status)
+        : c.verdict === 'not_measured'
+          ? 'not measured'
+          : 'robots.txt',
     text: c.text_share === null ? 'not measured' : `${percent(c.text_share)}%`,
   }));
 }

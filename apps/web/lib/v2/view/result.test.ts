@@ -497,7 +497,9 @@ describe('the third card when there is no fix', () => {
       ];
     });
     if (v.first.kind !== 'not-served') throw new Error(`got ${v.first.kind}`);
-    expect(v.first.body).toMatch(/^3 pages answered our requests, with 401, 403 or 429\./);
+    expect(v.first.body).toMatch(
+      /^3 pages answered our requests, with 401, 403 or 429 \(“too many requests”/,
+    );
   });
 
   it('does not let a search engine it could not measure stop the all-clear', () => {

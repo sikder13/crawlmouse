@@ -450,3 +450,14 @@
     flex: 1 1 100%;
   }
 }
+
+/* A refused check's next step: what to allow, then run it again. */
+.letIn {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.letIn a:not([data-v2-primary]) {
+  text-decoration: underline;
+}

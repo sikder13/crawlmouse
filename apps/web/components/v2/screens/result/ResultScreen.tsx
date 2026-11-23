@@ -185,6 +185,19 @@ export function ResultScreen({
                 <div className={styles.fixFirstTitle}>{first.title}</div>
                 <div className={styles.fixFirstBody}>{first.body}</div>
               </div>
+              {first.letIn ? (
+                <div className={styles.letIn}>
+                  <div className={styles.fixFirstBody}>
+                    Our requests carry <code>{first.letIn.agent}</code> in the user agent.{' '}
+                    <a href={first.letIn.href}>How our crawler identifies itself</a>
+                  </div>
+                  <div className={`${layout.row} ${styles.actions}`}>
+                    <AuditLink to="rerun" variant="primary">
+                      Run this audit again
+                    </AuditLink>
+                  </div>
+                </div>
+              ) : null}
               {first.action ? (
                 <div className={`${layout.row} ${styles.actions}`}>
                   <Button variant="primary" href={first.action.href}>
@@ -314,7 +327,7 @@ export function ResultScreen({
             </div>
           )}
         </Card>
-      ) : (
+      ) : kept || first.kind === 'not-served' ? null : (
         <div data-v2-addition="">
           <Card as="section" tone="sunken" className={styles.competitor}>
             <Heading level={2} size="s" className={styles.proTitle}>
