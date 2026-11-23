@@ -139,7 +139,11 @@ Each access row names its identity: `identity_role` is `control`, `crawler` or `
 
 - A read the thread is still on 20 s after reaching it fails with `reader_deadline`: the thread is stopped and a new one started. If the thread dies (out of memory, say), the read it was on fails with `reader_thread_crashed`. Either way the reads queued behind it go to the new thread, in order. A read that throws fails with `reader_error`, and the thread goes on (`src/reader/thread-reader.test.ts`).
 
-- A response not read for any of these reasons fails alone: a crawl page is fetched and not complete, an access row is `not_measured`, the batch goes on, and none of them is a fault of the site or makes the batch partial. The result's findings count them by reason as `not_read` (`src/batch/run.test.ts`, "a page the reader gives no answer for fails alone").
+- A tag with more than 256 attributes, or a closing tag of 256 characters or more, keeps the page's links and text but skips the content features' second parse, whose time grows with the square of a tag's attributes. The row's features are null, with a note.
+
+- One host cannot hold the reader. Within a batch, the host's remaining pages are fetched and not read (`reader_stopped_for_host`) once a page under 256 KiB crashed the reader or took over 5 s, or the host has used 180 s of the reader. A larger page that fails does not stop its host by itself, because an ordinary page of about 2 MiB can.
+
+- Apart from that, a response not read for any of these reasons fails alone: a crawl page is fetched and not complete, an access row is `not_measured`, the batch goes on, and none of them is a fault of the site or makes the batch partial. The result's findings count them by reason as `not_read` (`src/batch/run.test.ts`, "a page the reader gives no answer for fails alone").
 
 ## A page with no `<body>`
 

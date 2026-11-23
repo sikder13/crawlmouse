@@ -75,7 +75,14 @@ import {
   MAX_LINKS_READ,
   MAX_URL_LENGTH,
 } from '../rows/links.js';
-import { HTML_MEDIA_TYPES, MAX_DOM_DEPTH, MAX_READ_TAGS } from '../rows/text.js';
+import {
+  HTML_MEDIA_TYPES,
+  MAX_ATTRIBUTES_PER_TAG,
+  MAX_DOM_DEPTH,
+  MAX_END_TAG_CHARS,
+  MAX_READ_TAGS,
+} from '../rows/text.js';
+import { HOST_READER_MS, SLOW_READ_MS, SMALL_PAGE_CHARS } from '../batch/reader-breaker.js';
 import { REFUSALS, ROUTES } from '../routes.js';
 import { BODY_DEADLINE_MS, MAX_BODY_BYTES as MAX_REQUEST_BODY_BYTES } from '../server.js';
 import { SAMPLE_PAGES, SITES, SITE_EXPECTATIONS } from '../test-support/discriminators.js';
@@ -279,7 +286,11 @@ export function renderSpec(): string {
     `- Pages are parsed for their text, word count and links on one thread of the process's own (\`src/reader/\`), so the event loop that times requests never waits on a parse. Bodies go to it as UTF-8 bytes in a transferred buffer, and it answers in the order asked.`,
     `- A page that nests elements more than ${MAX_DOM_DEPTH} deep is parsed only to that depth, then the parse stops: the page is fetched and not read, with the reason \`parse_depth_exceeded\` (\`src/rows/text.test.ts\`, \`src/reader/hostile-page.test.ts\`).`,
     `- A read the thread is still on ${READ_DEADLINE_MS / 1000} s after reaching it fails with \`reader_deadline\`: the thread is stopped and a new one started. If the thread dies (out of memory, say), the read it was on fails with \`reader_thread_crashed\`. Either way the reads queued behind it go to the new thread, in order. A read that throws fails with \`reader_error\`, and the thread goes on (\`src/reader/thread-reader.test.ts\`).`,
-    '- A response not read for any of these reasons fails alone: a crawl page is fetched and not complete, an access row is `not_measured`, the batch goes on, and none of them is a fault of the site or makes the batch partial. The result\'s findings count them by reason as `not_read` (`src/batch/run.test.ts`, "a page the reader gives no answer for fails alone").',
+    `- A tag with more than ${MAX_ATTRIBUTES_PER_TAG} attributes, or a closing tag of ${MAX_END_TAG_CHARS} characters or more, keeps the page's links and text but skips the content features' second parse, whose time grows with the square of a tag's attributes. The row's features are null, with a note.`,
+    '',
+    `- One host cannot hold the reader. Within a batch, the host's remaining pages are fetched and not read (\`reader_stopped_for_host\`) once a page under ${SMALL_PAGE_CHARS / 1024} KiB crashed the reader or took over ${SLOW_READ_MS / 1000} s, or the host has used ${HOST_READER_MS / 1000} s of the reader. A larger page that fails does not stop its host by itself, because an ordinary page of about 2 MiB can.`,
+    '',
+    '- Apart from that, a response not read for any of these reasons fails alone: a crawl page is fetched and not complete, an access row is `not_measured`, the batch goes on, and none of them is a fault of the site or makes the batch partial. The result\'s findings count them by reason as `not_read` (`src/batch/run.test.ts`, "a page the reader gives no answer for fails alone").',
 
     '## A page with no `<body>`',
     "htmlparser2, the worker's parser, builds no element a page does not write, so a page with no `<body>` tag has no body element. Its main content (`content_simhash`) and its served text (`raw_text`, its word count, and the words the access comparison counts) are read from the body its HTML implies, as a browser's parser builds it: the engine's `ImpliedBody`, which `MainContentWalk` reads with `impliedBody: true`.",
