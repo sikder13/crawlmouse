@@ -21,6 +21,13 @@ export type CheckRequested = {
   requestedByUserId?: string;
 };
 
+/** The worker's note that a batch ended (PR 5a): a hint to read it now. The result is still read. */
+export type CheckBatchEnded = {
+  checkId: string;
+  batch: number;
+  status: 'done' | 'failed';
+};
+
 export type CheckFinished = {
   checkId: string;
   siteId: string;

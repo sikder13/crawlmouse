@@ -25,6 +25,7 @@ import {
   checkFinishedEventId,
   failureReasonOf,
   type CheckFailed,
+  type CheckBatchEnded,
   type CheckFinished,
   type CheckRequested,
   type FailureReason,
@@ -50,6 +51,8 @@ export const PACE = {
   pollStartS: 5,
   /** The wait doubles up to this and stays there: a long batch costs one poll per 30 s. */
   pollMaxS: 30,
+  /** The longest a run waits on a worker's done signal before it polls once (PR 5a). */
+  signalWaitS: 60,
   /**
    * A batch is lost once it is past its max_seconds by this much: the worker starts no request after
    * max_seconds, the one in flight has up to its 30 s ceiling (worker MAX_REQUEST_MS), and the
@@ -137,7 +140,8 @@ export type DiscoverOutput = {
   at: number;
 };
 export type PostOutput =
-  | { status: 'posted'; urls: number; at: number; max_seconds: number }
+  /** `signals`: the worker said it will signal this batch's end, so the run can wait for that. */
+  | { status: 'posted'; urls: number; at: number; max_seconds: number; signals?: true }
   | { status: 'busy'; at: number }
   | { status: 'paused' }
   /** Nothing to post: the crawl is done, stage 2 is not needed, or too little time is left. */
@@ -158,7 +162,9 @@ export type ReadOutput =
       release: string | null;
     }
   /** The worker no longer holds the batch (restarted, or its 60-minute TTL passed). */
-  | { status: 'not_found' };
+  | { status: 'not_found' }
+  /** Read on a signal while the worker still runs the batch: nothing is lost, and nothing is read. */
+  | { status: 'running' };
 export type RenderOutput = { rendered: number; not_rendered: number };
 export type BuildOutput = { status: 'finished' | 'partial'; pages: number; fixes: number };
 export type PersistOutput = { written: boolean };
@@ -197,6 +203,11 @@ export interface CheckStepTools {
   run<T>(id: string, fn: () => Promise<T>): Promise<T>;
   /** `ms` milliseconds. */
   sleep(id: string, ms: number): Promise<void>;
+  /** The batch's done signal, or null at the timeout. Absent where no signal can arrive. */
+  waitForEvent?(
+    id: string,
+    opts: { event: 'check.batch.ended'; timeout: string; if: string },
+  ): Promise<{ data: CheckBatchEnded } | null>;
   sendEvent(
     id: string,
     payload:
@@ -333,6 +344,8 @@ export async function runCheck(
     let posted = await post(`${p}-post`, at);
     let reposted = false;
     let polls = 0;
+    let reads = 0;
+    let listening = true;
     for (;;) {
       if (posted.status === 'capacity') return { end: 'capacity' };
       if (posted.status === 'paused') return { end: 'paused' };
@@ -340,18 +353,41 @@ export async function runCheck(
       const deadline = posted.at + (posted.max_seconds + PACE.pollGraceS) * 1000;
       let wait: number = PACE.pollStartS;
       let poll: PollOutput;
+      let lastAt = posted.at;
       do {
         polls += 1;
-        await step.sleep(`${p}-wait-${polls}`, wait * 1000);
-        wait = Math.min(wait * 2, PACE.pollMaxS);
-        poll = await run(`${p}-poll-${polls}`, () => steps.poll(data, at, soFar()));
+        const listens = listening && posted.signals === true && step.waitForEvent !== undefined;
+        const ended =
+          listens && step.waitForEvent
+            ? await step.waitForEvent(`${p}-done-${polls}`, {
+                event: 'check.batch.ended',
+                // Never past the deadline: the time plan allows one poll wait after it.
+                timeout: `${Math.max(1, Math.min(PACE.signalWaitS, Math.ceil((deadline - lastAt) / 1000)))}s`,
+                if: `event.data.checkId == async.data.checkId && async.data.batch == ${at.batch}`,
+              })
+            : null;
+        if (!listens) {
+          await step.sleep(`${p}-wait-${polls}`, wait * 1000);
+          wait = Math.min(wait * 2, PACE.pollMaxS);
+        }
+        // A signal of `done` goes straight to the read; anything else is the poll's to decide.
+        poll =
+          ended?.data.status === 'done'
+            ? { status: 'done', at: lastAt }
+            : await run(`${p}-poll-${polls}`, () => steps.poll(data, at, soFar()));
+        lastAt = poll.at;
       } while ((poll.status === 'running' || poll.status === 'unreachable') && poll.at < deadline);
 
       if (poll.status === 'done') {
-        const read = await run(reposted ? `${p}-read-2` : `${p}-read`, () =>
-          steps.read(data, at, soFar()),
-        );
+        const readId = reposted ? `${p}-read-2` : reads > 0 ? `${p}-read-${polls}` : `${p}-read`;
+        reads += 1;
+        const read = await run(readId, () => steps.read(data, at, soFar()));
         if (read.status === 'read') return { end: 'read', out: read };
+        if (read.status === 'running') {
+          // Signalled early: back to polling this batch, which also bounds a run's steps.
+          listening = false;
+          continue;
+        }
       }
       const lost = poll.status === 'not_found' || poll.status === 'done';
       if (!lost || reposted) return fail(p, at);
@@ -480,6 +516,7 @@ export function createCheckFn(
           step: {
             run: <T>(id: string, fn: () => Promise<T>) => step.run(id, fn) as Promise<T>,
             sleep: (id, ms) => step.sleep(id, ms),
+            waitForEvent: (id, opts) => step.waitForEvent(id, opts),
             sendEvent: (id, payload) => step.sendEvent(id, payload),
           },
         },

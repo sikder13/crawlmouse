@@ -95,7 +95,10 @@ describe('against the worker, in process', () => {
     const w = await worker();
     const client = clientOf(w);
     const batch = crawl();
-    expect(await client.postBatch(batch)).toEqual({ batch_id: `${CHECK}:${batch.batch}` });
+    expect(await client.postBatch(batch)).toEqual({
+      batch_id: `${CHECK}:${batch.batch}`,
+      signals: false,
+    });
     await w.worker.idle();
     const polled = await client.pollBatch(batchIdOf(CHECK, batch.batch));
     expect(polled).toMatchObject({

@@ -156,7 +156,7 @@ const ROWS: readonly RowInput[] = [
     file: 'inngest/check.ts',
     id: 'crawlmouse.check.run',
     onFailure: true,
-    callSites: 11,
+    callSites: 13,
     registration: 'V2_PIPELINE',
     trigger: 'check.requested',
     steps: 0,
@@ -171,7 +171,7 @@ const ROWS: readonly RowInput[] = [
     trigger: 'inngest/function.cancelled (checkFn)',
     steps: 2,
     stepsHow: 'fail, emit-failed',
-    stepAt: [536, 538],
+    stepAt: [573, 575],
   },
   {
     file: 'inngest/check-reaper.ts',

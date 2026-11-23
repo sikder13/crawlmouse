@@ -41,7 +41,8 @@ export type PollResult =
 
 export interface WorkerClient {
   /** Resolves with the worker's batch id once it answered 202; throws WorkerError otherwise. */
-  postBatch(batch: BatchPost): Promise<{ batch_id: string }>;
+  /** `signals`: the worker said it will signal this batch's end (PR 5a). */
+  postBatch(batch: BatchPost): Promise<{ batch_id: string; signals: boolean }>;
   pollBatch(batchId: string): Promise<PollResult>;
   readMetrics(): Promise<unknown>;
 }

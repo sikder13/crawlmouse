@@ -64,6 +64,7 @@ Concurrency: one plan cap, `PLAN_CONCURRENCY_CAP = 5` (Inngest Free), which the 
 | The latest first crawl batch that still gets a whole crawl window, from the first claim  | 1260 s                  |
 | The run’s finish timeout                                                                 | 2220 s                  |
 | Crawl phase ceiling, from the first crawl batch the worker accepts                       | 480 s                   |
+| The longest wait on a worker’s done signal before one poll                               | 60 s                    |
 | Access stages’ slice                                                                     | 300 s                   |
 | Reserve for render, build, persist, finalize                                             | 180 s                   |
 | A batch that would get less is not posted                                                | 60 s                    |

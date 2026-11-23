@@ -105,17 +105,17 @@ export function batchSteps(
     worker: WorkerClient,
     body: BatchPost,
     id: string,
-  ): Promise<true | Extract<PostOutput, { status: 'busy' | 'paused' }>> {
+  ): Promise<{ signals: boolean } | Extract<PostOutput, { status: 'busy' | 'paused' }>> {
     try {
-      await worker.postBatch(body);
-      return true;
+      const { signals } = await worker.postBatch(body);
+      return { signals };
     } catch (e) {
       if (!(e instanceof WorkerError)) throw e;
-      if (e.kind === 'batch_exists') return true;
+      if (e.kind === 'batch_exists') return { signals: false };
       if (e.kind === 'busy') return { status: 'busy', at: deps.now() };
       if (e.kind === 'paused') return { status: 'paused' };
       if (TRANSIENT.has(e.kind)) {
-        if (found((await worker.pollBatch(id)).status)) return true;
+        if (found((await worker.pollBatch(id)).status)) return { signals: false };
         throw e;
       }
       if (e.kind === 'unauthorized' || e.kind === 'forbidden') {
@@ -177,8 +177,14 @@ export function batchSteps(
         ? { ...common, kind: 'crawl', urls: planned.urls }
         : { ...common, kind: 'access', pages: planned.pages };
     const sent = await send(worker, body, id);
-    if (sent !== true) return sent;
-    return { status: 'posted', urls, at: now, max_seconds: seconds };
+    if ('status' in sent) return sent;
+    return {
+      status: 'posted',
+      urls,
+      at: now,
+      max_seconds: seconds,
+      ...(sent.signals && { signals: true as const }),
+    };
   }
 
   return {
@@ -218,6 +224,8 @@ export function batchSteps(
       const id = batchIdOf(event.checkId, at.batch);
       const got = await worker.pollBatch(id);
       if (got.status === 'not_found') return { status: 'not_found' };
+      // Read on a signal that came early: nothing is lost, and the run goes back to polling it.
+      if (got.status === 'running') return { status: 'running' };
       if (got.status !== 'done') throw new Error(`batch ${at.batch} is ${got.status} at read`);
       const parsed = BatchResultSchema.safeParse(got.result);
       if (!parsed.success) throw new CheckFailure('internal', { cause: parsed.error });
