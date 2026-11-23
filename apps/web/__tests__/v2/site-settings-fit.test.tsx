@@ -4,7 +4,8 @@
  * line, so the table outgrew the card: the controls were clipped at its right edge and the
  * explanation column was squeezed to a word per line. Now the two cards stack up to 1300px (the
  * shared breakpoint is 1100px), a control's fields wrap within their cell, and the explanation keeps
- * a minimum width beside them.
+ * a minimum width beside them while the card is wide enough for three columns (F-110, which also
+ * measures the layout: tests/visual/site-settings-fit.spec.ts).
  *
  * This reads the rules and the markup they key on; it does not measure layout. The controls are on
  * a live page only (`LiveActions`), so the geometry check is on a live /sites/<id> (CC-39
@@ -24,9 +25,9 @@ const CSS = readFileSync(
   'utf8',
 );
 
-/** The body of the `@media` block whose condition is exactly `condition`. */
-function media(condition: string): string {
-  const at = CSS.indexOf(`@media ${condition} {`);
+/** The body of the `@media` or `@container` block whose condition is exactly `condition`. */
+function media(condition: string, rule = '@media'): string {
+  const at = CSS.indexOf(`${rule} ${condition} {`);
   expect(at, condition).toBeGreaterThanOrEqual(0);
   const next = CSS.indexOf('\n}', at);
   return CSS.slice(at, next);
@@ -42,9 +43,9 @@ describe('the site page’s settings card (CC-39 F10)', () => {
     );
   });
 
-  it('wraps a control’s fields in their cell and keeps the explanation readable, off a phone', () => {
-    const wide = media('(min-width: 761px)');
-    expect(wide).toMatch(/\.settings td:last-child form \{[^}]*flex-wrap: wrap;/);
+  it('wraps a control’s fields in their cell and keeps the explanation readable in a wide card', () => {
+    expect(CSS).toMatch(/\.settings td:last-child form \{[^}]*flex-wrap: wrap;/);
+    const wide = media('(min-width: 640px)', '@container');
     expect(wide).toMatch(/\.settings td:nth-child\(2\) \{[^}]*min-width: 12em;/);
   });
 

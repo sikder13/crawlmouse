@@ -116,6 +116,11 @@
   max-width: 100%;
 }
 
+/* A host is one long word: it breaks in its cell, at any width, rather than widen the table. */
+.settings td:nth-child(2) {
+  overflow-wrap: anywhere;
+}
+
 .settings td:last-child form input:not([type='hidden'], [type='checkbox']) {
   width: 14rem;
   max-width: 100%;
@@ -154,6 +159,25 @@
   .settings tr:has(td:last-child :is(select, input:not([type='hidden']))) td:nth-child(3) {
     grid-column: 1 / -1;
     grid-row: auto;
+  }
+
+  /* On its own line a text field takes the room there is, so a long host stays readable. */
+  .settings tr:has(td:last-child input[type='text']) td:nth-child(3) form {
+    display: flex;
+    width: 100%;
+  }
+
+  .settings td:last-child form input[type='text'] {
+    flex: 1 1 10rem;
+    width: auto;
+    min-width: 0;
+  }
+
+  /* A row's line is the row's own. The phone's baselines keep theirs until F-129. */
+  @media (min-width: 761px) {
+    .settings th {
+      border-bottom: 0 !important;
+    }
   }
 }
 
