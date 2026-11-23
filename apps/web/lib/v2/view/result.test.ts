@@ -4,6 +4,7 @@ import { findCheck, fixture, type FixtureName } from '../fixtures';
 import { CHECKS } from '../recordings';
 import { partialNotice, resultView, type DoorView, type ResultView } from './result';
 import { pagesReadableText } from './effect-headline';
+import { isAi } from '../sentences';
 
 const NO_MAP = { nodes: [], positions: {} };
 
@@ -164,6 +165,18 @@ describe('the clean bill’s all-clear card', () => {
     return v.first;
   };
   const TAIL = 'What changes that is a deploy, a plugin or a new firewall rule;';
+
+  it('claims nothing about the templates when one was read by no AI crawler', () => {
+    const v = view('clean-site', (c) => {
+      const key = c.coverage!.templates[0]!.template_key;
+      for (const x of c.crawlers.filter(isAi)) {
+        x.by_template.find((t) => t.template_key === key)!.verdict = 'refused_unverified';
+      }
+    });
+    const { body } = allClear(v);
+    expect(body).toContain('were served');
+    expect(body).not.toContain('ships its text');
+  });
 
   it('says what the verdicts and templates show, and offers to start watching', () => {
     const first = allClear(view('clean-site'));

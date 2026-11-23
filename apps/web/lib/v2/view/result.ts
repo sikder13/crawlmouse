@@ -821,15 +821,18 @@ function allClear(check: Check, kept: boolean, cadence: string | null): NoFixCar
     : inside.length
       ? `${out.join('; ')}; ${servedOthers(inside.length).replace(/^./, (x) => x.toLowerCase())}${servedExtent(check)}`
       : out.join('; ');
-  const thin = (clientRenderedTemplates(check) ?? []).map(
+  // Null when some template was read by no AI crawler: the verdicts then cannot say how it arrives.
+  const rendered = clientRenderedTemplates(check);
+  const thin = (rendered ?? []).map(
     (k) => templateNoun(check.coverage!.templates.find((t) => t.template_key === k)!.label).pages,
   );
   // What the requests that were served read; with none served, nothing was read to say it of.
-  const text = !inside.length
-    ? ''
-    : thin.length
-      ? `, and ${listOf(thin)} ${verbFor(thin, 'is', 'are')} empty without JavaScript`
-      : ' and every template ships its text';
+  const text =
+    !inside.length || rendered === null
+      ? ''
+      : thin.length
+        ? `, and ${listOf(thin)} ${verbFor(thin, 'is', 'are')} empty without JavaScript`
+        : ' and every template ships its text';
   const watch = !kept
     ? 'kept, this audit is re-run monthly and you hear when one lands.'
     : cadence
