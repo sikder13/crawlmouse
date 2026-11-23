@@ -353,11 +353,13 @@ export function aiWithheldSummary(check: Check, measured: number): string {
     ? `This audit did not measure ${orList(missing)}, which the AI readability grade needs.`
     : '';
   const { access: accessPart, quotable, signals } = ai.components;
+  // What Access was scored from, which can be fewer than the crawlers holding a verdict.
+  const accessFrom = ai.scored_from_fewer_crawlers ?? measured;
   const tested = [
     accessPart.score === null
       ? null
-      : measured < scored
-        ? `crawler access for ${numberWord(measured)} of the ${numberWord(scored)} scored crawlers`
+      : accessFrom < scored
+        ? `crawler access for ${numberWord(accessFrom)} of the ${numberWord(scored)} scored crawlers`
         : 'crawler access',
     quotable.score === null ? null : 'content',
     signals.score === null ? null : 'AI signals',

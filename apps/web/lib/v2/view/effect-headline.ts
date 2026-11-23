@@ -59,8 +59,7 @@ export const AI_WAITING: Readonly<Record<WithheldReason, string>> = {
   too_few_crawlers_measured: 'AI readability is graded once two scored crawlers can be measured',
   blocked_by_choice:
     'AI readability is not graded while the site’s robots.txt keeps the scored crawlers out',
-  readable_unmeasured:
-    'AI readability needs the JavaScript comparison, which this audit did not measure',
+  readable_unmeasured: 'AI readability needs a JavaScript comparison of each template',
   quotable_unmeasured: 'AI readability is graded once its content part can be measured',
   signals_unmeasured:
     'AI readability is graded once its schema.org and Content Signals checks are decided',

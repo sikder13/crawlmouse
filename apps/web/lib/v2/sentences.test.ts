@@ -447,6 +447,14 @@ describe('a withheld AI readability grade says what was measured', () => {
     );
   });
 
+  it('counts the crawlers Access was scored from, not the ones with a verdict', () => {
+    const c = withheld(['readable_unmeasured', 'quotable_unmeasured'], { access: 40, signals: 5 });
+    c.ai_readability!.scored_from_fewer_crawlers = 1;
+    expect(aiWithheldSummary(c, 4)).toContain(
+      'It tested crawler access for one of the four scored crawlers and AI signals.',
+    );
+  });
+
   it('claims no test when no part has a score', () => {
     const c = withheld(['readable_unmeasured', 'quotable_unmeasured', 'signals_unmeasured'], {});
     const said = aiWithheldSummary(c, 4);
