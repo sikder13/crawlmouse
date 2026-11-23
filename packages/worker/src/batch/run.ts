@@ -46,6 +46,16 @@ export interface Progress {
   urls_done: number;
   urls_total: number;
   requests: number;
+  /** Pages fetched so far, counted as the result counts them: `outcome === 'fetched'`. */
+  pages: number;
+  /** Link edges read so far: the result's `link_edges`, as they arrive. */
+  links: number;
+}
+
+/** What one finished page adds to `Progress`. An access batch reads no page into the map. */
+export interface PageCounts {
+  pages: number;
+  links: number;
 }
 
 export async function runBatch(
@@ -67,12 +77,19 @@ export async function runBatch(
   const robots = new BatchRobots(ctx, deps.robotsCache, tokens);
   const requested = urlsOf(req);
   let urlsDone = 0;
-  const pageDone = () =>
+  let pagesRead = 0;
+  let linksRead = 0;
+  const pageDone = (read?: PageCounts) => {
+    pagesRead += read?.pages ?? 0;
+    linksRead += read?.links ?? 0;
     onProgress({
       urls_done: ++urlsDone,
       urls_total: requested.length,
       requests: budget.used.requests,
+      pages: pagesRead,
+      links: linksRead,
     });
+  };
   // robots.txt for every origin first: one that blocks the site keeps the whole batch from fetching.
   const blocked = await robots.preload(requested);
   if (blocked && 'reason' in blocked) findings.notRequested(blocked);

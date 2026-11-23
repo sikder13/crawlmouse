@@ -31,7 +31,7 @@ import {
   type Ids,
 } from '../../../../../__tests__/v2/_lib/check-routes-harness';
 import { STREAM_OPENS_PER_IP_PER_HOUR } from '../_lib/limit-keys';
-import { BATCH_READ_ATTEMPTS, POLL_MS, STREAM_CLOSE_MS, serveStream } from './serve';
+import { BATCH_READ_ATTEMPTS, LIVE_READ_MS, POLL_MS, STREAM_CLOSE_MS, serveStream } from './serve';
 
 const anonymous: Viewer = { userId: null };
 const one = crawlResult(
@@ -63,6 +63,99 @@ const typesOf = (events: ProgressEvent[]) =>
   events.map((e) => (e.type === 'stage' ? `${e.phase}:${e.state}` : e.type));
 const fold = (events: ProgressEvent[]) => events.reduce(reduce, INITIAL_STATE);
 const cancelled = (h: Harness, ids: Ids) => () => h.pipeline.fail(ids.checkId, 'canceled', null);
+
+/** A batch the worker has been given and has not finished: the row a running crawl holds. */
+const postBatch = (h: Harness, ids: Ids, n: number, kind: 'crawl' | 'access' = 'crawl') =>
+  h.pipeline.upsertBatch({
+    check_id: ids.checkId,
+    batch: n,
+    kind,
+    nonce: `nonce-${String(n).padStart(16, '0')}`,
+    posted_at: new Date(h.clock.now).toISOString(),
+    summary: { urls: 10, max_seconds: 60 },
+  });
+const countsIn = (events: ProgressEvent[]) =>
+  events.flatMap((e) => (e.type === 'counts' ? [[e.pages_crawled, e.links_found]] : []));
+
+describe('counts from the batch the worker is crawling', () => {
+  it('adds the running batch to the stored totals, by that batch id', async () => {
+    const h = harness(db);
+    const ids = await running(db, h, 'live-counts.example');
+    await storeBatch(h, ids, 1, one, { pages: 2, links: 2 });
+    await postBatch(h, ids, 2);
+    const asked: string[] = [];
+    h.deps.liveCounts = async (id) => {
+      asked.push(id);
+      return { pages: 3, links: 5 };
+    };
+    h.betweenPolls.push(cancelled(h, ids));
+    const { groups } = groupsOf(await (await open(h, ids)).text());
+    expect(asked[0]).toBe(`${ids.checkId}:2`);
+    expect(countsIn(groups.flatMap((g) => g.events))).toEqual([[5, 7]]);
+  });
+
+  it('never shows a lower number when the batch is then read', async () => {
+    const h = harness(db);
+    const ids = await running(db, h, 'live-falls.example');
+    await postBatch(h, ids, 1);
+    h.deps.liveCounts = async () => ({ pages: 9, links: 9 });
+    h.betweenPolls.push(async () => {
+      h.deps.liveCounts = async () => null;
+      await storeBatch(h, ids, 1, one, { pages: 2, links: 2 });
+    });
+    h.betweenPolls.push(cancelled(h, ids));
+    const { groups } = groupsOf(await (await open(h, ids)).text());
+    const state = fold(groups.flatMap((g) => g.events));
+    expect([state.pages_crawled, state.links_found]).toEqual([9, 9]);
+  });
+
+  it('carries on from the database when the worker read fails', async () => {
+    const h = harness(db);
+    const ids = await running(db, h, 'live-down.example');
+    await storeBatch(h, ids, 1, one, { pages: 2, links: 2 });
+    await postBatch(h, ids, 2);
+    h.deps.liveCounts = async () => {
+      throw new Error('worker unreachable');
+    };
+    h.betweenPolls.push(cancelled(h, ids));
+    const { groups } = groupsOf(await (await open(h, ids)).text());
+    const events = groups.flatMap((g) => g.events);
+    expect(countsIn(events)).toEqual([[2, 2]]);
+    expect(events.at(-1)!.type).toBe('ended');
+  });
+
+  it(`reads the worker at most once per ${LIVE_READ_MS} ms`, async () => {
+    const h = harness(db);
+    const ids = await running(db, h, 'live-pace.example');
+    await postBatch(h, ids, 1);
+    let reads = 0;
+    h.deps.liveCounts = async () => {
+      reads++;
+      return { pages: reads, links: 0 };
+    };
+    const polls = Math.ceil((2 * LIVE_READ_MS) / POLL_MS);
+    for (let i = 0; i < polls; i++) h.betweenPolls.push(async () => undefined);
+    h.betweenPolls.push(cancelled(h, ids));
+    await (await open(h, ids)).text();
+    expect(polls).toBeGreaterThan(2);
+    expect(reads).toBe(Math.floor((polls * POLL_MS) / LIVE_READ_MS) + 1);
+  });
+
+  it('does not ask about an access batch, which adds no page or link', async () => {
+    const h = harness(db);
+    const ids = await running(db, h, 'live-access.example');
+    await storeBatch(h, ids, 1, one, { pages: 2, links: 2 });
+    await postBatch(h, ids, 2, 'access');
+    const asked: string[] = [];
+    h.deps.liveCounts = async (id) => {
+      asked.push(id);
+      return { pages: 7, links: 7 };
+    };
+    h.betweenPolls.push(cancelled(h, ids));
+    await (await open(h, ids)).text();
+    expect(asked).toEqual([]);
+  });
+});
 
 describe('the stream of a check anyone with its id may read', () => {
   it('sends the stored batch, the stages and the counts, then the end when the check ends', async () => {

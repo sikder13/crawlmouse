@@ -11,7 +11,7 @@ import { fakeFetcher, type FakeResponse } from '../test-support/fake-fetcher.js'
 import { whoSent } from '../test-support/discriminators.js';
 import { startServer, type FixtureServer } from '../test-support/http.js';
 import type { BatchRequest } from './request.js';
-import { runBatch, type BatchResult } from './run.js';
+import { runBatch, type BatchResult, type Progress } from './run.js';
 import { MAX_ROBOTS_BYTES, MAX_ROBOTS_RULES } from '../politeness/robots.js';
 import { siteKeyOf } from '../politeness/site-key.js';
 import { MAX_DOM_DEPTH, READ_IN_PART, TOO_DEEP } from '../rows/text.js';
@@ -1726,6 +1726,37 @@ describe('round 5: redirect targets', () => {
     expect(requested).toEqual(['https://example.com/robots.txt']);
     expect(result.robots[0]).toMatchObject({ state: 'unreachable', why: 'redirect_status' });
     expect(result.pages[0]!.outcome).toBe('not_requested');
+  });
+});
+
+describe('progress while a batch runs', () => {
+  it('counts pages and links by the rule the result is counted by', async () => {
+    const s = await serve({ robots: robotsText('User-agent: *\nDisallow: /b\n') });
+    const seen: Progress[] = [];
+    const clock = new InstantClock();
+    const result = await runBatch(
+      crawlReq(s.base, ['/a', '/b', '/c']),
+      {
+        clock,
+        sites: new Sites(clock),
+        fetcher: createFetcher(clock, { bypassSsrf: true }),
+        robotsCache: new RobotsCache(clock),
+      },
+      (p) => seen.push(p),
+    );
+    if (result.kind !== 'crawl') throw new Error('expected a crawl result');
+    const fetched = result.pages.filter((p) => p.outcome === 'fetched').length;
+    // The fixture must hold a page that is not fetched, or this cannot tell the two rules apart.
+    expect(fetched).toBeLessThan(result.pages.length);
+    expect(result.link_edges.length).toBeGreaterThan(0);
+    const last = seen.at(-1)!;
+    expect(last.urls_done).toBe(3);
+    expect(last.pages).toBe(fetched);
+    expect(last.links).toBe(result.link_edges.length);
+    for (let i = 1; i < seen.length; i++) {
+      expect(seen[i]!.pages).toBeGreaterThanOrEqual(seen[i - 1]!.pages);
+      expect(seen[i]!.links).toBeGreaterThanOrEqual(seen[i - 1]!.links);
+    }
   });
 });
 

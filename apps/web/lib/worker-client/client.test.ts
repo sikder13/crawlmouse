@@ -7,7 +7,12 @@ import { REFUSALS } from '../../../../packages/worker/src/routes';
 import type { Fetcher } from '../../../../packages/worker/src/fetch/fetcher';
 import { InstantClock } from '../../../../packages/worker/src/test-support/clock';
 import { pageFetcher, startWorker, type InProcessWorker } from './__tests__/in-process-worker';
-import { createWorkerClient, WORKER_REFUSALS, workerClientFromEnv } from './client';
+import {
+  createWorkerClient,
+  PROGRESS_TIMEOUT_MS,
+  WORKER_REFUSALS,
+  workerClientFromEnv,
+} from './client';
 import { batchIdOf, WorkerError, type BatchPost, type WorkerErrorKind } from './types';
 
 const CHECK = '00000000-0000-4000-8000-0000000000c9';
@@ -100,6 +105,56 @@ describe('against the worker, in process', () => {
       signals: true,
     });
     await w.worker.idle();
+  });
+
+  it('reads a running batch from the real worker as live counts, and nothing once it is done', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const w = await worker({}, (clock) => {
+      const page = pageFetcher(clock);
+      return async (url, identity, limits) => {
+        await gate;
+        return page(url, identity, limits);
+      };
+    });
+    const client = clientOf(w);
+    const batch = crawl();
+    await client.postBatch(batch);
+    const id = batchIdOf(CHECK, batch.batch);
+    expect(await client.readProgress(id)).toEqual({ pages: 0, links: 0 });
+    release();
+    await w.worker.idle();
+    expect(await client.readProgress(id)).toBeNull();
+    expect(await client.readProgress(`${CHECK}:424242`)).toBeNull();
+  });
+
+  it('answers null, never throwing, when the progress read fails or stalls', async () => {
+    const down = createWorkerClient({
+      url: 'http://worker.invalid',
+      signingSecret: 's'.repeat(48),
+      privateKey: generateKeyPairSync('ed25519').privateKey,
+      fetch: async () => {
+        throw new Error('unreachable');
+      },
+    });
+    expect(await down.readProgress(`${CHECK}:1`)).toBeNull();
+    const asked: (AbortSignal | null | undefined)[] = [];
+    const stalled = createWorkerClient({
+      url: 'http://worker.invalid',
+      signingSecret: 's'.repeat(48),
+      privateKey: generateKeyPairSync('ed25519').privateKey,
+      timeoutMs: 60_000,
+      fetch: (_url, init) => {
+        asked.push(init?.signal);
+        return new Promise((_resolve, reject) =>
+          init!.signal!.addEventListener('abort', () => reject(init!.signal!.reason)),
+        );
+      },
+    });
+    const before = Date.now();
+    expect(await stalled.readProgress(`${CHECK}:1`)).toBeNull();
+    expect(asked).toHaveLength(1);
+    expect(Date.now() - before).toBeLessThan(PROGRESS_TIMEOUT_MS + 1000);
   });
 
   it('posts a crawl batch it accepts, polls it to done, and reads metrics', async () => {

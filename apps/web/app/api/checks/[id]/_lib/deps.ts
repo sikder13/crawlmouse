@@ -9,6 +9,8 @@ import type { Viewer } from '@/lib/v2/pipeline/public';
 import { sessionMembership } from '@/lib/v2/pipeline/public-deps';
 import { supabasePipelineStore } from '@/lib/v2/pipeline/store';
 import { supabaseStreamStore } from '@/lib/v2/pipeline/stream-store';
+import { workerClientFromEnv } from '@/lib/worker-client/client';
+import type { WorkerClient } from '@/lib/worker-client/types';
 import { capturePublicEventAfterResponse } from '../../_lib/events';
 import { checkRouteLimits } from './limits';
 import type { CancelDeps } from '../cancel/cancel';
@@ -27,6 +29,7 @@ export function checkRouteDeps(
   viewer: Viewer,
 ): StreamDeps & NotifyDeps & CancelDeps {
   const admin = supabaseAdmin();
+  let worker: WorkerClient | null = null;
   return {
     read: supabaseCheckReader(admin),
     isMember: sessionMembership(session, viewer.userId),
@@ -39,6 +42,15 @@ export function checkRouteDeps(
         userId: viewer.userId,
       }),
     send: (event) => inngest.send(event),
+    liveCounts: async (batchId) => {
+      try {
+        worker ??= workerClientFromEnv(process.env);
+        return (await worker?.readProgress(batchId)) ?? null;
+      } catch {
+        // A client that cannot be built (a bad key) leaves the stream on the database's totals.
+        return null;
+      }
+    },
     clientIp: getClientIp,
     now: () => Date.now(),
     sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),

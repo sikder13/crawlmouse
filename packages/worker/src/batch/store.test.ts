@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { BatchResult } from './run.js';
 import { BatchStore, MAX_RECORDS, MAX_RESULT_BYTES, RESULT_TTL_MS } from './store.js';
 
-const progress = { urls_done: 0, urls_total: 1, requests: 0 };
+const progress = { urls_done: 0, urls_total: 1, requests: 0, pages: 0, links: 0 };
 /** A result whose JSON is about `bytes` long, with non-Latin-1 text, so a UTF-16 string would double it. */
 const result = (bytes: number) =>
   ({ kind: 'access', note: '’'.repeat(Math.floor(bytes / 3)) }) as unknown as BatchResult;

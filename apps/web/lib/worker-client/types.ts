@@ -39,11 +39,22 @@ export type PollResult =
   | { status: 'failed' }
   | { status: 'not_found' };
 
+/** What a running batch has read so far, counted as its result will count it. */
+export interface LiveCounts {
+  pages: number;
+  links: number;
+}
+
 export interface WorkerClient {
   /** Resolves with the worker's batch id once it answered 202; throws WorkerError otherwise. */
   /** `signals`: the worker said it will signal this batch's end (PR 5a). */
   postBatch(batch: BatchPost): Promise<{ batch_id: string; signals: boolean }>;
   pollBatch(batchId: string): Promise<PollResult>;
+  /**
+   * A running batch's counts for the live screen; null for anything else, a failed read included.
+   * It never throws and waits at most PROGRESS_TIMEOUT_MS, so a slow worker cannot stall a stream.
+   */
+  readProgress(batchId: string): Promise<LiveCounts | null>;
   readMetrics(): Promise<unknown>;
 }
 

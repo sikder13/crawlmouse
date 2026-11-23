@@ -6,6 +6,7 @@ import {
   type SearchRobots,
 } from '@crawlmouse/types/v2';
 import type { Clock } from '../clock.js';
+import type { PageCounts } from './run.js';
 import type { FetchOutcome } from '../fetch/fetcher.js';
 import { CRAWL } from '../identities.js';
 import { oursAllow, PathMatch, searchVerdicts } from '../politeness/robots.js';
@@ -63,7 +64,7 @@ export interface CrawlRun {
   /** Set when robots.txt, or the batch itself, keeps every page from being requested. */
   blocked: SiteBlock | NotRequested | null;
   /** Called after each page, for progress. */
-  pageDone: () => void;
+  pageDone: (read: PageCounts) => void;
   vantage?: Vantage;
 }
 
@@ -100,7 +101,8 @@ export async function runCrawl(run: CrawlRun, urls: readonly string[]): Promise<
         run.ctx.abort.abort();
         throw e;
       }
-      run.pageDone();
+      const { page, edges } = outcomes[i]!;
+      run.pageDone({ pages: page.outcome === 'fetched' ? 1 : 0, links: edges.length });
     }
   };
   await Promise.all(Array.from({ length: Math.min(CONCURRENT_PAGES, urls.length) }, worker));

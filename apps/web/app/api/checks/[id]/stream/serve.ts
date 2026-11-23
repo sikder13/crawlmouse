@@ -25,19 +25,24 @@ import {
   formatCursor,
   parseCursor,
   readBatch,
+  runningCrawlBatch,
   storedCrawlBatches,
+  withLiveCounts,
   type Cursor,
   type StoredBatch,
 } from '../../../../../lib/v2/pipeline/stream';
 import type { StreamSnapshot, StreamStore } from '../../../../../lib/v2/pipeline/stream-store';
 import type { CheckReader, EvidenceStore } from '../../../../../lib/v2/pipeline/types';
 import type { ProgressEvent } from '../../../../../lib/v2/progress';
+import { batchIdOf, type LiveCounts } from '../../../../../lib/worker-client/types';
 import type { PublicServerEvents } from '../../_lib/events';
 import type { CheckRouteLimits } from '../_lib/limit-keys';
 
 export const POLL_MS = 1500;
 /** The stream closes itself this long after it opened; the route's `maxDuration` is 300 s. */
 export const STREAM_CLOSE_MS = 240_000;
+/** One stream reads the worker's running batch at most this often. */
+export const LIVE_READ_MS = 3000;
 /** How long a browser waits before it reconnects. */
 const RETRY_MS = 2000;
 
@@ -57,6 +62,8 @@ export interface StreamDeps {
     properties: PublicServerEvents['check_finished'],
     accountId: string | null,
   ): Promise<void>;
+  /** The running batch's counts from the worker; absent or null leaves the database's totals. */
+  liveCounts?(batchId: string): Promise<LiveCounts | null>;
   clientIp(req: Request): string;
   now(): number;
   sleep(ms: number): Promise<void>;
@@ -127,6 +134,8 @@ export async function serveStream(
       const openedAt = deps.now();
       let cursor = resumed;
       let snapshot: StreamSnapshot | null = first;
+      let live = null as { batch: number; counts: LiveCounts } | null;
+      let liveReadAt = -Infinity;
       write(`retry: ${RETRY_MS}\n\n`);
       try {
         while (open) {
@@ -152,7 +161,17 @@ export async function serveStream(
             }
           }
           if (!open) break;
-          const facts = factsOf(snapshot, deps.now());
+          const runningBatch = runningCrawlBatch(snapshot);
+          if (live?.batch !== runningBatch) live = null;
+          if (runningBatch !== null && deps.liveCounts && deps.now() - liveReadAt >= LIVE_READ_MS) {
+            liveReadAt = deps.now();
+            const counts = await deps
+              .liveCounts(batchIdOf(checkId, runningBatch))
+              .catch(() => null);
+            if (counts) live = { batch: runningBatch, counts };
+            if (!open) break;
+          }
+          const facts = withLiveCounts(factsOf(snapshot, deps.now()), live?.counts ?? null);
           const out = checkEvents(cursor, facts);
           send(out.events, out.cursor);
           if (cursor.ended) {

@@ -14,11 +14,14 @@ import {
   type PollResult,
   type WorkerClient,
   type WorkerErrorKind,
+  type LiveCounts,
 } from './types';
 
 export const WORKER_URL_ENV = 'CRAWL_WORKER_URL';
 export const SIGNING_SECRET_ENV = 'WORKER_SIGNING_SECRET';
 export const DEFAULT_TIMEOUT_MS = 30_000;
+/** How long one live-progress read may wait: one poll of the stream (`POLL_MS`, 1.5 s). */
+export const PROGRESS_TIMEOUT_MS = 1_500;
 
 /**
  * The worker's refusals (packages/worker/src/routes.ts REFUSALS, plus server.ts's 500 `internal`),
@@ -123,12 +126,12 @@ export function createWorkerClient(opts: WorkerClientOptions): WorkerClient {
   const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 
   /** One request; its signal also bounds reading the answer's body. Redirects are not followed. */
-  async function send(path: string, init: RequestInit): Promise<Response> {
+  async function send(path: string, init: RequestInit, ms = timeoutMs): Promise<Response> {
     try {
       return await fetchImpl(`${base}${path}`, {
         ...init,
         redirect: 'error',
-        signal: AbortSignal.timeout(timeoutMs),
+        signal: AbortSignal.timeout(ms),
       });
     } catch (e) {
       throw new WorkerError(isAbort(e) ? 'timeout' : 'network', null, null);
@@ -159,12 +162,16 @@ export function createWorkerClient(opts: WorkerClientOptions): WorkerClient {
       : new WorkerError(kindOfStatus(res.status), res.status, null);
   }
 
-  function signedGet(path: string, purpose: string): Promise<Response> {
+  function signedGet(path: string, purpose: string, ms?: number): Promise<Response> {
     const ts = String(now());
-    return send(path, {
-      method: 'GET',
-      headers: { [TS_HEADER]: ts, [SIGNATURE_HEADER]: signRead(opts.signingSecret, ts, purpose) },
-    });
+    return send(
+      path,
+      {
+        method: 'GET',
+        headers: { [TS_HEADER]: ts, [SIGNATURE_HEADER]: signRead(opts.signingSecret, ts, purpose) },
+      },
+      ms,
+    );
   }
 
   async function postBatch(batch: BatchPost): Promise<{ batch_id: string; signals: boolean }> {
@@ -239,6 +246,27 @@ export function createWorkerClient(opts: WorkerClientOptions): WorkerClient {
     throw new WorkerError('server', res.status, null);
   }
 
+  async function readProgress(batchId: string): Promise<LiveCounts | null> {
+    if (!ROUTABLE_BATCH_ID.test(batchId)) return null;
+    try {
+      const res = await signedGet(
+        `/batch/${batchId}/progress`,
+        `progress:${batchId}`,
+        PROGRESS_TIMEOUT_MS,
+      );
+      if (res.status !== 200) return null;
+      const answer = await bodyOf(res);
+      if (!isRecord(answer) || answer.batch_id !== batchId || answer.status !== 'running') {
+        return null;
+      }
+      const progress = answer.progress;
+      if (!isRecord(progress) || !isCount(progress.pages) || !isCount(progress.links)) return null;
+      return { pages: progress.pages, links: progress.links };
+    } catch {
+      return null;
+    }
+  }
+
   async function readMetrics(): Promise<unknown> {
     const res = await signedGet('/metrics', 'metrics');
     if (res.status !== 200) throw await refusalOf(res);
@@ -247,8 +275,10 @@ export function createWorkerClient(opts: WorkerClientOptions): WorkerClient {
     return metrics;
   }
 
-  return { postBatch, pollBatch, readMetrics };
+  return { postBatch, pollBatch, readProgress, readMetrics };
 }
+
+const isCount = (v: unknown): v is number => Number.isSafeInteger(v) && (v as number) >= 0;
 
 const present = (v: string | undefined): v is string => v !== undefined && v.trim() !== '';
 

@@ -450,6 +450,68 @@ describe('POST /batch: pause and capacity', () => {
   });
 });
 
+describe('GET /batch/{id}/progress', () => {
+  it('answers a running batch with its progress', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const clock = new InstantClock();
+    const slow: Fetcher = async (url, identity, limits) => {
+      await gate;
+      return fakeFetcher(clock, () => ({ status: 404, body: '' }))(url, identity, limits);
+    };
+    await start({}, slow);
+    const { body } = await post(batchBody());
+    const id = String(body.batch_id);
+    expect((await get(`/batch/${id}/progress`, `progress:${id}`)).body).toEqual({
+      batch_id: id,
+      status: 'running',
+      progress: { urls_done: 0, urls_total: 2, requests: 0, pages: 0, links: 0 },
+    });
+    release();
+  });
+
+  it('never carries the result of a finished batch', async () => {
+    const { worker } = await start();
+    const { body } = await post(batchBody());
+    await worker.idle();
+    const id = String(body.batch_id);
+    const answer = await get(`/batch/${id}/progress`, `progress:${id}`);
+    expect(answer.status).toBe(200);
+    expect(answer.body).toEqual({ batch_id: id, status: 'done' });
+  });
+
+  it('answers failed for a batch that threw', async () => {
+    const { worker } = await start({}, async () => {
+      throw new Error('boom');
+    });
+    const { body } = await post(batchBody());
+    await worker.idle();
+    const id = String(body.batch_id);
+    expect((await get(`/batch/${id}/progress`, `progress:${id}`)).body).toEqual({
+      batch_id: id,
+      status: 'failed',
+    });
+  });
+
+  it('answers 404 for an unknown batch', async () => {
+    await start();
+    const unknown = `${CHECK}:424242`;
+    expect((await get(`/batch/${unknown}/progress`, `progress:${unknown}`)).status).toBe(404);
+  });
+
+  it('takes only a signature made for this batch and this purpose', async () => {
+    const { worker } = await start();
+    const { body } = await post(batchBody());
+    await worker.idle();
+    const id = String(body.batch_id);
+    expect((await get(`/batch/${id}/progress`, `batch:${id}`)).status).toBe(401);
+    expect((await get(`/batch/${id}/progress`, `progress:${CHECK}:0`)).status).toBe(401);
+    expect((await get(`/batch/${id}/progress`, 'metrics')).status).toBe(401);
+    // And a progress signature does not open the route that returns the result.
+    expect((await get(`/batch/${id}`, `progress:${id}`)).status).toBe(401);
+  });
+});
+
 describe('GET /batch/{id}', () => {
   it('reports running with progress while a batch runs', async () => {
     let release!: () => void;
@@ -465,7 +527,7 @@ describe('GET /batch/{id}', () => {
     expect((await get(`/batch/${id}`, `batch:${id}`)).body).toEqual({
       batch_id: id,
       status: 'running',
-      progress: { urls_done: 0, urls_total: 2, requests: 0 },
+      progress: { urls_done: 0, urls_total: 2, requests: 0, pages: 0, links: 0 },
     });
     release();
   });

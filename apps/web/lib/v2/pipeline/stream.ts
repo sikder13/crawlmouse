@@ -161,6 +161,30 @@ export function factsOf(s: StreamSnapshot, now: number): CheckFacts {
   };
 }
 
+/** The crawl batch the worker holds now: posted and not yet read. An access batch adds no page. */
+export const runningCrawlBatch = (s: Pick<StreamSnapshot, 'status' | 'batches'>): number | null =>
+  s.status === 'running'
+    ? (s.batches.find((b) => b.kind === 'crawl' && b.status === 'posted')?.batch ?? null)
+    : null;
+
+/**
+ * The row's totals plus what the running batch has read so far. The stored totals leave a batch out
+ * until it is read, so the two do not overlap; `checkEvents` keeps the result from ever falling.
+ */
+export function withLiveCounts(
+  facts: CheckFacts,
+  live: { pages: number; links: number } | null,
+): CheckFacts {
+  if (live === null) return facts;
+  return {
+    ...facts,
+    counts: {
+      pages_crawled: (facts.counts?.pages_crawled ?? 0) + live.pages,
+      links_found: (facts.counts?.links_found ?? 0) + live.links,
+    },
+  };
+}
+
 /** A stored `waiting_since` as ms from the check's start; null without both, or unreadable. */
 function waitedFrom(since: string | null, started: number | null): number | null {
   if (since === null || started === null) return null;
