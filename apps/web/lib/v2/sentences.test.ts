@@ -103,7 +103,12 @@ const crawler = (c: Check, ua: string) => c.crawlers.find((x) => x.ua === ua)!;
 /** The crawler reads every template in full. */
 const readsAll = (c: Check, ua: string) => {
   const r = crawler(c, ua);
-  Object.assign(r, { verdict: 'allowed', cause: null, text_share: 0.95 });
+  Object.assign(r, {
+    verdict: 'allowed',
+    cause: null,
+    text_share: 0.95,
+    pages_served: r.pages_measured,
+  });
   r.by_template.forEach((t) => (t.verdict = 'allowed'));
 };
 const SCORED_THIN = ['OAI-SearchBot', 'ChatGPT-User', 'Claude-SearchBot'];

@@ -48,6 +48,7 @@ import {
   isChallenged,
   keptOutClauses,
   servedAll,
+  servedCountMissing,
   servedExtent,
   servedOthers,
   meetsEdge,
@@ -289,12 +290,14 @@ export function accessPill(check: Check): DoorView['pill'] {
   return meetsEdge(check)
     ? { state: 'bad', label: EDGE_PILL }
     : kept === 0 && unmeasured === 0
-      ? servedExtent(check)
-        ? {
-            state: 'unverified',
-            label: `${ai.length} of ${ai.length} served${servedExtent(check, true)}`,
-          }
-        : { state: 'ok', label: `${ai.length} of ${ai.length} served` }
+      ? servedCountMissing(check)
+        ? { state: 'unverified', label: 'Served on at least half of pages answered' }
+        : servedExtent(check)
+          ? {
+              state: 'unverified',
+              label: `${ai.length} of ${ai.length} served${servedExtent(check, true)}`,
+            }
+          : { state: 'ok', label: `${ai.length} of ${ai.length} served` }
       : {
           state: blocked ? 'bad' : 'unverified',
           label: [

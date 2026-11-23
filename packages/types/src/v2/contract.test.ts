@@ -144,12 +144,15 @@ describe('every required field is load-bearing', () => {
     for (const [name, field] of arrays) expect(ownCheckCount(field), name).toBe(0);
   });
 
-  it('no field anywhere in the contract is optional', () => {
+  // The one exception (CTO ruling, V2R inbox 032). A crawler row stored before `pages_served` existed
+  // has no count, and a required key would make every stored check and minted snapshot fail to parse.
+  it("no field anywhere in the contract is optional, except a crawler row's pages_served", () => {
     const optional = [FixtureDatasetSchema, ...ENTITIES.map((e) => e.schema)]
       .flatMap((s) => nodes(s))
       .filter((n) => schemaType(n.schema) === 'optional')
       .map((n) => n.path);
-    expect(optional).toEqual([]);
+    expect(optional.length).toBeGreaterThan(0);
+    expect(optional.filter((p) => !/(^|\.)crawlers\[\]\.pages_served$/.test(p))).toEqual([]);
   });
 
   it('every object anywhere in the contract rejects keys it does not declare', () => {

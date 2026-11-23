@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Check, Verdict } from '@crawlmouse/types/v2';
+import { CheckSchema, type Check, type Verdict } from '@crawlmouse/types/v2';
 import { FIXTURE_NAMES, findCheck, fixture, type ViewDataset } from '../fixtures';
 import { CHECKS } from '../recordings';
 import { VERDICTS } from '../../../components/v2/verdicts';
@@ -155,6 +155,7 @@ describe('how many pages a served verdict rests on', () => {
     c.coverage!.pages_sampled = 25;
     c.crawlers.filter(isAi).forEach((x, i) => {
       x.pages_measured = pages[i % pages.length]!;
+      x.pages_served = pages[i % pages.length]!;
     });
     return { d, c };
   }
@@ -194,6 +195,7 @@ describe('how many pages a served verdict rests on', () => {
     Object.assign(c.crawlers.filter(isAi)[0]!, {
       verdict: 'blocked_by_ua_rule',
       pages_measured: 1,
+      pages_served: 1,
     });
     expect(servedExtent(c)).toBe('');
   });
@@ -225,6 +227,7 @@ describe('what the crawler sentences may claim (review of PR 2a)', () => {
       x.verdict = 'allowed';
       x.evidence_class = 'simulated';
       x.pages_measured = x.scored ? 5 : 2;
+      x.pages_served = x.scored ? 5 : 2;
     }
     expect(c.crawlers.some((x) => isAi(x) && !x.scored)).toBe(true);
     expect(
@@ -257,5 +260,73 @@ describe('what the crawler sentences may claim (review of PR 2a)', () => {
     expect(headline).toContain('no crawler request was measured on those pages');
     expect(headline).toMatch(/the other \w+ AI crawlers/);
     expect(headline).not.toMatch(/Requests with all /);
+  });
+});
+
+describe('how many pages a crawler was served on (pages_served)', () => {
+  const OLD_ROW = ', on at least half of the pages that answered';
+  const served = (measured: number, count: number | undefined) => {
+    const c = withVerdicts([]);
+    c.coverage!.pages_sampled = measured;
+    for (const x of c.crawlers.filter(isAi)) {
+      x.verdict = 'allowed';
+      x.evidence_class = 'simulated';
+      x.pages_measured = measured;
+      if (count === undefined) delete x.pages_served;
+      else x.pages_served = count;
+    }
+    return c;
+  };
+
+  it('counts the pages served, not the pages measured', () => {
+    expect(servedExtent(served(5, 3))).toBe(', on 3 of the 5 sampled pages');
+  });
+
+  it('says nothing more when each was served on the whole sample', () => {
+    const c = served(5, 5);
+    expect(servedExtent(c)).toBe('');
+    const n = c.crawlers.filter(isAi).length;
+    expect(accessPill(c)).toEqual({ state: 'ok', label: `${n} of ${n} served` });
+  });
+
+  it('renders a new row with its exact count', () => {
+    const c = served(5, 3);
+    const n = c.crawlers.filter(isAi).length;
+    expect(CheckSchema.parse(c).crawlers[0]).toHaveProperty('pages_served');
+    expect(accessPill(c)).toEqual({
+      state: 'unverified',
+      label: `${n} of ${n} served, on 3 of 5 pages`,
+    });
+    expect(JSON.stringify(accessView(fixtureOf(c), c.id).headline)).toContain(
+      'on 3 of the 5 sampled pages',
+    );
+  });
+
+  it('renders a row stored before the count existed with only what its verdict proves', () => {
+    const c = served(5, undefined);
+    const n = c.crawlers.filter(isAi).length;
+    expect(CheckSchema.parse(c).crawlers.filter(isAi)[0]).not.toHaveProperty('pages_served');
+    expect(servedExtent(c)).toBe(OLD_ROW);
+    expect(JSON.stringify(accessView(fixtureOf(c), c.id).headline)).toContain(OLD_ROW);
+    const pill = accessPill(c);
+    expect(pill).toEqual({
+      state: 'unverified',
+      label: 'Served on at least half of pages answered',
+    });
+    expect(pill!.label).not.toContain(`${n} of ${n} served`);
+  });
+
+  it('treats a check with one old row as old', () => {
+    const c = served(5, 5);
+    delete c.crawlers.filter(isAi)[0]!.pages_served;
+    expect(servedExtent(c)).toBe(OLD_ROW);
+  });
+
+  it('does not ask a row that was not served for its count', () => {
+    const c = served(5, 5);
+    const out = c.crawlers.filter(isAi)[0]!;
+    out.verdict = 'blocked_by_ua_rule';
+    delete out.pages_served;
+    expect(servedExtent(c)).toBe('');
   });
 });

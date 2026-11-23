@@ -56,10 +56,21 @@ export const servedOthers = (n: number) =>
     ? 'The request with the other AI crawler’s user agent was served'
     : `Requests with the other ${numberWord(n)} AI crawlers’ user agents were served`;
 
+/** The crawlers our own request was served as: a verdict from robots.txt alone sent no request. */
+const servedRows = (among: readonly CrawlerResult[]) =>
+  among.filter((c) => isAllowed(c.verdict) && c.evidence_class !== 'declared');
+
+/** A served crawler's row was stored before `pages_served` existed, so its count is not known. */
+export const servedCountMissing = (check: Pick<Check, 'crawlers'>): boolean =>
+  servedRows(check.crawlers.filter(isAi)).some((c) => c.pages_served === undefined);
+
 /**
- * How many sampled pages a served verdict rests on, when that is less than the sample: a crawler can
- * read as served from one page in 25 (V2R question 010). Empty when each was measured on the whole
- * sample. `among` is the crawlers the sentence names. `short` drops "the" and "sampled", for the pill.
+ * How many sampled pages our requests were served on, when that is less than the sample: a crawler
+ * can read as served from one page in 25 (V2R question 010). A row stored before `pages_served`
+ * existed claims what its verdict proves: served on at least half of the pages that answered.
+ * `pages_measured` cannot say more, because it also counts refused and robots-disallowed pages. Empty
+ * when each was served on the whole sample. `among` is the crawlers the sentence names. `short` drops
+ * "the" and "sampled", for the pill, which does not use the wording for an older row.
  */
 export function servedExtent(
   check: Pick<Check, 'crawlers' | 'coverage'>,
@@ -67,10 +78,13 @@ export function servedExtent(
   among: readonly CrawlerResult[] = check.crawlers.filter(isAi),
 ): string {
   const sampled = check.coverage?.pages_sampled ?? 0;
-  const read = among
-    .filter((c) => isAllowed(c.verdict) && c.evidence_class !== 'declared')
-    .map((c) => Math.min(c.pages_measured, sampled));
-  if (!read.length || read.every((n) => n >= sampled)) return '';
+  const rows = servedRows(among);
+  if (!rows.length) return '';
+  if (rows.some((c) => c.pages_served === undefined)) {
+    return ', on at least half of the pages that answered';
+  }
+  const read = rows.map((c) => Math.min(c.pages_served!, sampled));
+  if (read.every((n) => n >= sampled)) return '';
   const low = Math.min(...read);
   const high = Math.max(...read);
   const range = low === high ? count(low) : `${count(low)} to ${count(high)}`;

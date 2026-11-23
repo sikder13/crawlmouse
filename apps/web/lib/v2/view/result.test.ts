@@ -274,7 +274,13 @@ describe('the crawler-access bar', () => {
     const set = (c: Check, verdict: Check['crawlers'][number]['verdict'], uas: string[]) =>
       c.crawlers
         .filter((x) => uas.includes(x.ua))
-        .forEach((x) => Object.assign(x, { verdict, cause: null }));
+        .forEach((x) =>
+          Object.assign(x, {
+            verdict,
+            cause: null,
+            pages_served: verdict === 'allowed' ? x.pages_measured : 0,
+          }),
+        );
     const AI = [
       'OAI-SearchBot',
       'ChatGPT-User',
