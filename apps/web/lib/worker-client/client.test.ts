@@ -5,7 +5,9 @@ import type { AddressInfo } from 'node:net';
 import { afterEach, describe, expect, it } from 'vitest';
 import { REFUSALS } from '../../../../packages/worker/src/routes';
 import type { Fetcher } from '../../../../packages/worker/src/fetch/fetcher';
+import { CRAWL } from '../../../../packages/worker/src/identities';
 import { InstantClock } from '../../../../packages/worker/src/test-support/clock';
+import { fakeFetcher } from '../../../../packages/worker/src/test-support/fake-fetcher';
 import { pageFetcher, startWorker, type InProcessWorker } from './__tests__/in-process-worker';
 import {
   createWorkerClient,
@@ -152,6 +154,44 @@ describe('against the worker, in process', () => {
         ),
     });
     expect(await client.readProgress(id)).toBeNull();
+  });
+
+  it('carries a real finished page from the worker, with its bounds', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const long = `/${'l'.repeat(600)}`;
+    const links = [long, ...Array.from({ length: 30 }, (_, i) => `/p${i}`)]
+      .map((href) => `<a href="${href}">x</a>`)
+      .join('');
+    const w = await worker({}, (clock) => {
+      const page = fakeFetcher(clock, (url) =>
+        url.endsWith('/robots.txt')
+          ? { status: 404, body: '' }
+          : { status: 200, body: `<html><body>${links}</body></html>` },
+      );
+      return async (url, identity, limits) => {
+        if (url.endsWith('/a')) await gate;
+        return page(url, identity, limits);
+      };
+    });
+    const client = clientOf(w);
+    const batch = crawl();
+    await client.postBatch(batch);
+    const id = batchIdOf(CHECK, batch.batch);
+    let live: Awaited<ReturnType<typeof client.readProgress>> = null;
+    for (let i = 0; i < 400 && !live?.total; i++) {
+      live = await client.readProgress(id);
+      await new Promise((r) => setTimeout(r, 5));
+    }
+    release();
+    await w.worker.idle();
+    expect(live).toMatchObject({ pages: 1, total: 1 });
+    const [page] = live!.fresh;
+    // The real crawl identity is the user agent, longer than a short token.
+    expect(page!.identity).toBe(CRAWL.userAgent);
+    expect(page!.identity.length).toBeGreaterThan(64);
+    expect(page!.edges).toHaveLength(20);
+    for (const e of page!.edges) expect(e.to.length).toBeLessThanOrEqual(512);
   });
 
   it('asks from the offset it is given, and hands back the pages finished since', async () => {

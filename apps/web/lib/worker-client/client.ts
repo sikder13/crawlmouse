@@ -30,7 +30,8 @@ const LiveAnswerSchema = z.object({
         status: HttpStatusSchema,
         ms: CountSchema,
         links: CountSchema,
-        identity: z.string().min(1).max(64),
+        // The stored row's limit: the crawl identity is a full user agent.
+        identity: z.string().min(1).max(512),
         edges: z
           .array(z.object({ from: HttpUrlSchema, to: HttpUrlSchema, js_only: z.boolean() }))
           .max(20),
