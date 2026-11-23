@@ -122,8 +122,17 @@
     display: none;
   }
 
+  /* The shell's canvas is dark in a dark theme, and prints if "background graphics" is on. */
+  .frame > [data-v2-shell] {
+    min-height: 0;
+    background: #fff !important;
+    color-scheme: light !important;
+  }
+
   .legal,
-  .legal * {
+  .legal *,
+  .legal input::placeholder,
+  .legal textarea::placeholder {
     color: #13161b !important;
     background: transparent !important;
   }

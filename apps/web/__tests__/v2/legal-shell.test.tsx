@@ -62,10 +62,15 @@ describe('printing a legal page', () => {
     expect(print).toMatch(/\.frame > \[data-v2-shell\] > \[data-v2-footer\]/);
     expect(print).toMatch(/display:\s*none/);
     expect(print).toMatch(/color: #13161b !important/);
+    expect(print).toMatch(/\.frame > \[data-v2-shell\] \{[^}]*background: #fff !important/);
+    expect(print).toMatch(/\.frame > \[data-v2-shell\] \{[^}]*color-scheme: light !important/);
+    expect(print).toMatch(/\.legal input::placeholder/);
   });
 
   it('those selectors name what the page draws', async () => {
     const doc = await docOf(PAGES[1][1]);
+    // The print rules select `.frame`, so the frame must carry that class.
+    expect(doc.querySelector('[data-v2-legal-frame]')?.className).toMatch(/frame/);
     expect(doc.querySelectorAll('[data-v2-legal-frame] > [data-v2-shell] > header')).toHaveLength(
       1,
     );
