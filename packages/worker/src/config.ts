@@ -23,6 +23,17 @@ export interface WorkerConfig {
   /** Where requests leave from (FLY_REGION, FLY_MACHINE_ID) and the build; see vantage.ts. */
   vantage: Vantage;
   /**
+   * APP_SIGNAL_URL: the app's route for "this batch has ended" (signal.ts). Null when unset or not an
+   * https address; the worker then sends no signal and says so, and runs poll as they always have.
+   */
+  appSignalUrl: string | null;
+  /**
+   * APP_SIGNAL_PROTECTION_BYPASS: sent with the done signal so it can reach a staging app behind
+   * Vercel Deployment Protection. Null except on the staging worker, for a `*.vercel.app` address,
+   * because the value opens every non-production deployment. A secret: never logged.
+   */
+  appSignalBypass: string | null;
+  /**
    * LAB_HOST_POLITENESS: each host under lab.crawlmouse.com has its own limiter and stop, for the
    * load test on staging (F-018). Only `1`, and only on the staging app.
    */
@@ -55,6 +66,22 @@ function intIn(
   return n;
 }
 
+function httpsUrl(raw: string | undefined): string | null {
+  if (!raw) return null;
+  try {
+    const u = new URL(raw.trim());
+    return u.protocol === 'https:' && u.username === '' && u.password === '' ? u.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
+function signalBypass(env: Env, url: string | null): string | null {
+  const value = env.APP_SIGNAL_PROTECTION_BYPASS?.trim();
+  if (!value || !url || env.FLY_APP_NAME !== LAB_HOST_POLITENESS_APP) return null;
+  return new URL(url).hostname.endsWith('.vercel.app') ? value : null;
+}
+
 export function loadConfig(env: Env): WorkerConfig {
   const signingSecret = env.WORKER_SIGNING_SECRET ?? '';
   if (signingSecret.length < MIN_SECRET_LENGTH) {
@@ -79,6 +106,8 @@ export function loadConfig(env: Env): WorkerConfig {
     ),
     paused: isCrawlPaused(env),
     vantage: vantageOf(env, RELEASE),
+    appSignalUrl: httpsUrl(env.APP_SIGNAL_URL),
+    appSignalBypass: signalBypass(env, httpsUrl(env.APP_SIGNAL_URL)),
     labHostPoliteness:
       env.LAB_HOST_POLITENESS?.trim() === '1' && env.FLY_APP_NAME === LAB_HOST_POLITENESS_APP,
   };

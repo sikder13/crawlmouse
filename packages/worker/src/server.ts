@@ -20,6 +20,7 @@ import { DeclarationCache } from './batch/declarations.js';
 import { BatchStore } from './batch/store.js';
 import { systemClock, type Clock } from './clock.js';
 import type { WorkerConfig } from './config.js';
+import { createDoneSignal, type SignalPost } from './signal.js';
 import { createFetcher, type Fetcher } from './fetch/fetcher.js';
 import { Sites } from './politeness/sites.js';
 import { REFUSALS, type Refusal } from './routes.js';
@@ -44,6 +45,8 @@ export interface WorkerDeps {
   /** The entry point passes the reader thread; tests read pages inline. */
   reader?: PageReader;
   log?: (e: LogEvent) => void;
+  /** Tests pass what the signal is sent through; the entry point passes none. */
+  signalPost?: SignalPost;
 }
 
 export interface Worker {
@@ -139,6 +142,16 @@ export function createWorker(deps: WorkerDeps): Worker {
     vantage: deps.config.vantage,
     declarationCache: new DeclarationCache(clock),
   };
+  const signal = config.appSignalUrl
+    ? createDoneSignal({
+        url: config.appSignalUrl,
+        secret: config.signingSecret,
+        now,
+        log,
+        ...(deps.signalPost && { post: deps.signalPost }),
+        ...(config.appSignalBypass && { protectionBypass: config.appSignalBypass }),
+      })
+    : null;
   const store = new BatchStore(now);
   const nonces = new Nonces(now);
   const running = new Set<Promise<void>>();
@@ -170,6 +183,7 @@ export function createWorker(deps: WorkerDeps): Worker {
     try {
       const result = await runBatch(req, batchDeps, (p) => store.progress(id, p));
       store.finish(id, result);
+      signal?.({ check_id: req.check_id, batch: req.batch, status: 'done' });
       log({
         event: 'batch_done',
         batch_id: id,
@@ -180,6 +194,7 @@ export function createWorker(deps: WorkerDeps): Worker {
       });
     } catch (e) {
       store.fail(id);
+      signal?.({ check_id: req.check_id, batch: req.batch, status: 'failed' });
       log({ event: 'batch_failed', batch_id: id, error: e instanceof Error ? e.name : 'unknown' });
     } finally {
       sites.sweep();
@@ -235,7 +250,7 @@ export function createWorker(deps: WorkerDeps): Worker {
     const p: Promise<void> = run(id, body).finally(() => running.delete(p));
     running.add(p);
     log({ event: 'batch_accepted', batch_id: id, kind: body.kind, urls: urlsOf(body).length });
-    json(res, 202, { batch_id: id });
+    json(res, 202, { batch_id: id, ...(signal && { signals: true }) });
   }
 
   function getBatch(req: http.IncomingMessage, res: http.ServerResponse, id: string): void {

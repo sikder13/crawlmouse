@@ -45,3 +45,68 @@
   color: var(--v2-mut);
   font-size: var(--v2-text-micro);
 }
+
+.notice {
+  margin: 0 0 12px;
+  color: var(--v2-fg2);
+  font-size: var(--v2-text-ui);
+}
+
+/* F-100: five columns that fit a desktop window beside the rail (changes-log-fit.spec.ts measures
+   1280 and 1440). Narrower, each keeps a readable width and the table scrolls in its region
+   (DESIGN-LOCK §7.7). A fix title or a Slack channel can hold a long unbroken string, so every cell
+   may break inside a word: `anywhere`, because `break-word` does not narrow the column. */
+.stack {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 2px;
+  min-width: 8rem;
+}
+
+.stack,
+.host,
+.what,
+.effect,
+.cause {
+  overflow-wrap: anywhere;
+}
+
+/* Wide enough for "AI readability" and "Technical SEO" on one line each. */
+.effect {
+  display: block;
+  min-width: 7.5rem;
+}
+
+.under {
+  display: block;
+  overflow-wrap: anywhere;
+  color: var(--v2-mut);
+  font-size: var(--v2-text-micro);
+}
+
+.what {
+  min-width: 12rem;
+}
+
+.cause {
+  display: block;
+  min-width: 14rem;
+}
+
+.cause .under {
+  margin-top: 6px;
+}
+
+@media (min-width: 1101px) {
+  .stack {
+    min-width: 10rem;
+  }
+
+  .what {
+    min-width: 10rem;
+  }
+
+  .cause {
+    min-width: 11rem;
+  }
+}

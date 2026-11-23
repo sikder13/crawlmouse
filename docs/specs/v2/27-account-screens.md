@@ -79,6 +79,7 @@ From `apps/web/lib/v2/view`, read through the TypeScript compiler. The screens r
 | `filters`           | `{ name: string; links: FilterLinkView[]; }[]` | The three filters, each with its name, in the order the page draws them.              |
 | `filtersLabel`      | `string`                                       |                                                                                       |
 | `rows`              | `ChangeRowView[]`                              | CC-23's rows, each naming its site.                                                   |
+| `notice`            | `string \| null`                               | Said when the site filter names no site of this account; it does not repeat the id.   |
 | `empty`             | `string \| null`                               | What the page says in place of the table; null when it has rows.                      |
 | `tableLabel`        | `string`                                       |                                                                                       |
 

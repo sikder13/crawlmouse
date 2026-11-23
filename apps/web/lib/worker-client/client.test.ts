@@ -91,11 +91,25 @@ function gated(): { fetcher: (c: InstantClock) => Fetcher; release: () => void }
 }
 
 describe('against the worker, in process', () => {
+  it('reports that a worker with a signal address will signal the batch', async () => {
+    // A closed local port: the signal fails at once, and nothing leaves the machine.
+    const w = await worker({ appSignalUrl: 'https://127.0.0.1:1/api/webhooks/worker' });
+    const batch = crawl();
+    expect(await clientOf(w).postBatch(batch)).toEqual({
+      batch_id: `${CHECK}:${batch.batch}`,
+      signals: true,
+    });
+    await w.worker.idle();
+  });
+
   it('posts a crawl batch it accepts, polls it to done, and reads metrics', async () => {
     const w = await worker();
     const client = clientOf(w);
     const batch = crawl();
-    expect(await client.postBatch(batch)).toEqual({ batch_id: `${CHECK}:${batch.batch}` });
+    expect(await client.postBatch(batch)).toEqual({
+      batch_id: `${CHECK}:${batch.batch}`,
+      signals: false,
+    });
     await w.worker.idle();
     const polled = await client.pollBatch(batchIdOf(CHECK, batch.batch));
     expect(polled).toMatchObject({
