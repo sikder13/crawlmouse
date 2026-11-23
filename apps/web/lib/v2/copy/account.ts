@@ -13,14 +13,29 @@ export const ACCOUNT_COPY = {
   /** The first run: FACTS A6, short form. */
   trialFirstRun: (schedule: string) =>
     `When it ends, this site stays on Free with ${schedule} checks. Nothing you can see is deleted.`,
+  /** The first run, the one site paused by the person: the move to Free does not change it. */
+  trialFirstRunPaused:
+    'When it ends, this site stays on Free, paused as you left it. Nothing you can see is deleted.',
+  /** The first run with no site yet: there is no "this site" to keep (F-103). */
+  trialNoSite: (sites: number, schedule: string) =>
+    `When it ends, the account moves to Free: ${numberWord(sites)} ${plural(sites, 'site', 'sites')}, with ${schedule} checks. Nothing you can see is deleted.`,
   /**
    * After the first run: FACTS A6, and A8 while the reminder is still ahead (`reminderDays` before
    * the end); once it is due the sentence about it is left out, since it would no longer be true.
    */
-  trialLater: (host: string, schedule: string, others: number, reminderDays: number | null) =>
-    `Then Free: ${host} keeps ${schedule} checks${
+  trialLater: (
+    host: string,
+    schedule: string,
+    others: number,
+    reminderDays: number | null,
+    plansOpen = true,
+    oldestPaused = false,
+  ) =>
+    `Then Free: ${host} ${oldestPaused ? 'stays paused, as you left it' : `keeps ${schedule} checks`}${
       others
-        ? `; the other ${numberWord(others)} ${plural(others, 'site pauses', 'sites pause')} until you choose Pro or remove ${plural(others, 'it', 'them')}`
+        ? `; the other ${numberWord(others)} ${plural(others, 'site pauses', 'sites pause')}${
+            plansOpen ? ` until you choose Pro or remove ${plural(others, 'it', 'them')}` : ''
+          }`
         : ''
     }. Nothing you can see is deleted.${
       reminderDays === null ? '' : ` We'll email you ${numberWord(reminderDays)} days before.`

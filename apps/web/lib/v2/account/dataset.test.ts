@@ -166,7 +166,7 @@ describe('loadAccountDataset as the owner', () => {
     const viewer = { accountId: owner.accountId, seatId: owner.seatId, now: NOW.toISOString() };
     const v = dashboardView(d, viewer);
     const row = v.sites.rows.find((r) => r.key === built.check.site_id)!;
-    expect(row.schedule).toBe('monthly, Thu');
+    expect(row.schedule).toBe('monthly, first Thu');
     expect(v.sites.rows.find((r) => r.key === OTHER_SITE)!.schedule).toBe('not scheduled');
     const site = sitePage(d, viewer, built.check.site_id);
     expect(site.kind).toBe('site');

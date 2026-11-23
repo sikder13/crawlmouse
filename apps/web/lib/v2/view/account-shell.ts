@@ -9,6 +9,8 @@
  */
 import { instant, type Change, type Site } from '@crawlmouse/types/v2';
 import { TRIAL_REMINDER_DAYS_BEFORE_END } from '../../auth/constants';
+import { checksPublicEnabled } from '../../auth/flags';
+import { billingV2Enabled } from '../../billing/flags';
 import { AGENCY_MONTHLY, AGENCY_YEARLY, PRO_MONTHLY, usd } from '../../billing/prices';
 import { GATES, type Tier } from '../../entitlement-v2';
 import { ACCOUNT_COPY as COPY } from '../copy/account';
@@ -134,11 +136,23 @@ export const isFirstRun = (v: AccountView) =>
  */
 export type PlanPlace = 'rail' | 'page';
 
+/**
+ * Whether an account page may offer the plan's checkout (F-108). Off on a deployment that serves the
+ * account pages with V2_BILLING off, where the checkout answers raw JSON. With V2_CHECKS_PUBLIC off
+ * no live account page renders, so the design previews keep the offer they were approved with.
+ */
+export function checkoutOpen(
+  env: Readonly<Record<string, string | undefined>> = process.env,
+): boolean {
+  return !checksPublicEnabled(env) || billingV2Enabled(env);
+}
+
 function trialCard(
   v: AccountView,
   plan: PlanPlace,
   billingEnd: string | null,
   owner: boolean,
+  billingOpen: boolean,
 ): TrialCardView | null {
   const a = v.account;
   if (a.state !== 'pro_trial' && a.state !== 'agency_trial') return null;
@@ -166,7 +180,9 @@ function trialCard(
       left,
       note:
         !v.cardOnFile && !charges && billingEnd === null
-          ? `${COPY.noCard} ${COPY.nothingCharged}`
+          ? billingOpen
+            ? `${COPY.noCard} ${COPY.nothingCharged}`
+            : COPY.noCard
           : withheld
             ? COPY.cardManagedByOwner
             : billingEnd !== null
@@ -179,6 +195,24 @@ function trialCard(
   const reminderDue =
     instant(daysBefore(end, TRIAL_REMINDER_DAYS_BEFORE_END, zone)) <= instant(v.now);
   const firstRun = isFirstRun(v);
+  const primaries = primarySites(v).length;
+  const noCardLead = !v.cardOnFile ? `${COPY.noCard} ` : '';
+  // Paused by the person: the move to Free leaves it paused, with no check.
+  const oldestPaused = primaries > 0 && primarySite(v).paused;
+  const whatStays =
+    primaries === 0
+      ? `${noCardLead}${COPY.trialNoSite(GATES.free.sites, freeSchedule)}`
+      : firstRun && primaries === 1
+        ? `${noCardLead}${oldestPaused ? COPY.trialFirstRunPaused : COPY.trialFirstRun(freeSchedule)}`
+        : `${firstRun ? noCardLead : ''}${COPY.trialLater(
+            primarySite(v).host,
+            freeSchedule,
+            primaries - 1,
+            // Nothing sends the reminder while paid plans are closed, so it is not promised.
+            reminderDue || !billingOpen ? null : TRIAL_REMINDER_DAYS_BEFORE_END,
+            billingOpen,
+            oldestPaused,
+          )}`;
   return {
     title,
     left,
@@ -186,19 +220,12 @@ function trialCard(
       ? withheld
         ? COPY.cardManagedByOwner
         : COPY.cardCharged(a.card_last4, dayDate(end, zone))
-      : firstRun
-        ? `${!v.cardOnFile ? `${COPY.noCard} ` : ''}${COPY.trialFirstRun(freeSchedule)}`
-        : COPY.trialLater(
-            primarySite(v).host,
-            freeSchedule,
-            primarySites(v).length - 1,
-            reminderDue ? null : TRIAL_REMINDER_DAYS_BEFORE_END,
-          ),
+      : whatStays,
     // Billing and Keep are the owner's: Settings › Plan and the checkout refuse anyone else.
     billing: owner && firstRun ? action('plan', 'Billing') : null,
     // A trial that charges its card becomes the plan at its end: there is nothing to keep it by.
     keep:
-      !owner || firstRun || charges
+      !billingOpen || !owner || firstRun || charges
         ? null
         : action(
             'keepPlan',
@@ -335,6 +362,7 @@ export function accountShellView(
     role,
     accounts,
     actingIn,
+    billingOpen = checkoutOpen(),
   }: {
     /**
      * The reader's seat role: the rail's Billing and Keep are offered to the owner only. It has no
@@ -348,13 +376,15 @@ export function accountShellView(
     accounts?: readonly SwitcherAccount[];
     /** The account the reader acts in, where it may not be this one (`withSwitcher`). */
     actingIn?: string;
+    /** Whether the plan's checkout can be offered; read from the deployment unless given. */
+    billingOpen?: boolean;
   },
 ): ShellView {
   const seat = readerSeat(v);
   const shell: ShellView = {
     nav: rail(v, current),
     badge: v.tier === 'agency' ? PLAN_NAMES.agency : null,
-    trial: trialCard(v, plan, billingEnd, role === 'owner'),
+    trial: trialCard(v, plan, billingEnd, role === 'owner', billingOpen),
     plan: planCard(v, role === 'owner'),
     switcher: null,
     theme: seat?.theme ?? 'system',

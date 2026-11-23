@@ -10,7 +10,7 @@ import {
   readOfFixes,
 } from '../../../../../lib/v2/pipeline/persist';
 import { checkRef } from '../../../../../lib/v2/pipeline/public';
-import { BATCH_GZIP_BYTES } from '../../../../../lib/v2/pipeline/stream';
+import { BATCH_GZIP_BYTES, START, formatCursor } from '../../../../../lib/v2/pipeline/stream';
 import { crawlResult, edge, row, urlOf } from '../../../../../lib/v2/pipeline/stream.fixtures';
 import {
   pglitePersistDb,
@@ -31,7 +31,7 @@ import {
   type Ids,
 } from '../../../../../__tests__/v2/_lib/check-routes-harness';
 import { STREAM_OPENS_PER_IP_PER_HOUR } from '../_lib/limit-keys';
-import { BATCH_READ_ATTEMPTS, POLL_MS, STREAM_CLOSE_MS, serveStream } from './serve';
+import { BATCH_READ_ATTEMPTS, LIVE_READ_MS, POLL_MS, STREAM_CLOSE_MS, serveStream } from './serve';
 
 const anonymous: Viewer = { userId: null };
 const one = crawlResult(
@@ -63,6 +63,261 @@ const typesOf = (events: ProgressEvent[]) =>
   events.map((e) => (e.type === 'stage' ? `${e.phase}:${e.state}` : e.type));
 const fold = (events: ProgressEvent[]) => events.reduce(reduce, INITIAL_STATE);
 const cancelled = (h: Harness, ids: Ids) => () => h.pipeline.fail(ids.checkId, 'canceled', null);
+
+/** A batch the worker has been given and has not finished: the row a running crawl holds. */
+const postBatch = (h: Harness, ids: Ids, n: number, kind: 'crawl' | 'access' = 'crawl') =>
+  h.pipeline.upsertBatch({
+    check_id: ids.checkId,
+    batch: n,
+    kind,
+    nonce: `nonce-${String(n).padStart(16, '0')}`,
+    posted_at: new Date(h.clock.now).toISOString(),
+    summary: { urls: 10, max_seconds: 60 },
+  });
+const countsIn = (events: ProgressEvent[]) =>
+  events.flatMap((e) => (e.type === 'counts' ? [[e.pages_crawled, e.links_found]] : []));
+
+const liveOf = (pages: number, links: number) => ({
+  pages,
+  links,
+  homepageRead: false,
+  total: 0,
+  fresh: [],
+});
+
+describe('counts from the batch the worker is crawling', () => {
+  it('adds the running batch to the stored totals, by that batch id', async () => {
+    const h = harness(db);
+    const ids = await running(db, h, 'live-counts.example');
+    await storeBatch(h, ids, 1, one, { pages: 2, links: 2 });
+    await postBatch(h, ids, 2);
+    const asked: string[] = [];
+    h.deps.liveProgress = async (id, _after) => {
+      asked.push(id);
+      return liveOf(3, 5);
+    };
+    h.betweenPolls.push(cancelled(h, ids));
+    const { groups } = groupsOf(await (await open(h, ids)).text());
+    expect(asked[0]).toBe(`${ids.checkId}:2`);
+    expect(countsIn(groups.flatMap((g) => g.events))).toEqual([[5, 7]]);
+  });
+
+  const restarts = (body: string) =>
+    body.split('\n\n').filter((b) => b.startsWith('event: restart'));
+
+  it('does not lower a number on the open screen, and tells it to start over', async () => {
+    const h = harness(db);
+    const ids = await running(db, h, 'live-falls.example');
+    await postBatch(h, ids, 1);
+    h.deps.liveProgress = async () => liveOf(9, 9);
+    h.betweenPolls.push(async () => {
+      h.deps.liveProgress = async () => null;
+      await storeBatch(h, ids, 1, one, { pages: 2, links: 2 });
+    });
+    h.betweenPolls.push(async () => undefined);
+    h.betweenPolls.push(cancelled(h, ids));
+    const body = await (await open(h, ids)).text();
+    const state = fold(groupsOf(body).groups.flatMap((g) => g.events));
+    expect([state.pages_crawled, state.links_found]).toEqual([9, 9]);
+    // Once per connection, so a tab that cannot act on it is not told at every poll.
+    expect(restarts(body)).toHaveLength(1);
+  });
+
+  it('after a batch fails, a fresh connection shows only what the check recorded', async () => {
+    const h = harness(db);
+    const ids = await running(db, h, 'live-failed.example');
+    await storeBatch(h, ids, 1, one, { pages: 2, links: 2 });
+    await postBatch(h, ids, 2);
+    h.deps.liveProgress = async () => ({
+      pages: 25,
+      links: 25,
+      homepageRead: false,
+      total: 1,
+      fresh: [finishedPage('/lost', '/gone')],
+    });
+    h.betweenPolls.push(() =>
+      h.pipeline.endBatch(ids.checkId, 2, {
+        status: 'failed',
+        finished_at: new Date(h.clock.now).toISOString(),
+      }),
+    );
+    h.betweenPolls.push(cancelled(h, ids));
+    const first = await (await open(h, ids)).text();
+    expect(fold(groupsOf(first).groups.flatMap((g) => g.events)).pages_crawled).toBe(27);
+    expect(restarts(first)).toHaveLength(1);
+
+    const again = groupsOf(await (await open(h, ids)).text());
+    const state = fold(again.groups.flatMap((g) => g.events));
+    expect([state.pages_crawled, state.links_found]).toEqual([2, 2]);
+    expect(state.nodes.map((n) => n.url)).not.toContain(urlOf('/lost'));
+  });
+
+  it('tells a viewer who reconnects holding a count the check no longer has', async () => {
+    const h = harness(db);
+    const ids = await running(db, h, 'live-resume.example');
+    await storeBatch(h, ids, 1, one, { pages: 2, links: 2 });
+    const held = formatCursor({ ...START, batch: 1, step: 5, pages: 27, links: 26, at: 10 });
+    h.betweenPolls.push(cancelled(h, ids));
+    expect(restarts(await (await open(h, ids, anonymous, held)).text())).toHaveLength(1);
+  });
+
+  it('sends a live page and the count that includes it as one group', async () => {
+    const h = harness(db);
+    const ids = await running(db, h, 'live-together.example');
+    await postBatch(h, ids, 1);
+    h.deps.liveProgress = async () => ({
+      pages: 1,
+      links: 1,
+      homepageRead: true,
+      total: 1,
+      fresh: [finishedPage('/', '/a')],
+    });
+    h.betweenPolls.push(cancelled(h, ids));
+    const { groups } = groupsOf(await (await open(h, ids)).text());
+    const withPage = groups.find((g) => g.events.some((e) => e.type === 'page_fetched'))!;
+    expect(withPage.events.some((e) => e.type === 'counts')).toBe(true);
+  });
+
+  it('does not restart an ordinary run', async () => {
+    const h = harness(db);
+    const ids = await running(db, h, 'live-ordinary.example');
+    await postBatch(h, ids, 1);
+    h.deps.liveProgress = async () => liveOf(2, 2);
+    // Polls with the batch still running and its live count already sent: stored rows alone are
+    // below what the viewer holds, and that is no reason to restart.
+    h.betweenPolls.push(async () => undefined);
+    h.betweenPolls.push(async () => undefined);
+    h.betweenPolls.push(async () => {
+      h.deps.liveProgress = async () => null;
+      await storeBatch(h, ids, 1, one, { pages: 2, links: 2 });
+    });
+    h.betweenPolls.push(cancelled(h, ids));
+    expect(restarts(await (await open(h, ids)).text())).toHaveLength(0);
+  });
+
+  it('carries on from the database when the worker read fails', async () => {
+    const h = harness(db);
+    const ids = await running(db, h, 'live-down.example');
+    await storeBatch(h, ids, 1, one, { pages: 2, links: 2 });
+    await postBatch(h, ids, 2);
+    h.deps.liveProgress = async () => {
+      throw new Error('worker unreachable');
+    };
+    h.betweenPolls.push(cancelled(h, ids));
+    const { groups } = groupsOf(await (await open(h, ids)).text());
+    const events = groups.flatMap((g) => g.events);
+    expect(countsIn(events)).toEqual([[2, 2]]);
+    expect(events.at(-1)!.type).toBe('ended');
+  });
+
+  it(`reads the worker at most once per ${LIVE_READ_MS} ms`, async () => {
+    const h = harness(db);
+    const ids = await running(db, h, 'live-pace.example');
+    await postBatch(h, ids, 1);
+    let reads = 0;
+    h.deps.liveProgress = async () => {
+      reads++;
+      return liveOf(reads, 0);
+    };
+    const polls = Math.ceil((2 * LIVE_READ_MS) / POLL_MS);
+    for (let i = 0; i < polls; i++) h.betweenPolls.push(async () => undefined);
+    h.betweenPolls.push(cancelled(h, ids));
+    await (await open(h, ids)).text();
+    expect(polls).toBeGreaterThan(2);
+    expect(reads).toBe(Math.floor((polls * POLL_MS) / LIVE_READ_MS) + 1);
+  });
+
+  it('does not ask about an access batch, which adds no page or link', async () => {
+    const h = harness(db);
+    const ids = await running(db, h, 'live-access.example');
+    await storeBatch(h, ids, 1, one, { pages: 2, links: 2 });
+    await postBatch(h, ids, 2, 'access');
+    const asked: string[] = [];
+    h.deps.liveProgress = async (id, _after) => {
+      asked.push(id);
+      return liveOf(7, 7);
+    };
+    h.betweenPolls.push(cancelled(h, ids));
+    await (await open(h, ids)).text();
+    expect(asked).toEqual([]);
+  });
+  const finishedPage = (path: string, to: string) => ({
+    url: urlOf(path),
+    status: 200,
+    ms: 40,
+    links: 1,
+    identity: 'browser',
+    edges: [{ from: urlOf(path), to: urlOf(to), js_only: false }],
+  });
+
+  it('draws a finished page on the map while its batch is still running', async () => {
+    const h = harness(db);
+    const ids = await running(db, h, 'live-map.example');
+    await postBatch(h, ids, 1);
+    h.deps.liveProgress = async () => ({
+      pages: 1,
+      links: 1,
+      homepageRead: false,
+      total: 1,
+      fresh: [finishedPage('/', '/a')],
+    });
+    h.betweenPolls.push(cancelled(h, ids));
+    const { groups } = groupsOf(await (await open(h, ids)).text());
+    const state = fold(groups.flatMap((g) => g.events));
+    expect(state.nodes.map((n) => n.url)).toEqual([urlOf('/')]);
+    expect(state.first_links[urlOf('/a')]).toEqual({ from: urlOf('/'), via: 'link' });
+    expect(h.gets).toEqual([]);
+  });
+
+  it('asks only for what it has not sent, and shows a page once when the batch is read', async () => {
+    const h = harness(db);
+    const ids = await running(db, h, 'live-once.example');
+    await postBatch(h, ids, 1);
+    const offsets: number[] = [];
+    const pages = [finishedPage('/', '/a'), finishedPage('/a', '/')];
+    h.deps.liveProgress = async (_id, after) => {
+      offsets.push(after);
+      return { pages: 2, links: 2, homepageRead: false, total: 2, fresh: pages.slice(after) };
+    };
+    h.betweenPolls.push(async () => undefined);
+    h.betweenPolls.push(async () => undefined);
+    h.betweenPolls.push(() =>
+      storeBatch(h, ids, 1, one, { pages: 2, links: 2 }).then(() => undefined),
+    );
+    h.betweenPolls.push(cancelled(h, ids));
+    const { groups } = groupsOf(await (await open(h, ids)).text());
+    expect(offsets).toEqual([0, 2]);
+    const state = fold(groups.flatMap((g) => g.events));
+    expect(state.fetches.map((f) => f.url)).toEqual([urlOf('/'), urlOf('/a')]);
+    expect(state.nodes.map((n) => n.url)).toEqual([urlOf('/'), urlOf('/a')]);
+  });
+
+  it('starts the list again when the worker lost the batch and it was posted anew', async () => {
+    const h = harness(db);
+    const ids = await running(db, h, 'live-restart.example');
+    await postBatch(h, ids, 1);
+    const offsets: number[] = [];
+    const answers = [
+      {
+        pages: 2,
+        links: 2,
+        homepageRead: false,
+        total: 2,
+        fresh: [finishedPage('/', '/a'), finishedPage('/a', '/')],
+      },
+      { pages: 1, links: 1, homepageRead: false, total: 1, fresh: [] },
+      { pages: 1, links: 1, homepageRead: false, total: 1, fresh: [finishedPage('/', '/a')] },
+    ];
+    h.deps.liveProgress = async (_id, after) => {
+      offsets.push(after);
+      return answers.shift() ?? null;
+    };
+    for (let i = 0; i < 4; i++) h.betweenPolls.push(async () => undefined);
+    h.betweenPolls.push(cancelled(h, ids));
+    await (await open(h, ids)).text();
+    expect(offsets).toEqual([0, 2, 0]);
+  });
+});
 
 describe('the stream of a check anyone with its id may read', () => {
   it('sends the stored batch, the stages and the counts, then the end when the check ends', async () => {

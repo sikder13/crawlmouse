@@ -479,6 +479,8 @@ describe('a trial with a card whose subscription is set to cancel at its end', (
 
 describe('/trial-ended for a seat that is not the owner’s', () => {
   it('offers the owner the checkout, and the manager neither it nor a link to Settings › Plan', async () => {
+    // The checkout is offered only while it answers (F-108).
+    vi.stubEnv('V2_BILLING', '1');
     as(shared);
     expect(renderToStaticMarkup(screen(await TrialEndedPage()))).toContain(
       'action="/api/billing/checkout"',

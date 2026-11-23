@@ -258,7 +258,8 @@ export function groupsOf(body: string): { groups: Group[]; retry: number | null;
     const id = lines.find((l) => l.startsWith('id: '));
     const r = lines.find((l) => l.startsWith('retry: '));
     if (r) retry = Number(r.slice(7));
-    if (!data) continue;
+    // A named event (`restart`) is a control message, not a ProgressEvent.
+    if (!data || lines.some((l) => l.startsWith('event: '))) continue;
     open.push(ProgressEventSchema.parse(JSON.parse(data.slice(6))));
     if (id) {
       groups.push({ id: id.slice(4), events: open });

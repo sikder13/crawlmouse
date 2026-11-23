@@ -6,12 +6,13 @@ The worker is a Node 22 HTTP service on Fly (`crawlmouse-worker-staging`). The a
 
 ## Routes
 
-| Method | Path                | Auth                                                                      | Answers                                                                                  |
-| ------ | ------------------- | ------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| GET    | `/healthz`          | none                                                                      | 200 `{"ok":true}`; reads no state                                                        |
-| POST   | `/batch`            | HMAC over `ts.` and the raw body; single-use nonce; per-batch Ed25519 JWT | 202 `{"batch_id"}`; the batch runs after the response                                    |
-| GET    | `/batch/{batch_id}` | HMAC over `ts.batch:{batch_id}`                                           | 200 `running` with progress, `done` with the result, or `failed`; 404 unknown or expired |
-| GET    | `/metrics`          | HMAC over `ts.metrics`                                                    | 200 memory, event-loop lag p99, batches running, requests per site, reader restarts      |
+| Method | Path                                   | Auth                                                                      | Answers                                                                                                                            |
+| ------ | -------------------------------------- | ------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/healthz`                             | none                                                                      | 200 `{"ok":true}`; reads no state                                                                                                  |
+| POST   | `/batch`                               | HMAC over `ts.` and the raw body; single-use nonce; per-batch Ed25519 JWT | 202 `{"batch_id"}`; the batch runs after the response                                                                              |
+| GET    | `/batch/{batch_id}`                    | HMAC over `ts.batch:{batch_id}`                                           | 200 `running` with progress, `done` with the result, or `failed`; 404 unknown or expired                                           |
+| GET    | `/batch/{batch_id}/progress?after={n}` | HMAC over `ts.progress:{batch_id}`                                        | 200 `running` with progress and up to 25 finished pages from `after`, `done` or `failed`, never the result; 404 unknown or expired |
+| GET    | `/metrics`                             | HMAC over `ts.metrics`                                                    | 200 memory, event-loop lag p99, batches running, requests per site, reader restarts                                                |
 
 ### Refusals
 
@@ -102,6 +103,10 @@ Crawlers are the registry entries marked testable; the canary is the registry's 
 | canary  | Googlebot        | Googlebot                       | `Mozilla/5.0 (Linux; Android 6.0.1; Nexus 5X Build/MMB29P) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36 (compatible; Googlebot/2.1; +http://www.google.com/bot.html) Crawlmouse/2.0 (+https://crawlmouse.com/bot)` | bot@crawlmouse.com |
 
 Each access row names its identity: `identity_role` is `control`, `crawler` or `canary` (`render` is CC-14's), and only a `crawler` row has a `ua`, the crawler its verdict is about. `tagged` says whether the request the row shows carried the tag: never the control's; a crawler row whose evidence is the robots.txt read shows that read, made as our crawler, so it is tagged. robots.txt evidence on a batch result records the `identity_sent` it was read with, always our crawler's.
+
+## The done signal
+
+- With `APP_SIGNAL_URL` set to an https address, the worker's `202` says `signals: true`, and when a batch ends it posts `{ check_id, batch, status }` to that address, signed with its HMAC secret in a context of its own, and once more 5 s later. Each request has a 3 s deadline. A signal that fails is logged and changes nothing about the batch. Without the setting the worker sends none and runs poll as before (`src/signal.test.ts`).
 
 ## Politeness
 

@@ -55,6 +55,8 @@ const cancelForms = (html: string) =>
   );
 
 beforeEach(() => {
+  // Cancel and the portal are offered only while billing is on (F-108).
+  vi.stubEnv('V2_BILLING', '1');
   process.env.V2_CHECKS_PUBLIC = '1';
   h.read = read('owner');
 });
