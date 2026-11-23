@@ -1,5 +1,6 @@
 import { checksPublicEnabled, pipelineEnabled } from '@/lib/auth/flags';
 import { scheduleFor } from '@/lib/auth/schedule';
+import { getClientIp } from '@/lib/client-ip';
 import { isCrawlPaused } from '@/lib/crawl-pause';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { supabaseServer } from '@/lib/supabase/server';
@@ -14,9 +15,14 @@ import {
   tooSoonTo,
 } from '@/lib/v2/account/route';
 import { admittedHost, parseAddBody } from '@/lib/v2/account/sites';
-import { supabaseAddSite } from '@/lib/v2/account/sites-store';
+import {
+  supabaseAddSite,
+  supabaseResendQueued,
+  type QueuedCheckRef,
+} from '@/lib/v2/account/sites-store';
 import { loadViewer } from '@/lib/v2/account/viewer';
 import { agencyCaptureFor } from '@/lib/v2/agency/events';
+import { startLimits } from '../checks/_lib/start-limits';
 
 /**
  * The pages a form posts this from, and is sent back to when it is refused: the dashboard, and for
@@ -41,7 +47,8 @@ export const dynamic = 'force-dynamic';
  * transaction (`add_site`). A form is answered with a 303 to the new site's page, or back to the
  * client matrix when it was posted from there; JSON with its ids. A refused form goes back to the
  * page it came from, the dashboard or the matrix, with its notice. The first site an agency account
- * adds also sends `first_client_added` (CC-31 D10).
+ * adds also sends `first_client_added` (CC-31 D10). A host the account already keeps is a 409, and
+ * sends its first check's event again while that check is queued.
  */
 export async function POST(req: Request) {
   if (!checksPublicEnabled()) return notFound();
@@ -115,8 +122,33 @@ export async function POST(req: Request) {
         ? respond('form', back === MATRIX ? MATRIX : `/sites/${added.siteId}`)
         : Response.json({ siteId: added.siteId, checkId: added.checkId }, { status: 201 });
     }
-    case 'exists':
+    case 'exists': {
+      // The add that made this site may have failed at its send, leaving its check queued with
+      // nothing to run it. This repeat recovers it: the same event id, so Inngest runs it once,
+      // counted as the public start counts a repeat. Over that limit it sends nothing.
+      const latest = await sb
+        .from('checks')
+        .select('id, status, trigger, queued_at')
+        .eq('site_id', added.siteId)
+        .order('queued_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (latest.error) throw new Error(`checks read failed: ${latest.error.message}`);
+      const check = latest.data as (QueuedCheckRef & { status: string }) | null;
+      if (check?.status === 'queued') {
+        const ip = getClientIp(req);
+        if (ip === 'unknown' || (await startLimits.replay(ip))) {
+          await supabaseResendQueued()({
+            siteId: added.siteId,
+            accountId: account.id,
+            host: admitted.host,
+            check,
+            requestedByUserId: user.id,
+          });
+        }
+      }
       return refuseTo(req, back, 409, 'site_exists', { siteId: added.siteId });
+    }
     case 'full':
       return refuseTo(req, back, 402, 'upgrade_required', { gate: 'sites' });
     case 'adds_capped':

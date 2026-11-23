@@ -12,6 +12,8 @@ import {
 } from '@/lib/v2/account/sites-test-support';
 import { domainSlot, globalSlot } from '@/lib/v2/account/sites-store';
 import { GLOBAL_AUDITS_PER_DAY } from '@/lib/limits';
+import { rateLimitWindowStart } from '@/lib/rate-limit-window';
+import { START_REPLAYS_PER_IP_PER_HOUR } from '../checks/_lib/start-limits';
 
 // POST /api/sites (CC-26b D6). The session and service-role clients are the PostgREST stand-in over
 // PGlite with every migration applied, so membership, row security and migration 20261112000001's
@@ -341,6 +343,98 @@ describe('POST /api/sites', () => {
     const res = await POST(json({ url: kept.host }));
     expect(res.status).toBe(409);
     expect(await res.json()).toEqual({ code: 'site_exists', siteId: kept.id });
+  });
+
+  describe('adding a site whose first check was left queued by a failed send', () => {
+    const IP = '203.0.113.9';
+    const from = (ip: string | null, url: string) => {
+      const req = json({ url });
+      if (ip !== null) req.headers.set('x-forwarded-for', ip);
+      return req;
+    };
+    const eventOf = (call: number) =>
+      h.send.mock.calls[call]![0] as { id: string; name: string; data: { checkId: string } };
+    /** A site added while the send fails: it and its queued check are there, the event is not. */
+    async function stranded(name: string) {
+      const p = await person(h.db, name);
+      as(p);
+      const url = `${name}.example`;
+      h.send.mockRejectedValueOnce(new Error('inngest down'));
+      await expect(POST(from(null, url))).rejects.toThrow('inngest down');
+      const lost = eventOf(0);
+      h.send.mockClear();
+      return { p, url, lost, site: (await sitesOf(p.accountId))[0]! };
+    }
+    const replayCount = async (ip: string) =>
+      (
+        await h.db.query<{ n: number }>(
+          `select coalesce(sum(request_count), 0)::int as n from public.rate_limits
+            where bucket_key = $1`,
+          [`start-replay:ip:${ip}`],
+        )
+      ).rows[0]!.n;
+
+    it('adding it again answers 409 and sends the same event, so it runs once', async () => {
+      const { url, lost, site } = await stranded('strand');
+      const res = await POST(from(null, url));
+      expect(res.status).toBe(409);
+      expect(await res.json()).toEqual({ code: 'site_exists', siteId: site.id });
+      expect(h.send).toHaveBeenCalledTimes(1);
+      expect(eventOf(0).id).toBe(lost.id);
+      expect(eventOf(0).name).toBe('check.requested');
+      expect(eventOf(0).data.checkId).toBe(lost.data.checkId);
+    });
+
+    it('counts the repeat in the replay bucket, as the home form counts one', async () => {
+      const ip = '203.0.113.10';
+      const { url } = await stranded('strandcount');
+      const before = await replayCount(ip);
+      await POST(from(ip, url));
+      expect((await replayCount(ip)) - before).toBe(1);
+    });
+
+    it('over the replay limit sends nothing and still answers 409', async () => {
+      const { url, site } = await stranded('strandcap');
+      const restore = await setCount(
+        {
+          bucket: `start-replay:ip:${IP}`,
+          window_start: rateLimitWindowStart(Date.now(), 60 * 60 * 1000).toISOString(),
+        },
+        START_REPLAYS_PER_IP_PER_HOUR,
+      );
+      const res = await POST(from(IP, url));
+      await restore();
+      expect(res.status).toBe(409);
+      expect(await res.json()).toEqual({ code: 'site_exists', siteId: site.id });
+      expect(h.send).not.toHaveBeenCalled();
+    });
+
+    it.each(['running', 'failed'])('sends nothing when the check is %s', async (status) => {
+      const { url, site } = await stranded(`strand${status}`);
+      await h.db.query(
+        `update public.checks
+            set status = $2,
+                started_at = now(),
+                progress = case when $2 = 'running' then '{}'::jsonb end,
+                finished_at = case when $2 = 'failed' then now() end,
+                failure_reason = case when $2 = 'failed' then 'crawl_failed' end
+          where site_id = $1`,
+        [site.id, status],
+      );
+      const res = await POST(from(null, url));
+      expect(res.status).toBe(409);
+      expect(h.send).not.toHaveBeenCalled();
+    });
+
+    it('sends nothing for a queued scheduled check, whose retry is the scheduler’s', async () => {
+      const { url, site } = await stranded('strandsched');
+      await h.db.query(`update public.checks set trigger = 'scheduled' where site_id = $1`, [
+        site.id,
+      ]);
+      const res = await POST(from(null, url));
+      expect(res.status).toBe(409);
+      expect(h.send).not.toHaveBeenCalled();
+    });
   });
 
   it('add, remove, add again on Free inside a day is 429 with Retry-After (Q14)', async () => {

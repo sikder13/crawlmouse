@@ -273,8 +273,8 @@ class NotAdded extends Error {
  * an insert that is `add_site`, which writes the site and the check in one transaction. The site does
  * not exist until that insert, so `requestSite` answers with the row being added (its schedule is
  * not read by `requestCheck`, and `next_check_at` stays null for CC-28's scheduler). A send that fails
- * after the insert leaves the site with a queued check that the reaper fails, and a re-check can
- * follow.
+ * after the insert leaves the site with a queued check: adding the site again sends that event again
+ * (`app/api/sites/route.ts`), and the reaper fails the check if nobody does.
  */
 export function supabaseAddSite(
   admin: SupabaseClient,
