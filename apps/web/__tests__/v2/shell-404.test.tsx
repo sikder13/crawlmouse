@@ -1,6 +1,6 @@
 /**
  * RC-20: the site's 404 in the v2 shell (F-026), the skip link on every shell page (F-085), and the
- * Free checks column on the `/check` pages (F-032, F-068).
+ * Free checks column on the `/check` pages (F-068; F-032's footer target, its page copy is row 5a).
  */
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { ReactElement } from 'react';
