@@ -16,7 +16,7 @@ function makeSb(errs: { public_reports?: Error; takedown_requests?: Error } = {}
     table: string;
     update?: Record<string, unknown>;
     filters: [string, string, unknown][];
-    from?: number;
+    after?: string;
   };
   const calls: Call[] = [];
   const sb = {
@@ -34,13 +34,17 @@ function makeSb(errs: { public_reports?: Error; takedown_requests?: Error } = {}
         is: (col: string, val: unknown) => (rec.filters.push(['is', col, val]), chain),
         in: (col: string, val: unknown) => (rec.filters.push(['in', col, val]), chain),
         order: () => chain,
-        range: (from: number) => ((rec.from = from), chain),
+        limit: () => chain,
+        gte: (_col: string, val: string) => ((rec.after = val), chain),
         maybeSingle: async () => ({ data: { domain: 'taken.example' }, error: null }),
         then: (resolve: (r: unknown) => unknown) =>
           resolve(
             rec.update
               ? { error: errs[table as keyof typeof errs] ?? null }
-              : { data: rec.from ? [] : [{ slug: 'abc123' }, { slug: 'older' }], error: null },
+              : {
+                  data: rec.after ? [{ slug: rec.after }] : [{ slug: 'abc123' }, { slug: 'older' }],
+                  error: null,
+                },
           ),
       };
       return chain;

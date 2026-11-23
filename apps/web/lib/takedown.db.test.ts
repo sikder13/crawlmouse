@@ -134,6 +134,41 @@ describe('processTakedown closes the host', () => {
     expect(await status('older')).toBe('removed');
   });
 
+  it('a report removed during the walk does not make it skip the next', async () => {
+    const purged: string[] = [];
+    purgePublicReport.mockImplementation((slug: string) => {
+      purged.push(slug);
+      if (slug === 'named') void db.query(`delete from public.public_reports where slug = 'named'`);
+    });
+    await processTakedown(postgrestOver(db, { maxRows: 2 }), 'named');
+    purgePublicReport.mockReset();
+    expect(purged).toEqual(['named', 'older', 'oldest']);
+  });
+
+  it('walks by key when rows were stored out of key order', async () => {
+    for (const slug of ['zeta', 'alpha', 'mid', 'beta', 'yak']) {
+      await db.query(
+        `insert into public.public_reports (slug, domain) values ($1, 'shuffled.example')`,
+        [slug],
+      );
+    }
+    await processTakedown(postgrestOver(db, { maxRows: 2 }), 'mid');
+    expect(purgePublicReport.mock.calls.map(([s]) => s)).toEqual([
+      'alpha',
+      'beta',
+      'mid',
+      'yak',
+      'zeta',
+    ]);
+  });
+
+  it('reads each report once, however the reads are cut', async () => {
+    await processTakedown(postgrestOver(db, { maxRows: 2 }), 'named');
+    const seen = purgePublicReport.mock.calls.map(([s]) => s);
+    expect(seen).toHaveLength(new Set(seen).size);
+    expect(seen).toHaveLength(3);
+  });
+
   it('still purges each report when the queue write fails', async () => {
     const real = postgrestOver(db);
     const failing = {

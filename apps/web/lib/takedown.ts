@@ -1,23 +1,29 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { purgePublicReport } from './reports';
 
-/** How many of a host's reports one read asks for; the walk continues until a read is empty. */
+/** How many of a host's reports one read asks for. */
 const SLUGS_PER_READ = 500;
 
-/** Each report slug of a domain, read in pages, because one read is capped (`max_rows`). */
-async function slugsOfDomain(sb: SupabaseClient, domain: string): Promise<string[]> {
-  const slugs: string[] = [];
+/**
+ * Purges each report of a domain and answers how many. It reads by key, from the last slug seen,
+ * because one read is capped (`max_rows`) and an offset would skip a row removed during the walk.
+ */
+async function purgeHost(sb: SupabaseClient, domain: string): Promise<number> {
+  let purged = 0;
+  let last: string | null = null;
   for (;;) {
-    const { data, error } = await sb
-      .from('public_reports')
-      .select('slug')
-      .eq('domain', domain)
+    const base = sb.from('public_reports').select('slug').eq('domain', domain);
+    const { data, error } = await (last === null ? base : base.gte('slug', last))
       .order('slug')
-      .range(slugs.length, slugs.length + SLUGS_PER_READ - 1);
+      .limit(SLUGS_PER_READ);
     if (error) throw error;
-    const page = ((data ?? []) as { slug: string }[]).map((r) => r.slug);
-    if (page.length === 0) return slugs;
-    slugs.push(...page);
+    const fresh: string[] = ((data ?? []) as { slug: string }[])
+      .map((r) => r.slug)
+      .filter((s) => s !== last);
+    if (fresh.length === 0) return purged;
+    for (const s of fresh) purgePublicReport(s);
+    purged += fresh.length;
+    last = fresh[fresh.length - 1]!;
   }
 }
 
@@ -54,8 +60,7 @@ export async function processTakedown(sb: SupabaseClient, slug: string): Promise
     .is('takedown_requested_at', null);
   if (rErr) throw rErr;
 
-  const slugs = await slugsOfDomain(sb, domain);
-  for (const s of slugs) purgePublicReport(s);
+  const reports = await purgeHost(sb, domain);
 
   const { error: qErr } = await sb
     .from('takedown_requests')
@@ -63,5 +68,5 @@ export async function processTakedown(sb: SupabaseClient, slug: string): Promise
     .eq('domain', domain)
     .in('status', ['pending', 'verified']);
   if (qErr) throw qErr;
-  return slugs.length;
+  return reports;
 }
