@@ -377,7 +377,7 @@ export function trialEndView(
           ? [COPY.seatsLost(otherSeats)]
           : []
         : [
-            charges && billingEnd === null
+            (charges || onFile) && billingEnd === null
               ? COPY.yourSeatIfCancelled(dayDate(end, zone))
               : COPY.yourSeatEnds(dayDate(end, zone), billingOpen ? plan : null),
           ]),

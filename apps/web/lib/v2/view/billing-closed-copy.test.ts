@@ -299,6 +299,16 @@ describe('Trial ending, other cases with paid plans closed', () => {
       expect(text).not.toContain('If the owner cancels');
     });
 
+    it.each(roles)('%s, a card on file with no renewal recorded: as the owner is told', (role) => {
+      const noMirror = withAccount(bad, { card_last4: '4242', billing_period_months: 1 });
+      expect(read(noMirror, { billingOpen: true, role: 'owner' }).banner.sub).toContain(
+        'is charged on Sat 7 Nov unless you cancel',
+      );
+      expect(read(noMirror, { billingOpen: true, role }).endText).toContain(
+        `If the owner cancels, your access to this account ends on ${END}.`,
+      );
+    });
+
     it('the owner keeps their seat, and is not told otherwise', () => {
       for (const d of [bad, card]) {
         expect(read(d, { ...closed, role: 'owner' }).endText).not.toMatch(/your access/i);
