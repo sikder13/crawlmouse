@@ -9,6 +9,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 import { applyAllMigrations, freshDb } from '../../../__tests__/helpers/pglite-migrations';
 import { personalAccount, signUp } from '../../../__tests__/helpers/v2-check-tables';
 import { checkIdOfKey } from '../pipeline/ids';
+import { MANUAL_BUCKET_S } from '../pipeline/limits';
 import { homepageOf } from '../pipeline/request';
 import { checkRateLimit } from '../../rate-limit';
 import { GLOBAL_AUDITS_BUCKET, GLOBAL_AUDITS_PER_DAY } from '../../limits';
@@ -21,6 +22,7 @@ import {
   removeSite,
   supabaseAddSite,
   supabaseRequestRecheck,
+  queuedEventId,
 } from './sites-store';
 import { adminOver } from './sites-test-support';
 
@@ -576,5 +578,49 @@ describe('readNextChecks (CC-28 D8)', () => {
       ]),
     );
     expect(await readNextChecks(adminOver(db), [])).toEqual(new Map());
+  });
+});
+
+describe('queuedEventId', () => {
+  const SITE = '50000000-0000-4000-8000-000000000001';
+  const AT = Date.UTC(2026, 10, 22, 12, 1, 30);
+  const bucket = Math.floor(AT / (MANUAL_BUCKET_S * 1000));
+  const manualKey = (b: number) => `check:${SITE}:manual:${b}`;
+  const at = new Date(AT).toISOString();
+
+  it('a first audit’s id is its check’s', () => {
+    const id = '0b9d3c52-7c1e-4f0a-9a44-1f2e3d4c5b6a';
+    expect(queuedEventId(SITE, { id, trigger: 'first_audit', queued_at: at })).toBe(
+      `check:${SITE}:first_audit:${id}`,
+    );
+  });
+
+  it('a re-check’s is the bucket it was queued in, or the next (a bucket already taken)', () => {
+    for (const b of [bucket, bucket + 1]) {
+      const id = checkIdOfKey(manualKey(b));
+      expect(queuedEventId(SITE, { id, trigger: 'manual', queued_at: at })).toBe(manualKey(b));
+    }
+  });
+
+  it('is null for an id neither bucket gives, rather than a guess that could start a second run', () => {
+    const id = checkIdOfKey(manualKey(bucket + 2));
+    expect(queuedEventId(SITE, { id, trigger: 'manual', queued_at: at })).toBeNull();
+    expect(
+      queuedEventId(SITE, {
+        id: '0b9d3c52-7c1e-4f0a-9a44-1f2e3d4c5b6a',
+        trigger: 'manual',
+        queued_at: at,
+      }),
+    ).toBeNull();
+  });
+
+  it('is null for a scheduled check: the scheduler owns its retry', () => {
+    expect(
+      queuedEventId(SITE, {
+        id: '0b9d3c52-7c1e-4f0a-9a44-1f2e3d4c5b6a',
+        trigger: 'scheduled',
+        queued_at: at,
+      }),
+    ).toBeNull();
   });
 });

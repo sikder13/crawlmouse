@@ -76,7 +76,31 @@ const refuse = (
   more: { resetAt?: string } = {},
 ): StartRefusal => ({ ok: false, status, body: { code, error, ...more } });
 
-const INVALID_URL = refuse(400, 'invalid_url', 'Enter the address of a public website.');
+export const INVALID_URL = refuse(400, 'invalid_url', 'Enter the address of a public website.');
+
+/**
+ * The caller's address bucket, with Turnstile once it is over its limit: null when the start may go
+ * on. An address that is `unknown` is not counted, and then whether the caller is signed in is not
+ * read. A signed-in start (start-account.ts) passes through the same gate, at the signed-in limit.
+ */
+export async function addressGate(
+  deps: Pick<StartDeps, 'limits' | 'verifyTurnstile'>,
+  input: Pick<StartInput, 'ip' | 'turnstileToken'>,
+  signedIn: () => Promise<boolean>,
+): Promise<StartRefusal | null> {
+  if (input.ip === 'unknown') return null;
+  const bucket = await deps.limits.ip(input.ip, await signedIn());
+  if (bucket.allowed) return null;
+  if (input.turnstileToken === undefined) {
+    return refuse(429, 'captcha_required', 'Confirm you are not a robot to start another audit.', {
+      resetAt: bucket.resetAt.toISOString(),
+    });
+  }
+  if (!(await deps.verifyTurnstile(input.turnstileToken, input.ip))) {
+    return refuse(429, 'captcha_failed', 'That check did not pass. Please try again.');
+  }
+  return null;
+}
 
 export async function startPublicCheck(deps: StartDeps, input: StartInput): Promise<StartOutcome> {
   const host = publicHost(input.url);
@@ -107,24 +131,8 @@ export async function startPublicCheck(deps: StartDeps, input: StartInput): Prom
     );
   }
 
-  if (input.ip !== 'unknown') {
-    const bucket = await deps.limits.ip(input.ip, await deps.signedIn());
-    if (!bucket.allowed) {
-      if (input.turnstileToken === undefined) {
-        return refuse(
-          429,
-          'captcha_required',
-          'Confirm you are not a robot to start another audit.',
-          {
-            resetAt: bucket.resetAt.toISOString(),
-          },
-        );
-      }
-      if (!(await deps.verifyTurnstile(input.turnstileToken, input.ip))) {
-        return refuse(429, 'captcha_failed', 'That check did not pass. Please try again.');
-      }
-    }
-  }
+  const address = await addressGate(deps, input, () => deps.signedIn());
+  if (address !== null) return address;
 
   if (!(await deps.limits.domain(normalizeDomain(host)))) {
     return refuse(
