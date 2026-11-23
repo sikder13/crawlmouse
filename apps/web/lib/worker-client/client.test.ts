@@ -121,16 +121,17 @@ describe('against the worker, in process', () => {
     const batch = crawl();
     await client.postBatch(batch);
     const id = batchIdOf(CHECK, batch.batch);
-    expect(await client.readProgress(id)).toEqual({ pages: 0, links: 0 });
+    const whileRunning = await client.readProgress(id);
     release();
     await w.worker.idle();
+    expect(whileRunning).toEqual({ pages: 0, links: 0 });
     expect(await client.readProgress(id)).toBeNull();
     expect(await client.readProgress(`${CHECK}:424242`)).toBeNull();
   });
 
   it('answers null, never throwing, when the progress read fails or stalls', async () => {
     const down = createWorkerClient({
-      url: 'http://worker.invalid',
+      url: 'http://127.0.0.1:1',
       signingSecret: 's'.repeat(48),
       privateKey: generateKeyPairSync('ed25519').privateKey,
       fetch: async () => {
@@ -140,7 +141,7 @@ describe('against the worker, in process', () => {
     expect(await down.readProgress(`${CHECK}:1`)).toBeNull();
     const asked: (AbortSignal | null | undefined)[] = [];
     const stalled = createWorkerClient({
-      url: 'http://worker.invalid',
+      url: 'http://127.0.0.1:1',
       signingSecret: 's'.repeat(48),
       privateKey: generateKeyPairSync('ed25519').privateKey,
       timeoutMs: 60_000,
