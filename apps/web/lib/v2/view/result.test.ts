@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Check, Fix, FixtureDataset } from '@crawlmouse/types/v2';
 import { findCheck, fixture, type FixtureName } from '../fixtures';
 import { CHECKS } from '../recordings';
-import { resultView, type DoorView, type ResultView } from './result';
+import { partialNotice, resultView, type DoorView, type ResultView } from './result';
 import { pagesReadableText } from './effect-headline';
 
 const NO_MAP = { nodes: [], positions: {} };
@@ -396,6 +396,246 @@ describe('the tables’ labels', () => {
     expect(new Set(rows.map((r) => want(r.key)))).toContain('SEO not estimated');
     expect(new Set(rows.map((r) => want(r.key)))).toContain('AI not yet estimated');
     expect(rows.map((r) => r.points)).toEqual(rows.map((r) => want(r.key)));
+  });
+});
+
+describe('the third card when there is no fix', () => {
+  /** The clean site with its page rows answering `codes`, and every other row removed. */
+  const answering = (codes: number[]) =>
+    view('clean-site', (c, d) => {
+      const template = d.page_results.find((p) => p.check_id === c.id)!;
+      d.page_results = codes.map((status_code, i) => ({
+        ...template,
+        url: `https://example.test/${i}`,
+        status_code,
+      }));
+      c.coverage!.pages_crawled = codes.length;
+      c.coverage!.pages_discovered = codes.length;
+      // As the builder leaves a check with no page served: no letter.
+      Object.assign(c.technical_seo!, { grade: null, score: null });
+    });
+
+  it('says nothing to fix on a check that measured everything', () => {
+    expect(view('clean-site').first.kind).toBe('all-clear');
+  });
+
+  it('does not say all-clear, or that templates ship text, when text was not measured', () => {
+    const v = view('clean-site', (c) => {
+      c.without_js = null;
+    });
+    if (v.first.kind !== 'unmeasured') throw new Error(`got ${v.first.kind}`);
+    expect(v.first.title).toBe('Not everything was measured');
+    expect(v.first.body).toBe(
+      'We found nothing to fix in what we measured. Text without JavaScript was not measured.',
+    );
+    expect(JSON.stringify(v.first)).not.toMatch(/ships its text|get in|Keep it that way/);
+  });
+
+  it('names the AI crawlers that were not measured, from the check', () => {
+    const v = view('clean-site', (c) => {
+      for (const ua of ['GPTBot', 'ClaudeBot']) {
+        c.crawlers.find((x) => x.ua === ua)!.verdict = 'not_measured';
+      }
+    });
+    if (v.first.kind !== 'unmeasured') throw new Error(`got ${v.first.kind}`);
+    expect(v.first.body).toContain('GPTBot and ClaudeBot were not measured.');
+    expect(v.first.body).not.toContain('Text without JavaScript');
+  });
+
+  it('says the site refused when every page answered a refusal, with the status', () => {
+    const v = answering([403, 403]);
+    if (v.first.kind !== 'not-served') throw new Error(`got ${v.first.kind}`);
+    expect(v.first.title).toBe('Your site refused our requests');
+    expect(v.first.body).toMatch(/^2 pages answered our requests, with 403\./);
+    expect(v.first.action).toBeNull();
+  });
+
+  it('does not call a 404 a refusal', () => {
+    const v = answering([404]);
+    if (v.first.kind !== 'not-served') throw new Error(`got ${v.first.kind}`);
+    expect(v.first.title).toBe('Your site did not serve a page');
+    expect(v.first.body).toMatch(/^1 page answered our request, with 404\./);
+  });
+
+  it('takes a 200 at its word: a long page whose links were not all read is served', () => {
+    const v = view('clean-site', (c, d) => {
+      for (const p of d.page_results.filter((x) => x.check_id === c.id)) {
+        Object.assign(p, { links_read: false, title: null, content_simhash: null });
+      }
+    });
+    expect(v.first.kind).toBe('all-clear');
+    expect(v.crawledLine).not.toContain('none served');
+  });
+
+  it('never says nothing was graded beside a letter', () => {
+    const v = view('clean-site', (c, d) => {
+      d.page_results = d.page_results
+        .filter((p) => p.check_id === c.id)
+        .map((p) => ({ ...p, status_code: 403 }));
+      expect(c.technical_seo!.grade).not.toBeNull();
+    });
+    expect(v.first.kind).not.toBe('not-served');
+    expect(v.grades[0].summary).not.toContain('nothing was graded');
+    expect(v.crawledLine).not.toContain('none served');
+  });
+
+  it.each([301, 302, 304, 399])('does not call a %i served', (code) => {
+    expect(answering([code]).first.kind).toBe('not-served');
+  });
+
+  it('names each status, and reads only this check’s pages', () => {
+    const v = view('clean-site', (c, d) => {
+      Object.assign(c.technical_seo!, { grade: null, score: null });
+      const template = d.page_results.find((p) => p.check_id === c.id)!;
+      d.page_results = [
+        ...[401, 403, 429].map((status_code, i) => ({
+          ...template,
+          url: `https://example.test/${i}`,
+          status_code,
+        })),
+        { ...template, check_id: '00000000-0000-4000-8000-0000000000ff', status_code: 200 },
+      ];
+    });
+    if (v.first.kind !== 'not-served') throw new Error(`got ${v.first.kind}`);
+    expect(v.first.body).toMatch(/^3 pages answered our requests, with 401, 403 or 429\./);
+  });
+
+  it('does not let a search engine it could not measure stop the all-clear', () => {
+    const v = view('clean-site', (c) => {
+      c.crawlers.find((x) => x.group === 'search_engine')!.verdict = 'not_measured';
+    });
+    expect(v.first.kind).toBe('all-clear');
+  });
+
+  it('says none of the AI crawlers was measured only when none was', () => {
+    const none = view('clean-site', (c, d) => {
+      Object.assign(c.technical_seo!, { grade: null, score: null });
+      d.page_results = d.page_results
+        .filter((p) => p.check_id === c.id)
+        .map((p) => ({ ...p, status_code: 403 }));
+      for (const x of c.crawlers.filter((y) => y.group !== 'search_engine'))
+        x.verdict = 'not_measured';
+    });
+    const some = view('clean-site', (c, d) => {
+      Object.assign(c.technical_seo!, { grade: null, score: null });
+      d.page_results = d.page_results
+        .filter((p) => p.check_id === c.id)
+        .map((p) => ({ ...p, status_code: 403 }));
+      c.crawlers.find((y) => y.ua === 'GPTBot')!.verdict = 'not_measured';
+    });
+    expect(none.first.kind === 'not-served' && none.first.body).toContain(
+      'None of the six AI crawlers could be measured.',
+    );
+    expect(some.first.kind === 'not-served' && some.first.body).not.toContain('None of the');
+  });
+
+  it('does not call a check with no page served "nothing urgent", whatever its signals show', () => {
+    const signals = answering([403]).doors.find((x) => x.title === 'Agent-readiness signals')!;
+    expect(signals.footer).toBe('Checked by fetch');
+  });
+
+  it('gives each kind of answer its own next step', () => {
+    const next = (code: number) => {
+      const f = answering([code]).first;
+      return f.kind === 'not-served' ? f.body : '';
+    };
+    expect(next(403)).toContain('find the firewall or bot rule that answered them');
+    expect(next(404)).toContain('Once the site serves its pages');
+    expect(next(404)).not.toContain('firewall');
+    expect(next(301)).toContain('If the site has moved, run this audit on its new address');
+    expect(next(301)).not.toContain('Once the site serves');
+  });
+
+  it.each([
+    [
+      'a site that served no page',
+      (c: Check, d: FixtureDataset) => {
+        Object.assign(c.technical_seo!, { grade: null, score: null });
+        d.page_results = d.page_results
+          .filter((p) => p.check_id === c.id)
+          .map((p) => ({ ...p, status_code: 403 }));
+        c.without_js = null;
+        c.content = null;
+        for (const x of c.crawlers.filter((y) => y.group !== 'search_engine'))
+          x.verdict = 'not_measured';
+      },
+    ],
+    [
+      'a check with the crawlers and the text unmeasured',
+      (c: Check) => {
+        c.without_js = null;
+        c.content = null;
+        for (const x of c.crawlers.filter((y) => y.group !== 'search_engine'))
+          x.verdict = 'not_measured';
+      },
+    ],
+  ])('%s: no door says there is nothing to fix in what it did not measure', (_name, edit) => {
+    const v = view('clean-site', edit);
+    const unmeasured = v.doors.filter((d) => d.pill.label.includes('not measured'));
+    expect(unmeasured.length).toBeGreaterThanOrEqual(2);
+    for (const d of unmeasured)
+      expect(d.footer, d.title).not.toMatch(/nothing to fix|nothing urgent/);
+  });
+
+  it('claims nothing about structure on a check where no page was served', () => {
+    const v = answering([403]);
+    expect(v.crawledLine).toBe('1 page answered, none served');
+    expect(v.grades[0].summary).toBe('No page was served, so nothing was graded.');
+    const structure = door(v, 'Site structure');
+    expect(structure.pill.label).toBe('not measured');
+    expect(structure.body).not.toMatch(/orphan|linked|hub/i);
+  });
+});
+
+describe('the partial notice', () => {
+  const noticeOf = (edit: (c: Check, d: FixtureDataset) => void) => {
+    const d = structuredClone(fixture('clean-site'));
+    const c = findCheck(d, CHECK_OF['clean-site']);
+    c.status = 'partial';
+    edit(c, d);
+    return partialNotice(d, c.id);
+  };
+
+  it('states the crawler tests that did not finish, in numbers', () => {
+    const notice = noticeOf((c, d) => {
+      const template = d.page_results.find((p) => p.check_id === c.id)!;
+      d.page_results = [0, 1, 2].map((i) => ({
+        ...template,
+        url: `https://example.test/${i}`,
+        sampled: true,
+        crawlers_reached: i === 0 ? 6 : null,
+      }));
+    });
+    expect(notice).toBe(
+      'This audit is partial: crawler tests did not finish on 2 of the 3 sampled pages.',
+    );
+  });
+
+  it('counts only this check’s sampled pages', () => {
+    const notice = noticeOf((c, d) => {
+      const template = d.page_results.find((p) => p.check_id === c.id)!;
+      d.page_results = [
+        { ...template, url: 'https://example.test/a', sampled: true, crawlers_reached: null },
+        { ...template, url: 'https://example.test/b', sampled: false, crawlers_reached: null },
+        {
+          ...template,
+          check_id: '00000000-0000-4000-8000-0000000000ff',
+          url: 'https://example.test/c',
+          sampled: true,
+          crawlers_reached: null,
+        },
+      ];
+    });
+    expect(notice).toBe(
+      'This audit is partial: crawler tests did not finish on 1 of the 1 sampled page.',
+    );
+  });
+
+  it('does not give unmeasured text as the reason a check is partial', () => {
+    const notice = noticeOf((c) => {
+      c.without_js = null;
+    });
+    expect(notice).not.toContain('text without JavaScript');
   });
 });
 

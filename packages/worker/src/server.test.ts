@@ -216,6 +216,21 @@ describe('the done signal (PR 5a)', () => {
   });
 });
 
+describe('LAB_HOST_POLITENESS reaches the limiter (F-018)', () => {
+  it.each([
+    [true, 'a.lab.crawlmouse.com'],
+    [false, 'crawlmouse.com'],
+  ])('with the setting %s, a lab host is held under %s', async (labHostPoliteness, key) => {
+    const { worker } = await start({ labHostPoliteness });
+    const host = 'a.lab.crawlmouse.com';
+    const body = batchBody({ urls: [`https://${host}/`] }, { site_host: host });
+    expect((await post(body)).status).toBe(202);
+    await worker.idle();
+    const m = await get('/metrics', 'metrics');
+    expect(Object.keys(m.body.requests_per_site as Record<string, number>)).toEqual([key]);
+  });
+});
+
 describe('POST /batch: signature and replay', () => {
   it('refuses a bad signature, a changed body and a stale timestamp with 401', async () => {
     const { clock } = await start();
@@ -566,6 +581,25 @@ describe('GET /batch/{id}/progress', () => {
   });
 });
 
+describe('the done signal through a protected staging app', () => {
+  it('carries the configured bypass from the config to the post', async () => {
+    const signalPost = vi.fn<SignalPost>(async () => undefined);
+    const { worker } = await start(
+      {
+        appSignalUrl: 'https://staging.vercel.app/api/webhooks/worker',
+        appSignalBypass: 'b'.repeat(32),
+      },
+      undefined,
+      undefined,
+      signalPost,
+    );
+    await post(batchBody());
+    await worker.idle();
+    await vi.waitFor(() => expect(signalPost).toHaveBeenCalled());
+    expect(signalPost.mock.calls[0]![1].headers['x-vercel-protection-bypass']).toBe('b'.repeat(32));
+  });
+});
+
 describe('GET /batch/{id}', () => {
   it('reports running with progress while a batch runs', async () => {
     let release!: () => void;
@@ -736,7 +770,7 @@ describe('configuration', () => {
     expect(main).toMatch(/createWorker\(\{ config, reader \}\)/);
   });
 
-  it('reads no environment variable but its own six: no database or Inngest key can reach it', () => {
+  it('reads no environment variable but its own nine: no database or Inngest key can reach it', () => {
     const read = new Set<string>();
     for (const file of ['main.ts', 'config.ts', 'server.ts']) {
       const source = readFileSync(new URL(file, import.meta.url), 'utf8');
@@ -744,9 +778,12 @@ describe('configuration', () => {
       expect(source.match(/process\.env\.[A-Z_]/g)).toBeNull();
     }
     expect([...read].sort()).toEqual([
+      'APP_SIGNAL_PROTECTION_BYPASS',
       'APP_SIGNAL_URL',
       'BATCH_CONCURRENCY',
       'CRAWL_PAUSED',
+      'FLY_APP_NAME',
+      'LAB_HOST_POLITENESS',
       'PORT',
       'WORKER_JWT_PUBLIC_KEY',
       'WORKER_SIGNING_SECRET',

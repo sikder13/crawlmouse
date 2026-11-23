@@ -175,7 +175,9 @@ export interface QueuedCheckRef {
 /**
  * The event id a kept site's queued check was requested under, or null when it cannot be proved.
  * Inngest drops a second event with one id, so re-sending that id is safe whether or not the first
- * send arrived; any other id could start a second run. A first audit's id names its check. A re-check's
+ * send arrived. A check claimed while queued was first sent under its anonymous id, so its re-send has
+ * a different id; the function's `idempotency` on `checkId` keeps that to one run. A first audit's id
+ * names its check. A re-check's
  * names its bucket, the one it was queued in or the next (`requestCheck`, D11), and is accepted only if
  * it gives back this check's id. A scheduled check's depends on the site's schedule at the time, and
  * the scheduler owns its retry.
@@ -273,8 +275,8 @@ class NotAdded extends Error {
  * an insert that is `add_site`, which writes the site and the check in one transaction. The site does
  * not exist until that insert, so `requestSite` answers with the row being added (its schedule is
  * not read by `requestCheck`, and `next_check_at` stays null for CC-28's scheduler). A send that fails
- * after the insert leaves the site with a queued check that the reaper fails, and a re-check can
- * follow.
+ * after the insert leaves the site with a queued check: adding the site again sends that event again
+ * (`app/api/sites/route.ts`), and the reaper fails the check if nobody does.
  */
 export function supabaseAddSite(
   admin: SupabaseClient,

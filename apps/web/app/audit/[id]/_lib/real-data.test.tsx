@@ -45,6 +45,7 @@ import {
 } from '../../../../components/v2/screens/result/AuditPage';
 import { LiveCrawl } from '../_crawl/LiveCrawl';
 import { CheckPage, noticeOf, resultOf } from './CheckPage';
+import { partialNotice } from '../../../../lib/v2/view/result';
 import { FAILURE_COPY } from './failure-copy';
 import { auditHrefs } from './hrefs';
 import type { ReadyCheck } from './page-data';
@@ -196,7 +197,9 @@ describe('/audit/[id]: the result of a measured check, read by a visitor', () =>
     const markup = html(<CheckPage read={two} />);
     expect(markup).toContain('This audit is partial: ');
     for (const c of unmeasured) expect(markup).toContain(c.ua);
-    expect(markup).toContain('text without JavaScript was not measured');
+    // Not why it is partial (a finished check can lack it too): the door says it, the notice does not.
+    expect(partialNotice(two.dataset, SECOND)).not.toContain('JavaScript');
+    expect(markup).toContain('was not measured in this audit');
     expect(html(<CheckPage read={one} />)).not.toContain('This audit is partial');
   });
 
@@ -264,7 +267,13 @@ describe('/audit/[id]: the states around a result', () => {
       kept: false,
     };
     const markup = html(<CheckPage read={read} />);
-    expect(markup).toContain('This audit did not finish');
+    const heading =
+      reason === 'site_unreachable'
+        ? 'We could not reach this site'
+        : reason === 'nothing_read'
+          ? 'We could not read this site'
+          : 'This audit did not finish';
+    expect(markup).toContain(heading);
     expect(markup).not.toContain('before it could grade');
     expect(markup).toContain(`What happened: ${FAILURE_COPY[reason]}.`);
     expect(markup).toContain('6 Nov 2026');
@@ -734,6 +743,24 @@ describe('/audit/[id]/map', () => {
     expect(view.caption).toContain(`of ${one.dataset.page_results.length}`);
     const markup = html(<MapBody read={one} scope="all" />);
     expect(dead(markup)).toEqual([]);
+  });
+
+  it('a check whose pages all answered and none served says so, with no explorer', () => {
+    const refused: ReadyCheck = {
+      ...one,
+      dataset: {
+        ...one.dataset,
+        page_results: one.dataset.page_results.map((p) => ({ ...p, status_code: 403 })),
+      },
+    };
+    for (const scope of ['hubs', 'all'] as const) {
+      const markup = html(<MapBody read={refused} scope={scope} />);
+      expect(markup).toContain('No page was served.');
+      expect(markup).toContain('none served, so there is no link map');
+      expect(markup).not.toContain('pages crawled');
+      expect(markup).not.toContain('Find a page');
+      expect(dead(markup)).toEqual([]);
+    }
   });
 
   it('a check with no page to draw shows a notice, with the way back', () => {

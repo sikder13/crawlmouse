@@ -290,9 +290,12 @@ export function pgliteDoorStore(db: PGlite): DoorStore {
         throw e;
       }
     },
-    async clearExpiry(checkId) {
+    async clearExpiry(siteId) {
       await svc(db, (tx) =>
-        tx.query(`update public.checks set expires_at = null where id = $1`, [checkId]),
+        tx.query(
+          `update public.checks set expires_at = null where site_id = $1 and expires_at is not null`,
+          [siteId],
+        ),
       );
     },
     async recordAttribution(accountId, record) {
