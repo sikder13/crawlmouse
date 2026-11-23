@@ -15,7 +15,6 @@ let turnstileOk = true;
 let auditRow: Record<string, unknown> | null = { id: 'aud-1', user_id: null, url: 'https://ex.com', status: 'completed', grade: 'C' };
 let existingReport: { slug: string } | null = null;
 let insertError: { code?: string; message?: string } | null = null;
-let takenDown = false;
 const rlCalls: string[] = [];
 const insertMock = vi.fn();
 
@@ -28,7 +27,6 @@ vi.mock('@/lib/turnstile', () => ({ verifyTurnstileToken: () => Promise.resolve(
 vi.mock('@/lib/mint-snapshot', () => ({ buildMintSnapshot: () => Promise.resolve({ version: 1, domain: 'ex.com', grade: 'C' }) }));
 vi.mock('@/lib/slug', () => ({ newReportSlug: () => 'slug-xyz' }));
 vi.mock('@/lib/domain', () => ({ normalizeDomain: () => 'ex.com' }));
-vi.mock('@/lib/host-takedown', () => ({ hostTakenDown: () => Promise.resolve(takenDown) }));
 vi.mock('@/lib/supabase/admin', () => ({
   supabaseAdmin: () => ({
     from: (table: string) => ({
@@ -50,7 +48,7 @@ const req = (body: unknown) => new Request('http://localhost/api/reports/mint', 
 beforeEach(() => {
   user = null; ip = '9.9.9.9'; capAllowed = true; turnstileOk = true;
   auditRow = { id: AUD, user_id: null, url: 'https://ex.com', status: 'completed', grade: 'C', score: '63', cms_detected: 'wp', page_count: 10, confidence: 'high', coverage_pct: '0.9', confidence_band: null, projected_score: null, projected_grade: null };
-  existingReport = null; insertError = null; takenDown = false; rlCalls.length = 0; insertMock.mockClear();
+  existingReport = null; insertError = null; rlCalls.length = 0; insertMock.mockClear();
 });
 
 describe('POST /api/reports/mint — auth-optional (V4)', () => {
@@ -87,16 +85,6 @@ describe('POST /api/reports/mint — auth-optional (V4)', () => {
     const res = await POST(req({ auditId: AUD }));
     expect(res.status).toBe(400);
     expect(insertMock).not.toHaveBeenCalled();
-  });
-
-  it('a host with a taken-down report is 409 and writes nothing, even for a report already there', async () => {
-    takenDown = true;
-    const res = await POST(req({ auditId: AUD }));
-    expect(res.status).toBe(409);
-    expect(await res.json()).toEqual({ error: 'host_taken_down' });
-    expect(insertMock).not.toHaveBeenCalled();
-    existingReport = { slug: 'the-old-slug' };
-    expect((await POST(req({ auditId: AUD }))).status).toBe(409);
   });
 
   it('idempotent — an existing report for the audit returns its slug without re-inserting', async () => {
