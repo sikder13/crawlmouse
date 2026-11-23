@@ -27,8 +27,8 @@ when:
 Not read: anything outside those roots, `scripts/` included. The files there that name the
 service-role factory or key: `grep -rlE "supabaseAdmin|SUPABASE_SERVICE_ROLE_KEY" scripts`.
 
-Rows: 91 route handlers, 56 server entry files that read data, 114 files that
-open a service-role client. By gate: caller 23, capability 65, member 29, member_for_site 26, operator 7, own_rows 42, public 33, seat_may 26, signature 10. Open holes: none.
+Rows: 92 route handlers, 56 server entry files that read data, 114 files that
+open a service-role client. By gate: caller 23, capability 65, member 29, member_for_site 26, operator 7, own_rows 42, public 34, seat_may 26, signature 10. Open holes: none.
 
 What this cannot see: a signed-in seat calling PostgREST or an RPC directly with its own session,
 which row security and grants decide (`infra/supabase/migrations`, tested by the `v2-0*` suites);
@@ -129,6 +129,7 @@ Regenerate: `pnpm --filter @crawlmouse/web exec tsx __tests__/security/access-ma
 | `api/webhooks/inngest` | Inngest | signature | `serve` in `apps/web/app/api/webhooks/inngest/route.ts` | Runs the background functions; `serve` checks Inngest’s signing key on every call. | `apps/web/__tests__/security/access-proof-public.test.ts` › the Inngest route refuses an unsigned call when a signing key is set |
 | `api/trpc/[trpc]` | anyone, through their own session | public | — | Queries only, through the caller’s own client, so row security decides; opens no service-role client. | `apps/web/__tests__/security/access-proof-public.test.ts` › the tRPC route runs no procedure on a POST: the router has no mutation |
 | `api/health` | nobody | public | — | Liveness: the version and commit, no database or network read. | `apps/web/app/api/health/route.test.ts` › depends on next/server and the health module only, which depends on package.json only, and neither calls fetch (a liveness probe must not reach Supabase or the network) |
+| `ingest/[...path]` | anyone | public | — | The PostHog proxy: passes a fixed list of headers, no cookie or referrer, to PostHog’s two hosts. Reads no data. | `apps/web/app/ingest/[...path]/route.test.ts` › a signed-in browser’s cookie and page address do not reach PostHog |
 | `embed/[domain]` | anyone | public | — | The badge of the domain’s latest visible public report, and a view count. | `apps/web/__tests__/security/access-proof-public.test.ts` › the embed badge of a domain with no visible report shows no grade |
 | `og/[card]` | anyone | public | — | A social card with a fixed title per card key; reads nothing. | `apps/web/app/og/[card]/route.test.tsx` › has a card for each of those pages and no other |
 | `llms.txt` | anyone | public | — | Static text. | `apps/web/__tests__/llms-txt-route-guard.test.ts` › opens with the H1 and carries the four sections in order |

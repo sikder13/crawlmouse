@@ -34,6 +34,7 @@ import { REFUSALS, type Refusal } from './routes.js';
 
 export const MAX_BODY_BYTES = 1024 * 1024;
 const BATCH_ID = /^\/batch\/([0-9a-f-]{36}:\d{1,7})$/;
+const BATCH_PROGRESS = /^\/batch\/([0-9a-f-]{36}:\d{1,7})\/progress(?:\?after=(\d{1,6}))?$/;
 
 export type LogEvent = Record<string, string | number | boolean | null | string[]>;
 
@@ -181,7 +182,7 @@ export function createWorker(deps: WorkerDeps): Worker {
 
   async function run(id: string, req: BatchRequest): Promise<void> {
     try {
-      const result = await runBatch(req, batchDeps, (p) => store.progress(id, p));
+      const result = await runBatch(req, batchDeps, (p, live) => store.progress(id, p, live));
       store.finish(id, result);
       signal?.({ check_id: req.check_id, batch: req.batch, status: 'done' });
       log({
@@ -246,7 +247,14 @@ export function createWorker(deps: WorkerDeps): Worker {
     if (!nonces.claim(body.nonce)) return refuse(res, 'nonce_replayed');
 
     // Recorded before the 202 goes out, so a poll that follows it finds the batch.
-    store.start(id, { urls_done: 0, urls_total: urlsOf(body).length, requests: 0 });
+    store.start(id, {
+      urls_done: 0,
+      urls_total: urlsOf(body).length,
+      requests: 0,
+      pages: 0,
+      links: 0,
+      homepage_read: false,
+    });
     const p: Promise<void> = run(id, body).finally(() => running.delete(p));
     running.add(p);
     log({ event: 'batch_accepted', batch_id: id, kind: body.kind, urls: urlsOf(body).length });
@@ -263,6 +271,30 @@ export function createWorker(deps: WorkerDeps): Worker {
       return send(res, 200, Buffer.concat([head, r.json, Buffer.from('}')]));
     }
     json(res, 200, { batch_id: id, status: r.status, progress: r.progress });
+  }
+
+  /** A batch's state and counts, never its result: cheap to answer however large the result is. */
+  function getProgress(
+    req: http.IncomingMessage,
+    res: http.ServerResponse,
+    id: string,
+    after: number,
+  ): void {
+    const signature = readSigned(req, `progress:${id}`);
+    if (signature) return refuse(res, signature);
+    const r = store.get(id);
+    if (!r) return refuse(res, 'not_found');
+    if (r.status === 'running') {
+      const live = store.livePages(id, after);
+      return json(res, 200, {
+        batch_id: id,
+        status: r.status,
+        progress: r.progress,
+        pages_total: live.total,
+        live_pages: live.pages,
+      });
+    }
+    json(res, 200, { batch_id: id, status: r.status });
   }
 
   function metrics(req: http.IncomingMessage, res: http.ServerResponse): void {
@@ -289,6 +321,8 @@ export function createWorker(deps: WorkerDeps): Worker {
       if (req.method === 'GET' && url === '/metrics') return metrics(req, res);
       const batch = req.method === 'GET' ? BATCH_ID.exec(url) : null;
       if (batch) return getBatch(req, res, batch[1]!);
+      const progress = req.method === 'GET' ? BATCH_PROGRESS.exec(url) : null;
+      if (progress) return getProgress(req, res, progress[1]!, Number(progress[2] ?? 0));
       if (req.method === 'POST' && url === '/batch') return postBatch(req, res);
       refuse(res, 'not_found');
     };

@@ -209,6 +209,7 @@ export function fakeWorker(results: Map<number, unknown>) {
       held.set(id, batch.batch);
       return { batch_id: id, signals: false };
     },
+    readProgress: async () => null,
     async pollBatch(id): Promise<PollResult> {
       const n = held.get(id);
       if (n === undefined || lost.has(n)) return { status: 'not_found' };

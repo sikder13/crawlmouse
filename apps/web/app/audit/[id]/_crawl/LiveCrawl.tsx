@@ -28,6 +28,9 @@ export interface LiveCrawlProps {
 /** What the email ask says of the address on a real check: where it goes in this step. */
 export const LIVE_EMAIL_DOES = 'We use that address to send you this result, and for nothing else.';
 
+/** How long a dropped stream may stay down before the screen says so: a routine reconnect is shorter. */
+export const LOST_AFTER_MS = 5_000;
+
 /** How long after the server refuses a connection the next is tried: doubling, to a minute. */
 export const retryDelayMs = (refusals: number): number =>
   Math.min(60_000, 5000 * 2 ** Math.max(0, refusals - 1));
@@ -52,6 +55,13 @@ export function LiveCrawl({ checkId, host, crawlers = NO_CRAWLERS }: LiveCrawlPr
     let retry: number | undefined;
     let refusals = 0;
     let stopped = false;
+    /** Runs while the browser retries by itself; a retry that lands first says nothing. */
+    let lost: number | undefined;
+    const connected = () => {
+      window.clearTimeout(lost);
+      lost = undefined;
+      setReachable(true);
+    };
 
     const connect = () => {
       const es = new EventSource(`/api/checks/${checkId}/stream`);
@@ -64,23 +74,36 @@ export function LiveCrawl({ checkId, host, crawlers = NO_CRAWLERS }: LiveCrawlPr
       es.onopen = () => {
         if (first) source.reset();
         first = false;
-        setReachable(true);
+        connected();
       };
       es.onmessage = (e: MessageEvent<string>) => {
         refusals = 0;
+        if (lost !== undefined) connected();
         source.receive(e.data, e.lastEventId);
         if (source.getState().ended === null) return;
         // The check is over: the page now answers this URL with the result, or how it failed.
         es.close();
         refresh.current();
       };
+      // The server holds fewer pages than it showed (a batch failed). A new EventSource sends no
+      // Last-Event-ID, so the run is sent again from the stored rows, and `onopen` starts over.
+      es.addEventListener('restart', () => {
+        es.close();
+        source.interrupted();
+        connect();
+      });
       es.onerror = () => {
         source.interrupted();
         // Still connecting: the browser is reconnecting by itself, with its last event id.
-        if (es.readyState !== EventSource.CLOSED) return;
+        if (es.readyState !== EventSource.CLOSED) {
+          lost ??= window.setTimeout(() => setReachable(false), LOST_AFTER_MS);
+          return;
+        }
         // The server refused. The page is asked again once (the check may be kept, over or gone),
         // and the stream is tried again after a wait.
         es.close();
+        window.clearTimeout(lost);
+        lost = undefined;
         if (stopped) return;
         setReachable(false);
         refusals++;
@@ -94,6 +117,7 @@ export function LiveCrawl({ checkId, host, crawlers = NO_CRAWLERS }: LiveCrawlPr
       stopped = true;
       stream?.close();
       window.clearTimeout(retry);
+      window.clearTimeout(lost);
       window.clearInterval(clock);
     };
   }, [checkId, source]);

@@ -89,6 +89,10 @@ const INVENTORY: [entry: string, why: string][] = [
     "ARRAY slice of a URL pathname's segments (drops the empty one before the leading slash); segments are shaped or replaced, never cut (CC-41).",
   ],
   [
+    "apps/web/lib/analytics/ingest-proxy.ts :: const path = pathname.slice(PREFIX.length) || '/';",
+    'Not crawled text: a `URL.pathname` of a request to our own proxy, which is percent-encoded ASCII, cut after the fixed `/ingest` prefix the line above it has just checked.',
+  ],
+  [
     "apps/web/lib/analytics/first-touch.ts :: return d.toISOString().replace(/\\.\\d{3}Z$/, 'Z');",
     'Not a cut of crawled text: an ISO timestamp of our own clock with its milliseconds removed (CC-41).',
   ],
@@ -431,11 +435,11 @@ const INVENTORY: [entry: string, why: string][] = [
     'ARRAY slice over fix records in the CC-26 account previews (development-only, never persisted): no string is indexed, so no surrogate pair can be split. The three fixes the first-run dashboard starts with; the line under them states how many more there are.',
   ],
   [
-    'apps/web/lib/v2/view/site.ts :: const rest = byNumber.slice(SHOWN_FIXES);',
+    'apps/web/lib/v2/view/site.ts :: const rest = inTable.slice(shownFixes);',
     'ARRAY slice over fix records in the CC-26 account previews (development-only, never persisted): no string is indexed, so no surrogate pair can be split. Every fix after the five the site page lists, shown as one row that states their count, sections and summed effect.',
   ],
   [
-    'apps/web/lib/v2/view/site.ts :: const rows = byNumber.slice(0, SHOWN_FIXES).map((f) => fixRow(v, result, f, fixes));',
+    'apps/web/lib/v2/view/site.ts :: const rows = inTable.slice(0, shownFixes).map((f) => fixRow(v, result, f, fixes));',
     'ARRAY slice over fix records in the CC-26 account previews (development-only, never persisted): no string is indexed, so no surrogate pair can be split. The five fixes the site page lists by number; the rest are the row above.',
   ],
   [

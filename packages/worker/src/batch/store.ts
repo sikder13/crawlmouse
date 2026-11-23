@@ -1,4 +1,4 @@
-import type { BatchResult, Progress } from './run.js';
+import type { BatchResult, LivePage, Progress } from './run.js';
 
 /**
  * Batch records, in memory. A record is kept until RESULT_TTL_MS after its batch finishes, then
@@ -23,8 +23,11 @@ export const MAX_RECORDS = 500;
  */
 export const MAX_RESULT_BYTES = 272 * 1024 * 1024;
 
+/** How many finished pages one progress read hands out; the reader asks again from its offset. */
+export const LIVE_PAGES_PER_READ = 25;
+
 export type BatchRecord =
-  | { status: 'running'; accepted_at: number; progress: Progress }
+  | { status: 'running'; accepted_at: number; progress: Progress; live: LivePage[] }
   /** The result as UTF-8 JSON, held off the JavaScript heap and counted to the byte. */
   | { status: 'done'; accepted_at: number; finished_at: number; json: Buffer }
   | { status: 'failed'; accepted_at: number; finished_at: number; progress: Progress };
@@ -46,12 +49,21 @@ export class BatchStore {
   }
 
   start(id: string, progress: Progress): void {
-    this.records.set(id, { status: 'running', accepted_at: this.now(), progress });
+    this.records.set(id, { status: 'running', accepted_at: this.now(), progress, live: [] });
   }
 
-  progress(id: string, progress: Progress): void {
+  progress(id: string, progress: Progress, live?: LivePage): void {
     const r = this.records.get(id);
-    if (r?.status === 'running') r.progress = progress;
+    if (r?.status !== 'running') return;
+    r.progress = progress;
+    if (live) r.live.push(live);
+  }
+
+  /** A running batch's finished pages from `after`; none for any other batch. */
+  livePages(id: string, after: number): { total: number; pages: LivePage[] } {
+    const r = this.records.get(id);
+    if (r?.status !== 'running') return { total: 0, pages: [] };
+    return { total: r.live.length, pages: r.live.slice(after, after + LIVE_PAGES_PER_READ) };
   }
 
   finish(id: string, result: BatchResult): void {

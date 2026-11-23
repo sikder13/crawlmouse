@@ -10,7 +10,7 @@ import { instant, type Change, type FixtureDataset, type Verdict } from '@crawlm
 import { TRIAL_REMINDER_DAYS_BEFORE_END } from '../../auth/constants';
 import { AGENCY_MONTHLY, AGENCY_YEARLY, PRO_MONTHLY, PRO_YEARLY } from '../../billing/prices';
 import { GATES } from '../../entitlement-v2';
-import { CANCEL_CLICKS, EVIDENCE_CONDENSED_AFTER_DAYS } from '../copy/settings';
+import { CANCEL_CLICKS, SETTINGS_COPY } from '../copy/settings';
 import { ACCOUNT_COPY } from '../copy/account';
 import { TRIAL_END_COPY as COPY } from '../copy/trial-end';
 import { fixesAsOf } from '../fixtures';
@@ -34,7 +34,7 @@ import {
   type Viewer,
 } from './account';
 import { ACCOUNT_NAV, action, type ActionView } from './account-actions';
-import { FREE_SCHEDULE, accountShellView, type ShellView } from './account-shell';
+import { FREE_SCHEDULE, accountShellView, checkoutOpen, type ShellView } from './account-shell';
 import { freeFixes } from './free-fixes';
 import { GRADES } from './segment/changes';
 import type { SeatRole } from '../account/profile';
@@ -99,12 +99,14 @@ export interface TrialReading {
   billingEnd?: string | null;
   /** The reader's seat role: only the owner is offered the plan's checkout or its cancel. */
   role?: SeatRole;
+  /** Whether the plan's checkout can be offered (F-108); read from the deployment unless given. */
+  billingOpen?: boolean;
 }
 
 export function trialEndView(
   d: FixtureDataset,
   viewer: Viewer,
-  { billingEnd = null, role = 'owner' }: TrialReading = {},
+  { billingEnd = null, role = 'owner', billingOpen = checkoutOpen() }: TrialReading = {},
 ): TrialEndView {
   const v = viewAt(d, viewer);
   const a = v.account;
@@ -123,6 +125,8 @@ export function trialEndView(
   // A card trial set to cancel at its end is not charged: it ends as a trial with no card does.
   const cancelled = onFile && billingEnd !== null;
   const owner = role === 'owner';
+  // No card and no checkout: the trial simply ends, so there is nothing to choose between.
+  const nothingToChoose = !billingOpen && !onFile && a.renews_at === null;
   const hostOf = new Map(v.d.sites.map((s) => [s.id, s.host]));
   const checkSite = new Map(v.d.checks.map((c) => [c.id, c.site_id]));
 
@@ -147,7 +151,9 @@ export function trialEndView(
   // when the reminder is due, from its day until that day is over in the account's zone, and nothing
   // after.
   const reminderLine =
-    a.email_prefs.trial_reminder && (at(reminder) >= at(v.now) || sameDay(reminder, v.now, zone))
+    billingOpen &&
+    a.email_prefs.trial_reminder &&
+    (at(reminder) >= at(v.now) || sameDay(reminder, v.now, zone))
       ? COPY.reminderDue(dayDate(reminder, zone))
       : null;
   // A trial whose subscription renews at its end charges the card Checkout took, recorded or not
@@ -155,7 +161,9 @@ export function trialEndView(
   const charges = a.renews_at !== null;
   const cardLine =
     !onFile && !charges
-      ? COPY.noCard
+      ? billingOpen
+        ? COPY.noCard
+        : COPY.noCardClosed
       : card !== null
         ? cancelled
           ? COPY.cardCancelled(card, dayDate(end, zone))
@@ -226,7 +234,7 @@ export function trialEndView(
 
   return {
     // Reached from the dashboard's banner: it sits under Sites, as Final-TrialEnd marks it.
-    shell: accountShellView(v, 'Sites', { plan: 'page', billingEnd, role }),
+    shell: accountShellView(v, 'Sites', { plan: 'page', billingEnd, role, billingOpen }),
     header: {
       title: COPY.title(days, plan),
       line,
@@ -236,7 +244,7 @@ export function trialEndView(
       title: COPY.bannerTitle(plan, dayDate(end, zone)),
       sub: [reminderLine, cardLine].filter(Boolean).join(' '),
       keep:
-        owner && !onFile
+        billingOpen && owner && !onFile
           ? action(
               'keepPlan',
               COPY.keepNoCard(plan, price),
@@ -247,19 +255,20 @@ export function trialEndView(
               },
             )
           : null,
-      end: !owner
-        ? null
-        : !onFile || cancelled
-          ? {
-              label: COPY.letItEnd(dayDate(end, zone)),
-              route: dashboard.href,
-              href: dashboard.href,
-              method: 'get',
-              fields: {},
-              primary: false,
-              context: null,
-            }
-          : action('plan', COPY.cancelBefore(dayDate(end, zone))),
+      end:
+        !owner || nothingToChoose
+          ? null
+          : !onFile || cancelled
+            ? {
+                label: COPY.letItEnd(dayDate(end, zone)),
+                route: dashboard.href,
+                href: dashboard.href,
+                method: 'get',
+                fields: {},
+                primary: false,
+                context: null,
+              }
+            : action('plan', COPY.cancelBefore(dayDate(end, zone))),
     },
     staysTitle: COPY.staysTitle,
     stays,
@@ -320,28 +329,47 @@ export function trialEndView(
         },
       ],
     },
-    keepTitle: !onFile ? COPY.keepTitle(plan) : COPY.doNothingTitle,
-    keepText: [
-      !onFile
-        ? COPY.keepNoCardText(price, yearly)
-        : card === null
-          ? ACCOUNT_COPY.cardManagedByOwner
-          : cancelled
-            ? COPY.cancelledKeepText(card, dayDate(end, zone))
-            : COPY.keepCardText(
-                card,
-                a.billing_period_months === 12 ? yearly : price,
-                dayDate(end, zone),
-                a.billing_period_months === 12 ? 'year' : 'month',
-              ),
-      COPY.terms(CANCEL_CLICKS, EVIDENCE_CONDENSED_AFTER_DAYS),
-    ].join(' '),
-    endTitle: !onFile || cancelled ? COPY.endTitle : COPY.cancelTitle,
+    keepTitle: nothingToChoose
+      ? COPY.plansTitle
+      : !onFile
+        ? COPY.keepTitle(plan)
+        : COPY.doNothingTitle,
+    keepText: nothingToChoose
+      ? SETTINGS_COPY.plansOpenSoon(dayDate(end, zone))
+      : [
+          !onFile
+            ? COPY.keepNoCardText(price, yearly)
+            : card === null
+              ? ACCOUNT_COPY.cardManagedByOwner
+              : cancelled
+                ? COPY.cancelledKeepText(card, dayDate(end, zone))
+                : COPY.keepCardText(
+                    card,
+                    a.billing_period_months === 12 ? yearly : price,
+                    dayDate(end, zone),
+                    a.billing_period_months === 12 ? 'year' : 'month',
+                  ),
+          COPY.terms(CANCEL_CLICKS),
+        ].join(' '),
+    endTitle: nothingToChoose
+      ? COPY.whenItEndsTitle
+      : !onFile || cancelled
+        ? COPY.endTitle
+        : COPY.cancelTitle,
     endText: [
       !onFile || cancelled
         ? COPY.endNothing(dayDate(end, zone))
         : COPY.endCancel(dayDate(end, zone), CANCEL_CLICKS),
-      COPY.endKeeps(site.host, free, freeThree.length, others.length, staging.length > 0, plan),
+      COPY.endKeeps(
+        site.host,
+        free,
+        freeThree.length,
+        others.length,
+        staging.length > 0,
+        plan,
+        billingOpen,
+        site.paused,
+      ),
     ].join(' '),
     tables: COPY.tables,
     columns: COPY.columns,
@@ -371,7 +399,7 @@ const TRIAL_TIER = { pro_trial: 'pro', agency_trial: 'agency' } as const;
 export function trialEndedView(
   d: FixtureDataset,
   viewer: Viewer,
-  { role = 'owner' }: Pick<TrialReading, 'role'> = {},
+  { role = 'owner', billingOpen = checkoutOpen() }: Pick<TrialReading, 'role' | 'billingOpen'> = {},
 ): TrialEndedView | null {
   const v = viewAt(d, viewer);
   const a = v.account;
@@ -381,18 +409,18 @@ export function trialEndedView(
   const tier = TRIAL_TIER[before];
   const plan = PLAN_NAMES[tier];
   const zone = a.timezone;
-  const { stays, pauses } = staysAndPauses(v, plan);
+  const { stays, pauses } = staysAndPauses(v, plan, true);
   return {
-    shell: accountShellView(v, 'Sites', { plan: 'page', role }),
+    shell: accountShellView(v, 'Sites', { plan: 'page', role, billingOpen }),
     header: {
       title: COPY.ended.title(plan),
       line: [dayDate(v.now, zone), COPY.sites(v.d.sites.length)].join(' · '),
     },
     banner: {
       title: COPY.ended.banner(plan, dayDate(a.state_history.at(-1)!.since, zone)),
-      sub: COPY.ended.sub(plan),
+      sub: billingOpen ? COPY.ended.sub(plan) : COPY.ended.subPlansClosed,
       keep:
-        role !== 'owner'
+        !billingOpen || role !== 'owner'
           ? null
           : action(
               'keepPlan',
@@ -424,7 +452,10 @@ export function trialPage(
   if (primarySites(v).length === 0) return null;
   if (v.account.state === 'pro_trial' || v.account.state === 'agency_trial')
     return { kind: 'before', view: trialEndView(d, viewer, reading) };
-  const view = trialEndedView(d, viewer, { role: reading.role });
+  const view = trialEndedView(d, viewer, {
+    role: reading.role,
+    ...(reading.billingOpen === undefined ? {} : { billingOpen: reading.billingOpen }),
+  });
   return view === null ? null : { kind: 'after', view };
 }
 
@@ -434,7 +465,7 @@ export function trialPage(
  * copies, the fixes beyond the three and the paid features the account uses pause. Trial ending reads
  * it before the end, and Trial ended after it.
  */
-function staysAndPauses(v: AccountView, plan: string) {
+function staysAndPauses(v: AccountView, plan: string, ended = false) {
   const site = primarySite(v);
   const others = primarySites(v).filter((s) => s.id !== site.id);
   const staging = v.d.sites.filter((s) => s.staging_of_site_id !== null);
@@ -454,11 +485,22 @@ function staysAndPauses(v: AccountView, plan: string) {
 
   // ── what stays and what pauses ──
   const emails = v.account.email_prefs.change_notes;
+  // The oldest site can only be paused by its owner, and the move to Free leaves it paused
+  // (`apply_entitlement_transition`): it gets no check, so nothing to email about either.
   const alertsByEmail =
-    emails && v.d.alert_rules.some((r) => r.enabled && r.channels.includes('email'));
+    !site.paused &&
+    emails &&
+    v.d.alert_rules.some((r) => r.enabled && r.channels.includes('email'));
   const stays: TrialRowView[] = [
-    { what: site.host, how: COPY.stays.site(free, alertsByEmail) },
-    { what: COPY.stays.evidence, how: COPY.stays.kept(EVIDENCE_CONDENSED_AFTER_DAYS) },
+    {
+      what: site.host,
+      how: site.paused
+        ? ended
+          ? COPY.ended.sitePaused
+          : COPY.stays.sitePaused
+        : COPY.stays.site(free, alertsByEmail),
+    },
+    { what: COPY.stays.evidence, how: COPY.stays.kept },
     ...(freeThree.length
       ? [
           {
