@@ -158,7 +158,7 @@ export const VERDICT_PHRASE: Readonly<Record<Verdict, string>> = {
   disallowed_by_robots: 'disallowed by robots.txt',
   blocked_by_ua_rule: 'our request refused by user agent',
   challenged_ua: 'our request challenged',
-  refused_unverified: 'our request refused, as was every crawler name we sent',
+  refused_unverified: 'our request refused, no other crawler name served on the same pages',
   rate_limited: 'our request rate limited',
   payment_required: 'our request asked to pay',
   edge_blocks_automation: 'blocked our test requests',
@@ -166,6 +166,12 @@ export const VERDICT_PHRASE: Readonly<Record<Verdict, string>> = {
   not_measured: 'not measured',
 };
 export const ACCESS: readonly Verdict[] = ['allowed', 'allowed_thin'];
+
+/** A served verdict that rests on robots.txt alone: no request was sent, so none was served. */
+const phraseOf = (r: Pick<CrawlerResult, 'verdict' | 'evidence_class'>): string =>
+  ACCESS.includes(r.verdict) && r.evidence_class === 'declared'
+    ? 'allowed by robots.txt'
+    : VERDICT_PHRASE[r.verdict];
 
 /**
  * A row for each crawler both checks tested and measured whose verdict moved, in user-agent order:
@@ -188,15 +194,17 @@ export function crawlerRows(
   const now = measured(after);
   const rows: Change[] = [];
   for (const ua of [...now.keys()].sort()) {
-    const from = was.get(ua)?.verdict;
-    const to = now.get(ua)!.verdict;
-    if (from === undefined || from === to) continue;
+    const before = was.get(ua);
+    const after = now.get(ua)!;
+    const from = before?.verdict;
+    const to = after.verdict;
+    if (before === undefined || from === undefined || from === to) continue;
     const viaRobots = from === 'disallowed_by_robots' || to === 'disallowed_by_robots';
     rows.push(
       row(ctx, {
         kind: accessMove(from, to),
         subject: 'crawler_access',
-        summary: `${ua}: ${VERDICT_PHRASE[from]} → ${VERDICT_PHRASE[to]}`,
+        summary: `${ua}: ${phraseOf(before)} → ${phraseOf(after)}`,
         where: viaRobots ? 'robots.txt' : 'all pages',
         pages_affected: ctx.pages_crawled,
         ua,

@@ -44,6 +44,7 @@ const verdict = (ua: string, v: Verdict) => (c: Check) => {
   const existing = c.crawlers.find((r) => r.ua === ua);
   if (existing) {
     existing.verdict = v;
+    existing.evidence_class = v === 'disallowed_by_robots' ? 'declared' : 'simulated';
     return;
   }
   c.crawlers.push({
@@ -51,7 +52,7 @@ const verdict = (ua: string, v: Verdict) => (c: Check) => {
     group: 'ai_training',
     scored: false,
     verdict: v,
-    evidence_class: 'declared',
+    evidence_class: v === 'disallowed_by_robots' ? 'declared' : 'simulated',
     status: null,
     pages_measured: 20,
     cause: null,
@@ -525,6 +526,25 @@ describe('crawler rows', () => {
         diff: { removed: [], added: ['User-agent: ClaudeBot', 'Disallow: /'] },
       },
     });
+  });
+
+  it('does not say we sent a request to a crawler known only from robots.txt', () => {
+    const declared = (v: Verdict) => (c: Check) => {
+      verdict('Googlebot', v)(c);
+      const row = c.crawlers.find((r) => r.ua === 'Googlebot')!;
+      row.evidence_class = 'declared';
+      row.status = null;
+    };
+    const rows = diff({
+      previous: side(1, declared('allowed'), { robots_txt: ROBOTS_BEFORE }),
+      current: side(2, declared('disallowed_by_robots'), { robots_txt: ROBOTS_AFTER }),
+      fixes: [],
+      events: [],
+      outcomes: [],
+    }).changes.filter((c) => c.ua === 'Googlebot');
+    expect(rows.map((r) => r.summary)).toEqual([
+      'Googlebot: allowed by robots.txt → disallowed by robots.txt',
+    ]);
   });
 
   it('resolves a block that lifted', () => {
