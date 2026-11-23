@@ -16,7 +16,7 @@ const PROJECTS: Record<string, string> = {
   webkit: 'webkit',
 };
 
-function parse(md: string): Map<string, StepMeta> {
+export function parseSteps(md: string): Map<string, StepMeta> {
   const out = new Map<string, StepMeta>();
   for (const line of md.split('\n')) {
     // Journey tables: Step | customer | passes | devices | writes | expected. SMOKE: Step | what | passes | writes.
@@ -42,19 +42,42 @@ function parse(md: string): Map<string, StepMeta> {
     const listed = smoke ? [] : [...(cells[5] ?? '').matchAll(/F-\d{3}/g)].map((m) => m[0]);
     out.set(id, { id, devices, writes, listed });
   }
-  // Defect-named steps (D.F-nnn) have no row: every device, and treated as writing until written.
-  for (const m of md.matchAll(/\bD\.(F-\d{3})\b/g)) {
+  // Defect-named steps (D.F-nnn) have no journey row: every device, and writing unless declared below.
+  const declared = /^\s*\|\s*D\.F-\d{3}\s*\|/;
+  const named = md
+    .split('\n')
+    .filter((line) => !declared.test(line))
+    .join('\n');
+  for (const m of named.matchAll(/\bD\.(F-\d{3})\b/g)) {
     out.set(m[0], {
       id: m[0],
       devices: ['desktop', 'phone', 'firefox'],
       writes: true,
-      listed: [m[1]],
+      listed: [m[1]!],
     });
+  }
+  // "D steps that write nothing". Fails closed, as the journey rows do: anything but exactly "no" writes.
+  const seen = new Set<string>();
+  for (const line of md.split('\n').filter((l) => declared.test(l))) {
+    const cells = line
+      .split('|')
+      .slice(1, -1)
+      .map((c) => c.trim());
+    const step = out.get(cells[0]!);
+    if (!step) throw new Error(`STEPS.md declares ${cells[0]}, which is not a D step`);
+    if (seen.has(step.id)) throw new Error(`STEPS.md declares ${step.id} twice`);
+    seen.add(step.id);
+    if (cells.length !== 2 || !/^(yes|no)\b/.test(cells[1]!)) {
+      throw new Error(
+        `STEPS.md ${cells[0]}: Writes cell "${cells[1] ?? ''}" is neither yes nor no`,
+      );
+    }
+    step.writes = cells[1] !== 'no';
   }
   return out;
 }
 
-export const STEPS: ReadonlyMap<string, StepMeta> = parse(
+export const STEPS: ReadonlyMap<string, StepMeta> = parseSteps(
   readFileSync(new URL('../STEPS.md', import.meta.url), 'utf8'),
 );
 
