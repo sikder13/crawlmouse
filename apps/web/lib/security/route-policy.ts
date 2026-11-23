@@ -528,6 +528,13 @@ export const ROUTE_POLICIES: readonly RoutePolicy[] = [
     reason: 'same-origin PostHog proxy; forwards a fixed list of headers, no cookie or referrer',
     origin: 'any',
   },
+  {
+    route: 'api/webhooks/worker',
+    methods: ['POST'],
+    class: 'webhook',
+    verifier: 'verifySignal',
+    origin: 'any',
+  },
 ];
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);

@@ -83,11 +83,11 @@ show up through the items that use them (A-7, B-F8).
 | --- | ---: | ---: | ---: | ---: |
 | page | 20 | 6 | 0 | 26 |
 | metadata | 23 | 0 | 0 | 23 |
-| route | 29 | 9 | 0 | 38 |
+| route | 30 | 9 | 0 | 39 |
 | inngest | 2 | 2 | 0 | 4 |
 | cron | 1 | 1 | 0 | 2 |
 | table | 11 | 7 | 0 | 18 |
-| **all** | 86 | 25 | 0 | 111 |
+| **all** | 87 | 25 | 0 | 112 |
 <!-- /v1-inventory:counts -->
 <!-- prettier-ignore-end -->
 
@@ -211,6 +211,7 @@ rows that matter here are reproduced below so this repository holds the basis of
 | route | `app/api/webhooks/inngest/route.ts` | keep | Inngest serve route; v2 functions register through it too | apps/web/app/api/webhooks/inngest/route.ts:31 |
 | route | `app/api/webhooks/resend/route.ts` | keep | email events webhook, kept | apps/web/lib/security/route-policy.ts:163 |
 | route | `app/api/webhooks/stripe/route.ts` | keep | Stripe webhook, kept (dual-write until 009) | ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md "6.2 URLs") |
+| route | `app/api/webhooks/worker/route.ts` | keep | the crawl worker's signed note that a batch ended (V2R PR 5a), new in v2 | apps/web/lib/security/route-policy.ts:525 |
 | route | `app/billing/route.ts` | retire | v1 redirect to the Stripe portal | ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md "6.2 URLs") |
 | route | `app/embed/[domain]/route.ts` | keep | badge image; kept forever | ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md "6.2 URLs") |
 | route | `app/llms.txt/route.ts` | keep | kept | ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md "6.2 URLs") |
@@ -321,6 +322,7 @@ is the verdict word; the full verdict with its evidence is the entry's `checks` 
 | `app/api/webhooks/inngest/route.ts` | keep | pass | n/a | n/a | n/a | n/a | n/a | n/a |
 | `app/api/webhooks/resend/route.ts` | keep | pass | n/a | n/a | n/a | pass | n/a | n/a |
 | `app/api/webhooks/stripe/route.ts` | keep | pass | n/a | n/a | n/a | pass | n/a | n/a |
+| `app/api/webhooks/worker/route.ts` | keep | pass | n/a | n/a | n/a | pass | n/a | n/a |
 | `app/billing/route.ts` | retire | n/a | pass | pass | pass | n/a | n/a | finding |
 | `app/embed/[domain]/route.ts` | keep | pass | pass | pass | n/a | pass | pass | n/a |
 | `app/llms.txt/route.ts` | keep | n/a | pass | pass | n/a | n/a | n/a | n/a |

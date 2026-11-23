@@ -1274,6 +1274,22 @@
     },
     {
       "kind": "route",
+      "path": "app/api/webhooks/worker/route.ts",
+      "ruling": "keep",
+      "reason": "the crawl worker's signed note that a batch ended (V2R PR 5a), new in v2",
+      "evidence": "apps/web/lib/security/route-policy.ts:525",
+      "checks": {
+        "input": "pass — size bound, then HMAC verified (:41) before parse (:44)",
+        "output": "n/a — returns no data of its owns",
+        "cache": "n/a — machine-to-machine POST, never cached",
+        "redirect": "n/a — no redirect and no next/returnTo param in the file",
+        "errors": "pass — status codes only, no message (:53)",
+        "escaping": "n/a — no HTML output (JSON, plain text or a redirect)",
+        "abuse": "n/a — signed"
+      }
+    },
+    {
+      "kind": "route",
       "path": "app/billing/route.ts",
       "ruling": "retire",
       "reason": "v1 redirect to the Stripe portal",
