@@ -135,8 +135,8 @@ describe('every fixture parses with its schema', () => {
 
 describe('every required field is load-bearing', () => {
   // The sweep below asks the schema which keys are required, so it cannot notice a key that has been
-  // made optional. This rule is independent of that: no key in the contract is optional; a value that
-  // can be absent is written as null, so every record has every key.
+  // made optional. This rule is independent of that: a value that can be absent is written as null, so a
+  // record has every key. The one optional key is named in the test below.
   it('the dataset schema adds no rule of its own, so a record can be checked on its own', () => {
     expect(ownCheckCount(FixtureDatasetSchema)).toBe(0);
     const arrays = Object.entries(DATASET_SHAPE).filter(([, f]) => schemaType(f) === 'array');
@@ -151,7 +151,7 @@ describe('every required field is load-bearing', () => {
       .flatMap((s) => nodes(s))
       .filter((n) => schemaType(n.schema) === 'optional')
       .map((n) => n.path);
-    expect([...new Set(optional)].sort()).toEqual([
+    expect([...optional].sort()).toEqual([
       'checks[].crawlers[].pages_served',
       'crawlers[].pages_served',
     ]);
