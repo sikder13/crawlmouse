@@ -258,6 +258,7 @@ export const NotReadReasonSchema = z.enum([
   'reader_thread_crashed',
   'reader_deadline',
   'reader_error',
+  'reader_stopped_for_host',
 ]);
 
 /** robots.txt as one origin answered it for the batch, as evidence. */

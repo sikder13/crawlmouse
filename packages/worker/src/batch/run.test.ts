@@ -11,6 +11,7 @@ import { fakeFetcher, type FakeResponse } from '../test-support/fake-fetcher.js'
 import { whoSent } from '../test-support/discriminators.js';
 import { startServer, type FixtureServer } from '../test-support/http.js';
 import type { BatchRequest } from './request.js';
+import { SLOW_READ_MS, SMALL_PAGE_CHARS } from './reader-breaker.js';
 import { runBatch, type BatchResult } from './run.js';
 import { MAX_ROBOTS_BYTES, MAX_ROBOTS_RULES } from '../politeness/robots.js';
 import { siteKeyOf } from '../politeness/site-key.js';
@@ -753,7 +754,7 @@ describe('review fixes: the canary and causes', () => {
 });
 
 describe('review round 6: a page the reader gives no answer for fails alone', () => {
-  type How = ReaderNotRead;
+  type How = Exclude<ReaderNotRead, 'reader_stopped_for_host'>;
   const HOW: How[] = ['reader_thread_crashed', 'reader_deadline', 'reader_error'];
   /** The inline reader, except that a body containing `marker` gets no answer, in the way named. */
   const failingOn = (marker: string, how: How): PageReader => {
@@ -784,19 +785,99 @@ describe('review round 6: a page the reader gives no answer for fails alone', ()
       reader,
     );
 
-  it.each(HOW)('fails only that page of a crawl batch, and reads the rest: %s', async (how) => {
-    const { result, requested } = await crawlWith(failingOn('example.com/b', how));
-    if (result.kind !== 'crawl') throw new Error('crawl');
-    const row = (p: string) => result.pages.find((r) => r.url === `https://example.com${p}`)!;
-    expect(row('/b')).toMatchObject({ outcome: 'fetched', response: 'served', raw_text: null });
-    expect(row('/b').limitations).toContain(NOT_READ[how]);
-    for (const p of paths.filter((p) => p !== '/b')) {
-      expect(row(p).raw_text, p).toBe(`page https://example.com${p}`);
-      expect(requested).toContain(`https://example.com${p}`);
-    }
-    expect(result.partial).toBeNull();
-    expect(result.findings).toEqual([{ kind: 'not_read', reason: how, responses: 1 }]);
-    expect(result.coverage.urls_complete).toBe(paths.length - 1);
+  // Large, so a crash is not read as hostile: an ordinary page of about 2 MiB can crash the reader.
+  const largeB = (u: string) =>
+    u.endsWith('/b') ? html(`page ${u} ${'x'.repeat(SMALL_PAGE_CHARS)}`) : html(`page ${u}`);
+
+  it.each(HOW)(
+    'fails only that large page of a crawl batch, and reads the rest: %s',
+    async (how) => {
+      const { result, requested } = await crawlWith(failingOn('example.com/b', how), largeB);
+      if (result.kind !== 'crawl') throw new Error('crawl');
+      const row = (p: string) => result.pages.find((r) => r.url === `https://example.com${p}`)!;
+      expect(row('/b')).toMatchObject({ outcome: 'fetched', response: 'served', raw_text: null });
+      expect(row('/b').limitations).toContain(NOT_READ[how]);
+      for (const p of paths.filter((p) => p !== '/b')) {
+        expect(row(p).raw_text, p).toBe(`page https://example.com${p}`);
+        expect(requested).toContain(`https://example.com${p}`);
+      }
+      expect(result.partial).toBeNull();
+      expect(result.findings).toEqual([{ kind: 'not_read', reason: how, responses: 1 }]);
+      expect(result.coverage.urls_complete).toBe(paths.length - 1);
+    },
+  );
+
+  describe('a small page that fails stops its host for the rest of the batch', () => {
+    const counting = (inner: PageReader) => {
+      const asked: string[] = [];
+      const reader: PageReader = {
+        words: inner.words,
+        page: (body, cut, url, stack) => {
+          asked.push(url);
+          return inner.page(body, cut, url, stack);
+        },
+      };
+      return { reader, asked };
+    };
+
+    it.each(['reader_thread_crashed', 'reader_deadline'] as const)('after %s', async (how) => {
+      const { reader, asked } = counting(failingOn('example.com/a', how));
+      const { result, requested } = await crawlWith(reader);
+      if (result.kind !== 'crawl') throw new Error('crawl');
+      // Two pages run at once, so the one beside the failure may already be with the reader.
+      expect(asked.length).toBeLessThanOrEqual(2);
+      const stopped = result.pages.filter((r) =>
+        r.limitations.includes(NOT_READ.reader_stopped_for_host),
+      );
+      expect(stopped.length).toBe(paths.length - asked.length);
+      for (const r of stopped) {
+        expect(r).toMatchObject({ outcome: 'fetched', raw_text: null, links_read: false });
+      }
+      // The pages are still fetched: only the reader is spared.
+      for (const p of paths) expect(requested).toContain(`https://example.com${p}`);
+      expect(result.findings).toEqual(
+        expect.arrayContaining([
+          { kind: 'not_read', reason: how, responses: 1 },
+          { kind: 'not_read', reason: 'reader_stopped_for_host', responses: stopped.length },
+        ]),
+      );
+      expect(result.coverage.urls_complete).toBe(asked.length - 1);
+    });
+
+    it('a read that throws is not a reason to stop the host', async () => {
+      const { reader, asked } = counting(failingOn('example.com/a', 'reader_error'));
+      const { result } = await crawlWith(reader);
+      expect(asked).toHaveLength(paths.length);
+      expect(result.findings).toEqual([{ kind: 'not_read', reason: 'reader_error', responses: 1 }]);
+    });
+
+    it('a slow small page stops the host too', async () => {
+      const slow: PageReader = {
+        words: inlineReader.words,
+        page: async (body, cut, url) => ({
+          ...(await inlineReader.page(body, cut, url)),
+          readMs: url.endsWith('/a') ? SLOW_READ_MS + 1 : 1,
+        }),
+      };
+      const { reader, asked } = counting(slow);
+      const { result } = await crawlWith(reader);
+      expect(asked.length).toBeLessThanOrEqual(2);
+      expect(result.findings).toEqual([
+        {
+          kind: 'not_read',
+          reason: 'reader_stopped_for_host',
+          responses: paths.length - asked.length,
+        },
+      ]);
+    });
+
+    it('a new batch starts with the breaker closed', async () => {
+      const first = counting(failingOn('example.com/a', 'reader_thread_crashed'));
+      await crawlWith(first.reader);
+      const second = counting(inlineReader);
+      await crawlWith(second.reader);
+      expect(second.asked).toHaveLength(paths.length);
+    });
   });
 
   it.each(HOW)("leaves only that crawler's row unmeasured in an access batch: %s", async (how) => {
@@ -873,7 +954,10 @@ describe('review round 6: a page the reader gives no answer for fails alone', ()
   });
 
   it('counts each response not read, and does not fault the site for them', async () => {
-    const { result } = await crawlWith(failingOn('page', 'reader_deadline'));
+    // Large pages: a small one that fails would stop the host (the breaker, above).
+    const { result } = await crawlWith(failingOn('page', 'reader_deadline'), (u) =>
+      html(`page ${u} ${'x'.repeat(SMALL_PAGE_CHARS)}`),
+    );
     if (result.kind !== 'crawl') throw new Error('crawl');
     expect(result.findings).toEqual([
       { kind: 'not_read', reason: 'reader_deadline', responses: paths.length },

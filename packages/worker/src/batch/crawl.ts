@@ -6,6 +6,7 @@ import {
   type SearchRobots,
 } from '@crawlmouse/types/v2';
 import type { Clock } from '../clock.js';
+import type { ReaderBreaker } from './reader-breaker.js';
 import type { FetchOutcome } from '../fetch/fetcher.js';
 import { CRAWL } from '../identities.js';
 import { oursAllow, PathMatch, searchVerdicts } from '../politeness/robots.js';
@@ -59,6 +60,8 @@ export interface CrawlRun {
   findings: Findings;
   clock: Clock;
   reader: PageReader;
+  /** Stops a host that is holding the shared reader, for the rest of this batch. */
+  breaker: ReaderBreaker;
   checkId: string;
   /** Set when robots.txt, or the batch itself, keeps every page from being requested. */
   blocked: SiteBlock | NotRequested | null;
@@ -413,7 +416,12 @@ async function readPage(
   finalUrl: string,
   stack: StackHeaders | null,
 ): Promise<PageRead | ReaderNotRead> {
+  if (run.breaker.isOpen(finalUrl)) {
+    run.findings.notRead('reader_stopped_for_host');
+    return 'reader_stopped_for_host';
+  }
   const r = await run.reader.page(body, bodyCut, finalUrl, stack).catch(() => null);
+  if (r !== null) run.breaker.record(finalUrl, body.length, r);
   if (r !== null && !isNotRead(r)) return r;
   const why = r?.failed ?? 'reader_error';
   run.findings.notRead(why);

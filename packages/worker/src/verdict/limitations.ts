@@ -121,7 +121,11 @@ export function stoppedBecause(n: NotRequested): string {
  * (the response's own TOO_DEEP note says so), or the worker's reader failed on it: a limit of the
  * worker, never a fault of the site.
  */
-export type NotReadReason = 'parse_depth_exceeded' | ReaderFailure | 'reader_error';
+export type NotReadReason =
+  | 'parse_depth_exceeded'
+  | ReaderFailure
+  | 'reader_error'
+  | 'reader_stopped_for_host';
 
 /** The reasons the reader itself gives no answer for, as against a parse that stopped. */
 export type ReaderNotRead = Exclude<NotReadReason, 'parse_depth_exceeded'>;
@@ -132,6 +136,8 @@ export const NOT_READ: Record<ReaderNotRead, string> = {
   reader_deadline: `This response was fetched but not read: reading it took longer than the worker's ${READ_DEADLINE_MS / 1000} s limit for one read. The limit is the worker's; the site did not time out.`,
   reader_error:
     "This response was fetched but not read: the worker's page reader failed on it. The fault is the worker's, not the site's.",
+  reader_stopped_for_host:
+    "This response was fetched but not read: an earlier page on this host crashed the worker's page reader, held it too long, or this host used its share of it, so the worker stopped reading this host's pages in this batch. It says nothing about this page.",
 };
 
 export function notRequested(n: NotRequested): string {

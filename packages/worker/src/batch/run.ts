@@ -14,6 +14,7 @@ import { runCrawl } from './crawl.js';
 import { DeclarationCache, fetchDeclarations } from './declarations.js';
 import { Findings } from './findings.js';
 import { inlineReader, type PageReader } from '../reader/read.js';
+import { ReaderBreaker } from './reader-breaker.js';
 import type { FetchContext } from './polite-fetch.js';
 import { batchIdOf, urlsOf, type BatchRequest } from './request.js';
 import { BatchRobots, type OriginRules, type RobotsCache } from './site-rules.js';
@@ -82,6 +83,7 @@ export async function runBatch(
     findings,
     clock: deps.clock,
     reader: deps.reader ?? inlineReader,
+    breaker: new ReaderBreaker(),
     checkId: req.check_id,
     blocked,
     pageDone,
