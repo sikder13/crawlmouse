@@ -26,6 +26,8 @@ export interface FetchContext {
   sites: Sites;
   fetcher: Fetcher;
   budget: Budget;
+  /** Each politeness key this batch requested, with its registrable domain (`batch/run.ts`). */
+  asked?: Map<string, string>;
   /** Aborted once a budget is spent, so the batch's queued requests are dropped without a start. */
   abort: AbortController;
 }
@@ -92,6 +94,7 @@ async function oneRequest(
       ctx.abort.abort();
       return { reason: 'budget', budget: spent } satisfies NotRequested;
     }
+    ctx.asked?.set(site, siteKeyOf(url));
     const limits = ctx.budget.requestLimits();
     const f = await ctx.fetcher(url, identity, {
       ...limits,
@@ -110,6 +113,10 @@ async function oneRequest(
   if (scheduled.ran) return scheduled.value;
   return { reason: 'budget', budget: ctx.budget.exhausted! };
 }
+
+/** The URL whose host gave this response: where its chain landed, or the URL asked for. */
+export const answeredUrl = (f: FetchOutcome, requested: string): string =>
+  f.redirectStop === null && f.status !== null && f.finalUrl !== null ? f.finalUrl : requested;
 
 function refusal(ctx: FetchContext, site: string): NotRequested | null {
   const stop = ctx.sites.stopOf(site);

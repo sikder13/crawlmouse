@@ -13,7 +13,7 @@ import { BODY_TIEBREAK_BYTES, readResponse, type ResponseReading } from '../verd
 import { decide, isRefusal, type Cell, type Observed, type Row } from '../verdict/table.js';
 import type { Vantage } from '../vantage.js';
 import type { Findings } from './findings.js';
-import { politeFetch, type FetchContext, type NotRequested } from './polite-fetch.js';
+import { answeredUrl, politeFetch, type FetchContext, type NotRequested } from './polite-fetch.js';
 import { pathOf, type BatchRobots, type SiteBlock } from './site-rules.js';
 
 /**
@@ -249,7 +249,10 @@ async function accessPage(run: AccessRun, page: AccessPage): Promise<AccessTest[
 
   const control = oursAllowed ? await probe(run, page.url, CONTROL) : skipped(CONTROL);
   if (control.fetch)
-    run.ctx.sites.recordPage(run.ctx.sites.keyOf(page.url), control.observed === 'challenged');
+    run.ctx.sites.recordPage(
+      run.ctx.sites.keyOf(answeredUrl(control.fetch, page.url)),
+      control.observed === 'challenged',
+    );
 
   const crawlers: Probe[] = [];
   for (const identity of CRAWLERS) {

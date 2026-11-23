@@ -39,6 +39,7 @@ describe('politenessKeyOf (F-018)', () => {
 
   it.each([
     ['https://lab.crawlmouse.com/', 'crawlmouse.com'],
+    ['https://.lab.crawlmouse.com/', 'crawlmouse.com'],
     ['https://crawlmouse.com/', 'crawlmouse.com'],
     ['https://www.crawlmouse.com/', 'crawlmouse.com'],
     ['https://evil-lab.crawlmouse.com/', 'crawlmouse.com'],
@@ -48,6 +49,11 @@ describe('politenessKeyOf (F-018)', () => {
     ['https://www.nike.com/', 'nike.com'],
   ])('with the setting on, %s keeps its registrable domain', (url, key) => {
     expect(politenessKeyOf(url, true)).toBe(key);
+  });
+
+  it('gives a host with an empty label no key of its own', () => {
+    const url = 'https://a..lab.crawlmouse.com/';
+    expect(politenessKeyOf(url, true)).toBe(siteKeyOf(url));
   });
 
   it('leaves "off-site" alone: two lab hosts are still one site to siteKeyOf', () => {

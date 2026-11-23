@@ -5,7 +5,8 @@ import { getDomain } from 'tldts';
  * section, so `www.nike.com` and `nike.com` share a key while `a.github.io` and `b.github.io` do not.
  * An IP address or a single-label host has no registrable domain and is its own key.
  *
- * Politeness is keyed on this, and so is "off-site" for `redirected_away`.
+ * "Off-site" for `redirected_away` is keyed on this, and so is politeness (`politenessKeyOf`), except
+ * for our own lab hosts on a worker that sets LAB_HOST_POLITENESS.
  */
 export function siteKeyOf(url: string | URL): string {
   const hostname = hostnameOf(url);
@@ -30,5 +31,8 @@ const LAB_HOST_SUFFIX = '.lab.crawlmouse.com';
 export function politenessKeyOf(url: string | URL, perLabHost: boolean): string {
   if (!perLabHost) return siteKeyOf(url);
   const hostname = hostnameOf(url);
-  return hostname.endsWith(LAB_HOST_SUFFIX) ? hostname : siteKeyOf(url);
+  const under = hostname.endsWith(LAB_HOST_SUFFIX)
+    ? hostname.slice(0, -LAB_HOST_SUFFIX.length).split('.')
+    : [];
+  return under.length > 0 && under.every(Boolean) ? hostname : siteKeyOf(url);
 }

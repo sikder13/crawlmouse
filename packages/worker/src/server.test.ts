@@ -149,6 +149,21 @@ describe('POST /batch: accepted', () => {
   });
 });
 
+describe('LAB_HOST_POLITENESS reaches the limiter (F-018)', () => {
+  it.each([
+    [true, 'a.lab.crawlmouse.com'],
+    [false, 'crawlmouse.com'],
+  ])('with the setting %s, a lab host is held under %s', async (labHostPoliteness, key) => {
+    const { worker } = await start({ labHostPoliteness });
+    const host = 'a.lab.crawlmouse.com';
+    const body = batchBody({ urls: [`https://${host}/`] }, { site_host: host });
+    expect((await post(body)).status).toBe(202);
+    await worker.idle();
+    const m = await get('/metrics', 'metrics');
+    expect(Object.keys(m.body.requests_per_site as Record<string, number>)).toEqual([key]);
+  });
+});
+
 describe('POST /batch: signature and replay', () => {
   it('refuses a bad signature, a changed body and a stale timestamp with 401', async () => {
     const { clock } = await start();

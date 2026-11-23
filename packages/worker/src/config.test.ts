@@ -21,6 +21,17 @@ describe('LAB_HOST_POLITENESS (F-018)', () => {
       { LAB_HOST_POLITENESS: '1', FLY_APP_NAME: 'crawlmouse-worker' },
       false,
     ],
+    ['1 with no app name', { LAB_HOST_POLITENESS: '1' }, false],
+    [
+      '1 on a renamed app',
+      { LAB_HOST_POLITENESS: '1', FLY_APP_NAME: 'crawlmouse-worker-2' },
+      false,
+    ],
+    [
+      '1 on a differently cased name',
+      { LAB_HOST_POLITENESS: '1', FLY_APP_NAME: 'Crawlmouse-Worker-Staging' },
+      false,
+    ],
   ])('%s', (_name, env, on) => {
     expect(loadConfig({ ...base, ...env }).labHostPoliteness).toBe(on);
   });

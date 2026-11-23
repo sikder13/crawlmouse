@@ -1,4 +1,3 @@
-import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import type { Fetcher } from '../fetch/fetcher.js';
 import { FLOOR_GAP_MS } from '../politeness/limiter.js';
@@ -25,7 +24,7 @@ const request = (host: string, i: number, pages: number): BatchRequest => ({
 
 function harness(
   perLabHost: boolean,
-  answer: (host: string, path: string) => 'ok' | '429' | 'challenge',
+  answer: (host: string, path: string) => 'ok' | '429' | 'challenge' | { redirect: string },
   robots = (_host: string) => '',
 ) {
   const clock = new VirtualClock();
@@ -49,6 +48,13 @@ function harness(
         body: `User-agent: *\nAllow: /\n${robots(u.hostname)}`,
       });
     const a = answer(u.hostname, u.pathname);
+    if (typeof a === 'object')
+      return outcome({
+        ...common,
+        status: 301,
+        headers: { location: a.redirect },
+        body: '',
+      });
     if (a === '429')
       return outcome({
         ...common,
@@ -125,26 +131,100 @@ describe('pace', () => {
   });
 });
 
-describe('every politeness call in batch/ goes through the Sites key', () => {
-  const dir = new URL('.', import.meta.url);
-  const sources = readdirSync(dir).filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'));
+const accessRequest = (host: string, i: number, pages: number): BatchRequest => {
+  const { urls, ...rest } = request(host, i, pages) as Extract<BatchRequest, { kind: 'crawl' }>;
+  return {
+    ...rest,
+    kind: 'access',
+    pages: urls.map((url) => ({ url, template_key: '/p/{n}' })),
+  };
+};
+const stops = (r: { findings: readonly { kind: string }[] }) =>
+  r.findings
+    .filter((f) => f.kind === 'site_stopped')
+    .map((f) => (f as unknown as { site: string }).site);
 
-  it('reads the batch sources', () => {
-    expect(sources).toEqual(
-      expect.arrayContaining([
-        'polite-fetch.ts',
-        'crawl.ts',
-        'access.ts',
-        'run.ts',
-        'site-rules.ts',
-      ]),
+describe('the stop keys on the host that answered', () => {
+  const HOSTS = ['a', 'b', 'c', 'd', 'e'].map((x) => `${x}.lab.crawlmouse.com`);
+  const TARGET = 'crawlmouse.com';
+  const toTarget = (host: string, path: string) =>
+    host === TARGET ? ('challenge' as const) : { redirect: `https://${TARGET}${path}` };
+
+  it.each([
+    ['crawl', request],
+    ['access', accessRequest],
+  ] as const)(
+    '%s: lab hosts redirecting to one challenged host stop it at four pages',
+    async (_k, make) => {
+      const h = harness(true, toTarget);
+      for (const [i, host] of HOSTS.entries()) await h.run([make(host, i + 1, 3)]);
+      // The control is the first request to each page; a stopped host gets no more of them.
+      expect(h.seen.get(TARGET)!.length).toBeLessThanOrEqual(4);
+    },
+  );
+
+  it('a redirect target’s stop is a finding of the batch that caused it', async () => {
+    const h = harness(true, (host, path) =>
+      host === A ? { redirect: `https://${B}${path}` } : '429',
     );
+    const [result] = await h.run([request(A, 1, 3)]);
+    expect(stops(result!)).toContain(B);
   });
 
-  it.each(sources)('%s passes no registrable-domain key to the limiter or the stop', (file) => {
-    const text = readFileSync(new URL(file, dir), 'utf8');
-    expect(text).not.toMatch(/sites\s*\.\s*(limiter|recordPage|record429|stopOf)\(\s*siteKeyOf/);
-    expect(text).not.toMatch(/requested\.map\(siteKeyOf\)/);
-    expect(text).not.toMatch(/const site = siteKeyOf\(/);
+  it('a stop on the requested host is named by its own key', async () => {
+    const h = harness(true, (host) => (host === A ? '429' : 'ok'));
+    const [result] = await h.run([request(A, 1, 6)]);
+    expect(stops(result!)).toEqual([A]);
+  });
+
+  it('with the setting off the same stop is named by the registrable domain', async () => {
+    const h = harness(false, (host) => (host === A ? '429' : 'ok'));
+    const [result] = await h.run([request(A, 1, 6)]);
+    expect(stops(result!)).toEqual([TARGET]);
+  });
+});
+
+describe('an access batch', () => {
+  it('stops a challenged lab host, names it, and leaves another alone', async () => {
+    const h = harness(true, (host) => (host === A ? 'challenge' : 'ok'));
+    const [first] = await h.run([accessRequest(A, 1, 6)]);
+    expect(stops(first!)).toEqual([A]);
+    expect(h.seen.get(A)!.length).toBeLessThan(6 * 2);
+    const [second] = await h.run([accessRequest(B, 2, 2)]);
+    expect(stops(second!)).toEqual([]);
+    if (second!.kind !== 'access') throw new Error('access');
+    expect(second!.access_tests.every((r) => r.verdict === 'allowed')).toBe(true);
+  });
+});
+
+describe('off-site does not move with the setting on', () => {
+  it('a redirect between two lab hosts is followed and read as served', async () => {
+    const h = harness(true, (host, path) =>
+      host === A ? { redirect: `https://${B}${path}` } : 'ok',
+    );
+    const [result] = await h.run([request(A, 1, 1)]);
+    if (result!.kind !== 'crawl') throw new Error('crawl');
+    const page = result!.pages[0]!;
+    expect(page.outcome).toBe('fetched');
+    expect(page.final_url).toBe(`https://${B}/p/0`);
+    expect(h.seen.get(B)).toHaveLength(1);
+  });
+
+  it('an access test of a redirect between two lab hosts is a served page, not redirected away', async () => {
+    const h = harness(true, (host, path) =>
+      host === A ? { redirect: `https://${B}${path}` } : 'ok',
+    );
+    const [result] = await h.run([accessRequest(A, 1, 1)]);
+    if (result!.kind !== 'access') throw new Error('access');
+    expect(result!.access_tests.length).toBeGreaterThan(0);
+    expect(result!.access_tests.every((r) => r.verdict === 'allowed')).toBe(true);
+  });
+
+  it('a redirect from a lab host to another registrable domain is still not requested', async () => {
+    const h = harness(true, (host, path) =>
+      host === A ? { redirect: `https://elsewhere.test${path}` } : 'ok',
+    );
+    await h.run([request(A, 1, 1)]);
+    expect(h.seen.get('elsewhere.test')).toBeUndefined();
   });
 });

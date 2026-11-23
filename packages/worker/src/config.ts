@@ -24,7 +24,7 @@ export interface WorkerConfig {
   vantage: Vantage;
   /**
    * LAB_HOST_POLITENESS: each host under lab.crawlmouse.com has its own limiter and stop, for the
-   * load test on staging (F-018). Only `1`, and never on the production app.
+   * load test on staging (F-018). Only `1`, and only on the staging app.
    */
   labHostPoliteness: boolean;
 }
@@ -38,8 +38,8 @@ type Env = Readonly<Record<string, string | undefined>>;
 
 export const isCrawlPaused = (env: Env): boolean => env.CRAWL_PAUSED?.trim() === '1';
 
-/** The production worker's Fly app, which ignores LAB_HOST_POLITENESS whatever it is set to. */
-const PRODUCTION_APP = 'crawlmouse-worker';
+/** The one Fly app that may use LAB_HOST_POLITENESS; any other name, or none, ignores it. */
+const LAB_HOST_POLITENESS_APP = 'crawlmouse-worker-staging';
 
 function intIn(
   raw: string | undefined,
@@ -80,6 +80,6 @@ export function loadConfig(env: Env): WorkerConfig {
     paused: isCrawlPaused(env),
     vantage: vantageOf(env, RELEASE),
     labHostPoliteness:
-      env.LAB_HOST_POLITENESS?.trim() === '1' && env.FLY_APP_NAME !== PRODUCTION_APP,
+      env.LAB_HOST_POLITENESS?.trim() === '1' && env.FLY_APP_NAME === LAB_HOST_POLITENESS_APP,
   };
 }
