@@ -29,10 +29,10 @@ const door = (v: ResultView, title: string): DoorView => v.doors.find((x) => x.t
 const allText = (v: ResultView) =>
   JSON.stringify({ grades: v.grades, first: v.first, doors: v.doors, crawlers: v.crawlers });
 
-describe('the edge that refused our test requests', () => {
+describe('the edge that refused or challenged our tests', () => {
   it('is said in one wording, the access pill’s, wherever the challenged result mentions it', () => {
     const v = view('challenged-site');
-    expect(door(v, 'Crawler access').pill.label).toBe('refused our test requests');
+    expect(door(v, 'Crawler access').pill.label).toBe('refused or challenged our tests');
     expect(door(v, 'Crawler access').body).toMatch(
       /^The site’s edge refused or challenged our browser-identity request from Crawlmouse’s address/,
     );
@@ -334,7 +334,7 @@ describe('the crawler-access bar', () => {
     if (of) return Math.round((Number(of[1]) / Number(of[2])) * 100);
     const plain = /^(\d+)(?: \/ 100|% of text)$/.exec(label);
     if (plain) return Number(plain[1]);
-    if (label === 'refused our test requests') return 100;
+    if (label === 'refused or challenged our tests') return 100;
     const counts = [
       ...label.matchAll(/(\d+) (?:blocked|refused|challenged|not served|not measured)/g),
     ];

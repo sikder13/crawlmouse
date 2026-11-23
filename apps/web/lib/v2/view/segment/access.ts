@@ -303,8 +303,8 @@ function methodSentence(
   const exact =
     crawlerTests.length > 0 && crawlerTests.every((t) => !t.identity_sent.includes(OUR_TAG));
   const stated = exact
-    ? 'Each sampled page where our browser-identity control was served was requested with the crawler’s exact user agent from Crawlmouse’s address, not the operator’s.'
-    : `Each sampled page where our browser-identity control was served was requested with the crawler’s own user agent, tagged “${OUR_TAG}”, from Crawlmouse’s own address, not the operator’s. A rule matching the exact string will not fire on it, and a site that verifies crawler addresses may refuse it while serving the real crawler.`;
+    ? 'Sampled pages were requested with the crawler’s exact user agent from Crawlmouse’s address, not the operator’s, only where our browser-identity control got a normal answer and robots.txt allowed that crawler.'
+    : `Sampled pages were requested with the crawler’s own user agent, tagged “${OUR_TAG}”, from Crawlmouse’s own address, not the operator’s, only where our browser-identity control got a normal answer and robots.txt allowed that crawler. A rule matching the exact string will not fire on it, and a site that verifies crawler addresses may refuse it while serving the real crawler.`;
   const identity = noCrawlerRequest(ai)
     ? 'No crawler request was sent, because the site’s edge refused or challenged our browser-identity control first.'
     : stated;

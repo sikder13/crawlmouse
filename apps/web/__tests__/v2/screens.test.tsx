@@ -280,7 +280,7 @@ describe('the other Result variants and states', () => {
     expect(data.grades[0]).toMatchObject({ letter: 'C+', score: 67, withheld: false });
     expect(data.grades[1]).toMatchObject({ letter: null, score: null, withheld: true });
     expect(data.grades[1].summary).toContain('between 0 and 30 of 40');
-    expect(data.doors[0]!.pill.label).toBe('refused our test requests');
+    expect(data.doors[0]!.pill.label).toBe('refused or challenged our tests');
     const html = renderToStaticMarkup(resultElement('challenged'));
     expect(html).toContain('data-v2-grade-withheld');
     expect(html).toContain('data-v2-evidence="observed"');

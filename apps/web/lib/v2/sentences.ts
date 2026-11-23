@@ -36,7 +36,7 @@ export const isChallenged = (v: Verdict) => v === 'challenged_ua' || v === 'refu
  * `edge_blocks_automation` in words: the access pill's, so a result names that one condition one
  * way. It says what our test saw: the request refused was our own control (F-145).
  */
-export const EDGE_PILL = 'refused our test requests';
+export const EDGE_PILL = 'refused or challenged our tests';
 export const EDGE_SENTENCE =
   'The site’s edge refused or challenged our browser-identity request from Crawlmouse’s address';
 /**
@@ -136,8 +136,8 @@ function keptOut(verdict: Verdict, cause: AccessCause | null): [string, string] 
       ];
     case 'edge_blocks_automation':
       return [
-        'could not be tested: the site’s edge refused our control request',
-        'could not be tested: the site’s edge refused our control request',
+        'could not be tested: the site’s edge refused or challenged our control request',
+        'could not be tested: the site’s edge refused or challenged our control request',
       ];
     case 'redirected_away':
       return [

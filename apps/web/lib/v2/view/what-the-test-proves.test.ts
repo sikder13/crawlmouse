@@ -372,16 +372,14 @@ describe('every crawler sentence says what our request got (review 2 of PR 2a)',
 
   it('says what an edge that refused every request did, in what our test saw', () => {
     const c = edged(0);
-    expect(accessPill(c)).toEqual({ state: 'bad', label: 'refused our test requests' });
-    expect(VERDICTS.edge_blocks_automation.label).toBe('refused our test requests');
+    expect(accessPill(c)).toEqual({ state: 'bad', label: 'refused or challenged our tests' });
+    expect(VERDICTS.edge_blocks_automation.label).toBe('refused or challenged our tests');
   });
 
   it('does not say crawler requests were sent where none was', () => {
     const c = edged(0);
     const v = accessView(fixtureOf(c), c.id);
-    expect(v.method).not.toMatch(
-      /^Each sampled page where our browser-identity control was served was requested/,
-    );
+    expect(v.method).not.toMatch(/^Sampled pages were requested/);
     expect(v.method).toContain('No crawler request was sent');
     const tile = v.tiles.find((t) => t.label === 'Pages sampled per crawler')!;
     expect(tile.value).toBe(`0 of ${c.coverage!.pages_discovered.toLocaleString('en-US')}`);
@@ -389,9 +387,7 @@ describe('every crawler sentence says what our request got (review 2 of PR 2a)',
 
   it('limits the method line to pages our control was served on, when an edge refused some', () => {
     const c = edged(5);
-    expect(accessView(fixtureOf(c), c.id).method).toMatch(
-      /^Each sampled page where our browser-identity control was served was requested/,
-    );
+    expect(accessView(fixtureOf(c), c.id).method).toMatch(/^Sampled pages were requested/);
   });
 
   it('mints a headline with the served wording and its extent, and no search engine', () => {
@@ -433,7 +429,9 @@ describe('claims the third review of PR 2a found', () => {
   it('says a crawler behind an edge could not be tested, not that it met the edge', () => {
     const c = withVerdicts(['edge_blocks_automation']);
     const [clause] = keptOutClauses(c.crawlers.filter(isAi));
-    expect(clause).toContain('could not be tested: the site’s edge refused our control request');
+    expect(clause).toContain(
+      'could not be tested: the site’s edge refused or challenged our control request',
+    );
     expect(clause).not.toContain('met an edge');
   });
 

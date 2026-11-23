@@ -56,7 +56,7 @@ describe.each(SEGMENT_VARIANTS)(
       const n = (re: RegExp) => Number(re.exec(label)?.[1] ?? 0);
       const count = (vs: string[]) => rows.filter((r) => vs.includes(r.verdict)).length;
       if (rows.some((r) => r.verdict === 'edge_blocks_automation')) {
-        expect(label).toBe('refused our test requests');
+        expect(label).toBe('refused or challenged our tests');
       } else {
         expect(n(/(\d+) blocked by robots/)).toBe(count(['disallowed_by_robots']));
         expect(n(/(\d+) refused by user agent/)).toBe(count(['blocked_by_ua_rule']));

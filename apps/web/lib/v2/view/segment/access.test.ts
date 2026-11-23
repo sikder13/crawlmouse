@@ -136,9 +136,9 @@ describe('accessView: headline, tiles and the method sentence', () => {
     expect(v.headline.pill).toEqual({ state: 'ok', label: '6 of 6 served' });
   });
 
-  it('names the edge once when it refused our test requests', () => {
+  it('names the edge once when it refused or challenged our tests', () => {
     const v = view('challenged-site');
-    expect(v.headline.pill.label).toBe('refused our test requests');
+    expect(v.headline.pill.label).toBe('refused or challenged our tests');
     expect(v.headline.title).toBe(
       'The site’s edge refused or challenged our browser-identity request from Crawlmouse’s address.',
     );
@@ -164,7 +164,7 @@ describe('accessView: headline, tiles and the method sentence', () => {
 
   it('uses the tagged-identity sentence (FACTS D1, with the L5 correction)', () => {
     expect(view('bad-site').method).toBe(
-      'Each sampled page where our browser-identity control was served was requested with the crawler’s own user agent, tagged “Crawlmouse/2.0 (+https://crawlmouse.com/bot)”, from Crawlmouse’s own address, not the operator’s. A rule matching the exact string will not fire on it, and a site that verifies crawler addresses may refuse it while serving the real crawler. Rendering requests come from Cloudflare Browser Rendering. One untagged browser-identity control fetch per sampled page is part of the method. Select a cell to see the raw request and response.',
+      'Sampled pages were requested with the crawler’s own user agent, tagged “Crawlmouse/2.0 (+https://crawlmouse.com/bot)”, from Crawlmouse’s own address, not the operator’s, only where our browser-identity control got a normal answer and robots.txt allowed that crawler. A rule matching the exact string will not fire on it, and a site that verifies crawler addresses may refuse it while serving the real crawler. Rendering requests come from Cloudflare Browser Rendering. One untagged browser-identity control fetch per sampled page is part of the method. Select a cell to see the raw request and response.',
     );
   });
 
