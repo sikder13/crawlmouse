@@ -71,14 +71,36 @@ export const PACE = {
   /** Discovery's bound on reading robots.txt and the sitemaps (DISCOVER_S in the app's limits). */
   discoverS: 60,
   /**
-   * The run's finish timeout: 37 minutes. Its parts: every claim wait (300 s), discovery (60 s), the
-   * wait budget (QUEUE_WAIT_MAX_S, 900 s), the crawl (CRAWL_CEILING_S, 480 s), the access slice
-   * (300 s) and the reserve (180 s); steps/time.test.ts recomputes the sum from those constants.
+   * The run's finish timeout: 88 minutes (5,260 s), the plan of the largest page cap (2,000 pages,
+   * inbox 079). Its parts: every claim wait (300 s), discovery (60 s), the wait budget
+   * (QUEUE_WAIT_MAX_S, 900 s), the crawl (3,400 s), the access slice (300 s) and the reserve (300 s). It is one setting on the
+   * function, so it is the largest cap's; a smaller check keeps its own plan inside it
+   * (`finishSFor` in the app's limits). steps/time.test.ts recomputes it from those constants.
    */
-  finishS: 2220,
+  finishS: 5260,
   /** Crawl batches per check: 40 × 50 URLs is 2,000, the largest page cap in FACTS. */
   maxCrawlBatches: 40,
 } as const;
+
+/** A check above this many pages is large: its crawl and reserve grow, and it waits longer (inbox 079). */
+export const LARGE_CHECK_ABOVE = 500;
+
+/**
+ * The waits a check's run uses, by its page cap. A large check's run lasts up to PACE.finishS, and at
+ * 30-second waits its steps could pass Inngest's 1,000 a run (steps/time.test.ts, finding 18), so it
+ * polls from 10 s up to 60 s and waits 60 s on a busy worker: three short polls a posting and half
+ * the long ones. A batch's done signal still wakes the run at once (PR 5a). A check of 500 pages or
+ * fewer keeps PACE's waits.
+ */
+export function cadenceFor(pageCap: number): {
+  pollStartS: number;
+  pollMaxS: number;
+  busyWaitS: number;
+} {
+  return pageCap > LARGE_CHECK_ABOVE
+    ? { pollStartS: 10, pollMaxS: 60, busyWaitS: 60 }
+    : { pollStartS: PACE.pollStartS, pollMaxS: PACE.pollMaxS, busyWaitS: PACE.busyWaitS };
+}
 
 /**
  * The latest a check's first crawl batch is taken, in seconds from its first claim attempt, for the
@@ -104,6 +126,8 @@ export interface BatchAt {
 export interface RunSoFar {
   /** The first claim attempt's time, ms since the epoch: the time plan's zero. */
   startedAt: number;
+  /** The check's page cap (`CheckRequested.pageCap`): its time plan and waits follow it. */
+  pageCap: number;
   /**
    * When the worker accepted the check's first crawl batch: the crawl clock's zero. Null until then;
    * waiting for that batch does not run the clock.
@@ -277,6 +301,7 @@ export async function runCheck(
 
   const so: RunSoFar = {
     startedAt,
+    pageCap: data.pageCap,
     crawlFrom: null,
     pagesCrawled: 0,
     linksFound: 0,
@@ -287,6 +312,7 @@ export async function runCheck(
     discovered: null,
   };
   const soFar = (): RunSoFar => ({ ...so, discovered: so.discovered && { ...so.discovered } });
+  const cadence = cadenceFor(data.pageCap);
   const found = await run('discover', () => steps.discover(data, soFar()));
   // `?? null`: a discover output recorded before robots_txt existed, replayed after the deploy.
   so.discovered = { sitemap_urls: found.sitemap_urls, robots_txt: found.robots_txt ?? null };
@@ -315,15 +341,15 @@ export async function runCheck(
         // correctness N1). A first batch that is taken is then taken after either bound by no more
         // than the taken post's own latency and the sleep's lateness; time.test.ts checks the
         // crawl it gets at 1, 2, 3 and 5 s a step.
-        const nextPost = out.at + PACE.busyWaitS * 1000;
+        const nextPost = out.at + cadence.busyWaitS * 1000;
         if (
           so.crawlFrom === null &&
-          (so.busyMs + PACE.busyWaitS * 1000 > QUEUE_WAIT_MAX_S * 1000 ||
+          (so.busyMs + cadence.busyWaitS * 1000 > QUEUE_WAIT_MAX_S * 1000 ||
             nextPost > so.startedAt + FIRST_ACCEPT_BY_S * 1000)
         ) {
           return { status: 'capacity' };
         }
-        await step.sleep(`${prefix}-busy-${k + 1}`, PACE.busyWaitS * 1000);
+        await step.sleep(`${prefix}-busy-${k + 1}`, cadence.busyWaitS * 1000);
         continue;
       }
       if (out.status === 'posted') {
@@ -359,7 +385,7 @@ export async function runCheck(
       if (posted.status === 'paused') return { end: 'paused' };
       if (posted.status !== 'posted') return reposted ? fail(p, at) : { end: 'none' };
       const deadline = posted.at + (posted.max_seconds + PACE.pollGraceS) * 1000;
-      let wait: number = PACE.pollStartS;
+      let wait: number = cadence.pollStartS;
       let poll: PollOutput;
       let lastAt = posted.at;
       do {
@@ -371,13 +397,13 @@ export async function runCheck(
                 event: 'check.batch.ended',
                 // Never past the deadline: the time plan allows one poll wait after it. Until a
                 // signal has reached this run, no longer than a poll would have waited.
-                timeout: `${Math.max(1, Math.min(heard ? PACE.signalWaitS : PACE.pollMaxS, Math.ceil((deadline - lastAt) / 1000)))}s`,
+                timeout: `${Math.max(1, Math.min(heard ? PACE.signalWaitS : cadence.pollMaxS, Math.ceil((deadline - lastAt) / 1000)))}s`,
                 if: `event.data.checkId == async.data.checkId && async.data.batch == ${at.batch}`,
               })
             : null;
         if (!listens) {
           await step.sleep(`${p}-wait-${polls}`, wait * 1000);
-          wait = Math.min(wait * 2, PACE.pollMaxS);
+          wait = Math.min(wait * 2, cadence.pollMaxS);
         }
         // A signal of `done` goes straight to the read; anything else is the poll's to decide.
         poll =
@@ -514,7 +540,7 @@ export function createCheckFn(
       id: CHECK_FN_ID,
       concurrency: [{ key: 'event.data.siteId', limit: 1 }, { limit: checkConcurrencyLimit(env) }],
       idempotency: 'event.data.checkId',
-      timeouts: { finish: `${PACE.finishS / 60}m` },
+      timeouts: { finish: `${PACE.finishS}s` },
       retries: 2,
       cancelOn: [{ event: 'check.cancel.requested', match: 'data.checkId' }],
       onFailure: async ({ event, error, step }) => {
