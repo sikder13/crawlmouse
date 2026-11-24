@@ -202,8 +202,9 @@ export class ThreadReader implements PageReader, MeasureReader {
 
   private ensure(): Worker {
     if (this.thread) return this.thread;
-    if (this.started++ > 0) this.restarts++;
     const thread = new Worker(this.entry, { resourceLimits: this.limits });
+    // Counted once the thread exists: a constructor that throws started nothing.
+    if (this.started++ > 0) this.restarts++;
     this.ready = false;
     thread.unref();
     const died = () => {

@@ -336,10 +336,18 @@ describe('through a real measure thread, as the entry point wires it', () => {
     // and reaches the replacement thread only by being sent again.
     let onThread!: () => void;
     const slowSent = new Promise<void>((r) => (onThread = r));
+    // Whether each call came while the slow page was still unanswered: the second must, or it reached
+    // the replacement thread directly rather than by being sent again.
+    let slowAnswered = false;
+    const whileSlowOpen: boolean[] = [];
     const { base, clock } = await start({
       measure: (b) => {
+        whileSlowOpen.push(!slowAnswered);
         const answer = t.measure(b);
-        onThread();
+        if (whileSlowOpen.length === 1) {
+          void answer.finally(() => (slowAnswered = true));
+          onThread();
+        }
         return answer;
       },
     });
@@ -351,6 +359,7 @@ describe('through a real measure thread, as the entry point wires it', () => {
     const firstAnswer = post(base, slow, signed(ts, slow));
     await slowSent;
     const [first, second] = await Promise.all([firstAnswer, post(base, next, signed(ts, next))]);
+    expect(whileSlowOpen.slice(0, 2)).toEqual([true, true]);
     expect(t.restarts).toBe(1);
     expect(first).toEqual({ status: 200, body: { failed: 'reader_deadline' } });
     expect(second).toEqual({
