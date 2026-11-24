@@ -67,6 +67,7 @@ Concurrency: one plan cap, `PLAN_CONCURRENCY_CAP = 100` (Inngest Pro, 100 concur
 | The longest wait on a worker’s done signal before one poll                               | 60 s                    |
 | Access stages’ slice                                                                     | 300 s                   |
 | Reserve for render, build, persist, finalize                                             | 180 s                   |
+| Of it, render at most                                                                    | 90 s                    |
 | A batch that would get less is not posted                                                | 60 s                    |
 | Discovery                                                                                | 60 s, 5000 sitemap URLs |
 | Crawl batches per check                                                                  | 40                      |

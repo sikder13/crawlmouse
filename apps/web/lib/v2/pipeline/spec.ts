@@ -39,6 +39,7 @@ import {
   MIN_BATCH_S,
   QUEUE_WAIT_MAX_S,
   REAP_AFTER_S,
+  RENDER_SHARE_S,
   RESERVE_S,
   SITEMAP_URL_CAP,
 } from './limits';
@@ -267,6 +268,7 @@ export function buildSpec20b(): string {
         ['The longest wait on a worker’s done signal before one poll', `${PACE.signalWaitS} s`],
         ['Access stages’ slice', `${ACCESS_SLICE_S} s`],
         ['Reserve for render, build, persist, finalize', `${RESERVE_S} s`],
+        ['Of it, render at most', `${RENDER_SHARE_S} s`],
         ['A batch that would get less is not posted', `${MIN_BATCH_S} s`],
         ['Discovery', `${DISCOVER_S} s, ${SITEMAP_URL_CAP} sitemap URLs`],
         ['Crawl batches per check', String(PACE.maxCrawlBatches)],

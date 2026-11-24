@@ -6,6 +6,7 @@ import type { DailyBudget, renderCheck } from '@crawlmouse/engine/v2/pipeline';
 import type { WorkerClient } from '../../../worker-client/types';
 import type { LedgerDraftSink } from '../../ledger/draft-step';
 import type { DiscoverDeps } from '../discover';
+import { RENDER_SHARE_S } from '../limits';
 import type { PipelineStore } from '../store';
 import type { EvidenceStore, PersistDb } from '../types';
 
@@ -47,11 +48,12 @@ export interface StepDeps {
 }
 
 /**
- * How long the render step may render, counted from the step's start, of the function's 300 s
- * (`maxDuration`). The rest is for settling the budget and storing the outcome. Chosen, not measured:
- * check it against a real render on staging before rendering is turned on.
+ * How long the render step may render, counted from the step's start: its share of the run's reserve
+ * after the last batch (`RENDER_SHARE_S` of `RESERVE_S`), so build, persist and finalize keep the
+ * rest. Within the step it leaves time of the function's 300 s (`maxDuration`) for settling the
+ * budget and storing the outcome.
  */
-export const RENDER_STEP_MS = 240_000;
+export const RENDER_STEP_MS = RENDER_SHARE_S * 1000;
 
 /**
  * The budget for a wiring with no durable one: it throws, so renderCheck renders nothing. A sampled

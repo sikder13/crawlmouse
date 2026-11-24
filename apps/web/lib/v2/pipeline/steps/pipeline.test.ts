@@ -15,6 +15,7 @@ import {
 import { getJson, putJson } from '../evidence';
 import { fakeWorker, memoryStore, queuedCheck } from '../test-support/fakes';
 import { memoryEvidenceStore } from '../test-support/memory-evidence';
+import { AFTER_RENDER_MIN_S, RENDER_SHARE_S, RESERVE_S } from '../limits';
 import { RENDER_STEP_MS } from './deps';
 import { NO_DAILY_BUDGET, checkSteps, type StepDeps } from './index';
 
@@ -232,6 +233,14 @@ describe('checkSteps under runCheck, on the recorded worker batches', () => {
     const pages = await renderedPages(evidence);
     expect(pages.length).toBeGreaterThan(0);
     for (const p of pages) expect(p).toMatchObject({ rendered: false, reason: 'daily_cap' });
+  });
+
+  // Review of the render budget (B1): a 240 s render step did not fit the 180 s the run keeps for
+  // render, build, persist and finalize together, so a full render would run the check past its
+  // finish timeout. Render takes its share of RESERVE_S; the rest is left for the steps after it.
+  it('renders within its share of the reserve, leaving the rest for build, persist and finalize', () => {
+    expect(RENDER_STEP_MS).toBe(RENDER_SHARE_S * 1000);
+    expect(RESERVE_S - RENDER_SHARE_S).toBeGreaterThanOrEqual(AFTER_RENDER_MIN_S);
   });
 
   it(`stops rendering ${RENDER_STEP_MS / 1000} s after the render step began`, async () => {
