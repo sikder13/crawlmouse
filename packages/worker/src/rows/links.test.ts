@@ -1,4 +1,4 @@
-import { extractPage, toPersistableText } from '@crawlmouse/engine/worker';
+import { canonicalizeUrl, extractPage, toPersistableText } from '@crawlmouse/engine/worker';
 import { expectWithinBudget, expectWithinRelative } from '@crawlmouse/timing';
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
@@ -89,6 +89,49 @@ describe('readLinks: pinned readings', () => {
       ['https://example.com/dir/docs', 'https://example.com/dir/docs/'],
       ['https://example.com/Team?a=1&b=2', 'https://example.com/Team/?b=2&a=1'],
     ]);
+  });
+
+  // Review of 02245b5f: the engine trims an href with String.prototype.trim, which strips Unicode
+  // whitespace (a no-break space from an editor); the URL parser strips only ASCII. Resolved
+  // untrimmed, `/about/&nbsp;` named another page than the one recorded.
+  it('names the page the engine recorded, when the href carries Unicode whitespace (review of 02245b5f)', () => {
+    const { links } = readLinks(
+      parseHtml('<body><a href="/about/&nbsp;">A</a><a href="&nbsp;/team/">T</a></body>')!,
+      BASE,
+    );
+    expect(links.map((l) => [l.toUrl, l.href])).toEqual([
+      ['https://example.com/about', 'https://example.com/about/'],
+      ['https://example.com/team', 'https://example.com/team/'],
+    ]);
+  });
+
+  it('gives every link an address that is the same page as its target', () => {
+    const space = fc.constantFrom('', ' ', '\u00a0', '\ufeff', '\u2003', '\t', '\n');
+    const part = fc.stringMatching(/^[a-zA-Z0-9-]{1,6}$/);
+    const href = fc
+      .tuple(
+        space,
+        fc.constantFrom('', '/', '../', 'https://example.com/', 'https://Example.com:443/'),
+        fc.array(part, { maxLength: 3 }),
+        fc.boolean(),
+        fc.option(fc.tuple(part, part), { nil: null }),
+        fc.option(part, { nil: null }),
+        space,
+      )
+      .map(
+        ([a, root, path, slash, q, frag, b]) =>
+          `${a}${root}${path.join('/')}${slash ? '/' : ''}${q ? `?${q[0]}=${q[1]}` : ''}${frag ? `#${frag}` : ''}${b}`,
+      );
+    fc.assert(
+      fc.property(fc.array(href, { minLength: 1, maxLength: 5 }), (hrefs) => {
+        const html = `<body>${hrefs.map((h, i) => `<a href="${h.replace(/"/g, '')}">l${i}</a>`).join('')}</body>`;
+        for (const l of readLinks(parseHtml(html)!, BASE).links) {
+          expect(canonicalizeUrl(l.href)).toBe(l.toUrl);
+          expect(l.href).not.toContain('#');
+        }
+      }),
+      { numRuns: 300 },
+    );
   });
 
   it('collapses whitespace across elements and trims it, as the engine does', () => {
