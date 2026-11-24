@@ -310,15 +310,14 @@ function markNoRetryOnTimeout(ctx: { request: { noRetry?: boolean } }, error: un
  */
 function makeRedirectHook(robots: ParsedRobots | undefined, revalidateSsrf: boolean) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return async function onBeforeRedirect(options: any, response: any): Promise<void> {
-    const locationHeader = response.headers.location;
-    if (!locationHeader) return;
-    const locationValue = Array.isArray(locationHeader) ? locationHeader[0] : locationHeader;
-    if (!locationValue) return;
-    const baseUrl = typeof options.url === 'string' ? options.url : options.url.toString();
-    const target = new URL(locationValue, baseUrl).toString();
-    // Unconditionally, like robots: a host that is not plain never becomes a page, so it never becomes
-    // the base of a crawlee enqueue glob (hostname.ts).
+  return async function onBeforeRedirect(options: any): Promise<void> {
+    // The URL got is about to request. got has already resolved the Location header into it, decoding
+    // the header's bytes as UTF-8 (got 14, core/index.js), and set it here before calling this hook.
+    // Re-parsing the raw header instead reads those bytes as latin1, so a host such as U+FE61 'a﹡b'
+    // would pass the check below while got requested 'a*b', and a relative Location would be resolved
+    // a second time against a URL that is already the target.
+    const target = options.url instanceof URL ? options.url.href : String(options.url);
+    // Unconditionally, like robots: the host checked is the host requested (hostname.ts).
     if (!hasPlainHost(target)) {
       throw new HostnameRefusedRedirectError(`Redirect target host is not plain: ${target}`);
     }
@@ -485,8 +484,9 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
   // §4.4 — trap caps, applied at the same boundary as robots so every admission rule lives together.
   // A URL whose host is not plain is not admitted either. Every enqueued URL passes here, on both the
   // enqueueLinks and the deterministic-frontier path (hostname.ts). Defence in depth: extractPage
-  // keeps only links on the page's own host, which the start-URL and redirect gates have already held
-  // to the rule, so no crawl reaches this refusal and no crawl test can show it.
+  // keeps only links on the page's own host, and that host was a start URL's or the host got requested
+  // after a redirect, both held to the rule (the redirect hook checks got's own target, not the raw
+  // Location header). No crawl test reaches this refusal for that reason.
   const isAdmissible = (u: string): boolean =>
     hasPlainHost(u) && isUrlAllowed(robots, u) && !isCrawlTrap(u).trapped;
 

@@ -404,8 +404,9 @@ describe('a host that is not letters, digits, hyphens and dots (hostname.ts, inb
       if (req.url === '/go') {
         goHits += 1;
         res.statusCode = 302;
-        // `.localhost` resolves to loopback on many systems, so without the refusal this would be
-        // fetched from this same server.
+        // Whether this host resolves depends on the machine. Where it does not, an unrefused redirect
+        // fails and is retried, so `goHits` is what shows the refusal; where it does, the page check
+        // below shows it too.
         res.setHeader('location', `http://{a,b}{c,d}.localhost:${port}/x`);
         res.end('');
         return;
@@ -419,6 +420,82 @@ describe('a host that is not letters, digits, hyphens and dots (hostname.ts, inb
       const out = await runCrawl({ ...opts, startUrls: [`http://127.0.0.1:${port}`] });
       expect(goHits).toBe(1);
       expect(out.pages.some((p) => p.url.includes('{'))).toBe(false);
+    } finally {
+      await new Promise<void>((r) => server.close(() => r()));
+    }
+  });
+});
+
+describe('the redirect hook checks the URL got requests, not the raw Location header (review of 054)', () => {
+  const opts = {
+    pageCap: 10,
+    perHostConcurrency: 2,
+    staggerMs: 0,
+    pageTimeoutMs: 5000,
+    allowPrivateIpsForTesting: true,
+  };
+
+  /** A home page linking to /go, which redirects with `location`, set as given (latin1 bytes). */
+  async function redirecting(location: (port: number) => string, robotsTxt?: string) {
+    const hits = new Map<string, number>();
+    const server = http.createServer((req, res) => {
+      hits.set(req.url ?? '', (hits.get(req.url ?? '') ?? 0) + 1);
+      if (req.url === '/robots.txt' && robotsTxt) {
+        res.setHeader('content-type', 'text/plain');
+        res.end(robotsTxt);
+        return;
+      }
+      if (req.url === '/dir/go') {
+        res.statusCode = 302;
+        res.setHeader('location', location(port));
+        res.end('');
+        return;
+      }
+      res.setHeader('content-type', 'text/html');
+      res.end('<html><head><title>Home</title></head><body><a href="/dir/go">Go</a></body></html>');
+    });
+    await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
+    const port = (server.address() as { port: number }).port;
+    return { server, port, hits };
+  }
+
+  it.each([
+    ['the default path', {}],
+    ['the polite crawl', { politeCrawl: true }],
+  ])(
+    'refuses a host that is plain only when its UTF-8 bytes are misread as latin1, on %s',
+    async (_name, extra) => {
+      // U+FE61 SMALL ASTERISK, sent as its UTF-8 bytes. got decodes the header as UTF-8 and the
+      // parser maps the character to '*', so got would request 'a*b.localhost'; read as latin1, the
+      // same bytes make an IDN host that is plain.
+      const smallAsterisk = Buffer.from('﹡', 'utf8').toString('latin1');
+      const { server, port, hits } = await redirecting(
+        (p) => `http://a${smallAsterisk}b.localhost:${p}/landed`,
+      );
+      try {
+        const out = await runCrawl({ ...opts, ...extra, startUrls: [`http://127.0.0.1:${port}`] });
+        // Refused once, not retried: an unrefused redirect to an unreachable host is retried.
+        expect(hits.get('/dir/go')).toBe(1);
+        expect(hits.has('/landed')).toBe(false);
+        expect(out.pages.some((p) => p.url.includes('*'))).toBe(false);
+      } finally {
+        await new Promise<void>((r) => server.close(() => r()));
+      }
+    },
+  );
+
+  it('checks robots against a relative Location resolved once, as got resolves it', async () => {
+    // /dir/go -> 'sub/x' is /dir/sub/x, which robots disallows. Resolving it twice gave
+    // /dir/sub/sub/x, which robots allows, so the redirect was followed.
+    const { server, port, hits } = await redirecting(
+      () => 'sub/x',
+      'User-agent: *\nDisallow: /dir/sub/x\n',
+    );
+    try {
+      const robots = parseRobotsTxt('User-agent: *\nDisallow: /dir/sub/x\n');
+      await runCrawl({ ...opts, robots, startUrls: [`http://127.0.0.1:${port}`] });
+      expect(hits.get('/dir/go')).toBe(1);
+      expect(hits.has('/dir/sub/x')).toBe(false);
     } finally {
       await new Promise<void>((r) => server.close(() => r()));
     }
