@@ -264,24 +264,35 @@ export interface EmailLimits {
 export interface EmailEvent {
   id: string;
   name: 'fix.email_developer_requested';
-  data: { requestId: string };
+  data: { requestId: string; framework?: NonNullable<Fix['packet']>['framework'] };
 }
 
 export interface EmailDeps extends FixDeps {
   limits: EmailLimits;
   send(event: EmailEvent): Promise<unknown>;
+  /** The page a form's answer returns to (`backFrom`); the dashboard's change rows without one. */
+  back?: string;
 }
 
-/** The email-developer body, `{email}` and nothing else; the live form posts it as rendered. */
-export const EmailBody = z.strictObject({ email: z.email().max(254) });
+/**
+ * The email-developer body: `{email}`, and from the fix page the `framework` whose steps the reader
+ * has on screen. The live form posts it as rendered.
+ */
+export const EmailBody = z.strictObject({
+  email: z.email().max(254),
+  // Unbounded here: it is only compared with the packet's frameworks, never stored or sent.
+  framework: z.string().optional(),
+});
 
 /**
- * POST /api/fixes/[id]/email-developer `{email}` once membership is established: 402
- * `fixesVisible` for a fix the tier does not see; 400 `invalid_email`; 429 `rate_limited` with
+ * POST /api/fixes/[id]/email-developer `{email, framework?}` once membership is established: 402
+ * `fixesVisible` for a fix the tier does not see; 400 `invalid_email`; 400 `invalid` for a
+ * framework the fix's packet has no body for; 429 `rate_limited` with
  * `Retry-After` past either limit, both failing closed, the per-fix one counted first so a request
  * it refuses spends none of the caller's hourly sends; otherwise a `fix_email_requests` row holding
- * the address, then one `fix.email_developer_requested` event naming only that row, with the row's
- * id in the event id, and `{queued: true}`. CC-28's mailer reads the row and sends; nothing is sent
+ * the address, then one `fix.email_developer_requested` event naming that row and, when one was
+ * posted, the framework as the packet records it, with the row's id in the event id, and
+ * `{queued: true}`. CC-28's mailer reads the row and sends; nothing is sent
  * from here (owner ruling Q8).
  */
 export async function emailDeveloper(
@@ -292,11 +303,19 @@ export async function emailDeveloper(
   const r = await reach(deps, caller);
   if (r === null) return notFound();
   const kind = body?.kind ?? 'json';
+  const back = deps.back ?? EMAIL_BACK;
   if (!(await visible(deps, r)))
-    return refuseTo(kind, EMAIL_BACK, 402, 'upgrade_required', { gate: 'fixesVisible' });
+    return refuseTo(kind, back, 402, 'upgrade_required', { gate: 'fixesVisible' });
   const input = EmailBody.safeParse(body?.fields ?? {});
-  if (!input.success) return refuseTo(kind, EMAIL_BACK, 400, 'invalid_email');
+  if (!input.success) return refuseTo(kind, back, 400, 'invalid_email');
   const to = input.data.email.toLowerCase();
+  const named = input.data.framework;
+  const written =
+    named === undefined || r.fix.packet === null
+      ? undefined
+      : packetBodies(r.fix.packet).find((b) => b.framework === named);
+  // A framework the packet has no steps for: the mail could not hold what the form said it would.
+  if (named !== undefined && written === undefined) return refuseTo(kind, back, 400, 'invalid');
 
   for (const limit of [deps.limits.perFix, deps.limits.perUser]) {
     const verdict = await limit();
@@ -307,7 +326,7 @@ export async function emailDeveloper(
       );
       // The JSON answer carries the wait as Retry-After only; a form's notice says when.
       return kind === 'form'
-        ? noticeTo(EMAIL_BACK, 'rate_limited', verdict.resetAt.toISOString())
+        ? noticeTo(back, 'rate_limited', verdict.resetAt.toISOString())
         : refuse(429, 'rate_limited', {}, { 'retry-after': String(seconds) });
     }
   }
@@ -321,12 +340,10 @@ export async function emailDeveloper(
   await deps.send({
     id: `fix-email:${requestId}`,
     name: 'fix.email_developer_requested',
-    data: { requestId },
+    data: written ? { requestId, framework: written.framework } : { requestId },
   });
-  return kind === 'form'
-    ? noticeTo(EMAIL_BACK, 'email_requested')
-    : Response.json({ queued: true });
+  return kind === 'form' ? noticeTo(back, 'email_requested') : Response.json({ queued: true });
 }
 
-/** The page the email action is on (the dashboard's change rows). */
+/** Where a form's answer goes when its page is not one to go back to: the dashboard's change rows. */
 const EMAIL_BACK = '/dashboard';

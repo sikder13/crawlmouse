@@ -61,7 +61,7 @@ import { auditHref } from './audit-hrefs';
 import { nextCheckLine, type NextChecks } from './site';
 import { GRADES, PILL, SUBJECTS } from './segment/changes';
 import { effortText } from './segment/fixes';
-import { action, type ActionView } from './account-actions';
+import { action, emailDeveloperAction, type ActionView } from './account-actions';
 import {
   FREE_SCHEDULE,
   accountShellView,
@@ -567,23 +567,7 @@ function changeRow(v: AccountView, site: Site, c: Change): ChangeRowView {
               { id: fix.id },
               { context: `for: ${c.summary}`, copy: true },
             ),
-            action(
-              'emailDeveloper',
-              'Email to my developer',
-              { id: fix.id },
-              {
-                context: `about: ${c.summary}`,
-                inputs: [
-                  {
-                    kind: 'text',
-                    name: 'email',
-                    type: 'email',
-                    ...COPY.developerField,
-                    required: true,
-                  },
-                ],
-              },
-            ),
+            emailDeveloperAction(fix.id, 'Email to my developer', `about: ${c.summary}`),
           ]
         : []),
     ],
