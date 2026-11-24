@@ -33,6 +33,7 @@ import type {
 import { packetBodies, packetPrompt } from '../view/segment/fixes';
 import type { AgencyCapture } from '../agency/events';
 import { checkRef } from '../pipeline/public';
+import { afterTrial } from './after-trial';
 import { hashMailAddress } from './address-hash';
 import { unsubscribeHeaders } from './headers';
 import { reportDeclineUrl, reportPauseUrl } from './links';
@@ -46,6 +47,7 @@ import { fixToDeveloper } from './templates/fix-to-developer';
 import { reportConfirm } from './templates/report-confirm';
 import { seatInvite } from './templates/seat-invite';
 import { trialReminder } from './templates/trial-reminder';
+import { trialReminderKey } from './trial-key';
 import type { RenderedMail } from './types';
 
 /**
@@ -63,6 +65,8 @@ export interface MailHandlerDeps {
   mail: MailDeps;
   store: MailStore;
   capture: CaptureEvent;
+  /** Whether paid plans are open; with them closed the trial reminder offers none. Open by default. */
+  plansOpen?: () => boolean;
 }
 
 /** The link row each account template's `tokenId` names (CC-27b's emits). */
@@ -127,10 +131,18 @@ export function mailHandlers(d: MailHandlerDeps): MailHandlers {
     const endsAt = new Date(a.trialEndsAt);
     if (endsAt.getTime() <= mail.now().getTime()) return 'trial_over';
     if (a.ownerEmail === null) return 'no_owner';
+    // Read before the claim, so a failed read is retried with nothing claimed.
+    const closed = a.trialVariant === 'no_card' && d.plansOpen?.() === false;
+    const after = closed
+      ? afterTrial(
+          await read(store.trialSites(accountId)),
+          await read(store.trialOtherSeats(accountId)),
+        )
+      : undefined;
     return send(mail, {
       kind: 'trial_reminder',
       to: a.ownerEmail,
-      idempotencyKey: `trial_reminder:${accountId}:${endsAt.toISOString()}`,
+      idempotencyKey: trialReminderKey(accountId, endsAt),
       accountId,
       render: async () =>
         trialReminder({
@@ -138,6 +150,7 @@ export function mailHandlers(d: MailHandlerDeps): MailHandlers {
           variant: a.trialVariant!,
           endsAt: endsAt.toISOString(),
           timezone: a.timezone,
+          ...(after ? { after } : {}),
         }),
     });
   }
