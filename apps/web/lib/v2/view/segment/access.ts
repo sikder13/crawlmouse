@@ -301,8 +301,9 @@ const noCrawlerAnswer = (ai: readonly CrawlerResult[]): boolean =>
   ai.every((c) => NO_ANSWER.includes(c.verdict));
 
 /**
- * Every crawler is unmeasured or disallowed on at least half its pages. Some may have been served on the
- * pages robots.txt allows, so this says nothing about requests either way.
+ * Every crawler is unmeasured or disallowed on at least half the pages whose robots.txt was read.
+ * Some pages may have been served and others never checked, and a stored row does not record how
+ * many, so no sentence about all the sampled pages can be proven here.
  */
 const decidedByRobots = (ai: readonly CrawlerResult[]): boolean =>
   ai.every((c) => NO_ANSWER.includes(c.verdict) || c.verdict === 'disallowed_by_robots');
@@ -430,7 +431,7 @@ export function accessView(
         note: noCrawlerAnswer(ai)
           ? 'no crawler request was measured'
           : decidedByRobots(ai)
-            ? 'each checked against robots.txt'
+            ? null
             : coverage.sample_strategy.method === 'census'
               ? coverage.pages_sampled === coverage.pages_discovered
                 ? 'every page'

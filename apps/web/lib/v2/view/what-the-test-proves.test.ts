@@ -254,11 +254,17 @@ describe('a check that sent no request under a crawler’s name', () => {
     },
   );
 
-  it('does not say no request was measured when robots.txt decided the verdicts', () => {
-    // Robots.txt can disallow most pages while the crawler was served on the ones it allows.
+  it('claims nothing about the sampled pages when robots.txt decided the verdicts', () => {
+    // Robots.txt can disallow most pages read while the crawler was served on the ones it allows.
     const c = withVerdicts(Array.from({ length: 6 }, () => 'disallowed_by_robots'));
     for (const x of c.crawlers.filter(isAi)) x.pages_served = 2;
-    expect(sampledNote(c)).toBe('each checked against robots.txt');
+    expect(sampledNote(c)).toBeNull();
+  });
+
+  it('claims nothing either when robots.txt decided some and the rest were not measured', () => {
+    const verdicts: Verdict[] = ['disallowed_by_robots', 'not_measured', 'disallowed_by_robots'];
+    const c = withVerdicts([...verdicts, ...verdicts]);
+    expect(sampledNote(c)).toBeNull();
   });
 
   it.each(['not_measured', 'edge_blocks_automation', 'disallowed_by_robots'] as Verdict[])(
@@ -266,7 +272,7 @@ describe('a check that sent no request under a crawler’s name', () => {
     (v) => {
       const note = sampledNote(withVerdicts([v]));
       expect(note).not.toBe('no crawler request was measured');
-      expect(note).not.toBe('each checked against robots.txt');
+      expect(note).not.toBeNull();
     },
   );
 
