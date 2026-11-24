@@ -751,7 +751,7 @@ describe('createCheckFn (D3)', () => {
     expect(main).toMatchObject({
       id: `${inngest.id}-${CHECK_FN_ID}`,
       triggers: [{ event: 'check.requested' }],
-      concurrency: [{ key: 'event.data.siteId', limit: 1 }, { limit: 2 }],
+      concurrency: [{ key: 'event.data.siteId', limit: 1 }, { limit: 16 }],
       idempotency: 'event.data.checkId',
       timeouts: { finish: '37m' },
       cancel: [{ event: 'check.cancel.requested', if: 'event.data.checkId == async.data.checkId' }],
@@ -771,7 +771,8 @@ describe('createCheckFn (D3)', () => {
         }[]
       )[1]!.limit;
     expect(limitOf('1')).toBe(1);
-    expect(limitOf('50')).toBe(5);
+    expect(limitOf('50')).toBe(50);
+    expect(limitOf('500')).toBe(100);
   });
 
   it('onFailure fails the check with the error’s reason through `fail` alone, and sends check.failed', async () => {

@@ -12,6 +12,7 @@ import {
 import { FAILURE_REASONS, type FailureReason } from '../../../../../inngest/check-events';
 import { CHECK_REAPER_FN_ID } from '../../../../../inngest/check-reaper';
 import {
+  AUDIT_CONCURRENCY_DEFAULT,
   CHECK_CONCURRENCY_DEFAULT,
   PLAN_CONCURRENCY_CAP,
 } from '../../../../../inngest/concurrency';
@@ -186,7 +187,7 @@ export function buildSpec20b(): string {
       ],
     ),
     '',
-    `Concurrency: one plan cap, ${code(`PLAN_CONCURRENCY_CAP = ${PLAN_CONCURRENCY_CAP}`)} (Inngest Free), which the registered functions’ limits are clamped to, v1’s audit function included (Q3; \`pnpm --filter @crawlmouse/web exec vitest run lib/v2/pipeline/functions.test.ts\` sweeps them). The check function’s account-wide limit is \`INNGEST_CHECK_CONCURRENCY\`, default ${CHECK_CONCURRENCY_DEFAULT}. Its per-site key does not keep two checks of a site apart, because Inngest counts executing steps and a sleeping run holds none; the database does (\`checks_one_running_per_site\`, Q13).`,
+    `Concurrency: one plan cap, ${code(`PLAN_CONCURRENCY_CAP = ${PLAN_CONCURRENCY_CAP}`)} (Inngest Pro, 100 concurrent steps, read 2026-11-23), which the registered functions’ limits are clamped to, v1’s audit function included (Q3; \`pnpm --filter @crawlmouse/web exec vitest run lib/v2/pipeline/functions.test.ts\` sweeps them). The check function’s account-wide limit is \`INNGEST_CHECK_CONCURRENCY\`, default ${CHECK_CONCURRENCY_DEFAULT}, the production worker’s batch slots: a batch past them is answered busy and the check waits. v1’s audits default to ${AUDIT_CONCURRENCY_DEFAULT}. Its per-site key does not keep two checks of a site apart, because Inngest counts executing steps and a sleeping run holds none; the database does (\`checks_one_running_per_site\`, Q13).`,
     '',
     '## The steps of a check',
     '',
@@ -329,7 +330,7 @@ export function buildSpec20b(): string {
     '## Differences from ARCH-2 §4',
     '',
     '- **Polling, not `check.batch.done` (D1).** The deployed worker holds no Inngest or database key and is polled; `step.sleep` holds no Vercel function open.',
-    `- **Concurrency default ${CHECK_CONCURRENCY_DEFAULT}, not 20 (D3).** The limits are clamped to the plan cap (above); a higher one makes Inngest refuse the whole app sync.`,
+    `- **Concurrency default ${CHECK_CONCURRENCY_DEFAULT} (D3, revised for Inngest Pro).** The limits are clamped to the plan cap (above); a higher one makes Inngest refuse the whole app sync.`,
     '- **The database serialises a site’s checks**, not the concurrency key (above).',
     '- **Cancel and timeout** are caught by a function of their own, since `onFailure` does not see them.',
     '- **Sitemaps are read by the app** (Q8); the worker reads robots.txt for itself and the sitemap’s status only.',
@@ -351,6 +352,6 @@ export function buildSpec20b(): string {
     )
       .map(code)
       .join(', ')} (Q11, Q13, review round 1).`,
-    '- **v1’s audit function clamps its concurrency to the plan cap**, not 100 (Q3).',
+    '- **v1’s audit function clamps its concurrency to the plan cap** (Q3), and defaults to the 5 it ran at.',
   ].join('\n');
 }
