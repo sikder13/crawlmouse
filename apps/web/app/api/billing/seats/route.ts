@@ -1,5 +1,5 @@
 import { checksPublicEnabled } from '@/lib/auth/flags';
-import { billingV2Enabled } from '@/lib/billing/flags';
+import { billingOpenTo, billingV2Enabled } from '@/lib/billing/flags';
 import { requestedAccountId } from '@/lib/billing/owner';
 import { stripeAccount } from '@/lib/billing/stripe-account';
 import { accountCatalog } from '@/lib/billing/stripe-catalog';
@@ -38,6 +38,8 @@ export async function POST(req: Request) {
     data: { user },
   } = await sb.auth.getUser();
   if (!user) return refuse(401, 'auth_required');
+  // While paying is kept to one user, anyone else is refused before the service-role client.
+  if (!billingOpenTo(user.id)) return refuse(403, 'billing_not_open');
 
   const body = await readBody(req);
   const input = body && parseExtras(body);
