@@ -662,3 +662,113 @@ describe('fixView: other fixtures and states', () => {
     expect(() => fixView(d, BAD, fixOf(0).id)).toThrow(/not seen/);
   });
 });
+
+describe('Fixed, and proven (Goal 1 row 22)', () => {
+  const OPEN = 'c0000000-0000-4000-8000-00000000000b';
+  const VERIFIED = 'c0000000-0000-4000-8000-00000000000c';
+  const ORPHANS = 'f0000000-0000-4000-8000-000000000014';
+  const base = () => fixture('bad-site');
+  const proofOf = (d: ReturnType<typeof base>, fixId = ORPHANS, plan: 'free' | 'pro' = 'free') => {
+    const v = fixView(d, VERIFIED, fixId, { plan });
+    if (v.kind !== 'resolved') throw new Error(v.kind);
+    return v.proof;
+  };
+  /** bad-site with a second fix of nahltech.com, verified by the same check half a minute sooner. */
+  function twoProven() {
+    const d = base();
+    const f = d.fixes.find((x) => x.id === ORPHANS)!;
+    const other = { ...f, id: 'f0000000-0000-4000-8000-0000000000e1', number: 2 };
+    const verified = d.fix_events.find((e) => e.fix_id === ORPHANS && e.kind === 'verified')!;
+    const change = d.changes.find((c) => c.fix_id === ORPHANS && c.kind === 'resolved')!;
+    return {
+      ...d,
+      fixes: [...d.fixes, other],
+      fix_events: [
+        ...d.fix_events,
+        {
+          ...verified,
+          id: 'b0000000-0000-4000-8000-0000000000e1',
+          fix_id: other.id,
+          at: '2026-10-30T10:01:00Z',
+        },
+      ],
+      changes: [
+        ...d.changes,
+        {
+          ...change,
+          id: '90000000-0000-4000-8000-0000000000e1',
+          fix_id: other.id,
+          pages_affected: 5,
+        },
+      ],
+      otherId: other.id,
+    };
+  }
+
+  it('says pages affected went to 0, and names both checks and the verification', () => {
+    // The resolved change row: 3 pages, from check …0b (26 Oct 19:01:40Z) to …0c (30 Oct 10:01:30Z).
+    expect(proofOf(base())).toEqual({
+      kind: 'shown',
+      title: 'Fixed, and proven',
+      lines: [
+        'Affected pages: 3, now 0',
+        'Checked 26 Oct, 19:01 UTC, re-checked 30 Oct, 10:01 UTC · verified',
+      ],
+    });
+  });
+
+  it('for an edge rule, also counts the AI crawlers that read the text at each check', () => {
+    const d = base();
+    // At the check before, GPTBot was kept out by a rule: 5 of the 6 AI crawlers read the text.
+    const edge = {
+      ...d,
+      fixes: d.fixes.map((f) =>
+        f.id === ORPHANS ? { ...f, type: 'edge_rule_blocks_crawler' as const } : f,
+      ),
+      checks: d.checks.map((c) =>
+        c.id === OPEN
+          ? {
+              ...c,
+              crawlers: c.crawlers.map((x) =>
+                x.ua === 'GPTBot' ? { ...x, verdict: 'blocked_by_ua_rule' as const } : x,
+              ),
+            }
+          : c,
+      ),
+    };
+    const p = proofOf(edge);
+    expect(p?.kind === 'shown' && p.lines).toEqual([
+      'Affected pages: 3, now 0',
+      'AI crawlers that read the text: 5 of 6, now 6 of 6',
+      'Checked 26 Oct, 19:01 UTC, re-checked 30 Oct, 10:01 UTC · verified',
+    ]);
+  });
+
+  it('a fix type with no measured value says only the pages, never an estimate', () => {
+    const p = proofOf(base());
+    expect(p?.kind === 'shown' && p.lines.join(' ')).not.toMatch(/crawlers|estimated|≈/);
+  });
+
+  it('on Free, shows the site’s first verified fix and counts the rest', () => {
+    const d = twoProven();
+    // The other fix was verified first, so Free's one proof is its.
+    expect(proofOf(d, d.otherId)?.kind).toBe('shown');
+    expect(proofOf(d)).toEqual({
+      kind: 'counted',
+      title: 'Fixed, and proven',
+      counter: '1 of 2 proven fixes shown on Free · see every one with Pro',
+      action: { label: 'See plans', href: '/pricing' },
+    });
+  });
+
+  it('on a paid plan, shows every verified fix', () => {
+    const d = twoProven();
+    expect(proofOf(d, ORPHANS, 'pro')?.kind).toBe('shown');
+    expect(proofOf(d, d.otherId, 'pro')?.kind).toBe('shown');
+  });
+
+  it('with no resolved change row to name the check before, shows nothing rather than guess', () => {
+    const d = base();
+    expect(proofOf({ ...d, changes: d.changes.filter((c) => c.fix_id !== ORPHANS) })).toBeNull();
+  });
+});

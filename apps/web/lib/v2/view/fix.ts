@@ -8,6 +8,8 @@
  */
 import { frameworkOf } from '@crawlmouse/engine/v2/pipeline';
 import { RECHECK_MINUTES } from '../recheck';
+import { GATES } from '../../entitlement-v2';
+import { FIX_PROOF_COPY } from '../copy/fix-proof';
 import type { Check, CrawlerResult, Fix } from '@crawlmouse/types/v2';
 import { instant } from '@crawlmouse/types/v2';
 import { findCheck, fixesAsOf, siteOf } from '../fixtures';
@@ -160,9 +162,19 @@ export interface LockedFixPage extends FixBase {
   wall: { heading: string; body: string; action: SegmentLink | null };
 }
 
+/**
+ * "Fixed, and proven" (Goal 1 row 22): a verified fix's before and after, from its `resolved` change
+ * row and the two checks. On a plan whose `fixProofs` gate is spent on other fixes, the counter in
+ * its place. Null when the change row that names the check before is missing.
+ */
+export type FixProofView =
+  | { kind: 'shown'; title: string; lines: string[] }
+  | { kind: 'counted'; title: string; counter: string; action: SegmentLink };
+
 export interface ResolvedFixPage extends FixBase {
   kind: 'resolved';
   resolved: string;
+  proof: FixProofView | null;
 }
 
 export type FixView = OpenFixPage | LockedFixPage | ResolvedFixPage;
@@ -231,6 +243,61 @@ function headOf(f: Omit<Fix, 'packet'>, lede: string[], siteFixes: readonly Fix[
     lede,
     tiles,
   };
+}
+
+/** Where the counter's action goes: the plans page, as the other upgrade asks do. */
+const PRICING_HREF = '/pricing';
+
+/** The AI crawlers a check found reading the text, of those it tested, as the fix page counts them. */
+function aiReading(c: Check): { reading: number; of: number } {
+  const ai = c.crawlers.filter(isAi);
+  return { reading: ai.filter(getsIn).length, of: ai.length };
+}
+
+function proofOf(
+  d: ViewDataset,
+  check: Check,
+  f: Omit<Fix, 'packet'>,
+  verifiedBy: string,
+  plan: FixPlan,
+): FixProofView | null {
+  const allowed = GATES[plan === 'pro' ? 'pro' : 'free'].fixProofs;
+  if (allowed !== 'all') {
+    // The site's fixes verified by this check or before, in the order they were verified.
+    const site = new Set(d.fixes.filter((x) => x.site_id === check.site_id).map((x) => x.id));
+    const proven = [
+      ...new Set(
+        d.fix_events
+          .filter((e) => e.kind === 'verified' && site.has(e.fix_id))
+          .filter((e) => instant(e.at) <= instant(check.finished_at!))
+          .sort((a, b) => instant(a.at) - instant(b.at) || a.fix_id.localeCompare(b.fix_id))
+          .map((e) => e.fix_id),
+      ),
+    ];
+    if (!proven.slice(0, allowed).includes(f.id)) {
+      return {
+        kind: 'counted',
+        title: FIX_PROOF_COPY.title,
+        counter: FIX_PROOF_COPY.counter(allowed, proven.length),
+        action: { label: FIX_PROOF_COPY.upgrade, href: PRICING_HREF },
+      };
+    }
+  }
+  const change = d.changes.find(
+    (c) => c.kind === 'resolved' && c.fix_id === f.id && c.check_id === verifiedBy,
+  );
+  if (!change || change.previous_check_id === null) return null;
+  const before = findCheck(d, change.previous_check_id);
+  const after = findCheck(d, verifiedBy);
+  const lines = [FIX_PROOF_COPY.pages(change.pages_affected)];
+  if (f.type === 'edge_rule_blocks_crawler') {
+    const [b, a] = [aiReading(before), aiReading(after)];
+    lines.push(FIX_PROOF_COPY.crawlers(b.reading, b.of, a.reading, a.of));
+  }
+  lines.push(
+    FIX_PROOF_COPY.checks(dayTimeUtc(before.finished_at!), dayTimeUtc(after.finished_at!)),
+  );
+  return { kind: 'shown', title: FIX_PROOF_COPY.title, lines };
 }
 
 function beforeAfterOf(
@@ -516,6 +583,7 @@ export function fixView(
       beforeAfter: null,
       keep: null,
       resolved: `Verified resolved by the check of ${dayTimeUtc(verified.at)}.`,
+      proof: verified.kind === 'verified' ? proofOf(d, check, bare, verified.check_id, plan) : null,
     };
   }
 
