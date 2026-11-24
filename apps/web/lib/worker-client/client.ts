@@ -8,7 +8,16 @@ import type { KeyObject } from 'node:crypto';
 import { CountSchema, HttpStatusSchema, HttpUrlSchema } from '@crawlmouse/types/v2';
 import { z } from 'zod';
 import { loadPrivateKey, mintBatchJwt, PRIVATE_KEY_ENV } from './jwt';
-import { SIGNATURE_HEADER, TS_HEADER, signBody, signMeasure, signRead } from './sign';
+import {
+  BODY_BYTES_HEADER,
+  BODY_SHA256_HEADER,
+  SIGNATURE_HEADER,
+  TS_HEADER,
+  sha256Hex,
+  signBody,
+  signMeasure,
+  signRead,
+} from './sign';
 import {
   batchIdOf,
   WorkerError,
@@ -50,8 +59,14 @@ export const SIGNING_SECRET_ENV = 'WORKER_SIGNING_SECRET';
 export const DEFAULT_TIMEOUT_MS = 30_000;
 /** How long one live-progress read may wait: one poll of the stream (`POLL_MS`, 1.5 s). */
 export const PROGRESS_TIMEOUT_MS = 1_500;
-/** The worker's reader deadline (20 s, READ_DEADLINE_MS) and time for two pages of HTML each way. */
-export const MEASURE_TIMEOUT_MS = 35_000;
+/**
+ * One measure request, from sending it to reading the answer. The worker holds two signed requests at
+ * once (MEASURE_CONCURRENCY), so this one can wait behind one read before its own: two reader deadlines
+ * (READ_DEADLINE_MS, 20 s each) and 5 s for two pages of HTML each way.
+ */
+export const MEASURE_TIMEOUT_MS = 45_000;
+/** Waits before asking again after `measure_busy`, in milliseconds; then the page records it failed. */
+export const MEASURE_BUSY_WAITS_MS = [1_000, 2_000, 4_000] as const;
 
 const MeasuredSchema = z.strictObject({
   reading: z.strictObject({
@@ -124,6 +139,8 @@ export interface WorkerClientOptions {
   now?: () => number;
   /** Per request, from sending it to reading the whole answer. */
   timeoutMs?: number;
+  /** How the client waits between tries; tests pass one that does not. */
+  sleep?: (ms: number) => Promise<void>;
 }
 
 const isRecord = (v: unknown): v is Record<string, unknown> =>
@@ -171,6 +188,7 @@ export function createWorkerClient(opts: WorkerClientOptions): WorkerClient {
   const fetchImpl = opts.fetch ?? fetch;
   const now = opts.now ?? Date.now;
   const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const sleep = opts.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
 
   /** One request; its signal also bounds reading the answer's body. Redirects are not followed. */
   async function send(path: string, init: RequestInit, ms = timeoutMs): Promise<Response> {
@@ -337,23 +355,33 @@ export function createWorkerClient(opts: WorkerClientOptions): WorkerClient {
       const raw = new TextEncoder().encode(
         JSON.stringify({ static_html: staticHtml, rendered_html: renderedHtml, url: pageUrl }),
       );
-      const ts = String(now());
-      const res = await send(
-        '/render/measure',
-        {
-          method: 'POST',
-          headers: {
-            'content-type': 'application/json',
-            [TS_HEADER]: ts,
-            [SIGNATURE_HEADER]: signMeasure(opts.signingSecret, ts, raw),
+      const sha256 = sha256Hex(raw);
+      for (let tried = 0; ; tried++) {
+        const ts = String(now());
+        const res = await send(
+          '/render/measure',
+          {
+            method: 'POST',
+            headers: {
+              'content-type': 'application/json',
+              [TS_HEADER]: ts,
+              [BODY_SHA256_HEADER]: sha256,
+              [BODY_BYTES_HEADER]: String(raw.length),
+              [SIGNATURE_HEADER]: signMeasure(opts.signingSecret, ts, sha256, raw.length),
+            },
+            body: raw,
           },
-          body: raw,
-        },
-        MEASURE_TIMEOUT_MS,
-      );
-      if (res.status !== 200) return null;
-      const answer = MeasuredSchema.safeParse(await bodyOf(res));
-      return answer.success ? answer.data.reading : null;
+          MEASURE_TIMEOUT_MS,
+        );
+        if (res.status === 200) {
+          const answer = MeasuredSchema.safeParse(await bodyOf(res));
+          return answer.success ? answer.data.reading : null;
+        }
+        const wait = MEASURE_BUSY_WAITS_MS[tried];
+        const refusal = await refusalOf(res);
+        if (wait === undefined || refusal.code !== 'measure_busy') return null;
+        await sleep(wait);
+      }
     } catch {
       return null;
     }

@@ -36,9 +36,9 @@ export const ROUTES: readonly Route[] = [
   {
     method: 'POST',
     path: '/render/measure',
-    auth: 'HMAC over `ts.` and the raw body, under a key derived for this route from the shared secret',
+    auth: "HMAC over `ts.{sha256}.{bytes}`, the body's SHA-256 and length sent in `x-crawlmouse-body-sha256` and `x-crawlmouse-body-bytes`, under a key derived for this route from the shared secret; checked before the body is read, and the body is then held to both",
     answers:
-      '200 `{"reading"}` (each render\'s words, whether either is a challenge, the links only the rendered side has) or `{"failed"}` when the reader thread stopped or lost the read; nothing is stored',
+      '200 `{"reading"}` (each render\'s words, whether either is a challenge, the links only the rendered side has) or `{"failed"}` when the measure thread passed its deadline, died, or threw; nothing is stored',
   },
   {
     method: 'GET',
@@ -82,7 +82,7 @@ export const REFUSALS = {
   },
   reader_unavailable: {
     status: 503,
-    when: 'the worker has no reader thread to measure a rendered page on',
+    when: 'the worker has no measure thread to read a rendered page on',
   },
   batch_exists: { status: 409, when: 'this check_id and batch were accepted already' },
   nonce_replayed: { status: 409, when: 'this nonce was used already' },

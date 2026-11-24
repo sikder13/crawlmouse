@@ -689,6 +689,7 @@ describe('GET /metrics', () => {
         'batches_stored',
         'event_loop_lag_p99_ms',
         'heap_used_mb',
+        'measure_reader_restarts',
         'peak_rss_mb',
         'reader_restarts',
         'requests_per_site',
@@ -696,6 +697,7 @@ describe('GET /metrics', () => {
       ].sort(),
     );
     expect(m.body.reader_restarts).toBe(0);
+    expect(m.body.measure_reader_restarts).toBe(0);
     // The process's peak resident memory since it started, from /proc on Linux (the VM); null elsewhere.
     if (process.platform !== 'linux') {
       expect(m.body.peak_rss_mb).toBeNull();
@@ -778,7 +780,12 @@ describe('configuration', () => {
       /new ThreadReader\(new URL\(`\.\/\$\{READER_FILE\}`, import\.meta\.url\)\)/,
     );
     expect(main).toMatch(/await reader\.start\(\)/);
-    expect(main).toMatch(/createWorker\(\{ config, reader \}\)/);
+    // Rendered pages are measured on a thread of their own, also started at boot.
+    expect(main).toMatch(
+      /const measureReader = new ThreadReader\(new URL\(`\.\/\$\{READER_FILE\}`, import\.meta\.url\)\)/,
+    );
+    expect(main).toMatch(/await measureReader\.start\(\)/);
+    expect(main).toMatch(/createWorker\(\{ config, reader, measureReader \}\)/);
   });
 
   it('reads no environment variable but its own nine: no database or Inngest key can reach it', () => {

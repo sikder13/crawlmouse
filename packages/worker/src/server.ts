@@ -2,10 +2,12 @@ import { readFileSync } from 'node:fs';
 import http from 'node:http';
 import { monitorEventLoopDelay } from 'node:perf_hooks';
 import { inSiteScope } from '@crawlmouse/engine/worker';
-import { z } from 'zod';
 import {
+  BODY_BYTES_HEADER,
+  BODY_SHA256_HEADER,
   SIGNATURE_HEADER,
   TS_HEADER,
+  sha256Hex,
   tsProblem,
   type SignatureFailure,
   verifyBatchSignature,
@@ -17,6 +19,7 @@ import { Nonces } from './auth/nonces.js';
 import { BatchRequestSchema, batchIdOf, urlsOf, type BatchRequest } from './batch/request.js';
 import { runBatch } from './batch/run.js';
 import { inlineReader, isNotRead, type PageReader } from './reader/read.js';
+import type { MeasureReader } from './reader/measure.js';
 import { RobotsCache } from './batch/site-rules.js';
 import { DeclarationCache } from './batch/declarations.js';
 import { BatchStore } from './batch/store.js';
@@ -40,14 +43,13 @@ export const MAX_BODY_BYTES = 1024 * 1024;
  * (10 MiB, packages/engine/src/v2/render/client.ts) and the JSON around them.
  */
 export const MAX_MEASURE_BODY_BYTES = 2 * 10 * 1024 * 1024 + 64 * 1024;
-/** Rendered pages measured at once; past it a request is refused, and the render step retries. */
-export const MEASURE_CONCURRENCY = 4;
-
-const MeasureRequestSchema = z.strictObject({
-  static_html: z.string(),
-  rendered_html: z.string(),
-  url: z.string().url().max(2048),
-});
+/**
+ * Signed measure requests held at once: one on the measure thread and one queued behind it, so a
+ * queued request waits at most one READ_DEADLINE_MS. Past it a request is refused `measure_busy`, and
+ * the app's client waits and asks again (apps/web/lib/worker-client/client.ts). Only a request whose
+ * signed headers have passed takes a slot.
+ */
+export const MEASURE_CONCURRENCY = 2;
 const BATCH_ID = /^\/batch\/([0-9a-f-]{36}:\d{1,7})$/;
 const BATCH_PROGRESS = /^\/batch\/([0-9a-f-]{36}:\d{1,7})\/progress(?:\?after=(\d{1,6}))?$/;
 
@@ -60,6 +62,12 @@ export interface WorkerDeps {
   fetcher?: Fetcher;
   /** The entry point passes the reader thread; tests read pages inline. */
   reader?: PageReader;
+  /**
+   * The thread rendered pages are measured on, separate from `reader` so a slow rendered page never
+   * holds up a crawl read. The entry point passes one; without it POST /render/measure answers
+   * `reader_unavailable`, because nothing inline stops a read at a deadline.
+   */
+  measureReader?: MeasureReader;
   log?: (e: LogEvent) => void;
   /** Tests pass what the signal is sent through; the entry point passes none. */
   signalPost?: SignalPost;
@@ -280,44 +288,60 @@ export function createWorker(deps: WorkerDeps): Worker {
   }
 
   let measuring = 0;
+  /**
+   * The order of checks: the signed headers (time, digest, length, HMAC) before a byte of the body is
+   * read; then the measure thread, the slot, the body against its signed length and digest. The body is
+   * decoded and parsed on the measure thread, never here. Every refusal before the body is read closes
+   * the connection, so an unread body is not left on a kept-alive socket.
+   */
   async function postMeasure(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
-    const early = headerProblem(req, now());
-    if (early) {
+    const close = (why: Refusal) => {
       res.setHeader('connection', 'close');
-      return refuse(res, early);
-    }
-    const reader = batchDeps.reader;
-    if (!reader.rendered) return refuse(res, 'reader_unavailable');
-    if (measuring >= MEASURE_CONCURRENCY) return refuse(res, 'measure_busy');
+      refuse(res, why);
+    };
+    const early = headerProblem(req, now());
+    if (early) return close(early);
+    const sha256 = header(req, BODY_SHA256_HEADER);
+    const declared = header(req, BODY_BYTES_HEADER);
+    if (!/^[0-9a-f]{64}$/.test(sha256) || !/^\d{1,9}$/.test(declared))
+      return close('bad_signature');
+    const bytes = Number(declared);
+    const signature = verifyMeasureSignature(
+      config.signingSecret,
+      header(req, TS_HEADER),
+      sha256,
+      bytes,
+      header(req, SIGNATURE_HEADER),
+      now(),
+    );
+    if (signature) return close(signature);
+    if (bytes > MAX_MEASURE_BODY_BYTES) return close('too_large');
+    const reader = deps.measureReader;
+    if (!reader) return close('reader_unavailable');
+    if (measuring >= MEASURE_CONCURRENCY) return close('measure_busy');
     measuring++;
     try {
-      const raw = await readBody(req, MAX_MEASURE_BODY_BYTES);
-      if (raw === 'timeout' || raw === null) res.setHeader('connection', 'close');
-      if (raw === 'timeout') return refuse(res, 'body_timeout');
-      if (raw === null) return refuse(res, 'too_large');
-      const signature = verifyMeasureSignature(
-        config.signingSecret,
-        header(req, TS_HEADER),
-        raw,
-        header(req, SIGNATURE_HEADER),
-        now(),
-      );
-      if (signature) return refuse(res, signature);
-      let parsed: unknown;
+      const raw = await readBody(req, bytes);
+      if (raw === 'timeout') return close('body_timeout');
+      // Over the signed length, cut short, or not the bytes that were signed.
+      if (raw === null || raw.length !== bytes || sha256Hex(raw) !== sha256) {
+        return close('bad_signature');
+      }
+      let r: Awaited<ReturnType<MeasureReader['measure']>>;
       try {
-        parsed = parseJsonStrict(utf8.decode(raw));
+        r = await reader.measure(raw);
       } catch {
-        return refuse(res, 'invalid_json');
+        // The read threw on the thread (measure.ts catches what the page can cause; this is the rest).
+        log({ event: 'measure_threw' });
+        return json(res, 200, { failed: 'read_threw' });
       }
-      const checked = MeasureRequestSchema.safeParse(parsed);
-      if (!checked.success) {
-        return refuse(res, 'invalid_body', {
-          fields: [...new Set(checked.error.issues.map((i) => i.path.join('.') || '(root)'))],
-        });
+      if (isNotRead(r)) return json(res, 200, { failed: r.failed });
+      if ('invalid' in r) {
+        return r.invalid === 'json'
+          ? refuse(res, 'invalid_json')
+          : refuse(res, 'invalid_body', { fields: r.invalid });
       }
-      const { static_html, rendered_html, url } = checked.data;
-      const r = await reader.rendered(static_html, rendered_html, url);
-      json(res, 200, isNotRead(r) ? { failed: r.failed } : { reading: r });
+      json(res, 200, { reading: r.reading });
     } finally {
       measuring--;
     }
@@ -373,6 +397,8 @@ export function createWorker(deps: WorkerDeps): Worker {
       requests_per_site: sites.requestsPerSite(),
       // Reader threads started to replace one that died or passed a read's deadline (0 inline).
       reader_restarts: batchDeps.reader.restarts ?? 0,
+      // The same, for the thread rendered pages are measured on (0 when there is none).
+      measure_reader_restarts: deps.measureReader?.restarts ?? 0,
     });
   }
 

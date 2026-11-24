@@ -8,7 +8,11 @@ const config = loadConfig(process.env);
 const reader = new ThreadReader(new URL(`./${READER_FILE}`, import.meta.url));
 await reader.start();
 process.stdout.write(`${JSON.stringify({ event: 'reader_started' })}\n`);
-const worker = createWorker({ config, reader });
+// Rendered pages are measured on a second thread, so a slow one never holds up a crawl read.
+const measureReader = new ThreadReader(new URL(`./${READER_FILE}`, import.meta.url));
+await measureReader.start();
+process.stdout.write(`${JSON.stringify({ event: 'measure_reader_started' })}\n`);
+const worker = createWorker({ config, reader, measureReader });
 
 worker.server.listen(config.port, '0.0.0.0', () => {
   process.stdout.write(

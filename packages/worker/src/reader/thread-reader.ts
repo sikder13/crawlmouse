@@ -1,5 +1,5 @@
 import { Worker, type ResourceLimits } from 'node:worker_threads';
-import type { RenderedReading } from '@crawlmouse/engine/worker';
+import type { MeasureReader, MeasureReply } from './measure.js';
 import type {
   NotRead,
   PageRead,
@@ -44,29 +44,32 @@ export type ReadMessage =
       finalUrl: string;
       stackHeaders: StackHeaders | null;
     }
-  /** A page's two renders, sent as one body: the static side is its first `split` characters. */
-  | { id: number; kind: 'rendered'; body: ArrayBuffer; split: number; pageUrl: string };
+  /** A POST /render/measure body, as the route received it (measure.ts). */
+  | { id: number; kind: 'measure'; body: ArrayBuffer };
 
 export type ReadReply =
-  | { id: number; result: WordCount | PageRead | RenderedReading }
+  | { id: number; result: WordCount | PageRead | MeasureReply }
   | { id: number; error: string };
 export type ReadyMessage = { ready: true };
 
 type Ask =
   | { kind: 'words'; bodyCut: boolean }
   | { kind: 'page'; bodyCut: boolean; finalUrl: string; stackHeaders: StackHeaders | null }
-  | { kind: 'rendered'; split: number; pageUrl: string };
+  | { kind: 'measure' };
 
 interface Read {
   id: number;
   ask: Ask;
-  /** Kept to send again to a new thread; the caller holds the same string until the read answers. */
-  body: string;
-  resolve: (r: WordCount | PageRead | RenderedReading | NotRead) => void;
+  /**
+   * Kept to send again to a new thread; the caller holds the same value until the read answers. Bytes
+   * are copied for each send, since a transfer detaches what it sends.
+   */
+  body: string | Uint8Array;
+  resolve: (r: WordCount | PageRead | MeasureReply | NotRead) => void;
   reject: (e: Error) => void;
 }
 
-export class ThreadReader implements PageReader {
+export class ThreadReader implements PageReader, MeasureReader {
   private thread: Worker | null = null;
   /** Unanswered reads, oldest first: all sent to the current thread. */
   private readonly queue: Read[] = [];
@@ -117,15 +120,13 @@ export class ThreadReader implements PageReader {
     >;
   }
 
-  rendered(
-    staticHtml: string,
-    renderedHtml: string,
-    pageUrl: string,
-  ): Promise<RenderedReading | NotRead> {
-    return this.send(
-      { kind: 'rendered', split: staticHtml.length, pageUrl },
-      staticHtml + renderedHtml,
-    ) as Promise<RenderedReading | NotRead>;
+  /**
+   * A POST /render/measure body's bytes, decoded, parsed and read on this thread (measure.ts). The
+   * worker gives measuring a ThreadReader of its own (main.ts), so a slow rendered page never holds up
+   * a crawl read queued behind it.
+   */
+  measure(bytes: Uint8Array): Promise<MeasureReply | NotRead> {
+    return this.send({ kind: 'measure' }, bytes) as Promise<MeasureReply | NotRead>;
   }
 
   async close(): Promise<void> {
@@ -135,7 +136,10 @@ export class ThreadReader implements PageReader {
     if (t) await t.terminate();
   }
 
-  private send(ask: Ask, body: string): Promise<WordCount | PageRead | RenderedReading | NotRead> {
+  private send(
+    ask: Ask,
+    body: string | Uint8Array,
+  ): Promise<WordCount | PageRead | MeasureReply | NotRead> {
     return new Promise((resolve, reject) => {
       const read: Read = { id: this.nextId++, ask, body, resolve, reject };
       this.queue.push(read);
@@ -147,7 +151,9 @@ export class ThreadReader implements PageReader {
   private post(thread: Worker, read: Read): void {
     // A fresh ArrayBuffer of its own: Buffer.from may hand back a slice of a shared pool, which a
     // transfer would detach from under other buffers.
-    const bytes = new TextEncoder().encode(read.body).buffer as ArrayBuffer;
+    const bytes = (
+      typeof read.body === 'string' ? new TextEncoder().encode(read.body) : read.body.slice()
+    ).buffer as ArrayBuffer;
     thread.ref();
     thread.postMessage({ ...read.ask, id: read.id, body: bytes } satisfies ReadMessage, [bytes]);
   }

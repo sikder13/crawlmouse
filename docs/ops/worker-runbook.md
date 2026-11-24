@@ -202,12 +202,15 @@ flyctl logs --app crawlmouse-worker-staging
 ```
 
 The worker logs JSON lines: `reader_started` (the page reader thread is up; the worker does not
-listen without it), `listening`, `batch_accepted`, `batch_done` (with requests and any partial
-reasons), `batch_failed`, `request_failed`, `stopping`. It does not log URLs, headers,
+listen without it), `measure_reader_started` (the same, for the thread rendered pages are measured
+on), `listening`, `batch_accepted`, `batch_done` (with requests and any partial
+reasons), `batch_failed`, `request_failed`, `measure_threw` (a rendered page's read threw on the measure thread), `stopping`. It does not log URLs, headers,
 secrets or JWTs. `GET /metrics` is signed with the signing secret, purpose `metrics`; it gives
 memory (resident now, peak resident since the process started, heap used), event-loop lag p99 since
 start, batches running and stored, requests started per site, and `reader_restarts`: page reader threads
-started to replace one that died or passed a read's deadline.
+started to replace one that died or passed a read's deadline. `measure_reader_restarts` counts the
+same for the measure thread, which POST /render/measure reads on so that a slow rendered page never
+holds up a crawl read. Each thread's old space is `READER_HEAP_MB` (192 MiB, `src/reader/thread-reader.ts`).
 To read it without handling the secret, sign it inside the machine:
 
 ```bash

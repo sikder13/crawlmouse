@@ -7,9 +7,12 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { bundleReader } from '../../build.js';
 import { ThreadReader } from './thread-reader.js';
 
+const bytesOf = (static_html: string, rendered_html: string, url = URL_) =>
+  new TextEncoder().encode(JSON.stringify({ static_html, rendered_html, url }));
+
 /**
- * A page's two renders, read on the reader thread as the engine reads them inline (questions/042,
- * design C). The thread runs the bundled reader, as the image does.
+ * A POST /render/measure body, decoded, parsed and read on the reader thread as the engine reads the
+ * two renders inline (questions/042, design C). The thread runs the bundled reader, as the image does.
  */
 const dir = mkdtempSync(join(tmpdir(), 'worker-rendered-'));
 const entry = join(dir, 'reader.mjs');
@@ -52,19 +55,44 @@ const PAIRS: Record<string, [string, string]> = {
   ],
 };
 
-describe('a page’s two renders, read on the thread', () => {
+describe('a measure body, read on the thread', () => {
   it('answers exactly what the engine reads inline', async () => {
     const r = reader();
     for (const [name, [s, rendered]] of Object.entries(PAIRS)) {
-      expect(await r.rendered(s, rendered, URL_), name).toEqual(readRendered(s, rendered, URL_));
+      expect(await r.measure(bytesOf(s, rendered)), name).toEqual({
+        reading: readRendered(s, rendered, URL_),
+      });
     }
   });
 
-  it('splits the two sides where the static one ends, whatever characters it holds', async () => {
+  it('keeps each side whole, a leading byte-order mark and characters outside the BMP included', async () => {
     const r = reader();
-    const s = '<body><p>a 😀 b</p></body>';
-    const rendered = '<body><p>c d e f</p></body>';
-    expect(await r.rendered(s, rendered, URL_)).toMatchObject({ raw_words: 3, rendered_words: 4 });
+    const s = '\uFEFF<body><p>a 😀 b</p></body>';
+    const rendered = '\uFEFF<body><p>c d e f</p></body>';
+    expect(await r.measure(bytesOf(s, rendered))).toEqual({
+      reading: readRendered(s, rendered, URL_),
+    });
+  });
+
+  it('keeps a byte-order mark at the very start of the body, as it was signed', async () => {
+    const r = reader();
+    const raw = bytesOf('<p>a</p>', '<p>b</p>');
+    const withBom = new Uint8Array([0xef, 0xbb, 0xbf, ...raw]);
+    // A decoder that dropped it would parse this as JSON; kept, it is not JSON.
+    expect(await r.measure(withBom)).toEqual({ invalid: 'json' });
+  });
+
+  it('answers a body that is not JSON, or not the measure request, without reading it', async () => {
+    const r = reader();
+    expect(await r.measure(new TextEncoder().encode('{"static_html":'))).toEqual({
+      invalid: 'json',
+    });
+    expect(await r.measure(new TextEncoder().encode('{"__proto__":{}}'))).toEqual({
+      invalid: 'json',
+    });
+    expect(await r.measure(new TextEncoder().encode('{"static_html":"x"}'))).toEqual({
+      invalid: ['rendered_html', 'url'],
+    });
   });
 
   it('stops a page that would hold the thread, and reads the next one', async () => {
@@ -72,9 +100,22 @@ describe('a page’s two renders, read on the thread', () => {
     // `extractMainContent` on repeated <title> grows faster than its size (questions/026).
     const slow = `<html><head>${'<title>x</title>'.repeat(140_000)}</head><body><p>w</p></body></html>`;
     const started = Date.now();
-    expect(await r.rendered(slow, slow, URL_)).toEqual({ failed: 'reader_deadline' });
+    expect(await r.measure(bytesOf(slow, slow))).toEqual({ failed: 'reader_deadline' });
     expect(Date.now() - started).toBeLessThan(5_000);
     const [s, rendered] = PAIRS['server-rendered']!;
-    expect(await r.rendered(s, rendered, URL_)).toEqual(readRendered(s, rendered, URL_));
+    expect(await r.measure(bytesOf(s, rendered))).toEqual({
+      reading: readRendered(s, rendered, URL_),
+    });
+  }, 30_000);
+
+  it('sends a body again, whole, to the new thread when the one before it was stopped', async () => {
+    const r = reader(500);
+    const slow = `<html><head>${'<title>x</title>'.repeat(140_000)}</head><body><p>w</p></body></html>`;
+    const [s, rendered] = PAIRS['client-rendered']!;
+    const queued = bytesOf(s, rendered);
+    const [first, second] = await Promise.all([r.measure(bytesOf(slow, slow)), r.measure(queued)]);
+    expect(first).toEqual({ failed: 'reader_deadline' });
+    expect(second).toEqual({ reading: readRendered(s, rendered, URL_) });
+    expect(queued.byteLength).toBeGreaterThan(0); // the caller's bytes were copied, not transferred
   }, 30_000);
 });
