@@ -73,6 +73,9 @@ type Events = {
   // A visitor asked to be told when a check ends (CC-22b). CC-28's mailer handles it; the address
   // stays in checks.notify_email and is not in the event.
   'check.notify_requested': { data: CheckNotifyRequested };
+  // Row 18: a member changed a site's competitor list; competitors.ts audits them against the site's
+  // latest ended check. Names the site only.
+  'competitors.requested': { data: { siteId: string } };
   // CC-26b: a member asked for a fix's packet to be emailed to a developer
   // (POST /api/fixes/[id]/email-developer). The request, address included, is a
   // fix_email_requests row; the event names that row and no address, so none sits in Inngest's

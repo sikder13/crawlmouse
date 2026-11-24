@@ -71,10 +71,11 @@ A cron registered under two flags (`V2_PIPELINE+V2_CHECKS_PUBLIC`) starts with t
 | `crawlmouse.mail.report-confirm`     | `inngest/mail.ts`            | V2_CHECKS_PUBLIC               | report.confirmation.requested                        | 1 (send)                                                                            | `inngest/mail.ts:188`                                                                                                                                                                                   |
 | `crawlmouse.mail.client-report`      | `inngest/mail.ts`            | V2_CHECKS_PUBLIC               | report.send.requested                                | 1 (send)                                                                            | `inngest/mail.ts:201`                                                                                                                                                                                   |
 | `crawlmouse.alert.dispatch`          | `inngest/alerts.ts`          | V2_PIPELINE+V2_CHECKS_PUBLIC   | check.finished                                       | 1 (plan; then one per channel ('email', 'slack') when an alert fires)               | `inngest/alerts.ts:51`, `inngest/alerts.ts:57`                                                                                                                                                          |
+| `crawlmouse.competitors.compare`     | `inngest/competitors.ts`     | V2_PIPELINE+V2_CHECKS_PUBLIC   | check.finished, competitors.requested                | 1 (plan; with competitors, start-{n}, wait-{n}, ended-{n} and write)                | `inngest/competitors.ts:64`, `inngest/competitors.ts:73`                                                                                                                                                |
 | `crawlmouse.summary.send`            | `inngest/summary.ts`         | V2_PIPELINE+V2_CHECKS_PUBLIC   | summary.requested                                    | 1 (send)                                                                            | `inngest/summary.ts:88`                                                                                                                                                                                 |
 | `crawlmouse.founder.entitlement`     | `inngest/founder.ts`         | V2_BILLING or V2_CHECKS_PUBLIC | entitlement.changed                                  | 1 (notify)                                                                          | `inngest/founder.ts:71`                                                                                                                                                                                 |
 
-A finished check starts 4 of them (`crawlmouse.alert.dispatch`, `crawlmouse.mail.check-notify`, `crawlmouse.events.check-finished`, `crawlmouse.ledger.write`): 8 executions.
+A finished check starts 5 of them (`crawlmouse.alert.dispatch`, `crawlmouse.mail.check-notify`, `crawlmouse.events.check-finished`, `crawlmouse.ledger.write`, `crawlmouse.competitors.compare`): 10 executions.
 One alert that fires on both channels: 4. One mail: 2.
 
 ## One check, by shape
@@ -95,9 +96,9 @@ production, so the shapes stand in for them until they are.
 
 | Shape             | Why                                                                                                                                                                                                                                                                                                                                                                                                          | checkFn run | First check | Scheduled re-check |
 | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------- | ----------- | ------------------ |
-| typical           | v1's median audit: 27 pages, one crawl batch, 14 s; access stage 1 only                                                                                                                                                                                                                                                                                                                                      | 22          | 30          | 31                 |
-| large             | v1's 90th percentile: 195 pages, four crawl batches, 247 s in all; both access stages                                                                                                                                                                                                                                                                                                                        | 69          | 77          | 78                 |
-| heaviest searched | the most executions of 48 shapes tried (claim waits 0 or 5; 0, 1, 30 busy answers a post; batches done at 5, 15, 35, 299 s; a first read that finds the batch gone, or not), all 40 crawl batches and both access stages, cut at the 37-minute finish timeout. This one: 5 claim waits, 0 busy a post, batches of 15 s, each re-posted once. Not a bound: batches that differ from one another are not tried | 522         | 530         | 531                |
+| typical           | v1's median audit: 27 pages, one crawl batch, 14 s; access stage 1 only                                                                                                                                                                                                                                                                                                                                      | 22          | 32          | 33                 |
+| large             | v1's 90th percentile: 195 pages, four crawl batches, 247 s in all; both access stages                                                                                                                                                                                                                                                                                                                        | 69          | 79          | 80                 |
+| heaviest searched | the most executions of 48 shapes tried (claim waits 0 or 5; 0, 1, 30 busy answers a post; batches done at 5, 15, 35, 299 s; a first read that finds the batch gone, or not), all 40 crawl batches and both access stages, cut at the 37-minute finish timeout. This one: 5 claim waits, 0 busy a post, batches of 15 s, each re-posted once. Not a bound: batches that differ from one another are not tried | 522         | 532         | 533                |
 
 A run that passes its finish timeout is counted to the sleep that passes it, and Inngest cancels
 it there; the table still adds the fan-out of a finished check to it, where the real run would
@@ -107,9 +108,9 @@ start `crawlmouse.check.cancelled` and the failed-check mail instead.
 
 | Checks a month | typical | large   | heaviest searched |
 | -------------- | ------- | ------- | ----------------- |
-| 100            | 43,145  | 47,845  | 93,145            |
-| 1,000          | 70,145  | 117,145 | 570,145           |
-| 5,000          | 190,145 | 425,145 | 2,690,145         |
+| 100            | 43,345  | 48,045  | 93,345            |
+| 1,000          | 72,145  | 119,145 | 572,145           |
+| 5,000          | 200,145 | 435,145 | 2,700,145         |
 
 Every figure is a clean run: a step that fails and is retried is one more execution, and an
 `onFailure` handler's run and steps are more again. The totals are a floor under real traffic.
@@ -119,7 +120,7 @@ the brief measured 85 audits in production in the 30 days to 2026-11-13 (F2), co
 
 ## The rule (CC-35 D2)
 
-The floor plus 1,000 typical checks is **70,145** against the line of 800,000.
+The floor plus 1,000 typical checks is **72,145** against the line of 800,000.
 It is under the line: the Pro plan passes `golive:check`.
 
 The largest part of the floor is `crawlmouse.founder.sweep`, on cron `*/5 * * * *` (17,856 a month).

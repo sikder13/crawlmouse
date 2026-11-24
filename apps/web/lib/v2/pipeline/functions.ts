@@ -48,6 +48,7 @@ import { mailFunctions } from '../mail/functions';
 import { reportScheduleFunctions } from '../agency/schedules-wiring';
 import { workerClientFromEnv } from '../../worker-client/client';
 import { monitorFunctions } from '../monitor/functions';
+import { competitorFunctions } from '../competitors/functions';
 import { opsFunctions } from '../ops/functions';
 import { ledgerWorkFromEnv } from '../ledger/functions';
 import { putLedgerDraft } from '../ledger/store';
@@ -164,6 +165,8 @@ export function inngestFunctions(
     ...(checksPublicEnabled(env) ? scheduleFunctions(env) : []),
     // CC-28's alerts and weekly summary, with V2_CHECKS_PUBLIC=1 as well (lib/v2/monitor/functions.ts).
     ...(checksPublicEnabled(env) ? monitorFunctions(env) : []),
+    // Row 18's competitor audits, with V2_CHECKS_PUBLIC=1 as well (lib/v2/competitors/functions.ts).
+    ...(checksPublicEnabled(env) ? competitorFunctions(env) : []),
     ...reports,
     ...ops,
   ];
