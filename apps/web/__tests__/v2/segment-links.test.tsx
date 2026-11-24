@@ -70,8 +70,11 @@ describe('Links and pages, a list longer than ten', () => {
     const d = structuredClone(fixture('built-site'));
     const id = d.checks[0]!.id;
     const served = d.page_results.filter((p) => p.check_id === id && p.status_code === 200);
-    served.slice(0, 11).forEach((p) => (p.meta_description = null));
-    const missing = served.filter((p) => !p.meta_description?.text).length;
+    // Read, and declaring none: missing. (A null description was not read, so is not missing.)
+    served.slice(0, 11).forEach((p) => (p.meta_description = { text: null, chars: 0, cut: false }));
+    const missing = served.filter(
+      (p) => p.meta_description !== null && !p.meta_description.text,
+    ).length;
     expect(missing).toBeGreaterThan(10);
     const doc = dom(renderToStaticMarkup(<LinksScreen data={linksView(d, id)} />));
     const more = [...doc.querySelectorAll('details')].find(

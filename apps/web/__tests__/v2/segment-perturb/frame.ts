@@ -70,7 +70,7 @@ export const FRAME_PERTURB: PerturbTable = {
     'page_results[].status_code': [
       {
         change: (c, d) => (pageOf(c, d, '/products/trail-mug').status_code = 404),
-        expect: { structure: ['Next: Links and pages · 1 broken'] },
+        expect: { structure: ['Next: Links and pages · 1 missing page'] },
       },
     ],
   },
