@@ -10,9 +10,9 @@ import { mapLabel } from '../map-label';
 import { toneOf } from '../letters';
 import type { CrawlState } from '../progress';
 import type { MapDrawing } from './map';
-import type { GradeView } from './result';
+import { AI_READABILITY_LABEL, type GradeView } from './result';
 import { isFreeFix } from './free-fixes';
-import { aiShortSummary, seoShortSummary } from '../sentences';
+import { aiShortSummary, isAllowed, seoShortSummary } from '../sentences';
 import { capitalise } from '../words';
 import type { ViewDataset } from '../fixtures';
 
@@ -69,15 +69,24 @@ export interface HomeView {
   };
 }
 
-function obstacle(c: CrawlerResult, productNoun: string): string {
+/**
+ * What is in the crawler's way. With `nojs` hidden a client-rendered template is a without-JavaScript
+ * finding, so it is not named: the crawler is let in on every template (its verdicts are "allowed"
+ * then), and the cell says so.
+ */
+function obstacle(c: CrawlerResult, productNoun: string, nojs: boolean): string {
   if (c.group === 'search_engine' && c.verdict === 'allowed') {
     return 'nothing: robots.txt allows it and it renders JavaScript';
+  }
+  if (!nojs && c.cause === 'client_rendered_template') {
+    if (!c.by_template.every((x) => isAllowed(x.verdict))) {
+      throw new Error(`${c.ua} is client-rendered but not let in on every template`);
+    }
+    return 'nothing: robots.txt and the edge let it in';
   }
   const phrases: Record<AccessCause, string> = {
     cloudflare_1020: 'a Cloudflare firewall rule',
     bot_fight_mode: 'Bot Fight Mode',
-    // Kept with `nojs` hidden: it names the cause of the Products column's "allowed, thin"
-    // verdict, which shows either way, and gives no without-JavaScript figure.
     client_rendered_template: `the ${productNoun} template is client-rendered`,
     robots_txt_disallow: 'a robots.txt rule',
     automation_challenge: 'an automation challenge at the edge',
@@ -122,7 +131,9 @@ export function homeView(
   const cell = (c: CrawlerResult, key: string): VerdictView => {
     const byT = c.by_template.find((x) => x.template_key === key);
     if (!byT) throw new Error(`${c.ua} has no verdict for ${key}`);
-    return { verdict: byT.verdict, evidence: c.evidence_class };
+    // `nojs` hidden: "allowed, thin" is a without-JavaScript finding, so the cell says "allowed".
+    const verdict = !features.nojs && byT.verdict === 'allowed_thin' ? 'allowed' : byT.verdict;
+    return { verdict, evidence: c.evidence_class };
   };
 
   // The example of words lost without JavaScript: the sampled page that loses the most.
@@ -193,7 +204,7 @@ export function homeView(
         ...(features.ai_letter
           ? [
               {
-                label: 'AI readability',
+                label: AI_READABILITY_LABEL,
                 letter: ai.grade,
                 score: ai.total,
                 tone: toneOf(ai.grade),
@@ -219,7 +230,7 @@ export function homeView(
             : c.text_share === null
               ? 'not measured'
               : `${percent(c.text_share)}%`,
-          obstacle: obstacle(c, productNoun.adjective),
+          obstacle: obstacle(c, productNoun.adjective, features.nojs),
         };
       }),
     },

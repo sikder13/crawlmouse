@@ -76,9 +76,21 @@ function freeFixes(): number {
   if (n === 'all') throw new Error('the pricing copy assumes Free shows a number of fixes');
   return n;
 }
-/** A plan's page limit; with `pages2000` false (the Goal 1 switch hides it), Free's limit at most. */
-const pages = (tier: Tier, pages2000: boolean) =>
-  `${count(pages2000 ? GATES[tier].pagesPerCheck : Math.min(GATES[tier].pagesPerCheck, GATES.free.pagesPerCheck))} pages`;
+/**
+ * A plan's page limit, "2,000 pages". Null when `pages2000` is false (the Goal 1 switch hides it) and
+ * the plan's limit is above Free's: no figure is stated then, since the hidden one is the plan's own
+ * and Free's would understate it.
+ */
+const pages = (tier: Tier, pages2000: boolean): string | null =>
+  !pages2000 && GATES[tier].pagesPerCheck > GATES.free.pagesPerCheck
+    ? null
+    : `${count(GATES[tier].pagesPerCheck)} pages`;
+
+/** "Up to 500 pages per audit", or `without` when `pages` states no figure. */
+const pagesSentence = (tier: Tier, pages2000: boolean, without: string): string => {
+  const p = pages(tier, pages2000);
+  return p === null ? without : `Up to ${p} per audit`;
+};
 
 export interface PlanRow extends Tagged {
   /** The short left-hand label: "5 sites", "weekly". */
@@ -96,10 +108,11 @@ function seatAndSitePrices(interval: Interval, pages2000: boolean): string {
   const a = GATES.agency;
   const seat = interval === 'month' ? EXTRA_SEAT : EXTRA_SEAT_YEARLY;
   const site = interval === 'month' ? EXTRA_SITE : EXTRA_SITE_YEARLY;
+  const p = pages('agency', pages2000);
   return (
     `${a.seats} seats, ${usd(seat)} a seat ${per(interval)} beyond; ` +
-    `${usd(site)} ${per(interval)} for each site from ${a.sites + 1} to ${a.maxSites}; ` +
-    `up to ${pages('agency', pages2000)} per audit`
+    `${usd(site)} ${per(interval)} for each site from ${a.sites + 1} to ${a.maxSites}` +
+    (p === null ? '' : `; up to ${p} per audit`)
   );
 }
 
@@ -136,7 +149,8 @@ export function planCopy(
       rows: [
         {
           label: `${free.sites} ${plural(free.sites, 'site', 'sites')}`,
-          text: `Up to ${pages('free', p2k)} per audit`,
+          // Free's own limit, which the switch does not hide.
+          text: `Up to ${count(free.pagesPerCheck)} pages per audit`,
           capabilities: ['sites'],
         },
         {
@@ -166,7 +180,7 @@ export function planCopy(
       rows: [
         {
           label: `${pro.sites} sites`,
-          text: `Up to ${pages('pro', p2k)} per audit`,
+          text: pagesSentence('pro', p2k, 'Each with its own audits'),
           capabilities: ['sites'],
         },
         {

@@ -20,17 +20,18 @@
  * that still holds beside its routes.
  */
 import type { RiskFeature } from '../../feature-switch';
-import { ALL_SHOWN, type Features } from '../features';
+import { ALL_SHOWN, NOJS_FIX_TYPES, type Features } from '../features';
 import { TRIAL_DAYS } from '../../billing/state-machine';
 import { AGENCY_MONTHLY, PRO_MONTHLY, usd } from '../../billing/prices';
 import { GATES } from '../../entitlement-v2';
 import { AGENCIES_COPY as COPY, SAMPLE_AGENCY, type Tagged } from '../copy/agencies';
 import { AGENCY_PLUS_INBOX_ADDRESS } from '../copy/contact-inbox';
-import { findCheck, fixture } from '../fixtures';
+import { findCheck, fixesAsOf, fixture } from '../fixtures';
 import { dayMonth } from '../format';
 import { toneOf } from '../letters';
 import { CHECKS } from '../recordings';
-import { buildPublicSnapshot, headline } from '../reports/build-snapshot';
+import { buildPublicSnapshot, headline, openFixRows } from '../reports/build-snapshot';
+import { AI_READABILITY_LABEL } from './result';
 import { numberWord } from '../words';
 import { FOOTER_LINE_CAPABILITIES } from '../copy/footer-line';
 
@@ -384,15 +385,19 @@ export interface AgenciesView {
 export const AGENCY_TRIAL_HREF = '/agency-trial';
 export const PRICING_HREF = '/pricing';
 
-/** The sample's AI readability grade, by the label the result view gives it (`view/result.ts`). */
-const AI_READABILITY = 'AI readability';
-
 function onePager(features: Features): AgenciesView['onePager'] {
   const tag = taggedWith(features);
   const d = fixture('bad-site');
   const check = findCheck(d, CHECKS.badFirstAudit);
   const s = buildPublicSnapshot(d, check.id, check.finished_at!);
   const o = COPY.onePager;
+  // `nojs` hidden: no fix whose type is a without-JavaScript finding (`NOJS_FIX_TYPES`).
+  const nojsFixes = new Set(
+    fixesAsOf(d, check)
+      .filter((f) => NOJS_FIX_TYPES.has(f.type))
+      .map((f) => f.id),
+  );
+  const fixRows = openFixRows(d, check).filter((r) => features.nojs || !nojsFixes.has(r.key));
   // The client report page's path: the host without its last label (example-outfitter.com → example-outfitter).
   const slug = s.host.replace(/\.[^.]+$/, '');
   return {
@@ -408,7 +413,7 @@ function onePager(features: Features): AgenciesView['onePager'] {
     heading: `${s.host}: ${features.nojs ? s.headline : headline(check, s.host, false)}`,
     // Without the AI readability letter (`ai_letter` hidden) the sample shows Technical SEO alone.
     grades: s.grades
-      .filter((g) => features.ai_letter || g.label !== AI_READABILITY)
+      .filter((g) => features.ai_letter || g.label !== AI_READABILITY_LABEL)
       .map((g) => ({
         label: g.label,
         letter: g.letter,
@@ -416,8 +421,8 @@ function onePager(features: Features): AgenciesView['onePager'] {
         withheld: g.withheld,
         tone: g.letter ? toneOf(g.letter) : 'default',
       })),
-    fixesCaption: o.fixesCaption,
-    fixes: s.topFixes.map((f, i) => ({
+    fixesCaption: o.fixesCaption(fixRows.length),
+    fixes: fixRows.map((f, i) => ({
       key: f.title,
       n: i + 1,
       title: f.scope ? `${f.title}, ${f.scope}` : f.title,

@@ -6,9 +6,9 @@
  * points call `shownFeatures()`. `/agencies`, `/`, `/check/*` and `/llms.txt` are static, so they
  * read the switch at build time and a change to it takes a redeploy; `/pricing` reads it per request.
  */
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { createElement } from 'react';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { dirname, join, relative } from 'node:path';
+import { createElement, type ReactElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AgenciesScreen } from '../../../components/v2/screens/agencies/AgenciesScreen';
@@ -17,13 +17,13 @@ import { homePreview } from '../../../app/(v2-preview)/v2-preview/_preview/scree
 import { v2KeyPages } from '../../seo/llms-v2';
 import { v2LlmsDescriptor } from '../../seo/site-copy';
 import type { RiskFeature } from '../../feature-switch';
-import { ALL_SHOWN, type Features } from '../features';
+import { ALL_SHOWN, NOJS_FIX_TYPES, type Features } from '../features';
 import { agenciesView } from './agencies';
 import { checkDescription, checkPageView } from './check-pages';
 import { pricingView } from './pricing';
 import mapStyles from '../../../components/v2/map/MapSvg.module.css';
 import type { Check } from '@crawlmouse/types/v2';
-import { findCheck, fixture } from '../fixtures';
+import { findCheck, fixesAsOf, fixture } from '../fixtures';
 import { CHECKS } from '../recordings';
 import { headline } from '../reports/build-snapshot';
 import { aiShortSummary } from '../sentences';
@@ -94,25 +94,70 @@ describe('nothing hidden', () => {
   });
 });
 
-describe('the modules a client component can reach import the switch for its type alone', () => {
+/** The source files under `dir`, tests aside. */
+function sources(dir: string): string[] {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
+    if (e.name === 'node_modules' || e.name.startsWith('.')) return [];
+    const path = join(dir, e.name);
+    if (e.isDirectory()) return sources(path);
+    return /\.(?:tsx?|mjs|js)$/.test(e.name) && !/\.(?:test|spec)\./.test(e.name) ? [path] : [];
+  });
+}
+
+/**
+ * The files a module's value imports name: `import`, `export … from` and `import()` with a relative
+ * or `@/` path, `import type` and `export type` left out (the compiler erases them). A package import
+ * is not followed.
+ */
+function valueImports(file: string): string[] {
+  const source = readFileSync(file, 'utf8');
+  const specs = [
+    ...[
+      ...source.matchAll(/^\s*(?:import|export)\s+(?!type\b)[^;]*?\bfrom\s*['"]([^'"]+)['"]/gm),
+    ].map((m) => m[1]!),
+    ...[...source.matchAll(/^\s*import\s*['"]([^'"]+)['"]/gm)].map((m) => m[1]!),
+    ...[...source.matchAll(/\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/g)].map((m) => m[1]!),
+  ];
+  return specs.flatMap((spec) => {
+    const base = spec.startsWith('@/')
+      ? join(WEB, spec.slice(2))
+      : spec.startsWith('.')
+        ? join(dirname(file), spec)
+        : null;
+    if (base === null) return [];
+    const found = ['', '.ts', '.tsx', '.mjs', '.js', '/index.ts', '/index.tsx']
+      .map((ext) => base + ext)
+      .find((f) => existsSync(f) && statSync(f).isFile() && /\.(?:tsx?|mjs|js)$/.test(f));
+    return found ? [found] : [];
+  });
+}
+
+describe('no module a client component reaches imports the switch as a value', () => {
   // AgencyPlusForm.tsx is 'use client' and imports the pricing copy; 'server-only' would fail it.
-  it.each([
-    'lib/v2/copy/pricing.ts',
-    'lib/v2/view/agencies.ts',
-    'lib/v2/view/home.ts',
-    'lib/v2/view/check-pages.ts',
-    'lib/v2/view/pricing.ts',
-    'lib/v2/features.ts',
-    'lib/v2/reports/build-snapshot.ts',
-    'lib/v2/sentences.ts',
-  ])('%s', (file) => {
-    const source = readFileSync(join(WEB, file), 'utf8');
-    const imports = [
-      ...source.matchAll(
-        /^\s*(?:import|export)\b[^;]*?\bfrom\s*['"][^'"]*feature-switch['"]|\bimport\s*\(\s*['"][^'"]*feature-switch['"]/gm,
-      ),
-    ].map((m) => m[0].trim());
-    expect(imports.filter((i) => !/^(?:import|export)\s+type\b/.test(i))).toEqual([]);
+  // Every 'use client' file under app, components and lib, and each file its value imports reach.
+  const roots = ['app', 'components', 'lib']
+    .flatMap((d) => sources(join(WEB, d)))
+    .filter((f) =>
+      /^(?:\s|\/\/[^\n]*|\/\*[\s\S]*?\*\/)*['"]use client['"]/.test(readFileSync(f, 'utf8')),
+    );
+  const reached = new Set<string>();
+  const queue = [...roots];
+  while (queue.length) {
+    const f = queue.pop()!;
+    if (reached.has(f)) continue;
+    reached.add(f);
+    queue.push(...valueImports(f));
+  }
+  const rel = (f: string) => relative(WEB, f);
+
+  it('the walk starts at client files and reaches the modules that take the record', () => {
+    expect(roots.map(rel)).toContain('components/v2/screens/pricing/AgencyPlusForm.tsx');
+    const seen = [...reached].map(rel);
+    for (const f of ['lib/v2/copy/pricing.ts', 'lib/v2/features.ts']) expect(seen).toContain(f);
+  });
+
+  it('lib/feature-switch.ts is not among them', () => {
+    expect([...reached].map(rel)).not.toContain('lib/feature-switch.ts');
   });
 });
 
@@ -122,11 +167,25 @@ describe('Pricing and For agencies', () => {
     expect(text(agencies(hide('competitors')))).not.toMatch(/competitor/i);
   });
 
-  it('pages_2000 hidden: paid plans say the free page limit, and 2,000 appears nowhere', () => {
-    const t = text(pricing(hide('pages_2000')));
-    expect(t).not.toContain('2,000');
-    expect(t).toContain('Up to 500 pages per audit');
-  });
+  it.each(['month', 'year'] as const)(
+    'pages_2000 hidden (%s): Free keeps its limit, the paid plans state no page figure',
+    (interval) => {
+      const view = (f?: Features) => pricingView({ kind: 'signed_out' }, interval, NOW, FLAGS, f);
+      const rows = (f: Features | undefined, tier: string) =>
+        view(f)
+          .plans.find((p) => p.tier === tier)!
+          .rows.map((r) => r.text);
+      expect(rows(undefined, 'pro')).toContain('Up to 2,000 pages per audit');
+      expect(rows(undefined, 'agency').join(' ')).toContain('up to 2,000 pages per audit');
+      const hidden = hide('pages_2000');
+      expect(text(view(hidden))).not.toContain('2,000');
+      expect(rows(hidden, 'free')).toContain('Up to 500 pages per audit');
+      for (const tier of ['pro', 'agency']) {
+        expect(rows(hidden, tier).join(' ')).not.toMatch(/pages per audit|\b500 pages/);
+      }
+      expect(rows(hidden, 'pro')).toContain('Each with its own audits');
+    },
+  );
 
   it('staging_deploys hidden: no staging or preview sentence', () => {
     expect(text(pricing())).toMatch(/staging/i);
@@ -280,6 +339,31 @@ describe('For agencies under nojs', () => {
     );
     expect(agenciesHtml(hide('nojs'))).not.toContain('empty without JavaScript');
   });
+
+  it('the one-pager lists no without-JavaScript fix, and its caption counts what it lists', () => {
+    const d = fixture('bad-site');
+    const typeOf = new Map(
+      fixesAsOf(d, findCheck(d, CHECKS.badFirstAudit)).map((f) => [f.title, f.type]),
+    );
+    const types = (f?: Features) => agencies(f).onePager.fixes.map((x) => typeOf.get(x.key));
+    // Nothing hidden: the three fixes, client rendering among them, as before the switch.
+    expect(agencies().onePager.fixes.map((x) => x.title)).toEqual([
+      'Let GPTBot and PerplexityBot through Cloudflare',
+      'Server-render the product template, 158 pages',
+      'Link the 7 orphan pages from their collections',
+    ]);
+    expect(types()).toContain('client_rendered_template');
+    expect(agencies().onePager.fixesCaption).toBe('Three fixes, effects estimated');
+    const hidden = agencies(hide('nojs')).onePager;
+    expect(types(hide('nojs')).filter((t) => t === undefined || NOJS_FIX_TYPES.has(t))).toEqual([]);
+    expect(hidden.fixes.map((x) => [x.n, x.title])).toEqual([
+      [1, 'Let GPTBot and PerplexityBot through Cloudflare'],
+      [2, 'Link the 7 orphan pages from their collections'],
+    ]);
+    expect(hidden.fixesCaption).toBe('Two fixes, effects estimated');
+    expect(words(agenciesHtml(EVERY))).toContain('Server-render the product template');
+    expect(words(agenciesHtml(hide('nojs')))).not.toMatch(/server-render|client-rendered/i);
+  });
 });
 
 describe('Home', () => {
@@ -373,6 +457,23 @@ describe('Home', () => {
     for (const r of rows) expect((r.match(/<t[dh]\b/g) ?? []).length).toBe(4);
   });
 
+  it('nojs hidden: the crawler table names no thin verdict and no client-rendered template', () => {
+    const claude = (f?: Features) =>
+      homePreview(f).crawlers.rows.find((r) => r.crawler === 'ClaudeBot')!;
+    const verdicts = (f?: Features) =>
+      homePreview(f).crawlers.rows.flatMap((r) => [r.homepage.verdict, r.products.verdict]);
+    // Nothing hidden: ClaudeBot reads the product template thin, and the cell says why.
+    expect(claude().products.verdict).toBe('allowed_thin');
+    expect(claude().obstacle).toBe('the product template is client-rendered');
+    expect(words(homeHtml())).toContain('allowed, thin');
+    expect(words(homeHtml())).toContain('client-rendered');
+    expect(verdicts(hide('nojs'))).not.toContain('allowed_thin');
+    expect(claude(hide('nojs')).products.verdict).toBe('allowed');
+    expect(claude(hide('nojs')).obstacle).toBe('nothing: robots.txt and the edge let it in');
+    const t = words(homeHtml(hide('nojs')));
+    expect(t).not.toMatch(/allowed, thin|client-rendered|server-render/i);
+  });
+
   it('ai_letter hidden: the example shows Technical SEO alone', () => {
     expect(homePreview().example.grades.map((g) => g.label)).toEqual([
       'Technical SEO',
@@ -438,6 +539,20 @@ describe('the server entry points read the switch', () => {
     expect(m.description).toBe(checkDescription('javascript', hide('nojs')));
     expect(m.openGraph?.description).toBe(m.description);
     expect(m.title).toBe('AI crawlers and JavaScript: AI visibility check');
+  });
+
+  it('/check/javascript: the page body under nojs', async () => {
+    vi.stubEnv('V2_CHECKS_PUBLIC', '1');
+    const { default: CheckPage } = await import('../../../app/check/[question]/page');
+    const render = async () =>
+      renderToStaticMarkup(
+        (await CheckPage({ params: Promise.resolve({ question: 'javascript' }) })) as ReactElement,
+      );
+    expect(await render()).toContain('words in a browser');
+    vi.stubEnv('V2_HIDE_FEATURES', 'nojs');
+    const html = await render();
+    expect(html).not.toContain('words in a browser');
+    expect(html).toContain('Can AI crawlers read your site without JavaScript?');
   });
 
   it('/llms.txt: the descriptor and the key pages under ai_letter and nojs', async () => {

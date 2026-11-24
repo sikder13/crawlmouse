@@ -4,6 +4,7 @@
  * `lib/feature-switch.ts`, which imports 'server-only') and passes the record down; this module
  * imports that file's type alone, so a client component may import it.
  */
+import type { FixType } from '@crawlmouse/types/v2';
 import type { RiskFeature } from '../feature-switch';
 
 /** Which Goal 1 features may be named: true is shown. */
@@ -21,3 +22,12 @@ export const ALL_SHOWN: Features = Object.freeze({
   agency_white_label: true,
   agency_domain: true,
 });
+
+/**
+ * The fix types that are without-JavaScript findings: a template empty until scripts run, and links a
+ * page adds only through JavaScript. With `nojs` hidden a public page lists no fix of these types.
+ */
+export const NOJS_FIX_TYPES: ReadonlySet<FixType> = new Set<FixType>([
+  'client_rendered_template',
+  'js_only_navigation',
+]);

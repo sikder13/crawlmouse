@@ -10,7 +10,7 @@ import { keptOutClauses, thinSentence } from '../sentences';
 import { capitalise } from '../words';
 import { findCheck, siteOf, type ViewDataset } from '../fixtures';
 import { CAUSE_SHORT } from '../view/segment/access';
-import { crawlerRows, resultView } from '../view/result';
+import { crawlerRows, resultView, type ResultView } from '../view/result';
 import { freeFixes } from '../view/free-fixes';
 import { PublicSnapshotV2Schema, type PublicSnapshotV2 } from './snapshot';
 
@@ -33,6 +33,21 @@ export function headline(check: Check, host: string, withThin = true): string {
 }
 
 /**
+ * The fix rows a snapshot lists: the overview's rows, in its order, of the fixes Free opens, each with
+ * the id of its fix (`key`), which the snapshot itself does not keep.
+ */
+export function openFixRows(
+  d: ViewDataset,
+  check: Check,
+  view: ResultView = resultView(d, check.id, { map: null }),
+): { key: string; title: string; scope: string | null; points: string }[] {
+  const opened = new Set(freeFixes(d, check).map((f) => f.id));
+  return (view.fixes?.rows ?? [])
+    .filter((r) => opened.has(r.key))
+    .map(({ key, title, scope, points }) => ({ key, title, scope, points }));
+}
+
+/**
  * The snapshot of a finished (or partial) check, minted at `mintedAt`. Throws for a check that has not
  * finished, as the overview does.
  */
@@ -43,8 +58,7 @@ export function buildPublicSnapshot(
 ): PublicSnapshotV2 {
   const check = findCheck(d, checkId);
   const view = resultView(d, checkId, { map: null });
-  const opened = new Set(freeFixes(d, check).map((f) => f.id));
-  const rows = (view.fixes?.rows ?? []).filter((r) => opened.has(r.key));
+  const rows = openFixRows(d, check, view);
   return PublicSnapshotV2Schema.parse({
     version: 2,
     host: siteOf(d, check).host,
