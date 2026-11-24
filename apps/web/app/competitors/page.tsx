@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Route } from 'next';
 import { notFound, redirect } from 'next/navigation';
 import { AccountStateScreen } from '@/components/v2/screens/account/AccountStateScreen';
 import { checksPublicEnabled } from '@/lib/auth/flags';
@@ -43,5 +43,5 @@ export default async function CompetitorsPage() {
   if (sites.length === 0) redirect('/dashboard');
   const site = sites.find((s) => s.competitor_hosts.length > 0) ?? primarySite(v);
   const latest = resultChecks(v, site.id).at(-1);
-  redirect(latest ? auditHrefs(latest.id).segment('signals') : `/sites/${site.id}`);
+  redirect((latest ? auditHrefs(latest.id).segment('signals') : `/sites/${site.id}`) as Route);
 }
