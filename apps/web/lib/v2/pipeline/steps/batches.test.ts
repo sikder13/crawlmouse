@@ -358,20 +358,42 @@ describe('stagePages', () => {
     picked_for: 'homepage' as const,
   };
   it('plans stage 2 only when stage 1 found it needed', () => {
-    expect(stagePages({ stage1: [page], stage2_needed: false, stage2: [] }, 2)).toEqual({
+    expect(stagePages({ stage1: [page], stage2_needed: false, stage2: [] }, 2, new Map())).toEqual({
       none: 'not_needed',
     });
-    expect(stagePages({ stage1: [page], stage2_needed: null, stage2: [] }, 2)).toEqual({
+    expect(stagePages({ stage1: [page], stage2_needed: null, stage2: [] }, 2, new Map())).toEqual({
       none: 'not_needed',
     });
-    expect(stagePages({ stage1: [page], stage2_needed: true, stage2: [] }, 2)).toEqual({
+    expect(stagePages({ stage1: [page], stage2_needed: true, stage2: [] }, 2, new Map())).toEqual({
       none: 'done',
     });
     expect(
-      stagePages({ stage1: [page], stage2_needed: true, stage2: [{ ...page, stage: 2 }] }, 2),
+      stagePages(
+        { stage1: [page], stage2_needed: true, stage2: [{ ...page, stage: 2 }] },
+        2,
+        new Map(),
+      ),
     ).toEqual({ kind: 'access', pages: [{ url: page.url, template_key: '/' }] });
-    expect(stagePages({ stage1: [], stage2_needed: null, stage2: [] }, 1)).toEqual({
+    expect(stagePages({ stage1: [], stage2_needed: null, stage2: [] }, 1, new Map())).toEqual({
       none: 'done',
+    });
+  });
+});
+
+describe('stagePages: the address an access test asks (F-252)', () => {
+  it('asks a page where the crawl found it answering, not at its canonical spelling', () => {
+    const page = {
+      url: 'https://x.test/about',
+      template_key: '/',
+      stage: 1 as const,
+      picked_for: 'homepage' as const,
+    };
+    const rows = new Map([
+      [page.url, { url: page.url, final_url: 'https://x.test/about/', status_code: 200 }],
+    ]);
+    expect(stagePages({ stage1: [page], stage2_needed: null, stage2: [] }, 1, rows)).toEqual({
+      kind: 'access',
+      pages: [{ url: 'https://x.test/about/', template_key: '/' }],
     });
   });
 });

@@ -19,7 +19,7 @@ import { canonicalizeUrl } from '../../url-canonical.js';
 import { assemble } from './assemble.js';
 import { readBatches } from './batches.js';
 import { MAX_TEMPLATE_KEY_LENGTH, MAX_URL_LENGTH } from '../batch-bounds.js';
-import { nextCrawlBatch, sample, STAGE1_CHALLENGED, STAGE1_MAX_PAGES } from './plan.js';
+import { answeredAt, nextCrawlBatch, sample, STAGE1_CHALLENGED, STAGE1_MAX_PAGES } from './plan.js';
 import type { Seed } from './types.js';
 
 const HOME = 'https://p.test';
@@ -389,6 +389,47 @@ describe('nextCrawlBatch', () => {
     expect(nextCrawlBatch(seeds, [batch], 500)).toBeNull();
   });
 
+  // F-252: a server that answers /about/ and not /about gave a site of 404s when the crawl asked the
+  // canonical spelling. The address asked is the one the site wrote; the identity stays canonical.
+  it('asks a link in the spelling the site wrote, once whatever the spelling', () => {
+    const batch = crawlBatch(
+      0,
+      [crawlRow({ url: HOME, outcome: 'fetched', status: 200 })],
+      [],
+      [at('/about/'), at('/about'), at('/About/'), at('/b/#part'), at('/c?y=2&x=1')],
+    );
+    const seeds: Seed[] = [{ url: HOME, source: 'homepage', lastmod: null }];
+    expect(nextCrawlBatch(seeds, [batch], 500)).toEqual([
+      at('/about/'),
+      at('/About/'),
+      at('/b/'),
+      at('/c?y=2&x=1'),
+    ]);
+  });
+
+  it('asks a sitemap seed as the sitemap spells it', () => {
+    const seeds: Seed[] = [
+      { url: HOME, source: 'homepage', lastmod: null },
+      { url: at('/docs/'), source: 'sitemap', lastmod: null },
+      { url: at('/docs'), source: 'sitemap', lastmod: null },
+    ];
+    expect(nextCrawlBatch(seeds, [], 500)).toEqual([HOME, at('/docs/')]);
+  });
+
+  it('asks no page again that a batch crawled, in whichever spelling', () => {
+    const batch = crawlBatch(
+      0,
+      [
+        crawlRow({ url: HOME, outcome: 'fetched', status: 200 }),
+        crawlRow({ url: at('/x'), outcome: 'fetched', status: 200, final_url: at('/x/') }),
+      ],
+      [],
+      [at('/x/'), at('/x'), at('/y/')],
+    );
+    const seeds: Seed[] = [{ url: HOME, source: 'homepage', lastmod: null }];
+    expect(nextCrawlBatch(seeds, [batch], 500)).toEqual([at('/y/')]);
+  });
+
   // F-252: the worker names a discovered URL as the site linked it (`/x/`); rows stay canonical.
   it('counts a page once in coverage, whichever spelling the site linked', () => {
     const batch = crawlBatch(
@@ -419,5 +460,23 @@ describe('nextCrawlBatch', () => {
       { url: 'https://p.test:8443/x/ported', source: 'sitemap', lastmod: null },
     ];
     expect(nextCrawlBatch(seeds, [], 500)).toEqual([HOME]);
+  });
+});
+
+describe('answeredAt (F-252)', () => {
+  it('asks a crawled page again where it answered, when that is the same page', () => {
+    const row = (path: string, status: number, final: string | null) => ({
+      ...crawlRow({ url: at(path), outcome: 'fetched', status }),
+      final_url: final,
+    });
+    expect(answeredAt(row('/x', 200, at('/x/')))).toBe(at('/x/'));
+    expect(answeredAt(row('/x', 200, at('/x')))).toBe(at('/x'));
+    // Redirected to another page, or stopped on a redirect: the row's own address.
+    expect(answeredAt(row('/w', 200, at('/v/')))).toBe(at('/w'));
+    expect(answeredAt(row('/y', 301, at('/y/')))).toBe(at('/y'));
+    expect(answeredAt(row('/z', 200, null))).toBe(at('/z'));
+    expect(
+      answeredAt(crawlRow({ url: HOME, outcome: 'fetched', status: 200, final_url: `${HOME}/` })),
+    ).toBe(HOME);
   });
 });

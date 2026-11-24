@@ -7,6 +7,7 @@
  * read.
  */
 import {
+  askedAs,
   canonicalizeUrl,
   discoverSitemaps,
   parseSitemapEntries,
@@ -73,11 +74,13 @@ export async function discoverSeeds(
   // seed of a URL listed as both (assemble.ts seedMap).
   const seeds: Seed[] = [{ url: homepageUrl, source: 'homepage', lastmod: null }];
   const listed = new Set<string>();
+  // Compared in canonical spelling, kept in the sitemap's (F-252): the crawl asks the address the
+  // site wrote, and a server may answer /docs/ and not /docs.
   for (const { loc, lastmod } of entries) {
     const url = canonicalHttp(loc);
     if (url === null || listed.has(url)) continue;
     listed.add(url);
-    seeds.push({ url, source: 'sitemap', lastmod });
+    seeds.push({ url: askedAs(loc, url), source: 'sitemap', lastmod });
   }
   return { seeds, sitemapUrls: entries.length, robotsTxt: robotsStatus };
 }
