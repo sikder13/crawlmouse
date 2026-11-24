@@ -148,7 +148,23 @@ describe('GET /api/report-files/[id]/download', () => {
       const path = reportPath(w.accountId, onSite, 'pdf');
       expect(res.status).toBe(302);
       expect(res.headers.get('location')).toBe(`https://storage.test/reports/${path}?token=signed`);
-      expect(h.bucket.signed).toEqual([[path, 600]]);
+      const { rows } = await h.db.query<{ host: string }>(
+        `select host from public.sites where id = $1`,
+        [w.site.id],
+      );
+      // F-125: the file downloads under the site and the day, not the report's id.
+      expect(h.bucket.signed).toEqual([
+        [
+          path,
+          600,
+          expect.stringMatching(
+            new RegExp(
+              `^crawlmouse-${rows[0]!.host.replace(/[.]/g, '\\.')}-\\d{4}-\\d{2}-\\d{2}-audit\\.pdf$`,
+            ),
+          ),
+        ],
+      ]);
+      expect(h.bucket.signed[0]![2]).not.toContain(onSite);
       expect(res.headers.get('cache-control')).toBe('no-store');
       expect(res.headers.get('referrer-policy')).toBe('no-referrer');
       expect(await res.text()).toBe('');

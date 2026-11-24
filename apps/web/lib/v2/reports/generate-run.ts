@@ -88,8 +88,8 @@ export interface ReportBucket {
   put(path: string, file: ReportFile): Promise<void>;
   /** Removes the object at `path`; removing one that is not there is not an error. */
   remove(path: string): Promise<void>;
-  /** An address that serves the object as a download for `seconds`. */
-  signedUrl(path: string, seconds: number): Promise<string>;
+  /** An address that serves the object as a download for `seconds`, as `filename` when given. */
+  signedUrl(path: string, seconds: number, filename?: string): Promise<string>;
 }
 
 export interface GenerateDeps {
@@ -308,8 +308,10 @@ export function supabaseReportBucket(admin: SupabaseClient): ReportBucket {
       const { error } = await bucket().remove([path]);
       if (error) throw new Error(`reports: remove: ${error.message}`);
     },
-    async signedUrl(path, seconds) {
-      const { data, error } = await bucket().createSignedUrl(path, seconds, { download: true });
+    async signedUrl(path, seconds, filename) {
+      const { data, error } = await bucket().createSignedUrl(path, seconds, {
+        download: filename ?? true,
+      });
       if (error || !data) throw new Error(`reports: sign: ${error?.message ?? 'no address'}`);
       return data.signedUrl;
     },
