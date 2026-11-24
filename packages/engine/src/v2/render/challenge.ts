@@ -32,15 +32,25 @@ export const CHALLENGE_MARKERS = [
   '/_sec/cp_challenge',
 ] as const;
 
-const titleOf = (html: string): string | null => {
-  const m = /<title[^>]*>([\s\S]*?)<\/title>/i.exec(html);
-  return m ? m[1]!.trim().toLowerCase() : null;
-};
+/**
+ * The text of the first `<title…>…</title>`, trimmed, from the page already in lower case: the match
+ * `/<title[^>]*>([\s\S]*?)<\/title>/i` gives, found in one pass. That regular expression takes time
+ * quadratic in the page on many `<title` with no `>`, or many `<title>a` with no `</title>`, and a
+ * page is up to 10 MiB. Each search below starts where the last ended, so this reads the page once.
+ */
+export function titleOf(lower: string): string | null {
+  const open = lower.indexOf('<title');
+  if (open < 0) return null;
+  const tagEnd = lower.indexOf('>', open + '<title'.length);
+  if (tagEnd < 0) return null;
+  const close = lower.indexOf('</title>', tagEnd + 1);
+  return close < 0 ? null : lower.slice(tagEnd + 1, close).trim();
+}
 
 export function challengeIn(html: string): boolean {
-  const title = titleOf(html);
+  const lower = html.toLowerCase();
+  const title = titleOf(lower);
   if (title !== null && (CHALLENGE_TITLES as readonly string[]).includes(title)) return true;
   if (title !== null && CHALLENGE_TITLE_ENDINGS.some((e) => title.endsWith(e))) return true;
-  const lower = html.toLowerCase();
   return CHALLENGE_MARKERS.some((m) => lower.includes(m));
 }
