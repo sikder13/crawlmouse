@@ -323,6 +323,44 @@ describe('a page that answered 404 or 410', () => {
     ).toEqual(expect.arrayContaining([['/products/old-dome-tent', []]]));
   });
 
+  it('counts pages and missing pages the same way, so the two add up to the pages crawled', () => {
+    // 10 pages crawled and recorded; /products/old-dome-tent answered 404 after a redirect to
+    // /products/retired-tent, which the record also holds answering 404. Two records, one missing
+    // URL: 9 pages and 1 missing, worked out by hand.
+    const copy = structuredClone(d);
+    const at = (p: string) =>
+      copy.page_results.find((x) => x.check_id === id && new URL(x.url).pathname === p)!;
+    const old = at('/products/old-dome-tent');
+    const retired = at('/products/retired-tent');
+    const others = copy.page_results
+      .filter((p) => p.check_id === id && p.status_code === 200 && p !== old && p !== retired)
+      .filter((_, i) => i < 8);
+    expect(others).toHaveLength(8);
+    copy.page_results = [
+      ...copy.page_results.filter((p) => p.check_id !== id),
+      ...others,
+      old,
+      retired,
+    ];
+    Object.assign(retired, { status_code: 404, links_out: 0, links_read: false });
+    Object.assign(old, {
+      status_code: 404,
+      final_url: retired.url,
+      redirect: { hops: [{ from: old.url, status: 301, location: retired.url }], loop: false },
+      links_out: 0,
+      links_read: false,
+      content_simhash: null,
+      title: null,
+      meta_description: null,
+    });
+    const check = copy.checks.find((c) => c.id === id)!;
+    check.coverage!.pages_crawled = 10;
+    const links = check.structure!.internal_links;
+    expect(linkMapView(copy, id, { scope: 'all', hrefs }).title).toBe(
+      `9 pages, 1 missing, ${links} links.`,
+    );
+  });
+
   it('scopes the missing count to the pages checked when the record holds fewer than were crawled', () => {
     const copy = structuredClone(d);
     const check = copy.checks.find((c) => c.id === id)!;
