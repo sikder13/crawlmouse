@@ -1925,17 +1925,26 @@ describe('round 5: a robots.txt redirect the batch could not follow', () => {
 
 describe('a site that answers 429 only to crawler names (review of the back-off, M4)', () => {
   it('measures every crawler as rate limited, without waiting, retrying or stopping the site', async () => {
+    // Each crawler name's requests, by page: a crawler that is refused is not asked again.
+    const asked = new Map<string, number>();
     const { result } = await runFake(
       accessReq('https://example.com', ['/a', '/b']),
-      (url, identity) =>
-        url.endsWith('/robots.txt') || identity.role === 'control'
+      (url, identity) => {
+        if (identity.role === 'crawler') {
+          const key = `${identity.userAgent} ${url}`;
+          asked.set(key, (asked.get(key) ?? 0) + 1);
+        }
+        return url.endsWith('/robots.txt') || identity.role === 'control'
           ? { status: 200, headers: { 'content-type': 'text/html' }, body: '<p>served</p>' }
-          : { status: 429, headers: { 'retry-after': '30' }, body: '' },
+          : { status: 429, headers: { 'retry-after': '30' }, body: '' };
+      },
     );
     if (result.kind !== 'access') throw new Error('access');
     const crawlerRows = result.access_tests.filter((r) => r.ua !== null);
     expect(crawlerRows.length).toBeGreaterThan(0);
     expect(new Set(crawlerRows.map((r) => r.verdict))).toEqual(new Set(['rate_limited']));
     expect(result.findings.filter((f) => f.kind === 'site_stopped')).toEqual([]);
+    expect(asked.size).toBeGreaterThan(0);
+    expect(Math.max(...asked.values())).toBe(1);
   });
 });
