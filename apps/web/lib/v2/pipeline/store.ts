@@ -20,7 +20,7 @@ import type { ReapedCheck } from '../../../../../inngest/check-reaper';
 import { checkFromRow, diffInputsFromRow, fixEventFromRow, fixFromRow, siteFromRow } from './rows';
 import type { CrawlBatchRow, CrawlBatchStatus } from './types';
 import type { EntitlementClock } from '../../entitlement-v2';
-import { ACCOUNT_CLOCK_COLUMNS, clockFromAccountRow } from './load-for';
+import { readAccountClock } from './page-cap';
 
 export type ClaimOutcome = 'claimed' | 'site_busy' | 'gone';
 
@@ -30,11 +30,6 @@ export interface RequestSite {
   account_id: string | null;
   host: string;
   next_check_at: string | null;
-  /**
-   * The keeping account's entitlement clock, which sets the check's page cap (page-cap.ts); null for a
-   * site no account keeps. A store that does not read it leaves it out, and the cap is the default.
-   */
-  account?: EntitlementClock | null;
 }
 
 /** A `checks` row requestCheck inserts. */
@@ -82,6 +77,11 @@ export interface PipelineStore {
   check(checkId: string): Promise<Check>;
   site(siteId: string): Promise<Site>;
   requestSite(siteId: string): Promise<RequestSite>;
+  /**
+   * The entitlement clock of the account `accountId`, which sets a check's page cap (page-cap.ts). Every
+   * store `requestCheck` runs on must read it: there is no default to fall back to.
+   */
+  accountClock(accountId: string): Promise<EntitlementClock>;
   /**
    * The diff's baseline: the site's other finished or partial check that finished last, with its diff
    * inputs. By `finished_at`, not queue order: claims are not in queue order (correctness 4). Its id
@@ -228,7 +228,7 @@ export function supabasePipelineStore(sb: SupabaseClient): PipelineStore {
     },
 
     async requestSite(siteId) {
-      const site = must<RequestSite>(
+      return must<RequestSite>(
         'request site',
         await sb
           .from('sites')
@@ -236,12 +236,10 @@ export function supabasePipelineStore(sb: SupabaseClient): PipelineStore {
           .eq('id', siteId)
           .single(),
       );
-      if (!site.account_id) return { ...site, account: null };
-      const account = must<Record<string, unknown>>(
-        'request site account',
-        await sb.from('accounts').select(ACCOUNT_CLOCK_COLUMNS).eq('id', site.account_id).single(),
-      );
-      return { ...site, account: clockFromAccountRow(account) };
+    },
+
+    async accountClock(accountId) {
+      return readAccountClock(sb, accountId);
     },
 
     async previousGraded(siteId, checkId) {

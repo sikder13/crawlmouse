@@ -268,6 +268,36 @@ describe('supabaseRequestRecheck', () => {
 describe('supabaseAddSite', () => {
   const schedule = { cadence: 'monthly' as const, iso_weekday: 3, hour_local: 6 };
 
+  it("sends the site's first check its account's page cap: 2,000 on Pro, 500 on Free (row 16)", async () => {
+    const capOf = async (host: string, plan: 'pro' | 'free') => {
+      const a = await account();
+      if (plan === 'pro') {
+        await db.query(
+          `update public.accounts set state = 'pro', tier = 'pro', current_subscription_id = 'sub_row16',
+             state_history = state_history || jsonb_build_array(jsonb_build_object('state', 'pro', 'since', now()::text))
+           where id = $1`,
+          [a.accountId],
+        );
+      }
+      const send = vi.fn(async (_e: { data: { pageCap: number } }) => undefined);
+      await supabaseAddSite(
+        adminOver(db),
+        send as never,
+      )({
+        accountId: a.accountId,
+        ownerSeatId: a.seatId,
+        host,
+        schedule,
+        limit: 5,
+        perDomain: false,
+        requestedByUserId: a.userId,
+      });
+      return send.mock.calls[0]![0].data.pageCap;
+    };
+    expect(await capOf('pro-added.example', 'pro')).toBe(2000);
+    expect(await capOf('free-added.example', 'free')).toBe(500);
+  });
+
   it('inserts the site with its schedule and its queued first audit, and sends that check’s event', async () => {
     const a = await account();
     const send = vi.fn(async () => undefined);

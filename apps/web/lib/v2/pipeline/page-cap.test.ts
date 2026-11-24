@@ -48,6 +48,26 @@ describe('pageCapFor', () => {
       2000,
     ],
     [
+      'a no-card Pro trial that has ended',
+      clock({
+        state: 'pro_trial',
+        tier: 'pro',
+        trialVariant: 'no_card',
+        trialEndsAt: new Date(NOW.getTime() - DAY),
+      }),
+      500,
+    ],
+    [
+      'past due within its grace',
+      clock({
+        state: 'past_due',
+        tier: 'free',
+        pastDueTier: 'pro',
+        pastDueSince: new Date(NOW.getTime() - 2 * DAY),
+      }),
+      2000,
+    ],
+    [
       'past due beyond its grace',
       clock({
         state: 'past_due',

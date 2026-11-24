@@ -60,6 +60,7 @@ async function request(siteId: string, between: () => Promise<unknown> = async (
   const deps: RequestDeps = {
     store: {
       requestSite: (id) => store.requestSite(id),
+      accountClock: (id) => store.accountClock(id),
       insertQueued: async (row) => {
         await between();
         return store.insertQueued(row);

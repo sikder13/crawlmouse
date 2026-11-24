@@ -1,11 +1,11 @@
 /**
- * Row 16 (F-157): no sender of a check sets its page cap by hand, so a new sender cannot silently stay
- * at 500 when the account's plan reads 2,000. A check's cap comes from `pageCapFor` or
- * `accountPageCap` (lib/v2/pipeline/page-cap.ts). Two rules over the app's source (lib/v2 and app/,
- * tests excluded):
+ * Row 16 (F-157): two literal rules over the app's source (lib/v2 and app/, tests excluded):
  * - no `pageCap:` is written as DEFAULT_PAGE_CAP or as a number;
  * - DEFAULT_PAGE_CAP is named only where it is defined, where the rule reads it, and where the
  *   pipeline's spec prints it.
+ * They catch a sender that names the default; they cannot see one that reads its cap some other way.
+ * The control for that is the store: `accountClock` is a required method of every store
+ * `requestCheck` runs on (pipeline/store.ts), so a new store without it does not compile.
  */
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';

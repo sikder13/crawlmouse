@@ -23,13 +23,21 @@ export function pageCapFor(
   return tier === 'free' ? DEFAULT_PAGE_CAP : GATES[tier].pagesPerCheck;
 }
 
-/** The page cap of a check of a site kept by `accountId`, read from its `accounts` row now. */
-export async function accountPageCap(sb: SupabaseClient, accountId: string): Promise<number> {
+/** The entitlement clock of `accountId`, from its `accounts` row. */
+export async function readAccountClock(
+  sb: SupabaseClient,
+  accountId: string,
+): Promise<EntitlementClock> {
   const { data, error } = await sb
     .from('accounts')
     .select(ACCOUNT_CLOCK_COLUMNS)
     .eq('id', accountId)
     .single();
   if (error || !data) throw new Error(`page cap: reading account: ${error?.code ?? 'none'}`);
-  return pageCapFor(clockFromAccountRow(data as Record<string, unknown>), new Date());
+  return clockFromAccountRow(data as Record<string, unknown>);
+}
+
+/** The page cap of a check of a site kept by `accountId`, read from its `accounts` row now. */
+export async function accountPageCap(sb: SupabaseClient, accountId: string): Promise<number> {
+  return pageCapFor(await readAccountClock(sb, accountId), new Date());
 }

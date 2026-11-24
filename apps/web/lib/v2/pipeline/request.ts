@@ -12,7 +12,7 @@ import { pageCapFor } from './page-cap';
 import type { PipelineStore } from './store';
 
 export interface RequestDeps {
-  store: Pick<PipelineStore, 'requestSite' | 'insertQueued' | 'checkStatus'>;
+  store: Pick<PipelineStore, 'requestSite' | 'accountClock' | 'insertQueued' | 'checkStatus'>;
   send(event: { id: string; name: 'check.requested'; data: CheckRequested }): Promise<unknown>;
   /** Milliseconds since the epoch. */
   now(): number;
@@ -65,6 +65,10 @@ export async function requestCheck(
   }
   const checkId = bucketed === null ? deps.newId() : checkIdOfKey(bucketed);
   const at = new Date(now).toISOString();
+  // Row 16: the cap is the keeping account's plan's, read before the insert, so a read that fails
+  // leaves no queued check without its event.
+  const clock = site.account_id === null ? null : await deps.store.accountClock(site.account_id);
+  const pageCap = pageCapFor(clock, new Date(now));
   const created = await deps.store.insertQueued({
     id: checkId,
     site_id: site.id,
@@ -85,7 +89,7 @@ export async function requestCheck(
       host: site.host,
       homepageUrl: homepageOf(site.host),
       trigger: req.trigger,
-      pageCap: pageCapFor(site.account ?? null, new Date(now)),
+      pageCap,
       ...(req.requestedByUserId === undefined ? {} : { requestedByUserId: req.requestedByUserId }),
     },
   });

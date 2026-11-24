@@ -83,6 +83,7 @@ function traced(deps: StartDeps, trace: string[]): StartDeps {
     pipeline: {
       store: {
         requestSite: named('requestSite', deps.pipeline.store.requestSite),
+        accountClock: named('accountClock', deps.pipeline.store.accountClock),
         insertQueued: named('insertQueued', deps.pipeline.store.insertQueued),
       },
       send: named('send', deps.pipeline.send),
