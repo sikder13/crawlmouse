@@ -171,9 +171,10 @@ export async function runBatch(
   // Compared in the canonical spelling the edges use, so a page already crawled is not rediscovered.
   // A chain's last Location counts only when it was requested: a stopped redirect's was not.
   const crawled = new Set([...requested, ...done.landed].map((u) => canonicalizeUrl(u)));
-  const discovered = [...new Set(done.link_edges.map((e) => e.to_url))].filter(
-    (u) => !crawled.has(u),
-  );
+  // Named as first linked (F-252), so the next batch asks the address the site wrote.
+  const discovered = [...new Set(done.link_edges.map((e) => e.to_url))]
+    .filter((u) => !crawled.has(u))
+    .map((u) => done.linked.get(u) ?? u);
   return {
     ...common,
     kind: 'crawl',

@@ -20,7 +20,12 @@ const read = (html: string) => {
   return {
     canonicalUrl,
     notRead,
-    links: links.map((l) => ({ ...l, anchorText: bounded(l.anchorText, CAPS.anchorText) })),
+    // The engine's fields only: `href` is the worker's own (F-252), tested below.
+    links: links.map((l) => ({
+      toUrl: l.toUrl,
+      anchorText: bounded(l.anchorText, CAPS.anchorText),
+      isGenericAnchor: l.isGenericAnchor,
+    })),
   };
 };
 const urls = (html: string) => read(html).links.map((l) => l.toUrl);
@@ -72,6 +77,17 @@ describe('readLinks: pinned readings', () => {
       ['https://example.com/category/news', 'News'],
       ['https://example.com/post-2', 'Post 2Filed in News'],
       ['https://example.com/category/news', 'News'],
+    ]);
+  });
+
+  it('keeps each link’s address as the page wrote it, resolved and without its fragment (F-252)', () => {
+    const { links } = readLinks(
+      parseHtml('<body><a href="docs/#intro">D</a><a href="/Team/?b=2&a=1">T</a></body>')!,
+      BASE,
+    );
+    expect(links.map((l) => [l.toUrl, l.href])).toEqual([
+      ['https://example.com/dir/docs', 'https://example.com/dir/docs/'],
+      ['https://example.com/Team?a=1&b=2', 'https://example.com/Team/?b=2&a=1'],
     ]);
   });
 
