@@ -2,7 +2,7 @@ import * as Sentry from '@sentry/nextjs';
 import { after } from 'next/server';
 import { agencyTrial } from '@/lib/billing/agency-trial';
 import { supabaseCheckoutAccounts } from '@/lib/billing/checkout-v2';
-import { billingV2Enabled } from '@/lib/billing/flags';
+import { agencySalesOpen, billingV2Enabled } from '@/lib/billing/flags';
 import { refuse } from '@/lib/billing/request-body';
 import { stripeAccount } from '@/lib/billing/stripe-account';
 import { accountCatalog } from '@/lib/billing/stripe-catalog';
@@ -30,7 +30,8 @@ const report = (message: string, extra: Readonly<Record<string, string>>) => {
 
 /**
  * Start the Agency trial (CC-29 D3): the second account, its first site, then CC-03's Checkout.
- * The caller's own session first (401 without one), then V2_BILLING (404 while it is off); the
+ * The caller's own session first (401 without one), then V2_BILLING and V2_AGENCY_SALES (404 while
+ * either is off); the
  * service-role client is made only after both. What follows: ./_lib/start.ts.
  */
 export async function POST(req: Request) {
@@ -40,6 +41,7 @@ export async function POST(req: Request) {
   } = await sb.auth.getUser();
   if (!user) return refuse(401, 'auth_required');
   if (!billingV2Enabled()) return refuse(404, 'not_found');
+  if (!agencySalesOpen()) return refuse(404, 'not_found');
 
   const admin = supabaseAdmin();
   const checkouts = agencyCheckouts(admin);
