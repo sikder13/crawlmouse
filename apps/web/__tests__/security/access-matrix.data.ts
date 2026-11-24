@@ -2011,6 +2011,7 @@ const LIBS: readonly Spec[] = [
       'apps/web/app/api/reports/route.ts',
       'apps/web/app/api/seats/id/[id]/resend/route.ts',
       'apps/web/app/api/seats/route.ts',
+      'apps/web/app/api/sites/[id]/route.ts',
       'apps/web/app/api/takedown/route.ts',
       'apps/web/app/api/verify/check/[id]/route.ts',
       'apps/web/app/api/verify/start/route.ts',

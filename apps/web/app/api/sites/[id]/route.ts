@@ -1,5 +1,6 @@
 import * as Sentry from '@sentry/nextjs';
 import { checksPublicEnabled } from '@/lib/auth/flags';
+import { checkRateLimit } from '@/lib/rate-limit';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { supabaseServer } from '@/lib/supabase/server';
 import {
@@ -14,11 +15,27 @@ import {
 import { decideEdit, isRemoveConfirmed, parseEditBody, readSite } from '@/lib/v2/account/sites';
 import { editSite, removeSite } from '@/lib/v2/account/sites-store';
 import { readEntitlement } from '@/lib/v2/account/viewer';
+import {
+  COMPETITOR_REQUESTS_PER_SITE,
+  COMPETITOR_REQUESTS_WINDOW_MS,
+  competitorRequestBucket,
+} from '@/lib/v2/competitors/request';
 import { inngest } from '../../../../../../inngest/client';
 
-/** Sends `competitors.requested`; a failed send is reported and does not fail the edit. */
+/**
+ * Sends `competitors.requested`, at most COMPETITOR_REQUESTS_PER_SITE times an hour for one site.
+ * Past that, or when the count cannot be read (the bucket fails closed), nothing is sent and the
+ * site's next check audits the list. A failed send is reported. Neither fails the edit.
+ */
 async function requestCompetitors(siteId: string): Promise<void> {
   try {
+    const { allowed } = await checkRateLimit(
+      competitorRequestBucket(siteId),
+      COMPETITOR_REQUESTS_PER_SITE,
+      COMPETITOR_REQUESTS_WINDOW_MS,
+      { failClosed: true },
+    );
+    if (!allowed) return;
     await inngest.send({ name: 'competitors.requested', data: { siteId } });
   } catch (err) {
     Sentry.captureException(err, { tags: { route: 'sites/[id]', event: 'competitors.requested' } });

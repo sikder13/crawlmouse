@@ -23,6 +23,7 @@ const h = vi.hoisted(() => ({
   refused: new Set<string>(),
   sent: [] as unknown[],
   sendFails: false,
+  countFails: false,
   reported: [] as unknown[],
 }));
 
@@ -36,7 +37,18 @@ vi.mock('@/lib/supabase/server', () => ({
 vi.mock('@/lib/supabase/admin', () => ({
   supabaseAdmin: () => {
     h.log.push('supabaseAdmin');
-    return adminOver(h.db);
+    const c = adminOver(h.db);
+    if (!h.countFails) return c;
+    // The rate-limit counter's RPC errors; every other call goes through.
+    return new Proxy(c, {
+      get: (t, k) =>
+        k === 'rpc'
+          ? (fn: string, args: unknown) =>
+              fn === 'increment_rate_limit'
+                ? Promise.resolve({ data: null, error: { message: 'counter down' } })
+                : t.rpc(fn as never, args as never)
+          : Reflect.get(t, k),
+    });
   },
 }));
 vi.mock('@/lib/auth/admit-site', () => ({
@@ -73,6 +85,7 @@ beforeEach(() => {
   h.sent.length = 0;
   h.reported.length = 0;
   h.sendFails = false;
+  h.countFails = false;
   vi.stubEnv('V2_CHECKS_PUBLIC', '1');
 });
 afterEach(() => vi.unstubAllEnvs());
@@ -295,6 +308,36 @@ describe('PATCH /api/sites/[id]', () => {
     expect((await patch(s.id, { competitorHosts: ['rival.example'] })).status).toBe(200);
     expect((await siteRow(s.id)).competitor_hosts).toEqual(['rival.example']);
     expect(h.reported).toHaveLength(1);
+  });
+
+  it('asks at most six times an hour for one site; the seventh edit is saved and sends nothing (row 18)', async () => {
+    const p = await person(h.db, 'complimit');
+    await makePaid(h.db, p.accountId, 'pro');
+    const s = await keptSite(h.db, p.accountId);
+    const other = await keptSite(h.db, p.accountId);
+    as(p);
+    for (let i = 1; i <= 6; i++) {
+      expect((await patch(s.id, { competitorHosts: [`rival${i}.example`] })).status).toBe(200);
+    }
+    expect(h.sent).toHaveLength(6);
+    expect((await patch(s.id, { competitorHosts: ['rival7.example'] })).status).toBe(200);
+    expect((await siteRow(s.id)).competitor_hosts).toEqual(['rival7.example']);
+    expect(h.sent).toHaveLength(6);
+    expect(h.reported).toHaveLength(0);
+    // The count is the site's own: another site of the same account still asks.
+    expect((await patch(other.id, { competitorHosts: ['rival.example'] })).status).toBe(200);
+    expect(h.sent.at(-1)).toEqual({ name: 'competitors.requested', data: { siteId: other.id } });
+  });
+
+  it('with the count unreadable, sends nothing and still saves the edit (row 18, fails closed)', async () => {
+    const p = await person(h.db, 'compcount');
+    await makePaid(h.db, p.accountId, 'pro');
+    const s = await keptSite(h.db, p.accountId);
+    as(p);
+    h.countFails = true;
+    expect((await patch(s.id, { competitorHosts: ['rival.example'] })).status).toBe(200);
+    expect((await siteRow(s.id)).competitor_hosts).toEqual(['rival.example']);
+    expect(h.sent).toHaveLength(0);
   });
 
   it('Pro: a staging URL makes a staging site that holds no slot, and an empty one clears it', async () => {
