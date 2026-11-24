@@ -7,7 +7,7 @@
  */
 import type { Metadata } from 'next';
 import { accountDoorEnabled, v2PublicPagesEnabled } from '../auth/flags';
-import { billingV2Enabled } from '../billing/flags';
+import { billingPublic } from '../billing/flags';
 import { AGENCY_MONTHLY, AGENCY_YEARLY, PRO_MONTHLY, PRO_YEARLY, usd } from '../billing/prices';
 import { DEVELOPERS_COPY } from '../v2/copy/developers';
 import { PRICING_COPY } from '../v2/copy/pricing';
@@ -42,7 +42,7 @@ export function v2KeyPages(): KeyPage[] {
   // RC-01: /pricing and /developers are the v2 pages while either flag is on.
   const v2Served = v2PublicPagesEnabled();
   const agencies = agenciesView({
-    billing: billingV2Enabled(),
+    billing: billingPublic(),
     accountDoor: accountDoorEnabled(),
   });
   return [
@@ -73,7 +73,7 @@ export function plansLine(): string {
   const plans = [
     'Free',
     `Pro ${usd(PRO_MONTHLY)}/month or ${usd(PRO_YEARLY)}/year`,
-    ...(billingV2Enabled()
+    ...(billingPublic()
       ? [`Agency ${usd(AGENCY_MONTHLY)}/month or ${usd(AGENCY_YEARLY)}/year`]
       : []),
   ];
