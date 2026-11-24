@@ -54,23 +54,24 @@ Concurrency: one plan cap, `PLAN_CONCURRENCY_CAP = 100` (Inngest Pro, 100 concur
 
 ## Polling and time
 
-| Bound                                                                                    | Value                   |
-| ---------------------------------------------------------------------------------------- | ----------------------- |
-| First poll wait, doubling to                                                             | 5 s, 30 s               |
-| A batch is lost after its `max_seconds` plus                                             | 60 s                    |
-| A lost batch (`not_found`) is posted again                                               | once                    |
-| Wait after the worker answers busy                                                       | 30 s                    |
-| Wait budget, before and after the first crawl batch; time after it is added to the crawl | 900 s                   |
-| The latest first crawl batch that still gets a whole crawl window, from the first claim  | 1260 s                  |
-| The run’s finish timeout                                                                 | 2220 s                  |
-| Crawl phase ceiling, from the first crawl batch the worker accepts                       | 480 s                   |
-| The longest wait on a worker’s done signal before one poll                               | 60 s                    |
-| Access stages’ slice                                                                     | 300 s                   |
-| Reserve for render, build, persist, finalize                                             | 180 s                   |
-| A batch that would get less is not posted                                                | 60 s                    |
-| Discovery                                                                                | 60 s, 5000 sitemap URLs |
-| Crawl batches per check                                                                  | 40                      |
-| Default page cap                                                                         | 500                     |
+| Bound                                                                                    | Value                                                                                                                                                                                                      |
+| ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| First poll wait, doubling to                                                             | 5 s, 30 s                                                                                                                                                                                                  |
+| A batch is lost after its `max_seconds` plus                                             | 60 s                                                                                                                                                                                                       |
+| A lost batch (`not_found`) is posted again                                               | once                                                                                                                                                                                                       |
+| Wait after the worker answers busy                                                       | 30 s                                                                                                                                                                                                       |
+| Wait budget, before and after the first crawl batch; time after it is added to the crawl | 900 s                                                                                                                                                                                                      |
+| The latest first crawl batch that still gets a whole crawl window, from the first claim  | 1260 s                                                                                                                                                                                                     |
+| The run’s finish timeout                                                                 | 2220 s                                                                                                                                                                                                     |
+| Crawl phase ceiling, from the first crawl batch the worker accepts                       | 480 s                                                                                                                                                                                                      |
+| The longest wait on a worker’s done signal before one poll                               | 60 s                                                                                                                                                                                                       |
+| Access stages’ slice                                                                     | 300 s                                                                                                                                                                                                      |
+| Reserve for render, build, persist, finalize                                             | 180 s                                                                                                                                                                                                      |
+| A batch that would get less is not posted                                                | 60 s                                                                                                                                                                                                       |
+| Kept after a batch, inside its phase, for the poll grace and one poll                    | crawl: none; crawl batches end by the crawl's end, requests in flight finish within the worker's request timeout after it, and the grace and poll fall after it, in the access slice (F-247); access: 90 s |
+| Discovery                                                                                | 60 s, 5000 sitemap URLs                                                                                                                                                                                    |
+| Crawl batches per check                                                                  | 40                                                                                                                                                                                                         |
+| Default page cap                                                                         | 500                                                                                                                                                                                                        |
 
 | Batch budget | Requests | Bytes   | Seconds (cut to the time left) |
 | ------------ | -------- | ------- | ------------------------------ |

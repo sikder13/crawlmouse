@@ -107,6 +107,14 @@
       "from_cache": true
     }
   ],
+  "timing": {
+    "requests": 12,
+    "fetch_ms_p50": 0,
+    "fetch_ms_p90": 0,
+    "fetch_ms_max": 0,
+    "fetch_ms_total": 0,
+    "idle_ms_total": 5500
+  },
   "kind": "crawl",
   "pages": [
     {
