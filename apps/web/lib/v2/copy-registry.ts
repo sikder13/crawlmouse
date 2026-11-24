@@ -99,7 +99,7 @@ const BASE_CHANGES: CopyChange[] = [
     screen: 'segment-structure',
     kind: 'ruling',
     locked: 'Next: Content an answer engine can quote · 58',
-    rendered: 'Next: Links and pages · no broken link',
+    rendered: 'Next: Links and pages · no broken link in 16 pages checked',
     source: LINKS_TAB_SOURCE,
   },
   {

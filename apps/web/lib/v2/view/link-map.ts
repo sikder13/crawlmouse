@@ -23,6 +23,7 @@ import { type FixHrefs } from './fix';
 import type { MapDrawing } from './map';
 import { openFixes, type FixPlan } from './free-fixes';
 import { keptUntilOf } from './result';
+import { isMissing } from './segment/broken';
 import { sectionFixes } from './segment/fixes';
 import { NO_HREFS, SEGMENT_KEYS, SEGMENTS, segmentTab, type SegmentLink } from './segment/frame';
 import { drawingOf } from './segment/structure';
@@ -156,12 +157,12 @@ const pathOf = (url: string) => {
 
 const round = (n: number) => Math.round(n * 10) / 10;
 
-/** The statuses that say a page is gone, which the map labels as missing rather than by depth. */
-const MISSING_STATUSES: readonly number[] = [404, 410];
-
-/** "missing (404)" for a page that answered 404 or 410; null for any other page. */
+/**
+ * "missing (404)" for a page that answered one of MISSING_STATUSES (segment/broken.ts, which the
+ * Links and pages view reads too); null for any other page.
+ */
 export const missingLabel = (page: PageResult): string | null =>
-  MISSING_STATUSES.includes(page.status_code) ? `missing (${page.status_code})` : null;
+  isMissing(page) ? `missing (${page.status_code})` : null;
 
 /** "0.4%" for a small share, "18%" otherwise. */
 const share = (s: number) => (s < 0.01 ? `${(s * 100).toFixed(1)}%` : `${percent(s)}%`);

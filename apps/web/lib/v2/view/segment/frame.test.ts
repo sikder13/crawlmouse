@@ -39,7 +39,7 @@ describe('segmentFrame', () => {
     expect(links('nojs')).toEqual(['Back: Crawler access', 'Next: Site structure · 74']);
     expect(links('structure')).toEqual([
       'Back: Without JavaScript',
-      'Next: Links and pages · no broken link',
+      'Next: Links and pages · no broken link in 16 pages checked',
     ]);
     expect(links('links')).toEqual([
       'Back: Site structure',
@@ -95,17 +95,23 @@ describe('segmentFrame', () => {
     );
   });
 
-  it('gives the Links and pages tab its figure: the pages of the record that answer an error', () => {
+  it('gives the Links and pages tab its figure: the pill of its door, scoped to the pages checked', () => {
     const { d, id } = edited('built-site');
     // Counted here from the fixture's rows, apart from the code under test.
-    const broken = d.page_results.filter((p) => p.check_id === id && p.status_code >= 400).length;
-    expect(broken).toBe(1);
+    const gone = d.page_results.filter(
+      (p) => p.check_id === id && (p.status_code === 404 || p.status_code === 410),
+    ).length;
+    expect(gone).toBe(1);
     expect(segmentFrame(d, id, 'structure', { hrefs }).next.label).toBe(
-      'Next: Links and pages · 1 broken',
+      'Next: Links and pages · 1 broken link',
     );
     const clean = edited('clean-site');
     expect(segmentFrame(clean.d, clean.id, 'structure', { hrefs }).next.label).toBe(
-      'Next: Links and pages · no broken link',
+      'Next: Links and pages · no broken link in 2 pages checked',
+    );
+    const challenged = edited('challenged-site');
+    expect(segmentFrame(challenged.d, challenged.id, 'structure', { hrefs }).next.label).toBe(
+      'Next: Links and pages · not measured',
     );
   });
 

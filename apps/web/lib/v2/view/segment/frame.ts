@@ -8,8 +8,7 @@ import { SCREEN_SIGNALS, screenSignals } from '../screen-signals';
 import { findCheck, siteOf } from '../../fixtures';
 import { dayTimeUtc, percent } from '../../format';
 import { keptUntilOf } from '../result';
-import { count } from '../../words';
-import { brokenPagesOf } from './broken';
+import { linksFacts } from './links-facts';
 import type { ViewDataset } from '../../fixtures';
 import type { FixPlan } from '../free-fixes';
 
@@ -135,10 +134,9 @@ export interface SegmentFrame {
 /** A section's own figure, as its next link shows it; null when the section has none. */
 function figureOf(d: ViewDataset, check: Check, key: SegmentKey): string | null {
   switch (key) {
-    case 'links': {
-      const broken = brokenPagesOf(d, check.id).length;
-      return broken ? `${count(broken)} broken` : 'no broken link';
-    }
+    case 'links':
+      // The door's pill, so the tab and the door cannot disagree.
+      return linksFacts(d, check).pill.label;
     case 'nojs':
       return check.without_js ? `${percent(check.without_js.site_text_share)}%` : 'not measured';
     case 'structure': {

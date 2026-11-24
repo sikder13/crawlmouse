@@ -13,7 +13,7 @@ export const LINKS_PERTURB: PerturbTable = {
     'page_results[].status_code': [
       {
         change: (c, d) => (pageOf(c, d, '/products/trail-mug').status_code = 410),
-        expect: { links: ['1 page answers 410'] },
+        expect: { links: ['answering 410'] },
       },
     ],
   },

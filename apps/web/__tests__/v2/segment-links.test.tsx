@@ -13,14 +13,15 @@ describe('Links and pages, the built site', () => {
   const doc = dom(renderToStaticMarkup(<LinksScreen data={data} />));
   const text = doc.body.textContent ?? '';
 
-  it('shows the broken page with every linking page behind a disclosure', () => {
+  it('shows the broken page with the links that lead to it behind a "Linked from" disclosure', () => {
     const row = data.broken.rows[0]!;
     expect(text).toContain(row.path);
     const summary = [...doc.querySelectorAll('summary')].map((s) => s.textContent);
-    expect(summary).toContain('Every page that links to it');
+    expect(summary).toContain('Linked from');
+    expect(summary).not.toContain('Every page that links to it');
   });
 
-  it('breaks a URL cell anywhere, so a long one keeps to its column', () => {
+  it('gives a URL cell the breakAnywhere class', () => {
     const cell = [...doc.querySelectorAll('span')].find(
       (s) => s.textContent === data.broken.rows[0]!.path,
     )!;
@@ -34,6 +35,33 @@ describe('Links and pages, the built site', () => {
     )!;
     expect(tab.getAttribute('aria-current')).toBe('page');
     expect(tab.hasAttribute('data-v2-addition')).toBe(true);
+  });
+});
+
+describe('Links and pages, the other errors and the links with no text', () => {
+  const d = structuredClone(fixture('built-site'));
+  const id = d.checks[0]!.id;
+  const page = (path: string) =>
+    d.page_results.find((p) => p.check_id === id && new URL(p.url).pathname === path)!;
+  page('/products/camp-kitchen-item-1').status_code = 503;
+  const edge = d.link_edges.find((e) => e.to_url === page('/products/retired-tent').url)!;
+  edge.anchor_text = '\u00a0';
+  const doc = dom(renderToStaticMarkup(<LinksScreen data={linksView(d, id)} />));
+  const tables = [...doc.querySelectorAll('table')];
+  const tableOf = (label: string) => tables.find((t) => t.getAttribute('aria-label') === label);
+
+  it('lists a 503 apart under "Pages that answered an error", headed "Page", in a neutral pill', () => {
+    const t = tableOf('Pages that answered an error')!;
+    expect(t.querySelector('th')!.textContent).toBe('Page');
+    expect(t.textContent).toContain('/products/camp-kitchen-item-1');
+    expect(t.querySelector('[data-v2-pill]')!.getAttribute('data-v2-pill')).toBe('neutral');
+    expect(tableOf('Broken links')!.textContent).not.toContain('/products/camp-kitchen-item-1');
+  });
+
+  it('shows a link with no text as "(no link text)", not as empty quotes', () => {
+    const items = [...doc.querySelectorAll('details li')].map((li) => li.textContent);
+    expect(items).toContain('/blog/first-night-outdoors (no link text)');
+    expect(doc.body.textContent).not.toContain('“\u00a0”');
   });
 });
 

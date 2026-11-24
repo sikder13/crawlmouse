@@ -1,16 +1,19 @@
 /**
- * Links and pages (row 5) as data: the pages that answer an error and where they are linked from,
- * the pages that redirect, and the titles and meta descriptions that are missing or shared. It reads
- * the page and link records of one check, through the pages CSV's own accessors (reports/csv.ts), so
- * the screen, the CSV and the PDF read the same values. Titles and descriptions are counted over the
- * pages that answered 200; missing means no text or empty text.
+ * Links and pages (row 5) as data: the missing pages a link leads to and where they are linked
+ * from, the missing pages no link leads to, the pages that answered another error, the pages that
+ * redirect, and the titles and meta descriptions that are missing or shared. It reads the page and
+ * link records of one check. A page's status, final URL, title and meta description are read
+ * through the pages CSV's accessors (reports/csv.ts), so the screen, the CSV and the PDF read the
+ * same values; its redirect chain, which the CSV has no column for, is read off `page.redirect`.
+ * Which statuses are missing is segment/broken.ts's, which the link map reads too. Titles and
+ * descriptions are counted over the pages that answered 200; missing means no text, or text made
+ * of whitespace alone.
  */
 import type { Check, LinkEdge, PageResult } from '@crawlmouse/types/v2';
 import { siteOf } from '../../fixtures';
-import { listOf } from '../../format';
 import { PAGE_CELLS } from '../../reports/csv';
 import { capitalise, count, plural } from '../../words';
-import { brokenPagesOf } from './broken';
+import { isMissing, isOtherError } from './broken';
 import type { DoorView } from '../result';
 import type { ViewDataset } from '../../fixtures';
 
@@ -37,24 +40,39 @@ export function shortList<T>(items: readonly T[], max = LIST_MAX): ShortList<T> 
   };
 }
 
-export interface LinkingPage {
+/** A page of the record: its full URL (a row's key) and its URL as shown. */
+export interface PageRef {
+  url: string;
   path: string;
-  anchor: string;
 }
 
-export interface BrokenRowView {
-  path: string;
+export interface LinkingPage extends PageRef {
+  /** The link's text; null when it has none, or only whitespace. */
+  anchor: string | null;
+}
+
+/** What a link with no text shows in its place. */
+export const NO_LINK_TEXT = '(no link text)';
+
+export interface ErrorRowView extends PageRef {
   status: number;
-  /** Every page whose link leads to it, with that link's text, in the record's order. */
+  /** The record's URLs that redirect here, as shown; empty when the page was requested directly. */
+  via: string[];
+  /** The path, then "(redirected from /a, /b)" when it was reached by a redirect: one cell. */
+  pageText: string;
+  /**
+   * The links in the record that lead here, with their text, in the record's order. A link from the
+   * page itself is left out. A link's page may be one the record does not hold (where a redirect
+   * landed), so this is what the record read, not a census of the site.
+   */
   linkedFrom: LinkingPage[];
   /** "/blog/a, /pricing and 1 more": the first two linking pages, and how many more. */
   linkedSummary: string;
-  /** Every linking page, comma-separated, as the PDF lists it. */
+  /** The linking pages, comma-separated, as the PDF lists them. */
   linkedAll: string;
 }
 
-export interface RedirectRowView {
-  path: string;
+export interface RedirectRowView extends PageRef {
   /** "301 → /b → 302 → /c" */
   hops: string;
   /** Where the chain ends, with that response's status; null for a loop. */
@@ -68,16 +86,16 @@ export interface SharedGroupView {
   text: string;
   /** "“Guide” · 3 pages" */
   line: string;
-  pages: ShortList<string>;
+  pages: ShortList<PageRef>;
   pageCount: number;
 }
 
 export interface BasicsColumnView {
   heading: string;
-  /** One line: the missing count, or that none is missing. */
+  /** One line: the missing count, that none is missing, or that none was read. */
   missingLine: string;
-  missing: ShortList<string>;
-  /** One line: how many texts are shared, by how many pages, or that none is. */
+  missing: ShortList<PageRef>;
+  /** One line: how many texts are shared, by how many pages, that none is, or that none was read. */
   sharedLine: string;
   shared: ShortList<SharedGroupView>;
 }
@@ -87,9 +105,14 @@ export interface LinksCounts {
   checked: number;
   /** Pages that answered 200: the pages whose titles and descriptions are read. */
   served: number;
+  /** Missing pages (segment/broken.ts) at least one link in the record leads to. */
   broken: number;
-  /** Distinct pages that link to a broken page. */
+  /** Distinct pages whose link leads to one of those, a page's link to itself left out. */
   brokenLinkedFrom: number;
+  /** Missing pages no link in the record leads to (found by the sitemap, or the start URL). */
+  missingUnlinked: number;
+  /** Pages that answered an error of 400 or more other than a missing one. */
+  errors: number;
   redirects: number;
   loops: number;
   missingTitles: number;
@@ -98,9 +121,15 @@ export interface LinksCounts {
   sharedDescriptionPages: number;
 }
 
-export const BROKEN_EMPTY = 'No internal link leads to a page that answers an error.';
-export const REDIRECTS_EMPTY = 'No page we crawled redirects.';
 export const HEADINGS_LINE = 'Headings are not checked yet.';
+/** The empty state of each table when the record holds no page. */
+export const NOT_MEASURED_LINE = 'Not measured: this check recorded no page.';
+export const ERRORS_HEADING = 'Pages that answered an error';
+export const UNLINKED_HEADING = 'Missing pages no link leads to';
+
+/** Text made of whitespace alone, Unicode's spaces and the zero-width ones included. */
+export const isBlank = (text: string | null): boolean =>
+  text === null || /^[\s\p{Z}​-‍⁠﻿]*$/u.test(text);
 
 /** A path on the site's own host; any other host keeps its whole URL. */
 function shortUrl(url: string, host: string): string {
@@ -117,7 +146,7 @@ function groupsOf(
   const by = new Map<string, PageResult[]>();
   for (const p of served) {
     const text = read(p);
-    if (!text) {
+    if (text === null || isBlank(text)) {
       missing.push(p);
       continue;
     }
@@ -134,28 +163,32 @@ function column(
   noun: [string, string],
   served: readonly PageResult[],
   read: (p: PageResult) => string | null,
-  host: string,
+  ref: (p: PageResult) => PageRef,
 ): { view: BasicsColumnView; missing: number; sharedPages: number } {
   const { missing, shared } = groupsOf(served, read);
   const sharedPages = shared.reduce((n, [, ps]) => n + ps.length, 0);
-  const path = (p: PageResult) => shortUrl(p.url, host);
+  const none = served.length === 0;
   return {
     missing: missing.length,
     sharedPages,
     view: {
       heading,
-      missingLine: missing.length
-        ? `Missing: ${count(missing.length)} ${plural(missing.length, 'page', 'pages')}`
-        : 'Missing: none',
-      missing: shortList(missing.map(path)),
-      sharedLine: shared.length
-        ? `Shared by more than one page: ${count(shared.length)} ${plural(shared.length, noun[0], noun[1])}, ${count(sharedPages)} pages`
-        : 'Shared by more than one page: none',
+      missingLine: none
+        ? 'Missing: not read, as no page answered 200'
+        : missing.length
+          ? `Missing: ${count(missing.length)} ${plural(missing.length, 'page', 'pages')}`
+          : 'Missing: none',
+      missing: shortList(missing.map(ref)),
+      sharedLine: none
+        ? 'Shared by more than one page: not read'
+        : shared.length
+          ? `Shared by more than one page: ${count(shared.length)} ${plural(shared.length, noun[0], noun[1])}, ${count(sharedPages)} pages`
+          : 'Shared by more than one page: none',
       shared: shortList(
         shared.map(([text, ps]) => ({
           text,
           line: `“${text}” · ${count(ps.length)} pages`,
-          pages: shortList(ps.map(path)),
+          pages: shortList(ps.map(ref)),
           pageCount: ps.length,
         })),
       ),
@@ -163,25 +196,30 @@ function column(
   };
 }
 
-/** "1 page answers 404" / "2 pages answer 404 and 1 page answers 410", by status. */
-function brokenWords(broken: readonly PageResult[]): string {
-  const by = new Map<number, number>();
-  for (const p of broken) by.set(p.status_code, (by.get(p.status_code) ?? 0) + 1);
-  return listOf(
-    [...by.entries()]
-      .sort((a, b) => a[0] - b[0])
-      .map(([status, n]) => `${count(n)} ${plural(n, 'page answers', 'pages answer')} ${status}`),
-  );
-}
+/** The distinct statuses of `rows`, lowest first. */
+const statusesOf = (rows: readonly ErrorRowView[]) =>
+  [...new Set(rows.map((r) => r.status))].sort((a, b) => a - b);
 
 export interface LinksFacts {
   counts: LinksCounts;
-  broken: BrokenRowView[];
+  /** Missing pages a link leads to: the broken links. */
+  broken: ErrorRowView[];
+  /** Missing pages no link in the record leads to. */
+  unlinked: ErrorRowView[];
+  /** Pages that answered another error (a 403, a 429, a 503): they exist, so are not broken. */
+  errors: ErrorRowView[];
   redirects: RedirectRowView[];
   titles: BasicsColumnView;
   descriptions: BasicsColumnView;
-  /** The sentence the door and the screen open with, built from the counts. */
+  /** The door's sentence, built from the counts. */
   body: string;
+  /** The screen's and the PDF's: the body without the sentence the broken table's empty state says. */
+  screenBody: string;
+  /** What the broken links table says when it has no row; null when it has one. */
+  brokenEmpty: string | null;
+  /** What the redirects table says when it has no row; null when it has one. */
+  redirectsEmpty: string | null;
+  /** The door's pill and the Links and pages tab's figure. */
   pill: DoorView['pill'];
   coverage: string;
 }
@@ -192,29 +230,53 @@ export function linksFacts(d: ViewDataset, check: Check): LinksFacts {
   const pages = d.page_results.filter((p) => p.check_id === check.id);
   const edges: LinkEdge[] = d.link_edges.filter((e) => e.check_id === check.id);
   const path = (url: string) => shortUrl(url, host);
+  const ref = (p: PageResult): PageRef => ({ url: p.url, path: path(p.url) });
+  const hopsOf = (p: PageResult) => p.redirect?.hops ?? [];
 
-  const brokenPages = brokenPagesOf(d, check.id);
-  const broken: BrokenRowView[] = brokenPages.map((p) => {
-    const into = edges.filter((e) => e.to_url === p.url);
-    const linkedFrom = into.map((e) => ({ path: path(e.from_url), anchor: e.anchor_text }));
+  // A page that answered an error, grouped by where it answered: a page reached by a redirect is
+  // shown at its final URL, and a final URL the record also holds as a page is one row, not two.
+  const groups = new Map<string, PageResult[]>();
+  for (const p of pages.filter((x) => isMissing(x) || isOtherError(x))) {
+    const finalUrl = hopsOf(p).length ? PAGE_CELLS.final_url(p) : null;
+    const at = finalUrl ?? p.url;
+    groups.set(at, [...(groups.get(at) ?? []), p]);
+  }
+  const rowOf = (at: string, members: PageResult[]): ErrorRowView => {
+    const asked = new Set([at, ...members.map((p) => p.url)]);
+    const via = members.filter((p) => p.url !== at).map((p) => path(p.url));
+    const into = edges.filter(
+      (e) => asked.has(e.to_url) && e.from_url !== e.to_url && e.from_url !== at,
+    );
+    const linkedFrom = into.map((e) => ({
+      url: e.from_url,
+      path: path(e.from_url),
+      anchor: isBlank(e.anchor_text) ? null : e.anchor_text,
+    }));
     const froms = [...new Set(linkedFrom.map((l) => l.path))];
     return {
-      path: path(p.url),
-      status: PAGE_CELLS.status_code(p),
+      url: at,
+      path: path(at),
+      status: PAGE_CELLS.status_code(members[0]!),
+      via,
+      pageText: via.length ? `${path(at)} (redirected from ${via.join(', ')})` : path(at),
       linkedFrom,
       linkedAll: froms.length ? froms.join(', ') : 'no link in the record',
       linkedSummary: froms.length
         ? `${froms.filter((_, i) => i < 2).join(', ')}${froms.length > 2 ? ` and ${count(froms.length - 2)} more` : ''}`
         : 'no link in the record',
     };
-  });
-  const brokenUrls = new Set(brokenPages.map((p) => p.url));
-  const brokenLinkedFrom = new Set(
-    edges.filter((e) => brokenUrls.has(e.to_url)).map((e) => e.from_url),
-  ).size;
+  };
+  const rows = [...groups.entries()].map(([at, members]) => ({
+    missing: isMissing(members[0]!),
+    row: rowOf(at, members),
+  }));
+  const broken = rows.filter((r) => r.missing && r.row.linkedFrom.length).map((r) => r.row);
+  const unlinked = rows.filter((r) => r.missing && !r.row.linkedFrom.length).map((r) => r.row);
+  const errors = rows.filter((r) => !r.missing).map((r) => r.row);
+  const brokenLinkedFrom = new Set(broken.flatMap((r) => r.linkedFrom.map((l) => l.url))).size;
 
   const redirects: RedirectRowView[] = pages
-    .filter((p) => (p.redirect?.hops.length ?? 0) > 0)
+    .filter((p) => hopsOf(p).length > 0)
     .map((p) => {
       const chain = p.redirect!;
       const finalUrl = PAGE_CELLS.final_url(p);
@@ -223,7 +285,7 @@ export function linksFacts(d: ViewDataset, check: Check): LinksFacts {
           ? null
           : { path: path(finalUrl), status: PAGE_CELLS.status_code(p) };
       return {
-        path: path(p.url),
+        ...ref(p),
         hops: chain.hops
           .map(
             (h) =>
@@ -241,20 +303,22 @@ export function linksFacts(d: ViewDataset, check: Check): LinksFacts {
     });
 
   const served = pages.filter((p) => PAGE_CELLS.status_code(p) === 200);
-  const titles = column('Titles', ['title', 'titles'], served, PAGE_CELLS.title, host);
+  const titles = column('Titles', ['title', 'titles'], served, PAGE_CELLS.title, ref);
   const descriptions = column(
     'Meta descriptions',
     ['description', 'descriptions'],
     served,
     PAGE_CELLS.meta_description,
-    host,
+    ref,
   );
 
   const counts: LinksCounts = {
     checked: pages.length,
     served: served.length,
-    broken: brokenPages.length,
+    broken: broken.length,
     brokenLinkedFrom,
+    missingUnlinked: unlinked.length,
+    errors: errors.length,
     redirects: redirects.length,
     loops: redirects.filter((r) => r.loop).length,
     missingTitles: titles.missing,
@@ -263,57 +327,107 @@ export function linksFacts(d: ViewDataset, check: Check): LinksFacts {
     sharedDescriptionPages: descriptions.sharedPages,
   };
 
-  const linkWords = (n: number) => `${count(n)} ${plural(n, 'page', 'pages')}`;
-  const brokenSentence = brokenPages.length
-    ? `${brokenWords(brokenPages)}${brokenLinkedFrom ? ` and ${plural(brokenPages.length, 'is', 'are')} linked from ${linkWords(brokenLinkedFrom)}` : ''}.`
+  const pagesWord = (n: number) => `${count(n)} ${plural(n, 'page', 'pages')}`;
+  const checked = pages.length;
+  const crawled = check.coverage?.pages_crawled ?? null;
+  const coverage =
+    crawled !== null && crawled > checked
+      ? `Checked ${count(checked)} of the ${count(crawled)} pages crawled`
+      : `Checked ${pagesWord(checked)}`;
+
+  if (checked === 0) {
+    return {
+      counts,
+      broken,
+      unlinked,
+      errors,
+      redirects,
+      titles: titles.view,
+      descriptions: descriptions.view,
+      body: 'This check recorded no page, so no link, redirect, title or meta description was read.',
+      screenBody:
+        'This check recorded no page, so no link, redirect, title or meta description was read.',
+      brokenEmpty: NOT_MEASURED_LINE,
+      redirectsEmpty: NOT_MEASURED_LINE,
+      pill: { state: 'neutral', label: 'not measured' },
+      coverage,
+    };
+  }
+
+  // Each clause below is built from the rows it names, so it says only what they hold.
+  const brokenSentence = broken.length
+    ? `${count(broken.length)} broken ${plural(broken.length, 'link', 'links')}: ${broken.length === 1 ? 'a page' : 'pages'} answering ${statusesOf(broken).join(' or ')}, linked from ${pagesWord(brokenLinkedFrom)}.`
     : null;
+  const unlinkedSentence = unlinked.length
+    ? `No link we read leads to ${count(unlinked.length)} missing ${plural(unlinked.length, 'page', 'pages')}, answering ${statusesOf(unlinked).join(' or ')}.`
+    : null;
+  const errorSentence = errors.length
+    ? `${pagesWord(errors.length)} answered an error (${statusesOf(errors).join(', ')}).`
+    : null;
+  const noneSentence =
+    broken.length || unlinked.length || errors.length
+      ? null
+      : checked === 1
+        ? 'The page we checked answers no error.'
+        : `None of the ${count(checked)} pages we checked answers an error.`;
   const redirectSentence = redirects.length
-    ? `${linkWords(redirects.length)} ${plural(redirects.length, 'redirects', 'redirect')}${counts.loops ? `, ${count(counts.loops)} in a loop` : ''}.`
+    ? `${pagesWord(redirects.length)} ${plural(redirects.length, 'redirects', 'redirect')}${counts.loops ? `, ${count(counts.loops)} in a loop` : ''}.`
     : null;
   const basics = [
     counts.missingDescriptions
-      ? `${linkWords(counts.missingDescriptions)} ${plural(counts.missingDescriptions, 'has', 'have')} no meta description`
+      ? `${pagesWord(counts.missingDescriptions)} ${plural(counts.missingDescriptions, 'has', 'have')} no meta description`
       : null,
     counts.missingTitles
-      ? `${linkWords(counts.missingTitles)} ${plural(counts.missingTitles, 'has', 'have')} no title`
+      ? `${pagesWord(counts.missingTitles)} ${plural(counts.missingTitles, 'has', 'have')} no title`
       : null,
     counts.sharedTitlePages
-      ? `${linkWords(counts.sharedTitlePages)} share a title with another`
+      ? `${pagesWord(counts.sharedTitlePages)} share a title with another`
       : null,
     counts.sharedDescriptionPages
-      ? `${linkWords(counts.sharedDescriptionPages)} share a meta description with another`
+      ? `${pagesWord(counts.sharedDescriptionPages)} share a meta description with another`
       : null,
   ].filter((s): s is string => s !== null);
   const basicsSentence = !served.length
     ? 'No page answered 200, so no title or meta description was read.'
     : basics.length
       ? `${capitalise(basics.join('; '))}.`
-      : `Each of the ${linkWords(served.length)} that answered 200 has its own title and meta description.`;
-  const body = [
-    brokenSentence ?? 'No page we checked answers an error.',
-    redirectSentence,
-    basicsSentence,
-  ]
-    .filter(Boolean)
-    .join(' ');
+      : served.length === 1
+        ? 'The page that answered 200 has a title and a meta description.'
+        : `Each of the ${pagesWord(served.length)} that answered 200 has its own title and meta description.`;
+  const sentences = (none: string | null) =>
+    [brokenSentence, unlinkedSentence, errorSentence, none, redirectSentence, basicsSentence]
+      .filter(Boolean)
+      .join(' ');
 
-  const crawled = check.coverage?.pages_crawled ?? null;
+  const partial = crawled !== null && crawled > checked;
   return {
     counts,
     broken,
+    unlinked,
+    errors,
     redirects,
     titles: titles.view,
     descriptions: descriptions.view,
-    body,
-    pill: brokenPages.length
+    body: sentences(noneSentence),
+    // The broken links table's empty state says the none sentence, so the screen does not twice.
+    screenBody: sentences(null),
+    brokenEmpty: broken.length
+      ? null
+      : (noneSentence ?? 'No link we read leads to a missing page.'),
+    redirectsEmpty: redirects.length
+      ? null
+      : checked === 1
+        ? 'The page we checked does not redirect.'
+        : `None of the ${count(checked)} pages we checked redirects.`,
+    pill: broken.length
       ? {
           state: 'bad',
-          label: `${count(brokenPages.length)} broken ${plural(brokenPages.length, 'link', 'links')}`,
+          label: `${count(broken.length)} broken ${plural(broken.length, 'link', 'links')}`,
         }
-      : { state: 'neutral', label: 'no broken link' },
-    coverage:
-      crawled !== null && crawled > pages.length
-        ? `Checked ${count(pages.length)} of the ${count(crawled)} pages crawled`
-        : `Checked ${linkWords(pages.length)}`,
+      : {
+          state: 'neutral',
+          label: partial ? `no broken link in ${pagesWord(checked)} checked` : 'no broken link',
+        },
+    coverage,
   };
 }

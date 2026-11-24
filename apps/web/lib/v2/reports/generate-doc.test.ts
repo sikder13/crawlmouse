@@ -291,6 +291,49 @@ describe('auditDoc: broken links and page basics', () => {
       resultView(BUILT, id, { map: null }).crawledAt,
     );
   });
+
+  it('lists a page answering 503 apart from the broken links, under a neutral "Page" column', () => {
+    const copy = structuredClone(BUILT);
+    const p = copy.page_results.find(
+      (x) => x.check_id === id && new URL(x.url).pathname === '/products/camp-kitchen-item-1',
+    )!;
+    p.status_code = 503;
+    const s = auditDoc({ dataset: copy, checkId: id }, OPTIONS).sections.find(
+      (x) => x.heading === REPORT_DOC_COPY.links,
+    )!;
+    const tables = s.blocks.filter(
+      (b): b is Extract<DocBlock, { type: 'table' }> => b.type === 'table',
+    );
+    const errors = tables.find((t) => t.caption === 'Pages that answered an error')!;
+    expect(errors.columns).toEqual([
+      REPORT_DOC_COPY.page,
+      REPORT_DOC_COPY.status,
+      REPORT_DOC_COPY.linkedFrom,
+    ]);
+    expect(errors.rows.map((r) => r.filter((_, i) => i < 2))).toEqual([
+      ['/products/camp-kitchen-item-1', '503'],
+    ]);
+    const brokenRows = tables.find((t) => t.caption === REPORT_DOC_COPY.brokenLinks)!.rows;
+    expect(brokenRows.map((r) => r[0])).not.toContain('/products/camp-kitchen-item-1');
+    expectSaidByThePages(
+      auditDoc({ dataset: copy, checkId: id }, OPTIONS),
+      pageStrings(copy, id),
+      resultView(copy, id, { map: null }).crawledAt,
+    );
+  });
+});
+
+describe('auditDoc: broken links on a record of 2 pages of 38', () => {
+  const s = auditDoc({ dataset: CLEAN, checkId: CLEAN_CHECK }, OPTIONS).sections.find(
+    (x) => x.heading === REPORT_DOC_COPY.links,
+  )!;
+  const texts = s.blocks.flatMap((b) => (b.type === 'text' ? [b.text] : []));
+
+  it('says no page answers an error once, scoped to the pages checked', () => {
+    const none = 'None of the 2 pages we checked answers an error.';
+    expect(texts.filter((t) => t.includes(none))).toEqual([none]);
+    expect(texts).toContain('None of the 2 pages we checked redirects.');
+  });
 });
 
 describe('baselineDoc', () => {

@@ -21,7 +21,7 @@ import { screenSignals } from '../view/screen-signals';
 import { accessView } from '../view/segment/access';
 import { changesView, type ChangeRowView } from '../view/segment/changes';
 import { contentView } from '../view/segment/content';
-import { linksView, type BasicsColumnView } from '../view/segment/links';
+import { linksView, type BasicsColumnView, type ErrorRowView } from '../view/segment/links';
 import { nojsView } from '../view/segment/nojs';
 import { signalsView } from '../view/segment/signals';
 import { structureView } from '../view/segment/structure';
@@ -153,7 +153,7 @@ function basicsBlocks(col: BasicsColumnView): DocBlock[] {
             type: 'table',
             caption: col.missingLine,
             columns: [COPY.page],
-            rows: col.missing.shown.map((p) => [p]),
+            rows: col.missing.shown.map((p) => [p.path]),
           } satisfies DocBlock,
         ]
       : [text(col.missingLine)]),
@@ -172,9 +172,18 @@ function basicsBlocks(col: BasicsColumnView): DocBlock[] {
   ];
 }
 
+/** A table of pages that answered an error: the page (and what redirects to it), status, links in. */
+const errorTable = (caption: string, pageHeader: string, rows: ErrorRowView[]): DocBlock => ({
+  type: 'table',
+  caption,
+  columns: [pageHeader, COPY.status, COPY.linkedFrom],
+  rows: rows.map((r) => [r.pageText, String(r.status), r.linkedAll]),
+});
+
 /**
- * Broken links and page basics: every page that answers an error with every page linking to it,
- * every redirect, and the missing and shared titles and descriptions, ten of each.
+ * Broken links and page basics: the missing pages a link leads to, with the pages linking to them;
+ * the missing pages no link leads to and the pages that answered another error, each when there is
+ * one; the redirects; and the missing and shared titles and descriptions, ten of each.
  */
 function linksSection({ links: l }: Pages): DocSection {
   return {
@@ -184,22 +193,21 @@ function linksSection({ links: l }: Pages): DocSection {
       text(l.body),
       ...facts(l.tiles),
       text(l.coverage.read),
-      l.broken.rows.length
-        ? {
-            type: 'table',
-            caption: COPY.brokenLinks,
-            columns: [COPY.missingPage, COPY.status, COPY.linkedFrom],
-            rows: l.broken.rows.map((r) => [r.path, String(r.status), r.linkedAll]),
-          }
-        : text(l.broken.empty!),
-      l.redirects.rows.length
+      l.broken.empty === null
+        ? errorTable(COPY.brokenLinks, COPY.missingPage, l.broken.rows)
+        : text(l.broken.empty),
+      ...(l.unlinked.rows.length
+        ? [errorTable(l.unlinked.heading, COPY.missingPage, l.unlinked.rows)]
+        : []),
+      ...(l.errors.rows.length ? [errorTable(l.errors.heading, COPY.page, l.errors.rows)] : []),
+      l.redirects.empty === null
         ? {
             type: 'table',
             caption: COPY.redirects,
             columns: [COPY.linkedAs, COPY.hops, COPY.endsAt],
             rows: l.redirects.rows.map((r) => [r.path, r.hops, r.endsText]),
           }
-        : text(l.redirects.empty!),
+        : text(l.redirects.empty),
       ...basicsBlocks(l.titles),
       ...basicsBlocks(l.descriptions),
       text(l.headings),

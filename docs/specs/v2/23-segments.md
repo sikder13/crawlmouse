@@ -404,32 +404,44 @@ Every interface the segment view modules export, read through the TypeScript com
 | `more`      | `string \| null` | "and 3 more"; null when nothing is held back.                                            |
 | `moreInApp` | `string \| null` | "and 3 more in the app", as the PDF ends a list it cuts; null when nothing is held back. |
 
+#### `PageRef`
+
+| Field  | Type     | Note |
+| ------ | -------- | ---- |
+| `url`  | `string` |      |
+| `path` | `string` |      |
+
 #### `LinkingPage`
 
-| Field    | Type     | Note |
-| -------- | -------- | ---- |
-| `path`   | `string` |      |
-| `anchor` | `string` |      |
+| Field    | Type             | Note                                                        |
+| -------- | ---------------- | ----------------------------------------------------------- |
+| `anchor` | `string \| null` | The link's text; null when it has none, or only whitespace. |
+| `url`    | `string`         |                                                             |
+| `path`   | `string`         |                                                             |
 
-#### `BrokenRowView`
+#### `ErrorRowView`
 
-| Field           | Type            | Note                                                                             |
-| --------------- | --------------- | -------------------------------------------------------------------------------- |
-| `path`          | `string`        |                                                                                  |
-| `status`        | `number`        |                                                                                  |
-| `linkedFrom`    | `LinkingPage[]` | Every page whose link leads to it, with that link's text, in the record's order. |
-| `linkedSummary` | `string`        | "/blog/a, /pricing and 1 more": the first two linking pages, and how many more.  |
-| `linkedAll`     | `string`        | Every linking page, comma-separated, as the PDF lists it.                        |
+| Field           | Type            | Note                                                                                                                                                                                                                                                             |
+| --------------- | --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `status`        | `number`        |                                                                                                                                                                                                                                                                  |
+| `via`           | `string[]`      | The record's URLs that redirect here, as shown; empty when the page was requested directly.                                                                                                                                                                      |
+| `pageText`      | `string`        | The path, then "(redirected from /a, /b)" when it was reached by a redirect: one cell.                                                                                                                                                                           |
+| `linkedFrom`    | `LinkingPage[]` | The links in the record that lead here, with their text, in the record's order. A link from the page itself is left out. A link's page may be one the record does not hold (where a redirect landed), so this is what the record read, not a census of the site. |
+| `linkedSummary` | `string`        | "/blog/a, /pricing and 1 more": the first two linking pages, and how many more.                                                                                                                                                                                  |
+| `linkedAll`     | `string`        | The linking pages, comma-separated, as the PDF lists them.                                                                                                                                                                                                       |
+| `url`           | `string`        |                                                                                                                                                                                                                                                                  |
+| `path`          | `string`        |                                                                                                                                                                                                                                                                  |
 
 #### `RedirectRowView`
 
 | Field      | Type                                        | Note                                                                |
 | ---------- | ------------------------------------------- | ------------------------------------------------------------------- |
-| `path`     | `string`                                    |                                                                     |
 | `hops`     | `string`                                    | "301 → /b → 302 → /c"                                               |
 | `endsAt`   | `{ path: string; status: number; } \| null` | Where the chain ends, with that response's status; null for a loop. |
 | `loop`     | `boolean`                                   |                                                                     |
 | `endsText` | `string`                                    | "/c (200)", or "LOOP": the end as one cell, as the PDF prints it.   |
+| `url`      | `string`                                    |                                                                     |
+| `path`     | `string`                                    |                                                                     |
 
 #### `SharedGroupView`
 
@@ -438,133 +450,150 @@ Every interface the segment view modules export, read through the TypeScript com
 | `text`            | `string`         |                                                                                          |
 | `line`            | `string`         | "“Guide” · 3 pages"                                                                      |
 | `pages`           | `object`         |                                                                                          |
-| `pages.shown`     | `string[]`       |                                                                                          |
-| `pages.rest`      | `string[]`       |                                                                                          |
+| `pages.shown`     | `PageRef[]`      |                                                                                          |
+| `pages.rest`      | `PageRef[]`      |                                                                                          |
 | `pages.more`      | `string \| null` | "and 3 more"; null when nothing is held back.                                            |
 | `pages.moreInApp` | `string \| null` | "and 3 more in the app", as the PDF ends a list it cuts; null when nothing is held back. |
 | `pageCount`       | `number`         |                                                                                          |
 
 #### `BasicsColumnView`
 
-| Field               | Type                | Note                                                                                     |
-| ------------------- | ------------------- | ---------------------------------------------------------------------------------------- |
-| `heading`           | `string`            |                                                                                          |
-| `missingLine`       | `string`            | One line: the missing count, or that none is missing.                                    |
-| `missing`           | `object`            |                                                                                          |
-| `missing.shown`     | `string[]`          |                                                                                          |
-| `missing.rest`      | `string[]`          |                                                                                          |
-| `missing.more`      | `string \| null`    | "and 3 more"; null when nothing is held back.                                            |
-| `missing.moreInApp` | `string \| null`    | "and 3 more in the app", as the PDF ends a list it cuts; null when nothing is held back. |
-| `sharedLine`        | `string`            | One line: how many texts are shared, by how many pages, or that none is.                 |
-| `shared`            | `object`            |                                                                                          |
-| `shared.shown`      | `SharedGroupView[]` |                                                                                          |
-| `shared.rest`       | `SharedGroupView[]` |                                                                                          |
-| `shared.more`       | `string \| null`    | "and 3 more"; null when nothing is held back.                                            |
-| `shared.moreInApp`  | `string \| null`    | "and 3 more in the app", as the PDF ends a list it cuts; null when nothing is held back. |
+| Field               | Type                | Note                                                                                         |
+| ------------------- | ------------------- | -------------------------------------------------------------------------------------------- |
+| `heading`           | `string`            |                                                                                              |
+| `missingLine`       | `string`            | One line: the missing count, that none is missing, or that none was read.                    |
+| `missing`           | `object`            |                                                                                              |
+| `missing.shown`     | `PageRef[]`         |                                                                                              |
+| `missing.rest`      | `PageRef[]`         |                                                                                              |
+| `missing.more`      | `string \| null`    | "and 3 more"; null when nothing is held back.                                                |
+| `missing.moreInApp` | `string \| null`    | "and 3 more in the app", as the PDF ends a list it cuts; null when nothing is held back.     |
+| `sharedLine`        | `string`            | One line: how many texts are shared, by how many pages, that none is, or that none was read. |
+| `shared`            | `object`            |                                                                                              |
+| `shared.shown`      | `SharedGroupView[]` |                                                                                              |
+| `shared.rest`       | `SharedGroupView[]` |                                                                                              |
+| `shared.more`       | `string \| null`    | "and 3 more"; null when nothing is held back.                                                |
+| `shared.moreInApp`  | `string \| null`    | "and 3 more in the app", as the PDF ends a list it cuts; null when nothing is held back.     |
 
 #### `LinksCounts`
 
-| Field                    | Type     | Note                                                                       |
-| ------------------------ | -------- | -------------------------------------------------------------------------- |
-| `checked`                | `number` | Pages in the record.                                                       |
-| `served`                 | `number` | Pages that answered 200: the pages whose titles and descriptions are read. |
-| `broken`                 | `number` |                                                                            |
-| `brokenLinkedFrom`       | `number` | Distinct pages that link to a broken page.                                 |
-| `redirects`              | `number` |                                                                            |
-| `loops`                  | `number` |                                                                            |
-| `missingTitles`          | `number` |                                                                            |
-| `sharedTitlePages`       | `number` |                                                                            |
-| `missingDescriptions`    | `number` |                                                                            |
-| `sharedDescriptionPages` | `number` |                                                                            |
+| Field                    | Type     | Note                                                                                   |
+| ------------------------ | -------- | -------------------------------------------------------------------------------------- |
+| `checked`                | `number` | Pages in the record.                                                                   |
+| `served`                 | `number` | Pages that answered 200: the pages whose titles and descriptions are read.             |
+| `broken`                 | `number` | Missing pages (segment/broken.ts) at least one link in the record leads to.            |
+| `brokenLinkedFrom`       | `number` | Distinct pages whose link leads to one of those, a page's link to itself left out.     |
+| `missingUnlinked`        | `number` | Missing pages no link in the record leads to (found by the sitemap, or the start URL). |
+| `errors`                 | `number` | Pages that answered an error of 400 or more other than a missing one.                  |
+| `redirects`              | `number` |                                                                                        |
+| `loops`                  | `number` |                                                                                        |
+| `missingTitles`          | `number` |                                                                                        |
+| `sharedTitlePages`       | `number` |                                                                                        |
+| `missingDescriptions`    | `number` |                                                                                        |
+| `sharedDescriptionPages` | `number` |                                                                                        |
 
 #### `LinksFacts`
 
-| Field                           | Type                         | Note                                                                       |
-| ------------------------------- | ---------------------------- | -------------------------------------------------------------------------- |
-| `counts`                        | `object`                     |                                                                            |
-| `counts.checked`                | `number`                     | Pages in the record.                                                       |
-| `counts.served`                 | `number`                     | Pages that answered 200: the pages whose titles and descriptions are read. |
-| `counts.broken`                 | `number`                     |                                                                            |
-| `counts.brokenLinkedFrom`       | `number`                     | Distinct pages that link to a broken page.                                 |
-| `counts.redirects`              | `number`                     |                                                                            |
-| `counts.loops`                  | `number`                     |                                                                            |
-| `counts.missingTitles`          | `number`                     |                                                                            |
-| `counts.sharedTitlePages`       | `number`                     |                                                                            |
-| `counts.missingDescriptions`    | `number`                     |                                                                            |
-| `counts.sharedDescriptionPages` | `number`                     |                                                                            |
-| `broken`                        | `BrokenRowView[]`            |                                                                            |
-| `redirects`                     | `RedirectRowView[]`          |                                                                            |
-| `titles`                        | `object`                     |                                                                            |
-| `titles.heading`                | `string`                     |                                                                            |
-| `titles.missingLine`            | `string`                     | One line: the missing count, or that none is missing.                      |
-| `titles.missing`                | `ShortList<string>`          |                                                                            |
-| `titles.sharedLine`             | `string`                     | One line: how many texts are shared, by how many pages, or that none is.   |
-| `titles.shared`                 | `ShortList<SharedGroupView>` |                                                                            |
-| `descriptions`                  | `object`                     |                                                                            |
-| `descriptions.heading`          | `string`                     |                                                                            |
-| `descriptions.missingLine`      | `string`                     | One line: the missing count, or that none is missing.                      |
-| `descriptions.missing`          | `ShortList<string>`          |                                                                            |
-| `descriptions.sharedLine`       | `string`                     | One line: how many texts are shared, by how many pages, or that none is.   |
-| `descriptions.shared`           | `ShortList<SharedGroupView>` |                                                                            |
-| `body`                          | `string`                     | The sentence the door and the screen open with, built from the counts.     |
-| `pill`                          | `object`                     |                                                                            |
-| `pill.state`                    | `PillState`                  |                                                                            |
-| `pill.label`                    | `string`                     |                                                                            |
-| `coverage`                      | `string`                     |                                                                            |
+| Field                           | Type                         | Note                                                                                           |
+| ------------------------------- | ---------------------------- | ---------------------------------------------------------------------------------------------- |
+| `counts`                        | `object`                     |                                                                                                |
+| `counts.checked`                | `number`                     | Pages in the record.                                                                           |
+| `counts.served`                 | `number`                     | Pages that answered 200: the pages whose titles and descriptions are read.                     |
+| `counts.broken`                 | `number`                     | Missing pages (segment/broken.ts) at least one link in the record leads to.                    |
+| `counts.brokenLinkedFrom`       | `number`                     | Distinct pages whose link leads to one of those, a page's link to itself left out.             |
+| `counts.missingUnlinked`        | `number`                     | Missing pages no link in the record leads to (found by the sitemap, or the start URL).         |
+| `counts.errors`                 | `number`                     | Pages that answered an error of 400 or more other than a missing one.                          |
+| `counts.redirects`              | `number`                     |                                                                                                |
+| `counts.loops`                  | `number`                     |                                                                                                |
+| `counts.missingTitles`          | `number`                     |                                                                                                |
+| `counts.sharedTitlePages`       | `number`                     |                                                                                                |
+| `counts.missingDescriptions`    | `number`                     |                                                                                                |
+| `counts.sharedDescriptionPages` | `number`                     |                                                                                                |
+| `broken`                        | `ErrorRowView[]`             | Missing pages a link leads to: the broken links.                                               |
+| `unlinked`                      | `ErrorRowView[]`             | Missing pages no link in the record leads to.                                                  |
+| `errors`                        | `ErrorRowView[]`             | Pages that answered another error (a 403, a 429, a 503): they exist, so are not broken.        |
+| `redirects`                     | `RedirectRowView[]`          |                                                                                                |
+| `titles`                        | `object`                     |                                                                                                |
+| `titles.heading`                | `string`                     |                                                                                                |
+| `titles.missingLine`            | `string`                     | One line: the missing count, that none is missing, or that none was read.                      |
+| `titles.missing`                | `ShortList<PageRef>`         |                                                                                                |
+| `titles.sharedLine`             | `string`                     | One line: how many texts are shared, by how many pages, that none is, or that none was read.   |
+| `titles.shared`                 | `ShortList<SharedGroupView>` |                                                                                                |
+| `descriptions`                  | `object`                     |                                                                                                |
+| `descriptions.heading`          | `string`                     |                                                                                                |
+| `descriptions.missingLine`      | `string`                     | One line: the missing count, that none is missing, or that none was read.                      |
+| `descriptions.missing`          | `ShortList<PageRef>`         |                                                                                                |
+| `descriptions.sharedLine`       | `string`                     | One line: how many texts are shared, by how many pages, that none is, or that none was read.   |
+| `descriptions.shared`           | `ShortList<SharedGroupView>` |                                                                                                |
+| `body`                          | `string`                     | The door's sentence, built from the counts.                                                    |
+| `screenBody`                    | `string`                     | The screen's and the PDF's: the body without the sentence the broken table's empty state says. |
+| `brokenEmpty`                   | `string \| null`             | What the broken links table says when it has no row; null when it has one.                     |
+| `redirectsEmpty`                | `string \| null`             | What the redirects table says when it has no row; null when it has one.                        |
+| `pill`                          | `object`                     | The door's pill and the Links and pages tab's figure.                                          |
+| `pill.state`                    | `PillState`                  |                                                                                                |
+| `pill.label`                    | `string`                     |                                                                                                |
+| `coverage`                      | `string`                     |                                                                                                |
 
 ### Links and pages (`lib/v2/view/segment/links.ts`)
 
 #### `LinksView`
 
-| Field                           | Type                                                                                  | Note                                                                                |
-| ------------------------------- | ------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| `frame`                         | `object`                                                                              |                                                                                     |
-| `frame.key`                     | `"access" \| "nojs" \| "structure" \| "links" \| "content" \| "signals" \| "changes"` |                                                                                     |
-| `frame.domain`                  | `string`                                                                              |                                                                                     |
-| `frame.title`                   | `string`                                                                              |                                                                                     |
-| `frame.keptUntil`               | `string \| null`                                                                      | "26 Oct, 02:34 UTC" while nobody has kept the audit; null once an account keeps it. |
-| `frame.tabs`                    | `(SegmentLink & { current: boolean; added?: boolean \| undefined; })[]`               |                                                                                     |
-| `frame.back`                    | `SegmentLink`                                                                         |                                                                                     |
-| `frame.next`                    | `SegmentLink`                                                                         |                                                                                     |
-| `frame.keepHref`                | `string`                                                                              | Where an ask that needs an account goes: the keep bar, while there is one.          |
-| `headline`                      | `object`                                                                              |                                                                                     |
-| `headline.title`                | `string`                                                                              |                                                                                     |
-| `headline.pill`                 | `{ state: PillState; label: string; }`                                                |                                                                                     |
-| `body`                          | `string`                                                                              |                                                                                     |
-| `tiles`                         | `{ label: string; value: string; note: string \| null; }[]`                           |                                                                                     |
-| `coverage`                      | `object`                                                                              |                                                                                     |
-| `coverage.read`                 | `string`                                                                              |                                                                                     |
-| `counts`                        | `object`                                                                              |                                                                                     |
-| `counts.checked`                | `number`                                                                              | Pages in the record.                                                                |
-| `counts.served`                 | `number`                                                                              | Pages that answered 200: the pages whose titles and descriptions are read.          |
-| `counts.broken`                 | `number`                                                                              |                                                                                     |
-| `counts.brokenLinkedFrom`       | `number`                                                                              | Distinct pages that link to a broken page.                                          |
-| `counts.redirects`              | `number`                                                                              |                                                                                     |
-| `counts.loops`                  | `number`                                                                              |                                                                                     |
-| `counts.missingTitles`          | `number`                                                                              |                                                                                     |
-| `counts.sharedTitlePages`       | `number`                                                                              |                                                                                     |
-| `counts.missingDescriptions`    | `number`                                                                              |                                                                                     |
-| `counts.sharedDescriptionPages` | `number`                                                                              |                                                                                     |
-| `broken`                        | `object`                                                                              |                                                                                     |
-| `broken.rows`                   | `BrokenRowView[]`                                                                     |                                                                                     |
-| `broken.empty`                  | `string \| null`                                                                      |                                                                                     |
-| `redirects`                     | `object`                                                                              |                                                                                     |
-| `redirects.rows`                | `RedirectRowView[]`                                                                   |                                                                                     |
-| `redirects.empty`               | `string \| null`                                                                      |                                                                                     |
-| `titles`                        | `object`                                                                              |                                                                                     |
-| `titles.heading`                | `string`                                                                              |                                                                                     |
-| `titles.missingLine`            | `string`                                                                              | One line: the missing count, or that none is missing.                               |
-| `titles.missing`                | `ShortList<string>`                                                                   |                                                                                     |
-| `titles.sharedLine`             | `string`                                                                              | One line: how many texts are shared, by how many pages, or that none is.            |
-| `titles.shared`                 | `ShortList<SharedGroupView>`                                                          |                                                                                     |
-| `descriptions`                  | `object`                                                                              |                                                                                     |
-| `descriptions.heading`          | `string`                                                                              |                                                                                     |
-| `descriptions.missingLine`      | `string`                                                                              | One line: the missing count, or that none is missing.                               |
-| `descriptions.missing`          | `ShortList<string>`                                                                   |                                                                                     |
-| `descriptions.sharedLine`       | `string`                                                                              | One line: how many texts are shared, by how many pages, or that none is.            |
-| `descriptions.shared`           | `ShortList<SharedGroupView>`                                                          |                                                                                     |
-| `headings`                      | `string`                                                                              |                                                                                     |
-| `keep`                          | `{ title: string; sub: string; } \| null`                                             |                                                                                     |
+| Field                           | Type                                                                                  | Note                                                                                         |
+| ------------------------------- | ------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `frame`                         | `object`                                                                              |                                                                                              |
+| `frame.key`                     | `"access" \| "nojs" \| "structure" \| "links" \| "content" \| "signals" \| "changes"` |                                                                                              |
+| `frame.domain`                  | `string`                                                                              |                                                                                              |
+| `frame.title`                   | `string`                                                                              |                                                                                              |
+| `frame.keptUntil`               | `string \| null`                                                                      | "26 Oct, 02:34 UTC" while nobody has kept the audit; null once an account keeps it.          |
+| `frame.tabs`                    | `(SegmentLink & { current: boolean; added?: boolean \| undefined; })[]`               |                                                                                              |
+| `frame.back`                    | `SegmentLink`                                                                         |                                                                                              |
+| `frame.next`                    | `SegmentLink`                                                                         |                                                                                              |
+| `frame.keepHref`                | `string`                                                                              | Where an ask that needs an account goes: the keep bar, while there is one.                   |
+| `headline`                      | `object`                                                                              | The pill is null when the record holds no page: nothing was measured to pill.                |
+| `headline.title`                | `string`                                                                              |                                                                                              |
+| `headline.pill`                 | `{ state: PillState; label: string; } \| null`                                        |                                                                                              |
+| `body`                          | `string`                                                                              |                                                                                              |
+| `tiles`                         | `{ label: string; value: string; note: string \| null; }[]`                           |                                                                                              |
+| `coverage`                      | `object`                                                                              |                                                                                              |
+| `coverage.read`                 | `string`                                                                              |                                                                                              |
+| `counts`                        | `object`                                                                              |                                                                                              |
+| `counts.checked`                | `number`                                                                              | Pages in the record.                                                                         |
+| `counts.served`                 | `number`                                                                              | Pages that answered 200: the pages whose titles and descriptions are read.                   |
+| `counts.broken`                 | `number`                                                                              | Missing pages (segment/broken.ts) at least one link in the record leads to.                  |
+| `counts.brokenLinkedFrom`       | `number`                                                                              | Distinct pages whose link leads to one of those, a page's link to itself left out.           |
+| `counts.missingUnlinked`        | `number`                                                                              | Missing pages no link in the record leads to (found by the sitemap, or the start URL).       |
+| `counts.errors`                 | `number`                                                                              | Pages that answered an error of 400 or more other than a missing one.                        |
+| `counts.redirects`              | `number`                                                                              |                                                                                              |
+| `counts.loops`                  | `number`                                                                              |                                                                                              |
+| `counts.missingTitles`          | `number`                                                                              |                                                                                              |
+| `counts.sharedTitlePages`       | `number`                                                                              |                                                                                              |
+| `counts.missingDescriptions`    | `number`                                                                              |                                                                                              |
+| `counts.sharedDescriptionPages` | `number`                                                                              |                                                                                              |
+| `broken`                        | `object`                                                                              |                                                                                              |
+| `broken.rows`                   | `ErrorRowView[]`                                                                      |                                                                                              |
+| `broken.empty`                  | `string \| null`                                                                      |                                                                                              |
+| `unlinked`                      | `object`                                                                              | Missing pages no link in the record leads to; listed only when there is one.                 |
+| `unlinked.heading`              | `string`                                                                              |                                                                                              |
+| `unlinked.rows`                 | `ErrorRowView[]`                                                                      |                                                                                              |
+| `errors`                        | `object`                                                                              | Pages that answered an error other than missing; listed only when there is one.              |
+| `errors.heading`                | `string`                                                                              |                                                                                              |
+| `errors.rows`                   | `ErrorRowView[]`                                                                      |                                                                                              |
+| `redirects`                     | `object`                                                                              |                                                                                              |
+| `redirects.rows`                | `RedirectRowView[]`                                                                   |                                                                                              |
+| `redirects.empty`               | `string \| null`                                                                      |                                                                                              |
+| `titles`                        | `object`                                                                              |                                                                                              |
+| `titles.heading`                | `string`                                                                              |                                                                                              |
+| `titles.missingLine`            | `string`                                                                              | One line: the missing count, that none is missing, or that none was read.                    |
+| `titles.missing`                | `ShortList<PageRef>`                                                                  |                                                                                              |
+| `titles.sharedLine`             | `string`                                                                              | One line: how many texts are shared, by how many pages, that none is, or that none was read. |
+| `titles.shared`                 | `ShortList<SharedGroupView>`                                                          |                                                                                              |
+| `descriptions`                  | `object`                                                                              |                                                                                              |
+| `descriptions.heading`          | `string`                                                                              |                                                                                              |
+| `descriptions.missingLine`      | `string`                                                                              | One line: the missing count, that none is missing, or that none was read.                    |
+| `descriptions.missing`          | `ShortList<PageRef>`                                                                  |                                                                                              |
+| `descriptions.sharedLine`       | `string`                                                                              | One line: how many texts are shared, by how many pages, that none is, or that none was read. |
+| `descriptions.shared`           | `ShortList<SharedGroupView>`                                                          |                                                                                              |
+| `headings`                      | `string`                                                                              |                                                                                              |
+| `keep`                          | `{ title: string; sub: string; } \| null`                                             |                                                                                              |
 
 ### Content an answer engine can quote (`lib/v2/view/segment/content.ts`)
 
@@ -757,7 +786,7 @@ From `apps/web/lib/v2/view/segment/inventory`. `apps/web/__tests__/v2/segment-pe
 | structure                                                 | Pages crawled, of pages found                                                        | `checks[].coverage.pages_crawled, checks[].coverage.pages_discovered`                                                                                                                                                                         |
 | structure                                                 | The orphan pages, where each belongs, and what reads them                            | `page_results[].is_orphan, page_results[].url, page_results[].links_in, page_results[].found_via, page_results[].suggested_parent_url, page_results[].crawlers_reading_text, page_results[].crawlers_reached, page_results[].sitemap_lastmod` |
 | structure                                                 | The section’s Pro fixes: title and scope                                             | `fixes[].title, fixes[].detail`                                                                                                                                                                                                               |
-| links                                                     | A page that answers an error, and its status                                         | `page_results[].status_code`                                                                                                                                                                                                                  |
+| links                                                     | A missing page (404 or 410), or one that answered another error, and its status      | `page_results[].status_code`                                                                                                                                                                                                                  |
 | links                                                     | A page that redirects, hop by hop                                                    | `page_results[].redirect`                                                                                                                                                                                                                     |
 | links                                                     | A title more than one page shares                                                    | `page_results[].title.text`                                                                                                                                                                                                                   |
 | links                                                     | The pages with no meta description                                                   | `page_results[].meta_description.text`                                                                                                                                                                                                        |
@@ -783,7 +812,7 @@ From `apps/web/lib/v2/copy/segment-*.ts`. The lock comparisons apply each change
 
 | Page              | Kind    | Locked                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | Now                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | Why                                                                                                                                                                                                                                                                                               |
 | ----------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| segment-structure | ruling  | Next: Content an answer engine can quote · 58                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | Next: Links and pages · no broken link                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | V2R register, row 5 (CTO rulings of 2026-11-24): the Links and pages tab sits between Site structure and Content                                                                                                                                                                                  |
+| segment-structure | ruling  | Next: Content an answer engine can quote · 58                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | Next: Links and pages · no broken link in 16 pages checked                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | V2R register, row 5 (CTO rulings of 2026-11-24): the Links and pages tab sits between Site structure and Content                                                                                                                                                                                  |
 | segment-content   | ruling  | Back: Site structure                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | Back: Links and pages                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | V2R register, row 5 (CTO rulings of 2026-11-24): the Links and pages tab sits between Site structure and Content                                                                                                                                                                                  |
 | segment-access    | facts   | Two of six crawlers never get in. blocked GPTBot is refused by a Cloudflare firewall rule on every page. PerplexityBot is served a challenge page instead of your content. Google, Bing, OAI-SearchBot and ClaudeBot reach the site; two of them then hit the JavaScript problem covered in the next section.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | One of six AI crawlers is blocked, and one is challenged. 1 blocked · 1 challenged GPTBot is blocked by a firewall rule; PerplexityBot gets a challenge page. The other four AI crawlers get in; OAI-SearchBot, ChatGPT-User, Claude-SearchBot and ClaudeBot then read product pages empty without JavaScript, covered in the next section. Googlebot and Bingbot are allowed by robots.txt.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | FACTS I6 and I2: “two of six crawlers never get in” is ENGINE-DERIVED under the new vocabulary, where a challenge is not “blocked”; the pill is the Result door’s.                                                                                                                                |
 | segment-access    | facts   | Crawlers tested 6 Pages requested per crawler 214 Responses kept as evidence 1,284                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | AI crawlers tested 6 Pages fetched per crawler 50 of 214 Responses kept as evidence 408                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | FACTS B2 (the tiles, FACTS-proposed line 215) and I1; 408 is the fixture’s count of the responses this audit kept (`withheld.total`).                                                                                                                                                             |

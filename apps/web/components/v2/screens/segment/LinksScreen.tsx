@@ -3,7 +3,14 @@ import { Card } from '../../Card';
 import { Heading } from '../../Heading';
 import { StatusPill } from '../../StatusPill';
 import { Table } from '../../Table';
-import type { BasicsColumnView, LinksView, ShortList } from '../../../../lib/v2/view/segment/links';
+import {
+  NO_LINK_TEXT,
+  type BasicsColumnView,
+  type ErrorRowView,
+  type LinksView,
+  type PageRef,
+  type ShortList,
+} from '../../../../lib/v2/view/segment/links';
 import { VerdictCard } from './SegmentParts';
 import { SegmentShell } from './SegmentShell';
 import layout from '../../layout.module.css';
@@ -45,7 +52,103 @@ function Short<T>({
   );
 }
 
-const path = (p: string) => <span className={own.mono}>{p}</span>;
+const path = (p: PageRef) => <span className={own.mono}>{p.path}</span>;
+const byUrl = (p: PageRef) => p.url;
+
+/** The page's URL, and the URLs of the record that redirect to it. */
+function PageCell({ r }: { r: ErrorRowView }) {
+  return (
+    <span className={`${own.mono} ${own.breakAnywhere}`}>
+      {r.path}
+      {r.via.length ? (
+        <span className={own.anchor}> (redirected from {r.via.join(', ')})</span>
+      ) : null}
+    </span>
+  );
+}
+
+/** "/a, /b and 1 more", then the links in the record that lead to the page, each with its text. */
+function LinkedFrom({ r }: { r: ErrorRowView }) {
+  return (
+    <div className={own.breakAnywhere}>
+      {r.linkedSummary}
+      {r.linkedFrom.length ? (
+        <details className={own.more}>
+          <summary>Linked from</summary>
+          <ul className={own.list}>
+            {r.linkedFrom.map((l, i) => (
+              <li key={`${l.url}-${i}`} className={own.breakAnywhere}>
+                {path(l)}{' '}
+                <span className={own.anchor}>
+                  {l.anchor === null ? NO_LINK_TEXT : <>&ldquo;{l.anchor}&rdquo;</>}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </details>
+      ) : null}
+    </div>
+  );
+}
+
+/** A table of pages that answered an error: the page, its status, and the links that lead to it. */
+function ErrorTable({
+  label,
+  pageHeader,
+  tone,
+  rows,
+}: {
+  label: string;
+  pageHeader: string;
+  tone: 'bad' | 'neutral';
+  rows: ErrorRowView[];
+}) {
+  return (
+    <Table
+      label={label}
+      columns={[
+        { header: pageHeader },
+        { header: 'Status', numeric: true, mono: true },
+        { header: 'Linked from' },
+      ]}
+      rows={rows.map((r) => ({
+        key: r.url,
+        cells: [
+          <PageCell key="p" r={r} />,
+          <StatusPill key="s" state={tone}>
+            {String(r.status)}
+          </StatusPill>,
+          <LinkedFrom key="f" r={r} />,
+        ],
+      }))}
+    />
+  );
+}
+
+/** A section heading and its table, shown only when it has a row. */
+function ErrorSection({
+  heading,
+  rows,
+  pageHeader,
+  tone,
+}: {
+  heading: string;
+  rows: ErrorRowView[];
+  pageHeader: string;
+  tone: 'bad' | 'neutral';
+}) {
+  if (!rows.length) return null;
+  return (
+    <Card as="section" className={styles.panel}>
+      <div className={`${layout.row} ${styles.hd}`}>
+        <Heading level={2} size="s">
+          {heading}
+        </Heading>
+      </div>
+      <ErrorTable label={heading} pageHeader={pageHeader} tone={tone} rows={rows} />
+    </Card>
+  );
+}
 
 function Basics({ col }: { col: BasicsColumnView }) {
   return (
@@ -54,7 +157,7 @@ function Basics({ col }: { col: BasicsColumnView }) {
         {col.heading}
       </Heading>
       <div className={own.line}>{col.missingLine}</div>
-      {col.missing.shown.length ? <Short list={col.missing} item={path} keyOf={(p) => p} /> : null}
+      {col.missing.shown.length ? <Short list={col.missing} item={path} keyOf={byUrl} /> : null}
       <div className={own.line}>{col.sharedLine}</div>
       {col.shared.shown.length ? (
         <Short
@@ -63,7 +166,7 @@ function Basics({ col }: { col: BasicsColumnView }) {
           item={(g) => (
             <div className={own.group}>
               {g.line}
-              <Short list={g.pages} item={path} keyOf={(p) => p} />
+              <Short list={g.pages} item={path} keyOf={byUrl} />
             </div>
           )}
         />
@@ -73,8 +176,9 @@ function Basics({ col }: { col: BasicsColumnView }) {
 }
 
 /**
- * Links and pages (row 5): pages that answer an error and where they are linked from, redirects,
- * and the titles and meta descriptions that are missing or shared. Headings are not read yet, and
+ * Links and pages (row 5): the missing pages a link leads to and where they are linked from, the
+ * missing pages no link leads to, the pages that answered another error, redirects, and the titles
+ * and meta descriptions that are missing or shared. Headings are not read yet, and
  * the page says so.
  */
 export function LinksScreen({ data }: { data: LinksView }) {
@@ -97,43 +201,26 @@ export function LinksScreen({ data }: { data: LinksView }) {
         {data.broken.empty ? (
           <p className={own.empty}>{data.broken.empty}</p>
         ) : (
-          <Table
+          <ErrorTable
             label="Broken links"
-            columns={[
-              { header: 'Missing page' },
-              { header: 'Status', numeric: true, mono: true },
-              { header: 'Linked from' },
-            ]}
-            rows={data.broken.rows.map((r) => ({
-              key: r.path,
-              cells: [
-                <span key="p" className={`${own.mono} ${own.breakAnywhere}`}>
-                  {r.path}
-                </span>,
-                <StatusPill key="s" state="bad">
-                  {String(r.status)}
-                </StatusPill>,
-                <div key="f" className={own.breakAnywhere}>
-                  {r.linkedSummary}
-                  {r.linkedFrom.length ? (
-                    <details className={own.more}>
-                      <summary>Every page that links to it</summary>
-                      <ul className={own.list}>
-                        {r.linkedFrom.map((l, i) => (
-                          <li key={`${l.path}-${i}`} className={own.breakAnywhere}>
-                            {path(l.path)}{' '}
-                            <span className={own.anchor}>&ldquo;{l.anchor}&rdquo;</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </details>
-                  ) : null}
-                </div>,
-              ],
-            }))}
+            pageHeader="Missing page"
+            tone="bad"
+            rows={data.broken.rows}
           />
         )}
       </Card>
+      <ErrorSection
+        heading={data.unlinked.heading}
+        rows={data.unlinked.rows}
+        pageHeader="Missing page"
+        tone="bad"
+      />
+      <ErrorSection
+        heading={data.errors.heading}
+        rows={data.errors.rows}
+        pageHeader="Page"
+        tone="neutral"
+      />
       <Card as="section" className={styles.panel}>
         <div className={`${layout.row} ${styles.hd}`}>
           <Heading level={2} size="s">
@@ -147,7 +234,7 @@ export function LinksScreen({ data }: { data: LinksView }) {
             label="Redirects"
             columns={[{ header: 'Linked as' }, { header: 'Hops' }, { header: 'Ends at' }]}
             rows={data.redirects.rows.map((r) => ({
-              key: r.path,
+              key: r.url,
               cells: [
                 <span key="p" className={`${own.mono} ${own.breakAnywhere}`}>
                   {r.path}
