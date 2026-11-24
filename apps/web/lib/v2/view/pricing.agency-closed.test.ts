@@ -99,6 +99,20 @@ const allText = (v: ReturnType<typeof pricingView>) =>
     ]),
   ].join(' ');
 
+/** Every capability the view's tagged sentences carry, the plan columns' included. */
+const capabilitiesOf = (v: ReturnType<typeof pricingView>): string[] =>
+  [
+    v.title,
+    ...v.lead,
+    ...v.crawlers,
+    ...v.annual,
+    ...v.after.lead,
+    ...v.after.rows.map(([, t]) => t),
+    ...v.why.text,
+    ...v.faq.items.map((i) => i.a),
+    ...v.plans.flatMap((p) => [p.description, ...p.rows]),
+  ].flatMap((t) => (t as { capabilities?: readonly string[] }).capabilities ?? []);
+
 const agencyOf = (v: ReturnType<typeof pricingView>) => v.plans.find((p) => p.tier === 'agency')!;
 const proOf = (v: ReturnType<typeof pricingView>) => v.plans.find((p) => p.tier === 'pro')!;
 
@@ -130,6 +144,12 @@ describe('pricingView with billing on and Agency sales closed (F-251)', () => {
         );
       },
     );
+
+    it.each(VIEWERS)('%s: no sentence is marked as the Agency trial', (_n, viewer) => {
+      expect(capabilitiesOf(pricingView(viewer, interval, NOW, CLOSED))).not.toContain(
+        'agency_trial',
+      );
+    });
   });
 
   it('a signed-out visitor is offered Agency as with billing off: start free, opening shortly', () => {
