@@ -4,9 +4,9 @@ export const INTEGRATIONS_COPY = {
   line: 'Where Crawlmouse sends alerts, besides your email.',
   slackTitle: 'Slack',
   slackOff:
-    'Send each alert to a Slack channel as well as by email. In Slack, create an incoming webhook for the channel, then paste its URL here.',
+    'Send each alert to a Slack channel too. In Slack, create an incoming webhook for the channel, then paste its URL here.',
   slackOn: (last4: string) =>
-    `Each alert goes by email and to the channel this webhook was made for. Its address ends in ${last4}, and we do not show the rest.`,
+    `Each alert also goes to the channel this webhook was made for. Its address ends in ${last4}, and we do not show the rest.`,
   slackLocked: 'Alerts to Slack are on Pro.',
   slackLockedNotOwner: 'Alerts to Slack are on Pro, and the account’s owner can change the plan.',
   slackStored: (last4: string) =>
