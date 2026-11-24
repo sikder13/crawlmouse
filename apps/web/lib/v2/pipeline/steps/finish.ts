@@ -2,7 +2,9 @@
  * The steps after the batches: render, build, persist, finalize.
  *
  * render runs CC-14's renderCheck over renderCandidates with the check's daily budget, and stops
- * RENDER_STEP_MS after the step began. With the two render caps unset, nothing renders.
+ * RENDER_STEP_MS after the earlier of the step's start and the end of the fetching phases
+ * (`renderEndsAt`), so a retry cannot render past its share of the reserve. With the two render caps
+ * unset, nothing renders.
  *
  * build calls buildCheck on what the check stored and what the database holds (finding 14: the
  * engine SHA is VERCEL_GIT_COMMIT_SHA, 40 hex, or the step fails; the worker release is the batches'
@@ -32,7 +34,8 @@ import { storeLedgerDraft } from '../../ledger/draft-step';
 import { getJson, putJson } from '../evidence';
 import { pageVantage, persistBuiltCheck, readOfFixes } from '../persist';
 import type { FixRead, PageVantage } from '../types';
-import { RENDER_STEP_MS, type StepDeps } from './deps';
+import type { StepDeps } from './deps';
+import { renderEndsAt } from './time';
 import {
   assembledSoFar,
   isCrawl,
@@ -58,7 +61,7 @@ export function finishSteps(
   deps: StepDeps,
 ): Pick<CheckSteps, 'render' | 'build' | 'persist' | 'finalize'> {
   return {
-    async render(event) {
+    async render(event, so) {
       const startedAt = deps.now();
       const [seeds, results] = await Promise.all([
         loadSeeds(deps, event),
@@ -76,7 +79,7 @@ export function finishSteps(
         ...renderCandidates(assembled, [...sampled.stage1, ...sampled.stage2], fixes, states),
         ...render,
         daily: dailyFor?.(event.checkId) ?? render.daily,
-        deadlineAt: startedAt + RENDER_STEP_MS,
+        deadlineAt: renderEndsAt(startedAt, so),
         now: deps.now,
       });
       await putJson(deps.evidence, pathOf(event, 'render'), outcome);
