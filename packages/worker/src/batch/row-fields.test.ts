@@ -3,7 +3,7 @@
  * main-content length on a page read whole, the CMS and front-end markers on the batch's first URL
  * only, noindex from the meta tags and from the X-Robots-Tag header, and robots.txt kept whole.
  */
-import { readContentFeatures } from '@crawlmouse/engine/worker';
+import { canonicalizeUrl, readContentFeatures } from '@crawlmouse/engine/worker';
 import { describe, expect, it } from 'vitest';
 import { Sites } from '../politeness/sites.js';
 import { InstantClock } from '../test-support/clock.js';
@@ -57,7 +57,9 @@ async function crawl(paths: string[]) {
     robotsCache: new RobotsCache(clock),
   });
   if (result.kind !== 'crawl') throw new Error(result.kind);
-  return { result, row: (p: string) => result.pages.find((r) => r.url === `${BASE}${p}`)! };
+  // Rows are keyed on the canonical spelling of the URL asked (F-252).
+  const key = (p: string) => canonicalizeUrl(`${BASE}${p}`);
+  return { result, row: (p: string) => result.pages.find((r) => r.url === key(p))! };
 }
 
 describe('crawl row fields for the check builder', () => {

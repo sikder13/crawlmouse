@@ -1,4 +1,5 @@
 import type { AccessCause, AccessTest, EvidenceClass, Verdict } from '@crawlmouse/types/v2';
+import { canonicalizeUrl } from '@crawlmouse/engine/worker';
 import type { Clock } from '../clock.js';
 import type { FetchOutcome } from '../fetch/fetcher.js';
 import { CANARY, CONTROL, CRAWLERS, type Identity } from '../identities.js';
@@ -101,9 +102,15 @@ const skipped = (identity: Identity, cut: NotRequested | null = null): Probe => 
 });
 
 async function probe(run: AccessRun, url: string, identity: Identity): Promise<Probe> {
+  // A 429 to a crawler's name is a verdict about that crawler, not a request to slow down: it is not
+  // asked again and counts towards no stop. Only the control's 429 waits the site out, slows it, is
+  // asked again and counts towards a stop.
+  const control = identity.role === 'control';
   const r = await politeFetch(run.ctx, url, identity, {
     offSite: 'stop',
     gate: run.robots.gate(identity),
+    retryOn429: control,
+    countsTowardStop: control,
   });
   if ('notRequested' in r) {
     run.findings.notRequested(r.notRequested);
@@ -221,7 +228,8 @@ async function accessPage(run: AccessRun, page: AccessPage): Promise<AccessTest[
   ) =>
     accessTestRow({
       checkId: run.checkId,
-      pageUrl: page.url,
+      // Keyed on the canonical spelling the crawl's rows use (F-252); asked as given.
+      pageUrl: canonicalizeUrl(page.url),
       templateKey: page.template_key,
       ua,
       verdict,

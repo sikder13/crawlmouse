@@ -361,8 +361,16 @@ export const CrawlBatchResultSchema = z.strictObject({
   kind: z.literal('crawl'),
   pages: z.array(CrawlPageSchema),
   link_edges: z.array(LinkEdgeSchema),
-  /** Link targets the batch found that it neither requested nor landed on, in canonical spelling. */
+  /**
+   * Link targets the batch found that it neither requested nor landed on, compared in canonical
+   * spelling and named as the batch first saw them linked: resolved, without the fragment (F-252).
+   */
   discovered_urls: z.array(HttpUrlSchema),
+  /**
+   * Edges the app's build loader left out of `link_edges` to bound memory (F-248, engine
+   * build/edge-scope.ts); absent when none were. The worker never sends it.
+   */
+  link_edges_dropped: CountSchema.optional(),
 });
 
 export const BatchResultSchema = z.discriminatedUnion('kind', [
