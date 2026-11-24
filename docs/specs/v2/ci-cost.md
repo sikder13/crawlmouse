@@ -29,7 +29,7 @@ When GitHub cannot be asked, or answers something that is not a count, the gate 
 warning: the run then costs what it did before this step, and nothing is skipped by mistake.
 
 Otherwise the gate is `deferred`: the visual set is skipped and the `visual` job is renamed
-`visual (deferred: no open pull request)`. The ruleset requires a check named exactly `visual`; on a
+`visual (deferred: not up for merge, or another run reports it)`. The ruleset requires a check named exactly `visual`; on a
 deferred push no check of that name is reported for the commit, so the requirement stays unmet and
 the branch cannot merge on that run. Only an explicit `deferred` renames the job: when `changes`
 fails, the job keeps the name `visual` and fails.
@@ -44,11 +44,39 @@ What a branch costs, in order:
 
 1. Each push before the pull request opens: the cheap jobs, and `visual` reported under its
    deferred name.
-2. Opening the pull request: one full run.
+2. Opening the pull request: one full run, the `pull_request` run. The push run of the same head
+   does not run the visual set as well (D1a).
 3. Each push after that: a full run (or the cheap jobs and a passing `visual` when the path filter
    finds nothing that renders, D2).
 
 How this was proven on this branch's own pull request is in its description.
+
+### D1a — the visual set runs once per head when a pull request opens (CTO inbox 105)
+
+Opening a pull request starts a `pull_request` run on the head that the branch's last push already
+runs. By the time that push run's `changes` job starts, the pull request is usually open, so under
+(b) its gate opened too and the head ran the visual set twice. Measured on 2026-11-24, over the
+last 100 CI runs (05:48 to 18:23 UTC, `gh api "repos/{repo}/actions/workflows/ci.yml/runs?per_page=100"`):
+29 heads had a `pull_request` run and 29 of them had a push run as well; 25 of those push runs ran
+visual shards, 415 shard jobs run and 35 still queued (each push run's `jobs`, counting
+`visual-shard` jobs not skipped). A shard took about 12 minutes on the run measured.
+
+The rule: on a **push**, when (b) finds an open pull request, `changes` also asks GitHub whether
+this commit has a `pull_request` run (`GET /repos/{repo}/actions/workflows/ci.yml/runs?event=pull_request&head_sha={sha}`;
+the job has `actions: read`). If it has one, the push run's gate is `deferred`: that run reports
+`visual` for the head, and the push run reports it under the deferred name. When GitHub cannot be
+asked, or answers something that is not a count, the gate stays open with a warning, as before.
+
+Nothing is cancelled. Cancelling the push run was the other way to drop the duplicate, and it is
+the one that failed on PR #125: a cancelled run's always-run aggregate jobs report a failure on the
+same commit, so the required checks read as failed and the pull request was blocked while the
+other run was green. Making them skip on cancellation instead would report a skipped required
+check, which a ruleset reads as passed. Deferring the visual set uses the rename the gate already
+has, which reports nothing under the required name. If the `pull_request` run then never reports
+`visual`, the requirement is unmet and the pull request cannot merge; it is never met by mistake.
+
+Not covered: a pull request reopened or marked ready later, on a head whose push run already ran
+the set, runs it again in its own run. The cheap jobs still run in both runs.
 
 ## D2 — the path filter still decides inside an open gate
 
