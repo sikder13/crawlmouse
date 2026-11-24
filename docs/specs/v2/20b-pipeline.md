@@ -32,7 +32,7 @@ A `check.requested` event becomes a finished, persisted, readable check: `reques
 | `crawlmouse.check.cancelled` | `inngest/function.cancelled` of the check function | fails `canceled` the check the cancelled run’s event named, or else the check its run claimed; `onFailure` does not fire on a cancel or a timeout |
 | `crawlmouse.check.reaper`    | cron `*/10 * * * *`                                | fails a queued or running check whose heartbeat (or, unclaimed, its queue time) is older than 45 minutes, and releases its posted batches         |
 
-Concurrency: one plan cap, `PLAN_CONCURRENCY_CAP = 5` (Inngest Free), which the registered functions’ limits are clamped to, v1’s audit function included (Q3; `pnpm --filter @crawlmouse/web exec vitest run lib/v2/pipeline/functions.test.ts` sweeps them). The check function’s account-wide limit is `INNGEST_CHECK_CONCURRENCY`, default 2. Its per-site key does not keep two checks of a site apart, because Inngest counts executing steps and a sleeping run holds none; the database does (`checks_one_running_per_site`, Q13).
+Concurrency: one plan cap, `PLAN_CONCURRENCY_CAP = 100` (Inngest Pro, 100 concurrent steps, read 2026-11-23), which the registered functions’ limits are clamped to, v1’s audit function included (Q3; `pnpm --filter @crawlmouse/web exec vitest run lib/v2/pipeline/functions.test.ts` sweeps them). The check function’s account-wide limit is `INNGEST_CHECK_CONCURRENCY`, default 16, the production worker’s batch slots: a batch past them is answered busy and the check waits. v1’s audits default to 5. Its per-site key does not keep two checks of a site apart, because Inngest counts executing steps and a sleeping run holds none; the database does (`checks_one_running_per_site`, Q13).
 
 ## The steps of a check
 
@@ -119,7 +119,7 @@ A bucketed key’s check id is the engine’s `stableId` of the key, so two requ
 ## Differences from ARCH-2 §4
 
 - **Polling, not `check.batch.done` (D1).** The deployed worker holds no Inngest or database key and is polled; `step.sleep` holds no Vercel function open.
-- **Concurrency default 2, not 20 (D3).** The limits are clamped to the plan cap (above); a higher one makes Inngest refuse the whole app sync.
+- **Concurrency default 16 (D3, revised for Inngest Pro).** The limits are clamped to the plan cap (above); a higher one makes Inngest refuse the whole app sync.
 - **The database serialises a site’s checks**, not the concurrency key (above).
 - **Cancel and timeout** are caught by a function of their own, since `onFailure` does not see them.
 - **Sitemaps are read by the app** (Q8); the worker reads robots.txt for itself and the sitemap’s status only.

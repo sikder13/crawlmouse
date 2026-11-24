@@ -9,11 +9,31 @@
  * the cap: `pnpm --filter @crawlmouse/web exec vitest run lib/v2/pipeline/functions.test.ts`.
  */
 
-/** The account's Inngest plan cap (Free). Raising the plan raises this, in the same change. */
-export const PLAN_CONCURRENCY_CAP = 5;
+/**
+ * The account's Inngest plan cap: Pro, 100 concurrent steps (Inngest dashboard, Billing, read
+ * 2026-11-23; the owner upgraded on 21 Nov). A change of plan changes this, in the same change.
+ */
+export const PLAN_CONCURRENCY_CAP = 100;
 
-/** checkFn's account-wide limit when INNGEST_CHECK_CONCURRENCY sets none: the audits share the cap. */
-export const CHECK_CONCURRENCY_DEFAULT = 2;
+/**
+ * The batches the production worker runs at once: `BATCH_CONCURRENCY` in
+ * `packages/worker/fly.production.toml`, one machine. A batch past them is answered busy and the
+ * check waits (inngest/check.ts), so more check steps at once than this buy no crawling.
+ */
+export const WORKER_BATCH_SLOTS = 16;
+
+/**
+ * checkFn's account-wide limit when INNGEST_CHECK_CONCURRENCY sets none. Inngest counts executing
+ * steps, and a check waiting on the worker holds none, so this bounds the posts, polls, builds and
+ * persists running at one moment, not the checks in flight.
+ */
+export const CHECK_CONCURRENCY_DEFAULT = WORKER_BATCH_SLOTS;
+
+/**
+ * v1's audit function when INNGEST_AUDIT_CONCURRENCY sets none: the 5 it ran at under Free. Each v1
+ * audit crawls inside one step of a Vercel function, so it is not raised with the plan.
+ */
+export const AUDIT_CONCURRENCY_DEFAULT = 5;
 
 type Env = Readonly<Record<string, string | undefined>>;
 

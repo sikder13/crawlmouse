@@ -90,7 +90,7 @@ describe('trialLifecycleFn config (CC-03 D9a)', () => {
     expect(TRIAL_LIFECYCLE_FN_ID).toBe('crawlmouse.trial.lifecycle');
   });
 
-  it('declares a concurrency limit of 2, within the Inngest plan cap of 5', () => {
+  it('declares a concurrency limit of 2, within the Inngest plan cap', () => {
     expect(config!.concurrency).toEqual({ limit: 2 });
   });
 });

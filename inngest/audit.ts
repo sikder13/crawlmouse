@@ -6,7 +6,7 @@ import { supabaseAdmin } from './supabase';
 import { persistAuditResults } from './persist-results';
 import { createProgressBatcher, type ProgressBatcher } from './progress';
 import { sendAuditNotification } from './notify';
-import { PLAN_CONCURRENCY_CAP, planSafeLimit } from './concurrency';
+import { AUDIT_CONCURRENCY_DEFAULT, planSafeLimit } from './concurrency';
 import type { CrawlHealth, AuditResult, CrawlActivity } from '@crawlmouse/types';
 
 /**
@@ -111,19 +111,16 @@ export function emitFindingPreviews(
  *
  * Inngest validates this at APP SYNC time and REJECTS the entire app registration (no functions
  * get registered, so NO audit ever runs) if a function's concurrency limit exceeds the account
- * plan's cap — the Inngest Free plan caps at 5. Hardcoding the Pro-tier 50 therefore broke prod
- * sync with `"...higher concurrency limits (50) than your plan limit of 5"`. The limit comes from
- * INNGEST_AUDIT_CONCURRENCY; a missing / non-numeric / non-positive value falls back to the cap.
- *
- * Clamped to PLAN_CONCURRENCY_CAP (concurrency.ts), which checkFn shares, so no env value can
- * declare more than the plan allows. It clamped at 100 before CC-20b, so a value from 6 to 100
- * re-created the outage on Free. Moving to a paid plan (the cost model's 50,
- * docs/ops/2026-06-03-cost-model.md §4) raises PLAN_CONCURRENCY_CAP in the same change.
+ * plan's cap. On the Free plan's 5, a hardcoded 50 broke prod sync with
+ * `"...higher concurrency limits (50) than your plan limit of 5"`. The limit comes from
+ * INNGEST_AUDIT_CONCURRENCY; a missing / non-numeric / non-positive value falls back to
+ * AUDIT_CONCURRENCY_DEFAULT (5), and any value is clamped to PLAN_CONCURRENCY_CAP (concurrency.ts),
+ * so no env value can declare more than the plan allows.
  */
 export function auditConcurrencyLimit(
   env: Record<string, string | undefined> = process.env,
 ): number {
-  return planSafeLimit(env.INNGEST_AUDIT_CONCURRENCY, PLAN_CONCURRENCY_CAP);
+  return planSafeLimit(env.INNGEST_AUDIT_CONCURRENCY, AUDIT_CONCURRENCY_DEFAULT);
 }
 
 /**

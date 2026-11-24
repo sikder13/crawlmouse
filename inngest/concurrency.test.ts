@@ -1,24 +1,26 @@
 import { describe, expect, it } from 'vitest';
 import {
+  AUDIT_CONCURRENCY_DEFAULT,
   CHECK_CONCURRENCY_DEFAULT,
   PLAN_CONCURRENCY_CAP,
+  WORKER_BATCH_SLOTS,
   checkConcurrencyLimit,
   planSafeLimit,
 } from './concurrency';
 
 // Inngest refuses the whole app sync when a function declares a concurrency limit above the
-// account plan's cap (Free: 5), and then no function runs (PROJECT_OVERVIEW §11).
+// account plan's cap, and then no function runs (PROJECT_OVERVIEW §11).
 describe('planSafeLimit', () => {
-  it('is the Free plan cap', () => {
-    expect(PLAN_CONCURRENCY_CAP).toBe(5);
+  it('is the Pro plan cap, 100 concurrent steps', () => {
+    expect(PLAN_CONCURRENCY_CAP).toBe(100);
   });
 
   it('takes a whole number from 1 to the cap as given', () => {
-    for (const n of [1, 2, 3, 4, 5]) expect(planSafeLimit(String(n), 3)).toBe(n);
+    for (const n of [1, 2, 5, 16, 50, 99, 100]) expect(planSafeLimit(String(n), 3)).toBe(n);
   });
 
   it('clamps a whole number above the cap to the cap', () => {
-    for (const raw of ['6', '50', '100', '1000', '1000000']) {
+    for (const raw of ['101', '500', '1000', '1000000']) {
       expect(planSafeLimit(raw, 3)).toBe(PLAN_CONCURRENCY_CAP);
     }
   });
@@ -31,15 +33,28 @@ describe('planSafeLimit', () => {
 });
 
 describe('checkConcurrencyLimit', () => {
-  it('defaults to 2, leaving the rest of the cap to v1 audits', () => {
-    expect(CHECK_CONCURRENCY_DEFAULT).toBe(2);
-    expect(checkConcurrencyLimit({})).toBe(2);
-    expect(checkConcurrencyLimit({ INNGEST_CHECK_CONCURRENCY: 'abc' })).toBe(2);
+  it('defaults to the production worker’s batch slots', () => {
+    expect(WORKER_BATCH_SLOTS).toBe(16);
+    expect(CHECK_CONCURRENCY_DEFAULT).toBe(WORKER_BATCH_SLOTS);
+    expect(checkConcurrencyLimit({})).toBe(16);
+    expect(checkConcurrencyLimit({ INNGEST_CHECK_CONCURRENCY: 'abc' })).toBe(16);
   });
 
   it('reads INNGEST_CHECK_CONCURRENCY, clamped to the cap', () => {
     expect(checkConcurrencyLimit({ INNGEST_CHECK_CONCURRENCY: '1' })).toBe(1);
-    expect(checkConcurrencyLimit({ INNGEST_CHECK_CONCURRENCY: '5' })).toBe(5);
-    expect(checkConcurrencyLimit({ INNGEST_CHECK_CONCURRENCY: '6' })).toBe(5);
+    expect(checkConcurrencyLimit({ INNGEST_CHECK_CONCURRENCY: '40' })).toBe(40);
+    expect(checkConcurrencyLimit({ INNGEST_CHECK_CONCURRENCY: '101' })).toBe(100);
+  });
+});
+
+describe('the defaults, against what the account allows', () => {
+  it('keeps v1 audits at the 5 they have run at, not the new cap', () => {
+    expect(AUDIT_CONCURRENCY_DEFAULT).toBe(5);
+  });
+
+  it('declares no default above the plan cap, alone or together', () => {
+    expect(CHECK_CONCURRENCY_DEFAULT + AUDIT_CONCURRENCY_DEFAULT).toBeLessThanOrEqual(
+      PLAN_CONCURRENCY_CAP,
+    );
   });
 });
