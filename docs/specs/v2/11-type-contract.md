@@ -332,9 +332,9 @@ Fixture collection: `checks`.
 | `competitors[].host`                           | `string`               | no   |                    |                     |
 | `competitors[].crawlers_with_access`           | `integer`              | no   |                    |                     |
 | `competitors[].crawlers_tested`                | `integer`              | no   |                    |                     |
-| `competitors[].text_share`                     | `number`               | no   |                    |                     |
-| `competitors[].product_schema`                 | `boolean`              | no   |                    |                     |
-| `competitors[].technical_seo`                  | `object`               | no   |                    |                     |
+| `competitors[].text_share`                     | `number`               | yes  |                    |                     |
+| `competitors[].product_schema`                 | `boolean`              | yes  |                    |                     |
+| `competitors[].technical_seo`                  | `object`               | yes  |                    |                     |
 | `competitors[].technical_seo.score`            | `number`               | no   |                    |                     |
 | `competitors[].technical_seo.grade`            | `GradeLetter`          | no   |                    |                     |
 | `competitors[].ai_readability`                 | `object`               | yes  |                    |                     |

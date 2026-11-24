@@ -6,14 +6,15 @@
  * A button is offered only where the route it reaches would act (correctness B2, Q24):
  * - Signed out, Free and Pro go to Sign-up (one email creates the account and starts the Pro trial)
  *   while V2_ACCOUNT_DOOR serves it, and to v1's sign-in (`/login`) otherwise; Agency goes to the
- *   Agency trial page, or with V2_BILLING off to the same free start.
+ *   Agency trial page while Agency is on sale (`agencyOnSale`), and otherwise to the same free start.
  * - Signed in, the default account's tier is "Your plan", and only the account's owner changes it.
  *   Pro offers its trial when `trialRefusal` lets the account start one and V2_CHECKS_PUBLIC serves
  *   the trial's route. Otherwise a paid plan is decided by CC-03's `checkoutRefusal`: no refusal is
  *   the checkout; `subscription_open` is the billing portal for that account, when `portalRefusal`
  *   lets it open; any other refusal is no button.
- * - Agency is "Your plan" when one of the viewer's agency accounts is on Agency; on the agency
- *   account whose trial was used (one trial a person), the paid plan as above; otherwise the trial.
+ * - Agency is "Your plan" when one of the viewer's agency accounts is on Agency; while Agency is not
+ *   on sale, a note that it opens shortly; on the agency account whose trial was used (one trial a
+ *   person), the paid plan as above; otherwise the trial.
  * The one orange button (DESIGN-LOCK rule 3) is the first of Pro, Agency and Free that is a button.
  */
 import type { Interval } from '../../billing/catalog';
@@ -56,13 +57,24 @@ export type PricingViewer =
       };
     };
 
-/** The flags the buttons' routes are served under: V2_ACCOUNT_DOOR, V2_CHECKS_PUBLIC, V2_BILLING. */
+/**
+ * The flags the buttons' routes are served under: V2_ACCOUNT_DOOR, V2_CHECKS_PUBLIC, V2_BILLING and
+ * V2_AGENCY_SALES.
+ */
 export interface PricingFlags {
   accountDoor: boolean;
   checksPublic: boolean;
   /** Off (RC-01): nothing reaches checkout, the portal or the Agency trial. */
   billing: boolean;
+  /**
+   * `agencySalesOpen()`. Off, the checkout refuses Agency and `/agency-trial` redirects, so Agency
+   * reads as it does with billing off while Pro is sold as normal (F-251).
+   */
+  agencySales: boolean;
 }
+
+/** Whether the page sells Agency: billing is on and Agency sales are open. */
+export const agencyOnSale = (flags: PricingFlags): boolean => flags.billing && flags.agencySales;
 
 interface ActionText {
   label: string;
@@ -263,13 +275,15 @@ function proAction(
 function agencyAction(viewer: PricingViewer, interval: Interval, flags: PricingFlags): Unranked {
   const trial = link(agencyTrialPath(interval), COPY.buttons.agencyTrial);
   if (viewer.kind === 'signed_out') {
-    if (flags.billing) return trial;
+    if (agencyOnSale(flags)) return trial;
     return link(flags.accountDoor ? SIGNUP : LOGIN, COPY.buttons.agencyStartFree);
   }
   if (viewer.agency.held || viewer.account?.tier === 'agency') {
     return { kind: 'current', ...COPY.buttons.current };
   }
   if (!flags.billing) return { kind: 'note', note: COPY.buttons.opensShortly.note };
+  // Pro is on sale, so "paid plans open shortly" would be false; only Agency waits.
+  if (!flags.agencySales) return { kind: 'note', note: COPY.buttons.agencyOpensShortly.note };
   const used = viewer.agency.used;
   if (used === null) return trial;
   if (used.account === null) return { kind: 'note', note: COPY.buttons.agencyUsed.note };
@@ -311,7 +325,8 @@ export function pricingView(
 ): PricingView {
   const tagged = taggedWith(features);
   const pro = proAction(viewer, interval, now, flags);
-  const copy = planCopy(interval, pro.trial, flags.billing, features);
+  const agency = agencyOnSale(flags);
+  const copy = planCopy(interval, pro.trial, flags.billing, agency, features);
   const actions = ranked({
     free: freeAction(viewer, flags),
     pro: pro.action,
@@ -341,7 +356,7 @@ export function pricingView(
       action: actions[tier],
     })),
     crawlers: shown(COPY.crawlers(features.ai_letter).map(tagged)),
-    annual: shown(COPY.annual(flags.billing).map(tagged)),
+    annual: shown(COPY.annual(flags.billing, agency).map(tagged)),
     agencyPlus: {
       name: COPY.agencyPlus.name,
       limits: tagged({ text: COPY.agencyPlus.limits(), capabilities: ['sites', 'seats'] }),
@@ -357,11 +372,11 @@ export function pricingView(
       },
     },
     after: {
-      title: COPY.after.title(pro.trial, flags.billing),
+      title: COPY.after.title(pro.trial, agency),
       lead: shown(COPY.after.lead(flags.billing).map(tagged)),
       columns: COPY.after.columns,
       rows: COPY.after
-        .rows(interval, flags.billing)
+        .rows(interval, flags.billing, agency)
         .map(([what, happens]) => [what, tagged(happens)] as [string, TaggedView])
         .filter(([, happens]) => !happens.hidden),
     },
@@ -369,7 +384,7 @@ export function pricingView(
     faq: {
       title: COPY.faq.title,
       items: COPY.faq
-        .items(pro.trial, flags.billing)
+        .items(pro.trial, flags.billing, agency)
         .map(({ q, a }) => ({ q, a: tagged(a) }))
         .filter(({ a }) => !a.hidden),
     },

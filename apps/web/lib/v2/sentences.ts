@@ -204,6 +204,13 @@ export function nextBandSentence(
   return `${head}; ${numberWord(open)} of them ${open === 1 ? 'is' : 'are'} open now.`;
 }
 
+/**
+ * The crawl read every page it found. When it did not, or its coverage is unknown, a sentence about
+ * every page claims too much: orphans and depth are counted among the pages crawled (inbox 059).
+ */
+export const crawledAll = (check: Check): boolean =>
+  check.coverage !== null && check.coverage.pages_crawled >= check.coverage.pages_discovered;
+
 /** What a Technical SEO summary says of a check that read no internal link. */
 const NO_LINK_READ = 'No internal link was read, so the structure was not measured.';
 
@@ -213,7 +220,9 @@ export function seoShortSummary(check: Check, fixes: readonly Fix[], isOpen: (f:
   const orphans = check.structure!.orphan_pages;
   const lead = orphans
     ? `${count(orphans)} orphan ${plural(orphans, 'page', 'pages')}.`
-    : 'No orphan pages.';
+    : crawledAll(check)
+      ? 'No orphan pages.'
+      : 'No orphan pages among those crawled.';
   const next =
     t.score !== null && t.grade ? nextBandSentence(t.score, t.grade, fixes, isOpen) : null;
   return next ? `${lead} ${next.replace(/;.*$/, '.')}` : lead;
@@ -231,9 +240,12 @@ export function seoSummary(check: Check, fixes: readonly Fix[], isOpen: (f: Fix)
   const t = check.technical_seo!;
   if (!sectionMeasured(check, 'structure')) return NO_LINK_READ;
   const orphans = check.structure!.orphan_pages;
+  // Orphans are counted among the pages crawled; a partial crawl says nothing of the rest (F-247).
   const linked = orphans
     ? `${numberWord(orphans)} ${plural(orphans, 'page nobody links to', 'pages nobody links to')}`
-    : 'every page is linked';
+    : crawledAll(check)
+      ? 'every page is linked'
+      : 'every page crawled is linked';
   // A refused grade has no structure score: then the sentence says only what was counted.
   const lead =
     t.site_structure_score === null

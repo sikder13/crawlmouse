@@ -44,7 +44,7 @@ const { RISK_FEATURES } = await import('../../feature-switch');
 
 const WEB = join(__dirname, '..', '..', '..');
 const NOW = new Date('2026-11-24T12:00:00Z');
-const FLAGS = { billing: true, checksPublic: true, accountDoor: true };
+const FLAGS = { billing: true, agencySales: true, checksPublic: true, accountDoor: true };
 const SAMPLE_AGENCY_NAME = 'Summit Digital';
 /**
  * Home's crawler rows under nojs, read by hand from bad-site.json: ClaudeBot's cause there is
@@ -60,7 +60,8 @@ const hide = (...names: RiskFeature[]): Features => ({
 });
 
 const pricing = (f?: Features) => pricingView({ kind: 'signed_out' }, 'month', NOW, FLAGS, f);
-const agencies = (f?: Features) => agenciesView({ billing: true, accountDoor: true }, f);
+const agencies = (f?: Features) =>
+  agenciesView({ billing: true, agencySales: true, accountDoor: true }, f);
 const text = (v: unknown) => JSON.stringify(v);
 const agenciesHtml = (f: Features) =>
   renderToStaticMarkup(createElement(AgenciesScreen, { data: agencies(f), audit: 'live' }));
@@ -287,6 +288,7 @@ describe('Pricing and For agencies', () => {
     '%s hidden: the description and the /llms.txt line drop the branded reports',
     (name) => {
       vi.stubEnv('V2_BILLING', '1');
+      vi.stubEnv('V2_AGENCY_SALES', '1');
       expect(agencies().description).toContain('branded client reports are coming');
       const description = agencies(hide(name)).description;
       expect(description).not.toMatch(/branded|client report/i);
@@ -570,6 +572,7 @@ describe('the free check pages and /llms.txt', () => {
 describe('the server entry points read the switch', () => {
   it('/agencies: its meta, Open Graph and Twitter text under agency_white_label', async () => {
     vi.stubEnv('V2_BILLING', '1');
+    vi.stubEnv('V2_AGENCY_SALES', '1');
     vi.stubEnv('V2_HIDE_FEATURES', 'agency_white_label');
     const { metadata } = await import('../../../app/agencies/page');
     const all = JSON.stringify([

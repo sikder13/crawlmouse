@@ -433,14 +433,21 @@ function onePager(features: Features): AgenciesView['onePager'] {
   };
 }
 
-/** The flags the page's first button follows: V2_BILLING and V2_ACCOUNT_DOOR. */
+/** The flags the page's first button follows: V2_BILLING, V2_AGENCY_SALES and V2_ACCOUNT_DOOR. */
 export interface AgenciesFlags {
   billing: boolean;
+  /**
+   * `agencySalesOpen()`. The trial is offered only with this and `billing` both on; otherwise the
+   * page reads as with billing off (F-251), since the checkout refuses Agency and `/agency-trial`
+   * redirects here.
+   */
+  agencySales: boolean;
   accountDoor: boolean;
 }
 
 export function agenciesView(flags: AgenciesFlags, features: Features = ALL_SHOWN): AgenciesView {
   const tagged = taggedWith(features);
+  const onSale = flags.billing && flags.agencySales;
   const pro = GATES.pro;
   const agency = GATES.agency;
   const price = usd(AGENCY_MONTHLY);
@@ -457,7 +464,7 @@ export function agenciesView(flags: AgenciesFlags, features: Features = ALL_SHOW
 
   return {
     title: COPY.title,
-    description: flags.billing
+    description: onSale
       ? // "branded client reports are coming" names both agency features, so either hidden drops it.
         features.agency_white_label && features.agency_domain
         ? COPY.description({ price, sites: agency.sites, days: TRIAL_DAYS })
@@ -465,13 +472,13 @@ export function agenciesView(flags: AgenciesFlags, features: Features = ALL_SHOW
       : COPY.descriptionBillingOff({ price, sites: agency.sites }),
     h1: COPY.h1,
     hero: shown([tagged(COPY.hero[0](numberWord(aiCrawlers))), tagged(COPY.hero[1]())]),
-    trial: flags.billing
+    trial: onSale
       ? { ...tagged(COPY.trial(TRIAL_DAYS)), href: AGENCY_TRIAL_HREF }
       : {
           ...tagged({ text: COPY.opensSoon.start, capabilities: ['free_audit'] }),
           href: flags.accountDoor ? '/signup' : '/login',
         },
-    opensSoon: flags.billing
+    opensSoon: onSale
       ? null
       : {
           before: COPY.opensSoon.before,

@@ -29,7 +29,7 @@ When GitHub cannot be asked, or answers something that is not a count, the gate 
 warning: the run then costs what it did before this step, and nothing is skipped by mistake.
 
 Otherwise the gate is `deferred`: the visual set is skipped and the `visual` job is renamed
-`visual (deferred: no open pull request)`. The ruleset requires a check named exactly `visual`; on a
+`visual (deferred: not up for merge, or another run reports it)`. The ruleset requires a check named exactly `visual`; on a
 deferred push no check of that name is reported for the commit, so the requirement stays unmet and
 the branch cannot merge on that run. Only an explicit `deferred` renames the job: when `changes`
 fails, the job keeps the name `visual` and fails.
@@ -38,17 +38,62 @@ A pull request event runs **every** job, not only the visual set. A job skipped 
 reports success, and a skipped twin of a required check on the head commit could stand in for one
 that failed; GitHub does not document which of two same-named check runs a ruleset reads. The
 pull request run tests GitHub's merge commit for the pull request; its checks attach to the head
-commit. A pull request merges only when up to date with `main`, and then the two trees are the same.
+commit. The `protect-main` ruleset does not require a branch to be up to date with `main`
+(`strict_required_status_checks_policy: false`), so the merge commit a run tested can differ from the
+one that merges when `main` has moved since.
 
 What a branch costs, in order:
 
 1. Each push before the pull request opens: the cheap jobs, and `visual` reported under its
    deferred name.
-2. Opening the pull request: one full run.
+2. Opening the pull request: one full run, the `pull_request` run. The push run of the same head
+   does not run the visual set as well (D1a).
 3. Each push after that: a full run (or the cheap jobs and a passing `visual` when the path filter
    finds nothing that renders, D2).
 
 How this was proven on this branch's own pull request is in its description.
+
+### D1a — the visual set runs once per head when a pull request opens (CTO inbox 105)
+
+Opening a pull request starts a `pull_request` run on the head that the branch's last push already
+runs. By the time that push run's `changes` job starts, the pull request is usually open, so under
+(b) its gate opened too and the head ran the visual set twice.
+
+Measured on 2026-11-24 over the 100 most recent CI runs at 18:23 UTC (created 05:48 to 18:23 UTC):
+29 heads had a `pull_request` run and 29 of them had a push run as well; 25 of those push runs ran
+visual shards, 415 shard jobs run and 35 still queued. The runs:
+`gh api "repos/{repo}/actions/workflows/ci.yml/runs?per_page=100&created=>=2026-11-23" --jq '.workflow_runs[]|[.id,.event,.head_branch,.head_sha]|@tsv'`,
+read at that time (the list moves with every run). Per push run that shares a head with a
+`pull_request` run, its shards:
+`gh api "repos/{repo}/actions/runs/{id}/jobs?per_page=100" --jq '[.jobs[]|select(.name|startswith("visual-shard"))|.conclusion]'`,
+counting conclusions that are neither `skipped` nor null as run, and null as queued. A shard took
+12 minutes on average over the 13 shards of run 45444325132 that had finished (`completed_at`
+minus `started_at`).
+
+The rule: on a **push**, when (b) finds an open pull request, `changes` also asks GitHub whether
+this commit has a `pull_request` run from this branch (`GET /repos/{repo}/actions/workflows/ci.yml/runs?event=pull_request&branch={branch}&head_sha={sha}`;
+the job has `actions: read`). If it has one, the push run's gate is `deferred`: that run reports
+`visual` for the head, and the push run reports it under the deferred name. When GitHub cannot be
+asked, or answers something that is not a count, the gate stays open with a warning, as before.
+
+Nothing is cancelled. Cancelling the push run was the other way to drop the duplicate, and it is
+the one that failed on PR #125: a cancelled run's always-run aggregate jobs report a failure on the
+same commit, so the required checks read as failed and the pull request was blocked while the
+other run was green. Making them skip on cancellation instead would report a skipped required
+check, which a ruleset reads as passed. Deferring the visual set uses the rename the gate already
+has, which reports nothing under the required name. If the `pull_request` run then never reports
+`visual`, the requirement is unmet and the pull request cannot merge; it is never met by mistake.
+
+Not covered:
+
+- A push run whose `changes` job starts after the pull request opens but before GitHub has created
+  the `pull_request` run finds no such run, so it runs the set as well. Over the same 29 pairs,
+  three push `changes` jobs started at or before the `pull_request` run's `created_at` (by 14 s,
+  2 s and 0 s); the one 2 s early, run 45422945315, ran its 18 shards. Its `changes` job's
+  `started_at` against the `pull_request` run's `created_at` shows it.
+- A pull request reopened or marked ready later, on a head whose push run already ran the set,
+  runs it again in its own run.
+- The cheap jobs still run in both runs.
 
 ## D2 — the path filter still decides inside an open gate
 
@@ -56,6 +101,18 @@ Unchanged from CC-REPO (`docs/specs/v2/repo-private.md`, D6): inside an open gat
 skipped, and `visual` passes, when every file the branch changed is on the reviewed skip list in
 `.github/workflows/scripts/changes.mjs`. A docs-only or CI-only branch with an open pull request
 therefore costs the cheap jobs only.
+
+Added 2026-11-24 (CTO inbox 105): `fixtures/qa-lab/**` (the QA lab, a separate Vercel project that
+the app never imports or serves) and `tests/journeys/**` (the staging journeys; their pure guard
+specs run in the `test` job, which the gate does not decide). Over the pull requests opened since
+2026-11-23, six changed only paths the widened list skips (#109, #111, #114, #115, #145, #161), and
+their runs ran 274 visual shard jobs, counting the latest attempt of each run, or 329 counting
+every attempt. The pull requests: the files of each (`gh api "repos/{repo}/pulls/{n}/files"`)
+read by the old and the new `changes.mjs`. The shard jobs: each run of the head branch
+(`gh api "repos/{repo}/actions/workflows/ci.yml/runs?branch={branch}"`), its jobs with
+`filter=latest` or `filter=all`, counting `visual-shard` jobs neither `skipped` nor unfinished. `packages/worker/**` and `infra/**` were already skipped; a
+worker pull request that also changes `packages/engine` or `packages/types` still runs the set,
+because the screens read both.
 
 ## D3 — the crawl screen's budget measures work, not the refresh rate
 

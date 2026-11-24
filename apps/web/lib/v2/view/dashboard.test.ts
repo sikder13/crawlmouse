@@ -42,7 +42,7 @@ describe('Dashboard home, bad-site at as_of (Fri 30 Oct 06:05 in Indiana)', () =
     expect(v.header.title).toBe("Since Thursday's check");
     // last check: 10:02Z = 06:02 EDT; next: Fri 6 Nov 06:00 EST; trial: 8 Nov 02:41Z = Sat 7 Nov.
     expect(v.header.line).toBe(
-      'Fri 30 Oct · 5 sites · last check today 06:02 · next weekly check Fri 6 Nov around 06:00 · trial ends Sat 7 Nov',
+      'Fri 30 Oct · 4 sites · last check today 06:02 · next weekly check Fri 6 Nov around 06:00 · trial ends Sat 7 Nov',
     );
   });
 
@@ -162,7 +162,7 @@ describe('Dashboard home, bad-site at as_of (Fri 30 Oct 06:05 in Indiana)', () =
       billing: null,
     });
     expect(v.shell.trial!.keep!.label).toBe('Keep Pro, $19 a month');
-    expect(v.shell.nav.find((n) => n.label === 'Sites')!.count).toBe('5');
+    expect(v.shell.nav.find((n) => n.label === 'Sites')!.count).toBe('4');
   });
 
   it('makes running a check its one orange action', () => {
