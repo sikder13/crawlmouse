@@ -437,24 +437,20 @@ function expectTrueToTheRecord(given: PageResult[], edges: LinkEdge[], scope: Sc
     expect(notAll.map((m) => num(m[1]!))).toEqual(t.notAllHeld ? [t.notAllHeld] : []);
   }
 
-  // The pill: a count of missing pages and of the record's pages that link to them, or the statuses
-  // no page checked answered.
-  if (t.broken) {
-    expect(pill).toBe(
-      `${t.broken} missing ${t.broken === 1 ? 'page' : 'pages'} · linked from ${nPages(t.linkingPages)} in the record`,
-    );
-  } else if (t.unlinked) {
-    const missing = `${t.unlinked} missing ${t.unlinked === 1 ? 'page' : 'pages'}`;
-    expect(pill).toBe(`${missing} · linked from 0 pages in the record`);
-  } else {
-    expect(pill).toBe(
-      t.checked === 1
-        ? 'the page checked did not answer 404 or 410'
-        : 'no page checked answered 404 or 410',
-    );
-  }
+  // The pill: a count of the missing pages, linked or not, or that no page checked answered 404 or
+  // 410. The body's sentences carry the scope the pill leaves out.
+  const missingCount = t.broken + t.unlinked;
+  expect(pill).toBe(
+    missingCount
+      ? `${missingCount} missing ${missingCount === 1 ? 'page' : 'pages'}`
+      : 'no 404 or 410',
+  );
   // "Answered 404 or 410" is said of none only when no page checked answered either.
-  if (strings.some((x) => /did not answer 404 or 410|no page checked answered/i.test(x)))
+  if (
+    strings.some((x) =>
+      /did not answer 404 or 410|no page checked answered|^no 404 or 410$/i.test(x),
+    )
+  )
     expect(t.missingAt).toEqual([]);
 
   // The headline: the scope, the missing pages found, whether links were read, the redirects and
@@ -767,7 +763,7 @@ const VECTORS: [string, PageResult[], LinkEdge[], Said][] = [
     [whole('/', 1500), gone('/gone', 404)],
     [edge('/', '/a')],
     {
-      pill: '1 missing page · linked from 0 pages in the record',
+      pill: '1 missing page',
       body:
         '1 missing page, linked from 0 pages in this check’s record, answering 404. ' +
         'The links of 1 page are not all in this check’s record. ' +
@@ -776,7 +772,7 @@ const VECTORS: [string, PageResult[], LinkEdge[], Said][] = [
         '1 missing page, linked from 0 pages in this check’s record, answering 404. ' +
         'The links of 1 page are not all in this check’s record. ' +
         'The page that answered 200 has a title and a meta description.',
-      tab: 'Next: Links and pages · 1 missing page · linked from 0 pages in the record',
+      tab: 'Next: Links and pages · 1 missing page',
       brokenEmpty: 'The missing page is linked from 0 pages in this check’s record.',
       headline: '1 missing page found · 0 redirects · titles and descriptions read on 1 page',
     },
@@ -786,7 +782,7 @@ const VECTORS: [string, PageResult[], LinkEdge[], Said][] = [
     [whole('/', 3), gone('/gone', 410)],
     [],
     {
-      pill: '1 missing page · linked from 0 pages in the record',
+      pill: '1 missing page',
       body:
         '1 missing page, linked from 0 pages in this check’s record, answering 410. ' +
         'The links of 1 page are not all in this check’s record. ' +
@@ -795,7 +791,7 @@ const VECTORS: [string, PageResult[], LinkEdge[], Said][] = [
         '1 missing page, linked from 0 pages in this check’s record, answering 410. ' +
         'The links of 1 page are not all in this check’s record. ' +
         'The page that answered 200 has a title and a meta description.',
-      tab: 'Next: Links and pages · 1 missing page · linked from 0 pages in the record',
+      tab: 'Next: Links and pages · 1 missing page',
       brokenEmpty: 'The missing page is linked from 0 pages in this check’s record.',
       headline: '1 missing page found · 0 redirects · titles and descriptions read on 1 page',
     },
@@ -805,7 +801,7 @@ const VECTORS: [string, PageResult[], LinkEdge[], Said][] = [
     [whole('/', 1), whole('/a', 1), gone('/gone', 404)],
     [edge('/', '/gone')],
     {
-      pill: '1 missing page · linked from 1 page in the record',
+      pill: '1 missing page',
       body:
         '1 missing page, linked from 1 page in this check’s record, answering 404. ' +
         'The links of 1 page are not all in this check’s record. ' +
@@ -814,7 +810,7 @@ const VECTORS: [string, PageResult[], LinkEdge[], Said][] = [
         '1 missing page, linked from 1 page in this check’s record, answering 404. ' +
         'The links of 1 page are not all in this check’s record. ' +
         'Each of the 2 pages that answered 200 has its own title and meta description.',
-      tab: 'Next: Links and pages · 1 missing page · linked from 1 page in the record',
+      tab: 'Next: Links and pages · 1 missing page',
       brokenEmpty: null,
       headline: '1 missing page found · 0 redirects · titles and descriptions read on 2 pages',
     },
@@ -824,14 +820,14 @@ const VECTORS: [string, PageResult[], LinkEdge[], Said][] = [
     [whole('/', 1), gone('/a', 429), gone('/b', 429), gone('/c', 429)],
     [edge('/', '/a')],
     {
-      pill: 'no page checked answered 404 or 410',
+      pill: 'no 404 or 410',
       body:
         '3 pages answered an error (429). ' +
         'The page that answered 200 has a title and a meta description.',
       doorBody:
         '3 pages answered an error (429). ' +
         'The page that answered 200 has a title and a meta description.',
-      tab: 'Next: Links and pages · no page checked answered 404 or 410',
+      tab: 'Next: Links and pages · no 404 or 410',
       brokenEmpty: 'No page checked answered 404 or 410.',
       headline: '0 missing pages found · 0 redirects · titles and descriptions read on 1 page',
     },
@@ -841,12 +837,12 @@ const VECTORS: [string, PageResult[], LinkEdge[], Said][] = [
     [pdf('/a.pdf'), pdf('/b.pdf')],
     [],
     {
-      pill: 'no page checked answered 404 or 410',
+      pill: 'no 404 or 410',
       body: 'No title or meta description was read on the 2 pages that answered 200.',
       doorBody:
         'None of the 2 pages we checked answers an error. ' +
         'No title or meta description was read on the 2 pages that answered 200.',
-      tab: 'Next: Links and pages · no page checked answered 404 or 410',
+      tab: 'Next: Links and pages · no 404 or 410',
       brokenEmpty: 'None of the 2 pages we checked answers an error.',
       headline: '0 missing pages found · 0 redirects · titles and descriptions read on 0 pages',
     },
@@ -863,7 +859,7 @@ const VECTORS: [string, PageResult[], LinkEdge[], Said][] = [
     ],
     [edge('/', '/gone')],
     {
-      pill: '1 missing page · linked from 1 page in the record',
+      pill: '1 missing page',
       body:
         '1 missing page, linked from 1 page in this check’s record, answering 404. ' +
         '1 page redirects. ' +
@@ -872,7 +868,7 @@ const VECTORS: [string, PageResult[], LinkEdge[], Said][] = [
         '1 missing page, linked from 1 page in this check’s record, answering 404. ' +
         '1 page redirects. ' +
         'The page that answered 200 has a title and a meta description.',
-      tab: 'Next: Links and pages · 1 missing page · linked from 1 page in the record',
+      tab: 'Next: Links and pages · 1 missing page',
       brokenEmpty: null,
       headline: '1 missing page found · 1 redirect · titles and descriptions read on 1 page',
     },
@@ -882,12 +878,12 @@ const VECTORS: [string, PageResult[], LinkEdge[], Said][] = [
     [whole('/', 1), page('/a', 200, { is_html: true, links_read: false, links_out: 0 })],
     [edge('/', '/a')],
     {
-      pill: 'no page checked answered 404 or 410',
+      pill: 'no 404 or 410',
       body: 'Each of the 2 pages that answered 200 has its own title and meta description.',
       doorBody:
         'None of the 2 pages we checked answers an error. ' +
         'Each of the 2 pages that answered 200 has its own title and meta description.',
-      tab: 'Next: Links and pages · no page checked answered 404 or 410',
+      tab: 'Next: Links and pages · no 404 or 410',
       brokenEmpty: 'None of the 2 pages we checked answers an error.',
       headline: '0 missing pages found · 0 redirects · titles and descriptions read on 2 pages',
     },

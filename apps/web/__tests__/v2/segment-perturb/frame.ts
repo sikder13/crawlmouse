@@ -80,7 +80,7 @@ export const FRAME_PERTURB: PerturbTable = {
           pageOf(c, d, '/products/trail-mug').status_code = 404;
           d.link_edges = d.link_edges.filter((e) => e.check_id !== c.id);
         },
-        expect: { structure: ['Next: Links and pages · 1 missing page · linked from 0 pages'] },
+        expect: { structure: ['Next: Links and pages · 1 missing page'] },
       },
     ],
   },

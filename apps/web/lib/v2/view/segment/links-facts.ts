@@ -668,14 +668,12 @@ export function linksFacts(d: ViewDataset, check: Check): LinksFacts {
           : checked === 1
             ? 'The page we checked does not redirect.'
             : `None of the ${count(checked)} pages we checked redirects.`,
-    pill: nBroken
-      ? { state: 'bad', label: `${missingPages(nBroken)} · ${linkedFromRecord} in the record` }
-      : nUnlinked
-        ? {
-            state: 'neutral',
-            label: `${missingPages(nUnlinked)} · linked from 0 pages in the record`,
-          }
-        : { state: 'neutral', label: noneMissing },
+    // The pill is short enough for its box; the sentences above carry the scope it leaves out. It
+    // counts every missing page, as the headline's "missing pages found" does, linked or not.
+    pill:
+      nBroken + nUnlinked
+        ? { state: nBroken ? 'bad' : 'neutral', label: missingPages(nBroken + nUnlinked) }
+        : { state: 'neutral', label: 'no 404 or 410' },
     coverage,
   };
 }
