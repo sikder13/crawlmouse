@@ -265,11 +265,11 @@ describe('VerdictCell', () => {
     expect(Object.keys(EVIDENCE_CLASSES)).toEqual(['declared', 'simulated', 'observed']);
   });
 
-  it('uses the word "blocked" only for the two verdicts FACTS allows it on', () => {
+  it('uses the word "blocked" only for a robots.txt disallow', () => {
     const blocked = Object.entries(VERDICTS)
       .filter(([, v]) => /\bblocked\b/i.test(v.label))
       .map(([k]) => k);
-    expect(blocked).toEqual(['disallowed_by_robots', 'blocked_by_ua_rule']);
+    expect(blocked).toEqual(['disallowed_by_robots']);
   });
 
   it('gives the fourth glyph (○) to exactly the challenged and unverified verdicts, worded as FACTS', () => {

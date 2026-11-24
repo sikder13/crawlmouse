@@ -134,7 +134,8 @@ const BASE_CHANGES: CopyChange[] = [
     screen: 'home',
     kind: 'facts',
     locked: 'GPTBot 403 403 0%',
-    rendered: 'GPTBot blocked by a rule blocked by a rule 0%',
+    rendered:
+      'GPTBot refused while another name was served refused while another name was served 0%',
     source: 'FACTS I2: verdicts, not status codes, in a crawler cell',
   },
   {

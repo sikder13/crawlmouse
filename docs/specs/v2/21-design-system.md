@@ -406,7 +406,7 @@ From `apps/web/components/v2/verdicts.ts`. "FACTS" means `docs/design/v2/FACTS-p
 | `allowed`                | ok         | ●      | FACTS        | allowed                               | proposed     |
 | `allowed_thin`           | warn       | ▲      | FACTS        | allowed, thin                         | proposed     |
 | `disallowed_by_robots`   | bad        | ■      | FACTS        | blocked by robots.txt                 | proposed     |
-| `blocked_by_ua_rule`     | bad        | ■      | FACTS        | blocked by a rule                     | proposed     |
+| `blocked_by_ua_rule`     | bad        | ■      | FACTS        | refused while another name was served | proposed     |
 | `challenged_ua`          | unverified | ○      | FACTS        | challenged: the real crawler may pass | FACTS        |
 | `refused_unverified`     | unverified | ○      | FACTS        | refused, unverified                   | FACTS        |
 | `rate_limited`           | warn       | ▲      | proposed     | rate limited                          | proposed     |

@@ -29,7 +29,8 @@ import { siteView } from '../../lib/v2/view/site';
 
 /**
  * FACTS I2: the word "blocked" is said only of `disallowed_by_robots` and `blocked_by_ua_rule`,
- * and every verdict has its phrase. Each segment page, for each fixture it is previewed with, is
+ * and every verdict has its phrase. A verdict's own label says it only for a robots.txt disallow:
+ * `blocked_by_ua_rule` is labelled as the refusal it is, and a change row may still call it blocked. Each segment page, for each fixture it is previewed with, is
  * rendered and read: every verdict cell (`data-v2-verdict`) must show its vocabulary phrase and
  * glyph, and "blocked" may appear in a cell, or in a table row holding verdict cells, only where a
  * blocking verdict is. A property then puts any verdict on any cell of the matrix. The account
@@ -38,6 +39,8 @@ import { siteView } from '../../lib/v2/view/site';
  */
 const BLOCKING: readonly Verdict[] = ['disallowed_by_robots', 'blocked_by_ua_rule'];
 const BLOCKED = /\bblocked\b/i;
+/** The one verdict whose own label says "blocked". */
+const LABELLED_BLOCKED: Verdict = 'disallowed_by_robots';
 
 const doc = (markup: string) => new JSDOM(`<body>${markup}</body>`).window.document;
 /** Visible text: screen-reader-only words removed, as the eye reads the cell. */
@@ -81,7 +84,7 @@ function problems(markup: string): string[] {
     // A glyph-only cell shows no words; its words are the ones it gives a screen reader.
     const text = seen(cell) || heard(cell);
     if (!text.startsWith(VERDICTS[v].label)) out.push(`${v}: "${text}" lacks its phrase`);
-    if (BLOCKED.test(text) !== BLOCKING.includes(v)) out.push(`${v}: "${text}"`);
+    if (BLOCKED.test(text) !== (v === LABELLED_BLOCKED)) out.push(`${v}: "${text}"`);
     const pill =
       cell.querySelector('[data-v2-pill]')?.getAttribute('data-v2-pill') ??
       cell.getAttribute('data-v2-check-glyph');

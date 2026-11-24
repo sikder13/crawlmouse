@@ -35,7 +35,7 @@ export const VERDICT_LABELS: Readonly<
   >
 > = {
   disallowed_by_robots: 'blocked by robots.txt',
-  blocked_by_ua_rule: 'blocked by a rule',
+  blocked_by_ua_rule: 'refused while another name was served',
   refused_unverified: 'refused, unverified',
 };
 

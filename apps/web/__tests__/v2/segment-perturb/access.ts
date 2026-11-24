@@ -15,7 +15,7 @@ export const ACCESS_PERTURB: PerturbTable = {
     'checks[].crawlers[].verdict': [
       {
         change: (c) => (crawler(c, 'PerplexityBot').verdict = 'blocked_by_ua_rule'),
-        expect: { access: ['2 blocked'] },
+        expect: { access: ['2 refused while another name was served'] },
       },
     ],
     'checks[].crawlers[].by_template': [
@@ -42,7 +42,7 @@ export const ACCESS_PERTURB: PerturbTable = {
     'checks[].crawlers[].evidence_class': [
       {
         change: (c) => (crawler(c, 'Bingbot').evidence_class = 'simulated'),
-        expect: { access: ['Bingbot allowed simulated'] },
+        expect: { access: ['Bingbot confirmed allowed simulated'] },
       },
     ],
   },

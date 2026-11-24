@@ -132,7 +132,12 @@ describe('auditDoc on the contract fixtures', () => {
     expect(tableOf(doc, 'AI training')).toMatchObject({
       columns: ['Crawler', 'Verdict', 'Text read', 'What is in the way'],
       rows: [
-        ['GPTBot', 'blocked by a rule', '0%', 'Cloudflare firewall rule (error 1020)'],
+        [
+          'GPTBot',
+          'refused while another name was served',
+          '0%',
+          'Cloudflare firewall rule (error 1020)',
+        ],
         ['ClaudeBot', 'allowed, thin', '31%', 'client-rendered template'],
       ],
     });

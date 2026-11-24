@@ -108,7 +108,7 @@ export interface HealthView {
 
 export interface CountView {
   count: number;
-  /** What was counted: "crawlers blocked", "orphan pages". */
+  /** What was counted: "crawlers blocked", "crawlers refused", "orphan pages". */
   noun: string;
   /** The verdicts behind a "blocked" noun, so the copy guard can check the word. */
   verdicts: Verdict[];
@@ -342,6 +342,14 @@ function allBlocked(v: AccountView, changes: readonly Change[]): boolean {
   );
 }
 
+/** "blocked" is what robots.txt does; a refusal of our request is counted as a refusal. */
+export function keptOutNoun(n: number, verdicts: readonly Verdict[]): string {
+  const robots = verdicts.filter((x) => x === 'disallowed_by_robots').length;
+  if (robots === verdicts.length) return plural(n, 'crawler blocked', 'crawlers blocked');
+  if (robots === 0) return plural(n, 'crawler refused', 'crawlers refused');
+  return plural(n, 'crawler blocked or refused', 'crawlers blocked or refused');
+}
+
 function countOf(v: AccountView, changes: readonly Change[]): CountView {
   const verdicts = changes.flatMap((c) => verdictOf(v, c) ?? []);
   if (!changes.length) return { count: 0, noun: '', verdicts };
@@ -349,7 +357,7 @@ function countOf(v: AccountView, changes: readonly Change[]): CountView {
   if (allBlocked(v, changes)) {
     return {
       count: changes.length,
-      noun: plural(changes.length, 'crawler blocked', 'crawlers blocked'),
+      noun: keptOutNoun(changes.length, verdicts),
       verdicts,
     };
   }

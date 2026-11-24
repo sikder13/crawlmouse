@@ -88,7 +88,7 @@ export const crawlerOrder = (c: Check): CrawlerResult[] => [
 
 /**
  * Labels for one value per check, read aloud as runs: "41 at checks 1 to 5, then 22 at check 6",
- * "blocked by a rule at all six checks", "allowed at both checks".
+ * "blocked by robots.txt at all six checks", "allowed at both checks".
  */
 export function readRuns(labels: readonly string[]): string {
   const runs: { label: string; n: number }[] = [];

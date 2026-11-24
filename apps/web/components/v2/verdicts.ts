@@ -46,7 +46,7 @@ export const VERDICTS: Record<Verdict, VerdictStyle> = {
   },
   blocked_by_ua_rule: {
     state: 'bad',
-    label: 'blocked by a rule',
+    label: 'refused while another name was served',
     glyphFromFacts: true,
     labelFromFacts: false,
   },

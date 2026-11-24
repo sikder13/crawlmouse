@@ -394,7 +394,7 @@ export const I4_MEASURED_CRAWLERS = 2;
 /**
  * The withheld AI readability grade, said plainly (FACTS I4). `measured` is the contract's count
  * (`scoredCrawlersMeasured`: a scored crawler with a verdict). The engine withholds by a count of
- * its own (a crawler with pages enough that were served or blocked by a rule), so the two can part:
+ * its own (a crawler with pages enough that were served or refused), so the two can part:
  * a site that challenges each crawler has four measured by the contract and none by the engine.
  * What is said therefore follows the reasons the grade names (`withheld_reasons`), of which a
  * withheld grade names at least one (CheckSchema refuses one that names none, and so does this):

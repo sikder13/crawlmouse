@@ -9,9 +9,10 @@ import { firstRunNow } from './account';
 import {
   ACCOUNT_ACTIONS,
   dashboardView,
+  keptOutNoun,
   moveOver,
-  weekdayAmbiguous,
   type DashboardView,
+  weekdayAmbiguous,
   withoutTrialOffer,
 } from './dashboard';
 import { CLEAN_VIEWER } from '../../../app/(v2-preview)/v2-preview/_preview/accounts';
@@ -431,5 +432,25 @@ describe('the Pro trial offer after a refusal (F-104)', () => {
   it('changes nothing else on the page', () => {
     const v = offered();
     expect(withoutTrialOffer(v, { notice: 'refused' })).toEqual({ ...v, startPro: null });
+  });
+});
+
+describe('what the dashboard calls crawlers it counts as kept out', () => {
+  it('says blocked only of a robots.txt disallow', () => {
+    expect(keptOutNoun(1, ['disallowed_by_robots'])).toBe('crawler blocked');
+    expect(keptOutNoun(2, ['disallowed_by_robots', 'disallowed_by_robots'])).toBe(
+      'crawlers blocked',
+    );
+  });
+
+  it('says refused of a refusal of our request', () => {
+    expect(keptOutNoun(1, ['blocked_by_ua_rule'])).toBe('crawler refused');
+    expect(keptOutNoun(2, ['blocked_by_ua_rule', 'blocked_by_ua_rule'])).toBe('crawlers refused');
+  });
+
+  it('names both when the count holds both', () => {
+    expect(keptOutNoun(2, ['disallowed_by_robots', 'blocked_by_ua_rule'])).toBe(
+      'crawlers blocked or refused',
+    );
   });
 });
