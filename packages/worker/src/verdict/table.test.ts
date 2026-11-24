@@ -1,6 +1,8 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { VerdictSchema } from '@crawlmouse/types/v2';
+import { controlBlocked, witnessReading } from './limitations.js';
+import { VERDICT_MEANINGS } from './meanings.js';
 import { DECISION_TABLE, THIN_RATIO, decide, type Cell, type Observed } from './table.js';
 
 const OBSERVED: Observed[] = [
@@ -212,5 +214,31 @@ describe('decision table: thin', () => {
       }),
       { numRuns: 5000 },
     );
+  });
+});
+
+describe('what a verdict may say about a request that only the control made', () => {
+  it.each(['challenged', 'refused'] as const)('a %s control speaks only for itself', (control) => {
+    const said = controlBlocked(control);
+    expect(said).toContain("the crawler's own request was not sent");
+    expect(said).not.toMatch(/whatever the user agent|all automation/);
+  });
+
+  it('the edge verdict says the crawlers were not requested, and claims nothing wider', () => {
+    const { means } = VERDICT_MEANINGS.edge_blocks_automation;
+    expect(means).toContain('the crawlers were not requested');
+    expect(means).not.toMatch(/whatever the user agent|all automation/);
+  });
+
+  it('a hedged witness does not name the user agent as the cause', () => {
+    const said = witnessReading(
+      { role: 'crawler', ua: 'Claude-SearchBot' } as never,
+      'served',
+      null,
+      ['Claude-SearchBot'],
+      true,
+    );
+    expect(said).toContain('may not be of our address alone');
+    expect(said).not.toMatch(/aimed at the user agent/);
   });
 });

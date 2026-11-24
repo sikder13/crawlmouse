@@ -259,7 +259,7 @@ const BASE_CHANGES: CopyChange[] = [
     screen: 'result',
     kind: 'facts',
     locked: '2 of 6 blocked',
-    rendered: '1 refused by user agent · 1 challenged',
+    rendered: '1 refused while another name was served · 1 challenged',
     source:
       'FACTS I2 and the crawler-matrix line: under the new vocabulary a challenge is not "blocked", and the headline count is ENGINE-DERIVED.',
   },

@@ -108,7 +108,7 @@ export interface AccessView {
 export const OUR_TAG = 'Crawlmouse/2.0 (+https://crawlmouse.com/bot)';
 
 const GROUPS: { group: CrawlerGroup; title: string; note: string }[] = [
-  { group: 'search_engine', title: 'Search engines', note: 'by robots.txt, not fetched' },
+  { group: 'search_engine', title: 'Search engines', note: 'by robots.txt' },
   { group: 'ai_search', title: 'AI search and answers', note: 'counts towards AI readability' },
   {
     group: 'ai_training',
@@ -123,7 +123,7 @@ export const CAUSE_SHORT: Record<AccessCause, string> = {
   bot_fight_mode: 'Bot Fight Mode challenge',
   client_rendered_template: 'client-rendered template',
   robots_txt_disallow: 'Disallow in robots.txt',
-  automation_challenge: 'edge challenge on all automation',
+  automation_challenge: 'edge challenge',
   rate_limit_429: 'rate limit (429)',
   pay_per_crawl_402: 'pay per crawl (402)',
   cross_host_redirect: 'redirect to another host',
@@ -136,7 +136,7 @@ const CAUSE_MEANS: Record<AccessCause, string> = {
   bot_fight_mode: 'a challenge page in place of the content is what Bot Fight Mode serves',
   client_rendered_template: 'the HTML arrives without its text; a browser draws it with JavaScript',
   robots_txt_disallow: 'robots.txt has a Disallow rule for this crawler',
-  automation_challenge: 'the edge challenged our request, with or without a crawler user agent',
+  automation_challenge: 'the edge answered our request with a challenge',
   rate_limit_429: '429 means the site limited how fast this crawler may fetch',
   pay_per_crawl_402: '402 means the site asks this crawler to pay to crawl',
   cross_host_redirect: 'the site sent this crawler to another host',
@@ -212,7 +212,7 @@ function evidenceView(
   };
 }
 
-/** "Requests as one of six AI crawlers were refused by user agent, and one was challenged." */
+/** "Requests as one of six AI crawlers were refused while another crawler name was served, and one was challenged." */
 function headlineTitle(check: Check): string {
   const ai = check.crawlers.filter(isAi);
   if (meetsEdge(check)) return `${EDGE_SENTENCE}.`;
@@ -223,7 +223,12 @@ function headlineTitle(check: Check): string {
   // what the site declares, and an unmeasured crawler got no answer to report.
   const kinds: [n: number, one: string, many: string, request: boolean][] = [
     [n(is('disallowed_by_robots')), 'is blocked by robots.txt', 'are blocked by robots.txt', false],
-    [n(is('blocked_by_ua_rule')), 'was refused by user agent', 'were refused by user agent', true],
+    [
+      n(is('blocked_by_ua_rule')),
+      'was refused while another crawler name was served',
+      'were refused while another crawler name was served',
+      true,
+    ],
     [
       n(is('refused_unverified')),
       'was refused on pages where no other crawler name was served',
@@ -288,19 +293,20 @@ function headlineBody(check: Check): string {
   return parts.join(' ');
 }
 
-/** Every crawler's verdict says the edge stopped or nothing measured it: no crawler request counted. */
-const noCrawlerRequest = (ai: readonly CrawlerResult[]): boolean =>
-  ai.some((c) => c.verdict === 'edge_blocks_automation') &&
-  ai.every((c) => c.verdict === 'edge_blocks_automation' || c.verdict === 'not_measured');
+/** The verdicts a crawler holds when the batch sent no request under its name. */
+const NOT_REQUESTED: readonly Verdict[] = [
+  'edge_blocks_automation',
+  'not_measured',
+  'disallowed_by_robots',
+];
 
-/** FACTS D1, with the L5 correction; the exact-string variant when the evidence carries no tag. */
-function methodSentence(tests: readonly AccessTest[], rendered: boolean): string {
-  const crawlerTests = tests.filter((t) => t.ua !== null && t.source_ip_class === 'fly_egress');
-  const exact =
-    crawlerTests.length > 0 && crawlerTests.every((t) => !t.identity_sent.includes(OUR_TAG));
-  const stated = exact
-    ? 'We request a sampled page with the crawler’s exact user agent from Crawlmouse’s address, not the operator’s, only where our browser-identity control gets a normal answer and robots.txt allows that crawler.'
-    : `We request a sampled page with the crawler’s own user agent, tagged “${OUR_TAG}”, from Crawlmouse’s own address, not the operator’s, only where our browser-identity control gets a normal answer and robots.txt allows that crawler. A rule matching the exact string will not fire on it, and a site that verifies crawler addresses may refuse it while serving the real crawler.`;
+/** No crawler's row rests on a request sent under its name. */
+const noCrawlerRequest = (ai: readonly CrawlerResult[]): boolean =>
+  ai.every((c) => NOT_REQUESTED.includes(c.verdict) || c.evidence_class === 'declared');
+
+/** FACTS D1, with the L5 correction. The worker tags every crawler identity it sends. */
+function methodSentence(rendered: boolean): string {
+  const stated = `We request a sampled page with the crawler’s own user agent, tagged “${OUR_TAG}”, from Crawlmouse’s own address, not the operator’s, only where our browser-identity control gets a normal answer and robots.txt allows that crawler. A rule matching the exact string will not fire on it, and a site that verifies crawler addresses may refuse it while serving the real crawler.`;
   const render = rendered ? ' Rendering requests come from Cloudflare Browser Rendering.' : '';
   return `${stated}${render} One untagged browser-identity control fetch per sampled page is part of the method. Select a cell to see the raw request and response.`;
 }
@@ -432,7 +438,7 @@ export function accessView(
         note: null,
       },
     ],
-    method: methodSentence(tests, check.without_js !== null),
+    method: methodSentence(check.without_js !== null),
     columns,
     groups,
     footnote: groups.some((g) => g.rows.some((r) => r.text.endsWith('*'))) ? FOOTNOTE : null,

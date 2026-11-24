@@ -23,7 +23,7 @@ describe('accessView: the matrix', () => {
       ['AI training', ['GPTBot', 'ClaudeBot']],
     ]);
     expect(v.groups.map((g) => g.note)).toEqual([
-      'by robots.txt, not fetched',
+      'by robots.txt',
       'counts towards AI readability',
       'not scored; blocking these is your choice',
     ]);
@@ -120,10 +120,10 @@ describe('accessView: headline, tiles and the method sentence', () => {
     const v = view('bad-site');
     expect(v.headline.pill).toEqual({
       state: 'bad',
-      label: '1 refused by user agent · 1 challenged',
+      label: '1 refused while another name was served · 1 challenged',
     });
     expect(v.headline.title).toBe(
-      'Requests as one of six AI crawlers were refused by user agent, and one was challenged.',
+      'Requests as one of six AI crawlers were refused while another crawler name was served, and one was challenged.',
     );
     expect(v.headline.body).toBe(
       'GPTBot was refused by a firewall rule when we sent its user agent; PerplexityBot was challenged when we sent its user agent. Requests with the other four AI crawlers’ user agents were served; OAI-SearchBot, ChatGPT-User, Claude-SearchBot and ClaudeBot then read product pages empty without JavaScript, covered in the next section. Googlebot and Bingbot are allowed by robots.txt. Tested 25 Oct 2026 at 02:33 UTC.',

@@ -45,7 +45,7 @@ export const VERDICT_MEANINGS: Record<Verdict, { means: string; evidence: string
   },
   edge_blocks_automation: {
     means:
-      'The untagged browser control was itself challenged or refused, so the site treats our requests this way whatever the user agent. The crawlers were not requested.',
+      'The untagged browser control was challenged or refused, so the crawlers were not requested.',
     evidence: "The control's request and response.",
   },
   redirected_away: {

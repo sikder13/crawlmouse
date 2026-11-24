@@ -138,10 +138,10 @@ describe('auditDoc on the contract fixtures', () => {
     });
     expect(tableOf(doc, 'Search engines').rows.map((r) => r[0])).toEqual(['Googlebot', 'Bingbot']);
     const access = doc.sections.find((s) => s.heading === 'Crawler access')!;
-    expect(access.blocks).toContainEqual({ type: 'text', text: 'by robots.txt, not fetched' });
+    expect(access.blocks).toContainEqual({ type: 'text', text: 'by robots.txt' });
     expect(access.blocks[0]).toEqual({
       type: 'text',
-      text: 'Requests as one of six AI crawlers were refused by user agent, and one was challenged.',
+      text: 'Requests as one of six AI crawlers were refused while another crawler name was served, and one was challenged.',
     });
   });
 
@@ -256,7 +256,7 @@ describe('baselineDoc', () => {
     const blocked = baselineDoc({ dataset: BAD, checkId: BAD_FIRST }, OPTIONS);
     expect(blocked.sections[1]!.blocks[0]).toEqual({
       type: 'text',
-      text: 'Requests as one of six AI crawlers were refused by user agent, and one was challenged.',
+      text: 'Requests as one of six AI crawlers were refused while another crawler name was served, and one was challenged.',
     });
   });
 });

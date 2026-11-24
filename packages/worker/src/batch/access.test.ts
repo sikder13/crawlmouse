@@ -90,7 +90,7 @@ describe('the five discriminator sites, from their recorded POC shapes', () => {
     expect(row.witness).toEqual({ role: 'crawler', ua: 'Claude-SearchBot' });
     expect(row.limitations.join(' ')).toContain(
       // Hedged: a caveat follows (the witness went as its bare token).
-      'Claude-SearchBot was served on this page from the same address, so this refusal is likely aimed at the user agent rather than at an unverified address.',
+      'Claude-SearchBot was served on this page from the same address, so this refusal may not be of our address alone.',
     );
     expect(row.limitations.join(' ')).toContain(
       'Claude-SearchBot and ClaudeBot were served on this page.',

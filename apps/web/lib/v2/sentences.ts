@@ -331,7 +331,7 @@ export function seoSummary(check: Check, fixes: readonly Fix[], isOpen: (f: Fix)
 }
 
 /**
- * "All four scored crawlers get in and read 98% of the text or more": the share only when every one
+ * "All four scored crawlers are served and read 98% of the text or more": the share only when every one
  * was measured, and a plain statement when none was tested.
  */
 function allInSentence(scored: readonly CrawlerResult[], extent: string): string {

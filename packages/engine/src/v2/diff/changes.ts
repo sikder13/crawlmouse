@@ -156,7 +156,7 @@ export const VERDICT_PHRASE: Readonly<Record<Verdict, string>> = {
   allowed: 'our request served',
   allowed_thin: 'our request served, with little text',
   disallowed_by_robots: 'disallowed by robots.txt',
-  blocked_by_ua_rule: 'our request refused by user agent',
+  blocked_by_ua_rule: 'our request refused while another name was served',
   challenged_ua: 'our request challenged',
   refused_unverified: 'our request refused, unverified',
   rate_limited: 'our request rate limited',

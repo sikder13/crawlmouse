@@ -90,7 +90,7 @@ describe('publicReportView on the other fixtures', () => {
     expect(v.crawlers.find((c) => c.ua === 'Googlebot')).toMatchObject({
       verdict: 'not_measured',
       qualifier: null,
-      cause: 'edge challenge on all automation',
+      cause: 'edge challenge',
     });
   });
 

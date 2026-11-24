@@ -68,7 +68,7 @@ const REASONS: Readonly<Record<AccessIndeterminateReason, string>> = {
   not_measured:
     'edge: no page where the crawler’s own request got an answer, and none of the two below',
   edge_blocks_automation:
-    'edge: the edge refused or challenged the untagged browser control too, so it treats all automation that way; the crawler was not requested',
+    'edge: the edge refused or challenged the untagged browser control, so the crawler was not requested',
   robots_disallows:
     'edge: no page where the crawler’s own request got an answer, and robots.txt disallows it on one or more pages, so the edge was not tested there',
   challenge_real_crawler_may_pass: `edge: neither detected nor clear; challenges and unverified refusals together are as many as the blocks and as the other answers (${list(OTHER_ANSWERS)}) or more, and challenges are as many as unverified refusals or more: the real crawler, from its own addresses, may pass a challenge`,

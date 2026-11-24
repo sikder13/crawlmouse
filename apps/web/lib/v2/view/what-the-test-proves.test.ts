@@ -5,7 +5,7 @@ import { CHECKS } from '../recordings';
 import { VERDICTS } from '../../../components/v2/verdicts';
 import { isAi, keptOutClauses, servedExtent } from '../sentences';
 import { accessPill, resultView } from './result';
-import { accessView } from './segment/access';
+import { CAUSE_SHORT, OUR_TAG, accessView } from './segment/access';
 import { buildPublicSnapshot } from '../reports/build-snapshot';
 
 /** The sentences a reader meets first, on every graded check of every fixture. */
@@ -67,7 +67,7 @@ describe('a request in a crawler’s name is reported as that request', () => {
     const label = accessPill(
       withVerdicts(['allowed', 'blocked_by_ua_rule', 'refused_unverified', 'refused_unverified']),
     ).label;
-    expect(label).toBe('1 refused by user agent · 2 refused, unverified');
+    expect(label).toBe('1 refused while another name was served · 2 refused, unverified');
   });
 
   it('counts a challenge apart from a refusal to every crawler name', () => {
@@ -218,6 +218,45 @@ describe('the method line, on the Access screen', () => {
 
   it('promises no exact-string mode, which does not exist', () => {
     expect(method).not.toMatch(/Settings|exact strings/);
+  });
+});
+
+describe('a check that sent no request under a crawler’s name', () => {
+  /** Each row's evidence is the control's or the robots.txt read: its identity holds no tag. */
+  const untagged = (verdict: Verdict) => {
+    const c = withVerdicts(Array.from({ length: 6 }, () => verdict));
+    const d = fixtureOf(c);
+    d.access_tests = d.access_tests.map((t) =>
+      t.check_id === c.id && t.ua !== null
+        ? { ...t, identity_sent: 'Mozilla/5.0 (X11; Linux x86_64)', source_ip_class: 'fly_egress' }
+        : t,
+    );
+    expect(d.access_tests.some((t) => t.check_id === c.id && t.ua !== null)).toBe(true);
+    return accessView(d, c.id);
+  };
+  const NONE_SENT: Verdict[] = ['edge_blocks_automation', 'disallowed_by_robots', 'not_measured'];
+
+  it.each(NONE_SENT)('%s: the method line states the tagged request, never an exact one', (v) => {
+    const { method } = untagged(v);
+    expect(method).toContain(`tagged “${OUR_TAG}”`);
+    expect(method).not.toContain('exact user agent');
+  });
+
+  it.each(NONE_SENT)('%s: the sampled-pages tile does not say every page', (v) => {
+    const tile = untagged(v).tiles.find((t) => t.label === 'Pages sampled per crawler')!;
+    expect(tile.note).toBe('no crawler request was measured');
+  });
+
+  it('keeps the page extent on the tile once a crawler request was served', () => {
+    const c = withVerdicts([]);
+    const tile = accessView(fixtureOf(c), c.id).tiles.find(
+      (t) => t.label === 'Pages sampled per crawler',
+    )!;
+    expect(tile.note).not.toBe('no crawler request was measured');
+  });
+
+  it('names no audience wider than the request in any cause', () => {
+    for (const short of Object.values(CAUSE_SHORT)) expect(short).not.toMatch(/all automation/);
   });
 });
 
@@ -451,7 +490,7 @@ describe('claims the third review of PR 2a found', () => {
   it('keeps a later refusal a statement about our request when robots.txt comes first', () => {
     const c = withVerdicts(['disallowed_by_robots', 'blocked_by_ua_rule']);
     expect(JSON.stringify(accessView(fixtureOf(c), c.id).headline)).toContain(
-      'requests as one were refused by user agent',
+      'requests as one were refused while another crawler name was served',
     );
   });
 });
