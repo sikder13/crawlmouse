@@ -73,6 +73,8 @@ export const ROUTE_POLICIES: readonly RoutePolicy[] = [
     verifier: 'timingSafeEqual',
     origin: 'any',
   },
+  // Goal 1 row 24: an Agency account's white-label brand name and logo (multipart, so no jsonBody).
+  { route: 'api/agency/brand', methods: ['POST'], class: 'member', origin: 'strict' },
   { route: 'api/alert-rules', methods: ['POST', 'PUT'], class: 'member', origin: 'strict' },
   {
     route: 'api/audits/[id]/cancel',
