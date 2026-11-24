@@ -4,6 +4,7 @@
  * the crawl planner on a stopped redirect and on seeds of another host. plan.property.test.ts holds the
  * bounds over generated sites.
  */
+import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import type { AccessTest, CrawlPage } from '@crawlmouse/types/v2';
 import {
@@ -19,7 +20,14 @@ import { canonicalizeUrl } from '../../url-canonical.js';
 import { assemble } from './assemble.js';
 import { readBatches } from './batches.js';
 import { MAX_TEMPLATE_KEY_LENGTH, MAX_URL_LENGTH } from '../batch-bounds.js';
-import { answeredAt, nextCrawlBatch, sample, STAGE1_CHALLENGED, STAGE1_MAX_PAGES } from './plan.js';
+import {
+  answeredAt,
+  askedAs,
+  nextCrawlBatch,
+  sample,
+  STAGE1_CHALLENGED,
+  STAGE1_MAX_PAGES,
+} from './plan.js';
 import type { Seed } from './types.js';
 
 const HOME = 'https://p.test';
@@ -460,6 +468,38 @@ describe('nextCrawlBatch', () => {
       { url: 'https://p.test:8443/x/ported', source: 'sitemap', lastmod: null },
     ];
     expect(nextCrawlBatch(seeds, [], 500)).toEqual([HOME]);
+  });
+});
+
+describe('askedAs (F-252)', () => {
+  it('sends an address that is the same page, without a fragment, within the URL limit', () => {
+    const part = fc.stringMatching(/^[a-zA-Z0-9-]{1,6}$/);
+    const raw = fc
+      .tuple(
+        fc.constantFrom(
+          'https://p.test',
+          'https://P.test:443',
+          'http://p.test:80',
+          'https://p.test',
+        ),
+        fc.array(part, { maxLength: 3 }),
+        fc.boolean(),
+        fc.option(fc.array(fc.tuple(part, part), { minLength: 1, maxLength: 3 }), { nil: null }),
+        fc.option(part, { nil: null }),
+      )
+      .map(
+        ([origin, path, slash, q, frag]) =>
+          `${origin}/${path.join('//')}${slash && path.length > 0 ? '/' : ''}${q ? `?${q.map(([k, v]) => `${k}=${v}`).join('&')}` : ''}${frag ? `#${frag}` : ''}`,
+      );
+    fc.assert(
+      fc.property(raw, (r) => {
+        const sent = askedAs(r);
+        expect(canonicalizeUrl(sent)).toBe(canonicalizeUrl(r));
+        expect(sent).not.toContain('#');
+        expect(sent.length).toBeLessThanOrEqual(MAX_URL_LENGTH);
+      }),
+      { numRuns: 500 },
+    );
   });
 });
 
