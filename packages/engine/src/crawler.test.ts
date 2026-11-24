@@ -10,7 +10,9 @@ beforeAll(async () => {
   server = http.createServer((req, res) => {
     res.setHeader('content-type', 'text/html');
     if (req.url === '/' || req.url === '') {
-      res.end(`<html><head><title>Home</title></head><body><a href="/a">A</a><a href="/b">B</a></body></html>`);
+      res.end(
+        `<html><head><title>Home</title></head><body><a href="/a">A</a><a href="/b">B</a></body></html>`,
+      );
     } else if (req.url === '/a') {
       res.end(`<html><head><title>A</title></head><body><a href="/">Home</a></body></html>`);
     } else if (req.url === '/b') {
@@ -79,7 +81,9 @@ describe('runCrawl', () => {
     expect(result.pages.length).toBe(3); // fetch still works against the http server
     expect(result.pages.every((p) => p.url.startsWith('https://'))).toBe(true);
     expect(result.links.length).toBeGreaterThan(0);
-    expect(result.links.every((l) => l.fromUrl.startsWith('https://') && l.toUrl.startsWith('https://'))).toBe(true);
+    expect(
+      result.links.every((l) => l.fromUrl.startsWith('https://') && l.toUrl.startsWith('https://')),
+    ).toBe(true);
     // The home->/a link target must resolve to a real crawled node (no scheme split):
     // every link whose target was crawled appears as a page url under the same scheme.
     const pageUrls = new Set(result.pages.map((p) => p.url));
@@ -178,10 +182,15 @@ describe('runCrawl — adaptive AIMD concurrency (§5, T7)', () => {
       const path = req.url ?? '/';
       res.setHeader('content-type', 'text/html');
       if (path === '/' || path === '') {
-        const links = Array.from({ length: N }, (_, i) => `<a href="/p${i + 1}">p${i + 1}</a>`).join('');
+        const links = Array.from(
+          { length: N },
+          (_, i) => `<a href="/p${i + 1}">p${i + 1}</a>`,
+        ).join('');
         res.end(`<html><head><title>Home</title></head><body>${links}</body></html>`);
       } else if (/^\/p\d+$/.test(path)) {
-        res.end(`<html><head><title>${path}</title></head><body><a href="/">home</a></body></html>`);
+        res.end(
+          `<html><head><title>${path}</title></head><body><a href="/">home</a></body></html>`,
+        );
       } else {
         res.statusCode = 404;
         res.end('');
@@ -216,15 +225,23 @@ describe('runCrawl — adaptive AIMD concurrency (§5, T7)', () => {
       const path = req.url ?? '/';
       if (path === '/' || path === '') {
         res.setHeader('content-type', 'text/html');
-        res.end('<html><head><title>Home</title></head><body><a href="/q1">1</a><a href="/q2">2</a><a href="/q3">3</a></body></html>');
+        res.end(
+          '<html><head><title>Home</title></head><body><a href="/q1">1</a><a href="/q2">2</a><a href="/q3">3</a></body></html>',
+        );
         return;
       }
       if (/^\/q\d+$/.test(path)) {
         const n = (hits.get(path) ?? 0) + 1;
         hits.set(path, n);
-        if (n === 1) { res.statusCode = 429; res.end('slow down'); return; } // throttle once, then recover
+        if (n === 1) {
+          res.statusCode = 429;
+          res.end('slow down');
+          return;
+        } // throttle once, then recover
         res.setHeader('content-type', 'text/html');
-        res.end(`<html><head><title>${path}</title></head><body><a href="/">home</a></body></html>`);
+        res.end(
+          `<html><head><title>${path}</title></head><body><a href="/">home</a></body></html>`,
+        );
         return;
       }
       res.statusCode = 404;
@@ -261,10 +278,15 @@ describe('runCrawl — adaptive AIMD concurrency (§5, T7)', () => {
       const path = req.url ?? '/';
       res.setHeader('content-type', 'text/html');
       if (path === '/' || path === '') {
-        const links = Array.from({ length: N }, (_, i) => `<a href="/p${i + 1}">p${i + 1}</a>`).join('');
+        const links = Array.from(
+          { length: N },
+          (_, i) => `<a href="/p${i + 1}">p${i + 1}</a>`,
+        ).join('');
         res.end(`<html><head><title>Home</title></head><body>${links}</body></html>`);
       } else if (/^\/p\d+$/.test(path)) {
-        res.end(`<html><head><title>${path}</title></head><body><a href="/">home</a></body></html>`);
+        res.end(
+          `<html><head><title>${path}</title></head><body><a href="/">home</a></body></html>`,
+        );
       } else {
         res.statusCode = 404;
         res.end('');
@@ -310,7 +332,9 @@ describe('runCrawl — SPEC 02 non-content link skipping (v2 excludeCrossHost)',
       res.setHeader('content-type', 'text/html');
       const u = req.url ?? '/';
       if (u === '/' || u === '') {
-        res.end(`<html><head><title>Home</title></head><body><a href="/stay">stay</a><a href="/post?share=facebook">share</a><a href="/photo.jpg">img</a><a href="/wp-content/uploads/2020/pic.png">wpimg</a></body></html>`);
+        res.end(
+          `<html><head><title>Home</title></head><body><a href="/stay">stay</a><a href="/post?share=facebook">share</a><a href="/photo.jpg">img</a><a href="/wp-content/uploads/2020/pic.png">wpimg</a></body></html>`,
+        );
       } else if (u === '/stay') {
         res.end('<html><head><title>Stay</title></head><body>same-host page</body></html>');
       } else {
@@ -322,12 +346,21 @@ describe('runCrawl — SPEC 02 non-content link skipping (v2 excludeCrossHost)',
     await new Promise<void>((r) => srv.listen(0, '127.0.0.1', () => r()));
     base = `http://127.0.0.1:${(srv.address() as { port: number }).port}`;
   });
-  afterAll(async () => { await new Promise<void>((r) => srv.close(() => r())); });
+  afterAll(async () => {
+    await new Promise<void>((r) => srv.close(() => r()));
+  });
 
   it('v2: does NOT enqueue/fetch same-host ?share= action links or media/binary file links', async () => {
     const out = await runCrawl({
-      startUrls: [base], pageCap: 20, perHostConcurrency: 2, staggerMs: 0, pageTimeoutMs: 5000,
-      allowPrivateIpsForTesting: true, canonicalScheme: 'http:', deterministicFrontier: true, politeCrawl: true,
+      startUrls: [base],
+      pageCap: 20,
+      perHostConcurrency: 2,
+      staggerMs: 0,
+      pageTimeoutMs: 5000,
+      allowPrivateIpsForTesting: true,
+      canonicalScheme: 'http:',
+      deterministicFrontier: true,
+      politeCrawl: true,
       excludeCrossHost: true,
     });
     expect(out.pages.some((p) => p.url.includes('/post'))).toBe(false); // ?share= action link skipped
@@ -338,10 +371,56 @@ describe('runCrawl — SPEC 02 non-content link skipping (v2 excludeCrossHost)',
 
   it('v1 (no excludeCrossHost): still crawls the share + media links — prod unchanged', async () => {
     const out = await runCrawl({
-      startUrls: [base], pageCap: 20, perHostConcurrency: 2, staggerMs: 0, pageTimeoutMs: 5000,
+      startUrls: [base],
+      pageCap: 20,
+      perHostConcurrency: 2,
+      staggerMs: 0,
+      pageTimeoutMs: 5000,
       allowPrivateIpsForTesting: true,
     });
     expect(out.pages.some((p) => p.url.includes('/post'))).toBe(true);
     expect(out.pages.some((p) => p.url.includes('/photo.jpg'))).toBe(true);
+  });
+});
+
+describe('a host that is not letters, digits, hyphens and dots (hostname.ts, inbox 054)', () => {
+  const opts = {
+    pageCap: 10,
+    perHostConcurrency: 2,
+    staggerMs: 0,
+    pageTimeoutMs: 5000,
+    allowPrivateIpsForTesting: true,
+  };
+
+  it('refuses such a start URL before any request, in the loopback test mode too', async () => {
+    await expect(
+      runCrawl({ ...opts, startUrls: ['http://{a,b}{c,d}.localhost/'] }),
+    ).rejects.toThrow(/not letters, digits, hyphens and dots/);
+  });
+
+  it('refuses a redirect to such a host once, without retrying, and never crawls it', async () => {
+    let goHits = 0;
+    const server = http.createServer((req, res) => {
+      if (req.url === '/go') {
+        goHits += 1;
+        res.statusCode = 302;
+        // `.localhost` resolves to loopback on many systems, so without the refusal this would be
+        // fetched from this same server.
+        res.setHeader('location', `http://{a,b}{c,d}.localhost:${port}/x`);
+        res.end('');
+        return;
+      }
+      res.setHeader('content-type', 'text/html');
+      res.end('<html><head><title>Home</title></head><body><a href="/go">Go</a></body></html>');
+    });
+    await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
+    const port = (server.address() as { port: number }).port;
+    try {
+      const out = await runCrawl({ ...opts, startUrls: [`http://127.0.0.1:${port}`] });
+      expect(goHits).toBe(1);
+      expect(out.pages.some((p) => p.url.includes('{'))).toBe(false);
+    } finally {
+      await new Promise<void>((r) => server.close(() => r()));
+    }
   });
 });

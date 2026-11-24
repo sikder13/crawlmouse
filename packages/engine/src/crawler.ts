@@ -1,6 +1,7 @@
 import { CheerioCrawler, Configuration, log, LogLevel, type CheerioCrawlerOptions } from 'crawlee';
 import type { CrawlActivity, CrawlFingerprint } from '@crawlmouse/types';
 import { validateUrlOrThrow, createSafeLookup } from './ssrf-guard.js';
+import { assertPlainHost, hasPlainHost } from './hostname.js';
 import { refuseForbiddenHeaders } from './safe-fetch.js';
 import { classifyFetchOutcome } from './crawl-health.js';
 import { canonicalizeUrl, hashUrl } from './url-canonical.js';
@@ -182,13 +183,17 @@ export interface CrawlOutput {
 const DEFAULT_UA = 'CrawlmouseBot/1.0 (+https://crawlmouse.com/bot)';
 
 /**
- * Marks a request abandoned because its redirect target is robots-disallowed. A distinct CLASS rather
- * than a message, because the retry decision must not depend on prose.
+ * Marks a request abandoned because we refused its redirect target. A distinct CLASS rather than a
+ * message, because the retry decision must not depend on prose.
  */
-class RobotsRefusedRedirectError extends Error {}
+class RefusedRedirectError extends Error {}
+/** The redirect target is robots-disallowed. */
+class RobotsRefusedRedirectError extends RefusedRedirectError {}
+/** The redirect target's host is not a plain hostname (hostname.ts). */
+class HostnameRefusedRedirectError extends RefusedRedirectError {}
 
 /**
- * True when this failure was our own robots refusal, anywhere on the error's cause chain.
+ * True when this failure was our own redirect refusal, anywhere on the error's cause chain.
  *
  * The chain walk is the whole point, and it was established empirically rather than assumed: got wraps
  * a thrown hook error in its own `RequestError`, so the class Crawlee sees is `RequestError` and the
@@ -196,26 +201,26 @@ class RobotsRefusedRedirectError extends Error {}
  * own non-retryable error class fails here for exactly that reason; it is checked with `instanceof` on
  * the top-level error, which got has already replaced.
  */
-function isRobotsRefusal(err: unknown): boolean {
+function isRefusedRedirect(err: unknown): boolean {
   for (let e: unknown = err, hops = 0; e && hops < 5; hops++) {
-    if (e instanceof RobotsRefusedRedirectError) return true;
+    if (e instanceof RefusedRedirectError) return true;
     e = (e as { cause?: unknown }).cause;
   }
   return false;
 }
 
 /**
- * Set Crawlee's `request.noRetry` when a failure is our own robots refusal. Returns whether it matched,
+ * Set Crawlee's `request.noRetry` when a failure is our own redirect refusal. Returns whether it matched,
  * so a caller can skip the rest of its error handling.
  *
  * `request.noRetry` is the layer that actually works: Crawlee consults the flag on the request AFTER
  * the errorHandler runs, so it is unaffected by got having replaced the error's class.
  */
-function markNoRetryOnRobotsRefusal(
+function markNoRetryOnRefusedRedirect(
   ctx: { request: { noRetry?: boolean } },
   error: unknown,
 ): boolean {
-  if (!isRobotsRefusal(error)) return false;
+  if (!isRefusedRedirect(error)) return false;
   ctx.request.noRetry = true;
   return true;
 }
@@ -287,7 +292,8 @@ function markNoRetryOnTimeout(ctx: { request: { noRetry?: boolean } }, error: un
 /**
  * got `beforeRedirect` hook, built ONCE PER CRAWL so it can close over that crawl's parsed robots.
  *
- * It does two jobs on every 3xx hop:
+ * It does three jobs on every 3xx hop:
+ *  - SECURITY: refuse a target whose host is not a plain hostname (hostname.ts), unconditionally;
  *  - SECURITY: re-validate the target so a public start URL cannot 302 to an internal host (a raw-IP
  *    literal that dnsLookup pinning won't see);
  *  - §4.1 ENTRY PATH 3: refuse to follow a redirect into a robots-disallowed path. A redirect is a
@@ -311,12 +317,17 @@ function makeRedirectHook(robots: ParsedRobots | undefined, revalidateSsrf: bool
     if (!locationValue) return;
     const baseUrl = typeof options.url === 'string' ? options.url : options.url.toString();
     const target = new URL(locationValue, baseUrl).toString();
+    // Unconditionally, like robots: a host that is not plain never becomes a page, so it never becomes
+    // the base of a crawlee enqueue glob (hostname.ts).
+    if (!hasPlainHost(target)) {
+      throw new HostnameRefusedRedirectError(`Redirect target host is not plain: ${target}`);
+    }
     // Robots is checked UNCONDITIONALLY. The SSRF revalidation below is bypassed for loopback
     // fixtures, and registering the two together meant the robots check inherited that bypass — which
     // is both wrong in principle (a private-IP allowance says nothing about what an owner permits) and
     // the reason this gate silently did nothing under test.
     if (!isUrlAllowed(robots, target)) {
-      // Marked non-retryable in the errorHandler below (see isRobotsRefusal). Without that, Crawlee
+      // Marked non-retryable in the errorHandler below (see isRefusedRedirect). Without that, Crawlee
       // spends its full retry budget re-deriving this same deterministic verdict — measured at 5
       // requests to the redirecting page — which burns crawl budget against the wall clock and puts
       // avoidable load on the very host whose rules we are honouring.
@@ -472,8 +483,15 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
   const robots = input.robots;
   const redirectHook = makeRedirectHook(robots, !input.allowPrivateIpsForTesting);
   // §4.4 — trap caps, applied at the same boundary as robots so every admission rule lives together.
-  const isAdmissible = (u: string): boolean => isUrlAllowed(robots, u) && !isCrawlTrap(u).trapped;
+  // A URL whose host is not plain is not admitted either. Every enqueued URL passes here, on both the
+  // enqueueLinks and the deterministic-frontier path (hostname.ts). Defence in depth: extractPage
+  // keeps only links on the page's own host, which the start-URL and redirect gates have already held
+  // to the rule, so no crawl reaches this refusal and no crawl test can show it.
+  const isAdmissible = (u: string): boolean =>
+    hasPlainHost(u) && isUrlAllowed(robots, u) && !isCrawlTrap(u).trapped;
 
+  // Every start URL's host is plain, before any request and whatever the test mode (hostname.ts).
+  for (const u of input.startUrls) assertPlainHost(u);
   // Pre-validate every start URL (unless test mode bypasses for loopback testing)
   if (!input.allowPrivateIpsForTesting) {
     for (const u of input.startUrls) await validateUrlOrThrow(u);
@@ -612,9 +630,9 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
           gotOptions.dnsLookup = createSafeLookup();
         }
 
-        // Redirect hook, registered UNCONDITIONALLY (§4.1 entry path 3). It carries two jobs: the
-        // robots gate, which must run on every crawl, and — when not bypassed for loopback fixtures —
-        // the SSRF re-validation of each 3xx hop. These used to be registered together inside the
+        // Redirect hook, registered UNCONDITIONALLY (§4.1 entry path 3). It carries three jobs: the
+        // plain-hostname refusal and the robots gate, which must run on every crawl, and — when not
+        // bypassed for loopback fixtures — the SSRF re-validation of each 3xx hop. These used to be registered together inside the
         // block above, so the robots gate was skipped exactly where fixtures could have proven it.
         // Dedupe by function reference (the hook may run more than once for the same options object)
         // without tagging options, which got 14 would reject.
@@ -742,7 +760,7 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
     // re-introduces the per-request stagger the throughput fix removed. Crawlee awaits this BEFORE
     // re-enqueuing the failed request, so the delay throttles exactly the retry.
     crawlerOptions.errorHandler = async (ctx, error) => {
-      if (markNoRetryOnRobotsRefusal(ctx, error)) return;
+      if (markNoRetryOnRefusedRedirect(ctx, error)) return;
       if (markNoRetryOnTimeout(ctx, error)) return;
       const status = ctx.response?.statusCode ?? 0;
       if (!isThrottleStatus(status)) return;
@@ -761,7 +779,7 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlOutput> {
     // five requests for one refusal. This is the only errorHandler v1 has, and it never touches
     // timing — it just declines to repeat a decision that cannot change.
     crawlerOptions.errorHandler = async (ctx, error) => {
-      markNoRetryOnRobotsRefusal(ctx, error);
+      markNoRetryOnRefusedRedirect(ctx, error);
     };
     // The active politeness + parallelism lever on the v1 path. With the per-request stagger sleep
     // removed (see preNavigationHooks), Crawlee's autoscaler ramps in-flight requests up to this
