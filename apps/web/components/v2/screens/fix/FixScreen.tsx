@@ -2,13 +2,15 @@ import { Button } from '../../Button';
 import { Card } from '../../Card';
 import { Heading } from '../../Heading';
 import { SUPPORT_COPY } from '../../../../lib/v2/copy/support';
+import type { ActionView } from '../../../../lib/v2/view/account-actions';
 import type { FixView } from '../../../../lib/v2/view/fix';
+import { Notice, type NoticeView } from '../account/Notice';
 import { ResultShell } from '../result/ResultScreen';
 import { KeepBar } from '../result/KeepBar';
 import { RecommendationTag } from '../segment/SegmentParts';
 import { SegmentTabs } from '../segment/SegmentTabs';
 import { FrameworkSwitch } from './FrameworkSwitch';
-import { ChosenPacket, PacketChoice } from './PacketChoice';
+import { ChosenDeveloperForm, ChosenPacket, PacketChoice } from './PacketChoice';
 import layout from '../../layout.module.css';
 import segment from '../segment/SegmentScreen.module.css';
 import styles from './FixScreen.module.css';
@@ -17,7 +19,13 @@ import styles from './FixScreen.module.css';
  * The packet card of an open fix: the packet as written for the chosen framework and what to do
  * with it, or the sentence saying why the fix has none.
  */
-function PacketCard({ data }: { data: Extract<FixView, { kind: 'open' }> }) {
+function PacketCard({
+  data,
+  developer,
+}: {
+  data: Extract<FixView, { kind: 'open' }>;
+  developer?: ActionView | null;
+}) {
   const p = data.packet;
   return (
     <Card as="section" className={segment.panel}>
@@ -35,6 +43,11 @@ function PacketCard({ data }: { data: Extract<FixView, { kind: 'open' }> }) {
           <div className={styles.hdSub}>{data.notWritten}</div>
         </div>
       )}
+      {p && developer ? (
+        <div className={styles.developer} data-v2-addition="">
+          <ChosenDeveloperForm action={developer} bodies={p.bodies} />
+        </div>
+      ) : null}
     </Card>
   );
 }
@@ -69,9 +82,20 @@ function WallCard({
 /**
  * The fix page (Final-Fix): the fix's verdict and estimated effect, then, as the plan allows, its
  * packet or the ask that opens it, the before and after, and the keep bar. `support` is the live
- * page's support link (CC-33 D5); a preview passes none and shows none.
+ * page's support link (CC-33 D5), `developer` its form that emails the fix and `notice` what that
+ * form did; a preview passes none and shows none.
  */
-export function FixScreen({ data, support }: { data: FixView; support?: string }) {
+export function FixScreen({
+  data,
+  support,
+  developer,
+  notice,
+}: {
+  data: FixView;
+  support?: string;
+  developer?: ActionView | null;
+  notice?: NoticeView | null;
+}) {
   const { frame, head } = data;
   const copies = data.kind === 'open' && data.packet !== null;
   const keepPrimary = Boolean(data.keep?.primary);
@@ -83,6 +107,7 @@ export function FixScreen({ data, support }: { data: FixView; support?: string }
       rerun
       mainClassName={segment.main}
     >
+      <Notice notice={notice} />
       <div className={`${layout.row} ${segment.crumbRow}`}>
         <div className={`${layout.row} ${segment.crumb}`}>
           <a href={frame.overview}>{frame.domain}</a>
@@ -165,7 +190,7 @@ export function FixScreen({ data, support }: { data: FixView; support?: string }
         >
           <PacketChoice>
             {data.kind === 'open' ? (
-              <PacketCard data={data} />
+              <PacketCard data={data} developer={developer} />
             ) : (
               <WallCard data={data} primary={!keepPrimary} />
             )}

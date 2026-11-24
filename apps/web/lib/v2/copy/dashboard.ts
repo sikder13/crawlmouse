@@ -16,6 +16,16 @@ export const DASHBOARD_COPY = {
     hosts.length === 1
       ? `${hosts[0]} is kept.`
       : `${capitalise(numberWord(hosts.length))} sites are kept.`,
+  /** The heading when every site the account keeps is paused (F-235). */
+  allPaused: 'Every site is paused.',
+  /** The sites note with some paused, within the plan's limit: a paused site still holds its slot. */
+  sitesWithPaused: (slots: number, limit: number, plan: string, paused: number) =>
+    `${slots} of ${limit} on ${plan} · ${paused} paused`,
+  /** The sites note over the plan's limit, as after a trial ends: how many are checked (F-235). */
+  sitesOverLimit: (checked: number, slots: number, plan: string, limit: number) =>
+    `${checked} of ${slots} sites checked · ${plan} checks ${limit} ${plural(limit, 'site', 'sites')}`,
+  /** The first-run note with every site paused: no check is scheduled to compare against (F-234). */
+  firstRunAllPaused: 'Every site is paused, so none is scheduled. Nothing to compare yet.',
   /** "Since Thursday's check", or, where a weekday would be ambiguous, "Since the check of Fri 23 Oct". */
   since: (name: { weekday: string } | { date: string }) =>
     'weekday' in name ? `Since ${name.weekday}'s check` : `Since the check of ${name.date}`,

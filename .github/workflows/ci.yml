@@ -32,13 +32,15 @@ permissions:
   contents: read
 
 # A newer run of a branch cancels its older run, and a pull request event its older run (its ref is
-# refs/pull/<n>/merge, so it never cancels a push run). On main each run has its own group, so no main run
-# is cancelled or replaced, not even by a dispatch or the nightly run of the same commit: GitHub also
-# drops a PENDING run when a newer one joins its group, and the Prettier job on main checks only what
-# that push added.
+# refs/pull/<n>/merge, so it never cancels a push run).
+# On main (Goal 1, CTO inbox 075): pushes share one group and never cancel a running run. GitHub keeps
+# one running and one PENDING run per group and drops the older pending one when a newer push joins, so
+# a burst of merges tests the newest commit, not each one. What that costs: an intermediate merge commit
+# is not tested on its own, and the Prettier job on main checks only the files of the push that ran.
+# The nightly run and a dispatch on main keep a group of their own, so a merge never drops them.
 concurrency:
-  group: ci-${{ github.ref }}${{ github.ref == 'refs/heads/main' && format('-{0}', github.run_id) || '' }}
-  cancel-in-progress: true
+  group: ci-${{ github.ref }}${{ github.ref == 'refs/heads/main' && github.event_name != 'push' && format('-{0}', github.run_id) || '' }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 env:
   NEXT_TELEMETRY_DISABLED: '1'

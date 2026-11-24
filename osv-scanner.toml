@@ -3,430 +3,111 @@
 # Scanner summary for that run: Total 52 packages affected by 144 known vulnerabilities (8 Critical, 55 High, 69 Medium, 9 Low, 3 Unknown) from 1 ecosystem.
 # This file started with 113 advisory IDs (144 table rows, 52 package versions); entries are deleted as
 # the upgrades that fix them land, so count the current number with the check below.
-# Each CC-00 entry expires on 2026-11-26 (scan date + 30 days); after that the advisory fails CI again.
+# Each CC-00 entry expired on 2026-11-26 (scan date + 30 days) unless re-accepted with its own date and approval.
 # Entries added later carry their own expiry. Check that every entry has one:
 # grep -c '^ignoreUntil = ' osv-scanner.toml  and  grep -c '^\[\[IgnoredVulns\]\]$' osv-scanner.toml  print the same number.
 # Entries added after CC-00 carry their own date, reason and approval in a comment above them.
 # Any advisory NOT listed here fails CI immediately. Delete an entry when the upgrade that fixes it lands.
 
-[[IgnoredVulns]]
-id = "GHSA-4x5r-pxfx-6jf8"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: @babel/core@7.29.0 (fixed: 7.29.6)"
-
-[[IgnoredVulns]]
-id = "GHSA-f596-whhp-79r4"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: @grpc/grpc-js@1.14.4 (fixed: 1.14.5)"
-
-[[IgnoredVulns]]
-id = "GHSA-m9gg-hp2v-232j"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: @grpc/grpc-js@1.14.4 (fixed: 1.14.5)"
-
-[[IgnoredVulns]]
-id = "GHSA-8988-4f7v-96qf"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: @opentelemetry/core@2.2.0 (fixed: 2.8.0); @opentelemetry/core@2.6.1 (fixed: 2.8.0); @opentelemetry/core@2.7.1 (fixed: 2.8.0)"
-
-[[IgnoredVulns]]
-id = "GHSA-qqmp-wf37-98f9"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: @opentelemetry/instrumentation-cassandra-driver@0.63.0 (fixed: 0.66.0); @opentelemetry/instrumentation-knex@0.58.0 (fixed: 0.65.0); @opentelemetry/instrumentation-knex@0.62.0 (fixed: 0.65.0); @opentelemetry/instrumentation-mongoose@0.60.0 (fixed: 0.67.0); @opentelemetry/instrumentation-mongoose@0.64.0 (fixed: 0.67.0); @opentelemetry/instrumentation-mysql@0.60.0 (fixed: 0.67.0); @opentelemetry/instrumentation-mysql@0.64.0 (fixed: 0.67.0); @opentelemetry/instrumentation-mysql2@0.60.0 (fixed: 0.67.0); @opentelemetry/instrumentation-mysql2@0.64.0 (fixed: 0.67.0); @opentelemetry/instrumentation-oracledb@0.43.0 (fixed: 0.46.0); @opentelemetry/instrumentation-pg@0.66.0 (fixed: 0.73.0); @opentelemetry/instrumentation-pg@0.70.0 (fixed: 0.73.0); @opentelemetry/instrumentation-tedious@0.33.0 (fixed: 0.40.0); @opentelemetry/instrumentation-tedious@0.37.0 (fixed: 0.40.0)"
-
-[[IgnoredVulns]]
-id = "GHSA-45rx-2jwx-cxfr"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: @opentelemetry/propagator-jaeger@2.7.1 (fixed: 2.9.0)"
-
-[[IgnoredVulns]]
-id = "GHSA-mchm-gjx6-7h55"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: @sentry/nextjs@10.53.1 (fixed: 10.75.2)"
+# Re-accepted 2026-11-24 to 2026-12-10, approved by the owner in the QA chat ("Yes, re-accept the 16
+# advisories to 10 December with their reasons"; v2r/qa/findings/osv-left-for-owner.md). The 14 below are the
+# Vitest 2 toolchain: vitest 2.1.9, @vitest/mocker 2.1.9, vite 5.4.21, esbuild 0.21.5 and tinypool 1.1.1,
+# build and test only (pnpm why -r --prod vitest prints no path). Only Vitest 4 clears them, a migration
+# of every package's test config with its own PR. Not used: the Vitest UI (no @vitest/ui in any
+# package.json) and a Vite dev server reachable from a browser.
 
 [[IgnoredVulns]]
 id = "GHSA-82fw-gwwq-j7x9"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: @vitest/mocker@2.1.9 (fixed: 4.1.11); vitest@2.1.9 (fixed: 4.1.11)"
+ignoreUntil = 2026-12-10
+reason = "Re-accepted to 2026-12-10 by the owner on 2026-11-24. Present at the CC-00 baseline: @vitest/mocker@2.1.9 (fixed: 4.1.11); vitest@2.1.9 (fixed: 4.1.11)"
 
 [[IgnoredVulns]]
 id = "GHSA-qxg6-89mg-rqv8"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: @vitest/mocker@2.1.9 (fixed: 4.1.12)"
-
-[[IgnoredVulns]]
-id = "GHSA-7q85-xj36-vmfc"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: adm-zip@0.5.17 (fixed: 0.6.1)"
-
-[[IgnoredVulns]]
-id = "GHSA-8238-w5pm-2374"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: adm-zip@0.5.17 (fixed: 0.6.1)"
-
-[[IgnoredVulns]]
-id = "GHSA-c6fg-446q-cg94"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: adm-zip@0.5.17 (fixed: 0.6.1)"
-
-[[IgnoredVulns]]
-id = "GHSA-j5f4-cc29-5x44"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: adm-zip@0.5.17 (fixed: 0.6.1)"
-
-[[IgnoredVulns]]
-id = "GHSA-p634-w6r4-rjp2"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: adm-zip@0.5.17 (fixed: 0.6.1)"
-
-[[IgnoredVulns]]
-id = "GHSA-rcw4-f5rp-g42v"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: adm-zip@0.5.17 (fixed: 0.6.1)"
-
-[[IgnoredVulns]]
-id = "GHSA-vwc7-r8mq-g2x9"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: adm-zip@0.5.17 (fixed: --)"
-
-[[IgnoredVulns]]
-id = "GHSA-xcpc-8h2w-3j85"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: adm-zip@0.5.17 (fixed: 0.6.0)"
-
-[[IgnoredVulns]]
-id = "GHSA-w5vr-8v7q-w6rv"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: baseline-browser-mapping@2.10.32 (fixed: 2.11.0)"
-
-[[IgnoredVulns]]
-id = "GHSA-3jxr-9vmj-r5cp"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: brace-expansion@1.1.14 (fixed: 1.1.16); brace-expansion@2.1.0 (fixed: 2.1.2); brace-expansion@5.0.6 (fixed: 5.0.7)"
-
-[[IgnoredVulns]]
-id = "GHSA-6j4f-fj2g-mc7p"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: brace-expansion@1.1.14 (fixed: 1.1.19); brace-expansion@2.1.0 (fixed: 2.1.5); brace-expansion@5.0.6 (fixed: 5.0.10)"
-
-[[IgnoredVulns]]
-id = "GHSA-mh99-v99m-4gvg"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: brace-expansion@1.1.14 (fixed: 1.1.17); brace-expansion@2.1.0 (fixed: 2.1.3); brace-expansion@5.0.6 (fixed: 5.0.8)"
-
-[[IgnoredVulns]]
-id = "GHSA-q2hr-2g5m-vwhr"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: brace-expansion@1.1.14 (fixed: 1.1.21); brace-expansion@2.1.0 (fixed: 2.1.7); brace-expansion@5.0.6 (fixed: 5.0.12)"
-
-[[IgnoredVulns]]
-id = "GHSA-qhr7-859c-m2p7"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: brace-expansion@1.1.14 (fixed: 1.1.20); brace-expansion@2.1.0 (fixed: 2.1.6); brace-expansion@5.0.6 (fixed: 5.0.11)"
-
-[[IgnoredVulns]]
-id = "GHSA-rgw5-rvv9-x895"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: brace-expansion@1.1.14 (fixed: 1.1.18); brace-expansion@2.1.0 (fixed: 2.1.4); brace-expansion@5.0.6 (fixed: 5.0.9)"
-
-[[IgnoredVulns]]
-id = "GHSA-73wf-gq98-2v4g"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: browserslist@4.28.2 (fixed: 4.28.7)"
-
-[[IgnoredVulns]]
-id = "GHSA-c83g-rgw3-j3cx"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: browserslist@4.28.2 (fixed: 4.28.7)"
+ignoreUntil = 2026-12-10
+reason = "Re-accepted to 2026-12-10 by the owner on 2026-11-24. Present at the CC-00 baseline: @vitest/mocker@2.1.9 (fixed: 4.1.12)"
 
 [[IgnoredVulns]]
 id = "GHSA-67mh-4wv8-2f99"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: esbuild@0.21.5 (fixed: 0.25.0)"
-
-[[IgnoredVulns]]
-id = "GHSA-g7r4-m6w7-qqqr"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: esbuild@0.28.0 (fixed: 0.28.1)"
-
-[[IgnoredVulns]]
-id = "GHSA-333x-w4r6-6crp"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: fast-uri@3.1.2 (fixed: 3.1.9)"
-
-[[IgnoredVulns]]
-id = "GHSA-4c8g-83qw-93j6"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: fast-uri@3.1.2 (fixed: 3.1.3)"
-
-[[IgnoredVulns]]
-id = "GHSA-7p8r-x3mc-p8w7"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: fast-uri@3.1.2 (fixed: 3.1.5)"
-
-[[IgnoredVulns]]
-id = "GHSA-f65p-4m7j-42xc"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: fast-uri@3.1.2 (fixed: 3.1.6)"
-
-[[IgnoredVulns]]
-id = "GHSA-fph4-wmhf-6fwf"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: fast-uri@3.1.2 (fixed: 3.1.6)"
-
-[[IgnoredVulns]]
-id = "GHSA-hrr3-gc8f-f4qj"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: fast-uri@3.1.2 (fixed: 3.1.8)"
-
-[[IgnoredVulns]]
-id = "GHSA-jqff-g426-hqxp"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: fast-uri@3.1.2 (fixed: 3.1.6)"
-
-[[IgnoredVulns]]
-id = "GHSA-qw65-cvwx-89v3"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: fast-uri@3.1.2 (fixed: 3.1.7)"
-
-[[IgnoredVulns]]
-id = "GHSA-v2hh-gcrm-f6hx"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: fast-uri@3.1.2 (fixed: 3.1.4)"
-
-[[IgnoredVulns]]
-id = "GHSA-w74x-v6f9-j3xg"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: fast-uri@3.1.2 (fixed: 3.1.9)"
-
-[[IgnoredVulns]]
-id = "GHSA-xhq7-xmqj-769h"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: fast-uri@3.1.2 (fixed: 3.1.9)"
-
-[[IgnoredVulns]]
-id = "GHSA-px8p-9vwx-vf98"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: fflate@0.4.8 (fixed: 0.4.9)"
-
-[[IgnoredVulns]]
-id = "GHSA-62ch-8vmq-8xm7"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: figlet@1.11.0 (fixed: 1.11.3)"
-
-[[IgnoredVulns]]
-id = "GHSA-5v7r-6r5c-r473"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: file-type@20.5.0 (fixed: 21.3.1)"
-
-[[IgnoredVulns]]
-id = "GHSA-j47w-4g3g-c36v"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: file-type@20.5.0 (fixed: 21.3.2)"
-
-[[IgnoredVulns]]
-id = "GHSA-22jq-vg5j-6vgg"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: ip-address@10.2.0 (fixed: 10.2.1)"
-
-[[IgnoredVulns]]
-id = "GHSA-2vr4-cq9g-pvrc"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: ip-address@10.2.0 (fixed: 10.5.1)"
-
-[[IgnoredVulns]]
-id = "GHSA-4xrf-jv44-h6hh"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: ip-address@10.2.0 (fixed: 10.2.2)"
-
-[[IgnoredVulns]]
-id = "GHSA-h3mg-xc3c-68pw"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: ip-address@10.2.0 (fixed: 10.7.1)"
-
-[[IgnoredVulns]]
-id = "GHSA-j6r3-76f7-8jcv"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: ip-address@10.2.0 (fixed: 10.7.1)"
-
-[[IgnoredVulns]]
-id = "GHSA-mwp4-54f8-5fhr"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: ip-address@10.2.0 (fixed: 10.3.1)"
-
-[[IgnoredVulns]]
-id = "GHSA-rpw4-54j3-4h4q"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: ip-address@10.2.0 (fixed: 10.5.1)"
-
-[[IgnoredVulns]]
-id = "GHSA-rxp7-6hxx-x8q5"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: ip-address@10.2.0 (fixed: 10.7.4)"
-
-[[IgnoredVulns]]
-id = "GHSA-2883-xcg3-v3hh"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: js-yaml@4.1.1 (fixed: 4.3.2)"
-
-[[IgnoredVulns]]
-id = "GHSA-52cp-r559-cp3m"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: js-yaml@4.1.1 (fixed: 4.3.0)"
-
-[[IgnoredVulns]]
-id = "GHSA-5p4m-2wfm-xmqj"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: js-yaml@4.1.1 (fixed: 4.3.1)"
-
-[[IgnoredVulns]]
-id = "GHSA-h67p-54hq-rp68"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: js-yaml@4.1.1 (fixed: 4.2.0)"
-
-[[IgnoredVulns]]
-id = "GHSA-28wg-ghj8-5hjv"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: nanoid@3.3.12 (fixed: 3.3.16); nanoid@5.1.11 (fixed: 5.1.16)"
-
-[[IgnoredVulns]]
-id = "GHSA-2v37-7h3g-55p8"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: nanoid@3.3.12 (fixed: 3.3.18)"
-
-[[IgnoredVulns]]
-id = "GHSA-6g55-p6wh-862q"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: postcss@8.4.31 (fixed: 8.5.12)"
-
-[[IgnoredVulns]]
-id = "GHSA-fxqj-rqcc-2cmp"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: postcss@8.4.31 (fixed: 8.5.23); postcss@8.5.15 (fixed: 8.5.23)"
-
-[[IgnoredVulns]]
-id = "GHSA-qx2v-qp2m-jg93"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: postcss@8.4.31 (fixed: 8.5.10)"
-
-[[IgnoredVulns]]
-id = "GHSA-r28c-9q8g-f849"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: postcss@8.4.31 (fixed: 8.5.18); postcss@8.5.15 (fixed: 8.5.18)"
-
-[[IgnoredVulns]]
-id = "GHSA-rj75-hqrm-r3gf"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: postcss-selector-parser@6.1.2 (fixed: 6.1.5)"
-
-[[IgnoredVulns]]
-id = "GHSA-w9m9-85wc-3x92"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: postcss-selector-parser@6.1.2 (fixed: 6.1.3)"
-
-[[IgnoredVulns]]
-id = "GHSA-f38q-mgvj-vph7"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: protobufjs@7.6.1 (fixed: 7.6.3)"
-
-[[IgnoredVulns]]
-id = "GHSA-j3f2-48v5-ccww"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: protobufjs@7.6.1 (fixed: 7.6.5)"
-
-[[IgnoredVulns]]
-id = "GHSA-68fv-2mgg-jv7q"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: source-map-js@1.2.1 (fixed: 1.2.2)"
-
-[[IgnoredVulns]]
-id = "GHSA-528h-pc64-c93x"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: stream-json@1.9.1 (fixed: 3.5.0)"
-
-[[IgnoredVulns]]
-id = "GHSA-hqr4-qq8f-hg3x"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: stream-json@1.9.1 (fixed: 3.6.0)"
-
-[[IgnoredVulns]]
-id = "GHSA-mjw6-4jj6-33hc"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: stream-json@1.9.1 (fixed: 3.6.0)"
+ignoreUntil = 2026-12-10
+reason = "Re-accepted to 2026-12-10 by the owner on 2026-11-24. Present at the CC-00 baseline: esbuild@0.21.5 (fixed: 0.25.0)"
 
 [[IgnoredVulns]]
 id = "GHSA-5gmw-xhrv-c9v3"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: tinypool@1.1.1 (fixed: 2.1.1)"
+ignoreUntil = 2026-12-10
+reason = "Re-accepted to 2026-12-10 by the owner on 2026-11-24. Present at the CC-00 baseline: tinypool@1.1.1 (fixed: 2.1.1)"
 
 [[IgnoredVulns]]
 id = "GHSA-85c8-ppgw-ccpr"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: tinypool@1.1.1 (fixed: 2.1.2)"
+ignoreUntil = 2026-12-10
+reason = "Re-accepted to 2026-12-10 by the owner on 2026-11-24. Present at the CC-00 baseline: tinypool@1.1.1 (fixed: 2.1.2)"
 
 [[IgnoredVulns]]
 id = "GHSA-4w7w-66w2-5vf9"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: vite@5.4.21 (fixed: 6.4.2)"
+ignoreUntil = 2026-12-10
+reason = "Re-accepted to 2026-12-10 by the owner on 2026-11-24. Present at the CC-00 baseline: vite@5.4.21 (fixed: 6.4.2)"
 
 [[IgnoredVulns]]
 id = "GHSA-587h-7wmj-h5pm"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: vite@5.4.21 (fixed: 6.4.4)"
+ignoreUntil = 2026-12-10
+reason = "Re-accepted to 2026-12-10 by the owner on 2026-11-24. Present at the CC-00 baseline: vite@5.4.21 (fixed: 6.4.4)"
 
 [[IgnoredVulns]]
 id = "GHSA-698v-4r3x-3vcv"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: vite@5.4.21 (fixed: 6.4.4)"
+ignoreUntil = 2026-12-10
+reason = "Re-accepted to 2026-12-10 by the owner on 2026-11-24. Present at the CC-00 baseline: vite@5.4.21 (fixed: 6.4.4)"
 
 [[IgnoredVulns]]
 id = "GHSA-9jrq-w75r-8gcw"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: vite@5.4.21 (fixed: 6.4.4)"
+ignoreUntil = 2026-12-10
+reason = "Re-accepted to 2026-12-10 by the owner on 2026-11-24. Present at the CC-00 baseline: vite@5.4.21 (fixed: 6.4.4)"
 
 [[IgnoredVulns]]
 id = "GHSA-fx2h-pf6j-xcff"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: vite@5.4.21 (fixed: 6.4.3)"
+ignoreUntil = 2026-12-10
+reason = "Re-accepted to 2026-12-10 by the owner on 2026-11-24. Present at the CC-00 baseline: vite@5.4.21 (fixed: 6.4.3)"
 
 [[IgnoredVulns]]
 id = "GHSA-r825-w8mm-5pxw"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: vite@5.4.21 (fixed: 6.4.4)"
+ignoreUntil = 2026-12-10
+reason = "Re-accepted to 2026-12-10 by the owner on 2026-11-24. Present at the CC-00 baseline: vite@5.4.21 (fixed: 6.4.4)"
 
 [[IgnoredVulns]]
 id = "GHSA-rq7h-c2jc-7f22"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: vite@5.4.21 (fixed: 6.4.4)"
+ignoreUntil = 2026-12-10
+reason = "Re-accepted to 2026-12-10 by the owner on 2026-11-24. Present at the CC-00 baseline: vite@5.4.21 (fixed: 6.4.4)"
 
 [[IgnoredVulns]]
 id = "GHSA-v6wh-96g9-6wx3"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: vite@5.4.21 (fixed: 6.4.3)"
+ignoreUntil = 2026-12-10
+reason = "Re-accepted to 2026-12-10 by the owner on 2026-11-24. Present at the CC-00 baseline: vite@5.4.21 (fixed: 6.4.3)"
 
 [[IgnoredVulns]]
 id = "GHSA-5xrq-8626-4rwp"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: vitest@2.1.9 (fixed: 3.2.6)"
-
-[[IgnoredVulns]]
-id = "GHSA-mrhx-c7xc-m3w5"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: zod@4.4.3 (fixed: 4.6.6)"
+ignoreUntil = 2026-12-10
+reason = "Re-accepted to 2026-12-10 by the owner on 2026-11-24. Present at the CC-00 baseline: vitest@2.1.9 (fixed: 3.2.6)"
 
 # Published after the baseline and recorded on 2026-10-31, the day CI first reported them. Not from the
 # CC-00 scan: the only fixed versions are new majors, pulled in transitively by eslint, typescript-eslint,
-# @sentry/nextjs's bundler plugin and crawlee, which pin the old majors. Same expiry as the baseline.
+# @sentry/nextjs's bundler plugin and crawlee, which pin the old majors. Re-accepted 2026-11-24 to
+# 2026-12-10 with the 14 above, by the same owner approval. minimatch 9.0.9 is in production through
+# @crawlee/core: each enqueueLinks call compiles `http{s,}://<origin>/**` from the page's own origin,
+# unescaped (enqueue_links.js:99; packages/engine/src/crawler.ts, `same-hostname`). WHATWG URL parsing
+# keeps braces and `*` in a hostname, and nothing in our code refuses them (normalizeDomain,
+# validateUrlOrThrow). What stops it today is Node's resolver, measured 2026-11-24 on Node 22.23 and
+# glibc 2.35: `{a,b}.lab.crawlmouse.com` resolves in public DNS through our wildcard record, but
+# dns.lookup answers ENOTFOUND and dns.resolve4 EBADNAME, so no page of such a host is fetched and no
+# pattern is built from it. Not measured on the Vercel or Fly runtimes. If reached, a 247-character
+# brace hostname costs 4.3 s and 57,142 patterns per compile (v2r/qa/findings/osv-left-for-owner.md).
 
 [[IgnoredVulns]]
 id = "GHSA-3g3m-2fjr-6pw4"
-ignoreUntil = 2026-11-26
-reason = "Published 2026-10-31 (medium): glob@13.0.6 (fixed: 14.0.2, a new major), via @sentry/bundler-plugin-core"
+ignoreUntil = 2026-12-10
+reason = "Re-accepted to 2026-12-10 by the owner on 2026-11-24. Published 2026-10-31 (medium): glob@13.0.6 (fixed: 14.0.2, a new major), via @sentry/bundler-plugin-core"
 
 [[IgnoredVulns]]
 id = "GHSA-g3hv-75wg-m249"
-ignoreUntil = 2026-11-26
-reason = "Published 2026-10-31 (medium): minimatch@3.1.5 via eslint, minimatch@9.0.9 via crawlee, minimatch@10.2.5 via typescript-eslint and @sentry/nextjs (fixed: 11.0.1, a new major)"
+ignoreUntil = 2026-12-10
+reason = "Re-accepted to 2026-12-10 by the owner on 2026-11-24; the crawl path is not reached while Node refuses brace hostnames (comment above). Published 2026-10-31 (medium): minimatch@3.1.5 via eslint, minimatch@9.0.9 via crawlee, minimatch@10.2.5 via typescript-eslint and @sentry/nextjs (fixed: 11.0.1, a new major)"
 
 # Added 2026-11-17, approved by the owner at 20:56 ET ("picomatch approve", CC-GL rulings-10). Not
 # present when CI was introduced: osv.dev published GHSA-fc5q-39xc-vjpf (CVE-2026-112366) after it.

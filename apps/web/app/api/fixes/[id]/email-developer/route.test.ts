@@ -1,5 +1,5 @@
 import type { PGlite } from '@electric-sql/pglite';
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // POST /api/fixes/[id]/email-developer (CC-26b D9, questions.md Q8). The route's guards and
 // lib/v2/account/fixes.ts run over PGlite through the PostgREST stand-in; the rate limiter and the
@@ -56,6 +56,8 @@ vi.mock('../../../../../../../inngest/client', () => ({
 }));
 
 import { fixWorld, type FixWorld } from '@/lib/v2/account/test-support/fix-world';
+import { fixture } from '@/lib/v2/fixtures';
+import { withBodies } from '@/lib/v2/view/test-support/multi-body';
 import { POST } from './route';
 
 let fw: FixWorld;
@@ -80,6 +82,20 @@ const post = (id: string, body: string, type = 'application/json') =>
     new Request(`https://crawlmouse.com/api/fixes/${id}/email-developer`, {
       method: 'POST',
       headers: { origin: 'https://crawlmouse.com', 'content-type': type },
+      body,
+    }),
+    { params: Promise.resolve({ id }) },
+  );
+/** The form as the fix page posts it, the browser naming the page in `Referer`. */
+const postFrom = (id: string, referer: string, body = 'email=dev%40agency.example') =>
+  POST(
+    new Request(`https://crawlmouse.com/api/fixes/${id}/email-developer`, {
+      method: 'POST',
+      headers: {
+        origin: 'https://crawlmouse.com',
+        'content-type': 'application/x-www-form-urlencoded',
+        referer,
+      },
       body,
     }),
     { params: Promise.resolve({ id }) },
@@ -200,6 +216,99 @@ describe('POST /api/fixes/[id]/email-developer', () => {
 describe('POST /api/fixes/[id]/email-developer from a live form', () => {
   const FORM = 'application/x-www-form-urlencoded';
   const where = (res: Response) => [res.status, res.headers.get('location')];
+  const CHECK = '11111111-1111-4111-8111-111111111111';
+  const fixPage = (id: string) => `/audit/${CHECK}/fix/${id}`;
+
+  it('sent from the fix page: back to that page saying so', async () => {
+    const id = fw.ranked[0]!;
+    const res = await postFrom(id, `https://crawlmouse.com${fixPage(id)}`);
+    expect(where(res)).toEqual([303, `${fixPage(id)}?notice=email_requested`]);
+    expect(h.sent).toHaveLength(1);
+  });
+
+  it('a bad address from the fix page: back to that page, nothing sent', async () => {
+    const id = fw.ranked[0]!;
+    const res = await postFrom(id, `https://crawlmouse.com${fixPage(id)}`, 'email=nope');
+    expect(where(res)).toEqual([303, `${fixPage(id)}?notice=invalid_email`]);
+    expect(h.sent).toEqual([]);
+  });
+
+  it('a limit from the fix page: back to that page', async () => {
+    h.limited.add('fix-email:user');
+    const id = fw.ranked[0]!;
+    const res = await postFrom(id, `https://crawlmouse.com${fixPage(id)}`);
+    const to = new URL(res.headers.get('location')!, 'https://crawlmouse.com');
+    expect([to.pathname, to.searchParams.get('notice')]).toEqual([fixPage(id), 'rate_limited']);
+    expect(h.sent).toEqual([]);
+  });
+
+  it('a fix the tier does not open, from the fix page: back to that page', async () => {
+    const id = fw.ranked[3]!;
+    const res = await postFrom(id, `https://crawlmouse.com${fixPage(id)}`);
+    expect(where(res)).toEqual([303, `${fixPage(id)}?notice=upgrade_required`]);
+  });
+
+  describe('naming the framework on screen', () => {
+    const PACKET = withBodies(fixture('bad-site').fixes.find((f) => f.packet !== null)!.packet!, [
+      'wordpress',
+    ]);
+    const packed = async (id: string, packet: unknown) =>
+      fw.db.query(`update public.site_fixes set packet = $1 where id = $2`, [
+        JSON.stringify(packet),
+        id,
+      ]);
+    afterEach(() => packed(fw.ranked[0]!, null));
+
+    it('carries a framework the packet has a body for, on the event', async () => {
+      const id = fw.ranked[0]!;
+      await packed(id, PACKET);
+      const res = await post(id, 'email=dev%40agency.example&framework=wordpress', FORM);
+      expect(res.status).toBe(303);
+      expect(h.sent).toHaveLength(1);
+      expect((h.sent[0] as { data: unknown }).data).toMatchObject({ framework: 'wordpress' });
+    });
+
+    it('with no framework, the event names none', async () => {
+      const id = fw.ranked[0]!;
+      await packed(id, PACKET);
+      await post(id, 'email=dev%40agency.example', FORM);
+      expect((h.sent[0] as { data: object }).data).not.toHaveProperty('framework');
+    });
+
+    it.each([
+      ['one the packet has no body for', 'shopify_liquid'],
+      ['one that is not a framework', 'nonsense'],
+      ['a long one', 'x'.repeat(41)],
+    ])('refuses %s, and sends nothing', async (_name, framework) => {
+      const id = fw.ranked[0]!;
+      await packed(id, PACKET);
+      const res = await post(id, `email=dev%40agency.example&framework=${framework}`, FORM);
+      expect(where(res)).toEqual([303, '/dashboard?notice=invalid']);
+      expect(h.sent).toEqual([]);
+      expect(await requests(id)).toBe(requestsBefore);
+    });
+
+    let requestsBefore = 0;
+    beforeEach(async () => {
+      requestsBefore = await requests(fw.ranked[0]!);
+    });
+  });
+
+  it('keeps only the path of the page it came from', async () => {
+    const id = fw.ranked[0]!;
+    const res = await postFrom(id, `https://crawlmouse.com${fixPage(id)}?notice=x&t=secret#y`);
+    expect(where(res)).toEqual([303, `${fixPage(id)}?notice=email_requested`]);
+  });
+
+  it.each([
+    ['another site', (id: string) => `https://evil.example${fixPage(id)}`],
+    ['another page of the audit', () => `https://crawlmouse.com/audit/${CHECK}`],
+    ['a fix address that is not ids', () => `https://crawlmouse.com/audit/x/fix/y`],
+    ['a path past the fix', (id: string) => `https://crawlmouse.com${fixPage(id)}/more`],
+  ])('from %s: back to the dashboard', async (_name, from) => {
+    const id = fw.ranked[0]!;
+    expect(where(await postFrom(id, from(id)))).toEqual([303, '/dashboard?notice=email_requested']);
+  });
 
   it('recorded: back to the dashboard saying so, the address not in the address bar', async () => {
     const res = await post(fw.ranked[0]!, 'email=dev%40agency.example', FORM);
