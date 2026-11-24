@@ -127,12 +127,16 @@ export function blockedOf(c: Check) {
   return { blocked: hit.length, of: ai.length, verdicts: [...new Set(hit.map((x) => x.verdict))] };
 }
 
-/** "weekly, Fri", "on each deploy", "not scheduled", "paused". */
+/**
+ * "weekly, Fri", "monthly, first Fri", "on each deploy", "not scheduled", "paused". A monthly check
+ * runs on the first such weekday of the month (`next_check_after`), so the cell says so (F-115).
+ */
 export function scheduleCell(s: Site): string {
   if (s.paused) return 'paused';
   if (!s.schedule) return 'not scheduled';
   if (s.schedule.cadence === 'on_deploy') return 'on each deploy';
-  return `${s.schedule.cadence}, ${WEEKDAYS[s.schedule.iso_weekday!]}`;
+  const day = WEEKDAYS[s.schedule.iso_weekday!];
+  return s.schedule.cadence === 'monthly' ? `monthly, first ${day}` : `weekly, ${day}`;
 }
 
 /**

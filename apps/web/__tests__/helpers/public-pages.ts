@@ -14,8 +14,8 @@ import type { Build } from '../../lib/seo/page-exceptions';
 export const ORIGIN = 'https://crawlmouse.com';
 export const FLAGS = ['V2_ACCOUNT_DOOR', 'V2_PIPELINE', 'V2_CHECKS_PUBLIC', 'V2_BILLING'] as const;
 const REWRITE_FLAG_ON: Record<Build, Record<RewriteFlag, boolean>> = {
-  off: { checksPublic: false, billing: false },
-  on: { checksPublic: true, billing: true },
+  off: { checksPublic: false, billing: false, publicPages: false },
+  on: { checksPublic: true, billing: true, publicPages: true },
 };
 
 type RouteModule = {

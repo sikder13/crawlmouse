@@ -66,7 +66,7 @@ describe('the client page', () => {
     // Fix 1 could not be verified, so it is still to raise; fix 2 is marked done, so it is not.
     expect(view.fixes.title).toBe('Open fixes · 1 to raise');
     expect(view.fixes.rows).toEqual(site.fixes.rows.filter((r) => r.number === 1));
-    expect(view.fixes.rows[0]!.packet.href).toMatch(/^\/audit\/[^/]+\/fix\/[^/]+$/);
+    expect(view.fixes.rows[0]!.packet!.href).toMatch(/^\/audit\/[^/]+\/fix\/[^/]+$/);
     expect(view.fixes).toMatchObject({ more: null, empty: null });
   });
 

@@ -128,7 +128,7 @@ describe('the v2 rewrites (owner ruling Q17)', () => {
     ['the flag unset', '', '/dashboard'],
     ['the flag not 1', 'true', '/dashboard'],
     ['another page', '1', '/dashboards'],
-    ['the pricing page', '1', '/pricing'],
+    ['a path under the pricing page', '1', '/pricing/x'],
   ])('no rewrite with %s', async (_name, flag, path) => {
     vi.stubEnv('V2_CHECKS_PUBLIC', flag);
     const res = await handleEdge(at(path), rotated);
@@ -147,7 +147,7 @@ describe('the v2 rewrites (owner ruling Q17)', () => {
       );
     const rewritten = await handleEdge(spoofed('/dashboard'), rotated);
     expect(rewritten.headers.get(`x-middleware-request-${REWRITE_HEADER}`)).toBe('1');
-    for (const path of ['/pricing', '/sites/x']) {
+    for (const path of ['/pricing/x', '/sites/x']) {
       const passed = await handleEdge(spoofed(path), rotated);
       expect(passed.headers.get(`x-middleware-request-${REWRITE_HEADER}`)).toBeNull();
       expect(passed.headers.get('x-middleware-override-headers') ?? '').not.toContain(
@@ -192,22 +192,28 @@ describe('the CC-29 rows: each follows its own flag', () => {
     ['/pricing', '/v2-pricing'],
     ['/pricing?interval=year', '/v2-pricing?interval=year'],
     ['/developers', '/v2-developers'],
-  ])('with V2_BILLING=1, %s is served by %s', async (path, to) => {
+  ])('RC-01: with V2_CHECKS_PUBLIC=1 and billing off, %s is served by %s', async (path, to) => {
+    vi.stubEnv('V2_BILLING', '');
+    vi.stubEnv('V2_CHECKS_PUBLIC', '1');
+    expect(rewrittenTo(await handleEdge(at(path), refresh))).toBe(to);
+  });
+
+  it.each(['/pricing', '/developers'])('with both flags off, %s is not rewritten', async (path) => {
+    vi.stubEnv('V2_BILLING', '');
+    vi.stubEnv('V2_CHECKS_PUBLIC', '');
+    const res = await handleEdge(at(path), refresh);
+    expect(rewrittenTo(res)).toBeNull();
+    expect(res.status).toBe(200);
+  });
+
+  it.each([
+    ['/pricing', '/v2-pricing'],
+    ['/developers', '/v2-developers'],
+  ])('RC-01: with V2_BILLING=1 and public checks off, %s is served by %s', async (path, to) => {
     vi.stubEnv('V2_BILLING', '1');
     vi.stubEnv('V2_CHECKS_PUBLIC', '');
     expect(rewrittenTo(await handleEdge(at(path), refresh))).toBe(to);
   });
-
-  it.each(['/pricing', '/developers'])(
-    'with V2_BILLING unset, %s is not rewritten, whatever V2_CHECKS_PUBLIC says',
-    async (path) => {
-      vi.stubEnv('V2_BILLING', '');
-      vi.stubEnv('V2_CHECKS_PUBLIC', '1');
-      const res = await handleEdge(at(path), refresh);
-      expect(rewrittenTo(res)).toBeNull();
-      expect(res.status).toBe(200);
-    },
-  );
 
   it('with V2_CHECKS_PUBLIC=1, a report is served by the report target, with its query string', async () => {
     vi.stubEnv('V2_CHECKS_PUBLIC', '1');
@@ -648,7 +654,7 @@ describe('the / row of the v2 rewrite table (CC-22b, carried onto lib/v2/rewrite
     expect(res.headers.get('x-middleware-request-x-from-test')).toBe('kept');
   });
 
-  it.each(['/pricing', '/blogs', '/dashboards', '/audit/abc/overview', '//', '/index'])(
+  it.each(['/pricing/x', '/blogs', '/dashboards', '/audit/abc/overview', '//', '/index'])(
     'with the flag on, %s is not rewritten: a row matches its own path only',
     async (path) => {
       flag(true);

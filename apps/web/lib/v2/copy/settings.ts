@@ -2,6 +2,7 @@
  * Settings' written sentences (Final-Settings): every number a parameter or a named constant. The
  * lock corrections for the artboard follow.
  */
+import { SUPPORT_EMAIL } from './support';
 import { SIGNIN_SENDER, SIGNIN_SENDER_LOCKED } from '../../auth/constants';
 import type { Addition, CopyChange } from '../copy-registry';
 import { listOf } from '../format';
@@ -49,8 +50,8 @@ export const SETTINGS_COPY = {
   noTrial: 'only during a trial',
   always: 'always',
   /** FACTS A9: Stripe sends the receipts. */
-  emailFoot: (kinds: number) =>
-    `Those are the ${numberWord(kinds)} kinds from us. If you pay, Stripe sends the receipts. There is no newsletter and no product-update mail to unsubscribe from.`,
+  emailFoot: (kinds: number, plansOpen = true) =>
+    `Those are the ${numberWord(kinds)} kinds from us.${plansOpen ? ' If you pay, Stripe sends the receipts.' : ''} There is no newsletter and no product-update mail to unsubscribe from.`,
   /**
    * The member's own address, once a hard bounce or a spam report suppressed it (CC-28 D7): every kind
    * of mail but account mail stops (`email_kind_suppressible`), so what still goes is named.
@@ -93,8 +94,10 @@ export const SETTINGS_COPY = {
   trialName: (plan: string) => `${plan}, trial`,
   daysLeft: (n: number) => `${count(n)} ${plural(n, 'day', 'days')} left`,
   ends: (date: string) => `Ends ${date}.`,
-  noCardTerms: (plan: string) =>
-    `No card on file; nothing is charged unless you add one and choose ${plan}.`,
+  noCardTerms: (plan: string, plansOpen = true) =>
+    plansOpen
+      ? `No card on file; nothing is charged unless you add one and choose ${plan}.`
+      : 'No card on file; nothing is charged.',
   /** A card taken at Checkout whose last four digits were not recorded is named without them. */
   cardTerms: (last4: string | null) =>
     `The card ${last4 === null ? 'on file' : `ending ${last4}`} is charged then unless you cancel.`,
@@ -105,6 +108,11 @@ export const SETTINGS_COPY = {
   of: (n: number, of: number) => `${count(n)} of ${count(of)}`,
   keep: (plan: string, price: number) => `Keep ${plan}, $${price} a month`,
   choose: (plan: string, price: number) => `Choose ${plan}, $${price} a month`,
+  /** In place of Keep or Choose while paid plans are not open (F-108); `until` is a trial's end. */
+  plansOpenSoon: (until: string | null) =>
+    until === null
+      ? 'Paid plans open shortly.'
+      : `Paid plans open shortly. Your trial runs to ${until}.`,
   other: (yearly: number, agency: number, sites: number, seats: number) =>
     `Or $${yearly} a year. Agency, $${agency} a month: ${count(sites)} sites, ${count(seats)} seats, reports under your brand.`,
   otherYearly: (yearly: number) => `Or $${yearly} a year.`,
@@ -120,17 +128,21 @@ export const SETTINGS_COPY = {
     `The last payment failed on ${failed}. ${plan} stays until ${until}; update the card in the billing portal to keep it.`,
   compare: 'Compare',
   cancel: 'Cancel',
-  /** FACTS A6 (long form) and D5 (two clicks). */
-  cancelTrial: (clicks: number, days: number) =>
-    `Nothing to cancel on a trial; it ends by itself. On Pro or Agency, "Cancel, back to Free" sits here: ${numberWord(clicks)} clicks, effective at the end of the paid month. Nothing you can see is deleted; evidence older than ${days} days is condensed to headers and the parts of pages that changed.`,
+  /** FACTS D5 (two clicks). */
+  cancelTrialClosed:
+    'Nothing to cancel on a trial; it ends by itself. Nothing you can see is deleted.',
+  /** While paid plans are closed the cancel route answers 404, so the way to cancel is a person. */
+  cancelByEmail: `To cancel, email ${SUPPORT_EMAIL}.`,
+  cancelTrial: (clicks: number) =>
+    `Nothing to cancel on a trial; it ends by itself. On Pro or Agency, "Cancel, back to Free" sits here: ${numberWord(clicks)} clicks, effective at the end of the paid month. Nothing you can see is deleted.`,
   /** A trial with a card becomes the plan at its end unless it is cancelled (ARCH-2 §3.1). */
-  cancelCardTrial: (date: string, clicks: number, days: number) =>
-    `The trial ends ${date} and the card is charged unless you cancel: ${numberWord(clicks)} clicks, effective when the trial ends. Nothing you can see is deleted; evidence older than ${days} days is condensed to headers and the parts of pages that changed.`,
-  cancelPaid: (clicks: number, days: number, period: 'month' | 'year') =>
-    `${capitalise(numberWord(clicks))} clicks, effective at the end of the paid ${period}. Nothing you can see is deleted; evidence older than ${days} days is condensed to headers and the parts of pages that changed.`,
+  cancelCardTrial: (date: string, clicks: number) =>
+    `The trial ends ${date} and the card is charged unless you cancel: ${numberWord(clicks)} clicks, effective when the trial ends. Nothing you can see is deleted.`,
+  cancelPaid: (clicks: number, period: 'month' | 'year') =>
+    `${capitalise(numberWord(clicks))} clicks, effective at the end of the paid ${period}. Nothing you can see is deleted.`,
   /** A plan whose payment failed is cancelled at once (lib/billing/cancel.ts, `AT_ONCE`). */
-  cancelAtOnce: (clicks: number, days: number) =>
-    `${capitalise(numberWord(clicks))} clicks, effective at once. Nothing you can see is deleted; evidence older than ${days} days is condensed to headers and the parts of pages that changed.`,
+  cancelAtOnce: (clicks: number) =>
+    `${capitalise(numberWord(clicks))} clicks, effective at once. Nothing you can see is deleted.`,
   cancelAction: 'Cancel, back to Free',
   /**
    * Cancel's second click (CC-39 D1): what ends and when, as lib/billing/cancel.ts ends it — a paid
@@ -154,14 +166,15 @@ export const SETTINGS_COPY = {
     `${plan} trial until ${date}, then Free. The card is not charged.`,
   trialCancelled: (date: string) =>
     `Cancelled; the trial ends ${date} and the card is not charged.`,
-  cancelled: (date: string, days: number) =>
-    `Cancelled; it takes effect ${date}. Nothing you can see is deleted; evidence older than ${days} days is condensed to headers and the parts of pages that changed.`,
+  cancelled: (date: string) =>
+    `Cancelled; it takes effect ${date}. Nothing you can see is deleted.`,
   cancelFree: 'Nothing to cancel on Free.',
   receipts: 'Receipts',
   /** FACTS A9. */
   receiptsText: 'Emailed by Stripe after each charge, and listed in the billing portal from here',
   /** Before any charge there is no Stripe customer, so no portal to list them in. */
   noReceipts: 'Emailed by Stripe after each charge; there has been no charge yet.',
+  receiptsClosed: 'Emailed by Stripe after each charge.',
   portalAction: 'Billing portal',
   free: 'Free',
   tables: { email: 'Email kinds', danger: 'Delete', usage: 'Usage', terms: 'Cancel' },
@@ -296,9 +309,9 @@ export const SETTINGS_CHANGES: CopyChange[] = [
     screen: 'settings',
     kind: 'facts',
     locked: 'one click, effective at the end of the paid month, nothing deleted.',
-    rendered:
-      'two clicks, effective at the end of the paid month. Nothing you can see is deleted; evidence older than 90 days is condensed to headers and the parts of pages that changed.',
-    source: 'FACTS A6 (long form) and D5 (two clicks)',
+    rendered: 'two clicks, effective at the end of the paid month. Nothing you can see is deleted.',
+    source:
+      'FACTS A6 and D5 (two clicks). The sentence about condensing evidence is out: no job does it (CTO ruling, 2026-11-22)',
   },
   {
     screen: 'settings',

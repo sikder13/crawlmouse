@@ -234,3 +234,28 @@ describe('the Result, built from a fixture whose fixes are edited', () => {
     expect(body).not.toMatch(NEVER);
   });
 });
+
+describe('a sum of effects is printed as a number to read (F-099)', () => {
+  it.each([
+    [6.909999999999998, '+6.91'],
+    [6.999999999999998, '+7'],
+    [0.1 + 0.2, '+0.3'],
+    [1.35, '+1.35'],
+    [3, '+3'],
+    [0.01, '+0.01'],
+  ])('%s prints as %s', (n, shown) => {
+    expect(formatPoints(n)).toBe(shown);
+  });
+
+  it('an effect that rounds to nothing is no effect, never "+0"', () => {
+    expect(formatPoints(0.004)).toBeNull();
+  });
+
+  it('each printer of a group says the rounded sum', () => {
+    const f = (seo: number) => fixWith(null, seo, 'structure');
+    const group = [f(0.1), f(0.7)];
+    expect(0.1 + 0.7).not.toBe(0.8);
+    expect(groupPoints(group)).toContain('+0.8 Technical SEO');
+    expect(restPoints(group)).toContain('+0.8 SEO');
+  });
+});

@@ -46,8 +46,11 @@ export function PricingScreen({ view, contact }: { view: PricingView; contact?: 
       <main>
         <section className={`${layout.wrap} ${styles.hero}`}>
           <Heading level={1} size="xl" className={styles.title}>
-            <Capability item={view.title} comingLabel={view.comingLabel} />
+            {view.h1}
           </Heading>
+          <p className={styles.tagline}>
+            <Capability item={view.title} comingLabel={view.comingLabel} />
+          </p>
           <p className={styles.lead}>
             {view.lead.map((t, i) => (
               <Fragment key={t.text}>
@@ -119,52 +122,54 @@ export function PricingScreen({ view, contact }: { view: PricingView; contact?: 
         </section>
 
         <section className={`${layout.wrap} ${styles.plus}`} aria-label={view.agencyPlus.name}>
-          <Table
-            label={view.agencyPlus.name}
-            headersHidden
-            rowHeader
-            columns={[
-              { header: 'Plan' },
-              { header: 'Limits' },
-              { header: 'Price' },
-              { header: 'Contact' },
-            ]}
-            rows={[
-              {
-                key: 'agency-plus',
-                cells: [
-                  view.agencyPlus.name,
-                  <Capability
-                    key="limits"
-                    item={view.agencyPlus.limits}
-                    comingLabel={view.comingLabel}
-                  />,
-                  view.agencyPlus.price,
-                  <a key="link" href={`#${AGENCY_PLUS_ANCHOR}`}>
-                    {view.agencyPlus.link}
-                  </a>,
-                ],
-              },
-            ]}
-          />
-          <Card as="section" id={AGENCY_PLUS_ANCHOR} className={styles.contact}>
-            <Heading level={2} size="s">
-              {view.agencyPlus.formTitle}
-            </Heading>
-            {view.agencyPlus.form ? (
-              <>
-                <Capability as="p" item={view.agencyPlus.reply} comingLabel={view.comingLabel} />
-                <AgencyPlusForm initial={contact} />
-              </>
-            ) : (
-              <p>
-                {view.agencyPlus.inbox.before}{' '}
-                <a href={`mailto:${view.agencyPlus.inbox.address}`}>
-                  {view.agencyPlus.inbox.address}
-                </a>{' '}
-                {view.agencyPlus.inbox.after}
-              </p>
-            )}
+          <Card className={styles.cardFlush}>
+            <Table
+              label={view.agencyPlus.name}
+              headersHidden
+              rowHeader
+              columns={[
+                { header: 'Plan' },
+                { header: 'Limits' },
+                { header: 'Price' },
+                { header: 'Contact' },
+              ]}
+              rows={[
+                {
+                  key: 'agency-plus',
+                  cells: [
+                    view.agencyPlus.name,
+                    <Capability
+                      key="limits"
+                      item={view.agencyPlus.limits}
+                      comingLabel={view.comingLabel}
+                    />,
+                    view.agencyPlus.price,
+                    <a key="link" href={`#${AGENCY_PLUS_ANCHOR}`}>
+                      {view.agencyPlus.link}
+                    </a>,
+                  ],
+                },
+              ]}
+            />
+            <section id={AGENCY_PLUS_ANCHOR} className={styles.contact}>
+              <Heading level={2} size="s">
+                {view.agencyPlus.formTitle}
+              </Heading>
+              {view.agencyPlus.form ? (
+                <>
+                  <Capability as="p" item={view.agencyPlus.reply} comingLabel={view.comingLabel} />
+                  <AgencyPlusForm initial={contact} />
+                </>
+              ) : (
+                <p>
+                  {view.agencyPlus.inbox.before}{' '}
+                  <a href={`mailto:${view.agencyPlus.inbox.address}`}>
+                    {view.agencyPlus.inbox.address}
+                  </a>{' '}
+                  {view.agencyPlus.inbox.after}
+                </p>
+              )}
+            </section>
           </Card>
         </section>
 

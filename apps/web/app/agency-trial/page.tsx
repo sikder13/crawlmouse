@@ -1,6 +1,6 @@
 import '../../styles/v2/tokens.css';
 import type { Metadata } from 'next';
-import { notFound, redirect } from 'next/navigation';
+import { redirect } from 'next/navigation';
 import { AgencyTrialScreen } from '@/components/v2/screens/agency-trial/AgencyTrialScreen';
 import { billingV2Enabled } from '@/lib/billing/flags';
 import { supabasePortalAccounts } from '@/lib/billing/portal-v2';
@@ -25,7 +25,8 @@ export const metadata: Metadata = {
 };
 
 /**
- * The Agency trial page (CC-29 D3): a 404 unless V2_BILLING is on; a signed-out visitor is sent to
+ * The Agency trial page (CC-29 D3). With V2_BILLING off it sends the visitor to For agencies, which
+ * says the trial opens soon (RC-01, a temporary redirect), and reads nothing; a signed-out visitor is sent to
  * sign in and back here. The form posts to /api/agency-trial. An owned agency account on the trial,
  * Agency or past due gets its Manage billing and Cancel here, naming the account (Q26);
  * `?cancel=<id>` shows that account's confirmation, CC-03's second click.
@@ -35,7 +36,7 @@ export default async function AgencyTrialPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  if (!billingV2Enabled()) return notFound();
+  if (!billingV2Enabled()) redirect('/agencies');
   const params = await searchParams;
   const interval = intervalFrom(params.interval);
   const r = await loadViewer();

@@ -432,7 +432,7 @@ Learn opens as a disclosure (NavMenu). Log in is the header's action, at `/login
 | Item         | Under | Target           | Note |
 | ------------ | ----- | ---------------- | ---- |
 | Product      |       | `/`              |      |
-| For agencies |       | planned          |      |
+| For agencies |       | `/agencies`      |      |
 | Learn        |       | menu             |      |
 | Blog         | Learn | `/blog`          |      |
 | Research     | Learn | `/blog/research` |      |
@@ -447,7 +447,7 @@ Learn opens as a disclosure (NavMenu). Log in is the header's action, at `/login
 | ----------------- | --------------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
 | Product           | Free audit                  | `/`                                    |                                                                                                                    |
 | Product           | Pricing                     | `/pricing`                             |                                                                                                                    |
-| Product           | For agencies                | planned                                |                                                                                                                    |
+| Product           | For agencies                | `/agencies`                            |                                                                                                                    |
 | Product           | Developers                  | `/developers`                          |                                                                                                                    |
 | Product           | Changelog                   | planned                                |                                                                                                                    |
 | Product           | Status                      | `/status` + status shape               |                                                                                                                    |
