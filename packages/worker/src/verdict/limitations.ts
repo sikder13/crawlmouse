@@ -141,7 +141,7 @@ export function notRequested(n: NotRequested): string {
   }
   const why =
     n.stop.reason === 'three_429_responses'
-      ? `it answered 429 ${STOP_AFTER_429S} times in a row, though we waited as it asked and slowed down each time`
+      ? `it answered 429 ${STOP_AFTER_429S} times in a row`
       : 'four pages in a row were challenged';
   return `Not requested: requests to ${n.site} were stopped because ${why}. The user agent shown is the one that would have been sent.`;
 }

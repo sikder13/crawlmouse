@@ -29,6 +29,9 @@ export type Scheduled<T> = { ran: true; value: T } | { ran: false };
 
 interface Waiting {
   start: () => void;
+  /** The latest moment this task may start; past it, it is dropped rather than waited for. */
+  latestAt?: number;
+  drop: () => void;
 }
 
 export class SiteLimiter {
@@ -81,7 +84,16 @@ export class SiteLimiter {
     );
   }
 
-  schedule<T>(task: () => Promise<T>, signal?: AbortSignal): Promise<Scheduled<T>> {
+  /**
+   * `latestAt`: a task that could not start by then (a pause or the gap holds the site past it) is
+   * dropped, answering `{ ran: false }`, instead of being waited for. A batch passes its own deadline,
+   * so a long wait asked by the site does not run it past its time.
+   */
+  schedule<T>(
+    task: () => Promise<T>,
+    signal?: AbortSignal,
+    latestAt?: number,
+  ): Promise<Scheduled<T>> {
     if (signal?.aborted) return Promise.resolve({ ran: false });
     return new Promise<Scheduled<T>>((resolve, reject) => {
       const onAbort = () => {
@@ -95,6 +107,11 @@ export class SiteLimiter {
         start: () => {
           signal?.removeEventListener('abort', onAbort);
           this.run(task).then((value) => resolve({ ran: true, value }), reject);
+        },
+        ...(latestAt !== undefined && { latestAt }),
+        drop: () => {
+          signal?.removeEventListener('abort', onAbort);
+          resolve({ ran: false });
         },
       };
       signal?.addEventListener('abort', onAbort, { once: true });
@@ -130,6 +147,13 @@ export class SiteLimiter {
     this.pumping = true;
     try {
       while (this.queue.length > 0 && this.inFlight < this.maxConcurrent()) {
+        const startAt = Math.max(this.nextStartAt, this.clock.now());
+        const late = this.queue.filter((w) => w.latestAt !== undefined && w.latestAt < startAt);
+        if (late.length) {
+          for (const w of late) this.queue.splice(this.queue.indexOf(w), 1);
+          for (const w of late) w.drop();
+          continue;
+        }
         const wait = this.nextStartAt - this.clock.now();
         if (wait > 0) {
           await this.clock.sleep(wait);

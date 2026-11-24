@@ -11,7 +11,8 @@ import { politenessKeyOf } from './site-key.js';
  * A 429 is a request to slow down, not a refusal (inbox 048). The site's next request waits for its
  * Retry-After, or for a back-off that doubles with each 429 in a row when it sends none, at most
  * MAX_WAIT_MS either way. The gap between requests then doubles, up to MAX_BACKOFF_GAP_MS, and stays
- * raised. Any other answer ends the run of 429s; the gap does not come back down.
+ * raised for as long as the worker holds the site (it forgets a site idle for SITE_IDLE_FORGET_MS).
+ * Any other answer but a redirect ends the run of 429s; the gap does not come back down with it.
  *
  * What counts as a challenged page is decided by the caller: in a crawl batch it is a page whose
  * fetch was a challenge; in an access batch it is a page whose browser control was challenged.

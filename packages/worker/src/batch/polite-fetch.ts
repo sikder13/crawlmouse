@@ -91,39 +91,48 @@ async function oneRequest(
   const site = ctx.sites.keyOf(url);
   const before = refusal(ctx, site);
   if (before) return before;
-  const scheduled = await ctx.sites.limiter(site).schedule(async () => {
-    const atStart = refusal(ctx, site);
-    if (atStart) return atStart;
-    const spent = ctx.budget.take();
-    if (spent) {
-      ctx.abort.abort();
-      return { reason: 'budget', budget: spent } satisfies NotRequested;
-    }
-    ctx.asked?.set(site, siteKeyOf(url));
-    const limits = ctx.budget.requestLimits();
-    const f = await ctx.fetcher(url, identity, {
-      ...limits,
-      maxBytes: Math.min(limits.maxBytes, ceiling),
-      ...(keepBytes !== undefined && { keepBytes }),
-    });
-    ctx.budget.addBytes(f.bytes);
-    // Cut off by what the batch had left, rather than by the request's own ceiling.
-    if (f.error === 'too_large' && limits.maxBytes < ceiling) {
-      ctx.budget.cutByBytes();
-      ctx.abort.abort();
-    }
-    if (countsTowardStop) {
-      if (f.status === 429) {
-        const after = f.headers['retry-after'];
-        ctx.sites.record429(site, Array.isArray(after) ? after[0] : after);
-      } else if (f.status !== null && !REDIRECT_STATUSES.has(f.status)) {
-        // A redirect points on rather than answering, so the run of 429s goes on through it.
-        ctx.sites.recordAnswer(site);
+  const scheduled = await ctx.sites.limiter(site).schedule(
+    async () => {
+      const atStart = refusal(ctx, site);
+      if (atStart) return atStart;
+      const spent = ctx.budget.take();
+      if (spent) {
+        ctx.abort.abort();
+        return { reason: 'budget', budget: spent } satisfies NotRequested;
       }
-    }
-    return f;
-  }, ctx.abort.signal);
+      ctx.asked?.set(site, siteKeyOf(url));
+      const limits = ctx.budget.requestLimits();
+      const f = await ctx.fetcher(url, identity, {
+        ...limits,
+        maxBytes: Math.min(limits.maxBytes, ceiling),
+        ...(keepBytes !== undefined && { keepBytes }),
+      });
+      ctx.budget.addBytes(f.bytes);
+      // Cut off by what the batch had left, rather than by the request's own ceiling.
+      if (f.error === 'too_large' && limits.maxBytes < ceiling) {
+        ctx.budget.cutByBytes();
+        ctx.abort.abort();
+      }
+      if (countsTowardStop) {
+        if (f.status === 429) {
+          const after = f.headers['retry-after'];
+          ctx.sites.record429(site, Array.isArray(after) ? after[0] : after);
+        } else if (f.status !== null && !REDIRECT_STATUSES.has(f.status)) {
+          // A redirect points on rather than answering, so the run of 429s goes on through it.
+          ctx.sites.recordAnswer(site);
+        }
+      }
+      return f;
+    },
+    ctx.abort.signal,
+    ctx.budget.endsAt(),
+  );
   if (scheduled.ran) return scheduled.value;
+  // Dropped: the batch was stopped, or the site cannot be asked again before the batch's time ends.
+  if (!ctx.budget.exhausted) {
+    ctx.budget.outOfTime();
+    ctx.abort.abort();
+  }
   return { reason: 'budget', budget: ctx.budget.exhausted! };
 }
 
@@ -141,11 +150,14 @@ export async function politeFetch(
   policy: RequestPolicy,
 ): Promise<Requested> {
   const retries = policy.retryOn429 ? RETRIES_ON_429 : 0;
+  let last: (Requested & { fetch: FetchOutcome }) | null = null;
   for (let attempt = 0; ; attempt++) {
     let answeredBy = url;
     const r = await followChain(ctx, url, identity, policy, (u) => (answeredBy = u));
-    if ('notRequested' in r) return r;
-    if (r.fetch.status !== 429 || attempt >= retries) return { ...r, answeredBy };
+    // A retry that could not be made keeps the 429 the page did answer, with why it was not asked again.
+    if ('notRequested' in r) return last ? { ...last, cut: r.notRequested } : r;
+    last = { ...r, answeredBy };
+    if (r.fetch.status !== 429 || attempt >= retries) return last;
   }
 }
 
