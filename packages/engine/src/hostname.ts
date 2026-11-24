@@ -10,7 +10,10 @@
  * this refuses everything else rather than escaping it.
  *
  * Rejected by this rule, though some DNS names carry it: an underscore. Production on 2026-11-24 had
- * 0 of 187 audits and 0 of 21 sites with a host outside the rule, underscores included (read-only):
+ * 0 of 187 audits and 0 of 21 sites whose stored host holds any character but a-z, 0-9, '.', '-', '[',
+ * ']' and ':' (read-only, the queries below). That set is a little wider than the rule's, so the
+ * count is of hosts the rule would certainly refuse, an underscore or a brace among them; it reads
+ * an upper-case letter as such a character, which can only raise the count:
  *   select count(*) filter (where substring(url from '^[a-z]+://([^/:?#]+)') ~ '[^a-z0-9.\-\[\]:]'),
  *          count(*) from public.audits;
  *   select count(*) filter (where host ~ '[^a-z0-9.\-\[\]:]'), count(*) from public.sites;
