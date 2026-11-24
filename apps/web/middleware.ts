@@ -4,7 +4,7 @@ import { reportRefusal, reportedMethod, type Refusal } from '@/lib/security/refu
 import { isApiPath, isStateChanging, policyForPath } from '@/lib/security/route-policy';
 import { isCrossSite, isJsonBody, isSameOrigin } from '@/lib/security/same-origin';
 import { updateSession } from '@/lib/supabase/middleware';
-import { checksPublicEnabled, pipelineEnabled } from '@/lib/auth/flags';
+import { checksPublicEnabled, pipelineEnabled, v2PublicPagesEnabled } from '@/lib/auth/flags';
 import { billingV2Enabled } from '@/lib/billing/flags';
 import {
   apiGoneBody,
@@ -13,7 +13,7 @@ import {
   type CutoverFlag,
   type CutoverMatch,
 } from '@/lib/v2/cutover';
-import { isRewriteTarget, REWRITE_HEADER, rewriteOf } from '@/lib/v2/rewrites';
+import { isRewriteTarget, REWRITE_HEADER, rewriteOf, type RewriteFlag } from '@/lib/v2/rewrites';
 
 /**
  * API requests: a state change to a route the registry guards (lib/security/route-policy.ts) is
@@ -106,10 +106,11 @@ export async function handleEdge(
 }
 
 /** Whether each v2 flag is on, read per request: `V2_REWRITES` rows name one, `V1_CUTOVER` rows several. */
-const FLAG_ON: Readonly<Record<CutoverFlag, () => boolean>> = {
+const FLAG_ON: Readonly<Record<CutoverFlag | RewriteFlag, () => boolean>> = {
   pipeline: () => pipelineEnabled(),
   checksPublic: () => checksPublicEnabled(),
   billing: () => billingV2Enabled(),
+  publicPages: () => v2PublicPagesEnabled(),
 };
 
 const NO_STORE = { 'Cache-Control': 'no-store' };

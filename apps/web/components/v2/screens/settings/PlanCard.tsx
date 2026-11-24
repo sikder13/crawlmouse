@@ -39,6 +39,7 @@ export function PlanCard({
             <ActionControl action={plan.keep} size="md" />
           </div>
         ) : null}
+        {plan.keepNote ? <div className={styles.keep}>{plan.keepNote}</div> : null}
         <div className={styles.hint}>
           {plan.other}{' '}
           <a href={plan.compare.href} className={styles.inlineLink}>

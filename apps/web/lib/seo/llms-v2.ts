@@ -1,17 +1,19 @@
 /**
  * /llms.txt's key pages while V2_CHECKS_PUBLIC is on: [label, path, description] for the public
  * pages listed below, the label and description being the page's own title and meta description,
- * read from where its metadata reads them. A page behind V2_BILLING is listed only while that flag is
- * on; with it off, /pricing and /developers are v1's pages and are listed with v1's own metadata.
+ * read from where its metadata reads them; /developers is labelled by its short name, because its
+ * indexed title lists tools that are not shipped. With both V2_CHECKS_PUBLIC and V2_BILLING off, /pricing and
+ * /developers are v1's pages and are listed with v1's own metadata.
  */
 import type { Metadata } from 'next';
+import { accountDoorEnabled, v2PublicPagesEnabled } from '../auth/flags';
 import { billingV2Enabled } from '../billing/flags';
 import { AGENCY_MONTHLY, AGENCY_YEARLY, PRO_MONTHLY, PRO_YEARLY, usd } from '../billing/prices';
+import { DEVELOPERS_COPY } from '../v2/copy/developers';
 import { PRICING_COPY } from '../v2/copy/pricing';
 import { CHECK_COPY, CHECK_QUESTIONS, checkPath } from '../v2/copy/check-pages';
 import { HELP_COPY } from '../v2/help/copy';
 import { agenciesView } from '../v2/view/agencies';
-import { developersView } from '../v2/view/developers';
 import { metadata as v1Pricing } from '../../app/pricing/page';
 import { metadata as v1Developers } from '../../app/developers/page';
 import { metadata as blog } from '../../app/blog/page';
@@ -37,17 +39,20 @@ function fromMetadata(path: string, m: Pick<Metadata, 'title' | 'description'>):
 }
 
 export function v2KeyPages(): KeyPage[] {
-  const billing = billingV2Enabled();
-  const agencies = agenciesView();
-  const developers = developersView();
+  // RC-01: /pricing and /developers are the v2 pages while either flag is on.
+  const v2Served = v2PublicPagesEnabled();
+  const agencies = agenciesView({
+    billing: billingV2Enabled(),
+    accountDoor: accountDoorEnabled(),
+  });
   return [
     [V2_HOME_TITLE, '/', V2_HOME_DESCRIPTION],
-    billing
+    v2Served
       ? [PRICING_COPY.pageTitle, '/pricing', PRICING_COPY.description()]
       : fromMetadata('/pricing', v1Pricing),
-    ...(billing ? [[agencies.title, '/agencies', agencies.description] as const] : []),
-    billing
-      ? [developers.title, '/developers', developers.description]
+    [agencies.title, '/agencies', agencies.description],
+    v2Served
+      ? [DEVELOPERS_COPY.navLabel, '/developers', DEVELOPERS_COPY.description]
       : fromMetadata('/developers', v1Developers),
     ...CHECK_QUESTIONS.map(
       (q): KeyPage => [CHECK_COPY[q].title, checkPath(q), CHECK_COPY[q].description],

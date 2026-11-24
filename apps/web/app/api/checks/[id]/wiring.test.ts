@@ -214,3 +214,10 @@ describe('the routes’ membership test and the audit pages’ (requestAccess)',
     expect(seen).toEqual([true, false, false, 'throws']);
   });
 });
+
+describe('the stream route', () => {
+  it('hands the stream the live read, so a running batch can be shown', async () => {
+    const { deps } = await wired(streamRoute, 'GET', USER);
+    expect(deps.liveProgress).toBeTypeOf('function');
+  });
+});

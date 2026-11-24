@@ -1,5 +1,5 @@
 /**
- * /agency-trial (CC-29 D3): a 404 unless V2_BILLING and V2_AGENCY_SALES are on, before any read; signed out, a redirect to
+ * /agency-trial (CC-29 D3): with V2_BILLING off or Agency not on sale a redirect to /agencies, before any read; signed out, a redirect to
  * sign in that returns here; never indexed; the form for a new trialist, the reason and no form for
  * a used trial, and the "did not finish" note for an agency account a Checkout left (Q16).
  */
@@ -70,26 +70,29 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllEnvs());
 
 describe('/agency-trial', () => {
-  it.each(['', 'true'])('is a 404 with V2_BILLING=%j, before any read', async (flag) => {
-    vi.stubEnv('V2_BILLING', flag);
-    await expect(render()).rejects.toMatchObject({
-      digest: expect.stringContaining('NEXT_HTTP_ERROR_FALLBACK;404'),
-    });
-    expect(h.reads).toBe(0);
-  });
+  it.each(['', 'true'])(
+    'RC-01: with V2_BILLING=%j goes to /agencies, before any read',
+    async (flag) => {
+      vi.stubEnv('V2_BILLING', flag);
+      await expect(render()).rejects.toMatchObject({
+        digest: expect.stringMatching(/^NEXT_REDIRECT;[a-z]+;\/agencies;307;/),
+      });
+      expect(h.reads).toBe(0);
+    },
+  );
 
-  it('is a 404 with Agency not on sale, before any read, signed in or not', async () => {
+  it('sends the visitor to For agencies with Agency not on sale, before any read', async () => {
     vi.stubEnv('V2_AGENCY_SALES', '');
     await expect(render()).rejects.toMatchObject({
-      digest: expect.stringContaining('NEXT_HTTP_ERROR_FALLBACK;404'),
+      digest: expect.stringContaining('NEXT_REDIRECT;replace;/agencies;'),
     });
     expect(h.reads).toBe(0);
   });
 
-  it('its layout is a 404 with Agency not on sale too', async () => {
+  it('its layout does the same', async () => {
     const { default: Layout } = await import('./layout');
     vi.stubEnv('V2_AGENCY_SALES', '');
-    expect(() => Layout({ children: null })).toThrow(/NEXT_HTTP_ERROR_FALLBACK;404/);
+    expect(() => Layout({ children: null })).toThrow(/NEXT_REDIRECT/);
     vi.stubEnv('V2_AGENCY_SALES', '1');
     expect(() => Layout({ children: null })).not.toThrow();
   });
