@@ -187,13 +187,13 @@ describe('sitemap.ts', () => {
   );
 });
 
-// CC-29: the new public pages answer 404 while their flag is off (/agencies under V2_BILLING, the
-// three /check pages under V2_CHECKS_PUBLIC), and a sitemap entry must never answer an error
-// (OPERATING-RULES §13). So each is listed exactly while its own flag is on, and /pricing and
-// /developers, which v1 or v2 serves either way, are listed whatever the flags say.
+// CC-29: the new public pages answer 404 while their flag is off (the three /check pages and help
+// under V2_CHECKS_PUBLIC), and a sitemap entry must never answer an error (OPERATING-RULES §13). So
+// each is listed exactly while its own flag is on. /pricing and /developers, which v1 or v2 serves
+// either way, and /agencies, served whatever the flags say (RC-01), are always listed.
 describe('sitemap.ts — the flag-gated pages (CC-29 D9)', () => {
   const GATED = {
-    V2_BILLING: ['/agencies'],
+    V2_BILLING: [],
     V2_CHECKS_PUBLIC: [
       '/check/gptbot',
       '/check/javascript',
@@ -229,7 +229,7 @@ describe('sitemap.ts — the flag-gated pages (CC-29 D9)', () => {
         (p) => ALL.includes(p as never) || p.startsWith('/check') || p.startsWith('/help'),
       ),
     ).toEqual([]);
-    expect(listed).toEqual(expect.arrayContaining(['/pricing', '/developers']));
+    expect(listed).toEqual(expect.arrayContaining(['/pricing', '/developers', '/agencies']));
   });
 
   it.each([
@@ -240,7 +240,7 @@ describe('sitemap.ts — the flag-gated pages (CC-29 D9)', () => {
     async (flag, flags) => {
       const listed = await paths(flags);
       expect(listed.filter((p) => ALL.includes(p as never))).toEqual([...GATED[flag]]);
-      expect(listed).toEqual(expect.arrayContaining(['/pricing', '/developers']));
+      expect(listed).toEqual(expect.arrayContaining(['/pricing', '/developers', '/agencies']));
     },
   );
 

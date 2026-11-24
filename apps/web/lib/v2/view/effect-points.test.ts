@@ -9,7 +9,7 @@
 import type { Fix, FixSection } from '@crawlmouse/types/v2';
 import { describe, expect, it } from 'vitest';
 import { findCheck, fixture } from '../fixtures';
-import { formatPoints, groupSum, NO_EFFECT, NO_EFFECT_SHORT } from './effect-headline';
+import { formatPoints, groupSum, NO_EFFECT, NO_EFFECT_SHORT, scoreAfter } from './effect-headline';
 import { points, restPoints, resultView } from './result';
 import { effectOf, groupPoints, proPoints } from './segment/fixes';
 import { FIRST_AUDIT } from './segment/test-helpers';
@@ -62,6 +62,27 @@ describe('formatPoints and groupSum', () => {
   it('give a figure above zero only', () => {
     expect([0.01, 3].map(formatPoints)).toEqual(['+0.01', '+3']);
     expect([0, -0.01, -1].map(formatPoints)).toEqual([null, null, null]);
+  });
+
+  it('print a sum to two decimal places, as a grade is given', () => {
+    // Each of these sums is one binary fraction away from its decimal value.
+    expect(0.1 + 0.2).not.toBe(0.3);
+    expect(formatPoints(0.1 + 0.2)).toBe('+0.3');
+    expect(formatPoints(2.7399999999999998)).toBe('+2.74');
+    expect(formatPoints(groupSum([1.1, 2.2]))).toBe('+3.3');
+    // A half that binary stores just under still rounds up, as the engine's `round` does.
+    expect(formatPoints(1.005)).toBe('+1.01');
+  });
+
+  it('give no figure for an effect too small to print', () => {
+    expect(formatPoints(0.004)).toBeNull();
+    expect(formatPoints(0.005)).toBe('+0.01');
+  });
+
+  it('give the score after a fix to two places, and never above 100', () => {
+    expect(81.57 + 1.35).not.toBe(82.92);
+    expect(scoreAfter(81.57, 1.35)).toBe(82.92);
+    expect(scoreAfter(99.5, 3)).toBe(100);
   });
 
   it('take each member at 0 before adding', () => {
@@ -232,5 +253,30 @@ describe('the Result, built from a fixture whose fixes are edited', () => {
     const body = v.first.kind === 'fix' ? v.first.body : '';
     expect(body).toContain(`${NO_EFFECT}.`);
     expect(body).not.toMatch(NEVER);
+  });
+});
+
+describe('a sum of effects is printed as a number to read (F-099)', () => {
+  it.each([
+    [6.909999999999998, '+6.91'],
+    [6.999999999999998, '+7'],
+    [0.1 + 0.2, '+0.3'],
+    [1.35, '+1.35'],
+    [3, '+3'],
+    [0.01, '+0.01'],
+  ])('%s prints as %s', (n, shown) => {
+    expect(formatPoints(n)).toBe(shown);
+  });
+
+  it('an effect that rounds to nothing is no effect, never "+0"', () => {
+    expect(formatPoints(0.004)).toBeNull();
+  });
+
+  it('each printer of a group says the rounded sum', () => {
+    const f = (seo: number) => fixWith(null, seo, 'structure');
+    const group = [f(0.1), f(0.7)];
+    expect(0.1 + 0.7).not.toBe(0.8);
+    expect(groupPoints(group)).toContain('+0.8 Technical SEO');
+    expect(restPoints(group)).toContain('+0.8 SEO');
   });
 });

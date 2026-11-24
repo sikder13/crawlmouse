@@ -6,7 +6,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin';
 import { stripe } from '@/lib/stripe';
 import { resolveOrigin } from '@/lib/origin';
 import { checkoutV2, parseCheckout, supabaseCheckoutAccounts } from '@/lib/billing/checkout-v2';
-import { billingV2Enabled } from '@/lib/billing/flags';
+import { agencySalesOpen, billingV2Enabled } from '@/lib/billing/flags';
 import { v1PurchasesClosed } from '@/lib/billing/v1-purchases';
 import { requestedAccountId } from '@/lib/billing/owner';
 import { chosenInHeader } from '@/lib/v2/account/viewer-cookie';
@@ -33,6 +33,7 @@ export async function POST(req: Request) {
     const body = await readBody(req);
     const input = body && parseCheckout(body);
     if (!body || !input) return refuse(400, 'invalid');
+    if (input.plan === 'agency' && !agencySalesOpen()) return refuse(403, 'agency_not_open');
     const target = await requestedAccountId(
       sb,
       user.id,

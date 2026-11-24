@@ -24,7 +24,7 @@ type Line = { file: string; line: string };
 const ALLOWED: (Line & { why: string })[] = [
   {
     file: 'effect-headline.ts',
-    line: 'export const formatPoints = (n: number): string | null => (n > 0 ? `+${n}` : null);',
+    line: 'return shown > 0 ? `+${shown}` : null;',
     why: 'the one printer of a fix effect’s sign',
   },
   {

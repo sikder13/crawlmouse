@@ -23,7 +23,7 @@ const nextConfig = {
   // AI crawlers don't run JavaScript, so metadata Next streams into <body> never reaches their <head>:
   // every agent gets blocking metadata (CC-40 ruling 4; __tests__/next-config-html-limited-bots.test.ts).
   htmlLimitedBots: /.*/,
-  // PostHog reverse proxy: route /ingest/* to PostHog's US hosts so events survive ad-blockers.
+  // PostHog's same-origin proxy is the route app/ingest/[...path], which forwards no cookie.
   // skipTrailingSlashRedirect keeps PostHog's trailing-slash paths from 308-redirecting.
   skipTrailingSlashRedirect: true,
   // Security headers on every response (lib/security/headers.mjs). headers() runs at build time, so
@@ -35,19 +35,6 @@ const nextConfig = {
       posthogHost: process.env.NEXT_PUBLIC_POSTHOG_HOST,
       dev: process.env.NODE_ENV === 'development',
     });
-  },
-  async rewrites() {
-    return [
-      {
-        source: '/ingest/static/:path*',
-        destination: 'https://us-assets.i.posthog.com/static/:path*',
-      },
-      {
-        source: '/ingest/array/:path*',
-        destination: 'https://us-assets.i.posthog.com/array/:path*',
-      },
-      { source: '/ingest/:path*', destination: 'https://us.i.posthog.com/:path*' },
-    ];
   },
   transpilePackages: ['@crawlmouse/engine', '@crawlmouse/types'],
   // The report PDF's fonts are read from disk when a report is made (lib/v2/reports/pdf.ts), which

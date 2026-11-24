@@ -185,6 +185,8 @@ export function sentryServerOptions<I>(
 ) {
   return {
     integrations: [requestDataIntegration({ include: { cookies: false, data: false } })],
+    // Every outbound call but PostHog's: the `/ingest` proxy sends it a fixed list of headers.
+    tracePropagationTargets: [/^(?!https:\/\/us(?:-assets)?\.i\.posthog\.com(?:[/:?#]|$))/],
     beforeSend: <E>(event: E) => scrubDoorSecrets(event),
     beforeSendTransaction: <E>(event: E) => scrubDoorSecrets(event),
   };

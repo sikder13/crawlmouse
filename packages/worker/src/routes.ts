@@ -28,6 +28,13 @@ export const ROUTES: readonly Route[] = [
   },
   {
     method: 'GET',
+    path: '/batch/{batch_id}/progress?after={n}',
+    auth: 'HMAC over `ts.progress:{batch_id}`',
+    answers:
+      '200 `running` with progress and up to 25 finished pages from `after`, `done` or `failed`, never the result; 404 unknown or expired',
+  },
+  {
+    method: 'GET',
     path: '/metrics',
     auth: 'HMAC over `ts.metrics`',
     answers: '200 memory, event-loop lag p99, batches running, requests per site, reader restarts',

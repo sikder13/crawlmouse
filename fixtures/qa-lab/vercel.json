@@ -1,6 +1,12 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "ignoreCommand": "if [ -n \"$VERCEL_GIT_PREVIOUS_SHA\" ]; then git diff --quiet \"$VERCEL_GIT_PREVIOUS_SHA\" HEAD -- . || exit 1; else exit 1; fi",
+  "functions": {
+    "api/slow.mjs": {
+      "includeFiles": "sites/slow/**",
+      "maxDuration": 10
+    }
+  },
   "routes": [
     {
       "src": "/(.*)",
@@ -17,7 +23,7 @@
       "continue": true
     },
     {
-      "src": "/(?:(?:sites|blocked\\.html|404\\.html)(?:/.*)?|.*%.*)",
+      "src": "/(?:(?:sites|api|blocked\\.html|404\\.html)(?:/.*)?|.*%.*)",
       "status": 404,
       "dest": "/404.html"
     },
@@ -166,6 +172,16 @@
         }
       ],
       "dest": "/sites/demo-3/$1"
+    },
+    {
+      "src": "/(.*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "slow.lab.crawlmouse.com"
+        }
+      ],
+      "dest": "/api/slow?path=/$1"
     },
     {
       "src": "/(.*)",

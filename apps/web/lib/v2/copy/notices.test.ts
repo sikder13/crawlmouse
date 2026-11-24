@@ -45,7 +45,10 @@ describe('noticeLine', () => {
     ],
     ['not_owner', 'Only the account’s owner can start the trial.'],
     ['not_eligible', 'This account cannot start a trial: it is on a plan, or has had its trial.'],
-    ['refused', 'A trial could not be started for this account.'],
+    [
+      'refused',
+      'A free trial has already been used with this email address, device or network, so another cannot start here. Free keeps working. To ask about it, email support@crawlmouse.com.',
+    ],
     [
       'conflict',
       'The account changed while the trial was starting. Reload the page and try again.',

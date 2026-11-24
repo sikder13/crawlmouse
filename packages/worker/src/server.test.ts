@@ -465,6 +465,133 @@ describe('POST /batch: pause and capacity', () => {
   });
 });
 
+describe('GET /batch/{id}/progress', () => {
+  it('answers a running batch with its progress', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const clock = new InstantClock();
+    const slow: Fetcher = async (url, identity, limits) => {
+      await gate;
+      return fakeFetcher(clock, () => ({ status: 404, body: '' }))(url, identity, limits);
+    };
+    await start({}, slow);
+    const { body } = await post(batchBody());
+    const id = String(body.batch_id);
+    expect((await get(`/batch/${id}/progress`, `progress:${id}`)).body).toEqual({
+      batch_id: id,
+      status: 'running',
+      progress: {
+        urls_done: 0,
+        urls_total: 2,
+        requests: 0,
+        pages: 0,
+        links: 0,
+        homepage_read: false,
+      },
+      pages_total: 0,
+      live_pages: [],
+    });
+    release();
+  });
+
+  it('lists the pages a running batch has finished, from an offset, and ends the list when it ends', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const clock = new InstantClock();
+    const page = fakeFetcher(clock, (url) =>
+      url.endsWith('/robots.txt')
+        ? { status: 404, body: '' }
+        : { status: 200, body: '<html><body><a href="/next">next</a></body></html>' },
+    );
+    // The first page finishes; the second waits on the gate.
+    const held: Fetcher = async (url, identity, limits) => {
+      if (url.endsWith('/a')) await gate;
+      return page(url, identity, limits);
+    };
+    const { worker } = await start({}, held);
+    const { body } = await post(batchBody());
+    const id = String(body.batch_id);
+    let first: Record<string, unknown> = {};
+    for (let i = 0; i < 200 && !first.pages_total; i++) {
+      first = (await get(`/batch/${id}/progress`, `progress:${id}`)).body;
+      await new Promise((r) => setTimeout(r, 5));
+    }
+    expect(first.pages_total).toBe(1);
+    const [listed] = first.live_pages as Array<Record<string, unknown>>;
+    expect(listed).toMatchObject({ status: 200, identity: expect.any(String), links: 1 });
+    expect(listed!.edges).toEqual([
+      // As the stored edge holds it: `from_url` is canonical, so the root has no trailing slash.
+      { from: 'https://www.example.com', to: expect.stringContaining('/next'), js_only: false },
+    ]);
+    const after = await get(`/batch/${id}/progress?after=1`, `progress:${id}`);
+    expect(after.body).toMatchObject({ pages_total: 1, live_pages: [] });
+    release();
+    await worker.idle();
+    expect((await get(`/batch/${id}/progress`, `progress:${id}`)).body).toEqual({
+      batch_id: id,
+      status: 'done',
+    });
+  });
+
+  it('refuses an offset that is not a number, on a batch that is running', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const clock = new InstantClock();
+    const slow: Fetcher = async (url, identity, limits) => {
+      await gate;
+      return fakeFetcher(clock, () => ({ status: 404, body: '' }))(url, identity, limits);
+    };
+    const { worker } = await start({}, slow);
+    const { body } = await post(batchBody());
+    const id = String(body.batch_id);
+    expect((await get(`/batch/${id}/progress?after=1`, `progress:${id}`)).status).toBe(200);
+    expect((await get(`/batch/${id}/progress?after=x`, `progress:${id}`)).status).toBe(404);
+    release();
+    await worker.idle();
+  });
+
+  it('never carries the result of a finished batch', async () => {
+    const { worker } = await start();
+    const { body } = await post(batchBody());
+    await worker.idle();
+    const id = String(body.batch_id);
+    const answer = await get(`/batch/${id}/progress`, `progress:${id}`);
+    expect(answer.status).toBe(200);
+    expect(answer.body).toEqual({ batch_id: id, status: 'done' });
+  });
+
+  it('answers failed for a batch that threw', async () => {
+    const { worker } = await start({}, async () => {
+      throw new Error('boom');
+    });
+    const { body } = await post(batchBody());
+    await worker.idle();
+    const id = String(body.batch_id);
+    expect((await get(`/batch/${id}/progress`, `progress:${id}`)).body).toEqual({
+      batch_id: id,
+      status: 'failed',
+    });
+  });
+
+  it('answers 404 for an unknown batch', async () => {
+    await start();
+    const unknown = `${CHECK}:424242`;
+    expect((await get(`/batch/${unknown}/progress`, `progress:${unknown}`)).status).toBe(404);
+  });
+
+  it('takes only a signature made for this batch and this purpose', async () => {
+    const { worker } = await start();
+    const { body } = await post(batchBody());
+    await worker.idle();
+    const id = String(body.batch_id);
+    expect((await get(`/batch/${id}/progress`, `batch:${id}`)).status).toBe(401);
+    expect((await get(`/batch/${id}/progress`, `progress:${CHECK}:0`)).status).toBe(401);
+    expect((await get(`/batch/${id}/progress`, 'metrics')).status).toBe(401);
+    // And a progress signature does not open the route that returns the result.
+    expect((await get(`/batch/${id}`, `progress:${id}`)).status).toBe(401);
+  });
+});
+
 describe('the done signal through a protected staging app', () => {
   it('carries the configured bypass from the config to the post', async () => {
     const signalPost = vi.fn<SignalPost>(async () => undefined);
@@ -499,7 +626,14 @@ describe('GET /batch/{id}', () => {
     expect((await get(`/batch/${id}`, `batch:${id}`)).body).toEqual({
       batch_id: id,
       status: 'running',
-      progress: { urls_done: 0, urls_total: 2, requests: 0 },
+      progress: {
+        urls_done: 0,
+        urls_total: 2,
+        requests: 0,
+        pages: 0,
+        links: 0,
+        homepage_read: false,
+      },
     });
     release();
   });

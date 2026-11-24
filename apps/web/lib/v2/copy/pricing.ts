@@ -25,8 +25,10 @@ import {
 } from '../../billing/prices';
 import { TRIAL_DAYS } from '../../billing/state-machine';
 import { GATES, type Tier } from '../../entitlement-v2';
+import { AUDIT_TTL_DAYS } from '../../limits';
 import type { Tagged } from './agencies';
-import { CANCEL_CLICKS, EVIDENCE_CONDENSED_AFTER_DAYS } from './settings';
+import { AGENCY_PLUS_INBOX_ADDRESS } from './contact-inbox';
+import { CANCEL_CLICKS } from './settings';
 import { capitalise, count, numberWord, plural } from '../words';
 
 /** FACTS A3: the Agency Plus anchor row. A contact form only; nothing is built behind it. */
@@ -63,6 +65,9 @@ export function monthsFree(): number {
 }
 
 const trialDays = `${TRIAL_DAYS} days`;
+
+/** What a paid plan says while V2_BILLING is off (RC-01). */
+const OPENS_SHORTLY = 'opens shortly';
 
 /** How many fixes Free shows: a number on Free, or the page's sentences would not hold. */
 function freeFixes(): number {
@@ -106,7 +111,11 @@ const renders = (tier: Tier): PlanRow => ({
  * `proTrial`: whether the page offers Pro's no-card trial (`pricingView` decides it from Pro's
  * button and the flags); without it, Pro's tag says the card is required (SEO R2-N1).
  */
-export function planCopy(interval: Interval, proTrial: boolean): Record<Tier, PlanCopy> {
+export function planCopy(
+  interval: Interval,
+  proTrial: boolean,
+  billing: boolean,
+): Record<Tier, PlanCopy> {
   const { free, pro, agency } = GATES;
   return {
     free: {
@@ -134,14 +143,14 @@ export function planCopy(interval: Interval, proTrial: boolean): Record<Tier, Pl
         },
         {
           label: 'kept',
-          text: 'Every audit, its evidence and link map, kept',
+          text: `Audits of the site you keep, with evidence and link map; audits from the earlier version last ${AUDIT_TTL_DAYS} days`,
           capabilities: ['free_audit'],
         },
       ],
     },
     pro: {
       name: 'Pro',
-      tag: proTrial ? `free for ${trialDays}, no card` : 'card required',
+      tag: proTrial ? `free for ${trialDays}, no card` : billing ? 'card required' : OPENS_SHORTLY,
       description: {
         text: `Freelancers and in-house developers watching up to ${pro.sites} sites. ${capitalise(numberWord(pro.seats))} ${plural(pro.seats, 'seat', 'seats')}.`,
         capabilities: ['sites', 'weekly_checks', 'seats'],
@@ -178,7 +187,7 @@ export function planCopy(interval: Interval, proTrial: boolean): Record<Tier, Pl
     },
     agency: {
       name: 'Agency',
-      tag: `${TRIAL_DAYS}-day trial, card required`,
+      tag: billing ? `${TRIAL_DAYS}-day trial, card required` : OPENS_SHORTLY,
       description: {
         text: 'Agencies reporting to clients under their own name.',
         // A client report names the agency in its mail; the page it opens, the sender and the
@@ -225,7 +234,11 @@ export const PRICING_COPY = {
   /** The meta description: built capabilities only, since a search result carries no "coming" mark. */
   description: () =>
     `Every audit is free and complete. Pro is ${usd(PRO_MONTHLY)} a month for every fix the audit finds, on up to ${GATES.pro.sites} sites; Agency is ${usd(AGENCY_MONTHLY)} a month for ${GATES.agency.sites} client sites.`,
-  /** The artboard's h1 (Q33): "watched" is checking again and telling you, which CC-28 builds. */
+  /**
+   * The indexed h1, v1's (OPERATING-RULES §13). The artboard's sentence follows it as the tagline.
+   */
+  h1: 'Pricing',
+  /** The artboard's line (Q33): "watched" is checking again and telling you, which CC-28 builds. */
   title: {
     text: 'Every audit is free. Pay when you want it watched.',
     capabilities: ['weekly_checks', 'change_emails'],
@@ -252,8 +265,16 @@ export const PRICING_COPY = {
       capabilities: ['observed_crawlers'],
     },
   ],
-  annual: (): Tagged[] => {
+  annual: (billing: boolean): Tagged[] => {
     const [first, second] = ANNUAL_RENEWAL_REMINDER_DAYS;
+    if (!billing) {
+      return [
+        {
+          text: `Annual: Pro ${usd(PRO_YEARLY)}, Agency ${usd(AGENCY_YEARLY)} — ${numberWord(monthsFree())} months free, when paid plans open.`,
+          capabilities: [],
+        },
+      ];
+    }
     return [
       {
         text: `Annual: Pro ${usd(PRO_YEARLY)}, Agency ${usd(AGENCY_YEARLY)} — ${numberWord(monthsFree())} months free, from Settings.`,
@@ -305,9 +326,18 @@ export const PRICING_COPY = {
     },
     unavailable: { note: 'This account cannot choose this plan now' },
     agencyUsed: { note: 'Your agency trial was used, on an agency account since deleted' },
+    /** V2_BILLING off (RC-01): no route here takes a card. */
+    opensShortly: { note: 'Paid plans open shortly' },
+    agencyStartFree: { label: 'Start free', note: `The Agency plan ${OPENS_SHORTLY}` },
+    proTrialBillingOff: {
+      label: `Start with ${trialDays} of Pro`,
+      note: 'Same account, no card; paid plans open shortly',
+    },
     current: { label: 'Your plan', note: 'The plan your account is on now' },
     included: { label: 'Included in your plan', note: 'Agency includes all of Pro' },
     freeBelow: { note: 'If you cancel, from Settings, the account returns to Free' },
+    /** V2_BILLING off: the cancel route answers 404, and a trial ends by itself. */
+    freeBelowBillingOff: { note: 'When a trial ends, the account returns to Free' },
     notOwner: { note: 'Only the account owner changes its plan' },
   },
   agencyPlus: {
@@ -321,7 +351,7 @@ export const PRICING_COPY = {
      * (AGENCY_PLUS_INBOX; pinned equal in lib/v2/view/pricing.test.ts). A literal, because this copy
      * reaches client components and email-change.ts does not.
      */
-    inbox: 'support@crawlmouse.com',
+    inbox: AGENCY_PLUS_INBOX_ADDRESS,
     inboxBefore: 'Write to',
     inboxAfter: 'with your agency’s name and how many client sites you run.',
     /** The request is mailed to this inbox (`agency_plus_contact`, AGENCY_PLUS_INBOX). */
@@ -349,24 +379,28 @@ export const PRICING_COPY = {
   },
   after: {
     /** Without Pro's trial on offer, the section is the Agency trial's (`proTrial`, SEO R2-N1). */
-    title: (proTrial: boolean) =>
-      proTrial
+    title: (proTrial: boolean, billing: boolean) =>
+      proTrial || !billing
         ? `What happens when the ${trialDays} end`
         : `What happens when the Agency trial’s ${trialDays} end`,
-    /** FACTS A6 (long form) and A8. */
-    lead: (): Tagged[] => [
+    /**
+     * FACTS A6 and A8, without A6's clause on condensing old evidence, which no job does. The reminder
+     * is said only with billing on: the function that sends it is registered only then
+     * (`billingFunctions`).
+     */
+    lead: (billing: boolean): Tagged[] => [
       { text: 'Nothing you can see is deleted.', capabilities: [] },
-      {
-        text: `Evidence older than ${EVIDENCE_CONDENSED_AFTER_DAYS} days is condensed to headers and the parts of pages that changed.`,
-        capabilities: ['evidence_condensed'],
-      },
-      {
-        text: `We email you ${numberWord(TRIAL_REMINDER_DAYS_BEFORE_END)} days before.`,
-        capabilities: ['trial_reminder'],
-      },
+      ...(billing
+        ? [
+            {
+              text: `We email you ${numberWord(TRIAL_REMINDER_DAYS_BEFORE_END)} days before.`,
+              capabilities: ['trial_reminder'],
+            } as Tagged,
+          ]
+        : []),
     ],
     columns: ['What', 'What happens'] as const,
-    rows: (interval: Interval): [string, Tagged][] => [
+    rows: (interval: Interval, billing: boolean): [string, Tagged][] => [
       [
         'Your first site',
         {
@@ -377,24 +411,32 @@ export const PRICING_COPY = {
       [
         'Other sites',
         {
-          text: 'Pause until you choose Pro or remove them; their history stays',
+          text: billing
+            ? 'Pause until you choose Pro or remove them; their history stays'
+            : `Scheduled checks stop; choosing Pro, once paid plans open, restarts up to ${numberWord(GATES.pro.sites)}. Their history stays`,
           capabilities: ['sites'],
         },
       ],
       [
         `Fixes beyond the first ${numberWord(freeFixes())}`,
         {
-          text: 'Stay listed with their estimated effect; the packets reopen with Pro',
+          text: billing
+            ? 'Stay listed with their estimated effect; the packets reopen with Pro'
+            : 'Stay listed with their estimated effect; the packets reopen with Pro, when paid plans open',
           capabilities: ['fix_packets'],
         },
       ],
-      [
-        'Agency trial',
-        {
-          text: `Card on file is charged ${usd(priceOf('agency', interval))} on day ${TRIAL_DAYS + 1} unless you cancel; from the Agency trial page, any day, ${numberWord(CANCEL_CLICKS)} clicks, no call`,
-          capabilities: ['agency_trial', 'cancel'],
-        },
-      ],
+      ...(billing
+        ? ([
+            [
+              'Agency trial',
+              {
+                text: `Card on file is charged ${usd(priceOf('agency', interval))} on day ${TRIAL_DAYS + 1} unless you cancel; from the Agency trial page, any day, ${numberWord(CANCEL_CLICKS)} clicks, no call`,
+                capabilities: ['agency_trial', 'cancel'],
+              },
+            ],
+          ] as [string, Tagged][])
+        : []),
     ],
   },
   why: {
@@ -413,8 +455,35 @@ export const PRICING_COPY = {
   faq: {
     title: 'Questions people ask before paying',
     /** `proTrial`: whether the page offers Pro's no-card trial (SEO R2-N1). */
-    items: (proTrial: boolean): { q: string; a: Tagged }[] => {
+    items: (proTrial: boolean, billing: boolean): { q: string; a: Tagged }[] => {
       const [first, second] = ANNUAL_RENEWAL_REMINDER_DAYS;
+      if (!billing) {
+        return [
+          {
+            q: 'Do I need a card for Pro?',
+            a: {
+              text: proTrial
+                ? `No. The ${trialDays} start with your email. Paid plans open shortly.`
+                : 'Not yet: paid plans open shortly.',
+              capabilities: [],
+            },
+          },
+          {
+            q: 'Which emails will I get?',
+            a: {
+              text: 'A sign-in link, a note when a check finds a change, and, on Pro or during its trial, a weekly summary when something changed.',
+              capabilities: ['change_emails'],
+            },
+          },
+          {
+            q: 'Can I cancel?',
+            a: {
+              text: `New paid plans have not opened. A Pro trial ends by itself and the account goes back to Free; nothing you can see is deleted. If you already pay for Pro, write to ${AGENCY_PLUS_INBOX_ADDRESS} to change or end it.`,
+              capabilities: [],
+            },
+          },
+        ];
+      }
       const agencyCard =
         'Agency’s trial takes a card at the start, and the plan is charged when the trial ends unless you cancel.';
       return [
