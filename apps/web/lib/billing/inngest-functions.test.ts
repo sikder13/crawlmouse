@@ -110,7 +110,7 @@ describe('billingFunctions (CC-03 D9)', { timeout: 60_000 }, () => {
     ]);
   });
 
-  it('every concurrency limit it declares is within the Inngest plan cap of 5', async () => {
+  it('declares its two concurrency limits, both within Hobby’s cap of 5, so a lapse leaves them syncable', async () => {
     const { billingFunctions } = await import('./inngest-functions');
     const configs = configsOf(billingFunctions({ V2_BILLING: '1' }));
     expect(configs.map((c) => c.concurrency?.limit)).toEqual([2, 1]);
