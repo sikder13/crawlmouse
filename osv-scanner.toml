@@ -20,21 +20,6 @@ ignoreUntil = 2026-11-26
 reason = "Present at the CC-00 baseline: @grpc/grpc-js@1.14.4 (fixed: 1.14.5)"
 
 [[IgnoredVulns]]
-id = "GHSA-8988-4f7v-96qf"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: @opentelemetry/core@2.2.0 (fixed: 2.8.0); @opentelemetry/core@2.6.1 (fixed: 2.8.0); @opentelemetry/core@2.7.1 (fixed: 2.8.0)"
-
-[[IgnoredVulns]]
-id = "GHSA-qqmp-wf37-98f9"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: @opentelemetry/instrumentation-cassandra-driver@0.63.0 (fixed: 0.66.0); @opentelemetry/instrumentation-knex@0.58.0 (fixed: 0.65.0); @opentelemetry/instrumentation-knex@0.62.0 (fixed: 0.65.0); @opentelemetry/instrumentation-mongoose@0.60.0 (fixed: 0.67.0); @opentelemetry/instrumentation-mongoose@0.64.0 (fixed: 0.67.0); @opentelemetry/instrumentation-mysql@0.60.0 (fixed: 0.67.0); @opentelemetry/instrumentation-mysql@0.64.0 (fixed: 0.67.0); @opentelemetry/instrumentation-mysql2@0.60.0 (fixed: 0.67.0); @opentelemetry/instrumentation-mysql2@0.64.0 (fixed: 0.67.0); @opentelemetry/instrumentation-oracledb@0.43.0 (fixed: 0.46.0); @opentelemetry/instrumentation-pg@0.66.0 (fixed: 0.73.0); @opentelemetry/instrumentation-pg@0.70.0 (fixed: 0.73.0); @opentelemetry/instrumentation-tedious@0.33.0 (fixed: 0.40.0); @opentelemetry/instrumentation-tedious@0.37.0 (fixed: 0.40.0)"
-
-[[IgnoredVulns]]
-id = "GHSA-45rx-2jwx-cxfr"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: @opentelemetry/propagator-jaeger@2.7.1 (fixed: 2.9.0)"
-
-[[IgnoredVulns]]
 id = "GHSA-82fw-gwwq-j7x9"
 ignoreUntil = 2026-11-26
 reason = "Present at the CC-00 baseline: @vitest/mocker@2.1.9 (fixed: 4.1.11); vitest@2.1.9 (fixed: 4.1.11)"
