@@ -20,11 +20,6 @@ ignoreUntil = 2026-11-26
 reason = "Present at the CC-00 baseline: @vitest/mocker@2.1.9 (fixed: 4.1.12)"
 
 [[IgnoredVulns]]
-id = "GHSA-vwc7-r8mq-g2x9"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: adm-zip@0.5.17 (fixed: --)"
-
-[[IgnoredVulns]]
 id = "GHSA-67mh-4wv8-2f99"
 ignoreUntil = 2026-11-26
 reason = "Present at the CC-00 baseline: esbuild@0.21.5 (fixed: 0.25.0)"
