@@ -1,7 +1,7 @@
 import { siteOrigin, siteUrl } from '@/lib/site-url';
 import type { BlogPostMeta } from '@/lib/blog/posts';
 import { checksPublicEnabled } from '@/lib/auth/flags';
-import { billingV2Enabled } from '@/lib/billing/flags';
+import { agencySalesOpen, billingPublic } from '@/lib/billing/flags';
 import { AGENCY_MONTHLY, AGENCY_YEARLY, PRO_MONTHLY, PRO_YEARLY } from '@/lib/billing/prices';
 import { PARENT_ORGANIZATION, V2_HOME_DESCRIPTION } from './site-copy';
 import { postAbstract } from '@/lib/blog/answers';
@@ -81,15 +81,16 @@ function offer(name: string, price: number, interval: 'P1M' | 'P1Y' | null) {
 }
 
 /**
- * The plans on sale, priced from lib/billing/prices.ts: Free, Pro (sold in both builds) and, while
- * V2_BILLING sells it, Agency, each paid plan monthly and yearly.
+ * The plans on sale, priced from lib/billing/prices.ts: Free, Pro (sold in both builds) and Agency
+ * only while it is on sale, that is billing is public (`billingPublic`) and Agency sales are open
+ * (`agencySalesOpen`, F-251); each paid plan monthly and yearly.
  */
 export function planOffers() {
   return [
     offer('Free', 0, null),
     offer('Pro, monthly', PRO_MONTHLY, 'P1M'),
     offer('Pro, yearly', PRO_YEARLY, 'P1Y'),
-    ...(billingV2Enabled()
+    ...(billingPublic() && agencySalesOpen()
       ? [
           offer('Agency, monthly', AGENCY_MONTHLY, 'P1M'),
           offer('Agency, yearly', AGENCY_YEARLY, 'P1Y'),

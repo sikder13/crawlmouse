@@ -361,6 +361,6 @@ export function resultChecks(v: AccountView, siteId: string): Check[] {
     .sort((x, y) => at(x.finished_at!) - at(y.finished_at!));
 }
 
-/** The sites that hold a slot: staging and competitor copies do not (ARCH-2 §2.5, Q10). */
+/** The sites that hold a slot: a staging copy does not (ARCH-2 §2.5, Q10). */
 export const primarySites = (v: AccountView) =>
   v.d.sites.filter((s) => s.staging_of_site_id === null);

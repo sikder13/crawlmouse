@@ -2,7 +2,10 @@
 
 import { createContext, useContext, useState, type ReactNode } from 'react';
 import { Heading } from '../../Heading';
+import type { ActionView } from '../../../../lib/v2/view/account-actions';
 import type { PacketBodyView, PacketFramework } from '../../../../lib/v2/view/fix';
+import { ActionControl } from '../account/ActionControl';
+import { LiveActions } from '../account/LiveActions';
 import { PacketActions } from '../segment/PacketActions';
 import { DownloadText } from './DownloadText';
 import styles from './FixScreen.module.css';
@@ -85,5 +88,25 @@ export function ChosenPacket({
         </DownloadText>
       </PacketActions>
     </>
+  );
+}
+
+/**
+ * The form that emails the fix to a developer. Its `framework` field is the body `ChosenPacket`
+ * shows, so the mail holds the steps the reader is looking at.
+ */
+export function ChosenDeveloperForm({
+  action,
+  bodies,
+}: {
+  action: ActionView;
+  bodies: PacketBodyView[];
+}) {
+  const chosen = useContext(ChoiceContext)?.chosen ?? null;
+  const body = bodies.find((b) => b.key === chosen) ?? bodies[0]!;
+  return (
+    <LiveActions>
+      <ActionControl action={{ ...action, fields: { ...action.fields, framework: body.key } }} />
+    </LiveActions>
   );
 }

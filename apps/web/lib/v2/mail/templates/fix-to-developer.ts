@@ -13,7 +13,10 @@ import { hostText, para, pre, small } from './parts';
 export interface FixToDeveloperInput {
   host: string;
   fixTitle: string;
-  /** The packet as text: `packetPrompt(fix, fix.packet)` (lib/v2/view/segment/fixes.ts). */
+  /**
+   * The packet as text: `packetPrompt` (lib/v2/view/segment/fixes.ts) of the body the reader chose,
+   * or of the packet's own.
+   */
   packet: string;
 }
 

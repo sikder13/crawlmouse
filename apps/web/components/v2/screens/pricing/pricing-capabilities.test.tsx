@@ -14,7 +14,7 @@ import { capabilitySweep, comingNamedIn } from '../../../../__tests__/helpers/ca
 import { PricingScreen } from './PricingScreen';
 
 const NOW = new Date('2026-11-12T12:00:00Z');
-const FLAGS = { accountDoor: true, checksPublic: true, billing: true };
+const FLAGS = { accountDoor: true, checksPublic: true, billing: true, agencySales: true };
 const VIEWERS: [string, PricingViewer][] = [
   ['signed out', { kind: 'signed_out' }],
   [
@@ -102,7 +102,7 @@ describe('Pricing names only capabilities it can account for', () => {
 
   it('the emails question names the renewal reminders, as FACTS does', () => {
     const emails = PRICING_COPY.faq
-      .items(true, true)
+      .items(true, true, true)
       .find((i) => i.q === 'Which emails will I get?')!;
     expect(emails.a.text).toMatch(/Three kinds and no others/);
     expect(emails.a.text).toMatch(/renewal reminders 45 and 20 days before/);

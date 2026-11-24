@@ -291,7 +291,7 @@ const ROWS: readonly RowInput[] = [
     trigger: 'email.requested',
     steps: 1,
     stepsHow: 'send',
-    stepAt: [115],
+    stepAt: [119],
   },
   {
     file: 'inngest/mail.ts',
@@ -302,7 +302,7 @@ const ROWS: readonly RowInput[] = [
     trigger: 'check.notify_requested, check.finished, check.failed',
     steps: 1,
     stepsHow: 'send',
-    stepAt: [126],
+    stepAt: [130],
   },
   {
     file: 'inngest/mail.ts',
@@ -313,7 +313,7 @@ const ROWS: readonly RowInput[] = [
     trigger: 'fix.email_developer_requested',
     steps: 1,
     stepsHow: 'send',
-    stepAt: [137],
+    stepAt: [141],
   },
   {
     file: 'inngest/mail.ts',
@@ -324,7 +324,7 @@ const ROWS: readonly RowInput[] = [
     trigger: 'check.finished',
     steps: 1,
     stepsHow: 'capture',
-    stepAt: [153],
+    stepAt: [159],
   },
   {
     file: 'inngest/mail.ts',
@@ -345,7 +345,7 @@ const ROWS: readonly RowInput[] = [
     trigger: 'seat.invite.requested',
     steps: 1,
     stepsHow: 'send',
-    stepAt: [164],
+    stepAt: [170],
   },
   {
     file: 'inngest/mail.ts',
@@ -356,7 +356,7 @@ const ROWS: readonly RowInput[] = [
     trigger: 'report.confirmation.requested',
     steps: 1,
     stepsHow: 'send',
-    stepAt: [182],
+    stepAt: [188],
   },
   {
     file: 'inngest/mail.ts',
@@ -367,7 +367,7 @@ const ROWS: readonly RowInput[] = [
     trigger: 'report.send.requested',
     steps: 1,
     stepsHow: 'send',
-    stepAt: [195],
+    stepAt: [201],
   },
   {
     file: 'inngest/report-schedules.ts',
@@ -400,6 +400,28 @@ const ROWS: readonly RowInput[] = [
     steps: 1,
     stepsHow: "plan; then one per channel ('email', 'slack') when an alert fires",
     stepAt: [51, 57],
+  },
+  {
+    file: 'inngest/sentinel.ts',
+    id: 'crawlmouse.sentinel.tick',
+    onFailure: false,
+    callSites: 1,
+    registration: 'V2_PIPELINE+V2_CHECKS_PUBLIC',
+    cron: '23 * * * *',
+    steps: 1,
+    stepsHow: 'due, which sends the watch events itself',
+  },
+  {
+    file: 'inngest/sentinel.ts',
+    id: 'crawlmouse.sentinel.watch',
+    onFailure: false,
+    callSites: 6,
+    registration: 'V2_PIPELINE+V2_CHECKS_PUBLIC',
+    trigger: 'sentinel.watch',
+    steps: 6,
+    stepsHow:
+      'spread, look-1, then wait-1-p and result-1-p until the look ends (at least two polls for 8 templates at two requests a second); a move adds again, a second look and request',
+    stepAt: [79, 83, 88, 89],
   },
   {
     file: 'inngest/summary.ts',

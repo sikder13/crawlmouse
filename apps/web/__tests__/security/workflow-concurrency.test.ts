@@ -6,7 +6,7 @@ import { parse } from 'yaml';
 
 // Every workflow has a concurrency group (docs/specs/v2/ci-cost.md, D4). A newer run of the same
 // ref cancels an older one, except where cancelling midway would leave something half done, and
-// never on main: there each run has a group of its own.
+// never a running run on main.
 
 const WORKFLOWS = join(
   resolve(fileURLToPath(new URL('.', import.meta.url)), '../../../..'),
@@ -16,11 +16,18 @@ const WORKFLOWS = join(
 const ON_MAIN_ITS_OWN =
   "${{ github.ref == 'refs/heads/main' && format('-{0}', github.run_id) || '' }}";
 
-const EXPECTED: Record<string, { group: string; cancel: boolean; why: string }> = {
+/**
+ * ci.yml on main (Goal 1, CTO inbox 075): pushes share one group, so a newer merge replaces a PENDING run
+ * and never a running one; the nightly run and a dispatch keep a group of their own.
+ */
+const MAIN_PUSHES_SHARE =
+  "${{ github.ref == 'refs/heads/main' && github.event_name != 'push' && format('-{0}', github.run_id) || '' }}";
+
+const EXPECTED: Record<string, { group: string; cancel: boolean | string; why: string }> = {
   'ci.yml': {
-    group: `ci-\${{ github.ref }}${ON_MAIN_ITS_OWN}`,
-    cancel: true,
-    why: 'a newer push makes the older run of the branch moot; a pull request event has its own ref',
+    group: `ci-\${{ github.ref }}${MAIN_PUSHES_SHARE}`,
+    cancel: "${{ github.ref != 'refs/heads/main' }}",
+    why: 'a newer push makes the older run of a branch moot; on main a newer push replaces only a pending run',
   },
   'nightly.yml': {
     group: `nightly-\${{ github.ref }}${ON_MAIN_ITS_OWN}`,
@@ -62,7 +69,7 @@ describe('workflow concurrency', () => {
 
   it.each(files)('%s has its group and its cancel rule', (file) => {
     const wf = parse(readFileSync(join(WORKFLOWS, file), 'utf8')) as {
-      concurrency?: { group?: string; 'cancel-in-progress'?: boolean };
+      concurrency?: { group?: string; 'cancel-in-progress'?: boolean | string };
     };
     const want = EXPECTED[file]!;
     expect(wf.concurrency, want.why).toEqual({

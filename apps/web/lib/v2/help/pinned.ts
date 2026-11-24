@@ -24,6 +24,9 @@ export const CRAWL_USER_AGENT =
 /** What is appended to each crawler's user agent when the audit requests as that crawler. */
 export const CRAWLER_TAG = 'Crawlmouse/2.0 (+https://crawlmouse.com/bot)';
 
+/** The address that header gives. */
+export const FROM_ADDRESS = 'bot@crawlmouse.com';
+
 /** The header naming us that a request sent as a crawler carries; the browser control sends none. */
 export const FROM_HEADER = 'From';
 

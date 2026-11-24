@@ -17,7 +17,10 @@ import { AgenciesScreen } from './AgenciesScreen';
 
 function render() {
   const markup = renderToStaticMarkup(
-    <AgenciesScreen data={agenciesView({ billing: true, accountDoor: true })} audit="live" />,
+    <AgenciesScreen
+      data={agenciesView({ billing: true, agencySales: true, accountDoor: true })}
+      audit="live"
+    />,
   );
   return new JSDOM(markup).window.document;
 }

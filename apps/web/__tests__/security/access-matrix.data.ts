@@ -1881,6 +1881,11 @@ const LIBS: readonly Spec[] = [
     [
       ['apps/web/lib/v2/agency/schedules-wiring.ts', 'The report-schedule functions’ store.', 1],
       ['apps/web/lib/v2/monitor/functions.ts', 'The alert and summary functions’ stores.', 1],
+      [
+        'apps/web/lib/v2/monitor/sentinel-functions.ts',
+        'The daily sentinel’s store and requests.',
+        1,
+      ],
       ['apps/web/lib/v2/monitor/schedule.ts', 'The scheduled re-check claims.', 1],
       ['apps/web/lib/billing/inngest-functions.ts', 'The billing functions’ stores.', 1],
     ] as const
