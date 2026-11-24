@@ -31,6 +31,10 @@ const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')
 /** Site ids due at 06:00 UTC, and one that is not. */
 const DUE = Array.from({ length: 400 }, (_, i) => id(i)).filter((s) => sentinelHour(s) === 6);
 const NOT_DUE = Array.from({ length: 400 }, (_, i) => id(i)).find((s) => sentinelHour(s) !== 6)!;
+/** A Free site due at 06:00, from ids outside DUE's range: the hour alone would pick it. */
+const FREE_DUE = Array.from({ length: 400 }, (_, i) => id(1000 + i)).find(
+  (s) => sentinelHour(s) === 6,
+)!;
 
 const site = (siteId: string, account = PRO): WatchableSite => ({
   siteId,
@@ -65,9 +69,7 @@ function harness(
   const deps: SentinelDeps = {
     store: {
       watchableSites: async (offset) =>
-        offset === 0
-          ? [...DUE.map((s) => site(s)), site(NOT_DUE), site(DUE[0]!.replace(/.$/, 'f'), FREE)]
-          : [],
+        offset === 0 ? [...DUE.map((s) => site(s)), site(NOT_DUE), site(FREE_DUE, FREE)] : [],
       baseline: async () => ({
         checkId: 'full-1',
         host: 'shop.lab.crawlmouse.com',
