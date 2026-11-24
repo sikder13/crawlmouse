@@ -160,7 +160,7 @@ describe('the function rows against the code', () => {
     'inngest/founder.ts': 4, // 71 95 109 110 (CC-33)
     'inngest/signin-canary.ts': 4, // 54 62 74 77 (CC-33)
     'inngest/ledger.ts': 2, // 39 49 (CC-41)
-    'inngest/competitors.ts': 6, // 64 73 79 91 93 99 (row 18)
+    'inngest/competitors.ts': 6, // 76 85 91 103 105 111 (row 18)
   };
   it.each(Object.entries(HAND))('counts %s step call sites as a hand count does', (file, hand) => {
     expect(count(code(readFileSync(join(ROOT, file), 'utf8')), STEP_CALL)).toBe(hand);

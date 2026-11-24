@@ -64,4 +64,10 @@ describe('competitorSnapshot', () => {
     c.status = 'partial';
     expect(competitorSnapshot(c, 'rival.example')).not.toBeNull();
   });
+
+  it('has no signal count when no signal could be read', () => {
+    const c = badSite();
+    c.signals = c.signals.map((s) => ({ ...s, state: 'indeterminate' as const }));
+    expect(competitorSnapshot(c, 'rival.example')!.signals_present).toBeNull();
+  });
 });

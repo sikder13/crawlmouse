@@ -11,6 +11,7 @@ import { createCompetitorFn, type CompetitorWork } from '../../../../../inngest/
 import { startLimits } from '../../../app/api/checks/_lib/start-limits';
 import { admitSiteHost } from '../../auth/admit-site';
 import { isCrawlPaused } from '../../crawl-pause';
+import { checkRateLimit } from '../../rate-limit';
 import { featureShown } from '../../feature-switch';
 import { inngest } from '../../inngest';
 import { requestCheck } from '../pipeline/request';
@@ -19,6 +20,8 @@ import { competitorWork, type CompetitorDeps } from './compare';
 import { supabaseCompetitorStore } from './store';
 
 type Env = Readonly<Record<string, string | undefined>>;
+
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 const serviceClient = (env: Env): SupabaseClient =>
   createClient(env.NEXT_PUBLIC_SUPABASE_URL ?? '', env.SUPABASE_SERVICE_ROLE_KEY ?? '', {
@@ -38,7 +41,17 @@ export function competitorDeps(env: Env): CompetitorDeps {
     paused: () => isCrawlPaused(env),
     now: Date.now,
     admit: (host) => admitSiteHost(host),
-    limits: { global: () => startLimits.global(), domain: (d) => startLimits.domain(d) },
+    limits: {
+      global: () => startLimits.global(),
+      // In place of a visitor's per-address bucket. Fails closed, as the day's ceiling does.
+      account: async (accountId, cap) =>
+        (
+          await checkRateLimit(`competitors:account:${accountId}`, cap, DAY_MS, {
+            failClosed: true,
+          })
+        ).allowed,
+      domain: (d) => startLimits.domain(d),
+    },
     newId: randomUUID,
     request: async (siteId, checkId) =>
       (await requestCheck({ ...pipeline, newId: () => checkId }, { siteId, trigger: 'manual' }))
@@ -52,7 +65,7 @@ export function competitorWorkFromEnv(env: Env): CompetitorWork {
   return {
     latest: (siteId) => work().latest(siteId),
     plan: (checkId) => work().plan(checkId),
-    start: (host) => work().start(host),
+    start: (host, accountId, cap) => work().start(host, accountId, cap),
     ended: (ids) => work().ended(ids),
     write: (checkId, entries) => work().write(checkId, entries),
   };

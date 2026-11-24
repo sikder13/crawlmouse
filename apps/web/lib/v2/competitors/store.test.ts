@@ -64,18 +64,23 @@ describe('planRow', () => {
       checkStatus: 'finished',
       siteId: c.siteId,
       host,
-      kept: true,
+      accountId: expect.any(String),
       staging: false,
       removed: false,
       paused: false,
       competitorHosts: ['rival.example'],
       competitorLimit: 1,
+      siteLimit: 1,
     });
   });
 
   it('reads a site no account keeps as unkept, with no limit', async () => {
     const c = await recordedStoredCheck(db, memoryEvidenceStore(), LATER);
-    expect(await store().planRow(c.checkId)).toMatchObject({ kept: false, competitorLimit: 0 });
+    expect(await store().planRow(c.checkId)).toMatchObject({
+      accountId: null,
+      competitorLimit: 0,
+      siteLimit: 0,
+    });
   });
 
   it('answers null for a check that is not there', async () => {
@@ -116,6 +121,44 @@ describe('endedOf', () => {
     });
     const ids = [done.checkId, failed.checkId, running.checkId];
     expect((await store().endedOf(ids)).sort()).toEqual([done.checkId, failed.checkId].sort());
+  });
+});
+
+describe('competitorState', () => {
+  it('answers null for a host never audited', async () => {
+    expect(await store().competitorState(SITE)).toBeNull();
+  });
+
+  it('names the latest ended check with its expiry, and no check under way', async () => {
+    const c = await recordedStoredCheck(db, memoryEvidenceStore(), LATER);
+    expect(await store().competitorState(c.siteId)).toEqual({
+      kept: false,
+      live: null,
+      ended: {
+        checkId: c.checkId,
+        finishedAt: expect.any(String),
+        expiresAt: expect.any(String),
+      },
+    });
+    const { ended } = (await store().competitorState(c.siteId))!;
+    expect(Date.parse(ended!.expiresAt!)).toBe(Date.parse(LATER));
+  });
+
+  it('names a check under way', async () => {
+    const running = await storedCheck(db, memoryEvidenceStore(), {
+      host: 'running.example',
+      expiresAt: new Date(LATER),
+      status: 'running',
+    });
+    expect(await store().competitorState(running.siteId)).toMatchObject({
+      live: running.checkId,
+      ended: null,
+    });
+  });
+
+  it('says when an account keeps the row', async () => {
+    const c = await keptFinished([], 0);
+    expect(await store().competitorState(c.siteId)).toMatchObject({ kept: true });
   });
 });
 

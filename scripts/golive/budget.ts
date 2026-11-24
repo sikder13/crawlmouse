@@ -409,8 +409,9 @@ const ROWS: readonly RowInput[] = [
     registration: 'V2_PIPELINE+V2_CHECKS_PUBLIC',
     trigger: 'check.finished, competitors.requested',
     steps: 1,
-    stepsHow: 'plan; with competitors, start-{n}, wait-{n}, ended-{n} and write',
-    stepAt: [64, 73],
+    stepsHow:
+      'plan, for a site with no competitors; with 3, up to 33 (start-{n}, wait-{n}, ended-{n}, write) and 3 competitor checks',
+    stepAt: [76, 85],
   },
   {
     file: 'inngest/summary.ts',

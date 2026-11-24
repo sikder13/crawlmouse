@@ -153,6 +153,15 @@ describe('signalsView: the competitor', () => {
     expect(c.verdict).toBe('');
   });
 
+  it('compares the measure both checks hold when only one of the competitor’s is missing', () => {
+    const c = view('bad-site', (ch) => {
+      (ch.competitors[0] as unknown as Record<string, unknown>).text_share = null;
+    }).competitor!;
+    expect(c.rows[1]!.theirs).toBe('not measured');
+    expect(c.rows[2]!.theirs).toBe('B- · 72');
+    expect(c.verdict).toBe('You are ahead on technical SEO.');
+  });
+
   it('has no comparison when the audit named no competitor', () => {
     expect(view('clean-site').competitor).toBeNull();
   });

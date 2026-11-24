@@ -17,7 +17,7 @@ const config = (fn: unknown) =>
 
 const work = (over: Partial<CompetitorWork> = {}): CompetitorWork => ({
   latest: async () => CHECK,
-  plan: async () => ({ hosts: ['a.example', 'b.example'] }),
+  plan: async () => ({ hosts: ['a.example', 'b.example'], accountId: 'acct-1', cap: 2 }),
   start: async (host) => ({ checkId: `check-${host}`, reused: false }),
   ended: async (ids) => ids,
   write: async (_, entries) => ({ written: entries.filter((e) => e.checkId).length }),
@@ -60,7 +60,7 @@ describe('createCompetitorFn (row 18)', () => {
     expect(c).toMatchObject({
       id: `${inngest.id}-${COMPETITOR_FN_ID}`,
       triggers: [{ event: 'check.finished' }, { event: 'competitors.requested' }],
-      concurrency: { limit: PLAN_CONCURRENCY_CAP },
+      concurrency: [{ limit: PLAN_CONCURRENCY_CAP }, { key: 'event.data.siteId', limit: 1 }],
     });
   });
 
@@ -162,5 +162,14 @@ describe('createCompetitorFn (row 18)', () => {
     });
     expect(out).toEqual({ skip: 'no_check' });
     expect(ids).toEqual(['latest']);
+  });
+
+  it('hands each start the account and its daily cap from the plan', async () => {
+    const asked: unknown[] = [];
+    await run(work({ start: async (...a) => (asked.push(a), { skip: 'x' }) }));
+    expect(asked).toEqual([
+      ['a.example', 'acct-1', 2],
+      ['b.example', 'acct-1', 2],
+    ]);
   });
 });

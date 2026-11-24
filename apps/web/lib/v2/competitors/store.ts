@@ -31,25 +31,28 @@ export function supabaseCompetitorStore(sb: SupabaseClient): CompetitorStore {
       if (site.error) fail('reading the site', site.error);
       if (!site.data) return null;
       let competitorLimit = 0;
+      let siteLimit = 0;
       if (site.data.account_id !== null) {
         const account = await sb
           .from('accounts')
-          .select('competitor_limit')
+          .select('competitor_limit, site_limit')
           .eq('id', site.data.account_id)
           .maybeSingle();
         if (account.error) fail('reading the account', account.error);
         competitorLimit = account.data?.competitor_limit ?? 0;
+        siteLimit = account.data?.site_limit ?? 0;
       }
       return {
         checkStatus: check.data.status as Check['status'],
         siteId: check.data.site_id as string,
         host: site.data.host as string,
-        kept: site.data.account_id !== null,
+        accountId: (site.data.account_id ?? null) as string | null,
         staging: site.data.staging_of_site_id !== null,
         removed: site.data.removed_at !== null,
         paused: site.data.paused === true,
         competitorHosts: (site.data.competitor_hosts ?? []) as string[],
         competitorLimit,
+        siteLimit,
       };
     },
 
@@ -60,10 +63,48 @@ export function supabaseCompetitorStore(sb: SupabaseClient): CompetitorStore {
         .eq('site_id', siteId)
         .in('status', [...ENDED])
         .order('finished_at', { ascending: false })
+        .order('id', { ascending: false })
         .limit(1)
         .maybeSingle();
       if (error) fail('reading the latest check', error);
       return data ? { checkId: data.id as string, finishedAt: data.finished_at as string } : null;
+    },
+
+    async competitorState(siteId) {
+      const site = await sb.from('sites').select('account_id').eq('id', siteId).maybeSingle();
+      if (site.error) fail('reading the competitor site', site.error);
+      if (!site.data) return null;
+      const live = await sb
+        .from('checks')
+        .select('id')
+        .eq('site_id', siteId)
+        .in('status', ['queued', 'running', 'deferred'])
+        .order('queued_at', { ascending: false })
+        .order('id', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (live.error) fail('reading the competitor check under way', live.error);
+      const ended = await sb
+        .from('checks')
+        .select('id, finished_at, expires_at')
+        .eq('site_id', siteId)
+        .in('status', [...ENDED])
+        .order('finished_at', { ascending: false })
+        .order('id', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (ended.error) fail('reading the competitor check', ended.error);
+      return {
+        kept: site.data.account_id !== null,
+        live: (live.data?.id ?? null) as string | null,
+        ended: ended.data
+          ? {
+              checkId: ended.data.id as string,
+              finishedAt: ended.data.finished_at as string,
+              expiresAt: (ended.data.expires_at ?? null) as string | null,
+            }
+          : null,
+      };
     },
 
     async ensureSite(siteId, host) {

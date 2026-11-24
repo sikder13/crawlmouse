@@ -1,46 +1,54 @@
 /**
  * Row 18: which finished checks audit their site's competitors, how each competitor's check is
- * started or reused, and what is written back. The store, the pipeline's request and the limits are
- * fakes here; the SQL is tested against PGlite in store.test.ts.
+ * started, waited on or reused, and what is written back. The store, the pipeline's request and the
+ * limits are fakes here; the SQL is tested against PGlite in store.test.ts.
  */
 import { describe, expect, it } from 'vitest';
-import type { Check } from '@crawlmouse/types/v2';
-import { fixture } from '../fixtures';
+import type { Check, CompetitorSnapshot } from '@crawlmouse/types/v2';
+import { findCheck, fixture } from '../fixtures';
+import { FIRST_AUDIT } from '../view/segment/test-helpers';
 import {
+  COMPETITOR_HOLD_MS,
   COMPETITOR_REUSE_MS,
   competitorSiteId,
   competitorWork,
   type CompetitorDeps,
+  type CompetitorState,
   type PlanRow,
 } from './compare';
 
 const NOW = Date.parse('2026-11-24T12:00:00Z');
 const HOUR = 60 * 60 * 1000;
+const iso = (ms: number) => new Date(ms).toISOString();
 
 const ROW: PlanRow = {
   checkStatus: 'finished',
   siteId: 'site-own',
   host: 'own.example',
-  kept: true,
+  accountId: 'acct-1',
   staging: false,
   removed: false,
   paused: false,
   competitorHosts: ['rival-a.example', 'rival-b.example', 'rival-c.example'],
   competitorLimit: 3,
+  siteLimit: 25,
 };
 
-const ended = (): Check => structuredClone(fixture('bad-site').checks.at(-1)!);
+const ended = (): Check => structuredClone(findCheck(fixture('bad-site'), FIRST_AUDIT['bad-site']));
 
 function harness(over: Partial<CompetitorDeps> = {}, row: Partial<PlanRow> | null = {}) {
   const calls = {
     ensured: [] as string[],
-    requested: [] as { siteId: string; trigger: string }[],
+    requested: [] as string[],
     written: [] as { checkId: string; hosts: string[] }[],
     global: 0,
+    account: [] as [string, number][],
     domain: [] as string[],
   };
-  const latest = new Map<string, { checkId: string; finishedAt: string }>();
+  const states = new Map<string, CompetitorState>();
   const checks = new Map<string, Check>();
+  const latest = new Map<string, string>();
+  let current: PlanRow | null = row === null ? null : { ...ROW, ...row };
   let ids = 0;
   const deps: CompetitorDeps = {
     shown: () => true,
@@ -49,19 +57,24 @@ function harness(over: Partial<CompetitorDeps> = {}, row: Partial<PlanRow> | nul
     admit: async () => true,
     limits: {
       global: async () => (calls.global++, true),
+      account: async (id, cap) => (calls.account.push([id, cap]), true),
       domain: async (d) => (calls.domain.push(d), true),
     },
     newId: () => `fresh-${++ids}`,
     request: async (siteId, checkId) => {
-      calls.requested.push({ siteId, trigger: 'manual' });
+      calls.requested.push(siteId);
       return checkId;
     },
     store: {
-      planRow: async () => (row === null ? null : { ...ROW, ...row }),
-      latestEnded: async (siteId) => latest.get(siteId) ?? null,
+      planRow: async () => current,
+      latestEnded: async (siteId) => {
+        const id = latest.get(siteId);
+        return id ? { checkId: id, finishedAt: iso(NOW) } : null;
+      },
+      competitorState: async (siteId) => states.get(siteId) ?? null,
       ensureSite: async (siteId, host) => void calls.ensured.push(`${siteId}:${host}`),
       endedCheck: async (id) => checks.get(id) ?? null,
-      endedOf: async (ids) => ids.filter((id) => checks.has(id) || id.startsWith('failed-')),
+      endedOf: async (list) => list.filter((id) => checks.has(id)),
       writeCompetitors: async (checkId, snaps) => {
         calls.written.push({ checkId, hosts: snaps.map((s) => s.host) });
         return true;
@@ -69,27 +82,50 @@ function harness(over: Partial<CompetitorDeps> = {}, row: Partial<PlanRow> | nul
     },
     ...over,
   };
-  return { work: competitorWork(deps), calls, latest, checks };
+  return {
+    work: competitorWork(deps),
+    calls,
+    states,
+    checks,
+    latest,
+    setRow: (r: Partial<PlanRow>) => (current = { ...ROW, ...r }),
+  };
 }
 
 describe('plan', () => {
-  it('names the first competitor_limit hosts, in the order the customer saved them', async () => {
-    const { work } = harness({}, { competitorLimit: 2 });
-    expect(await work.plan('check-own')).toEqual({ hosts: ['rival-a.example', 'rival-b.example'] });
+  it('names the first competitor_limit hosts in the saved order, with the account and its cap', async () => {
+    const { work } = harness({}, { competitorLimit: 2, siteLimit: 5 });
+    expect(await work.plan('check-own')).toEqual({
+      hosts: ['rival-a.example', 'rival-b.example'],
+      accountId: 'acct-1',
+      cap: 10,
+    });
   });
 
-  it('drops the site’s own host and repeats, whatever their spelling', async () => {
+  it('drops the site’s own host and repeats, by case and by www.', async () => {
     const { work } = harness(
       {},
-      { competitorHosts: ['OWN.example', 'rival-a.example', 'Rival-A.example', 'rival-b.example'] },
+      {
+        host: 'www.own.example',
+        competitorHosts: [
+          'OWN.example',
+          'own.example',
+          'rival-a.example',
+          'Rival-A.example',
+          'www.rival-a.example',
+          'rival-b.example',
+        ],
+      },
     );
-    expect(await work.plan('check-own')).toEqual({ hosts: ['rival-a.example', 'rival-b.example'] });
+    expect(await work.plan('check-own')).toMatchObject({
+      hosts: ['rival-a.example', 'rival-b.example'],
+    });
   });
 
   it.each<[string, Partial<PlanRow> | null, Partial<CompetitorDeps>]>([
     ['check_missing', null, {}],
     ['not_ended', { checkStatus: 'running' }, {}],
-    ['unkept', { kept: false }, {}],
+    ['unkept', { accountId: null }, {}],
     ['staging', { staging: true }, {}],
     ['removed', { removed: true }, {}],
     ['paused', { paused: true }, {}],
@@ -102,70 +138,119 @@ describe('plan', () => {
   });
 
   it('audits no competitor of a competitor: a site no account keeps never plans', async () => {
-    const { work } = harness({}, { kept: false, competitorHosts: ['rival-a.example'] });
+    const { work } = harness({}, { accountId: null, competitorHosts: ['rival-a.example'] });
     expect(await work.plan('check-rival')).toEqual({ skip: 'unkept' });
   });
 });
 
 describe('start', () => {
-  it('reuses a check of the host that ended under a day ago, and crawls nothing', async () => {
-    const { work, calls, latest } = harness();
-    const site = competitorSiteId('rival-a.example');
-    latest.set(site, {
+  const site = competitorSiteId('rival-a.example');
+  const endedAt = (finishedAgo: number, expiresIn: number | null): CompetitorState => ({
+    kept: false,
+    live: null,
+    ended: {
       checkId: 'old-1',
-      finishedAt: new Date(NOW - COMPETITOR_REUSE_MS + HOUR).toISOString(),
+      finishedAt: iso(NOW - finishedAgo),
+      expiresAt: expiresIn === null ? null : iso(NOW + expiresIn),
+    },
+  });
+
+  it('reuses a check that ended under a day ago and is kept past the wait, and crawls nothing', async () => {
+    const { work, calls, states } = harness();
+    states.set(site, endedAt(COMPETITOR_REUSE_MS - HOUR, COMPETITOR_HOLD_MS + HOUR));
+    expect(await work.start('rival-a.example', 'acct-1', 3)).toEqual({
+      checkId: 'old-1',
+      reused: true,
     });
-    expect(await work.start('rival-a.example')).toEqual({ checkId: 'old-1', reused: true });
     expect(calls.requested).toEqual([]);
     expect(calls.global).toBe(0);
   });
 
-  it('crawls again once the last check is a day old, on the shared site row, with a fresh id', async () => {
-    const { work, calls, latest } = harness();
-    const site = competitorSiteId('rival-a.example');
-    latest.set(site, {
-      checkId: 'old-1',
-      finishedAt: new Date(NOW - COMPETITOR_REUSE_MS).toISOString(),
+  it('waits on a check of the host already under way, and starts none', async () => {
+    const { work, calls, states } = harness();
+    states.set(site, { kept: false, live: 'live-1', ended: null });
+    expect(await work.start('rival-a.example', 'acct-1', 3)).toEqual({
+      checkId: 'live-1',
+      reused: false,
     });
-    expect(await work.start('rival-a.example')).toEqual({ checkId: 'fresh-1', reused: false });
-    expect(calls.ensured).toEqual([`${site}:rival-a.example`]);
-    expect(calls.requested).toEqual([{ siteId: site, trigger: 'manual' }]);
+    expect(calls.requested).toEqual([]);
   });
 
-  it('gives one host one site row, whoever names it', () => {
-    expect(competitorSiteId('rival-a.example')).toBe(competitorSiteId('Rival-A.example'));
-    expect(competitorSiteId('rival-a.example')).not.toBe(competitorSiteId('rival-b.example'));
+  it.each([
+    ['a day old', COMPETITOR_REUSE_MS, COMPETITOR_HOLD_MS + HOUR],
+    ['due to expire during the wait', HOUR, COMPETITOR_HOLD_MS],
+  ])(
+    'crawls again when the last check is %s, on the shared row, with a fresh id',
+    async (_, ago, hold) => {
+      const { work, calls, states } = harness();
+      states.set(site, endedAt(ago, hold));
+      expect(await work.start('rival-a.example', 'acct-1', 3)).toEqual({
+        checkId: 'fresh-1',
+        reused: false,
+      });
+      expect(calls.ensured).toEqual([`${site}:rival-a.example`]);
+      expect(calls.requested).toEqual([site]);
+    },
+  );
+
+  it('never reads or crawls a row an account has come to keep', async () => {
+    const { work, calls, states } = harness();
+    states.set(site, { ...endedAt(HOUR, null), kept: true, live: 'live-1' });
+    expect(await work.start('rival-a.example', 'acct-1', 3)).toEqual({ skip: 'site_kept' });
+    expect(calls.requested).toEqual([]);
   });
 
-  it('counts a new crawl against the day’s ceiling and the host’s bucket, without www.', async () => {
+  it('gives one host one site row, by case and by www.', () => {
+    expect(competitorSiteId('Rival-A.example')).toBe(site);
+    expect(competitorSiteId('www.rival-a.example')).toBe(site);
+    expect(competitorSiteId('rival-b.example')).not.toBe(site);
+  });
+
+  it('counts a new crawl against the day’s ceiling, the account’s bucket and the host’s, without www.', async () => {
     const { work, calls } = harness();
-    await work.start('www.rival-a.example');
+    await work.start('www.rival-a.example', 'acct-1', 75);
     expect(calls.global).toBe(1);
+    expect(calls.account).toEqual([['acct-1', 75]]);
     expect(calls.domain).toEqual(['rival-a.example']);
   });
 
+  const limits = (g: boolean, a: boolean, d: boolean): Partial<CompetitorDeps> => ({
+    limits: { global: async () => g, account: async () => a, domain: async () => d },
+  });
   it.each<[string, Partial<CompetitorDeps>]>([
     ['crawl_paused', { paused: () => true }],
     ['refused_host', { admit: async () => false }],
-    ['capacity', { limits: { global: async () => false, domain: async () => true } }],
-    ['domain_limit', { limits: { global: async () => true, domain: async () => false } }],
+    ['capacity', limits(false, true, true)],
+    ['account_limit', limits(true, false, true)],
+    ['domain_limit', limits(true, true, false)],
   ])('starts nothing with %s', async (skip, over) => {
     const { work, calls } = harness(over);
-    expect(await work.start('rival-a.example')).toEqual({ skip });
+    expect(await work.start('rival-a.example', 'acct-1', 3)).toEqual({ skip });
     expect(calls.requested).toEqual([]);
     expect(calls.ensured).toEqual([]);
   });
 });
 
 describe('write', () => {
-  it('writes one snapshot per ended check, in the plan’s order, and leaves out the rest', async () => {
+  const snap = (host: string): CompetitorSnapshot => ({
+    host,
+    crawlers_with_access: 1,
+    crawlers_tested: 6,
+    text_share: null,
+    product_schema: null,
+    technical_seo: null,
+    ai_readability: null,
+    signals_present: 0,
+  });
+
+  it('writes one snapshot per ended check, in the listed order, and leaves out the rest', async () => {
     const { work, calls, checks } = harness();
     checks.set('c-a', ended());
     checks.set('c-c', ended());
     const out = await work.write('check-own', [
-      { host: 'rival-a.example', checkId: 'c-a' },
-      { host: 'rival-b.example', checkId: null },
       { host: 'rival-c.example', checkId: 'c-c' },
+      { host: 'rival-b.example', checkId: null },
+      { host: 'rival-a.example', checkId: 'c-a' },
     ]);
     expect(out).toEqual({ written: 2 });
     expect(calls.written).toEqual([
@@ -173,7 +258,31 @@ describe('write', () => {
     ]);
   });
 
-  it('writes nothing when no competitor check ended', async () => {
+  it('leaves out a host the member removed since the plan', async () => {
+    const { work, calls, checks, setRow } = harness();
+    checks.set('c-a', ended());
+    checks.set('c-b', ended());
+    setRow({ competitorHosts: ['rival-b.example'] });
+    await work.write('check-own', [
+      { host: 'rival-a.example', checkId: 'c-a' },
+      { host: 'rival-b.example', checkId: 'c-b' },
+    ]);
+    expect(calls.written).toEqual([{ checkId: 'check-own', hosts: ['rival-b.example'] }]);
+  });
+
+  it('keeps a listed host’s snapshot when this run has none for it, and clears a removed one', async () => {
+    const { work, calls, checks, setRow } = harness();
+    const own = ended();
+    own.competitors = [snap('rival-a.example'), snap('gone.example')];
+    checks.set('check-own', own);
+    setRow({ competitorHosts: ['rival-a.example', 'rival-b.example'] });
+    expect(await work.write('check-own', [{ host: 'rival-b.example', checkId: null }])).toEqual({
+      written: 0,
+    });
+    expect(calls.written).toEqual([{ checkId: 'check-own', hosts: ['rival-a.example'] }]);
+  });
+
+  it('writes nothing when nothing changed', async () => {
     const { work, calls } = harness();
     expect(
       await work.write('check-own', [{ host: 'rival-a.example', checkId: 'missing' }]),
@@ -182,19 +291,11 @@ describe('write', () => {
   });
 });
 
-describe('ended', () => {
-  it('names the checks that have ended, so a failed one stops the wait too', async () => {
-    const { work, checks } = harness();
-    checks.set('c-a', ended());
-    expect(await work.ended(['c-a', 'c-running', 'failed-1'])).toEqual(['c-a', 'failed-1']);
-  });
-});
-
 describe('latest', () => {
   it("names the site's latest ended check, or none", async () => {
     const { work, latest } = harness();
     expect(await work.latest('site-own')).toBeNull();
-    latest.set('site-own', { checkId: 'c-1', finishedAt: new Date(NOW).toISOString() });
+    latest.set('site-own', 'c-1');
     expect(await work.latest('site-own')).toBe('c-1');
   });
 });

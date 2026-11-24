@@ -3,8 +3,11 @@
  * measured into the site's check.
  *
  * It runs on `check.finished`, for the check that finished, and on `competitors.requested`
- * (`{ siteId }`, sent when a member changes the site's competitor list), for the site's latest ended
- * check. Steps: `latest` (the second event only), `plan` (whether the check audits competitors, and
+ * (`{ siteId }`), for the site's latest ended check. Nothing in this package sends that event: it is
+ * for the site edit route to send after a member changes the competitor list, which that route's
+ * owner adds; until then a changed list is first audited at the site's next check. Runs for one site
+ * do not overlap (a concurrency key on the site), so a later run's write is not overtaken by an
+ * earlier one's. Steps: `latest` (the second event only), `plan` (whether the check audits competitors, and
  * which hosts), `start-<n>` per host (reuse a recent check of the host, or request one), then
  * `wait-<n>` and `ended-<n>` until every started check has ended or the polls in
  * `COMPETITOR_POLLS_S` run out, then `write`. A competitor's own check finishing starts this function
@@ -40,8 +43,14 @@ type Env = Readonly<Record<string, string | undefined>>;
 
 export interface CompetitorWork {
   latest(siteId: string): Promise<string | null>;
-  plan(checkId: string): Promise<{ skip: string } | { hosts: string[] }>;
-  start(host: string): Promise<{ skip: string } | { checkId: string; reused: boolean }>;
+  plan(
+    checkId: string,
+  ): Promise<{ skip: string } | { hosts: string[]; accountId: string; cap: number }>;
+  start(
+    host: string,
+    accountId: string,
+    cap: number,
+  ): Promise<{ skip: string } | { checkId: string; reused: boolean }>;
   ended(checkIds: string[]): Promise<string[]>;
   write(
     checkId: string,
@@ -54,7 +63,10 @@ export function createCompetitorFn(work: CompetitorWork, env: Env = process.env)
     {
       id: COMPETITOR_FN_ID,
       retries: 3,
-      concurrency: { limit: planSafeLimit(env.INNGEST_COMPETITOR_CONCURRENCY, 2) },
+      concurrency: [
+        { limit: planSafeLimit(env.INNGEST_COMPETITOR_CONCURRENCY, 2) },
+        { key: 'event.data.siteId', limit: 1 },
+      ],
     },
     [{ event: 'check.finished' }, { event: 'competitors.requested' }],
     async ({ event, step }) => {
@@ -77,7 +89,7 @@ export function createCompetitorFn(work: CompetitorWork, env: Env = process.env)
       let waiting: string[] = [];
       for (const [i, host] of plan.hosts.entries()) {
         const started = await step.run(`start-${i}`, async () =>
-          sized(`start-${i}`, await work.start(host)),
+          sized(`start-${i}`, await work.start(host, plan.accountId, plan.cap)),
         );
         if ('skip' in started) {
           entries.push({ host, checkId: null });

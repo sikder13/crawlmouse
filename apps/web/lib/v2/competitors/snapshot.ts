@@ -18,6 +18,7 @@ export function competitorSnapshot(check: Check, host: string): CompetitorSnapsh
   const ai = check.crawlers.filter(isAi);
   const seo = check.technical_seo;
   const air = check.ai_readability;
+  const signals = screenSignals(check);
   return {
     host,
     crawlers_with_access: ai.filter((c) => isAllowed(c.verdict)).length,
@@ -30,6 +31,9 @@ export function competitorSnapshot(check: Check, host: string): CompetitorSnapsh
         ? { score: seo.score, grade: seo.grade }
         : null,
     ai_readability: air && !air.withheld ? { score: air.total, grade: air.grade } : null,
-    signals_present: screenSignals(check).filter((s) => s.state === 'detected').length,
+    // Null when no signal could be read, rather than a count of none found.
+    signals_present: signals.every((s) => s.state === 'indeterminate')
+      ? null
+      : signals.filter((s) => s.state === 'detected').length,
   };
 }
