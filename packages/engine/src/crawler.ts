@@ -308,7 +308,8 @@ function markNoRetryOnTimeout(ctx: { request: { noRetry?: boolean } }, error: un
  * object, so options cannot be tagged). One closure per crawl preserves that exactly: the same instance
  * is pushed for every request of that crawl, so `includes()` still dedupes.
  */
-function makeRedirectHook(robots: ParsedRobots | undefined, revalidateSsrf: boolean) {
+/** Exported for its own tests (crawler-redirect-hook.test.ts); runCrawl builds one per crawl. */
+export function makeRedirectHook(robots: ParsedRobots | undefined, revalidateSsrf: boolean) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return async function onBeforeRedirect(options: any): Promise<void> {
     // The URL got is about to request. got has already resolved the Location header into it, decoding
