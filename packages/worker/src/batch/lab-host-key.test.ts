@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Fetcher } from '../fetch/fetcher.js';
 import { CRAWL, type Identity } from '../identities.js';
 import { FLOOR_GAP_MS } from '../politeness/limiter.js';
-import { Sites } from '../politeness/sites.js';
+import { STOP_AFTER_429S, Sites } from '../politeness/sites.js';
 import { outcome } from '../test-support/outcome.js';
 import { VirtualClock } from '../test-support/virtual-clock.js';
 import { Budget } from './budget.js';
@@ -97,6 +97,7 @@ function harness(
     robotsCache: new RobotsCache(clock),
   };
   return {
+    sites: deps.sites,
     clock,
     seen,
     run: (reqs: BatchRequest[]) => clock.run(Promise.all(reqs.map((r) => runBatch(r, deps)))),
@@ -104,7 +105,7 @@ function harness(
 }
 
 describe.each([
-  ['three 429s', '429', 3],
+  [`${STOP_AFTER_429S} 429s in a row`, '429', STOP_AFTER_429S],
   ['four challenged pages', 'challenge', 4],
 ] as const)('a stop from %s on one lab host', (_name, bad, stopsAfter) => {
   const go = async (perLabHost: boolean) => {
@@ -316,7 +317,7 @@ describe('answeredBy names the request whose outcome the row holds', () => {
   it('a later hop refused by a stop: the hop before it, which answered', async () => {
     const clock = new VirtualClock();
     const sites = new Sites(clock, true);
-    for (let i = 0; i < 3; i++) sites.record429(B);
+    for (let i = 0; i < STOP_AFTER_429S; i++) sites.record429(B);
     const fetcher: Fetcher = async (url, identity, limits) =>
       hop(url, identity, limits.maxBytes, `https://${B}/next`);
     const r = await clock.run(
@@ -367,9 +368,19 @@ describe('which stops a batch reports', () => {
       () => 'Disallow: /private\n',
     );
     await h.run([{ ...request(A, 1, 1), urls: [`https://${A}/open`] } as BatchRequest]);
+    // One 429 short of a stop, with no wait asked, so the next batch's first 429 stops the host
+    // while the named batch is still running. A robots.txt answer in between would end the run, so
+    // the run is kept through it: this test is about which stops a batch reports.
+    h.sites.recordAnswer = () => {};
+    for (let i = 1; i < STOP_AFTER_429S; i++)
+      h.sites.record429(h.sites.keyOf(`https://${A}/`), '0');
     const named = {
       ...request(A, 2, 1),
-      urls: [`https://${A}/private`, ...Array.from({ length: 6 }, (_, k) => `https://${B}/q/${k}`)],
+      // Long enough to still be running when A, slowed to MAX_BACKOFF_GAP_MS by the run, answers again.
+      urls: [
+        `https://${A}/private`,
+        ...Array.from({ length: 30 }, (_, k) => `https://${B}/q/${k}`),
+      ],
     } as BatchRequest;
     const [, result] = await h.run([request(A, 3, 6), named]);
     expect(stops(result!)).toContain(A);
@@ -384,7 +395,7 @@ describe('which stops a batch reports', () => {
         () => '',
         (host) => (host === 'elsewhere.test' ? null : 'https://elsewhere.test/robots.txt'),
       );
-      // Three answers stop that domain, and no later request is refused, so no finding is owed.
+      // Three answers do not stop that domain (STOP_AFTER_429S in a row do), so no finding is owed.
       const urls = ['a', 'b', 'c'].map((x) => `https://${x}.lab.crawlmouse.com/p/0`);
       const [result] = await h.run([{ ...request(A, 1, 1), urls } as BatchRequest]);
       expect(stops(result!)).not.toContain('elsewhere.test');

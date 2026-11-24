@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { DECLARATION_PATHS } from '@crawlmouse/types/v2';
 import { createFetcher, MAX_BODY_BYTES } from '../fetch/fetcher.js';
 import { CANARY, CRAWL, CRAWLERS, type Identity } from '../identities.js';
-import { Sites } from '../politeness/sites.js';
+import { STOP_AFTER_429S, Sites } from '../politeness/sites.js';
 import { InstantClock } from '../test-support/clock.js';
 import { fakeFetcher, type FakeResponse } from '../test-support/fake-fetcher.js';
 import { whoSent } from '../test-support/discriminators.js';
@@ -624,7 +624,8 @@ describe('review fixes: budgets, stops and coverage', () => {
 
   it("records a stop the batch's own last request caused, without calling the batch partial for it", async () => {
     const s = await serve({ page: (_p, _u, res) => void ((res.statusCode = 429), res.end()) });
-    const { result } = await run(crawlReq(s.base, ['/1', '/2', '/3']));
+    // Each page is asked for 1 + RETRIES_ON_429 times, so two pages make STOP_AFTER_429S answers.
+    const { result } = await run(crawlReq(s.base, ['/1', '/2']));
     expect(result.findings).toContainEqual(
       expect.objectContaining({
         kind: 'site_stopped',
@@ -1163,7 +1164,7 @@ describe('review round 2: behaviour the tests did not pin', () => {
     const s = await serve({});
     const clock = new InstantClock();
     const sites = new Sites(clock);
-    for (let i = 0; i < 3; i++) sites.record429('127.0.0.1');
+    for (let i = 0; i < STOP_AFTER_429S; i++) sites.record429('127.0.0.1');
     const result = await runBatch(crawlReq(s.base, ['/']), {
       clock,
       sites,
@@ -1459,8 +1460,11 @@ describe('round 4: behaviour review round 3 found unpinned', () => {
         url.endsWith('/robots.txt') ? { status: 429, body: '' } : html200('<p>t</p>'),
       ),
       (sites) => {
-        sites.record429(siteKeyOf('https://example.com'));
-        sites.record429(siteKeyOf('https://example.com'));
+        // One 429 short of a stop. The apex's robots.txt answers 404 first, which would end the run
+        // of 429s; this test is about a stop cutting a chain, so the run is kept through it.
+        sites.recordAnswer = () => {};
+        for (let i = 1; i < STOP_AFTER_429S; i++)
+          sites.record429(siteKeyOf('https://example.com'), '0');
       },
     );
     return { result, targetRequested: requested.includes('https://www.example.com/t') };

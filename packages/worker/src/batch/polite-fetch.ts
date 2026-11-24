@@ -9,7 +9,7 @@ import {
 import type { Identity } from '../identities.js';
 import { MAX_URL_LENGTH } from '../rows/bounded.js';
 import { siteKeyOf } from '../politeness/site-key.js';
-import type { SiteStop, Sites } from '../politeness/sites.js';
+import { RETRIES_ON_429, type SiteStop, type Sites } from '../politeness/sites.js';
 import type { Budget, BudgetKind } from './budget.js';
 
 /**
@@ -67,6 +67,11 @@ export interface RequestPolicy {
    * stop the crawl of its pages.
    */
   countsTowardStop?: boolean;
+  /**
+   * `true`: a 429 is asked again, up to RETRIES_ON_429 times, once the site's wait is over, so a
+   * request to slow down does not cost the page (inbox 048). For the pages a batch crawls and tests.
+   */
+  retryOn429?: boolean;
 }
 
 function locationOf(f: FetchOutcome): string | null {
@@ -107,7 +112,15 @@ async function oneRequest(
       ctx.budget.cutByBytes();
       ctx.abort.abort();
     }
-    if (f.status === 429 && countsTowardStop) ctx.sites.record429(site);
+    if (countsTowardStop) {
+      if (f.status === 429) {
+        const after = f.headers['retry-after'];
+        ctx.sites.record429(site, Array.isArray(after) ? after[0] : after);
+      } else if (f.status !== null && !REDIRECT_STATUSES.has(f.status)) {
+        // A redirect points on rather than answering, so the run of 429s goes on through it.
+        ctx.sites.recordAnswer(site);
+      }
+    }
     return f;
   }, ctx.abort.signal);
   if (scheduled.ran) return scheduled.value;
@@ -127,9 +140,13 @@ export async function politeFetch(
   identity: Identity,
   policy: RequestPolicy,
 ): Promise<Requested> {
-  let answeredBy = url;
-  const r = await followChain(ctx, url, identity, policy, (u) => (answeredBy = u));
-  return 'notRequested' in r ? r : { ...r, answeredBy };
+  const retries = policy.retryOn429 ? RETRIES_ON_429 : 0;
+  for (let attempt = 0; ; attempt++) {
+    let answeredBy = url;
+    const r = await followChain(ctx, url, identity, policy, (u) => (answeredBy = u));
+    if ('notRequested' in r) return r;
+    if (r.fetch.status !== 429 || attempt >= retries) return { ...r, answeredBy };
+  }
 }
 
 async function followChain(

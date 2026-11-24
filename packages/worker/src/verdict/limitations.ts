@@ -1,4 +1,5 @@
 import type { NotRequested } from '../batch/polite-fetch.js';
+import { STOP_AFTER_429S } from '../politeness/sites.js';
 import { MAX_URL_LENGTH } from '../rows/bounded.js';
 import { MAX_CRAWL_DELAY_S, MAX_ROBOTS_ORIGINS, type SiteBlock } from '../batch/site-rules.js';
 import type { FetchOutcome, RedirectStop } from '../fetch/fetcher.js';
@@ -140,7 +141,7 @@ export function notRequested(n: NotRequested): string {
   }
   const why =
     n.stop.reason === 'three_429_responses'
-      ? 'it answered 429 three times'
+      ? `it answered 429 ${STOP_AFTER_429S} times in a row, though we waited as it asked and slowed down each time`
       : 'four pages in a row were challenged';
   return `Not requested: requests to ${n.site} were stopped because ${why}. The user agent shown is the one that would have been sent.`;
 }

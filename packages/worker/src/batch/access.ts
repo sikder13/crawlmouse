@@ -104,6 +104,7 @@ async function probe(run: AccessRun, url: string, identity: Identity): Promise<P
   const r = await politeFetch(run.ctx, url, identity, {
     offSite: 'stop',
     gate: run.robots.gate(identity),
+    retryOn429: true,
   });
   if ('notRequested' in r) {
     run.findings.notRequested(r.notRequested);

@@ -61,6 +61,11 @@ export class SiteLimiter {
     }
   }
 
+  /** Holds the next start until `at`, a moment on this limiter's clock. Never brings it forward. */
+  pauseUntil(at: number): void {
+    if (Number.isFinite(at)) this.nextStartAt = Math.max(this.nextStartAt, at);
+  }
+
   get started(): number {
     return this.startedCount;
   }
