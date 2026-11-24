@@ -149,11 +149,6 @@ id = "GHSA-5xrq-8626-4rwp"
 ignoreUntil = 2026-11-26
 reason = "Present at the CC-00 baseline: vitest@2.1.9 (fixed: 3.2.6)"
 
-[[IgnoredVulns]]
-id = "GHSA-mrhx-c7xc-m3w5"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: zod@4.4.3 (fixed: 4.6.6)"
-
 # Published after the baseline and recorded on 2026-10-31, the day CI first reported them. Not from the
 # CC-00 scan: the only fixed versions are new majors, pulled in transitively by eslint, typescript-eslint,
 # @sentry/nextjs's bundler plugin and crawlee, which pin the old majors. Same expiry as the baseline.
