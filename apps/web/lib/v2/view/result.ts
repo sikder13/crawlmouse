@@ -428,7 +428,7 @@ function structureDoor(
     ? `${capitalise(problems.join(', '))}.`
     : crawledAll(check)
       ? 'No orphan pages, every page within three clicks, varied anchor text.'
-      : 'Of the pages crawled: no orphan, every one within three clicks, varied anchor text.';
+      : 'Of the pages crawled: no orphans, every one within three clicks, varied anchor text.';
   const hubs = `${capitalise(numberWord(s.hubs))} ${plural(s.hubs, 'hub carries', 'hubs carry')} ${percent(s.hub_pagerank_share)}% of the site's PageRank.`;
   const crawled = check.coverage!.pages_crawled;
   return {

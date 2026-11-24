@@ -98,7 +98,7 @@ describe('a partial crawl claims nothing of the pages it did not crawl (inbox 05
       )!.body;
     expect(door(clean)).toContain('No orphan pages, every page within three clicks');
     expect(door(partial)).toContain(
-      'Of the pages crawled: no orphan, every one within three clicks',
+      'Of the pages crawled: no orphans, every one within three clicks',
     );
     expect(door(partial)).not.toContain('every page within three clicks');
   });
