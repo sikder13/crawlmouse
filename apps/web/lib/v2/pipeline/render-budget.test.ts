@@ -43,6 +43,17 @@ describe('the daily render budget, per check', () => {
     expect(rpc.mock.calls[1]![1 as never]).toMatchObject({ p_used_ms: 13 });
   });
 
+  it.each([Number.NaN, Number.POSITIVE_INFINITY, -1])(
+    'does not settle a time used of %s, so the reservation stays counted',
+    async (used) => {
+      const { rpc, sb } = client();
+      const budget = supabaseRenderBudget(sb, CHECK);
+      expect(await budget.reserve(600, 5000)).toBe(true);
+      await budget.settle(600, used);
+      expect(rpc.mock.calls.map(([name]) => name)).toEqual(['reserve_render_ms']);
+    },
+  );
+
   it('is refused when the database gives no reservation, and then settles nothing', async () => {
     const { rpc, sb } = client([null]);
     const budget = supabaseRenderBudget(sb, CHECK);

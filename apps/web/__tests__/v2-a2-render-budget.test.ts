@@ -31,7 +31,7 @@ const reserve = (check: string, ms: number, limit: number) =>
     );
     return rows[0]!.id;
   });
-const settle = (reservation: string, used: number) =>
+const settle = (reservation: string, used: number | null) =>
   asRole(db, 'service_role', null, (tx) =>
     tx.query('select public.settle_render_ms($1, $2)', [reservation, used]),
   );
@@ -169,6 +169,15 @@ describe('settling', () => {
       { day_offset: 1, ms: '100' },
       { day_offset: 0, ms: '50' },
     ]);
+  });
+
+  it('keeps the whole reservation counted when the time used is unknown', async () => {
+    const id = (await reserve(randomUUID(), 600, 5000))!;
+    await settle(id, null);
+    expect(await committed()).toBe(600);
+    // And it stays open: a later settle with a real figure still closes it once.
+    await settle(id, 250);
+    expect(await committed()).toBe(250);
   });
 
   it('never takes a day below zero', async () => {

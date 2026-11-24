@@ -25,6 +25,11 @@ export function supabaseRenderBudget(sb: SupabaseClient, checkId: string): Daily
     },
     async settle(_reservedMs, usedMs) {
       if (held === null) return;
+      // A time that is not a figure leaves the reservation open, so its whole time stays counted.
+      if (!(Number.isFinite(usedMs) && usedMs >= 0)) {
+        held = null;
+        return;
+      }
       const { error } = await sb.rpc('settle_render_ms', {
         p_reservation: held,
         p_used_ms: Math.ceil(usedMs),

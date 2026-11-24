@@ -82,7 +82,13 @@ begin
 end;
 $$;
 
--- Close a reservation at what it used, on the day it reserved. A repeat changes nothing.
+-- Close a reservation at what it used, on the day it reserved. A repeat changes nothing. A null or
+-- negative time used is not a figure: the reservation is left open and its whole time stays counted.
+--
+-- What ran over its reservation is added, so a day can end above its cap by the overruns of the
+-- phases that were rendering at once; the next reservation is then refused. Each render reserves its
+-- request timeout (packages/engine/src/v2/render/run.ts, RESERVE_PER_RENDER_MS), so an overrun needs a
+-- render to report more browser time than that.
 create or replace function public.settle_render_ms(
   p_reservation uuid,
   p_used_ms bigint
@@ -95,15 +101,18 @@ declare
   v_day date;
   v_reserved bigint;
 begin
+  if p_used_ms is null or p_used_ms < 0 then
+    return;
+  end if;
   update public.render_reservations
-  set used_ms = greatest(p_used_ms, 0)
+  set used_ms = p_used_ms
   where id = p_reservation and used_ms is null
   returning day, reserved_ms into v_day, v_reserved;
   if not found then
     return;
   end if;
   update public.render_budget_days
-  set committed_ms = greatest(committed_ms + greatest(p_used_ms, 0) - v_reserved, 0)
+  set committed_ms = greatest(committed_ms + p_used_ms - v_reserved, 0)
   where day = v_day;
 end;
 $$;
