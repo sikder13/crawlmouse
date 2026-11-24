@@ -32,6 +32,8 @@ import {
   noFixWords,
   sectionMeasured,
 } from './section-measured';
+import { CRAWL_USER_AGENT } from '../help/pinned';
+import { ACCOUNT_NAV } from './account-actions';
 import { SCREEN_SIGNALS, screenSignals, type ScreenSignal } from './screen-signals';
 import { dateTimeUtc, dayTimeUtc, listOf, percent, templateNoun } from '../format';
 import { toneOf } from '../letters';
@@ -141,6 +143,11 @@ export interface ResultView {
    * The third card: the one fix to make today; with no fix, what that rests on (`noFixKind`): a clean
    * bill, a check that did not measure everything, or a site that served no page.
    */
+  /**
+   * Whether the competitor prompt may show: only when at least one AI crawler was measured,
+   * since it sells comparing a measurement.
+   */
+  competitorPrompt: boolean;
   first:
     | { kind: 'fix'; title: string; body: string; href: string }
     | {
@@ -150,6 +157,8 @@ export interface ResultView {
         body: string;
         /** The way to start watching an audit nobody has kept; null once it is kept. */
         action: { label: string; href: string } | null;
+        /** A refused check: the user agent to look for in the logs, and where our crawler is described. */
+        logIdentity?: { agent: string; href: string; untaggedControl: boolean };
       };
   doors: DoorView[];
   fixes: { total: number; open: number; pro: number; rows: FixRowView[] } | null;
@@ -614,13 +623,21 @@ function signalsDoor(check: Check, notServed: boolean): DoorView {
   const unknown = by('indeterminate');
   // The pill counts what is known present. A signal the check could not determine, or did not
   // record, is not tested, and the coverage line says how many were.
-  const label = `${present.length} of ${kinds.length} present`;
+  const tested = present.length + absent.length;
+  // On a check that read no page, "0 of 7 present" would read as seven signals looked for and missing.
+  const label = notServed
+    ? tested === 0
+      ? 'Not tested'
+      : `${present.length} found, ${tested} of ${kinds.length} tested`
+    : `${present.length} of ${kinds.length} present`;
   const names = (xs: { signal: ScreenSignal }[]) => xs.map((s) => SIGNAL_NAMES[s.signal]);
   const counting = shown.filter((s) => s.counts_toward_grade);
   // What could not be tested is said in the check's own words, grouped where the words agree.
   const untested = new Map<string, string[]>();
-  for (const s of unknown)
-    untested.set(s.evidence, [...(untested.get(s.evidence) ?? []), SIGNAL_NAMES[s.signal]]);
+  for (const s of unknown) {
+    const evidence = s.evidence.replace(/\.$/, '');
+    untested.set(evidence, [...(untested.get(evidence) ?? []), SIGNAL_NAMES[s.signal]]);
+  }
   const body = [
     present.length
       ? `${listOf(names(present))} ${present.length === 1 ? 'is' : 'are'} there.`
@@ -648,7 +665,7 @@ function signalsDoor(check: Check, notServed: boolean): DoorView {
       notServed || (!present.length && unknown.length)
         ? 'Checked by fetch'
         : 'Checked by fetch · nothing urgent',
-    coverage: { read: `Tested ${present.length + absent.length} of ${kinds.length} signals` },
+    coverage: { read: `Tested ${tested} of ${kinds.length} signals` },
     href: '#',
   };
 }
@@ -730,13 +747,34 @@ type NoFixCard = Exclude<ResultView['first'], { kind: 'fix' }>;
 
 /** "403", "403 or 429", "401, 403 or 429". */
 const eitherOf = (codes: readonly number[]) => {
-  const last = codes.at(-1);
-  const rest = codes.filter((c) => c !== last);
-  return rest.length ? `${rest.join(', ')} or ${last}` : `${last}`;
+  return orList(codes.map(statusName));
 };
 
+/** "a", "a or b", "a, b or c". */
+const orList = (items: readonly string[]) =>
+  items.map((x, i) => (i === 0 ? x : i === items.length - 1 ? ` or ${x}` : `, ${x}`)).join('');
+
+/** A status as the card names it: 429 is said in words, beside the code it belongs to. */
+const statusName = (code: number) =>
+  code === 429 ? '429 (“too many requests”: the site is limiting requests)' : `${code}`;
+
+/** What each refusal status points to. Built from the codes a check holds, so no other is named. */
+const REFUSAL_CAUSES: Readonly<Record<number, string>> = {
+  401: 'a login or password requirement',
+  403: 'a firewall or bot rule',
+  429: 'a rate limit',
+  451: 'a legal or regional restriction',
+};
+
+const causesOf = (codes: readonly number[]) => {
+  return orList([...new Set(codes.map((c) => REFUSAL_CAUSES[c] ?? 'what refused the request'))]);
+};
+
+const SITES_ACTION = { label: 'Open Sites', href: ACCOUNT_NAV[0].href };
+const NEW_AUDIT_ACTION = { label: 'Run a new audit', href: '/' };
+
 /** The third card when pages answered and none with a 200: what they answered, and what to do. */
-function notServedCard(check: Check, statuses: readonly number[]): NoFixCard {
+function notServedCard(check: Check, statuses: readonly number[], kept: boolean): NoFixCard {
   const codes = [...new Set(statuses)].sort((a, b) => a - b);
   const refused = servedWord(codes) === 'refused';
   const moved = codes.every((c) => c >= 300 && c < 400);
@@ -747,7 +785,7 @@ function notServedCard(check: Check, statuses: readonly number[]): NoFixCard {
       ? `None of the ${numberWord(ai.length)} AI crawlers could be measured.`
       : null;
   const next = refused
-    ? 'If you did not mean to refuse automated requests, find the firewall or bot rule that answered them, then run this audit again.'
+    ? `If this was not intended, look for ${causesOf(codes)}, then ${kept ? 'run it again from Sites' : 'run a new audit'}.`
     : moved
       ? 'If the site has moved, run this audit on its new address.'
       : 'Once the site serves its pages, run this audit again.';
@@ -763,7 +801,15 @@ function notServedCard(check: Check, statuses: readonly number[]): NoFixCard {
     ]
       .filter(Boolean)
       .join(' '),
-    action: null,
+    // An audit page has no re-run route: a kept site re-runs from Sites, an unkept one is a new audit.
+    action: refused ? (kept ? SITES_ACTION : NEW_AUDIT_ACTION) : null,
+    // The page requests' user agent, named so the owner can find them in their logs. It is not advice
+    // to allow it. The edge's browser-identity request carries no Crawlmouse tag, and the card says so.
+    ...(refused
+      ? {
+          logIdentity: { agent: CRAWL_USER_AGENT, href: '/bot', untaggedControl: meetsEdge(check) },
+        }
+      : {}),
   };
 }
 
@@ -984,7 +1030,15 @@ function crawlerRows(check: Check): CrawlerRowView[] {
         : `${GROUP_NAMES[c.group]}, ${c.scored ? 'scored' : 'not scored'}`,
     verdict: c.verdict,
     evidence: c.evidence_class,
-    status: c.status === null ? 'robots.txt' : String(c.status),
+    // A null status is a robots.txt reading only when the verdict was declared by robots.txt.
+    status:
+      c.status !== null
+        ? String(c.status)
+        : c.verdict === 'not_measured'
+          ? 'not measured'
+          : c.evidence_class === 'declared'
+            ? 'robots.txt'
+            : 'no standard status',
     text: c.text_share === null ? 'not measured' : `${percent(c.text_share)}%`,
   }));
 }
@@ -1123,6 +1177,7 @@ export function resultView(
       notServed ? pageRows.length : null,
       pageRows.map((p) => p.status_code),
     ),
+    competitorPrompt: check.crawlers.filter(isAi).some((c) => c.verdict !== 'not_measured'),
     crawledAt: dateTimeUtc(check.finished_at!),
     keptUntil: keptUntil ? dayTimeUtc(keptUntil) : null,
     grades,
@@ -1134,7 +1189,7 @@ export function resultView(
           href: fixHref(fixes[0].id),
         }
       : notServed
-        ? notServedCard(check, statuses)
+        ? notServedCard(check, statuses, kept)
         : noFix === 'unmeasured'
           ? unmeasuredCard(check, kept)
           : allClear(check, kept, cadence),

@@ -43,7 +43,8 @@
   },
   "pnpm": {
     "overrides": {
-      "@opentelemetry/instrumentation-http@<0.222.0": "0.222.0"
+      "@opentelemetry/instrumentation-http@<0.222.0": "0.222.0",
+      "postcss@<8.5.23": "8.5.33"
     }
   }
 }

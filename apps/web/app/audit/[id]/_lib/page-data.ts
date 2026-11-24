@@ -24,7 +24,7 @@ export function viewOptions(read: ReadyCheck): {
 
 /**
  * The page as its screens see it. No control of `AuditLinks` has a route in this step (Share:
- * the public report, wave 2; Re-run and "Email this fix": the site page and the emails), so none
+ * the public report, wave 2; Re-run and "Email this fix": the site page, the fix page's own form and the emails), so none
  * is rendered.
  */
 export const auditPage = (checkId: string, from: AuditPage['from']): AuditPage => ({
