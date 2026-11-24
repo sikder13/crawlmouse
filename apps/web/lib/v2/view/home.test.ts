@@ -66,6 +66,7 @@ describe('Home’s crawler table with `nojs` hidden', () => {
       (c) => c.ua === 'Googlebot',
     )!;
     expect(googlebot.cause).toBeNull();
+    expect(rowsOf(variant)).toContain('Googlebot');
     googlebot.by_template.at(-1)!.verdict = 'allowed_thin';
     expect(rowsOf(variant)).not.toContain('Googlebot');
   });
@@ -76,6 +77,7 @@ describe('Home’s crawler table with `nojs` hidden', () => {
       (c) => c.ua === 'PerplexityBot',
     )!;
     expect(perplexity.by_template.some((t) => t.verdict === 'allowed_thin')).toBe(false);
+    expect(rowsOf(variant)).toContain('PerplexityBot');
     perplexity.cause = 'client_rendered_template';
     expect(rowsOf(variant)).not.toContain('PerplexityBot');
   });
