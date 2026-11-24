@@ -17,6 +17,11 @@ export default defineConfig({
   resolve: {
     alias: {
       '@/': `${webRoot}`,
+      // Next resolves `server-only` at build time; under vitest it is an empty module, so a lib a test
+      // imports may import it (the feature switch does) without every test stubbing it.
+      'server-only': fileURLToPath(
+        new URL('./__tests__/helpers/server-only-stub.ts', import.meta.url),
+      ),
     },
   },
   test: {
