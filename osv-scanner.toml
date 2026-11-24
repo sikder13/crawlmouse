@@ -89,9 +89,15 @@ reason = "Re-accepted to 2026-12-10 by the owner on 2026-11-24. Present at the C
 # Published after the baseline and recorded on 2026-10-31, the day CI first reported them. Not from the
 # CC-00 scan: the only fixed versions are new majors, pulled in transitively by eslint, typescript-eslint,
 # @sentry/nextjs's bundler plugin and crawlee, which pin the old majors. Re-accepted 2026-11-24 to
-# 2026-12-10 with the 14 above, by the same owner approval. minimatch 9.0.9 is reachable in production
-# through @crawlee/core, which compiles one pattern per enqueue from a parsed origin; the engine passes
-# it no pattern, so a crawled site cannot supply one (packages/engine/src/crawler.ts, `same-hostname`).
+# 2026-12-10 with the 14 above, by the same owner approval. minimatch 9.0.9 is in production through
+# @crawlee/core: each enqueueLinks call compiles `http{s,}://<origin>/**` from the page's own origin,
+# unescaped (enqueue_links.js:99; packages/engine/src/crawler.ts, `same-hostname`). WHATWG URL parsing
+# keeps braces and `*` in a hostname, and nothing in our code refuses them (normalizeDomain,
+# validateUrlOrThrow). What stops it today is Node's resolver, measured 2026-11-24 on Node 22.23 and
+# glibc 2.35: `{a,b}.lab.crawlmouse.com` resolves in public DNS through our wildcard record, but
+# dns.lookup answers ENOTFOUND and dns.resolve4 EBADNAME, so no page of such a host is fetched and no
+# pattern is built from it. Not measured on the Vercel or Fly runtimes. If reached, a 247-character
+# brace hostname costs 4.3 s and 57,142 patterns per compile (v2r/qa/findings/osv-left-for-owner.md).
 
 [[IgnoredVulns]]
 id = "GHSA-3g3m-2fjr-6pw4"
@@ -101,7 +107,7 @@ reason = "Re-accepted to 2026-12-10 by the owner on 2026-11-24. Published 2026-1
 [[IgnoredVulns]]
 id = "GHSA-g3hv-75wg-m249"
 ignoreUntil = 2026-12-10
-reason = "Re-accepted to 2026-12-10 by the owner on 2026-11-24. Published 2026-10-31 (medium): minimatch@3.1.5 via eslint, minimatch@9.0.9 via crawlee, minimatch@10.2.5 via typescript-eslint and @sentry/nextjs (fixed: 11.0.1, a new major)"
+reason = "Re-accepted to 2026-12-10 by the owner on 2026-11-24; the crawl path is not reached while Node refuses brace hostnames (comment above). Published 2026-10-31 (medium): minimatch@3.1.5 via eslint, minimatch@9.0.9 via crawlee, minimatch@10.2.5 via typescript-eslint and @sentry/nextjs (fixed: 11.0.1, a new major)"
 
 # Added 2026-11-17, approved by the owner at 20:56 ET ("picomatch approve", CC-GL rulings-10). Not
 # present when CI was introduced: osv.dev published GHSA-fc5q-39xc-vjpf (CVE-2026-112366) after it.
