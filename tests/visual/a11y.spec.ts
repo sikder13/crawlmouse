@@ -344,10 +344,13 @@ test.describe('keyboard focus reaches every interactive primitive', () => {
 /**
  * Reduced motion. Two checks, because motion here comes two ways:
  * - CSS: on every preview, nothing in the page carries a CSS animation under reduced motion.
- * - Script: the crawl screen moves with Web Animations and CSS transitions while it plays. Every
- *   call to Element.animate and every transition that starts is counted while it plays for a few
- *   seconds; under reduced motion the count is zero, and without the preference it is not (the
- *   control that shows the count can fail).
+ * - Script: the crawl screen moves with Web Animations and CSS transitions while it plays. For a
+ *   few seconds of play this counts the calls to Element.animate, the transitions that start inside
+ *   its <main> at any length, and those outside <main> longer than 1 ms. Under reduced motion the
+ *   count is zero, and without the preference it is not (the control that shows the count can fail).
+ *   The 1 ms is F-179: globals.css shortens transitions to 0.01ms rather than removing them, so a
+ *   web font arriving after the first paint re-resolves the footer's `max-width: 34ch` and starts
+ *   one there, 0.01ms long, on a line that is not playing.
  */
 async function motionWhilePlaying(
   browser: import('./pw').Browser,
@@ -367,7 +370,19 @@ async function motionWhilePlaying(
       w.__animate++;
       return animate.apply(this, args);
     };
-    document.addEventListener('transitionrun', () => w.__transitions++, true);
+    document.addEventListener(
+      'transitionrun',
+      (e) => {
+        const target = e.target as Element;
+        const style = getComputedStyle(target, (e as TransitionEvent).pseudoElement || undefined);
+        const delays = style.transitionDelay.split(',').map((v) => parseFloat(v));
+        const seconds = style.transitionDuration
+          .split(',')
+          .map((v, i) => parseFloat(v) + delays[i % delays.length]!);
+        if (target.closest('main') || Math.max(...seconds) > 0.001) w.__transitions++;
+      },
+      true,
+    );
   });
   // From just before the crawler tests: pages, links, log lines, verdicts and findings all land.
   await page.goto('/v2-preview/screens/crawl?at=66000&play', { waitUntil: 'load' });
