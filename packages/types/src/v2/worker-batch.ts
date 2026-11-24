@@ -332,6 +332,21 @@ export type Finding = z.infer<typeof FindingSchema>;
 
 // ─── The batch result ──────────────────────────────────────────────────────────────────────────
 
+/**
+ * How long the batch's requests took (F-247): each request's time from asking to answer, and the
+ * batch's idle time between requests (its span from first request to last answer, less the time at
+ * least one request was in flight). Optional so the app reads a worker that does not send it yet.
+ */
+export const BatchTimingSchema = z.strictObject({
+  requests: CountSchema,
+  fetch_ms_p50: CountSchema,
+  fetch_ms_p90: CountSchema,
+  fetch_ms_max: CountSchema,
+  fetch_ms_total: CountSchema,
+  idle_ms_total: CountSchema,
+});
+export type BatchTiming = z.infer<typeof BatchTimingSchema>;
+
 const common = {
   /** `<check_id>:<n>`, the batch number without leading zeros, so no two ids share a number. */
   batch_id: z.string().regex(/^[0-9a-f-]{36}:(?:0|[1-9]\d*)$/),
@@ -348,6 +363,7 @@ const common = {
   robots: z.array(RobotsEvidenceSchema),
   /** The declaration files a crawl batch requested, once each; none for access. */
   declarations: z.array(DeclarationFetchSchema),
+  timing: BatchTimingSchema.optional(),
 };
 
 export const AccessBatchResultSchema = z.strictObject({

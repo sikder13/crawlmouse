@@ -126,7 +126,11 @@ async function runFake(
     robotsCache: new RobotsCache(clock),
     reader,
   });
-  return { result, requested: fetcher.calls.map((c) => c.url).filter((u) => !isDeclaration(u)) };
+  return {
+    result,
+    requested: fetcher.calls.map((c) => c.url).filter((u) => !isDeclaration(u)),
+    calls: fetcher.calls,
+  };
 }
 /** example.com/a redirects to www.example.com/t; `www` answers the rest. */
 const toWww =
@@ -1916,5 +1920,23 @@ describe('round 5: a robots.txt redirect the batch could not follow', () => {
     expect(result.pages[0]!.limitations[0]).toBe(
       "Not requested: the batch's requests budget was spent. The user agent shown is the one that would have been sent.",
     );
+  });
+});
+
+describe('the batch result carries its request timing (F-247)', () => {
+  it('times every request the batch made, for crawl and access batches alike', async () => {
+    const served = () => ({
+      status: 200,
+      headers: { 'content-type': 'text/html' },
+      body: '<p>a</p>',
+    });
+    for (const req of [
+      crawlReq('https://example.com', ['/a', '/b']),
+      accessReq('https://example.com', ['/a']),
+    ]) {
+      const { result, calls } = await runFake(req, served);
+      expect(result.timing?.requests).toBe(calls.length);
+      expect(calls.length).toBeGreaterThan(0);
+    }
   });
 });
