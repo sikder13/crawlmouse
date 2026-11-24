@@ -249,7 +249,8 @@ describe('accountFromRow', () => {
       w.accountId,
     ]);
     const account = await one('accounts', 'id', w.accountId);
-    const { logo_path: _omitted, ...brand } = await one('agency_brands', 'account_id', w.accountId);
+    const brand = await one('agency_brands', 'account_id', w.accountId);
+    delete brand.logo_path;
     expect(() =>
       accountFromRow({ account, email: 'a@example.com', subscription: null, apiKeys: [], brand }),
     ).toThrow(/logo_path/);
