@@ -47,16 +47,20 @@ interface PlanCard {
   /** Null: the card has no button. */
   action: string | null;
   note: string;
-  /** A link after the note. */
+  /** A link after the note, its label saying where it leads. */
   noteLink?: { label: string; href: string };
 }
+
+/** The closed Agency card's link: where the plan is described, named for what is there. */
+const AGENCY_DETAILS = { label: 'See what Agency includes', href: FOR_AGENCIES.href };
 
 /**
  * The plan cards, without what the Goal 1 switch hides; with nothing hidden, the locked words and
  * the paid plans' page limit. `agencyOpen` false (Agency not on sale): its card offers no trial and
- * says the plan opens, with a link to For agencies.
+ * says the plan opens, then links to For agencies. `billingOpen` false (V2_BILLING not public): Pro
+ * cannot be bought, so its note is Pricing's billing-off note and names no price.
  */
-function plans(f: Features, agencyOpen: boolean): PlanCard[] {
+function plans(f: Features, agencyOpen: boolean, billingOpen: boolean): PlanCard[] {
   const competitors = GATES.pro.competitorsPerSite;
   const pro = said(f, [
     { text: 'Every fix with a copy-paste packet', capabilities: ['fix_packets'] },
@@ -93,7 +97,9 @@ function plans(f: Features, agencyOpen: boolean): PlanCard[] {
       per: ' a month',
       body: `Five sites${proLimit}, checked weekly. ${pro.join(', ')}.`,
       action: 'Start with 14 days of Pro',
-      note: `The same free account; ${formatPlanPrice('pro')} a month only if you keep Pro`,
+      note: billingOpen
+        ? `The same free account; ${formatPlanPrice('pro')} a month only if you keep Pro`
+        : PRICING_COPY.buttons.proTrialBillingOff.note,
     },
     {
       name: 'Agency',
@@ -104,8 +110,8 @@ function plans(f: Features, agencyOpen: boolean): PlanCard[] {
         ? { action: 'Start a 14-day trial', note: 'Card required; nothing charged for 14 days' }
         : {
             action: null,
-            note: PRICING_COPY.buttons.agencyStartFree.note,
-            noteLink: FOR_AGENCIES,
+            note: `${PRICING_COPY.buttons.agencyStartFree.note}.`,
+            noteLink: AGENCY_DETAILS,
           }),
     },
   ];
@@ -120,6 +126,7 @@ export function HomeScreen({
   start = false,
   planHref,
   agencyOpen = true,
+  billingOpen = true,
 }: {
   data: HomeView;
   /** The forms start an audit (`POST /api/checks`); omitted (the preview), they post nowhere. */
@@ -134,6 +141,11 @@ export function HomeScreen({
    * Omitted (the preview), it is, as the locked screen shows it.
    */
   agencyOpen?: boolean;
+  /**
+   * Whether a paid plan can be bought (`billingPublic()`, read by the entry point). Omitted (the
+   * preview), it can, as the locked screen shows it.
+   */
+  billingOpen?: boolean;
 }) {
   const { crawlers, withoutJs, alert } = data;
   // `nojs` hidden: the crawler table loses its "Text it can read" column, header and cells together.
@@ -318,7 +330,7 @@ export function HomeScreen({
             Every new account gets Pro for 14 days. When that ends, nothing you can see is deleted.
           </p>
           <div className={styles.g3}>
-            {plans(data.features, agencyOpen).map((p) => (
+            {plans(data.features, agencyOpen, billingOpen).map((p) => (
               <Card key={p.name} className={styles.plan}>
                 <div className={layout.mut}>{p.name}</div>
                 <div className={styles.price}>
@@ -335,7 +347,8 @@ export function HomeScreen({
                   {p.note}
                   {p.noteLink ? (
                     <>
-                      : <a href={p.noteLink.href}>{p.noteLink.label}</a>
+                      {' '}
+                      <a href={p.noteLink.href}>{p.noteLink.label}</a>
                     </>
                   ) : null}
                 </div>

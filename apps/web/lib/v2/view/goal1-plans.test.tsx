@@ -80,20 +80,45 @@ function signupAside(html: string): string {
   return html.slice(i, html.indexOf('</section>', i));
 }
 
-const homeHtml = (f: Features = EVERY, agencyOpen?: boolean) =>
-  renderToStaticMarkup(<HomeScreen data={homePreview(f)} agencyOpen={agencyOpen} />);
-const cards = (f?: Features, agencyOpen?: boolean) => cardsOf(homeHtml(f, agencyOpen));
+const homeHtml = (f: Features = EVERY, agencyOpen?: boolean, billingOpen?: boolean) =>
+  renderToStaticMarkup(
+    <HomeScreen data={homePreview(f)} agencyOpen={agencyOpen} billingOpen={billingOpen} />,
+  );
+
+/** Each plan card's button target, by plan name; null where the card has no button. */
+const buttonHrefs = (html: string) =>
+  Object.fromEntries(
+    [...dom(html).querySelectorAll(`.${homeStyles.plan}`)].map((card) => [
+      squish(card.children[0]?.textContent),
+      card.querySelector(`.${homeStyles.planButton}`)?.getAttribute('href') ?? null,
+    ]),
+  );
+const cards = (f?: Features, agencyOpen?: boolean, billingOpen?: boolean) =>
+  cardsOf(homeHtml(f, agencyOpen, billingOpen));
 const card = (name: string, f?: Features, agencyOpen?: boolean) =>
   cards(f, agencyOpen).find((c) => c.name === name)!;
 
-const signupHtml = (f?: Features, agencyOpen?: boolean) =>
-  renderToStaticMarkup(<SignupScreen checksPublic={false} features={f} agencyOpen={agencyOpen} />);
+const signupHtml = (f?: Features, agencyOpen?: boolean, billingOpen?: boolean) =>
+  renderToStaticMarkup(
+    <SignupScreen
+      checksPublic={false}
+      features={f}
+      agencyOpen={agencyOpen}
+      billingOpen={billingOpen}
+    />,
+  );
 const tableRows = (html: string) =>
   [
     ...dom(html).querySelectorAll('table[aria-label="What your account includes"] td:first-child'),
   ].map((td) => squish(td.textContent));
 const foot = (html: string) =>
   squish(dom(html).querySelector(`.${signupStyles.foot}`)?.textContent);
+
+/** Pricing's sentences for a plan not yet on sale, and for billing off (lib/v2/copy/pricing.ts). */
+const AGENCY_CLOSED = 'The Agency plan opens shortly.';
+const PRO_BILLING_OFF_NOTE = 'Same account, no card; paid plans open shortly';
+const BILLING_OFF_FOOT =
+  'After 14 days the account is Free. Paid plans open shortly. Agencies: 25 sites under your brand, $99 a month. The Agency plan opens shortly.';
 
 // ── The words at 735ac453 ──────────────────────────────────────────────────────────────────────
 
@@ -323,7 +348,7 @@ describe('Agency not on sale', () => {
   it('Home: no button, no card, trial or "charged" wording; one line that it opens, linking /agencies', () => {
     const agency = card('Agency', EVERY, false);
     expect(agency.action).toBeNull();
-    expect(agency.note).toBe('The Agency plan opens shortly: For agencies');
+    expect(agency.note).toBe(`${AGENCY_CLOSED} See what Agency includes`);
     expect(agency.links).toEqual(['/agencies']);
     expect(JSON.stringify(agency)).not.toMatch(/card|trial|charged/i);
     // The body is the plan's, as on sale.
@@ -347,6 +372,28 @@ describe('Agency not on sale', () => {
     expect(foot(signupHtml(hide('agency_white_label'), false))).toBe(
       'After 14 days the account is Free. Pro is $19 a month only if you choose it. Agencies: 25 sites, $99 a month. The Agency plan opens shortly.',
     );
+  });
+});
+
+describe('billing not public: Pro cannot be bought, so no page offers it at a price', () => {
+  it('Home: Pro’s note is Pricing’s billing-off note; Free, the bodies and the buttons stay', () => {
+    const off = cards(EVERY, false, false);
+    expect(off.find((c) => c.name === 'Pro')!.note).toBe(PRO_BILLING_OFF_NOTE);
+    expect(JSON.stringify(off.find((c) => c.name === 'Pro'))).not.toContain('$19');
+    expect(off.map((c) => ({ ...c, note: c.name === 'Pro' ? '' : c.note }))).toEqual(
+      cards(EVERY, false).map((c) => ({ ...c, note: c.name === 'Pro' ? '' : c.note })),
+    );
+  });
+
+  it('Home: billing on, the Pro note is byte for byte as before', () => {
+    expect(card('Pro', EVERY, true).note).toBe(LOCKED_HOME[1]!.note);
+    expect(homeHtml(hide('pages_2000'), true, true)).toBe(homeHtml(hide('pages_2000')));
+  });
+
+  it('Sign-up: the footer names no Pro price, and says paid plans open', () => {
+    expect(foot(signupHtml(EVERY, false, false))).toBe(BILLING_OFF_FOOT);
+    expect(foot(signupHtml(EVERY, true, true))).toBe(LOCKED_SIGNUP_FOOT);
+    expect(signupHtml(hide('pages_2000'), true, true)).toBe(signupHtml(hide('pages_2000')));
   });
 });
 
@@ -381,17 +428,17 @@ describe('the entry points read the switch and the flags', () => {
     );
     vi.stubEnv('V2_AGENCY_SALES', '');
     expect((await liveHome()).find((c) => c.name === 'Agency')!.note).toBe(
-      'The Agency plan opens shortly: For agencies',
+      `${AGENCY_CLOSED} See what Agency includes`,
     );
     open();
     vi.stubEnv('V2_BILLING', '');
     expect((await liveHome()).find((c) => c.name === 'Agency')!.note).toBe(
-      'The Agency plan opens shortly: For agencies',
+      `${AGENCY_CLOSED} See what Agency includes`,
     );
     open();
     vi.stubEnv('V2_BILLING_ONLY_USER', 'some-user');
     expect((await liveHome()).find((c) => c.name === 'Agency')!.note).toBe(
-      'The Agency plan opens shortly: For agencies',
+      `${AGENCY_CLOSED} See what Agency includes`,
     );
   }, 60_000);
 
@@ -421,5 +468,53 @@ describe('the entry points read the switch and the flags', () => {
     open();
     vi.stubEnv('V2_BILLING', '');
     expect(foot(await signupPage())).not.toMatch(/trial with a card/);
+  }, 60_000);
+
+  const liveHomeHtml = async () => {
+    vi.resetModules();
+    const { LiveHome } = await import('../../../components/v2/screens/home/LiveHome');
+    return renderToStaticMarkup(<LiveHome />);
+  };
+
+  it('LiveHome: Agency on sale and the door open, its card’s button goes to the trial page', async () => {
+    open();
+    vi.stubEnv('V2_ACCOUNT_DOOR', '1');
+    const html = await liveHomeHtml();
+    expect(buttonHrefs(html)).toEqual({
+      Free: '/signup',
+      Pro: '/signup',
+      Agency: '/agency-trial',
+    });
+    expect(cardsOf(html).find((c) => c.name === 'Agency')!.action).toBe('Start a 14-day trial');
+    vi.stubEnv('V2_AGENCY_SALES', '');
+    const closed = await liveHomeHtml();
+    expect(buttonHrefs(closed)).toEqual({ Free: '/signup', Pro: '/signup', Agency: null });
+    expect(cardsOf(closed).find((c) => c.name === 'Agency')!.note).toBe(
+      `${AGENCY_CLOSED} See what Agency includes`,
+    );
+    // The door shut: no plan has a button, Agency's on sale or not.
+    open();
+    vi.stubEnv('V2_ACCOUNT_DOOR', '');
+    expect(buttonHrefs(await liveHomeHtml())).toEqual({ Free: null, Pro: null, Agency: null });
+  }, 60_000);
+
+  it('LiveHome: Pro’s note names its price only while V2_BILLING is public', async () => {
+    open();
+    expect((await liveHome()).find((c) => c.name === 'Pro')!.note).toBe(LOCKED_HOME[1]!.note);
+    vi.stubEnv('V2_BILLING', '');
+    expect((await liveHome()).find((c) => c.name === 'Pro')!.note).toBe(PRO_BILLING_OFF_NOTE);
+    open();
+    vi.stubEnv('V2_BILLING_ONLY_USER', 'some-user');
+    expect((await liveHome()).find((c) => c.name === 'Pro')!.note).toBe(PRO_BILLING_OFF_NOTE);
+  }, 60_000);
+
+  it('/signup: Pro’s price only while V2_BILLING is public', async () => {
+    open();
+    expect(foot(await signupPage())).toBe(LOCKED_SIGNUP_FOOT);
+    vi.stubEnv('V2_BILLING', '');
+    expect(foot(await signupPage())).toBe(BILLING_OFF_FOOT);
+    open();
+    vi.stubEnv('V2_BILLING_ONLY_USER', 'some-user');
+    expect(foot(await signupPage())).toBe(BILLING_OFF_FOOT);
   }, 60_000);
 });

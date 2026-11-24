@@ -85,12 +85,21 @@ export function planGroups(features: Features = ALL_SHOWN): PlanGroup[] {
 /**
  * The line under the table. "under your brand" names the client report page, which either agency
  * switch hides. `agencyOpen` false (Agency not on sale): no trial and no card, and the plan opens.
+ * `billingOpen` false (V2_BILLING not public): Pro cannot be bought, so no price is offered for it,
+ * and the sentence is Pricing's billing-off note.
  */
-export function planFootnote(features: Features = ALL_SHOWN, agencyOpen = true): string {
+export function planFootnote(
+  features: Features = ALL_SHOWN,
+  agencyOpen = true,
+  billingOpen = true,
+): string {
   const brand = isHidden(['client_report_page'], features) ? '' : ' under your brand';
+  const pro = billingOpen
+    ? `Pro is ${usd(PRO_MONTHLY)} a month only if you choose it.`
+    : `${PRICING_COPY.buttons.opensShortly.note}.`;
   return (
-    `After ${trialDays} the account is Free. Pro is ${usd(PRO_MONTHLY)} a month only if you choose ` +
-    `it. Agencies: ${GATES.agency.sites} sites${brand}, ${usd(AGENCY_MONTHLY)} a month` +
+    `After ${trialDays} the account is Free. ${pro} ` +
+    `Agencies: ${GATES.agency.sites} sites${brand}, ${usd(AGENCY_MONTHLY)} a month` +
     (agencyOpen
       ? `, ${TRIAL_DAYS}-day trial with a card.`
       : `. ${PRICING_COPY.buttons.agencyStartFree.note}.`)

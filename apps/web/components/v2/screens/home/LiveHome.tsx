@@ -7,6 +7,7 @@ import { shownFeatures } from '../../../../lib/feature-switch';
 import { fixture } from '../../../../lib/v2/fixtures';
 import { stateAt } from '../../../../lib/v2/progress';
 import { CHECKS, recording } from '../../../../lib/v2/recordings';
+import { AGENCY_TRIAL_HREF } from '../../../../lib/v2/view/agencies';
 import { homeView } from '../../../../lib/v2/view/home';
 import { mapDrawing } from '../../../../lib/v2/view/map';
 import { HomeScreen } from './HomeScreen';
@@ -20,9 +21,11 @@ import { HomeScreen } from './HomeScreen';
  * lib/v2/rewrites.ts, whose row says what a production build linked when `app/page.tsx` could reach
  * this module). `app/page.tsx` does not import it; `live-home.test.tsx` holds that.
  *
- * The plan buttons lead to Sign-up while the account door is open (V2_ACCOUNT_DOOR); the Agency
- * trial has no page yet, so it has no button. While Agency is not on sale (V2_BILLING public and
- * V2_AGENCY_SALES, read here at build time like the switch), its card names no trial or card.
+ * The plan buttons lead to Sign-up while the account door is open (V2_ACCOUNT_DOOR), and Agency's
+ * to its trial page (`app/agency-trial/page.tsx`, which redirects while Agency is not on sale) while
+ * Agency is on sale too (V2_BILLING public and V2_AGENCY_SALES, read here at build time like the
+ * switch). While it is not, its card names no trial or card and has no button. While V2_BILLING is
+ * not public, Pro's note names no price.
  */
 export function LiveHome() {
   // The Goal 1 switch (V2_HIDE_FEATURES). `/` is a static page, so the switch is read at build
@@ -33,7 +36,11 @@ export function LiveHome() {
     { map: mapDrawing('bad-site'), end: stateAt(recording('bad-site').events, Infinity) },
     shownFeatures(),
   );
-  const planHref = accountDoorEnabled() ? { Free: '/signup', Pro: '/signup' } : {};
+  const billingOpen = billingPublic();
+  const agencyOpen = billingOpen && agencySalesOpen();
+  const planHref = accountDoorEnabled()
+    ? { Free: '/signup', Pro: '/signup', ...(agencyOpen ? { Agency: AGENCY_TRIAL_HREF } : {}) }
+    : {};
   return (
     <>
       <TrackView event="home_viewed" />
@@ -42,7 +49,8 @@ export function LiveHome() {
         data={data}
         start
         planHref={planHref}
-        agencyOpen={billingPublic() && agencySalesOpen()}
+        agencyOpen={agencyOpen}
+        billingOpen={billingOpen}
       />
     </>
   );

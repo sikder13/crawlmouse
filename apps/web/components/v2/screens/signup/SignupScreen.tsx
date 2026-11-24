@@ -13,12 +13,14 @@ import styles from './Signup.module.css';
 /**
  * Final-Signup (CC-25): the email, an optional first site, and what the account is. The table and
  * every number on the page come from door-copy.ts and plan-table.ts; `checksPublic` is
- * V2_CHECKS_PUBLIC, read by the route, as are `features` (the Goal 1 switch) and `agencyOpen`.
+ * V2_CHECKS_PUBLIC, read by the route, as are `features` (the Goal 1 switch), `agencyOpen` and
+ * `billingOpen`.
  */
 export function SignupScreen({
   checksPublic,
   features,
   agencyOpen = true,
+  billingOpen = true,
   initial,
 }: {
   checksPublic: boolean;
@@ -29,6 +31,11 @@ export function SignupScreen({
    * as the locked screen shows it.
    */
   agencyOpen?: boolean;
+  /**
+   * Whether a paid plan can be bought (`billingPublic()`); omitted (the preview), it can, as the
+   * locked screen shows it.
+   */
+  billingOpen?: boolean;
   /** Fix the form's state, for previews and tests. */
   initial?: SignupFormState;
 }) {
@@ -80,7 +87,7 @@ export function SignupScreen({
                 ])}
               </tbody>
             </table>
-            <div className={styles.foot}>{planFootnote(features, agencyOpen)}</div>
+            <div className={styles.foot}>{planFootnote(features, agencyOpen, billingOpen)}</div>
           </Card>
         </div>
       </main>
