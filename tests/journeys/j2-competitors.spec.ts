@@ -1,6 +1,7 @@
 import { expect } from './pw';
 import { stagingAdmin } from './lib/accounts';
 import { keptLabSite, person } from './lib/people';
+import { startTrialFromDashboard } from './lib/pro';
 import { assertCheckableSite } from './lib/sites';
 import { step } from './lib/step';
 
@@ -25,15 +26,15 @@ async function until<T>(what: string, read: () => Promise<T | null>, ms: number)
 step('J2.4e', 'One competitor', async ({ context, baseURL }, info) => {
   info.setTimeout(WAIT_MS + 10 * MINUTE);
   const A = await person(context, baseURL!, 'j2', 5);
-  const trial = await A.page.evaluate(async (accountId) => {
-    const r = await fetch('/api/billing/pro-trial/start', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ accountId }),
-    });
-    return r.status;
-  }, A.accountId);
-  expect(trial, 'the no-card Pro trial starts').toBe(200);
+  // QA's helper: staging's trial ledger is set aside around the press and put back as read, since
+  // every run comes from one network and its ledger would refuse a repeat trial (409 trial_ledger).
+  await startTrialFromDashboard(A);
+  const { data: account } = await stagingAdmin()
+    .from('accounts')
+    .select('state')
+    .eq('id', A.accountId)
+    .single();
+  expect(account?.state, 'the no-card Pro trial started').toBe('pro_trial');
 
   const { site, host } = await keptLabSite(A);
   const rival = ['client-1', 'client-2']
