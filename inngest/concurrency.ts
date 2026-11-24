@@ -26,10 +26,11 @@ export const WORKER_BATCH_SLOTS = 16;
  * steps, and a check sleeping between polls holds none, so this bounds the posts, polls, builds and
  * persists running at one moment, not the checks in flight or the worker's batches. Builds and
  * persists are the heavy ones; 16 lets as many checks build at once as one worker machine runs
- * batches. Their load on Vercel and Supabase at 16 is what the staging run measures.
+ * batches. Their load on Vercel and Supabase at 16 is not measured yet.
  *
  * If the plan ever falls back to Hobby (a cap of 5), this default makes Inngest refuse the app sync.
- * Set INNGEST_CHECK_CONCURRENCY to 5 or less and redeploy; the variable can lower the limit.
+ * Set INNGEST_CHECK_CONCURRENCY, and any other INNGEST_*_CONCURRENCY that is set, to 5 or less, then
+ * redeploy: each variable can lower its function's limit.
  */
 export const CHECK_CONCURRENCY_DEFAULT = WORKER_BATCH_SLOTS;
 

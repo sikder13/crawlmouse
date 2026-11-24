@@ -191,7 +191,8 @@ Served through `apps/web/app/api/webhooks/inngest` (`maxDuration=300`, `runtime=
   limit read from the environment is clamped to `PLAN_CONCURRENCY_CAP`, Inngest Pro's 100; the declared limits are
   swept against it by `pnpm --filter @crawlmouse/web exec vitest run lib/v2/pipeline/functions.test.ts`. The
   check function's default is 16. **If the plan falls back to Hobby**, that 16 is above Hobby's 5 and Inngest
-  refuses the app sync: set `INNGEST_CHECK_CONCURRENCY=5` in Vercel and redeploy.
+  refuses the app sync: set `INNGEST_CHECK_CONCURRENCY=5` in Vercel, and any other `INNGEST_*_CONCURRENCY` that is
+  set to 5 or less, then redeploy.
 - **`reconcileBillingFn`** — daily Stripe↔DB entitlement reconcile (dry-run by construction; livemode-guarded).
 - **`cleanupExpiredAuditsFn`** — bounded daily TTL delete of expired free audits.
 
