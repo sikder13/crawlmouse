@@ -77,9 +77,11 @@ export class SiteLimiter {
   }
 
   /**
-   * Drops every queued task that cannot start by its `latestAt`. Called where the start moves later
-   * (a pause) or a task is queued, as well as in the pump: the pump may be asleep through a long
-   * pause, and a task queued meanwhile must not wait for it to wake.
+   * Drops every queued task that cannot start by its `latestAt`. Called by `pauseUntil` and in the
+   * pump; `schedule` checks a new task the same way before queueing it. The pump may be asleep
+   * through a long pause, and a task queued meanwhile must not wait for it to wake. A start moved
+   * later by `raiseGapMs` is not checked at once: the pump, waking at the earlier start, drops the
+   * task then, which is still before its deadline.
    */
   private dropLate(): void {
     const startAt = this.startAt();

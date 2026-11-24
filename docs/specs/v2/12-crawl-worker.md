@@ -118,7 +118,7 @@ Each access row names its identity: `identity_role` is `control`, `crawler` or `
 
 - A 429 is a request to slow down. The site's next request waits for its Retry-After, or without one for a back-off from 2 s that doubles with each 429 in a row, at most 1 min either way; the gap between starts then doubles, up to 8 s, and stays raised while the worker holds the site (it forgets a site idle for 1 min); and the page is asked for again, up to 2 more times. Declaration reads, and requests under a crawler's name, do none of this.
 
-- A site is stopped for 10 min after 6 responses of 429 in a row (any other answer but a redirect ends the run), or 4 consecutive challenged pages (in a crawl batch, a challenged fetch; in an access batch, a challenged control). A batch records a stop it met or caused as a finding; it is partial with `site_stopped` only when the stop refused one of its requests.
+- A site is stopped for 10 min after 6 responses of 429 in a row (any other answer to a request that counts toward the stop, but a redirect, ends the run; requests under a crawler's name and declaration reads do not count), or 4 consecutive challenged pages (in a crawl batch, a challenged fetch; in an access batch, a challenged control). A batch records a stop it met or caused as a finding; it is partial with `site_stopped` only when the stop refused one of its requests.
 
 - Redirects are followed one paced request at a time. A redirect to another registrable domain is recorded, not requested; robots.txt redirects are followed, as RFC 9309 asks.
 
