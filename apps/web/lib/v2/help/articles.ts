@@ -465,7 +465,7 @@ function howWeCrawl(): HelpArticle {
       p(s(`Our crawler’s user agent is ${quote(CRAWL_USER_AGENT)}.`)),
       p(
         s(
-          `To test AI crawlers, an audit also requests a sample of pages as each crawler’s user agent with ${quote(CRAWLER_TAG)} added, and once per sampled page as an ordinary browser, which carries no tag.`,
+          `To test AI crawlers, an audit also requests a sample of pages with each crawler’s published user agent, or just its name where its operator publishes none, with ${quote(CRAWLER_TAG)} added, and once per sampled page as an ordinary browser, which carries no tag.`,
         ),
         s(
           'When a page refuses a crawler, the audit may request it once more as Googlebot, tagged the same way, to see whether the refusal is about that crawler.',

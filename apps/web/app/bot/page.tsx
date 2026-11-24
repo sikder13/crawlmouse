@@ -18,7 +18,8 @@ export default function BotPage() {
         <h1 className="font-display font-bold text-5xl tracking-tight">CrawlmouseBot</h1>
         <p className="mt-4 text-lg text-ink/70">
           Hi &mdash; if you&rsquo;re reading this, you probably saw{' '}
-          <code className="font-mono text-sm bg-oat px-1.5 py-0.5 rounded">Crawlmouse/2.0</code> in
+          <code className="font-mono text-sm bg-oat px-1.5 py-0.5 rounded">Crawlmouse/2.0</code> or
+          <code className="font-mono text-sm bg-oat px-1.5 py-0.5 rounded">CrawlmouseBot</code> in
           your access logs.
         </p>
         <Card className="mt-10">
@@ -36,15 +37,22 @@ export default function BotPage() {
           <h2 className="font-display font-bold text-2xl mb-3">How we crawl</h2>
           <ul className="space-y-2 text-ink/80 list-disc pl-5">
             <li>
-              We respect{' '}
-              <code className="font-mono text-sm bg-oat px-1.5 py-0.5 rounded">robots.txt</code> on
-              every request.
+              We obey{' '}
+              <code className="font-mono text-sm bg-oat px-1.5 py-0.5 rounded">robots.txt</code> for
+              page requests and crawler tests. Reading robots.txt and sitemaps to find pages, and
+              the domain-verification check, do not depend on it.
             </li>
             <li>
               Max 8 concurrent requests per host &mdash; we stay polite with bounded concurrency,
               not aggressive bursts.
             </li>
             <li>We back off immediately on 429 (rate-limited) or 503 responses.</li>
+            <li>
+              To find pages, we first read robots.txt and sitemap files with the User-Agent below
+              and no{' '}
+              <code className="font-mono text-sm bg-oat px-1.5 py-0.5 rounded">{FROM_HEADER}</code>{' '}
+              header.
+            </li>
             <li>
               Our page requests send the User-Agent{' '}
               <code className="font-mono text-sm bg-oat px-1.5 py-0.5 rounded break-all">
@@ -58,7 +66,8 @@ export default function BotPage() {
             </li>
             <li>
               To test what an AI crawler is served, we request a sample of pages with that
-              crawler&rsquo;s own user agent followed by{' '}
+              crawler&rsquo;s published user agent, or just its name where its operator publishes
+              none, followed by{' '}
               <code className="font-mono text-sm bg-oat px-1.5 py-0.5 rounded break-all">
                 {CRAWLER_TAG}
               </code>
@@ -68,15 +77,24 @@ export default function BotPage() {
               crawler&rsquo;s.
             </li>
             <li>
-              When a crawler test is refused, we may send one more tagged request with
-              Googlebot&rsquo;s user agent, to see whether the site checks crawler addresses. It
-              never produces a Googlebot result.
+              When a crawler test is refused, we may send one more tagged request (plus any
+              redirects it follows) with Googlebot&rsquo;s user agent, to see whether the site
+              checks crawler addresses. It never produces a Googlebot result.
             </li>
             <li>
-              For each sampled page we also send one comparison request with an ordinary browser
-              user agent, with no Crawlmouse tag and no{' '}
+              For each sampled page robots.txt lets us request, we first send one comparison request
+              (plus any redirects it follows) with an ordinary browser user agent, with no
+              Crawlmouse tag and no{' '}
               <code className="font-mono text-sm bg-oat px-1.5 py-0.5 rounded">{FROM_HEADER}</code>{' '}
               header, to tell a rule about one crawler from a site that refuses all automation.
+            </li>
+            <li>
+              When someone verifies ownership of a domain with a meta tag, we request its homepage
+              under our earlier name,{' '}
+              <code className="font-mono text-sm bg-oat px-1.5 py-0.5 rounded">CrawlmouseBot</code>,
+              with no{' '}
+              <code className="font-mono text-sm bg-oat px-1.5 py-0.5 rounded">{FROM_HEADER}</code>{' '}
+              header.
             </li>
             <li>HTTP only, no headless browser, no cookie persistence.</li>
           </ul>
