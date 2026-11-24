@@ -4,6 +4,7 @@
  * V2_CHECKS_PUBLIC=1. The last is CC-29's daily deletion of Agency Plus requests. Everything is built when a function runs, not when the route loads: with no
  * RESEND_API_KEY or no pepper `send()` claims nothing and logs `mail.unconfigured`.
  */
+import { billingV2Enabled } from '../../billing/flags';
 import { createClient } from '@supabase/supabase-js';
 import type { InngestFunction } from 'inngest';
 import {
@@ -57,6 +58,7 @@ export function productionMailHandlers(env: Env): MailHandlers {
   return mailHandlers({
     mail: mailDeps(env, sb),
     store: supabaseMailStore(sb),
+    plansOpen: () => billingV2Enabled(env),
     // A step has no request, so no cookie header: serverCaptureAllowed reads none (CC-26b's known gap).
     capture: (event, distinctId, properties, accountId) =>
       captureServerEvent(null, { event, distinctId, accountId, properties }),

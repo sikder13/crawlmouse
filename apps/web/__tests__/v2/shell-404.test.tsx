@@ -84,13 +84,18 @@ describe('the skip link', () => {
 });
 
 describe('the Free checks column', () => {
-  it('goes to the three /check pages, each under the flag that serves it', () => {
+  it('goes to the three /check pages under their flag, then keeps the three search pages (§13)', () => {
     const items = FOOTER_COLUMNS.find((c) => c.title === 'Free checks')!.items;
     expect(items.map((i) => ('href' in i ? i.href : null))).toEqual([
       '/check/gptbot',
       '/check/javascript',
       '/check/robots-ai',
+      '/ai-readiness-checker',
+      '/blog/can-ai-crawlers-see-javascript',
+      '/blog/block-ai-crawlers-robots-txt',
     ]);
-    for (const i of items) expect('gate' in i && i.gate).toBe('checksPublic');
+    for (const i of items.slice(0, 3)) expect('gate' in i && i.gate).toBe('checksPublic');
+    // The search pages are always served, so they are never gated.
+    for (const i of items.slice(3)) expect('gate' in i).toBe(false);
   });
 });

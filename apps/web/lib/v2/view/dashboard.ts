@@ -1048,13 +1048,15 @@ export function dashboardView(
     ...new Set((byCheck ?? []).flatMap((r) => r.verdicts).filter((x): x is Verdict => x !== null)),
   ];
   const free = FREE_SCHEDULE[GATES.free.schedule];
-  // With paid plans closed nothing sends the trial's reminder yet, so it is not promised.
   const plansOpen = checkoutOpen();
+  // The reminder goes to the owner, unless they turned it off, and is named while it is ahead.
+  const reminderAt =
+    trial && v.account.email_prefs.trial_reminder && readerRole(v) === 'owner'
+      ? daysBefore(v.account.trial_ends_at!, 3, zone)
+      : null;
   const kinds = COPY.emailKinds(
     v.account.email_prefs.change_notes,
-    plansOpen && trial && v.account.email_prefs.trial_reminder
-      ? dayDate(daysBefore(v.account.trial_ends_at!, 3, zone), zone)
-      : null,
+    reminderAt !== null && instant(reminderAt) > instant(v.now) ? dayDate(reminderAt, zone) : null,
   );
   const daysLeft = trial ? calendarDays(v.now, v.account.trial_ends_at!, zone) : null;
 

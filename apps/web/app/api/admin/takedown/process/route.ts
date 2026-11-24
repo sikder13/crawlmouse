@@ -49,12 +49,13 @@ export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}));
   const parsed = schema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: 'invalid input' }, { status: 400 });
+  let reports: number;
   try {
-    await processTakedown(supabaseAdmin(), parsed.data.slug);
+    reports = await processTakedown(supabaseAdmin(), parsed.data.slug);
   } catch {
     return NextResponse.json({ error: 'could not process' }, { status: 500 });
   }
   // Audit trail for the actioned takedown (who/when is captured by the platform log timestamp + ip).
-  console.log(`[admin:takedown] actioned slug=${parsed.data.slug} ip=${ip}`);
+  console.log(`[admin:takedown] actioned slug=${parsed.data.slug} reports=${reports} ip=${ip}`);
   return NextResponse.json({ ok: true });
 }

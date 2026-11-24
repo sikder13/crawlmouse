@@ -26,6 +26,7 @@ from the step calls it cites; no test derives that number from the code.
 | `crawlmouse.check.expiry`           | `inngest/check-expiry.ts`     | V2_PIPELINE                    | cron `17 5 * * *`   | 3 (expire-unkept, settle-kept, purge-removed)                                        | 4                |
 | `crawlmouse.ledger.backfill`        | `inngest/ledger.ts`           | V2_PIPELINE                    | cron `41 */6 * * *` | 1 (backfill)                                                                         | 8                |
 | `crawlmouse.billing.past-due-sweep` | `inngest/past-due-sweep.ts`   | V2_BILLING                     | cron `0 * * * *`    | 2 (now, candidates; then two per due account, none when nothing is due)              | 72               |
+| `crawlmouse.trial.clock`            | `inngest/trial-clock.ts`      | V2_CHECKS_PUBLIC               | cron `20 * * * *`   | 2 (now, due; then two per due account, none when nothing is due)                     | 72               |
 | `crawlmouse.account.purge-deleted`  | `inngest/deletion.ts`         | V2_CHECKS_PUBLIC               | cron `30 3 * * *`   | 2 (now, due; then one per person due)                                                | 3                |
 | `crawlmouse.mail.contact-purge`     | `inngest/mail.ts`             | V2_CHECKS_PUBLIC               | cron `43 5 * * *`   | 1 (purge)                                                                            | 2                |
 | `crawlmouse.report.schedules`       | `inngest/report-schedules.ts` | V2_CHECKS_PUBLIC               | cron `7 * * * *`    | 1 (run-due: the due client report schedules, in one step)                            | 48               |
@@ -34,7 +35,7 @@ from the step calls it cites; no test derives that number from the code.
 | `crawlmouse.founder.sweep`          | `inngest/founder.ts`          | V2_BILLING or V2_CHECKS_PUBLIC | cron `*/5 * * * *`  | 1 (sweep: sign-ups, agency accounts and cancellations, read and noticed in one step) | 576              |
 | `crawlmouse.founder.digest`         | `inngest/founder.ts`          | V2_BILLING or V2_CHECKS_PUBLIC | cron `7 * * * *`    | 2 (clock, digest: the daily and weekly digests and the "N more" notice, in one step) | 72               |
 
-**Floor: 37,913 executions a month.** v1's own crons are 186 of it, counted as
+**Floor: 40,145 executions a month.** v1's own crons are 186 of it, counted as
 they run with V2_BILLING on (the reconcile's second step); with every flag off they are one step fewer a day.
 
 Not in the floor: `crawlmouse.ops.signin-canary` (`inngest/signin-canary.ts`, cron `*/10 * * * *`, 3 steps idle: request, wait (a sleep), look; then report-{stage} when it raises its signal) runs once `SIGNIN_CANARY_TO` is set, whatever the flags, and adds 17,856 executions a month.
@@ -45,8 +46,8 @@ Not in the floor: `crawlmouse.ops.signin-canary` (`inngest/signin-canary.ts`, cr
 | ---------------------------------------------------------- | ------------- |
 | V2_PIPELINE                                                | 9,486         |
 | V2_PIPELINE, V2_ACCOUNT_DOOR                               | 9,486         |
-| V2_PIPELINE, V2_ACCOUNT_DOOR, V2_CHECKS_PUBLIC             | 35,681        |
-| V2_PIPELINE, V2_ACCOUNT_DOOR, V2_CHECKS_PUBLIC, V2_BILLING | 37,913        |
+| V2_PIPELINE, V2_ACCOUNT_DOOR, V2_CHECKS_PUBLIC             | 37,913        |
+| V2_PIPELINE, V2_ACCOUNT_DOOR, V2_CHECKS_PUBLIC, V2_BILLING | 40,145        |
 
 A cron registered under two flags (`V2_PIPELINE+V2_CHECKS_PUBLIC`) starts with the second of them.
 
@@ -106,9 +107,9 @@ start `crawlmouse.check.cancelled` and the failed-check mail instead.
 
 | Checks a month | typical | large   | heaviest searched |
 | -------------- | ------- | ------- | ----------------- |
-| 100            | 40,913  | 45,613  | 90,913            |
-| 1,000          | 67,913  | 114,913 | 567,913           |
-| 5,000          | 187,913 | 422,913 | 2,687,913         |
+| 100            | 43,145  | 47,845  | 93,145            |
+| 1,000          | 70,145  | 117,145 | 570,145           |
+| 5,000          | 190,145 | 425,145 | 2,690,145         |
 
 Every figure is a clean run: a step that fails and is retried is one more execution, and an
 `onFailure` handler's run and steps are more again. The totals are a floor under real traffic.
@@ -118,7 +119,7 @@ the brief measured 85 audits in production in the 30 days to 2026-11-13 (F2), co
 
 ## The rule (CC-35 D2)
 
-The floor plus 1,000 typical checks is **67,913** against the line of 800,000.
+The floor plus 1,000 typical checks is **70,145** against the line of 800,000.
 It is under the line: the Pro plan passes `golive:check`.
 
 The largest part of the floor is `crawlmouse.founder.sweep`, on cron `*/5 * * * *` (17,856 a month).
