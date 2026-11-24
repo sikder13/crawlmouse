@@ -1304,6 +1304,7 @@ const ENTRIES: readonly Spec[] = [
       'app/agency/layout.tsx',
       'app/alerts/layout.tsx',
       'app/changes/layout.tsx',
+      'app/competitors/layout.tsx',
       'app/dashboard/v2/layout.tsx',
       'app/reports/layout.tsx',
       'app/seats/layout.tsx',
