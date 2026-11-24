@@ -188,6 +188,12 @@ describe('/sites/[id] with V2_CHECKS_PUBLIC=1', () => {
       expect(
         verifyDeployHook(hook!.signature, staging, data!.created_at as string, 'h'.repeat(40)),
       ).toBe(true);
+      // With the RISK switch hiding staging deploys, the row is not drawn at all.
+      vi.stubEnv('V2_HIDE_FEATURES', 'staging_deploys');
+      const hidden = children(await open(kept)) as ReactElement<{
+        data: { settings: { rows: { label: string }[] } };
+      }>;
+      expect(hidden.props.data.settings.rows.map((r) => r.label)).not.toContain('Deploy hook');
     } finally {
       await db.query(`delete from public.sites where id = $1`, [staging]);
       const b = before[0]!;

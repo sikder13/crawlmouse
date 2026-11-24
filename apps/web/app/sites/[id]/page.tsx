@@ -17,6 +17,7 @@ import { chosenFromRequest, readViewer } from '@/lib/v2/account/viewer';
 import { readerRole, viewAt } from '@/lib/v2/view/account';
 import { accountShellView, withSwitcher } from '@/lib/v2/view/account-shell';
 import { sitePage, wantsAllFixes } from '@/lib/v2/view/site';
+import { featureShown } from '@/lib/feature-switch';
 import { noticeLine } from '@/lib/v2/copy/notices';
 
 export const dynamic = 'force-dynamic';
@@ -72,7 +73,8 @@ export default async function SitePage({
   // The scheduler's own column (CC-28 D8), read once the caller's seat is established.
   const query = await searchParams;
   // The staging site's deploy hook, signed here: the view never sees the secret (Goal 1 row 20).
-  const secret = deployHookSecret();
+  // Hidden by the RISK switch (`V2_HIDE_FEATURES=staging_deploys`), as until its migration is applied.
+  const secret = featureShown('staging_deploys') ? deployHookSecret() : null;
   const staging = d.sites.find((s) => s.staging_of_site_id === id);
   const page = sitePage(d, viewer, id, await readNextChecks(supabaseAdmin(), [id]), {
     allFixes: wantsAllFixes(query),
