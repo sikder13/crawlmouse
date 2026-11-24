@@ -65,11 +65,6 @@ ignoreUntil = 2026-11-26
 reason = "Present at the CC-00 baseline: esbuild@0.21.5 (fixed: 0.25.0)"
 
 [[IgnoredVulns]]
-id = "GHSA-g7r4-m6w7-qqqr"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: esbuild@0.28.0 (fixed: 0.28.1)"
-
-[[IgnoredVulns]]
 id = "GHSA-5v7r-6r5c-r473"
 ignoreUntil = 2026-11-26
 reason = "Present at the CC-00 baseline: file-type@20.5.0 (fixed: 21.3.1)"
