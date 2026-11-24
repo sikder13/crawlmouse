@@ -125,6 +125,14 @@ export const REPORTS_CHANGES: CopyChange[] = [
   ...railChanges('reports'),
   {
     screen: 'reports',
+    kind: 'ruling',
+    locked: '5 sites ·',
+    rendered: '4 sites ·',
+    source:
+      'Owner ruling Q10: a staging site holds no primary slot (ARCH-2 §2.5), so the count of sites leaves it out (F-097)',
+  },
+  {
+    screen: 'reports',
     kind: 'facts',
     locked: '9 days of Pro left',
     rendered: '8 days of Pro left',

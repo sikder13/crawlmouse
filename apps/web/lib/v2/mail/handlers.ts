@@ -30,7 +30,7 @@ import type {
   MailHandlers,
   ReportMailHandlers,
 } from '../../../../../inngest/mail';
-import { packetPrompt } from '../view/segment/fixes';
+import { packetBodies, packetPrompt } from '../view/segment/fixes';
 import type { AgencyCapture } from '../agency/events';
 import { checkRef } from '../pipeline/public';
 import { afterTrial } from './after-trial';
@@ -207,11 +207,18 @@ export function mailHandlers(d: MailHandlerDeps): MailHandlers {
       });
     },
 
-    async fixToDeveloper(requestId) {
+    async fixToDeveloper(requestId, framework) {
       const r = await read(store.fixEmailRequest(requestId));
       if (r === null) return 'not_found';
       if (r.fix.packet === null) return 'no_packet';
-      const packet = r.fix.packet;
+      // The steps the reader had on screen; an event naming none (one from before the field, or
+      // the dashboard's form) sends the packet's own. A named body a later check removed is not
+      // swapped for another framework's: nothing is sent.
+      const packet =
+        framework === undefined
+          ? r.fix.packet
+          : packetBodies(r.fix.packet).find((b) => b.framework === framework);
+      if (packet === undefined) return 'no_body';
       const outcome = await send(mail, {
         kind: 'fix_to_developer',
         to: r.toEmail,
