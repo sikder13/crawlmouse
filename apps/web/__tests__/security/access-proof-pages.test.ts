@@ -101,6 +101,7 @@ const PAGES: Record<string, Open> = {
 async function read(page: string, p: Person | null) {
   vi.stubEnv('V2_CHECKS_PUBLIC', '1');
   vi.stubEnv('V2_BILLING', '1');
+  vi.stubEnv('V2_AGENCY_SALES', '1');
   h.user = p && { id: p.id, email: p.email };
   h.chosen = w.accountId;
   return PAGES[page]!().then(
