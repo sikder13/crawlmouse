@@ -13,18 +13,30 @@
  *
  * `start` crawls a host only when its site row has no check under way and no ended check it may
  * reuse: one that ended under `COMPETITOR_REUSE_MS` ago and is not due to expire within
- * `COMPETITOR_HOLD_MS`. A check under way is waited on rather than duplicated, which also makes a
- * retried start step find the check its first attempt requested. A site row that an account has come
+ * `COMPETITOR_HOLD_MS`. A check under way is waited on, which also makes a retried start step find
+ * the check its first attempt requested. Two customers' runs reading the host's row in the same
+ * moment, before either has requested a check, can each request one: the read and the request are
+ * not one transaction. A site row that an account has come
  * to keep is not a competitor's any more, and is neither read nor crawled.
  *
  * Before a new crawl: the crawl pause, the SSRF guard on `https://{host}/` (the public start's
- * `admitSiteHost`), the day's ceiling on starts, the account's own daily bucket (in place of a
- * visitor's per-address bucket) and the host's hourly bucket. A host refused by any of them is
+ * `admitSiteHost`), the account's own daily bucket (in place of a visitor's per-address bucket),
+ * the day's ceiling on starts and the host's hourly bucket. A host refused by any of them is
  * skipped, not retried.
  *
  * `write` copies the snapshots of the hosts the site lists when it writes, in that order: a host the
  * member removed since the plan is left out, and a listed host with no new snapshot keeps the one
  * the check already holds.
+ *
+ * Two runs for one site can overlap: each waits up to three hours, and a sleeping run holds no
+ * concurrency slot. Their start steps do not run at once (a concurrency key on the site), so the
+ * later one finds the earlier one's check of a host under way or ended and takes it; it can take
+ * a different one only when another customer's run requested a check of that host in the same
+ * moment (above), or when the earlier check failed. Checks of a host started more than a day apart
+ * cannot both be copied by overlapping runs, since a run ends within three hours.
+ *
+ * The site row keeps the host as the first customer to name it spelled it (`www.` or not), and the
+ * crawl starts there.
  */
 import { stableId } from '@crawlmouse/engine/v2/pipeline';
 import type { Check, CompetitorSnapshot } from '@crawlmouse/types/v2';
@@ -66,7 +78,7 @@ export interface CompetitorState {
   /** An account keeps the row. */
   kept: boolean;
   /** Its check that is queued, running or deferred, if any. */
-  live: string | null;
+  live: { checkId: string; status: 'queued' | 'running' | 'deferred' } | null;
   /** Its latest finished or partial check, if any. */
   ended: { checkId: string; finishedAt: string; expiresAt: string | null } | null;
 }
@@ -177,7 +189,13 @@ export function competitorWork(deps: CompetitorDeps): CompetitorWork {
       const siteId = competitorSiteId(host);
       const state = await store.competitorState(siteId);
       if (state?.kept) return { skip: 'site_kept' };
-      if (state?.live) return { checkId: state.live, reused: false };
+      if (state?.live) {
+        // A queued check's event may not have gone out (requestCheck inserts, then sends): request
+        // it again under its own id, which inserts nothing and sends the same event id, which
+        // Inngest drops when the first send arrived.
+        if (state.live.status === 'queued') await deps.request(siteId, state.live.checkId);
+        return { checkId: state.live.checkId, reused: false };
+      }
       const last = state?.ended;
       const now = deps.now();
       if (
@@ -189,8 +207,10 @@ export function competitorWork(deps: CompetitorDeps): CompetitorWork {
       }
       if (deps.paused()) return { skip: 'crawl_paused' };
       if (!(await deps.admit(host))) return { skip: 'refused_host' };
-      if (!(await deps.limits.global())) return { skip: 'capacity' };
+      // The account's bucket first: a bucket counts a refused request too, so an account over its
+      // cap spends nothing of the day's ceiling that visitors share.
       if (!(await deps.limits.account(accountId, cap))) return { skip: 'account_limit' };
+      if (!(await deps.limits.global())) return { skip: 'capacity' };
       if (!(await deps.limits.domain(normalizeDomain(host)))) return { skip: 'domain_limit' };
       await store.ensureSite(siteId, host);
       return { checkId: await deps.request(siteId, deps.newId()), reused: false };
@@ -202,7 +222,7 @@ export function competitorWork(deps: CompetitorDeps): CompetitorWork {
 
     async write(checkId, entries) {
       const row = await store.planRow(checkId);
-      if (row === null || row.accountId === null) return { written: 0 };
+      if (row === null || row.accountId === null || row.removed) return { written: 0 };
       const current = listed(row, row.competitorLimit);
       const fresh = new Map<string, CompetitorSnapshot>();
       for (const { host, checkId: theirs } of entries) {

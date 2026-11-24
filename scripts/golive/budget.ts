@@ -411,7 +411,7 @@ const ROWS: readonly RowInput[] = [
     steps: 1,
     stepsHow:
       'plan, for a site with no competitors; with 3, up to 33 (start-{n}, wait-{n}, ended-{n}, write) and 3 competitor checks',
-    stepAt: [76, 85],
+    stepAt: [77, 86],
   },
   {
     file: 'inngest/summary.ts',

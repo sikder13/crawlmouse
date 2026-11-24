@@ -151,7 +151,7 @@ describe('competitorState', () => {
       status: 'running',
     });
     expect(await store().competitorState(running.siteId)).toMatchObject({
-      live: running.checkId,
+      live: { checkId: running.checkId, status: 'running' },
       ended: null,
     });
   });

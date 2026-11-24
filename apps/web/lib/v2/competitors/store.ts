@@ -76,7 +76,7 @@ export function supabaseCompetitorStore(sb: SupabaseClient): CompetitorStore {
       if (!site.data) return null;
       const live = await sb
         .from('checks')
-        .select('id')
+        .select('id, status')
         .eq('site_id', siteId)
         .in('status', ['queued', 'running', 'deferred'])
         .order('queued_at', { ascending: false })
@@ -96,7 +96,12 @@ export function supabaseCompetitorStore(sb: SupabaseClient): CompetitorStore {
       if (ended.error) fail('reading the competitor check', ended.error);
       return {
         kept: site.data.account_id !== null,
-        live: (live.data?.id ?? null) as string | null,
+        live: live.data
+          ? {
+              checkId: live.data.id as string,
+              status: live.data.status as 'queued' | 'running' | 'deferred',
+            }
+          : null,
         ended: ended.data
           ? {
               checkId: ended.data.id as string,

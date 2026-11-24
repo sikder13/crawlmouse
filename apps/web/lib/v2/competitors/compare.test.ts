@@ -168,12 +168,27 @@ describe('start', () => {
 
   it('waits on a check of the host already under way, and starts none', async () => {
     const { work, calls, states } = harness();
-    states.set(site, { kept: false, live: 'live-1', ended: null });
+    states.set(site, { kept: false, live: { checkId: 'live-1', status: 'running' }, ended: null });
     expect(await work.start('rival-a.example', 'acct-1', 3)).toEqual({
       checkId: 'live-1',
       reused: false,
     });
     expect(calls.requested).toEqual([]);
+    expect(calls.global).toBe(0);
+  });
+
+  it('asks again for a queued check under its own id, in case its event never went out', async () => {
+    const requested: [string, string][] = [];
+    const { work, calls, states } = harness({
+      request: async (s, id) => (requested.push([s, id]), id),
+    });
+    states.set(site, { kept: false, live: { checkId: 'queued-1', status: 'queued' }, ended: null });
+    expect(await work.start('rival-a.example', 'acct-1', 3)).toEqual({
+      checkId: 'queued-1',
+      reused: false,
+    });
+    expect(requested).toEqual([[site, 'queued-1']]);
+    expect([calls.global, calls.account, calls.domain]).toEqual([0, [], []]);
   });
 
   it.each([
@@ -195,7 +210,11 @@ describe('start', () => {
 
   it('never reads or crawls a row an account has come to keep', async () => {
     const { work, calls, states } = harness();
-    states.set(site, { ...endedAt(HOUR, null), kept: true, live: 'live-1' });
+    states.set(site, {
+      ...endedAt(HOUR, null),
+      kept: true,
+      live: { checkId: 'live-1', status: 'queued' },
+    });
     expect(await work.start('rival-a.example', 'acct-1', 3)).toEqual({ skip: 'site_kept' });
     expect(calls.requested).toEqual([]);
   });
@@ -212,6 +231,19 @@ describe('start', () => {
     expect(calls.global).toBe(1);
     expect(calls.account).toEqual([['acct-1', 75]]);
     expect(calls.domain).toEqual(['rival-a.example']);
+  });
+
+  it('spends nothing of the shared ceiling once the account is over its cap', async () => {
+    let global = 0;
+    const { work } = harness({
+      limits: {
+        global: async () => (global++, true),
+        account: async () => false,
+        domain: async () => true,
+      },
+    });
+    expect(await work.start('rival-a.example', 'acct-1', 3)).toEqual({ skip: 'account_limit' });
+    expect(global).toBe(0);
   });
 
   const limits = (g: boolean, a: boolean, d: boolean): Partial<CompetitorDeps> => ({
@@ -280,6 +312,28 @@ describe('write', () => {
       written: 0,
     });
     expect(calls.written).toEqual([{ checkId: 'check-own', hosts: ['rival-a.example'] }]);
+  });
+
+  it('writes no more hosts than the plan allows when it writes, after a downgrade', async () => {
+    const { work, calls, checks, setRow } = harness();
+    checks.set('c-a', ended());
+    checks.set('c-b', ended());
+    setRow({ competitorLimit: 1 });
+    await work.write('check-own', [
+      { host: 'rival-a.example', checkId: 'c-a' },
+      { host: 'rival-b.example', checkId: 'c-b' },
+    ]);
+    expect(calls.written).toEqual([{ checkId: 'check-own', hosts: ['rival-a.example'] }]);
+  });
+
+  it('writes nothing to the check of a site removed since the plan', async () => {
+    const { work, calls, checks, setRow } = harness();
+    checks.set('c-a', ended());
+    setRow({ removed: true });
+    expect(await work.write('check-own', [{ host: 'rival-a.example', checkId: 'c-a' }])).toEqual({
+      written: 0,
+    });
+    expect(calls.written).toEqual([]);
   });
 
   it('writes nothing when nothing changed', async () => {

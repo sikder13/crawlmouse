@@ -5,9 +5,10 @@
  * It runs on `check.finished`, for the check that finished, and on `competitors.requested`
  * (`{ siteId }`), for the site's latest ended check. Nothing in this package sends that event: it is
  * for the site edit route to send after a member changes the competitor list, which that route's
- * owner adds; until then a changed list is first audited at the site's next check. Runs for one site
- * do not overlap (a concurrency key on the site), so a later run's write is not overtaken by an
- * earlier one's. Steps: `latest` (the second event only), `plan` (whether the check audits competitors, and
+ * owner adds; until then a changed list is first audited at the site's next check. A concurrency key
+ * on the site keeps two runs' steps for one site from executing at once; it does not stop the runs
+ * overlapping, since a sleeping run holds no slot. Why an overlap does no harm is in
+ * apps/web/lib/v2/competitors/compare.ts. Steps: `latest` (the second event only), `plan` (whether the check audits competitors, and
  * which hosts), `start-<n>` per host (reuse a recent check of the host, or request one), then
  * `wait-<n>` and `ended-<n>` until every started check has ended or the polls in
  * `COMPETITOR_POLLS_S` run out, then `write`. A competitor's own check finishing starts this function
@@ -25,7 +26,7 @@ import { planSafeLimit } from './concurrency';
 
 export const COMPETITOR_FN_ID = 'crawlmouse.competitors.compare';
 
-/** The event a member's change of the competitor list sends. */
+/** The event for a member's change of the competitor list; the site edit route is to send it. */
 export type CompetitorsRequested = { siteId: string };
 
 /**
