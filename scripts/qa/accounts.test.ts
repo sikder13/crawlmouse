@@ -21,11 +21,11 @@ import {
   OUR_ROBOTS_TOKENS,
 } from '../../packages/worker/src/identities';
 import { QA_ACCOUNTS, QA_HOSTS } from './accounts';
-// @ts-expect-error a plain .mjs served by Vercel as it is, with no declaration file
 import {
   createLab,
   HOSTS as LARGE,
   paths as largePaths,
+  // @ts-expect-error a plain .mjs served by Vercel as it is, with no declaration file
 } from '../../fixtures/qa-lab/api/large.mjs';
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
