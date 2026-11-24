@@ -73,6 +73,25 @@ export const FRAME_PERTURB: PerturbTable = {
         expect: { structure: ['Next: Links and pages · 1 missing page'] },
       },
     ],
+    'link_edges[]': [
+      {
+        // The record keeps none of the links its pages count.
+        change: (c, d) => (d.link_edges = d.link_edges.filter((e) => e.check_id !== c.id)),
+        expect: { structure: ['Next: Links and pages · no link recorded'] },
+      },
+    ],
+    'page_results[].links_out': [
+      {
+        // With no link in the record and the structure section reading none, `links_out` decides
+        // between "no link read" (no page counts a link) and "no link recorded".
+        change: (c, d) => {
+          d.link_edges = d.link_edges.filter((e) => e.check_id !== c.id);
+          Object.assign(c.structure!, { internal_links: 0, orphan_pages: 0, js_only_pages: 0 });
+          for (const p of d.page_results.filter((x) => x.check_id === c.id)) p.links_out = 0;
+        },
+        expect: { structure: ['Next: Links and pages · no link read'] },
+      },
+    ],
   },
   'segment-next-content': {
     'checks[].content.score': [
