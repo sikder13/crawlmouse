@@ -33,7 +33,20 @@ async function overflow(page: Page, text: string) {
     }
     return tables.map((t) => {
       const region = t.parentElement!;
-      return { inside: region.scrollWidth, outside: region.clientWidth };
+      const edge = region.getBoundingClientRect();
+      // Every control in the table (the packet and Change links) lies inside the region's edges,
+      // so none is cut off by the card.
+      const cutControls = Array.from(t.querySelectorAll('a, button'))
+        .map((c) => ({ text: c.textContent ?? '', box: c.getBoundingClientRect() }))
+        .filter(({ box }) => box.left < edge.left - 0.5 || box.right > edge.right + 0.5)
+        .map(({ text, box }) => `${text.trim()} at ${box.left}-${box.right}`);
+      return {
+        inside: region.scrollWidth,
+        outside: region.clientWidth,
+        controls: t.querySelectorAll('a, button').length,
+        cut: cutControls,
+        edge: `${edge.left}-${edge.right}`,
+      };
     });
   }, text);
 }
@@ -45,12 +58,16 @@ for (const width of [1280, 390]) {
       await openPreview(page, CLIENT);
       const regions = await overflow(page, text);
       expect(regions.length, 'the fixes and the This client tables').toBeGreaterThanOrEqual(2);
-      for (const { inside, outside } of regions)
+      for (const { inside, outside, cut, edge } of regions) {
         expect(inside, `table ${inside}px in a region of ${outside}px`).toBeLessThanOrEqual(
           outside,
         );
-      for (const button of await page.getByRole('main').getByText('Change', { exact: true }).all())
-        await expect(button).toBeInViewport({ ratio: 1 });
+        expect(cut, `controls outside the region ${edge}`).toEqual([]);
+      }
+      expect(
+        regions.reduce((n, r) => n + r.controls, 0),
+        'the tables hold the packet and Change controls',
+      ).toBeGreaterThan(0);
     });
   }
 }
