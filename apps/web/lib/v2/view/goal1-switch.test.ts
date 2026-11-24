@@ -84,3 +84,19 @@ describe('the switch on Home', () => {
     expect(t).not.toContain('run JavaScript. How much');
   });
 });
+
+describe('the AI readability letter on Home', () => {
+  it('unset: the example audit shows both grades', async () => {
+    const { homePreview } = await import('../../../app/(v2-preview)/v2-preview/_preview/screens');
+    expect(homePreview().example.grades.map((g) => g.label)).toEqual([
+      'Technical SEO',
+      'AI readability',
+    ]);
+  });
+
+  it('ai_letter hidden: only Technical SEO', async () => {
+    vi.stubEnv('V2_HIDE_FEATURES', 'ai_letter');
+    const { homePreview } = await import('../../../app/(v2-preview)/v2-preview/_preview/screens');
+    expect(homePreview().example.grades.map((g) => g.label)).toEqual(['Technical SEO']);
+  });
+});

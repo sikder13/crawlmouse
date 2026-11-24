@@ -2,7 +2,7 @@
  * The Home screen's example audit, its crawler table, its words-without-JavaScript card and its
  * alert card, as data from the bad-site fixture. The marketing copy around them is the component's.
  */
-import { shownFeatures, type RiskFeature } from '../../feature-switch';
+import { featureShown, shownFeatures, type RiskFeature } from '../../feature-switch';
 import type { AccessCause, CrawlerResult } from '@crawlmouse/types/v2';
 import { crawlerOf, findCheck, fixesAsOf, siteOf, templateOf } from '../fixtures';
 import { duration, percent, templateNoun, weekdayTime } from '../format';
@@ -33,7 +33,8 @@ export interface HomeView {
     pagesCrawled: number;
     pagesTotal: number;
     links: number;
-    grades: [GradeView, GradeView];
+    /** Technical SEO, then AI readability unless the Goal 1 switch hides its letter. */
+    grades: GradeView[];
     map: MapDrawing;
     mapLabel: string;
   };
@@ -173,14 +174,18 @@ export function homeView(
           withheld: false,
           summary: seoShortSummary(check, fixes, isOpen),
         },
-        {
-          label: 'AI readability',
-          letter: ai.grade,
-          score: ai.total,
-          tone: toneOf(ai.grade),
-          withheld: false,
-          summary: aiShortSummary(check),
-        },
+        ...(featureShown('ai_letter')
+          ? [
+              {
+                label: 'AI readability',
+                letter: ai.grade,
+                score: ai.total,
+                tone: toneOf(ai.grade),
+                withheld: false,
+                summary: aiShortSummary(check),
+              },
+            ]
+          : []),
       ],
       map,
       mapLabel: mapLabel(map.nodes, false),
