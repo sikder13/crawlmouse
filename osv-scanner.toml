@@ -160,26 +160,6 @@ ignoreUntil = 2026-11-26
 reason = "Present at the CC-00 baseline: ip-address@10.2.0 (fixed: 10.7.4)"
 
 [[IgnoredVulns]]
-id = "GHSA-2883-xcg3-v3hh"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: js-yaml@4.1.1 (fixed: 4.3.2)"
-
-[[IgnoredVulns]]
-id = "GHSA-52cp-r559-cp3m"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: js-yaml@4.1.1 (fixed: 4.3.0)"
-
-[[IgnoredVulns]]
-id = "GHSA-5p4m-2wfm-xmqj"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: js-yaml@4.1.1 (fixed: 4.3.1)"
-
-[[IgnoredVulns]]
-id = "GHSA-h67p-54hq-rp68"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: js-yaml@4.1.1 (fixed: 4.2.0)"
-
-[[IgnoredVulns]]
 id = "GHSA-28wg-ghj8-5hjv"
 ignoreUntil = 2026-11-26
 reason = "Present at the CC-00 baseline: nanoid@3.3.12 (fixed: 3.3.16); nanoid@5.1.11 (fixed: 5.1.16)"
