@@ -43,9 +43,12 @@ function backOf(req: Request): string {
  * to set one: 402). Membership and role are read through the caller's own session (`member_role`,
  * `seat_may`) before the service-role client is made, and the writes name that account only, so
  * another account's rule is a 404. The answer carries whether a
- * URL is set and its last four characters, never the URL. A form is sent back to the page it came
- * from (`backOf`), a refused one with `?error=<code>`, and one saved from Integrations with
- * `?saved=1`.
+ * URL is set and its last four characters, never the URL. `{ testSlack: true }` posts the fixed test
+ * message, at most ten a day per account, failing closed (429 `rate_limited`): 409
+ * `slack_not_connected` with none set, 502 `slack_failed` when Slack refused it, 503
+ * `slack_unreachable` when Slack could not be reached. A form is sent back to the page it came from
+ * (`backOf`), a refused one with `?error=<code>`, and from Integrations one saved with `?saved=1`, a
+ * test sent with `?tested=1`.
  */
 async function update(req: Request, method: 'PUT' | null): Promise<Response> {
   const sb = await supabaseServer();

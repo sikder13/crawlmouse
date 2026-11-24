@@ -11,6 +11,7 @@ const h = vi.hoisted(() => ({
   slackAnswer: { ok: true } as { ok: true } | { ok: false; code: string; retryable: boolean },
   limited: false,
   limitKeys: [] as string[],
+  limitArgs: [] as unknown[],
   db: null as unknown as PGlite,
   user: null as { id: string; email: string } | null,
   log: [] as string[],
@@ -57,8 +58,9 @@ vi.mock('@/lib/v2/monitor/slack', async (original) => ({
   },
 }));
 vi.mock('@/lib/rate-limit', () => ({
-  checkRateLimit: async (key: string) => {
+  checkRateLimit: async (key: string, limit: number, windowMs: number, opts: unknown) => {
     h.limitKeys.push(key);
+    h.limitArgs.push([limit, windowMs, opts]);
     return { allowed: !h.limited, remaining: 0, resetAt: new Date(Date.now() + 60_000) };
   },
 }));
@@ -100,6 +102,7 @@ beforeEach(() => {
   h.slackAnswer = { ok: true };
   h.limited = false;
   h.limitKeys.length = 0;
+  h.limitArgs.length = 0;
   h.log.length = 0;
   h.user = null;
   vi.stubEnv('V2_CHECKS_PUBLIC', '1');
@@ -232,6 +235,8 @@ describe('PUT /api/alert-rules', () => {
       // Nothing of the account or its sites is in it.
       expect(h.posted[0]!.text).not.toContain(m.user.email);
       expect(h.limitKeys).toEqual([`slack-test:account:${m.accountId}`]);
+      // Ten a day per account, and closed if the limiter cannot be read.
+      expect(h.limitArgs).toEqual([[10, 24 * 60 * 60 * 1000, { failClosed: true }]]);
     });
 
     it('with nothing connected: refused, nothing posted', async () => {
@@ -250,6 +255,19 @@ describe('PUT /api/alert-rules', () => {
       const res = await POST(formFrom('_method=PUT&testSlack=true', PAGE));
       expect(res.headers.get('location')).toBe('/settings/integrations?error=slack_failed');
       expect(await secretsOf(m.accountId)).toEqual([URL_A]);
+    });
+
+    it('Slack not reached at all: says so, rather than blame the webhook', async () => {
+      const m = await member('test-unreached', 'pro');
+      h.user = m.user;
+      await PUT(put({ slackWebhookUrl: URL_A }));
+      for (const code of ['slack_dns', 'network']) {
+        h.slackAnswer = { ok: false, code, retryable: true };
+        const res = await POST(formFrom('_method=PUT&testSlack=true', PAGE));
+        expect(res.headers.get('location'), code).toBe(
+          '/settings/integrations?error=slack_unreachable',
+        );
+      }
     });
 
     it('over the limit: refused before anything is posted', async () => {

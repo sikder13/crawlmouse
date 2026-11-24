@@ -6,8 +6,9 @@
  *
  * The body is what the Alerts screen posts: one rule's switch, `{ rule, enabled }` (the rule an
  * account-level one, `site_id` null), and the Slack destination, `{ slackWebhookUrl }` to set or
- * replace it or `{ clearSlack: true }` to remove it. A form carries the same fields as strings.
- * Setting a URL needs a tier whose gates open Slack (402 otherwise); clearing one does not.
+ * replace it, `{ clearSlack: true }` to remove it, or `{ testSlack: true }` alone to post the fixed
+ * test message to it. A form carries the same fields as strings. Setting a URL or testing one needs a
+ * tier whose gates open Slack (402 otherwise); clearing one does not.
  *
  * The URL goes into Vault through `set_account_slack_webhook` and is not read back: the answer says
  * whether one is set and its last four characters, which is all a page shows. Setting it also puts
@@ -102,14 +103,15 @@ export interface AlertRulePorts {
   clearSlack(accountId: string): Promise<void>;
   slackLast4(accountId: string): Promise<string | null>;
   /** Posts the test message to the account's webhook, if its tier has Slack and one is set. */
-  testSlack(accountId: string): Promise<'sent' | 'not_connected' | 'failed'>;
+  testSlack(accountId: string): Promise<'sent' | 'not_connected' | 'unreachable' | 'failed'>;
 }
 
 export type AlertRulesOutcome =
   | { ok: true; slack: SlackState; tested: boolean }
   | { ok: false; status: 404; code: 'not_found' }
   | { ok: false; status: 409; code: 'slack_not_connected' }
-  | { ok: false; status: 502; code: 'slack_failed' };
+  | { ok: false; status: 502; code: 'slack_failed' }
+  | { ok: false; status: 503; code: 'slack_unreachable' };
 
 /**
  * Writes the plan to `accountId`: the rule first, so a rule that is not one of the account's own
@@ -128,6 +130,7 @@ export async function applyAlertRules(
     const sent = await ports.testSlack(accountId);
     if (sent === 'not_connected') return { ok: false, status: 409, code: 'slack_not_connected' };
     if (sent === 'failed') return { ok: false, status: 502, code: 'slack_failed' };
+    if (sent === 'unreachable') return { ok: false, status: 503, code: 'slack_unreachable' };
   } else if (plan.slack === 'clear') await ports.clearSlack(accountId);
   else if (plan.slack !== null) await ports.setSlack(accountId, plan.slack.set);
   const last4 = await ports.slackLast4(accountId);
@@ -213,7 +216,10 @@ export function supabaseAlertRulePorts(
       if (error) failed('account_slack_webhook_url', error);
       const url = (data as string | null) ?? null;
       if (url === null) return 'not_connected';
-      return (await post(url, SLACK_TEST_TEXT)).ok ? 'sent' : 'failed';
+      const result = await post(url, SLACK_TEST_TEXT);
+      if (result.ok) return 'sent';
+      // A lookup or a connection that failed on our side never reached Slack: not the webhook's fault.
+      return result.code === 'slack_dns' || result.code === 'network' ? 'unreachable' : 'failed';
     },
     async slackLast4(accountId) {
       const { data, error } = await admin.rpc('account_slack_last4', { p_account: accountId });

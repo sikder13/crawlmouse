@@ -56,6 +56,8 @@ export const REFUSAL_SENTENCES: Readonly<Record<string, string>> = {
     'Your sign-in address and deleting your account belong to your own account. Switch to it, then try again.',
   upgrade_required: 'Slack alerts need Pro or Agency.',
   slack_not_connected: 'Slack is not connected, so there is nowhere to send a test.',
+  slack_unreachable:
+    'Slack could not be reached just now, so no test message was sent. Try again in a minute.',
   slack_failed:
     'Slack did not take the test message. Check that the webhook is still active in Slack, or replace it.',
   // What was sent
