@@ -2,7 +2,12 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { describe, expect, it } from 'vitest';
 // @ts-expect-error a plain .mjs served by Vercel as it is, with no declaration file
-import { answer, fileFor, gptbotBlockedAt, robotsAt } from '../../fixtures/qa-lab/api/sentinel.mjs';
+import handler, {
+  answer,
+  fileFor,
+  gptbotBlockedAt,
+  robotsAt,
+} from '../../fixtures/qa-lab/api/sentinel.mjs';
 
 const SITE = join(__dirname, '..', '..', 'fixtures', 'qa-lab', 'sites', 'sentinel');
 const walk = (dir: string): string[] =>
@@ -53,5 +58,29 @@ describe('the sentinel lab site', () => {
       expect(answer(path, { files, read, now }).status).toBe(404);
     }
     expect(fileFor('/', files)).toBe('index.html');
+  });
+
+  it('serves through the handler, and lets no cache keep robots.txt across an hour', () => {
+    const served = (path: string) => {
+      const headers: Record<string, string> = {};
+      const res = {
+        statusCode: 0,
+        body: '',
+        setHeader: (k: string, v: string) => void (headers[k.toLowerCase()] = v),
+        end(b: string) {
+          this.body = b;
+        },
+      };
+      handler({ url: `/api/sentinel?path=${encodeURIComponent(path)}` }, res);
+      return { status: res.statusCode, headers, body: res.body };
+    };
+    const robots = served('/robots.txt');
+    expect(robots.status).toBe(200);
+    expect(robots.headers['cache-control']).toBe('no-store');
+    expect(robots.body).toMatch(/^User-agent: \*\nAllow: \/\n/);
+    const home = served('/');
+    expect([home.status, home.headers['cache-control']]).toEqual([200, undefined]);
+    expect(home.body).toBe(read('index.html'));
+    expect(served('/nope/').status).toBe(404);
   });
 });
