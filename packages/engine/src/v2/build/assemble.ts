@@ -250,8 +250,9 @@ export function assemble(
   const landed = new Set(allRows.flatMap((r) => landedOn(r) ?? []));
   const rowUrls = new Set(allRows.map((r) => r.url));
   const crawlable = crawlableSeeds(input.seeds);
+  // Discovered URLs and seeds come in the spelling the site wrote (F-252); rows are canonical.
   const found = [
-    ...crawlableDiscovered(input.seeds, batches.crawl),
+    ...crawlableDiscovered(input.seeds, batches.crawl).map((u) => canonicalizeUrl(u)),
     ...crawlable.map((s) => canonicalizeUrl(s.url)),
   ];
   const unread = [...new Set(found)].filter((u) => !rowUrls.has(u) && !landed.has(u)).sort();
