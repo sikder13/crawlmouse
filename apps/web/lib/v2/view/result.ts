@@ -142,6 +142,11 @@ export interface ResultView {
    * The third card: the one fix to make today; with no fix, what that rests on (`noFixKind`): a clean
    * bill, a check that did not measure everything, or a site that served no page.
    */
+  /**
+   * Whether the competitor prompt may show: only when at least one AI crawler was measured,
+   * since it sells comparing a measurement.
+   */
+  competitorPrompt: boolean;
   first:
     | { kind: 'fix'; title: string; body: string; href: string }
     | {
@@ -739,11 +744,12 @@ type NoFixCard = Exclude<ResultView['first'], { kind: 'fix' }>;
 
 /** "403", "403 or 429", "401, 403 or 429". */
 const eitherOf = (codes: readonly number[]) => {
-  const names = codes.map(statusName);
-  const last = names.at(-1);
-  const rest = names.slice(0, -1);
-  return rest.length ? `${rest.join(', ')} or ${last}` : `${last}`;
+  return orList(codes.map(statusName));
 };
+
+/** "a", "a or b", "a, b or c". */
+const orList = (items: readonly string[]) =>
+  items.map((x, i) => (i === 0 ? x : i === items.length - 1 ? ` or ${x}` : `, ${x}`)).join('');
 
 /** A status as the card names it: 429 is said in words, beside the code it belongs to. */
 const statusName = (code: number) =>
@@ -758,10 +764,7 @@ const REFUSAL_CAUSES: Readonly<Record<number, string>> = {
 };
 
 const causesOf = (codes: readonly number[]) => {
-  const causes = [...new Set(codes.map((c) => REFUSAL_CAUSES[c] ?? 'what refused the request'))];
-  const last = causes.at(-1);
-  const rest = causes.slice(0, -1);
-  return rest.length ? `${rest.join(', ')} or ${last}` : `${last}`;
+  return orList([...new Set(codes.map((c) => REFUSAL_CAUSES[c] ?? 'what refused the request'))]);
 };
 
 const SITES_ACTION = { label: 'Open Sites', href: ACCOUNT_NAV[0].href };
@@ -1144,6 +1147,7 @@ export function resultView(
     variant: withheld ? 'withheld' : clean ? 'clean' : 'issues',
     domain: site.host,
     crawledLine: crawledLine(check, notServed ? pageRows.length : null),
+    competitorPrompt: check.crawlers.filter(isAi).some((c) => c.verdict !== 'not_measured'),
     crawledAt: dateTimeUtc(check.finished_at!),
     keptUntil: keptUntil ? dayTimeUtc(keptUntil) : null,
     grades,

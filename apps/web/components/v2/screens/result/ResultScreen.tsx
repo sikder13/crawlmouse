@@ -326,7 +326,7 @@ export function ResultScreen({
             </div>
           )}
         </Card>
-      ) : kept || first.kind === 'not-served' ? null : (
+      ) : kept || first.kind === 'not-served' || !data.competitorPrompt ? null : (
         <div data-v2-addition="">
           <Card as="section" tone="sunken" className={styles.competitor}>
             <Heading level={2} size="s" className={styles.proTitle}>

@@ -325,6 +325,16 @@ describe('the competitor card', () => {
     expect(html(v)).not.toContain(COMPETITOR);
   });
 
+  it('is not offered when no AI crawler was measured', () => {
+    const v = view((c) => {
+      for (const x of c.crawlers.filter((x) => x.group !== 'search_engine'))
+        Object.assign(x, { verdict: 'not_measured', status: null, text_share: null });
+    }, true);
+    expect(v.first.kind).not.toBe('not-served');
+    expect(v.competitorPrompt).toBe(false);
+    expect(html(v)).not.toContain(COMPETITOR);
+  });
+
   it('is still offered on a served audit nobody has kept', () => {
     const v = view(() => {}, true);
     expect(v.keptUntil).not.toBeNull();
