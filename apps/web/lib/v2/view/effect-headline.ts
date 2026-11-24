@@ -59,7 +59,7 @@ export const AI_WAITING: Readonly<Record<WithheldReason, string>> = {
   too_few_crawlers_measured: 'AI readability is graded once two scored crawlers can be measured',
   blocked_by_choice:
     'AI readability is not graded while the site’s robots.txt keeps the scored crawlers out',
-  readable_unmeasured: 'AI readability is graded once each template has a page read in a browser',
+  readable_unmeasured: 'AI readability needs a JavaScript comparison of each graded template',
   quotable_unmeasured: 'AI readability is graded once its content part can be measured',
   signals_unmeasured:
     'AI readability is graded once its schema.org and Content Signals checks are decided',
@@ -72,14 +72,24 @@ export const NO_EFFECT = 'No measurable effect on the grade';
 export const NO_EFFECT_SHORT = 'No measurable effect';
 
 /**
- * One figure of a fix's effect as every view prints it: "+3" above zero; null at or below zero,
- * which a view prints as no measurable effect, never with a minus sign.
+ * `n` to the two decimal places a grade is given in, by the engine's rule (`grade/numbers.ts`). A sum
+ * of two stored figures can otherwise print as 82.91999999999999.
  */
-export const formatPoints = (n: number): string | null => {
-  // To two decimals: a sum of effects is a float, and "+6.909999999999998" is not a number to read.
-  const shown = Math.round(n * 100) / 100;
+const toScore = (n: number): number =>
+  (Math.sign(n) * Math.round(Number((Math.abs(n) * 100).toPrecision(15)))) / 100;
+
+/**
+ * One figure of a fix's effect as every view prints it, to two places: "+3" above zero; null when it
+ * prints as zero or less, which a view shows as no measurable effect, never with a minus sign.
+ */
+export function formatPoints(n: number): string | null {
+  const shown = toScore(n);
   return shown > 0 ? `+${shown}` : null;
-};
+}
+
+/** A grade's score after a fix's estimated points, to two places and at most 100. */
+export const scoreAfter = (score: number, points: number): number =>
+  Math.min(100, toScore(score + points));
 
 /**
  * "Makes 3 pages readable without JavaScript", singular for one page; for a count from an earlier

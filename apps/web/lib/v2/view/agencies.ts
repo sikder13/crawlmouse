@@ -23,6 +23,7 @@ import { TRIAL_DAYS } from '../../billing/state-machine';
 import { AGENCY_MONTHLY, PRO_MONTHLY, usd } from '../../billing/prices';
 import { GATES } from '../../entitlement-v2';
 import { AGENCIES_COPY as COPY, SAMPLE_AGENCY, type Tagged } from '../copy/agencies';
+import { AGENCY_PLUS_INBOX_ADDRESS } from '../copy/contact-inbox';
 import { findCheck, fixture } from '../fixtures';
 import { dayMonth } from '../format';
 import { toneOf } from '../letters';
@@ -305,6 +306,8 @@ export interface AgenciesView {
   hero: TaggedView[];
   trial: TaggedView & { href: string };
   trialNote: TaggedView;
+  /** Set while V2_BILLING is off: the sentence, with the inbox, in place of the trial's note. */
+  opensSoon: { before: string; address: string; after: string } | null;
   prospect: { title: TaggedView; lines: TaggedView[]; formLabel: string; homeLink: string };
   onePager: {
     title: TaggedView;
@@ -378,7 +381,13 @@ function onePager(): AgenciesView['onePager'] {
   };
 }
 
-export function agenciesView(): AgenciesView {
+/** The flags the page's first button follows: V2_BILLING and V2_ACCOUNT_DOOR. */
+export interface AgenciesFlags {
+  billing: boolean;
+  accountDoor: boolean;
+}
+
+export function agenciesView(flags: AgenciesFlags): AgenciesView {
   const pro = GATES.pro;
   const agency = GATES.agency;
   const price = usd(AGENCY_MONTHLY);
@@ -395,10 +404,24 @@ export function agenciesView(): AgenciesView {
 
   return {
     title: COPY.title,
-    description: COPY.description({ price, sites: agency.sites, days: TRIAL_DAYS }),
+    description: flags.billing
+      ? COPY.description({ price, sites: agency.sites, days: TRIAL_DAYS })
+      : COPY.descriptionBillingOff({ price, sites: agency.sites }),
     h1: COPY.h1,
     hero: [tagged(COPY.hero[0](numberWord(aiCrawlers))), tagged(COPY.hero[1]())],
-    trial: { ...tagged(COPY.trial(TRIAL_DAYS)), href: AGENCY_TRIAL_HREF },
+    trial: flags.billing
+      ? { ...tagged(COPY.trial(TRIAL_DAYS)), href: AGENCY_TRIAL_HREF }
+      : {
+          ...tagged({ text: COPY.opensSoon.start, capabilities: ['free_audit'] }),
+          href: flags.accountDoor ? '/signup' : '/login',
+        },
+    opensSoon: flags.billing
+      ? null
+      : {
+          before: COPY.opensSoon.before,
+          address: AGENCY_PLUS_INBOX_ADDRESS,
+          after: COPY.opensSoon.after,
+        },
     trialNote: tagged(COPY.trialNote({ days: TRIAL_DAYS, price, sites: agency.sites })),
     prospect: {
       title: tagged(COPY.prospect.title),

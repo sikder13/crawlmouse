@@ -40,9 +40,20 @@ const METADATA_FILE = new RegExp(
   ].join('|'),
 );
 
+/**
+ * v2 pages outside a v2 group that no flag hides. RC-01: For agencies is served whatever the flags
+ * say, and the Agency trial redirects to it with billing off, so the flag rule no longer recognises
+ * them. Neither was ever a v1 page.
+ */
+const V2_UNGATED = new Set([
+  'agencies/page.tsx',
+  'agency-trial/layout.tsx',
+  'agency-trial/page.tsx',
+]);
+
 /** A v2 route group at any depth. Next does not route `_folder`s, so they are skipped as well. */
 export const isV2AppPath = (rel: string): boolean =>
-  rel.split('/').some((segment) => V2_GROUPS.has(segment));
+  V2_UNGATED.has(rel) || rel.split('/').some((segment) => V2_GROUPS.has(segment));
 
 function walkApp(dir: string, keep: RegExp): string[] {
   const out: string[] = [];

@@ -73,7 +73,7 @@ export function AuditForm({
         refuse(START_COPY.captcha_failed);
         return;
       }
-      refuse(START_COPY[outcome.code]);
+      refuse(outcome.sentence ?? START_COPY[outcome.code]);
     },
     [refuse],
   );
