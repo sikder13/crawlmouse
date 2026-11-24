@@ -1,6 +1,7 @@
 import { AccessScreen } from '../../../../components/v2/screens/segment/AccessScreen';
 import { ChangesScreen } from '../../../../components/v2/screens/segment/ChangesScreen';
 import { ContentScreen } from '../../../../components/v2/screens/segment/ContentScreen';
+import { LinksScreen } from '../../../../components/v2/screens/segment/LinksScreen';
 import { NoJsScreen } from '../../../../components/v2/screens/segment/NoJsScreen';
 import { SignalsScreen } from '../../../../components/v2/screens/segment/SignalsScreen';
 import { StructureScreen } from '../../../../components/v2/screens/segment/StructureScreen';
@@ -8,6 +9,7 @@ import type { SegmentKey } from '../../../../lib/v2/view/segment/frame';
 import {
   SEGMENT_PREVIEWS,
   changesHistoryPreview,
+  linksBuiltPreview,
   type ChangesHistory,
   type SegmentVariant,
 } from './segments';
@@ -27,6 +29,8 @@ export function SegmentPreview({
       return <NoJsScreen data={SEGMENT_PREVIEWS.nojs(variant)} />;
     case 'structure':
       return <StructureScreen data={SEGMENT_PREVIEWS.structure(variant)} />;
+    case 'links':
+      return <LinksScreen data={SEGMENT_PREVIEWS.links(variant)} />;
     case 'content':
       return <ContentScreen data={SEGMENT_PREVIEWS.content(variant)} />;
     case 'signals':
@@ -34,6 +38,11 @@ export function SegmentPreview({
     case 'changes':
       return <ChangesScreen data={SEGMENT_PREVIEWS.changes(variant)} />;
   }
+}
+
+/** Links and pages on the built site. */
+export function LinksBuiltPreview() {
+  return <LinksScreen data={linksBuiltPreview()} />;
 }
 
 /** The Changes page of a later check. */

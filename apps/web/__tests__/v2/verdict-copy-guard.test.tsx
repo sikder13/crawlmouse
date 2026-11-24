@@ -146,12 +146,21 @@ function pageProblems(markup: string): string[] {
   return out;
 }
 
-const SEGMENTS: SegmentKey[] = ['access', 'nojs', 'structure', 'content', 'signals', 'changes'];
+const SEGMENTS: SegmentKey[] = [
+  'access',
+  'nojs',
+  'structure',
+  'links',
+  'content',
+  'signals',
+  'changes',
+];
 
 describe('verdict copy guard', () => {
   it('covers every segment page in the preview registry', () => {
     const paths = PREVIEWS.map((p) => p.path).filter((p) => p.includes('/screens/segment/'));
-    expect(paths).toHaveLength(SEGMENTS.length * SEGMENT_VARIANTS.length + 2);
+    // Each segment in each variant, the two later Changes pages, and Links and pages on the built site.
+    expect(paths).toHaveLength(SEGMENTS.length * SEGMENT_VARIANTS.length + 3);
   });
 
   it.each(SEGMENTS.flatMap((s) => SEGMENT_VARIANTS.map((v) => [s, v] as const)))(

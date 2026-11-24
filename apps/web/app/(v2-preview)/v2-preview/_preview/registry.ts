@@ -116,6 +116,22 @@ export const PREVIEWS: PreviewEntry[] = [
     name: 'Structure, withheld',
     kind: 'screen',
   },
+  { path: '/v2-preview/screens/segment/links', name: 'Links and pages', kind: 'screen' },
+  {
+    path: '/v2-preview/screens/segment/links/clean',
+    name: 'Links and pages, clean bill',
+    kind: 'screen',
+  },
+  {
+    path: '/v2-preview/screens/segment/links/challenged',
+    name: 'Links and pages, withheld',
+    kind: 'screen',
+  },
+  {
+    path: '/v2-preview/screens/segment/links/built',
+    name: 'Links and pages, a broken link',
+    kind: 'screen',
+  },
   { path: '/v2-preview/screens/segment/content', name: 'Final-Seg-Content', kind: 'screen' },
   {
     path: '/v2-preview/screens/segment/content/clean',
