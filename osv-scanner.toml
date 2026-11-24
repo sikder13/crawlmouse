@@ -120,46 +120,6 @@ ignoreUntil = 2026-11-26
 reason = "Present at the CC-00 baseline: file-type@20.5.0 (fixed: 21.3.2)"
 
 [[IgnoredVulns]]
-id = "GHSA-22jq-vg5j-6vgg"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: ip-address@10.2.0 (fixed: 10.2.1)"
-
-[[IgnoredVulns]]
-id = "GHSA-2vr4-cq9g-pvrc"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: ip-address@10.2.0 (fixed: 10.5.1)"
-
-[[IgnoredVulns]]
-id = "GHSA-4xrf-jv44-h6hh"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: ip-address@10.2.0 (fixed: 10.2.2)"
-
-[[IgnoredVulns]]
-id = "GHSA-h3mg-xc3c-68pw"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: ip-address@10.2.0 (fixed: 10.7.1)"
-
-[[IgnoredVulns]]
-id = "GHSA-j6r3-76f7-8jcv"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: ip-address@10.2.0 (fixed: 10.7.1)"
-
-[[IgnoredVulns]]
-id = "GHSA-mwp4-54f8-5fhr"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: ip-address@10.2.0 (fixed: 10.3.1)"
-
-[[IgnoredVulns]]
-id = "GHSA-rpw4-54j3-4h4q"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: ip-address@10.2.0 (fixed: 10.5.1)"
-
-[[IgnoredVulns]]
-id = "GHSA-rxp7-6hxx-x8q5"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: ip-address@10.2.0 (fixed: 10.7.4)"
-
-[[IgnoredVulns]]
 id = "GHSA-f38q-mgvj-vph7"
 ignoreUntil = 2026-11-26
 reason = "Present at the CC-00 baseline: protobufjs@7.6.1 (fixed: 7.6.3)"
