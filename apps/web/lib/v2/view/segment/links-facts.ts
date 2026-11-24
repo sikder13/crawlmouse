@@ -28,9 +28,9 @@ export interface ShortList<T> {
 }
 
 export function shortList<T>(items: readonly T[], max = LIST_MAX): ShortList<T> {
-  const rest = items.slice(max);
+  const rest = items.filter((_, i) => i >= max);
   return {
-    shown: items.slice(0, max),
+    shown: items.filter((_, i) => i < max),
     rest,
     more: rest.length ? `and ${count(rest.length)} more` : null,
     moreInApp: rest.length ? `and ${count(rest.length)} more in the app` : null,
@@ -204,7 +204,7 @@ export function linksFacts(d: ViewDataset, check: Check): LinksFacts {
       linkedFrom,
       linkedAll: froms.length ? froms.join(', ') : 'no link in the record',
       linkedSummary: froms.length
-        ? `${froms.slice(0, 2).join(', ')}${froms.length > 2 ? ` and ${count(froms.length - 2)} more` : ''}`
+        ? `${froms.filter((_, i) => i < 2).join(', ')}${froms.length > 2 ? ` and ${count(froms.length - 2)} more` : ''}`
         : 'no link in the record',
     };
   });
