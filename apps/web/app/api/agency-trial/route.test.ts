@@ -371,6 +371,7 @@ describe('POST /api/agency-trial', () => {
     ['cm_consent=granted', ['plan_chosen', 'first_client_added', 'trial_started']],
   ])('cookie %s: sends %j through the real consent gate', async (cookie, events) => {
     vi.stubEnv('V2_BILLING', '1');
+    vi.stubEnv('V2_AGENCY_SALES', '1');
     r.user = USER;
     // The host's DNS check is replaced here only; the handler's tests above use the real guard.
     vi.resetModules();
@@ -394,10 +395,21 @@ describe('POST /api/agency-trial', () => {
 
   it('401 without a session, whatever the flag', async () => {
     vi.stubEnv('V2_BILLING', '1');
+    vi.stubEnv('V2_AGENCY_SALES', '1');
     const { POST } = await import('./route');
     const res = await POST(json(GOOD));
     expect(res.status).toBe(401);
     expect(await res.json()).toEqual({ error: 'auth_required' });
+    expect(r.admin).toBe(0);
+  });
+
+  it('404 with Agency not on sale, before the service-role client', async () => {
+    vi.stubEnv('V2_BILLING', '1');
+    vi.stubEnv('V2_AGENCY_SALES', '');
+    r.user = USER;
+    const { POST } = await import('./route');
+    const res = await POST(json(GOOD));
+    expect(res.status).toBe(404);
     expect(r.admin).toBe(0);
   });
 

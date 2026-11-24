@@ -207,8 +207,9 @@ export function fakeWorker(results: Map<number, unknown>) {
       if (held.has(id)) throw new WorkerError('batch_exists', 409, 'batch_exists');
       posted.push(batch);
       held.set(id, batch.batch);
-      return { batch_id: id };
+      return { batch_id: id, signals: false };
     },
+    readProgress: async () => null,
     async pollBatch(id): Promise<PollResult> {
       const n = held.get(id);
       if (n === undefined || lost.has(n)) return { status: 'not_found' };

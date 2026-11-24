@@ -233,3 +233,25 @@ describe('scrubDoorSecrets, a Slack webhook in any shape the stored URL may take
     expect(out.breadcrumbs[0]!.data.url).toBe(scrubbed);
   });
 });
+
+describe('trace headers on the server’s outbound calls', () => {
+  const targets = sentryServerOptions(() => 'integration').tracePropagationTargets;
+  const propagates = (url: string) => targets.some((t) => t.test(url));
+
+  it.each([
+    'https://us.i.posthog.com/e/?ip=0',
+    'https://us-assets.i.posthog.com/static/array.js',
+    'https://us.i.posthog.com',
+  ])('none goes to PostHog: %s', (url) => {
+    expect(propagates(url)).toBe(false);
+  });
+
+  it.each([
+    'https://project.supabase.co/rest/v1/audits',
+    'https://api.stripe.com/v1/customers',
+    '/api/health',
+    'https://us.i.posthog.com.evil.example/e/',
+  ])('other calls keep them: %s', (url) => {
+    expect(propagates(url)).toBe(true);
+  });
+});

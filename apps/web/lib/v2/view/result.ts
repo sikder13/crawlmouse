@@ -18,6 +18,7 @@ import {
   AI_WAITING,
   effectHeadline,
   formatPoints,
+  scoreAfter,
   groupSum,
   NO_EFFECT,
   NO_EFFECT_SHORT,
@@ -873,7 +874,7 @@ function fixFirstBody(check: Check, f: Fix, siteFixes: readonly Fix[]): string {
     h.kind === 'ai'
       ? ai.withheld
         ? `${withheldBy ? AI_WAITING[withheldBy] : 'AI readability is not graded yet'}.`
-        : `AI readability ${ai.total} → ${Math.min(100, ai.total + h.points)}, estimated.`
+        : `AI readability ${ai.total} → ${scoreAfter(ai.total, h.points)}, estimated.`
       : h.kind === 'waiting'
         ? `${h.sentence}.`
         : h.kind === 'no_effect'
@@ -882,7 +883,7 @@ function fixFirstBody(check: Check, f: Fix, siteFixes: readonly Fix[]): string {
             ? `${h.text}.`
             : seo === null || h.kind === 'seo_not_estimated'
               ? 'Technical SEO is not graded for this audit, so no change to it is estimated.'
-              : `Technical SEO ${seo} → ${Math.min(100, seo + h.points)}, estimated.`;
+              : `Technical SEO ${seo} → ${scoreAfter(seo, h.points)}, estimated.`;
   // The steps are named only where a packet was written; a fix with none ends at its effect.
   const open = f.packet ? ' The steps and the evidence are open, free.' : '';
   return `${what ? `${capitalise(what)}. ` : ''}${effect}${open}`;

@@ -27,6 +27,15 @@ export const AGENCIES_COPY = {
   title: 'For agencies',
   description: (p: { price: string; sites: number; days: number }) =>
     `Audit a prospect’s site free before the first call. Agency is ${p.price} a month for ${p.sites} client sites, with a ${p.days}-day trial; branded client reports are coming.`,
+  /** RC-01: the description while V2_BILLING is off, when the trial cannot be started. */
+  descriptionBillingOff: (p: { price: string; sites: number }) =>
+    `Audit a prospect’s site free before the first call. Agency is ${p.price} a month for ${p.sites} client sites; the agency trial opens soon.`,
+  /** RC-01: the hero's action while V2_BILLING is off. */
+  opensSoon: {
+    start: 'Start free',
+    before: 'The agency trial opens soon. To hear when it does, write to',
+    after: 'with your agency’s name.',
+  },
   h1: 'Audit a prospect’s site before the first call.',
   hero: [
     (crawlers: string): Tagged => ({

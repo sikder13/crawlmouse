@@ -130,6 +130,7 @@ const stripeWrites = () => h.log.filter((l) => l.includes('stripe'));
 
 beforeEach(() => {
   process.env.V2_BILLING = '1';
+  process.env.V2_AGENCY_SALES = '1';
   // Production's combination once billing opens. The v1 purchase guard (CC-45) applies only while
   // V2_BILLING is off, so every case below must answer as it did before the guard.
   process.env.V2_CHECKS_PUBLIC = '1';
@@ -182,6 +183,36 @@ describe('POST /api/billing/checkout, V2_BILLING=1', () => {
     expect(h.sessionsCreate.mock.calls[0]![0]).toMatchObject({
       metadata,
       subscription_data: { metadata },
+    });
+  });
+
+  describe('with Agency not on sale', () => {
+    beforeEach(() => {
+      delete process.env.V2_AGENCY_SALES;
+    });
+
+    it.each(['month', 'year'])(
+      'refuses Agency (%s) before any account or Stripe call',
+      async (interval) => {
+        const res = await json({ plan: 'agency', interval });
+        expect([res.status, await res.json()]).toEqual([403, { error: 'agency_not_open' }]);
+        // The session alone was read: the refusal comes before the account's role is asked.
+        expect(h.log).toEqual(['getUser']);
+        expect(h.sessionsCreate).not.toHaveBeenCalled();
+      },
+    );
+
+    it('refuses a form post too', async () => {
+      const res = await form('plan=agency&interval=month');
+      expect([res.status, await res.json()]).toEqual([403, { error: 'agency_not_open' }]);
+      expect(h.log).toEqual(['getUser']);
+      expect(h.sessionsCreate).not.toHaveBeenCalled();
+    });
+
+    it('still sells Pro', async () => {
+      const res = await json({ plan: 'pro', interval: 'month' });
+      expect(res.status).toBe(200);
+      expect(h.sessionsCreate).toHaveBeenCalledTimes(1);
     });
   });
 

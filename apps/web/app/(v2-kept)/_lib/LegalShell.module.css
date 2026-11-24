@@ -1,0 +1,151 @@
+/* The v1 legal pages' markup on v2's tokens. Selectors reach v1's utility classes on purpose. */
+/* No box of its own: it is here so print can reach the shell's header and footer. */
+.frame {
+  display: contents;
+}
+
+.legal {
+  flex: 1;
+  color: var(--v2-fg2);
+  font-size: var(--v2-text-body);
+  line-height: var(--v2-line-body);
+}
+
+.legal :global(main) {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 72px 24px 120px;
+}
+
+.legal h1 {
+  margin: 0 0 24px;
+  font-family: var(--v2-font-display);
+  font-size: var(--v2-text-xl);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  color: var(--v2-fg);
+}
+
+.legal h2 {
+  margin-top: 40px;
+  font-family: var(--v2-font-display);
+  font-size: var(--v2-text-m);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  color: var(--v2-fg);
+}
+
+.legal :global(.space-y-4) > h2:not([hidden]) {
+  margin-top: 40px;
+}
+
+.legal h3 {
+  font-family: var(--v2-font-display);
+  font-weight: 600;
+  color: var(--v2-fg);
+}
+
+.legal strong,
+.legal th,
+.legal :global(.text-ink) {
+  color: var(--v2-fg);
+}
+
+.legal th,
+.legal :global(.font-bold) {
+  font-weight: 600;
+}
+
+.legal :global(.text-warning) {
+  color: var(--v2-bad);
+}
+
+.legal a {
+  color: var(--v2-fg);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.legal :global([class*='text-ink/']) {
+  color: var(--v2-fg2);
+}
+
+.legal :global([class*='border-oat']) {
+  border-color: var(--v2-line);
+}
+
+.legal :global([class*='bg-oat']) {
+  background: var(--v2-line2);
+}
+
+/* The takedown form's v1 card, fields and button. */
+.legal :global(.bg-surface-raised) {
+  background: var(--v2-s1);
+  border-color: var(--v2-line);
+}
+
+.legal input[class],
+.legal textarea[class] {
+  background: var(--v2-bg);
+  border-color: var(--v2-ctl);
+  color: var(--v2-fg);
+}
+
+.legal input::placeholder,
+.legal textarea::placeholder {
+  color: var(--v2-mut);
+}
+
+.legal button[type='submit'] {
+  min-height: var(--v2-control-h);
+  padding: 0 18px;
+  border-radius: var(--v2-radius-control);
+  background: var(--v2-acc);
+  color: var(--v2-on-acc);
+  font-size: var(--v2-text-ui);
+}
+
+.legal button[type='submit']:focus-visible {
+  --tw-ring-offset-color: var(--v2-s1);
+}
+
+/* A printed policy is its content, dark on paper, whatever the screen's theme. */
+@media print {
+  .frame > [data-v2-shell] > header,
+  .frame > [data-v2-shell] > [data-v2-footer] {
+    display: none;
+  }
+
+  /* The shell's canvas is dark in a dark theme, and prints if "background graphics" is on. */
+  .frame > [data-v2-shell] {
+    min-height: 0;
+    background: #fff !important;
+    color-scheme: light !important;
+    --v2-line: #e2e6eb;
+    --v2-ctl: #808996;
+  }
+
+  .legal,
+  .legal *,
+  .legal input::placeholder,
+  .legal textarea::placeholder {
+    color: #13161b !important;
+    background: transparent !important;
+  }
+}
+
+@media (max-width: 760px) {
+  .legal :global(main) {
+    padding: 40px 20px 80px;
+  }
+
+  .legal h1 {
+    font-size: var(--v2-text-xl-phone);
+  }
+
+  .legal h2 {
+    font-size: var(--v2-text-m-phone);
+  }
+}

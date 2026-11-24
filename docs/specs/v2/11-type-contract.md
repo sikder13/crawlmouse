@@ -307,6 +307,7 @@ Fixture collection: `checks`.
 | `crawlers[].evidence_class`                    | `EvidenceClass`        | no   |                    |                     |
 | `crawlers[].status`                            | `integer`              | yes  |                    |                     |
 | `crawlers[].pages_measured`                    | `integer`              | no   |                    |                     |
+| `crawlers[].pages_served`                      | `integer`              | no   |                    |                     |
 | `crawlers[].cause`                             | `AccessCause`          | yes  |                    |                     |
 | `crawlers[].text_share`                        | `number`               | yes  |                    |                     |
 | `crawlers[].confidence`                        | `Confidence`           | no   |                    |                     |
