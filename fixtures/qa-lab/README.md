@@ -31,7 +31,8 @@ noindex`, except to a user agent containing `Crawlmouse`. Vercel's own redirects
 - **DNS.** One record in Cloudflare zone `crawlmouse.com`: `*.lab` CNAME `cname.vercel-dns.com`, DNS
   only. Vercel issues each host's certificate.
 - **Politeness.** Every lab host shares the politeness key `crawlmouse.com`, so checks of different
-  lab sites wait on one another (`docs/specs/v2/38-launch-qa.md`, Known gaps).
+  lab sites wait on one another (`docs/specs/v2/38-launch-qa.md`, Known gaps), unless the staging
+  worker sets `LAB_HOST_POLITENESS=1` (`docs/ops/worker-runbook.md`, "Lab hosts on staging").
 
 ## Editing
 

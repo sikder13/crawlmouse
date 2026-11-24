@@ -314,6 +314,7 @@ describe('/settings of an account that is not the caller’s own personal accoun
 
   it('acting in their own account: the address can be changed and Delete… is offered, as before', async () => {
     as(boss);
+    h.chosen = boss.accountId;
     const html = await settings();
     expect(html.match(NEW_EMAIL)![0]).not.toMatch(/readonly/i);
     expect(html).toContain('href="/settings/delete"');
@@ -347,7 +348,7 @@ describe('/settings of an account that is not the caller’s own personal accoun
     as(boss);
     h.chosen = agencyId;
     await expect(DeletePage(q())).rejects.toMatchObject(redirectTo('/settings'));
-    h.chosen = null;
+    h.chosen = boss.accountId;
     expect(screen(await DeletePage(q())).type).toBe(DeleteScreen);
   });
 
@@ -478,6 +479,8 @@ describe('a trial with a card whose subscription is set to cancel at its end', (
 
 describe('/trial-ended for a seat that is not the owner’s', () => {
   it('offers the owner the checkout, and the manager neither it nor a link to Settings › Plan', async () => {
+    // The checkout is offered only while it answers (F-108).
+    vi.stubEnv('V2_BILLING', '1');
     as(shared);
     expect(renderToStaticMarkup(screen(await TrialEndedPage()))).toContain(
       'action="/api/billing/checkout"',

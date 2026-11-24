@@ -61,10 +61,14 @@ const INDEXABLE: {
   { route: '/aup', module: '../app/aup/page', title: 'Acceptable Use' },
   { route: '/subprocessors', module: '../app/subprocessors/page', title: 'Subprocessors' },
   { route: '/takedown', module: '../app/takedown/page', title: 'Takedown request' },
-  // CC-29: For agencies, and the v2 Developers page, which serves /developers under V2_BILLING. The
+  // CC-29: For agencies, and the v2 Developers page, which serves /developers under V2_CHECKS_PUBLIC. The
   // /check pages build theirs per question (__tests__/v2/public-pages.test.tsx).
   { route: '/agencies', module: '../app/agencies/page', title: 'For agencies' },
-  { route: '/developers', module: '../app/v2-developers/page', title: 'Developers' },
+  {
+    route: '/developers',
+    module: '../app/v2-developers/page',
+    title: 'Crawlmouse for developers — CLI, GitHub Action & webhooks',
+  },
 ];
 
 describe('per-page metadata — self-canonicals', () => {

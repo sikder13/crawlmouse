@@ -15,8 +15,10 @@ import {
   type CrawlerResult,
   type Fix,
   type Verdict,
+  type WithheldReason,
 } from '@crawlmouse/types/v2';
 import { AI_WAITING } from './view/effect-headline';
+import { sectionMeasured } from './view/section-measured';
 import { letterFor, nextBandFloor } from './letters';
 import { listOf, percent, templateNoun } from './format';
 import { capitalise, count, numberWord, plural } from './words';
@@ -202,6 +204,9 @@ export function nextBandSentence(
   return `${head}; ${numberWord(open)} of them ${open === 1 ? 'is' : 'are'} open now.`;
 }
 
+/** What a Technical SEO summary says of a check that read no internal link. */
+const NO_LINK_READ = 'No internal link was read, so the structure was not measured.';
+
 /** Locked Home stage: "7 orphan pages. Three fixes take it to A-." */
 export function seoShortSummary(check: Check, fixes: readonly Fix[], isOpen: (f: Fix) => boolean) {
   const t = check.technical_seo!;
@@ -224,6 +229,7 @@ export function structureWord(score: number): string {
 /** Locked Result: "Sound structure; seven pages nobody links to. Three fixes take it to A-; …" */
 export function seoSummary(check: Check, fixes: readonly Fix[], isOpen: (f: Fix) => boolean) {
   const t = check.technical_seo!;
+  if (!sectionMeasured(check, 'structure')) return NO_LINK_READ;
   const orphans = check.structure!.orphan_pages;
   const linked = orphans
     ? `${numberWord(orphans)} ${plural(orphans, 'page nobody links to', 'pages nobody links to')}`
@@ -298,6 +304,18 @@ export function aiShortSummary(check: Check): string {
 /** FACTS I4: the scored crawlers a grade needs measured. The engine's MIN_MEASURED_CRAWLERS. */
 export const I4_MEASURED_CRAWLERS = 2;
 
+/** What each unmeasured part of the AI grade is called, in a sentence about one audit. */
+const MISSING_PART: Partial<Record<WithheldReason, string>> = {
+  readable_unmeasured: 'the JavaScript comparison',
+  quotable_unmeasured: 'a content score',
+  signals_unmeasured: 'the schema.org and Content Signals checks',
+};
+
+const orList = (xs: readonly string[]) =>
+  xs.length < 2
+    ? (xs[0] ?? '')
+    : `${xs.filter((_, i) => i < xs.length - 1).join(', ')} or ${xs.at(-1)}`;
+
 /**
  * The withheld AI readability grade, said plainly (FACTS I4). `measured` is the contract's count
  * (`scoredCrawlersMeasured`: a scored crawler with a verdict). The engine withholds by a count of
@@ -321,12 +339,36 @@ export function aiWithheldSummary(check: Check, measured: number): string {
   const edge = meetsEdge(check);
   const few = `${measured === 0 ? 'none' : `only ${numberWord(measured)}`} of the ${numberWord(scored)} scored crawlers could be measured`;
   const counted = edge ? `${EDGE_SENTENCE}, so ${few}.` : `${capitalise(few)}.`;
+  // A site's own robots.txt withholds the grade by choice: measuring more would not give it one.
+  const missing = reasons.includes('blocked_by_choice')
+    ? []
+    : reasons.flatMap((r) => MISSING_PART[r] ?? []);
   const why = !byCount
-    ? `${AI_WAITING[reasons[0]!]}.`
+    ? missing.length && MISSING_PART[reasons[0]!]
+      ? ''
+      : `${AI_WAITING[reasons[0]!]}.`
     : measured < I4_MEASURED_CRAWLERS
       ? counted
       : `${edge ? `${EDGE_SENTENCE}. ` : ''}${AI_WAITING.too_few_crawlers_measured}.`;
+  // Said of this audit and built from what it holds, so a minted report's copy stays true (F-012).
+  const unmeasured = missing.length
+    ? `This audit did not measure ${orList(missing)}, which the AI readability grade needs.`
+    : '';
+  const { access: accessPart, quotable, signals } = ai.components;
+  // The grade stores how many crawlers Access rests on only when it is one. Otherwise it is at least
+  // I4's two, and a stored check cannot say more: a crawler with a verdict may not have counted.
+  const from = ai.scored_from_fewer_crawlers;
+  const accessFrom =
+    from === null ? `at least ${numberWord(I4_MEASURED_CRAWLERS)}` : numberWord(from);
+  const tested = [
+    accessPart.score === null
+      ? null
+      : `crawler access for ${accessFrom} of the ${numberWord(scored)} scored crawlers`,
+    quotable.score === null ? null : 'content',
+    signals.score === null ? null : 'AI signals',
+  ].filter((x): x is string => x !== null);
+  const testedSentence = missing.length && tested.length ? `It tested ${listOf(tested)}.` : '';
   const range = ai.access_range;
   const access = range ? `Access is somewhere between ${range.min} and ${range.max} of 40.` : '';
-  return [why, access].filter(Boolean).join(' ');
+  return [why, unmeasured, testedSentence, access].filter(Boolean).join(' ');
 }

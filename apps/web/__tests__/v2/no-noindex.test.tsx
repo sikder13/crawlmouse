@@ -142,7 +142,12 @@ describe('no v2 component sets a robots directive or a head element', () => {
     ],
     ['the footer alone', () => <SiteFooter status="ok" />],
     // CC-29: the public pages' screens, as their routes render them.
-    ['For agencies', () => <AgenciesScreen data={agenciesView()} audit="live" />],
+    [
+      'For agencies',
+      () => (
+        <AgenciesScreen data={agenciesView({ billing: true, accountDoor: true })} audit="live" />
+      ),
+    ],
     ['Developers', () => <DevelopersScreen data={developersView()} audit="live" />],
     ...CHECK_QUESTIONS.map((q): [string, () => React.ReactElement] => [
       `the /check/${q} page`,

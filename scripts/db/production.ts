@@ -68,6 +68,17 @@ export function driftProblems(
 }
 
 /**
+ * What to do when a dry run missed a pending file. `dry_run_pr` names one pull request, and a pull
+ * request's dry run applies the files pending in its own tree, so two migration PRs that each ran
+ * before the other merged cannot pass under either number.
+ */
+export const oneDryRun = (pending: readonly MigrationFile[]): string =>
+  `one dry run must apply all ${pending.length} pending files (${pending
+    .map((f) => f.file)
+    .join(', ')}): open a pull request from main that touches infra/supabase or scripts/db, ` +
+  'check that its dry run lists them all, merge it, and give its number as dry_run_pr';
+
+/**
  * Why the dry run does not cover the pending files; empty when it does. `productionNow` is
  * production's fingerprint as read by the plan: a section that changed since the dry run read it
  * means the dry run tested a different production.
@@ -81,12 +92,16 @@ export function gateProblems(
   if (summary.passed !== true) problems.push('the dry run did not pass');
   problems.push(...driftProblems(summary.production, productionNow, 'the dry run'));
   const tested = new Map(summary.files.map((f) => [f.file, f.sha256]));
+  let missed = false;
   for (const f of pending) {
     const sha = tested.get(f.file);
-    if (sha === undefined) problems.push(`${f.file} was not in the dry run`);
-    else if (sha !== f.sha256)
+    if (sha === undefined) {
+      missed = true;
+      problems.push(`${f.file} was not in the dry run`);
+    } else if (sha !== f.sha256)
       problems.push(`${f.file} differs from the bytes the dry run applied`);
   }
+  if (missed) problems.push(oneDryRun(pending));
   return problems;
 }
 

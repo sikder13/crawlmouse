@@ -6,7 +6,7 @@ import { dateTimeUtc } from '../../../../lib/v2/format';
 import type { CheckRead } from '../../../../lib/v2/pipeline/public';
 import { partialNotice, resultView } from '../../../../lib/v2/view/result';
 import { LiveCrawl } from '../_crawl/LiveCrawl';
-import { FAILURE_COPY } from './failure-copy';
+import { FAILURE_COPY, FAILURE_NEXT, FAILURE_TITLE } from './failure-copy';
 import { auditPage, viewOptions, type ReadyCheck } from './page-data';
 
 /** Where a reader of an audit that cannot be read any more starts another. */
@@ -28,13 +28,11 @@ export function resultOf(read: ReadyCheck) {
 export function noticeOf(read: Extract<CheckRead, { state: 'failed' | 'expired' }>) {
   if (read.state === 'failed') {
     return {
-      title: 'This audit did not finish',
+      title: FAILURE_TITLE[read.reason] ?? 'This audit did not finish',
       lines: [
         `What happened: ${FAILURE_COPY[read.reason]}.`,
         `It stopped on ${dateTimeUtc(read.failedAt)}.`,
-        ...(read.reason === 'capacity_wait_exceeded'
-          ? ['Start it again in a few minutes, once a crawler is free. A new audit is free.']
-          : []),
+        ...(FAILURE_NEXT[read.reason] ? [FAILURE_NEXT[read.reason]!] : []),
       ],
     };
   }

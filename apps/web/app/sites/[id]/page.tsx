@@ -14,7 +14,7 @@ import { readNextChecks } from '@/lib/v2/account/sites-store';
 import { chosenFromRequest, readViewer } from '@/lib/v2/account/viewer';
 import { readerRole, viewAt } from '@/lib/v2/view/account';
 import { accountShellView, withSwitcher } from '@/lib/v2/view/account-shell';
-import { sitePage } from '@/lib/v2/view/site';
+import { sitePage, wantsAllFixes } from '@/lib/v2/view/site';
 import { noticeLine } from '@/lib/v2/copy/notices';
 
 export const dynamic = 'force-dynamic';
@@ -68,8 +68,11 @@ export default async function SitePage({
       ? { accounts: found.viewer.accounts, actingIn: found.viewer.account.id }
       : null;
   // The scheduler's own column (CC-28 D8), read once the caller's seat is established.
-  const page = sitePage(d, viewer, id, await readNextChecks(supabaseAdmin(), [id]));
-  const notice = noticeLine(await searchParams, d.accounts[0]!.timezone);
+  const query = await searchParams;
+  const page = sitePage(d, viewer, id, await readNextChecks(supabaseAdmin(), [id]), {
+    allFixes: wantsAllFixes(query),
+  });
+  const notice = noticeLine(query, d.accounts[0]!.timezone);
   const account = viewAt(d, viewer);
   return (
     <LiveActions>

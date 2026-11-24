@@ -11,7 +11,9 @@ import { fakeFetcher, type FakeResponse } from '../test-support/fake-fetcher.js'
 import { whoSent } from '../test-support/discriminators.js';
 import { startServer, type FixtureServer } from '../test-support/http.js';
 import type { BatchRequest } from './request.js';
-import { runBatch, type BatchResult } from './run.js';
+import { livePageOf } from './crawl.js';
+import type { CrawlPage } from '../rows/crawl-page.js';
+import { runBatch, type BatchResult, type LivePage, type Progress } from './run.js';
 import { MAX_ROBOTS_BYTES, MAX_ROBOTS_RULES } from '../politeness/robots.js';
 import { siteKeyOf } from '../politeness/site-key.js';
 import { MAX_DOM_DEPTH, READ_IN_PART, TOO_DEEP } from '../rows/text.js';
@@ -1726,6 +1728,175 @@ describe('round 5: redirect targets', () => {
     expect(requested).toEqual(['https://example.com/robots.txt']);
     expect(result.robots[0]).toMatchObject({ state: 'unreachable', why: 'redirect_status' });
     expect(result.pages[0]!.outcome).toBe('not_requested');
+  });
+});
+
+describe('progress while a batch runs', () => {
+  it('never reports a page the result does not count as fetched, whatever else it holds', () => {
+    const row = {
+      url: 'https://site.test/a',
+      outcome: 'fetched',
+      status_code: 200,
+      timing: { total_ms: 5 },
+      links_read: true,
+      links_out: 0,
+      identity_sent: 'browser',
+    } as unknown as CrawlPage;
+    expect(livePageOf(row, [])).not.toBeNull();
+    expect(livePageOf({ ...row, outcome: 'not_requested' } as CrawlPage, [])).toBeNull();
+  });
+
+  it('reports a finished page as the stored result will hold it, and none that was not read', async () => {
+    const s = await serve({ robots: robotsText('User-agent: *\nDisallow: /b\n') });
+    const seen: LivePage[] = [];
+    const clock = new InstantClock();
+    const result = await runBatch(
+      crawlReq(s.base, ['/a', '/b', '/c']),
+      {
+        clock,
+        sites: new Sites(clock),
+        fetcher: createFetcher(clock, { bypassSsrf: true }),
+        robotsCache: new RobotsCache(clock),
+      },
+      (_p, live) => {
+        if (live) seen.push(live);
+      },
+    );
+    if (result.kind !== 'crawl') throw new Error('expected a crawl result');
+    const fetched = result.pages.filter((p) => p.outcome === 'fetched');
+    expect(seen.map((p) => p.url).sort()).toEqual(fetched.map((p) => p.url).sort());
+    for (const page of fetched) {
+      const live = seen.find((p) => p.url === page.url)!;
+      expect(live).toMatchObject({
+        status: page.status_code,
+        ms: page.timing!.total_ms,
+        links: page.links_out,
+        identity: page.identity_sent,
+      });
+      expect(live.edges.map((e) => e.to).sort()).toEqual(
+        result.link_edges
+          .filter((e) => e.from_url === page.url)
+          .map((e) => e.to_url)
+          .sort(),
+      );
+    }
+  });
+
+  it.each([
+    ['read', 'User-agent: *\nDisallow: /b\n', true],
+    ['not read, though other pages were', 'User-agent: *\nDisallow: /a\n', false],
+  ])('says the batch’s first page was %s', async (_name, robots, expected) => {
+    const s = await serve({ robots: robotsText(robots) });
+    const seen: Progress[] = [];
+    const clock = new InstantClock();
+    await runBatch(
+      crawlReq(s.base, ['/a', '/b', '/c']),
+      {
+        clock,
+        sites: new Sites(clock),
+        fetcher: createFetcher(clock, { bypassSsrf: true }),
+        robotsCache: new RobotsCache(clock),
+      },
+      (p) => seen.push(p),
+    );
+    expect(seen.at(-1)!.pages).toBeGreaterThan(0);
+    expect(seen.at(-1)!.homepage_read).toBe(expected);
+  });
+
+  it.each([403, 404, 429, 503])('does not call a homepage that answered %i read', async (code) => {
+    const s = await serve({
+      robots: robotsText('User-agent: *\nAllow: /\n'),
+      page: (path, _ua, res) => {
+        res.statusCode = path === '/a' ? code : 200;
+        res.setHeader('content-type', 'text/html');
+        res.end(`<html><body><p>page ${path}</p></body></html>`);
+      },
+    });
+    const seen: Progress[] = [];
+    const clock = new InstantClock();
+    await runBatch(
+      crawlReq(s.base, ['/a', '/b']),
+      {
+        clock,
+        sites: new Sites(clock),
+        fetcher: createFetcher(clock, { bypassSsrf: true }),
+        robotsCache: new RobotsCache(clock),
+      },
+      (p) => seen.push(p),
+    );
+    expect(seen.at(-1)!.pages).toBe(2);
+    expect(seen.at(-1)!.homepage_read).toBe(false);
+  });
+
+  it.each<[string, (res: http.ServerResponse) => void]>([
+    [
+      'a challenge',
+      (res) => {
+        res.statusCode = 403;
+        res.setHeader('cf-mitigated', 'challenge');
+        res.end();
+      },
+    ],
+    [
+      'a redirect to another site',
+      (res) => {
+        res.statusCode = 302;
+        res.setHeader('location', 'https://other-site.example/');
+        res.end();
+      },
+    ],
+  ])('does not call a homepage that answered with %s read', async (_name, answer) => {
+    const s = await serve({
+      robots: robotsText('User-agent: *\nAllow: /\n'),
+      page: (path, _ua, res) => {
+        if (path === '/a') return answer(res);
+        res.setHeader('content-type', 'text/html');
+        res.end(`<html><body><p>page ${path}</p></body></html>`);
+      },
+    });
+    const seen: Progress[] = [];
+    const clock = new InstantClock();
+    await runBatch(
+      crawlReq(s.base, ['/a', '/b']),
+      {
+        clock,
+        sites: new Sites(clock),
+        fetcher: createFetcher(clock, { bypassSsrf: true }),
+        robotsCache: new RobotsCache(clock),
+      },
+      (p) => seen.push(p),
+    );
+    expect(seen.at(-1)!.pages).toBeGreaterThan(0);
+    expect(seen.at(-1)!.homepage_read).toBe(false);
+  });
+
+  it('counts pages and links by the rule the result is counted by', async () => {
+    const s = await serve({ robots: robotsText('User-agent: *\nDisallow: /b\n') });
+    const seen: Progress[] = [];
+    const clock = new InstantClock();
+    const result = await runBatch(
+      crawlReq(s.base, ['/a', '/b', '/c']),
+      {
+        clock,
+        sites: new Sites(clock),
+        fetcher: createFetcher(clock, { bypassSsrf: true }),
+        robotsCache: new RobotsCache(clock),
+      },
+      (p) => seen.push(p),
+    );
+    if (result.kind !== 'crawl') throw new Error('expected a crawl result');
+    const fetched = result.pages.filter((p) => p.outcome === 'fetched').length;
+    // The fixture must hold a page that is not fetched, or this cannot tell the two rules apart.
+    expect(fetched).toBeLessThan(result.pages.length);
+    expect(result.link_edges.length).toBeGreaterThan(0);
+    const last = seen.at(-1)!;
+    expect(last.urls_done).toBe(3);
+    expect(last.pages).toBe(fetched);
+    expect(last.links).toBe(result.link_edges.length);
+    for (let i = 1; i < seen.length; i++) {
+      expect(seen[i]!.pages).toBeGreaterThanOrEqual(seen[i - 1]!.pages);
+      expect(seen[i]!.links).toBeGreaterThanOrEqual(seen[i - 1]!.links);
+    }
   });
 });
 

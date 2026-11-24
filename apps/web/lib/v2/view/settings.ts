@@ -18,12 +18,7 @@ import { AT_ONCE } from '../../billing/cancel';
 import { AGENCY_MONTHLY, AGENCY_YEARLY, PRO_MONTHLY, PRO_YEARLY } from '../../billing/prices';
 import { GATES, PAST_DUE_GRACE_DAYS } from '../../entitlement-v2';
 import { TRIAL_DAYS } from '../copy/account';
-import {
-  CANCEL_CLICKS,
-  DELETE_GRACE_DAYS,
-  EVIDENCE_CONDENSED_AFTER_DAYS,
-  SETTINGS_COPY as COPY,
-} from '../copy/settings';
+import { CANCEL_CLICKS, DELETE_GRACE_DAYS, SETTINGS_COPY as COPY } from '../copy/settings';
 import { calendarDays, dayDate, daysBefore } from '../format';
 import {
   PLAN_NAMES,
@@ -280,6 +275,8 @@ export interface SettingsView {
     usageLabel: string;
     usage: [string, string][];
     keep: ActionView | null;
+    /** Said in place of Keep while paid plans are not open; null otherwise. */
+    keepNote: string | null;
     other: string;
     compare: ActionView;
     termsLabel: string;
@@ -319,7 +316,13 @@ export function settingsView(
     notOwnAccount,
     undeliverable = null,
     cancelStep = null,
+    billingOpen = true,
   }: {
+    /**
+     * Whether paid plans can be bought (`V2_BILLING`, read by the live pages). While they cannot, the
+     * card has no button that posts to checkout, and says so (F-108). Left out in a preview.
+     */
+    billingOpen?: boolean;
     /**
      * `confirm` after Cancel's first click (the `cancel` search parameter), when the card offers the
      * second; null otherwise.
@@ -391,6 +394,9 @@ export function settingsView(
     },
   };
 
+  // With paid plans closed nothing sends the trial's reminder yet, so it is not offered as a kind.
+  const emailKinds = EMAIL_KINDS.filter((k) => billingOpen || k !== 'trial_reminder');
+
   // The largest site: the most pages its latest result crawled.
   const largest = Math.max(
     0,
@@ -419,31 +425,34 @@ export function settingsView(
   const monthly = v.tier === 'agency' ? AGENCY_MONTHLY : PRO_MONTHLY;
   // A trial with a card becomes the plan at its end, and an account past due on Free gets back by
   // updating its card: neither has a Keep. A trial with no card keeps its plan; Free chooses Pro.
-  const keep = !owner
-    ? null
-    : trial && !cardTrial
-      ? action(
-          'keepPlan',
-          COPY.keep(plan, monthly),
-          {},
-          { fields: { plan: v.tier, interval: 'month', accountId: v.account.id } },
-        )
-      : v.tier === 'free' && !pastDue
+  const keep =
+    !owner || !billingOpen
+      ? null
+      : trial && !cardTrial
         ? action(
             'keepPlan',
-            COPY.choose(PLAN_NAMES.pro, PRO_MONTHLY),
+            COPY.keep(plan, monthly),
             {},
-            {
-              fields: { plan: 'pro', interval: 'month', accountId: v.account.id },
-            },
+            { fields: { plan: v.tier, interval: 'month', accountId: v.account.id } },
           )
-        : null;
+        : v.tier === 'free' && !pastDue
+          ? action(
+              'keepPlan',
+              COPY.choose(PLAN_NAMES.pro, PRO_MONTHLY),
+              {},
+              {
+                fields: { plan: 'pro', interval: 'month', accountId: v.account.id },
+              },
+            )
+          : null;
   const keepShown = keep !== null;
   // Each billing form names the account it was rendered for, so it is acted on in that account
   // whichever one the reader has switched to since.
   const billing = { fields: { accountId: v.account.id } };
-  const cancel = owner ? routeAction('cancelPlan', COPY.cancelAction, {}, billing) : null;
-  const portal = owner ? routeAction('billingPortal', COPY.portalAction, {}, billing) : null;
+  const cancel =
+    owner && billingOpen ? routeAction('cancelPlan', COPY.cancelAction, {}, billing) : null;
+  const portal =
+    owner && billingOpen ? routeAction('billingPortal', COPY.portalAction, {}, billing) : null;
   // A card on file or a subscription means a Stripe customer, which the portal opens for.
   const customer = onFile || (subscriptionStatus !== undefined && subscriptionStatus !== null);
   // A cancel ends at once where lib/billing/cancel.ts cancels at once (`AT_ONCE`: past due, unpaid,
@@ -454,15 +463,18 @@ export function settingsView(
   // After the first click the confirm step stands in the Cancel row's place, so the page carries
   // one cancel form at a time.
   const confirming = cancelStep === 'confirm' && cancel !== null && offersCancel;
-  const cancelRow = (text: string) => ({
-    label: COPY.cancel,
-    text,
-    action: confirming ? null : cancel,
-  });
+  const cancelRow = (text: string) =>
+    billingOpen
+      ? { label: COPY.cancel, text, action: confirming ? null : cancel }
+      : {
+          label: COPY.cancel,
+          text: owner ? COPY.cancelByEmail : ACCOUNT_COPY.cardManagedByOwner,
+          action: null,
+        };
 
   return {
     // The plan card carries the plan's terms and its Keep, so the rail's trial card leaves them out.
-    shell: accountShellView(v, 'Settings', { plan: 'page', billingEnd, role }),
+    shell: accountShellView(v, 'Settings', { plan: 'page', billingEnd, role, billingOpen }),
     header: {
       title: COPY.title,
       line: [a.email, trial ? COPY.trialLeft(plan, days!) : plan].join(' · '),
@@ -493,8 +505,8 @@ export function settingsView(
     email: {
       title: COPY.emailTitle,
       tableLabel: COPY.tables.email,
-      rows: EMAIL_KINDS.map((k) => rowOf[k]()),
-      foot: COPY.emailFoot(EMAIL_KINDS.length),
+      rows: emailKinds.map((k) => rowOf[k]()),
+      foot: COPY.emailFoot(emailKinds.length, billingOpen),
       undeliverable:
         undeliverable === null
           ? null
@@ -531,7 +543,7 @@ export function settingsView(
           : trial
             ? `${COPY.ends(date(a.trial_ends_at!))} ${
                 !cardTrial
-                  ? COPY.noCardTerms(plan)
+                  ? COPY.noCardTerms(plan, billingOpen)
                   : withheld
                     ? ACCOUNT_COPY.cardManagedByOwner
                     : COPY.cardTerms(card)
@@ -552,13 +564,17 @@ export function settingsView(
       ],
       // A trial with a card becomes the plan at its end: there is nothing to keep it by.
       keep,
+      keepNote:
+        !billingOpen && owner && (v.tier === 'free' || (trial && !cardTrial))
+          ? COPY.plansOpenSoon(trial ? date(a.trial_ends_at!) : null)
+          : null,
       // "Or …" follows a Keep; where the card has none, the plan's own prices lead.
       other: [
         keepShown
           ? v.tier === 'agency'
             ? COPY.otherYearly(yearly)
             : COPY.other(yearly, AGENCY_MONTHLY, GATES.agency.sites, GATES.agency.seats)
-          : COPY.prices(plan, monthly, yearly),
+          : COPY.prices(v.tier === 'free' ? PLAN_NAMES.pro : plan, monthly, yearly),
         ...(!keepShown && v.tier !== 'agency'
           ? [COPY.agencyLine(AGENCY_MONTHLY, GATES.agency.sites, GATES.agency.seats)]
           : []),
@@ -569,38 +585,35 @@ export function settingsView(
         cardTrial && ending !== null
           ? { label: COPY.cancel, text: COPY.trialCancelled(date(ending)), action: null }
           : cardTrial
-            ? cancelRow(
-                COPY.cancelCardTrial(
-                  date(a.trial_ends_at!),
-                  CANCEL_CLICKS,
-                  EVIDENCE_CONDENSED_AFTER_DAYS,
-                ),
-              )
+            ? cancelRow(COPY.cancelCardTrial(date(a.trial_ends_at!), CANCEL_CLICKS))
             : trial
               ? {
                   label: COPY.cancel,
-                  text: COPY.cancelTrial(CANCEL_CLICKS, EVIDENCE_CONDENSED_AFTER_DAYS),
+                  text: billingOpen ? COPY.cancelTrial(CANCEL_CLICKS) : COPY.cancelTrialClosed,
                   action: null,
                 }
               : ending !== null
                 ? {
                     label: COPY.cancel,
-                    text: COPY.cancelled(date(ending), EVIDENCE_CONDENSED_AFTER_DAYS),
+                    text: COPY.cancelled(date(ending)),
                     action: null,
                   }
                 : paid
                   ? cancelRow(
                       atOnce
-                        ? COPY.cancelAtOnce(CANCEL_CLICKS, EVIDENCE_CONDENSED_AFTER_DAYS)
+                        ? COPY.cancelAtOnce(CANCEL_CLICKS)
                         : COPY.cancelPaid(
                             CANCEL_CLICKS,
-                            EVIDENCE_CONDENSED_AFTER_DAYS,
                             a.billing_period_months === 12 ? 'year' : 'month',
                           ),
                     )
                   : { label: COPY.cancel, text: COPY.cancelFree, action: null },
         customer
-          ? { label: COPY.receipts, text: COPY.receiptsText, action: portal }
+          ? {
+              label: COPY.receipts,
+              text: billingOpen ? COPY.receiptsText : COPY.receiptsClosed,
+              action: portal,
+            }
           : { label: COPY.receipts, text: COPY.noReceipts, action: null },
       ],
       confirm: confirming
