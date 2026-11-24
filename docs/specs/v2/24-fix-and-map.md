@@ -321,7 +321,7 @@ Read through the TypeScript compiler. A screen receives its view and nothing els
 | `r`       | `number`                          |                                                                                     |
 | `parent`  | `string \| null`                  | The path of the page whose link the line is drawn from; null for none.              |
 | `js`      | `boolean`                         | The link the line stands for was made by JavaScript (drawn dashed).                 |
-| `missing` | `string \| null`                  | "missing (404)" for a page that answered 404 or 410, which has no depth; else null. |
+| `missing` | `string \| null`                  | `missingLabel`: for a page that answered 404 or 410, which has no depth; else null. |
 
 #### `PageDetails`
 

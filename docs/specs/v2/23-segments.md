@@ -476,20 +476,25 @@ Every interface the segment view modules export, read through the TypeScript com
 
 #### `LinksCounts`
 
-| Field                    | Type     | Note                                                                                   |
-| ------------------------ | -------- | -------------------------------------------------------------------------------------- |
-| `checked`                | `number` | Pages in the record.                                                                   |
-| `served`                 | `number` | Pages that answered 200: the pages whose titles and descriptions are read.             |
-| `broken`                 | `number` | Missing pages (segment/broken.ts) at least one link in the record leads to.            |
-| `brokenLinkedFrom`       | `number` | Distinct pages whose link leads to one of those, a page's link to itself left out.     |
-| `missingUnlinked`        | `number` | Missing pages no link in the record leads to (found by the sitemap, or the start URL). |
-| `errors`                 | `number` | Pages that answered an error of 400 or more other than a missing one.                  |
-| `redirects`              | `number` |                                                                                        |
-| `loops`                  | `number` |                                                                                        |
-| `missingTitles`          | `number` |                                                                                        |
-| `sharedTitlePages`       | `number` |                                                                                        |
-| `missingDescriptions`    | `number` |                                                                                        |
-| `sharedDescriptionPages` | `number` |                                                                                        |
+| Field                    | Type     | Note                                                                                     |
+| ------------------------ | -------- | ---------------------------------------------------------------------------------------- |
+| `checked`                | `number` | Pages in the record.                                                                     |
+| `served`                 | `number` | Pages that answered 200: the pages whose titles and descriptions are looked for.         |
+| `broken`                 | `number` | Missing pages (segment/broken.ts) at least one link from another page leads to.          |
+| `brokenLinkedFrom`       | `number` | Distinct pages whose link leads to one of those, a page's link to itself left out.       |
+| `missingUnlinked`        | `number` | Missing pages no link from another page in the record leads to.                          |
+| `errors`                 | `number` | Pages that answered an error of 400 or more other than a missing one.                    |
+| `redirects`              | `number` |                                                                                          |
+| `loops`                  | `number` |                                                                                          |
+| `redirectsRecorded`      | `number` | Pages whose redirects were recorded (`redirect` not null), whether or not they redirect. |
+| `titlesRead`             | `number` | Of the pages that answered 200, those whose title was read.                              |
+| `missingTitles`          | `number` | Of those, the ones that declare no title, or one of whitespace alone.                    |
+| `sharedTitlePages`       | `number` |                                                                                          |
+| `cutTitles`              | `number` | Titles kept cut short, left out of the shared groups.                                    |
+| `descriptionsRead`       | `number` |                                                                                          |
+| `missingDescriptions`    | `number` |                                                                                          |
+| `sharedDescriptionPages` | `number` |                                                                                          |
+| `cutDescriptions`        | `number` |                                                                                          |
 
 #### `LinksFacts`
 
@@ -497,19 +502,26 @@ Every interface the segment view modules export, read through the TypeScript com
 | ------------------------------- | ---------------------------- | ---------------------------------------------------------------------------------------------- |
 | `counts`                        | `object`                     |                                                                                                |
 | `counts.checked`                | `number`                     | Pages in the record.                                                                           |
-| `counts.served`                 | `number`                     | Pages that answered 200: the pages whose titles and descriptions are read.                     |
-| `counts.broken`                 | `number`                     | Missing pages (segment/broken.ts) at least one link in the record leads to.                    |
+| `counts.served`                 | `number`                     | Pages that answered 200: the pages whose titles and descriptions are looked for.               |
+| `counts.broken`                 | `number`                     | Missing pages (segment/broken.ts) at least one link from another page leads to.                |
 | `counts.brokenLinkedFrom`       | `number`                     | Distinct pages whose link leads to one of those, a page's link to itself left out.             |
-| `counts.missingUnlinked`        | `number`                     | Missing pages no link in the record leads to (found by the sitemap, or the start URL).         |
+| `counts.missingUnlinked`        | `number`                     | Missing pages no link from another page in the record leads to.                                |
 | `counts.errors`                 | `number`                     | Pages that answered an error of 400 or more other than a missing one.                          |
 | `counts.redirects`              | `number`                     |                                                                                                |
 | `counts.loops`                  | `number`                     |                                                                                                |
-| `counts.missingTitles`          | `number`                     |                                                                                                |
+| `counts.redirectsRecorded`      | `number`                     | Pages whose redirects were recorded (`redirect` not null), whether or not they redirect.       |
+| `counts.titlesRead`             | `number`                     | Of the pages that answered 200, those whose title was read.                                    |
+| `counts.missingTitles`          | `number`                     | Of those, the ones that declare no title, or one of whitespace alone.                          |
 | `counts.sharedTitlePages`       | `number`                     |                                                                                                |
+| `counts.cutTitles`              | `number`                     | Titles kept cut short, left out of the shared groups.                                          |
+| `counts.descriptionsRead`       | `number`                     |                                                                                                |
 | `counts.missingDescriptions`    | `number`                     |                                                                                                |
 | `counts.sharedDescriptionPages` | `number`                     |                                                                                                |
-| `broken`                        | `ErrorRowView[]`             | Missing pages a link leads to: the broken links.                                               |
-| `unlinked`                      | `ErrorRowView[]`             | Missing pages no link in the record leads to.                                                  |
+| `counts.cutDescriptions`        | `number`                     |                                                                                                |
+| `linkGap`                       | `LinkGap`                    |                                                                                                |
+| `broken`                        | `ErrorRowView[]`             | Missing pages a link from another page leads to: the broken links.                             |
+| `unlinked`                      | `ErrorRowView[]`             | Missing pages no link from another page in the record leads to.                                |
+| `unlinkedHeading`               | `string`                     | Its heading, which says "no other page links to" only when links were read.                    |
 | `errors`                        | `ErrorRowView[]`             | Pages that answered another error (a 403, a 429, a 503): they exist, so are not broken.        |
 | `redirects`                     | `RedirectRowView[]`          |                                                                                                |
 | `titles`                        | `object`                     |                                                                                                |
@@ -557,21 +569,26 @@ Every interface the segment view modules export, read through the TypeScript com
 | `coverage.read`                 | `string`                                                                              |                                                                                              |
 | `counts`                        | `object`                                                                              |                                                                                              |
 | `counts.checked`                | `number`                                                                              | Pages in the record.                                                                         |
-| `counts.served`                 | `number`                                                                              | Pages that answered 200: the pages whose titles and descriptions are read.                   |
-| `counts.broken`                 | `number`                                                                              | Missing pages (segment/broken.ts) at least one link in the record leads to.                  |
+| `counts.served`                 | `number`                                                                              | Pages that answered 200: the pages whose titles and descriptions are looked for.             |
+| `counts.broken`                 | `number`                                                                              | Missing pages (segment/broken.ts) at least one link from another page leads to.              |
 | `counts.brokenLinkedFrom`       | `number`                                                                              | Distinct pages whose link leads to one of those, a page's link to itself left out.           |
-| `counts.missingUnlinked`        | `number`                                                                              | Missing pages no link in the record leads to (found by the sitemap, or the start URL).       |
+| `counts.missingUnlinked`        | `number`                                                                              | Missing pages no link from another page in the record leads to.                              |
 | `counts.errors`                 | `number`                                                                              | Pages that answered an error of 400 or more other than a missing one.                        |
 | `counts.redirects`              | `number`                                                                              |                                                                                              |
 | `counts.loops`                  | `number`                                                                              |                                                                                              |
-| `counts.missingTitles`          | `number`                                                                              |                                                                                              |
+| `counts.redirectsRecorded`      | `number`                                                                              | Pages whose redirects were recorded (`redirect` not null), whether or not they redirect.     |
+| `counts.titlesRead`             | `number`                                                                              | Of the pages that answered 200, those whose title was read.                                  |
+| `counts.missingTitles`          | `number`                                                                              | Of those, the ones that declare no title, or one of whitespace alone.                        |
 | `counts.sharedTitlePages`       | `number`                                                                              |                                                                                              |
+| `counts.cutTitles`              | `number`                                                                              | Titles kept cut short, left out of the shared groups.                                        |
+| `counts.descriptionsRead`       | `number`                                                                              |                                                                                              |
 | `counts.missingDescriptions`    | `number`                                                                              |                                                                                              |
 | `counts.sharedDescriptionPages` | `number`                                                                              |                                                                                              |
+| `counts.cutDescriptions`        | `number`                                                                              |                                                                                              |
 | `broken`                        | `object`                                                                              |                                                                                              |
 | `broken.rows`                   | `ErrorRowView[]`                                                                      |                                                                                              |
 | `broken.empty`                  | `string \| null`                                                                      |                                                                                              |
-| `unlinked`                      | `object`                                                                              | Missing pages no link in the record leads to; listed only when there is one.                 |
+| `unlinked`                      | `object`                                                                              | Missing pages no link from another page leads to; listed only when there is one.             |
 | `unlinked.heading`              | `string`                                                                              |                                                                                              |
 | `unlinked.rows`                 | `ErrorRowView[]`                                                                      |                                                                                              |
 | `errors`                        | `object`                                                                              | Pages that answered an error other than missing; listed only when there is one.              |
