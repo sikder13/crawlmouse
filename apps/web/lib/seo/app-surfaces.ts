@@ -75,6 +75,7 @@ export const ROUTE_FOLDERS: Readonly<
   // Not pages a search engine lists: handlers, images, embeds, rewrite targets, previews.
   api: 'not-a-page',
   embed: 'not-a-page',
+  ingest: 'not-a-page',
   og: 'not-a-page',
   'llms.txt': 'not-a-page',
   'robots.txt': 'not-a-page',

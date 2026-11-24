@@ -64,6 +64,7 @@ Concurrency: one plan cap, `PLAN_CONCURRENCY_CAP = 5` (Inngest Free), which the 
 | The latest first crawl batch that still gets a whole crawl window, from the first claim  | 1260 s                  |
 | The run’s finish timeout                                                                 | 2220 s                  |
 | Crawl phase ceiling, from the first crawl batch the worker accepts                       | 480 s                   |
+| The longest wait on a worker’s done signal before one poll                               | 60 s                    |
 | Access stages’ slice                                                                     | 300 s                   |
 | Reserve for render, build, persist, finalize                                             | 180 s                   |
 | A batch that would get less is not posted                                                | 60 s                    |
@@ -82,19 +83,21 @@ The worst case these allow fits the finish timeout, and the worst-case step coun
 
 `checks.failure_reason` is readable by the site’s members, so the pipeline writes one of these words. Its stores refuse a word outside the list, and so do `fail_check` and `reap_stalled_checks`, which read it from `check_failure_reasons()`, a SQL function a test holds equal to the list (`pnpm --filter @crawlmouse/web exec vitest run lib/v2/pipeline/store.test.ts __tests__/v2-008-pipeline.test.ts`).
 
-| Reason                   | When                                                                                                                                                                                      |
-| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `paused`                 | `CRAWL_PAUSED=1` when the check was claimed, or the worker answered `paused`                                                                                                              |
-| `site_busy`              | another check of the site was still running after the claim waited                                                                                                                        |
-| `canceled`               | the run was cancelled or passed its finish timeout (Inngest reports both alike)                                                                                                           |
-| `stalled`                | the reaper found a claimed check with no heartbeat within its bound                                                                                                                       |
-| `not_started`            | the reaper found a check that no run claimed within its bound                                                                                                                             |
-| `worker_redeployed`      | a batch came from another worker release than the check’s first (Q10)                                                                                                                     |
-| `worker_unavailable`     | no crawl batch could be read: the worker did not answer, refused the app’s credentials, lost a batch twice, kept a batch running past its deadline, or its result could not be read       |
-| `capacity_wait_exceeded` | the worker answered, busy with other checks, until the next wait for the first crawl batch would have passed the wait budget (900 s) or 1260 s from the start: the check never won a slot |
-| `build_failed`           | `buildCheck` threw                                                                                                                                                                        |
-| `persist_failed`         | persisting the built check threw                                                                                                                                                          |
-| `internal`               | anything else                                                                                                                                                                             |
+| Reason                   | When                                                                                                                                                                                                                |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `paused`                 | `CRAWL_PAUSED=1` when the check was claimed, or the worker answered `paused`                                                                                                                                        |
+| `site_busy`              | another check of the site was still running after the claim waited                                                                                                                                                  |
+| `canceled`               | the run was cancelled or passed its finish timeout (Inngest reports both alike)                                                                                                                                     |
+| `stalled`                | the reaper found a claimed check with no heartbeat within its bound                                                                                                                                                 |
+| `not_started`            | the reaper found a check that no run claimed within its bound                                                                                                                                                       |
+| `worker_redeployed`      | a batch came from another worker release than the check’s first (Q10)                                                                                                                                               |
+| `worker_unavailable`     | no crawl batch could be read: the worker did not answer, refused the app’s credentials, lost a batch twice, kept a batch running past its deadline, or its result could not be read                                 |
+| `capacity_wait_exceeded` | the worker answered, busy with other checks, until the next wait for the first crawl batch would have passed the wait budget (900 s) or 1260 s from the start: the check never won a slot                           |
+| `site_unreachable`       | no page was read, robots.txt on the homepage’s origin got no answer (a network failure or a timeout), and no robots.txt read got a status                                                                           |
+| `nothing_read`           | no page was read for another reason, such as a robots.txt that could not be used or disallows every page, a refused address, a failed request, a spent budget, or another origin of the site that stopped the batch |
+| `build_failed`           | `buildCheck` threw                                                                                                                                                                                                  |
+| `persist_failed`         | persisting the built check threw                                                                                                                                                                                    |
+| `internal`               | anything else                                                                                                                                                                                                       |
 
 ## Requests
 

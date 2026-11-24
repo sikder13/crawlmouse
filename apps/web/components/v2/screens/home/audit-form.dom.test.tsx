@@ -6,10 +6,18 @@
 import { act, forwardRef } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { ACCOUNT_SENTENCES, siteLimitSentence } from '@/app/api/checks/_lib/start-account';
+import { GATES } from '@/lib/entitlement-v2';
 import { KeepBar } from '../result/KeepBar';
 import { AuditEvent, AuditPageProvider } from '../result/AuditPage';
 import { AuditForm } from './AuditForm';
-import { START_COPY, START_REFUSALS, startCheck, urlOf } from './start-check';
+import {
+  START_COPY,
+  SERVER_WORDED_REFUSALS,
+  START_REFUSALS,
+  startCheck,
+  urlOf,
+} from './start-check';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -157,6 +165,96 @@ describe('the Home form, starting an audit', () => {
       expect((host.querySelector('button[type="submit"]') as HTMLButtonElement).disabled).toBe(
         false,
       );
+    },
+  );
+
+  // Inbox 003: for these six the route builds the sentence from the account's plan.
+  const WORDED = [
+    'site_limit',
+    'adds_capped',
+    'role_refused',
+    'site_paused',
+    'recently_checked',
+    'site_exists',
+  ] as const;
+
+  it('fits the route’s fixed sentences and a sample of its site-limit sentences', () => {
+    const sentences = [
+      ...Object.values(ACCOUNT_SENTENCES),
+      ...(['free', 'pro', 'agency'] as const).flatMap((tier) =>
+        [0, GATES[tier].sites, GATES[tier].sites + 1, GATES.agency.maxSites + 1].map((kept) =>
+          siteLimitSentence(tier, GATES[tier].sites, kept),
+        ),
+      ),
+    ];
+    expect(sentences.length).toBeGreaterThan(5);
+    for (const text of sentences) {
+      expect(text.length, text).toBeLessThanOrEqual(300);
+      expect(text, text).not.toMatch(/[\u0000-\u001f\u007f]/);
+    }
+  });
+
+  it('names exactly the six codes whose sentence the server writes', () => {
+    expect([...SERVER_WORDED_REFUSALS].sort()).toEqual([...WORDED].sort());
+  });
+
+  it.each(WORDED)('for %s shows the server’s own sentence', async (code) => {
+    const host = form();
+    const error = `Free keeps 1 site; Pro keeps 5 (${code}).`;
+    answers.push(json(409, { code, error }));
+    await submit(host, 'example.com');
+    expect(alertOf(host)).toBe(error);
+  });
+
+  it('shows a sentence of exactly the longest length it accepts', async () => {
+    const host = form();
+    const error = 'a'.repeat(300);
+    answers.push(json(409, { code: 'site_limit', error }));
+    await submit(host, 'example.com');
+    expect(alertOf(host)).toBe(error);
+  });
+
+  it.each(WORDED)('for %s shows hostile text as text, never as markup', async (code) => {
+    const host = form();
+    const error = '<img src=x onerror="alert(1)"><a href="//evil.example">Upgrade</a>';
+    answers.push(json(409, { code, error }));
+    await submit(host, 'example.com');
+    const alert = host.querySelector('[role="alert"]')!;
+    expect(alert.textContent).toBe(error);
+    expect(alert.children).toHaveLength(0);
+  });
+
+  it.each(
+    WORDED.flatMap((code) =>
+      [
+        undefined,
+        null,
+        5,
+        {},
+        ['x'],
+        '',
+        '   ',
+        'a'.repeat(301),
+        'line one\nline two',
+        'a\rb',
+        'a\u0000b',
+        'a\u007fb',
+      ].map((error) => [code, error] as const),
+    ),
+  )('for %s with error %j falls back to the fixed sentence', async (code, error) => {
+    const host = form();
+    answers.push(json(409, { code, error }));
+    await submit(host, 'example.com');
+    expect(alertOf(host)).toBe(START_COPY[code]);
+  });
+
+  it.each(START_REFUSALS.filter((c) => c !== 'captcha_required' && !WORDED.includes(c as never)))(
+    'for %s never shows the server’s text',
+    async (code) => {
+      const host = form();
+      answers.push(json(429, { code, error: 'ECONNRESET at 10.1.2.3' }));
+      await submit(host, 'example.com');
+      expect(alertOf(host)).toBe(START_COPY[code]);
     },
   );
 

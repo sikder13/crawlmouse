@@ -74,11 +74,11 @@ describe('v1’s /pricing, /developers and /r/<slug> pages, as main has them (D1
     },
   );
 
-  it('serves the v2 Developers page from the target the rewrite row names, under the billing flag', () => {
+  it('serves the v2 Developers page from the target the rewrite row names, under either public flag', () => {
     expect(V2_REWRITES.find((r) => r.from === '/developers')).toEqual({
       from: '/developers',
       to: '/v2-developers',
-      flag: 'billing',
+      flag: 'publicPages',
     });
   });
 });
@@ -86,11 +86,17 @@ describe('v1’s /pricing, /developers and /r/<slug> pages, as main has them (D1
 describe('/agencies (D4)', () => {
   const load = () => import('../../app/agencies/page');
 
-  it('is a 404 with V2_BILLING unset, whatever V2_CHECKS_PUBLIC says', async () => {
+  it('RC-01: with V2_BILLING unset is the page, with no way into the trial, whatever V2_CHECKS_PUBLIC says', async () => {
     for (const checks of [false, true]) {
       flags({ billing: false, checks });
       const { default: Page } = await load();
-      expect(await digestOf(() => Page())).toContain('404');
+      const markup = renderToStaticMarkup(Page() as ReactElement);
+      expect(markup.match(/<h1/g)).toHaveLength(1);
+      expect(markup).toContain('The agency trial opens soon');
+      expect(markup).toContain('href="mailto:support@crawlmouse.com"');
+      expect(markup).not.toContain('/agency-trial');
+      expect(markup).not.toMatch(/card required|charged|-day trial/i);
+      expect(String((await load()).metadata.description)).not.toMatch(/-day trial|charged/i);
       vi.resetModules();
     }
   }, 60_000);
@@ -116,23 +122,53 @@ describe('/agencies (D4)', () => {
   }, 60_000);
 });
 
+describe('/agencies’ first button with billing off (RC-01)', () => {
+  it.each([
+    ['1', '/signup'],
+    ['', '/login'],
+  ])(
+    'with V2_ACCOUNT_DOOR=%j it starts free at %s',
+    async (door, href) => {
+      vi.resetModules();
+      flags({ billing: false, checks: true });
+      vi.stubEnv('V2_ACCOUNT_DOOR', door);
+      const { default: Page } = await import('../../app/agencies/page');
+      const { document } = new JSDOM(renderToStaticMarkup(Page() as ReactElement)).window;
+      const start = [...document.querySelectorAll('main a')].find(
+        (a) => a.textContent === 'Start free',
+      );
+      expect(start?.getAttribute('href')).toBe(href);
+    },
+    60_000,
+  );
+});
+
 describe('/developers, v2 (D5)', () => {
   const load = () => import('../../app/v2-developers/page');
 
-  it('is a 404 with V2_BILLING unset', async () => {
-    flags({ billing: false, checks: true });
+  it('is a 404 with both flags off', async () => {
+    flags({ billing: false, checks: false });
     const { default: Page } = await load();
     expect(await digestOf(() => Page())).toContain('404');
   }, 60_000);
 
-  it('with V2_BILLING on keeps v1’s canonical, takes the artboard’s title, and is indexable', async () => {
+  it('RC-01: with billing off and public checks on is the page', async () => {
+    flags({ billing: false, checks: true });
+    const { default: Page } = await load();
+    const markup = renderToStaticMarkup(Page() as ReactElement);
+    expect(markup.match(/<h1/g)).toHaveLength(1);
+    expect(markup).toContain('name="email"');
+  }, 60_000);
+
+  it('keeps v1’s title, h1 and canonical, and is indexable (OPERATING-RULES §13)', async () => {
     flags({ billing: true, checks: true });
     const { default: Page, metadata } = await load();
     expect(metadata.alternates?.canonical).toBe('/developers');
     expect(metadata.robots).toBeUndefined();
-    expect(metadata.title).toBe('Developers');
+    expect(metadata.title).toBe('Crawlmouse for developers — CLI, GitHub Action & webhooks');
     const markup = renderToStaticMarkup(Page() as ReactElement);
     expect(markup.match(/<h1/g)).toHaveLength(1);
+    expect(markup).toMatch(/<h1[^>]*>Crawlmouse for developers<\/h1>/);
     expect(markup).not.toContain('href="#"');
     expect(markup.match(/data-v2-primary=""/g)).toHaveLength(1);
     expect(markup).toContain('name="email"');

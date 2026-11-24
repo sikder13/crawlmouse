@@ -91,7 +91,7 @@ Supabase → SQL editor, production, read-only. The block between the markers is
 with ended as (
   select checks.status = 'failed' as failed,
          checks.status = 'failed' and checks.failure_reason in (
-           'canceled', 'stalled', 'not_started', 'worker_redeployed', 'worker_unavailable', 'capacity_wait_exceeded', 'build_failed', 'persist_failed', 'internal'
+           'canceled', 'stalled', 'not_started', 'worker_redeployed', 'worker_unavailable', 'capacity_wait_exceeded', 'site_unreachable', 'nothing_read', 'build_failed', 'persist_failed', 'internal'
          ) as ours
   from public.checks
   where checks.finished_at > now() - interval '1 hour'
@@ -116,6 +116,8 @@ The reasons a check fails with, each with what the result page tells its visitor
 - `worker_redeployed`, counted: our crawler was updated part-way through, so its results could not be combined
 - `worker_unavailable`, counted: our crawler could not be reached
 - `capacity_wait_exceeded`, counted: our crawlers were all busy with other audits, and yours waited too long for one; nothing was wrong with your site
+- `site_unreachable`, counted: the site did not answer our request (a DNS, connection or TLS failure, or a timeout)
+- `nothing_read`, counted: we could not read a single page of this site, so there is nothing to grade
 - `build_failed`, counted: the pages were crawled, and grading them failed on our side
 - `persist_failed`, counted: the audit was graded, and saving the result failed on our side
 - `internal`, counted: something failed on our side

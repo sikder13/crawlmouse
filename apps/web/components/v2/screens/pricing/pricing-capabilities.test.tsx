@@ -14,7 +14,7 @@ import { capabilitySweep, comingNamedIn } from '../../../../__tests__/helpers/ca
 import { PricingScreen } from './PricingScreen';
 
 const NOW = new Date('2026-11-12T12:00:00Z');
-const FLAGS = { accountDoor: true, checksPublic: true };
+const FLAGS = { accountDoor: true, checksPublic: true, billing: true };
 const VIEWERS: [string, PricingViewer][] = [
   ['signed out', { kind: 'signed_out' }],
   [
@@ -62,19 +62,20 @@ describe('Pricing names only capabilities it can account for', () => {
     expect(comingNamedIn(PRICING_COPY.description())).toEqual([]);
   });
 
-  // SEO R2-N2 (Q33): the artboard's h1 promises monitoring, and the footer's line on every page that
+  // SEO R2-N2 (Q33): the artboard's line under the h1 promises monitoring, and the footer's line on every page that
   // the change is told; each carries what it names and is marked while that is coming. With CC-28
   // merged both are built, so neither is marked (rulings-2).
-  it('the h1 and the footer line carry the monitoring they name, marked while it is coming', () => {
+  it('the line under the h1 and the footer line carry the monitoring they name, marked while it is coming', () => {
     expect(PRICING_COPY.title.text).toBe('Every audit is free. Pay when you want it watched.');
     expect(PRICING_COPY.title.capabilities).toEqual(['weekly_checks', 'change_emails']);
     expect(CAPABILITIES.weekly_checks.status).toBe('built');
     expect(CAPABILITIES.change_emails.status).toBe('built');
     for (const [, html] of pages) {
       const doc = new JSDOM(html).window.document;
-      const h1 = doc.querySelector('h1')!;
-      expect(h1.querySelector('[data-capability~="weekly_checks"]')).not.toBeNull();
-      expect(h1.querySelector('[data-v2-coming]') !== null).toBe(
+      expect(doc.querySelector('h1')!.textContent).toBe(PRICING_COPY.h1);
+      const tagline = doc.querySelector('h1 + p')!;
+      expect(tagline.querySelector('[data-capability~="weekly_checks"]')).not.toBeNull();
+      expect(tagline.querySelector('[data-v2-coming]') !== null).toBe(
         CAPABILITIES.weekly_checks.status === 'coming',
       );
       const line = [...doc.querySelectorAll('footer p')].find((p) =>
@@ -100,7 +101,9 @@ describe('Pricing names only capabilities it can account for', () => {
   });
 
   it('the emails question names the renewal reminders, as FACTS does', () => {
-    const emails = PRICING_COPY.faq.items(true).find((i) => i.q === 'Which emails will I get?')!;
+    const emails = PRICING_COPY.faq
+      .items(true, true)
+      .find((i) => i.q === 'Which emails will I get?')!;
     expect(emails.a.text).toMatch(/Three kinds and no others/);
     expect(emails.a.text).toMatch(/renewal reminders 45 and 20 days before/);
   });

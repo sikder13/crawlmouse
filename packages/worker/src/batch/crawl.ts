@@ -6,10 +6,10 @@ import {
   type SearchRobots,
 } from '@crawlmouse/types/v2';
 import type { Clock } from '../clock.js';
+import type { LivePage, PageCounts } from './run.js';
 import type { FetchOutcome } from '../fetch/fetcher.js';
 import { CRAWL } from '../identities.js';
 import { oursAllow, PathMatch, searchVerdicts } from '../politeness/robots.js';
-import { siteKeyOf } from '../politeness/site-key.js';
 import { CrawlPageSchema, type CrawlPage } from '../rows/crawl-page.js';
 import { bounded, CAPS, MAX_URL_LENGTH } from '../rows/bounded.js';
 import {
@@ -63,7 +63,7 @@ export interface CrawlRun {
   /** Set when robots.txt, or the batch itself, keeps every page from being requested. */
   blocked: SiteBlock | NotRequested | null;
   /** Called after each page, for progress. */
-  pageDone: () => void;
+  pageDone: (read: PageCounts) => void;
   vantage?: Vantage;
 }
 
@@ -83,6 +83,27 @@ interface PageOutcome {
   landed?: string | null;
 }
 
+/** Per page, so a page of thousands of links cannot grow a running batch's record. */
+const LIVE_EDGES_PER_PAGE = 20;
+const LIVE_URL_CHARS = 512;
+
+/** The page for the live screen; null where the stream could not fill a `page_fetched` from it. */
+export function livePageOf(page: CrawlPage, edges: readonly LinkEdge[]): LivePage | null {
+  if (page.outcome !== 'fetched' || page.status_code === null || page.timing === null) return null;
+  if (!page.links_read || page.links_out === null || page.url.length > LIVE_URL_CHARS) return null;
+  return {
+    url: page.url,
+    status: page.status_code,
+    ms: page.timing.total_ms,
+    links: page.links_out,
+    identity: page.identity_sent,
+    edges: edges
+      .filter((e) => e.from_url.length <= LIVE_URL_CHARS && e.to_url.length <= LIVE_URL_CHARS)
+      .slice(0, LIVE_EDGES_PER_PAGE)
+      .map((e) => ({ from: e.from_url, to: e.to_url, js_only: e.js_only })),
+  };
+}
+
 export async function runCrawl(run: CrawlRun, urls: readonly string[]): Promise<CrawlOutput> {
   const room = { bytes: MAX_RESULT_TEXT_BYTES };
   const outcomes: PageOutcome[] = new Array(urls.length);
@@ -100,7 +121,13 @@ export async function runCrawl(run: CrawlRun, urls: readonly string[]): Promise<
         run.ctx.abort.abort();
         throw e;
       }
-      run.pageDone();
+      const { page, edges } = outcomes[i]!;
+      run.pageDone({
+        pages: page.outcome === 'fetched' ? 1 : 0,
+        links: edges.length,
+        live: livePageOf(page, edges),
+        homepage: i === 0 && page.response === 'served',
+      });
     }
   };
   await Promise.all(Array.from({ length: Math.min(CONCURRENT_PAGES, urls.length) }, worker));
@@ -187,7 +214,7 @@ async function crawlPage(
   // A chain stopped at a redirect never requested its last Location, so it has not landed there.
   const landed = f.redirectStop === null && f.status !== null ? f.finalUrl : null;
   const reading = readResponse(f);
-  run.ctx.sites.recordPage(siteKeyOf(url), reading.class === 'challenged');
+  run.ctx.sites.recordPage(run.ctx.sites.keyOf(r.answeredBy), reading.class === 'challenged');
   const limitations = [
     ...(f.error ? [say.requestFailed(f)] : []),
     ...(f.redirectStop ? [say.redirectStopped(f.redirectStop, r.cut ?? null)] : []),

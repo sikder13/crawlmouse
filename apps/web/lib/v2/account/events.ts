@@ -54,10 +54,17 @@ export interface Capture {
 /** The capture for one request: the product's sender, given the request's cookie header. */
 export function captureFor(req: Request, send?: SendCapture): Capture {
   const cookie = req.headers.get('cookie');
+  const userAgent = req.headers.get('user-agent');
   return (event, key, properties) =>
     captureServerEvent(
       cookie,
-      { event, distinctId: distinctIdFor(cookie, key), accountId: key.accountId, properties },
+      {
+        event,
+        distinctId: distinctIdFor(cookie, key),
+        accountId: key.accountId,
+        properties,
+        userAgent,
+      },
       send,
     );
 }

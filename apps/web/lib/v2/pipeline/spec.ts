@@ -65,6 +65,10 @@ const REASONS: Readonly<Record<FailureReason, string>> = {
   worker_unavailable:
     'no crawl batch could be read: the worker did not answer, refused the app’s credentials, lost a batch twice, kept a batch running past its deadline, or its result could not be read',
   capacity_wait_exceeded: `the worker answered, busy with other checks, until the next wait for the first crawl batch would have passed the wait budget (${QUEUE_WAIT_MAX_S} s) or ${FIRST_ACCEPT_BY_S} s from the start: the check never won a slot`,
+  site_unreachable:
+    'no page was read, robots.txt on the homepage’s origin got no answer (a network failure or a timeout), and no robots.txt read got a status',
+  nothing_read:
+    'no page was read for another reason, such as a robots.txt that could not be used or disallows every page, a refused address, a failed request, a spent budget, or another origin of the site that stopped the batch',
   build_failed: '`buildCheck` threw',
   persist_failed: 'persisting the built check threw',
   internal: 'anything else',
@@ -259,6 +263,7 @@ export function buildSpec20b(): string {
           'Crawl phase ceiling, from the first crawl batch the worker accepts',
           `${CRAWL_CEILING_S} s`,
         ],
+        ['The longest wait on a worker’s done signal before one poll', `${PACE.signalWaitS} s`],
         ['Access stages’ slice', `${ACCESS_SLICE_S} s`],
         ['Reserve for render, build, persist, finalize', `${RESERVE_S} s`],
         ['A batch that would get less is not posted', `${MIN_BATCH_S} s`],

@@ -12,7 +12,7 @@ import { readNextChecks } from '@/lib/v2/account/sites-store';
 import { loadViewer } from '@/lib/v2/account/viewer';
 import { reachedByRewrite } from '@/lib/v2/rewrite-target';
 import { withSwitcher } from '@/lib/v2/view/account-shell';
-import { dashboardView } from '@/lib/v2/view/dashboard';
+import { dashboardView, withoutTrialOffer } from '@/lib/v2/view/dashboard';
 import { noticeLine } from '@/lib/v2/copy/notices';
 import { readEarlierAudits } from './earlier-audits';
 
@@ -59,12 +59,17 @@ export default async function V2Dashboard({
       return [];
     }),
   ]);
+  const query = await searchParams;
   return (
     <LiveActions>
       <DashboardScreen
-        data={withSwitcher(dashboardView(d, viewer, next, earlier), accounts, account.id)}
+        data={withSwitcher(
+          withoutTrialOffer(dashboardView(d, viewer, next, earlier), query),
+          accounts,
+          account.id,
+        )}
         // The form a plan's limit refuses here is the add-site form: its notice names the limit.
-        notice={noticeLine(await searchParams, account.timezone, tier)}
+        notice={noticeLine(query, account.timezone, tier)}
       />
     </LiveActions>
   );

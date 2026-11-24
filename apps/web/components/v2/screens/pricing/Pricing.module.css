@@ -8,6 +8,20 @@
   max-width: 760px;
 }
 
+.tagline {
+  font-size: var(--v2-text-m);
+  font-weight: 600;
+  color: var(--v2-fg);
+  max-width: 760px;
+  margin: 12px 0 0;
+}
+
+@media (max-width: 760px) {
+  .tagline {
+    font-size: var(--v2-text-m-phone);
+  }
+}
+
 .lead {
   font-size: 18px;
   color: var(--v2-fg2);
@@ -135,8 +149,8 @@
 }
 
 .contact {
-  margin-top: 16px;
   padding: 22px 24px;
+  border-top: 1px solid var(--v2-line);
 }
 
 .form {

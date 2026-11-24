@@ -21,6 +21,13 @@ export type CheckRequested = {
   requestedByUserId?: string;
 };
 
+/** The worker's note that a batch ended (PR 5a): a hint to read it now. The result is still read. */
+export type CheckBatchEnded = {
+  checkId: string;
+  batch: number;
+  status: 'done' | 'failed';
+};
+
 export type CheckFinished = {
   checkId: string;
   siteId: string;
@@ -57,6 +64,10 @@ export const FAILURE_REASONS = [
    * never won a slot.
    */
   'capacity_wait_exceeded',
+  /** No page was read, robots.txt on the homepage's origin got no answer, and no robots.txt read did. */
+  'site_unreachable',
+  /** No page was read for any other reason (nothingReadReason in the engine). */
+  'nothing_read',
   'build_failed',
   'persist_failed',
   /** Anything else. */

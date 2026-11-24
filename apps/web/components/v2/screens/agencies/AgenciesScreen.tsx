@@ -54,7 +54,15 @@ export function AgenciesScreen({
                 {data.trial.text}
               </Button>
             </span>
-            <Capability item={data.trialNote} comingLabel={c} className={layout.mut} />
+            {data.opensSoon ? (
+              <span className={layout.mut}>
+                {data.opensSoon.before}{' '}
+                <a href={`mailto:${data.opensSoon.address}`}>{data.opensSoon.address}</a>{' '}
+                {data.opensSoon.after}
+              </span>
+            ) : (
+              <Capability item={data.trialNote} comingLabel={c} className={layout.mut} />
+            )}
           </div>
         </section>
 

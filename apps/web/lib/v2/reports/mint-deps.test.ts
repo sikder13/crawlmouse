@@ -180,6 +180,39 @@ describe('supabaseMintDeps', () => {
   });
 });
 
+describe('hostTakenDown', () => {
+  /** A service role that holds one site row and records what `public_reports` is asked. */
+  function admin(site: { host: string } | null, taken: boolean) {
+    const asked: unknown[][] = [];
+    const from = (table: string) => {
+      const q: Record<string, unknown> = {};
+      q.select = () => q;
+      q.eq = (...args: unknown[]) => {
+        if (table === 'public_reports') asked.push(args);
+        return q;
+      };
+      q.not = () => q;
+      q.maybeSingle = async () => ({ data: site, error: null });
+      q.limit = async () => ({ data: taken ? [{ slug: 'down' }] : [], error: null });
+      return q;
+    };
+    return { client: { from } as unknown as SupabaseClient, asked };
+  }
+
+  it('asks by the normalized domain, as public_reports stores it', async () => {
+    const { client, asked } = admin({ host: 'www.Taken.Example.' }, true);
+    const deps = supabaseMintDeps({} as SupabaseClient, client, null);
+    expect(await deps.hostTakenDown('site-1')).toBe(true);
+    expect(asked).toEqual([['domain', 'taken.example']]);
+  });
+
+  it('a site it cannot read throws, so the mint does not go through', async () => {
+    const { client } = admin(null, false);
+    const deps = supabaseMintDeps({} as SupabaseClient, client, null);
+    await expect(deps.hostTakenDown('site-1')).rejects.toThrow('takedown');
+  });
+});
+
 describe('the cap', () => {
   it("counts the caller's bucket at v1's per-user cap and window", async () => {
     const { checkRateLimit } = await import('@/lib/rate-limit');

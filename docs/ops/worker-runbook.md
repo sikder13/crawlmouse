@@ -323,6 +323,44 @@ Levels run: 4, 8, 16. The largest result the load test measured is 8.36 MiB; 16 
 
 <!-- end of capacity section -->
 
+### The done signal (PR 5a)
+
+The worker can tell the app when a batch ends, so a check reads it at once instead of at its next poll.
+Set the app's route as a secret on each worker. The address differs per worker, so it cannot live in
+`fly.toml`, which must match `fly.production.toml`:
+
+```bash
+flyctl secrets set APP_SIGNAL_URL=https://<the app's host>/api/webhooks/worker --app <the worker's app>
+```
+
+Until it is set the worker sends nothing and checks poll as before, so the app and the worker can deploy
+in either order. To turn it off, unset the secret. Verify:
+`pnpm --filter @crawlmouse/worker exec vitest run src/signal.test.ts src/signal-config.test.ts`.
+
+**Staging only.** The staging app is behind Vercel Deployment Protection, which answers the worker's
+POST with 401 before it reaches the route. Give the staging worker the automation bypass as its own
+secret, from standard input so it stays out of the shell history. The worker sends it as the
+`x-vercel-protection-bypass` header and never logs it. It ignores the value unless it is the staging
+worker and the signal's address is on `*.vercel.app`. Never put it in `APP_SIGNAL_URL`, and do not set
+it on production.
+
+```bash
+printf 'APP_SIGNAL_PROTECTION_BYPASS=%s\n' "$VERCEL_AUTOMATION_BYPASS_SECRET" | flyctl secrets import --app crawlmouse-worker-staging
+```
+
+### Lab hosts on staging (F-018)
+
+The worker keys its limiter and its stop on the registrable domain, so every `*.lab.crawlmouse.com` host
+shares one 2 requests a second. A load test of many lab hosts would measure that one limiter. To give each
+lab host its own, set this once on the staging worker:
+
+```bash
+flyctl secrets set LAB_HOST_POLITENESS=1 --app crawlmouse-worker-staging
+```
+
+Only a host under `lab.crawlmouse.com` changes, and "off-site" does not. The production app ignores the
+setting. Verify: `pnpm --filter @crawlmouse/worker exec vitest run src/config.test.ts src/politeness/site-key.test.ts src/batch/lab-host-key.test.ts`.
+
 ## Rotate the signing secret
 
 The worker holds one signing secret at a time, so a rotation has a short window in which requests
