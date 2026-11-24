@@ -330,16 +330,28 @@ describe('through a real measure thread, as the entry point wires it', () => {
   });
 
   it('answers a page queued behind one the thread is stopped on, and goes on serving', async () => {
-    const { base, clock } = await start(thread(500));
+    // 2 s: long enough for the second page to arrive while the first is on the thread.
+    const t = thread(2_000);
+    // The slow page is sent to the thread before the other is posted, so the other queues behind it
+    // and reaches the replacement thread only by being sent again.
+    let onThread!: () => void;
+    const slowSent = new Promise<void>((r) => (onThread = r));
+    const { base, clock } = await start({
+      measure: (b) => {
+        const answer = t.measure(b);
+        onThread();
+        return answer;
+      },
+    });
     const slowHtml = `<html><head>${'<title>x</title>'.repeat(140_000)}</head><body><p>w</p></body></html>`;
     const slow = JSON.stringify({ ...PAGE, static_html: slowHtml, rendered_html: slowHtml });
     const big = `<body><main>${'<p>tent pole stake guy line </p>'.repeat(400)}</main></body>`;
     const next = JSON.stringify({ ...PAGE, rendered_html: big });
     const ts = String(clock.now());
-    const [first, second] = await Promise.all([
-      post(base, slow, signed(ts, slow)),
-      post(base, next, signed(ts, next)),
-    ]);
+    const firstAnswer = post(base, slow, signed(ts, slow));
+    await slowSent;
+    const [first, second] = await Promise.all([firstAnswer, post(base, next, signed(ts, next))]);
+    expect(t.restarts).toBe(1);
     expect(first).toEqual({ status: 200, body: { failed: 'reader_deadline' } });
     expect(second).toEqual({
       status: 200,

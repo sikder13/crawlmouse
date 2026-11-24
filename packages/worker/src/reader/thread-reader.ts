@@ -141,18 +141,19 @@ export class ThreadReader implements PageReader, MeasureReader {
     return new Promise((resolve, reject) => {
       const read: Read = { id: this.nextId++, ask, body, resolve, reject };
       this.queue.push(read);
-      if (!this.post(this.ensure(), read)) return;
+      if (!this.post(read)) return;
       if (this.queue.length === 1) this.arm();
     });
   }
 
   /**
-   * Sends a read to the thread; false when it could not be sent, and the read is then taken off the
-   * queue and rejected, so it never sits at the head with no deadline. Never throws: it runs in timer
-   * and exit callbacks, where a throw would end the process.
+   * Sends a read to the thread, starting one if there is none; false when it could not be sent, and the
+   * read is then taken off the queue and rejected, so it never sits at the head with no deadline. Never
+   * throws: it runs in timer and exit callbacks, where a throw would end the process.
    */
-  private post(thread: Worker, read: Read): boolean {
+  private post(read: Read): boolean {
     try {
+      const thread = this.ensure();
       // An ArrayBuffer made for this send, the size of the body. A Buffer's `slice` is a view on its
       // memory (a small one on Node's shared pool), which a transfer would detach from under the
       // caller and other buffers; the Uint8Array constructor copies.
@@ -167,7 +168,7 @@ export class ThreadReader implements PageReader, MeasureReader {
     } catch (e) {
       const at = this.queue.indexOf(read);
       if (at >= 0) this.queue.splice(at, 1);
-      if (this.queue.length === 0) thread.unref();
+      if (this.queue.length === 0) this.thread?.unref();
       read.reject(e instanceof Error ? e : new Error(String(e)));
       return false;
     }
@@ -194,9 +195,8 @@ export class ThreadReader implements PageReader, MeasureReader {
     if (reason === 'reader_deadline') void thread?.terminate();
     this.queue.shift()?.resolve({ failed: reason });
     if (this.queue.length === 0) return;
-    const next = this.ensure();
-    // A copy: a read that cannot be sent takes itself off the queue.
-    for (const read of [...this.queue]) this.post(next, read);
+    // A copy: a read that cannot be sent takes itself off the queue. The first send starts the new thread.
+    for (const read of [...this.queue]) this.post(read);
     this.arm();
   }
 
