@@ -62,10 +62,16 @@ export const PROGRESS_TIMEOUT_MS = 1_500;
 /**
  * One measure request, from sending it to reading the answer. The worker holds two signed requests at
  * once (MEASURE_CONCURRENCY), so this one can wait behind one read before its own: two reader deadlines
- * (READ_DEADLINE_MS, 20 s each) and 5 s for two pages of HTML each way.
+ * (READ_DEADLINE_MS, 20 s each); 5 s for a replacement thread to load after the read ahead was stopped,
+ * since a read's deadline starts only once its thread is ready (not measured on Fly); and 5 s for two
+ * pages of HTML each way.
  */
-export const MEASURE_TIMEOUT_MS = 45_000;
-/** Waits before asking again after `measure_busy`, in milliseconds; then the page records it failed. */
+export const MEASURE_TIMEOUT_MS = 50_000;
+/**
+ * Waits before asking again, in milliseconds, after `measure_busy` or after the request failed on the
+ * network: a busy worker closes the connection without reading the body, which can reach the client as
+ * a reset while it is still sending. Then the page records it failed. A timeout is not asked again.
+ */
 export const MEASURE_BUSY_WAITS_MS = [1_000, 2_000, 4_000] as const;
 
 const MeasuredSchema = z.strictObject({
@@ -358,26 +364,34 @@ export function createWorkerClient(opts: WorkerClientOptions): WorkerClient {
       const sha256 = sha256Hex(raw);
       for (let tried = 0; ; tried++) {
         const ts = String(now());
-        const res = await send(
-          '/render/measure',
-          {
-            method: 'POST',
-            headers: {
-              'content-type': 'application/json',
-              [TS_HEADER]: ts,
-              [BODY_SHA256_HEADER]: sha256,
-              [BODY_BYTES_HEADER]: String(raw.length),
-              [SIGNATURE_HEADER]: signMeasure(opts.signingSecret, ts, sha256, raw.length),
+        const wait = MEASURE_BUSY_WAITS_MS[tried];
+        let res: Response;
+        try {
+          res = await send(
+            '/render/measure',
+            {
+              method: 'POST',
+              headers: {
+                'content-type': 'application/json',
+                [TS_HEADER]: ts,
+                [BODY_SHA256_HEADER]: sha256,
+                [BODY_BYTES_HEADER]: String(raw.length),
+                [SIGNATURE_HEADER]: signMeasure(opts.signingSecret, ts, sha256, raw.length),
+              },
+              body: raw,
             },
-            body: raw,
-          },
-          MEASURE_TIMEOUT_MS,
-        );
+            MEASURE_TIMEOUT_MS,
+          );
+        } catch (e) {
+          if (wait === undefined || !(e instanceof WorkerError) || e.kind !== 'network')
+            return null;
+          await sleep(wait);
+          continue;
+        }
         if (res.status === 200) {
           const answer = MeasuredSchema.safeParse(await bodyOf(res));
           return answer.success ? answer.data.reading : null;
         }
-        const wait = MEASURE_BUSY_WAITS_MS[tried];
         const refusal = await refusalOf(res);
         if (wait === undefined || refusal.code !== 'measure_busy') return null;
         await sleep(wait);

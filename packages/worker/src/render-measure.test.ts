@@ -1,12 +1,18 @@
 import { createHash, createHmac } from 'node:crypto';
+import { mkdtempSync, rmSync } from 'node:fs';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { readRendered } from '@crawlmouse/engine/worker';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { bundleReader } from '../build.js';
 import { sha256Hex, signBatch, signMeasure, signRead } from './auth/hmac.js';
 import { loadConfig } from './config.js';
 import { readMeasure, type MeasureReader } from './reader/measure.js';
 import { inlineReader, type PageReader } from './reader/read.js';
+import { ThreadReader } from './reader/thread-reader.js';
 import {
   MAX_MEASURE_BODY_BYTES,
   MEASURE_CONCURRENCY,
@@ -231,7 +237,10 @@ describe('POST /render/measure', () => {
       bytes: String(bytes),
       signature: signMeasure(SECRET, ts, sha256, bytes),
     };
-    expect(await post(base, '{}', h)).toEqual({ status: 413, body: { error: 'too_large' } });
+    // The body starts and never finishes: answered from the headers, or not until the body deadline.
+    const started = Date.now();
+    expect(await unfinished(base, h)).toBe(413);
+    expect(Date.now() - started).toBeLessThan(2_000);
   });
 
   it('answers a bad signature from its headers, while the body is still arriving', async () => {
@@ -289,6 +298,55 @@ describe('measuring slots', () => {
     for (const status of await Promise.all(answers)) expect(status).toBe(401);
     expect(Date.now() - started).toBeLessThan(2_000);
   });
+});
+
+describe('through a real measure thread, as the entry point wires it', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'worker-measure-route-'));
+  const entry = join(dir, 'reader.mjs');
+  const threads: ThreadReader[] = [];
+  const thread = (deadlineMs?: number) => {
+    const t = new ThreadReader(pathToFileURL(entry), undefined, deadlineMs);
+    threads.push(t);
+    return t;
+  };
+  beforeAll(async () => {
+    await bundleReader(entry);
+  }, 60_000);
+  afterAll(async () => {
+    await Promise.all(threads.map((t) => t.close()));
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("answers a small body, from Node's shared buffer pool, and the ones after it", async () => {
+    const { base, clock } = await start(thread());
+    expect(Buffer.byteLength(PAGE_RAW)).toBeLessThan(4096);
+    const expected = readRendered(PAGE.static_html, PAGE.rendered_html, PAGE.url);
+    for (let i = 0; i < 3; i++) {
+      expect(await post(base, PAGE_RAW, signed(String(clock.now()), PAGE_RAW))).toEqual({
+        status: 200,
+        body: { reading: expected },
+      });
+    }
+  });
+
+  it('answers a page queued behind one the thread is stopped on, and goes on serving', async () => {
+    const { base, clock } = await start(thread(500));
+    const slowHtml = `<html><head>${'<title>x</title>'.repeat(140_000)}</head><body><p>w</p></body></html>`;
+    const slow = JSON.stringify({ ...PAGE, static_html: slowHtml, rendered_html: slowHtml });
+    const big = `<body><main>${'<p>tent pole stake guy line </p>'.repeat(400)}</main></body>`;
+    const next = JSON.stringify({ ...PAGE, rendered_html: big });
+    const ts = String(clock.now());
+    const [first, second] = await Promise.all([
+      post(base, slow, signed(ts, slow)),
+      post(base, next, signed(ts, next)),
+    ]);
+    expect(first).toEqual({ status: 200, body: { failed: 'reader_deadline' } });
+    expect(second).toEqual({
+      status: 200,
+      body: { reading: readRendered(PAGE.static_html, big, PAGE.url) },
+    });
+    expect((await post(base, PAGE_RAW, signed(ts, PAGE_RAW))).status).toBe(200);
+  }, 30_000);
 });
 
 describe('the measure key', () => {

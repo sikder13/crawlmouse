@@ -5,7 +5,7 @@ import type { ReadMessage, ReadReply, ReadyMessage } from './thread-reader.js';
 
 /**
  * The reader thread's entry, bundled as dist/reader.mjs. It answers each message in turn. The body
- * arrives as UTF-8 bytes in a transferred ArrayBuffer, so the main thread keeps no copy of it. A read
+ * arrives as UTF-8 bytes in an ArrayBuffer made for that send and transferred here (thread-reader.ts). A read
  * that throws is answered with the error's message, and the thread goes on to the next.
  */
 

@@ -211,6 +211,21 @@ describe('the page reader thread', () => {
   });
 });
 
+describe('a read that cannot be sent', () => {
+  it('rejects that read alone, and the next read answers', async () => {
+    const r = reader();
+    const spy = vi.spyOn(Worker.prototype, 'postMessage').mockImplementationOnce(() => {
+      throw new Error('could not be cloned');
+    });
+    try {
+      await expect(r.words('<p>a b</p>', false)).rejects.toThrow('could not be cloned');
+    } finally {
+      spy.mockRestore();
+    }
+    expect(await r.words('<p>a b c</p>', false)).toMatchObject({ words: 3 });
+  });
+});
+
 describe('the page reader thread and the process', () => {
   // A script that uses the reader with nothing else keeping the process alive.
   const run = async (body: string) => {

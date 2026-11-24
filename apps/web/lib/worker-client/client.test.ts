@@ -1025,12 +1025,6 @@ describe('measureRendered (questions/042, design C)', () => {
       () => Response.json({ reading: { ...reading, raw_words: -1 } }),
     ],
     ['an extra field', () => Response.json({ reading: { ...reading, x: 1 } })],
-    [
-      'a network failure',
-      () => {
-        throw new TypeError('fetch failed');
-      },
-    ],
   ])('answers null for %s, and never throws', async (_name, respond) => {
     const { client, seen } = make(respond);
     expect(
@@ -1044,8 +1038,9 @@ describe('measureRendered (questions/042, design C)', () => {
   it('waits long enough for every read the worker holds ahead of it, and its own', () => {
     // The worker holds MEASURE_CONCURRENCY signed requests, each read under READ_DEADLINE_MS, one
     // after another on its measure thread; 5 s more is for the HTML each way.
+    // and 5 s for a replacement thread to load.
     expect(MEASURE_TIMEOUT_MS).toBeGreaterThanOrEqual(
-      MEASURE_CONCURRENCY * READ_DEADLINE_MS + 5_000,
+      MEASURE_CONCURRENCY * READ_DEADLINE_MS + 5_000 + 5_000,
     );
   });
 
@@ -1077,6 +1072,39 @@ describe('measureRendered (questions/042, design C)', () => {
     expect(await clientOf(w).measureRendered!(s, r, 'https://example.com/p')).toEqual(
       readRendered(s, r, 'https://example.com/p'),
     );
+  });
+
+  it('asks again after a network failure, such as a busy worker resetting a long upload', async () => {
+    let n = 0;
+    const { client, seen, waits } = make(() => {
+      if (n++ === 0) throw new TypeError('fetch failed');
+      return Response.json({ reading });
+    });
+    expect(await client.measureRendered!('<p>a</p>', '<p>b</p>', 'https://example.com/p')).toEqual(
+      reading,
+    );
+    expect(seen).toHaveLength(2);
+    expect(waits).toEqual([1_000]);
+  });
+
+  it('answers null after a network failure on every try, and never throws', async () => {
+    const { client, seen } = make(() => {
+      throw new TypeError('fetch failed');
+    });
+    expect(
+      await client.measureRendered!('<p>a</p>', '<p>b</p>', 'https://example.com/p'),
+    ).toBeNull();
+    expect(seen).toHaveLength(MEASURE_BUSY_WAITS_MS.length + 1);
+  });
+
+  it('does not ask again after a timeout', async () => {
+    const { client, seen } = make(() => {
+      throw new DOMException('timed out', 'TimeoutError');
+    });
+    expect(
+      await client.measureRendered!('<p>a</p>', '<p>b</p>', 'https://example.com/p'),
+    ).toBeNull();
+    expect(seen).toHaveLength(1);
   });
 
   it('does not ask again on a 429 that is not the worker saying it is busy measuring', async () => {

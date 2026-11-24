@@ -108,14 +108,46 @@ describe('a measure body, read on the thread', () => {
     });
   }, 30_000);
 
-  it('sends a body again, whole, to the new thread when the one before it was stopped', async () => {
-    const r = reader(500);
-    const slow = `<html><head>${'<title>x</title>'.repeat(140_000)}</head><body><p>w</p></body></html>`;
-    const [s, rendered] = PAIRS['client-rendered']!;
-    const queued = bytesOf(s, rendered);
-    const [first, second] = await Promise.all([r.measure(bytesOf(slow, slow)), r.measure(queued)]);
-    expect(first).toEqual({ failed: 'reader_deadline' });
-    expect(second).toEqual({ reading: readRendered(s, rendered, URL_) });
-    expect(queued.byteLength).toBeGreaterThan(0); // the caller's bytes were copied, not transferred
-  }, 30_000);
+  // The route hands the reader the Buffer readBody made: under 4 KiB, Buffer.concat takes it from
+  // Node's shared pool, so its ArrayBuffer holds other buffers too; over 4 KiB it has its own.
+  const asRouteGivesIt = (static_html: string, rendered_html: string) =>
+    Buffer.concat([Buffer.from(JSON.stringify({ static_html, rendered_html, url: URL_ }))]);
+  const bigPage = `<body><main>${'<p>tent pole stake guy line </p>'.repeat(400)}</main></body>`;
+
+  it.each([
+    ['under 4 KiB, from the shared pool', PAIRS['client-rendered']!],
+    ['over 4 KiB, a buffer of its own', [bigPage, bigPage] as [string, string]],
+  ])(
+    'reads a Buffer body %s, and leaves it and its neighbours whole',
+    async (_name, [s, rendered]) => {
+      const r = reader();
+      const body = asRouteGivesIt(s, rendered);
+      const neighbour = Buffer.from('still here');
+      const before = body.toString();
+      for (let i = 0; i < 2; i++) {
+        expect(await r.measure(body)).toEqual({ reading: readRendered(s, rendered, URL_) });
+      }
+      expect(body.toString()).toBe(before);
+      expect(neighbour.toString()).toBe('still here');
+    },
+  );
+
+  it.each([
+    ['under 4 KiB', PAIRS['client-rendered']!],
+    ['over 4 KiB', [bigPage, bigPage] as [string, string]],
+  ])(
+    'sends a queued Buffer body %s again, whole, to the thread that replaces a stopped one',
+    async (_name, [s, rendered]) => {
+      const r = reader(500);
+      const slow = `<html><head>${'<title>x</title>'.repeat(140_000)}</head><body><p>w</p></body></html>`;
+      const queued = asRouteGivesIt(s, rendered);
+      const [first, second] = await Promise.all([
+        r.measure(asRouteGivesIt(slow, slow)),
+        r.measure(queued),
+      ]);
+      expect(first).toEqual({ failed: 'reader_deadline' });
+      expect(second).toEqual({ reading: readRendered(s, rendered, URL_) });
+    },
+    30_000,
+  );
 });

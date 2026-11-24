@@ -12,7 +12,8 @@ import type {
 /**
  * The page reader on one thread, created once per process. Reads are answered in the order sent, so
  * the oldest unanswered read is the one the thread is on. Each body is handed over as UTF-8 bytes in a
- * transferred ArrayBuffer, never copied.
+ * transferred ArrayBuffer made for that send: a string body is encoded into one, and a byte body is
+ * copied into one, so the caller's bytes are never detached and can be sent again.
  *
  * The read the thread is on has READ_DEADLINE_MS from when the thread reached it. Past that, the
  * thread is stopped and that read answers `reader_deadline`; if the thread dies (out of memory, say),
@@ -60,10 +61,7 @@ type Ask =
 interface Read {
   id: number;
   ask: Ask;
-  /**
-   * Kept to send again to a new thread; the caller holds the same value until the read answers. Bytes
-   * are copied for each send, since a transfer detaches what it sends.
-   */
+  /** Kept to send again to a new thread; the caller holds the same value until the read answers. */
   body: string | Uint8Array;
   resolve: (r: WordCount | PageRead | MeasureReply | NotRead) => void;
   reject: (e: Error) => void;
@@ -143,19 +141,36 @@ export class ThreadReader implements PageReader, MeasureReader {
     return new Promise((resolve, reject) => {
       const read: Read = { id: this.nextId++, ask, body, resolve, reject };
       this.queue.push(read);
-      this.post(this.ensure(), read);
+      if (!this.post(this.ensure(), read)) return;
       if (this.queue.length === 1) this.arm();
     });
   }
 
-  private post(thread: Worker, read: Read): void {
-    // A fresh ArrayBuffer of its own: Buffer.from may hand back a slice of a shared pool, which a
-    // transfer would detach from under other buffers.
-    const bytes = (
-      typeof read.body === 'string' ? new TextEncoder().encode(read.body) : read.body.slice()
-    ).buffer as ArrayBuffer;
-    thread.ref();
-    thread.postMessage({ ...read.ask, id: read.id, body: bytes } satisfies ReadMessage, [bytes]);
+  /**
+   * Sends a read to the thread; false when it could not be sent, and the read is then taken off the
+   * queue and rejected, so it never sits at the head with no deadline. Never throws: it runs in timer
+   * and exit callbacks, where a throw would end the process.
+   */
+  private post(thread: Worker, read: Read): boolean {
+    try {
+      // An ArrayBuffer made for this send, the size of the body. A Buffer's `slice` is a view on its
+      // memory (a small one on Node's shared pool), which a transfer would detach from under the
+      // caller and other buffers; the Uint8Array constructor copies.
+      const bytes = (
+        typeof read.body === 'string'
+          ? new TextEncoder().encode(read.body)
+          : new Uint8Array(read.body)
+      ).buffer as ArrayBuffer;
+      thread.ref();
+      thread.postMessage({ ...read.ask, id: read.id, body: bytes } satisfies ReadMessage, [bytes]);
+      return true;
+    } catch (e) {
+      const at = this.queue.indexOf(read);
+      if (at >= 0) this.queue.splice(at, 1);
+      if (this.queue.length === 0) thread.unref();
+      read.reject(e instanceof Error ? e : new Error(String(e)));
+      return false;
+    }
   }
 
   /** Starts the deadline of the read the thread is now on, if any, once the thread is ready. */
@@ -180,7 +195,8 @@ export class ThreadReader implements PageReader, MeasureReader {
     this.queue.shift()?.resolve({ failed: reason });
     if (this.queue.length === 0) return;
     const next = this.ensure();
-    for (const read of this.queue) this.post(next, read);
+    // A copy: a read that cannot be sent takes itself off the queue.
+    for (const read of [...this.queue]) this.post(next, read);
     this.arm();
   }
 
