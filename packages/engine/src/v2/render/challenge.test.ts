@@ -23,6 +23,17 @@ describe('titleOf', () => {
       'Just a moment...',
       ' class="a"',
       '\n',
+      // Characters whose case behaves differently under /i and toLowerCase: the axis the change moved.
+      'İ',
+      'ı',
+      'Σ',
+      'AΣ',
+      'ẞ',
+      '\u212A',
+      'ſ',
+      '<TİTLE',
+      '</tİtle>',
+      'title',
     );
     fc.assert(
       fc.property(fc.array(piece, { maxLength: 30 }), (parts) => {
