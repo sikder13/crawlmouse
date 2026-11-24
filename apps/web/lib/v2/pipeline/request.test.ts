@@ -83,6 +83,30 @@ describe('requestCheck (D13)', () => {
     expect(h.sent).toEqual([]);
   });
 
+  it("sends a Pro site's check its plan's page cap, and a Free or unkept site's the default (row 16)", async () => {
+    const pro = {
+      state: 'pro',
+      tier: 'pro',
+      pastDueTier: null,
+      pastDueSince: null,
+      trialVariant: null,
+      trialEndsAt: null,
+    } as const;
+    const capOf = async (site: RequestSite) => {
+      const h = harness(site);
+      await requestCheck(h.deps, { siteId: SITE.id, trigger: 'manual' });
+      return h.sent[0]!.data.pageCap;
+    };
+    expect(await capOf({ ...SITE, account: pro })).toBe(2000);
+    expect(await capOf({ ...SITE, account: { ...pro, state: 'free', tier: 'free' } })).toBe(
+      DEFAULT_PAGE_CAP,
+    );
+    expect(await capOf({ ...SITE, account_id: null, next_check_at: null, account: null })).toBe(
+      DEFAULT_PAGE_CAP,
+    );
+    expect(await capOf(SITE)).toBe(DEFAULT_PAGE_CAP);
+  });
+
   it('keys re-checks and deploys on their own buckets', () => {
     const k = { siteId: SITE.id, kept: true, now: NOON + 599_999, nextCheckAt: null };
     expect(bucketedKey({ ...k, trigger: 'fix_recheck' })).toBe(

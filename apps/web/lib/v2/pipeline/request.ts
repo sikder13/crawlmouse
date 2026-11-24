@@ -7,7 +7,8 @@ import { canonicalizeUrl, GRADE_VERSION } from '@crawlmouse/engine/v2/pipeline';
 import type { Check } from '@crawlmouse/types/v2';
 import type { CheckRequested } from '../../../../../inngest/check-events';
 import { bucketedKey, checkIdOfKey, freshKey } from './ids';
-import { ANONYMOUS_EXPIRY_HOURS, DEFAULT_PAGE_CAP, MANUAL_BUCKET_S } from './limits';
+import { ANONYMOUS_EXPIRY_HOURS, MANUAL_BUCKET_S } from './limits';
+import { pageCapFor } from './page-cap';
 import type { PipelineStore } from './store';
 
 export interface RequestDeps {
@@ -84,7 +85,7 @@ export async function requestCheck(
       host: site.host,
       homepageUrl: homepageOf(site.host),
       trigger: req.trigger,
-      pageCap: DEFAULT_PAGE_CAP,
+      pageCap: pageCapFor(site.account ?? null, new Date(now)),
       ...(req.requestedByUserId === undefined ? {} : { requestedByUserId: req.requestedByUserId }),
     },
   });

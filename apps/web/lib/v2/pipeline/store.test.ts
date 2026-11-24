@@ -259,7 +259,8 @@ describe('supabasePipelineStore: each method’s statements, whole (quality 2)',
       ],
     },
     requestSite: {
-      answers: [ok({ id: S })],
+      // A kept site's account is read for its entitlement clock, which sets the page cap (row 16).
+      answers: [ok({ id: S, account_id: 'acct' }), ok({ state: 'pro', tier: 'pro' })],
       call: (s) => s.requestSite(S),
       calls: [
         {
@@ -267,6 +268,17 @@ describe('supabasePipelineStore: each method’s statements, whole (quality 2)',
           chain: [
             ['select', ['id, account_id, host, next_check_at']],
             ['eq', ['id', S]],
+            ['single', []],
+          ],
+        },
+        {
+          root: ['from', 'accounts'],
+          chain: [
+            [
+              'select',
+              ['state, tier, past_due_tier, past_due_since, trial_variant, trial_ends_at'],
+            ],
+            ['eq', ['id', 'acct']],
             ['single', []],
           ],
         },
@@ -456,6 +468,33 @@ describe('supabasePipelineStore: answers', () => {
     const store = supabasePipelineStore(sb);
     expect(await store.fail(C, 'paused', null)).toBe(true);
     expect(await store.fail(null, 'canceled', 'run-9')).toBe(false);
+  });
+
+  it("gives a kept site its account's entitlement clock, and a site no account keeps none (row 16)", async () => {
+    const kept = recorder(
+      ok({ id: S, account_id: 'acct', host: 'h.example', next_check_at: null }),
+      ok({
+        state: 'pro',
+        tier: 'pro',
+        past_due_tier: null,
+        past_due_since: null,
+        trial_variant: null,
+        trial_ends_at: null,
+      }),
+    );
+    expect((await supabasePipelineStore(kept.sb).requestSite(S)).account).toEqual({
+      state: 'pro',
+      tier: 'pro',
+      pastDueTier: null,
+      pastDueSince: null,
+      trialVariant: null,
+      trialEndsAt: null,
+    });
+    const unkept = recorder(
+      ok({ id: S, account_id: null, host: 'h.example', next_check_at: null }),
+    );
+    expect((await supabasePipelineStore(unkept.sb).requestSite(S)).account).toBeNull();
+    expect(unkept.calls).toHaveLength(1);
   });
 
   it('reads the site a check belongs to, or null when there is no such check', async () => {
