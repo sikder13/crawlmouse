@@ -123,6 +123,32 @@ export function SignalsScreen({ data }: { data: SignalsView }) {
           {competitor.verdict ? <div className={own.foot}>{competitor.verdict}</div> : null}
         </Card>
       ) : null}
+      {/* F-256: on a plan that compares competitors, each compared one in full, with no ask. */}
+      {data.compared.map((c) => (
+        <Card as="section" className={styles.panel} key={c.host} data-v2-addition="">
+          <div className={`${layout.row} ${styles.hd}`}>
+            <div>
+              <Heading level={2} size="s">
+                How {c.host} compares
+              </Heading>
+              <div className={styles.sub}>
+                {c.host} is on this site’s competitor list, and is audited the same way from its
+                public pages.
+              </div>
+            </div>
+          </div>
+          <Table
+            label={`Competitor comparison, ${c.host}`}
+            columns={[
+              { header: 'Measure' },
+              { header: frame.domain, numeric: true, mono: true },
+              { header: c.host, numeric: true, mono: true },
+            ]}
+            rows={c.rows.map((r) => ({ key: r.measure, cells: [r.measure, r.own, r.theirs] }))}
+          />
+          {c.verdict ? <div className={own.foot}>{c.verdict}</div> : null}
+        </Card>
+      ))}
     </SegmentShell>
   );
 }

@@ -96,12 +96,13 @@ Every interface the segment view modules export, read through the TypeScript com
 
 #### `SegmentOptions`
 
-| Field         | Type                        | Note                                                                                                                                                                   |
-| ------------- | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `asFirstSeen` | `boolean \| undefined`      | Show a since-kept check as it was at its finish, as the Result preview does.                                                                                           |
-| `hrefs`       | `SegmentHrefs \| undefined` |                                                                                                                                                                        |
-| `plan`        | `FixPlan \| undefined`      | The reader's plan: Free opens the free fixes (free-fixes.ts), Pro opens every live fix.                                                                                |
-| `rerun`       | `boolean \| undefined`      | Whether the page's header offers "Re-run, free", which the Changes page of a first audit mentions. The previews show it; a page that has no such control passes false. |
+| Field         | Type                        | Note                                                                                                                                                                                                                             |
+| ------------- | --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `asFirstSeen` | `boolean \| undefined`      | Show a since-kept check as it was at its finish, as the Result preview does.                                                                                                                                                     |
+| `hrefs`       | `SegmentHrefs \| undefined` |                                                                                                                                                                                                                                  |
+| `plan`        | `FixPlan \| undefined`      | The reader's plan: Free opens the free fixes (free-fixes.ts), Pro opens every live fix.                                                                                                                                          |
+| `competitors` | `number \| undefined`       | How many competitors the reader's plan compares, `GATES[tier].competitorsPerSite` (F-256): Signals shows that many of the check's compared competitors in full. 0, the default, shows the first one as the preview held for Pro. |
+| `rerun`       | `boolean \| undefined`      | Whether the page's header offers "Re-run, free", which the Changes page of a first audit mentions. The previews show it; a page that has no such control passes false.                                                           |
 
 #### `SegmentLink`
 
@@ -471,29 +472,38 @@ Every interface the segment view modules export, read through the TypeScript com
 | `theirs`  | `string`  |                                          |
 | `pro`     | `boolean` | The competitor's figure is held for Pro. |
 
+#### `CompetitorView`
+
+| Field     | Type                  | Note |
+| --------- | --------------------- | ---- |
+| `host`    | `string`              |      |
+| `rows`    | `CompetitorRowView[]` |      |
+| `verdict` | `string`              |      |
+
 #### `SignalsView`
 
-| Field             | Type                                                                       | Note                                                                                |
-| ----------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| `frame`           | `object`                                                                   |                                                                                     |
-| `frame.key`       | `"access" \| "nojs" \| "structure" \| "content" \| "signals" \| "changes"` |                                                                                     |
-| `frame.domain`    | `string`                                                                   |                                                                                     |
-| `frame.title`     | `string`                                                                   |                                                                                     |
-| `frame.keptUntil` | `string \| null`                                                           | "26 Oct, 02:34 UTC" while nobody has kept the audit; null once an account keeps it. |
-| `frame.tabs`      | `(SegmentLink & { current: boolean; })[]`                                  |                                                                                     |
-| `frame.back`      | `SegmentLink`                                                              |                                                                                     |
-| `frame.next`      | `SegmentLink`                                                              |                                                                                     |
-| `frame.keepHref`  | `string`                                                                   | Where an ask that needs an account goes: the keep bar, while there is one.          |
-| `headline`        | `object`                                                                   |                                                                                     |
-| `headline.title`  | `string`                                                                   |                                                                                     |
-| `headline.pill`   | `{ state: PillState; label: string; }`                                     |                                                                                     |
-| `body`            | `string`                                                                   |                                                                                     |
-| `tiles`           | `{ label: string; value: string; note: string \| null; }[]`                |                                                                                     |
-| `rows`            | `SignalRowView[]`                                                          |                                                                                     |
-| `coverage`        | `object`                                                                   |                                                                                     |
-| `coverage.read`   | `string`                                                                   |                                                                                     |
-| `competitor`      | `{ host: string; rows: CompetitorRowView[]; verdict: string; } \| null`    |                                                                                     |
-| `keep`            | `{ title: string; sub: string; } \| null`                                  |                                                                                     |
+| Field             | Type                                                                       | Note                                                                                            |
+| ----------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `frame`           | `object`                                                                   |                                                                                                 |
+| `frame.key`       | `"access" \| "nojs" \| "structure" \| "content" \| "signals" \| "changes"` |                                                                                                 |
+| `frame.domain`    | `string`                                                                   |                                                                                                 |
+| `frame.title`     | `string`                                                                   |                                                                                                 |
+| `frame.keptUntil` | `string \| null`                                                           | "26 Oct, 02:34 UTC" while nobody has kept the audit; null once an account keeps it.             |
+| `frame.tabs`      | `(SegmentLink & { current: boolean; })[]`                                  |                                                                                                 |
+| `frame.back`      | `SegmentLink`                                                              |                                                                                                 |
+| `frame.next`      | `SegmentLink`                                                              |                                                                                                 |
+| `frame.keepHref`  | `string`                                                                   | Where an ask that needs an account goes: the keep bar, while there is one.                      |
+| `headline`        | `object`                                                                   |                                                                                                 |
+| `headline.title`  | `string`                                                                   |                                                                                                 |
+| `headline.pill`   | `{ state: PillState; label: string; }`                                     |                                                                                                 |
+| `body`            | `string`                                                                   |                                                                                                 |
+| `tiles`           | `{ label: string; value: string; note: string \| null; }[]`                |                                                                                                 |
+| `rows`            | `SignalRowView[]`                                                          |                                                                                                 |
+| `coverage`        | `object`                                                                   |                                                                                                 |
+| `coverage.read`   | `string`                                                                   |                                                                                                 |
+| `competitor`      | `CompetitorView \| null`                                                   | The preview held for Pro: the first compared competitor, for a reader whose plan compares none. |
+| `compared`        | `CompetitorView[]`                                                         | Each compared competitor in full, up to the reader's plan's number (F-256); empty on Free.      |
+| `keep`            | `{ title: string; sub: string; } \| null`                                  |                                                                                                 |
 
 ### Changes (`lib/v2/view/segment/changes.ts`)
 
