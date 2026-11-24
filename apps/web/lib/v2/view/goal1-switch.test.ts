@@ -251,6 +251,9 @@ describe('the free check pages and /llms.txt', () => {
   it('nojs hidden: /check/javascript promises no per-page figure, keeps its h1 and title', () => {
     const p = text(checkPageView('javascript', hide('nojs')));
     expect(p).not.toContain('gives you the number');
+    // The sample's per-page figure ("… shows N words in a browser and M to GPTBot …").
+    expect(text(checkPageView('javascript'))).toContain('words in a browser');
+    expect(p).not.toContain('words in a browser');
     expect(p).toContain('Can AI crawlers read your site without JavaScript?');
     expect(p).toContain('shows you what each one is served');
     const description = checkDescription('javascript', hide('nojs'));
