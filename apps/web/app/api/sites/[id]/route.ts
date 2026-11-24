@@ -17,10 +17,12 @@ import { editSite, removeSite } from '@/lib/v2/account/sites-store';
 import { readEntitlement } from '@/lib/v2/account/viewer';
 import {
   COMPETITOR_REQUESTS_PER_SITE,
-  COMPETITOR_REQUESTS_WINDOW_MS,
   competitorRequestBucket,
 } from '@/lib/v2/competitors/request';
 import { inngest } from '../../../../../../inngest/client';
+
+/** One hour. Here, not imported, so the window guard (`lib/rate-limit-callers.test.ts`) can read it. */
+const COMPETITOR_REQUESTS_WINDOW_MS = 60 * 60 * 1000;
 
 /**
  * Sends `competitors.requested`, at most COMPETITOR_REQUESTS_PER_SITE times an hour for one site.
