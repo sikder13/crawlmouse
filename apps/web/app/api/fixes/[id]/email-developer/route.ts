@@ -5,7 +5,7 @@ import { supabaseServer } from '@/lib/supabase/server';
 import { captureFor } from '@/lib/v2/account/events';
 import { emailDeveloper } from '@/lib/v2/account/fixes';
 import { supabaseFixesStore } from '@/lib/v2/account/fixes-store';
-import { isId, notFound, readBody, refuse } from '@/lib/v2/account/route';
+import { backFrom, isId, notFound, readBody, refuse } from '@/lib/v2/account/route';
 import { inngest } from '../../../../../../../inngest/client';
 
 export const runtime = 'nodejs';
@@ -48,6 +48,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           checkRateLimit(`fix-email:user:${user.id}`, PER_USER_HOUR, HOUR_MS, { failClosed: true }),
       },
       send: (event) => inngest.send(event),
+      back: backFrom(req, '/dashboard'),
     },
     { fixId: id, userId: user.id },
     await readBody(req),

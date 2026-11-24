@@ -5,7 +5,7 @@ import { AccountStateScreen } from '@/components/v2/screens/account/AccountState
 import { LiveActions } from '@/components/v2/screens/account/LiveActions';
 import { SeatsScreen } from '@/components/v2/screens/seats/SeatsScreen';
 import { checksPublicEnabled } from '@/lib/auth/flags';
-import { billingV2Enabled } from '@/lib/billing/flags';
+import { billingOpenTo } from '@/lib/billing/flags';
 import { supabaseServer } from '@/lib/supabase/server';
 import { readAccount } from '@/lib/v2/account/pages';
 import { loadViewer } from '@/lib/v2/account/viewer';
@@ -37,13 +37,13 @@ export default async function SeatsPage({
   const r = await loadViewer();
   if (r.kind === 'signed_out') redirect('/login');
   if (r.kind !== 'viewer') return <AccountStateScreen state={r.kind} />;
-  const { account, seat, limits, accounts } = r.viewer;
+  const { account, seat, limits, accounts, userId } = r.viewer;
   const { d, viewer } = await readAccount(await supabaseServer(), account.id, seat.id, new Date());
   return (
     <LiveActions>
       <SeatsScreen
         data={withSwitcher(
-          seatsView(d, viewer, { seatLimit: limits.seats, billing: billingV2Enabled() }),
+          seatsView(d, viewer, { seatLimit: limits.seats, billing: billingOpenTo(userId) }),
           accounts,
           account.id,
         )}

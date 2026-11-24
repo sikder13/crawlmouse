@@ -164,6 +164,13 @@ describe.each(CASES)('viewAt and the dashboard, $name, at any moment', (c) => {
   const finishes = new Set(
     c.d.checks.flatMap((ch) => (ch.finished_at ? [instant(ch.finished_at)] : [])),
   );
+  // Each check's finish inside the moments generated, run as an explicit example on every run, so the
+  // "at a check's finish" edge below is reached by construction, not by the generator's luck. A
+  // seeded run once drew 300 moments without one (CI, main 62e04f35).
+  const finishExamples = [...finishes]
+    .filter((t) => t >= instant(firstRunNow(c.d, c.viewer)) && t <= instant(c.d.as_of))
+    .sort((a, b) => a - b)
+    .map((t): [number] => [t]);
 
   it('never shows a record from after now, stays a valid dataset, and reconciles its counts', () => {
     fc.assert(
@@ -224,8 +231,10 @@ describe.each(CASES)('viewAt and the dashboard, $name, at any moment', (c) => {
         if (finishes.has(t)) seen.atCheckFinish++;
         if (v.inFlight.length) seen.inFlight++;
       }),
-      { numRuns: 300 },
+      { numRuns: 300, examples: finishExamples },
     );
+    // The fixture has a check finishing inside its window, so the examples are not empty.
+    expect(finishExamples.length).toBeGreaterThan(0);
     // The edges this fixture holds, each reached at least once.
     expect(seen.emptyWindow).toBeGreaterThan(0);
     expect(seen.atCheckFinish).toBeGreaterThan(0);

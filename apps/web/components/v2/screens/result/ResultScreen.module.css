@@ -450,3 +450,22 @@
     flex: 1 1 100%;
   }
 }
+
+/* A refused check's next step: how our requests appear in the logs, then what to do. */
+.logIdentity {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.agent {
+  display: block;
+  margin: 6px 0;
+  font-family: var(--v2-font-mono);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.logIdentity a {
+  text-decoration: underline;
+}
