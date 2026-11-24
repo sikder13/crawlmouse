@@ -3,95 +3,105 @@
 # Scanner summary for that run: Total 52 packages affected by 144 known vulnerabilities (8 Critical, 55 High, 69 Medium, 9 Low, 3 Unknown) from 1 ecosystem.
 # This file started with 113 advisory IDs (144 table rows, 52 package versions); entries are deleted as
 # the upgrades that fix them land, so count the current number with the check below.
-# Each CC-00 entry expires on 2026-11-26 (scan date + 30 days); after that the advisory fails CI again.
+# Each CC-00 entry expired on 2026-11-26 (scan date + 30 days) unless re-accepted with its own date and approval.
 # Entries added later carry their own expiry. Check that every entry has one:
 # grep -c '^ignoreUntil = ' osv-scanner.toml  and  grep -c '^\[\[IgnoredVulns\]\]$' osv-scanner.toml  print the same number.
 # Entries added after CC-00 carry their own date, reason and approval in a comment above them.
 # Any advisory NOT listed here fails CI immediately. Delete an entry when the upgrade that fixes it lands.
 
+# Re-accepted 2026-11-24 to 2026-12-10, approved by the owner in the QA chat ("Yes, re-accept the 16
+# advisories to 10 December with their reasons"; v2r/qa/findings/osv-left-for-owner.md). The 14 below are the
+# Vitest 2 toolchain: vitest 2.1.9, @vitest/mocker 2.1.9, vite 5.4.21, esbuild 0.21.5 and tinypool 1.1.1,
+# build and test only (pnpm why -r --prod vitest prints no path). Only Vitest 4 clears them, a migration
+# of every package's test config with its own PR. Not used: the Vitest UI (no @vitest/ui in any
+# package.json) and a Vite dev server reachable from a browser.
+
 [[IgnoredVulns]]
 id = "GHSA-82fw-gwwq-j7x9"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: @vitest/mocker@2.1.9 (fixed: 4.1.11); vitest@2.1.9 (fixed: 4.1.11)"
+ignoreUntil = 2026-12-10
+reason = "Re-accepted to 2026-12-10 by the owner on 2026-11-24. Present at the CC-00 baseline: @vitest/mocker@2.1.9 (fixed: 4.1.11); vitest@2.1.9 (fixed: 4.1.11)"
 
 [[IgnoredVulns]]
 id = "GHSA-qxg6-89mg-rqv8"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: @vitest/mocker@2.1.9 (fixed: 4.1.12)"
+ignoreUntil = 2026-12-10
+reason = "Re-accepted to 2026-12-10 by the owner on 2026-11-24. Present at the CC-00 baseline: @vitest/mocker@2.1.9 (fixed: 4.1.12)"
 
 [[IgnoredVulns]]
 id = "GHSA-67mh-4wv8-2f99"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: esbuild@0.21.5 (fixed: 0.25.0)"
+ignoreUntil = 2026-12-10
+reason = "Re-accepted to 2026-12-10 by the owner on 2026-11-24. Present at the CC-00 baseline: esbuild@0.21.5 (fixed: 0.25.0)"
 
 [[IgnoredVulns]]
 id = "GHSA-5gmw-xhrv-c9v3"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: tinypool@1.1.1 (fixed: 2.1.1)"
+ignoreUntil = 2026-12-10
+reason = "Re-accepted to 2026-12-10 by the owner on 2026-11-24. Present at the CC-00 baseline: tinypool@1.1.1 (fixed: 2.1.1)"
 
 [[IgnoredVulns]]
 id = "GHSA-85c8-ppgw-ccpr"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: tinypool@1.1.1 (fixed: 2.1.2)"
+ignoreUntil = 2026-12-10
+reason = "Re-accepted to 2026-12-10 by the owner on 2026-11-24. Present at the CC-00 baseline: tinypool@1.1.1 (fixed: 2.1.2)"
 
 [[IgnoredVulns]]
 id = "GHSA-4w7w-66w2-5vf9"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: vite@5.4.21 (fixed: 6.4.2)"
+ignoreUntil = 2026-12-10
+reason = "Re-accepted to 2026-12-10 by the owner on 2026-11-24. Present at the CC-00 baseline: vite@5.4.21 (fixed: 6.4.2)"
 
 [[IgnoredVulns]]
 id = "GHSA-587h-7wmj-h5pm"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: vite@5.4.21 (fixed: 6.4.4)"
+ignoreUntil = 2026-12-10
+reason = "Re-accepted to 2026-12-10 by the owner on 2026-11-24. Present at the CC-00 baseline: vite@5.4.21 (fixed: 6.4.4)"
 
 [[IgnoredVulns]]
 id = "GHSA-698v-4r3x-3vcv"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: vite@5.4.21 (fixed: 6.4.4)"
+ignoreUntil = 2026-12-10
+reason = "Re-accepted to 2026-12-10 by the owner on 2026-11-24. Present at the CC-00 baseline: vite@5.4.21 (fixed: 6.4.4)"
 
 [[IgnoredVulns]]
 id = "GHSA-9jrq-w75r-8gcw"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: vite@5.4.21 (fixed: 6.4.4)"
+ignoreUntil = 2026-12-10
+reason = "Re-accepted to 2026-12-10 by the owner on 2026-11-24. Present at the CC-00 baseline: vite@5.4.21 (fixed: 6.4.4)"
 
 [[IgnoredVulns]]
 id = "GHSA-fx2h-pf6j-xcff"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: vite@5.4.21 (fixed: 6.4.3)"
+ignoreUntil = 2026-12-10
+reason = "Re-accepted to 2026-12-10 by the owner on 2026-11-24. Present at the CC-00 baseline: vite@5.4.21 (fixed: 6.4.3)"
 
 [[IgnoredVulns]]
 id = "GHSA-r825-w8mm-5pxw"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: vite@5.4.21 (fixed: 6.4.4)"
+ignoreUntil = 2026-12-10
+reason = "Re-accepted to 2026-12-10 by the owner on 2026-11-24. Present at the CC-00 baseline: vite@5.4.21 (fixed: 6.4.4)"
 
 [[IgnoredVulns]]
 id = "GHSA-rq7h-c2jc-7f22"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: vite@5.4.21 (fixed: 6.4.4)"
+ignoreUntil = 2026-12-10
+reason = "Re-accepted to 2026-12-10 by the owner on 2026-11-24. Present at the CC-00 baseline: vite@5.4.21 (fixed: 6.4.4)"
 
 [[IgnoredVulns]]
 id = "GHSA-v6wh-96g9-6wx3"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: vite@5.4.21 (fixed: 6.4.3)"
+ignoreUntil = 2026-12-10
+reason = "Re-accepted to 2026-12-10 by the owner on 2026-11-24. Present at the CC-00 baseline: vite@5.4.21 (fixed: 6.4.3)"
 
 [[IgnoredVulns]]
 id = "GHSA-5xrq-8626-4rwp"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: vitest@2.1.9 (fixed: 3.2.6)"
+ignoreUntil = 2026-12-10
+reason = "Re-accepted to 2026-12-10 by the owner on 2026-11-24. Present at the CC-00 baseline: vitest@2.1.9 (fixed: 3.2.6)"
 
 # Published after the baseline and recorded on 2026-10-31, the day CI first reported them. Not from the
 # CC-00 scan: the only fixed versions are new majors, pulled in transitively by eslint, typescript-eslint,
-# @sentry/nextjs's bundler plugin and crawlee, which pin the old majors. Same expiry as the baseline.
+# @sentry/nextjs's bundler plugin and crawlee, which pin the old majors. Re-accepted 2026-11-24 to
+# 2026-12-10 with the 14 above, by the same owner approval. minimatch 9.0.9 is reachable in production
+# through @crawlee/core, which compiles one pattern per enqueue from a parsed origin; the engine passes
+# it no pattern, so a crawled site cannot supply one (packages/engine/src/crawler.ts, `same-hostname`).
 
 [[IgnoredVulns]]
 id = "GHSA-3g3m-2fjr-6pw4"
-ignoreUntil = 2026-11-26
-reason = "Published 2026-10-31 (medium): glob@13.0.6 (fixed: 14.0.2, a new major), via @sentry/bundler-plugin-core"
+ignoreUntil = 2026-12-10
+reason = "Re-accepted to 2026-12-10 by the owner on 2026-11-24. Published 2026-10-31 (medium): glob@13.0.6 (fixed: 14.0.2, a new major), via @sentry/bundler-plugin-core"
 
 [[IgnoredVulns]]
 id = "GHSA-g3hv-75wg-m249"
-ignoreUntil = 2026-11-26
-reason = "Published 2026-10-31 (medium): minimatch@3.1.5 via eslint, minimatch@9.0.9 via crawlee, minimatch@10.2.5 via typescript-eslint and @sentry/nextjs (fixed: 11.0.1, a new major)"
+ignoreUntil = 2026-12-10
+reason = "Re-accepted to 2026-12-10 by the owner on 2026-11-24. Published 2026-10-31 (medium): minimatch@3.1.5 via eslint, minimatch@9.0.9 via crawlee, minimatch@10.2.5 via typescript-eslint and @sentry/nextjs (fixed: 11.0.1, a new major)"
 
 # Added 2026-11-17, approved by the owner at 20:56 ET ("picomatch approve", CC-GL rulings-10). Not
 # present when CI was introduced: osv.dev published GHSA-fc5q-39xc-vjpf (CVE-2026-112366) after it.
