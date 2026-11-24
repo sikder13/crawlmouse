@@ -100,3 +100,28 @@ describe('the AI readability letter on Home', () => {
     expect(homePreview().example.grades.map((g) => g.label)).toEqual(['Technical SEO']);
   });
 });
+
+describe('the free check pages under the switch', () => {
+  const page = async (q: 'gptbot' | 'javascript') => {
+    const { checkPageView } = await import('./check-pages');
+    return JSON.stringify(checkPageView(q));
+  };
+
+  it('unset: the grade sentence and the per-page figure are there', async () => {
+    expect(await page('gptbot')).toContain('AI readability grade');
+    expect(await page('javascript')).toContain('page by page, and gives you the number');
+  });
+
+  it('ai_letter hidden: /check/gptbot names no grade', async () => {
+    vi.stubEnv('V2_HIDE_FEATURES', 'ai_letter');
+    expect(await page('gptbot')).not.toMatch(/readability grade/i);
+  });
+
+  it('nojs hidden: /check/javascript promises no per-page figure, and keeps its h1', async () => {
+    vi.stubEnv('V2_HIDE_FEATURES', 'nojs');
+    const p = await page('javascript');
+    expect(p).not.toContain('gives you the number');
+    expect(p).toContain('Can AI crawlers read your site without JavaScript?');
+    expect(p).toContain('shows you what each one is served');
+  });
+});

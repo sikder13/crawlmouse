@@ -5,6 +5,7 @@
  * each OpenAI crawler does from the engine's crawler list (`AI_BOT_REGISTRY`), and the crawlers the
  * JavaScript guide names from `JS_GUIDE_CRAWLERS`, so none is typed here.
  */
+import { featureShown } from '../../feature-switch';
 import { AI_BOT_REGISTRY } from '@crawlmouse/engine';
 import { GATES } from '../../entitlement-v2';
 import {
@@ -29,8 +30,8 @@ export type CheckPageBlock =
   | {
       kind: 'table';
       label: string;
-      columns: [string, string, string];
-      rows: { key: string; cells: [string, string, string] }[];
+      columns: string[];
+      rows: { key: string; cells: string[] }[];
       sources: readonly string[];
     };
 
@@ -60,13 +61,15 @@ function gptbotBlocks(): CheckPageBlock[] {
   const { check } = exampleCheck();
   const [p1, ...rest] = CHECK_COPY.gptbot.paragraphs;
   const t = CHECK_DATA_COPY.openAiTable;
+  // Without the AI readability letter (Goal 1 switch), no sentence or column names the grade.
+  const grade = featureShown('ai_letter');
   const rows = OPENAI.map((ua) => {
     const crawler = check.crawlers.find((c) => c.ua === ua);
     const bot = AI_BOT_REGISTRY.find((b) => b.token === ua);
     if (!crawler || !bot) throw new Error(`The check pages need ${ua} in the check and the list`);
     return {
       key: ua,
-      cells: [ua, bot.note, crawler.scored ? t.counted : t.notCounted] as [string, string, string],
+      cells: grade ? [ua, bot.note, crawler.scored ? t.counted : t.notCounted] : [ua, bot.note],
     };
   });
   const scored = check.crawlers.filter((c) => c.scored).map((c) => c.ua);
@@ -75,14 +78,18 @@ function gptbotBlocks(): CheckPageBlock[] {
     {
       kind: 'table',
       label: t.label,
-      columns: [t.crawler, t.does, t.grade],
+      columns: grade ? [t.crawler, t.does, t.grade] : [t.crawler, t.does],
       rows,
       sources: CHECK_DATA_COPY.openAiSources,
     },
-    paragraph({
-      text: CHECK_DATA_COPY.scored(listOf(scored)),
-      sources: CHECK_DATA_COPY.scoredSources,
-    }),
+    ...(grade
+      ? [
+          paragraph({
+            text: CHECK_DATA_COPY.scored(listOf(scored)),
+            sources: CHECK_DATA_COPY.scoredSources,
+          }),
+        ]
+      : []),
     ...rest.map(paragraph),
   ];
 }
@@ -101,18 +108,23 @@ function javascriptBlocks(): CheckPageBlock[] {
     }),
     paragraph(p1!),
     paragraph(p2!),
-    paragraph({
-      text: CHECK_DATA_COPY.example({
-        path: w.path,
-        browser: count(w.browserWords),
-        bot: w.bot,
-        botWords: count(w.botWords),
-        share: w.share,
-        pages: capitalise(count(w.templatePages)),
-        noun: w.templateNoun,
-      }),
-      sources: CHECK_DATA_COPY.exampleSources,
-    }),
+    // The sample's per-page figure is the without-JavaScript measurement (Goal 1 row 4).
+    ...(featureShown('nojs')
+      ? [
+          paragraph({
+            text: CHECK_DATA_COPY.example({
+              path: w.path,
+              browser: count(w.browserWords),
+              bot: w.bot,
+              botWords: count(w.botWords),
+              share: w.share,
+              pages: capitalise(count(w.templatePages)),
+              noun: w.templateNoun,
+            }),
+            sources: CHECK_DATA_COPY.exampleSources,
+          }),
+        ]
+      : []),
     paragraph(p3!),
   ];
 }
@@ -129,7 +141,10 @@ export function checkPageView(question: CheckQuestion): CheckPageView {
     question,
     canonical: checkPath(question),
     h1: copy.h1,
-    sub: copy.sub,
+    sub:
+      question === 'javascript' && !featureShown('nojs')
+        ? CHECK_DATA_COPY.subWithoutNojs
+        : copy.sub,
     heroNote: FUNNEL.heroNote(count(GATES.free.pagesPerCheck)),
     heading: copy.heading,
     blocks: BLOCKS[question](),

@@ -158,6 +158,9 @@ export const CHECK_COPY: Readonly<Record<CheckQuestion, CheckPageCopy>> = {
 
 /** Sentences built from data in the view; each names its sources the same way. */
 export const CHECK_DATA_COPY = {
+  /** javascript, while the Goal 1 switch hides the without-JavaScript figures: what an audit does measure. */
+  subWithoutNojs:
+    'Crawlmouse requests your pages as each AI crawler and shows you what each one is served.',
   /** gptbot: `names` lists the crawlers the grade counts, from the fixture's check. */
   scored: (names: string) =>
     `Because blocking GPTBot is a choice, Crawlmouse shows it and does not count it towards your AI readability grade. The grade counts ${names}.`,
