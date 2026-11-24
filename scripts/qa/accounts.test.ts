@@ -137,7 +137,7 @@ const taggedUserAgents = (): string[] => [
 ];
 
 describe('QA_HOSTS', () => {
-  it('names the thirteen lab sites under lab.crawlmouse.com, and the owner’s two domains', () => {
+  it('names the fourteen lab sites under lab.crawlmouse.com, and the owner’s two domains', () => {
     expect(allHosts()).toEqual([
       'nahltech.com',
       'crawlmouse.com',
@@ -154,6 +154,7 @@ describe('QA_HOSTS', () => {
       'demo-1.lab.crawlmouse.com',
       'demo-2.lab.crawlmouse.com',
       'demo-3.lab.crawlmouse.com',
+      'slow.lab.crawlmouse.com',
     ]);
   });
 
@@ -177,7 +178,8 @@ describe('the lab serves every lab host', () => {
       for (const path of PATHS) {
         expect(routeFor(host, path, CONTROL.userAgent), `${host}${path}`).toEqual({
           status: undefined,
-          dest: `/sites/${label(host)}${path}`,
+          // The slow site is served by its function, which reads the same folder (api/slow.mjs).
+          dest: host === QA_HOSTS.slow ? `/api/slow?path=${path}` : `/sites/${label(host)}${path}`,
         });
       }
     }
@@ -265,9 +267,9 @@ describe('the lab serves every lab host', () => {
       .filter((f) => !['vercel.json', '.vercelignore', 'generate.mjs', 'README.md'].includes(f))
       .filter((f) => !LOCAL_ONLY.includes(f))
       .sort();
-    expect(served).toEqual(['404.html', 'blocked.html', 'sites']);
+    expect(served).toEqual(['404.html', 'api', 'blocked.html', 'sites']);
     for (const host of labHosts()) {
-      for (const f of ['404.html', 'blocked.html', 'sites/healthy/']) {
+      for (const f of ['404.html', 'blocked.html', 'sites/healthy/', 'api/slow', 'api/slow.mjs']) {
         expect(routeFor(host, `/${f}`, CONTROL.userAgent)?.status, `${host}/${f}`).toBe(404);
       }
     }
