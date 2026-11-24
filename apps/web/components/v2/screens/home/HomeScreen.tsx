@@ -137,10 +137,8 @@ export function HomeScreen({
           </Heading>
           <p className={styles.sub}>
             {/* FACTS I1, I6: AI crawlers are tested on a sample from every template, not every page. */}
-            Firewalls, bot managers and client-side rendering never show up in that file. Crawlmouse
-            requests a sample of pages from every template as each AI crawler and keeps the answer:
-            status, headers, first bytes. If a bot got a challenge page, you&apos;ll see the
-            challenge page.
+            {/* `nojs` hidden: the table names no client-rendered row, so this does not promise one. */}
+            {`${nojs ? 'Firewalls, bot managers and client-side rendering' : 'Firewalls and bot managers'} never show up in that file. Crawlmouse requests a sample of pages from every template as each AI crawler and keeps the answer: status, headers, first bytes. If a bot got a challenge page, you'll see the challenge page.`}
           </p>
           <Card className={styles.tableCard}>
             <Table

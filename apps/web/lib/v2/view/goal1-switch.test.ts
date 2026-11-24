@@ -6,7 +6,16 @@
  * points call `shownFeatures()`. `/agencies`, `/`, `/check/*` and `/llms.txt` are static, so they
  * read the switch at build time and a change to it takes a redeploy; `/pricing` reads it per request.
  */
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import {
+  existsSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join, relative } from 'node:path';
 import { createElement, type ReactElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -37,6 +46,11 @@ const WEB = join(__dirname, '..', '..', '..');
 const NOW = new Date('2026-11-24T12:00:00Z');
 const FLAGS = { billing: true, checksPublic: true, accountDoor: true };
 const SAMPLE_AGENCY_NAME = 'Summit Digital';
+/**
+ * Home's crawler rows under nojs, read by hand from bad-site.json: ClaudeBot's cause there is
+ * client_rendered_template and its product verdict allowed_thin; the other three have neither.
+ */
+const NOJS_HOME_ROWS = ['Googlebot', 'GPTBot', 'PerplexityBot'];
 
 /** Every feature shown, built from the switch's own list rather than from `ALL_SHOWN`. */
 const EVERY = Object.fromEntries(RISK_FEATURES.map((f) => [f, true])) as Features;
@@ -135,11 +149,15 @@ function valueImports(file: string): string[] {
 describe('no module a client component reaches imports the switch as a value', () => {
   // AgencyPlusForm.tsx is 'use client' and imports the pricing copy; 'server-only' would fail it.
   // Every 'use client' file under app, components and lib, and each file its value imports reach.
-  const roots = ['app', 'components', 'lib']
-    .flatMap((d) => sources(join(WEB, d)))
-    .filter((f) =>
-      /^(?:\s|\/\/[^\n]*|\/\*[\s\S]*?\*\/)*['"]use client['"]/.test(readFileSync(f, 'utf8')),
-    );
+  // instrumentation-client.ts runs in the browser by Next's convention, without the directive.
+  const roots = [
+    ...['app', 'components', 'lib']
+      .flatMap((d) => sources(join(WEB, d)))
+      .filter((f) =>
+        /^(?:\s|\/\/[^\n]*|\/\*[\s\S]*?\*\/)*['"]use client['"]/.test(readFileSync(f, 'utf8')),
+      ),
+    join(WEB, 'instrumentation-client.ts'),
+  ];
   const reached = new Set<string>();
   const queue = [...roots];
   while (queue.length) {
@@ -154,6 +172,20 @@ describe('no module a client component reaches imports the switch as a value', (
     expect(roots.map(rel)).toContain('components/v2/screens/pricing/AgencyPlusForm.tsx');
     const seen = [...reached].map(rel);
     for (const f of ['lib/v2/copy/pricing.ts', 'lib/v2/features.ts']) expect(seen).toContain(f);
+  });
+
+  it('a value import of the switch, planted in a file, is followed to lib/feature-switch.ts', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'switch-sweep-'));
+    const planted = join(dir, 'planted.ts');
+    writeFileSync(
+      planted,
+      "import { featureShown } from '@/lib/feature-switch';\nexport const x = featureShown;\n",
+    );
+    try {
+      expect(valueImports(planted).map(rel)).toEqual(['lib/feature-switch.ts']);
+    } finally {
+      rmSync(dir, { recursive: true });
+    }
   });
 
   it('lib/feature-switch.ts is not among them', () => {
@@ -457,21 +489,28 @@ describe('Home', () => {
     for (const r of rows) expect((r.match(/<t[dh]\b/g) ?? []).length).toBe(4);
   });
 
-  it('nojs hidden: the crawler table names no thin verdict and no client-rendered template', () => {
-    const claude = (f?: Features) =>
-      homePreview(f).crawlers.rows.find((r) => r.crawler === 'ClaudeBot')!;
-    const verdicts = (f?: Features) =>
-      homePreview(f).crawlers.rows.flatMap((r) => [r.homepage.verdict, r.products.verdict]);
+  it('nojs hidden: the crawler table leaves out the without-JavaScript rows and rewords none', () => {
+    const rows = (f?: Features) => homePreview(f).crawlers.rows;
+    const claude = rows().find((r) => r.crawler === 'ClaudeBot')!;
     // Nothing hidden: ClaudeBot reads the product template thin, and the cell says why.
-    expect(claude().products.verdict).toBe('allowed_thin');
-    expect(claude().obstacle).toBe('the product template is client-rendered');
-    expect(words(homeHtml())).toContain('allowed, thin');
-    expect(words(homeHtml())).toContain('client-rendered');
-    expect(verdicts(hide('nojs'))).not.toContain('allowed_thin');
-    expect(claude(hide('nojs')).products.verdict).toBe('allowed');
-    expect(claude(hide('nojs')).obstacle).toBe('nothing: robots.txt and the edge let it in');
-    const t = words(homeHtml(hide('nojs')));
-    expect(t).not.toMatch(/allowed, thin|client-rendered|server-render/i);
+    expect(claude.products.verdict).toBe('allowed_thin');
+    expect(claude.obstacle).toBe('the product template is client-rendered');
+    expect(words(homeHtml())).toMatch(/allowed, thin/);
+    expect(words(homeHtml())).toMatch(/client-rendered/);
+    expect(words(homeHtml())).toMatch(/client-side rendering/);
+    // nojs hidden: the rows the fixture records as without-JavaScript findings are gone, by name.
+    expect(rows(hide('nojs')).map((r) => r.crawler)).toEqual(NOJS_HOME_ROWS);
+    // Each row left is the same row as with nothing hidden, but for its text column.
+    for (const r of rows(hide('nojs'))) {
+      const shown = rows().find((x) => x.crawler === r.crawler)!;
+      expect({ ...r, text: null }).toEqual({ ...shown, text: null });
+    }
+    expect(
+      rows(hide('nojs')).flatMap((r) => [r.homepage.verdict, r.products.verdict]),
+    ).not.toContain('allowed_thin');
+    expect(words(homeHtml(hide('nojs')))).not.toMatch(
+      /allowed, thin|client-rendered|client-side|server-render/i,
+    );
   });
 
   it('ai_letter hidden: the example shows Technical SEO alone', () => {

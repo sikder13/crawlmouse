@@ -12,7 +12,7 @@ import type { CrawlState } from '../progress';
 import type { MapDrawing } from './map';
 import { AI_READABILITY_LABEL, type GradeView } from './result';
 import { isFreeFix } from './free-fixes';
-import { aiShortSummary, isAllowed, seoShortSummary } from '../sentences';
+import { aiShortSummary, seoShortSummary } from '../sentences';
 import { capitalise } from '../words';
 import type { ViewDataset } from '../fixtures';
 
@@ -69,20 +69,18 @@ export interface HomeView {
   };
 }
 
-/**
- * What is in the crawler's way. With `nojs` hidden a client-rendered template is a without-JavaScript
- * finding, so it is not named: the crawler is let in on every template (its verdicts are "allowed"
- * then), and the cell says so.
- */
-function obstacle(c: CrawlerResult, productNoun: string, nojs: boolean): string {
+/** A crawler's row is a without-JavaScript finding: a thin verdict, or a client-rendered template. */
+function isNojsFinding(c: CrawlerResult): boolean {
+  return (
+    c.cause === 'client_rendered_template' ||
+    c.by_template.some((x) => x.verdict === 'allowed_thin')
+  );
+}
+
+/** What is in the crawler's way, as the check recorded it. */
+function obstacle(c: CrawlerResult, productNoun: string): string {
   if (c.group === 'search_engine' && c.verdict === 'allowed') {
     return 'nothing: robots.txt allows it and it renders JavaScript';
-  }
-  if (!nojs && c.cause === 'client_rendered_template') {
-    if (!c.by_template.every((x) => isAllowed(x.verdict))) {
-      throw new Error(`${c.ua} is client-rendered but not let in on every template`);
-    }
-    return 'nothing: robots.txt and the edge let it in';
   }
   const phrases: Record<AccessCause, string> = {
     cloudflare_1020: 'a Cloudflare firewall rule',
@@ -131,9 +129,7 @@ export function homeView(
   const cell = (c: CrawlerResult, key: string): VerdictView => {
     const byT = c.by_template.find((x) => x.template_key === key);
     if (!byT) throw new Error(`${c.ua} has no verdict for ${key}`);
-    // `nojs` hidden: "allowed, thin" is a without-JavaScript finding, so the cell says "allowed".
-    const verdict = !features.nojs && byT.verdict === 'allowed_thin' ? 'allowed' : byT.verdict;
-    return { verdict, evidence: c.evidence_class };
+    return { verdict: byT.verdict, evidence: c.evidence_class };
   };
 
   // The example of words lost without JavaScript: the sampled page that loses the most.
@@ -219,20 +215,25 @@ export function homeView(
     },
     crawlers: {
       productHeader: `${capitalise(productNoun.pages)} · ${product.pages}`,
-      rows: HOME_CRAWLERS.map((ua) => {
-        const c = crawlerOf(check, ua);
-        return {
-          crawler: ua,
-          homepage: cell(c, '/'),
-          products: cell(c, product.template_key),
-          text: !features.nojs
-            ? null
-            : c.text_share === null
-              ? 'not measured'
-              : `${percent(c.text_share)}%`,
-          obstacle: obstacle(c, productNoun.adjective, features.nojs),
-        };
-      }),
+      // `nojs` hidden: a crawler whose row is a without-JavaScript finding (a thin verdict, or a
+      // client-rendered template in its way) is left out of the table. No row is reworded, so each
+      // row shown says what the check recorded.
+      rows: HOME_CRAWLERS.map((ua) => crawlerOf(check, ua))
+        .filter((c) => features.nojs || !isNojsFinding(c))
+        .map((c) => {
+          const ua = c.ua;
+          return {
+            crawler: ua,
+            homepage: cell(c, '/'),
+            products: cell(c, product.template_key),
+            text: !features.nojs
+              ? null
+              : c.text_share === null
+                ? 'not measured'
+                : `${percent(c.text_share)}%`,
+            obstacle: obstacle(c, productNoun.adjective),
+          };
+        }),
     },
     withoutJs: {
       path: new URL(page.url).pathname,

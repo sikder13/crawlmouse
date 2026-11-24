@@ -25,7 +25,8 @@ export const ALL_SHOWN: Features = Object.freeze({
 
 /**
  * The fix types that are without-JavaScript findings: a template empty until scripts run, and links a
- * page adds only through JavaScript. With `nojs` hidden a public page lists no fix of these types.
+ * page adds only through JavaScript. With `nojs` hidden the /agencies one-pager lists no fix of these
+ * types (`view/agencies.ts`); a minted report does not read the switch.
  */
 export const NOJS_FIX_TYPES: ReadonlySet<FixType> = new Set<FixType>([
   'client_rendered_template',
