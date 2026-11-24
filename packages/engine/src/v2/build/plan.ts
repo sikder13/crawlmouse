@@ -83,10 +83,27 @@ export function nextCrawlBatch(
     const url = canonicalizeUrl(raw);
     if (asked.has(url)) continue;
     asked.add(url);
-    next.push(url);
+    next.push(askedAs(raw, url));
     if (next.length === room) break;
   }
   return next.length > 0 ? next : null;
+}
+
+/**
+ * The address a URL is requested at (F-252): the spelling the site wrote, in a link or its sitemap,
+ * without its fragment, which is never sent. The canonical spelling drops a trailing slash, and a
+ * server that answers `/about/` and not `/about` answers it 404; one that redirects pays a second
+ * paced request. Pages are still compared, and their rows keyed, in canonical spelling: the worker
+ * keys a row on the canonical spelling of the URL it was asked. A spelling past the worker's URL
+ * limit is asked in its canonical spelling, which is within it.
+ */
+export function askedAs(raw: string, canonical: string = canonicalizeUrl(raw)): string {
+  if (raw === canonical) return raw;
+  const u = new URL(raw);
+  u.hash = '';
+  // Where the two would send the same request (the root's slash, a default port), the canonical one.
+  if (u.href === new URL(canonical).href || u.href.length > MAX_URL_LENGTH) return canonical;
+  return u.href;
 }
 
 /**
@@ -138,6 +155,18 @@ export function landedOn(
   if (p.final_url === null || p.status_code === null) return null;
   if (p.status_code >= 300 && p.status_code < 400) return null;
   return canonicalizeUrl(p.final_url);
+}
+
+/**
+ * The address to ask a crawled page at again (F-252), as an access test does: where its request
+ * answered, when that is the same page (`/about` that answered at `/about/`), so the test asks what
+ * the crawl was served rather than a spelling the server may answer 404. Otherwise, a page redirected
+ * to another, a stopped redirect, or no answer, the row's own address.
+ */
+export function answeredAt(
+  p: Pick<CrawlBatchResult['pages'][number], 'url' | 'final_url' | 'status_code'>,
+): string {
+  return p.final_url !== null && landedOn(p) === p.url ? askedAs(p.final_url, p.url) : p.url;
 }
 
 export type SampleReason =

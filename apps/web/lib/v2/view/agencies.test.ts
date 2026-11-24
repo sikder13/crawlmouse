@@ -174,7 +174,7 @@ describe('what names a coming capability', () => {
 });
 
 describe('the For agencies view', () => {
-  const view = agenciesView({ billing: true, accountDoor: true });
+  const view = agenciesView({ billing: true, agencySales: true, accountDoor: true });
 
   it('prices the trial and the plans from prices.ts, the trial length from the state machine', () => {
     expect(view.trialNote.text).toContain(`then ${usd(AGENCY_MONTHLY)} a month`);
@@ -295,7 +295,11 @@ describe('the figures follow GATES and prices.ts, not the values typed today', (
       AGENCY_MONTHLY: ALTERED.AGENCY_MONTHLY,
     }));
     try {
-      return (await import('./agencies')).agenciesView({ billing: true, accountDoor: true });
+      return (await import('./agencies')).agenciesView({
+        billing: true,
+        agencySales: true,
+        accountDoor: true,
+      });
     } finally {
       vi.doUnmock('../../entitlement-v2');
       vi.doUnmock('../../billing/prices');

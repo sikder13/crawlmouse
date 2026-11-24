@@ -919,6 +919,18 @@ export function dashboardView(
   const slots = primarySites(v).length;
   const limit = v.account.limits.sites;
   const plan = PLAN_NAMES[v.tier];
+  // A paused site is kept and holds its slot, but is not checked: after a trial ends, every site
+  // over Free's limit is paused (F-234, F-235).
+  const checked = primarySites(v).filter((s) => !s.paused);
+  const paused = slots - checked.length;
+  /** The site whose schedule the first-run note names: the first site, or one still checked. */
+  const scheduled = primary.paused ? checked[0] : primary;
+  const slotsNote =
+    paused === 0
+      ? `${slots} of ${limit} on ${plan}`
+      : slots <= limit
+        ? COPY.sitesWithPaused(slots, limit, plan, paused)
+        : COPY.sitesOverLimit(checked.length, slots, plan, limit);
 
   const changed = firstRun
     ? []
@@ -937,7 +949,9 @@ export function dashboardView(
   const nextText = nextAt ? `${next ? 'next check' : 'next weekly check'} ${nextAt}` : null;
   const trialEnds = trial ? `trial ends ${dayDate(v.account.trial_ends_at!, zone)}` : null;
   const flight = v.inFlight.filter((f) => f.siteId === primary.id).map((f) => `check ${f.status}`);
-  const sitesWord = `${v.d.sites.length} ${plural(v.d.sites.length, 'site', 'sites')}`;
+  // The sites that hold a slot: a staging copy is not a sixth site (F-097).
+  const slotsHeld = primarySites(v).length;
+  const sitesWord = `${slotsHeld} ${plural(slotsHeld, 'site', 'sites')}`;
   const prev = sinceCheck(v);
 
   const addSite = addSiteAction(v);
@@ -948,7 +962,7 @@ export function dashboardView(
 
   const header: HeaderView = firstRun
     ? {
-        title: COPY.kept(primarySites(v).map((s) => s.host)),
+        title: checked.length ? COPY.kept(checked.map((s) => s.host)) : COPY.allPaused,
         line: [
           dayDate(v.now, zone),
           sitesWord,
@@ -1061,7 +1075,7 @@ export function dashboardView(
         }))
       : null,
     sites: {
-      note: firstRun && trial ? COPY.sitesFirstRun(free) : `${slots} of ${limit} on ${plan}`,
+      note: firstRun && trial ? COPY.sitesFirstRun(free) : slotsNote,
       upsell:
         v.tier === 'pro' && slots >= limit
           ? action(
@@ -1070,7 +1084,11 @@ export function dashboardView(
             )
           : null,
       rows,
-      foot: firstRun ? COPY.firstRunNote(primary.schedule?.cadence ?? null) : null,
+      foot: firstRun
+        ? scheduled
+          ? COPY.firstRunNote(scheduled.schedule?.cadence ?? null)
+          : COPY.firstRunAllPaused
+        : null,
     },
     topFixes:
       firstRun && result && fixes.length

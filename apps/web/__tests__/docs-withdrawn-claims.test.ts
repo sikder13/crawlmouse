@@ -580,6 +580,14 @@ const WITHDRAWN: readonly WithdrawnClaim[] = [
       'RESTORE_DAYS days later and keeps the site row.',
     allowedIn: [],
   },
+  {
+    text: 'A pull request merges only when up to date with `main`',
+    withdrawnIn: 'docs/specs/v2/ci-cost.md (D1), the #174 gate (v2r QA, finding N3)',
+    truth:
+      'The protect-main ruleset (25993587) has strict_required_status_checks_policy false: a branch need ' +
+      'not be up to date with main to merge, so the merge commit a run tested can differ from the one that merges.',
+    allowedIn: [],
+  },
 ];
 
 /**

@@ -23,7 +23,8 @@ const northwind = () =>
 
 describe('Reports, the header and Make a report', () => {
   it('counts the sites, names the plan exports are on, and the trial’s days in the account’s zone', () => {
-    expect(home().header.line).toBe('5 sites · exports and PDF on Pro · 8 days of Pro left');
+    // Four primaries: the staging copy holds no site slot, as on the rail (Owner ruling Q10).
+    expect(home().header.line).toBe('4 sites · exports and PDF on Pro · 8 days of Pro left');
   });
 
   it('makes reports for the primary site’s latest check by default', () => {
