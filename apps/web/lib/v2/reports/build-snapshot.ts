@@ -16,7 +16,8 @@ import { PublicSnapshotV2Schema, type PublicSnapshotV2 } from './snapshot';
 
 /**
  * The report's one-line verdict. `withThin` false (the Goal 1 switch hides `nojs`) leaves out the
- * sentence naming the templates that are empty without JavaScript.
+ * sentence naming the templates that are empty without JavaScript; with no crawler kept out either,
+ * it says every crawler was let in, and nothing of what they read.
  */
 export function headline(check: Check, host: string, withThin = true): string {
   const keptOut = keptOutClauses(check.crawlers);
@@ -25,9 +26,10 @@ export function headline(check: Check, host: string, withThin = true): string {
     ...(keptOut.length ? [`${keptOut.join('; ')}.`] : []),
     ...(thin ? [thin] : []),
   ];
-  return sentences.length
-    ? sentences.map(capitalise).join(' ')
-    : `Every crawler we tested reads ${host}.`;
+  if (sentences.length) return sentences.map(capitalise).join(' ');
+  return withThin
+    ? `Every crawler we tested reads ${host}.`
+    : `Every crawler we tested is let in to ${host}.`;
 }
 
 /**

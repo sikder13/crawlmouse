@@ -160,12 +160,17 @@ export function homeView(
   const zone = d.accounts.find((a) => a.id === site.account_id)?.timezone ?? 'UTC';
 
   // `nojs` hidden: a page reachable only through JavaScript is drawn and counted as an ordinary
-  // page, so neither the triangle (whose legend item is gone) nor the label names JavaScript.
+  // page, and its link as an ordinary link, so neither the triangle (whose legend item is gone), the
+  // dashed edge nor the label names JavaScript.
   const drawn: MapDrawing = features.nojs
     ? map
     : {
         ...map,
-        nodes: map.nodes.map((n) => (n.kind === 'js_only' ? { ...n, kind: 'page' as const } : n)),
+        nodes: map.nodes.map((n) => ({
+          ...n,
+          kind: n.kind === 'js_only' ? ('page' as const) : n.kind,
+          via: n.via === 'javascript' ? ('link' as const) : n.via,
+        })),
       };
 
   return {

@@ -21,6 +21,12 @@ import { ALL_SHOWN, type Features } from '../features';
 import { agenciesView } from './agencies';
 import { checkDescription, checkPageView } from './check-pages';
 import { pricingView } from './pricing';
+import mapStyles from '../../../components/v2/map/MapSvg.module.css';
+import type { Check } from '@crawlmouse/types/v2';
+import { findCheck, fixture } from '../fixtures';
+import { CHECKS } from '../recordings';
+import { headline } from '../reports/build-snapshot';
+import { aiShortSummary } from '../sentences';
 
 vi.mock('server-only', () => ({}));
 vi.mock('@/components/analytics/TrackView', () => ({ TrackView: () => null }));
@@ -208,12 +214,70 @@ describe('the client report page under either agency name', () => {
   );
 });
 
+/** The bad-site fixture's first audit, read directly. */
+const BAD = findCheck(fixture('bad-site'), CHECKS.badFirstAudit);
+const keptOut = (crawlers: Check['crawlers']) =>
+  crawlers
+    .filter((c) => !c.verdict.startsWith('allowed'))
+    .map((c) => [c.ua, c.verdict])
+    .sort(([a], [b]) => a!.localeCompare(b!));
+
+/**
+ * The fixture's audit with crawlers given `like`'s result (its verdict, cause, share and templates):
+ * the kept-out ones, or with `every`, all of them.
+ */
+function letIn(like: string, every = false): Check {
+  const m = BAD.crawlers.find((c) => c.ua === like)!;
+  const as = {
+    verdict: m.verdict,
+    cause: m.cause,
+    text_share: m.text_share,
+    by_template: m.by_template,
+  };
+  return {
+    ...BAD,
+    crawlers: BAD.crawlers.map((c) =>
+      every || !c.verdict.startsWith('allowed') ? { ...c, ...as } : c,
+    ),
+  };
+}
+
+describe('the summaries with no crawler kept out', () => {
+  const HOST = 'example-outfitter.com';
+
+  it('a thin template, nojs hidden: who gets in, no share and no "reads"', () => {
+    const thin = letIn('OAI-SearchBot');
+    expect(keptOut(thin.crawlers)).toEqual([]);
+    // Omitted, the output is what it was: the thin sentence alone.
+    expect(aiShortSummary(thin)).toBe('Product pages are empty without JavaScript.');
+    expect(headline(thin, HOST)).toBe('Product pages are empty without JavaScript.');
+    expect(aiShortSummary(thin, false)).toBe('All four scored crawlers get in.');
+    expect(headline(thin, HOST, false)).toBe(`Every crawler we tested is let in to ${HOST}.`);
+  });
+
+  it('no thin template: omitted, the all-in sentences are unchanged', () => {
+    const asRead = letIn('Googlebot', true);
+    expect(aiShortSummary(asRead)).toBe(
+      'All four scored crawlers get in and read 100% of the text or more.',
+    );
+    expect(headline(asRead, HOST)).toBe(`Every crawler we tested reads ${HOST}.`);
+    expect(aiShortSummary(asRead, false)).toBe('All four scored crawlers get in.');
+  });
+});
+
 describe('For agencies under nojs', () => {
   it('the one-pager heading drops the empty-without-JavaScript sentence', () => {
-    expect(agencies().onePager.heading).toContain('empty without JavaScript');
-    const heading = agencies(hide('nojs')).onePager.heading;
-    expect(heading).toMatch(/^example-outfitter\.com: \S/);
-    expect(heading).not.toContain('JavaScript');
+    expect(agencies().onePager.heading).toBe(
+      'example-outfitter.com: GPTBot is blocked by a firewall rule; PerplexityBot gets a challenge page. Product pages are empty without JavaScript.',
+    );
+    // The fixture's crawlers kept out: GPTBot by a Cloudflare rule, PerplexityBot by a challenge.
+    expect(keptOut(BAD.crawlers)).toEqual([
+      ['GPTBot', 'blocked_by_ua_rule'],
+      ['PerplexityBot', 'challenged_ua'],
+    ]);
+    expect(agencies(hide('nojs')).onePager.heading).toBe(
+      'example-outfitter.com: GPTBot is blocked by a firewall rule; PerplexityBot gets a challenge page.',
+    );
     expect(agenciesHtml(hide('nojs'))).not.toContain('empty without JavaScript');
   });
 });
@@ -270,12 +334,28 @@ describe('Home', () => {
     expect(html).not.toContain('only through JavaScript');
   });
 
+  it('nojs hidden: the map draws no dashed JavaScript edge', () => {
+    // The class MapSvg gives a link followed through JavaScript, read from its own CSS module.
+    const edgeJs = new RegExp(`class="[^"]*\\b${mapStyles.edgeJs}\\b`);
+    expect(mapStyles.edgeJs).toBeTruthy();
+    expect(homeHtml()).toMatch(edgeJs);
+    expect(homeHtml(hide('nojs'))).not.toMatch(edgeJs);
+    expect(homePreview(hide('nojs')).example.map.nodes.some((n) => n.via === 'javascript')).toBe(
+      false,
+    );
+  });
+
   it('nojs hidden: the AI readability summary drops the empty-without-JavaScript sentence', () => {
     const summary = (f?: Features) =>
       homePreview(f).example.grades.find((g) => g.label === 'AI readability')!.summary;
-    expect(summary()).toContain('without JavaScript');
-    expect(summary(hide('nojs'))).not.toContain('JavaScript');
-    expect(summary(hide('nojs'))).not.toBe('');
+    expect(summary()).toBe(
+      'PerplexityBot gets a challenge page. Product pages are empty without JavaScript.',
+    );
+    // The fixture's one scored crawler kept out is PerplexityBot, challenged by Bot Fight Mode.
+    expect(keptOut(BAD.crawlers.filter((c) => c.scored))).toEqual([
+      ['PerplexityBot', 'challenged_ua'],
+    ]);
+    expect(summary(hide('nojs'))).toBe('PerplexityBot gets a challenge page.');
   });
 
   it('nojs hidden: the crawler table drops its text column whole, and the legend its item', () => {

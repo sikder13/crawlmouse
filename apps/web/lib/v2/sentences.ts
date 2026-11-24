@@ -250,14 +250,15 @@ export function seoSummary(check: Check, fixes: readonly Fix[], isOpen: (f: Fix)
  * "All four scored crawlers get in and read 98% of the text or more": the share only when every one
  * was measured, and a plain statement when none was tested.
  */
-function allInSentence(scored: readonly CrawlerResult[]): string {
+/** `withShare` false: who gets in, without the share of the text they read. */
+function allInSentence(scored: readonly CrawlerResult[], withShare = true): string {
   if (!scored.length) return 'No scored AI crawler was tested.';
   const shares = scored.map((c) => c.text_share);
   const one = scored.length === 1;
   const all = one
     ? 'The one scored crawler gets in'
     : `All ${numberWord(scored.length)} scored crawlers get in`;
-  if (shares.some((x) => x === null)) return `${all}.`;
+  if (!withShare || shares.some((x) => x === null)) return `${all}.`;
   const share = percent(Math.min(...(shares as number[])));
   return `${all} and ${one ? 'reads' : 'read'} ${share}% of the text or more.`;
 }
@@ -293,12 +294,15 @@ export function aiSummary(check: Check): string {
 /**
  * Locked Home stage: the scored crawlers kept out, then the templates they read thin; when there is
  * neither, the sentence the AI card uses for a site every scored crawler reads.
+ *
+ * `withThin` false (the Goal 1 switch hides `nojs`) leaves out the empty-without-JavaScript sentence.
+ * When that sentence is left out and no crawler is kept out, the summary says who gets in and no
+ * share of the text, since the share is the without-JavaScript figure the switch hides.
  */
-/** `withThin` false (the Goal 1 switch hides `nojs`) leaves out the empty-without-JavaScript sentence. */
 export function aiShortSummary(check: Check, withThin = true): string {
   const out = keptOutClauses(scoredOf(check));
   const thin = withThin ? thinSentence(check) : null;
-  if (!out.length && !thin) return allInSentence(scoredOf(check));
+  if (!out.length && !thin) return allInSentence(scoredOf(check), withThin);
   return [out.length ? `${capitalise(out.join('; '))}.` : null, thin].filter(Boolean).join(' ');
 }
 
