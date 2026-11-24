@@ -8,7 +8,7 @@ import type { Check, PageResult } from '@crawlmouse/types/v2';
 import { findCheck } from '../../fixtures';
 import { listOf, percent, templateNoun } from '../../format';
 import { RECORDING_NAMES, recordingSpec } from '../../recordings';
-import { clientRenderedTemplates, isAi } from '../../sentences';
+import { clientRenderedTemplates, crawledAll, isAi } from '../../sentences';
 import { capitalise, count, numberWord, plural } from '../../words';
 import { mapDrawing, type MapDrawing } from '../map';
 import type { CoverageView, DoorView } from '../result';
@@ -177,7 +177,8 @@ function orphanTable(
     };
   }
   if (total === 0) {
-    return { heading: 'No orphan pages', sub: null, rows: [], unlisted: null, notes: [] };
+    const heading = crawledAll(check) ? 'No orphan pages' : 'No orphan pages among those crawled';
+    return { heading, sub: null, rows: [], unlisted: null, notes: [] };
   }
   // An orphan found through a link has lost it since; only another way in says where it was found.
   const vias = [...new Set(rows.map((r) => r.found_via))].filter((v) => v !== 'link');

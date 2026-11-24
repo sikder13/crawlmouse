@@ -5,6 +5,7 @@ import { auditDoc } from '../reports/generate-doc';
 import { seoShortSummary, seoSummary } from '../sentences';
 import { GONE_STATUSES } from '../../../../../packages/engine/src/v2/detectors/thresholds';
 import { NOT_FOUND_STATUSES, resultView } from './result';
+import { structureView } from './segment/structure';
 
 /**
  * The coverage line counts pages, not addresses (QA F-244): a site of 21 pages that links to two
@@ -84,6 +85,39 @@ describe('a partial crawl claims nothing of the pages it did not crawl (inbox 05
     expect(seoSummary(clean, [], none)).toContain('every page is linked');
     expect(seoSummary(partial, [], none)).toContain('every page crawled is linked');
     expect(seoSummary(partial, [], none)).not.toContain('every page is linked');
+  });
+
+  it('says no orphan pages, nor every page within three clicks, only of the pages crawled', () => {
+    const asCheck = (c: typeof clean) => ({
+      ...CLEAN,
+      checks: CLEAN.checks.map((x) => (x.id === CLEAN_CHECK ? c : x)),
+    });
+    const door = (c: typeof clean) =>
+      resultView(asCheck(c), CLEAN_CHECK, { map: null }).doors.find(
+        (d) => d.title === 'Site structure',
+      )!.body;
+    expect(door(clean)).toContain('No orphan pages, every page within three clicks');
+    expect(door(partial)).toContain(
+      'Of the pages crawled: no orphan, every one within three clicks',
+    );
+    expect(door(partial)).not.toContain('every page within three clicks');
+  });
+
+  it('heads the structure segment with no orphan pages among those crawled', () => {
+    const asCheck = (c: typeof clean) => ({
+      ...CLEAN,
+      checks: CLEAN.checks.map((x) => (x.id === CLEAN_CHECK ? c : x)),
+    });
+    const heading = (c: typeof clean) =>
+      JSON.stringify(structureView(asCheck(c), CLEAN_CHECK, {}, null));
+    expect(heading(clean)).toContain('"No orphan pages"');
+    expect(heading(partial)).toContain('No orphan pages among those crawled');
+  });
+
+  it('claims nothing of every page when the coverage is unknown', () => {
+    expect(seoSummary({ ...clean, coverage: null }, [], none)).not.toContain(
+      'every page is linked',
+    );
   });
 
   it('says no orphan pages among those crawled', () => {

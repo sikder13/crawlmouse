@@ -50,6 +50,7 @@ import {
   meetsEdge,
   seoSummary,
   clientRenderedTemplates,
+  crawledAll,
   verbFor,
 } from '../sentences';
 import { capitalise, count, numberWord, plural } from '../words';
@@ -425,7 +426,9 @@ function structureDoor(
   ].filter(Boolean) as string[];
   const lead = problems.length
     ? `${capitalise(problems.join(', '))}.`
-    : 'No orphan pages, every page within three clicks, varied anchor text.';
+    : crawledAll(check)
+      ? 'No orphan pages, every page within three clicks, varied anchor text.'
+      : 'Of the pages crawled: no orphan, every one within three clicks, varied anchor text.';
   const hubs = `${capitalise(numberWord(s.hubs))} ${plural(s.hubs, 'hub carries', 'hubs carry')} ${percent(s.hub_pagerank_share)}% of the site's PageRank.`;
   const crawled = check.coverage!.pages_crawled;
   return {

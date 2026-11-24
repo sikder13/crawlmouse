@@ -204,9 +204,12 @@ export function nextBandSentence(
   return `${head}; ${numberWord(open)} of them ${open === 1 ? 'is' : 'are'} open now.`;
 }
 
-/** The crawl read every page it found; when it did not, a sentence about every page claims too much. */
-const crawledAll = (check: Check): boolean =>
-  check.coverage === null || check.coverage.pages_crawled >= check.coverage.pages_discovered;
+/**
+ * The crawl read every page it found. When it did not, or its coverage is unknown, a sentence about
+ * every page claims too much: orphans and depth are counted among the pages crawled (inbox 059).
+ */
+export const crawledAll = (check: Check): boolean =>
+  check.coverage !== null && check.coverage.pages_crawled >= check.coverage.pages_discovered;
 
 /** What a Technical SEO summary says of a check that read no internal link. */
 const NO_LINK_READ = 'No internal link was read, so the structure was not measured.';
