@@ -47,7 +47,8 @@ async function readReport(slug: string): Promise<PublicReportRow | null> {
 
 /**
  * Cache the by-slug read and tag it with `public-report:<slug>` so a takedown/hide can purge exactly
- * this report's cached render (OG card + page) without waiting out the time-based revalidate.
+ * this report's cached read without waiting out the time-based revalidate. The page and the OG card
+ * render from it; a card copy the CDN already holds is not reached (`lib/og-card-cache.ts`).
  */
 export function getPublicReport(slug: string): Promise<PublicReportRow | null> {
   return unstable_cache(() => readReport(slug), ['public-report', slug], {
@@ -56,7 +57,11 @@ export function getPublicReport(slug: string): Promise<PublicReportRow | null> {
   })();
 }
 
-/** Purge a single report's cached OG image + page so a takedown/hide takes effect on the next request. */
+/**
+ * Purge a single report's cached read and page, so a takedown/hide shows on the page's next request
+ * and in each OG card rendered after it. A card copy the CDN already holds lasts at most
+ * OG_CARD_EDGE_SECONDS (F-241).
+ */
 export function purgePublicReport(slug: string): void {
   // Invalidate the shared by-slug data read (getPublicReport's unstable_cache) so any cold
   // re-render reads the now-taken-down/hidden row.

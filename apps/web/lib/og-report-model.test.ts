@@ -6,7 +6,7 @@ import type { PublicReportRow } from './reports';
 // SPEC 5.1a Stage 4 — SURFACE 2 of 13: THE OG CARD.
 //
 // Proved second, and only after the minted snapshot, because these two are the permanent public pair:
-// the card is cached for an hour, embedded in other people's timelines, and re-fetched by unfurlers we
+// the card is cached at the edge, embedded in other people's timelines, and re-fetched by unfurlers we
 // do not control. A verdict that escapes onto it is not correctable by editing our own page.
 //
 // The model returned here IS the payload the PNG is drawn from, so these assert on its serialized form
@@ -76,7 +76,11 @@ describe('SURFACE 2 — the OG card never draws a withheld verdict', () => {
 
   it('renders the placeholder for a missing, taken-down or hidden report', () => {
     expect(buildOgReportModel(null)).toEqual({ kind: 'placeholder' });
-    expect(buildOgReportModel({ ...GRADED, takedown_requested_at: '2026-08-01T00:00:00.000Z' })).toEqual({ kind: 'placeholder' });
-    expect(buildOgReportModel({ ...GRADED, hidden_at: '2026-08-01T00:00:00.000Z' })).toEqual({ kind: 'placeholder' });
+    expect(
+      buildOgReportModel({ ...GRADED, takedown_requested_at: '2026-08-01T00:00:00.000Z' }),
+    ).toEqual({ kind: 'placeholder' });
+    expect(buildOgReportModel({ ...GRADED, hidden_at: '2026-08-01T00:00:00.000Z' })).toEqual({
+      kind: 'placeholder',
+    });
   });
 });

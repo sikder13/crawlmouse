@@ -3,7 +3,8 @@
  * sorts for a takedown: once a report is taken down or hidden, its host and grade must stop being
  * served. `purgePublicReport` clears the by-slug read, so the next render draws the placeholder; what
  * it cannot clear is a copy the CDN already holds, which Vercel keeps for `s-maxage` (or until the
- * next deployment). So that copy is short-lived, and no browser or proxy keeps one at all.
+ * next deployment). So that copy is short-lived, and no browser or proxy reuses one without asking
+ * again (`max-age=0`).
  *
  * What no header can reach: a social platform's own copy of a card it has already fetched (X,
  * LinkedIn, Slack, Facebook). Those are refreshed only through each platform's own tools.
