@@ -4,10 +4,10 @@ import { recordedBuild } from '../../../fixtures/v2/build/recorded.js';
 import { buildCheck } from './build.js';
 import {
   boundedEdges,
-  edgeQuota,
-  MAX_CHECK_EDGES,
+  MAX_OTHER_EDGES_PER_PAGE,
+  noEdgesKept,
+  OwnEdgesOverBound,
   rowAddresses,
-  type EdgeQuota,
 } from './edge-scope.js';
 
 const isCrawl = (b: unknown): b is CrawlBatchResult => (b as { kind?: string }).kind === 'crawl';
@@ -45,77 +45,66 @@ function withUncrawledLinks(n: number): ReturnType<typeof recordedBuild> {
   };
 }
 
-/** As the build step does over the bound: each batch's edges within the quota, in batch order. */
-function bounded(input: ReturnType<typeof recordedBuild>, cap: number) {
-  const crawl = input.batches.filter(isCrawl);
-  const addresses = new Set(rowAddresses(crawl.flatMap((b) => b.pages)));
-  const quota = edgeQuota(
-    crawl.reduce((n, b) => n + b.pages.length, 0),
-    cap,
-  );
-  const kept = new Map<string, EdgeQuota>();
+/** As the build step does over the bound: each batch's edges through `boundedEdges`, in order. */
+function bounded(input: ReturnType<typeof recordedBuild>) {
+  const addresses = new Set(rowAddresses(input.batches.filter(isCrawl).flatMap((b) => b.pages)));
+  const kept = noEdgesKept();
   return {
     ...input,
     batches: input.batches.map((b) =>
-      isCrawl(b) ? { ...b, link_edges: boundedEdges(b.link_edges, addresses, quota, kept) } : b,
+      isCrawl(b) ? { ...b, link_edges: boundedEdges(b.link_edges, addresses, kept) } : b,
     ),
   };
 }
 
 describe('the bound on the edges a build holds (F-248)', () => {
-  it('holds at most the bound for 500 pages of 1,000 edges each, edges to its own pages first', () => {
-    const pages = Array.from({ length: 500 }, (_, i) => `https://example.com/p${i}`);
-    const addresses = new Set(rowAddresses(pages.map((url) => ({ url, final_url: null }))));
-    const quota = edgeQuota(pages.length);
-    const kept = new Map<string, EdgeQuota>();
-    let held = 0;
-    let own = 0;
-    for (let batch = 0; batch < 10; batch++) {
-      const edges = pages
-        .slice(batch * 50, batch * 50 + 50)
-        .flatMap((from, f) =>
-          Array.from({ length: 1000 }, (_, i) =>
-            edge(from, i % 2 ? pages[(f + i) % 500]! : `https://example.com/elsewhere/${i}`),
-          ),
-        );
-      const out = boundedEdges(edges, addresses, quota, kept);
-      held += out.length;
-      own += out.filter((e) => addresses.has(e.to_url)).length;
-    }
-    expect(held).toBeLessThanOrEqual(MAX_CHECK_EDGES);
-    expect(held).toBe(500 * (quota.own + quota.other));
-    expect(own).toBe(500 * quota.own);
-    expect(quota.own).toBeGreaterThan(quota.other);
+  const input = withUncrawledLinks(60);
+  const all = buildCheck(input);
+  const cut = buildCheck(bounded(input));
+
+  it('cuts only edges to addresses the crawl never fetched, to its per-page share', () => {
+    const own = (es: readonly LinkEdge[]) =>
+      es.filter((e) => !e.to_url.includes('/never-crawled/'));
+    expect(own(cut.link_edges)).toEqual(own(all.link_edges));
+    const elsewhere = new Map<string, number>();
+    for (const e of cut.link_edges)
+      if (e.to_url.includes('/never-crawled/'))
+        elsewhere.set(e.from_url, (elsewhere.get(e.from_url) ?? 0) + 1);
+    expect(new Set(elsewhere.values())).toEqual(new Set([MAX_OTHER_EDGES_PER_PAGE]));
+    expect(cut.link_edges.length).toBeLessThan(all.link_edges.length);
   });
 
-  it('over the bound, claims no orphan it cannot prove, where dropping every such edge would', () => {
-    const input = withUncrawledLinks(40);
-    const all = input.batches.filter(isCrawl).reduce((n, b) => n + b.link_edges.length, 0);
-    const cut = buildCheck(bounded(input, Math.floor(all / 4)));
-    expect(cut.link_edges.length).toBeLessThanOrEqual(Math.floor(all / 4));
-    expect(cut.page_results.filter((p) => p.is_orphan)).toEqual([]);
-    // The contrast: keep only edges to the crawl's own pages, and a page with no inbound link is
-    // called an orphan, though pages the crawl left unread may link to it.
-    const crawl = input.batches.filter(isCrawl);
-    const addresses = new Set(rowAddresses(crawl.flatMap((b) => b.pages)));
-    const ownOnly = buildCheck({
-      ...input,
-      batches: input.batches.map((b) =>
-        isCrawl(b) ? { ...b, link_edges: b.link_edges.filter((e) => addresses.has(e.to_url)) } : b,
-      ),
+  it('gives the grade the whole graph gives, and the same page facts and fixes', () => {
+    expect(cut.check.technical_seo).toEqual(all.check.technical_seo);
+    expect(cut.check.ai_readability).toEqual(all.check.ai_readability);
+    // `internal_links` counts the edges held, so it alone may differ.
+    expect({ ...cut.check.structure!, internal_links: 0 }).toEqual({
+      ...all.check.structure!,
+      internal_links: 0,
     });
-    expect(ownOnly.page_results.filter((p) => p.is_orphan).length).toBeGreaterThan(0);
+    expect(cut.page_results).toEqual(all.page_results);
+    expect(cut.fixes).toEqual(all.fixes);
+  });
+
+  it('stops, by name, when the own-page edges alone pass their bound', () => {
+    const pages = Array.from({ length: 500 }, (_, i) => `https://example.com/p${i}`);
+    const addresses = new Set(rowAddresses(pages.map((url) => ({ url, final_url: null }))));
+    const kept = noEdgesKept();
+    const edges = pages.flatMap((from, f) =>
+      Array.from({ length: 300 }, (_, i) => edge(from, pages[(f + i + 1) % 500]!)),
+    );
+    expect(() => boundedEdges(edges, addresses, kept, 100_000)).toThrow(OwnEdgesOverBound);
+    expect(boundedEdges(edges.slice(0, 1000), addresses, noEdgesKept(), 100_000)).toHaveLength(
+      1000,
+    );
   });
 
   it('answers for a row under its URL and where it landed', () => {
-    const addresses = rowAddresses([
-      { url: 'https://example.com/a', final_url: 'https://example.com/b-moved' },
-      { url: 'https://example.com/c', final_url: null },
-    ]);
-    expect(addresses).toEqual([
-      'https://example.com/a',
-      'https://example.com/b-moved',
-      'https://example.com/c',
-    ]);
+    expect(
+      rowAddresses([
+        { url: 'https://example.com/a', final_url: 'https://example.com/b-moved' },
+        { url: 'https://example.com/c', final_url: null },
+      ]),
+    ).toEqual(['https://example.com/a', 'https://example.com/b-moved', 'https://example.com/c']);
   });
 });

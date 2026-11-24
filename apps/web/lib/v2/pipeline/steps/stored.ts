@@ -7,12 +7,13 @@ import { z } from 'zod';
 import {
   assemble,
   boundedEdges,
-  edgeQuota,
   MAX_CHECK_EDGES,
+  MAX_OWN_EDGES,
+  noEdgesKept,
+  OwnEdgesOverBound,
   readBatches,
   rowAddresses,
   type Assembled,
-  type EdgeQuota,
   type Seed,
 } from '@crawlmouse/engine/v2/pipeline';
 import {
@@ -21,7 +22,7 @@ import {
   type Check,
   type CrawlBatchResult,
 } from '@crawlmouse/types/v2';
-import type { CheckRequested } from '../../../../../../inngest/check-events';
+import { CheckFailure, type CheckRequested } from '../../../../../../inngest/check-events';
 import { getJson } from '../evidence';
 import { evidencePath, type EvidenceName, type EvidenceOwner } from '../types';
 import type { StepDeps } from './deps';
@@ -62,41 +63,49 @@ export const isCrawl = (b: BatchResult): b is CrawlBatchResult => b.kind === 'cr
 
 /**
  * The build's batch results, with the edges it holds bounded (F-248; engine build/edge-scope.ts). The
- * results are read one at a time, in the order loadResults reads them. At or under MAX_CHECK_EDGES
- * they are what loadResults answers, read once. Over it, they are read again, each with its edges cut
- * to the per-page quota, so no more than one whole result and the kept edges are held at once.
+ * stored results are read one at a time, in the order loadResults reads them. While the edges read so
+ * far are within MAX_CHECK_EDGES, the results are kept: a check within the bound gets what loadResults
+ * gives, each result read once. Past it they are let go, and read again one at a time, each crawl
+ * result keeping every edge between the crawl's own pages and up to MAX_OTHER_EDGES_PER_PAGE of the
+ * rest per page; the results' page rows and other fields are kept whole. When the own-page edges pass
+ * MAX_OWN_EDGES the build is not attempted: the check fails `build_failed`, by name, rather than being
+ * graded from part of its graph or killed for memory.
  */
 export async function loadResultsForBuild(
   deps: StepDeps,
   event: CheckRequested,
   cap: number = MAX_CHECK_EDGES,
+  maxOwn: number = MAX_OWN_EDGES,
 ): Promise<BatchResult[]> {
   const rows = await deps.store.batches(event.checkId);
   const done = rows.filter((r) => r.status === 'done' && r.result_path !== null);
   const read = async (path: string) => BatchResultSchema.parse(await getJson(deps.evidence, path));
   const addresses = new Set<string>();
-  let pages = 0;
   let edges = 0;
-  // Kept while the check is within the bound, so an ordinary check is read once; let go once over it.
   let held: BatchResult[] | null = [];
   for (const r of done) {
     const b = await read(r.result_path!);
     if (isCrawl(b)) {
       for (const a of rowAddresses(b.pages)) addresses.add(a);
-      pages += b.pages.length;
       edges += b.link_edges.length;
     }
     held = held !== null && edges <= cap ? [...held, b] : null;
   }
   if (held !== null) return held;
-  const quota = edgeQuota(pages, cap);
-  const kept = new Map<string, EdgeQuota>();
+  const kept = noEdgesKept();
   const out: BatchResult[] = [];
   for (const r of done) {
     const b = await read(r.result_path!);
-    out.push(
-      isCrawl(b) ? { ...b, link_edges: boundedEdges(b.link_edges, addresses, quota, kept) } : b,
-    );
+    if (!isCrawl(b)) {
+      out.push(b);
+      continue;
+    }
+    try {
+      out.push({ ...b, link_edges: boundedEdges(b.link_edges, addresses, kept, maxOwn) });
+    } catch (e) {
+      if (e instanceof OwnEdgesOverBound) throw new CheckFailure('build_failed', { cause: e });
+      throw e;
+    }
   }
   return out;
 }

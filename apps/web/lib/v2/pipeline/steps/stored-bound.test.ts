@@ -1,6 +1,6 @@
 import { BatchResultSchema, type BatchResult, type LinkEdge } from '@crawlmouse/types/v2';
 import { describe, expect, it } from 'vitest';
-import { edgeQuota } from '@crawlmouse/engine/v2/pipeline';
+import { MAX_OTHER_EDGES_PER_PAGE } from '@crawlmouse/engine/v2/pipeline';
 import { readRecorded } from '../../../../../../packages/engine/fixtures/v2/build/recorded';
 import { putJson } from '../evidence';
 import { memoryEvidenceStore } from '../test-support/memory-evidence';
@@ -48,29 +48,35 @@ describe('loadResultsForBuild (F-248)', () => {
     expect(bounded).toEqual(await loadResults(s.deps, EVENT));
   });
 
-  it('over the bound, holds at most the bound, and reads each result twice', async () => {
+  it('over the bound, keeps every own-page edge and the share of the rest, reading each result twice', async () => {
     const s = await setup(40);
     const total = s.edges(s.results);
-    const cap = Math.floor(total / 4);
-    const bounded = await loadResultsForBuild(s.deps, EVENT, cap);
+    const bounded = await loadResultsForBuild(s.deps, EVENT, Math.floor(total / 4));
     expect(s.reads()).toBe(2 * s.results.length);
-    expect(s.edges(bounded)).toBeLessThanOrEqual(cap);
-    // Each source page keeps at most its share; a page with more links to unfetched pages than its
-    // share keeps exactly that share of them.
-    const pages = s.results.filter(isCrawl).reduce((n, b) => n + b.pages.length, 0);
-    const quota = edgeQuota(pages, cap);
-    const bySource = new Map<string, number>();
+    const isOwn = (e: LinkEdge) => !e.to_url.includes('/never-crawled/');
+    const own = (bs: readonly BatchResult[]) =>
+      bs.filter(isCrawl).flatMap((b) => b.link_edges.filter(isOwn));
+    const full = await loadResults(s.deps, EVENT);
+    expect(own(bounded)).toEqual(own(full));
     const elsewhere = new Map<string, number>();
-    for (const e of bounded.filter(isCrawl).flatMap((b) => b.link_edges)) {
-      bySource.set(e.from_url, (bySource.get(e.from_url) ?? 0) + 1);
-      if (e.to_url.includes('/never-crawled/'))
-        elsewhere.set(e.from_url, (elsewhere.get(e.from_url) ?? 0) + 1);
-    }
-    expect(Math.max(...bySource.values())).toBeLessThanOrEqual(quota.own + quota.other);
-    expect(new Set(elsewhere.values())).toEqual(new Set([quota.other]));
+    for (const e of bounded.filter(isCrawl).flatMap((b) => b.link_edges))
+      if (!isOwn(e)) elsewhere.set(e.from_url, (elsewhere.get(e.from_url) ?? 0) + 1);
+    expect(new Set(elsewhere.values())).toEqual(new Set([MAX_OTHER_EDGES_PER_PAGE]));
     // Only edges are cut: the pages, the access tests and every other field are the results' own.
     const strip = (bs: readonly BatchResult[]) =>
       bs.map((b) => (isCrawl(b) ? { ...b, link_edges: [] } : b));
-    expect(strip(bounded)).toEqual(strip(await loadResults(s.deps, EVENT)));
+    expect(strip(bounded)).toEqual(strip(full));
+  });
+
+  it('fails the check build_failed, by name, when the own-page edges pass their bound', async () => {
+    const s = await setup(40);
+    const own = s.results
+      .filter(isCrawl)
+      .flatMap((b) => b.link_edges)
+      .filter((e) => !e.to_url.includes('/never-crawled/')).length;
+    await expect(loadResultsForBuild(s.deps, EVENT, 1, own - 1)).rejects.toMatchObject({
+      reason: 'build_failed',
+    });
+    await expect(loadResultsForBuild(s.deps, EVENT, 1, own)).resolves.toBeDefined();
   });
 });
