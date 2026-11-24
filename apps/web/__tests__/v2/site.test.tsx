@@ -54,7 +54,7 @@ describe('a credential in the site’s settings', () => {
     const data = sitePreview('home');
     const row = {
       label: 'Deploy hook',
-      value: 'POST https://crawlmouse.com/api/hooks/deploy/x.y after each deploy',
+      value: 'POST https://crawlmouse.com/api/hooks/deploy/x.y after each staging deploy',
       mono: true,
       muted: false,
       action: null,

@@ -100,7 +100,7 @@ describe('Site page, example-outfitter.com at as_of', () => {
       siteView(d, at, OUTFITTER, undefined, { deployHookUrl: hook }).settings.rows;
     const hook = (r: ReturnType<typeof rows>) => r.find((x) => x.label === 'Deploy hook');
     expect(hook(rows(bad))).toMatchObject({
-      value: `POST ${url} after each deploy`,
+      value: `POST ${url} after each staging deploy · deploys in the same 10-minute window share one check`,
       mono: true,
       secret: true,
     });
