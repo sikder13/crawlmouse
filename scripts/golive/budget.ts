@@ -402,6 +402,28 @@ const ROWS: readonly RowInput[] = [
     stepAt: [51, 57],
   },
   {
+    file: 'inngest/sentinel.ts',
+    id: 'crawlmouse.sentinel.tick',
+    onFailure: false,
+    callSites: 2,
+    registration: 'V2_PIPELINE+V2_CHECKS_PUBLIC',
+    cron: '23 * * * *',
+    steps: 1,
+    stepsHow: 'due; then watch (one sendEvent) when sites are due this hour',
+  },
+  {
+    file: 'inngest/sentinel.ts',
+    id: 'crawlmouse.sentinel.watch',
+    onFailure: false,
+    callSites: 6,
+    registration: 'V2_PIPELINE+V2_CHECKS_PUBLIC',
+    trigger: 'sentinel.watch',
+    steps: 4,
+    stepsHow:
+      'plan, look-1, wait-1-1, result-1-1 when nothing moved; a move adds polls, again, a second look and request',
+    stepAt: [92, 97, 102, 103],
+  },
+  {
     file: 'inngest/summary.ts',
     id: 'crawlmouse.summary.tick',
     onFailure: false,
