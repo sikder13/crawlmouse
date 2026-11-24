@@ -23,6 +23,14 @@ const NAME_MAX = 60;
  * isolates U+200E/F, U+202A–U+202E and U+2066–U+2069, the Arabic letter mark U+061C, the zero-width
  * U+200B–U+200D and U+FEFF among them), and the line and paragraph separators (`Zl`, `Zp`).
  */
+/**
+ * What a refused name must change, said with the refusal: the length, and the shapes the mail
+ * templates' `LINKABLE` guard refuses (an @, a colon or a slash, a dot followed by another
+ * character, seven digits or more).
+ */
+const NAME_RULE =
+  'Use 1 to 60 characters, with no @, colon or slash, no dot followed by another character, and no number of 7 digits or more.';
+
 const CONTROLS = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu;
 const EDITORS: ReadonlySet<unknown> = new Set(['owner', 'account_manager']);
 
@@ -150,7 +158,7 @@ export async function POST(req: Request) {
 
   // 8. The brand name.
   const agencyName = cleanName(form.get('agencyName'));
-  if (agencyName === null) return refuse(400, 'invalid_name');
+  if (agencyName === null) return refuse(400, 'invalid_name', { message: NAME_RULE });
 
   // 9. The logo, if one was sent: the part's size first, then the validator decides on its bytes.
   //    A form's empty file input arrives as a nameless, empty file part, which is no logo.

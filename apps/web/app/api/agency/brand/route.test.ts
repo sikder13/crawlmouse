@@ -316,6 +316,10 @@ async function throughEdge(headers: Record<string, string>) {
   return POST(new Request(AT(), { method: 'POST', headers, body: form() }));
 }
 
+/** The refusal's advice, written out: what a refused agency name must change. */
+const NAME_RULE =
+  'Use 1 to 60 characters, with no @, colon or slash, no dot followed by another character, and no number of 7 digits or more.';
+
 describe('1. same-origin POST', () => {
   it('refuses another site’s Origin with 403 cross_site before the route runs', async () => {
     const res = await throughEdge({ origin: 'https://evil.example' });
@@ -532,7 +536,7 @@ describe('7. brand name', () => {
   ])('refuses a %s name with 400 invalid_name and writes nothing', async (_label, agencyName) => {
     const res = await post({ agencyName });
     expect(res.status).toBe(400);
-    expect(await res.json()).toEqual({ code: 'invalid_name' });
+    expect(await res.json()).toEqual({ code: 'invalid_name', message: NAME_RULE });
     expectNoWrite();
   });
 
@@ -574,7 +578,7 @@ describe('7b. brand name: format characters and separators', () => {
       agencyName: '\u200e\u200f\u061c\u200b\u200c\u200d\ufeff\u2028\u2029',
     });
     expect(res.status).toBe(400);
-    expect(await res.json()).toEqual({ code: 'invalid_name' });
+    expect(await res.json()).toEqual({ code: 'invalid_name', message: NAME_RULE });
     expectNoWrite();
   });
 });
@@ -585,10 +589,12 @@ describe('7c. brand name that reads as a link or an address', () => {
     ['an https URL', 'https://evil.example/reset'],
     ['an email address', 'help@evil.example'],
     ['a host split by a zero-width space', 'evil\u200b.tld now'],
+    ['a dot between letters, as in a brand name like J.Crew', 'J.Crew Studio'],
+    ['a telephone-length number', 'Acme 0800 123 4567'],
   ])('refuses %s with 400 invalid_name and writes nothing', async (_label, agencyName) => {
     const res = await post({ agencyName });
     expect(res.status).toBe(400);
-    expect(await res.json()).toEqual({ code: 'invalid_name' });
+    expect(await res.json()).toEqual({ code: 'invalid_name', message: NAME_RULE });
     expectNoWrite();
   });
 
