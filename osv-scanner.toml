@@ -10,11 +10,6 @@
 # Any advisory NOT listed here fails CI immediately. Delete an entry when the upgrade that fixes it lands.
 
 [[IgnoredVulns]]
-id = "GHSA-4x5r-pxfx-6jf8"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: @babel/core@7.29.0 (fixed: 7.29.6)"
-
-[[IgnoredVulns]]
 id = "GHSA-f596-whhp-79r4"
 ignoreUntil = 2026-11-26
 reason = "Present at the CC-00 baseline: @grpc/grpc-js@1.14.4 (fixed: 1.14.5)"
@@ -95,11 +90,6 @@ ignoreUntil = 2026-11-26
 reason = "Present at the CC-00 baseline: adm-zip@0.5.17 (fixed: 0.6.0)"
 
 [[IgnoredVulns]]
-id = "GHSA-w5vr-8v7q-w6rv"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: baseline-browser-mapping@2.10.32 (fixed: 2.11.0)"
-
-[[IgnoredVulns]]
 id = "GHSA-3jxr-9vmj-r5cp"
 ignoreUntil = 2026-11-26
 reason = "Present at the CC-00 baseline: brace-expansion@1.1.14 (fixed: 1.1.16); brace-expansion@2.1.0 (fixed: 2.1.2); brace-expansion@5.0.6 (fixed: 5.0.7)"
@@ -128,16 +118,6 @@ reason = "Present at the CC-00 baseline: brace-expansion@1.1.14 (fixed: 1.1.20);
 id = "GHSA-rgw5-rvv9-x895"
 ignoreUntil = 2026-11-26
 reason = "Present at the CC-00 baseline: brace-expansion@1.1.14 (fixed: 1.1.18); brace-expansion@2.1.0 (fixed: 2.1.4); brace-expansion@5.0.6 (fixed: 5.0.9)"
-
-[[IgnoredVulns]]
-id = "GHSA-73wf-gq98-2v4g"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: browserslist@4.28.2 (fixed: 4.28.7)"
-
-[[IgnoredVulns]]
-id = "GHSA-c83g-rgw3-j3cx"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: browserslist@4.28.2 (fixed: 4.28.7)"
 
 [[IgnoredVulns]]
 id = "GHSA-67mh-4wv8-2f99"
