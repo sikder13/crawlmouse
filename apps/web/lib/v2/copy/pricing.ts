@@ -66,7 +66,7 @@ export function monthsFree(): number {
 
 const trialDays = `${TRIAL_DAYS} days`;
 
-/** What a paid plan says while V2_BILLING is off (RC-01). */
+/** What a paid plan says while it is not on sale: V2_BILLING off (RC-01), or Agency closed (F-251). */
 const OPENS_SHORTLY = 'opens shortly';
 
 /** How many fixes Free shows: a number on Free, or the page's sentences would not hold. */
@@ -110,11 +110,14 @@ const renders = (tier: Tier): PlanRow => ({
  * The three plan columns (A2: Pro has two seats; K9: renders; K10: the seat and site prices).
  * `proTrial`: whether the page offers Pro's no-card trial (`pricingView` decides it from Pro's
  * button and the flags); without it, Pro's tag says the card is required (SEO R2-N1).
+ * `agencyOnSale`: billing is on and Agency sales are open (`agencyOnSale` in the view); without it,
+ * Agency's tag reads as with billing off.
  */
 export function planCopy(
   interval: Interval,
   proTrial: boolean,
   billing: boolean,
+  agencyOnSale: boolean,
 ): Record<Tier, PlanCopy> {
   const { free, pro, agency } = GATES;
   return {
@@ -187,7 +190,7 @@ export function planCopy(
     },
     agency: {
       name: 'Agency',
-      tag: billing ? `${TRIAL_DAYS}-day trial, card required` : OPENS_SHORTLY,
+      tag: agencyOnSale ? `${TRIAL_DAYS}-day trial, card required` : OPENS_SHORTLY,
       description: {
         text: 'Agencies reporting to clients under their own name.',
         // A client report names the agency in its mail; the page it opens, the sender and the
@@ -265,7 +268,8 @@ export const PRICING_COPY = {
       capabilities: ['observed_crawlers'],
     },
   ],
-  annual: (billing: boolean): Tagged[] => {
+  /** `agencyOnSale`: Agency yearly is offered from Settings only while Agency is on sale (F-251). */
+  annual: (billing: boolean, agencyOnSale: boolean): Tagged[] => {
     const [first, second] = ANNUAL_RENEWAL_REMINDER_DAYS;
     if (!billing) {
       return [
@@ -277,7 +281,9 @@ export const PRICING_COPY = {
     }
     return [
       {
-        text: `Annual: Pro ${usd(PRO_YEARLY)}, Agency ${usd(AGENCY_YEARLY)} — ${numberWord(monthsFree())} months free, from Settings.`,
+        text: agencyOnSale
+          ? `Annual: Pro ${usd(PRO_YEARLY)}, Agency ${usd(AGENCY_YEARLY)} — ${numberWord(monthsFree())} months free, from Settings.`
+          : `Annual: Pro ${usd(PRO_YEARLY)}, Agency ${usd(AGENCY_YEARLY)} — ${numberWord(monthsFree())} months free; Pro from Settings, Agency when the Agency plan opens.`,
         capabilities: [],
       },
       {
@@ -328,6 +334,8 @@ export const PRICING_COPY = {
     agencyUsed: { note: 'Your agency trial was used, on an agency account since deleted' },
     /** V2_BILLING off (RC-01): no route here takes a card. */
     opensShortly: { note: 'Paid plans open shortly' },
+    /** V2_BILLING on, V2_AGENCY_SALES off (F-251): Pro is on sale, Agency is not. */
+    agencyOpensShortly: { note: `The Agency plan ${OPENS_SHORTLY}` },
     agencyStartFree: { label: 'Start free', note: `The Agency plan ${OPENS_SHORTLY}` },
     proTrialBillingOff: {
       label: `Start with ${trialDays} of Pro`,
@@ -378,9 +386,12 @@ export const PRICING_COPY = {
     } as Record<string, string>,
   },
   after: {
-    /** Without Pro's trial on offer, the section is the Agency trial's (`proTrial`, SEO R2-N1). */
-    title: (proTrial: boolean, billing: boolean) =>
-      proTrial || !billing
+    /**
+     * Without Pro's trial on offer, the section is the Agency trial's (`proTrial`, SEO R2-N1), while
+     * Agency is on sale (`agencyOnSale`: billing on and V2_AGENCY_SALES, F-251).
+     */
+    title: (proTrial: boolean, agencyOnSale: boolean) =>
+      proTrial || !agencyOnSale
         ? `What happens when the ${trialDays} end`
         : `What happens when the Agency trial’s ${trialDays} end`,
     /**
@@ -400,7 +411,8 @@ export const PRICING_COPY = {
         : []),
     ],
     columns: ['What', 'What happens'] as const,
-    rows: (interval: Interval, billing: boolean): [string, Tagged][] => [
+    /** The Agency trial's row only while Agency is on sale (`agencyOnSale`, F-251). */
+    rows: (interval: Interval, billing: boolean, agencyOnSale: boolean): [string, Tagged][] => [
       [
         'Your first site',
         {
@@ -426,7 +438,7 @@ export const PRICING_COPY = {
           capabilities: ['fix_packets'],
         },
       ],
-      ...(billing
+      ...(agencyOnSale
         ? ([
             [
               'Agency trial',
@@ -454,8 +466,15 @@ export const PRICING_COPY = {
   },
   faq: {
     title: 'Questions people ask before paying',
-    /** `proTrial`: whether the page offers Pro's no-card trial (SEO R2-N1). */
-    items: (proTrial: boolean, billing: boolean): { q: string; a: Tagged }[] => {
+    /**
+     * `proTrial`: whether the page offers Pro's no-card trial (SEO R2-N1). `agencyOnSale`: whether
+     * Agency's trial and its trial page are on offer (F-251); without it, neither is named.
+     */
+    items: (
+      proTrial: boolean,
+      billing: boolean,
+      agencyOnSale: boolean,
+    ): { q: string; a: Tagged }[] => {
       const [first, second] = ANNUAL_RENEWAL_REMINDER_DAYS;
       if (!billing) {
         return [
@@ -484,16 +503,17 @@ export const PRICING_COPY = {
           },
         ];
       }
-      const agencyCard =
-        'Agency’s trial takes a card at the start, and the plan is charged when the trial ends unless you cancel.';
+      const agencyCard = agencyOnSale
+        ? ' Agency’s trial takes a card at the start, and the plan is charged when the trial ends unless you cancel.'
+        : '';
       return [
         {
           q: 'Do I need a card for Pro?',
           a: {
             text: proTrial
-              ? `No. The ${trialDays} start with your email. ${agencyCard}`
-              : `Yes: Pro starts when Stripe takes the card. ${agencyCard}`,
-            capabilities: ['agency_trial', 'cancel'],
+              ? `No. The ${trialDays} start with your email.${agencyCard}`
+              : `Yes: Pro starts when Stripe takes the card.${agencyCard}`,
+            capabilities: agencyOnSale ? ['agency_trial', 'cancel'] : [],
           },
         },
         {
@@ -507,7 +527,9 @@ export const PRICING_COPY = {
         {
           q: 'Can I cancel?',
           a: {
-            text: 'Any day, with no call: from Settings, or for an agency account from the Agency trial page. The account goes back to Free; nothing you can see is deleted.',
+            text: agencyOnSale
+              ? 'Any day, with no call: from Settings, or for an agency account from the Agency trial page. The account goes back to Free; nothing you can see is deleted.'
+              : 'Any day, with no call, from Settings. The account goes back to Free; nothing you can see is deleted.',
             capabilities: ['cancel'],
           },
         },

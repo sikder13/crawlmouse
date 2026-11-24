@@ -155,7 +155,7 @@ export const SETUP_COPY = {
   },
   staging: {
     subject: STAGING,
-    todo: `Add ${STAGING} so audits run before each deploy`,
+    todo: `Add ${STAGING} so audits run after each staging deploy`,
     done: 'Staging audited on each deploy',
   },
   observed: {
@@ -336,6 +336,14 @@ const DAY0: CopyChange[] = [
   },
   {
     screen: 'dashboard-day0',
+    kind: 'ruling',
+    locked: 'Add a staging URL so audits run before each deploy',
+    rendered: 'Add a staging URL so audits run after each staging deploy',
+    source:
+      'V2R register, F-097 (CTO 057): the deploy hook fires once a staging deploy has finished, so the audit runs after it',
+  },
+  {
+    screen: 'dashboard-day0',
     kind: 'facts',
     locked: 'one reminder on Fri 6 Nov, two days before the trial ends.',
     rendered:
@@ -375,6 +383,14 @@ const DAY0: CopyChange[] = [
 
 const HOME: CopyChange[] = [
   ...railChanges('dashboard'),
+  {
+    screen: 'dashboard',
+    kind: 'ruling',
+    locked: '5 sites ·',
+    rendered: '4 sites ·',
+    source:
+      'Owner ruling Q10: a staging site holds no primary slot (ARCH-2 §2.5), so the count of sites leaves it out (F-097)',
+  },
   {
     screen: 'dashboard',
     kind: 'fixture',
