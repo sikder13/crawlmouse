@@ -210,9 +210,15 @@ function competitorOf(check: Check, present: number): SignalsView['competitor'] 
     seo: seo?.score ?? null,
     read: check.without_js?.site_text_share ?? null,
   };
-  const side = (mine: number | null, theirs: number) =>
-    mine === null ? null : mine > theirs ? 'ahead' : mine < theirs ? 'behind' : 'level';
-  const seoSide = side(own.seo, c.technical_seo.score);
+  const side = (mine: number | null, theirs: number | null) =>
+    mine === null || theirs === null
+      ? null
+      : mine > theirs
+        ? 'ahead'
+        : mine < theirs
+          ? 'behind'
+          : 'level';
+  const seoSide = side(own.seo, c.technical_seo?.score ?? null);
   const readSide = side(own.read, c.text_share);
   const parts = [
     seoSide ? `${seoSide} on technical SEO` : null,
@@ -230,13 +236,15 @@ function competitorOf(check: Check, present: number): SignalsView['competitor'] 
       {
         measure: 'Text without JavaScript',
         own: own.read === null ? 'not measured' : `${percent(own.read)}%`,
-        theirs: `${percent(c.text_share)}%`,
+        theirs: c.text_share === null ? 'not measured' : `${percent(c.text_share)}%`,
         pro: false,
       },
       {
         measure: 'Technical SEO',
         own: seo?.grade ? `${seo.grade} · ${seo.score}` : 'not graded',
-        theirs: `${c.technical_seo.grade} · ${c.technical_seo.score}`,
+        theirs: c.technical_seo
+          ? `${c.technical_seo.grade} · ${c.technical_seo.score}`
+          : 'not graded',
         pro: false,
       },
       {

@@ -519,6 +519,55 @@ describe('crawl batch output', () => {
   });
 });
 
+// F-252: a server that answers /about/ and 404s /about. The crawl asks the address the site wrote and
+// keys the row on the canonical spelling, the identity the build compares pages in.
+describe('the address asked and the row’s key (F-252)', () => {
+  const slashOnly = (path: string, _ua: string, res: http.ServerResponse) => {
+    if (!path.endsWith('/')) {
+      res.statusCode = 404;
+      return res.end();
+    }
+    res.setHeader('content-type', 'text/html');
+    res.end(
+      '<html><body><p>a page</p><a href="/docs/">Docs</a><a href="/docs/#intro">Docs again</a><a href="/Team/?b=2&a=1#x">Team</a></body></html>',
+    );
+  };
+
+  it('asks a crawl URL as given, and keys its row on the canonical spelling', async () => {
+    const s = await serve({ page: slashOnly });
+    const { result } = await run(crawlReq(s.base, ['/about/']));
+    if (result.kind !== 'crawl') throw new Error('crawl');
+    expect(pagesRequested(s).map((r) => r.url)).toEqual(['/about/']);
+    expect(result.pages[0]).toMatchObject({
+      url: `${s.base}/about`,
+      status_code: 200,
+      final_url: `${s.base}/about/`,
+      redirect: { hops: [], loop: false },
+    });
+    expect(result.link_edges.map((e) => [e.from_url, e.to_url])).toEqual([
+      [`${s.base}/about`, `${s.base}/docs`],
+      [`${s.base}/about`, `${s.base}/Team?a=1&b=2`],
+    ]);
+  });
+
+  it('names each discovered URL as it was first linked, without its fragment', async () => {
+    const s = await serve({ page: slashOnly });
+    const { result } = await run(crawlReq(s.base, ['/about/']));
+    if (result.kind !== 'crawl') throw new Error('crawl');
+    expect(result.discovered_urls).toEqual([`${s.base}/docs/`, `${s.base}/Team/?b=2&a=1`]);
+  });
+
+  it('asks an access page as given, and keys its rows on the canonical spelling', async () => {
+    const s = await serve({ page: slashOnly });
+    const { result } = await run(accessReq(s.base, ['/about/']));
+    if (result.kind !== 'access') throw new Error('access');
+    expect(new Set(result.access_tests.map((t) => t.page_url))).toEqual(
+      new Set([`${s.base}/about`]),
+    );
+    expect(pagesRequested(s).every((r) => r.url === '/about/')).toBe(true);
+  });
+});
+
 describe('review fixes: robots.txt is per batch, across origins', () => {
   it('an unreachable robots.txt on one origin keeps the other origin of the site from being fetched too', async () => {
     // www and bare hosts cannot both be served on loopback, so two ports stand in for two origins of

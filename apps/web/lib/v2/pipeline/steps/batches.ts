@@ -13,7 +13,7 @@
  * gzipped, and its row marked done with a summary of counts and the worker release its rows name. A
  * row already done answers with that summary, without asking the worker.
  */
-import { nextCrawlBatch, sample, type Sample } from '@crawlmouse/engine/v2/pipeline';
+import { answeredAt, nextCrawlBatch, sample, type Sample } from '@crawlmouse/engine/v2/pipeline';
 import { BatchResultSchema, type BatchResult } from '@crawlmouse/types/v2';
 import { z } from 'zod';
 import type { BatchAt, CheckSteps, PostOutput, RunSoFar } from '../../../../../../inngest/check';
@@ -52,14 +52,24 @@ type Planned =
   | { kind: 'access'; pages: { url: string; template_key: string }[] }
   | { none: Extract<PostOutput, { status: 'none' }>['why'] };
 
-/** An access stage's pages from the sample. */
-export function stagePages(s: Sample, stage: 1 | 2): Planned {
+/**
+ * An access stage's pages from the sample, each asked where the crawl found it answering (F-252,
+ * engine `answeredAt`): the worker keys its rows on the canonical spelling, as the sample names them.
+ */
+export function stagePages(
+  s: Sample,
+  stage: 1 | 2,
+  rows: ReadonlyMap<string, Parameters<typeof answeredAt>[0]>,
+): Planned {
   if (stage === 2 && s.stage2_needed !== true) return { none: 'not_needed' };
   const picked = stage === 1 ? s.stage1 : s.stage2;
   if (picked.length === 0) return { none: 'done' };
   return {
     kind: 'access',
-    pages: picked.map((p) => ({ url: p.url, template_key: p.template_key })),
+    pages: picked.map((p) => {
+      const row = rows.get(p.url);
+      return { url: row ? answeredAt(row) : p.url, template_key: p.template_key };
+    }),
   };
 }
 
@@ -97,7 +107,7 @@ export function batchSteps(
       return urls === null ? { none: 'done' } : { kind: 'crawl', urls };
     }
     const { assembled } = await assembledSoFar(deps, event, seeds, results);
-    return stagePages(sample(assembled), at.stage ?? 1);
+    return stagePages(sample(assembled), at.stage ?? 1, assembled.rows);
   }
 
   /** True when the worker took the batch; otherwise the output the orchestration acts on. */

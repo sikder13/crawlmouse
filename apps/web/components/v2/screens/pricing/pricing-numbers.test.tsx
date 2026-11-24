@@ -110,6 +110,7 @@ const pages = VIEWERS.flatMap(([name, viewer]) =>
               accountDoor: true,
               checksPublic: true,
               billing: true,
+              agencySales: true,
             })}
           />,
         ),
@@ -179,6 +180,7 @@ describe('the figures follow GATES and prices.ts, not the values typed today', (
               accountDoor: true,
               checksPublic: true,
               billing: true,
+              agencySales: true,
             })}
           />,
         ),
