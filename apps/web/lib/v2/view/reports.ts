@@ -167,8 +167,10 @@ export function reportsView(
 
   // ── the header ──
   const trial = v.account.state === 'pro_trial' || v.account.state === 'agency_trial';
+  // A staging copy holds no site slot (Owner ruling Q10), so the count is of primaries, as the rail's.
+  const primaries = sites.filter((s) => s.staging_of_site_id === null).length;
   const line = [
-    scoped ? COPY.sitesInSeat(sites.length) : COPY.sites(sites.length),
+    scoped ? COPY.sitesInSeat(primaries) : COPY.sites(primaries),
     v.gates.exports ? COPY.exportsOn(plan) : COPY.exportsAre(exportsPlan),
     ...(trial ? [COPY.daysLeft(calendarDays(v.now, v.account.trial_ends_at!, zone), plan)] : []),
   ].join(' · ');
