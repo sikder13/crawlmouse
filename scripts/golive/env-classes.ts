@@ -57,6 +57,8 @@ export const REQUIRED_ENV: Readonly<Record<Step, Why>> = {
 /** Read when set, with a working default or a deliberate "off" when unset. */
 export const OPTIONAL_ENV: Why = {
   V2_AGENCY_SALES: 'unset keeps Agency "coming": its checkout and trial refuse with billing on',
+  V2_HIDE_FEATURES:
+    'unset shows every feature; names features not yet proven to hide them everywhere (Goal 1 rule 2, lib/feature-switch.ts)',
   ADMIN_SECRET: 'unset, the admin takedown route refuses every request (closed by default)',
   AI_READINESS_EXTRACTION: 'engine switch; unset keeps the default extraction',
   CRAWL_PAUSED: 'the global crawl pause, set only to pause (PROJECT_OVERVIEW §6)',
