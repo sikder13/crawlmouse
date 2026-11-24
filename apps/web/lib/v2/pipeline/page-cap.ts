@@ -8,7 +8,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { effectiveTier, GATES, type EntitlementClock } from '../../entitlement-v2';
 import { featureShown } from '../../feature-switch';
 import { DEFAULT_PAGE_CAP } from './limits';
-import { ACCOUNT_CLOCK_COLUMNS, clockFromAccountRow } from './load-for';
+import { readAccountClock } from './load-for';
 
 type Env = Readonly<Record<string, string | undefined>>;
 
@@ -21,20 +21,6 @@ export function pageCapFor(
   if (clock === null || !featureShown('pages_2000', env)) return DEFAULT_PAGE_CAP;
   const tier = effectiveTier(clock, now);
   return tier === 'free' ? DEFAULT_PAGE_CAP : GATES[tier].pagesPerCheck;
-}
-
-/** The entitlement clock of `accountId`, from its `accounts` row. */
-export async function readAccountClock(
-  sb: SupabaseClient,
-  accountId: string,
-): Promise<EntitlementClock> {
-  const { data, error } = await sb
-    .from('accounts')
-    .select(ACCOUNT_CLOCK_COLUMNS)
-    .eq('id', accountId)
-    .single();
-  if (error || !data) throw new Error(`page cap: reading account: ${error?.code ?? 'none'}`);
-  return clockFromAccountRow(data as Record<string, unknown>);
 }
 
 /** The page cap of a check of a site kept by `accountId`, read from its `accounts` row now. */

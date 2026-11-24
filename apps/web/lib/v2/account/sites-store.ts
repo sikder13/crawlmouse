@@ -26,7 +26,7 @@ import { DOMAIN_AUDITS_PER_HOUR, GLOBAL_AUDITS_BUCKET, GLOBAL_AUDITS_PER_DAY } f
 import { MAX_RATE_LIMIT_WINDOW_MS, rateLimitWindowStart } from '../../rate-limit-window';
 import { bucketedKey, checkIdOfKey, freshKey } from '../pipeline/ids';
 import { MANUAL_BUCKET_S } from '../pipeline/limits';
-import { readAccountClock } from '../pipeline/page-cap';
+import { readAccountClock } from '../pipeline/load-for';
 import { homepageOf, requestCheck, type RequestDeps } from '../pipeline/request';
 import { supabasePipelineStore, type QueuedCheck } from '../pipeline/store';
 import type { RecheckOutcome, RequestRecheck } from './recheck';

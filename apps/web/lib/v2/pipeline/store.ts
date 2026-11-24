@@ -20,7 +20,7 @@ import type { ReapedCheck } from '../../../../../inngest/check-reaper';
 import { checkFromRow, diffInputsFromRow, fixEventFromRow, fixFromRow, siteFromRow } from './rows';
 import type { CrawlBatchRow, CrawlBatchStatus } from './types';
 import type { EntitlementClock } from '../../entitlement-v2';
-import { readAccountClock } from './page-cap';
+import { readAccountClock } from './load-for';
 
 export type ClaimOutcome = 'claimed' | 'site_busy' | 'gone';
 
