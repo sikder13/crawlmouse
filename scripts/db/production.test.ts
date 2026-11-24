@@ -5,6 +5,7 @@ import {
   driftProblems,
   gateProblems,
   manifestProblems,
+  oneDryRun,
   type ApplySteps,
 } from './production';
 import { rollbackOrderProblem } from './rollback';
@@ -45,7 +46,25 @@ describe('the gate before the owner approves', () => {
     const s = summary({ files: summary().files.slice(1) });
     expect(gateProblems(pending, s, PRODUCTION)).toEqual([
       `${pending[0]!.file} was not in the dry run`,
+      oneDryRun(pending),
     ]);
+  });
+
+  it('says once that one dry run must cover every pending file, naming them all', () => {
+    const s = summary({ files: summary().files.slice(2) });
+    const problems = gateProblems(pending, s, PRODUCTION);
+    expect(problems).toHaveLength(3);
+    const advice = problems.at(-1)!;
+    expect(advice).toContain(`all ${pending.length} pending files`);
+    for (const f of pending) expect(advice).toContain(f.file);
+    expect(advice).toContain('dry_run_pr');
+  });
+
+  it('does not give that advice for a file whose bytes changed', () => {
+    const files = summary().files.map((f, i) => (i === 0 ? { ...f, sha256: '0'.repeat(64) } : f));
+    expect(gateProblems(pending, summary({ files }), PRODUCTION).join('\n')).not.toContain(
+      'dry_run_pr',
+    );
   });
 
   it('refuses a pending file whose bytes changed after the dry run', () => {

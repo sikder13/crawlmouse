@@ -1,0 +1,97 @@
+import { createHmac } from 'node:crypto';
+import { SIGNATURE_HEADER, TS_HEADER } from './auth/hmac.js';
+
+/**
+ * The worker's one call to the app: "this batch has ended", so a run waiting on it can read it now
+ * rather than at its next poll (PR 5a). It is a hint. The result is still read from the worker, and a
+ * signal that never arrives costs the run one wait's timeout, never a check.
+ *
+ * The address comes from the worker's own setting (APP_SIGNAL_URL), never from a batch. The body holds
+ * ids and a batch number only. It is sent when the batch ends and once more SIGNAL_REPEAT_MS later,
+ * because a wait hears only events sent after it starts listening.
+ */
+
+export const SIGNAL_REQUEST_MS = 3_000;
+export const SIGNAL_REPEAT_MS = 5_000;
+
+export interface BatchEnded {
+  check_id: string;
+  batch: number;
+  status: 'done' | 'failed';
+}
+
+export type SignalPost = (
+  url: string,
+  init: {
+    method: 'POST';
+    headers: Record<string, string>;
+    body: string;
+    signal: AbortSignal;
+    /** Refused, so a redirect cannot carry the signature to another address. */
+    redirect: 'error';
+  },
+) => Promise<{ status?: number } | void>;
+
+/**
+ * Signed under a key of its own derived from the shared secret, so a batch or read signature is made
+ * with a different key. The label does not start with digits and a dot, so no batch or read signature
+ * (`${ts}.…`) can equal the derived key. Same rule as apps/web/lib/worker-client/sign.ts.
+ */
+const SIGNAL_KEY_LABEL = 'crawlmouse-worker-signal-v1';
+export const signSignal = (secret: string, ts: string, raw: string): string => {
+  const key = createHmac('sha256', secret).update(SIGNAL_KEY_LABEL).digest();
+  return createHmac('sha256', key).update(`${ts}.`).update(raw).digest('hex');
+};
+
+export interface DoneSignalDeps {
+  url: string;
+  secret: string;
+  now(): number;
+  post?: SignalPost;
+  log(e: Record<string, string | number>): void;
+  /** Sent as `x-vercel-protection-bypass`, on staging only (config.ts). Never logged. */
+  protectionBypass?: string;
+}
+
+export function createDoneSignal(deps: DoneSignalDeps): (ended: BatchEnded) => void {
+  const post: SignalPost = deps.post ?? ((url, init) => fetch(url, init));
+  const once = async (ended: BatchEnded): Promise<void> => {
+    const raw = JSON.stringify(ended);
+    const ts = String(deps.now());
+    const deadline = new AbortController();
+    const timer = setTimeout(() => deadline.abort(), SIGNAL_REQUEST_MS);
+    timer.unref?.();
+    try {
+      const answer = await post(deps.url, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          [TS_HEADER]: ts,
+          [SIGNATURE_HEADER]: signSignal(deps.secret, ts, raw),
+          ...(deps.protectionBypass && { 'x-vercel-protection-bypass': deps.protectionBypass }),
+        },
+        body: raw,
+        signal: deadline.signal,
+        redirect: 'error',
+      });
+      if (answer?.status !== undefined && (answer.status < 200 || answer.status >= 300)) {
+        deps.log({
+          event: 'signal_refused',
+          check_id: ended.check_id,
+          batch: ended.batch,
+          status: answer.status,
+        });
+      }
+    } catch {
+      // Never the error's text: it can hold the address.
+      deps.log({ event: 'signal_failed', check_id: ended.check_id, batch: ended.batch });
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+  return (ended) => {
+    void once(ended);
+    // Unref'd, so a pending repeat holds neither a shutdown nor `idle()`.
+    setTimeout(() => void once(ended), SIGNAL_REPEAT_MS).unref?.();
+  };
+}

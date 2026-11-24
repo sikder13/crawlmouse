@@ -131,7 +131,7 @@ describe('footer-links.ts: the one map of header and footer links', () => {
         [
           ['Free audit', '/'],
           ['Pricing', '/pricing'],
-          ['For agencies', 'planned'],
+          ['For agencies', '/agencies'],
           ['Developers', '/developers'],
           ['Changelog', 'planned'],
           ['Status', '/status'],

@@ -9,7 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { frame } from '../../../api/checks/[id]/stream/serve';
 import { START, type Cursor } from '../../../../lib/v2/pipeline/stream';
 import type { ProgressEvent } from '../../../../lib/v2/progress';
-import { LIVE_EMAIL_DOES, LiveCrawl, retryDelayMs } from './LiveCrawl';
+import { LIVE_EMAIL_DOES, LOST_AFTER_MS, LiveCrawl, retryDelayMs } from './LiveCrawl';
 
 const refresh = vi.hoisted(() => vi.fn());
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh }) }));
@@ -27,8 +27,12 @@ class FakeEventSource {
   onopen: (() => void) | null = null;
   onmessage: ((e: { data: string; lastEventId: string }) => void) | null = null;
   onerror: (() => void) | null = null;
+  readonly named = new Map<string, () => void>();
   constructor(readonly url: string) {
     FakeEventSource.made.push(this);
+  }
+  addEventListener(name: string, fn: () => void) {
+    this.named.set(name, fn);
   }
   close() {
     this.readyState = FakeEventSource.CLOSED;
@@ -175,6 +179,55 @@ describe('LiveCrawl', () => {
 
   const LOST =
     'The live view lost its connection, and is trying again. The audit keeps running; the counts here are the last received.';
+
+  describe('a connection the browser is retrying by itself', () => {
+    const LOST = 'The live view lost its connection';
+
+    it('says nothing for a reconnect that succeeds quickly, as the stream’s own 240 s close does', () => {
+      const es = FakeEventSource.made[0]!;
+      act(() => es.onopen?.());
+      act(() => es.drop());
+      act(() => void vi.advanceTimersByTime(LOST_AFTER_MS - 1));
+      expect(host.textContent).not.toContain(LOST);
+      act(() => es.onopen?.());
+      act(() => void vi.advanceTimersByTime(LOST_AFTER_MS * 2));
+      expect(host.textContent).not.toContain(LOST);
+    });
+
+    it('says the connection is lost once it has stayed down, and clears when it returns', () => {
+      const es = FakeEventSource.made[0]!;
+      act(() => es.onopen?.());
+      act(() => es.drop());
+      act(() => void vi.advanceTimersByTime(LOST_AFTER_MS));
+      expect(host.textContent).toContain(LOST);
+      act(() => es.onopen?.());
+      expect(host.textContent).not.toContain(LOST);
+    });
+
+    it('counts from the first failure, when the retries fail one after another', () => {
+      const es = FakeEventSource.made[0]!;
+      act(() => es.onopen?.());
+      act(() => es.drop());
+      act(() => void vi.advanceTimersByTime(LOST_AFTER_MS - 1));
+      act(() => es.drop());
+      act(() => void vi.advanceTimersByTime(1));
+      expect(host.textContent).toContain(LOST);
+    });
+  });
+
+  it('starts over on a new connection when the server says its counts were too high', () => {
+    const first = source();
+    act(() => first.onopen?.());
+    act(() => first.send(crawling.events, crawling.cursor));
+    expect(text()).toContain('3 pages');
+    act(() => first.named.get('restart')?.());
+    expect(first.readyState).toBe(FakeEventSource.CLOSED);
+    expect(FakeEventSource.made).toHaveLength(2);
+    // What is drawn stays until the new connection is accepted.
+    expect(text()).toContain('3 pages');
+    act(() => FakeEventSource.made[1]!.onopen?.());
+    expect(text()).not.toContain('3 pages');
+  });
 
   it('says so when the server refuses the stream, keeps the last counts, and tries again later', () => {
     act(() => source().send(crawling.events, crawling.cursor));

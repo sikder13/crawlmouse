@@ -45,7 +45,7 @@ export const SITE_COPY = {
   fields: {
     cadence: 'How often',
     weekday: 'Day',
-    hour: 'Hour, in the account’s zone',
+    hour: (zone: string) => `Hour, ${zone}`,
     competitors: { label: 'Competitor sites', placeholder: 'competitor.example, another.example' },
     staging: { label: 'Staging URL (empty for none)', placeholder: 'staging.example.com' },
     removeConfirm: 'Yes, remove this site',
@@ -178,18 +178,10 @@ export const SITE_CHANGES: CopyChange[] = [
   {
     screen: 'site',
     kind: 'fixture',
-    locked: 'Structure +4 SEO open Packet',
-    rendered: 'Structure +4 SEO open · Pro Packet',
-    source:
-      'The fixture’s Free three at Friday’s check are fixes 1, 2 and 0 (isFreeFix, by rank), so fix 3 is a Pro fix',
-  },
-  {
-    screen: 'site',
-    kind: 'fixture',
     locked: 'Content +1 SEO open · Pro',
-    rendered: 'Content AI after fixes 1 and 2 open · Pro',
+    rendered: 'Content AI after fixes 1 and 2 open',
     source:
-      'The fixture’s fix 4 effect, as points() words it (FACTS I11: its AI effect waits on fixes 1 and 2)',
+      'The fixture’s fix 4 effect, as points() words it (FACTS I11: its AI effect waits on fixes 1 and 2); the account is on Pro, where every fix is plainly open (F-099)',
   },
   {
     screen: 'site',
@@ -200,6 +192,14 @@ export const SITE_CHANGES: CopyChange[] = [
       '5–15 Eleven more: 7 in Structure and 4 in Content — +7 Technical SEO together; AI effect not yet estimated for 4',
     source:
       'The fixture’s fixes 5 to 15, counted by section; the locked topic words (anchors, depth, …) are shorthand for the fixes’ titles, which Show all lists in full, and the grouped effect is the fixes’ own (groupPoints)',
+  },
+  {
+    screen: 'site',
+    kind: 'ruling',
+    locked: 'not yet estimated for 4 open · Pro',
+    rendered: 'not yet estimated for 4 open',
+    source:
+      'V2R register, F-099 (CC-45 sweep): an account on Pro has every fix open, so no row is marked as a Pro fix',
   },
   {
     screen: 'site',
@@ -224,6 +224,36 @@ export const SITE_CHANGES: CopyChange[] = [
     source: 'The fixture’s content change, as its summary words it, detected at Friday’s check',
   },
 ];
+
+/**
+ * F-099: the fixes table in the engine's order of impact, on the fixture's rows, last of the changes.
+ * At both widths, since the locked page hides a fix's note on a phone.
+ */
+const IMPACT_SOURCE =
+  'V2R register, F-099 (CC-45 sweep): rows in impact order, the engine’s rank, as the dashboard and the main button read them; the folded row names the numbers it holds';
+
+SITE_CHANGES.push(
+  {
+    screen: 'site',
+    kind: 'ruling',
+    locked:
+      '0 Remove the Claude-SearchBot block from robots.txt new Fri robots.txt, Thu 19:40 · + User-agent: ClaudeBot · + User-agent: Claude-SearchBot · + Disallow: / · three lines to delete, then mark done Crawler access +19 AI open Packet 1 Let GPTBot and PerplexityBot through Cloudflare Crawler access +24 AI open Packet 2 Server-render the product template · marked done Wed; the re-check that day did not agree, so it stays open Without JavaScript +22 AI open Packet 3 Link the 7 orphan pages from their collections Structure +4 SEO open Packet 4 Open every product page with a two-sentence answer Content AI after fixes 1 and 2 open Packet 5–15 Eleven more: 7 in Structure and 4 in Content — +7 Technical SEO together; AI effect not yet estimated for 4',
+    rendered:
+      '1 Let GPTBot and PerplexityBot through Cloudflare Crawler access +24 AI open Packet 2 Server-render the product template · marked done Wed; the re-check that day did not agree, so it stays open Without JavaScript +22 AI open Packet 0 Remove the Claude-SearchBot block from robots.txt new Fri robots.txt, Thu 19:40 · + User-agent: ClaudeBot · + User-agent: Claude-SearchBot · + Disallow: / · three lines to delete, then mark done Crawler access +19 AI open Packet 3 Link the 7 orphan pages from their collections Structure +4 SEO open Packet 5 Replace the generic anchor text on 6 pages Structure +2 SEO open Packet 4, 6–15 Eleven more: 6 in Structure and 5 in Content — +6 Technical SEO together; AI effect not yet estimated for 5',
+    hiddenOnPhone: true,
+    source: IMPACT_SOURCE,
+  },
+  {
+    screen: 'site',
+    kind: 'ruling',
+    locked:
+      '0 Remove the Claude-SearchBot block from robots.txt new Fri robots.txt, Thu 19:40 · + User-agent: ClaudeBot · + User-agent: Claude-SearchBot · + Disallow: / · three lines to delete, then mark done Crawler access +19 AI open Packet 1 Let GPTBot and PerplexityBot through Cloudflare Crawler access +24 AI open Packet 2 Server-render the product template Without JavaScript +22 AI open Packet 3 Link the 7 orphan pages from their collections Structure +4 SEO open Packet 4 Open every product page with a two-sentence answer Content AI after fixes 1 and 2 open Packet 5–15 Eleven more: 7 in Structure and 4 in Content — +7 Technical SEO together; AI effect not yet estimated for 4',
+    rendered:
+      '1 Let GPTBot and PerplexityBot through Cloudflare Crawler access +24 AI open Packet 2 Server-render the product template Without JavaScript +22 AI open Packet 0 Remove the Claude-SearchBot block from robots.txt new Fri robots.txt, Thu 19:40 · + User-agent: ClaudeBot · + User-agent: Claude-SearchBot · + Disallow: / · three lines to delete, then mark done Crawler access +19 AI open Packet 3 Link the 7 orphan pages from their collections Structure +4 SEO open Packet 5 Replace the generic anchor text on 6 pages Structure +2 SEO open Packet 4, 6–15 Eleven more: 6 in Structure and 5 in Content — +6 Technical SEO together; AI effect not yet estimated for 5',
+    onlyOnPhone: true,
+    source: IMPACT_SOURCE,
+  },
+);
 
 export const SITE_ADDITIONS: Addition[] = [
   {

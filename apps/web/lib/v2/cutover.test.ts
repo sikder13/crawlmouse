@@ -129,7 +129,7 @@ describe('the cutover table covers the inventory', () => {
       const target = TARGETS[to]!;
       if ('rewrite' in target) {
         const rewrite = V2_REWRITES.find((r) => r.from === target.rewrite);
-        expect(rewrite && row.flags.includes(rewrite.flag)).toBe(true);
+        expect(rewrite && (row.flags as readonly string[]).includes(rewrite.flag)).toBe(true);
         return;
       }
       const source = readFileSync(join(WEB, target.page), 'utf8');

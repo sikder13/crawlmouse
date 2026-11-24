@@ -3,11 +3,12 @@ import { setFlagsFromString } from 'node:v8';
 import { runInNewContext } from 'node:vm';
 import type { AddressInfo } from 'node:net';
 import { DECLARATION_PATHS } from '@crawlmouse/types/v2';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { inlineReader, type PageReader } from './reader/read.js';
 import { signBatch, signRead } from './auth/hmac.js';
 import { RESULT_TTL_MS } from './batch/store.js';
 import { loadConfig, isCrawlPaused, type WorkerConfig } from './config.js';
+import type { SignalPost } from './signal.js';
 import type { Fetcher } from './fetch/fetcher.js';
 import { BODY_DEADLINE_MS, createWorker, type LogEvent, type Worker } from './server.js';
 import { InstantClock } from './test-support/clock.js';
@@ -40,6 +41,7 @@ async function start(
   over: Partial<WorkerConfig> = {},
   fetcher?: Fetcher,
   reader?: PageReader,
+  signalPost?: SignalPost,
 ): Promise<Running> {
   const clock = new InstantClock(1_800_000_000_000);
   const logs: LogEvent[] = [];
@@ -57,6 +59,7 @@ async function start(
       ),
     log: (e) => logs.push(e),
     reader,
+    signalPost,
   });
   await new Promise<void>((r) => worker.server.listen(0, '127.0.0.1', r));
   current = {
@@ -146,6 +149,70 @@ describe('POST /batch: accepted', () => {
       (await post(batchBody({ urls: ['https://example.com/', 'https://www.example.com/x'] })))
         .status,
     ).toBe(202);
+  });
+});
+
+describe('the done signal (PR 5a)', () => {
+  const URL_ = 'https://app.example.test/api/webhooks/worker';
+
+  it('with no address, the 202 is as it was and nothing is sent', async () => {
+    const { worker } = await start();
+    const body = batchBody();
+    expect(await post(body)).toEqual({
+      status: 202,
+      body: { batch_id: `${CHECK}:${body.batch}` },
+    });
+    await worker.idle();
+  });
+
+  it('with an address, says so in the 202 and signals the batch once it is stored', async () => {
+    const sent: unknown[] = [];
+    let readable: number | null = null;
+    const { worker } = await start(
+      { appSignalUrl: URL_ },
+      undefined,
+      undefined,
+      async (_u, init) => {
+        sent.push(JSON.parse(init.body));
+        readable = (await get(`/batch/${CHECK}:${nonceSeq}`, `batch:${CHECK}:${nonceSeq}`)).status;
+      },
+    );
+    const body = batchBody();
+    const accepted = await post(body);
+    expect(accepted.body).toEqual({ batch_id: `${CHECK}:${body.batch}`, signals: true });
+    await worker.idle();
+    await vi.waitFor(() => expect(readable).toBe(200));
+    expect(sent[0]).toEqual({ check_id: CHECK, batch: body.batch, status: 'done' });
+  });
+
+  it('signals a batch that failed, so the run polls it at once', async () => {
+    const sent: unknown[] = [];
+    const { worker } = await start(
+      { appSignalUrl: URL_ },
+      async () => {
+        throw new Error('fetcher broke');
+      },
+      undefined,
+      async (_u, init) => {
+        sent.push(JSON.parse(init.body));
+      },
+    );
+    const body = batchBody();
+    await post(body);
+    await worker.idle();
+    await vi.waitFor(() =>
+      expect(sent[0]).toEqual({ check_id: CHECK, batch: body.batch, status: 'failed' }),
+    );
+  });
+
+  it('a signal that fails does not fail the batch', async () => {
+    const { worker } = await start({ appSignalUrl: URL_ }, undefined, undefined, async () => {
+      throw new Error('down');
+    });
+    const body = batchBody();
+    const id = String((await post(body)).body.batch_id);
+    await worker.idle();
+    expect((await get(`/batch/${id}`, `batch:${id}`)).body).toMatchObject({ status: 'done' });
   });
 });
 
@@ -398,6 +465,152 @@ describe('POST /batch: pause and capacity', () => {
   });
 });
 
+describe('GET /batch/{id}/progress', () => {
+  it('answers a running batch with its progress', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const clock = new InstantClock();
+    const slow: Fetcher = async (url, identity, limits) => {
+      await gate;
+      return fakeFetcher(clock, () => ({ status: 404, body: '' }))(url, identity, limits);
+    };
+    await start({}, slow);
+    const { body } = await post(batchBody());
+    const id = String(body.batch_id);
+    expect((await get(`/batch/${id}/progress`, `progress:${id}`)).body).toEqual({
+      batch_id: id,
+      status: 'running',
+      progress: {
+        urls_done: 0,
+        urls_total: 2,
+        requests: 0,
+        pages: 0,
+        links: 0,
+        homepage_read: false,
+      },
+      pages_total: 0,
+      live_pages: [],
+    });
+    release();
+  });
+
+  it('lists the pages a running batch has finished, from an offset, and ends the list when it ends', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const clock = new InstantClock();
+    const page = fakeFetcher(clock, (url) =>
+      url.endsWith('/robots.txt')
+        ? { status: 404, body: '' }
+        : { status: 200, body: '<html><body><a href="/next">next</a></body></html>' },
+    );
+    // The first page finishes; the second waits on the gate.
+    const held: Fetcher = async (url, identity, limits) => {
+      if (url.endsWith('/a')) await gate;
+      return page(url, identity, limits);
+    };
+    const { worker } = await start({}, held);
+    const { body } = await post(batchBody());
+    const id = String(body.batch_id);
+    let first: Record<string, unknown> = {};
+    for (let i = 0; i < 200 && !first.pages_total; i++) {
+      first = (await get(`/batch/${id}/progress`, `progress:${id}`)).body;
+      await new Promise((r) => setTimeout(r, 5));
+    }
+    expect(first.pages_total).toBe(1);
+    const [listed] = first.live_pages as Array<Record<string, unknown>>;
+    expect(listed).toMatchObject({ status: 200, identity: expect.any(String), links: 1 });
+    expect(listed!.edges).toEqual([
+      // As the stored edge holds it: `from_url` is canonical, so the root has no trailing slash.
+      { from: 'https://www.example.com', to: expect.stringContaining('/next'), js_only: false },
+    ]);
+    const after = await get(`/batch/${id}/progress?after=1`, `progress:${id}`);
+    expect(after.body).toMatchObject({ pages_total: 1, live_pages: [] });
+    release();
+    await worker.idle();
+    expect((await get(`/batch/${id}/progress`, `progress:${id}`)).body).toEqual({
+      batch_id: id,
+      status: 'done',
+    });
+  });
+
+  it('refuses an offset that is not a number, on a batch that is running', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const clock = new InstantClock();
+    const slow: Fetcher = async (url, identity, limits) => {
+      await gate;
+      return fakeFetcher(clock, () => ({ status: 404, body: '' }))(url, identity, limits);
+    };
+    const { worker } = await start({}, slow);
+    const { body } = await post(batchBody());
+    const id = String(body.batch_id);
+    expect((await get(`/batch/${id}/progress?after=1`, `progress:${id}`)).status).toBe(200);
+    expect((await get(`/batch/${id}/progress?after=x`, `progress:${id}`)).status).toBe(404);
+    release();
+    await worker.idle();
+  });
+
+  it('never carries the result of a finished batch', async () => {
+    const { worker } = await start();
+    const { body } = await post(batchBody());
+    await worker.idle();
+    const id = String(body.batch_id);
+    const answer = await get(`/batch/${id}/progress`, `progress:${id}`);
+    expect(answer.status).toBe(200);
+    expect(answer.body).toEqual({ batch_id: id, status: 'done' });
+  });
+
+  it('answers failed for a batch that threw', async () => {
+    const { worker } = await start({}, async () => {
+      throw new Error('boom');
+    });
+    const { body } = await post(batchBody());
+    await worker.idle();
+    const id = String(body.batch_id);
+    expect((await get(`/batch/${id}/progress`, `progress:${id}`)).body).toEqual({
+      batch_id: id,
+      status: 'failed',
+    });
+  });
+
+  it('answers 404 for an unknown batch', async () => {
+    await start();
+    const unknown = `${CHECK}:424242`;
+    expect((await get(`/batch/${unknown}/progress`, `progress:${unknown}`)).status).toBe(404);
+  });
+
+  it('takes only a signature made for this batch and this purpose', async () => {
+    const { worker } = await start();
+    const { body } = await post(batchBody());
+    await worker.idle();
+    const id = String(body.batch_id);
+    expect((await get(`/batch/${id}/progress`, `batch:${id}`)).status).toBe(401);
+    expect((await get(`/batch/${id}/progress`, `progress:${CHECK}:0`)).status).toBe(401);
+    expect((await get(`/batch/${id}/progress`, 'metrics')).status).toBe(401);
+    // And a progress signature does not open the route that returns the result.
+    expect((await get(`/batch/${id}`, `progress:${id}`)).status).toBe(401);
+  });
+});
+
+describe('the done signal through a protected staging app', () => {
+  it('carries the configured bypass from the config to the post', async () => {
+    const signalPost = vi.fn<SignalPost>(async () => undefined);
+    const { worker } = await start(
+      {
+        appSignalUrl: 'https://staging.vercel.app/api/webhooks/worker',
+        appSignalBypass: 'b'.repeat(32),
+      },
+      undefined,
+      undefined,
+      signalPost,
+    );
+    await post(batchBody());
+    await worker.idle();
+    await vi.waitFor(() => expect(signalPost).toHaveBeenCalled());
+    expect(signalPost.mock.calls[0]![1].headers['x-vercel-protection-bypass']).toBe('b'.repeat(32));
+  });
+});
+
 describe('GET /batch/{id}', () => {
   it('reports running with progress while a batch runs', async () => {
     let release!: () => void;
@@ -413,7 +626,14 @@ describe('GET /batch/{id}', () => {
     expect((await get(`/batch/${id}`, `batch:${id}`)).body).toEqual({
       batch_id: id,
       status: 'running',
-      progress: { urls_done: 0, urls_total: 2, requests: 0 },
+      progress: {
+        urls_done: 0,
+        urls_total: 2,
+        requests: 0,
+        pages: 0,
+        links: 0,
+        homepage_read: false,
+      },
     });
     release();
   });
@@ -561,7 +781,7 @@ describe('configuration', () => {
     expect(main).toMatch(/createWorker\(\{ config, reader \}\)/);
   });
 
-  it('reads no environment variable but its own seven: no database or Inngest key can reach it', () => {
+  it('reads no environment variable but its own nine: no database or Inngest key can reach it', () => {
     const read = new Set<string>();
     for (const file of ['main.ts', 'config.ts', 'server.ts']) {
       const source = readFileSync(new URL(file, import.meta.url), 'utf8');
@@ -569,6 +789,8 @@ describe('configuration', () => {
       expect(source.match(/process\.env\.[A-Z_]/g)).toBeNull();
     }
     expect([...read].sort()).toEqual([
+      'APP_SIGNAL_PROTECTION_BYPASS',
+      'APP_SIGNAL_URL',
       'BATCH_CONCURRENCY',
       'CRAWL_PAUSED',
       'FLY_APP_NAME',

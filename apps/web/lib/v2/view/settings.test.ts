@@ -87,7 +87,7 @@ describe('Settings, the plan', () => {
     expect(p.terms.map((t) => [t.label, t.text, t.action?.label ?? null])).toEqual([
       [
         'Cancel',
-        'Nothing to cancel on a trial; it ends by itself. On Pro or Agency, "Cancel, back to Free" sits here: two clicks, effective at the end of the paid month. Nothing you can see is deleted; evidence older than 90 days is condensed to headers and the parts of pages that changed.',
+        'Nothing to cancel on a trial; it ends by itself. On Pro or Agency, "Cancel, back to Free" sits here: two clicks, effective at the end of the paid month. Nothing you can see is deleted.',
         null,
       ],
       // No card, so no charge yet and no Stripe customer whose portal lists receipts.
@@ -253,5 +253,38 @@ describe('Settings, billed yearly, and past due on Free', () => {
     const p = settingsView(ch, { accountId: NW, now: '2026-11-08T14:00:00Z' }).plan;
     expect(p.keep).toBeNull();
     expect(p.terms[1]!.action).toMatchObject({ label: 'Billing portal' });
+  });
+});
+
+describe('the plan card while paid plans are not open (F-108)', () => {
+  const trialClosed = () =>
+    settingsView(fixture('bad-site'), ACCOUNT_VIEWERS.home(), { billingOpen: false }).plan;
+  const freeClosed = () =>
+    settingsView(fixture('clean-site'), CLEAN_VIEWER, { billingOpen: false }).plan;
+
+  it('a no-card trial has no paid button, and is told how long its trial runs', () => {
+    expect(home().plan.keep).not.toBeNull();
+    const p = trialClosed();
+    expect(p.keep).toBeNull();
+    expect(p.keepNote).toBe('Paid plans open shortly. Your trial runs to Sat 7 Nov.');
+  });
+
+  it('Free has no paid button, and is told paid plans open shortly', () => {
+    expect(free().plan.keep).not.toBeNull();
+    const p = freeClosed();
+    expect(p.keep).toBeNull();
+    expect(p.keepNote).toBe('Paid plans open shortly.');
+  });
+
+  it('with no Keep, the prices still read as prices, not as "Or …" after a button', () => {
+    expect(trialClosed().other).not.toMatch(/^Or /);
+    expect(freeClosed().other).not.toMatch(/^Or /);
+  });
+
+  it('with paid plans open the card is as it was, with no such sentence', () => {
+    expect(home().plan.keepNote).toBeNull();
+    expect(
+      settingsView(fixture('bad-site'), ACCOUNT_VIEWERS.home(), { billingOpen: true }).plan,
+    ).toEqual(home().plan);
   });
 });

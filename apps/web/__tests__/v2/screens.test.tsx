@@ -145,7 +145,7 @@ describe('Final-Result, the bad site', () => {
           : c.kind === 'a11y'
             ? /^axe /
             : c.kind === 'ruling'
-              ? /^(Owner ruling|CC-26 brief|CC-31 brief)/
+              ? /^(Owner ruling|CC-26 brief|CC-31 brief|V2R register)/
               : /^(The fixture|As on Home|The contract)/,
       );
     }

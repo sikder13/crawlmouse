@@ -103,9 +103,9 @@ const wrongPlanPrices = (text: string) =>
  */
 const PINNED_V1: Readonly<Record<string, string>> = {
   'app/pricing/page.tsx':
-    '__tests__/v2/public-pages.test.tsx ("app/pricing/page.tsx is the file main has", CC-29 D1); /pricing is served by the v2 page while V2_BILLING is on',
+    '__tests__/v2/public-pages.test.tsx ("app/pricing/page.tsx is the file main has", CC-29 D1); /pricing is served by the v2 page while V2_CHECKS_PUBLIC is on',
   'components/billing/PricingCards.tsx':
-    'rendered only by the v1 /pricing page above, which V2_BILLING replaces with the v2 page',
+    'rendered only by the v1 /pricing page above, which V2_CHECKS_PUBLIC replaces with the v2 page',
   'app/terms/page.tsx':
     'the legal Terms: never formatted, so an edit reflows the whole page, and a JSX reflow can change the legal text’s whitespace (CC-39 ruling 4, Q9)',
 };

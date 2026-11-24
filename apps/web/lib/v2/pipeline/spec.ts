@@ -267,6 +267,7 @@ export function buildSpec20b(): string {
           'Crawl phase ceiling, from the first crawl batch the worker accepts',
           `${CRAWL_CEILING_S} s`,
         ],
+        ['The longest wait on a worker’s done signal before one poll', `${PACE.signalWaitS} s`],
         ['Access stages’ slice', `${ACCESS_SLICE_S} s`],
         ['Reserve for render, build, persist, finalize', `${RESERVE_S} s`],
         ['A batch that would get less is not posted', `${MIN_BATCH_S} s`],

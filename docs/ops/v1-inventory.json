@@ -1032,6 +1032,22 @@
     },
     {
       "kind": "route",
+      "path": "app/ingest/[...path]/route.ts",
+      "ruling": "keep",
+      "reason": "same-origin PostHog proxy, in place of a rewrite that forwarded cookies",
+      "evidence": "apps/web/lib/analytics/ingest-proxy.ts:55",
+      "checks": {
+        "input": "pass — the path is joined to a fixed origin and the result's origin checked (apps/web/lib/analytics/ingest-proxy.ts:36)",
+        "output": "pass — only the listed response headers return, so no Set-Cookie (apps/web/lib/analytics/ingest-proxy.ts:63)",
+        "cache": "pass — the upstream's cache headers, on a dynamic route",
+        "redirect": "pass — an upstream redirect is not followed (apps/web/lib/analytics/ingest-proxy.ts:57)",
+        "errors": "pass — 502 with no body and a fixed log line (apps/web/lib/analytics/ingest-proxy.ts:67)",
+        "escaping": "n/a — bytes passed through",
+        "abuse": "n/a — reads no data and reaches two fixed PostHog hosts; no rate limit, as under the rewrite, and each request is now a function call"
+      }
+    },
+    {
+      "kind": "route",
       "path": "app/api/reports/hide/route.ts",
       "ruling": "keep",
       "reason": "/api/reports/* kept as is",
@@ -1252,6 +1268,22 @@
         "cache": "n/a — machine-to-machine POST, never cached",
         "redirect": "n/a — no redirect and no next/returnTo param in the file",
         "errors": "pass — 'invalid signature' / 'handler error' (:30,38)",
+        "escaping": "n/a — no HTML output (JSON, plain text or a redirect)",
+        "abuse": "n/a — signed"
+      }
+    },
+    {
+      "kind": "route",
+      "path": "app/api/webhooks/worker/route.ts",
+      "ruling": "keep",
+      "reason": "the crawl worker's signed note that a batch ended (V2R PR 5a), new in v2",
+      "evidence": "apps/web/lib/security/route-policy.ts:525",
+      "checks": {
+        "input": "pass — size bound, then HMAC verified (:41) before parse (:44)",
+        "output": "n/a — returns no data of its owns",
+        "cache": "n/a — machine-to-machine POST, never cached",
+        "redirect": "n/a — no redirect and no next/returnTo param in the file",
+        "errors": "pass — status codes only, no message (:53)",
         "escaping": "n/a — no HTML output (JSON, plain text or a redirect)",
         "abuse": "n/a — signed"
       }

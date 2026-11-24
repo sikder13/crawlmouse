@@ -10,6 +10,10 @@
  * id. A browser reconnects with the last id it saw, so a group cut short is sent again whole; the
  * crawl screen applies a group when its id arrives (app/audit/[id]/_crawl/live-source.ts).
  *
+ * While a crawl batch runs, the stream also reads that batch's progress from the worker, at most
+ * every LIVE_READ_MS, and sends the pages finished so far. It costs no Inngest step or database
+ * write, and a worker that does not answer leaves the stream on the stored rows.
+ *
  * Limits. A poll every POLL_MS; the stream closes itself STREAM_CLOSE_MS after it opened, before
  * the route's `maxDuration`, and the browser reconnects; STREAM_OPENS_PER_IP_PER_HOUR opens an hour
  * for one address, which is also what bounds the streams one address holds open at once
@@ -23,21 +27,33 @@ import {
   cursorFits,
   factsOf,
   formatCursor,
+  liveEvents,
+  overshot,
   parseCursor,
   readBatch,
+  runningCrawlBatch,
   storedCrawlBatches,
+  withLiveCounts,
   type Cursor,
   type StoredBatch,
 } from '../../../../../lib/v2/pipeline/stream';
 import type { StreamSnapshot, StreamStore } from '../../../../../lib/v2/pipeline/stream-store';
 import type { CheckReader, EvidenceStore } from '../../../../../lib/v2/pipeline/types';
 import type { ProgressEvent } from '../../../../../lib/v2/progress';
+import { batchIdOf, type LiveProgress } from '../../../../../lib/worker-client/types';
 import type { PublicServerEvents } from '../../_lib/events';
 import type { CheckRouteLimits } from '../_lib/limit-keys';
 
 export const POLL_MS = 1500;
 /** The stream closes itself this long after it opened; the route's `maxDuration` is 300 s. */
 export const STREAM_CLOSE_MS = 240_000;
+/** One stream reads the worker's running batch at most this often. */
+export const LIVE_READ_MS = 3000;
+/**
+ * A named event, so it is not a ProgressEvent and a tab on an older bundle ignores it. The screen
+ * opens a new connection, which is sent the run from its beginning.
+ */
+export const RESTART_FRAME = 'event: restart\ndata: {}\n\n';
 /** How long a browser waits before it reconnects. */
 const RETRY_MS = 2000;
 
@@ -57,6 +73,11 @@ export interface StreamDeps {
     properties: PublicServerEvents['check_finished'],
     accountId: string | null,
   ): Promise<void>;
+  /**
+   * The running batch's counts and the pages it finished from `after`, from the worker. Absent or
+   * null leaves the database's totals, and the map fills when the batch is read.
+   */
+  liveProgress?(batchId: string, after: number): Promise<LiveProgress | null>;
   clientIp(req: Request): string;
   now(): number;
   sleep(ms: number): Promise<void>;
@@ -127,6 +148,14 @@ export async function serveStream(
       const openedAt = deps.now();
       let cursor = resumed;
       let snapshot: StreamSnapshot | null = first;
+      let live = null as {
+        batch: number;
+        counts: { pages: number; links: number; homepageRead: boolean };
+      } | null;
+      /** How many of the running batch's finished pages this connection has sent. */
+      let liveSent = 0;
+      let liveReadAt = -Infinity;
+      let restartSent = false;
       write(`retry: ${RETRY_MS}\n\n`);
       try {
         while (open) {
@@ -152,9 +181,47 @@ export async function serveStream(
             }
           }
           if (!open) break;
-          const facts = factsOf(snapshot, deps.now());
+          // Sent with this poll's counts as one group, so a cut connection cannot keep one alone.
+          let liveGroup: ProgressEvent[] = [];
+          const runningBatch = runningCrawlBatch(snapshot);
+          if (live?.batch !== runningBatch) {
+            live = null;
+            liveSent = 0;
+          }
+          if (
+            runningBatch !== null &&
+            deps.liveProgress &&
+            deps.now() - liveReadAt >= LIVE_READ_MS
+          ) {
+            liveReadAt = deps.now();
+            const got = await deps
+              .liveProgress(batchIdOf(checkId, runningBatch), liveSent)
+              .catch(() => null);
+            if (!open) break;
+            if (got) {
+              live = {
+                batch: runningBatch,
+                counts: { pages: got.pages, links: got.links, homepageRead: got.homepageRead },
+              };
+              if (got.total < liveSent) {
+                // The worker lost the batch and it was posted again: its list starts over.
+                liveSent = 0;
+              } else {
+                const sent = liveEvents(cursor, got.fresh, factsOf(snapshot, deps.now()).elapsedMs);
+                liveGroup = sent.events;
+                cursor = sent.cursor;
+                liveSent += got.fresh.length;
+              }
+            }
+          }
+          // Once a connection: the stream stays open, so a tab that ignores it is not told each poll.
+          if (!restartSent && overshot(cursor, snapshot, runningBatch, live?.counts ?? null)) {
+            restartSent = true;
+            write(RESTART_FRAME);
+          }
+          const facts = withLiveCounts(factsOf(snapshot, deps.now()), live?.counts ?? null);
           const out = checkEvents(cursor, facts);
-          send(out.events, out.cursor);
+          send([...liveGroup, ...out.events], out.cursor);
           if (cursor.ended) {
             if (!before.ended) {
               await finished(req, checkId, access.trigger, facts, accountId, deps);

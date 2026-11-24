@@ -5,7 +5,7 @@
  */
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { INITIAL_STATE } from '../../../../lib/v2/progress';
+import { INITIAL_STATE, reduce } from '../../../../lib/v2/progress';
 import { LiveCrawlScreen, type LiveControls } from './CrawlScreen';
 
 const LABEL = 'How the grade is calculated';
@@ -77,5 +77,32 @@ describe('a real check waiting for a crawler, after discovery (CC-42A decisions 
     expect(t).not.toContain('Waiting for a free crawler');
     expect(t).not.toContain('robots.txt found');
     expect(t).not.toContain('Sitemap:');
+  });
+});
+
+describe('a page address the crawl brought back', () => {
+  it('is shown as text, whatever it holds', () => {
+    const url = 'https://site.test/<img src=x onerror=alert(1)>';
+    const state = reduce(INITIAL_STATE, {
+      type: 'page_fetched',
+      at_ms: 1,
+      url,
+      identity: 'browser',
+      purpose: 'crawl',
+      status: 200,
+      ms: 5,
+      links: 0,
+    });
+    const markup = renderToStaticMarkup(
+      <LiveCrawlScreen
+        source={{ subscribe: () => () => undefined, getState: () => state }}
+        context={{ domain: 'site.test', crawlers: [] }}
+        resultHref="/audit/0b0e7a52-5f0b-4b53-9c0e-0d4a3a1f2c11"
+        live={live}
+      />,
+    );
+    expect(markup).not.toContain('<img');
+    // The log shows the parsed path, in which the markup is percent-encoded.
+    expect(markup).toContain('%3Cimg');
   });
 });
