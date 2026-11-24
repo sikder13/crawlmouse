@@ -181,6 +181,11 @@ step('J2.4i', 'Daily watch: a crawler newly blocked', async ({ context, baseURL 
     expect(allowed(await gptbotVerdicts(base)), 'the baseline recorded GPTBot allowed').toBe(true);
 
     const watch = nextWatch(site, Date.now());
+    // When the watch will look, for whoever plans the run: the step waits for it.
+    info.annotations.push({
+      type: 'sentinel-watch',
+      description: `site ${site}: tick ${new Date(watch.tick).toISOString()}, first look ${new Date(watch.look).toISOString()}`,
+    });
     skipUnless(
       watch.look - Date.now() <= maxHours * HOUR,
       `the site's watch is ${((watch.look - Date.now()) / HOUR).toFixed(1)} h away, past JOURNEY_SENTINEL_MAX_HOURS`,
