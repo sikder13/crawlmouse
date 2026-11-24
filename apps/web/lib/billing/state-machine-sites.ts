@@ -25,7 +25,9 @@ export interface SiteChange {
   pausedReason: PausedReason | null;
 }
 
-function oldestFirst(sites: readonly PlannedSite[]): PlannedSite[] {
+export function oldestFirst<T extends Pick<PlannedSite, 'id' | 'createdAt'>>(
+  sites: readonly T[],
+): T[] {
   return [...sites].sort(
     (a, b) => a.createdAt.getTime() - b.createdAt.getTime() || a.id.localeCompare(b.id),
   );

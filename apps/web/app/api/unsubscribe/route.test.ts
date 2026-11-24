@@ -92,10 +92,13 @@ describe('POST /api/unsubscribe (D7)', () => {
   });
 
   it('the page’s form goes back to its own link with a done cookie naming that seat and kind', async () => {
-    const res = await post(form(token('summary')));
+    // Signed once: a token holds its expiry in whole seconds, so two calls either side of a second
+    // boundary give two different tokens, and the comparison below failed on #141's CI with no change here.
+    const t = token('summary');
+    const res = await post(form(t));
     expect(res.status).toBe(303);
     expect(res.headers.get('location')).toBe(
-      `https://crawlmouse.com/unsubscribe?t=${encodeURIComponent(token('summary'))}`,
+      `https://crawlmouse.com/unsubscribe?t=${encodeURIComponent(t)}`,
     );
     expect(res.headers.get('set-cookie')).toBe(
       `cm_unsubscribed=summary.${SEAT}; Path=/unsubscribe; Max-Age=120; HttpOnly; Secure; SameSite=Lax`,
