@@ -61,6 +61,7 @@ import {
   MAX_BACKOFF_GAP_MS,
   MAX_WAIT_MS,
   RETRIES_ON_429,
+  SITE_IDLE_FORGET_MS,
   STOP_AFTER_429S,
   STOP_AFTER_CHALLENGED_PAGES,
   STOP_COOLDOWN_MS,
@@ -271,8 +272,8 @@ export function renderSpec(): string {
     `- Request starts at least ${FLOOR_GAP_MS} ms apart per registrable domain (eTLD+1, Public Suffix List with its private section), shared by every batch in the process, measured start to start. On the staging app only, \`LAB_HOST_POLITENESS=1\` makes each host under \`lab.crawlmouse.com\` its own key for the limiter and the stops; off-site is still the registrable domain.`,
     `- One request in flight per site; two when the median latency of the last ${SLOW_WINDOW} responses is over ${SLOW_MEDIAN_MS} ms and no Crawl-delay raised the gap.`,
     `- Crawl-delay: the largest that applies to any identity the batch sends, honoured in full up to ${MAX_CRAWL_DELAY_S} s. From ${SLOW_CRAWL_DELAY_S} s the batch is partial (\`crawl_delay_10s_or_more\`) with its coverage; above ${MAX_CRAWL_DELAY_S} s nothing but robots.txt is requested (\`crawl_delay_over_limit\`).`,
-    `- A 429 is a request to slow down. The site's next request waits for its Retry-After, or without one for a back-off from ${seconds(BACKOFF_FIRST_MS)} that doubles with each 429 in a row, at most ${seconds(MAX_WAIT_MS)} either way; the gap between starts then doubles, up to ${seconds(MAX_BACKOFF_GAP_MS)}, and stays raised; and the page is asked for again, up to ${RETRIES_ON_429} more times. Declaration reads do none of this.`,
-    `- A site is stopped for ${seconds(STOP_COOLDOWN_MS)} after ${STOP_AFTER_429S} responses of 429 in a row (any other answer ends the run), or ${STOP_AFTER_CHALLENGED_PAGES} consecutive challenged pages (in a crawl batch, a challenged fetch; in an access batch, a challenged control). A batch records a stop it met or caused as a finding; it is partial with \`site_stopped\` only when the stop refused one of its requests.`,
+    `- A 429 is a request to slow down. The site's next request waits for its Retry-After, or without one for a back-off from ${seconds(BACKOFF_FIRST_MS)} that doubles with each 429 in a row, at most ${seconds(MAX_WAIT_MS)} either way; the gap between starts then doubles, up to ${seconds(MAX_BACKOFF_GAP_MS)}, and stays raised while the worker holds the site (it forgets a site idle for ${seconds(SITE_IDLE_FORGET_MS)}); and the page is asked for again, up to ${RETRIES_ON_429} more times. Declaration reads, and requests under a crawler's name, do none of this.`,
+    `- A site is stopped for ${seconds(STOP_COOLDOWN_MS)} after ${STOP_AFTER_429S} responses of 429 in a row (any other answer but a redirect ends the run), or ${STOP_AFTER_CHALLENGED_PAGES} consecutive challenged pages (in a crawl batch, a challenged fetch; in an access batch, a challenged control). A batch records a stop it met or caused as a finding; it is partial with \`site_stopped\` only when the stop refused one of its requests.`,
     '- Redirects are followed one paced request at a time. A redirect to another registrable domain is recorded, not requested; robots.txt redirects are followed, as RFC 9309 asks.',
 
     '## robots.txt',

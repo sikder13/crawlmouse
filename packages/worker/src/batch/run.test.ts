@@ -126,7 +126,11 @@ async function runFake(
     robotsCache: new RobotsCache(clock),
     reader,
   });
-  return { result, requested: fetcher.calls.map((c) => c.url).filter((u) => !isDeclaration(u)) };
+  return {
+    result,
+    requested: fetcher.calls.map((c) => c.url).filter((u) => !isDeclaration(u)),
+    calls: fetcher.calls,
+  };
 }
 /** example.com/a redirects to www.example.com/t; `www` answers the rest. */
 const toWww =
@@ -1920,6 +1924,36 @@ describe('round 5: a robots.txt redirect the batch could not follow', () => {
     expect(result.pages[0]!.limitations[0]).toBe(
       "Not requested: the batch's requests budget was spent. The user agent shown is the one that would have been sent.",
     );
+  });
+});
+
+describe('the access batch’s control request on a 429 (review of the back-off, B2)', () => {
+  const served = { status: 200, headers: { 'content-type': 'text/html' }, body: '<p>served</p>' };
+
+  it('waits as the site asks, asks again, and is then served', async () => {
+    const asked = new Map<string, number>();
+    const { calls } = await runFake(accessReq('https://example.com', ['/a']), (url, identity) => {
+      if (identity.role !== 'control' || url.endsWith('/robots.txt')) return served;
+      const n = (asked.get(url) ?? 0) + 1;
+      asked.set(url, n);
+      return n === 1 ? { status: 429, headers: { 'retry-after': '5' }, body: '' } : served;
+    });
+    const control = calls.filter((c) => c.identity.role === 'control' && c.url.endsWith('/a'));
+    expect(control).toHaveLength(2);
+    expect(control[1]!.at - control[0]!.at).toBeGreaterThanOrEqual(5_000);
+  });
+
+  it('counts toward the site’s stop, so a site refusing the control is stopped', async () => {
+    const { result } = await runFake(
+      accessReq('https://example.com', ['/a', '/b']),
+      (url, identity) =>
+        identity.role === 'control' && !url.endsWith('/robots.txt')
+          ? { status: 429, headers: {}, body: '' }
+          : served,
+    );
+    if (result.kind !== 'access') throw new Error('access');
+    // Each page is asked for 1 + RETRIES_ON_429 times, so two pages make STOP_AFTER_429S answers.
+    expect(result.findings.filter((f) => f.kind === 'site_stopped')).not.toEqual([]);
   });
 });
 

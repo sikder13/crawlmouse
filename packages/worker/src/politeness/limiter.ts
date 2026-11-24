@@ -67,6 +67,25 @@ export class SiteLimiter {
   /** Holds the next start until `at`, a moment on this limiter's clock. Never brings it forward. */
   pauseUntil(at: number): void {
     if (Number.isFinite(at)) this.nextStartAt = Math.max(this.nextStartAt, at);
+    // A task queued for another batch may now be unable to start before its deadline.
+    this.dropLate();
+  }
+
+  /** The earliest a queued task could start now. */
+  private startAt(): number {
+    return Math.max(this.nextStartAt, this.clock.now());
+  }
+
+  /**
+   * Drops every queued task that cannot start by its `latestAt`. Called where the start moves later
+   * (a pause) or a task is queued, as well as in the pump: the pump may be asleep through a long
+   * pause, and a task queued meanwhile must not wait for it to wake.
+   */
+  private dropLate(): void {
+    const startAt = this.startAt();
+    const late = this.queue.filter((w) => w.latestAt !== undefined && w.latestAt < startAt);
+    for (const w of late) this.queue.splice(this.queue.indexOf(w), 1);
+    for (const w of late) w.drop();
   }
 
   get started(): number {
@@ -86,8 +105,9 @@ export class SiteLimiter {
 
   /**
    * `latestAt`: a task that could not start by then (a pause or the gap holds the site past it) is
-   * dropped, answering `{ ran: false }`, instead of being waited for. A batch passes its own deadline,
-   * so a long wait asked by the site does not run it past its time.
+   * dropped, answering `{ ran: false }`, instead of being waited for: when it is queued, when a pause
+   * makes it late, and when the pump reaches it. A batch passes its own deadline, so a long wait asked
+   * by the site, for this batch or another one on the same site, does not run it past its time.
    */
   schedule<T>(
     task: () => Promise<T>,
@@ -114,6 +134,7 @@ export class SiteLimiter {
           resolve({ ran: false });
         },
       };
+      if (latestAt !== undefined && latestAt < this.startAt()) return resolve({ ran: false });
       signal?.addEventListener('abort', onAbort, { once: true });
       this.queue.push(waiting);
       void this.pump();
@@ -147,13 +168,9 @@ export class SiteLimiter {
     this.pumping = true;
     try {
       while (this.queue.length > 0 && this.inFlight < this.maxConcurrent()) {
-        const startAt = Math.max(this.nextStartAt, this.clock.now());
-        const late = this.queue.filter((w) => w.latestAt !== undefined && w.latestAt < startAt);
-        if (late.length) {
-          for (const w of late) this.queue.splice(this.queue.indexOf(w), 1);
-          for (const w of late) w.drop();
-          continue;
-        }
+        const before = this.queue.length;
+        this.dropLate();
+        if (this.queue.length !== before) continue;
         const wait = this.nextStartAt - this.clock.now();
         if (wait > 0) {
           await this.clock.sleep(wait);

@@ -101,8 +101,9 @@ const skipped = (identity: Identity, cut: NotRequested | null = null): Probe => 
 });
 
 async function probe(run: AccessRun, url: string, identity: Identity): Promise<Probe> {
-  // A 429 to a crawler's name, beside a served control, is a verdict about that crawler, not a
-  // request to slow down. Only the control's 429 waits the site out, slows it and counts towards a stop.
+  // A 429 to a crawler's name is a verdict about that crawler, not a request to slow down: it is not
+  // asked again and counts towards no stop. Only the control's 429 waits the site out, slows it, is
+  // asked again and counts towards a stop.
   const control = identity.role === 'control';
   const r = await politeFetch(run.ctx, url, identity, {
     offSite: 'stop',
