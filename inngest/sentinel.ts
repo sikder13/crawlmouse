@@ -56,9 +56,11 @@ export function createSentinelTickFn(work: SentinelSteps, now: () => number = Da
   return inngest.createFunction(
     { id: SENTINEL_TICK_FN_ID, retries: 3, concurrency: { limit: 1 } },
     { cron: '23 * * * *' },
-    async ({ step }) =>
+    async ({ event, step }) =>
       step.run('due', async () => {
-        const at = new Date(now());
+        // The cron event's own time, so a retry that runs past the hour still sends this hour's sites.
+        const ts = (event as { ts?: unknown } | undefined)?.ts;
+        const at = new Date(typeof ts === 'number' ? ts : now());
         return sized('due', await work.dispatch(at.getUTCHours(), at.toISOString().slice(0, 10)));
       }),
   );

@@ -70,6 +70,7 @@ function harness(
   const sent: { id: string; data: { siteId: string; day: string } }[][] = [];
   const offsets: number[] = [];
   let postError: WorkerError | null = null;
+  const dropped = new Set<string>();
   const worker: WorkerClient = {
     postBatch: async (b) => {
       posted.push(b);
@@ -82,10 +83,13 @@ function harness(
   };
   const deps: SentinelDeps = {
     store: {
-      watchableSites: async (offset) => (
-        offsets.push(offset),
-        sites.slice(offset, offset + SENTINEL_PAGE)
-      ),
+      watchableSites: async (offset) => {
+        offsets.push(offset);
+        const page = sites.slice(offset, offset + SENTINEL_PAGE);
+        return { sites: page.filter((s) => !dropped.has(s.siteId)), scanned: page.length };
+      },
+      watchableSite: async (siteId) =>
+        dropped.has(siteId) ? null : (sites.find((s) => s.siteId === siteId) ?? null),
       baseline: async () => ({
         checkId: 'full-1',
         host: 'shop.lab.crawlmouse.com',
@@ -110,6 +114,8 @@ function harness(
     sent,
     offsets,
     failPost: (e: WorkerError) => (postError = e),
+    /** Sites the store reads but leaves out, as it does a site whose account is marked for deletion. */
+    drop: (...siteIds: string[]) => siteIds.forEach((id) => dropped.add(id)),
   };
 }
 
@@ -145,6 +151,14 @@ describe('dispatch', () => {
     expect(offsets).toEqual([0, SENTINEL_PAGE, 2 * SENTINEL_PAGE, 3 * SENTINEL_PAGE]);
     expect(sent.every((chunk) => chunk.length <= SENTINEL_SEND_CHUNK)).toBe(true);
     expect(sent.flat()).toHaveLength(due);
+  });
+
+  it('reads on past a page the account filter shortened', async () => {
+    const many = ids(5000, 2 * SENTINEL_PAGE + 3).map((s) => site(s));
+    const h = harness({}, undefined, many);
+    h.drop(many[0]!.siteId);
+    await h.work.dispatch(6, DAY);
+    expect(h.offsets).toEqual([0, SENTINEL_PAGE, 2 * SENTINEL_PAGE]);
   });
 
   it('sends nothing while the sentinel is hidden or crawling is paused', async () => {
@@ -202,10 +216,22 @@ describe('look', () => {
     });
   });
 
-  it('skips a look the worker is too busy to take, as no evidence', async () => {
+  it.each([
+    ['busy', 'worker_busy'],
+    ['paused', 'worker_paused'],
+  ] as const)('skips a look a %s worker refuses, as no evidence', async (kind, skip) => {
     const h = harness();
-    h.failPost(new WorkerError('busy', 429, 'busy'));
-    expect(await h.work.look(SITE, DAY, 1)).toEqual({ skip: 'worker_busy' });
+    h.failPost(new WorkerError(kind, 503, kind));
+    expect(await h.work.look(SITE, DAY, 1)).toEqual({ skip });
+  });
+
+  it('looks at nothing on a site removed, paused or downgraded since the tick', async () => {
+    const h = harness();
+    h.drop(SITE);
+    expect(await h.work.look(SITE, DAY, 1)).toEqual({ skip: 'not_watched' });
+    const free = harness({}, undefined, [site(FREE_DUE, FREE)]);
+    expect(await free.work.look(FREE_DUE, DAY, 1)).toEqual({ skip: 'not_watched' });
+    expect([...h.posted, ...free.posted]).toEqual([]);
   });
 
   it('throws on any other refusal, so the step retries', async () => {
@@ -227,7 +253,8 @@ describe('look', () => {
   it('skips a site with no full check to compare with', async () => {
     const { work } = harness({
       store: {
-        watchableSites: async () => [],
+        watchableSites: async () => ({ sites: [], scanned: 0 }),
+        watchableSite: async (siteId) => site(siteId),
         baseline: async () => null,
         testsOf: async () => [],
       },
@@ -277,6 +304,13 @@ describe('request', () => {
     const { work, requested } = harness({ now: () => Date.parse('2026-11-25T00:05:00Z') });
     expect(await work.request(SITE, DAY)).toEqual({ checkId: `check-${SITE}` });
     expect(requested).toEqual([{ siteId: SITE, day: DAY }]);
+  });
+
+  it('starts none on a site removed, paused or downgraded since the tick', async () => {
+    const h = harness();
+    h.drop(SITE);
+    expect(await h.work.request(SITE, DAY)).toEqual({ skip: 'not_watched' });
+    expect(h.requested).toEqual([]);
   });
 
   it.each<[string, Partial<SentinelDeps>]>([

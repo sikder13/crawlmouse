@@ -33,11 +33,13 @@ async function keptRecorded() {
 describe('watchableSites', () => {
   it('lists a kept, live site with its account row', async () => {
     const c = await keptRecorded();
-    const sites = await store().watchableSites(0);
+    const { sites, scanned } = await store().watchableSites(0);
     expect(sites.map((s) => s.siteId)).toEqual([c.siteId]);
+    expect(scanned).toBe(1);
     expect(sites[0]!.account.id).toBe(c.accountId);
     expect(sites[0]!.account.state).toBe('free');
-    expect(await store().watchableSites(200)).toEqual([]);
+    expect(await store().watchableSites(200)).toEqual({ sites: [], scanned: 0 });
+    expect((await store().watchableSite(c.siteId))?.siteId).toBe(c.siteId);
   });
 
   it.each([
@@ -46,7 +48,8 @@ describe('watchableSites', () => {
   ])('leaves out a %s site', async (_, sql) => {
     const c = await keptRecorded();
     await db.query(sql, [c.siteId]);
-    expect(await store().watchableSites(0)).toEqual([]);
+    expect(await store().watchableSites(0)).toEqual({ sites: [], scanned: 0 });
+    expect(await store().watchableSite(c.siteId)).toBeNull();
   });
 
   it.each([
@@ -58,7 +61,9 @@ describe('watchableSites', () => {
   ])('leaves out a site whose account has %s set', async (_, set) => {
     const c = await keptRecorded();
     await db.query(`update public.accounts set ${set} where id = $1`, [c.accountId]);
-    expect(await store().watchableSites(0)).toEqual([]);
+    // The row is read and counted, so a scan goes on past it; it is not listed.
+    expect(await store().watchableSites(0)).toEqual({ sites: [], scanned: 1 });
+    expect(await store().watchableSite(c.siteId)).toBeNull();
   });
 
   it('leaves out a staging site', async () => {
@@ -71,12 +76,15 @@ describe('watchableSites', () => {
       c.siteId,
       parent.rows[0]!.id,
     ]);
-    expect((await store().watchableSites(0)).map((s) => s.siteId)).toEqual([parent.rows[0]!.id]);
+    expect((await store().watchableSites(0)).sites.map((s) => s.siteId)).toEqual([
+      parent.rows[0]!.id,
+    ]);
+    expect(await store().watchableSite(c.siteId)).toBeNull();
   });
 
   it('leaves out a site no account keeps', async () => {
     await recordedStoredCheck(db, memoryEvidenceStore(), LATER);
-    expect(await store().watchableSites(0)).toEqual([]);
+    expect(await store().watchableSites(0)).toEqual({ sites: [], scanned: 0 });
   });
 });
 

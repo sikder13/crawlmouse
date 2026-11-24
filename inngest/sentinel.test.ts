@@ -61,6 +61,16 @@ describe('createSentinelTickFn (row 23)', () => {
     });
   });
 
+  it("takes the hour from the cron event's time, so a late retry sends the same sites", async () => {
+    const asked: [number, string][] = [];
+    const fn = createSentinelTickFn(
+      work({ dispatch: async (h, d) => (asked.push([h, d]), { watched: 0 }) }),
+      () => Date.parse('2026-11-24T07:05:00Z'),
+    ) as unknown as Fn;
+    await fn.fn({ event: { ts: NOW }, step: tools([]) });
+    expect(asked).toEqual([[6, DAY]]);
+  });
+
   it("dispatches this UTC hour's sites in its one step, and answers a count", async () => {
     const ids: string[] = [];
     const asked: [number, string][] = [];

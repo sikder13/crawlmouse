@@ -420,8 +420,8 @@ const ROWS: readonly RowInput[] = [
     trigger: 'sentinel.watch',
     steps: 6,
     stepsHow:
-      'spread, look-1, then wait-1-p and result-1-p until the look ends (two polls for a look of 8 templates); a move adds again, a second look and request',
-    stepAt: [77, 81, 86, 87],
+      'spread, look-1, then wait-1-p and result-1-p until the look ends (at least two polls for 8 templates at two requests a second); a move adds again, a second look and request',
+    stepAt: [79, 83, 88, 89],
   },
   {
     file: 'inngest/summary.ts',

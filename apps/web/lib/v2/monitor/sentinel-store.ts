@@ -5,7 +5,12 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { IdentityRole, Verdict } from '@crawlmouse/types/v2';
 import { ACCOUNT_CLOCK_COLUMNS } from '../pipeline/load-for';
-import { SENTINEL_PAGE, type BaselineTest, type SentinelStore } from './sentinel-work';
+import {
+  SENTINEL_PAGE,
+  type BaselineTest,
+  type SentinelStore,
+  type WatchableSite,
+} from './sentinel-work';
 
 const fail = (what: string, error: { code?: string; message: string }): never => {
   throw new Error(`sentinel store: ${what}: ${error.code ?? ''} ${error.message}`);
@@ -28,34 +33,55 @@ export function supabaseSentinelStore(sb: SupabaseClient): SentinelStore {
     }));
   };
 
-  return {
-    async watchableSites(offset) {
-      const sites = await sb
-        .from('sites')
-        .select('id, host, account_id')
-        .not('account_id', 'is', null)
-        .is('removed_at', null)
-        .is('staging_of_site_id', null)
-        .eq('paused', false)
-        .order('id')
-        .range(offset, offset + SENTINEL_PAGE - 1);
-      if (sites.error) fail('reading sites', sites.error);
-      const rows = sites.data ?? [];
-      if (rows.length === 0) return [];
-      const ids = [...new Set(rows.map((r) => r.account_id as string))];
-      // An account marked for deletion is watched no more, as the schedule and alerts skip it.
-      const accounts = await sb
-        .from('accounts')
-        .select(`id, ${ACCOUNT_CLOCK_COLUMNS}`)
-        .in('id', ids)
-        .is('deleted_at', null)
-        .is('deletion_confirmed_at', null);
-      if (accounts.error) fail('reading accounts', accounts.error);
-      const byId = new Map((accounts.data ?? []).map((a) => [a.id as string, a]));
-      return rows.flatMap((r) => {
+  /**
+   * Kept, live, unpaused, non-staging sites, one page or one site, with the accounts of those not
+   * marked for deletion: the one rule both `watchableSites` and `watchableSite` read.
+   */
+  const listed = async (
+    only: { siteId: string } | { offset: number },
+  ): Promise<{ sites: WatchableSite[]; scanned: number }> => {
+    const query = sb
+      .from('sites')
+      .select('id, host, account_id')
+      .not('account_id', 'is', null)
+      .is('removed_at', null)
+      .is('staging_of_site_id', null)
+      .eq('paused', false);
+    const sites =
+      'siteId' in only
+        ? await query.eq('id', only.siteId)
+        : await query.order('id').range(only.offset, only.offset + SENTINEL_PAGE - 1);
+    if (sites.error) fail('reading sites', sites.error);
+    const rows = (sites.data ?? []) as Record<string, unknown>[];
+    if (rows.length === 0) return { sites: [], scanned: 0 };
+    const ids = [...new Set(rows.map((r) => r.account_id as string))];
+    // An account marked for deletion is watched no more, as the schedule and alerts skip it.
+    const accounts = await sb
+      .from('accounts')
+      .select(`id, ${ACCOUNT_CLOCK_COLUMNS}`)
+      .in('id', ids)
+      .is('deleted_at', null)
+      .is('deletion_confirmed_at', null);
+    if (accounts.error) fail('reading accounts', accounts.error);
+    const byId = new Map(
+      ((accounts.data ?? []) as Record<string, unknown>[]).map((a) => [a.id as string, a]),
+    );
+    return {
+      scanned: rows.length,
+      sites: rows.flatMap((r) => {
         const account = byId.get(r.account_id as string);
         return account ? [{ siteId: r.id as string, host: r.host as string, account }] : [];
-      });
+      }),
+    };
+  };
+
+  return {
+    async watchableSites(offset) {
+      return listed({ offset });
+    },
+
+    async watchableSite(siteId) {
+      return (await listed({ siteId })).sites[0] ?? null;
     },
 
     async baseline(siteId) {

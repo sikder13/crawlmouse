@@ -13,8 +13,10 @@
  *   `sentinelDay`), within the day's ceiling on starts. Its diff and the existing alert rules raise
  *   the alert.
  *
- * None of the four acts while the sentinel is hidden (`featureShown('sentinel')`) or crawling is
- * paused.
+ * `dispatch`, `look` and `request` do nothing while the sentinel is hidden
+ * (`featureShown('sentinel')`) or crawling is paused; `result` only reads a look already posted.
+ * `look` and `request` also apply `dispatch`'s site rule again to their one site, which may have
+ * been removed, paused or downgraded since the tick picked it.
  */
 import { stableId } from '@crawlmouse/engine/v2/pipeline';
 import { IdentityRoleSchema, VerdictSchema } from '@crawlmouse/types/v2';
@@ -45,10 +47,14 @@ export type BaselineTest = TestedPage & Look;
 
 export interface SentinelStore {
   /**
-   * Kept, live, unpaused, non-staging sites whose account is not marked for deletion, in id order
-   * from `offset`, `SENTINEL_PAGE` at most.
+   * One page of kept, live, unpaused, non-staging site rows in id order from `offset`,
+   * `SENTINEL_PAGE` rows at most: `scanned` is how many rows the page read, and `sites` those of
+   * them whose account is not marked for deletion. The scan ends on `scanned`, never on
+   * `sites.length`, which the account filter can shorten.
    */
-  watchableSites(offset: number): Promise<WatchableSite[]>;
+  watchableSites(offset: number): Promise<{ sites: WatchableSite[]; scanned: number }>;
+  /** The site, when it passes the same rule as `watchableSites`; null otherwise. */
+  watchableSite(siteId: string): Promise<WatchableSite | null>;
   /** The site's latest finished or partial check, its host and its access tests; null for none. */
   baseline(
     siteId: string,
@@ -100,6 +106,17 @@ export function sentinelWork(deps: SentinelDeps) {
   /** No look and no full check while the sentinel is hidden or crawling is paused. */
   const stopped = (): string | null =>
     !deps.shown() ? 'hidden' : deps.paused() ? 'crawl_paused' : null;
+  /** A paid site the sentinel may watch at `now`: the rule `dispatch` applies to each site. */
+  const watched = (s: WatchableSite, now: Date): boolean =>
+    effectiveTier(clockFromAccountRow(s.account), now) !== 'free';
+  /**
+   * Whether a site picked by the tick may still be watched: a watch runs up to an hour after, and
+   * the site may have been removed or paused, or its account downgraded or marked for deletion.
+   */
+  const stillWatched = async (siteId: string): Promise<boolean> => {
+    const s = await deps.store.watchableSite(siteId);
+    return s !== null && watched(s, new Date(deps.now()));
+  };
 
   return {
     /**
@@ -114,12 +131,10 @@ export function sentinelWork(deps: SentinelDeps) {
       const siteIds: string[] = [];
       for (let offset = 0; ; offset += SENTINEL_PAGE) {
         const page = await deps.store.watchableSites(offset);
-        for (const s of page) {
-          if (sentinelHour(s.siteId) !== hour) continue;
-          if (effectiveTier(clockFromAccountRow(s.account), now) === 'free') continue;
-          siteIds.push(s.siteId);
+        for (const s of page.sites) {
+          if (sentinelHour(s.siteId) === hour && watched(s, now)) siteIds.push(s.siteId);
         }
-        if (page.length < SENTINEL_PAGE) break;
+        if (page.scanned < SENTINEL_PAGE) break;
       }
       for (let i = 0; i < siteIds.length; i += SENTINEL_SEND_CHUNK) {
         await deps.send(
@@ -135,7 +150,7 @@ export function sentinelWork(deps: SentinelDeps) {
 
     /**
      * Look `n` on `day`: the latest full check's pages, one per template, posted to the worker as
-     * one access batch. A worker that is busy gives no evidence, and the look is skipped. A batch
+     * one access batch. A worker that is busy or paused gives no evidence, and the look is skipped. A batch
      * the worker already holds under this look's id (a retry after a lost answer) is read, not
      * posted again.
      */
@@ -146,6 +161,7 @@ export function sentinelWork(deps: SentinelDeps) {
     ): Promise<{ skip: string } | { batchId: string; baseline: string }> {
       const stop = stopped();
       if (stop) return { skip: stop };
+      if (!(await stillWatched(siteId))) return { skip: 'not_watched' };
       const base = await deps.store.baseline(siteId);
       if (base === null) return { skip: 'no_baseline' };
       const pages = pickPages(base.tests);
@@ -170,6 +186,7 @@ export function sentinelWork(deps: SentinelDeps) {
           return { batchId: batchIdOf(checkId, 0), baseline: base.checkId };
         }
         if (e instanceof WorkerError && e.kind === 'busy') return { skip: 'worker_busy' };
+        if (e instanceof WorkerError && e.kind === 'paused') return { skip: 'worker_paused' };
         throw e;
       }
     },
@@ -194,6 +211,7 @@ export function sentinelWork(deps: SentinelDeps) {
     async request(siteId: string, day: string): Promise<{ skip: string } | { checkId: string }> {
       const stop = stopped();
       if (stop) return { skip: stop };
+      if (!(await stillWatched(siteId))) return { skip: 'not_watched' };
       if (!(await deps.global())) return { skip: 'capacity' };
       return { checkId: await deps.request(siteId, day) };
     },
