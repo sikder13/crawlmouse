@@ -23,7 +23,15 @@ export interface CheckRequest {
   siteId: string;
   trigger: Check['trigger'];
   requestedByUserId?: string;
+  /**
+   * Row 23: a check the daily sentinel starts, on this UTC day (`YYYY-MM-DD`). Keyed
+   * `check:{site}:sentinel:{day}` instead of the trigger's own bucket, so the sentinel starts one
+   * check per site per day at most, and never takes the id of the site's coming scheduled check.
+   */
+  sentinelDay?: string;
 }
+
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
 const HOUR_MS = 60 * 60 * 1000;
 
@@ -48,8 +56,13 @@ export async function requestCheck(
   const now = deps.now();
   const kept = site.account_id !== null;
   const keyed = { siteId: site.id, kept };
+  if (req.sentinelDay !== undefined && (!kept || !DAY.test(req.sentinelDay))) {
+    throw new Error(`requestCheck: no sentinel check for site ${site.id} on ${req.sentinelDay}`);
+  }
   const key = (at: number) =>
-    bucketedKey({ ...keyed, trigger: req.trigger, now: at, nextCheckAt: site.next_check_at });
+    req.sentinelDay !== undefined
+      ? `check:${site.id}:sentinel:${req.sentinelDay}`
+      : bucketedKey({ ...keyed, trigger: req.trigger, now: at, nextCheckAt: site.next_check_at });
   let bucketed = key(now);
   // D11: a re-check whose bucket's check has left `queued` (started or ended) goes to the next
   // bucket, so asking again is a new check rather than the one already under way. Only when the

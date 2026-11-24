@@ -773,7 +773,21 @@ export function createLab({
       }
     } else {
       const found = resolve(path, host);
-      if (!found) {
+      // A page asked for without its trailing slash is redirected to it, as most servers do (308, so the
+      // method is kept). Pages are keyed with the slash; nothing else changes. Kept apart from F-252, the
+      // product dropping the slash before it asks: without this the lab answered 404 to every such request.
+      const slashed =
+        !found &&
+        typeof path === 'string' &&
+        path.length > 1 &&
+        path.startsWith('/') &&
+        !path.endsWith('/') &&
+        getSite().pages.has(`${path}/`)
+          ? `${path}/`
+          : null;
+      if (slashed) {
+        out = { status: 308, headers: { 'content-type': HTML, location: slashed }, body: '' };
+      } else if (!found) {
         out = { status: 404, headers: { 'content-type': HTML }, body: NOT_FOUND };
       } else {
         if (variant === 'slow' && found.page) {

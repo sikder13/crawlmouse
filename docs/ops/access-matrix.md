@@ -27,8 +27,8 @@ when:
 Not read: anything outside those roots, `scripts/` included. The files there that name the
 service-role factory or key: `grep -rlE "supabaseAdmin|SUPABASE_SERVICE_ROLE_KEY" scripts`.
 
-Rows: 92 route handlers, 56 server entry files that read data, 115 files that
-open a service-role client. By gate: caller 24, capability 65, member 29, member_for_site 26, operator 7, own_rows 42, public 34, seat_may 26, signature 10. Open holes: none.
+Rows: 92 route handlers, 56 server entry files that read data, 116 files that
+open a service-role client. By gate: caller 25, capability 65, member 29, member_for_site 26, operator 7, own_rows 42, public 34, seat_may 26, signature 10. Open holes: none.
 
 What this cannot see: a signed-in seat calling PostgREST or an RPC directly with its own session,
 which row security and grants decide (`infra/supabase/migrations`, tested by the `v2-0*` suites);
@@ -274,6 +274,7 @@ Regenerate: `pnpm --filter @crawlmouse/web exec tsx __tests__/security/access-ma
 | `apps/web/lib/v2/agency/schedules-wiring.ts` | 1 | Inngest | caller | `apps/web/lib/v2/pipeline/functions.ts` | The report-schedule functions’ store. Registered by the pipeline functions, served by the signed Inngest route. | `apps/web/__tests__/security/access-matrix.test.ts` › every chain of importers from a caller row ends at a gated row |
 | `apps/web/lib/v2/monitor/functions.ts` | 1 | Inngest | caller | `apps/web/lib/v2/pipeline/functions.ts` | The alert and summary functions’ stores. Registered by the pipeline functions, served by the signed Inngest route. | `apps/web/__tests__/security/access-matrix.test.ts` › every chain of importers from a caller row ends at a gated row |
 | `apps/web/lib/v2/competitors/functions.ts` | 1 | Inngest | caller | `apps/web/lib/v2/pipeline/functions.ts` | The competitor audits’ store and requests. Registered by the pipeline functions, served by the signed Inngest route. | `apps/web/__tests__/security/access-matrix.test.ts` › every chain of importers from a caller row ends at a gated row |
+| `apps/web/lib/v2/monitor/sentinel-functions.ts` | 1 | Inngest | caller | `apps/web/lib/v2/pipeline/functions.ts` | The daily sentinel’s store and requests. Registered by the pipeline functions, served by the signed Inngest route. | `apps/web/__tests__/security/access-matrix.test.ts` › every chain of importers from a caller row ends at a gated row |
 | `apps/web/lib/v2/monitor/schedule.ts` | 1 | Inngest | caller | `apps/web/lib/v2/pipeline/functions.ts` | The scheduled re-check claims. Registered by the pipeline functions, served by the signed Inngest route. | `apps/web/__tests__/security/access-matrix.test.ts` › every chain of importers from a caller row ends at a gated row |
 | `apps/web/lib/billing/inngest-functions.ts` | 1 | Inngest | caller | `apps/web/lib/v2/pipeline/functions.ts` | The billing functions’ stores. Registered by the pipeline functions, served by the signed Inngest route. | `apps/web/__tests__/security/access-matrix.test.ts` › every chain of importers from a caller row ends at a gated row |
 | `apps/web/lib/v2/ledger/functions.ts` | 1 | Inngest | caller | `apps/web/lib/v2/pipeline/functions.ts` | The research ledger’s writer and backfill (CC-41 D4): reads an ended check’s row, its site and its draft, and writes the de-identified ledger rows through record_check_ledger. Registered by the pipeline functions, served by the signed Inngest route. | `apps/web/__tests__/security/access-matrix.test.ts` › every chain of importers from a caller row ends at a gated row |
