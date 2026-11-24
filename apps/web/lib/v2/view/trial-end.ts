@@ -612,13 +612,13 @@ function describeChanges(
           ?.crawlers.find((x) => x.ua === c.ua);
         return crawler ? [crawler.verdict] : [];
       });
-      const word =
-        verdicts.length === group.length && verdicts.every(isBlocked)
-          ? keptOutWord(verdicts)
-          : COPY.noLongerServed;
+      // Named together only when each was kept out. Otherwise each change says what it recorded.
+      if (verdicts.length !== group.length || !verdicts.every(isBlocked)) {
+        return group.map((c) => c.summary).join(' · ');
+      }
       const said = COPY.keptOut(
         group.map((c) => c.ua!),
-        word,
+        keptOutWord(verdicts),
         dayDate(first.detected_at, zone),
       );
       return first.cause?.changed_at

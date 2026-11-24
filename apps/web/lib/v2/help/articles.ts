@@ -231,7 +231,7 @@ function crawlerShownAsBlocked(): HelpArticle {
       ),
       p(
         s(
-          'Where the audit opens a fix for a blocked crawler, its steps end with a command under Verify that you can run from your own machine. It sends the request with the crawler’s own user agent.',
+          'Where the audit opens a fix for a refused crawler, its steps end with a command under Verify that you can run from your own machine. It sends the request with the crawler’s own user agent.',
           'fix_packets',
         ),
         s(
