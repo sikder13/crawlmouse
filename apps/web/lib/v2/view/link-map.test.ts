@@ -219,3 +219,48 @@ describe('the drawing a finished check stores (checkMap, CC-20b D10)', () => {
     expect(stored.nodes.some((n) => n.kind === 'js_only')).toBe(true);
   });
 });
+
+describe('a page that answered 404 or 410', () => {
+  const d = fixture('built-site');
+  const id = FIRST_AUDIT['built-site'];
+  // Counted here from the record, apart from the code under test.
+  const gone = d.page_results.filter(
+    (p) => p.check_id === id && (p.status_code === 404 || p.status_code === 410),
+  );
+
+  it('is labelled missing with its own code, not drawn as a page with a depth', () => {
+    expect(gone.map((p) => p.status_code)).toEqual([404]);
+    const path = new URL(gone[0]!.url).pathname;
+    const v = linkMapView(d, id, { scope: 'all', hrefs });
+    const node = v.nodes.find((n) => n.path === path)!;
+    expect(node).toMatchObject({ missing: 'missing (404)', depth: null });
+    expect(v.details[path]!.pills[0]).toEqual({ state: 'bad', label: 'missing (404)' });
+    expect(v.details[path]!.depth).toBeNull();
+    expect(v.nodes.filter((n) => n.missing !== null)).toHaveLength(gone.length);
+  });
+
+  it('is counted apart in the title: "N pages, M missing"', () => {
+    const crawled = findCheck(d, id).coverage!.pages_crawled;
+    const links = findCheck(d, id).structure!.internal_links;
+    expect(linkMapView(d, id, { scope: 'all', hrefs }).title).toBe(
+      `${crawled - gone.length} pages, ${gone.length} missing, ${links} links.`,
+    );
+  });
+
+  it('uses the code it answered: a 410 reads "missing (410)"', () => {
+    const copy = structuredClone(d);
+    const page = copy.page_results.find((p) => p.url === gone[0]!.url)!;
+    page.status_code = 410;
+    const path = new URL(page.url).pathname;
+    expect(
+      linkMapView(copy, id, { scope: 'all', hrefs }).nodes.find((n) => n.path === path)!.missing,
+    ).toBe('missing (410)');
+  });
+
+  it('leaves the title alone on a record with no missing page', () => {
+    const bad = fixture('bad-site');
+    expect(linkMapView(bad, FIRST_AUDIT['bad-site'], { scope: 'hubs', hrefs }).title).not.toMatch(
+      /missing/,
+    );
+  });
+});

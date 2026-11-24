@@ -72,7 +72,7 @@ const Option = memo(function Option({
       {node.path}
       <span className={layout.mut}>
         {' '}
-        · {node.depth === null ? KIND_WORDS[node.kind] : `depth ${node.depth}`}
+        · {node.missing ?? (node.depth === null ? KIND_WORDS[node.kind] : `depth ${node.depth}`)}
         {node.kind === 'js_only' && node.depth !== null ? ', JavaScript-only' : ''}
       </span>
     </div>

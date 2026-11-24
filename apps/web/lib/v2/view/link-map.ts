@@ -60,6 +60,8 @@ export interface MapNodeView {
   parent: string | null;
   /** The link the line stands for was made by JavaScript (drawn dashed). */
   js: boolean;
+  /** "missing (404)" for a page that answered 404 or 410, which has no depth; else null. */
+  missing: string | null;
 }
 
 export interface PillView {
@@ -154,6 +156,13 @@ const pathOf = (url: string) => {
 
 const round = (n: number) => Math.round(n * 10) / 10;
 
+/** The statuses that say a page is gone, which the map labels as missing rather than by depth. */
+const MISSING_STATUSES: readonly number[] = [404, 410];
+
+/** "missing (404)" for a page that answered 404 or 410; null for any other page. */
+export const missingLabel = (page: PageResult): string | null =>
+  MISSING_STATUSES.includes(page.status_code) ? `missing (${page.status_code})` : null;
+
 /** "0.4%" for a small share, "18%" otherwise. */
 const share = (s: number) => (s < 0.01 ? `${(s * 100).toFixed(1)}%` : `${percent(s)}%`);
 
@@ -179,10 +188,13 @@ function detailsOf(
   // A page whose links were not all read has no count of its links out (its links_out is 0 when none
   // was read, the links found so far when the read stopped early), so none is shown.
   const linksOut = page.links_read ? page.links_out : null;
+  const missing = missingLabel(page);
   const pills: PillView[] = [
-    page.depth === null
-      ? { state: 'neutral', label: page.is_orphan ? 'orphan' : 'no link path' }
-      : { state: 'neutral', label: `depth ${page.depth}` },
+    missing !== null
+      ? { state: 'bad', label: missing }
+      : page.depth === null
+        ? { state: 'neutral', label: page.is_orphan ? 'orphan' : 'no link path' }
+        : { state: 'neutral', label: `depth ${page.depth}` },
   ];
   if (page.js_only) pills.push({ state: 'warn', label: 'JavaScript-only' });
   if (page.without_js) {
@@ -215,7 +227,7 @@ function detailsOf(
   }));
   return {
     path: pathOf(page.url),
-    depth: page.depth,
+    depth: missing === null ? page.depth : null,
     pills,
     facts: [
       { label: 'Links in', value: count(page.links_in) },
@@ -412,15 +424,17 @@ export function linkMapView(
     const at = drawing.positions[n.id];
     if (!at) throw new Error(`The drawing has no position for ${n.id}`);
     const r = record(n.id);
+    const missing = r ? missingLabel(r) : null;
     return {
       path: pathOf(n.id),
       kind: n.kind,
-      depth: r ? r.depth : n.depth,
+      depth: missing !== null ? null : r ? r.depth : n.depth,
       x: round(at.x),
       y: round(at.y),
       r: nodeRadius(n),
       parent: n.parent ? pathOf(n.parent) : null,
       js: n.via === 'javascript',
+      missing,
     };
   });
   const details: Record<string, PageDetails> = {};
@@ -449,7 +463,9 @@ export function linkMapView(
 
   const isGenerated = drawnScope === 'generated';
   const linkCount = isGenerated ? nodes.filter((n) => n.parent).length : s.internal_links;
-  const pageCount = isGenerated ? nodes.length : crawled;
+  // Pages that answered 404 or 410 are counted apart: they are links to pages that are not there.
+  const missingCount = isGenerated ? 0 : records.filter((p) => missingLabel(p) !== null).length;
+  const pageCount = isGenerated ? nodes.length : crawled - missingCount;
   const drawnOf = (pred: (n: MapNodeView) => boolean) => nodes.filter(pred).map((n) => n.path);
   const filter = (
     key: MapFilter['key'],
@@ -511,7 +527,7 @@ export function linkMapView(
     },
     title: noneServed
       ? 'No page was served.'
-      : `${count(pageCount)} ${plural(pageCount, 'page', 'pages')}, ${count(linkCount)} ${plural(linkCount, 'link', 'links')}.`,
+      : `${count(pageCount)} ${plural(pageCount, 'page', 'pages')}, ${missingCount ? `${count(missingCount)} missing, ` : ''}${count(linkCount)} ${plural(linkCount, 'link', 'links')}.`,
     caption: noneServed
       ? `${count(records.length)} ${plural(records.length, 'page', 'pages')} answered, none served, so there is no link map.`
       : noLinkRead
