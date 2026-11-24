@@ -145,7 +145,7 @@ export const SETUP_COPY = {
   },
   staging: {
     subject: STAGING,
-    todo: `Add ${STAGING} so audits run before each deploy`,
+    todo: `Add ${STAGING} so audits run after each staging deploy`,
     done: 'Staging audited on each deploy',
   },
   observed: {
@@ -323,6 +323,14 @@ const DAY0: CopyChange[] = [
       'before each deploy Add Connect Cloudflare Analytics or a Vercel Drain to see what the AI crawlers actually fetched Connect All five stop',
     source:
       'FACTS l.57: observed crawler activity is the fifth Pro set-up item (GATES.observedCrawlerActivity); the count is the items’',
+  },
+  {
+    screen: 'dashboard-day0',
+    kind: 'ruling',
+    locked: 'Add a staging URL so audits run before each deploy',
+    rendered: 'Add a staging URL so audits run after each staging deploy',
+    source:
+      'V2R register, F-097 (CTO 057): the deploy hook fires once a staging deploy has finished, so the audit runs after it',
   },
   {
     screen: 'dashboard-day0',
