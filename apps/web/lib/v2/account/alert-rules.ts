@@ -10,7 +10,8 @@
  * Setting a URL needs a tier whose gates open Slack (402 otherwise); clearing one does not.
  *
  * The URL goes into Vault through `set_account_slack_webhook` and is not read back: the answer says
- * whether one is set and its last four characters, which is all a page shows.
+ * whether one is set and its last four characters, which is all a page shows. Setting it also puts
+ * Slack on the account's rules, and clearing it takes Slack off them (`slackOnRules`).
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { z } from 'zod';
@@ -113,6 +114,33 @@ function failed(what: string, error: { message: string }): never {
   throw new Error(`alert rules: ${what} failed: ${error.message}`);
 }
 
+/**
+ * Puts Slack on each of the account's alert rules, beside their other channels, or takes it off.
+ * A destination alone sends nothing: delivery posts to Slack for a fired rule whose `channels` name
+ * it, and the default rules name email only (`seed_default_alert_rules`). So connecting Slack sends
+ * every rule's alerts there too, and disconnecting stops it. A rule seeded after the connection
+ * starts on email only.
+ */
+async function slackOnRules(admin: SupabaseClient, accountId: string, on: boolean): Promise<void> {
+  const { data, error } = await admin
+    .from('alert_rules')
+    .select('id, channels')
+    .eq('account_id', accountId);
+  if (error) failed('alert_rules read', error);
+  const rules = z.array(z.object({ id: z.string(), channels: z.array(z.string()) })).parse(data);
+  for (const rule of rules) {
+    const has = rule.channels.includes('slack');
+    if (has === on) continue;
+    const channels = on ? [...rule.channels, 'slack'] : rule.channels.filter((c) => c !== 'slack');
+    const update = await admin
+      .from('alert_rules')
+      .update({ channels })
+      .eq('id', rule.id)
+      .eq('account_id', accountId);
+    if (update.error) failed('alert_rules channels', update.error);
+  }
+}
+
 /** The writes over the service role, each keyed by the account id. */
 export function supabaseAlertRulePorts(admin: SupabaseClient): AlertRulePorts {
   return {
@@ -141,10 +169,12 @@ export function supabaseAlertRulePorts(admin: SupabaseClient): AlertRulePorts {
         p_url: url,
       });
       if (error) failed('set_account_slack_webhook', error);
+      await slackOnRules(admin, accountId, true);
     },
     async clearSlack(accountId) {
       const { error } = await admin.rpc('clear_account_slack_webhook', { p_account: accountId });
       if (error) failed('clear_account_slack_webhook', error);
+      await slackOnRules(admin, accountId, false);
     },
     async slackLast4(accountId) {
       const { data, error } = await admin.rpc('account_slack_last4', { p_account: accountId });

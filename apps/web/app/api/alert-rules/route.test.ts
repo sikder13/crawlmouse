@@ -198,6 +198,48 @@ describe('PUT /api/alert-rules', () => {
     expect(await secretsOf(m.accountId)).toEqual([URL_A]);
   });
 
+  describe('which alerts go to Slack', () => {
+    const channelsOf = async (accountId: string) =>
+      (
+        await h.db.query<{ channels: string[] }>(
+          `select channels from public.alert_rules where account_id = $1 order by kind`,
+          [accountId],
+        )
+      ).rows.map((r) => r.channels);
+
+    it('connecting adds Slack to each of the account’s rules, beside email', async () => {
+      const m = await member('rules-on', 'pro');
+      h.user = m.user;
+      await PUT(put({ slackWebhookUrl: URL_A }));
+      expect(await channelsOf(m.accountId)).toEqual([['email', 'slack']]);
+    });
+
+    it('replacing the URL adds nothing twice', async () => {
+      const m = await member('rules-again', 'pro');
+      h.user = m.user;
+      await PUT(put({ slackWebhookUrl: URL_A }));
+      await PUT(put({ slackWebhookUrl: URL_A.replace('abcd', 'efgh') }));
+      expect(await channelsOf(m.accountId)).toEqual([['email', 'slack']]);
+    });
+
+    it('disconnecting takes Slack off them and leaves email', async () => {
+      const m = await member('rules-off', 'pro');
+      h.user = m.user;
+      await PUT(put({ slackWebhookUrl: URL_A }));
+      expect(await channelsOf(m.accountId)).toEqual([['email', 'slack']]);
+      await PUT(put({ clearSlack: true }));
+      expect(await channelsOf(m.accountId)).toEqual([['email']]);
+    });
+
+    it('touches no other account’s rules', async () => {
+      const m = await member('rules-mine', 'pro');
+      const other = await member('rules-theirs', 'pro');
+      h.user = m.user;
+      await PUT(put({ slackWebhookUrl: URL_A }));
+      expect(await channelsOf(other.accountId)).toEqual([['email']]);
+    });
+  });
+
   it('stores a Slack URL on a paid account and answers its last four, never the URL', async () => {
     const m = await member('paid', 'pro');
     h.user = m.user;
