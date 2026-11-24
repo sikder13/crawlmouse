@@ -1243,6 +1243,8 @@ const ENTRIES: readonly Spec[] = [
       SETTINGS_TEST,
       'offers the owner the checkout, and the manager neither it nor a link to Settings › Plan',
     ),
+    // `mintedLinks`, once the seat is established: the reader's own sites' live public reports (F-123).
+    calls: 1,
   },
   {
     path: 'apps/web/app/(account)/account/delete/page.tsx',
@@ -1435,7 +1437,8 @@ const ENTRIES: readonly Spec[] = [
       'app/sites/[id]/page.test.tsx',
       'another account’s site, a removed site, a missing site and a malformed id are each a 404',
     ),
-    calls: 3,
+    // The fourth, `siteLinkGate`: whether a new public link may be offered, once the site is the caller's (F-123).
+    calls: 4,
   },
   {
     path: 'apps/web/app/agency/page.tsx',
@@ -2049,6 +2052,7 @@ const LIBS: readonly Spec[] = [
       'apps/web/app/(account)/account/email/page.tsx',
       'apps/web/app/(account)/account/restore/page.tsx',
       'apps/web/app/(account)/settings/delete/page.tsx',
+      'apps/web/app/(account)/trial-ended/page.tsx',
       'apps/web/app/agency-trial/page.tsx',
       'apps/web/app/agency/clients/[siteId]/page.tsx',
       'apps/web/app/agency/reports/page.tsx',
