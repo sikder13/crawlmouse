@@ -137,6 +137,11 @@ export const FOOTER_COLUMNS: FooterColumn[] = [
       { label: 'Is GPTBot blocked?', href: '/check/gptbot', gate: 'checksPublic' },
       { label: 'JavaScript-only content?', href: '/check/javascript', gate: 'checksPublic' },
       { label: 'robots.txt for AI', href: '/check/robots-ai', gate: 'checksPublic' },
+      // §13: these three earn search traffic (the first, 379 impressions in 28 days, is the site's
+      // largest), so the footer keeps its site-wide link to each (inbox 039).
+      { label: 'AI readiness checker', href: '/ai-readiness-checker' },
+      { label: 'Can AI crawlers see JavaScript?', href: '/blog/can-ai-crawlers-see-javascript' },
+      { label: 'Blocking AI crawlers in robots.txt', href: '/blog/block-ai-crawlers-robots-txt' },
     ],
   },
   {
