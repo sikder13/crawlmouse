@@ -39,7 +39,7 @@ describe('segmentFrame', () => {
     expect(links('nojs')).toEqual(['Back: Crawler access', 'Next: Site structure · 74']);
     expect(links('structure')).toEqual([
       'Back: Without JavaScript',
-      'Next: Links and pages · none of the 16 pages checked is missing',
+      'Next: Links and pages · no page checked answered 404 or 410',
     ]);
     expect(links('links')).toEqual([
       'Back: Site structure',
@@ -103,11 +103,11 @@ describe('segmentFrame', () => {
     ).length;
     expect(gone).toBe(1);
     expect(segmentFrame(d, id, 'structure', { hrefs }).next.label).toBe(
-      'Next: Links and pages · 1 missing page, linked from 1 page we read',
+      'Next: Links and pages · 1 missing page · linked from 1 page in the record',
     );
     const clean = edited('clean-site');
     expect(segmentFrame(clean.d, clean.id, 'structure', { hrefs }).next.label).toBe(
-      'Next: Links and pages · none of the 2 pages checked is missing',
+      'Next: Links and pages · no page checked answered 404 or 410',
     );
     const challenged = edited('challenged-site');
     expect(segmentFrame(challenged.d, challenged.id, 'structure', { hrefs }).next.label).toBe(

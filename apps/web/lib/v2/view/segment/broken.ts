@@ -1,10 +1,10 @@
 /**
  * Which pages of a check's record are missing (they answer 404 or 410) and which answer another
  * error, read through the pages CSV's status accessor (reports/csv.ts), and where each answered: a
- * page reached by a redirect answered at its final URL when that URL is recorded. The link map, the
- * Links and pages screen, its door, the tab's figure and the PDF all read the statuses, the rows and
- * the labels below from here, so the map's count of missing pages and the Links screen's cannot
- * disagree.
+ * page reached by a redirect answered at its final URL when that URL is recorded. The link map
+ * counts its missing pages with `missingUrls`, and the Links and pages screen, its door, the tab's
+ * figure and the PDF count theirs from `errorRows`, which `missingUrls` reads: one rule for which
+ * statuses are missing and where each answered. What each surface says around its count is its own.
  */
 import type { PageResult } from '@crawlmouse/types/v2';
 import { PAGE_CELLS } from '../../reports/csv';
@@ -18,8 +18,8 @@ export const isMissing = (p: PageResult): boolean =>
   MISSING_STATUSES.includes(PAGE_CELLS.status_code(p));
 
 /**
- * The page exists but answered an error: a status of 400 or more outside MISSING_STATUSES (a 403,
- * a 429, a 503). It is not called broken or missing.
+ * The page answered an error other than 404 or 410, which does not tell whether it exists: a status
+ * of 400 or more outside MISSING_STATUSES (a 403, a 429, a 503). It is not called broken or missing.
  */
 export const isOtherError = (p: PageResult): boolean =>
   PAGE_CELLS.status_code(p) >= 400 && !isMissing(p);

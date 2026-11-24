@@ -123,7 +123,7 @@ describe('linksView on the built site', () => {
     );
     expect(v.headline.pill).toEqual({
       state: 'bad',
-      label: `1 missing page, linked from ${independent.brokenLinkedFrom} page we read`,
+      label: `1 missing page · linked from ${independent.brokenLinkedFrom} page in the record`,
     });
     expect(v.headings).toBe(HEADINGS_LINE);
     expect(v.coverage).toEqual({ read: 'Checked 60 pages' });
@@ -162,7 +162,7 @@ describe('linksView on the clean preview: 2 pages recorded of 38 crawled', () =>
     expect(v.redirects).toEqual({ rows: [], empty: 'None of the 2 pages we checked redirects.' });
     expect(v.headline.pill).toEqual({
       state: 'neutral',
-      label: 'none of the 2 pages checked is missing',
+      label: 'no page checked answered 404 or 410',
     });
     expect(v.headline.title).toMatch(/^2 pages checked: 0 missing pages found/);
     expect(v.coverage).toEqual({ read: 'Checked 2 of the 38 pages crawled' });
@@ -175,7 +175,7 @@ describe('linksView on the clean preview: 2 pages recorded of 38 crawled', () =>
     )!;
     // The fixture holds 2 of the check's 412 links (`withheld`): said first, from the record.
     expect(door.body).toMatch(
-      /^The record holds 2 of the 412 links found\. None of the 2 pages we checked answers an error\./,
+      /^The record holds 2 of the 412 links found; the links of 2 pages are not all in this check’s record\. None of the 2 pages we checked answers an error\./,
     );
   });
 
@@ -188,10 +188,13 @@ describe('linksView on the clean preview: 2 pages recorded of 38 crawled', () =>
     expect(w.broken.empty).toBe('The page we checked answers no error.');
     expect(w.redirects.empty).toBe('The page we checked does not redirect.');
     expect(w.body).toBe(
-      'The record holds 2 of the 412 links found. ' +
+      'The record holds 2 of the 412 links found; the links of 1 page are not all in this check’s record. ' +
         'The page that answered 200 has a title and a meta description.',
     );
-    expect(w.headline.pill).toEqual({ state: 'neutral', label: 'the page checked is not missing' });
+    expect(w.headline.pill).toEqual({
+      state: 'neutral',
+      label: 'the page checked did not answer 404 or 410',
+    });
     expect(w.body).not.toMatch(/Each of the 1/);
   });
 });
@@ -236,7 +239,7 @@ describe('missing is 404 or 410; any other error is a page that answered an erro
       expect(v.counts).toMatchObject({ broken: 1, errors: 0 });
       expect(v.headline.pill).toEqual({
         state: 'bad',
-        label: '1 missing page, linked from 1 page we read',
+        label: '1 missing page · linked from 1 page in the record',
       });
     });
   }
@@ -252,9 +255,9 @@ describe('missing is 404 or 410; any other error is a page that answered an erro
       ]);
       expect(v.headline.pill).toEqual({
         state: 'neutral',
-        label: 'none of the 60 pages checked is missing',
+        label: 'no page checked answered 404 or 410',
       });
-      expect(v.broken.empty).toBe('None of the 60 pages checked is missing.');
+      expect(v.broken.empty).toBe('No page checked answered 404 or 410.');
       expect(v.body).toMatch(new RegExp(`^1 page answered an error \\(${status}\\)\\.`));
       expect(v.body).not.toMatch(/broken|missing/);
       const door = resultView(d, id, { map: null }).doors.find(
@@ -262,10 +265,10 @@ describe('missing is 404 or 410; any other error is a page that answered an erro
       )!;
       expect(door.pill).toEqual({
         state: 'neutral',
-        label: 'none of the 60 pages checked is missing',
+        label: 'no page checked answered 404 or 410',
       });
       expect(segmentFrame(d, id, 'structure').next.label).toBe(
-        'Next: Links and pages · none of the 60 pages checked is missing',
+        'Next: Links and pages · no page checked answered 404 or 410',
       );
     });
   }
@@ -319,8 +322,10 @@ describe('a hand-counted record: a blank title, a 503, a self-linked 410, blank 
 
   it('writes each clause once, each true of every page it names', () => {
     expect(v.body).toBe(
-      '1 missing page, linked from 2 pages we read, answering 404. ' +
-        '1 missing page found, answering 410; no link we read leads to it. ' +
+      '1 missing page, linked from 2 pages in this check’s record, answering 404. ' +
+        '1 missing page, answering 410; no link in this check’s record leads to it. ' +
+        // The links to the 410 were taken out of the record; the page they were on keeps its count.
+        'The links of 1 page are not all in this check’s record. ' +
         '1 page answered an error (503). ' +
         '1 page redirects. ' +
         '3 pages have no meta description; 1 page has no title; ' +
@@ -332,7 +337,9 @@ describe('a hand-counted record: a blank title, a 503, a self-linked 410, blank 
     expect(v.unlinked.heading).toBe('Missing pages found');
     expect(
       v.unlinked.rows.map((r) => [r.path, r.status, r.linkedFrom, r.linkedAll, r.linkedSummary]),
-    ).toEqual([['/products/sleeping-bags-item-1', 410, [], 'no link found', 'no link found']]);
+    ).toEqual([
+      ['/products/sleeping-bags-item-1', 410, [], 'no link in the record', 'no link in the record'],
+    ]);
     expect(v.titles.missing.shown.map((p) => p.path)).toEqual(['/blog/rainy-day-camping']);
   });
 
@@ -428,7 +435,7 @@ describe('two statuses at one URL are two rows: no status is hidden', () => {
     ]);
     expect(v.counts.broken + v.counts.missingUnlinked).toBe(1);
     expect(v.body).toMatch(
-      /^1 missing page, linked from \d+ pages? we read, answering 404 or 410\./,
+      /^1 missing page, linked from \d+ pages? in this check’s record, answering 404 or 410\./,
     );
   });
 });
@@ -525,10 +532,10 @@ describe('the overview door', () => {
     const d = door('built-site');
     expect(d.pill).toEqual({
       state: 'bad',
-      label: `${c.broken} missing page, linked from ${c.brokenLinkedFrom} page we read`,
+      label: `${c.broken} missing page · linked from ${c.brokenLinkedFrom} page in the record`,
     });
     expect(d.body).toBe(
-      `${c.broken} missing page, linked from ${c.brokenLinkedFrom} page we read, answering 404. ` +
+      `${c.broken} missing page, linked from ${c.brokenLinkedFrom} page in this check’s record, answering 404. ` +
         `${c.redirects} page redirects. ` +
         `${c.missingDescriptions} pages have no meta description; ` +
         `${c.sharedTitlePages} pages share a title with another; ` +
@@ -540,9 +547,9 @@ describe('the overview door', () => {
 
   it('is neutral with no broken page, and names no category the record does not hold', () => {
     const d = door('clean-site');
-    expect(d.pill).toEqual({ state: 'neutral', label: 'none of the 2 pages checked is missing' });
+    expect(d.pill).toEqual({ state: 'neutral', label: 'no page checked answered 404 or 410' });
     expect(d.body).toMatch(
-      /^The record holds 2 of the 412 links found\. None of the 2 pages we checked answers an error\./,
+      /^The record holds 2 of the 412 links found; the links of 2 pages are not all in this check’s record\. None of the 2 pages we checked answers an error\./,
     );
     // The clean record has no redirect, loop, missing or shared title, or other error: none named.
     for (const word of [/redirect/, /loop/, /title/, /missing/, /answered an error/, /broken/]) {

@@ -15,13 +15,13 @@
  * - the rows of the missing-page and error tables, as (page, status) pairs, and each row's linking
  *   pages, its "and N more" summary, and the cell that stands in when the record holds no link;
  * - the missing-page, error, redirect and loop counts and the status lists of the body's sentences;
- * - the clauses on links not all read and links withheld, on titles and descriptions not read, cut
- *   short, missing and shared;
+ * - the clause on the pages whose links the record does not hold in full (`links_read` false, or
+ *   `links_out` above the distinct links the record holds from the page), the clause on links
+ *   withheld, and the clauses on titles and descriptions not read, cut short, missing and shared;
  * - the pill, the headline's parts, the tiles, the coverage line, the door and the tab, and the link
  *   map's missing count and its scope;
  * - that no string of the view, the door, the tab, the map's title, the PDF section or the rendered
- *   screen says "no link from another page", "no other page links", "no broken link" or
- *   "unlinked".
+ *   screen matches a wording in FORBIDDEN.
  *
  * The truth is computed from the record, with no helper of the view under test (segment/broken.ts,
  * links-facts.ts, reports/csv.ts) imported.
@@ -45,6 +45,8 @@ import { linkMapView } from '../../lib/v2/view/link-map';
 import { resultView } from '../../lib/v2/view/result';
 import { segmentFrame } from '../../lib/v2/view/segment/frame';
 import { linksView } from '../../lib/v2/view/segment/links';
+import { linkSpelling } from '../../lib/v2/view/segment/links-facts';
+import { canonicalizeUrl } from '@crawlmouse/engine/v2/pipeline';
 
 const BASE = fixture('built-site');
 const ID = BASE.checks[0]!.id;
@@ -69,6 +71,7 @@ function page(path: string, status: number, over: Partial<PageResult> = {}): Pag
     status_code: status,
     final_url: url(path),
     redirect: { hops: [], loop: false },
+    links_out: 0,
     title: text(`Title of ${path}`),
     meta_description: text(`About ${path}`),
     ...over,
@@ -147,9 +150,28 @@ const path = (u: string) => {
 const distinct = <T,>(xs: readonly T[]) => [...new Set(xs)];
 const sortNum = (xs: readonly number[]) => [...xs].sort((a, b) => a - b);
 
+/** The distinct URLs other than `from` the record holds a link to from `from` or its final URL. */
+const heldFrom = (p: PageResult, edges: readonly LinkEdge[]) =>
+  new Set(
+    edges
+      .filter(
+        (e) => (e.from_url === p.url || e.from_url === p.final_url) && e.to_url !== e.from_url,
+      )
+      .map((e) => e.to_url),
+  ).size;
+
+/** Each page's `links_out` raised to at least the distinct links the record holds from it. */
+const settle = (pages: PageResult[], edges: LinkEdge[]) =>
+  pages.map((p) => ({ ...p, links_out: Math.max(p.links_out, heldFrom(p, edges)) }));
+
 function truthOf(pages: PageResult[], edges: LinkEdge[], scope: Scope) {
   const internalLinks = scope.unmeasured ? 0 : edges.length + (scope.extraLinks ?? 0);
-  const linkGap = internalLinks === 0 ? 'unread' : edges.length === 0 ? 'unrecorded' : null;
+  const linkGap =
+    edges.length > 0
+      ? null
+      : internalLinks === 0 && pages.every((p) => p.links_out === 0)
+        ? 'unread'
+        : 'unrecorded';
   // Where each request answered: the final URL of a recorded redirect chain, else its own URL.
   const at = (p: PageResult) =>
     p.redirect && p.redirect.hops.length > 0 && p.final_url !== null ? p.final_url : p.url;
@@ -208,7 +230,9 @@ function truthOf(pages: PageResult[], edges: LinkEdge[], scope: Scope) {
     linksHeld: edges.length,
     linkGap,
     heldLinks: scope.extraLinks && !scope.unmeasured ? edges.length + scope.extraLinks : null,
-    linksNotAllRead: served.filter((p) => !p.links_read).length,
+    notAllHeld: served.filter(
+      (p) => p.is_html && (!p.links_read || p.links_out > heldFrom(p, edges)),
+    ).length,
     rows,
     missingAt,
     broken: linkedAt.size,
@@ -287,17 +311,33 @@ const matchesOf = (strings: readonly string[], re: RegExp) =>
 const statusList = (s: string) => sortNum(s.split(/ or |, /).map(Number));
 const nPages = (n: number) => `${n.toLocaleString('en-US')} ${n === 1 ? 'page' : 'pages'}`;
 
-/** No string says a page has no link to it, or that the site has no broken link. */
-const FORBIDDEN = /no link from another page|no other page links|no broken link|unlinked/i;
+/**
+ * Wordings that claim more than the record holds: that no page links to a page, that the site has
+ * no broken link, that we read a page's links (the record may hold some of them), a link claim not
+ * scoped to the record, or that a page exists or is missing beyond the status it answered.
+ */
+const FORBIDDEN: readonly RegExp[] = [
+  /no link from another page/i,
+  /no other page links/i,
+  /no broken link/i,
+  /unlinked/i,
+  /we read/i,
+  /no (internal )?link leads to/i,
+  /no link found/i,
+  /missing pages no/i,
+  /not missing/i,
+  /\b(is|are) missing\b/i,
+];
 
 /** The assertions: no string contradicts the record. */
-function expectTrueToTheRecord(pages: PageResult[], edges: LinkEdge[], scope: Scope = {}) {
+function expectTrueToTheRecord(given: PageResult[], edges: LinkEdge[], scope: Scope = {}) {
+  const pages = settle(given, edges);
   const t = truthOf(pages, edges, scope);
   const d = dataset(pages, edges, scope);
   const { v, door, tab, map, strings, screenText } = said(d);
   const pill = v.headline.pill?.label ?? 'not measured';
 
-  for (const s of strings) expect(s).not.toMatch(FORBIDDEN);
+  for (const s of strings) for (const re of FORBIDDEN) expect(s).not.toMatch(re);
 
   // The door, the tab and the screen say the same figure.
   expect(door.pill.label).toBe(pill);
@@ -335,7 +375,7 @@ function expectTrueToTheRecord(pages: PageResult[], edges: LinkEdge[], scope: Sc
       ? 'no link read'
       : t.linkGap === 'unrecorded'
         ? 'no link recorded'
-        : 'no link found';
+        : 'no link in the record';
   for (const r of [...v.broken.rows, ...v.unlinked.rows, ...v.errors.rows]) {
     const truth = t.rows.find((x) => path(x.at) === r.path && x.status === r.status)!;
     const froms = distinct(truth.into.map((e) => path(e.from_url)));
@@ -355,12 +395,12 @@ function expectTrueToTheRecord(pages: PageResult[], edges: LinkEdge[], scope: Sc
   for (const body of bodies) {
     const b = matchesOf(
       [body],
-      /(\d[\d,]*) missing pages?, linked from (\d[\d,]*) pages? we read, answering ([\d or]+)\./,
+      /(\d[\d,]*) missing pages?, linked from (\d[\d,]*) pages? in this check’s record, answering ([\d or]+)\./,
     );
     expect(b.map((m) => [num(m[1]!), num(m[2]!), statusList(m[3]!)])).toEqual(
       t.broken ? [[t.broken, t.linkingPages, t.brokenStatuses]] : [],
     );
-    const u = matchesOf([body], /(\d[\d,]*) missing pages?(?: found)?, answering ([\d or]+)[.;]/);
+    const u = matchesOf([body], /(\d[\d,]*) missing pages?, answering ([\d or]+)[.;]/);
     expect(u.map((m) => [num(m[1]!), statusList(m[2]!)])).toEqual(
       t.unlinked ? [[t.unlinked, t.unlinkedStatuses]] : [],
     );
@@ -379,36 +419,38 @@ function expectTrueToTheRecord(pages: PageResult[], edges: LinkEdge[], scope: Sc
     );
     const notAll = matchesOf(
       [body],
-      /the links of (\d[\d,]*) pages? that answered 200 were not all read/i,
+      /the links of (\d[\d,]*) pages? are not all in this check’s record/i,
     );
-    expect(notAll.map((m) => num(m[1]!))).toEqual(
-      t.linkGap === null && t.linksNotAllRead ? [t.linksNotAllRead] : [],
-    );
+    expect(notAll.map((m) => num(m[1]!))).toEqual(t.notAllHeld ? [t.notAllHeld] : []);
   }
 
-  // The pill: a count of missing pages and of the pages we read that link to them, or what the
-  // record shows of the pages checked.
+  // The pill: a count of missing pages and of the record's pages that link to them, or the statuses
+  // no page checked answered.
   if (t.broken) {
     expect(pill).toBe(
-      `${t.broken} missing ${t.broken === 1 ? 'page' : 'pages'}, linked from ${nPages(t.linkingPages)} we read`,
+      `${t.broken} missing ${t.broken === 1 ? 'page' : 'pages'} · linked from ${nPages(t.linkingPages)} in the record`,
     );
   } else if (t.unlinked) {
     const missing = `${t.unlinked} missing ${t.unlinked === 1 ? 'page' : 'pages'}`;
-    expect(pill).toBe(t.linkGap === null ? `${missing} found` : `${missing}, ${stand}`);
+    expect(pill).toBe(
+      t.linkGap === null
+        ? `${missing} · no link in the record leads to ${t.unlinked === 1 ? 'it' : 'them'}`
+        : `${missing} · ${stand}`,
+    );
   } else if (t.linkGap !== null) {
     expect(pill).toBe(stand);
   } else {
     expect(pill).toBe(
       t.checked === 1
-        ? 'the page checked is not missing'
-        : `none of the ${t.checked} pages checked is missing`,
+        ? 'the page checked did not answer 404 or 410'
+        : 'no page checked answered 404 or 410',
     );
   }
-  for (const s of strings.filter((x) => /is missing|is not missing/.test(x))) {
+  // "Answered 404 or 410" is said of none only when no page checked answered either.
+  for (const s of strings.filter((x) =>
+    /did not answer 404 or 410|no page checked answered/i.test(x),
+  ))
     expect(t.missingAt).toEqual([]);
-    const n = s.match(/[Nn]one of the (\d[\d,]*) pages checked is missing/);
-    if (n) expect(num(n[1]!)).toBe(t.checked);
-  }
 
   // The headline: the scope, the missing pages found, whether links were read, the redirects and
   // the titles and descriptions read.
@@ -431,12 +473,10 @@ function expectTrueToTheRecord(pages: PageResult[], edges: LinkEdge[], scope: Sc
 
   // With no link held, nothing names a page a link comes from; with links held, none is called absent.
   if (t.linksHeld === 0) {
-    for (const s of strings) expect(s).not.toMatch(/No link we read|linked from \d/i);
+    for (const s of strings) expect(s).not.toMatch(/linked from \d/i);
   } else {
     for (const s of strings) {
-      expect(s).not.toMatch(
-        /no link (was )?(read|recorded)|No link is in this check|no link in the record/i,
-      );
+      expect(s).not.toMatch(/no link (was )?(read|recorded)|No link is in this check/i);
     }
   }
 
@@ -881,5 +921,23 @@ describe('every string of Links and pages is true to the record: generated recor
       zeroWidth: true,
       moreThanTwoLinking: true,
     });
+  });
+});
+
+describe('the spelling the record’s links are counted in', () => {
+  it('is the engine’s canonicalizeUrl, over URLs that vary each part it rewrites', () => {
+    const urls = [
+      'https://Example.COM/',
+      'https://example.com',
+      'https://example.com/a/',
+      'https://example.com//a///b/',
+      'https://example.com/a?b=2&a=1&a=0',
+      'https://example.com/a#part',
+      'https://example.com:443/a/?z=1#x',
+      'http://example.com:80/',
+      'http://example.com:8080/a/',
+      'https://example.com/%7Euser/?q=a%20b',
+    ];
+    expect(urls.map(linkSpelling)).toEqual(urls.map((u) => canonicalizeUrl(u)));
   });
 });

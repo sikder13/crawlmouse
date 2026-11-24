@@ -1,6 +1,6 @@
 /**
- * Links and pages (row 5) as data: the missing pages a link we read leads to and the pages we read
- * that link to them, the missing pages found with no link we read leading to them, the pages that
+ * Links and pages (row 5) as data: the missing pages a link in the record leads to and the pages of
+ * the record that link to them, the missing pages no link in the record leads to, the pages that
  * answered another error, the pages that redirect, and the titles and meta descriptions that are missing or shared. It
  * reads the page and link records of one check. A page's status, final URL, title and meta
  * description are read through the pages CSV's accessors (reports/csv.ts), so the screen, the CSV
@@ -8,13 +8,18 @@
  * `page.redirect`. Which statuses are missing, where a redirected page answered, and the rows (one
  * per URL where a page answered and status) are segment/broken.ts's, which the link map reads too.
  *
- * The record holds some of a site's links, not all of them: the worker keeps a bounded number of
- * links per page, a page read in part has `links_read` false, a page not crawled gives none, and a
- * fixture may hold a subset (`withheld`). So what it says of links is scoped to the links and pages
- * we read: "linked from 2 pages we read", "no link we read leads to it", "none of the 16 pages
- * checked is missing". __tests__/v2/links-sentences.property.test.tsx fails on "no link from another
- * page", "no other page links", "no broken link" or "unlinked" in any string the feature renders for
- * the records it generates.
+ * The record holds some of a site's links, not all of them. A page read whole (`links_read` true)
+ * can still have none or only some of its links in the record: the worker keeps the first 1,000
+ * distinct links of a page, and stores none of a page's links once its batch has used its room for
+ * them, while `links_out` keeps the page's full count of distinct links. A page read in part has
+ * `links_read` false, a page not crawled gives none, and a fixture may hold a subset (`withheld`).
+ * So what it says of links is said of the record: "linked from 2 pages in this check’s record", "no
+ * link in this check’s record leads to it"; and the pages whose links the record does not hold in
+ * full are counted from `links_read` and `links_out` against the links the record holds from each
+ * (`linksNotAllHeld`). Of the pages checked it says which statuses none answered ("no page checked
+ * answered 404 or 410"), never that a page exists. __tests__/v2/links-sentences.property.test.tsx
+ * holds a list of the wordings that claimed more (FORBIDDEN) and fails when a string the feature
+ * renders for the records it builds matches one.
  *
  * Titles and descriptions are read over the pages that answered 200, in three kinds: not read (the
  * page's `title` or `meta_description` is null: a non-HTML page, or one read in part), missing (read,
@@ -156,7 +161,7 @@ export const ERRORS_HEADING = 'Pages that answered an error';
 /** The heading of the missing pages found with no link in the record leading to them. */
 export const UNLINKED_HEADING = 'Missing pages found';
 /** What a row's "Linked from" cell says when the record holds no link that leads to it. */
-export const NO_LINK_FOUND = 'no link found';
+export const NO_LINK_IN_RECORD = 'no link in the record';
 /** The column that names the URL a redirect chain starts from. */
 export const REQUESTED_AS = 'Requested as';
 
@@ -270,13 +275,72 @@ function column(
   };
 }
 
+/**
+ * A URL as the engine spells a link's ends (packages/engine/src/url-canonical.ts `canonicalizeUrl`,
+ * with no options): the host in lower case, no fragment, the query's pairs sorted, runs of slashes
+ * in the path made one, and no slash at the end of the path, the origin's included. Kept here
+ * because that module reads node:crypto, which a screen built on these views cannot load;
+ * __tests__/v2/links-sentences.property.test.tsx holds the two equal over a list of URLs.
+ */
+export function linkSpelling(input: string): string {
+  const u = new URL(input);
+  u.hash = '';
+  if (u.search) {
+    const pairs = [...u.searchParams.entries()].sort((x, y) =>
+      x[0] < y[0] ? -1 : x[0] > y[0] ? 1 : x[1] < y[1] ? -1 : x[1] > y[1] ? 1 : 0,
+    );
+    u.search = '';
+    for (const [k, v] of pairs) u.searchParams.append(k, v);
+  }
+  let pathname = u.pathname.replace(/\/{2,}/g, '/');
+  if (pathname.length > 1 && pathname.endsWith('/')) pathname = pathname.replace(/\/$/, '');
+  u.pathname = pathname;
+  return `${u.protocol}//${u.host}${u.pathname === '/' ? '' : u.pathname}${u.search}`;
+}
+
+/**
+ * The pages that answered 200 as HTML whose links the record does not hold in full: their links
+ * were not all read (`links_read` false), or the page has more distinct links (`links_out`) than
+ * the record holds from it. The worker records a page's links from the URL its request ended at,
+ * in the engine's spelling, and counts in `links_out` each distinct link to another URL, a link to
+ * the page itself left out; the links held are counted the same way here.
+ */
+export function linksNotAllHeld(
+  pages: readonly PageResult[],
+  edges: readonly LinkEdge[],
+): PageResult[] {
+  const held = new Map<string, Set<string>>();
+  for (const e of edges) {
+    if (e.from_url === e.to_url) continue;
+    const to = held.get(e.from_url) ?? new Set<string>();
+    to.add(e.to_url);
+    held.set(e.from_url, to);
+  }
+  const spell = (u: string) => {
+    try {
+      return linkSpelling(u);
+    } catch {
+      return u;
+    }
+  };
+  return pages.filter((p) => {
+    if (PAGE_CELLS.status_code(p) !== 200 || !p.is_html) return false;
+    if (!p.links_read) return true;
+    const from = new Set([p.url, spell(p.url)]);
+    if (p.final_url !== null) [p.final_url, spell(p.final_url)].forEach((u) => from.add(u));
+    const to = new Set([...from].flatMap((u) => [...(held.get(u) ?? [])]));
+    return p.links_out > to.size;
+  });
+}
+
 /** The distinct statuses of `rows`, lowest first. */
 const statusesOf = (rows: readonly ErrorRowView[]) =>
   [...new Set(rows.map((r) => r.status))].sort((a, b) => a - b);
 
 /**
  * Why no link can be named: `unread`, the check read no internal link (its structure section is not
- * measured); `unrecorded`, it read some but its record holds none. Null when the record holds links.
+ * measured and no page counts a link); `unrecorded`, the record holds none, though the check counted
+ * some. Null when the record holds links.
  */
 export type LinkGap = 'unread' | 'unrecorded' | null;
 
@@ -290,7 +354,10 @@ export interface LinksFacts {
   unlinked: ErrorRowView[];
   /** Their heading: "Missing pages found". */
   unlinkedHeading: string;
-  /** Pages that answered another error (a 403, a 429, a 503): they exist, so are not broken. */
+  /**
+   * Pages that answered another error (a 403, a 429, a 503): each answered an error other than 404
+   * or 410, which does not tell whether it exists.
+   */
   errors: ErrorRowView[];
   redirects: RedirectRowView[];
   titles: BasicsColumnView;
@@ -315,11 +382,16 @@ export function linksFacts(d: ViewDataset, check: Check): LinksFacts {
   const edges: LinkEdge[] = d.link_edges.filter((e) => e.check_id === check.id);
   const path = (url: string) => shortUrl(url, host);
   const ref = (p: PageResult): PageRef => ({ url: p.url, path: path(p.url) });
-  const linkGap: LinkGap = !sectionMeasured(check, 'structure')
-    ? 'unread'
-    : edges.length === 0
-      ? 'unrecorded'
-      : null;
+  // No link read: the structure section read nothing and no page counts a link. An HTML page's
+  // `links_out` is its links when they were all read (`links_read`), and the links found before
+  // reading stopped when not: above 0, links were read, and a record holding none did not record them.
+  const countsALink = (p: PageResult) => (p.links_read || p.is_html) && p.links_out > 0;
+  const linkGap: LinkGap =
+    edges.length > 0
+      ? null
+      : !sectionMeasured(check, 'structure') && !pages.some(countsALink)
+        ? 'unread'
+        : 'unrecorded';
   const noLink =
     linkGap === 'unread' ? 'no link read' : linkGap === 'unrecorded' ? 'no link recorded' : null;
   /** The same, as a clause: "No link was read". */
@@ -345,7 +417,7 @@ export function linksFacts(d: ViewDataset, check: Check): LinksFacts {
       anchor: isBlank(e.anchor_text) ? null : e.anchor_text,
     }));
     const froms = [...new Set(linkedFrom.map((l) => l.path))];
-    const none = noLink ?? NO_LINK_FOUND;
+    const none = noLink ?? NO_LINK_IN_RECORD;
     return {
       url: at,
       path: path(at),
@@ -458,30 +530,28 @@ export function linksFacts(d: ViewDataset, check: Check): LinksFacts {
   const nBroken = counts.broken;
   const nUnlinked = counts.missingUnlinked;
   const nErrors = counts.errors;
-  const linkingRead = `linked from ${pagesWord(brokenLinkedFrom)} we read`;
+  const linkedFromRecord = `linked from ${pagesWord(brokenLinkedFrom)}`;
   const brokenSentence = nBroken
-    ? `${missingPages(nBroken)}, ${linkingRead}, answering ${statusesOf(broken).join(' or ')}.`
+    ? `${missingPages(nBroken)}, ${linkedFromRecord} in this check’s record, answering ${statusesOf(broken).join(' or ')}.`
     : null;
   const unlinkedSentence = nUnlinked
     ? noLinkClause === null
-      ? `${missingPages(nUnlinked)} found, answering ${statusesOf(unlinked).join(' or ')}; no link we read leads to ${plural(nUnlinked, 'it', 'them')}.`
+      ? `${missingPages(nUnlinked)}, answering ${statusesOf(unlinked).join(' or ')}; no link in this check’s record leads to ${plural(nUnlinked, 'it', 'them')}.`
       : `${missingPages(nUnlinked)}, answering ${statusesOf(unlinked).join(' or ')}. ${noLinkClause}, so what links to ${plural(nUnlinked, 'it', 'them')} is not known.`
     : null;
-  // The record holds only some of the links: say how, from the record, when it says so.
+  // The record holds only some of the links: say how, from the record. A `withheld` total is said
+  // when the record holds links; the pages whose links it does not hold in full, whenever there are.
   const heldLinks = d.withheld.find(
     (w) => w.check_id === check.id && w.collection === 'link_edges',
   );
-  const linksNotAllRead = served.filter((p) => !p.links_read).length;
+  const notAllHeld = linksNotAllHeld(pages, edges).length;
   const partLinks = [
-    heldLinks
+    heldLinks && linkGap === null
       ? `the record holds ${count(heldLinks.included)} of the ${count(heldLinks.total)} links found`
       : null,
-    linksNotAllRead
-      ? `the links of ${pagesWord(linksNotAllRead)} that answered 200 were not all read`
-      : null,
+    notAllHeld ? `the links of ${pagesWord(notAllHeld)} are not all in this check’s record` : null,
   ].filter((x): x is string => x !== null);
-  const partLinksSentence =
-    linkGap === null && partLinks.length ? `${capitalise(partLinks.join('; '))}.` : null;
+  const partLinksSentence = partLinks.length ? `${capitalise(partLinks.join('; '))}.` : null;
   const errorSentence = nErrors
     ? `${pagesWord(nErrors)} answered an error (${statusesOf(errors).join(', ')}).`
     : null;
@@ -563,18 +633,19 @@ export function linksFacts(d: ViewDataset, check: Check): LinksFacts {
       .join(' ');
 
   const notRecorded = recorded.length < checked;
-  /** "none of the 16 pages checked is missing": what the record shows, said of the pages checked. */
+  // What the record shows of the pages checked, by status: a 403, a 429 or a 503 does not tell
+  // whether a page exists, so this says only that none answered 404 or 410.
   const noneMissing =
     checked === 1
-      ? 'the page checked is not missing'
-      : `none of the ${pagesWord(checked)} checked is missing`;
+      ? 'the page checked did not answer 404 or 410'
+      : 'no page checked answered 404 or 410';
   const brokenEmpty = nBroken
     ? null
     : noLinkClause !== null
       ? `${noLinkClause}, so no link to a missing page can be named.`
       : (noneSentence ??
         (nUnlinked
-          ? `No link we read leads to ${nUnlinked === 1 ? 'the missing page found' : `any of the ${missingPages(nUnlinked)} found`}.`
+          ? `No link in this check’s record leads to ${nUnlinked === 1 ? 'the missing page' : `any of the ${missingPages(nUnlinked)}`}.`
           : `${capitalise(noneMissing)}.`));
   return {
     counts,
@@ -602,14 +673,14 @@ export function linksFacts(d: ViewDataset, check: Check): LinksFacts {
             ? 'The page we checked does not redirect.'
             : `None of the ${count(checked)} pages we checked redirects.`,
     pill: nBroken
-      ? { state: 'bad', label: `${missingPages(nBroken)}, ${linkingRead}` }
+      ? { state: 'bad', label: `${missingPages(nBroken)} · ${linkedFromRecord} in the record` }
       : nUnlinked
         ? {
             state: 'neutral',
             label:
               noLink === null
-                ? `${missingPages(nUnlinked)} found`
-                : `${missingPages(nUnlinked)}, ${noLink}`,
+                ? `${missingPages(nUnlinked)} · no link in the record leads to ${plural(nUnlinked, 'it', 'them')}`
+                : `${missingPages(nUnlinked)} · ${noLink}`,
           }
         : noLink !== null
           ? { state: 'neutral', label: noLink }
