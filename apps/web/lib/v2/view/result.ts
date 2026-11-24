@@ -986,8 +986,12 @@ function crawlerRows(check: Check): CrawlerRowView[] {
   }));
 }
 
-/** Answers that say an address has no page: such an address is not a page of the site (F-244). */
-const NOT_FOUND_STATUSES: readonly number[] = [404, 410];
+/**
+ * Answers that say an address has no page: such an address is not a page of the site (F-244). The
+ * engine's GONE_STATUSES (packages/engine/src/v2/detectors/thresholds.ts), held equal to it by
+ * crawled-line.test.ts; not imported, so this view stays out of the engine's modules.
+ */
+export const NOT_FOUND_STATUSES: readonly number[] = [404, 410];
 
 /**
  * "All 214 pages crawled", or "96 of 140 pages crawled" when the crawl stopped short, counting only
@@ -1012,7 +1016,7 @@ function crawledLine(
       : `${count(crawled)} of ${count(found)} pages crawled`;
   return notFound === 0
     ? pages
-    : `${pages}; ${count(notFound)} ${plural(notFound, 'address', 'addresses')} answered not found`;
+    : `${pages}; ${count(notFound)} ${plural(notFound, 'address', 'addresses')} answered not found or gone`;
 }
 
 export interface ResultOptions {
