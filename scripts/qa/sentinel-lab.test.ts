@@ -2,12 +2,10 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { describe, expect, it } from 'vitest';
 // @ts-expect-error a plain .mjs served by Vercel as it is, with no declaration file
-import handler, {
-  answer,
-  fileFor,
-  gptbotBlockedAt,
-  robotsAt,
-} from '../../fixtures/qa-lab/api/sentinel.mjs';
+import * as lab from '../../fixtures/qa-lab/api/sentinel.mjs';
+
+const { answer, fileFor, gptbotBlockedAt, robotsAt } = lab;
+const handler = lab.default;
 
 const SITE = join(__dirname, '..', '..', 'fixtures', 'qa-lab', 'sites', 'sentinel');
 const walk = (dir: string): string[] =>
