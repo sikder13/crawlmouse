@@ -115,14 +115,16 @@ const COVERAGE_NEXT = new Set(['stopped']);
 
 const isRecord = (v: unknown): v is Row => typeof v === 'object' && v !== null && !Array.isArray(v);
 
+/** A coverage without the next deployment's fields (COVERAGE_NEXT); any other value as it is. */
+export const withoutCoverageNext = (coverage: unknown): unknown =>
+  isRecord(coverage)
+    ? Object.fromEntries(Object.entries(coverage).filter(([key]) => !COVERAGE_NEXT.has(key)))
+    : coverage;
+
 export function checkFromRow(row: Row): Check {
   const derived: Row = {};
   if (isRecord(row.progress)) derived.progress = { ...PROGRESS_ADDED, ...row.progress };
-  if (isRecord(row.coverage)) {
-    derived.coverage = Object.fromEntries(
-      Object.entries(row.coverage).filter(([key]) => !COVERAGE_NEXT.has(key)),
-    );
-  }
+  if (isRecord(row.coverage)) derived.coverage = withoutCoverageNext(row.coverage);
   return contractRecord(CheckSchema, row, derived);
 }
 export const pageResultFromRow = (row: Row): PageResult => contractRecord(PageResultSchema, row);
