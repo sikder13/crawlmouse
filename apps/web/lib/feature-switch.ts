@@ -1,13 +1,16 @@
 /**
- * The one switch that hides a feature not yet proven (Goal 1, rule 2): at the deadline, a feature QA
- * has not proven is hidden everywhere it is named, pricing, product screens and emails, rather than
- * shipped broken. Every place that names one of these features reads it here, and nowhere else.
+ * The switch for hiding a feature not yet proven (Goal 1, rule 2): at the deadline, a feature QA has
+ * not proven is to be hidden wherever it is named, rather than shipped broken. This module is the one
+ * place that switch is read from. It hides only what reads it: each page, screen and email that
+ * names one of these features is wired to it in its owner's own change.
  *
  * `V2_HIDE_FEATURES` is a comma-separated list of the names in `RISK_FEATURES`, case and spaces
  * ignored. Unset or empty, every feature shows, as it does today. A name that is not a feature hides
- * nothing; `hiddenFeatures().unknown` lists it, for a check to report. Not a
- * NEXT_PUBLIC_ variable: a server component reads it and hands a client component `shownFeatures()`.
+ * nothing; `hiddenFeatures().unknown` lists it. Server-only: the variable is not NEXT_PUBLIC_, so a
+ * client bundle would read it as unset and show everything. A server component hands a client one
+ * `shownFeatures()`.
  */
+import 'server-only';
 
 type Env = Readonly<Record<string, string | undefined>>;
 

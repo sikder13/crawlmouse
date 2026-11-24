@@ -1,5 +1,8 @@
-import { describe, expect, it } from 'vitest';
-import { RISK_FEATURES, featureShown, hiddenFeatures, shownFeatures } from './feature-switch';
+import { describe, expect, it, vi } from 'vitest';
+vi.mock('server-only', () => ({}));
+
+const { RISK_FEATURES, featureShown, hiddenFeatures, shownFeatures } =
+  await import('./feature-switch');
 
 const hide = (value: string | undefined) => ({ V2_HIDE_FEATURES: value });
 
@@ -27,8 +30,11 @@ describe('the one switch that hides an unproven feature (Goal 1, rule 2)', () =>
     expect(RISK_FEATURES.filter((f) => !featureShown(f, env)).sort()).toEqual([...hidden].sort());
   });
 
-  it('reports a name that is no feature, so a typo cannot silently show what it meant to hide', () => {
+  it('lists a name that is no feature, once, as written, and hides nothing for it', () => {
     expect(hiddenFeatures(hide('competitor,nojs')).unknown).toEqual(['competitor']);
+    expect(hiddenFeatures(hide('Competitor,Competitor')).unknown).toEqual(['Competitor']);
+    expect(hiddenFeatures(hide(' , ,nojs,')).unknown).toEqual([]);
+    expect(hiddenFeatures(hide('competitors nojs')).unknown).toEqual(['competitors nojs']);
     expect(featureShown('competitors', hide('competitor'))).toBe(true);
   });
 
