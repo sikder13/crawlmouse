@@ -78,6 +78,28 @@ async function load(loader: keyof typeof LOADERS, who: Who) {
   };
 }
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const ISO_TIME = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}(:?\d{2})?)?$/;
+
+/**
+ * Every string or number at any depth of `value` that holds the card's last four as a number of its
+ * own, not inside a longer run of digits. A UUID or a timestamp is passed over: a random id or a
+ * time's fraction can hold any four digits (F-250: an id holding them failed CI on #158).
+ */
+function cardDigitsIn(value: unknown, out: string[] = []): string[] {
+  const own = new RegExp(`(?<!\\d)${LAST4}(?!\\d)`);
+  if (typeof value === 'string') {
+    if (!UUID.test(value) && !ISO_TIME.test(value) && own.test(value)) out.push(value);
+  } else if (typeof value === 'number') {
+    if (own.test(String(value))) out.push(String(value));
+  } else if (Array.isArray(value)) {
+    for (const v of value) cardDigitsIn(v, out);
+  } else if (value !== null && typeof value === 'object') {
+    for (const v of Object.values(value)) cardDigitsIn(v, out);
+  }
+  return out;
+}
+
 describe('the card’s last four on the account pages, as each role', () => {
   it.each(
     (['account', 'settings'] as const).flatMap((loader) =>
@@ -91,13 +113,23 @@ describe('the card’s last four on the account pages, as each role', () => {
     );
   });
 
+  it('the digit scan finds the card where it is, and not inside a random id or a time', () => {
+    const planted = {
+      id: `0b8c${LAST4}-3c55-4d1b-9a7a-2f0c4f9d6c11`,
+      at: `2026-11-24T14:37:31.9${LAST4}0+00`,
+      nested: [{ label: `Visa •••• ${LAST4}` }, { n: Number(LAST4) }],
+    };
+    expect(cardDigitsIn(planted)).toEqual([`Visa •••• ${LAST4}`, LAST4]);
+    expect(cardDigitsIn({ id: planted.id, at: planted.at })).toEqual([]);
+  });
+
   it('no role but the owner is given a digit of the card, at any depth of either dataset', async () => {
     for (const loader of ['account', 'settings'] as const) {
       for (const who of ['manager', 'developer', 'developer2'] as const) {
-        expect(JSON.stringify((await load(loader, who)).d), `${loader} ${who}`).not.toContain(
-          LAST4,
-        );
+        expect(cardDigitsIn((await load(loader, who)).d), `${loader} ${who}`).toEqual([]);
       }
+      // The scan is live on the real dataset: the owner's, which is given the card, is found holding it.
+      expect(cardDigitsIn((await load(loader, 'owner')).d), `${loader} owner`).not.toEqual([]);
     }
   });
 
