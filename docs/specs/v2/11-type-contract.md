@@ -966,6 +966,7 @@ The whole result (`worker-batch.ts`), parsed with `BatchResultSchema`: one of tw
 | `link_edges[].is_generic_anchor`                           | `boolean`                 | no   |
 | `link_edges[].js_only`                                     | `boolean`                 | no   |
 | `discovered_urls`                                          | `url[]`                   | no   |
+| `link_edges_dropped`                                       | `integer`                 | no   |
 
 ### Access batch result
 

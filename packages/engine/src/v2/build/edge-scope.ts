@@ -8,12 +8,16 @@
  *   - every edge between the crawl's own pages is kept (`rowAddresses`: a row's URL, or where it
  *     landed). Those are the edges the grade reads (the graph, its orphans, depth and PageRank), so
  *     the grade is the one the whole graph gives;
- *   - an edge to an address the crawl never fetched is kept only up to MAX_OTHER_EDGES_PER_PAGE per
- *     source page, in the order the worker recorded them. Such edges reach no grade; they tell the
- *     detectors the crawl left pages unread (`unfetched`), and a page that kept fewer than its row's
- *     `links_out` is read as not fully recorded, so no orphan is claimed that the crawl cannot prove;
- *   - when the own-page edges alone pass MAX_OWN_EDGES, the build is not attempted
- *     (OwnEdgesOverBound): a graph that large is not held, and no grade is given from part of one.
+ *   - every edge with generic anchor text is kept, wherever it points: the generic-anchor detector
+ *     counts a page's generic links against its `links_out`, so it decides as it would uncut, except
+ *     that a page keeping fewer links can be `indeterminate` where it was `not_detected`;
+ *   - any other edge to an address the crawl never fetched is kept only up to
+ *     MAX_OTHER_EDGES_PER_PAGE per source page, in the order the worker recorded them. Such edges
+ *     reach no grade; they tell the detectors the crawl left pages unread (`unfetched`). The loader
+ *     records how many it left out (`link_edges_dropped`), and `internal_links` counts them;
+ *   - when the edges kept whole (to own pages, or generic) pass MAX_OWN_EDGES, the build is not
+ *     attempted (OwnEdgesOverBound): a graph that large is not held, and no grade is given from part
+ *     of one.
  */
 import type { CrawlPage, LinkEdge } from '@crawlmouse/types/v2';
 import { canonicalizeUrl } from '../../url-canonical.js';
@@ -50,6 +54,7 @@ export function rowAddresses(rows: readonly Pick<CrawlPage, 'url' | 'final_url'>
 
 /** What has been kept so far over a whole check, across its batches. */
 export interface EdgesKept {
+  /** Edges kept whole: to the crawl's own pages, or with generic anchor text. */
   own: number;
   /** Per source page, its edges to addresses the crawl never fetched. */
   other: Map<string, number>;
@@ -58,8 +63,9 @@ export interface EdgesKept {
 export const noEdgesKept = (): EdgesKept => ({ own: 0, other: new Map() });
 
 /**
- * A batch's edges over the bound: every edge to `addresses`, and up to MAX_OTHER_EDGES_PER_PAGE per
- * source page of the rest. Throws OwnEdgesOverBound once the own-page edges pass MAX_OWN_EDGES.
+ * A batch's edges over the bound: every edge to `addresses` or with generic anchor text, and up to
+ * MAX_OTHER_EDGES_PER_PAGE per source page of the rest. Throws OwnEdgesOverBound once the edges kept
+ * whole pass MAX_OWN_EDGES.
  */
 export function boundedEdges(
   edges: readonly LinkEdge[],
@@ -69,7 +75,7 @@ export function boundedEdges(
 ): LinkEdge[] {
   const out: LinkEdge[] = [];
   for (const e of edges) {
-    if (addresses.has(e.to_url)) {
+    if (addresses.has(e.to_url) || e.is_generic_anchor) {
       if (++kept.own > maxOwn) throw new OwnEdgesOverBound(kept.own);
       out.push(e);
       continue;

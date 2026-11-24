@@ -21,8 +21,9 @@ async function setup(extraPerPage: number) {
           check_id: b.check_id,
           from_url: p.url,
           to_url: `${new URL(p.url).origin}/never-crawled/${p.url.length}-${i}`,
-          anchor_text: 'Article',
-          is_generic_anchor: false,
+          // Every fifth is generic anchor text, which the bound keeps wherever it points.
+          anchor_text: i % 5 === 0 ? 'click here' : 'Article',
+          is_generic_anchor: i % 5 === 0,
           js_only: false,
         })),
       );
@@ -48,23 +49,34 @@ describe('loadResultsForBuild (F-248)', () => {
     expect(bounded).toEqual(await loadResults(s.deps, EVENT));
   });
 
-  it('over the bound, keeps every own-page edge and the share of the rest, reading each result twice', async () => {
+  it('over the bound, keeps every own-page and generic-anchor edge and the share of the rest, records what it left out, and reads each result twice', async () => {
     const s = await setup(40);
     const total = s.edges(s.results);
     const bounded = await loadResultsForBuild(s.deps, EVENT, Math.floor(total / 4));
     expect(s.reads()).toBe(2 * s.results.length);
-    const isOwn = (e: LinkEdge) => !e.to_url.includes('/never-crawled/');
-    const own = (bs: readonly BatchResult[]) =>
-      bs.filter(isCrawl).flatMap((b) => b.link_edges.filter(isOwn));
+    const whole = (e: LinkEdge) => !e.to_url.includes('/never-crawled/') || e.is_generic_anchor;
+    const kept = (bs: readonly BatchResult[]) =>
+      bs.filter(isCrawl).flatMap((b) => b.link_edges.filter(whole));
     const full = await loadResults(s.deps, EVENT);
-    expect(own(bounded)).toEqual(own(full));
+    expect(kept(bounded)).toEqual(kept(full));
+    expect(
+      kept(full).some((e) => e.is_generic_anchor && e.to_url.includes('/never-crawled/')),
+    ).toBe(true);
     const elsewhere = new Map<string, number>();
     for (const e of bounded.filter(isCrawl).flatMap((b) => b.link_edges))
-      if (!isOwn(e)) elsewhere.set(e.from_url, (elsewhere.get(e.from_url) ?? 0) + 1);
+      if (!whole(e)) elsewhere.set(e.from_url, (elsewhere.get(e.from_url) ?? 0) + 1);
     expect(new Set(elsewhere.values())).toEqual(new Set([MAX_OTHER_EDGES_PER_PAGE]));
+    // Each result records how many edges it left out, so the count of links stays true.
+    const fullCrawls = full.filter(isCrawl);
+    for (const [i, b] of bounded.filter(isCrawl).entries()) {
+      const cut = fullCrawls[i]!.link_edges.length - b.link_edges.length;
+      expect(cut).toBeGreaterThan(0);
+      expect(b.link_edges_dropped).toBe(cut);
+    }
     // Only edges are cut: the pages, the access tests and every other field are the results' own.
     const strip = (bs: readonly BatchResult[]) =>
-      bs.map((b) => (isCrawl(b) ? { ...b, link_edges: [] } : b));
+      // toEqual reads an undefined field as absent, so the count of edges left out drops out here.
+      bs.map((b) => (isCrawl(b) ? { ...b, link_edges: [], link_edges_dropped: undefined } : b));
     expect(strip(bounded)).toEqual(strip(full));
   });
 
@@ -73,7 +85,7 @@ describe('loadResultsForBuild (F-248)', () => {
     const own = s.results
       .filter(isCrawl)
       .flatMap((b) => b.link_edges)
-      .filter((e) => !e.to_url.includes('/never-crawled/')).length;
+      .filter((e) => !e.to_url.includes('/never-crawled/') || e.is_generic_anchor).length;
     await expect(loadResultsForBuild(s.deps, EVENT, 1, own - 1)).rejects.toMatchObject({
       reason: 'build_failed',
     });

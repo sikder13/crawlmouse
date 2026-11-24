@@ -66,8 +66,9 @@ export const isCrawl = (b: BatchResult): b is CrawlBatchResult => b.kind === 'cr
  * stored results are read one at a time, in the order loadResults reads them. While the edges read so
  * far are within MAX_CHECK_EDGES, the results are kept: a check within the bound gets what loadResults
  * gives, each result read once. Past it they are let go, and read again one at a time, each crawl
- * result keeping every edge between the crawl's own pages and up to MAX_OTHER_EDGES_PER_PAGE of the
- * rest per page; the results' page rows and other fields are kept whole. When the own-page edges pass
+ * result keeping every edge between the crawl's own pages and every generic-anchor edge, and up to
+ * MAX_OTHER_EDGES_PER_PAGE of the rest per page, with the number left out as `link_edges_dropped`;
+ * the results' page rows and other fields are kept whole. When the own-page edges pass
  * MAX_OWN_EDGES the build is not attempted: the check fails `build_failed`, by name, rather than being
  * graded from part of its graph or killed for memory.
  */
@@ -101,7 +102,9 @@ export async function loadResultsForBuild(
       continue;
     }
     try {
-      out.push({ ...b, link_edges: boundedEdges(b.link_edges, addresses, kept, maxOwn) });
+      const link_edges = boundedEdges(b.link_edges, addresses, kept, maxOwn);
+      const dropped = b.link_edges.length - link_edges.length;
+      out.push({ ...b, link_edges, ...(dropped > 0 && { link_edges_dropped: dropped }) });
     } catch (e) {
       if (e instanceof OwnEdgesOverBound) throw new CheckFailure('build_failed', { cause: e });
       throw e;
