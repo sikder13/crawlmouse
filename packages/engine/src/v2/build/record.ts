@@ -135,7 +135,7 @@ export function stackOf(
 /** The structure counts the screens read, over the graded population where they are rates. */
 export function structureOf(
   pages: readonly PageResult[],
-  assembled: Pick<Assembled, 'edges' | 'analysis'>,
+  assembled: Pick<Assembled, 'edges' | 'edges_dropped' | 'analysis'>,
 ): NonNullable<Check['structure']> {
   const graded = pages.filter(isGraded);
   const deep = graded.filter((p) => p.depth !== null);
@@ -145,7 +145,7 @@ export function structureOf(
   const hubs = ranks.length === 0 ? 0 : Math.max(1, Math.ceil(TOP_HUB_FRACTION * ranks.length));
   const top = ranks.slice(0, hubs).reduce((n, v) => n + v, 0);
   return {
-    internal_links: assembled.edges.length,
+    internal_links: assembled.edges.length + assembled.edges_dropped,
     orphan_pages: pages.filter((p) => p.is_orphan).length,
     js_only_pages: pages.filter((p) => p.js_only).length,
     pages_deeper_than_3: deep.filter((p) => p.depth! > 3).length,

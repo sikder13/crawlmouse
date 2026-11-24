@@ -25,6 +25,16 @@ export type {
   Seed,
 } from './build/index.js';
 export { nothingReadReason } from './build/nothing-read.js';
+export {
+  boundedEdges,
+  MAX_CHECK_EDGES,
+  MAX_OTHER_EDGES_PER_PAGE,
+  MAX_OWN_EDGES,
+  noEdgesKept,
+  OwnEdgesOverBound,
+  rowAddresses,
+  type EdgesKept,
+} from './build/edge-scope.js';
 export type { CheckSide } from './diff/types.js';
 export { stableId } from './diff/ids.js';
 export { GRADE_VERSION } from './grade/weights.js';

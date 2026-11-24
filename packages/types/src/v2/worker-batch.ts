@@ -379,6 +379,11 @@ export const CrawlBatchResultSchema = z.strictObject({
   link_edges: z.array(LinkEdgeSchema),
   /** Link targets the batch found that it neither requested nor landed on, in canonical spelling. */
   discovered_urls: z.array(HttpUrlSchema),
+  /**
+   * Edges the app's build loader left out of `link_edges` to bound memory (F-248, engine
+   * build/edge-scope.ts); absent when none were. The worker never sends it.
+   */
+  link_edges_dropped: CountSchema.optional(),
 });
 
 export const BatchResultSchema = z.discriminatedUnion('kind', [
