@@ -81,7 +81,7 @@ describe('the function rows against the code', () => {
       const declared = count(code(readFileSync(join(ROOT, file), 'utf8')), ON_FAILURE);
       expect(FUNCTIONS.filter((f) => f.file === file && f.onFailure).length, file).toBe(declared);
     }
-    // Independent of the regex: inngest/audit.ts:411, inngest/check.ts:546 and CC-33's three in
+    // Independent of the regex: inngest/audit.ts:411, inngest/check.ts:551 and CC-33's three in
     // inngest/founder.ts (66, 92, 105) declare it, nothing else.
     expect(
       FUNCTIONS.filter((f) => f.onFailure)
@@ -148,7 +148,7 @@ describe('the function rows against the code', () => {
   const HAND: Record<string, number> = {
     'inngest/audit.ts': 5, // 357 361 376 378 386
     'inngest/billing.ts': 5, // 65 77 95 116 120
-    'inngest/check.ts': 15, // 278 282 290 352 396 405 483 549 550 560 561 562 563 616 618
+    'inngest/check.ts': 15, // 283 287 295 357 401 410 488 554 555 565 566 567 568 621 623
     'inngest/check-reaper.ts': 1, // 39
     'inngest/check-expiry.ts': 3, // 51 54 58 (CC-GL D2)
     'inngest/trial-lifecycle.ts': 6, // 87 89 99 102 103 113

@@ -78,8 +78,13 @@ export const PACE = {
    * (`finishSFor` in the app's limits). steps/time.test.ts recomputes it from those constants.
    */
   finishS: 5260,
-  /** Crawl batches per check: 40 × 50 URLs is 2,000, the largest page cap in FACTS. */
-  maxCrawlBatches: 40,
+  /**
+   * Crawl batches per check: 44, so a check reaches the largest page cap (2,000, FACTS) with up to
+   * four batches short of 50 URLs. The first batch of a site with no sitemap is its home page alone,
+   * and a batch can find fewer new links than it has room for. The worst-case steps
+   * (steps/time.test.ts, finding 18) stay under Inngest's 1,000 a run at 44; at 46 they would not.
+   */
+  maxCrawlBatches: 44,
 } as const;
 
 /** A check above this many pages is large: its crawl and reserve grow, and it waits longer (inbox 079). */

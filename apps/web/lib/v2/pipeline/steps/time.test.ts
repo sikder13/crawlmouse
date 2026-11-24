@@ -65,6 +65,12 @@ describe('the time plan by page cap (2,000 pages)', () => {
     expect(finishSFor(MAX_PAGE_CAP)).toBe(5260);
   });
 
+  // Review of 16009429: a site with no sitemap reads its home page alone in the first batch, so at 40
+  // batches of 50 it could never reach 2,000 pages, and its crawl ended on the batch count.
+  it('allows enough crawl batches to reach 2,000 pages with four batches short of full', () => {
+    expect((PACE.maxCrawlBatches - 4) * 50).toBeGreaterThanOrEqual(MAX_PAGE_CAP);
+  });
+
   it('the run’s finish timeout is the largest cap’s, so no check is cut short by it', () => {
     expect(PACE.finishS).toBe(finishSFor(MAX_PAGE_CAP));
     // A cap past MAX_PAGE_CAP reads no more pages (PACE.maxCrawlBatches) and plans no longer.
@@ -412,7 +418,8 @@ describe('a 2,000-page check through the orchestration (inbox 079)', () => {
         doneAfterS: 50,
         pageCap: 2000,
       });
-      expect(crawlReads(run.ids)).toBe(PACE.maxCrawlBatches);
+      // 50 pages a batch: the cap's worth of batches, and more if the time allows.
+      expect(crawlReads(run.ids)).toBeGreaterThanOrEqual(MAX_PAGE_CAP / 50);
       expect((run.stepsAt.get('render')! - T0) / S).toBeLessThanOrEqual(
         finishSFor(2000) - reserveS(2000) + 1,
       );
