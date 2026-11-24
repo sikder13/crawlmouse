@@ -8,6 +8,7 @@ import type { ReportsView } from '../../../../lib/v2/view/reports';
 import { AccountFrame } from '../account/AccountFrame';
 import { ActionControl } from '../account/ActionControl';
 import { CardHead } from '../account/parts';
+import { CopyText } from '../segment/CopyText';
 import shared from '../account/AccountScreen.module.css';
 import styles from './ReportsScreen.module.css';
 
@@ -140,7 +141,10 @@ export function ReportsScreen({
                           recorder masks (instrumentation-client.ts). */}
                       <code className="ph-no-capture" data-ph-mask="">
                         {r.madeLink.url}
-                      </code>
+                      </code>{' '}
+                      <CopyText text={r.madeLink.url} size="sm">
+                        {REPORTS_COPY.copyLink}
+                      </CopyText>
                     </p>
                   ) : null}
                 </div>,
