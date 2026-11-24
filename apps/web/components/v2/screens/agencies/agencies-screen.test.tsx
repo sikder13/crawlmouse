@@ -16,7 +16,9 @@ import { CAPABILITIES, agenciesView, type CapabilityKey } from '../../../../lib/
 import { AgenciesScreen } from './AgenciesScreen';
 
 function render() {
-  const markup = renderToStaticMarkup(<AgenciesScreen data={agenciesView()} audit="live" />);
+  const markup = renderToStaticMarkup(
+    <AgenciesScreen data={agenciesView({ billing: true, accountDoor: true })} audit="live" />,
+  );
   return new JSDOM(markup).window.document;
 }
 

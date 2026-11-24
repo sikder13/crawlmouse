@@ -1,5 +1,5 @@
 /**
- * /agency-trial (CC-29 D3): a 404 unless V2_BILLING is on, before any read; signed out, a redirect to
+ * /agency-trial (CC-29 D3): with V2_BILLING off a redirect to /agencies, before any read; signed out, a redirect to
  * sign in that returns here; never indexed; the form for a new trialist, the reason and no form for
  * a used trial, and the "did not finish" note for an agency account a Checkout left (Q16).
  */
@@ -69,13 +69,16 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllEnvs());
 
 describe('/agency-trial', () => {
-  it.each(['', 'true'])('is a 404 with V2_BILLING=%j, before any read', async (flag) => {
-    vi.stubEnv('V2_BILLING', flag);
-    await expect(render()).rejects.toMatchObject({
-      digest: expect.stringContaining('NEXT_HTTP_ERROR_FALLBACK;404'),
-    });
-    expect(h.reads).toBe(0);
-  });
+  it.each(['', 'true'])(
+    'RC-01: with V2_BILLING=%j goes to /agencies, before any read',
+    async (flag) => {
+      vi.stubEnv('V2_BILLING', flag);
+      await expect(render()).rejects.toMatchObject({
+        digest: expect.stringMatching(/^NEXT_REDIRECT;[a-z]+;\/agencies;307;/),
+      });
+      expect(h.reads).toBe(0);
+    },
+  );
 
   it.each([
     [{}, '/login?next=%2Fagency-trial'],
