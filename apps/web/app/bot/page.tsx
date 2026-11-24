@@ -10,6 +10,70 @@ export const metadata = {
   alternates: { canonical: '/bot' },
 };
 
+/**
+ * Every kind of request Crawlmouse sends a site, as data, so a line cannot describe a kind it does
+ * not name. `page.test.tsx` holds the values to the worker's identities and the fetchers.
+ */
+const REQUESTS: readonly {
+  what: string;
+  /** Words before `code`; empty when the user agent is `code` alone. */
+  agent: string;
+  code: string | null;
+  from: boolean;
+  obeysRobots: boolean;
+}[] = [
+  {
+    what: 'Finding pages: our audit service reads robots.txt and your sitemap files.',
+    agent: '',
+    code: CRAWL_USER_AGENT,
+    from: false,
+    obeysRobots: false,
+  },
+  {
+    what: 'Reading robots.txt: the crawler reads it itself, unless it holds a recent copy.',
+    agent: '',
+    code: CRAWL_USER_AGENT,
+    from: true,
+    obeysRobots: false,
+  },
+  {
+    what: 'Page requests, and checks for site files such as /llms.txt, /.well-known/mcp and /sitemap.xml.',
+    agent: '',
+    code: CRAWL_USER_AGENT,
+    from: true,
+    obeysRobots: true,
+  },
+  {
+    what: 'AI crawler tests, on a sample of pages, from Crawlmouse’s own address and not the crawler’s.',
+    agent:
+      'the crawler’s published user agent, or just its name where its operator publishes none, followed by',
+    code: CRAWLER_TAG,
+    from: true,
+    obeysRobots: true,
+  },
+  {
+    what: 'A comparison request for each sampled page robots.txt lets us request, plus any redirects it follows, to tell a rule about one crawler from a site that refuses all automation.',
+    agent: 'an ordinary browser user agent, with no Crawlmouse tag',
+    code: null,
+    from: false,
+    obeysRobots: true,
+  },
+  {
+    what: 'When a crawler test is refused, possibly one more request, plus any redirects it follows, to see whether the site checks crawler addresses. It never produces a Googlebot result.',
+    agent: 'Googlebot’s user agent, followed by',
+    code: CRAWLER_TAG,
+    from: true,
+    obeysRobots: true,
+  },
+  {
+    what: 'When someone verifies ownership of a domain with a meta tag, a request for its homepage, plus any redirects it follows.',
+    agent: 'CrawlmouseBot, our earlier name',
+    code: null,
+    from: false,
+    obeysRobots: false,
+  },
+];
+
 export default function BotPage() {
   return (
     <>
@@ -18,7 +82,7 @@ export default function BotPage() {
         <h1 className="font-display font-bold text-5xl tracking-tight">CrawlmouseBot</h1>
         <p className="mt-4 text-lg text-ink/70">
           Hi &mdash; if you&rsquo;re reading this, you probably saw{' '}
-          <code className="font-mono text-sm bg-oat px-1.5 py-0.5 rounded">Crawlmouse/2.0</code> or
+          <code className="font-mono text-sm bg-oat px-1.5 py-0.5 rounded">Crawlmouse/2.0</code> or{' '}
           <code className="font-mono text-sm bg-oat px-1.5 py-0.5 rounded">CrawlmouseBot</code> in
           your access logs.
         </p>
@@ -39,64 +103,42 @@ export default function BotPage() {
             <li>
               We obey{' '}
               <code className="font-mono text-sm bg-oat px-1.5 py-0.5 rounded">robots.txt</code> for
-              page requests and crawler tests. Reading robots.txt and sitemaps to find pages, and
-              the domain-verification check, do not depend on it.
+              page requests, site-file checks and crawler tests. The list below says which requests
+              do not depend on it.
             </li>
             <li>
               Max 8 concurrent requests per host &mdash; we stay polite with bounded concurrency,
               not aggressive bursts.
             </li>
             <li>We back off immediately on 429 (rate-limited) or 503 responses.</li>
-            <li>
-              To find pages, we first read robots.txt and sitemap files with the User-Agent below
-              and no{' '}
-              <code className="font-mono text-sm bg-oat px-1.5 py-0.5 rounded">{FROM_HEADER}</code>{' '}
-              header.
-            </li>
-            <li>
-              Our page requests send the User-Agent{' '}
-              <code className="font-mono text-sm bg-oat px-1.5 py-0.5 rounded break-all">
-                {CRAWL_USER_AGENT}
-              </code>{' '}
-              and the header{' '}
-              <code className="font-mono text-sm bg-oat px-1.5 py-0.5 rounded">
-                {FROM_HEADER}: {FROM_ADDRESS}
-              </code>
-              .
-            </li>
-            <li>
-              To test what an AI crawler is served, we request a sample of pages with that
-              crawler&rsquo;s published user agent, or just its name where its operator publishes
-              none, followed by{' '}
-              <code className="font-mono text-sm bg-oat px-1.5 py-0.5 rounded break-all">
-                {CRAWLER_TAG}
-              </code>
-              , and the same{' '}
-              <code className="font-mono text-sm bg-oat px-1.5 py-0.5 rounded">{FROM_HEADER}</code>{' '}
-              header. These requests come from Crawlmouse&rsquo;s own address, not the
-              crawler&rsquo;s.
-            </li>
-            <li>
-              When a crawler test is refused, we may send one more tagged request (plus any
-              redirects it follows) with Googlebot&rsquo;s user agent, to see whether the site
-              checks crawler addresses. It never produces a Googlebot result.
-            </li>
-            <li>
-              For each sampled page robots.txt lets us request, we first send one comparison request
-              (plus any redirects it follows) with an ordinary browser user agent, with no
-              Crawlmouse tag and no{' '}
-              <code className="font-mono text-sm bg-oat px-1.5 py-0.5 rounded">{FROM_HEADER}</code>{' '}
-              header, to tell a rule about one crawler from a site that refuses all automation.
-            </li>
-            <li>
-              When someone verifies ownership of a domain with a meta tag, we request its homepage
-              under our earlier name,{' '}
-              <code className="font-mono text-sm bg-oat px-1.5 py-0.5 rounded">CrawlmouseBot</code>,
-              with no{' '}
-              <code className="font-mono text-sm bg-oat px-1.5 py-0.5 rounded">{FROM_HEADER}</code>{' '}
-              header.
-            </li>
             <li>HTTP only, no headless browser, no cookie persistence.</li>
+          </ul>
+          <h3 className="font-display font-bold text-xl mt-6 mb-3">The requests we send</h3>
+          <ul className="space-y-4 text-ink/80 list-disc pl-5">
+            {REQUESTS.map((r) => (
+              <li key={r.what}>
+                <div>{r.what}</div>
+                <div>
+                  User-Agent: {r.agent}
+                  {r.agent && r.code ? ' ' : null}
+                  {r.code ? (
+                    <code className="font-mono text-sm bg-oat px-1.5 py-0.5 rounded break-all">
+                      {r.code}
+                    </code>
+                  ) : null}
+                </div>
+                <div>
+                  {r.from ? (
+                    <code className="font-mono text-sm bg-oat px-1.5 py-0.5 rounded">
+                      {FROM_HEADER}: {FROM_ADDRESS}
+                    </code>
+                  ) : (
+                    `No ${FROM_HEADER} header.`
+                  )}
+                </div>
+                <div>{r.obeysRobots ? 'Obeys robots.txt.' : 'Does not depend on robots.txt.'}</div>
+              </li>
+            ))}
           </ul>
         </Card>
         <Card className="mt-6">

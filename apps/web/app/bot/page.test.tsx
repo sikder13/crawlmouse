@@ -2,8 +2,6 @@
  * `/bot` names the identities the crawl worker really sends (RC-35, inbox 031). Its strings are held
  * to the worker's own constants, so the page cannot drift from the requests a site sees.
  */
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import {
@@ -57,22 +55,35 @@ describe('/bot', () => {
     expect(text()).toContain('or just its name where its operator publishes none');
   });
 
-  it('names the earlier crawler name that domain verification still sends', () => {
-    const verification = readFileSync(join(process.cwd(), 'lib/verification.ts'), 'utf8');
-    expect(verification).toContain("userAgent: 'CrawlmouseBot/");
-    expect(text()).toContain('verifies ownership of a domain');
-    expect(text()).toContain('under our earlier name, CrawlmouseBot');
+  it('the crawl identity carries the From header the list gives it', () => {
+    expect(CRAWL.headers).toContainEqual(['From', FROM]);
+    expect(CONTROL.headers.some(([name]) => name === 'From')).toBe(false);
   });
 
-  it('says discovery sends no From header, as its fetcher does', () => {
-    const discover = readFileSync(join(process.cwd(), 'lib/v2/pipeline/discover.ts'), 'utf8');
-    expect(discover).not.toMatch(/\bFrom\b.*bot@|headers:/);
-    expect(text()).toContain('read robots.txt and sitemap files with the User-Agent below');
+  it('renders the opener with its spaces', () => {
+    expect(text()).toContain('Crawlmouse/2.0 or CrawlmouseBot in your access logs.');
+  });
+
+  it.each([
+    ['Finding pages', 'No From header.', 'Does not depend on robots.txt.'],
+    ['Reading robots.txt', `From: ${FROM}`, 'Does not depend on robots.txt.'],
+    ['Page requests, and checks for site files', `From: ${FROM}`, 'Obeys robots.txt.'],
+    ['AI crawler tests', `From: ${FROM}`, 'Obeys robots.txt.'],
+    ['A comparison request', 'No From header.', 'Obeys robots.txt.'],
+    ['When a crawler test is refused', `From: ${FROM}`, 'Obeys robots.txt.'],
+    ['When someone verifies ownership', 'No From header.', 'Does not depend on robots.txt.'],
+  ])('%s: %s %s', (what, from, robots) => {
+    const items = renderToStaticMarkup(<BotPage />)
+      .split('<li>')
+      .map((li) => li.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' '));
+    const item = items.find((li) => li.trim().startsWith(what));
+    expect(item).toBeDefined();
+    expect(item).toContain(from);
+    expect(item).toContain(robots);
   });
 
   it('does not claim robots.txt governs every request', () => {
     expect(text()).not.toContain('on every request');
-    expect(text()).toContain('do not depend on it');
   });
 
   it('keeps the journey’s rule: no v1 version string', () => {
