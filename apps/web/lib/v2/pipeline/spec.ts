@@ -352,6 +352,6 @@ export function buildSpec20b(): string {
     )
       .map(code)
       .join(', ')} (Q11, Q13, review round 1).`,
-    '- **v1’s audit function clamps its concurrency to the plan cap**, not 100 (Q3).',
+    '- **v1’s audit function clamps its concurrency to the plan cap** (Q3), and defaults to the 5 it ran at.',
   ].join('\n');
 }

@@ -395,7 +395,7 @@ export const auditFn = inngest.createFunction(
     retries: 1,
     // Plan-safe: must not exceed the Inngest account's concurrency cap or the whole app sync is
     // rejected and no audits run. Clamped to PLAN_CONCURRENCY_CAP (concurrency.ts), which checkFn
-    // shares; INNGEST_AUDIT_CONCURRENCY can lower it.
+    // shares; INNGEST_AUDIT_CONCURRENCY sets it, default AUDIT_CONCURRENCY_DEFAULT (5).
     concurrency: { limit: auditConcurrencyLimit() },
     // User-stop: when the Cancel button POSTs /api/audits/[id]/cancel, the route sends
     // `audit.cancel.requested` with the auditId; this cancelOn makes Inngest STOP the in-flight

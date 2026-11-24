@@ -133,4 +133,4 @@ A bucketed key’s check id is the engine’s `stableId` of the key, so two requ
 - **`loadCheck` returns `provenance: "measured"`** (Q2), not FixtureDataset’s `"fixture"`.
 - **`V2_PIPELINE` registers the functions only** (Q6); the account door’s promises about checks moved to `V2_CHECKS_PUBLIC`.
 - **Persistence is staged** (Q11), and **008 creates more than D6 listed** (its table, its columns and `persist_built_check`): `persist_chunks`, `checks_one_running_per_site` and `checks_heartbeat_idx`, and `check_failure_reasons`, `claim_check`, `fail_check`, `reap_stalled_checks`, `stage_check_rows` (Q11, Q13, review round 1).
-- **v1’s audit function clamps its concurrency to the plan cap**, not 100 (Q3).
+- **v1’s audit function clamps its concurrency to the plan cap** (Q3), and defaults to the 5 it ran at.

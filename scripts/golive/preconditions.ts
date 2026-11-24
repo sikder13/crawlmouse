@@ -141,7 +141,7 @@ export const PRECONDITIONS: readonly Precondition[] = [
   },
   {
     id: 'inngest-plan',
-    mustBeTrue: `the Inngest plan holds the floor plus 1,000 checks a month under the D2 line, or the paid plan is ticked (${PAID_PLAN_TICK})`,
+    mustBeTrue: `the Inngest plan holds the floor plus 1,000 checks a month under the D2 line, or the owner has accepted a total over it (${PAID_PLAN_TICK})`,
     why: 'past what Pro includes, every further 1,000,000 executions is billed at $50 (D2)',
     source: 'docs/ops/inngest-budget.md:1',
     gates: 2,

@@ -1,7 +1,7 @@
 /**
  * The Inngest execution budget (CC-35 D2). Inngest bills each function run and each step
- * (step.run, step.sleep*, step.waitForEvent, step.sendEvent, step.invoke) as one execution, and stops
- * every function once the month's quota is used.
+ * (step.run, step.sleep*, step.waitForEvent, step.sendEvent, step.invoke) as one execution. On Pro,
+ * executions past the month's included amount are billed; on Hobby they stopped every function.
  *
  * A check's count is not written down here: `checkExecutions` runs the real `runCheck`
  * (inngest/check.ts) against a scripted worker and a counting `step`, so the figure moves when the

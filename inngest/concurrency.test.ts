@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   AUDIT_CONCURRENCY_DEFAULT,
@@ -52,9 +53,21 @@ describe('the defaults, against what the account allows', () => {
     expect(AUDIT_CONCURRENCY_DEFAULT).toBe(5);
   });
 
-  it('declares no default above the plan cap, alone or together', () => {
+  it('keeps the check and audit defaults under the plan cap, even added together', () => {
     expect(CHECK_CONCURRENCY_DEFAULT + AUDIT_CONCURRENCY_DEFAULT).toBeLessThanOrEqual(
       PLAN_CONCURRENCY_CAP,
     );
+  });
+
+  it('takes the worker’s batch slots from the production toml', () => {
+    const toml = readFileSync(
+      new URL('../packages/worker/fly.production.toml', import.meta.url),
+      'utf8',
+    );
+    expect(toml).toMatch(new RegExp(`^\\s*BATCH_CONCURRENCY = "${WORKER_BATCH_SLOTS}"$`, 'm'));
+  });
+
+  it('lets the check limit be lowered back under Hobby’s 5, the recovery if the plan lapses', () => {
+    expect(checkConcurrencyLimit({ INNGEST_CHECK_CONCURRENCY: '5' })).toBe(5);
   });
 });

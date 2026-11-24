@@ -187,9 +187,11 @@ Served through `apps/web/app/api/webhooks/inngest` (`maxDuration=300`, `runtime=
 - **`auditFn`** (`audit.ts`) — crawl + persist in one durable step (so the multi-MB crawl result never crosses
   an Inngest step-output boundary). `onFailure` marks the audit `failed` _and_ emits a `signal:audit-failed`
   Sentry event via an injected reporter (the worker stays Sentry-agnostic). Concurrency is env-driven
-  (`INNGEST_AUDIT_CONCURRENCY`, default **5**, `AUDIT_CONCURRENCY_DEFAULT` in `inngest/concurrency.ts`). Every
-  declared limit is clamped to the plan cap, `PLAN_CONCURRENCY_CAP`, now Inngest Pro's 100. The check function's
-  default is 16, the production worker's batch slots.
+  (`INNGEST_AUDIT_CONCURRENCY`, default **5**, `AUDIT_CONCURRENCY_DEFAULT` in `inngest/concurrency.ts`). A
+  limit read from the environment is clamped to `PLAN_CONCURRENCY_CAP`, Inngest Pro's 100; the declared limits are
+  swept against it by `pnpm --filter @crawlmouse/web exec vitest run lib/v2/pipeline/functions.test.ts`. The
+  check function's default is 16. **If the plan falls back to Hobby**, that 16 is above Hobby's 5 and Inngest
+  refuses the app sync: set `INNGEST_CHECK_CONCURRENCY=5` in Vercel and redeploy.
 - **`reconcileBillingFn`** — daily Stripe↔DB entitlement reconcile (dry-run by construction; livemode-guarded).
 - **`cleanupExpiredAuditsFn`** — bounded daily TTL delete of expired free audits.
 
@@ -376,7 +378,7 @@ completing on real sites), legal compliance (DMCA + DPAs in force), SEO + blog +
   data-driven caps/pricing tuning, benchmark percentiles.
 - **v1.2:** the developer surface (CLI / GitHub Action / agentic webhooks) on the same engine.
 - **Ops watch-items:** `crawlee` is caret-pinned (a minor bump could re-break the `ps` fix — consider exact-pin);
-  Inngest still Free (bump concurrency only on Inngest Pro); a dynamic `/r/` report sitemap for better discovery.
+  a dynamic `/r/` report sitemap for better discovery.
 
 ---
 

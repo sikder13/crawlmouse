@@ -16,16 +16,20 @@
 export const PLAN_CONCURRENCY_CAP = 100;
 
 /**
- * The batches the production worker runs at once: `BATCH_CONCURRENCY` in
- * `packages/worker/fly.production.toml`, one machine. A batch past them is answered busy and the
- * check waits (inngest/check.ts), so more check steps at once than this buy no crawling.
+ * The batches a production worker machine runs at once: `BATCH_CONCURRENCY` in
+ * `packages/worker/fly.production.toml`, which `concurrency.test.ts` reads.
  */
 export const WORKER_BATCH_SLOTS = 16;
 
 /**
  * checkFn's account-wide limit when INNGEST_CHECK_CONCURRENCY sets none. Inngest counts executing
- * steps, and a check waiting on the worker holds none, so this bounds the posts, polls, builds and
- * persists running at one moment, not the checks in flight.
+ * steps, and a check sleeping between polls holds none, so this bounds the posts, polls, builds and
+ * persists running at one moment, not the checks in flight or the worker's batches. Builds and
+ * persists are the heavy ones; 16 lets as many checks build at once as one worker machine runs
+ * batches. Their load on Vercel and Supabase at 16 is what the staging run measures.
+ *
+ * If the plan ever falls back to Hobby (a cap of 5), this default makes Inngest refuse the app sync.
+ * Set INNGEST_CHECK_CONCURRENCY to 5 or less and redeploy; the variable can lower the limit.
  */
 export const CHECK_CONCURRENCY_DEFAULT = WORKER_BATCH_SLOTS;
 
