@@ -108,6 +108,17 @@ describe('baseline', () => {
     });
   });
 
+  it("reads only the site's own checks and only the named check's tests", async () => {
+    const c = await keptRecorded();
+    const other = await db.query<{ id: string }>(
+      `insert into public.sites (account_id, host) values ($1, 'other.example') returning id`,
+      [c.accountId],
+    );
+    expect(await store().baseline(other.rows[0]!.id)).toBeNull();
+    expect(await store().testsOf('c0000000-0000-4000-8000-00000000beef')).toEqual([]);
+    expect((await store().testsOf(c.checkId)).length).toBe(c.built.access_tests.length);
+  });
+
   it('has no baseline for a site with no ended check', async () => {
     expect(await store().baseline('c0000000-0000-4000-8000-00000000dead')).toBeNull();
   });
