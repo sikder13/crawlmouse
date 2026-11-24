@@ -132,12 +132,25 @@ describe('signalsView: the competitor', () => {
 
   it('words the comparison from the numbers', () => {
     const c = view('bad-site', (ch) => {
-      ch.competitors[0]!.technical_seo.score = 79;
+      ch.competitors[0]!.technical_seo!.score = 79;
       ch.competitors[0]!.text_share = 0.2;
     }).competitor!;
     expect(c.verdict).toBe(
       'You are level on technical SEO and ahead on what AI crawlers can read.',
     );
+  });
+
+  it("says what the competitor's check could not measure, and compares only the rest", () => {
+    const c = view('bad-site', (ch) => {
+      const rival = ch.competitors[0] as unknown as Record<string, unknown>;
+      rival.text_share = null;
+      rival.technical_seo = null;
+    }).competitor!;
+    expect(c.rows.slice(1, 3)).toEqual([
+      { measure: 'Text without JavaScript', own: '31%', theirs: 'not measured', pro: false },
+      { measure: 'Technical SEO', own: 'B · 79', theirs: 'not graded', pro: false },
+    ]);
+    expect(c.verdict).toBe('');
   });
 
   it('has no comparison when the audit named no competitor', () => {
