@@ -5,6 +5,7 @@ import { StatusPill } from '../../StatusPill';
 import { Table } from '../../Table';
 import {
   NO_LINK_TEXT,
+  REQUESTED_AS,
   type BasicsColumnView,
   type ErrorRowView,
   type LinksView,
@@ -176,8 +177,8 @@ function Basics({ col }: { col: BasicsColumnView }) {
 }
 
 /**
- * Links and pages (row 5): the missing pages a link leads to and where they are linked from, the
- * missing pages no link leads to, the pages that answered another error, redirects, and the titles
+ * Links and pages (row 5): the missing pages a link from another page leads to and where they are
+ * linked from, the missing pages no other page links to, the pages that answered another error, redirects, and the titles
  * and meta descriptions that are missing or shared. Headings are not read yet, and
  * the page says so.
  */
@@ -232,7 +233,7 @@ export function LinksScreen({ data }: { data: LinksView }) {
         ) : (
           <Table
             label="Redirects"
-            columns={[{ header: 'Linked as' }, { header: 'Hops' }, { header: 'Ends at' }]}
+            columns={[{ header: REQUESTED_AS }, { header: 'Hops' }, { header: 'Ends at' }]}
             rows={data.redirects.rows.map((r) => ({
               key: r.url,
               cells: [

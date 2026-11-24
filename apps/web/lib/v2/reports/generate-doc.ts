@@ -181,9 +181,9 @@ const errorTable = (caption: string, pageHeader: string, rows: ErrorRowView[]): 
 });
 
 /**
- * Broken links and page basics: the missing pages a link leads to, with the pages linking to them;
- * the missing pages no link leads to and the pages that answered another error, each when there is
- * one; the redirects; and the missing and shared titles and descriptions, ten of each.
+ * Broken links and page basics: the missing pages a link from another page leads to, with the
+ * pages linking to them; the missing pages no other page links to and the pages that answered
+ * another error, each when there is one; the redirects; and the missing and shared titles and descriptions, ten of each.
  */
 function linksSection({ links: l }: Pages): DocSection {
   return {
@@ -204,7 +204,7 @@ function linksSection({ links: l }: Pages): DocSection {
         ? {
             type: 'table',
             caption: COPY.redirects,
-            columns: [COPY.linkedAs, COPY.hops, COPY.endsAt],
+            columns: [COPY.requestedAs, COPY.hops, COPY.endsAt],
             rows: l.redirects.rows.map((r) => [r.path, r.hops, r.endsText]),
           }
         : text(l.redirects.empty),

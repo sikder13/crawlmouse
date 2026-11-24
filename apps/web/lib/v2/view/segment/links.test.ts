@@ -58,10 +58,18 @@ const independent = (() => {
     errors: rawPages.filter((p) => p.status_code >= 400 && !gone.includes(p)).length,
     redirects: rawPages.filter((p) => (p.redirect?.hops.length ?? 0) > 0).length,
     loops: rawPages.filter((p) => p.redirect?.loop).length,
-    missingTitles: served.filter((p) => !p.title?.text?.trim()).length,
+    redirectsRecorded: rawPages.filter((p) => p.redirect !== null).length,
+    // A title or description not read (null) is not missing: missing is read, and blank.
+    titlesRead: served.filter((p) => p.title !== null).length,
+    missingTitles: served.filter((p) => p.title !== null && !p.title.text?.trim()).length,
     sharedTitlePages: sharedPages((p) => p.title?.text),
-    missingDescriptions: served.filter((p) => !p.meta_description?.text?.trim()).length,
+    cutTitles: 0,
+    descriptionsRead: served.filter((p) => p.meta_description !== null).length,
+    missingDescriptions: served.filter(
+      (p) => p.meta_description !== null && !p.meta_description.text?.trim(),
+    ).length,
     sharedDescriptionPages: sharedPages((p) => p.meta_description?.text),
+    cutDescriptions: 0,
   };
 })();
 
@@ -111,9 +119,12 @@ describe('linksView on the built site', () => {
   it('heads the page with the counts, and says headings are not checked', () => {
     const v = builtView();
     expect(v.headline.title).toBe(
-      `1 broken link · ${independent.redirects} redirect · titles and descriptions for ${independent.served} pages`,
+      `1 linked missing page · ${independent.redirects} redirect · titles and descriptions read on ${independent.served} pages`,
     );
-    expect(v.headline.pill).toEqual({ state: 'bad', label: '1 broken link' });
+    expect(v.headline.pill).toEqual({
+      state: 'bad',
+      label: `1 missing page, linked from ${independent.brokenLinkedFrom} page`,
+    });
     expect(v.headings).toBe(HEADINGS_LINE);
     expect(v.coverage).toEqual({ read: 'Checked 60 pages' });
   });
@@ -153,7 +164,7 @@ describe('linksView on the clean preview: 2 pages recorded of 38 crawled', () =>
       state: 'neutral',
       label: 'no broken link in 2 pages checked',
     });
-    expect(v.headline.title).toMatch(/^2 pages checked: 0 broken links/);
+    expect(v.headline.title).toMatch(/^2 pages checked: 0 linked missing pages/);
     expect(v.coverage).toEqual({ read: 'Checked 2 of the 38 pages crawled' });
   });
 
@@ -216,7 +227,10 @@ describe('missing is 404 or 410; any other error is a page that answered an erro
     it(`a linked page answering ${status} is a broken link`, () => {
       const { v } = builtEdited((d) => (at(d, '/products/retired-tent').status_code = status));
       expect(v.counts).toMatchObject({ broken: 1, errors: 0 });
-      expect(v.headline.pill).toEqual({ state: 'bad', label: '1 broken link' });
+      expect(v.headline.pill).toEqual({
+        state: 'bad',
+        label: '1 missing page, linked from 1 page',
+      });
     });
   }
 
@@ -267,7 +281,7 @@ describe('a hand-counted record: a blank title, a 503, a self-linked 410, blank 
   it('counts what was worked out by hand', () => {
     // 60 pages; 59 answered 200 and two of those now answer 503 and 410, so 57. The 404 is linked
     // from /blog/first-night-outdoors and now /blog/tent-care-guide: 2 pages. The 410's one link is
-    // its own, so no link leads to it. The rainy-day title is whitespace alone: 1 missing title.
+    // its own, so no other page links to it. The rainy-day title is whitespace alone: 1 missing title.
     // Shared titles: "Guide" x3 and "camping tents" x2 = 5. Missing descriptions: the 3 guides.
     expect(v.counts).toEqual({
       checked: 60,
@@ -278,17 +292,22 @@ describe('a hand-counted record: a blank title, a 503, a self-linked 410, blank 
       errors: 1,
       redirects: 1,
       loops: 0,
+      redirectsRecorded: 60,
+      titlesRead: 57,
       missingTitles: 1,
       sharedTitlePages: 5,
+      cutTitles: 0,
+      descriptionsRead: 57,
       missingDescriptions: 3,
       sharedDescriptionPages: 2,
+      cutDescriptions: 0,
     });
   });
 
   it('writes each clause once, each true of every page it names', () => {
     expect(v.body).toBe(
-      '1 broken link: a page answering 404, linked from 2 pages. ' +
-        'No link we read leads to 1 missing page, answering 410. ' +
+      '1 missing page, linked from 2 pages, answering 404. ' +
+        '1 missing page, answering 410, has no link from another page. ' +
         '1 page answered an error (503). ' +
         '1 page redirects. ' +
         '3 pages have no meta description; 1 page has no title; ' +
@@ -296,9 +315,10 @@ describe('a hand-counted record: a blank title, a 503, a self-linked 410, blank 
     );
   });
 
-  it('lists the 410 apart, as a missing page no link leads to, and never as linked from itself', () => {
-    expect(v.unlinked.rows.map((r) => [r.path, r.status, r.linkedFrom])).toEqual([
-      ['/products/sleeping-bags-item-1', 410, []],
+  it('lists the 410 apart, as a missing page no other page links to, never as linked from itself', () => {
+    expect(v.unlinked.heading).toBe('Missing pages no other page links to');
+    expect(v.unlinked.rows.map((r) => [r.path, r.status, r.linkedFrom, r.linkedAll])).toEqual([
+      ['/products/sleeping-bags-item-1', 410, [], 'no link from another page'],
     ]);
     expect(v.titles.missing.shown.map((p) => p.path)).toEqual(['/blog/rainy-day-camping']);
   });
@@ -312,7 +332,20 @@ describe('a hand-counted record: a blank title, a 503, a self-linked 410, blank 
 
 describe('a page that redirects to a missing page', () => {
   it('is shown at its final URL, with the URL that redirects to it', () => {
-    const { v } = builtEdited((d) => (at(d, '/products/old-dome-tent').status_code = 404));
+    // The chain's final URL, which the record does not hold, answered 404: nothing of the page was
+    // read, so it has no title, description or links.
+    const { v } = builtEdited((d) => {
+      const p = at(d, '/products/old-dome-tent');
+      Object.assign(p, {
+        status_code: 404,
+        links_out: 0,
+        links_read: false,
+        content_simhash: null,
+        title: null,
+        meta_description: null,
+      });
+      expect(d.page_results.some((x) => x.url === p.final_url)).toBe(false);
+    });
     const row = [...v.broken.rows, ...v.unlinked.rows].find((r) => r.via.length)!;
     expect(row).toMatchObject({
       path: '/products/dome-tent-classic',
@@ -324,8 +357,17 @@ describe('a page that redirects to a missing page', () => {
   it('is one row, not two, when the record also holds its final URL as a page', () => {
     const { v } = builtEdited((d) => {
       const p = at(d, '/products/old-dome-tent');
-      p.status_code = 404;
-      p.final_url = at(d, '/products/retired-tent').url;
+      const retired = at(d, '/products/retired-tent').url;
+      Object.assign(p, {
+        status_code: 404,
+        final_url: retired,
+        redirect: { hops: [{ from: p.url, status: 301, location: retired }], loop: false },
+        links_out: 0,
+        links_read: false,
+        content_simhash: null,
+        title: null,
+        meta_description: null,
+      });
     });
     expect(v.broken.rows.map((r) => [r.path, r.via])).toEqual([
       ['/products/retired-tent', ['/products/old-dome-tent']],
@@ -398,8 +440,11 @@ describe('a list longer than ten', () => {
       builtWith((pages) => {
         const served = pages.filter((p) => p.status_code === 200);
         served.forEach((p, i) => {
+          // Read, and declaring none: missing. (A null description was not read, so is not.)
           p.meta_description =
-            i < n ? null : { ...(served[n]!.meta_description ?? null)!, text: `own ${i}` };
+            i < n
+              ? { text: null, chars: 0, cut: false }
+              : { ...(served[n]!.meta_description ?? null)!, text: `own ${i}` };
         });
       }).descriptions.missing;
     expect(missing(10)).toMatchObject({ more: null });
@@ -421,9 +466,12 @@ describe('the overview door', () => {
   it('pills the broken pages, and words its body from the counts', () => {
     const c = independent;
     const d = door('built-site');
-    expect(d.pill).toEqual({ state: 'bad', label: `${c.broken} broken link` });
+    expect(d.pill).toEqual({
+      state: 'bad',
+      label: `${c.broken} missing page, linked from ${c.brokenLinkedFrom} page`,
+    });
     expect(d.body).toBe(
-      `${c.broken} broken link: a page answering 404, linked from ${c.brokenLinkedFrom} page. ` +
+      `${c.broken} missing page, linked from ${c.brokenLinkedFrom} page, answering 404. ` +
         `${c.redirects} page redirects. ` +
         `${c.missingDescriptions} pages have no meta description; ` +
         `${c.sharedTitlePages} pages share a title with another; ` +

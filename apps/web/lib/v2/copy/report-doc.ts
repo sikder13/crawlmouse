@@ -49,7 +49,7 @@ export const REPORT_DOC_COPY = {
   redirects: 'Redirects',
   missingPage: 'Missing page',
   linkedFrom: 'Linked from',
-  linkedAs: 'Linked as',
+  requestedAs: 'Requested as',
   hops: 'Hops',
   endsAt: 'Ends at',
   page: 'Page',

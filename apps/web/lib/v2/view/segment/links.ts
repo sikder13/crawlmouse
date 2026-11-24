@@ -9,7 +9,6 @@ import { segmentFrame, type SegmentFrame, type SegmentOptions } from './frame';
 import {
   ERRORS_HEADING,
   HEADINGS_LINE,
-  UNLINKED_HEADING,
   linksFacts,
   type BasicsColumnView,
   type ErrorRowView,
@@ -29,7 +28,7 @@ export interface LinksView {
   coverage: { read: string };
   counts: LinksCounts;
   broken: { rows: ErrorRowView[]; empty: string | null };
-  /** Missing pages no link in the record leads to; listed only when there is one. */
+  /** Missing pages no link from another page leads to; listed only when there is one. */
   unlinked: { heading: string; rows: ErrorRowView[] };
   /** Pages that answered an error other than missing; listed only when there is one. */
   errors: { heading: string; rows: ErrorRowView[] };
@@ -55,30 +54,48 @@ export function linksView(
     crawled !== null && crawled > c.checked
       ? `${count(c.checked)} ${plural(c.checked, 'page', 'pages')} checked: `
       : '';
-  const tile = (label: string, n: number) => ({
+  /** A tile's value: its count, or what stands in for it when the count was not read. */
+  const tile = (label: string, n: number, unread: string | null) => ({
     label,
-    value: measured ? count(n) : 'not measured',
+    value: !measured ? 'not measured' : (unread ?? count(n)),
     note: null,
   });
+  const linkPart =
+    f.linkGap === 'unread'
+      ? 'no link read'
+      : f.linkGap === 'unrecorded'
+        ? 'no link recorded'
+        : `${count(c.broken)} linked missing ${plural(c.broken, 'page', 'pages')}`;
+  const redirectPart = c.redirectsRecorded
+    ? `${count(c.redirects)} ${plural(c.redirects, 'redirect', 'redirects')}`
+    : 'redirects not recorded';
+  const basicsPart =
+    c.titlesRead === c.descriptionsRead
+      ? `titles and descriptions read on ${count(c.titlesRead)} ${plural(c.titlesRead, 'page', 'pages')}`
+      : `titles read on ${count(c.titlesRead)} ${plural(c.titlesRead, 'page', 'pages')}, descriptions on ${count(c.descriptionsRead)}`;
   return {
     frame,
     headline: {
       title: measured
-        ? `${scope}${count(c.broken)} broken ${plural(c.broken, 'link', 'links')} · ${count(c.redirects)} ${plural(c.redirects, 'redirect', 'redirects')} · titles and descriptions for ${count(c.served)} ${plural(c.served, 'page', 'pages')}`
+        ? `${scope}${linkPart} · ${redirectPart} · ${basicsPart}`
         : 'Links and pages were not measured',
       pill: measured ? f.pill : null,
     },
     body: f.screenBody,
     tiles: [
-      tile('Broken links', c.broken),
-      tile('Redirects', c.redirects),
-      tile('Missing titles', c.missingTitles),
-      tile('Missing descriptions', c.missingDescriptions),
+      tile(
+        'Linked missing pages',
+        c.broken,
+        f.linkGap === 'unread' ? 'not read' : f.linkGap === 'unrecorded' ? 'not recorded' : null,
+      ),
+      tile('Redirects', c.redirects, c.redirectsRecorded ? null : 'not recorded'),
+      tile('Missing titles', c.missingTitles, c.titlesRead ? null : 'not read'),
+      tile('Missing descriptions', c.missingDescriptions, c.descriptionsRead ? null : 'not read'),
     ],
     coverage: { read: f.coverage },
     counts: c,
     broken: { rows: f.broken, empty: f.brokenEmpty },
-    unlinked: { heading: UNLINKED_HEADING, rows: f.unlinked },
+    unlinked: { heading: f.unlinkedHeading, rows: f.unlinked },
     errors: { heading: ERRORS_HEADING, rows: f.errors },
     redirects: { rows: f.redirects, empty: f.redirectsEmpty },
     titles: f.titles,

@@ -230,13 +230,34 @@ describe('auditDoc on the contract fixtures', () => {
 });
 
 describe('auditDoc: broken links and page basics', () => {
-  const BUILT = fixture('built-site');
+  // The built site, with a page answering 503 and a 410 linked only from itself: neither is a
+  // broken link, so the truth below differs from "every page answering 400 or more".
+  const BUILT = structuredClone(fixture('built-site'));
   const id = BUILT.checks[0]!.id;
+  {
+    const at = (p: string) =>
+      BUILT.page_results.find((x) => x.check_id === id && new URL(x.url).pathname === p)!;
+    at('/products/camp-kitchen-item-1').status_code = 503;
+    const gone = at('/products/sleeping-bags-item-1');
+    gone.status_code = 410;
+    BUILT.link_edges = BUILT.link_edges.filter((e) => e.to_url !== gone.url);
+    BUILT.link_edges.push({
+      ...BUILT.link_edges.find((e) => e.check_id === id)!,
+      from_url: gone.url,
+      to_url: gone.url,
+    });
+  }
   const doc = auditDoc({ dataset: BUILT, checkId: id }, OPTIONS);
   const section = doc.sections.find((s) => s.heading === REPORT_DOC_COPY.links)!;
   // Counted here from the records, apart from the code under test.
   const pages = BUILT.page_results.filter((p) => p.check_id === id);
-  const broken = pages.filter((p) => p.status_code >= 400);
+  // A missing page (404 or 410) that a link from another page leads to: a page's link to itself
+  // does not make it a broken link.
+  const fromOthers = (p: (typeof pages)[number]) =>
+    BUILT.link_edges.filter((e) => e.check_id === id && e.to_url === p.url && e.from_url !== p.url);
+  const broken = pages.filter(
+    (p) => (p.status_code === 404 || p.status_code === 410) && fromOthers(p).length > 0,
+  );
   const redirecting = pages.filter((p) => (p.redirect?.hops.length ?? 0) > 0);
   const path = (u: string) => new URL(u).pathname;
 
@@ -255,15 +276,11 @@ describe('auditDoc: broken links and page basics', () => {
       broken.map((p) => [
         path(p.url),
         String(p.status_code),
-        [
-          ...new Set(
-            BUILT.link_edges
-              .filter((e) => e.check_id === id && e.to_url === p.url)
-              .map((e) => path(e.from_url)),
-          ),
-        ].join(', '),
+        [...new Set(fromOthers(p).map((e) => path(e.from_url)))].join(', '),
       ]),
     );
+    expect(broken).toHaveLength(1);
+    expect(table(REPORT_DOC_COPY.redirects).columns[0]).toBe('Requested as');
     expect(table(REPORT_DOC_COPY.redirects).rows.map((r) => r[0])).toEqual(
       redirecting.map((p) => path(p.url)),
     );
@@ -271,7 +288,8 @@ describe('auditDoc: broken links and page basics', () => {
 
   it('counts the missing and shared descriptions, and lists the missing pages', () => {
     const served = pages.filter((p) => p.status_code === 200);
-    const missing = served.filter((p) => !p.meta_description?.text);
+    // Read (not null) and declaring none: a description not read is not missing.
+    const missing = served.filter((p) => p.meta_description !== null && !p.meta_description.text);
     const texts = section.blocks.flatMap((b) =>
       b.type === 'text' ? [b.text] : b.type === 'table' ? [b.caption] : [],
     );

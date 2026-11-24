@@ -103,7 +103,7 @@ describe('segmentFrame', () => {
     ).length;
     expect(gone).toBe(1);
     expect(segmentFrame(d, id, 'structure', { hrefs }).next.label).toBe(
-      'Next: Links and pages · 1 broken link',
+      'Next: Links and pages · 1 missing page, linked from 1 page',
     );
     const clean = edited('clean-site');
     expect(segmentFrame(clean.d, clean.id, 'structure', { hrefs }).next.label).toBe(
