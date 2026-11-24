@@ -154,15 +154,24 @@ const path = (u: string) => {
 const distinct = <T,>(xs: readonly T[]) => [...new Set(xs)];
 const sortNum = (xs: readonly number[]) => [...xs].sort((a, b) => a - b);
 
+/** The engine's own spelling of a URL (the worker stores link targets in it), or the URL as given. */
+const canon = (u: string): string => {
+  try {
+    return canonicalizeUrl(u);
+  } catch {
+    return u;
+  }
+};
+
 /** The distinct URLs other than `from` the record holds a link to from `from` or its final URL. */
-const heldFrom = (p: PageResult, edges: readonly LinkEdge[]) =>
-  new Set(
+const heldFrom = (p: PageResult, edges: readonly LinkEdge[]) => {
+  const own = new Set([p.url, ...(p.final_url === null ? [] : [p.final_url])].map(canon));
+  return new Set(
     edges
-      .filter(
-        (e) => (e.from_url === p.url || e.from_url === p.final_url) && e.to_url !== e.from_url,
-      )
-      .map((e) => e.to_url),
+      .filter((e) => own.has(canon(e.from_url)) && e.to_url !== e.from_url)
+      .map((e) => canon(e.to_url)),
   ).size;
+};
 
 /** Each page's `links_out` raised to at least the distinct links the record holds from it. */
 const settle = (pages: PageResult[], edges: LinkEdge[]) =>
@@ -191,15 +200,16 @@ function truthOf(pages: PageResult[], edges: LinkEdge[], scope: Scope) {
       at: at(p),
       status: p.status_code,
       gone: isGone(p),
-      asked: new Set([at(p)]),
+      asked: new Set([at(p), canon(at(p))]),
     };
-    r.asked.add(p.url);
+    r.asked.add(p.url).add(canon(p.url));
     rowMap.set(key, r);
   }
   const rows = [...rowMap.values()].map((r) => ({
     ...r,
     into: edges.filter(
-      (e) => r.asked.has(e.to_url) && !r.asked.has(e.from_url) && e.from_url !== e.to_url,
+      (e) =>
+        r.asked.has(canon(e.to_url)) && !r.asked.has(canon(e.from_url)) && e.from_url !== e.to_url,
     ),
   }));
   const goneRows = rows.filter((r) => r.gone);
@@ -234,9 +244,7 @@ function truthOf(pages: PageResult[], edges: LinkEdge[], scope: Scope) {
     linksHeld: edges.length,
     linkGap,
     heldLinks: scope.extraLinks && !scope.unmeasured ? edges.length + scope.extraLinks : null,
-    notAllHeld: served.filter(
-      (p) => p.is_html && (!p.links_read || p.links_out > heldFrom(p, edges)),
-    ).length,
+    notAllHeld: served.filter((p) => p.is_html && p.links_out > heldFrom(p, edges)).length,
     rows,
     missingAt,
     broken: linkedAt.size,
@@ -841,6 +849,47 @@ const VECTORS: [string, PageResult[], LinkEdge[], Said][] = [
       tab: 'Next: Links and pages · no page checked answered 404 or 410',
       brokenEmpty: 'None of the 2 pages we checked answers an error.',
       headline: '0 missing pages found · 0 redirects · titles and descriptions read on 0 pages',
+    },
+  ],
+  [
+    '(f) a redirect lands on /gone/ answering 404, and the record holds a link from / to /gone',
+    [
+      whole('/', 1),
+      redirecting('/old', '/gone/', 404, {
+        links_read: false,
+        title: null,
+        meta_description: null,
+      }),
+    ],
+    [edge('/', '/gone')],
+    {
+      pill: '1 missing page · linked from 1 page in the record',
+      body:
+        '1 missing page, linked from 1 page in this check’s record, answering 404. ' +
+        '1 page redirects. ' +
+        'The page that answered 200 has a title and a meta description.',
+      doorBody:
+        '1 missing page, linked from 1 page in this check’s record, answering 404. ' +
+        '1 page redirects. ' +
+        'The page that answered 200 has a title and a meta description.',
+      tab: 'Next: Links and pages · 1 missing page · linked from 1 page in the record',
+      brokenEmpty: null,
+      headline: '1 missing page found · 1 redirect · titles and descriptions read on 1 page',
+    },
+  ],
+  [
+    '(g) a page whose reader stopped counts no link: no clause on links not in the record',
+    [whole('/', 1), page('/a', 200, { is_html: true, links_read: false, links_out: 0 })],
+    [edge('/', '/a')],
+    {
+      pill: 'no page checked answered 404 or 410',
+      body: 'Each of the 2 pages that answered 200 has its own title and meta description.',
+      doorBody:
+        'None of the 2 pages we checked answers an error. ' +
+        'Each of the 2 pages that answered 200 has its own title and meta description.',
+      tab: 'Next: Links and pages · no page checked answered 404 or 410',
+      brokenEmpty: 'None of the 2 pages we checked answers an error.',
+      headline: '0 missing pages found · 0 redirects · titles and descriptions read on 2 pages',
     },
   ],
 ];

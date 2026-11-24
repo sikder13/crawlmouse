@@ -282,6 +282,15 @@ function column(
  * because that module reads node:crypto, which a screen built on these views cannot load;
  * __tests__/v2/links-sentences.property.test.tsx holds the two equal over a list of URLs.
  */
+/** `linkSpelling`, or the URL as given when it does not parse. */
+function spell(u: string): string {
+  try {
+    return linkSpelling(u);
+  } catch {
+    return u;
+  }
+}
+
 export function linkSpelling(input: string): string {
   const u = new URL(input);
   u.hash = '';
@@ -316,16 +325,10 @@ export function linksNotAllHeld(
     to.add(e.to_url);
     held.set(e.from_url, to);
   }
-  const spell = (u: string) => {
-    try {
-      return linkSpelling(u);
-    } catch {
-      return u;
-    }
-  };
   return pages.filter((p) => {
     if (PAGE_CELLS.status_code(p) !== 200 || !p.is_html) return false;
-    if (!p.links_read) return true;
+    // A page whose reader stopped (`links_read` false) is counted only when the links it did count
+    // outnumber the links the record holds from it: its reader stopping alone shows no missing link.
     const from = new Set([p.url, spell(p.url)]);
     if (p.final_url !== null) [p.final_url, spell(p.final_url)].forEach((u) => from.add(u));
     const to = new Set([...from].flatMap((u) => [...(held.get(u) ?? [])]));
@@ -397,10 +400,12 @@ export function linksFacts(d: ViewDataset, check: Check): LinksFacts {
   // reached by a redirect is shown at its final URL, a final URL the record also holds with the same
   // status is one row, and a second status at that URL is a row of its own.
   const rowOf = ({ at, status, members }: ErrorRow): ErrorRowView => {
-    const asked = new Set([at, ...members.map((p) => p.url)]);
+    // The worker stores a link's target in `linkSpelling`, while `at` is the final URL as served
+    // (`/gone/` against a stored `/gone`): both sides are compared in that spelling.
+    const asked = new Set([at, ...members.map((p) => p.url)].flatMap((u) => [u, spell(u)]));
     const via = members.filter((p) => p.url !== at).map((p) => path(p.url));
     const into = edges.filter(
-      (e) => asked.has(e.to_url) && !asked.has(e.from_url) && e.from_url !== e.to_url,
+      (e) => asked.has(spell(e.to_url)) && !asked.has(spell(e.from_url)) && e.from_url !== e.to_url,
     );
     const linkedFrom = into.map((e) => ({
       url: e.from_url,
