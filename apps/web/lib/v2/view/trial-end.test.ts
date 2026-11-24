@@ -22,7 +22,7 @@ describe('Trial ending, the header and banner', () => {
   it('counts the days left and names the last check', () => {
     const h = view().header;
     expect(h.title).toBe('Three days of Pro left');
-    expect(h.line).toBe('Wed 4 Nov · 5 sites · last check Fri 30 Oct 06:02 · trial ends Sat 7 Nov');
+    expect(h.line).toBe('Wed 4 Nov · 4 sites · last check Fri 30 Oct 06:02 · trial ends Sat 7 Nov');
     expect(h.actions.map((a) => [a.label, a.href, a.primary])).toEqual([
       ['Run an audit now', '/api/sites/50000000-0000-4000-8000-000000000001/checks', false],
     ]);

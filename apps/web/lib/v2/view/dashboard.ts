@@ -714,7 +714,11 @@ function setup(
     );
   }
   if (g.stagingAndDeployHooks) {
-    const done = v.d.sites.some((s) => s.staging_of_site_id === site.id);
+    // Done once a deploy has been audited, not when a staging URL is merely saved (F-097).
+    const stagingIds = new Set(
+      v.d.sites.filter((s) => s.staging_of_site_id === site.id).map((s) => s.id),
+    );
+    const done = v.d.checks.some((c) => stagingIds.has(c.site_id) && c.trigger === 'deploy');
     item(
       'staging',
       done,
@@ -953,7 +957,9 @@ export function dashboardView(
   const nextText = nextAt ? `${next ? 'next check' : 'next weekly check'} ${nextAt}` : null;
   const trialEnds = trial ? `trial ends ${dayDate(v.account.trial_ends_at!, zone)}` : null;
   const flight = v.inFlight.filter((f) => f.siteId === primary.id).map((f) => `check ${f.status}`);
-  const sitesWord = `${v.d.sites.length} ${plural(v.d.sites.length, 'site', 'sites')}`;
+  // The sites that hold a slot: a staging copy is not a sixth site (F-097).
+  const slotsHeld = primarySites(v).length;
+  const sitesWord = `${slotsHeld} ${plural(slotsHeld, 'site', 'sites')}`;
   const prev = sinceCheck(v);
 
   const addSite = addSiteAction(v);

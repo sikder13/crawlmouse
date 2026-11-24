@@ -140,7 +140,7 @@ export function trialEndView(
     : null;
   const line = [
     dayDate(v.now, zone),
-    COPY.sites(v.d.sites.length),
+    COPY.sites(primarySites(v).length),
     ...(lastWhen ? [COPY.lastCheck(lastWhen)] : []),
     COPY.trialEnds(dayDate(end, zone)),
   ].join(' · ');
@@ -414,7 +414,7 @@ export function trialEndedView(
     shell: accountShellView(v, 'Sites', { plan: 'page', role, billingOpen }),
     header: {
       title: COPY.ended.title(plan),
-      line: [dayDate(v.now, zone), COPY.sites(v.d.sites.length)].join(' · '),
+      line: [dayDate(v.now, zone), COPY.sites(primarySites(v).length)].join(' · '),
     },
     banner: {
       title: COPY.ended.banner(plan, dayDate(a.state_history.at(-1)!.since, zone)),

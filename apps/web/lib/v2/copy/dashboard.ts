@@ -367,6 +367,14 @@ const HOME: CopyChange[] = [
   ...railChanges('dashboard'),
   {
     screen: 'dashboard',
+    kind: 'ruling',
+    locked: '5 sites ·',
+    rendered: '4 sites ·',
+    source:
+      'Owner ruling Q10: a staging site holds no primary slot (ARCH-2 §2.5), so the count of sites leaves it out (F-097)',
+  },
+  {
+    screen: 'dashboard',
     kind: 'fixture',
     locked: 'last check today 06:00',
     rendered: 'last check today 06:02',

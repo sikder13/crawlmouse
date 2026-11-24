@@ -42,7 +42,7 @@ describe('Dashboard home, bad-site at as_of (Fri 30 Oct 06:05 in Indiana)', () =
     expect(v.header.title).toBe("Since Thursday's check");
     // last check: 10:02Z = 06:02 EDT; next: Fri 6 Nov 06:00 EST; trial: 8 Nov 02:41Z = Sat 7 Nov.
     expect(v.header.line).toBe(
-      'Fri 30 Oct · 5 sites · last check today 06:02 · next weekly check Fri 6 Nov around 06:00 · trial ends Sat 7 Nov',
+      'Fri 30 Oct · 4 sites · last check today 06:02 · next weekly check Fri 6 Nov around 06:00 · trial ends Sat 7 Nov',
     );
   });
 
@@ -154,6 +154,22 @@ describe('Dashboard home, bad-site at as_of (Fri 30 Oct 06:05 in Indiana)', () =
     expect(v.setup!.items.map((i) => i.done)).toEqual([true, true, false, true, false]);
   });
 
+  it('ticks staging only once a deploy has been audited, not when the URL is saved (F-097)', () => {
+    const staging = bad.sites.find((x) => x.staging_of_site_id !== null)!;
+    const tick = (d: typeof bad) =>
+      dashboardView(d, { accountId: BAD_ACCOUNT, now: bad.as_of }).setup!.items.find(
+        (i) => i.key === 'staging',
+      )!.done;
+    expect(tick(bad)).toBe(true);
+    // The same account with the staging site's deploy checks taken away: saved, never audited.
+    const saved = {
+      ...bad,
+      checks: bad.checks.filter((c) => !(c.site_id === staging.id && c.trigger === 'deploy')),
+    };
+    expect(saved.sites).toContain(staging);
+    expect(tick(saved)).toBe(false);
+  });
+
   it('carries the trial card that follows the first run', () => {
     // Fri 30 Oct to Sat 7 Nov in Indiana: eight dates (Q4).
     expect(v.shell.trial).toMatchObject({
@@ -162,7 +178,7 @@ describe('Dashboard home, bad-site at as_of (Fri 30 Oct 06:05 in Indiana)', () =
       billing: null,
     });
     expect(v.shell.trial!.keep!.label).toBe('Keep Pro, $19 a month');
-    expect(v.shell.nav.find((n) => n.label === 'Sites')!.count).toBe('5');
+    expect(v.shell.nav.find((n) => n.label === 'Sites')!.count).toBe('4');
   });
 
   it('makes running a check its one orange action', () => {

@@ -338,7 +338,8 @@ function rail(v: AccountView, current: RailLabel | null): NavItemView[] {
     ...n,
     count:
       n.label === 'Sites'
-        ? String(v.d.sites.length)
+        ? // Staging and competitor copies hold no slot, so they are not counted (F-097).
+          String(primarySites(v).length)
         : n.label === 'Clients'
           ? count(primarySites(v).length)
           : n.label === 'Changes' && fresh
