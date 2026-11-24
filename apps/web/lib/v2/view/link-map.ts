@@ -462,8 +462,8 @@ export function linkMapView(
   const linkCount = isGenerated ? nodes.filter((n) => n.parent).length : s.internal_links;
   // Pages that answered 404 or 410 are counted apart: they are links to pages that are not there.
   // They are counted where they answered (segment/broken.ts `missingUrls`, which the Links and pages
-  // view counts by too), so a URL redirecting to a missing page the record also holds is one missing
-  // page, not two. The pages are counted the same way, the pages crawled less the missing URLs, so
+  // view counts by too), so a URL redirecting to a missing page the record also holds at the same
+  // spelling is one missing page, not two (a server answering 404 at both /gone and /gone/ gives two). The pages are counted the same way, the pages crawled less the missing URLs, so
   // "P pages, M missing" adds up to the pages crawled.
   const missingCount = isGenerated ? 0 : missingUrls(records).length;
   // The missing pages are only those of the record: when it holds fewer pages than were crawled, the

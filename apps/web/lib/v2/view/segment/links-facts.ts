@@ -15,7 +15,7 @@
  * `links_read` false, a page not crawled gives none, and a fixture may hold a subset (`withheld`).
  * So what it says of links is a count over the record, "linked from 2 pages in this check’s
  * record", "linked from 0 pages", never a claim that no link exists; and the pages whose links the record does not hold in
- * full are counted from `links_read` and `links_out` against the links the record holds from each
+ * full are counted from `links_out` against the links the record holds from each
  * (`linksNotAllHeld`). Of the pages checked it says which statuses none answered ("no page checked
  * answered 404 or 410"), never that a page exists. __tests__/v2/links-sentences.property.test.tsx
  * holds a list of the wordings that claimed more (FORBIDDEN) and fails when a string the feature
@@ -282,15 +282,6 @@ function column(
  * because that module reads node:crypto, which a screen built on these views cannot load;
  * __tests__/v2/links-sentences.property.test.tsx holds the two equal over a list of URLs.
  */
-/** `linkSpelling`, or the URL as given when it does not parse. */
-function spell(u: string): string {
-  try {
-    return linkSpelling(u);
-  } catch {
-    return u;
-  }
-}
-
 export function linkSpelling(input: string): string {
   const u = new URL(input);
   u.hash = '';
@@ -307,10 +298,18 @@ export function linkSpelling(input: string): string {
   return `${u.protocol}//${u.host}${u.pathname === '/' ? '' : u.pathname}${u.search}`;
 }
 
+/** `linkSpelling`, or the URL as given when it does not parse. */
+function spell(u: string): string {
+  try {
+    return linkSpelling(u);
+  } catch {
+    return u;
+  }
+}
+
 /**
- * The pages that answered 200 as HTML whose links the record does not hold in full: their links
- * were not all read (`links_read` false), or the page has more distinct links (`links_out`) than
- * the record holds from it. The worker records a page's links from the URL its request ended at,
+ * The pages that answered 200 as HTML with more distinct links (`links_out`) than the record holds
+ * from them; a page whose reader stopped (`links_read` false) counts only by that test. The worker records a page's links from the URL its request ended at,
  * in the engine's spelling, and counts in `links_out` each distinct link to another URL, a link to
  * the page itself left out; the links held are counted the same way here.
  */
