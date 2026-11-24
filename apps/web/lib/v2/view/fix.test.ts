@@ -790,10 +790,14 @@ describe('Fixed, and proven (Goal 1 row 22)', () => {
     expect(proofOf(d)?.kind).toBe('shown');
   });
 
-  it('on Free, a verification after the check does not count at that check', () => {
-    // The other fix's verification comes after the check finished at 10:01:30Z.
-    const d = withOther(base(), [{ kind: 'verified', at: '2026-10-30T10:02:00Z' }]);
-    expect(proofOf(d)?.kind).toBe('shown');
+  it('on Free, an event after the check does not change what stood at it', () => {
+    // The other fix was verified at 10:00, before the orphan fix, and reopened only at 10:02, after
+    // the check finished at 10:01:30. At this check it still stands verified, so it holds Free's proof.
+    const d = withOther(base(), [
+      { kind: 'verified', at: '2026-10-30T10:00:00Z' },
+      { kind: 'reopened', at: '2026-10-30T10:02:00Z' },
+    ]);
+    expect(proofOf(d)?.kind).toBe('counted');
   });
 
   it('on Free, another site’s verified fix does not take this site’s proof', () => {
