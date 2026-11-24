@@ -118,16 +118,14 @@ describe('purgePublicReport', () => {
     revalidatePath.mockClear();
   });
 
-  it('purges the tagged data read, the report page, AND the OG image segment', () => {
+  it('purges the tagged data read and the report page', () => {
     purgePublicReport('abc123');
     // The shared data layer (getPublicReport) is tag-invalidated.
     expect(revalidateTag).toHaveBeenCalledWith('public-report:abc123');
     // The report page full-route cache.
     expect(revalidatePath).toHaveBeenCalledWith('/r/abc123');
-    // The OG image is a SEPARATE route segment with its own `revalidate = 3600` full-route
-    // cache — revalidatePath('/r/<slug>') does NOT cascade to it, so it must be purged
-    // explicitly or the pre-takedown viral card serves for up to an hour.
-    expect(revalidatePath).toHaveBeenCalledWith('/r/abc123/opengraph-image');
+    // The OG card renders per request from the tagged read, so the tag purge is what turns it to
+    // the placeholder (F-241); its header bounds a CDN copy (app/r/[slug]/opengraph-image.test.tsx).
   });
 
   it('purges the v2 report route the rewrite serves /r/<slug> from (CC-29 Q12)', () => {

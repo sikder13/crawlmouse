@@ -597,11 +597,11 @@
       "evidence": "ARCH-2 §6.2 (owner cutover plan, ~/crawlmouse-plan/ARCH-2.md \"6.2 URLs\")",
       "checks": {
         "input": "pass — slug through getPublicReport (cached .eq read)",
-        "output": "pass — buildOgReportModel decides what is drawn; a gone report draws the placeholder (app/r/[slug]/opengraph-image.tsx:36-39)",
-        "cache": "pass — revalidate=3600, purged on hide/takedown/claim (lib/reports.ts:63-74); no cookies",
+        "output": "pass — buildOgReportModel decides what is drawn; a gone report draws the placeholder (app/r/[slug]/opengraph-image.tsx:40-46)",
+        "cache": "pass — rendered per request and held by the CDN for at most OG_CARD_EDGE_SECONDS, with no browser cache (lib/og-card-cache.ts:11-16, F-241); the by-slug read it renders from is purged on hide/takedown/claim (lib/reports.ts:60-72); no cookies",
         "redirect": "n/a — no redirect and no next/returnTo param in the file",
         "errors": "n/a — no error path of its own",
-        "escaping": "pass — domain, grade and white-label brand are satori text nodes, not HTML (:66,78,89); no image is fetched",
+        "escaping": "pass — domain, grade and white-label brand are satori text nodes, not HTML (:73,85,96); no image is fetched",
         "abuse": "n/a — no action that costs money or sends mail"
       }
     },

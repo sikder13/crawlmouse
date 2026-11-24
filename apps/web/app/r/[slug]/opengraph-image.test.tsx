@@ -15,7 +15,10 @@ const store = vi.hoisted(() => ({ row: null as unknown }));
 vi.mock('@/lib/reports', () => ({ getPublicReport: async () => store.row }));
 vi.mock('next/og', () => ({
   ImageResponse: class {
-    constructor(public element: ReactElement) {}
+    constructor(
+      public element: ReactElement,
+      public options: { headers?: Record<string, string> },
+    ) {}
   },
 }));
 
@@ -41,11 +44,14 @@ const row = (extra: Partial<PublicReportRow>): PublicReportRow => ({
   ...extra,
 });
 
-async function drawn(): Promise<string> {
-  const res = (await Image({ params: Promise.resolve({ slug: 'abc123' }) })) as unknown as {
+async function response() {
+  return (await Image({ params: Promise.resolve({ slug: 'abc123' }) })) as unknown as {
     element: ReactElement;
+    options: { headers?: Record<string, string> };
   };
-  return renderToStaticMarkup(res.element);
+}
+async function drawn(): Promise<string> {
+  return renderToStaticMarkup((await response()).element);
 }
 
 beforeEach(() => vi.stubEnv('V2_CHECKS_PUBLIC', '1'));
@@ -85,5 +91,33 @@ describe('/r/<slug>/opengraph-image', () => {
     expect(on).not.toContain('AI readability');
     vi.stubEnv('V2_CHECKS_PUBLIC', '');
     expect(await drawn()).toBe(on);
+  });
+
+  it('a taken-down v2 report is the placeholder', async () => {
+    store.row = row({
+      report_snapshot: v2 as unknown as PublicReportRow['report_snapshot'],
+      takedown_requested_at: MINTED,
+    });
+    expect(await drawn()).toBe('<div style="font-size:48px">Crawlmouse</div>');
+  });
+});
+
+describe('how long a card may be cached (F-241)', () => {
+  it('replaces the year-long immutable default on every card: v2, v1 and the placeholder', async () => {
+    const want = 'public, max-age=0, s-maxage=300, no-transform';
+    for (const r of [
+      row({ report_snapshot: v2 as unknown as PublicReportRow['report_snapshot'] }),
+      row({ grade: 'B', score: 79, claimed_at: MINTED }),
+      row({ hidden_at: MINTED }),
+    ]) {
+      store.row = r;
+      expect((await response()).options.headers?.['cache-control']).toBe(want);
+    }
+  });
+
+  it('is rendered per request, with no route cache for a takedown to miss', async () => {
+    const mod = await import('./opengraph-image');
+    expect(mod.dynamic).toBe('force-dynamic');
+    expect('revalidate' in mod).toBe(false);
   });
 });

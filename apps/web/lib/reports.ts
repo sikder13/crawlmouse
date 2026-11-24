@@ -66,10 +66,7 @@ export function purgePublicReport(slug: string): void {
   // With V2_CHECKS_PUBLIC on, /r/<slug> is rewritten to /v2-report/<slug>, which keeps a route cache
   // of its own under that path (CC-29 Q12).
   revalidatePath(`/v2-report/${slug}`);
-  // The OG card lives at the SEPARATE `/r/<slug>/opengraph-image` route segment, which has its
-  // own `revalidate = 3600` full-route cache. revalidatePath('/r/<slug>') does NOT cascade into
-  // that child segment, and the tag purge only clears the data layer — the already-rendered PNG
-  // would keep serving for up to an hour. Purge the OG segment explicitly so the viral-unfurl
-  // card flips to the placeholder immediately (the privacy-sensitive surface this exists for).
-  revalidatePath(`/r/${slug}/opengraph-image`);
+  // The OG card, `/r/<slug>/opengraph-image`, keeps no route cache to purge: it renders per request
+  // from the tagged read above, so its next render is the placeholder. A copy the CDN already holds
+  // is not reached from here and lasts at most OG_CARD_EDGE_SECONDS (lib/og-card-cache.ts, F-241).
 }
