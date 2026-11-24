@@ -64,6 +64,9 @@ if (
       // Add-ons no insight reads (scripts/ops/posthog/spec.ts): each is a script on every page.
       capture_dead_clicks: false,
       capture_performance: false,
+      // The project's heatmap setting would start them, and with them the dead-click add-on whatever
+      // `capture_dead_clicks` says. A heatmap is keyed by page address, which can hold a check id.
+      capture_heatmaps: false,
       // posthog-js skips surveys for an opted-out visitor only in cookieless mode, which this is not.
       disable_surveys: surveysOffAtStart(
         consentRequiredFromCookie(document.cookie),
