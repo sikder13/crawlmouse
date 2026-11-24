@@ -113,7 +113,8 @@ function ErrorTable({
         { header: 'Linked from' },
       ]}
       rows={rows.map((r) => ({
-        key: r.url,
+        // One row per URL and status: a URL that answered two statuses is two rows.
+        key: `${r.status} ${r.url}`,
         cells: [
           <PageCell key="p" r={r} />,
           <StatusPill key="s" state={tone}>
@@ -177,9 +178,9 @@ function Basics({ col }: { col: BasicsColumnView }) {
 }
 
 /**
- * Links and pages (row 5): the missing pages a link from another page leads to and where they are
- * linked from, the missing pages no other page links to, the pages that answered another error, redirects, and the titles
- * and meta descriptions that are missing or shared. Headings are not read yet, and
+ * Links and pages (row 5): the missing pages a link we read leads to and the pages we read that
+ * link to them, the missing pages found with no link we read leading to them, the pages that
+ * answered another error, redirects, and the titles and meta descriptions that are missing or shared. Headings are not read yet, and
  * the page says so.
  */
 export function LinksScreen({ data }: { data: LinksView }) {

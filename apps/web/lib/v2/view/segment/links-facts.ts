@@ -1,12 +1,20 @@
 /**
- * Links and pages (row 5) as data: the missing pages a link from another page leads to and where
- * they are linked from, the missing pages no other page links to, the pages that answered another
- * error, the pages that redirect, and the titles and meta descriptions that are missing or shared. It
+ * Links and pages (row 5) as data: the missing pages a link we read leads to and the pages we read
+ * that link to them, the missing pages found with no link we read leading to them, the pages that
+ * answered another error, the pages that redirect, and the titles and meta descriptions that are missing or shared. It
  * reads the page and link records of one check. A page's status, final URL, title and meta
  * description are read through the pages CSV's accessors (reports/csv.ts), so the screen, the CSV
  * and the PDF read the same values; its redirect chain, which the CSV has no column for, is read off
- * `page.redirect`. Which statuses are missing, and where a redirected page answered, is
- * segment/broken.ts's, which the link map reads too.
+ * `page.redirect`. Which statuses are missing, where a redirected page answered, and the rows (one
+ * per URL where a page answered and status) are segment/broken.ts's, which the link map reads too.
+ *
+ * The record holds some of a site's links, not all of them: the worker keeps a bounded number of
+ * links per page, a page read in part has `links_read` false, a page not crawled gives none, and a
+ * fixture may hold a subset (`withheld`). So what it says of links is scoped to the links and pages
+ * we read: "linked from 2 pages we read", "no link we read leads to it", "none of the 16 pages
+ * checked is missing". __tests__/v2/links-sentences.property.test.tsx fails on "no link from another
+ * page", "no other page links", "no broken link" or "unlinked" in any string the feature renders for
+ * the records it generates.
  *
  * Titles and descriptions are read over the pages that answered 200, in three kinds: not read (the
  * page's `title` or `meta_description` is null: a non-HTML page, or one read in part), missing (read,
@@ -19,7 +27,7 @@ import { siteOf } from '../../fixtures';
 import { PAGE_CELLS } from '../../reports/csv';
 import { capitalise, count, plural } from '../../words';
 import { sectionMeasured } from '../section-measured';
-import { errorGroups, isMissing, redirected } from './broken';
+import { errorRows, redirected, type ErrorRow } from './broken';
 import type { DoorView } from '../result';
 import type { ViewDataset } from '../../fixtures';
 
@@ -67,9 +75,9 @@ export interface ErrorRowView extends PageRef {
   /** The path, then "(redirected from /a, /b)" when it was reached by a redirect: one cell. */
   pageText: string;
   /**
-   * The links in the record that lead here, with their text, in the record's order. A link from the
-   * page itself is left out. A link's page may be one the record does not hold (where a redirect
-   * landed), so this is what the record read, not a census of the site.
+   * The links in the record that lead to one of this row's URLs, with their text, in the record's
+   * order. A link from one of those URLs is left out. A link's page may be one the record does not
+   * hold (where a redirect landed), so this is what the record read, not a census of the site.
    */
   linkedFrom: LinkingPage[];
   /** "/blog/a, /pricing and 1 more": the first two linking pages, and how many more. */
@@ -111,13 +119,13 @@ export interface LinksCounts {
   checked: number;
   /** Pages that answered 200: the pages whose titles and descriptions are looked for. */
   served: number;
-  /** Missing pages (segment/broken.ts) at least one link from another page leads to. */
+  /** Missing pages (segment/broken.ts), by URL, that a link the record holds leads to. */
   broken: number;
-  /** Distinct pages whose link leads to one of those, a page's link to itself left out. */
+  /** Distinct pages whose link in the record leads to one of those, a page's link to itself left out. */
   brokenLinkedFrom: number;
-  /** Missing pages no link from another page in the record leads to. */
+  /** Missing pages, by URL, found with no link in the record leading to them. */
   missingUnlinked: number;
-  /** Pages that answered an error of 400 or more other than a missing one. */
+  /** URLs that answered an error of 400 or more other than a missing one. */
   errors: number;
   redirects: number;
   loops: number;
@@ -125,12 +133,17 @@ export interface LinksCounts {
   redirectsRecorded: number;
   /** Of the pages that answered 200, those whose title was read. */
   titlesRead: number;
-  /** Of those, the ones that declare no title, or one of whitespace alone. */
+  /** Pages that answered 200, whose title was read, and that declare none, or one of whitespace alone. */
   missingTitles: number;
   sharedTitlePages: number;
   /** Titles kept cut short, left out of the shared groups. */
   cutTitles: number;
+  /** Of the pages that answered 200, those whose meta description was read. */
   descriptionsRead: number;
+  /**
+   * Pages that answered 200, whose meta description was read, and that declare none, or one of
+   * whitespace alone.
+   */
   missingDescriptions: number;
   sharedDescriptionPages: number;
   cutDescriptions: number;
@@ -140,16 +153,16 @@ export const HEADINGS_LINE = 'Headings are not checked yet.';
 /** The empty state of each table when the record holds no page. */
 export const NOT_MEASURED_LINE = 'Not measured: this check recorded no page.';
 export const ERRORS_HEADING = 'Pages that answered an error';
-/** The heading of the missing pages no other page links to, when links were read. */
-export const UNLINKED_HEADING = 'Missing pages no other page links to';
-/** Its heading when no link was read or recorded: whether a page links to them is not known. */
-export const UNLINKED_UNKNOWN_HEADING = 'Missing pages';
+/** The heading of the missing pages found with no link in the record leading to them. */
+export const UNLINKED_HEADING = 'Missing pages found';
+/** What a row's "Linked from" cell says when the record holds no link that leads to it. */
+export const NO_LINK_FOUND = 'no link found';
 /** The column that names the URL a redirect chain starts from. */
 export const REQUESTED_AS = 'Requested as';
 
 /** Text made of whitespace alone, Unicode's spaces and the zero-width ones included. */
 export const isBlank = (text: string | null): boolean =>
-  text === null || /^[\s\p{Z}​-‍⁠﻿]*$/u.test(text);
+  text === null || /^[\s\p{Z}\u200b-\u200d\u2060\ufeff]*$/u.test(text);
 
 /** A path on the site's own host; any other host keeps its whole URL. */
 function shortUrl(url: string, host: string): string {
@@ -269,12 +282,13 @@ export type LinkGap = 'unread' | 'unrecorded' | null;
 
 export interface LinksFacts {
   counts: LinksCounts;
+  /** Why no link can be named: the check read none (`unread`), or its record holds none. */
   linkGap: LinkGap;
-  /** Missing pages a link from another page leads to: the broken links. */
+  /** The rows of the missing pages a link in the record leads to: the broken links. */
   broken: ErrorRowView[];
-  /** Missing pages no link from another page in the record leads to. */
+  /** The rows of the missing pages found with no link in the record leading to them. */
   unlinked: ErrorRowView[];
-  /** Its heading, which says "no other page links to" only when links were read. */
+  /** Their heading: "Missing pages found". */
   unlinkedHeading: string;
   /** Pages that answered another error (a 403, a 429, a 503): they exist, so are not broken. */
   errors: ErrorRowView[];
@@ -316,9 +330,10 @@ export function linksFacts(d: ViewDataset, check: Check): LinksFacts {
         ? 'No link is in this check’s record'
         : null;
 
-  // A page that answered an error, grouped by where it answered (segment/broken.ts): a page reached
-  // by a redirect is shown at its final URL, and a final URL the record also holds is one row.
-  const rowOf = (at: string, members: PageResult[]): ErrorRowView => {
+  // One row per URL where pages answered an error and status (segment/broken.ts `errorRows`): a page
+  // reached by a redirect is shown at its final URL, a final URL the record also holds with the same
+  // status is one row, and a second status at that URL is a row of its own.
+  const rowOf = ({ at, status, members }: ErrorRow): ErrorRowView => {
     const asked = new Set([at, ...members.map((p) => p.url)]);
     const via = members.filter((p) => p.url !== at).map((p) => path(p.url));
     const into = edges.filter(
@@ -330,11 +345,11 @@ export function linksFacts(d: ViewDataset, check: Check): LinksFacts {
       anchor: isBlank(e.anchor_text) ? null : e.anchor_text,
     }));
     const froms = [...new Set(linkedFrom.map((l) => l.path))];
-    const none = noLink ?? 'no link from another page';
+    const none = noLink ?? NO_LINK_FOUND;
     return {
       url: at,
       path: path(at),
-      status: PAGE_CELLS.status_code(members[0]!),
+      status,
       via,
       pageText: via.length ? `${path(at)} (redirected from ${via.join(', ')})` : path(at),
       linkedFrom,
@@ -344,13 +359,17 @@ export function linksFacts(d: ViewDataset, check: Check): LinksFacts {
         : none,
     };
   };
-  const rows = errorGroups(pages).map(([at, members]) => ({
-    missing: isMissing(members[0]!),
-    row: rowOf(at, members),
-  }));
-  const broken = rows.filter((r) => r.missing && r.row.linkedFrom.length).map((r) => r.row);
-  const unlinked = rows.filter((r) => r.missing && !r.row.linkedFrom.length).map((r) => r.row);
+  const rows = errorRows(pages).map((r) => ({ missing: r.missing, row: rowOf(r) }));
+  // A missing page is linked when a link the record holds leads to one of its rows; all of its rows
+  // are listed with it, so one page is never in both tables.
+  const linkedAt = new Set(
+    rows.filter((r) => r.missing && r.row.linkedFrom.length).map((r) => r.row.url),
+  );
+  const broken = rows.filter((r) => r.missing && linkedAt.has(r.row.url)).map((r) => r.row);
+  const unlinked = rows.filter((r) => r.missing && !linkedAt.has(r.row.url)).map((r) => r.row);
   const errors = rows.filter((r) => !r.missing).map((r) => r.row);
+  /** The distinct URLs of `rs`: a count of pages, however many statuses each answered. */
+  const urlsOf = (rs: readonly ErrorRowView[]) => new Set(rs.map((r) => r.url)).size;
   const brokenLinkedFrom = new Set(broken.flatMap((r) => r.linkedFrom.map((l) => l.url))).size;
 
   const recorded = pages.filter((p) => p.redirect !== null);
@@ -386,10 +405,10 @@ export function linksFacts(d: ViewDataset, check: Check): LinksFacts {
   const counts: LinksCounts = {
     checked: pages.length,
     served: served.length,
-    broken: broken.length,
+    broken: urlsOf(broken),
     brokenLinkedFrom,
-    missingUnlinked: unlinked.length,
-    errors: errors.length,
+    missingUnlinked: urlsOf(unlinked),
+    errors: urlsOf(errors),
     redirects: redirects.length,
     loops: redirects.filter((r) => r.loop).length,
     redirectsRecorded: recorded.length,
@@ -407,9 +426,9 @@ export function linksFacts(d: ViewDataset, check: Check): LinksFacts {
   const crawled = check.coverage?.pages_crawled ?? null;
   const coverage =
     crawled !== null && crawled > checked
-      ? `Checked ${count(checked)} of the ${count(crawled)} pages crawled`
+      ? `Checked ${count(checked)} of the ${pagesWord(crawled)} crawled`
       : `Checked ${pagesWord(checked)}`;
-  const unlinkedHeading = linkGap === null ? UNLINKED_HEADING : UNLINKED_UNKNOWN_HEADING;
+  const unlinkedHeading = UNLINKED_HEADING;
 
   if (checked === 0) {
     return {
@@ -433,21 +452,41 @@ export function linksFacts(d: ViewDataset, check: Check): LinksFacts {
   }
 
   // Each clause below is built from the rows it names, so it says only what they hold. A count of
-  // missing pages is a count of pages, never of links.
+  // missing pages is a count of pages (URLs), never of links or rows; and what a link leads to is
+  // said of the links the record holds, never of the site's.
   const missingPages = (n: number) => `${count(n)} missing ${plural(n, 'page', 'pages')}`;
-  const brokenSentence = broken.length
-    ? `${missingPages(broken.length)}, linked from ${pagesWord(brokenLinkedFrom)}, answering ${statusesOf(broken).join(' or ')}.`
+  const nBroken = counts.broken;
+  const nUnlinked = counts.missingUnlinked;
+  const nErrors = counts.errors;
+  const linkingRead = `linked from ${pagesWord(brokenLinkedFrom)} we read`;
+  const brokenSentence = nBroken
+    ? `${missingPages(nBroken)}, ${linkingRead}, answering ${statusesOf(broken).join(' or ')}.`
     : null;
-  const unlinkedSentence = unlinked.length
+  const unlinkedSentence = nUnlinked
     ? noLinkClause === null
-      ? `${missingPages(unlinked.length)}, answering ${statusesOf(unlinked).join(' or ')}, ${plural(unlinked.length, 'has', 'have')} no link from another page.`
-      : `${missingPages(unlinked.length)}, answering ${statusesOf(unlinked).join(' or ')}. ${noLinkClause}, so what links to ${plural(unlinked.length, 'it', 'them')} is not known.`
+      ? `${missingPages(nUnlinked)} found, answering ${statusesOf(unlinked).join(' or ')}; no link we read leads to ${plural(nUnlinked, 'it', 'them')}.`
+      : `${missingPages(nUnlinked)}, answering ${statusesOf(unlinked).join(' or ')}. ${noLinkClause}, so what links to ${plural(nUnlinked, 'it', 'them')} is not known.`
     : null;
-  const errorSentence = errors.length
-    ? `${pagesWord(errors.length)} answered an error (${statusesOf(errors).join(', ')}).`
+  // The record holds only some of the links: say how, from the record, when it says so.
+  const heldLinks = d.withheld.find(
+    (w) => w.check_id === check.id && w.collection === 'link_edges',
+  );
+  const linksNotAllRead = served.filter((p) => !p.links_read).length;
+  const partLinks = [
+    heldLinks
+      ? `the record holds ${count(heldLinks.included)} of the ${count(heldLinks.total)} links found`
+      : null,
+    linksNotAllRead
+      ? `the links of ${pagesWord(linksNotAllRead)} that answered 200 were not all read`
+      : null,
+  ].filter((x): x is string => x !== null);
+  const partLinksSentence =
+    linkGap === null && partLinks.length ? `${capitalise(partLinks.join('; '))}.` : null;
+  const errorSentence = nErrors
+    ? `${pagesWord(nErrors)} answered an error (${statusesOf(errors).join(', ')}).`
     : null;
   const noneSentence =
-    broken.length || unlinked.length || errors.length
+    nBroken || nUnlinked || nErrors
       ? null
       : checked === 1
         ? 'The page we checked answers no error.'
@@ -511,20 +550,32 @@ export function linksFacts(d: ViewDataset, check: Check): LinksFacts {
           ? 'The page that answered 200 has a title and a meta description.'
           : `Each of the ${pagesWord(served.length)} that answered 200 has its own title and meta description.`;
   const sentences = (none: string | null) =>
-    [brokenSentence, unlinkedSentence, errorSentence, none, redirectSentence, basicsSentence]
+    [
+      brokenSentence,
+      unlinkedSentence,
+      partLinksSentence,
+      errorSentence,
+      none,
+      redirectSentence,
+      basicsSentence,
+    ]
       .filter(Boolean)
       .join(' ');
 
-  const partial = crawled !== null && crawled > checked;
   const notRecorded = recorded.length < checked;
-  const brokenEmpty = broken.length
+  /** "none of the 16 pages checked is missing": what the record shows, said of the pages checked. */
+  const noneMissing =
+    checked === 1
+      ? 'the page checked is not missing'
+      : `none of the ${pagesWord(checked)} checked is missing`;
+  const brokenEmpty = nBroken
     ? null
     : noLinkClause !== null
       ? `${noLinkClause}, so no link to a missing page can be named.`
       : (noneSentence ??
-        (unlinked.length
-          ? 'No link from another page leads to a missing page.'
-          : 'No link we read leads to a missing page.'));
+        (nUnlinked
+          ? `No link we read leads to ${nUnlinked === 1 ? 'the missing page found' : `any of the ${missingPages(nUnlinked)} found`}.`
+          : `${capitalise(noneMissing)}.`));
   return {
     counts,
     linkGap,
@@ -550,25 +601,19 @@ export function linksFacts(d: ViewDataset, check: Check): LinksFacts {
           : checked === 1
             ? 'The page we checked does not redirect.'
             : `None of the ${count(checked)} pages we checked redirects.`,
-    pill: broken.length
-      ? {
-          state: 'bad',
-          label: `${missingPages(broken.length)}, linked from ${pagesWord(brokenLinkedFrom)}`,
-        }
-      : unlinked.length
+    pill: nBroken
+      ? { state: 'bad', label: `${missingPages(nBroken)}, ${linkingRead}` }
+      : nUnlinked
         ? {
             state: 'neutral',
             label:
               noLink === null
-                ? `${missingPages(unlinked.length)}, no link from another page`
-                : `${missingPages(unlinked.length)}, ${noLink}`,
+                ? `${missingPages(nUnlinked)} found`
+                : `${missingPages(nUnlinked)}, ${noLink}`,
           }
         : noLink !== null
           ? { state: 'neutral', label: noLink }
-          : {
-              state: 'neutral',
-              label: partial ? `no broken link in ${pagesWord(checked)} checked` : 'no broken link',
-            },
+          : { state: 'neutral', label: noneMissing },
     coverage,
   };
 }

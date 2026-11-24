@@ -1,9 +1,10 @@
 /**
  * Which pages of a check's record are missing (they answer 404 or 410) and which answer another
  * error, read through the pages CSV's status accessor (reports/csv.ts), and where each answered: a
- * page reached by a redirect answered at its final URL. The link map, the Links and pages screen,
- * its door, the tab's figure and the PDF all read the statuses and the grouping below from here, so
- * the map's count of missing pages and the Links screen's cannot disagree.
+ * page reached by a redirect answered at its final URL when that URL is recorded. The link map, the
+ * Links and pages screen, its door, the tab's figure and the PDF all read the statuses, the rows and
+ * the labels below from here, so the map's count of missing pages and the Links screen's cannot
+ * disagree.
  */
 import type { PageResult } from '@crawlmouse/types/v2';
 import { PAGE_CELLS } from '../../reports/csv';
@@ -34,27 +35,53 @@ export const answeredAt = (p: PageResult): string =>
   (redirected(p) ? PAGE_CELLS.final_url(p) : null) ?? p.url;
 
 /**
- * The pages of `pages` that answered an error, grouped by where they answered (`answeredAt`) and by
- * whether the answer was missing, in first-seen order: a final URL the record also holds as a page
- * is one group, not two. The two kinds are kept apart because one URL can answer both ways in one
- * check (a request redirected there got a 429, the page itself a 410), and a group's status is
- * that of every member.
+ * What the link map says of a missing page, by where it answered (`answeredAt`), as the Links and
+ * pages rows place it: "redirects to a missing page (404)" when the request answered at another URL,
+ * "missing (404)" when it answered at its own (a redirect whose final URL is not recorded included);
+ * null for a page that is not missing.
  */
-export function errorGroups(pages: readonly PageResult[]): [string, PageResult[]][] {
-  const groups = new Map<string, { at: string; members: PageResult[] }>();
-  for (const p of pages.filter((x) => isMissing(x) || isOtherError(x))) {
-    const at = answeredAt(p);
-    const key = `${isMissing(p) ? 'missing' : 'error'} ${at}`;
-    const g = groups.get(key) ?? { at, members: [] };
-    g.members.push(p);
-    groups.set(key, g);
-  }
-  return [...groups.values()].map((g) => [g.at, g.members]);
+export const missingLabel = (p: PageResult): string | null =>
+  !isMissing(p)
+    ? null
+    : answeredAt(p) !== p.url
+      ? `redirects to a missing page (${PAGE_CELLS.status_code(p)})`
+      : `missing (${PAGE_CELLS.status_code(p)})`;
+
+/** One row of the pages that answered an error: where they answered, the status, and the pages. */
+export interface ErrorRow {
+  at: string;
+  status: number;
+  missing: boolean;
+  members: PageResult[];
 }
 
-/** The groups of `errorGroups` whose answer was missing: one per missing page, however reached. */
-export const missingGroups = (pages: readonly PageResult[]): [string, PageResult[]][] =>
-  errorGroups(pages).filter(([, members]) => isMissing(members[0]!));
+/**
+ * The pages of `pages` that answered an error, one row per pair of the URL where they answered
+ * (`answeredAt`) and the status, in first-seen order. The status is part of the row's key, so two
+ * statuses at one URL are two rows: a request redirected there that got a 429 and the page itself
+ * answering 503, or a 404 and a 410.
+ */
+export function errorRows(pages: readonly PageResult[]): ErrorRow[] {
+  const rows = new Map<string, ErrorRow>();
+  for (const p of pages.filter((x) => isMissing(x) || isOtherError(x))) {
+    const at = answeredAt(p);
+    const status = PAGE_CELLS.status_code(p);
+    const key = `${status} ${at}`;
+    const row = rows.get(key) ?? { at, status, missing: isMissing(p), members: [] };
+    row.members.push(p);
+    rows.set(key, row);
+  }
+  return [...rows.values()];
+}
+
+/** The distinct URLs where a missing page answered, in first-seen order: one per missing page. */
+export const missingUrls = (pages: readonly PageResult[]): string[] => [
+  ...new Set(
+    errorRows(pages)
+      .filter((r) => r.missing)
+      .map((r) => r.at),
+  ),
+];
 
 /** The pages of check `checkId` that are missing, in the record's order. */
 export const missingPagesOf = (d: ViewDataset, checkId: string): PageResult[] =>

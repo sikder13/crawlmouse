@@ -1,15 +1,30 @@
 /**
- * Every sentence the Links and pages view produces, held to the record it was built from.
+ * The strings the Links and pages feature renders, held to the record they were built from.
  *
  * Records are built from the types (PageResultSchema and LinkEdgeSchema parse each one): a table of
- * named shapes, then records fast-check generates over the same axes (status, redirect, whether a
- * title or description was read, blank or cut, and links between pages, self-links included). For
- * each record, the strings checked are the headline, the pill, the body, the screen's body, the
- * tiles, the empty states, the table headings and cells, the title and description columns, the
- * overview door, the tab's figure, the link map's title, the PDF section and the rendered screen.
+ * named shapes, then records fast-check generates. The generator varies a page's status (200, 404,
+ * 410, 429, 503, a 301 loop); its redirect (none, not recorded, one hop, a two-hop 301 chain, a
+ * chain whose final URL is not recorded, to a URL in the record or to a landing URL outside it);
+ * whether it is a PDF, or an HTML page whose links were not all read; its title and description
+ * (not read, declared empty, blank with Unicode or zero-width spaces, text, cut short); the links
+ * between pages, from the record's pages and from the landing URLs outside it, self-links included;
+ * how many links and pages the check found beyond those the record holds (`withheld`); and whether
+ * the structure section was measured at all.
  *
- * The truth each assertion compares with is computed here from the record, with no helper of the
- * view under test (segment/broken.ts, links-facts.ts, reports/csv.ts) imported.
+ * For each record, `expectTrueToTheRecord` checks, against a truth computed here:
+ * - the rows of the missing-page and error tables, as (page, status) pairs, and each row's linking
+ *   pages, its "and N more" summary, and the cell that stands in when the record holds no link;
+ * - the missing-page, error, redirect and loop counts and the status lists of the body's sentences;
+ * - the clauses on links not all read and links withheld, on titles and descriptions not read, cut
+ *   short, missing and shared;
+ * - the pill, the headline's parts, the tiles, the coverage line, the door and the tab, and the link
+ *   map's missing count and its scope;
+ * - that no string of the view, the door, the tab, the map's title, the PDF section or the rendered
+ *   screen says "no link from another page", "no other page links", "no broken link" or
+ *   "unlinked".
+ *
+ * The truth is computed from the record, with no helper of the view under test (segment/broken.ts,
+ * links-facts.ts, reports/csv.ts) imported.
  */
 import fc from 'fast-check';
 import { JSDOM } from 'jsdom';
@@ -77,20 +92,45 @@ const edge = (from: string, to: string, anchor = `to ${to}`): LinkEdge => ({
   js_only: false,
 });
 
-/**
- * The built site's dataset with its one check's record replaced: `pages` and `edges`, all of the
- * crawl held (nothing withheld), and a structure that read the links the record holds.
- */
-function dataset(pages: PageResult[], edges: LinkEdge[]): FixtureDataset {
+/** What the check found beyond the record, and whether it measured the structure section. */
+interface Scope {
+  /** Links the check found that the record does not hold (a `withheld` row for link_edges). */
+  extraLinks?: number;
+  /** Pages crawled that the record does not hold (a `withheld` row for page_results). */
+  extraCrawled?: number;
+  /** The structure section read nothing: no link counted, and the record holds none. */
+  unmeasured?: boolean;
+}
+
+/** The built site's dataset with its one check's record replaced by `pages` and `edges`. */
+function dataset(pages: PageResult[], edges: LinkEdge[], scope: Scope = {}): FixtureDataset {
   for (const p of pages) PageResultSchema.parse(p);
   for (const e of edges) LinkEdgeSchema.parse(e);
+  const extraLinks = scope.unmeasured ? 0 : (scope.extraLinks ?? 0);
+  const extraCrawled = scope.extraCrawled ?? 0;
   const d = structuredClone(BASE);
   d.page_results = [...d.page_results.filter((p) => p.check_id !== ID), ...pages];
   d.link_edges = [...d.link_edges.filter((e) => e.check_id !== ID), ...edges];
   d.withheld = d.withheld.filter((w) => w.check_id !== ID);
+  if (extraLinks) {
+    d.withheld.push({
+      check_id: ID,
+      collection: 'link_edges',
+      included: edges.length,
+      total: edges.length + extraLinks,
+    });
+  }
+  if (extraCrawled) {
+    d.withheld.push({
+      check_id: ID,
+      collection: 'page_results',
+      included: pages.length,
+      total: pages.length + extraCrawled,
+    });
+  }
   const check = d.checks.find((c) => c.id === ID)!;
-  check.coverage!.pages_crawled = pages.length;
-  check.structure!.internal_links = edges.length;
+  check.coverage!.pages_crawled = pages.length + extraCrawled;
+  check.structure!.internal_links = scope.unmeasured ? 0 : edges.length + extraLinks;
   check.structure!.orphan_pages = 0;
   check.structure!.js_only_pages = 0;
   return d;
@@ -104,33 +144,44 @@ const path = (u: string) => {
   const x = new URL(u);
   return x.origin === ORIGIN ? `${x.pathname}${x.search}` : u;
 };
+const distinct = <T,>(xs: readonly T[]) => [...new Set(xs)];
+const sortNum = (xs: readonly number[]) => [...xs].sort((a, b) => a - b);
 
-function truthOf(pages: PageResult[], edges: LinkEdge[]) {
+function truthOf(pages: PageResult[], edges: LinkEdge[], scope: Scope) {
+  const internalLinks = scope.unmeasured ? 0 : edges.length + (scope.extraLinks ?? 0);
+  const linkGap = internalLinks === 0 ? 'unread' : edges.length === 0 ? 'unrecorded' : null;
   // Where each request answered: the final URL of a recorded redirect chain, else its own URL.
   const at = (p: PageResult) =>
     p.redirect && p.redirect.hops.length > 0 && p.final_url !== null ? p.final_url : p.url;
-  const gone = pages.filter((p) => p.status_code === 404 || p.status_code === 410);
-  const other = pages.filter(
-    (p) => p.status_code >= 400 && p.status_code !== 404 && p.status_code !== 410,
-  );
-  const missingAt = [...new Set(gone.map(at))];
-  /** The URLs a missing page at `target` was asked for at. */
-  const askedFor = (target: string) =>
-    new Set([target, ...gone.filter((p) => at(p) === target).map((p) => p.url)]);
-  const fromOthers = (target: string) => {
-    const asked = askedFor(target);
-    return edges.filter((e) => asked.has(e.to_url) && !asked.has(e.from_url));
-  };
-  /** The links from another page into the other error (not missing) answered at `target`. */
-  const intoOther = (target: string) => {
-    const asked = new Set([target, ...other.filter((p) => at(p) === target).map((p) => p.url)]);
-    return edges.filter((e) => asked.has(e.to_url) && !asked.has(e.from_url));
-  };
-  const linkedMissing = missingAt.filter((t) => fromOthers(t).length > 0);
-  const unlinkedMissing = missingAt.filter((t) => fromOthers(t).length === 0);
-  const selfLinked = unlinkedMissing.filter((t) =>
-    edges.some((e) => askedFor(t).has(e.to_url) && askedFor(t).has(e.from_url)),
-  );
+  const isGone = (p: PageResult) => p.status_code === 404 || p.status_code === 410;
+  // A row per URL where an error answered and its status.
+  const rowMap = new Map<
+    string,
+    { at: string; status: number; gone: boolean; asked: Set<string> }
+  >();
+  for (const p of pages.filter((x) => x.status_code >= 400)) {
+    const key = `${p.status_code} ${at(p)}`;
+    const r = rowMap.get(key) ?? {
+      at: at(p),
+      status: p.status_code,
+      gone: isGone(p),
+      asked: new Set([at(p)]),
+    };
+    r.asked.add(p.url);
+    rowMap.set(key, r);
+  }
+  const rows = [...rowMap.values()].map((r) => ({
+    ...r,
+    into: edges.filter(
+      (e) => r.asked.has(e.to_url) && !r.asked.has(e.from_url) && e.from_url !== e.to_url,
+    ),
+  }));
+  const goneRows = rows.filter((r) => r.gone);
+  const missingAt = distinct(goneRows.map((r) => r.at));
+  const linkedAt = new Set(goneRows.filter((r) => r.into.length).map((r) => r.at));
+  const brokenRows = goneRows.filter((r) => linkedAt.has(r.at));
+  const unlinkedRows = goneRows.filter((r) => !linkedAt.has(r.at));
+  const otherRows = rows.filter((r) => !r.gone);
   const served = pages.filter((p) => p.status_code === 200);
   const headOf = (key: 'title' | 'meta_description') => {
     const read = served.filter((p) => p[key] !== null);
@@ -142,28 +193,38 @@ function truthOf(pages: PageResult[], edges: LinkEdge[]) {
     const shared = [...byText.values()].filter((ps) => ps.length > 1);
     return {
       read: read.length,
-      notRead: served.length - read.length,
+      notRead: served.filter((p) => p[key] === null).map((p) => p.url),
       missing: missing.map((p) => path(p.url)).sort(),
       cut: cut.length,
       sharedPages: shared.reduce((n, ps) => n + ps.length, 0),
       cutPaths: new Set(cut.map((p) => path(p.url))),
     };
   };
+  const pair = (r: { at: string; status: number }) => `${path(r.at)} ${r.status}`;
   return {
     checked: pages.length,
+    crawled: pages.length + (scope.extraCrawled ?? 0),
     served: served.length,
     linksHeld: edges.length,
+    linkGap,
+    heldLinks: scope.extraLinks && !scope.unmeasured ? edges.length + scope.extraLinks : null,
+    linksNotAllRead: served.filter((p) => !p.links_read).length,
+    rows,
     missingAt,
-    linkedMissing,
-    unlinkedMissing,
-    selfLinked,
-    linkingPages: new Set(linkedMissing.flatMap((t) => fromOthers(t).map((e) => e.from_url))).size,
-    fromOthers,
-    intoOther,
-    otherErrorsAt: [...new Set(other.map(at))],
+    broken: linkedAt.size,
+    unlinked: missingAt.length - linkedAt.size,
+    brokenPairs: brokenRows.map(pair).sort(),
+    unlinkedPairs: unlinkedRows.map(pair).sort(),
+    otherPairs: otherRows.map(pair).sort(),
+    brokenStatuses: sortNum(distinct(brokenRows.map((r) => r.status))),
+    unlinkedStatuses: sortNum(distinct(unlinkedRows.map((r) => r.status))),
+    otherStatuses: sortNum(distinct(otherRows.map((r) => r.status))),
+    linkingPages: new Set(brokenRows.flatMap((r) => r.into.map((e) => e.from_url))).size,
+    otherErrorsAt: distinct(otherRows.map((r) => r.at)),
     anyError: pages.some((p) => p.status_code >= 400),
     redirectsRecorded: pages.filter((p) => p.redirect !== null).length,
     redirecting: pages.filter((p) => (p.redirect?.hops.length ?? 0) > 0).length,
+    loops: pages.filter((p) => (p.redirect?.hops.length ?? 0) > 0 && p.redirect!.loop).length,
     titles: headOf('title'),
     descriptions: headOf('meta_description'),
   };
@@ -200,6 +261,7 @@ function said(d: FixtureDataset) {
     v.headline.pill?.label ?? '',
     v.body,
     ...v.tiles.flatMap((t) => [t.label, t.value]),
+    v.coverage.read,
     v.broken.empty ?? '',
     v.redirects.empty ?? '',
     v.unlinked.heading,
@@ -209,10 +271,12 @@ function said(d: FixtureDataset) {
     ...v.redirects.rows.flatMap((r) => [r.path, r.hops, r.endsText]),
     door.body,
     door.pill.label,
+    door.coverage && 'read' in door.coverage ? door.coverage.read : '',
     tab,
     map.title,
     ...pdfStrings,
     ...[...screen.querySelectorAll('h2, th, p, td, li, summary')].map((n) => n.textContent ?? ''),
+    screen.body.textContent ?? '',
   ].filter((s) => s !== '');
   return { v, door, tab, map, strings, screenText: screen.body.textContent ?? '' };
 }
@@ -220,17 +284,32 @@ function said(d: FixtureDataset) {
 const num = (s: string) => Number(s.replace(/,/g, ''));
 const matchesOf = (strings: readonly string[], re: RegExp) =>
   strings.flatMap((s) => [...s.matchAll(new RegExp(re.source, `${re.flags.replace('g', '')}g`))]);
+const statusList = (s: string) => sortNum(s.split(/ or |, /).map(Number));
+const nPages = (n: number) => `${n.toLocaleString('en-US')} ${n === 1 ? 'page' : 'pages'}`;
 
-/** The assertions: no sentence contradicts the record. */
-function expectTrueToTheRecord(pages: PageResult[], edges: LinkEdge[]) {
-  const t = truthOf(pages, edges);
-  const d = dataset(pages, edges);
+/** No string says a page has no link to it, or that the site has no broken link. */
+const FORBIDDEN = /no link from another page|no other page links|no broken link|unlinked/i;
+
+/** The assertions: no string contradicts the record. */
+function expectTrueToTheRecord(pages: PageResult[], edges: LinkEdge[], scope: Scope = {}) {
+  const t = truthOf(pages, edges, scope);
+  const d = dataset(pages, edges, scope);
   const { v, door, tab, map, strings, screenText } = said(d);
   const pill = v.headline.pill?.label ?? 'not measured';
+
+  for (const s of strings) expect(s).not.toMatch(FORBIDDEN);
 
   // The door, the tab and the screen say the same figure.
   expect(door.pill.label).toBe(pill);
   expect(tab).toBe(`Next: Links and pages · ${pill}`);
+
+  // The coverage line: the pages checked, of the pages crawled when the record holds fewer.
+  expect(v.coverage.read).toBe(
+    t.crawled > t.checked
+      ? `Checked ${t.checked} of the ${nPages(t.crawled)} crawled`
+      : `Checked ${nPages(t.checked)}`,
+  );
+  expect(door.coverage).toEqual({ read: v.coverage.read });
 
   if (t.checked === 0) {
     expect(v.tiles.map((x) => x.value)).toEqual(Array(4).fill('not measured'));
@@ -238,59 +317,135 @@ function expectTrueToTheRecord(pages: PageResult[], edges: LinkEdge[]) {
     return;
   }
 
-  // A count of links is never a count of pages: missing pages are counted as pages, and no string
-  // counts "broken links".
-  expect(matchesOf(strings, /\d[\d,]* broken links?\b/)).toEqual([]);
-  for (const m of matchesOf(strings, /(\d[\d,]*) missing pages?, linked from (\d[\d,]*) pages?/)) {
-    expect([num(m[1]!), num(m[2]!)]).toEqual([t.linkedMissing.length, t.linkingPages]);
+  // The tables: one row per (page, status), each in the table its page's links put it in.
+  const pairs = (rs: readonly { path: string; status: number }[]) =>
+    rs.map((r) => `${r.path} ${r.status}`).sort();
+  expect(pairs(v.broken.rows)).toEqual(t.brokenPairs);
+  expect(pairs(v.unlinked.rows)).toEqual(t.unlinkedPairs);
+  expect(pairs(v.errors.rows)).toEqual(t.otherPairs);
+  expect([v.counts.broken, v.counts.missingUnlinked, v.counts.errors]).toEqual([
+    t.broken,
+    t.unlinked,
+    t.otherErrorsAt.length,
+  ]);
+
+  // Each row's linking pages, its summary ("/a, /b and N more"), and what stands in for none.
+  const stand =
+    t.linkGap === 'unread'
+      ? 'no link read'
+      : t.linkGap === 'unrecorded'
+        ? 'no link recorded'
+        : 'no link found';
+  for (const r of [...v.broken.rows, ...v.unlinked.rows, ...v.errors.rows]) {
+    const truth = t.rows.find((x) => path(x.at) === r.path && x.status === r.status)!;
+    const froms = distinct(truth.into.map((e) => path(e.from_url)));
+    expect(distinct(r.linkedFrom.map((l) => l.path))).toEqual(froms);
+    if (!froms.length) {
+      expect([r.linkedSummary, r.linkedAll]).toEqual([stand, stand]);
+    } else {
+      expect(r.linkedAll).toBe(froms.join(', '));
+      expect(r.linkedSummary.startsWith(froms.slice(0, 2).join(', '))).toBe(true);
+      const more = r.linkedSummary.match(/ and (\d+) more$/);
+      expect(more ? num(more[1]!) : 0).toBe(Math.max(0, froms.length - 2));
+    }
   }
 
-  // No link held: nothing claims what links lead to, and the linked tile says it was not read.
-  const tile = (label: string) => v.tiles.find((x) => x.label === label)!.value;
-  if (t.linksHeld === 0) {
-    for (const s of strings) {
-      expect(s).not.toMatch(
-        /no broken link|No link we read|no link from another page|no other page links to|linked from \d/i,
-      );
-    }
-    expect(tile('Linked missing pages')).toMatch(/^not (read|recorded)$/);
+  // The body's sentences: counts and status lists, each said exactly when the record has it.
+  const bodies = [v.body, door.body];
+  for (const body of bodies) {
+    const b = matchesOf(
+      [body],
+      /(\d[\d,]*) missing pages?, linked from (\d[\d,]*) pages? we read, answering ([\d or]+)\./,
+    );
+    expect(b.map((m) => [num(m[1]!), num(m[2]!), statusList(m[3]!)])).toEqual(
+      t.broken ? [[t.broken, t.linkingPages, t.brokenStatuses]] : [],
+    );
+    const u = matchesOf([body], /(\d[\d,]*) missing pages?(?: found)?, answering ([\d or]+)[.;]/);
+    expect(u.map((m) => [num(m[1]!), statusList(m[2]!)])).toEqual(
+      t.unlinked ? [[t.unlinked, t.unlinkedStatuses]] : [],
+    );
+    const e = matchesOf([body], /(\d[\d,]*) pages? answered an error \(([\d, ]+)\)\./);
+    expect(e.map((m) => [num(m[1]!), statusList(m[2]!)])).toEqual(
+      t.otherErrorsAt.length ? [[t.otherErrorsAt.length, t.otherStatuses]] : [],
+    );
+    const r = matchesOf([body], /(\d[\d,]*) pages? redirects?(?:, (\d[\d,]*) in a loop)?\./);
+    expect(r.map((m) => [num(m[1]!), m[2] === undefined ? 0 : num(m[2])])).toEqual(
+      t.redirecting ? [[t.redirecting, t.loops]] : [],
+    );
+    // The record holds only some of the links: said, from the record, when links were read.
+    const held = matchesOf([body], /[Tt]he record holds (\d[\d,]*) of the (\d[\d,]*) links found/);
+    expect(held.map((m) => [num(m[1]!), num(m[2]!)])).toEqual(
+      t.linkGap === null && t.heldLinks !== null ? [[t.linksHeld, t.heldLinks]] : [],
+    );
+    const notAll = matchesOf(
+      [body],
+      /the links of (\d[\d,]*) pages? that answered 200 were not all read/i,
+    );
+    expect(notAll.map((m) => num(m[1]!))).toEqual(
+      t.linkGap === null && t.linksNotAllRead ? [t.linksNotAllRead] : [],
+    );
+  }
+
+  // The pill: a count of missing pages and of the pages we read that link to them, or what the
+  // record shows of the pages checked.
+  if (t.broken) {
+    expect(pill).toBe(
+      `${t.broken} missing ${t.broken === 1 ? 'page' : 'pages'}, linked from ${nPages(t.linkingPages)} we read`,
+    );
+  } else if (t.unlinked) {
+    const missing = `${t.unlinked} missing ${t.unlinked === 1 ? 'page' : 'pages'}`;
+    expect(pill).toBe(t.linkGap === null ? `${missing} found` : `${missing}, ${stand}`);
+  } else if (t.linkGap !== null) {
+    expect(pill).toBe(stand);
   } else {
-    // A link the record holds is never called absent.
+    expect(pill).toBe(
+      t.checked === 1
+        ? 'the page checked is not missing'
+        : `none of the ${t.checked} pages checked is missing`,
+    );
+  }
+  for (const s of strings.filter((x) => /is missing|is not missing/.test(x))) {
+    expect(t.missingAt).toEqual([]);
+    const n = s.match(/[Nn]one of the (\d[\d,]*) pages checked is missing/);
+    if (n) expect(num(n[1]!)).toBe(t.checked);
+  }
+
+  // The headline: the scope, the missing pages found, whether links were read, the redirects and
+  // the titles and descriptions read.
+  const h = v.headline.title.match(
+    /^(?:(\d+) pages? checked: )?(\d+) missing pages? found(?: · (no link read|no link recorded))? · (?:(\d+) redirects?|redirects not recorded) · (?:titles and descriptions read on (\d+) pages?|titles read on (\d+) pages?, descriptions on (\d+))$/,
+  );
+  expect(h).not.toBeNull();
+  expect(h![1] === undefined ? null : num(h![1])).toBe(t.crawled > t.checked ? t.checked : null);
+  expect(num(h![2]!)).toBe(t.missingAt.length);
+  expect(h![3] ?? null).toBe(t.linkGap === null ? null : stand);
+  expect(h![4] === undefined ? null : num(h![4])).toBe(t.redirectsRecorded ? t.redirecting : null);
+  const readOn = h![5] !== undefined ? [num(h![5]), num(h![5])] : [num(h![6]!), num(h![7]!)];
+  expect(readOn).toEqual([t.titles.read, t.descriptions.read]);
+
+  // The tiles.
+  const tile = (label: string) => v.tiles.find((x) => x.label === label)!.value;
+  expect(tile('Missing pages found')).toBe(String(t.missingAt.length));
+  if (t.redirectsRecorded === 0) expect(tile('Redirects')).toBe('not recorded');
+  else expect(tile('Redirects')).toBe(String(t.redirecting));
+
+  // With no link held, nothing names a page a link comes from; with links held, none is called absent.
+  if (t.linksHeld === 0) {
+    for (const s of strings) expect(s).not.toMatch(/No link we read|linked from \d/i);
+  } else {
     for (const s of strings) {
       expect(s).not.toMatch(
         /no link (was )?(read|recorded)|No link is in this check|no link in the record/i,
       );
     }
-    expect(tile('Linked missing pages')).toBe(String(t.linkedMissing.length));
   }
-  if (t.linkedMissing.length || t.unlinkedMissing.length || t.linksHeld === 0) {
-    for (const s of strings) expect(s).not.toMatch(/no broken link/);
-  }
-  // "No link from another page" is said of the missing pages only when one has none, and of a row
-  // only when no other page's link in the record leads to it.
-  const sentences = [v.headline.title, pill, v.body, door.body, tab, v.broken.empty ?? ''];
-  if (matchesOf(sentences, /no link from another page/i).length) {
-    expect(t.unlinkedMissing.length).toBeGreaterThan(0);
-  }
-  const rowsWithTruth = [
-    ...[...v.broken.rows, ...v.unlinked.rows].map((r) => [r, t.fromOthers(r.url)] as const),
-    ...v.errors.rows.map((r) => [r, t.intoOther(r.url)] as const),
-  ];
-  for (const [r, into] of rowsWithTruth) {
-    const truth = [...new Set(into.map((e) => path(e.from_url)))];
-    expect(r.linkedFrom.map((l) => l.path).filter((x, i, a) => a.indexOf(x) === i)).toEqual(truth);
-    if (r.linkedAll === 'no link from another page') {
-      expect([truth, t.linksHeld > 0]).toEqual([[], true]);
-    }
-  }
-  expect(v.broken.rows.map((r) => r.url).sort()).toEqual([...t.linkedMissing].sort());
-  expect(v.unlinked.rows.map((r) => r.url).sort()).toEqual([...t.unlinkedMissing].sort());
 
-  // The map counts the missing pages as the Links screen does.
+  // The map counts the missing pages as the Links screen does, scoped to the pages checked.
   if (!map.noneServed) {
-    const m = map.title.match(/(\d[\d,]*) missing/);
+    const m = map.title.match(/(\d[\d,]*) missing( among the (\d[\d,]*) checked)?,/);
     expect(m ? num(m[1]!) : 0).toBe(t.missingAt.length);
-    expect(t.missingAt.length).toBe(v.counts.broken + v.counts.missingUnlinked);
+    if (m)
+      expect(m[3] === undefined ? null : num(m[3])).toBe(t.crawled > t.checked ? t.checked : null);
   }
 
   // "No error" and "no redirect" only when the record shows none.
@@ -298,9 +453,6 @@ function expectTrueToTheRecord(pages: PageResult[], edges: LinkEdge[]) {
     strings.some((s) => /answers an error\.|answers no error/.test(s) && /None|no error/.test(s))
   ) {
     expect(t.anyError).toBe(false);
-  }
-  for (const m of matchesOf(strings, /(\d[\d,]*) pages? answered an error/)) {
-    expect(num(m[1]!)).toBe(t.otherErrorsAt.length);
   }
   const noRedirect = strings.filter(
     (s) => /redirects\.$|does not redirect/.test(s) && /None|does not/.test(s),
@@ -312,8 +464,6 @@ function expectTrueToTheRecord(pages: PageResult[], edges: LinkEdge[]) {
     else if (/whose redirects were recorded/.test(s)) expect(t.redirectsRecorded).toBe(1);
     else expect(t.redirectsRecorded).toBe(t.checked);
   }
-  if (t.redirectsRecorded === 0) expect(tile('Redirects')).toBe('not recorded');
-  else expect(tile('Redirects')).toBe(String(t.redirecting));
 
   // Titles and descriptions: a page not read is never counted missing; a tile never shows a number
   // where its column says "not read"; a cut text is never grouped as shared.
@@ -321,44 +471,84 @@ function expectTrueToTheRecord(pages: PageResult[], edges: LinkEdge[]) {
     ['titles', v.titles, 'Missing titles'],
     ['descriptions', v.descriptions, 'Missing descriptions'],
   ] as const) {
-    const h = t[key];
+    const hd = t[key];
     expect(
       col.missing.shown
         .concat(col.missing.rest)
         .map((p) => p.path)
         .sort(),
-    ).toEqual(h.missing);
+    ).toEqual(hd.missing);
     if (/^Missing: not read/.test(col.missingLine)) expect(tile(label)).not.toMatch(/\d/);
-    if (h.read === 0) {
+    if (hd.read === 0) {
       expect(col.missingLine).toMatch(/not read/);
       expect(tile(label)).toBe('not read');
     } else {
-      expect(tile(label)).toBe(String(h.missing.length));
-      if (/^Missing: none/.test(col.missingLine)) expect(h.missing).toEqual([]);
-      if (h.notRead) expect(col.missingLine).toContain(`not read on ${h.notRead} page`);
+      expect(tile(label)).toBe(String(hd.missing.length));
+      if (/^Missing: none/.test(col.missingLine)) expect(hd.missing).toEqual([]);
+      if (hd.notRead.length) {
+        expect(col.missingLine).toContain(`not read on ${nPages(hd.notRead.length)}`);
+      }
     }
     for (const g of col.shared.shown.concat(col.shared.rest)) {
       for (const p of g.pages.shown.concat(g.pages.rest))
-        expect(h.cutPaths.has(p.path)).toBe(false);
+        expect(hd.cutPaths.has(p.path)).toBe(false);
     }
     const sharedTotal = col.shared.shown
       .concat(col.shared.rest)
       .reduce((n, g) => n + g.pageCount, 0);
-    expect(sharedTotal).toBe(h.sharedPages);
+    expect(sharedTotal).toBe(hd.sharedPages);
   }
-  for (const m of matchesOf(strings, /(\d[\d,]*) pages? (?:has|have) no title/)) {
-    expect(num(m[1]!)).toBe(t.titles.missing.length);
-  }
-  for (const m of matchesOf(strings, /(\d[\d,]*) pages? (?:has|have) no meta description/)) {
-    expect(num(m[1]!)).toBe(t.descriptions.missing.length);
+
+  // The body's clauses on titles and descriptions, each said exactly when the record has it.
+  const anyRead = t.served > 0 && (t.titles.read > 0 || t.descriptions.read > 0);
+  for (const body of [v.body, door.body]) {
+    const count1 = (re: RegExp) => matchesOf([body], re).map((m) => num(m[1]!));
+    const when = (n: number) => (anyRead && n ? [n] : []);
+    expect(count1(/(\d[\d,]*) pages? (?:has|have) no title/)).toEqual(
+      when(t.titles.missing.length),
+    );
+    expect(count1(/(\d[\d,]*) pages? (?:has|have) no meta description/)).toEqual(
+      when(t.descriptions.missing.length),
+    );
+    expect(count1(/(\d[\d,]*) pages share a title with another/)).toEqual(
+      when(t.titles.sharedPages),
+    );
+    expect(count1(/(\d[\d,]*) pages share a meta description with another/)).toEqual(
+      when(t.descriptions.sharedPages),
+    );
+    expect(
+      count1(/(\d[\d,]*) titles? cut short at [\d,]+ bytes (?:was|were) not compared/),
+    ).toEqual(when(t.titles.cut));
+    expect(
+      count1(/(\d[\d,]*) descriptions? cut short at [\d,]+ bytes (?:was|were) not compared/),
+    ).toEqual(when(t.descriptions.cut));
+    // Not read: one clause for both when the same pages, else one for each.
+    const notRead = { title: 0, description: 0 };
+    for (const m of matchesOf(
+      [body],
+      /the (titles? and meta descriptions?|titles?|meta descriptions?) of (\d[\d,]*) pages? that answered 200 (?:was|were) not read/i,
+    )) {
+      if (/and/.test(m[1]!)) {
+        // One clause for both only when the same pages were not read.
+        expect([...t.titles.notRead].sort()).toEqual([...t.descriptions.notRead].sort());
+        notRead.title += num(m[2]!);
+        notRead.description += num(m[2]!);
+      } else if (/title/.test(m[1]!)) notRead.title += num(m[2]!);
+      else notRead.description += num(m[2]!);
+    }
+    expect(notRead).toEqual(
+      anyRead
+        ? { title: t.titles.notRead.length, description: t.descriptions.notRead.length }
+        : { title: 0, description: 0 },
+    );
   }
   if (
     strings.some((s) =>
       /has its own title and meta description|has a title and a meta description/.test(s),
     )
   ) {
-    for (const h of [t.titles, t.descriptions]) {
-      expect([h.notRead, h.missing.length, h.cut, h.sharedPages]).toEqual([0, 0, 0, 0]);
+    for (const hd of [t.titles, t.descriptions]) {
+      expect([hd.notRead.length, hd.missing.length, hd.cut, hd.sharedPages]).toEqual([0, 0, 0, 0]);
     }
   }
 
@@ -367,7 +557,7 @@ function expectTrueToTheRecord(pages: PageResult[], edges: LinkEdge[]) {
   if (t.redirecting) expect(screenText).toContain('Requested as');
 }
 
-// ---- The shapes the reviewer ran ---------------------------------------------------------------
+// ---- The named shapes ---------------------------------------------------------------------------
 
 const PDF = page('/guide.pdf', 200, {
   is_html: false,
@@ -375,32 +565,38 @@ const PDF = page('/guide.pdf', 200, {
   title: null,
   meta_description: null,
 });
+const gone = (path: string, status: number, over: Partial<PageResult> = {}) =>
+  page(path, status, { title: null, meta_description: null, links_read: false, ...over });
 
-const SHAPES: [string, PageResult[], LinkEdge[]][] = [
-  ['no page', [], []],
-  ['pages with no link edges', [page('/', 200), page('/a', 200), page('/b', 200)], []],
-  ['only 503', [page('/', 503, { title: null, meta_description: null })], []],
+const SHAPES: [string, PageResult[], LinkEdge[], Scope][] = [
+  ['no page', [], [], {}],
+  ['pages with no link edges', [page('/', 200), page('/a', 200), page('/b', 200)], [], {}],
+  ['links found but none recorded', [page('/', 200), page('/a', 200)], [], { extraLinks: 5 }],
   [
-    'only 429',
-    [
-      page('/', 429, { title: null, meta_description: null }),
-      page('/a', 429, { title: null, meta_description: null }),
-    ],
+    'structure not measured, with a missing page',
+    [page('/', 200), gone('/gone', 404)],
     [],
+    { unmeasured: true },
   ],
+  ['only 503', [gone('/', 503)], [], {}],
+  ['only 429', [gone('/', 429), gone('/a', 429)], [], {}],
   [
     'a 404 linked only from itself',
-    [page('/', 200), page('/gone', 404, { title: null, meta_description: null })],
+    [page('/', 200), gone('/gone', 404)],
     [edge('/gone', '/gone')],
+    {},
   ],
   [
     'a redirect chain ending at a 404 that is also in the record',
-    [
-      page('/', 200),
-      redirecting('/old', '/new', 404),
-      page('/new', 404, { title: null, meta_description: null }),
-    ],
+    [page('/', 200), redirecting('/old', '/new', 404), gone('/new', 404)],
     [edge('/', '/old')],
+    {},
+  ],
+  [
+    'a redirect to a 404 whose final URL is not recorded',
+    [page('/', 200), redirecting('/old', '/new', 404, { final_url: null })],
+    [edge('/', '/old')],
+    {},
   ],
   [
     'a redirect loop',
@@ -420,31 +616,51 @@ const SHAPES: [string, PageResult[], LinkEdge[]][] = [
       }),
     ],
     [edge('/', '/loop')],
+    {},
   ],
   [
-    'all titles blank',
+    'all titles blank, with zero-width characters',
     [
       page('/', 200, { title: text(null) }),
       page('/a', 200, { title: text('\u00a0') }),
       page('/b', 200, { title: text('\u2003 ') }),
+      page('/c', 200, { title: text('\u200b\u2060\ufeff') }),
     ],
-    [edge('/', '/a'), edge('/a', '/b')],
+    [edge('/', '/a'), edge('/a', '/b'), edge('/b', '/c')],
+    {},
   ],
-  ['one page', [page('/', 200)], [edge('/', '/')]],
+  ['one page', [page('/', 200)], [edge('/', '/')], {}],
   [
-    'mixed 404 and 410',
+    'mixed 404 and 410, linked from three pages and more',
     [
       page('/', 200),
-      page('/a', 404, { title: null, meta_description: null }),
-      page('/b', 410, { title: null, meta_description: null }),
-      page('/c', 404, { title: null, meta_description: null }),
+      page('/p', 200),
+      page('/q', 200),
+      page('/r', 200),
+      gone('/a', 404),
+      gone('/b', 410),
+      gone('/c', 404),
     ],
-    [edge('/', '/a'), edge('/', '/b')],
+    [edge('/', '/a'), edge('/p', '/a'), edge('/q', '/a'), edge('/r', '/a'), edge('/', '/b')],
+    {},
   ],
   [
     'a 200 non-HTML page (PDF) with no title or description read',
     [page('/', 200), PDF],
     [edge('/', '/guide.pdf')],
+    {},
+  ],
+  [
+    'an HTML page whose links were not all read, in a record holding some of the links',
+    [page('/', 200, { links_read: false }), page('/a', 200), gone('/gone', 404)],
+    [edge('/', '/a'), edge('/a', '/gone')],
+    { extraLinks: 760, extraCrawled: 198 },
+  ],
+  [
+    'a title not read on one page and a description not read on another',
+    [page('/', 200), page('/a', 200, { title: null }), page('/b', 200, { meta_description: null })],
+    [edge('/', '/a'), edge('/', '/b')],
+    {},
   ],
   [
     'two long titles cut at 512 bytes sharing a prefix',
@@ -454,46 +670,76 @@ const SHAPES: [string, PageResult[], LinkEdge[]][] = [
       page('/b', 200, { title: text(LONG, true, 700) }),
     ],
     [edge('/', '/a'), edge('/', '/b')],
+    {},
   ],
   [
     'a URL redirected to a page got a 429 while the page itself answered 410',
-    [
-      page('/', 200),
-      redirecting('/old', '/gone', 429),
-      page('/gone', 410, { title: null, meta_description: null }),
-    ],
+    [page('/', 200), redirecting('/old', '/gone', 429), gone('/gone', 410)],
     [edge('/', '/old')],
+    {},
+  ],
+  [
+    'a URL redirected to a page got a 429 while the page itself answered 503',
+    [page('/', 200), redirecting('/a', '/x', 429), gone('/x', 503)],
+    [edge('/', '/a'), edge('/', '/x')],
+    {},
+  ],
+  [
+    'a URL redirected to a page got a 404 while the page itself answered 410',
+    [page('/', 200), redirecting('/a', '/x', 404), gone('/x', 410)],
+    [edge('/', '/a')],
+    {},
+  ],
+  [
+    'links from a redirect landing URL outside the record',
+    [page('/', 200), redirecting('/moved', '/landing', 200), gone('/gone', 404)],
+    [edge('/', '/moved'), edge('/landing', '/gone')],
+    {},
   ],
 ];
 
-describe('every sentence of Links and pages is true to the record: the named shapes', () => {
-  it.each(SHAPES)('%s', (_name, pages, edges) => expectTrueToTheRecord(pages, edges));
+describe('every string of Links and pages is true to the record: the named shapes', () => {
+  it.each(SHAPES)('%s', (_name, pages, edges, scope) => expectTrueToTheRecord(pages, edges, scope));
 });
 
 // ---- Generated records -------------------------------------------------------------------------
 
 const PATHS = ['/', '/a', '/b', '/c', '/d', '/e'];
+/** Landing URLs no generated record holds as a page: a redirect may end there and links leave them. */
+const LANDINGS = ['/x1', '/x2'];
 const headArb = fc.oneof(
   fc.constant<Head>(null),
   fc.constant(text(null)),
-  fc.constant(text('\u00a0')),
+  fc.constantFrom('\u00a0', '\u200b', '\u2060\ufeff ', '\u200d\u200c').map((s) => text(s)),
   fc.constantFrom('Home', 'Guide', 'Tents').map((s) => text(s)),
   fc.integer({ min: 513, max: 900 }).map((n) => text(LONG, true, n)),
 );
+type RedirectKind =
+  | { kind: 'none' }
+  | { kind: 'null' }
+  | { kind: 'hop'; to: string }
+  | { kind: 'chain'; to: string }
+  | { kind: 'lost'; to: string };
+const redirectArb = (p: string): fc.Arbitrary<RedirectKind> => {
+  const to = fc.constantFrom(...[...PATHS, ...LANDINGS].filter((x) => x !== p));
+  return fc.oneof(
+    fc.constant<RedirectKind>({ kind: 'none' }),
+    fc.constant<RedirectKind>({ kind: 'null' }),
+    to.map((t): RedirectKind => ({ kind: 'hop', to: t })),
+    to.map((t): RedirectKind => ({ kind: 'chain', to: t })),
+    to.map((t): RedirectKind => ({ kind: 'lost', to: t })),
+  );
+};
 const pageArb = (p: string) =>
   fc
     .record({
       status: fc.constantFrom(200, 200, 200, 404, 410, 429, 503, 301),
       title: headArb,
       desc: headArb,
-      redirect: fc.oneof(
-        fc.constant<'none' | 'null'>('none'),
-        fc.constant<'none' | 'null'>('null'),
-        fc.constantFrom(...PATHS.filter((x) => x !== p)),
-      ),
-      pdf: fc.boolean(),
+      redirect: redirectArb(p),
+      kind: fc.constantFrom('html', 'html', 'pdf', 'partial'),
     })
-    .map(({ status, title, desc, redirect, pdf }): PageResult => {
+    .map(({ status, title, desc, redirect, kind }): PageResult => {
       if (status === 301) {
         return page(p, 301, {
           final_url: null,
@@ -512,13 +758,36 @@ const pageArb = (p: string) =>
         status === 200
           ? { title, meta_description: desc }
           : { title: null, meta_description: null };
-      const html =
-        status === 200 && pdf
-          ? { is_html: false, links_read: false, title: null, meta_description: null }
-          : {};
-      if (redirect === 'null') return page(p, status, { ...head, ...html, redirect: null });
-      if (redirect === 'none') return page(p, status, { ...head, ...html });
-      return redirecting(p, redirect, status, { ...head, ...html });
+      const read =
+        status !== 200
+          ? { links_read: false }
+          : kind === 'pdf'
+            ? { is_html: false, links_read: false, title: null, meta_description: null }
+            : kind === 'partial'
+              ? { links_read: false }
+              : {};
+      const over = { ...head, ...read };
+      switch (redirect.kind) {
+        case 'none':
+          return page(p, status, over);
+        case 'null':
+          return page(p, status, { ...over, redirect: null });
+        case 'hop':
+          return redirecting(p, redirect.to, status, over);
+        case 'chain':
+        case 'lost':
+          return page(p, status, {
+            ...over,
+            final_url: redirect.kind === 'lost' ? null : url(redirect.to),
+            redirect: {
+              hops: [
+                { from: url(p), status: 301, location: url(`${p}-mid`) },
+                { from: url(`${p}-mid`), status: 301, location: url(redirect.to) },
+              ],
+              loop: false,
+            },
+          });
+      }
     });
 
 const recordArb = fc
@@ -526,28 +795,91 @@ const recordArb = fc
   .chain((paths) =>
     fc.tuple(
       fc.tuple(...paths.map(pageArb)),
-      fc.uniqueArray(fc.tuple(fc.constantFrom(...PATHS), fc.constantFrom(...PATHS)), {
-        maxLength: 10,
-        selector: ([a, b]) => `${a} ${b}`,
+      fc.uniqueArray(
+        fc.tuple(fc.constantFrom(...PATHS, ...LANDINGS), fc.constantFrom(...PATHS, ...LANDINGS)),
+        { maxLength: 12, selector: ([a, b]) => `${a} ${b}` },
+      ),
+      fc.record({
+        extraLinks: fc.constantFrom(0, 0, 1, 3, 700),
+        extraCrawled: fc.constantFrom(0, 0, 1, 2, 200),
+        unmeasured: fc.constantFrom(false, false, false, false, true),
       }),
     ),
   )
-  .map(([pages, links]) => {
-    const held = new Set(pages.map((p) => p.url));
-    return {
-      pages,
-      // A link is held only from a page the record holds and read as HTML.
-      edges: links
-        .filter(([a]) => held.has(url(a)) && pages.find((p) => p.url === url(a))!.is_html)
-        .map(([a, b]) => edge(a, b)),
-    };
+  .map(([pages, links, scope]) => {
+    // A link is held only from a page the record holds and read as HTML, or from the URL where a
+    // redirect of one of them landed, outside the record.
+    const from = new Set([
+      ...pages.filter((p) => p.is_html).map((p) => p.url),
+      ...pages
+        .filter((p) => p.is_html && p.final_url !== null && (p.redirect?.hops.length ?? 0) > 0)
+        .map((p) => p.final_url!),
+    ]);
+    const edges = scope.unmeasured
+      ? []
+      : links.filter(([a]) => from.has(url(a))).map(([a, b]) => edge(a, b));
+    return { pages, edges, scope };
   });
 
-describe('every sentence of Links and pages is true to the record: generated records', () => {
+describe('every string of Links and pages is true to the record: generated records', () => {
   it('holds for each generated record', () => {
     fc.assert(
-      fc.property(recordArb, ({ pages, edges }) => expectTrueToTheRecord(pages, edges)),
-      { numRuns: 120 },
+      fc.property(recordArb, ({ pages, edges, scope }) =>
+        expectTrueToTheRecord(pages, edges, scope),
+      ),
+      { numRuns: 200 },
     );
+  });
+
+  it('generates each shape the assertions are about', () => {
+    // The generator reaches each axis it claims, counted over a fixed sample.
+    const sample = fc.sample(recordArb, { numRuns: 400, seed: 7 });
+    const some = (pred: (r: (typeof sample)[number]) => boolean) => sample.some(pred);
+    const twoStatuses = (r: (typeof sample)[number]) => {
+      const t = truthOf(r.pages, r.edges, r.scope);
+      const at = t.rows.map((x) => x.at);
+      return at.length > new Set(at).size;
+    };
+    expect({
+      withheldLinks: some((r) => (r.scope.extraLinks ?? 0) > 0 && r.edges.length > 0),
+      unmeasured: some((r) => r.scope.unmeasured === true && r.pages.length > 0),
+      partialHtml: some((r) =>
+        r.pages.some((p) => p.is_html && p.status_code === 200 && !p.links_read),
+      ),
+      fromLanding: some((r) => r.edges.some((e) => LANDINGS.includes(path(e.from_url)))),
+      chain: some((r) =>
+        r.pages.some(
+          (p) =>
+            p.redirect !== null &&
+            p.redirect.hops.length === 2 &&
+            !p.redirect.loop &&
+            p.final_url !== null,
+        ),
+      ),
+      lostChain: some((r) =>
+        r.pages.some(
+          (p) => (p.redirect?.hops.length ?? 0) > 0 && !p.redirect!.loop && p.final_url === null,
+        ),
+      ),
+      twoStatuses: some(twoStatuses),
+      zeroWidth: some((r) =>
+        r.pages.some((p) => /[\u200b-\u200d\u2060\ufeff]/.test(p.title?.text ?? '')),
+      ),
+      moreThanTwoLinking: some((r) =>
+        truthOf(r.pages, r.edges, r.scope).rows.some(
+          (x) => new Set(x.into.map((e) => e.from_url)).size > 2,
+        ),
+      ),
+    }).toEqual({
+      withheldLinks: true,
+      unmeasured: true,
+      partialHtml: true,
+      fromLanding: true,
+      chain: true,
+      lostChain: true,
+      twoStatuses: true,
+      zeroWidth: true,
+      moreThanTwoLinking: true,
+    });
   });
 });

@@ -23,7 +23,7 @@ import { type FixHrefs } from './fix';
 import type { MapDrawing } from './map';
 import { openFixes, type FixPlan } from './free-fixes';
 import { keptUntilOf } from './result';
-import { isMissing, missingGroups, redirected } from './segment/broken';
+import { missingLabel, missingUrls } from './segment/broken';
 import { sectionFixes } from './segment/fixes';
 import { NO_HREFS, SEGMENT_KEYS, SEGMENTS, segmentTab, type SegmentLink } from './segment/frame';
 import { drawingOf } from './segment/structure';
@@ -157,17 +157,8 @@ const pathOf = (url: string) => {
 
 const round = (n: number) => Math.round(n * 10) / 10;
 
-/**
- * "missing (404)" for a page that answered one of MISSING_STATUSES (segment/broken.ts, which the
- * Links and pages view reads too); "redirects to a missing page (404)" for a URL whose redirects end
- * at one, which is not itself the missing page; null for any other page.
- */
-export const missingLabel = (page: PageResult): string | null =>
-  !isMissing(page)
-    ? null
-    : redirected(page)
-      ? `redirects to a missing page (${page.status_code})`
-      : `missing (${page.status_code})`;
+/** What the map says of a missing page; segment/broken.ts's, which the Links and pages rows read. */
+export { missingLabel };
 
 /** "0.4%" for a small share, "18%" otherwise. */
 const share = (s: number) => (s < 0.01 ? `${(s * 100).toFixed(1)}%` : `${percent(s)}%`);
@@ -470,10 +461,14 @@ export function linkMapView(
   const isGenerated = drawnScope === 'generated';
   const linkCount = isGenerated ? nodes.filter((n) => n.parent).length : s.internal_links;
   // Pages that answered 404 or 410 are counted apart: they are links to pages that are not there.
-  // They are counted where they answered (segment/broken.ts `missingGroups`, which the Links and
-  // pages view groups by too), so a URL redirecting to a missing page the record also holds is one
-  // missing page, not two. Every record that answered 404 or 410 is taken out of the pages.
-  const missingCount = isGenerated ? 0 : missingGroups(records).length;
+  // They are counted where they answered (segment/broken.ts `missingUrls`, which the Links and pages
+  // view counts by too), so a URL redirecting to a missing page the record also holds is one missing
+  // page, not two. Every record that answered 404 or 410 is taken out of the pages.
+  const missingCount = isGenerated ? 0 : missingUrls(records).length;
+  // The missing pages are only those of the record: when it holds fewer pages than were crawled, the
+  // count is said of the pages checked, so it does not read as the site's.
+  const missingScope =
+    records.length < crawled ? ` among the ${count(records.length)} checked` : '';
   const pageCount = isGenerated
     ? nodes.length
     : crawled - records.filter((p) => missingLabel(p) !== null).length;
@@ -538,7 +533,7 @@ export function linkMapView(
     },
     title: noneServed
       ? 'No page was served.'
-      : `${count(pageCount)} ${plural(pageCount, 'page', 'pages')}, ${missingCount ? `${count(missingCount)} missing, ` : ''}${count(linkCount)} ${plural(linkCount, 'link', 'links')}.`,
+      : `${count(pageCount)} ${plural(pageCount, 'page', 'pages')}, ${missingCount ? `${count(missingCount)} missing${missingScope}, ` : ''}${count(linkCount)} ${plural(linkCount, 'link', 'links')}.`,
     caption: noneServed
       ? `${count(records.length)} ${plural(records.length, 'page', 'pages')} answered, none served, so there is no link map.`
       : noLinkRead

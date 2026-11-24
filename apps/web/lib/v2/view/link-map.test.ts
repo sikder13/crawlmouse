@@ -287,8 +287,50 @@ describe('a page that answered 404 or 410', () => {
     const links = linksView(copy, id);
     expect(v.title).toMatch(/, 1 missing, /);
     expect(links.counts.broken + links.counts.missingUnlinked).toBe(answered.size);
-    expect(v.nodes.find((n) => n.path === '/products/old-dome-tent')?.missing ?? null).not.toBe(
-      'missing (404)',
+    const node = v.nodes.find((n) => n.path === '/products/old-dome-tent');
+    expect(node).toBeDefined();
+    expect(node!.missing).toBe('redirects to a missing page (404)');
+  });
+
+  it('calls a redirect to a 404 whose final URL is not recorded missing where Links lists it', () => {
+    // /products/old-dome-tent redirects and answered 404, and where it ended is not recorded: the
+    // request answered at its own URL as far as the record shows, so the map and Links and pages
+    // both name that URL as the missing page.
+    const copy = structuredClone(d);
+    const old = copy.page_results.find(
+      (x) => x.check_id === id && new URL(x.url).pathname === '/products/old-dome-tent',
+    )!;
+    expect(old.redirect?.hops.length).toBeGreaterThan(0);
+    Object.assign(old, {
+      status_code: 404,
+      final_url: null,
+      links_out: 0,
+      links_read: false,
+      content_simhash: null,
+      title: null,
+      meta_description: null,
+    });
+    const node = linkMapView(copy, id, { scope: 'all', hrefs }).nodes.find(
+      (n) => n.path === '/products/old-dome-tent',
+    );
+    expect(node).toBeDefined();
+    expect(node!.missing).toBe('missing (404)');
+    const links = linksView(copy, id);
+    expect(
+      [...links.broken.rows, ...links.unlinked.rows]
+        .filter((r) => r.status === 404)
+        .map((r) => [r.path, r.via]),
+    ).toEqual(expect.arrayContaining([['/products/old-dome-tent', []]]));
+  });
+
+  it('scopes the missing count to the pages checked when the record holds fewer than were crawled', () => {
+    const copy = structuredClone(d);
+    const check = copy.checks.find((c) => c.id === id)!;
+    const records = copy.page_results.filter((p) => p.check_id === id).length;
+    check.coverage!.pages_crawled = records + 40;
+    const links = check.structure!.internal_links;
+    expect(linkMapView(copy, id, { scope: 'all', hrefs }).title).toBe(
+      `${records + 40 - gone.length} pages, ${gone.length} missing among the ${records} checked, ${links} links.`,
     );
   });
 

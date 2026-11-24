@@ -28,7 +28,7 @@ export interface LinksView {
   coverage: { read: string };
   counts: LinksCounts;
   broken: { rows: ErrorRowView[]; empty: string | null };
-  /** Missing pages no link from another page leads to; listed only when there is one. */
+  /** Missing pages found with no link in the record leading to them; listed only when there is one. */
   unlinked: { heading: string; rows: ErrorRowView[] };
   /** Pages that answered an error other than missing; listed only when there is one. */
   errors: { heading: string; rows: ErrorRowView[] };
@@ -60,12 +60,15 @@ export function linksView(
     value: !measured ? 'not measured' : (unread ?? count(n)),
     note: null,
   });
-  const linkPart =
+  // The missing pages the record holds, however they are linked, and whether any link was read.
+  const missing = c.broken + c.missingUnlinked;
+  const linkPart = `${count(missing)} missing ${plural(missing, 'page', 'pages')} found${
     f.linkGap === 'unread'
-      ? 'no link read'
+      ? ' · no link read'
       : f.linkGap === 'unrecorded'
-        ? 'no link recorded'
-        : `${count(c.broken)} linked missing ${plural(c.broken, 'page', 'pages')}`;
+        ? ' · no link recorded'
+        : ''
+  }`;
   const redirectPart = c.redirectsRecorded
     ? `${count(c.redirects)} ${plural(c.redirects, 'redirect', 'redirects')}`
     : 'redirects not recorded';
@@ -83,11 +86,7 @@ export function linksView(
     },
     body: f.screenBody,
     tiles: [
-      tile(
-        'Linked missing pages',
-        c.broken,
-        f.linkGap === 'unread' ? 'not read' : f.linkGap === 'unrecorded' ? 'not recorded' : null,
-      ),
+      tile('Missing pages found', missing, null),
       tile('Redirects', c.redirects, c.redirectsRecorded ? null : 'not recorded'),
       tile('Missing titles', c.missingTitles, c.titlesRead ? null : 'not read'),
       tile('Missing descriptions', c.missingDescriptions, c.descriptionsRead ? null : 'not read'),
