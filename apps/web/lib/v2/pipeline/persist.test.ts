@@ -141,6 +141,17 @@ describe('persistBuiltCheck: what it sends', () => {
     expect(stages).toEqual([]);
   });
 
+  // Inbox 084: a check built before coverage.stopped was kept, and persisted after the deploy.
+  it('persists a check built before coverage.stopped, with stopped: null', async () => {
+    const { db, sent } = recording();
+    const older = structuredClone(built);
+    const { stopped: _stopped, ...coverage } = older.check.coverage!;
+    void _stopped;
+    (older.check as { coverage: unknown }).coverage = coverage;
+    await persistBuiltCheck(db, inputOf(older));
+    expect(JSON.stringify(sent.at(-1))).toContain('"stopped":null');
+  });
+
   it('refuses a page with no vantage, before any call', async () => {
     const { db, sent, stages } = recording();
     const partial = new Map(vantage);

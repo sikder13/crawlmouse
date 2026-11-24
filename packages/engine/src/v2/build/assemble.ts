@@ -42,7 +42,7 @@ import type { RenderOutcome } from '../render/run.js';
 import type { Batches } from './batches.js';
 import { fileEdges, landingsOf } from './filing.js';
 import { crawlableDiscovered, crawlableSeeds, landedOn, nextCrawlBatch } from './plan.js';
-import { decideStatus, PARTIAL_RULE, type StatusDecision } from './status.js';
+import { decideStatus, type StatusDecision } from './status.js';
 import type { BuildInput, Seed } from './types.js';
 
 /** The most pages the staged sample holds (ENGINE-GAP §8.4): Coverage's `sample_strategy.max_pages`. */
@@ -405,20 +405,22 @@ function renderedPages(
 /**
  * Why the crawl ended (`coverage.stopped`, inbox 082, 084), from what the planner and the batches
  * hold: the cap, when the crawl asked for that many URLs (the planner counts every row, fetched or
- * not); time, when a crawl batch's time budget ran out, or the planner still had URLs to ask and no
- * crawl batch says why it stopped short (the time plan ended the crawl, or a batch was lost); the site,
- * when a crawl batch says the site stopped it.
+ * not); the site, when a crawl batch says the site stopped it; time, when a crawl batch's time budget
+ * ran out, or the planner still had URLs to ask and the site did not stop the crawl. A batch reason
+ * that does not end the crawl (a result past its size, a budget of one batch) leaves the time plan to
+ * end it, so it is no cause here. A batch lost before its result was read also leaves URLs unasked,
+ * and reads as time: the batches the build reads do not include it.
  */
 function crawlStopped(batches: Batches, crawlOpen: boolean, pageCap: number): Coverage['stopped'] {
   const reasons = new Set<BatchPartialReason>(
     batches.crawl.flatMap((b) => b.partial?.reasons ?? []),
   );
   const asked = batches.crawl.reduce((n, b) => n + b.pages.length, 0);
-  const crawlReason = [...reasons].some((r) => PARTIAL_RULE[r].crawl);
+  const siteStopped = reasons.has('site_stopped');
   return {
     page_cap: pageCap,
     at_cap: asked >= pageCap,
-    time_ran_out: reasons.has('budget_seconds') || (crawlOpen && !crawlReason),
-    site_stopped: reasons.has('site_stopped'),
+    time_ran_out: reasons.has('budget_seconds') || (crawlOpen && !siteStopped),
+    site_stopped: siteStopped,
   };
 }

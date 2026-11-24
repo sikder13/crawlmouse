@@ -565,7 +565,32 @@ describe('coverage.stopped: why the crawl ended', () => {
     const by = (reason: BatchPartialReason) =>
       stopped(crawlBatch(0, [home()], [], [at('/b')], { reasons: [reason] }));
     expect(by('site_stopped')).toEqual({ page_cap: 500, ...none, site_stopped: true });
-    expect(by('budget_requests')).toEqual({ page_cap: 500, ...none });
-    expect(by('robots_unreachable')).toEqual({ page_cap: 500, ...none });
+  });
+
+  it('a batch reason that does not end the crawl leaves time to end it (review of 7a73b839)', () => {
+    for (const reason of ['result_size', 'budget_requests', 'budget_bytes'] as const) {
+      const r = stopped(crawlBatch(0, [home()], [], [at('/b')], { reasons: [reason] }));
+      expect(r, reason).toEqual({ page_cap: 500, ...none, time_ran_out: true });
+    }
+  });
+
+  it('at_cap counts the rows asked across every batch', () => {
+    const row = (p: string) => crawlRow({ url: at(p), outcome: 'fetched', status: 200 });
+    const batches = [
+      crawlBatch(0, [home(), row('/a')], [], [at('/c')]),
+      crawlBatch(1, [row('/b')], [], [at('/c')]),
+    ];
+    const coverage = (cap: number) =>
+      assemble(
+        {
+          check: { id: CHECK, site_id: SITE, page_cap: cap } as never,
+          homepage_url: HOME,
+          seeds,
+          render: null,
+        },
+        readBatches(batches, { id: CHECK, site_id: SITE }, 'unreleased'),
+      ).coverage.stopped;
+    expect(coverage(3)?.at_cap).toBe(true);
+    expect(coverage(4)?.at_cap).toBe(false);
   });
 });

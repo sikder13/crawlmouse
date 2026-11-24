@@ -114,10 +114,17 @@ const COVERAGE_ADDED = { stopped: null } as const;
 
 const isRecord = (v: unknown): v is Row => typeof v === 'object' && v !== null && !Array.isArray(v);
 
+/**
+ * A coverage written before `stopped` was kept, with it as null; any other value as it is. Rows and
+ * checks built before the deploy (a build stored, then persisted after it) are both read through it.
+ */
+export const withCoverageAdded = (coverage: unknown): unknown =>
+  isRecord(coverage) ? { ...COVERAGE_ADDED, ...coverage } : coverage;
+
 export function checkFromRow(row: Row): Check {
   const derived: Row = {};
   if (isRecord(row.progress)) derived.progress = { ...PROGRESS_ADDED, ...row.progress };
-  if (isRecord(row.coverage)) derived.coverage = { ...COVERAGE_ADDED, ...row.coverage };
+  if (isRecord(row.coverage)) derived.coverage = withCoverageAdded(row.coverage);
   return contractRecord(CheckSchema, row, derived);
 }
 export const pageResultFromRow = (row: Row): PageResult => contractRecord(PageResultSchema, row);
