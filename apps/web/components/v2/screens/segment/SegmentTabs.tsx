@@ -36,6 +36,7 @@ export function SegmentTabs({ tabs }: { tabs: SegmentFrame['tabs'] }) {
           href={t.href}
           className={t.current ? `${styles.tab} ${styles.tabOn}` : styles.tab}
           aria-current={t.current ? 'page' : undefined}
+          data-v2-addition={t.added ? '' : undefined}
         >
           {t.label}
         </a>

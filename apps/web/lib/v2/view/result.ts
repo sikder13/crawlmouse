@@ -39,6 +39,7 @@ import { dateTimeUtc, dayTimeUtc, listOf, percent, templateNoun } from '../forma
 import { toneOf } from '../letters';
 import type { LayoutNode, Point } from '../map-layout';
 import type { SegmentKey } from './segment/frame';
+import { linksFacts } from './segment/links-facts';
 import {
   EDGE_PILL,
   EDGE_SENTENCE,
@@ -108,6 +109,8 @@ export interface DoorView {
   coverage: { pages: CoverageView } | { read: string };
   href: string;
   keep?: boolean;
+  /** A door the locked Result screen does not have (frame.ts ADDED_SEGMENTS). */
+  added?: boolean;
 }
 
 export interface FixRowView {
@@ -451,6 +454,23 @@ function structureDoor(
       },
     },
     href: '#',
+  };
+}
+
+/**
+ * Broken links and page basics: the pages that answer an error, the redirects, and the titles and
+ * meta descriptions that are missing or shared, as segment/links-facts.ts reads them from the record.
+ */
+function linksDoor(d: ViewDataset, check: Check): DoorView {
+  const f = linksFacts(d, check);
+  return {
+    title: 'Broken links and page basics',
+    pill: f.pill,
+    body: f.body,
+    footer: 'Titles and descriptions as each page serves them',
+    coverage: { read: f.coverage },
+    href: '#',
+    added: true,
   };
 }
 
@@ -1077,6 +1097,7 @@ const DOOR_SEGMENTS: readonly SegmentKey[] = [
   'access',
   'nojs',
   'structure',
+  'links',
   'content',
   'signals',
   'changes',
@@ -1167,6 +1188,7 @@ export function resultView(
       accessDoor(check, fixes, isOpen, sampled),
       withoutJsDoor(check, fixes, isOpen, sampled),
       structureDoor(check, fixes, isOpen, notServed),
+      linksDoor(d, check),
       contentDoor(check, fixes, isOpen),
       signalsDoor(check, notServed),
       changesDoor(d, check, kept, cadence),

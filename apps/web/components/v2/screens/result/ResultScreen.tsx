@@ -390,7 +390,11 @@ const BAR_TONE = { bad: 'barBad', warn: 'barWarn', neutral: 'barNeutral' } as co
 
 function Door({ door: d, kept }: { door: DoorView; kept: boolean }) {
   return (
-    <Card href={d.href} className={`${styles.door} ${d.keep && !kept ? styles.doorKeep : ''}`}>
+    <Card
+      href={d.href}
+      className={`${styles.door} ${d.keep && !kept ? styles.doorKeep : ''}`}
+      data-v2-addition={d.added ? '' : undefined}
+    >
       <div className={`${layout.row} ${styles.doorHead}`}>
         <strong className={styles.doorTitle}>{d.title}</strong>
         <StatusPill state={d.pill.state}>{d.pill.label}</StatusPill>

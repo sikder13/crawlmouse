@@ -13,7 +13,7 @@ import { SEGMENT_VARIANTS, changesHistoryElement, segmentElement } from './_lib/
 
 const RESULT_OF = { 'bad-site': 'bad-site', clean: 'clean', challenged: 'challenged' } as const;
 const door = (variant: (typeof SEGMENT_VARIANTS)[number]) =>
-  (RESULT_PREVIEWS[RESULT_OF[variant]]() as ResultView).doors[5]!;
+  (RESULT_PREVIEWS[RESULT_OF[variant]]() as ResultView).doors[6]!;
 const primaries = (html: string) => html.match(/<[^>]*data-v2-primary=""[^>]*>[^<]*/g) ?? [];
 
 describe('Final-Seg-Changes, the bad site', () => {

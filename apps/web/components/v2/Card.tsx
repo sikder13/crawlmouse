@@ -11,6 +11,8 @@ export interface CardProps {
   className?: string;
   style?: CSSProperties;
   'aria-label'?: string;
+  /** Marks a card the locked screens do not have (read by the lock comparison). */
+  'data-v2-addition'?: '';
   children: ReactNode;
 }
 

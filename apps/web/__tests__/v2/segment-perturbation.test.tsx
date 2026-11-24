@@ -15,6 +15,7 @@ import { ACCESS_PERTURB } from './segment-perturb/access';
 import { CHANGES_PERTURB } from './segment-perturb/changes';
 import { CONTENT_PERTURB } from './segment-perturb/content';
 import { FRAME_PERTURB } from './segment-perturb/frame';
+import { LINKS_PERTURB } from './segment-perturb/links';
 import { NOJS_PERTURB } from './segment-perturb/nojs';
 import { SIGNALS_PERTURB } from './segment-perturb/signals';
 import { STRUCTURE_PERTURB } from './segment-perturb/structure';
@@ -43,6 +44,7 @@ const TABLE: PerturbTable = {
   ...ACCESS_PERTURB,
   ...NOJS_PERTURB,
   ...STRUCTURE_PERTURB,
+  ...LINKS_PERTURB,
   ...CONTENT_PERTURB,
   ...SIGNALS_PERTURB,
   ...CHANGES_PERTURB,

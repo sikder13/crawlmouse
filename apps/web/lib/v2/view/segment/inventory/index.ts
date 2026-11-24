@@ -8,6 +8,7 @@ import { ACCESS_INVENTORY } from './access';
 import { CHANGES_INVENTORY } from './changes';
 import { CONTENT_INVENTORY } from './content';
 import { FRAME_INVENTORY } from './frame';
+import { LINKS_INVENTORY } from './links';
 import { NOJS_INVENTORY } from './nojs';
 import { SIGNALS_INVENTORY } from './signals';
 import { STRUCTURE_INVENTORY } from './structure';
@@ -20,6 +21,7 @@ export const SEGMENT_INVENTORY: SegmentInventoryEntry[] = [
   ...ACCESS_INVENTORY,
   ...NOJS_INVENTORY,
   ...STRUCTURE_INVENTORY,
+  ...LINKS_INVENTORY,
   ...CONTENT_INVENTORY,
   ...SIGNALS_INVENTORY,
   ...CHANGES_INVENTORY,

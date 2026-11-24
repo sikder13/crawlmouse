@@ -24,7 +24,7 @@ import type { MapDrawing } from './map';
 import { openFixes, type FixPlan } from './free-fixes';
 import { keptUntilOf } from './result';
 import { sectionFixes } from './segment/fixes';
-import { NO_HREFS, SEGMENT_KEYS, SEGMENTS, type SegmentLink } from './segment/frame';
+import { NO_HREFS, SEGMENT_KEYS, SEGMENTS, segmentTab, type SegmentLink } from './segment/frame';
 import { drawingOf } from './segment/structure';
 import type { ViewDataset } from '../fixtures';
 
@@ -118,7 +118,7 @@ export interface LinkMapView {
     section: { title: string; href: string };
     keptUntil: string | null;
     keepHref: string;
-    tabs: (SegmentLink & { current: boolean })[];
+    tabs: (SegmentLink & { current: boolean; added?: boolean })[];
     back: SegmentLink;
     next: SegmentLink;
   };
@@ -501,11 +501,7 @@ export function linkMapView(
       keepHref: kept === null ? '#' : '#keep',
       tabs: [
         { label: 'Overview', href: hrefs.overview, current: false },
-        ...SEGMENT_KEYS.map((k) => ({
-          label: SEGMENTS[k].tab,
-          href: hrefs.segment(k),
-          current: k === 'structure',
-        })),
+        ...SEGMENT_KEYS.map((k) => segmentTab(k, hrefs.segment(k), k === 'structure')),
       ],
       back: { label: `Back: ${SEGMENTS.structure.backName}`, href: hrefs.segment('structure') },
       next: {
