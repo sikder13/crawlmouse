@@ -5,7 +5,7 @@ import { CHECKS } from '../recordings';
 import { VERDICTS } from '../../../components/v2/verdicts';
 import { isAi, keptOutClauses, servedExtent } from '../sentences';
 import { accessPill, resultView } from './result';
-import { CAUSE_SHORT, OUR_TAG, accessView } from './segment/access';
+import { CAUSE_MEANS, CAUSE_SHORT, OUR_TAG, accessView } from './segment/access';
 import { buildPublicSnapshot } from '../reports/build-snapshot';
 
 /** The sentences a reader meets first, on every graded check of every fixture. */
@@ -242,10 +242,33 @@ describe('a check that sent no request under a crawler’s name', () => {
     expect(method).not.toContain('exact user agent');
   });
 
-  it.each(NONE_SENT)('%s: the sampled-pages tile does not say every page', (v) => {
-    const tile = untagged(v).tiles.find((t) => t.label === 'Pages sampled per crawler')!;
-    expect(tile.note).toBe('no crawler request was measured');
+  const sampledNote = (c: Check) =>
+    accessView(fixtureOf(c), c.id).tiles.find((t) => t.label === 'Pages sampled per crawler')!.note;
+
+  it.each(['edge_blocks_automation', 'not_measured'] as Verdict[])(
+    '%s: the sampled-pages tile says no crawler request was measured',
+    (v) => {
+      expect(sampledNote(withVerdicts(Array.from({ length: 6 }, () => v)))).toBe(
+        'no crawler request was measured',
+      );
+    },
+  );
+
+  it('does not say no request was measured when robots.txt decided the verdicts', () => {
+    // Robots.txt can disallow most pages while the crawler was served on the ones it allows.
+    const c = withVerdicts(Array.from({ length: 6 }, () => 'disallowed_by_robots'));
+    for (const x of c.crawlers.filter(isAi)) x.pages_served = 2;
+    expect(sampledNote(c)).toBe('each checked against robots.txt');
   });
+
+  it.each(['not_measured', 'edge_blocks_automation', 'disallowed_by_robots'] as Verdict[])(
+    'keeps the page extent when one crawler is %s and another was served',
+    (v) => {
+      const note = sampledNote(withVerdicts([v]));
+      expect(note).not.toBe('no crawler request was measured');
+      expect(note).not.toBe('each checked against robots.txt');
+    },
+  );
 
   it('keeps the page extent on the tile once a crawler request was served', () => {
     const c = withVerdicts([]);
@@ -256,7 +279,9 @@ describe('a check that sent no request under a crawler’s name', () => {
   });
 
   it('names no audience wider than the request in any cause', () => {
-    for (const short of Object.values(CAUSE_SHORT)) expect(short).not.toMatch(/all automation/);
+    for (const said of [...Object.values(CAUSE_SHORT), ...Object.values(CAUSE_MEANS)]) {
+      expect(said).not.toMatch(/all automation|with or without a crawler/);
+    }
   });
 });
 

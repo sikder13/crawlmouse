@@ -131,7 +131,7 @@ export const CAUSE_SHORT: Record<AccessCause, string> = {
 };
 
 /** The evidence caption: what the response shows, in the locked screen's form. */
-const CAUSE_MEANS: Record<AccessCause, string> = {
+export const CAUSE_MEANS: Record<AccessCause, string> = {
   cloudflare_1020: 'error 1020 means a firewall rule on this site blocked the request',
   bot_fight_mode: 'a challenge page in place of the content is what Bot Fight Mode serves',
   client_rendered_template: 'the HTML arrives without its text; a browser draws it with JavaScript',
@@ -144,8 +144,8 @@ const CAUSE_MEANS: Record<AccessCause, string> = {
 };
 
 /**
- * `automation_challenge` is the worker's cause for two verdicts: an edge that challenges every
- * automated request (`edge_blocks_automation`), and a challenge of one crawler's requests
+ * `automation_challenge` is the worker's cause for two verdicts: an edge that challenged our
+ * browser-identity control (`edge_blocks_automation`), and a challenge of one crawler's requests
  * (`challenged_ua`), where the same page asked for with a browser identity may have been served.
  * The two tables above word the first. These word the second from the rows themselves.
  */
@@ -293,16 +293,19 @@ function headlineBody(check: Check): string {
   return parts.join(' ');
 }
 
-/** The verdicts a crawler holds when the batch sent no request under its name. */
-const NOT_REQUESTED: readonly Verdict[] = [
-  'edge_blocks_automation',
-  'not_measured',
-  'disallowed_by_robots',
-];
+/** The verdicts that hold no answer to a crawler's request: stopped at the edge, or unmeasured. */
+const NO_ANSWER: readonly Verdict[] = ['edge_blocks_automation', 'not_measured'];
 
-/** No crawler's row rests on a request sent under its name. */
-const noCrawlerRequest = (ai: readonly CrawlerResult[]): boolean =>
-  ai.every((c) => NOT_REQUESTED.includes(c.verdict) || c.evidence_class === 'declared');
+/** No crawler's verdict rests on an answer to a request in its name. */
+const noCrawlerAnswer = (ai: readonly CrawlerResult[]): boolean =>
+  ai.every((c) => NO_ANSWER.includes(c.verdict));
+
+/**
+ * Every crawler is unmeasured or disallowed on at least half its pages. Some may have been served on the
+ * pages robots.txt allows, so this says nothing about requests either way.
+ */
+const decidedByRobots = (ai: readonly CrawlerResult[]): boolean =>
+  ai.every((c) => NO_ANSWER.includes(c.verdict) || c.verdict === 'disallowed_by_robots');
 
 /** FACTS D1, with the L5 correction. The worker tags every crawler identity it sends. */
 function methodSentence(rendered: boolean): string {
@@ -424,13 +427,15 @@ export function accessView(
       {
         label: 'Pages sampled per crawler',
         value: `${count(coverage.pages_sampled)} of ${count(coverage.pages_discovered)}`,
-        note: noCrawlerRequest(ai)
+        note: noCrawlerAnswer(ai)
           ? 'no crawler request was measured'
-          : coverage.sample_strategy.method === 'census'
-            ? coverage.pages_sampled === coverage.pages_discovered
-              ? 'every page'
-              : 'every page crawled'
-            : `at most ${coverage.sample_strategy.max_pages}, across every template`,
+          : decidedByRobots(ai)
+            ? 'each checked against robots.txt'
+            : coverage.sample_strategy.method === 'census'
+              ? coverage.pages_sampled === coverage.pages_discovered
+                ? 'every page'
+                : 'every page crawled'
+              : `at most ${coverage.sample_strategy.max_pages}, across every template`,
       },
       {
         label: 'Responses kept as evidence',
