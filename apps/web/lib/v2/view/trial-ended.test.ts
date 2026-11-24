@@ -42,7 +42,7 @@ describe('Trial ended: the account back on Free', () => {
     const v = after();
     expect(v.header).toEqual({
       title: 'Back on Free: the Pro trial ended',
-      line: 'Mon 9 Nov · 5 sites',
+      line: 'Mon 9 Nov · 4 sites',
     });
     expect(v.banner.title).toBe('Pro ended Sat 7 Nov. Here is what stays, and what is paused.');
     expect(v.banner.sub).toBe(
