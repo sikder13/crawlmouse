@@ -1213,6 +1213,17 @@ const ENTRIES: readonly Spec[] = [
     proof: by(SETTINGS_TEST, 'is a 404 for a developer'),
   },
   {
+    path: 'apps/web/app/(account)/settings/integrations/page.tsx',
+    v2: true,
+    identity: 'signed-in owner or account manager',
+    gate: 'member',
+    detail:
+      'The Slack destination of the viewer account, as its last four characters; `member_role` decides the role, a developer is a 404.',
+    check: at('lib/v2/account/settings-pages.ts', 'member_role'),
+    proof: by(SETTINGS_TEST, 'Integrations is a 404 for a developer'),
+    calls: 1,
+  },
+  {
     path: 'apps/web/app/(account)/settings/plan/page.tsx',
     v2: true,
     identity: 'signed-in owner',
@@ -1332,13 +1343,13 @@ const ENTRIES: readonly Spec[] = [
     identity: 'signed-in seat, in its viewer account',
     gate: 'member_for_site',
     detail:
-      'The account home: the sites the seat’s scope covers, read by `sitesInScope` through the session. Its two service-role clients read the next check time of those sites alone (`readNextChecks`) and the signed-in viewer’s own completed v1 audits, keyed by their user id (`readEarlierAudits`).',
+      'The account home: the sites the seat’s scope covers, read by `sitesInScope` through the session. Its three service-role clients read the next check time of those sites alone (`readNextChecks`), the signed-in viewer’s own completed v1 audits, keyed by their user id (`readEarlierAudits`), and whether the viewer account has a Slack destination (`account_slack_last4`, of which only set or not reaches the page).',
     check: at('lib/v2/account/dataset.ts', 'sitesInScope'),
     proof: by(
       PAGES_TEST,
       '/dashboard/v2: a developer sees the client their seat covers alone, and a stranger neither',
     ),
-    calls: 2,
+    calls: 3,
   },
   {
     path: 'apps/web/app/internal/page.tsx',
@@ -2049,6 +2060,7 @@ const LIBS: readonly Spec[] = [
       'apps/web/app/(account)/account/email/page.tsx',
       'apps/web/app/(account)/account/restore/page.tsx',
       'apps/web/app/(account)/settings/delete/page.tsx',
+      'apps/web/app/(account)/settings/integrations/page.tsx',
       'apps/web/app/agency-trial/page.tsx',
       'apps/web/app/agency/clients/[siteId]/page.tsx',
       'apps/web/app/agency/reports/page.tsx',

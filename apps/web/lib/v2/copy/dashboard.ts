@@ -122,9 +122,7 @@ export const DASHBOARD_COPY = {
  */
 const competitorsOf = (n: number) => `${numberWord(n)} ${plural(n, 'competitor', 'competitors')}`;
 const SLACK = 'Slack';
-const SEARCH_CONSOLE = 'Search Console';
 const STAGING = 'a staging URL';
-const OBSERVED = 'Cloudflare Analytics or a Vercel Drain';
 
 export const SETUP_COPY = {
   slack: {
@@ -138,20 +136,10 @@ export const SETUP_COPY = {
     done: (n: number) =>
       `${capitalise(numberWord(n))} ${plural(n, 'competitor', 'competitors')} added`,
   },
-  searchConsole: {
-    subject: SEARCH_CONSOLE,
-    todo: `Connect ${SEARCH_CONSOLE} to lay Google's impressions and clicks by page over the audit, and its AI-feature breakdown when its API exposes it`,
-    done: 'Search Console connected',
-  },
   staging: {
     subject: STAGING,
     todo: `Add ${STAGING} so audits run before each deploy`,
     done: 'Staging audited on each deploy',
-  },
-  observed: {
-    subject: OBSERVED,
-    todo: `Connect ${OBSERVED} to see what the AI crawlers actually fetched`,
-    done: 'Observed crawler activity connected',
   },
   schedule: (when: string) => `Choose the day and hour the weekly check runs (now ${when})`,
 };
@@ -310,19 +298,19 @@ const DAY0: CopyChange[] = [
   {
     screen: 'dashboard-day0',
     kind: 'facts',
-    locked: "Connect Search Console to lay Google's AI-feature impressions over these pages",
-    rendered:
-      "Connect Search Console to lay Google's impressions and clicks by page over the audit, and its AI-feature breakdown when its API exposes it",
-    source: 'FACTS H6',
+    locked:
+      "Connect Search Console to lay Google's AI-feature impressions over these pages Connect",
+    rendered: '',
+    source:
+      'CTO ruling 047 (23 Nov): Search Console and observed crawler activity have no connection behind them, so the set-up list does not offer them while the owner decides',
   },
   {
     screen: 'dashboard-day0',
     kind: 'facts',
     locked: 'before each deploy Add All four stop',
-    rendered:
-      'before each deploy Add Connect Cloudflare Analytics or a Vercel Drain to see what the AI crawlers actually fetched Connect All five stop',
+    rendered: 'before each deploy Add All three stop',
     source:
-      'FACTS l.57: observed crawler activity is the fifth Pro set-up item (GATES.observedCrawlerActivity); the count is the items’',
+      'CTO ruling 047 (23 Nov): Search Console and observed crawler activity have no connection behind them, so the set-up list does not offer them while the owner decides; the count is the items’',
   },
   {
     screen: 'dashboard-day0',
@@ -528,6 +516,14 @@ const HOME: CopyChange[] = [
   {
     screen: 'dashboard',
     kind: 'facts',
+    locked: 'Two things left to set up',
+    rendered: 'Everything is set up',
+    source:
+      'CTO ruling 047 (23 Nov): the two items left in the locked page are not offered, so on this fixture nothing is left',
+  },
+  {
+    screen: 'dashboard',
+    kind: 'facts',
     locked: 'done Alerts to email and Slack',
     rendered: 'done Slack alerts connected',
     source:
@@ -538,10 +534,9 @@ const HOME: CopyChange[] = [
     kind: 'facts',
     locked:
       "One competitor added 2 min Connect Search Console to lay Google's AI-feature impressions over these pages Connect 1 min",
-    rendered:
-      "One competitor added Connect Search Console to lay Google's impressions and clicks by page over the audit, and its AI-feature breakdown when its API exposes it Connect done Staging audited on each deploy Connect Cloudflare Analytics or a Vercel Drain to see what the AI crawlers actually fetched Connect",
+    rendered: 'One competitor added done Staging audited on each deploy',
     source:
-      'FACTS H6 and l.57: the Pro set-up items from the gates, staging done (a staging site exists) and observed crawler activity not connected; the efforts "2 min" and "1 min" are in no record and are left out',
+      'CTO ruling 047 (23 Nov): Search Console and observed crawler activity have no connection behind them, so the set-up list does not offer them while the owner decides; staging is done (a staging site exists); the efforts "2 min" and "1 min" are in no record and are left out',
   },
   {
     screen: 'dashboard',

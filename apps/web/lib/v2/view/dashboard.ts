@@ -703,16 +703,6 @@ function setup(
       settings('Add'),
     );
   }
-  if (g.searchConsole) {
-    item(
-      'search_console',
-      connected('search_console'),
-      SETUP_COPY.searchConsole.subject,
-      SETUP_COPY.searchConsole.todo,
-      SETUP_COPY.searchConsole.done,
-      action('integrations', 'Connect'),
-    );
-  }
   if (g.stagingAndDeployHooks) {
     const done = v.d.sites.some((s) => s.staging_of_site_id === site.id);
     item(
@@ -722,16 +712,6 @@ function setup(
       SETUP_COPY.staging.todo,
       SETUP_COPY.staging.done,
       settings('Add'),
-    );
-  }
-  if (g.observedCrawlerActivity) {
-    item(
-      'observed',
-      connected('cloudflare_analytics', 'vercel_drain'),
-      SETUP_COPY.observed.subject,
-      SETUP_COPY.observed.todo,
-      SETUP_COPY.observed.done,
-      action('integrations', 'Connect'),
     );
   }
   const left = items.filter((i) => !i.done).length;

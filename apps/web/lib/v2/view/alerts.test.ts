@@ -119,9 +119,11 @@ describe('Alerts, where they go and the rules', () => {
     expect(home().channels.rows.map((r) => [r.label, r.value, r.state?.label ?? null])).toEqual([
       ['Email', 'you@company.com', 'on'],
       ['Slack', 'Nahl · #seo', 'on'],
-      ['Slack channel per site', 'set on each site page', null],
+      ['Slack settings', 'in Integrations', null],
+      ['Alerts per site', 'set on each site page', null],
     ]);
-    expect(home().channels.rows[2]!.action!.href).toBe(
+    expect(home().channels.rows[2]!.action!.href).toBe('/settings/integrations');
+    expect(home().channels.rows[3]!.action!.href).toBe(
       '/sites/50000000-0000-4000-8000-000000000001',
     );
     expect(home().channels.foot).toBe(
@@ -185,7 +187,8 @@ describe('Alerts, on the stand-in Free account (clean-site)', () => {
     expect(v.channels.rows.map((r) => [r.label, r.value, r.state?.label ?? null])).toEqual([
       ['Email', 'owner@trailhead.example', 'on'],
       ['Slack', 'on Pro', 'off'],
-      ['Slack channel per site', 'set on each site page', null],
+      ['Slack settings', 'in Integrations', null],
+      ['Alerts per site', 'set on each site page', null],
     ]);
     expect(v.channels.foot).toBe('Slack is Pro. On Free, email alerts cover the first site.');
   });
@@ -230,10 +233,10 @@ describe('Alerts, an opened change that is not a block', () => {
 });
 
 describe('Alerts, which values are data', () => {
-  it('sets the address and the workspace in the data face, “on Pro” and “set on each site page” not', () => {
-    expect(home().channels.rows.map((r) => r.data)).toEqual([true, true, false]);
+  it('sets the address and the workspace in the data face, “on Pro” and “in Integrations” not', () => {
+    expect(home().channels.rows.map((r) => r.data)).toEqual([true, true, false, false]);
     expect(
       alertsView(fixture('clean-site'), CLEAN_VIEWER).channels.rows.map((r) => r.data),
-    ).toEqual([true, false, false]);
+    ).toEqual([true, false, false, false]);
   });
 });

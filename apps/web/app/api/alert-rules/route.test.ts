@@ -120,6 +120,17 @@ const form = (body: string) =>
     body,
   });
 
+const formFrom = (body: string, referer: string) =>
+  new Request(`${ORIGIN}/api/alert-rules`, {
+    method: 'POST',
+    headers: {
+      origin: ORIGIN,
+      'content-type': 'application/x-www-form-urlencoded',
+      referer,
+    },
+    body,
+  });
+
 const enabledOf = async (ruleId: string) =>
   (
     await h.db.query<{ enabled: boolean }>(`select enabled from public.alert_rules where id = $1`, [
@@ -279,6 +290,57 @@ describe('PUT /api/alert-rules', () => {
     expect(gone.headers.get('location')).toBe('/alerts?error=not_found');
     expect((await PUT(put({ slackWebhookUrl: URL_A }))).status).toBe(402);
     expect(await secretsOf(m.accountId)).toEqual([]);
+  });
+
+  describe('a form posted from Integrations', () => {
+    const PAGE = `${ORIGIN}/settings/integrations`;
+    const connect = `_method=PUT&slackWebhookUrl=${encodeURIComponent(URL_A)}`;
+
+    it('connecting goes back there saying it saved, and stores the URL', async () => {
+      const m = await member('int-set', 'pro');
+      h.user = m.user;
+      const res = await POST(formFrom(connect, PAGE));
+      expect(res.status).toBe(303);
+      expect(res.headers.get('location')).toBe('/settings/integrations?saved=1');
+      expect(await secretsOf(m.accountId)).toEqual([URL_A]);
+    });
+
+    it('the address never goes into the answer', async () => {
+      const m = await member('int-quiet', 'pro');
+      h.user = m.user;
+      const res = await POST(formFrom(connect, PAGE));
+      expect(res.headers.get('location')).not.toContain('hooks.slack.com');
+      expect(await res.text()).not.toContain('hooks.slack.com');
+    });
+
+    it('disconnecting goes back there and removes it', async () => {
+      const m = await member('int-clear', 'pro');
+      h.user = m.user;
+      await POST(formFrom(connect, PAGE));
+      const res = await POST(formFrom('_method=PUT&clearSlack=true', PAGE));
+      expect(res.headers.get('location')).toBe('/settings/integrations?saved=1');
+      expect(await secretsOf(m.accountId)).toEqual([]);
+    });
+
+    it('a refusal goes back there with its code', async () => {
+      const m = await member('int-free', 'free');
+      h.user = m.user;
+      const res = await POST(formFrom(connect, PAGE));
+      expect(res.headers.get('location')).toBe('/settings/integrations?error=upgrade_required');
+      expect(await secretsOf(m.accountId)).toEqual([]);
+    });
+
+    it.each([
+      ['Alerts', `${ORIGIN}/alerts`],
+      ['another site with the same path', 'https://evil.example/settings/integrations'],
+      ['a page below it', `${PAGE}/more`],
+      ['an address that is not one', 'not a url'],
+    ])('from %s: back to Alerts', async (_name, referer) => {
+      const m = await member('int-other', 'pro');
+      h.user = m.user;
+      const res = await POST(formFrom(connect, referer));
+      expect(res.headers.get('location')).toBe('/alerts');
+    });
   });
 
   it('a POST that does not name PUT is refused: 405 for JSON, back to Alerts for a form', async () => {
