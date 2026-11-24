@@ -185,7 +185,7 @@ function howGradesAreCalculated(): HelpArticle {
       { kind: 'heading', text: 'When a grade is withheld' },
       p(
         s(
-          'When a part cannot be measured, the grade is withheld rather than guessed, and the result says why. For AI readability it says one of these:',
+          'When a part cannot be measured, the grade is withheld rather than guessed, and the result says why. For AI readability it says which of these apply:',
         ),
       ),
       list(...GRADE_WITHHELD.map((r) => s(`${AI_WAITING[r]}.`))),

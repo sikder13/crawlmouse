@@ -294,7 +294,7 @@ describe('POST /api/checks, a person acting in an account (F-001)', () => {
       body: {
         code: 'site_limit',
         error:
-          'Your Free plan keeps one site, and this account keeps it already. Open your dashboard to check it again.',
+          'This account’s Free plan keeps one site, and it is already taken. Open your dashboard to check it again.',
       },
     });
     expect((await sitesOf(p.accountId)).map((s) => s.id)).toEqual([kept.id]);
@@ -313,7 +313,7 @@ describe('POST /api/checks, a person acting in an account (F-001)', () => {
       body: {
         code: 'site_limit',
         error:
-          'Your Pro plan keeps five sites, and this account keeps them already. Open your dashboard to check one of them again.',
+          'This account’s Pro plan keeps five sites, and they are already taken. Open your dashboard to check one of them again.',
       },
     });
   });
