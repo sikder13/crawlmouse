@@ -520,3 +520,64 @@ describe('answeredAt (F-252)', () => {
     ).toBe(HOME);
   });
 });
+
+// Inbox 083: on a site whose sitemap is larger than the cap, the crawl read the home page and the
+// first sitemap entries and no linked page, then scored orphans and depth over that set as if it were
+// the whole graph (measured on staging: ma.tt, 499 of 500 pages read with no depth). With a sitemap
+// larger than the cap the crawl reads links outward from the home page first, and sitemap entries
+// only once no link is left to ask; a sitemap that fits the cap keeps today's order.
+describe('links before the sitemap when the sitemap is larger than the cap', () => {
+  const sitemap = (n: number): Seed[] =>
+    Array.from({ length: n }, (_, i) => ({
+      url: at(`/s/${i}/`),
+      source: 'sitemap',
+      lastmod: null,
+    }));
+  const homeSeed: Seed = { url: HOME, source: 'homepage', lastmod: null };
+  const read = (urls: string[], discovered: string[] = [], n = 0) =>
+    crawlBatch(
+      n,
+      urls.map((u) => crawlRow({ url: canonicalizeUrl(u), outcome: 'fetched', status: 200 })),
+      [],
+      discovered,
+    );
+
+  it('reads the home page alone first, then the links it found, not the sitemap', () => {
+    const seeds = [homeSeed, ...sitemap(10)];
+    expect(nextCrawlBatch(seeds, [], 5)).toEqual([HOME]);
+    const links = [at('/a/'), at('/b/'), at('/c/')];
+    expect(nextCrawlBatch(seeds, [read([HOME], links)], 5)).toEqual(links);
+  });
+
+  it('asks sitemap entries only once no link is left, up to the cap', () => {
+    const seeds = [homeSeed, ...sitemap(10)];
+    const batches = [read([HOME], [at('/a/')], 0), read([at('/a/')], [], 1)];
+    expect(nextCrawlBatch(seeds, batches, 5)).toEqual([at('/s/0/'), at('/s/1/'), at('/s/2/')]);
+  });
+
+  it('keeps today’s order when the sitemap fits the cap: the home page and the sitemap first', () => {
+    const seeds = [homeSeed, ...sitemap(4)];
+    expect(nextCrawlBatch(seeds, [], 5)).toEqual([HOME, ...sitemap(4).map((s) => s.url)]);
+  });
+
+  it('reads a connected set: every page read after the home page was linked from a page read before it', () => {
+    // A site of 60 pages, each linking the next two, and a sitemap of 300 listing other pages first.
+    const seeds = [homeSeed, ...sitemap(300)];
+    const linksOf = (u: string) => {
+      const m = /\/p\/(\d+)\/$/.exec(u);
+      const i = u === HOME ? 0 : m ? Number(m[1]) + 1 : 1000;
+      return i < 60 ? [at(`/p/${i}/`), at(`/p/${i + 1}/`)] : [];
+    };
+    const batches: ReturnType<typeof crawlBatch>[] = [];
+    const linked = new Set<string>([canonicalizeUrl(HOME)]);
+    for (let n = 0; n < 100; n++) {
+      const next = nextCrawlBatch(seeds, batches, 40);
+      if (next === null) break;
+      for (const u of next) expect(linked.has(canonicalizeUrl(u))).toBe(true);
+      const found = next.flatMap(linksOf);
+      for (const u of found) linked.add(canonicalizeUrl(u));
+      batches.push(read(next, found, n));
+    }
+    expect(batches.reduce((k, b) => k + b.pages.length, 0)).toBe(40);
+  });
+});
