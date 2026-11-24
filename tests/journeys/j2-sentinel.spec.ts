@@ -15,7 +15,7 @@ import { step } from './lib/step';
 // watch first looks spreadMs after that. The step makes new Pro people until one site's first look
 // falls in LOOK_WINDOW_MIN of an odd hour, so the two looks and the full check they start all read
 // robots.txt in that hour, then waits for it: up to a day, bounded by JOURNEY_SENTINEL_MAX_HOURS
-// (default 24). Sites it does not choose are removed.
+// (default 24). Every site it keeps is removed when the step ends, however it ends.
 //
 // The three functions below are copies, kept equal by hand, of the product's own: sentinelHour
 // (apps/web/lib/v2/monitor/sentinel.ts), spreadMs (inngest/sentinel.ts) and stableId
@@ -95,15 +95,18 @@ async function startPro(who: Person) {
 }
 
 async function removeSite(who: Person, siteId: string) {
-  await who.page.evaluate(
+  const status = await who.page.evaluate(
     async (id) =>
-      fetch(`/api/sites/${id}`, {
-        method: 'DELETE',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ confirm: 'remove' }),
-      }),
+      (
+        await fetch(`/api/sites/${id}`, {
+          method: 'DELETE',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ confirm: 'remove' }),
+        })
+      ).status,
     siteId,
   );
+  expect(status, `the step's site ${siteId} is removed`).toBe(200);
 }
 
 /** The site's latest ended check, once one has ended at or after `since`. */
@@ -140,92 +143,98 @@ const allowed = (v: string[]) =>
 
 step('J2.4i', 'Daily watch: a crawler newly blocked', async ({ context, baseURL }, info) => {
   const maxHours = Number(process.env.JOURNEY_SENTINEL_MAX_HOURS ?? '24');
-  // The wait, the choosing (a first check per try), a re-checked baseline and the settle.
-  info.setTimeout((maxHours + 5) * HOUR);
+  // Past the wait for the watch, at most: choosing and its baseline (0.5 h), a re-check in the next
+  // even hour (2.9 h), the settle and the full check (1.3 h) and the Free arm (3.3 h).
+  info.setTimeout((maxHours + 9) * HOUR);
   const admin = stagingAdmin();
   const skipUnless = (ok: boolean, why: string) => info.skip(!ok, why);
+  /** Every site the step keeps, removed however the step ends, so none stays watched. */
+  const kept: { who: Person; site: string }[] = [];
+  try {
+    // A Pro site whose watch looks early in an odd hour: about one new site in five, by its id.
+    let pro: { who: Person; site: string } | null = null;
+    for (let n = 1; n <= TRIES && pro === null; n++) {
+      const ctx = n === 1 ? context : await freshContext(context, baseURL!);
+      const who = await person(ctx, baseURL!, 'j2', 40 + n);
+      await startPro(who);
+      const site = await keptSite(who, HOST);
+      kept.push({ who, site });
+      if (looksInOddWindow(site)) pro = { who, site };
+    }
+    skipUnless(pro !== null, `no new site's watch fell early in an odd hour in ${TRIES} tries`);
+    const { who, site } = pro!;
 
-  // A Pro site whose watch looks early in an odd hour: about one new site in five, by its id.
-  let pro: { who: Person; site: string } | null = null;
-  for (let n = 1; n <= TRIES && pro === null; n++) {
-    const ctx = n === 1 ? context : await freshContext(context, baseURL!);
-    const who = await person(ctx, baseURL!, 'j2', 40 + n);
-    await startPro(who);
-    const site = await keptSite(who, HOST);
-    if (looksInOddWindow(site)) pro = { who, site };
-    else await removeSite(who, site);
-  }
-  skipUnless(pro !== null, `no new site's watch fell early in an odd hour in ${TRIES} tries`);
-  const { who, site } = pro!;
+    // The baseline: the latest full check must have recorded GPTBot allowed. The worker keeps
+    // robots.txt for ROBOTS_TTL_MS, so a re-check waits that long into an even hour.
+    let base = await endedSince(site, 0, 30 * MINUTE);
+    if (!allowed(await gptbotVerdicts(base))) {
+      const nextEven = (Math.floor(Date.now() / (2 * HOUR)) + 1) * 2 * HOUR;
+      const askAt = nextEven + ROBOTS_TTL_MS + MINUTE;
+      await sleep(Math.max(0, askAt - Date.now()));
+      const asked = await who.page.evaluate(
+        async (id) => (await fetch(`/api/sites/${id}/checks`, { method: 'POST' })).status,
+        site,
+      );
+      expect(asked < 300, `a re-check in an even hour is asked for (${asked})`).toBe(true);
+      base = await endedSince(site, askAt, 40 * MINUTE);
+    }
+    expect(allowed(await gptbotVerdicts(base)), 'the baseline recorded GPTBot allowed').toBe(true);
 
-  // The baseline: the latest full check must have recorded GPTBot allowed. The worker keeps
-  // robots.txt for ROBOTS_TTL_MS, so a re-check waits that long into an even hour.
-  let base = await endedSince(site, 0, 30 * MINUTE);
-  if (!allowed(await gptbotVerdicts(base))) {
-    const nextEven = (Math.floor(Date.now() / (2 * HOUR)) + 1) * 2 * HOUR;
-    const askAt = nextEven + ROBOTS_TTL_MS + MINUTE;
-    await sleep(Math.max(0, askAt - Date.now()));
-    const asked = await who.page.evaluate(
-      async (id) => (await fetch(`/api/sites/${id}/checks`, { method: 'POST' })).status,
-      site,
+    const watch = nextWatch(site, Date.now());
+    skipUnless(
+      watch.look - Date.now() <= maxHours * HOUR,
+      `the site's watch is ${((watch.look - Date.now()) / HOUR).toFixed(1)} h away, past JOURNEY_SENTINEL_MAX_HOURS`,
     );
-    expect(asked < 300, `a re-check in an even hour is asked for (${asked})`).toBe(true);
-    base = await endedSince(site, askAt, 40 * MINUTE);
-  }
-  expect(allowed(await gptbotVerdicts(base)), 'the baseline recorded GPTBot allowed').toBe(true);
+    await sleep(watch.look - Date.now() + SETTLE_MS);
 
-  const watch = nextWatch(site, Date.now());
-  skipUnless(
-    watch.look - Date.now() <= maxHours * HOUR,
-    `the site's watch is ${((watch.look - Date.now()) / HOUR).toFixed(1)} h away, past JOURNEY_SENTINEL_MAX_HOURS`,
-  );
-  await sleep(watch.look - Date.now() + SETTLE_MS);
-
-  const checkId = sentinelCheckId(site, watch.day);
-  const { data: started } = await admin
-    .from('checks')
-    .select('id, trigger')
-    .eq('id', checkId)
-    .maybeSingle();
-  expect(started, 'the watch started one full check that day').not.toBeNull();
-  expect(started!.trigger).toBe('scheduled');
-  await endedSince(site, watch.look, 30 * MINUTE);
-  expect(
-    await gptbotVerdicts(checkId),
-    'the full check records GPTBot disallowed by robots.txt',
-  ).toContain('disallowed_by_robots');
-  const { data: alerts } = await admin
-    .from('alert_events')
-    .select('id, alert_rules!inner(kind)')
-    .eq('check_id', checkId)
-    .eq('alert_rules.kind', 'crawler_blocked');
-  expect((alerts ?? []).length, 'one crawler_blocked alert fired on it').toBe(1);
-  await removeSite(who, site);
-
-  // A Free site is not watched. A look leaves nothing behind, so only a started full check shows a
-  // watch, and one starts only when the site's own watch would see a move. The arm is asserted only
-  // when that holds for the Free site; otherwise it is recorded as not proven.
-  const free = await person(await freshContext(context, baseURL!), baseURL!, 'j2', 60);
-  const freeSite = await keptSite(free, HOST);
-  const freeBase = await endedSince(freeSite, 0, 30 * MINUTE);
-  const freeWatch = nextWatch(freeSite, Date.now());
-  const provable =
-    looksInOddWindow(freeSite) &&
-    allowed(await gptbotVerdicts(freeBase)) &&
-    freeWatch.look - Date.now() <= 2 * HOUR;
-  if (provable) {
-    await sleep(freeWatch.look - Date.now() + SETTLE_MS);
-    const { data: none } = await admin
+    const checkId = sentinelCheckId(site, watch.day);
+    const { data: started } = await admin
       .from('checks')
-      .select('id')
-      .eq('id', sentinelCheckId(freeSite, freeWatch.day))
+      .select('id, trigger')
+      .eq('id', checkId)
       .maybeSingle();
-    expect(none, 'the Free site was not watched').toBeNull();
-  } else {
-    info.annotations.push({
-      type: 'note',
-      description: "the Free arm is not proven on this run: its site's watch could not see a move",
-    });
+    expect(started, 'the watch started one full check that day').not.toBeNull();
+    expect(started!.trigger).toBe('scheduled');
+    await endedSince(site, watch.look, 30 * MINUTE);
+    expect(
+      await gptbotVerdicts(checkId),
+      'the full check records GPTBot disallowed by robots.txt',
+    ).toContain('disallowed_by_robots');
+    const { data: alerts } = await admin
+      .from('alert_events')
+      .select('id, alert_rules!inner(kind)')
+      .eq('check_id', checkId)
+      .eq('alert_rules.kind', 'crawler_blocked');
+    expect((alerts ?? []).length, 'one crawler_blocked alert fired on it').toBe(1);
+
+    // A Free site is not watched: asserted only when the Free site's own watch could see a move, which
+    // holds on few runs (a look leaves nothing behind, so only a started full check shows a watch);
+    // otherwise recorded as not proven. The Free filter itself is unit-tested with the sentinel.
+    const free = await person(await freshContext(context, baseURL!), baseURL!, 'j2', 60);
+    const freeSite = await keptSite(free, HOST);
+    kept.push({ who: free, site: freeSite });
+    const freeBase = await endedSince(freeSite, 0, 30 * MINUTE);
+    const freeWatch = nextWatch(freeSite, Date.now());
+    const provable =
+      looksInOddWindow(freeSite) &&
+      allowed(await gptbotVerdicts(freeBase)) &&
+      freeWatch.look - Date.now() <= 2 * HOUR;
+    if (provable) {
+      await sleep(freeWatch.look - Date.now() + SETTLE_MS);
+      const { data: none } = await admin
+        .from('checks')
+        .select('id')
+        .eq('id', sentinelCheckId(freeSite, freeWatch.day))
+        .maybeSingle();
+      expect(none, 'the Free site was not watched').toBeNull();
+    } else {
+      info.annotations.push({
+        type: 'note',
+        description:
+          "the Free arm is not proven on this run: its site's watch could not see a move",
+      });
+    }
+  } finally {
+    for (const k of kept) await removeSite(k.who, k.site);
   }
-  await removeSite(free, freeSite);
 });
