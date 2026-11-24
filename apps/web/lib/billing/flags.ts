@@ -24,3 +24,29 @@ export function billingV2Enabled(env: Env = process.env): boolean {
 export function agencySalesOpen(env: Env = process.env): boolean {
   return env.V2_AGENCY_SALES?.trim() === '1';
 }
+
+/**
+ * The one user paying is open to while it is kept to them, from `V2_BILLING_ONLY_USER` (a user id,
+ * whitespace ignored); null when unset or empty. Production sets it for the owner's own purchase and
+ * refund when billing is switched on, and unsets it once that has passed (specs/billing-switch-on).
+ */
+export function billingOnlyUser(env: Env = process.env): string | null {
+  const only = env.V2_BILLING_ONLY_USER?.trim();
+  return only ? only : null;
+}
+
+/**
+ * Whether `userId` may start paying: billing is on, and paying is not kept to another user. The
+ * checkout and the seats route read this; the webhook, cancel and the portal read
+ * `billingV2Enabled` alone, so the owner's own subscription is handled in full.
+ */
+export function billingOpenTo(userId: string | null, env: Env = process.env): boolean {
+  if (!billingV2Enabled(env)) return false;
+  const only = billingOnlyUser(env);
+  return only === null || only === userId;
+}
+
+/** Whether pages may show paying as open to every visitor: billing is on and kept to no one. */
+export function billingPublic(env: Env = process.env): boolean {
+  return billingV2Enabled(env) && billingOnlyUser(env) === null;
+}

@@ -502,6 +502,27 @@ describe('a trial with a card whose subscription is set to cancel at its end', (
   });
 });
 
+describe('while paying is kept to one user (V2_BILLING_ONLY_USER)', () => {
+  const checkout = 'action="/api/billing/checkout"';
+
+  it('that user still sees the checkout on Settings › Plan and /trial-ended', async () => {
+    vi.stubEnv('V2_BILLING', '1');
+    vi.stubEnv('V2_BILLING_ONLY_USER', shared.id);
+    as(shared);
+    expect(renderToStaticMarkup(screen(await PlanPage(q())))).toContain(checkout);
+    expect(renderToStaticMarkup(screen(await TrialEndedPage()))).toContain(checkout);
+  });
+
+  it('another owner sees none, and does once the window is open to all', async () => {
+    vi.stubEnv('V2_BILLING', '1');
+    vi.stubEnv('V2_BILLING_ONLY_USER', shared.id);
+    as(owner);
+    expect(renderToStaticMarkup(screen(await PlanPage(q())))).not.toContain(checkout);
+    vi.stubEnv('V2_BILLING_ONLY_USER', '');
+    expect(renderToStaticMarkup(screen(await PlanPage(q())))).toContain(checkout);
+  });
+});
+
 describe('/trial-ended for a seat that is not the owner’s', () => {
   it('offers the owner the checkout, and the manager neither it nor a link to Settings › Plan', async () => {
     // The checkout is offered only while it answers (F-108).

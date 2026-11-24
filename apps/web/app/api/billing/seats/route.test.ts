@@ -160,6 +160,17 @@ describe('POST /api/billing/seats', () => {
     },
   );
 
+  it('while paying is kept to another user: 403, and neither a service-role client nor Stripe', async () => {
+    vi.stubEnv('V2_BILLING_ONLY_USER', 'someone-else');
+    const a = await agency();
+    as(a.owner);
+    const res = await buy({ seats: 1, sites: 0 }, chosen(a));
+    expect([res.status, await res.json()]).toEqual([403, { code: 'billing_not_open' }]);
+    expect(h.log).toEqual(['supabaseServer']);
+    vi.stubEnv('V2_BILLING_ONLY_USER', a.owner.id);
+    expect((await buy({ seats: 1, sites: 0 }, chosen(a))).status).toBe(200);
+  });
+
   it('signed out: 401, and neither a service-role client nor Stripe', async () => {
     const res = await buy({ seats: 1, sites: 0 });
     expect(res.status).toBe(401);
