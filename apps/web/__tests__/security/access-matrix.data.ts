@@ -1974,6 +1974,7 @@ const LIBS: readonly Spec[] = [
     callers: [
       'apps/web/app/api/admin/takedown/process/route.ts',
       'apps/web/app/api/agency-trial/route.ts',
+      'apps/web/app/api/alert-rules/route.ts',
       'apps/web/app/api/audits/[id]/notify/route.ts',
       'apps/web/app/api/audits/[id]/reaudit/route.ts',
       'apps/web/app/api/audits/[id]/stream/route.ts',
