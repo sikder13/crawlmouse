@@ -155,6 +155,9 @@ describe('footer-links.ts: the one map of header and footer links', () => {
           ['Is GPTBot blocked?', 'checksPublic:/check/gptbot'],
           ['JavaScript-only content?', 'checksPublic:/check/javascript'],
           ['robots.txt for AI', 'checksPublic:/check/robots-ai'],
+          ['AI readiness checker', '/ai-readiness-checker'],
+          ['Can AI crawlers see JavaScript?', '/blog/can-ai-crawlers-see-javascript'],
+          ['Blocking AI crawlers in robots.txt', '/blog/block-ai-crawlers-robots-txt'],
         ],
       ],
       [
