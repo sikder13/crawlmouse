@@ -134,8 +134,7 @@ const BASE_CHANGES: CopyChange[] = [
     screen: 'home',
     kind: 'facts',
     locked: 'GPTBot 403 403 0%',
-    rendered:
-      'GPTBot refused while another name was served refused while another name was served 0%',
+    rendered: 'GPTBot refused, others served refused, others served 0%',
     source: 'FACTS I2: verdicts, not status codes, in a crawler cell',
   },
   {
@@ -260,7 +259,7 @@ const BASE_CHANGES: CopyChange[] = [
     screen: 'result',
     kind: 'facts',
     locked: '2 of 6 blocked',
-    rendered: '1 refused while another name was served · 1 challenged',
+    rendered: '1 refused, others served · 1 challenged',
     source:
       'FACTS I2 and the crawler-matrix line: under the new vocabulary a challenge is not "blocked", and the headline count is ENGINE-DERIVED.',
   },

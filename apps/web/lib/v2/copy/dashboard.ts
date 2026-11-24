@@ -464,7 +464,7 @@ const HOME: CopyChange[] = [
     locked:
       'Crawler access by check · ● full ▲ partial ■ blocked GPTBot OAI-SearchBot ClaudeBot PerplexityBot',
     rendered:
-      'Crawler access by check · allowed, thin challenged: the real crawler may pass blocked by robots.txt refused while another name was served OAI-SearchBot ChatGPT-User PerplexityBot Claude-SearchBot GPTBot ClaudeBot Tested with tagged user agents from published IPs — crawlmouse.com/bot.',
+      'Crawler access by check · allowed, thin challenged: the real crawler may pass blocked by robots.txt refused, others served OAI-SearchBot ChatGPT-User PerplexityBot Claude-SearchBot GPTBot ClaudeBot Tested with tagged user agents from published IPs — crawlmouse.com/bot.',
     source:
       'FACTS I6 (the six AI crawlers, in the check’s order) and I2 (each verdict in the shared words; a challenge is not "blocked"); the legend lists the verdicts the rows show; D1 puts its line under this crawler table too',
   },
@@ -474,7 +474,7 @@ const HOME: CopyChange[] = [
     locked:
       'Googlebot ● full Bingbot ● full OAI-SearchBot ▲ partial GPTBot ■ 403 ClaudeBot ■ robots PerplexityBot ■ challenge',
     rendered:
-      'Googlebot allowed by robots Bingbot allowed by robots OAI-SearchBot allowed, thin ChatGPT-User allowed, thin PerplexityBot challenged: the real crawler may pass Claude-SearchBot blocked by robots.txt GPTBot refused while another name was served ClaudeBot blocked by robots.txt Tested with tagged user agents from published IPs — crawlmouse.com/bot.',
+      'Googlebot allowed by robots Bingbot allowed by robots OAI-SearchBot allowed, thin ChatGPT-User allowed, thin PerplexityBot challenged: the real crawler may pass Claude-SearchBot blocked by robots.txt GPTBot refused, others served ClaudeBot blocked by robots.txt Tested with tagged user agents from published IPs — crawlmouse.com/bot.',
     source:
       'FACTS B2 (row 222), I2, I6 (eight crawlers, verdicts not status codes) and D1 (the line under every crawler table)',
   },

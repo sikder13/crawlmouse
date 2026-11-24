@@ -287,7 +287,7 @@ const TABLE: Record<string, Record<string, Change[]>> = {
     'access_tests[].verdict': [
       {
         change: (_, d) => (test0(d).verdict = 'blocked_by_ua_rule'),
-        expect: { map: ['OAI-SearchBot refused while another name was served'] },
+        expect: { map: ['OAI-SearchBot refused, others served'] },
       },
     ],
     'access_tests[].word_count': [

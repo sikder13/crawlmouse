@@ -67,7 +67,7 @@ describe('a request in a crawler’s name is reported as that request', () => {
     const label = accessPill(
       withVerdicts(['allowed', 'blocked_by_ua_rule', 'refused_unverified', 'refused_unverified']),
     ).label;
-    expect(label).toBe('1 refused while another name was served · 2 refused, unverified');
+    expect(label).toBe('1 refused, others served · 2 refused, unverified');
   });
 
   it('counts a challenge apart from a refusal to every crawler name', () => {

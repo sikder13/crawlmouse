@@ -318,7 +318,7 @@ export function accessPill(check: Check): DoorView['pill'] {
           state: blocked ? 'bad' : 'unverified',
           label: [
             robots ? `${robots} blocked by robots.txt` : null,
-            refused ? `${refused} refused while another name was served` : null,
+            refused ? `${refused} refused, others served` : null,
             unverified ? `${unverified} refused, unverified` : null,
             challenged - unverified ? `${challenged - unverified} challenged` : null,
             kept - blocked - challenged ? `${kept - blocked - challenged} not served` : null,

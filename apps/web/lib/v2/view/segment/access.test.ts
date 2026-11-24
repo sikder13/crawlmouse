@@ -120,7 +120,7 @@ describe('accessView: headline, tiles and the method sentence', () => {
     const v = view('bad-site');
     expect(v.headline.pill).toEqual({
       state: 'bad',
-      label: '1 refused while another name was served · 1 challenged',
+      label: '1 refused, others served · 1 challenged',
     });
     expect(v.headline.title).toBe(
       'Requests as one of six AI crawlers were refused while another crawler name was served, and one was challenged.',

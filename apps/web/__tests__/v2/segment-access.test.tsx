@@ -59,9 +59,7 @@ describe.each(SEGMENT_VARIANTS)(
         expect(label).toBe('refused or challenged our tests');
       } else {
         expect(n(/(\d+) blocked by robots/)).toBe(count(['disallowed_by_robots']));
-        expect(n(/(\d+) refused while another name was served/)).toBe(
-          count(['blocked_by_ua_rule']),
-        );
+        expect(n(/(\d+) refused, others served/)).toBe(count(['blocked_by_ua_rule']));
         expect(n(/(\d+) refused, unverified/)).toBe(count(['refused_unverified']));
         expect(n(/(\d+) challenged/)).toBe(count(['challenged_ua']));
         expect(n(/(\d+) not measured/)).toBe(count(['not_measured']));
