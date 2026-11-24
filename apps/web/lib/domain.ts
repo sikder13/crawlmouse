@@ -10,6 +10,8 @@
  */
 export function normalizeDomain(input: string): string {
   const withScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(input) ? input : `https://${input}`;
-  const host = new URL(withScheme).hostname.toLowerCase().replace(/\.$/, '');
-  return host.replace(/^www\./, '');
+  const host = new URL(withScheme).hostname.toLowerCase().replace(/\.+$/, '');
+  const key = host.replace(/^www\./, '');
+  if (key === '') throw new TypeError('not a host');
+  return key;
 }

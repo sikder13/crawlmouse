@@ -10,12 +10,14 @@ import { createClient } from '@supabase/supabase-js';
 import type { InngestFunction } from 'inngest';
 import { setAccountReconcile } from '../../../../inngest/billing';
 import { createPastDueSweepFn } from '../../../../inngest/past-due-sweep';
+import { createTrialClockFn } from '../../../../inngest/trial-clock';
 import { createTrialLifecycleFn } from '../../../../inngest/trial-lifecycle';
 import { billingClock, supabaseDeletionState, supabaseSweepReads, type ClockDeps } from './clock';
 import { productionSinks } from './effect-sinks';
 import { billingV2Enabled } from './flags';
 import { accountReconcileFromEnv } from './reconcile-v2';
 import { supabaseEntitlementStore } from './state-machine-apply';
+import { supabaseTrialClockReads, trialClockDue } from './trial-clock';
 
 type Env = Readonly<Record<string, string | undefined>>;
 
@@ -28,11 +30,34 @@ export function billingFunctions(env: Env = process.env): InngestFunction.Like[]
   return [createTrialLifecycleFn(clock), createPastDueSweepFn(clock)];
 }
 
-/** The clock's dependencies from the environment, through the service-role client. */
-function clockDeps(env: Env): ClockDeps {
-  const sb = createClient(env.NEXT_PUBLIC_SUPABASE_URL ?? '', env.SUPABASE_SERVICE_ROLE_KEY ?? '', {
+/**
+ * `crawlmouse.trial.clock`, registered by the serve route with V2_CHECKS_PUBLIC=1: a no-card trial
+ * gets its reminder and its end whether or not V2_BILLING is on.
+ */
+export function trialClockFunctions(env: Env = process.env): InngestFunction.Like[] {
+  return [
+    createTrialClockFn(() => {
+      const sb = serviceClient(env);
+      const clock = billingClock(clockDeps(env, sb));
+      const reads = supabaseTrialClockReads(sb);
+      return {
+        now: clock.now,
+        due: (at, limit) => trialClockDue(reads, at, limit),
+        remind: clock.remind,
+        expire: clock.expire,
+        dispatch: clock.dispatch,
+      };
+    }),
+  ];
+}
+
+const serviceClient = (env: Env) =>
+  createClient(env.NEXT_PUBLIC_SUPABASE_URL ?? '', env.SUPABASE_SERVICE_ROLE_KEY ?? '', {
     auth: { persistSession: false },
   });
+
+/** The clock's dependencies from the environment, through the service-role client. */
+function clockDeps(env: Env, sb = serviceClient(env)): ClockDeps {
   return {
     store: supabaseEntitlementStore(sb),
     reads: supabaseSweepReads(sb),

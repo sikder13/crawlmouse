@@ -32,6 +32,8 @@ export const QA_HOSTS = {
   // its host's hourly bucket, which qa+agency's first client would otherwise share on every reset.
   trialClient: 'trial-client-1.lab.crawlmouse.com',
   demo: [1, 2, 3].map((n) => `demo-${n}.lab.crawlmouse.com`),
+  // No account holds this one: journey J0.8g checks it directly (fixtures/qa-lab/api/slow.mjs).
+  slow: 'slow.lab.crawlmouse.com',
 } as const;
 
 /** Where the person's work lives: their own account, a second (agency) account, or a seat on one. */

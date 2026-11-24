@@ -32,7 +32,7 @@ describe('createAlertFn (D5)', () => {
       createAlertFn(
         { plan: async () => ({ skip: 'x' }), deliver: async () => ({ status: 'none' }) },
         {
-          INNGEST_ALERT_CONCURRENCY: '50',
+          INNGEST_ALERT_CONCURRENCY: '500',
         },
       ),
     );

@@ -228,6 +228,8 @@ describe('v2 stays out of live pages', () => {
     // CC-31: a report's document prints a verdict's word as the screens do. It imports
     // components/v2/verdicts.ts, which is data: a type import and no style.
     file === join(WEB_ROOT, 'lib', 'v2', 'reports', 'generate-doc.ts') ||
+    // RC-20: the root 404 reaches v2 only through a client island that loads the screen on demand.
+    file === join(WEB_ROOT, 'app', 'not-found.tsx') ||
     // A test beside the code it tests; the next case holds that no other module imports one.
     /\.test\.tsx?$/.test(file);
 
