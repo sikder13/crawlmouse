@@ -68,6 +68,12 @@ export const HISTORY_SOURCES: Record<ChangesHistory, { fixture: FixtureName; che
   },
 };
 
+/** Previews on a fixture of their own, not a variant's: the path's last part, and what it shows. */
+export const OWN_SOURCES: Record<'built', { fixture: FixtureName; check: string }> = {
+  /** The check builder's one check (CC-20a), read from the fixture rather than repeated here. */
+  built: { fixture: 'built-site', check: fixture('built-site').checks[0]!.id },
+};
+
 export const segmentPath = (key: SegmentKey, suffix = '') =>
   `/v2-preview/screens/segment/${key}${suffix}`;
 
@@ -117,8 +123,8 @@ export const SEGMENT_PREVIEWS = {
  * preview, so its tabs link nowhere.
  */
 export function linksBuiltPreview() {
-  const d = fixture('built-site');
-  return linksView(d, d.checks[0]!.id);
+  const { fixture: name, check } = OWN_SOURCES.built;
+  return linksView(fixture(name), check);
 }
 
 /** Changes for a later check: its site's own pages are not previewed, so the links go to "#". */
