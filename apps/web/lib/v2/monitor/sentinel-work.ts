@@ -106,7 +106,11 @@ export function sentinelWork(deps: SentinelDeps) {
   /** No look and no full check while the sentinel is hidden or crawling is paused. */
   const stopped = (): string | null =>
     !deps.shown() ? 'hidden' : deps.paused() ? 'crawl_paused' : null;
-  /** A paid site the sentinel may watch at `now`: the rule `dispatch` applies to each site. */
+  /**
+   * A paid site the sentinel may watch at `now`: the tier half of the rule. The store applies the
+   * site and deletion half (`listed`, sentinel-store.ts); a change to either half belongs in both
+   * `dispatch` and `stillWatched`, which is why both call this.
+   */
   const watched = (s: WatchableSite, now: Date): boolean =>
     effectiveTier(clockFromAccountRow(s.account), now) !== 'free';
   /**
