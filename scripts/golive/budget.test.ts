@@ -7,7 +7,7 @@ import { DOC_PATH, renderBudget } from './budget-doc';
 import {
   canaryMonthly,
   FUNCTIONS,
-  HOBBY_HEADROOM_LINE,
+  PLAN_HEADROOM_LINE,
   SHAPES,
   BUSY_PER_POST_MAX,
   MAX_SECONDS,
@@ -18,7 +18,7 @@ import {
   heaviestSearched,
   finishedFanOut,
   floorBySwitchOn,
-  hobbyVerdict,
+  planVerdict,
   monthlyFloor,
   type CheckShape,
 } from './budget';
@@ -379,10 +379,11 @@ describe('the month', () => {
     expect(finishedFanOut()).toBe(8);
   });
 
-  it('fails the Hobby plan when the floor plus 1,000 typical checks passes the line', async () => {
-    const { total, passes } = await hobbyVerdict();
+  it('passes the Pro plan only while the floor plus 1,000 typical checks stays under the line', async () => {
+    const { total, passes } = await planVerdict();
     expect(total).toBe(monthlyFloor() + 1_000 * (22 + 8));
-    expect(passes).toBe(total <= HOBBY_HEADROOM_LINE);
+    expect(passes).toBe(total <= PLAN_HEADROOM_LINE);
+    expect(passes).toBe(true);
   });
 });
 
