@@ -25,7 +25,7 @@ import { normalizeDomain } from '../../domain';
 import { DOMAIN_AUDITS_PER_HOUR, GLOBAL_AUDITS_BUCKET, GLOBAL_AUDITS_PER_DAY } from '../../limits';
 import { MAX_RATE_LIMIT_WINDOW_MS, rateLimitWindowStart } from '../../rate-limit-window';
 import { bucketedKey, checkIdOfKey, freshKey } from '../pipeline/ids';
-import { DEFAULT_PAGE_CAP, MANUAL_BUCKET_S } from '../pipeline/limits';
+import { MANUAL_BUCKET_S } from '../pipeline/limits';
 import { homepageOf, requestCheck, type RequestDeps } from '../pipeline/request';
 import { supabasePipelineStore, type QueuedCheck } from '../pipeline/store';
 import type { RecheckOutcome, RequestRecheck } from './recheck';
@@ -204,11 +204,17 @@ export interface ResendQueued {
 /**
  * Sends a queued check's event again, under its own id (QA on #101): after a send that failed the
  * check is queued with nothing to run it, and a retry is what recovers it. Answers whether it sent.
+ * Its page cap is `capOf`'s, the account's (`accountPageCap`), as `requestCheck` gave the first send; a
+ * caller must give it, so no re-send can fall back to the default.
  */
-export function supabaseResendQueued(send: Send = sendWithInngest) {
+export function supabaseResendQueued(
+  capOf: (accountId: string) => Promise<number>,
+  send: Send = sendWithInngest,
+) {
   return async ({ siteId, accountId, host, check, requestedByUserId }: ResendQueued) => {
     const id = queuedEventId(siteId, check);
     if (id === null) return false;
+    const pageCap = await capOf(accountId);
     await send({
       id,
       name: 'check.requested',
@@ -219,7 +225,7 @@ export function supabaseResendQueued(send: Send = sendWithInngest) {
         host,
         homepageUrl: homepageOf(host),
         trigger: check.trigger,
-        pageCap: DEFAULT_PAGE_CAP,
+        pageCap,
         requestedByUserId,
       },
     });
