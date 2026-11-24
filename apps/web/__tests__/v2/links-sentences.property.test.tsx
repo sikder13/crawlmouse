@@ -5,7 +5,8 @@
  * named shapes, then records fast-check generates. The generator varies a page's status (200, 404,
  * 410, 429, 503, a 301 loop); its redirect (none, not recorded, one hop, a two-hop 301 chain, a
  * chain whose final URL is not recorded, to a URL in the record or to a landing URL outside it);
- * whether it is a PDF, or an HTML page whose links were not all read; its title and description
+ * whether it is a PDF, an HTML page whose links were not all read, or an HTML page read whole whose
+ * `links_out` counts more links than the record holds from it; its title and description
  * (not read, declared empty, blank with Unicode or zero-width spaces, text, cut short); the links
  * between pages, from the record's pages and from the landing URLs outside it, self-links included;
  * how many links and pages the check found beyond those the record holds (`withheld`); and whether
@@ -24,7 +25,10 @@
  *   screen matches a wording in FORBIDDEN.
  *
  * The truth is computed from the record, with no helper of the view under test (segment/broken.ts,
- * links-facts.ts, reports/csv.ts) imported.
+ * links-facts.ts, reports/csv.ts) used by it; `linkSpelling` is imported from links-facts.ts only to
+ * be held equal to the engine's `canonicalizeUrl`. The hand-counted vectors below also carry their
+ * expected pill, body, tab, empty state and headline as literals, so a rule this truth shares with
+ * the view cannot pass both.
  */
 import fc from 'fast-check';
 import { JSDOM } from 'jsdom';
@@ -738,8 +742,117 @@ const SHAPES: [string, PageResult[], LinkEdge[], Scope][] = [
   ],
 ];
 
-describe('every string of Links and pages is true to the record: the named shapes', () => {
+describe('Links and pages: counts, rows, pills and clauses agree with the truth computed here, and no string matches FORBIDDEN: the named shapes', () => {
   it.each(SHAPES)('%s', (_name, pages, edges, scope) => expectTrueToTheRecord(pages, edges, scope));
+});
+
+// ---- Hand-counted vectors: the expected strings are written out, not computed ------------------
+
+/** A page read whole as HTML, counting `linksOut` distinct links. */
+const whole = (path: string, linksOut: number) =>
+  page(path, 200, { is_html: true, links_read: true, links_out: linksOut });
+const pdf = (path: string) =>
+  page(path, 200, { is_html: false, links_read: false, title: null, meta_description: null });
+
+interface Said {
+  pill: string;
+  body: string;
+  tab: string;
+  brokenEmpty: string | null;
+  headline: string;
+}
+
+const VECTORS: [string, PageResult[], LinkEdge[], Said][] = [
+  [
+    '(a) the cap: / read whole counts 1,500 links and the record keeps one; /gone 404 with no kept link',
+    [whole('/', 1500), gone('/gone', 404)],
+    [edge('/', '/a')],
+    {
+      pill: '1 missing page · no link in the record leads to it',
+      body:
+        '1 missing page, answering 404; no link in this check’s record leads to it. ' +
+        'The links of 1 page are not all in this check’s record. ' +
+        'The page that answered 200 has a title and a meta description.',
+      tab: 'Next: Links and pages · 1 missing page · no link in the record leads to it',
+      brokenEmpty: 'No link in this check’s record leads to the missing page.',
+      headline: '1 missing page found · 0 redirects · titles and descriptions read on 1 page',
+    },
+  ],
+  [
+    '(b) the batch out of room: / read whole counts 3 links and the record keeps none; /gone 410',
+    [whole('/', 3), gone('/gone', 410)],
+    [],
+    {
+      pill: '1 missing page · no link recorded',
+      body:
+        '1 missing page, answering 410. No link is in this check’s record, so what links to it is not known. ' +
+        'The links of 1 page are not all in this check’s record. ' +
+        'The page that answered 200 has a title and a meta description.',
+      tab: 'Next: Links and pages · 1 missing page · no link recorded',
+      brokenEmpty: 'No link is in this check’s record, so no link to a missing page can be named.',
+      headline:
+        '1 missing page found · no link recorded · 0 redirects · titles and descriptions read on 1 page',
+    },
+  ],
+  [
+    '(c) two pages link to /gone and the record keeps the link of one',
+    [whole('/', 1), whole('/a', 1), gone('/gone', 404)],
+    [edge('/', '/gone')],
+    {
+      pill: '1 missing page · linked from 1 page in the record',
+      body:
+        '1 missing page, linked from 1 page in this check’s record, answering 404. ' +
+        'The links of 1 page are not all in this check’s record. ' +
+        'Each of the 2 pages that answered 200 has its own title and meta description.',
+      tab: 'Next: Links and pages · 1 missing page · linked from 1 page in the record',
+      brokenEmpty: null,
+      headline: '1 missing page found · 0 redirects · titles and descriptions read on 2 pages',
+    },
+  ],
+  [
+    '(d) / answers 200 and three pages answer 429',
+    [whole('/', 1), gone('/a', 429), gone('/b', 429), gone('/c', 429)],
+    [edge('/', '/a')],
+    {
+      pill: 'no page checked answered 404 or 410',
+      body:
+        '3 pages answered an error (429). ' +
+        'The page that answered 200 has a title and a meta description.',
+      tab: 'Next: Links and pages · no page checked answered 404 or 410',
+      brokenEmpty: 'No page checked answered 404 or 410.',
+      headline: '0 missing pages found · 0 redirects · titles and descriptions read on 1 page',
+    },
+  ],
+  [
+    '(e) two PDFs answering 200',
+    [pdf('/a.pdf'), pdf('/b.pdf')],
+    [],
+    {
+      pill: 'no link read',
+      body:
+        'None of the 2 pages we checked answers an error. ' +
+        'No title or meta description was read on the 2 pages that answered 200.',
+      tab: 'Next: Links and pages · no link read',
+      brokenEmpty: 'No link was read, so no link to a missing page can be named.',
+      headline:
+        '0 missing pages found · no link read · 0 redirects · titles and descriptions read on 0 pages',
+    },
+  ],
+];
+
+describe('Links and pages on hand-counted records: the pill, body, tab, empty state and headline, as written', () => {
+  it.each(VECTORS)('%s', (_name, pages, edges, want) => {
+    expectTrueToTheRecord(pages, edges);
+    const { v, door, tab } = said(dataset(settle(pages, edges), edges));
+    expect({
+      pill: v.headline.pill?.label,
+      body: v.body,
+      tab,
+      brokenEmpty: v.broken.empty,
+      headline: v.headline.title,
+    }).toEqual(want);
+    expect([door.pill.label, door.body]).toEqual([want.pill, want.body]);
+  });
 });
 
 // ---- Generated records -------------------------------------------------------------------------
@@ -839,6 +952,7 @@ const recordArb = fc
         fc.tuple(fc.constantFrom(...PATHS, ...LANDINGS), fc.constantFrom(...PATHS, ...LANDINGS)),
         { maxLength: 12, selector: ([a, b]) => `${a} ${b}` },
       ),
+      fc.array(fc.constantFrom(0, 0, 0, 2, 1000), { minLength: 6, maxLength: 6 }),
       fc.record({
         extraLinks: fc.constantFrom(0, 0, 1, 3, 700),
         extraCrawled: fc.constantFrom(0, 0, 1, 2, 200),
@@ -846,7 +960,7 @@ const recordArb = fc
       }),
     ),
   )
-  .map(([pages, links, scope]) => {
+  .map(([pages, links, extraOut, scope]) => {
     // A link is held only from a page the record holds and read as HTML, or from the URL where a
     // redirect of one of them landed, outside the record.
     const from = new Set([
@@ -858,11 +972,18 @@ const recordArb = fc
     const edges = scope.unmeasured
       ? []
       : links.filter(([a]) => from.has(url(a))).map(([a, b]) => edge(a, b));
-    return { pages, edges, scope };
+    // A page read whole may count more links than the record holds from it: the worker keeps the
+    // first 1,000 of a page, and none once its batch has used its room.
+    const counted = pages.map((p, i) =>
+      p.is_html && p.links_read
+        ? { ...p, links_out: heldFrom(p, edges) + extraOut[i]! }
+        : { ...p, links_out: heldFrom(p, edges) },
+    );
+    return { pages: counted, edges, scope };
   });
 
-describe('every string of Links and pages is true to the record: generated records', () => {
-  it('holds for each generated record', () => {
+describe('Links and pages: counts, rows, pills and clauses agree with the truth computed here, and no string matches FORBIDDEN: generated records', () => {
+  it('holds for 200 generated records', () => {
     fc.assert(
       fc.property(recordArb, ({ pages, edges, scope }) =>
         expectTrueToTheRecord(pages, edges, scope),
@@ -871,8 +992,8 @@ describe('every string of Links and pages is true to the record: generated recor
     );
   });
 
-  it('generates each shape the assertions are about', () => {
-    // The generator reaches each axis it claims, counted over a fixed sample.
+  it('reaches each axis listed here, over a fixed sample of 400 records', () => {
+    // Each key below is an axis the generator varies; each is asserted reached in the sample.
     const sample = fc.sample(recordArb, { numRuns: 400, seed: 7 });
     const some = (pred: (r: (typeof sample)[number]) => boolean) => sample.some(pred);
     const twoStatuses = (r: (typeof sample)[number]) => {
@@ -910,6 +1031,21 @@ describe('every string of Links and pages is true to the record: generated recor
           (x) => new Set(x.into.map((e) => e.from_url)).size > 2,
         ),
       ),
+      unrecorded: some((r) => truthOf(r.pages, r.edges, r.scope).linkGap === 'unrecorded'),
+      gone410: some((r) => r.pages.some((p) => p.status_code === 410)),
+      loop: some((r) => r.pages.some((p) => p.redirect?.loop === true)),
+      redirectNotRecorded: some((r) => r.pages.some((p) => p.redirect === null)),
+      extraCrawled: some((r) => (r.scope.extraCrawled ?? 0) > 0 && r.pages.length > 0),
+      cutTitle: some((r) => r.pages.some((p) => p.title?.cut === true)),
+      readWholeNotAllHeld: some((r) =>
+        r.pages.some(
+          (p) =>
+            p.status_code === 200 &&
+            p.is_html &&
+            p.links_read &&
+            p.links_out > heldFrom(p, r.edges),
+        ),
+      ),
     }).toEqual({
       withheldLinks: true,
       unmeasured: true,
@@ -920,6 +1056,13 @@ describe('every string of Links and pages is true to the record: generated recor
       twoStatuses: true,
       zeroWidth: true,
       moreThanTwoLinking: true,
+      unrecorded: true,
+      gone410: true,
+      loop: true,
+      redirectNotRecorded: true,
+      extraCrawled: true,
+      cutTitle: true,
+      readWholeNotAllHeld: true,
     });
   });
 });
