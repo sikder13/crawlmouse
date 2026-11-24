@@ -24,9 +24,9 @@ import {
   rowsHtml,
   rowsText,
   rowText,
-  SITE_ORIGIN,
   type MailChange,
 } from './alert';
+import { mailOrigin } from '../links';
 
 /** The rows one site lists before it says how many more there are. */
 export const SUMMARY_SITE_ROWS = 10;
@@ -107,7 +107,7 @@ export const weeklySummaryTemplate: Template<WeeklySummaryInput> = (input): Rend
     dayMonth(input.since, input.zone),
     dayMonth(lastDay, input.zone),
   );
-  const log = `${SITE_ORIGIN}/changes`;
+  const log = `${mailOrigin()}/changes`;
 
   const htmlParts: string[] = [`<p style="margin:0 0 16px">${html(intro)}</p>`];
   const textParts: string[] = [SUMMARY_COPY.title, '', intro];

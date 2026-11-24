@@ -17,7 +17,7 @@
  * Test support, imported by tests: `grep -rln "inspect'" apps/web --include='*.ts*' | grep -v '\.test\.'`
  * lists this file alone.
  */
-import { MAIL_ORIGIN } from '../links';
+import { mailOrigin } from '../links';
 import type { RenderedMail } from '../types';
 
 /** The attributes whose value a mail client may load or follow. */
@@ -164,6 +164,6 @@ export function foreignTargets(mail: RenderedMail): string[] {
       !u
         .replace(/[\t\n\r]/g, '')
         .trim()
-        .startsWith(`${MAIL_ORIGIN}/`),
+        .startsWith(`${mailOrigin()}/`),
   );
 }

@@ -1,8 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { bounded, html, oneLine } from './escape';
 import { layout } from './layout';
-import { checkUrl, MAIL_ORIGIN } from './links';
-import { pageUrl, SITE_ORIGIN } from './templates/alert';
+import { checkUrl, mailOrigin, PRODUCTION_MAIL_ORIGIN } from './links';
+import { pageUrl } from './templates/alert';
 import { linkSecret, signUnsubscribe, verifyUnsubscribe } from './unsubscribe-token';
 
 const SECRET = 's'.repeat(40);
@@ -83,12 +83,43 @@ describe('the unsubscribe token (D7)', () => {
 
 describe('the page links (links.ts and templates/alert.ts)', () => {
   it('share one origin and refuse the same ids', () => {
-    expect(SITE_ORIGIN).toBe(MAIL_ORIGIN);
     const id = 'c0000000-0000-4000-8000-0000000000aa';
     expect(pageUrl('/audit/', id)).toBe(checkUrl(id));
     for (const bad of ['', 'x', `${id}/../alerts`, id.toUpperCase(), `${id} `]) {
       expect(() => pageUrl('/audit/', bad)).toThrow(RangeError);
       expect(() => checkUrl(bad)).toThrow(RangeError);
+    }
+  });
+});
+
+describe('mailOrigin: where mail links point (F-253)', () => {
+  afterEach(() => vi.unstubAllEnvs());
+  const id = 'c0000000-0000-4000-8000-0000000000aa';
+
+  it('is production with no origin named', () => {
+    vi.stubEnv('NEXT_PUBLIC_BASE_URL', '');
+    expect(mailOrigin()).toBe('https://crawlmouse.com');
+    expect(PRODUCTION_MAIL_ORIGIN).toBe('https://crawlmouse.com');
+  });
+
+  it('is the deployment’s own origin, so staging’s mail opens staging, in every link builder', () => {
+    vi.stubEnv('NEXT_PUBLIC_BASE_URL', 'https://staging.crawlmouse.example/');
+    expect(mailOrigin()).toBe('https://staging.crawlmouse.example');
+    expect(checkUrl(id)).toBe(`https://staging.crawlmouse.example/audit/${id}`);
+    expect(pageUrl('/sites/', id)).toBe(`https://staging.crawlmouse.example/sites/${id}`);
+  });
+
+  it('falls back to production for anything but a bare https origin', () => {
+    for (const odd of [
+      'http://staging.crawlmouse.example',
+      'https://staging.crawlmouse.example/path',
+      'https://staging.crawlmouse.example?x=1',
+      'https://user:pw@staging.crawlmouse.example',
+      'javascript:alert(1)',
+      'not a url',
+    ]) {
+      vi.stubEnv('NEXT_PUBLIC_BASE_URL', odd);
+      expect(mailOrigin(), odd).toBe('https://crawlmouse.com');
     }
   });
 });

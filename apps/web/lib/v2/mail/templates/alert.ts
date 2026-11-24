@@ -17,9 +17,7 @@ import { html, oneLine } from '../escape';
 import { layout } from '../layout';
 import type { RenderedMail, Template } from '../types';
 import { clockTime } from './when';
-
-/** Where the links in v2 mail point: pages this product serves. */
-export const SITE_ORIGIN = 'https://crawlmouse.com';
+import { mailOrigin } from '../links';
 
 /** The rows a message lists before it says how many more there are. */
 export const MAIL_ROWS_MAX = 20;
@@ -46,16 +44,16 @@ export interface AlertMailInput {
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
-/** A crawlmouse.com page for an id we hold; anything that is not an id is refused, not linked. */
+/** One of our pages for an id we hold; anything that is not an id is refused, not linked. */
 export function pageUrl(path: '/audit/' | '/sites/', id: string): string {
   if (!UUID.test(id)) throw new RangeError('not an id');
-  return `${SITE_ORIGIN}${path}${id}`;
+  return `${mailOrigin()}${path}${id}`;
 }
 
 /** A fix's page under the check that found it (`auditHrefs(checkId).fix(fixId)`); ids only. */
 export function fixUrl(checkId: string, fixId: string): string {
   if (!UUID.test(checkId) || !UUID.test(fixId)) throw new RangeError('not an id');
-  return `${SITE_ORIGIN}${auditHrefs(checkId).fix(fixId)}`;
+  return `${mailOrigin()}${auditHrefs(checkId).fix(fixId)}`;
 }
 
 export const GRADE_NAMES: Record<GradeName, string> = {
@@ -222,7 +220,7 @@ export const alertTemplate: Template<AlertMailInput> = (input): RenderedMail => 
   }));
   const when = `${dayDate(input.checkedAt, input.zone)} at ${clockTime(input.checkedAt, input.zone)}`;
   const check = pageUrl('/audit/', input.checkId);
-  const rules = `${SITE_ORIGIN}/alerts`;
+  const rules = `${mailOrigin()}/alerts`;
   const problems = all.filter(isProblem).length;
   const intro = ALERT_COPY.intro(when, problems, all.length - problems);
   const moves = letterMoves(all);
