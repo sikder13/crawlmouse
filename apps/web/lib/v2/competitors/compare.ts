@@ -30,7 +30,7 @@
  *
  * Two runs for one site can overlap, since a sleeping run holds no concurrency slot, and they can
  * copy different checks of one host. Each run's `write` replaces a host's snapshot with the one
- * it copied, so the run that writes last decides it.
+ * it copied, so the last run that copied one for that host decides it.
  *
  * The site row keeps the host as spelled by the customer whose run inserted the row (`www.` or
  * not), and the crawl starts there.
