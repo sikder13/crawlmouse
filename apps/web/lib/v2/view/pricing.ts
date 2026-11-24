@@ -6,7 +6,7 @@
  * A button is offered only where the route it reaches would act (correctness B2, Q24):
  * - Signed out, Free and Pro go to Sign-up (one email creates the account and starts the Pro trial)
  *   while V2_ACCOUNT_DOOR serves it, and to v1's sign-in (`/login`) otherwise; Agency goes to the
- *   Agency trial page.
+ *   Agency trial page, or with V2_BILLING off to the same free start.
  * - Signed in, the default account's tier is "Your plan", and only the account's owner changes it.
  *   Pro offers its trial when `trialRefusal` lets the account start one and V2_CHECKS_PUBLIC serves
  *   the trial's route. Otherwise a paid plan is decided by CC-03's `checkoutRefusal`: no refusal is
@@ -55,10 +55,12 @@ export type PricingViewer =
       };
     };
 
-/** The flags the buttons' routes are served under: V2_ACCOUNT_DOOR and V2_CHECKS_PUBLIC. */
+/** The flags the buttons' routes are served under: V2_ACCOUNT_DOOR, V2_CHECKS_PUBLIC, V2_BILLING. */
 export interface PricingFlags {
   accountDoor: boolean;
   checksPublic: boolean;
+  /** Off (RC-01): nothing reaches checkout, the portal or the Agency trial. */
+  billing: boolean;
 }
 
 interface ActionText {
@@ -97,7 +99,9 @@ export interface PlanView {
 export interface PricingView {
   /** The reader is signed in: the header offers their Sites in place of Log in (CC-39 D2). */
   signedIn: boolean;
-  /** The h1 (the artboard's, Q33): it names the monitoring that is coming (SEO R2-N2). */
+  /** The indexed h1, unchanged from v1 (OPERATING-RULES §13). */
+  h1: string;
+  /** The artboard's line under the h1 (Q33): it names the monitoring (SEO R2-N2). */
   title: TaggedView;
   lead: TaggedView[];
   interval: Interval;
@@ -165,7 +169,9 @@ function paidAction(
   plan: PaidTier,
   interval: Interval,
   text: ActionText,
+  billing: boolean,
 ): Unranked {
+  if (!billing) return { kind: 'note', note: COPY.buttons.opensShortly.note };
   const refusal = checkoutRefusal(account.snapshot, plan);
   if (refusal === null) return form(CHECKOUT, { plan, interval, accountId: account.id }, text);
   if (refusal.error === 'subscription_open' && portalRefusal(account.customer) === null) {
@@ -182,7 +188,10 @@ function freeAction(viewer: PricingViewer, flags: PricingFlags): Unranked {
       : link(LOGIN, COPY.buttons.freeSignIn);
   }
   if (account.tier === 'free') return { kind: 'current', ...COPY.buttons.current };
-  return { kind: 'note', note: COPY.buttons.freeBelow.note };
+  return {
+    kind: 'note',
+    note: flags.billing ? COPY.buttons.freeBelow.note : COPY.buttons.freeBelowBillingOff.note,
+  };
 }
 
 /**
@@ -199,7 +208,9 @@ function proAction(
   now: Date,
   flags: PricingFlags,
 ): { action: Unranked; trial: boolean } {
-  const trial = { label: COPY.buttons.proTrial.label, note: COPY.buttons.proTrial.note(interval) };
+  const trial = flags.billing
+    ? { label: COPY.buttons.proTrial.label, note: COPY.buttons.proTrial.note(interval) }
+    : COPY.buttons.proTrialBillingOff;
   const account = viewer.kind === 'signed_in' ? viewer.account : null;
   if (account === null) {
     if (flags.accountDoor) return { action: link(SIGNUP, trial), trial: true };
@@ -234,27 +245,43 @@ function proAction(
     return { action: form(PRO_TRIAL_START, { accountId: account.id }, trial), trial: true };
   }
   return {
-    action: paidAction(account, 'pro', interval, {
-      label: COPY.buttons.proBuy.label,
-      note: COPY.buttons.proBuy.note(interval),
-    }),
+    action: paidAction(
+      account,
+      'pro',
+      interval,
+      {
+        label: COPY.buttons.proBuy.label,
+        note: COPY.buttons.proBuy.note(interval),
+      },
+      flags.billing,
+    ),
     trial: false,
   };
 }
 
-function agencyAction(viewer: PricingViewer, interval: Interval): Unranked {
+function agencyAction(viewer: PricingViewer, interval: Interval, flags: PricingFlags): Unranked {
   const trial = link(agencyTrialPath(interval), COPY.buttons.agencyTrial);
-  if (viewer.kind === 'signed_out') return trial;
+  if (viewer.kind === 'signed_out') {
+    if (flags.billing) return trial;
+    return link(flags.accountDoor ? SIGNUP : LOGIN, COPY.buttons.agencyStartFree);
+  }
   if (viewer.agency.held || viewer.account?.tier === 'agency') {
     return { kind: 'current', ...COPY.buttons.current };
   }
+  if (!flags.billing) return { kind: 'note', note: COPY.buttons.opensShortly.note };
   const used = viewer.agency.used;
   if (used === null) return trial;
   if (used.account === null) return { kind: 'note', note: COPY.buttons.agencyUsed.note };
-  return paidAction(used.account, 'agency', interval, {
-    label: COPY.buttons.agencyBuy.label,
-    note: COPY.buttons.agencyBuy.note(interval),
-  });
+  return paidAction(
+    used.account,
+    'agency',
+    interval,
+    {
+      label: COPY.buttons.agencyBuy.label,
+      note: COPY.buttons.agencyBuy.note(interval),
+    },
+    flags.billing,
+  );
 }
 
 /** The first actionable of Pro, Agency and Free carries the orange; the rest are default buttons. */
@@ -269,6 +296,10 @@ function ranked(actions: Record<Tier, Unranked>): Record<Tier, PlanAction> {
   return out;
 }
 
+/** Agency's rows with what is built first, so its "coming" marks sit together at the end. */
+const builtFirst = <R extends { coming: boolean }>(tier: Tier, rows: R[]): R[] =>
+  tier === 'agency' ? [...rows.filter((r) => !r.coming), ...rows.filter((r) => r.coming)] : rows;
+
 export function pricingView(
   viewer: PricingViewer,
   interval: Interval,
@@ -276,15 +307,16 @@ export function pricingView(
   flags: PricingFlags,
 ): PricingView {
   const pro = proAction(viewer, interval, now, flags);
-  const copy = planCopy(interval, pro.trial);
+  const copy = planCopy(interval, pro.trial, flags.billing);
   const actions = ranked({
     free: freeAction(viewer, flags),
     pro: pro.action,
-    agency: agencyAction(viewer, interval),
+    agency: agencyAction(viewer, interval, flags),
   });
   const tiers: Tier[] = ['free', 'pro', 'agency'];
   return {
     signedIn: viewer.kind === 'signed_in',
+    h1: COPY.h1,
     title: tagged(COPY.title),
     lead: COPY.lead().map(tagged),
     interval,
@@ -299,13 +331,16 @@ export function pricingView(
       name: copy[tier].name,
       tag: copy[tier].tag,
       description: tagged(copy[tier].description),
-      rows: copy[tier].rows.map((r) => ({ label: r.label, ...tagged(r) })),
+      rows: builtFirst(
+        tier,
+        copy[tier].rows.map((r) => ({ label: r.label, ...tagged(r) })),
+      ),
       price: usd(priceOf(tier, interval)),
       per: per(interval),
       action: actions[tier],
     })),
     crawlers: COPY.crawlers().map(tagged),
-    annual: COPY.annual().map(tagged),
+    annual: COPY.annual(flags.billing).map(tagged),
     agencyPlus: {
       name: COPY.agencyPlus.name,
       limits: tagged({ text: COPY.agencyPlus.limits(), capabilities: ['sites', 'seats'] }),
@@ -313,7 +348,7 @@ export function pricingView(
       link: COPY.agencyPlus.link,
       formTitle: COPY.agencyPlus.formTitle,
       reply: tagged(COPY.agencyPlus.reply),
-      form: flags.checksPublic,
+      form: flags.checksPublic && flags.billing,
       inbox: {
         before: COPY.agencyPlus.inboxBefore,
         address: COPY.agencyPlus.inbox,
@@ -321,15 +356,17 @@ export function pricingView(
       },
     },
     after: {
-      title: COPY.after.title(pro.trial),
-      lead: COPY.after.lead().map(tagged),
+      title: COPY.after.title(pro.trial, flags.billing),
+      lead: COPY.after.lead(flags.billing).map(tagged),
       columns: COPY.after.columns,
-      rows: COPY.after.rows(interval).map(([what, happens]) => [what, tagged(happens)]),
+      rows: COPY.after
+        .rows(interval, flags.billing)
+        .map(([what, happens]) => [what, tagged(happens)]),
     },
     why: { title: COPY.why.title, text: COPY.why.text().map(tagged) },
     faq: {
       title: COPY.faq.title,
-      items: COPY.faq.items(pro.trial).map(({ q, a }) => ({ q, a: tagged(a) })),
+      items: COPY.faq.items(pro.trial, flags.billing).map(({ q, a }) => ({ q, a: tagged(a) })),
     },
     comingLabel: AGENCIES_COPY.coming,
     footerComing: footerComing(),

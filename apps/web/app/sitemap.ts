@@ -7,7 +7,6 @@ import { supabaseAdmin } from '@/lib/supabase/admin';
 import { fetchIndexableReportSlugs } from '@/lib/sitemap-reports';
 import { SITEMAP_REPORTS_MAX } from '@/lib/limits';
 import { checksPublicEnabled } from '@/lib/auth/flags';
-import { billingV2Enabled } from '@/lib/billing/flags';
 import { CHECK_QUESTIONS, checkPath } from '@/lib/v2/copy/check-pages';
 import { HELP_SLUGS, helpPath } from '@/lib/v2/help/questions';
 import { CLUSTERS } from '@/lib/blog/clusters';
@@ -43,6 +42,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const marketing: MetadataRoute.Sitemap = [
     entry('', 1.0, 'weekly'),
     entry('/pricing', 0.9, 'monthly'),
+    entry('/agencies', 0.8, 'monthly'),
     entry('/ai-readiness-checker', 0.9, 'monthly'),
     entry('/blog', 0.8, 'weekly', newest(POSTS)),
     entry('/guides', 0.8, 'weekly', newest(POSTS.filter((p) => guided.has(p.slug)))),
@@ -52,10 +52,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   ];
 
   // CC-29: new pages that answer 404 while their flag is off, so each is listed only while it is on
-  // (OPERATING-RULES §13: no sitemap entry answers an error). For agencies follows V2_BILLING; the
+  // (OPERATING-RULES §13: no sitemap entry answers an error). The
   // three /check pages and the help centre (CC-33 D4) follow V2_CHECKS_PUBLIC.
   const flagged: MetadataRoute.Sitemap = [
-    ...(billingV2Enabled() ? [entry('/agencies', 0.8, 'monthly')] : []),
     ...(checksPublicEnabled()
       ? CHECK_QUESTIONS.map((q) => entry(checkPath(q), 0.8, 'monthly'))
       : []),
