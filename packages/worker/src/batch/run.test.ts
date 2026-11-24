@@ -1939,4 +1939,13 @@ describe('the batch result carries its request timing (F-247)', () => {
       expect(calls.length).toBeGreaterThan(0);
     }
   });
+
+  it('times a redirect hop as a request of its own', async () => {
+    const { result, calls } = await runFake(
+      crawlReq('https://example.com', ['/a']),
+      toWww(() => ({ status: 200, headers: { 'content-type': 'text/html' }, body: '<p>w</p>' })),
+    );
+    expect(calls.some((c) => c.url === 'https://www.example.com/t')).toBe(true);
+    expect(result.timing?.requests).toBe(calls.length);
+  });
 });

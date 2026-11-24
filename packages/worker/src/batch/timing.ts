@@ -20,15 +20,16 @@ export class RequestTiming {
       try {
         return await fetcher(url, identity, limits);
       } finally {
-        this.spans.push({ start, end: this.clock.now() });
+        // A wall clock stepped back during the request would give a negative time: none is under 0.
+        this.spans.push({ start, end: Math.max(start, this.clock.now()) });
       }
     };
   }
 
   summary(): BatchTiming {
     const ms = this.spans.map((s) => s.end - s.start).sort((a, b) => a - b);
-    const at = (q: number) =>
-      ms.length ? ms[Math.min(ms.length - 1, Math.floor(q * ms.length))]! : 0;
+    // Nearest rank: the smallest time that at least a share q of the requests took no longer than.
+    const at = (q: number) => (ms.length ? ms[Math.max(0, Math.ceil(q * ms.length) - 1)]! : 0);
     const byStart = [...this.spans].sort((a, b) => a.start - b.start);
     let busy = 0;
     let runStart = -Infinity;

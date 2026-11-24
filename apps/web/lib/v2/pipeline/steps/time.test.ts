@@ -154,6 +154,20 @@ describe('the time plan', () => {
       }
     };
     phase('crawl', CRAWL_BATCH_BUDGET.max_seconds, PACE.maxCrawlBatches);
+    // The crawl's tail may fall in the access slice here (F-247 review): the first access batch still
+    // gets the slice less two graces and polls, the crawl's and its own.
+    const firstAccess = batchSeconds(
+      phaseEndsAt({ kind: 'access' }, plan, t * S),
+      t * S,
+      ACCESS_BATCH_BUDGET.max_seconds,
+      tailOf('access'),
+    );
+    expect(firstAccess).toBeGreaterThanOrEqual(
+      Math.min(
+        ACCESS_BATCH_BUDGET.max_seconds,
+        ACCESS_SLICE_S - 2 * (PACE.pollGraceS + PACE.pollMaxS),
+      ),
+    );
     phase('access', ACCESS_BATCH_BUDGET.max_seconds, 2);
     const fetching = t;
     t += RESERVE_S;

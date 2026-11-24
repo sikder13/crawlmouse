@@ -274,7 +274,7 @@ export function buildSpec20b(): string {
         ['A batch that would get less is not posted', `${MIN_BATCH_S} s`],
         [
           'Kept after a batch, inside its phase, for the poll grace and one poll',
-          `crawl: none, they fall in the access slice (F-247); access: ${PACE.pollGraceS + PACE.pollMaxS} s`,
+          `crawl: none; crawl batches end by the crawl's end, requests in flight finish within the worker's request timeout after it, and the grace and poll fall after it, in the access slice (F-247); access: ${PACE.pollGraceS + PACE.pollMaxS} s`,
         ],
         ['Discovery', `${DISCOVER_S} s, ${SITEMAP_URL_CAP} sitemap URLs`],
         ['Crawl batches per check', String(PACE.maxCrawlBatches)],

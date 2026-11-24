@@ -41,7 +41,8 @@ describe('RequestTiming', () => {
 
   it('reads the percentiles from the sorted times, and counts an answer that threw', async () => {
     const t = await run([100, 900, 300, 500, 700, 200, 800, 400, 600, 1000], Array(10).fill(0));
-    expect(t).toMatchObject({ fetch_ms_p50: 600, fetch_ms_p90: 1000, fetch_ms_max: 1000 });
+    // Nearest rank, worked by hand: of ten sorted times 100..1000, the 5th (500) and the 9th (900).
+    expect(t).toMatchObject({ fetch_ms_p50: 500, fetch_ms_p90: 900, fetch_ms_max: 1000 });
     const clock = new InstantClock(0);
     const timing = new RequestTiming(clock);
     const failing = timing.wrap(async () => {
@@ -81,6 +82,17 @@ describe('RequestTiming', () => {
       fetch_ms_total: 800,
       idle_ms_total: 500,
     });
+  });
+
+  it('records no negative time when the clock is stepped back during a request', async () => {
+    const clock = new InstantClock(10_000);
+    const timing = new RequestTiming(clock);
+    const back = timing.wrap(async () => {
+      clock.advance(-1_000);
+      return {} as FetchOutcome;
+    });
+    await back('https://example.com/', {} as never, {} as never);
+    expect(timing.summary()).toMatchObject({ requests: 1, fetch_ms_max: 0, fetch_ms_total: 0 });
   });
 
   it('is all zero for a batch that asked nothing', () => {

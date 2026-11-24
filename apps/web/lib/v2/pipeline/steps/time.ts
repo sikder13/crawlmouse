@@ -4,10 +4,16 @@
  * timeout less RESERVE_S; the finish timeout holds the whole wait budget, so that end needs no time
  * added back. The crawl's end comes earlier: CRAWL_CEILING_S after the worker accepted the first
  * crawl batch, plus the busy time added back since (`addBackMs`), or ACCESS_SLICE_S before
- * `fetchEndsAt`. Before the first batch is accepted the crawl clock has not started, and the window
- * is measured from the post's own time, so that batch gets its full budget however long it waited. A batch's max_seconds is cut so that its deadline (max_seconds + the poll
- * grace) and the poll after it (one poll wait at most) fall before its phase's end; step latency
- * comes on top (time.test.ts simulates it).
+ * `fetchEndsAt`. When it is the latter (a run that waited long before its crawl), the last crawl
+ * batch's grace and poll fall in the access slice, which then keeps at least ACCESS_SLICE_S less two
+ * graces and polls (time.test.ts); not reserved, because a check that waited must not crawl less
+ * (CC-42A). Before
+ * the first batch is accepted the crawl clock has not started, and the window is measured from the
+ * post's own time, so that batch gets its full budget however long it waited. An access batch's
+ * max_seconds is cut so that its deadline (max_seconds + the poll grace) and the poll after it (one
+ * poll wait at most) fall before its phase's end; a crawl batch's is cut to the crawl's end, and its
+ * grace and poll fall after it (PhaseTail, F-247). Step latency comes on top (time.test.ts simulates
+ * it).
  */
 import type { BatchAt, RunSoFar } from '../../../../../../inngest/check';
 import {
