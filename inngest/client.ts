@@ -1,5 +1,5 @@
 import { Inngest, EventSchemas } from 'inngest';
-import type { AccountState } from '@crawlmouse/types/v2';
+import type { AccountState, Fix } from '@crawlmouse/types/v2';
 import type {
   CheckBatchEnded,
   CheckCancelRequested,
@@ -75,9 +75,12 @@ type Events = {
   'check.notify_requested': { data: CheckNotifyRequested };
   // CC-26b: a member asked for a fix's packet to be emailed to a developer
   // (POST /api/fixes/[id]/email-developer). The request, address included, is a
-  // fix_email_requests row; the event names only that row, so no address sits in Inngest's event
-  // history. CC-28's mailer reads the row and sends; nothing in CC-26b does.
-  'fix.email_developer_requested': { data: { requestId: string } };
+  // fix_email_requests row; the event names that row and no address, so none sits in Inngest's
+  // event history. CC-28's mailer reads the row and sends; nothing in CC-26b does. `framework`: the
+  // body of the packet the reader had on screen, as the packet records it; none means its own.
+  'fix.email_developer_requested': {
+    data: { requestId: string; framework?: NonNullable<Fix['packet']>['framework'] };
+  };
   // CC-31: an invitation to a seat was written or re-sent (apps/web/lib/v2/agency/seats.ts). The
   // event names the seat and the invitation's number, never an address or a token: the handler
   // reads the address from the seat and mints the token through issue_seat_invite.
