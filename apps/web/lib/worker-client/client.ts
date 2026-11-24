@@ -5,6 +5,8 @@
  * status and a code looked up in WORKER_REFUSALS, so no header, body, JWT or key goes into it.
  */
 import type { KeyObject } from 'node:crypto';
+import { CountSchema, HttpStatusSchema, HttpUrlSchema } from '@crawlmouse/types/v2';
+import { z } from 'zod';
 import { loadPrivateKey, mintBatchJwt, PRIVATE_KEY_ENV } from './jwt';
 import { SIGNATURE_HEADER, TS_HEADER, signBody, signRead } from './sign';
 import {
@@ -14,11 +16,39 @@ import {
   type PollResult,
   type WorkerClient,
   type WorkerErrorKind,
+  type LiveProgress,
 } from './types';
+
+/** The worker's text is checked here: these URLs reach a visitor's screen. */
+const LiveAnswerSchema = z.object({
+  progress: z.object({
+    pages: CountSchema,
+    links: CountSchema,
+    homepage_read: z.boolean().default(false),
+  }),
+  pages_total: CountSchema,
+  live_pages: z
+    .array(
+      z.object({
+        url: HttpUrlSchema,
+        status: HttpStatusSchema,
+        ms: CountSchema,
+        links: CountSchema,
+        // The stored row's limit: the crawl identity is a full user agent.
+        identity: z.string().min(1).max(512),
+        edges: z
+          .array(z.object({ from: HttpUrlSchema, to: HttpUrlSchema, js_only: z.boolean() }))
+          .max(20),
+      }),
+    )
+    .max(25),
+});
 
 export const WORKER_URL_ENV = 'CRAWL_WORKER_URL';
 export const SIGNING_SECRET_ENV = 'WORKER_SIGNING_SECRET';
 export const DEFAULT_TIMEOUT_MS = 30_000;
+/** How long one live-progress read may wait: one poll of the stream (`POLL_MS`, 1.5 s). */
+export const PROGRESS_TIMEOUT_MS = 1_500;
 
 /**
  * The worker's refusals (packages/worker/src/routes.ts REFUSALS, plus server.ts's 500 `internal`),
@@ -123,12 +153,12 @@ export function createWorkerClient(opts: WorkerClientOptions): WorkerClient {
   const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 
   /** One request; its signal also bounds reading the answer's body. Redirects are not followed. */
-  async function send(path: string, init: RequestInit): Promise<Response> {
+  async function send(path: string, init: RequestInit, ms = timeoutMs): Promise<Response> {
     try {
       return await fetchImpl(`${base}${path}`, {
         ...init,
         redirect: 'error',
-        signal: AbortSignal.timeout(timeoutMs),
+        signal: AbortSignal.timeout(ms),
       });
     } catch (e) {
       throw new WorkerError(isAbort(e) ? 'timeout' : 'network', null, null);
@@ -159,15 +189,19 @@ export function createWorkerClient(opts: WorkerClientOptions): WorkerClient {
       : new WorkerError(kindOfStatus(res.status), res.status, null);
   }
 
-  function signedGet(path: string, purpose: string): Promise<Response> {
+  function signedGet(path: string, purpose: string, ms?: number): Promise<Response> {
     const ts = String(now());
-    return send(path, {
-      method: 'GET',
-      headers: { [TS_HEADER]: ts, [SIGNATURE_HEADER]: signRead(opts.signingSecret, ts, purpose) },
-    });
+    return send(
+      path,
+      {
+        method: 'GET',
+        headers: { [TS_HEADER]: ts, [SIGNATURE_HEADER]: signRead(opts.signingSecret, ts, purpose) },
+      },
+      ms,
+    );
   }
 
-  async function postBatch(batch: BatchPost): Promise<{ batch_id: string }> {
+  async function postBatch(batch: BatchPost): Promise<{ batch_id: string; signals: boolean }> {
     const batchId = batchIdOf(batch.check_id, batch.batch);
     if (!ROUTABLE_BATCH_ID.test(batchId)) throw new WorkerError('invalid', null, null);
     const at = now();
@@ -216,7 +250,8 @@ export function createWorkerClient(opts: WorkerClientOptions): WorkerClient {
     if (!isRecord(accepted) || accepted.batch_id !== batchId) {
       throw new WorkerError('server', res.status, null);
     }
-    return { batch_id: batchId };
+    // Only the literal `true`: a worker that does not say so is polled as it always was.
+    return { batch_id: batchId, signals: accepted.signals === true };
   }
 
   async function pollBatch(batchId: string): Promise<PollResult> {
@@ -238,6 +273,33 @@ export function createWorkerClient(opts: WorkerClientOptions): WorkerClient {
     throw new WorkerError('server', res.status, null);
   }
 
+  async function readProgress(batchId: string, after = 0): Promise<LiveProgress | null> {
+    if (!ROUTABLE_BATCH_ID.test(batchId)) return null;
+    try {
+      const res = await signedGet(
+        `/batch/${batchId}/progress?after=${after}`,
+        `progress:${batchId}`,
+        PROGRESS_TIMEOUT_MS,
+      );
+      if (res.status !== 200) return null;
+      const answer = await bodyOf(res);
+      if (!isRecord(answer) || answer.batch_id !== batchId || answer.status !== 'running') {
+        return null;
+      }
+      const live = LiveAnswerSchema.safeParse(answer);
+      if (!live.success) return null;
+      return {
+        pages: live.data.progress.pages,
+        links: live.data.progress.links,
+        homepageRead: live.data.progress.homepage_read,
+        total: live.data.pages_total,
+        fresh: live.data.live_pages,
+      };
+    } catch {
+      return null;
+    }
+  }
+
   async function readMetrics(): Promise<unknown> {
     const res = await signedGet('/metrics', 'metrics');
     if (res.status !== 200) throw await refusalOf(res);
@@ -246,7 +308,7 @@ export function createWorkerClient(opts: WorkerClientOptions): WorkerClient {
     return metrics;
   }
 
-  return { postBatch, pollBatch, readMetrics };
+  return { postBatch, pollBatch, readProgress, readMetrics };
 }
 
 const present = (v: string | undefined): v is string => v !== undefined && v.trim() !== '';

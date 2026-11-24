@@ -521,6 +521,20 @@ export const ROUTE_POLICIES: readonly RoutePolicy[] = [
       'a share link: the token in its path is the credential, stored as its sha256; per-IP limit; it counts the view and redirects (CC-31 D7)',
     origin: 'any',
   },
+  {
+    route: 'ingest/[...path]',
+    methods: ['GET', 'POST'],
+    class: 'public',
+    reason: 'same-origin PostHog proxy; forwards a fixed list of headers, no cookie or referrer',
+    origin: 'any',
+  },
+  {
+    route: 'api/webhooks/worker',
+    methods: ['POST'],
+    class: 'webhook',
+    verifier: 'verifySignal',
+    origin: 'any',
+  },
 ];
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
