@@ -58,6 +58,8 @@ export const REQUIRED_ENV: Readonly<Record<Step, Why>> = {
 export const OPTIONAL_ENV: Why = {
   V2_AGENCY_SALES: 'unset keeps Agency "coming": its checkout and trial refuse with billing on',
   ADMIN_SECRET: 'unset, the admin takedown route refuses every request (closed by default)',
+  DEPLOY_HOOK_SECRET:
+    'unset or under 32 characters, every deploy hook answers 503 not_configured (closed by default)',
   AI_READINESS_EXTRACTION: 'engine switch; unset keeps the default extraction',
   CRAWL_PAUSED: 'the global crawl pause, set only to pause (PROJECT_OVERVIEW §6)',
   CRAWL_WALL_CLOCK_MS: "engine budget override; unset uses the engine's default",
