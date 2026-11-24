@@ -218,7 +218,7 @@ describe('Fixed, and proven on the resolved fix page (Goal 1 row 22)', () => {
     expect(el?.querySelector('h2')?.textContent).toBe('Fixed, and proven');
     expect([...el!.querySelectorAll('p')].map((p) => p.textContent)).toEqual([
       'Affected pages: 3, now 0',
-      'Checked 26 Oct, 19:01 UTC, re-checked 30 Oct, 10:01 UTC · verified',
+      'Re-checked 30 Oct, 10:01 UTC · verified',
     ]);
     expect(el?.hasAttribute('data-v2-addition')).toBe(true);
   });

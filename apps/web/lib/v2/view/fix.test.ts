@@ -664,73 +664,93 @@ describe('fixView: other fixtures and states', () => {
 });
 
 describe('Fixed, and proven (Goal 1 row 22)', () => {
-  const OPEN = 'c0000000-0000-4000-8000-00000000000b';
   const VERIFIED = 'c0000000-0000-4000-8000-00000000000c';
   const ORPHANS = 'f0000000-0000-4000-8000-000000000014';
+  const OTHER = 'f0000000-0000-4000-8000-0000000000e1';
   const base = () => fixture('bad-site');
-  const proofOf = (d: ReturnType<typeof base>, fixId = ORPHANS, plan: 'free' | 'pro' = 'free') => {
-    const v = fixView(d, VERIFIED, fixId, { plan });
+  type D = ReturnType<typeof base>;
+  const proofOf = (d: D, fixId = ORPHANS, plan: 'free' | 'pro' = 'free', at = VERIFIED) => {
+    const v = fixView(d, at, fixId, { plan });
     if (v.kind !== 'resolved') throw new Error(v.kind);
     return v.proof;
   };
-  /** bad-site with a second fix of nahltech.com, verified by the same check half a minute sooner. */
-  function twoProven() {
-    const d = base();
+  const verifiedOf = (d: D) => {
+    const e = d.fix_events.find((x) => x.fix_id === ORPHANS && x.kind === 'verified');
+    if (e?.kind !== 'verified') throw new Error('bad-site has no verified orphan fix');
+    return e;
+  };
+  /**
+   * bad-site with a second fix of nahltech.com (number 2), and its events: by default verified by the
+   * same check half a minute before the orphan fix.
+   */
+  function withOther(
+    d: D,
+    events: { kind: 'verified' | 'reopened'; at: string }[] = [
+      { kind: 'verified', at: '2026-10-30T10:01:00Z' },
+    ],
+  ) {
     const f = d.fixes.find((x) => x.id === ORPHANS)!;
-    const other = { ...f, id: 'f0000000-0000-4000-8000-0000000000e1', number: 2 };
-    const verified = d.fix_events.find((e) => e.fix_id === ORPHANS && e.kind === 'verified')!;
-    const change = d.changes.find((c) => c.fix_id === ORPHANS && c.kind === 'resolved')!;
+    const v = verifiedOf(d);
     return {
       ...d,
-      fixes: [...d.fixes, other],
+      fixes: [...d.fixes, { ...f, id: OTHER, number: 2 }],
       fix_events: [
         ...d.fix_events,
-        {
-          ...verified,
-          id: 'b0000000-0000-4000-8000-0000000000e1',
-          fix_id: other.id,
-          at: '2026-10-30T10:01:00Z',
-        },
+        ...events.map((e, i) => ({
+          id: `b0000000-0000-4000-8000-0000000000f${i}`,
+          fix_id: OTHER,
+          at: e.at,
+          kind: e.kind,
+          check_id: v.check_id,
+        })),
       ],
-      changes: [
-        ...d.changes,
-        {
-          ...change,
-          id: '90000000-0000-4000-8000-0000000000e1',
-          fix_id: other.id,
-          pages_affected: 5,
-        },
-      ],
-      otherId: other.id,
     };
   }
 
-  it('says pages affected went to 0, and names both checks and the verification', () => {
-    // The resolved change row: 3 pages, from check …0b (26 Oct 19:01:40Z) to …0c (30 Oct 10:01:30Z).
+  it('says pages affected went to 0, and when the re-check verified it', () => {
+    // The fix records 3 affected pages; its verified event is 30 Oct 10:01:30Z.
     expect(proofOf(base())).toEqual({
       kind: 'shown',
       title: 'Fixed, and proven',
-      lines: [
-        'Affected pages: 3, now 0',
-        'Checked 26 Oct, 19:01 UTC, re-checked 30 Oct, 10:01 UTC · verified',
-      ],
+      lines: ['Affected pages: 3, now 0', 'Re-checked 30 Oct, 10:01 UTC · verified'],
     });
   });
 
-  it('for an edge rule, also counts the AI crawlers that read the text at each check', () => {
+  it('reads no change row, so a page that loads only its own check’s changes shows the same', () => {
+    // As loadCheck reads it: no change of another check.
     const d = base();
-    // At the check before, GPTBot was kept out by a rule: 5 of the 6 AI crawlers read the text.
+    expect(proofOf({ ...d, changes: [] })).toEqual(proofOf(d));
+  });
+
+  it('for an edge rule, gives the engine’s stored count before and counts allowed crawlers after', () => {
+    const d = base();
+    // Stored before: 4 AI crawlers read the text. At the verifying check one of the six answers thin,
+    // which the engine does not count as reading it: 5 of 6.
     const edge = {
       ...d,
       fixes: d.fixes.map((f) =>
-        f.id === ORPHANS ? { ...f, type: 'edge_rule_blocks_crawler' as const } : f,
+        f.id === ORPHANS
+          ? {
+              ...f,
+              type: 'edge_rule_blocks_crawler' as const,
+              before_after: [
+                {
+                  measure: 'crawlers_reading_text' as const,
+                  today: 4,
+                  after: 5,
+                  after_bound: 'approx' as const,
+                  after_is_estimate: true as const,
+                },
+              ],
+            }
+          : f,
       ),
       checks: d.checks.map((c) =>
-        c.id === OPEN
+        c.id === VERIFIED
           ? {
               ...c,
               crawlers: c.crawlers.map((x) =>
-                x.ua === 'GPTBot' ? { ...x, verdict: 'blocked_by_ua_rule' as const } : x,
+                x.ua === 'GPTBot' ? { ...x, verdict: 'allowed_thin' as const } : x,
               ),
             }
           : c,
@@ -739,20 +759,20 @@ describe('Fixed, and proven (Goal 1 row 22)', () => {
     const p = proofOf(edge);
     expect(p?.kind === 'shown' && p.lines).toEqual([
       'Affected pages: 3, now 0',
-      'AI crawlers that read the text: 5 of 6, now 6 of 6',
-      'Checked 26 Oct, 19:01 UTC, re-checked 30 Oct, 10:01 UTC · verified',
+      'AI crawlers that read the text: 4, now 5 of 6',
+      'Re-checked 30 Oct, 10:01 UTC · verified',
     ]);
   });
 
-  it('a fix type with no measured value says only the pages, never an estimate', () => {
+  it('a fix type with no stored count says only the pages, never an estimate', () => {
     const p = proofOf(base());
     expect(p?.kind === 'shown' && p.lines.join(' ')).not.toMatch(/crawlers|estimated|≈/);
   });
 
   it('on Free, shows the site’s first verified fix and counts the rest', () => {
-    const d = twoProven();
+    const d = withOther(base());
     // The other fix was verified first, so Free's one proof is its.
-    expect(proofOf(d, d.otherId)?.kind).toBe('shown');
+    expect(proofOf(d, OTHER)?.kind).toBe('shown');
     expect(proofOf(d)).toEqual({
       kind: 'counted',
       title: 'Fixed, and proven',
@@ -761,14 +781,35 @@ describe('Fixed, and proven (Goal 1 row 22)', () => {
     });
   });
 
-  it('on a paid plan, shows every verified fix', () => {
-    const d = twoProven();
-    expect(proofOf(d, ORPHANS, 'pro')?.kind).toBe('shown');
-    expect(proofOf(d, d.otherId, 'pro')?.kind).toBe('shown');
+  it('on Free, a fix reopened since its verification holds no proof and is not counted', () => {
+    // The other fix was verified first, then reopened before the check finished: it is live again.
+    const d = withOther(base(), [
+      { kind: 'verified', at: '2026-10-30T10:00:00Z' },
+      { kind: 'reopened', at: '2026-10-30T10:01:10Z' },
+    ]);
+    expect(proofOf(d)?.kind).toBe('shown');
   });
 
-  it('with no resolved change row to name the check before, shows nothing rather than guess', () => {
-    const d = base();
-    expect(proofOf({ ...d, changes: d.changes.filter((c) => c.fix_id !== ORPHANS) })).toBeNull();
+  it('on Free, a verification after the check does not count at that check', () => {
+    // The other fix's verification comes after the check finished at 10:01:30Z.
+    const d = withOther(base(), [{ kind: 'verified', at: '2026-10-30T10:02:00Z' }]);
+    expect(proofOf(d)?.kind).toBe('shown');
+  });
+
+  it('on Free, another site’s verified fix does not take this site’s proof', () => {
+    const d = withOther(base());
+    const elsewhere = {
+      ...d,
+      fixes: d.fixes.map((f) =>
+        f.id === OTHER ? { ...f, site_id: '50000000-0000-4000-8000-0000000000ee' } : f,
+      ),
+    };
+    expect(proofOf(elsewhere)?.kind).toBe('shown');
+  });
+
+  it('on a paid plan, shows every verified fix', () => {
+    const d = withOther(base());
+    expect(proofOf(d, ORPHANS, 'pro')?.kind).toBe('shown');
+    expect(proofOf(d, OTHER, 'pro')?.kind).toBe('shown');
   });
 });
