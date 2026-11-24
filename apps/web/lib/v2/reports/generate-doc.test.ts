@@ -14,6 +14,7 @@ import { contentView } from '../view/segment/content';
 import { nojsView } from '../view/segment/nojs';
 import { signalsView } from '../view/segment/signals';
 import { structureView } from '../view/segment/structure';
+import { linksView } from '../view/segment/links';
 import { datasetOfBuilds } from '../view/test-support/built-dataset';
 import { inputOf, recheckInputOf, siteShape } from '../view/test-support/generated-check';
 import { docStrings, type DocBlock, type ReportDoc } from './generate';
@@ -46,6 +47,7 @@ function pageStrings(d: ViewDataset, checkId: string): string[] {
     accessView(d, checkId, plan),
     nojsView(d, checkId, plan),
     structureView(d, checkId, plan, null),
+    linksView(d, checkId, plan),
     contentView(d, checkId, plan),
     signalsView(d, checkId, plan),
     graded(d).map((c) => changesView(d, c.id, { ...plan, rerun: false })),
@@ -182,6 +184,7 @@ describe('auditDoc on the contract fixtures', () => {
       'Crawler access',
       'Readable without JavaScript',
       'Site structure',
+      'Broken links and page basics',
       'Content an answer engine can quote',
       'Agent-readiness signals',
       'Open fixes, effects estimated',
@@ -222,6 +225,70 @@ describe('auditDoc on the contract fixtures', () => {
       baselineDoc({ dataset: d, checkId }, OPTIONS),
       pageStrings(d, checkId),
       checkedAt,
+    );
+  });
+});
+
+describe('auditDoc: broken links and page basics', () => {
+  const BUILT = fixture('built-site');
+  const id = BUILT.checks[0]!.id;
+  const doc = auditDoc({ dataset: BUILT, checkId: id }, OPTIONS);
+  const section = doc.sections.find((s) => s.heading === REPORT_DOC_COPY.links)!;
+  // Counted here from the records, apart from the code under test.
+  const pages = BUILT.page_results.filter((p) => p.check_id === id);
+  const broken = pages.filter((p) => p.status_code >= 400);
+  const redirecting = pages.filter((p) => (p.redirect?.hops.length ?? 0) > 0);
+  const path = (u: string) => new URL(u).pathname;
+
+  it('follows Site structure', () => {
+    const headings = doc.sections.map((s) => s.heading);
+    expect(headings.indexOf(REPORT_DOC_COPY.links)).toBe(headings.indexOf('Site structure') + 1);
+  });
+
+  it('holds every broken page with every page linking to it, and every redirect', () => {
+    const table = (caption: string) =>
+      section.blocks.find((b) => b.type === 'table' && b.caption === caption) as Extract<
+        DocBlock,
+        { type: 'table' }
+      >;
+    expect(table(REPORT_DOC_COPY.brokenLinks).rows).toEqual(
+      broken.map((p) => [
+        path(p.url),
+        String(p.status_code),
+        [
+          ...new Set(
+            BUILT.link_edges
+              .filter((e) => e.check_id === id && e.to_url === p.url)
+              .map((e) => path(e.from_url)),
+          ),
+        ].join(', '),
+      ]),
+    );
+    expect(table(REPORT_DOC_COPY.redirects).rows.map((r) => r[0])).toEqual(
+      redirecting.map((p) => path(p.url)),
+    );
+  });
+
+  it('counts the missing and shared descriptions, and lists the missing pages', () => {
+    const served = pages.filter((p) => p.status_code === 200);
+    const missing = served.filter((p) => !p.meta_description?.text);
+    const texts = section.blocks.flatMap((b) =>
+      b.type === 'text' ? [b.text] : b.type === 'table' ? [b.caption] : [],
+    );
+    expect(texts).toContain(`Missing: ${missing.length} pages`);
+    expect(texts).toContain('Shared by more than one page: 1 description, 2 pages');
+    expect(texts).toContain('Headings are not checked yet.');
+    const missingTable = section.blocks.find(
+      (b) => b.type === 'table' && b.caption === `Missing: ${missing.length} pages`,
+    ) as Extract<DocBlock, { type: 'table' }>;
+    expect(missingTable.rows).toEqual(missing.map((p) => [path(p.url)]));
+  });
+
+  it('says only what the pages say', () => {
+    expectSaidByThePages(
+      doc,
+      pageStrings(BUILT, id),
+      resultView(BUILT, id, { map: null }).crawledAt,
     );
   });
 });

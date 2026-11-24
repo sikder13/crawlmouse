@@ -21,6 +21,7 @@ import { screenSignals } from '../view/screen-signals';
 import { accessView } from '../view/segment/access';
 import { changesView, type ChangeRowView } from '../view/segment/changes';
 import { contentView } from '../view/segment/content';
+import { linksView, type BasicsColumnView } from '../view/segment/links';
 import { nojsView } from '../view/segment/nojs';
 import { signalsView } from '../view/segment/signals';
 import { structureView } from '../view/segment/structure';
@@ -48,6 +49,7 @@ function pagesOf({ dataset: d, checkId }: CheckRecords) {
     nojs: nojsView(d, checkId, PLAN),
     // No drawing: a document has the link map's figures, not its picture.
     structure: structureView(d, checkId, PLAN, null),
+    links: linksView(d, checkId, PLAN),
     content: contentView(d, checkId, PLAN),
     signals: signalsView(d, checkId, PLAN),
     partial: partialNotice(d, checkId),
@@ -141,6 +143,70 @@ function signalsSection({ signals: s }: Pages): DocSection {
   };
 }
 
+/** A title or description column: the first ten missing pages and shared texts, and the rest's count. */
+function basicsBlocks(col: BasicsColumnView): DocBlock[] {
+  return [
+    text(col.heading),
+    ...(col.missing.shown.length
+      ? [
+          {
+            type: 'table',
+            caption: col.missingLine,
+            columns: [COPY.page],
+            rows: col.missing.shown.map((p) => [p]),
+          } satisfies DocBlock,
+        ]
+      : [text(col.missingLine)]),
+    ...(col.missing.moreInApp ? [text(col.missing.moreInApp)] : []),
+    ...(col.shared.shown.length
+      ? [
+          {
+            type: 'table',
+            caption: col.sharedLine,
+            columns: [COPY.sharedText, COPY.pages],
+            rows: col.shared.shown.map((g) => [g.text, String(g.pageCount)]),
+          } satisfies DocBlock,
+        ]
+      : [text(col.sharedLine)]),
+    ...(col.shared.moreInApp ? [text(col.shared.moreInApp)] : []),
+  ];
+}
+
+/**
+ * Broken links and page basics: every page that answers an error with every page linking to it,
+ * every redirect, and the missing and shared titles and descriptions, ten of each.
+ */
+function linksSection({ links: l }: Pages): DocSection {
+  return {
+    heading: COPY.links,
+    blocks: [
+      text(l.headline.title),
+      text(l.body),
+      ...facts(l.tiles),
+      text(l.coverage.read),
+      l.broken.rows.length
+        ? {
+            type: 'table',
+            caption: COPY.brokenLinks,
+            columns: [COPY.missingPage, COPY.status, COPY.linkedFrom],
+            rows: l.broken.rows.map((r) => [r.path, String(r.status), r.linkedAll]),
+          }
+        : text(l.broken.empty!),
+      l.redirects.rows.length
+        ? {
+            type: 'table',
+            caption: COPY.redirects,
+            columns: [COPY.linkedAs, COPY.hops, COPY.endsAt],
+            rows: l.redirects.rows.map((r) => [r.path, r.hops, r.endsText]),
+          }
+        : text(l.redirects.empty!),
+      ...basicsBlocks(l.titles),
+      ...basicsBlocks(l.descriptions),
+      text(l.headings),
+    ],
+  };
+}
+
 /** Each live fix in the audit's order, with its effect; null when the check found none. */
 function fixesSection(p: Pages): DocSection | null {
   if (p.result.fixes === null) return null;
@@ -203,6 +269,7 @@ export function auditDoc(records: CheckRecords, options: DocOptions): ReportDoc 
       accessSection(p),
       headOf(p.nojs.frame.title, p.nojs.headline, p.nojs.tiles),
       headOf(p.structure.frame.title, p.structure.headline, p.structure.tiles),
+      linksSection(p),
       headOf(p.content.frame.title, p.content.headline, p.content.tiles),
       signalsSection(p),
       ...(fixes ? [fixes] : []),
