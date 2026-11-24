@@ -56,10 +56,11 @@ describe("golive:check's Inngest functions per step", () => {
 // case above holds the serve route to budget.ts's table; this holds the table to the counts the
 // owner's checklist printed before that change, so a purge registered as a new function (in the
 // route and the table together) fails here.
+// The one function added since is the trial clock, at step 4.
 describe('the function counts per step, as before CC-GL D2', () => {
   it('are unchanged', () => {
     expect(functionCountsByStep()).toBe(
-      'after step 1: 5; after step 2: 12; after step 3: 12; after step 4: 34; after step 5: 36',
+      'after step 1: 5; after step 2: 12; after step 3: 12; after step 4: 35; after step 5: 37',
     );
   });
 });

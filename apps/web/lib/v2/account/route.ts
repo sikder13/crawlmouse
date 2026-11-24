@@ -184,11 +184,11 @@ const NOTICE_SET: ReadonlySet<string> = new Set(NOTICE_CODES);
 
 /**
  * The pages a form posts from: the dashboard, Seats, Reports, an invitation's page, a report
- * recipient's link pages, one site's page, and for an agency the client matrix, its client
- * reports and one client's page.
+ * recipient's link pages, one site's page, one fix of an audit, and for an agency the client
+ * matrix, its client reports and one client's page.
  */
 const BACK =
-  /^\/(?:dashboard|seats|reports|invite|s\/confirm|s\/pause|s\/decline|agency|agency\/reports|(?:sites|agency\/clients)\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/;
+  /^\/(?:dashboard|seats|reports|invite|s\/confirm|s\/pause|s\/decline|agency|agency\/reports|(?:sites|agency\/clients)\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|audit\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/fix\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/;
 
 /**
  * The page a form was posted from, when it is one a form can go back to (one of `BACK`'s pages, on

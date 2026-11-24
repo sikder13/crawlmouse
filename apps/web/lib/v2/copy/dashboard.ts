@@ -16,6 +16,16 @@ export const DASHBOARD_COPY = {
     hosts.length === 1
       ? `${hosts[0]} is kept.`
       : `${capitalise(numberWord(hosts.length))} sites are kept.`,
+  /** The heading when every site the account keeps is paused (F-235). */
+  allPaused: 'Every site is paused.',
+  /** The sites note with some paused, within the plan's limit: a paused site still holds its slot. */
+  sitesWithPaused: (slots: number, limit: number, plan: string, paused: number) =>
+    `${slots} of ${limit} on ${plan} · ${paused} paused`,
+  /** The sites note over the plan's limit, as after a trial ends: how many are checked (F-235). */
+  sitesOverLimit: (checked: number, slots: number, plan: string, limit: number) =>
+    `${checked} of ${slots} sites checked · ${plan} checks ${limit} ${plural(limit, 'site', 'sites')}`,
+  /** The first-run note with every site paused: no check is scheduled to compare against (F-234). */
+  firstRunAllPaused: 'Every site is paused, so none is scheduled. Nothing to compare yet.',
   /** "Since Thursday's check", or, where a weekday would be ambiguous, "Since the check of Fri 23 Oct". */
   since: (name: { weekday: string } | { date: string }) =>
     'weekday' in name ? `Since ${name.weekday}'s check` : `Since the check of ${name.date}`,
@@ -145,7 +155,7 @@ export const SETUP_COPY = {
   },
   staging: {
     subject: STAGING,
-    todo: `Add ${STAGING} so audits run before each deploy`,
+    todo: `Add ${STAGING} so audits run after each staging deploy`,
     done: 'Staging audited on each deploy',
   },
   observed: {
@@ -326,6 +336,14 @@ const DAY0: CopyChange[] = [
   },
   {
     screen: 'dashboard-day0',
+    kind: 'ruling',
+    locked: 'Add a staging URL so audits run before each deploy',
+    rendered: 'Add a staging URL so audits run after each staging deploy',
+    source:
+      'V2R register, F-097 (CTO 057): the deploy hook fires once a staging deploy has finished, so the audit runs after it',
+  },
+  {
+    screen: 'dashboard-day0',
     kind: 'facts',
     locked: 'one reminder on Fri 6 Nov, two days before the trial ends.',
     rendered:
@@ -365,6 +383,14 @@ const DAY0: CopyChange[] = [
 
 const HOME: CopyChange[] = [
   ...railChanges('dashboard'),
+  {
+    screen: 'dashboard',
+    kind: 'ruling',
+    locked: '5 sites ·',
+    rendered: '4 sites ·',
+    source:
+      'Owner ruling Q10: a staging site holds no primary slot (ARCH-2 §2.5), so the count of sites leaves it out (F-097)',
+  },
   {
     screen: 'dashboard',
     kind: 'fixture',

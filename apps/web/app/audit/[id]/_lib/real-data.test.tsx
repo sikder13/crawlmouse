@@ -692,6 +692,98 @@ describe('/audit/[id]/fix/[fixId]', () => {
     expect(page).toContain('>WordPress<');
   });
 
+  describe('emailing a fix to a developer (F-109)', () => {
+    const ACCOUNT = '22222222-2222-4222-8222-222222222222';
+    const kept = (read: ReadyCheck): ReadyCheck => ({
+      ...read,
+      dataset: {
+        ...read.dataset,
+        sites: read.dataset.sites.map((s) => ({ ...s, account_id: ACCOUNT })),
+      },
+    });
+    const noPacket = (read: ReadyCheck): ReadyCheck => ({
+      ...read,
+      dataset: {
+        ...read.dataset,
+        fixes: read.dataset.fixes.map((f) => ({ ...f, packet: null })),
+      },
+    });
+    const formOf = (id: string) => `action="/api/fixes/${id}/email-developer"`;
+    const page = (read: ReadyCheck, id: string, notice?: { code: string; text: string }) =>
+      html(<FixBody read={read} found={fixOf(read, id)!} notice={notice} />);
+
+    it('a kept audit’s open fix has the form, with its email field', () => {
+      const id = live()[0]!.id;
+      const markup = page(kept(one), id);
+      expect(markup).toContain(formOf(id));
+      const field = markup.match(/<input[^>]*name="email"[^>]*>/)?.[0] ?? '';
+      expect(field).toContain('type="email"');
+      expect(field).toContain('required');
+      expect(markup).toContain('Email this fix to my developer');
+    });
+
+    it('names the packet’s own framework until the reader switches', () => {
+      const fix = live()[0]!;
+      const read: ReadyCheck = {
+        ...kept(one),
+        dataset: {
+          ...kept(one).dataset,
+          fixes: kept(one).dataset.fixes.map((f) =>
+            f.id === fix.id ? { ...f, packet: withBodies(PACKET, ['wordpress']) } : f,
+          ),
+        },
+      };
+      const hidden = page(read, fix.id).match(/<input[^>]*name="framework"[^>]*>/)?.[0] ?? '';
+      expect(hidden).toContain('type="hidden"');
+      expect(hidden).toContain(`value="${PACKET.framework}"`);
+    });
+
+    it('a locked fix ignores a notice typed into the address', () => {
+      const id = live()[FREE_FIXES]!.id;
+      const read = kept(one);
+      expect(fixOf(read, id)!.developer).toBeNull();
+      expect(
+        page(read, id, { code: 'email_requested', text: 'Recorded for the test.' }),
+      ).not.toContain('Recorded for the test.');
+    });
+
+    it('an audit nobody keeps has none: its email ask opens the keep bar', () => {
+      const id = live()[0]!.id;
+      const markup = page(one, id);
+      expect(markup).not.toContain('/email-developer');
+      expect(markup).toContain('Email this fix to my developer');
+    });
+
+    it('a fix the plan locks has none', () => {
+      const id = live()[FREE_FIXES]!.id;
+      const read = kept(one);
+      expect(fixOf(read, id)!.view.kind).toBe('locked');
+      expect(page(read, id)).not.toContain('/email-developer');
+    });
+
+    it('a fix with no packet has none: the mail would have nothing to send', () => {
+      const id = live()[0]!.id;
+      const read = noPacket(kept(one));
+      expect(fixOf(read, id)!.view.kind).toBe('open');
+      expect(page(read, id)).not.toContain('/email-developer');
+    });
+
+    it('a resolved fix has none', () => {
+      const orphan = one.dataset.fixes.find(
+        (f) => fixOf(kept(two), f.id)?.view.kind === 'resolved',
+      )!;
+      expect(page(kept(two), orphan.id)).not.toContain('/email-developer');
+    });
+
+    it('says what the form did, on the page that has the form only', () => {
+      const id = live()[0]!.id;
+      const notice = { code: 'email_requested', text: 'Recorded for the test.' };
+      expect(page(kept(one), id, notice)).toContain('Recorded for the test.');
+      // An address anyone can type must not make an unkept audit claim a mail was sent.
+      expect(page(one, id, notice)).not.toContain('Recorded for the test.');
+    });
+  });
+
   it('on a paid plan the same fix opens', () => {
     const fix = live()[FREE_FIXES]!;
     expect(fixOf({ ...one, plan: 'pro' }, fix.id)!.view.kind).toBe('open');
