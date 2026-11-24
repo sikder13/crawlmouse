@@ -7,6 +7,8 @@ export {
   assemble,
   buildCheck,
   DETECTORS_RUN,
+  answeredAt,
+  askedAs,
   nextCrawlBatch,
   readBatches,
   renderCandidates,
