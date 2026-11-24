@@ -9,7 +9,6 @@
  * `CAPABILITIES`), and the page marks "coming" each one that is not built (SEO review 1–3, Q27);
  * components/v2/screens/pricing/pricing-capabilities.test.tsx sweeps the rendered page for it.
  */
-import { featureShown } from '../../feature-switch';
 import { TRIAL_REMINDER_DAYS_BEFORE_END, EMAIL_KINDS } from '../../auth/constants';
 import type { Interval } from '../../billing/catalog';
 import {
@@ -27,6 +26,7 @@ import {
 import { TRIAL_DAYS } from '../../billing/state-machine';
 import { GATES, type Tier } from '../../entitlement-v2';
 import { AUDIT_TTL_DAYS } from '../../limits';
+import { ALL_SHOWN, type Features } from '../features';
 import type { Tagged } from './agencies';
 import { AGENCY_PLUS_INBOX_ADDRESS } from './contact-inbox';
 import { CANCEL_CLICKS } from './settings';
@@ -76,9 +76,9 @@ function freeFixes(): number {
   if (n === 'all') throw new Error('the pricing copy assumes Free shows a number of fixes');
   return n;
 }
-/** A plan's page limit, or the free one while the Goal 1 switch hides 2,000 pages. */
-const pages = (tier: Tier) =>
-  `${count(featureShown('pages_2000') ? GATES[tier].pagesPerCheck : Math.min(GATES[tier].pagesPerCheck, GATES.free.pagesPerCheck))} pages`;
+/** A plan's page limit; with `pages2000` false (the Goal 1 switch hides it), Free's limit at most. */
+const pages = (tier: Tier, pages2000: boolean) =>
+  `${count(pages2000 ? GATES[tier].pagesPerCheck : Math.min(GATES[tier].pagesPerCheck, GATES.free.pagesPerCheck))} pages`;
 
 export interface PlanRow extends Tagged {
   /** The short left-hand label: "5 sites", "weekly". */
@@ -92,14 +92,14 @@ export interface PlanCopy {
   rows: PlanRow[];
 }
 
-function seatAndSitePrices(interval: Interval): string {
+function seatAndSitePrices(interval: Interval, pages2000: boolean): string {
   const a = GATES.agency;
   const seat = interval === 'month' ? EXTRA_SEAT : EXTRA_SEAT_YEARLY;
   const site = interval === 'month' ? EXTRA_SITE : EXTRA_SITE_YEARLY;
   return (
     `${a.seats} seats, ${usd(seat)} a seat ${per(interval)} beyond; ` +
     `${usd(site)} ${per(interval)} for each site from ${a.sites + 1} to ${a.maxSites}; ` +
-    `up to ${pages('agency')} per audit`
+    `up to ${pages('agency', pages2000)} per audit`
   );
 }
 
@@ -113,13 +113,18 @@ const renders = (tier: Tier): PlanRow => ({
  * The three plan columns (A2: Pro has two seats; K9: renders; K10: the seat and site prices).
  * `proTrial`: whether the page offers Pro's no-card trial (`pricingView` decides it from Pro's
  * button and the flags); without it, Pro's tag says the card is required (SEO R2-N1).
+ * `features`: what the Goal 1 switch hides, which changes the page limits and Agency's description
+ * here; the view drops the rows it hides.
  */
 export function planCopy(
   interval: Interval,
   proTrial: boolean,
   billing: boolean,
+  features: Features = ALL_SHOWN,
 ): Record<Tier, PlanCopy> {
   const { free, pro, agency } = GATES;
+  const p2k = features.pages_2000;
+  const branded = features.agency_white_label && features.agency_domain;
   return {
     free: {
       name: 'Free',
@@ -131,7 +136,7 @@ export function planCopy(
       rows: [
         {
           label: `${free.sites} ${plural(free.sites, 'site', 'sites')}`,
-          text: `Up to ${pages('free')} per audit`,
+          text: `Up to ${pages('free', p2k)} per audit`,
           capabilities: ['sites'],
         },
         {
@@ -161,7 +166,7 @@ export function planCopy(
       rows: [
         {
           label: `${pro.sites} sites`,
-          text: `Up to ${pages('pro')} per audit`,
+          text: `Up to ${pages('pro', p2k)} per audit`,
           capabilities: ['sites'],
         },
         {
@@ -191,16 +196,22 @@ export function planCopy(
     agency: {
       name: 'Agency',
       tag: billing ? `${TRIAL_DAYS}-day trial, card required` : OPENS_SHORTLY,
-      description: {
-        text: 'Agencies reporting to clients under their own name.',
-        // A client report names the agency in its mail; the page it opens, the sender and the
-        // domain are ours (`client_report_page`), so the sentence is marked until that is built.
-        capabilities: ['client_reports', 'client_report_page'],
-      },
+      description: branded
+        ? {
+            text: 'Agencies reporting to clients under their own name.',
+            // A client report names the agency in its mail; the page it opens, the sender and the
+            // domain are ours (`client_report_page`), so the sentence is marked until that is built.
+            capabilities: ['client_reports', 'client_report_page'],
+          }
+        : {
+            // The switch hides the client reports and the branding: a sentence naming neither.
+            text: 'Agencies watching their clients’ sites, with seats for the team.',
+            capabilities: ['sites', 'seats'],
+          },
       rows: [
         {
           label: `${agency.sites} sites`,
-          text: seatAndSitePrices(interval),
+          text: seatAndSitePrices(interval, p2k),
           capabilities: ['sites', 'seats'],
         },
         {
@@ -258,9 +269,12 @@ export const PRICING_COPY = {
   ],
   intervals: { month: 'Monthly', year: 'Yearly' } as Record<Interval, string>,
   /** FACTS B2 (the crawlers, rewritten to I6) and L6 (the annual reminders). */
-  crawlers: (): Tagged[] => [
+  /** `aiLetter` false (the Goal 1 switch hides the AI readability letter): no grade is named. */
+  crawlers: (aiLetter = true): Tagged[] => [
     {
-      text: 'Every plan tests the same AI crawlers on a sample of your pages: OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot count towards your grade; GPTBot and ClaudeBot are shown, and blocking them is your choice. Googlebot and Bingbot are shown by robots.txt.',
+      text: aiLetter
+        ? 'Every plan tests the same AI crawlers on a sample of your pages: OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot count towards your grade; GPTBot and ClaudeBot are shown, and blocking them is your choice. Googlebot and Bingbot are shown by robots.txt.'
+        : 'Every plan tests the same AI crawlers on a sample of your pages: OAI-SearchBot, ChatGPT-User, PerplexityBot, Claude-SearchBot, GPTBot and ClaudeBot. Googlebot and Bingbot are shown by robots.txt.',
       capabilities: ['free_audit'],
     },
     {

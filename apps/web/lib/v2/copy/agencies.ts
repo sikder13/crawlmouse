@@ -27,6 +27,9 @@ export const AGENCIES_COPY = {
   title: 'For agencies',
   description: (p: { price: string; sites: number; days: number }) =>
     `Audit a prospect’s site free before the first call. Agency is ${p.price} a month for ${p.sites} client sites, with a ${p.days}-day trial; branded client reports are coming.`,
+  /** The description while the Goal 1 switch hides `agency_white_label` or `agency_domain`. */
+  descriptionUnbranded: (p: { price: string; sites: number; days: number }) =>
+    `Audit a prospect’s site free before the first call. Agency is ${p.price} a month for ${p.sites} client sites, with a ${p.days}-day trial.`,
   /** RC-01: the description while V2_BILLING is off, when the trial cannot be started. */
   descriptionBillingOff: (p: { price: string; sites: number }) =>
     `Audit a prospect’s site free before the first call. Agency is ${p.price} a month for ${p.sites} client sites; the agency trial opens soon.`,

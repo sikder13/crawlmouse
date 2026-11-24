@@ -82,6 +82,8 @@ export function HomeScreen({
   planHref?: Partial<Record<string, string>>;
 }) {
   const { crawlers, withoutJs, alert } = data;
+  // `nojs` hidden: the crawler table loses its "Text it can read" column, header and cells together.
+  const nojs = data.features.nojs;
 
   return (
     <PageShell
@@ -117,7 +119,7 @@ export function HomeScreen({
         </section>
 
         <section className={layout.wrap}>
-          <Stage example={data.example} />
+          <Stage example={data.example} nojs={nojs} />
           <div className={`${layout.row} ${styles.stageNotes}`}>
             <span className={layout.mut}>
               An example audit, replayed. Yours builds the same way while you watch.
@@ -146,7 +148,7 @@ export function HomeScreen({
                 { header: 'Crawler' },
                 { header: 'Homepage' },
                 { header: crawlers.productHeader },
-                { header: 'Text it can read', numeric: true, mono: true },
+                ...(nojs ? [{ header: 'Text it can read', numeric: true, mono: true }] : []),
                 { header: "What's in the way", muted: true },
               ]}
               rows={crawlers.rows.map((r) => ({
@@ -163,7 +165,7 @@ export function HomeScreen({
                     verdict={r.products.verdict}
                     evidence={r.products.evidence}
                   />,
-                  r.text,
+                  ...(nojs ? [r.text] : []),
                   r.obstacle,
                 ],
               }))}
@@ -176,7 +178,9 @@ export function HomeScreen({
           </p>
         </section>
 
-        {data.features.nojs ? (
+        {/* `nojs` hidden drops this whole section, its h2 ("GPTBot and ClaudeBot don't run
+            JavaScript…") with it: the heading introduces the words card's figure. */}
+        {nojs ? (
           <section className={`${layout.wrap} ${styles.sec} ${styles.g2}`}>
             <div>
               <Heading level={2} size="l">

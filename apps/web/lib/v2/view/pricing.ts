@@ -23,7 +23,8 @@ import { usd } from '../../billing/prices';
 import { trialRefusal, type EntitlementSnapshot } from '../../billing/state-machine';
 import type { PaidTier, Tier } from '../../entitlement-v2';
 import { AGENCIES_COPY } from '../copy/agencies';
-import { footerComing, shown, tagged, type TaggedView } from './agencies';
+import { ALL_SHOWN, type Features } from '../features';
+import { footerComing, shown, taggedWith, type TaggedView } from './agencies';
 import { agencyTrialPath } from './agency-trial';
 import { PRICING_COPY as COPY, per, planCopy, priceOf, type PlanRow } from '../copy/pricing';
 
@@ -305,9 +306,12 @@ export function pricingView(
   interval: Interval,
   now: Date,
   flags: PricingFlags,
+  /** What the Goal 1 switch hides, read by the page (`shownFeatures()`); nothing by default. */
+  features: Features = ALL_SHOWN,
 ): PricingView {
+  const tagged = taggedWith(features);
   const pro = proAction(viewer, interval, now, flags);
-  const copy = planCopy(interval, pro.trial, flags.billing);
+  const copy = planCopy(interval, pro.trial, flags.billing, features);
   const actions = ranked({
     free: freeAction(viewer, flags),
     pro: pro.action,
@@ -336,7 +340,7 @@ export function pricingView(
       per: per(interval),
       action: actions[tier],
     })),
-    crawlers: shown(COPY.crawlers().map(tagged)),
+    crawlers: shown(COPY.crawlers(features.ai_letter).map(tagged)),
     annual: shown(COPY.annual(flags.billing).map(tagged)),
     agencyPlus: {
       name: COPY.agencyPlus.name,

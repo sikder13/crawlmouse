@@ -6,6 +6,9 @@ import { WEB_ROOT } from './_lib/tokens-css';
 import { V2_REWRITES } from '../../lib/v2/rewrites';
 import { isFlagGated } from '../v1-inventory-source';
 
+// The Home preview reads the Goal 1 switch (lib/feature-switch.ts), which imports 'server-only'.
+vi.mock('server-only', () => ({}));
+
 const GROUP = join(WEB_ROOT, 'app', '(v2-preview)');
 /**
  * The account door's pages (CC-25), the first live pages on the v2 design system: their group's

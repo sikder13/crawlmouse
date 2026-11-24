@@ -2,6 +2,7 @@ import '../../../../styles/v2/tokens.css';
 import { ReferralCapture } from '@/components/analytics/ReferralCapture';
 import { TrackView } from '@/components/analytics/TrackView';
 import { accountDoorEnabled } from '../../../../lib/auth/flags';
+import { shownFeatures } from '../../../../lib/feature-switch';
 import { fixture } from '../../../../lib/v2/fixtures';
 import { stateAt } from '../../../../lib/v2/progress';
 import { CHECKS, recording } from '../../../../lib/v2/recordings';
@@ -22,10 +23,14 @@ import { HomeScreen } from './HomeScreen';
  * trial has no page yet, so it has no button.
  */
 export function LiveHome() {
-  const data = homeView(fixture('bad-site'), CHECKS.badFirstAudit, {
-    map: mapDrawing('bad-site'),
-    end: stateAt(recording('bad-site').events, Infinity),
-  });
+  // The Goal 1 switch (V2_HIDE_FEATURES). `/` is a static page, so the switch is read at build
+  // time and a change to it takes a redeploy.
+  const data = homeView(
+    fixture('bad-site'),
+    CHECKS.badFirstAudit,
+    { map: mapDrawing('bad-site'), end: stateAt(recording('bad-site').events, Infinity) },
+    shownFeatures(),
+  );
   const planHref = accountDoorEnabled() ? { Free: '/signup', Pro: '/signup' } : {};
   return (
     <>

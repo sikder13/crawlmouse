@@ -27,7 +27,7 @@ export function Capability({
   comingLabel: string;
   className?: string;
 }) {
-  // A feature the Goal 1 switch hides is named nowhere (lib/feature-switch.ts).
+  // Copy the view marked hidden (it names a feature the Goal 1 switch hides) renders nothing.
   if (item.hidden) return null;
   return (
     <Tag className={className} data-capability={item.capabilities.join(' ')}>

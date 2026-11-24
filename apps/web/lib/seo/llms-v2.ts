@@ -12,8 +12,10 @@ import { AGENCY_MONTHLY, AGENCY_YEARLY, PRO_MONTHLY, PRO_YEARLY, usd } from '../
 import { DEVELOPERS_COPY } from '../v2/copy/developers';
 import { PRICING_COPY } from '../v2/copy/pricing';
 import { CHECK_COPY, CHECK_QUESTIONS, checkPath } from '../v2/copy/check-pages';
+import { ALL_SHOWN, type Features } from '../v2/features';
 import { HELP_COPY } from '../v2/help/copy';
 import { agenciesView } from '../v2/view/agencies';
+import { checkDescription } from '../v2/view/check-pages';
 import { metadata as v1Pricing } from '../../app/pricing/page';
 import { metadata as v1Developers } from '../../app/developers/page';
 import { metadata as blog } from '../../app/blog/page';
@@ -38,13 +40,20 @@ function fromMetadata(path: string, m: Pick<Metadata, 'title' | 'description'>):
   return [titleOf(m), path, m.description];
 }
 
-export function v2KeyPages(): KeyPage[] {
+/**
+ * `features`: what the Goal 1 switch hides, which `/llms.txt`'s route reads (`shownFeatures()`); the
+ * /agencies and /check lines take the descriptions their pages take under it.
+ */
+export function v2KeyPages(features: Features = ALL_SHOWN): KeyPage[] {
   // RC-01: /pricing and /developers are the v2 pages while either flag is on.
   const v2Served = v2PublicPagesEnabled();
-  const agencies = agenciesView({
-    billing: billingV2Enabled(),
-    accountDoor: accountDoorEnabled(),
-  });
+  const agencies = agenciesView(
+    {
+      billing: billingV2Enabled(),
+      accountDoor: accountDoorEnabled(),
+    },
+    features,
+  );
   return [
     [V2_HOME_TITLE, '/', V2_HOME_DESCRIPTION],
     v2Served
@@ -55,7 +64,7 @@ export function v2KeyPages(): KeyPage[] {
       ? [DEVELOPERS_COPY.navLabel, '/developers', DEVELOPERS_COPY.description]
       : fromMetadata('/developers', v1Developers),
     ...CHECK_QUESTIONS.map(
-      (q): KeyPage => [CHECK_COPY[q].title, checkPath(q), CHECK_COPY[q].description],
+      (q): KeyPage => [CHECK_COPY[q].title, checkPath(q), checkDescription(q, features)],
     ),
     [HELP_COPY.title, '/help', HELP_COPY.description],
     fromMetadata('/ai-readiness-checker', aiReadiness),

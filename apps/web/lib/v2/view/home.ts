@@ -2,8 +2,8 @@
  * The Home screen's example audit, its crawler table, its words-without-JavaScript card and its
  * alert card, as data from the bad-site fixture. The marketing copy around them is the component's.
  */
-import { featureShown, shownFeatures, type RiskFeature } from '../../feature-switch';
 import type { AccessCause, CrawlerResult } from '@crawlmouse/types/v2';
+import { ALL_SHOWN, type Features } from '../features';
 import { crawlerOf, findCheck, fixesAsOf, siteOf, templateOf } from '../fixtures';
 import { duration, percent, templateNoun, weekdayTime } from '../format';
 import { mapLabel } from '../map-label';
@@ -25,8 +25,8 @@ export interface VerdictView {
 }
 
 export interface HomeView {
-  /** Which Goal 1 features may be named (`lib/feature-switch.ts`), read on the server. */
-  features: Record<RiskFeature, boolean>;
+  /** Which Goal 1 features may be named: the record the server entry point passed in. */
+  features: Features;
   example: {
     domain: string;
     duration: string;
@@ -44,7 +44,8 @@ export interface HomeView {
       crawler: string;
       homepage: VerdictView;
       products: VerdictView;
-      text: string;
+      /** The share of text it can read; null while the Goal 1 switch hides `nojs`. */
+      text: string | null;
       obstacle: string;
     }[];
   };
@@ -89,11 +90,13 @@ function obstacle(c: CrawlerResult, productNoun: string): string {
 /**
  * `end` is the crawl screen's replay at its end, so Home's example is that replay scrubbed to its
  * last frame; its counts are the stream's own (synthesise.test.ts shows they equal the check's).
+ * `features`: what the Goal 1 switch hides, read by the server entry point; nothing by default.
  */
 export function homeView(
   d: ViewDataset,
   checkId: string,
   { map, end }: { map: MapDrawing; end: CrawlState },
+  features: Features = ALL_SHOWN,
 ): HomeView {
   if (end.ended === null || !end.grades || end.pages_estimated === null) {
     throw new Error('Home shows the replay at its end');
@@ -117,10 +120,7 @@ export function homeView(
   const cell = (c: CrawlerResult, key: string): VerdictView => {
     const byT = c.by_template.find((x) => x.template_key === key);
     if (!byT) throw new Error(`${c.ua} has no verdict for ${key}`);
-    return {
-      verdict: byT.verdict,
-      evidence: c.evidence_class,
-    };
+    return { verdict: byT.verdict, evidence: c.evidence_class };
   };
 
   // The example of words lost without JavaScript: the sampled page that loses the most.
@@ -158,7 +158,7 @@ export function homeView(
   const zone = d.accounts.find((a) => a.id === site.account_id)?.timezone ?? 'UTC';
 
   return {
-    features: shownFeatures(),
+    features,
     example: {
       domain: site.host,
       duration: duration(end.elapsed_ms),
@@ -174,7 +174,7 @@ export function homeView(
           withheld: false,
           summary: seoShortSummary(check, fixes, isOpen),
         },
-        ...(featureShown('ai_letter')
+        ...(features.ai_letter
           ? [
               {
                 label: 'AI readability',
@@ -198,7 +198,11 @@ export function homeView(
           crawler: ua,
           homepage: cell(c, '/'),
           products: cell(c, product.template_key),
-          text: c.text_share === null ? 'not measured' : `${percent(c.text_share)}%`,
+          text: !features.nojs
+            ? null
+            : c.text_share === null
+              ? 'not measured'
+              : `${percent(c.text_share)}%`,
           obstacle: obstacle(c, productNoun.adjective),
         };
       }),

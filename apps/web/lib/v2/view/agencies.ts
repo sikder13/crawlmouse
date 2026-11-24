@@ -19,7 +19,8 @@
  * three it did not (the report page on your domain, your own sender address, the one-pager) a proof
  * that still holds beside its routes.
  */
-import { featureShown, type RiskFeature } from '../../feature-switch';
+import type { RiskFeature } from '../../feature-switch';
+import { ALL_SHOWN, type Features } from '../features';
 import { TRIAL_DAYS } from '../../billing/state-machine';
 import { AGENCY_MONTHLY, PRO_MONTHLY, usd } from '../../billing/prices';
 import { GATES } from '../../entitlement-v2';
@@ -158,6 +159,7 @@ export const CAPABILITIES: Readonly<Record<CapabilityKey, Capability>> = {
   },
   sender_address: {
     status: 'coming',
+    risk: 'agency_domain',
     what: 'Emails from your own address, with its records verified in Settings: every v2 email is sent from one address of ours.',
     proof: {
       kind: 'holds',
@@ -280,23 +282,29 @@ export interface TaggedView {
 const isComing = (keys: readonly CapabilityKey[]) =>
   keys.some((k) => CAPABILITIES[k].status === 'coming');
 
-/** Whether copy naming these capabilities names a feature the Goal 1 switch hides. */
-export const isHidden = (keys: readonly CapabilityKey[]) =>
+/** Whether copy naming these capabilities names a feature `features` hides. */
+export const isHidden = (keys: readonly CapabilityKey[], features: Features = ALL_SHOWN) =>
   keys.some((k) => {
     const risk = CAPABILITIES[k].risk;
-    return risk !== undefined && !featureShown(risk);
+    return risk !== undefined && !features[risk];
   });
 
 /** A list of tagged copy without what the switch hides. */
 export const shown = <T extends { hidden: boolean }>(items: readonly T[]): T[] =>
   items.filter((i) => !i.hidden);
 
-export const tagged = ({ text, capabilities }: Tagged): TaggedView => ({
-  text,
-  capabilities,
-  coming: isComing(capabilities),
-  hidden: isHidden(capabilities),
-});
+/** Tags copy with `hidden` computed from `features`, the record a server entry point read. */
+export const taggedWith =
+  (features: Features) =>
+  ({ text, capabilities }: Tagged): TaggedView => ({
+    text,
+    capabilities,
+    coming: isComing(capabilities),
+    hidden: isHidden(capabilities, features),
+  });
+
+/** Tags copy with nothing hidden. */
+export const tagged = taggedWith(ALL_SHOWN);
 
 /**
  * The "coming" label for the shared footer's line (components/v2/footer-links.ts), or null once what
@@ -371,7 +379,11 @@ export interface AgenciesView {
 export const AGENCY_TRIAL_HREF = '/agency-trial';
 export const PRICING_HREF = '/pricing';
 
-function onePager(): AgenciesView['onePager'] {
+/** The sample's AI readability grade, by the label the result view gives it (`view/result.ts`). */
+const AI_READABILITY = 'AI readability';
+
+function onePager(features: Features): AgenciesView['onePager'] {
+  const tag = taggedWith(features);
   const d = fixture('bad-site');
   const check = findCheck(d, CHECKS.badFirstAudit);
   const s = buildPublicSnapshot(d, check.id, check.finished_at!);
@@ -379,22 +391,25 @@ function onePager(): AgenciesView['onePager'] {
   // The client report page's path: the host without its last label (example-outfitter.com → example-outfitter).
   const slug = s.host.replace(/\.[^.]+$/, '');
   return {
-    title: tagged(o.title),
-    sub: tagged(o.sub),
+    title: tag(o.title),
+    sub: tag(o.sub),
     label: o.label,
     capabilities: o.capabilities,
     coming: isComing(o.capabilities),
-    hidden: isHidden(o.capabilities),
+    hidden: isHidden(o.capabilities, features),
     agency: SAMPLE_AGENCY.name,
     meta: `${SAMPLE_AGENCY.host} · ${dayMonthYear(s.checkedAt)}`,
     heading: `${s.host}: ${s.headline}`,
-    grades: s.grades.map((g) => ({
-      label: g.label,
-      letter: g.letter,
-      score: g.score,
-      withheld: g.withheld,
-      tone: g.letter ? toneOf(g.letter) : 'default',
-    })),
+    // Without the AI readability letter (`ai_letter` hidden) the sample shows Technical SEO alone.
+    grades: s.grades
+      .filter((g) => features.ai_letter || g.label !== AI_READABILITY)
+      .map((g) => ({
+        label: g.label,
+        letter: g.letter,
+        score: g.score,
+        withheld: g.withheld,
+        tone: g.letter ? toneOf(g.letter) : 'default',
+      })),
     fixesCaption: o.fixesCaption,
     fixes: s.topFixes.map((f, i) => ({
       key: f.title,
@@ -413,7 +428,8 @@ export interface AgenciesFlags {
   accountDoor: boolean;
 }
 
-export function agenciesView(flags: AgenciesFlags): AgenciesView {
+export function agenciesView(flags: AgenciesFlags, features: Features = ALL_SHOWN): AgenciesView {
+  const tagged = taggedWith(features);
   const pro = GATES.pro;
   const agency = GATES.agency;
   const price = usd(AGENCY_MONTHLY);
@@ -431,7 +447,10 @@ export function agenciesView(flags: AgenciesFlags): AgenciesView {
   return {
     title: COPY.title,
     description: flags.billing
-      ? COPY.description({ price, sites: agency.sites, days: TRIAL_DAYS })
+      ? // "branded client reports are coming" names both agency features, so either hidden drops it.
+        features.agency_white_label && features.agency_domain
+        ? COPY.description({ price, sites: agency.sites, days: TRIAL_DAYS })
+        : COPY.descriptionUnbranded({ price, sites: agency.sites, days: TRIAL_DAYS })
       : COPY.descriptionBillingOff({ price, sites: agency.sites }),
     h1: COPY.h1,
     hero: shown([tagged(COPY.hero[0](numberWord(aiCrawlers))), tagged(COPY.hero[1]())]),
@@ -455,7 +474,7 @@ export function agenciesView(flags: AgenciesFlags): AgenciesView {
       formLabel: COPY.prospect.formLabel,
       homeLink: COPY.prospect.homeLink,
     },
-    onePager: onePager(),
+    onePager: onePager(features),
     compare: {
       title: COPY.compare.title,
       columns: [

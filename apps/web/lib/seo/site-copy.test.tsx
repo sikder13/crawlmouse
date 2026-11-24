@@ -2,6 +2,9 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+// The page reads the Goal 1 switch (lib/feature-switch.ts), which imports 'server-only'.
+vi.mock('server-only', () => ({}));
 import { schemaProblems } from './schema-required';
 import { V2_HOME_DESCRIPTION, V2_HOME_TITLE, v2LlmsDescriptor } from './site-copy';
 import { POSTS } from '../blog/posts';
