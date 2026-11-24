@@ -433,3 +433,65 @@ describe('the Pro trial offer after a refusal (F-104)', () => {
     expect(withoutTrialOffer(v, { notice: 'refused' })).toEqual({ ...v, startPro: null });
   });
 });
+
+describe('a Free dashboard with paused sites, as after a trial ends (F-234, F-235)', () => {
+  const c = fixture('clean-site');
+  const site = c.sites.find((s) => CLEAN_VIEWER.adopt!.includes(s.id))!;
+  const extra = ['b', 'c'].map((n) => ({
+    ...site,
+    id: `${site.id.slice(0, -1)}${n}`,
+    host: `${n}.example`,
+    paused: true,
+  }));
+  /** The clean account with two more sites, each paused; its own site paused when `all`. */
+  const withPaused = (all: boolean) => ({
+    ...c,
+    sites: [...c.sites.map((s) => (s.id === site.id ? { ...s, paused: all } : s)), ...extra],
+  });
+  /** The clean viewer, adopting the two sites as well, on a plan of `sites` sites. */
+  const viewer = (sites = 1) => ({
+    ...CLEAN_VIEWER,
+    adopt: [...CLEAN_VIEWER.adopt!, ...extra.map((s) => s.id)],
+    account: { ...CLEAN_VIEWER.account!, limits: { ...CLEAN_VIEWER.account!.limits, sites } },
+  });
+
+  it('names the site Free still checks, and how many of the three are checked', () => {
+    const v = dashboardView(withPaused(false), viewer());
+    expect(v.header.title).toBe(`${site.host} is kept.`);
+    // Three sites hold slots on a plan of one; one is checked.
+    expect(v.sites.note).toBe('1 of 3 sites checked · Free checks 1 site');
+  });
+
+  it('with every site paused, says so, and promises no check', () => {
+    const v = dashboardView(withPaused(true), viewer());
+    expect(v.header.title).toBe('Every site is paused.');
+    expect(v.sites.note).toBe('0 of 3 sites checked · Free checks 1 site');
+    expect(v.sites.foot).toBe(
+      'Every site is paused, so none is scheduled. Nothing to compare yet.',
+    );
+  });
+
+  it('with the first site paused, names the schedule of a site still checked', () => {
+    const d = withPaused(true);
+    const b = d.sites.find((s) => s.id === extra[0]!.id)!;
+    const weekly = {
+      ...b,
+      paused: false,
+      schedule: { cadence: 'weekly' as const, iso_weekday: 5, hour_local: 6 },
+    };
+    const v = dashboardView(
+      { ...d, sites: d.sites.map((s) => (s.id === b.id ? weekly : s)) },
+      viewer(),
+    );
+    expect(v.header.title).toBe('b.example is kept.');
+    expect(v.sites.foot).toBe(
+      'Changes appear here after the first weekly check. Nothing to compare yet.',
+    );
+  });
+
+  it('within the limit, keeps the slot count and adds how many are paused', () => {
+    expect(dashboardView(withPaused(false), viewer(5)).sites.note).toBe(
+      '3 of 5 on Free · 2 paused',
+    );
+  });
+});
