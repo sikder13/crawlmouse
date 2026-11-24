@@ -22,7 +22,11 @@ import {
 } from '../../packages/worker/src/identities';
 import { QA_ACCOUNTS, QA_HOSTS } from './accounts';
 // @ts-expect-error a plain .mjs served by Vercel as it is, with no declaration file
-import { createLab, HOSTS as LARGE, paths as largePaths } from '../../fixtures/qa-lab/api/large.mjs';
+import {
+  createLab,
+  HOSTS as LARGE,
+  paths as largePaths,
+} from '../../fixtures/qa-lab/api/large.mjs';
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const LAB = join(REPO, 'fixtures', 'qa-lab');
@@ -186,7 +190,12 @@ describe('QA_HOSTS', () => {
 describe('the lab serves every lab host', () => {
   it('has a site folder with an index page for each lab host but the large four, and no folder no host names', () => {
     expect(largeHosts().sort()).toEqual(
-      [QA_HOSTS.large, QA_HOSTS.largeSlow, QA_HOSTS.largeThrottle, QA_HOSTS.largeThrottleBare].sort(),
+      [
+        QA_HOSTS.large,
+        QA_HOSTS.largeSlow,
+        QA_HOSTS.largeThrottle,
+        QA_HOSTS.largeThrottleBare,
+      ].sort(),
     );
     const folders = readdirSync(SITES).filter((f) => statSync(join(SITES, f)).isDirectory());
     expect(folders.sort()).toEqual(staticHosts().map(label).sort());

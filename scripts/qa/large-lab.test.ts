@@ -106,7 +106,10 @@ describe('the large lab site: its pages', () => {
       expect(out.status).toBe(200);
       expect(out.headers['content-type']).toMatch(/xml/);
       const locs = [...out.body.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]!);
-      expect(locs.every((u) => u.startsWith(`https://${host}/`)), host).toBe(true);
+      expect(
+        locs.every((u) => u.startsWith(`https://${host}/`)),
+        host,
+      ).toBe(true);
       const listed = locs.map((u) => u.slice(`https://${host}`.length));
       expect(listed.length, host).toBe(new Set(listed).size);
       expect(listed.sort(), host).toEqual([...depth.keys()].sort());
@@ -230,10 +233,7 @@ describe('the large lab site: how each host answers', () => {
           expect('retry-after' in out.headers, host).toBe(host === HOSTS.throttle);
         }
       }
-      expect(statuses, host).toEqual([
-        ...Array(THROTTLE_LIMIT).fill(200),
-        ...Array(3).fill(429),
-      ]);
+      expect(statuses, host).toEqual([...Array(THROTTLE_LIMIT).fill(200), ...Array(3).fill(429)]);
       // Another client in the same window has its own count.
       expect((await l.answer({ host, path: '/', client: '198.51.100.8' })).status).toBe(200);
       // The next window starts at the next multiple of ten seconds of Unix time, and counts from one.
@@ -269,7 +269,10 @@ describe('the large lab site: how each host answers', () => {
         l.at(T0 + i * 100);
         first.push((await l.answer({ host, path: '/', client: 'hammer' })).status);
       }
-      expect(first.filter((s) => s === 429), host).toHaveLength(60 - THROTTLE_LIMIT);
+      expect(
+        first.filter((s) => s === 429),
+        host,
+      ).toHaveLength(60 - THROTTLE_LIMIT);
       expect(first.slice(-1), host).toEqual([429]);
 
       // (a) Wait out the window: the next one starts from a count of one, so the full limit is 200 again.
@@ -371,7 +374,9 @@ describe('the large lab site: the function Vercel calls', () => {
     expect(res.body).toContain('<h1>About');
     expect(log).toHaveBeenCalledTimes(1);
     const entry = JSON.parse(String(log.mock.calls[0]![0])) as Record<string, unknown>;
-    expect(entry.client).toBe(createHash('sha256').update('203.0.113.9').digest('hex').slice(0, 16));
+    expect(entry.client).toBe(
+      createHash('sha256').update('203.0.113.9').digest('hex').slice(0, 16),
+    );
     expect(entry).toMatchObject({ host: HOSTS.fast, path: '/about/', status: 200 });
   });
 
