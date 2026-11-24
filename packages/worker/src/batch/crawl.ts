@@ -204,6 +204,7 @@ async function crawlPage(
   const r = await politeFetch(run.ctx, url, CRAWL, {
     offSite: 'stop',
     gate: run.robots.gate(CRAWL),
+    retryOn429: true,
   });
   if ('notRequested' in r) {
     run.findings.notRequested(r.notRequested);

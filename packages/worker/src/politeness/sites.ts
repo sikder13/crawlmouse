@@ -1,22 +1,39 @@
 import type { Clock } from '../clock.js';
 import { SiteLimiter } from './limiter.js';
+import { retryAfterMs } from '../fetch/retry-after.js';
 import { politenessKeyOf } from './site-key.js';
 
 /**
- * Per-site state shared by every batch in the process: the limiter, and the rule that stops all
- * requests to a site after three 429 responses or four consecutive challenged pages. A stop lasts
- * STOP_COOLDOWN_MS; each batch that meets it records it as a finding.
+ * Per-site state shared by every batch in the process: the limiter, how a 429 slows it, and the rule
+ * that stops all requests to a site after STOP_AFTER_429S answers of 429 in a row or four consecutive
+ * challenged pages. A stop lasts STOP_COOLDOWN_MS; each batch that meets it records it as a finding.
+ *
+ * A 429 is a request to slow down, not a refusal (inbox 048). The site's next request waits for its
+ * Retry-After, or for a back-off that doubles with each 429 in a row when it sends none, at most
+ * MAX_WAIT_MS either way. The gap between requests then doubles, up to MAX_BACKOFF_GAP_MS, and stays
+ * raised for as long as the worker holds the site (it forgets a site idle for SITE_IDLE_FORGET_MS).
+ * Any other answer but a redirect ends the run of 429s; the gap does not come back down with it.
  *
  * What counts as a challenged page is decided by the caller: in a crawl batch it is a page whose
  * fetch was a challenge; in an access batch it is a page whose browser control was challenged.
  */
 
-export const STOP_AFTER_429S = 3;
+/** 429 answers in a row, each waited out and each at a slower pace, before the site is stopped. */
+export const STOP_AFTER_429S = 6;
+/** The wait after a 429 that sends no Retry-After; it doubles with each 429 in a row. */
+export const BACKOFF_FIRST_MS = 2_000;
+/** The longest a 429 makes the site wait, whatever its Retry-After asks. */
+export const MAX_WAIT_MS = 60_000;
+/** The slowest pace a run of 429s brings a site to: one request start in this long. */
+export const MAX_BACKOFF_GAP_MS = 8_000;
+/** How many more times a page that answered 429 is asked for, after its wait. */
+export const RETRIES_ON_429 = 2;
 export const STOP_AFTER_CHALLENGED_PAGES = 4;
 export const STOP_COOLDOWN_MS = 10 * 60_000;
 /** A site with nothing queued or running for this long is forgotten (and its limiter with it). */
 export const SITE_IDLE_FORGET_MS = 60_000;
 
+/** `three_429_responses` is the contract's name from when three were enough; it is STOP_AFTER_429S now. */
 export type StopReason = 'three_429_responses' | 'four_consecutive_challenged_pages';
 
 export interface SiteStop {
@@ -74,10 +91,25 @@ export class Sites {
     return null;
   }
 
-  record429(key: string): void {
+  /**
+   * A 429 to a request that counts: waits the site out for its Retry-After (`retryAfter`, the header
+   * as sent; undefined when there was none), slows it, and stops it after STOP_AFTER_429S in a row.
+   */
+  record429(key: string, retryAfter?: string): void {
     const s = this.site(key);
     s.responses429++;
+    const backoff = BACKOFF_FIRST_MS * 2 ** (s.responses429 - 1);
+    const asked = retryAfterMs(retryAfter, this.clock.now());
+    const wait = Math.min(MAX_WAIT_MS, Math.max(0, asked ?? backoff));
+    s.limiter.pauseUntil(this.clock.now() + wait);
+    s.limiter.raiseGapMs(Math.min(MAX_BACKOFF_GAP_MS, s.limiter.gapMs() * 2));
     if (s.responses429 >= STOP_AFTER_429S) this.stopSite(s, 'three_429_responses');
+  }
+
+  /** Any answer but a 429 to a request that counts ends the site's run of 429s. */
+  recordAnswer(key: string): void {
+    const s = this.sites.get(key);
+    if (s) s.responses429 = 0;
   }
 
   /** One page's outcome for the consecutive-challenge rule; a page that was not challenged resets it. */

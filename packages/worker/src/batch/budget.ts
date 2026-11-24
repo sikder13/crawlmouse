@@ -45,6 +45,16 @@ export class Budget {
     this.bytes += n;
   }
 
+  /** When the batch's time ends, on its clock. */
+  endsAt(): number {
+    return this.startedAt + this.limits.max_seconds * 1000;
+  }
+
+  /** A request could not start before the batch's time ends: the seconds budget is spent. */
+  outOfTime(): void {
+    this.spent ??= 'seconds';
+  }
+
   /** A response was cut off by the bytes the batch had left: the byte budget is spent. */
   cutByBytes(): void {
     this.spent ??= 'bytes';
