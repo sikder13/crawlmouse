@@ -219,7 +219,14 @@ export function SiteScreen({
               muted: r.muted,
               cells: [
                 r.label,
-                <span key="v" className={r.mono ? shared.mono : undefined}>
+                <span
+                  key="v"
+                  className={
+                    [r.mono ? shared.mono : '', r.publicLink ? styles.linkValue : '']
+                      .filter(Boolean)
+                      .join(' ') || undefined
+                  }
+                >
                   {r.value}
                 </span>,
                 r.publicLink ? (
