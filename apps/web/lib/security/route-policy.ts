@@ -39,6 +39,12 @@ export interface RoutePolicy {
   readonly origin: 'strict' | 'lenient' | 'any';
   /** A state change must say its body is JSON, so another site cannot send one without a preflight. */
   readonly jsonBody?: true;
+  /**
+   * For `member`: the route reads no part of its request body until its membership check has
+   * answered, so a caller with no seat cannot make it read (or buffer) a body.
+   * __tests__/security/route-mechanism.ts holds the route's source to it.
+   */
+  readonly bodyAfterMembership?: true;
 }
 
 export const ROUTE_POLICIES: readonly RoutePolicy[] = [
@@ -74,7 +80,13 @@ export const ROUTE_POLICIES: readonly RoutePolicy[] = [
     origin: 'any',
   },
   // Goal 1 row 24: an Agency account's white-label brand name and logo (multipart, so no jsonBody).
-  { route: 'api/agency/brand', methods: ['POST'], class: 'member', origin: 'strict' },
+  {
+    route: 'api/agency/brand',
+    methods: ['POST'],
+    class: 'member',
+    origin: 'strict',
+    bodyAfterMembership: true,
+  },
   { route: 'api/alert-rules', methods: ['POST', 'PUT'], class: 'member', origin: 'strict' },
   {
     route: 'api/audits/[id]/cancel',
