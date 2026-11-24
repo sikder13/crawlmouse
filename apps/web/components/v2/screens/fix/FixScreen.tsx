@@ -158,7 +158,7 @@ export function FixScreen({
       {data.kind === 'resolved' && data.proof ? (
         // "Fixed, and proven" (Goal 1 row 22): the verified fix's before and after, or on a plan
         // whose proofs are spent, the counter in its place.
-        <Card as="section" className={styles.card} data-v2-addition="" data-v2-proof="">
+        <Card as="section" className={styles.card} data-v2-addition="" data-v2-fix-proof="">
           <Heading level={2} size="s">
             {data.proof.title}
           </Heading>

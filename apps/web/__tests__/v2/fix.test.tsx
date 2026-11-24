@@ -210,7 +210,7 @@ describe('the fix page agrees with the Result and the segment', () => {
 describe('Fixed, and proven on the resolved fix page (Goal 1 row 22)', () => {
   const card = (html: string) => {
     const doc = new JSDOM(html).window.document;
-    return doc.querySelector('[data-v2-proof]');
+    return doc.querySelector('[data-v2-fix-proof]');
   };
 
   it('draws the verified fix’s before and after under its own heading', () => {
@@ -221,6 +221,12 @@ describe('Fixed, and proven on the resolved fix page (Goal 1 row 22)', () => {
       'Re-checked 30 Oct, 10:01 UTC · verified',
     ]);
     expect(el?.hasAttribute('data-v2-addition')).toBe(true);
+  });
+
+  it('does not carry the proof page’s marker, which the a11y suite reads as that page', () => {
+    const html = renderToStaticMarkup(<FixScreen data={fixPreview('resolved')} />);
+    expect(card(html)).not.toBeNull();
+    expect(new JSDOM(html).window.document.querySelector('[data-v2-proof]')).toBeNull();
   });
 
   it('draws the counter and its link in the card’s place', () => {
