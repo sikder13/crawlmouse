@@ -192,6 +192,16 @@ describe('no module a client component reaches imports the switch as a value', (
   it('lib/feature-switch.ts is not among them', () => {
     expect([...reached].map(rel)).not.toContain('lib/feature-switch.ts');
   });
+
+  // lib/billing/flags.ts itself is reached already (ContinueScreen → PageShell → SiteFooter →
+  // lib/auth/flags.ts, for `billingV2Enabled`), so the sweep keys on the two readers of Agency's sale.
+  it('no module among them reads billingPublic or agencySalesOpen: the entry points pass them down', () => {
+    const readers = [...reached]
+      .filter((f) => rel(f) !== 'lib/billing/flags.ts')
+      .filter((f) => /\b(?:billingPublic|agencySalesOpen)\b/.test(readFileSync(f, 'utf8')))
+      .map(rel);
+    expect(readers).toEqual([]);
+  });
 });
 
 describe('Pricing and For agencies', () => {
