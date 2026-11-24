@@ -176,6 +176,19 @@ describe('request_capped_check, a deploy check (migration 20261124000001, Goal 1
     );
   });
 
+  it('leaves manual re-checks untouched by deploys', async () => {
+    const { accountId } = await account();
+    const primary = await site(accountId);
+    const staging = await site(accountId, { staging_of_site_id: primary });
+    await pastCheck(staging, 'deploy', 1);
+    await pastCheck(staging, 'deploy', 1);
+    // Two deploys fill a deploy cap of two, and a manual re-check under a cap of two still goes.
+    expect((await call('request_capped_check', [row(staging, 'deploy'), 2, slot()])).outcome).toBe(
+      'capped',
+    );
+    expect((await call('request_capped_check', [row(staging), 2, slot()])).outcome).toBe('created');
+  });
+
   it('still refuses a trigger it does not take', async () => {
     const { accountId } = await account();
     const s = await site(accountId);
