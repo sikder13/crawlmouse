@@ -280,16 +280,19 @@ export interface EmailDeps extends FixDeps {
  */
 export const EmailBody = z.strictObject({
   email: z.email().max(254),
-  framework: z.string().max(40).optional(),
+  // Unbounded here: it is only compared with the packet's frameworks, never stored or sent.
+  framework: z.string().optional(),
 });
 
 /**
- * POST /api/fixes/[id]/email-developer `{email}` once membership is established: 402
- * `fixesVisible` for a fix the tier does not see; 400 `invalid_email`; 429 `rate_limited` with
+ * POST /api/fixes/[id]/email-developer `{email, framework?}` once membership is established: 402
+ * `fixesVisible` for a fix the tier does not see; 400 `invalid_email`; 400 `invalid` for a
+ * framework the fix's packet has no body for; 429 `rate_limited` with
  * `Retry-After` past either limit, both failing closed, the per-fix one counted first so a request
  * it refuses spends none of the caller's hourly sends; otherwise a `fix_email_requests` row holding
- * the address, then one `fix.email_developer_requested` event naming only that row, with the row's
- * id in the event id, and `{queued: true}`. CC-28's mailer reads the row and sends; nothing is sent
+ * the address, then one `fix.email_developer_requested` event naming that row and, when one was
+ * posted, the framework as the packet records it, with the row's id in the event id, and
+ * `{queued: true}`. CC-28's mailer reads the row and sends; nothing is sent
  * from here (owner ruling Q8).
  */
 export async function emailDeveloper(

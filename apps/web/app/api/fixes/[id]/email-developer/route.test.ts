@@ -278,6 +278,7 @@ describe('POST /api/fixes/[id]/email-developer from a live form', () => {
     it.each([
       ['one the packet has no body for', 'shopify_liquid'],
       ['one that is not a framework', 'nonsense'],
+      ['a long one', 'x'.repeat(41)],
     ])('refuses %s, and sends nothing', async (_name, framework) => {
       const id = fw.ranked[0]!;
       await packed(id, PACKET);

@@ -198,9 +198,14 @@ export function mailHandlers(d: MailHandlerDeps): MailHandlers {
       const r = await read(store.fixEmailRequest(requestId));
       if (r === null) return 'not_found';
       if (r.fix.packet === null) return 'no_packet';
-      // The steps the reader had on screen, or the packet's own (an event from before the field).
+      // The steps the reader had on screen; an event naming none (one from before the field, or
+      // the dashboard's form) sends the packet's own. A named body a later check removed is not
+      // swapped for another framework's: nothing is sent.
       const packet =
-        packetBodies(r.fix.packet).find((b) => b.framework === framework) ?? r.fix.packet;
+        framework === undefined
+          ? r.fix.packet
+          : packetBodies(r.fix.packet).find((b) => b.framework === framework);
+      if (packet === undefined) return 'no_body';
       const outcome = await send(mail, {
         kind: 'fix_to_developer',
         to: r.toEmail,

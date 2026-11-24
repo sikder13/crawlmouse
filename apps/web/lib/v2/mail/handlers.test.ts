@@ -339,10 +339,11 @@ describe('the fix to a developer', () => {
       expect(transport.sent[0]!.text).toContain(packetPrompt(FIX, own!));
     });
 
-    it('with one the packet has no body for, sends the packet’s own', async () => {
-      const { h, transport } = setup(several());
-      await h.fixToDeveloper('r1', 'shopify_liquid');
-      expect(transport.sent[0]!.text).toContain(packetPrompt(FIX, own!));
+    it('with one the packet no longer has a body for, sends nothing', async () => {
+      const { h, transport, ledger } = setup(several());
+      expect(await h.fixToDeveloper('r1', 'shopify_liquid')).toBe('no_body');
+      expect(transport.sent).toEqual([]);
+      expect(ledger.claims).toEqual([]);
     });
   });
 
