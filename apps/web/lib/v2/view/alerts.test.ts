@@ -169,6 +169,22 @@ describe('Alerts, where they go and the rules', () => {
       Array.from({ length: 6 }, () => '/api/alert-rules'),
     );
   });
+
+  it('sends a developer nowhere for Slack: Integrations is a 404 for them', () => {
+    const owner = bad.seats.find((s) => s.role === 'owner')!;
+    const row = (role: 'developer' | 'account_manager') => {
+      const seat = { ...owner, id: '50000000-0000-4000-8000-0000000000d1', role };
+      const d = { ...bad, seats: [...bad.seats, seat] };
+      return alertsView(d, { accountId: BAD, seatId: seat.id, now: bad.as_of }).channels.rows.find(
+        (r) => r.label === 'Slack settings',
+      )!;
+    };
+    expect([row('developer').value, row('developer').action]).toEqual([
+      'with the owner or an account manager',
+      null,
+    ]);
+    expect(row('account_manager').action!.href).toBe('/settings/integrations');
+  });
 });
 
 describe('Alerts, on the stand-in Free account (clean-site)', () => {

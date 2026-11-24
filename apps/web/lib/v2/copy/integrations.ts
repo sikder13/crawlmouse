@@ -8,6 +8,9 @@ export const INTEGRATIONS_COPY = {
   slackOn: (last4: string) =>
     `Alerts post to the channel this webhook was made for. Its address ends in ${last4}, and we do not show the rest.`,
   slackLocked: 'Alerts to Slack are on Pro.',
+  slackLockedNotOwner: 'Alerts to Slack are on Pro, and the account’s owner can change the plan.',
+  slackStored: (last4: string) =>
+    `A Slack webhook ending in ${last4} is still stored. Alerts do not post to it on Free, and will again if the account returns to a paid plan. Disconnect it to remove it.`,
   help: { label: 'How to create a webhook', href: 'https://api.slack.com/messaging/webhooks' },
   connect: 'Connect Slack',
   replace: 'Replace webhook',

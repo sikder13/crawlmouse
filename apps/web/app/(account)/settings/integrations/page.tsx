@@ -36,7 +36,11 @@ export default async function IntegrationsPage({
     <LiveActions>
       <IntegrationsScreen
         notice={settingsNotice(await searchParams, 'integrations')}
-        data={withSwitcher(integrationsView(page.d, page.viewer, last4), page.accounts, accountId)}
+        data={withSwitcher(
+          integrationsView(page.d, page.viewer, last4, page.role),
+          page.accounts,
+          accountId,
+        )}
       />
     </LiveActions>
   );

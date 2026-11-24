@@ -62,6 +62,7 @@ import { nextCheckLine, type NextChecks } from './site';
 import { GRADES, PILL, SUBJECTS } from './segment/changes';
 import { effortText } from './segment/fixes';
 import { action, type ActionView } from './account-actions';
+import { roleMay } from '../agency/guard';
 import {
   FREE_SCHEDULE,
   accountShellView,
@@ -668,7 +669,7 @@ function setup(
     subject: string,
     todo: string,
     doneLabel: string,
-    act: ActionView,
+    act: ActionView | null,
   ) => {
     if (!todo.includes(subject)) {
       throw new Error(`set-up item ${key}: its row does not name its subject "${subject}"`);
@@ -677,7 +678,7 @@ function setup(
       key,
       label: done ? doneLabel : todo,
       done,
-      action: done ? null : { ...act, context: `for ${subject}` },
+      action: done || act === null ? null : { ...act, context: `for ${subject}` },
     });
   };
   const settings = (label: string) =>
@@ -689,7 +690,10 @@ function setup(
       SETUP_COPY.slack.subject,
       SETUP_COPY.slack.todo,
       SETUP_COPY.slack.done,
-      action('integrations', 'Connect'),
+      // Integrations is a 404 for a role that may not edit the account's alerts.
+      roleMay(readerRole(v) ?? 'developer', 'edit_account_alerts')
+        ? action('integrations', 'Connect')
+        : null,
     );
   }
   if (g.competitorsPerSite > 0) {

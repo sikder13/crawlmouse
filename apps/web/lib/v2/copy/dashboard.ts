@@ -297,20 +297,20 @@ const DAY0: CopyChange[] = [
   },
   {
     screen: 'dashboard-day0',
-    kind: 'facts',
+    kind: 'ruling',
     locked:
       "Connect Search Console to lay Google's AI-feature impressions over these pages Connect",
     rendered: '',
     source:
-      'CTO ruling 047 (23 Nov): Search Console and observed crawler activity have no connection behind them, so the set-up list does not offer them while the owner decides',
+      'V2R register (CTO ruling 047, 23 Nov): Search Console and observed crawler visits have no connection behind them yet (session C builds both before launch), so the set-up list does not offer them',
   },
   {
     screen: 'dashboard-day0',
-    kind: 'facts',
+    kind: 'ruling',
     locked: 'before each deploy Add All four stop',
     rendered: 'before each deploy Add All three stop',
     source:
-      'CTO ruling 047 (23 Nov): Search Console and observed crawler activity have no connection behind them, so the set-up list does not offer them while the owner decides; the count is the items’',
+      'V2R register (CTO ruling 047, 23 Nov): Search Console and observed crawler visits have no connection behind them yet (session C builds both before launch), so the set-up list does not offer them; the count is the items’',
   },
   {
     screen: 'dashboard-day0',
@@ -515,11 +515,11 @@ const HOME: CopyChange[] = [
   },
   {
     screen: 'dashboard',
-    kind: 'facts',
+    kind: 'ruling',
     locked: 'Two things left to set up',
     rendered: 'Everything is set up',
     source:
-      'CTO ruling 047 (23 Nov): the two items left in the locked page are not offered, so on this fixture nothing is left',
+      'V2R register (CTO ruling 047, 23 Nov): the two items left in the locked page are not offered, so on this fixture nothing is left',
   },
   {
     screen: 'dashboard',
@@ -531,12 +531,12 @@ const HOME: CopyChange[] = [
   },
   {
     screen: 'dashboard',
-    kind: 'facts',
+    kind: 'ruling',
     locked:
       "One competitor added 2 min Connect Search Console to lay Google's AI-feature impressions over these pages Connect 1 min",
     rendered: 'One competitor added done Staging audited on each deploy',
     source:
-      'CTO ruling 047 (23 Nov): Search Console and observed crawler activity have no connection behind them, so the set-up list does not offer them while the owner decides; staging is done (a staging site exists); the efforts "2 min" and "1 min" are in no record and are left out',
+      'V2R register (CTO ruling 047, 23 Nov): Search Console and observed crawler visits have no connection behind them yet (session C builds both before launch), so the set-up list does not offer them; staging is done (a staging site exists); the efforts "2 min" and "1 min" are in no record and are left out',
   },
   {
     screen: 'dashboard',

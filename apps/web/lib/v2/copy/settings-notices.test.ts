@@ -128,6 +128,11 @@ describe('settingsNotice', () => {
     // Each page reads its own success line only.
     expect(settingsNotice({ sent: '1' }, 'settings')).toBeNull();
     expect(settingsNotice({ saved: '1' }, 'delete')).toBeNull();
+    expect(settingsNotice({ saved: '1' }, 'integrations')).toEqual({
+      tone: 'ok',
+      text: SETTINGS_NOTICES.saved,
+    });
+    expect(settingsNotice({}, 'integrations')).toBeNull();
   });
 
   it('reads an error code on either page, ahead of a success line', () => {

@@ -1,21 +1,24 @@
 /**
- * Settings › Integrations as data: the account's Slack destination. `slackLast4` is what
+ * Settings › Integrations as data: one card per connection the account can make. Slack is the one
+ * there is today; the page takes further cards without changing shape. `slackLast4` is what
  * `account_slack_last4` answers, null when none is set; the URL itself is never read here.
  */
+import type { SeatRole } from '../account/profile';
 import { INTEGRATIONS_COPY as COPY } from '../copy/integrations';
-import { readerRole, viewAt, type AccountDataset, type Viewer } from './account';
+import { viewAt, type AccountDataset, type Viewer } from './account';
 import { action, type ActionInput, type ActionView } from './account-actions';
 import { accountShellView, type ShellView } from './account-shell';
 import { routeAction } from './settings';
 
-export interface SlackCardView {
+export interface IntegrationCardView {
+  key: 'slack';
   title: string;
   body: string;
   status: { state: 'ok' | 'neutral'; label: string };
-  /** The form that sets or replaces the webhook; null on a tier without Slack. */
+  /** The form that sets or replaces the connection; null where the tier has none. */
   connect: ActionView | null;
   disconnect: ActionView | null;
-  /** The way to a plan with Slack, on a tier without it. */
+  /** The way to a plan that has it: for the owner, who alone may change the plan. */
   upgrade: ActionView | null;
   help: { label: string; href: string } | null;
 }
@@ -24,7 +27,7 @@ export interface IntegrationsView {
   shell: ShellView;
   title: string;
   line: string;
-  slack: SlackCardView;
+  cards: IntegrationCardView[];
 }
 
 const WEBHOOK_FIELD: ActionInput = {
@@ -36,16 +39,23 @@ const WEBHOOK_FIELD: ActionInput = {
   autoComplete: 'off',
 };
 
-function slackCard(entitled: boolean, last4: string | null): SlackCardView {
-  const title = COPY.slackTitle;
+const disconnect = (): ActionView =>
+  routeAction('accountAlertRules', COPY.disconnect, {}, { fields: { clearSlack: 'true' } });
+
+function slackCard(entitled: boolean, last4: string | null, role: SeatRole): IntegrationCardView {
+  const base = { key: 'slack' as const, title: COPY.slackTitle };
   if (!entitled) {
+    const owner = role === 'owner';
+    // A destination kept from a trial: alerts do not post to it on this tier, and will again on
+    // a paid one, so the page says so and offers to remove it.
+    const locked = owner ? COPY.slackLocked : COPY.slackLockedNotOwner;
     return {
-      title,
-      body: COPY.slackLocked,
+      ...base,
+      body: last4 === null ? locked : `${COPY.slackStored(last4)} ${locked}`,
       status: { state: 'neutral', label: COPY.onPro },
       connect: null,
-      disconnect: null,
-      upgrade: action('plan', COPY.seePlans),
+      disconnect: last4 === null ? null : disconnect(),
+      upgrade: owner ? action('plan', COPY.seePlans) : null,
       help: null,
     };
   }
@@ -55,7 +65,7 @@ function slackCard(entitled: boolean, last4: string | null): SlackCardView {
   });
   if (last4 === null) {
     return {
-      title,
+      ...base,
       body: COPY.slackOff,
       status: { state: 'neutral', label: COPY.notConnected },
       connect: form(COPY.connect),
@@ -65,34 +75,29 @@ function slackCard(entitled: boolean, last4: string | null): SlackCardView {
     };
   }
   return {
-    title,
+    ...base,
     body: COPY.slackOn(last4),
     status: { state: 'ok', label: COPY.connected },
     connect: form(COPY.replace),
-    disconnect: routeAction(
-      'accountAlertRules',
-      COPY.disconnect,
-      {},
-      {
-        fields: { clearSlack: 'true' },
-      },
-    ),
+    disconnect: disconnect(),
     upgrade: null,
     help: COPY.help,
   };
 }
 
+/** `role` is the reader's, as the page's own `member_role` read it: the rail and the plan link follow it. */
 export function integrationsView(
   d: AccountDataset,
   viewer: Viewer,
   slackLast4: string | null,
+  role: SeatRole,
 ): IntegrationsView {
   const v = viewAt(d, viewer);
   return {
-    shell: accountShellView(v, 'Integrations', { role: readerRole(v) ?? 'developer' }),
+    shell: accountShellView(v, 'Integrations', { role }),
     title: COPY.title,
     line: COPY.line,
-    slack: slackCard(v.gates.slack, slackLast4),
+    cards: [slackCard(v.gates.slack, slackLast4, role)],
   };
 }
 

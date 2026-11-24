@@ -125,7 +125,7 @@ describe('the first-run dashboard with paid plans closed', () => {
   it('does not mention keeping Pro', () => {
     const v = dashboardView(bad, day0);
     expect(v.setup!.foot).toBe(
-      'All five stop when the 14 days end. The site, its audits and its monthly check do not.',
+      'All three stop when the 14 days end. The site, its audits and its monthly check do not.',
     );
     expect(v.threeKinds!.body).not.toContain('keep Pro');
   });
@@ -150,7 +150,7 @@ describe('the first-run dashboard with paid plans closed', () => {
       sites: bad.sites.map((s) => (s.id === OLDEST ? { ...s, paused: true } : s)),
     };
     expect(dashboardView(d, day0).setup!.foot).toBe(
-      'All five stop when the 14 days end. The site and its audits do not.',
+      'All three stop when the 14 days end. The site and its audits do not.',
     );
   });
 });

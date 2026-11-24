@@ -60,8 +60,14 @@ export default async function V2Dashboard({
       Sentry.captureException(cause);
       return [];
     }),
-    // Whether Slack is connected, for the set-up list. Only that it is set reaches the view.
-    supabaseAlertRulePorts(supabaseAdmin()).slackLast4(account.id),
+    // Whether Slack is connected, for the set-up list. Only that it is set reaches the view. A
+    // failed read is reported and taken as not set: the list then offers Slack again.
+    supabaseAlertRulePorts(supabaseAdmin())
+      .slackLast4(account.id)
+      .catch((cause: unknown) => {
+        Sentry.captureException(cause);
+        return null;
+      }),
   ]);
   const query = await searchParams;
   return (

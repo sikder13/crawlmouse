@@ -199,7 +199,7 @@ export const ALERTS_CHANGES: CopyChange[] = [
     locked: 'Slack channel per site set on each site page',
     rendered: 'Slack settings in Integrations Open Alerts per site set on each site page',
     source:
-      'TARGET.md (owner, 23 Nov): Slack is built. The webhook is the account’s and is set on Integrations; a site page has no Slack field (F-016), and what it does set is that site’s alert rules.',
+      'V2R register (F-016; TARGET.md, owner, 23 Nov): Slack is built. The webhook is the account’s and is set on Integrations; a site page has no Slack field (F-016), and what it does set is that site’s alert rules.',
   },
   {
     screen: 'alerts',
