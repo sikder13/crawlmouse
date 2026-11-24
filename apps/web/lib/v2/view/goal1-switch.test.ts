@@ -56,3 +56,31 @@ describe('the switch on Pricing and For agencies', () => {
     expect(elsewhere.sort()).toEqual(['ai_letter', 'nojs', 'sentinel']);
   });
 });
+
+describe('the switch on Home', () => {
+  const home = async () => {
+    const { renderToStaticMarkup } = await import('react-dom/server');
+    const { HomeScreen } = await import('../../../components/v2/screens/home/HomeScreen');
+    const { homePreview } = await import('../../../app/(v2-preview)/v2-preview/_preview/screens');
+    const data = homePreview();
+    return renderToStaticMarkup(HomeScreen({ data }) as never).replace(/<[^>]+>/g, ' ');
+  };
+
+  it('unset: the locked plan cards and the words card', async () => {
+    const t = await home();
+    expect(t).toContain('alerts to Slack, one competitor per site, PDF and CSV export.');
+    expect(t).toContain(
+      'Twenty-five client sites, five seats, reports on your domain with your logo, and a one-page audit you can hand to a prospect.',
+    );
+    expect(t).toContain('A browser sees');
+  });
+
+  it('hidden: no competitor, no logo or one-page audit, no words card', async () => {
+    vi.stubEnv('V2_HIDE_FEATURES', 'competitors,agency_domain,agency_white_label,nojs');
+    const t = await home();
+    expect(t).not.toMatch(/competitor/i);
+    expect(t).toContain('Twenty-five client sites and five seats.');
+    expect(t).not.toContain('A browser sees');
+    expect(t).not.toContain('run JavaScript. How much');
+  });
+});

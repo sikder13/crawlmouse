@@ -13,32 +13,55 @@ import { Stage } from './Stage';
 import layout from '../../layout.module.css';
 import styles from './HomeScreen.module.css';
 
-const PLANS = [
-  {
-    name: 'Free',
-    price: formatPlanPrice('free'),
-    per: null,
-    body: 'One site, checked monthly. The full crawler matrix, three complete fixes per audit, history kept.',
-    action: 'Create a free account',
-    note: 'Includes 14 days of Pro',
-  },
-  {
-    name: 'Pro',
-    price: formatPlanPrice('pro'),
-    per: ' a month',
-    body: 'Five sites, checked weekly. Every fix with a copy-paste packet, alerts to Slack, one competitor per site, PDF and CSV export.',
-    action: 'Start with 14 days of Pro',
-    note: `The same free account; ${formatPlanPrice('pro')} a month only if you keep Pro`,
-  },
-  {
-    name: 'Agency',
-    price: formatPlanPrice('agency'),
-    per: ' a month',
-    body: 'Twenty-five client sites, five seats, reports on your domain with your logo, and a one-page audit you can hand to a prospect.',
-    action: 'Start a 14-day trial',
-    note: 'Card required; nothing charged for 14 days',
-  },
-];
+/** "a and b", "a, b, and c": the serial comma the locked card uses. */
+const andList = (items: readonly string[]) =>
+  items.length === 2
+    ? `${items[0]} and ${items[1]}`
+    : items
+        .map((x, i) => (i === 0 ? x : i === items.length - 1 ? `, and ${x}` : `, ${x}`))
+        .join('');
+
+/** The plan cards, without what the Goal 1 switch hides; with nothing hidden, the locked words. */
+function plans(f: HomeView['features']) {
+  const pro = [
+    'Every fix with a copy-paste packet',
+    'alerts to Slack',
+    f.competitors ? 'one competitor per site' : null,
+    'PDF and CSV export',
+  ].filter(Boolean);
+  const agency = [
+    'Twenty-five client sites',
+    'five seats',
+    f.agency_domain ? 'reports on your domain with your logo' : null,
+    f.agency_white_label ? 'a one-page audit you can hand to a prospect' : null,
+  ].filter((x): x is string => x !== null);
+  return [
+    {
+      name: 'Free',
+      price: formatPlanPrice('free'),
+      per: null,
+      body: 'One site, checked monthly. The full crawler matrix, three complete fixes per audit, history kept.',
+      action: 'Create a free account',
+      note: 'Includes 14 days of Pro',
+    },
+    {
+      name: 'Pro',
+      price: formatPlanPrice('pro'),
+      per: ' a month',
+      body: `Five sites, checked weekly. ${pro.join(', ')}.`,
+      action: 'Start with 14 days of Pro',
+      note: `The same free account; ${formatPlanPrice('pro')} a month only if you keep Pro`,
+    },
+    {
+      name: 'Agency',
+      price: formatPlanPrice('agency'),
+      per: ' a month',
+      body: `${andList(agency)}.`,
+      action: 'Start a 14-day trial',
+      note: 'Card required; nothing charged for 14 days',
+    },
+  ];
+}
 
 /**
  * The locked Home screen (Final-Home). The example audit, the crawler table, the words card and the
@@ -153,40 +176,42 @@ export function HomeScreen({
           </p>
         </section>
 
-        <section className={`${layout.wrap} ${styles.sec} ${styles.g2}`}>
-          <div>
-            <Heading level={2} size="l">
-              GPTBot and ClaudeBot don&apos;t run JavaScript. How much of your page is left?
-            </Heading>
-            <p className={styles.sub}>
-              We compare what a browser renders with the raw response the bot receives, page by
-              page, and give you the number.
-            </p>
-          </div>
-          <Card className={styles.wordsCard}>
-            <div className={`${layout.mono} ${layout.mut}`}>{withoutJs.path}</div>
-            <div className={`${layout.row} ${styles.words}`}>
-              <div>
-                <div className={`${layout.mut} ${styles.small}`}>A browser sees</div>
-                <div className={styles.bigNumber}>{count(withoutJs.browserWords)}</div>
-                <div className={`${layout.mut} ${styles.micro}`}>words</div>
-              </div>
-              <div>
-                <div className={`${layout.mut} ${styles.small}`}>{withoutJs.bot} sees</div>
-                <div className={`${styles.bigNumber} ${styles.bad}`}>
-                  {count(withoutJs.botWords)}
+        {data.features.nojs ? (
+          <section className={`${layout.wrap} ${styles.sec} ${styles.g2}`}>
+            <div>
+              <Heading level={2} size="l">
+                GPTBot and ClaudeBot don&apos;t run JavaScript. How much of your page is left?
+              </Heading>
+              <p className={styles.sub}>
+                We compare what a browser renders with the raw response the bot receives, page by
+                page, and give you the number.
+              </p>
+            </div>
+            <Card className={styles.wordsCard}>
+              <div className={`${layout.mono} ${layout.mut}`}>{withoutJs.path}</div>
+              <div className={`${layout.row} ${styles.words}`}>
+                <div>
+                  <div className={`${layout.mut} ${styles.small}`}>A browser sees</div>
+                  <div className={styles.bigNumber}>{count(withoutJs.browserWords)}</div>
+                  <div className={`${layout.mut} ${styles.micro}`}>words</div>
                 </div>
-                <div className={`${layout.mut} ${styles.micro}`}>words · {withoutJs.share}%</div>
+                <div>
+                  <div className={`${layout.mut} ${styles.small}`}>{withoutJs.bot} sees</div>
+                  <div className={`${styles.bigNumber} ${styles.bad}`}>
+                    {count(withoutJs.botWords)}
+                  </div>
+                  <div className={`${layout.mut} ${styles.micro}`}>words · {withoutJs.share}%</div>
+                </div>
               </div>
-            </div>
-            <div className={styles.shareTrack}>
-              <div className={styles.shareFill} style={{ width: `${withoutJs.share}%` }} />
-            </div>
-            <div className={`${layout.mut} ${styles.micro} ${styles.shareNote}`}>
-              {count(withoutJs.templatePages)} {withoutJs.templateNoun} pages share this template.
-            </div>
-          </Card>
-        </section>
+              <div className={styles.shareTrack}>
+                <div className={styles.shareFill} style={{ width: `${withoutJs.share}%` }} />
+              </div>
+              <div className={`${layout.mut} ${styles.micro} ${styles.shareNote}`}>
+                {count(withoutJs.templatePages)} {withoutJs.templateNoun} pages share this template.
+              </div>
+            </Card>
+          </section>
+        ) : null}
 
         <section className={`${layout.wrap} ${styles.sec} ${styles.g2}`}>
           <Card className={styles.alertCard}>
@@ -237,7 +262,7 @@ export function HomeScreen({
             Every new account gets Pro for 14 days. When that ends, nothing you can see is deleted.
           </p>
           <div className={styles.g3}>
-            {PLANS.map((p) => (
+            {plans(data.features).map((p) => (
               <Card key={p.name} className={styles.plan}>
                 <div className={layout.mut}>{p.name}</div>
                 <div className={styles.price}>

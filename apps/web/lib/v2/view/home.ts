@@ -2,6 +2,7 @@
  * The Home screen's example audit, its crawler table, its words-without-JavaScript card and its
  * alert card, as data from the bad-site fixture. The marketing copy around them is the component's.
  */
+import { shownFeatures, type RiskFeature } from '../../feature-switch';
 import type { AccessCause, CrawlerResult } from '@crawlmouse/types/v2';
 import { crawlerOf, findCheck, fixesAsOf, siteOf, templateOf } from '../fixtures';
 import { duration, percent, templateNoun, weekdayTime } from '../format';
@@ -24,6 +25,8 @@ export interface VerdictView {
 }
 
 export interface HomeView {
+  /** Which Goal 1 features may be named (`lib/feature-switch.ts`), read on the server. */
+  features: Record<RiskFeature, boolean>;
   example: {
     domain: string;
     duration: string;
@@ -113,7 +116,10 @@ export function homeView(
   const cell = (c: CrawlerResult, key: string): VerdictView => {
     const byT = c.by_template.find((x) => x.template_key === key);
     if (!byT) throw new Error(`${c.ua} has no verdict for ${key}`);
-    return { verdict: byT.verdict, evidence: c.evidence_class };
+    return {
+      verdict: byT.verdict,
+      evidence: c.evidence_class,
+    };
   };
 
   // The example of words lost without JavaScript: the sampled page that loses the most.
@@ -151,6 +157,7 @@ export function homeView(
   const zone = d.accounts.find((a) => a.id === site.account_id)?.timezone ?? 'UTC';
 
   return {
+    features: shownFeatures(),
     example: {
       domain: site.host,
       duration: duration(end.elapsed_ms),
