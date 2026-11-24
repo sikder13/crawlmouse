@@ -549,7 +549,7 @@ const HOME: CopyChange[] = [
     rendered:
       "One competitor added Connect Search Console to lay Google's impressions and clicks by page over the audit, and its AI-feature breakdown when its API exposes it Connect done Staging audited on each deploy Connect Cloudflare Analytics or a Vercel Drain to see what the AI crawlers actually fetched Connect",
     source:
-      'FACTS H6 and l.57: the Pro set-up items from the gates, staging done (a staging site exists) and observed crawler activity not connected; the efforts "2 min" and "1 min" are in no record and are left out',
+      'FACTS H6 and l.57: the Pro set-up items from the gates, staging done (a deploy check of the staging site has a result) and observed crawler activity not connected; the efforts "2 min" and "1 min" are in no record and are left out',
   },
   {
     screen: 'dashboard',
