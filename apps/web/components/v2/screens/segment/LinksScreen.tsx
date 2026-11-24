@@ -179,7 +179,7 @@ function Basics({ col }: { col: BasicsColumnView }) {
 
 /**
  * Links and pages (row 5): the missing pages a link in the record leads to and the pages of the
- * record that link to them, the missing pages no link in the record leads to, the pages that
+ * record that link to them, the missing pages the record links to from 0 pages, the pages that
  * answered another error, redirects, and the titles and meta descriptions that are missing or shared. Headings are not read yet, and
  * the page says so.
  */

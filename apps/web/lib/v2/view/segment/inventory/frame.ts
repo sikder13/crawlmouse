@@ -23,8 +23,8 @@ export const FRAME_INVENTORY = [
   entry(
     'segment-next-links',
     ['structure'],
-    'The next link’s figure: the missing-page pill, and the record’s links to them',
-    ['page_results[].status_code', 'link_edges[]', 'page_results[].links_out'],
+    'The next link’s figure: the missing pages, and how many pages of the record link to them',
+    ['page_results[].status_code', 'link_edges[]'],
   ),
   entry('segment-next-content', ['links'], 'The next link’s figure: the content score', [
     'checks[].content.score',

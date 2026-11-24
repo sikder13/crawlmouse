@@ -1,6 +1,6 @@
 /**
  * Links and pages (row 5) as data: the missing pages a link in the record leads to and the pages of
- * the record that link to them, the missing pages no link in the record leads to, the pages that
+ * the record that link to them, the missing pages the record links to from 0 pages, the pages that
  * answered another error, the pages that redirect, and the titles and meta descriptions that are missing or shared. It
  * reads the page and link records of one check. A page's status, final URL, title and meta
  * description are read through the pages CSV's accessors (reports/csv.ts), so the screen, the CSV
@@ -13,8 +13,8 @@
  * distinct links of a page, and stores none of a page's links once its batch has used its room for
  * them, while `links_out` keeps the page's full count of distinct links. A page read in part has
  * `links_read` false, a page not crawled gives none, and a fixture may hold a subset (`withheld`).
- * So what it says of links is said of the record: "linked from 2 pages in this check’s record", "no
- * link in this check’s record leads to it"; and the pages whose links the record does not hold in
+ * So what it says of links is a count over the record, "linked from 2 pages in this check’s
+ * record", "linked from 0 pages", never a claim that no link exists; and the pages whose links the record does not hold in
  * full are counted from `links_read` and `links_out` against the links the record holds from each
  * (`linksNotAllHeld`). Of the pages checked it says which statuses none answered ("no page checked
  * answered 404 or 410"), never that a page exists. __tests__/v2/links-sentences.property.test.tsx
@@ -128,7 +128,7 @@ export interface LinksCounts {
   broken: number;
   /** Distinct pages whose link in the record leads to one of those, a page's link to itself left out. */
   brokenLinkedFrom: number;
-  /** Missing pages, by URL, found with no link in the record leading to them. */
+  /** Missing pages, by URL, the record links to from 0 pages. */
   missingUnlinked: number;
   /** URLs that answered an error of 400 or more other than a missing one. */
   errors: number;
@@ -158,10 +158,10 @@ export const HEADINGS_LINE = 'Headings are not checked yet.';
 /** The empty state of each table when the record holds no page. */
 export const NOT_MEASURED_LINE = 'Not measured: this check recorded no page.';
 export const ERRORS_HEADING = 'Pages that answered an error';
-/** The heading of the missing pages found with no link in the record leading to them. */
+/** The heading of the missing pages the record links to from 0 pages. */
 export const UNLINKED_HEADING = 'Missing pages found';
-/** What a row's "Linked from" cell says when the record holds no link that leads to it. */
-export const NO_LINK_IN_RECORD = 'no link in the record';
+/** A row's "Linked from" cell when the record holds no link to it: a count, never a claim of none. */
+export const LINKED_FROM_NONE = '0 pages in this check’s record';
 /** The column that names the URL a redirect chain starts from. */
 export const REQUESTED_AS = 'Requested as';
 
@@ -350,7 +350,7 @@ export interface LinksFacts {
   linkGap: LinkGap;
   /** The rows of the missing pages a link in the record leads to: the broken links. */
   broken: ErrorRowView[];
-  /** The rows of the missing pages found with no link in the record leading to them. */
+  /** The rows of the missing pages the record links to from 0 pages. */
   unlinked: ErrorRowView[];
   /** Their heading: "Missing pages found". */
   unlinkedHeading: string;
@@ -392,15 +392,6 @@ export function linksFacts(d: ViewDataset, check: Check): LinksFacts {
       : !sectionMeasured(check, 'structure') && !pages.some(countsALink)
         ? 'unread'
         : 'unrecorded';
-  const noLink =
-    linkGap === 'unread' ? 'no link read' : linkGap === 'unrecorded' ? 'no link recorded' : null;
-  /** The same, as a clause: "No link was read". */
-  const noLinkClause =
-    linkGap === 'unread'
-      ? 'No link was read'
-      : linkGap === 'unrecorded'
-        ? 'No link is in this check’s record'
-        : null;
 
   // One row per URL where pages answered an error and status (segment/broken.ts `errorRows`): a page
   // reached by a redirect is shown at its final URL, a final URL the record also holds with the same
@@ -417,7 +408,7 @@ export function linksFacts(d: ViewDataset, check: Check): LinksFacts {
       anchor: isBlank(e.anchor_text) ? null : e.anchor_text,
     }));
     const froms = [...new Set(linkedFrom.map((l) => l.path))];
-    const none = noLink ?? NO_LINK_IN_RECORD;
+    const none = LINKED_FROM_NONE;
     return {
       url: at,
       path: path(at),
@@ -513,9 +504,8 @@ export function linksFacts(d: ViewDataset, check: Check): LinksFacts {
       redirects,
       titles: titles.view,
       descriptions: descriptions.view,
-      body: 'This check recorded no page, so no link, redirect, title or meta description was read.',
-      screenBody:
-        'This check recorded no page, so no link, redirect, title or meta description was read.',
+      body: 'This check recorded no page.',
+      screenBody: 'This check recorded no page.',
       brokenEmpty: NOT_MEASURED_LINE,
       redirectsEmpty: NOT_MEASURED_LINE,
       pill: { state: 'neutral', label: 'not measured' },
@@ -535,9 +525,7 @@ export function linksFacts(d: ViewDataset, check: Check): LinksFacts {
     ? `${missingPages(nBroken)}, ${linkedFromRecord} in this check’s record, answering ${statusesOf(broken).join(' or ')}.`
     : null;
   const unlinkedSentence = nUnlinked
-    ? noLinkClause === null
-      ? `${missingPages(nUnlinked)}, answering ${statusesOf(unlinked).join(' or ')}; no link in this check’s record leads to ${plural(nUnlinked, 'it', 'them')}.`
-      : `${missingPages(nUnlinked)}, answering ${statusesOf(unlinked).join(' or ')}. ${noLinkClause}, so what links to ${plural(nUnlinked, 'it', 'them')} is not known.`
+    ? `${missingPages(nUnlinked)}, linked from 0 pages in this check’s record, answering ${statusesOf(unlinked).join(' or ')}.`
     : null;
   // The record holds only some of the links: say how, from the record. A `withheld` total is said
   // when the record holds links; the pages whose links it does not hold in full, whenever there are.
@@ -641,12 +629,12 @@ export function linksFacts(d: ViewDataset, check: Check): LinksFacts {
       : 'no page checked answered 404 or 410';
   const brokenEmpty = nBroken
     ? null
-    : noLinkClause !== null
-      ? `${noLinkClause}, so no link to a missing page can be named.`
-      : (noneSentence ??
-        (nUnlinked
-          ? `No link in this check’s record leads to ${nUnlinked === 1 ? 'the missing page' : `any of the ${missingPages(nUnlinked)}`}.`
-          : `${capitalise(noneMissing)}.`));
+    : (noneSentence ??
+      (nUnlinked
+        ? nUnlinked === 1
+          ? 'The missing page is linked from 0 pages in this check’s record.'
+          : `Each of the ${missingPages(nUnlinked)} is linked from 0 pages in this check’s record.`
+        : `${capitalise(noneMissing)}.`));
   return {
     counts,
     linkGap,
@@ -677,14 +665,9 @@ export function linksFacts(d: ViewDataset, check: Check): LinksFacts {
       : nUnlinked
         ? {
             state: 'neutral',
-            label:
-              noLink === null
-                ? `${missingPages(nUnlinked)} · no link in the record leads to ${plural(nUnlinked, 'it', 'them')}`
-                : `${missingPages(nUnlinked)} · ${noLink}`,
+            label: `${missingPages(nUnlinked)} · linked from 0 pages in the record`,
           }
-        : noLink !== null
-          ? { state: 'neutral', label: noLink }
-          : { state: 'neutral', label: noneMissing },
+        : { state: 'neutral', label: noneMissing },
     coverage,
   };
 }

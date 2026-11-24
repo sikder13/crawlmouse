@@ -14,7 +14,7 @@
  *
  * For each record, `expectTrueToTheRecord` checks, against a truth computed here:
  * - the rows of the missing-page and error tables, as (page, status) pairs, and each row's linking
- *   pages, its "and N more" summary, and the cell that stands in when the record holds no link;
+ *   pages, its "and N more" summary, and the count (0) that stands in when the record holds none;
  * - the missing-page, error, redirect and loop counts and the status lists of the body's sentences;
  * - the clause on the pages whose links the record does not hold in full (`links_read` false, or
  *   `links_out` above the distinct links the record holds from the page), the clause on links
@@ -326,6 +326,9 @@ const FORBIDDEN: readonly RegExp[] = [
   /no broken link/i,
   /unlinked/i,
   /we read/i,
+  /leads to/i,
+  /\bno link(?! text)/i,
+  /no (internal )?link (in|read|recorded|found|was|is)\b/i,
   /no (internal )?link leads to/i,
   /no link found/i,
   /missing pages no/i,
@@ -374,12 +377,7 @@ function expectTrueToTheRecord(given: PageResult[], edges: LinkEdge[], scope: Sc
   ]);
 
   // Each row's linking pages, its summary ("/a, /b and N more"), and what stands in for none.
-  const stand =
-    t.linkGap === 'unread'
-      ? 'no link read'
-      : t.linkGap === 'unrecorded'
-        ? 'no link recorded'
-        : 'no link in the record';
+  const stand = '0 pages in this check’s record';
   for (const r of [...v.broken.rows, ...v.unlinked.rows, ...v.errors.rows]) {
     const truth = t.rows.find((x) => path(x.at) === r.path && x.status === r.status)!;
     const froms = distinct(truth.into.map((e) => path(e.from_url)));
@@ -399,12 +397,15 @@ function expectTrueToTheRecord(given: PageResult[], edges: LinkEdge[], scope: Sc
   for (const body of bodies) {
     const b = matchesOf(
       [body],
-      /(\d[\d,]*) missing pages?, linked from (\d[\d,]*) pages? in this check’s record, answering ([\d or]+)\./,
+      /(\d[\d,]*) missing pages?, linked from ([1-9][\d,]*) pages? in this check’s record, answering ([\d or]+)\./,
     );
     expect(b.map((m) => [num(m[1]!), num(m[2]!), statusList(m[3]!)])).toEqual(
       t.broken ? [[t.broken, t.linkingPages, t.brokenStatuses]] : [],
     );
-    const u = matchesOf([body], /(\d[\d,]*) missing pages?, answering ([\d or]+)[.;]/);
+    const u = matchesOf(
+      [body],
+      /(\d[\d,]*) missing pages?, linked from 0 pages in this check’s record, answering ([\d or]+)\./,
+    );
     expect(u.map((m) => [num(m[1]!), statusList(m[2]!)])).toEqual(
       t.unlinked ? [[t.unlinked, t.unlinkedStatuses]] : [],
     );
@@ -436,13 +437,7 @@ function expectTrueToTheRecord(given: PageResult[], edges: LinkEdge[], scope: Sc
     );
   } else if (t.unlinked) {
     const missing = `${t.unlinked} missing ${t.unlinked === 1 ? 'page' : 'pages'}`;
-    expect(pill).toBe(
-      t.linkGap === null
-        ? `${missing} · no link in the record leads to ${t.unlinked === 1 ? 'it' : 'them'}`
-        : `${missing} · ${stand}`,
-    );
-  } else if (t.linkGap !== null) {
-    expect(pill).toBe(stand);
+    expect(pill).toBe(`${missing} · linked from 0 pages in the record`);
   } else {
     expect(pill).toBe(
       t.checked === 1
@@ -451,22 +446,19 @@ function expectTrueToTheRecord(given: PageResult[], edges: LinkEdge[], scope: Sc
     );
   }
   // "Answered 404 or 410" is said of none only when no page checked answered either.
-  for (const s of strings.filter((x) =>
-    /did not answer 404 or 410|no page checked answered/i.test(x),
-  ))
+  if (strings.some((x) => /did not answer 404 or 410|no page checked answered/i.test(x)))
     expect(t.missingAt).toEqual([]);
 
   // The headline: the scope, the missing pages found, whether links were read, the redirects and
   // the titles and descriptions read.
   const h = v.headline.title.match(
-    /^(?:(\d+) pages? checked: )?(\d+) missing pages? found(?: · (no link read|no link recorded))? · (?:(\d+) redirects?|redirects not recorded) · (?:titles and descriptions read on (\d+) pages?|titles read on (\d+) pages?, descriptions on (\d+))$/,
+    /^(?:(\d+) pages? checked: )?(\d+) missing pages? found · (?:(\d+) redirects?|redirects not recorded) · (?:titles and descriptions read on (\d+) pages?|titles read on (\d+) pages?, descriptions on (\d+))$/,
   );
   expect(h).not.toBeNull();
   expect(h![1] === undefined ? null : num(h![1])).toBe(t.crawled > t.checked ? t.checked : null);
   expect(num(h![2]!)).toBe(t.missingAt.length);
-  expect(h![3] ?? null).toBe(t.linkGap === null ? null : stand);
-  expect(h![4] === undefined ? null : num(h![4])).toBe(t.redirectsRecorded ? t.redirecting : null);
-  const readOn = h![5] !== undefined ? [num(h![5]), num(h![5])] : [num(h![6]!), num(h![7]!)];
+  expect(h![3] === undefined ? null : num(h![3])).toBe(t.redirectsRecorded ? t.redirecting : null);
+  const readOn = h![4] !== undefined ? [num(h![4]), num(h![4])] : [num(h![5]!), num(h![6]!)];
   expect(readOn).toEqual([t.titles.read, t.descriptions.read]);
 
   // The tiles.
@@ -475,13 +467,9 @@ function expectTrueToTheRecord(given: PageResult[], edges: LinkEdge[], scope: Sc
   if (t.redirectsRecorded === 0) expect(tile('Redirects')).toBe('not recorded');
   else expect(tile('Redirects')).toBe(String(t.redirecting));
 
-  // With no link held, nothing names a page a link comes from; with links held, none is called absent.
+  // With no link held, no string names a page a link comes from.
   if (t.linksHeld === 0) {
-    for (const s of strings) expect(s).not.toMatch(/linked from \d/i);
-  } else {
-    for (const s of strings) {
-      expect(s).not.toMatch(/no link (was )?(read|recorded)|No link is in this check/i);
-    }
+    for (const s of strings) expect(s).not.toMatch(/linked from [1-9]/i);
   }
 
   // The map counts the missing pages as the Links screen does, scoped to the pages checked.
@@ -756,7 +744,10 @@ const pdf = (path: string) =>
 
 interface Said {
   pill: string;
+  /** The screen's body. */
   body: string;
+  /** The door's body: the screen's, with the sentence the empty state says when it says it. */
+  doorBody: string;
   tab: string;
   brokenEmpty: string | null;
   headline: string;
@@ -768,13 +759,17 @@ const VECTORS: [string, PageResult[], LinkEdge[], Said][] = [
     [whole('/', 1500), gone('/gone', 404)],
     [edge('/', '/a')],
     {
-      pill: '1 missing page · no link in the record leads to it',
+      pill: '1 missing page · linked from 0 pages in the record',
       body:
-        '1 missing page, answering 404; no link in this check’s record leads to it. ' +
+        '1 missing page, linked from 0 pages in this check’s record, answering 404. ' +
         'The links of 1 page are not all in this check’s record. ' +
         'The page that answered 200 has a title and a meta description.',
-      tab: 'Next: Links and pages · 1 missing page · no link in the record leads to it',
-      brokenEmpty: 'No link in this check’s record leads to the missing page.',
+      doorBody:
+        '1 missing page, linked from 0 pages in this check’s record, answering 404. ' +
+        'The links of 1 page are not all in this check’s record. ' +
+        'The page that answered 200 has a title and a meta description.',
+      tab: 'Next: Links and pages · 1 missing page · linked from 0 pages in the record',
+      brokenEmpty: 'The missing page is linked from 0 pages in this check’s record.',
       headline: '1 missing page found · 0 redirects · titles and descriptions read on 1 page',
     },
   ],
@@ -783,15 +778,18 @@ const VECTORS: [string, PageResult[], LinkEdge[], Said][] = [
     [whole('/', 3), gone('/gone', 410)],
     [],
     {
-      pill: '1 missing page · no link recorded',
+      pill: '1 missing page · linked from 0 pages in the record',
       body:
-        '1 missing page, answering 410. No link is in this check’s record, so what links to it is not known. ' +
+        '1 missing page, linked from 0 pages in this check’s record, answering 410. ' +
         'The links of 1 page are not all in this check’s record. ' +
         'The page that answered 200 has a title and a meta description.',
-      tab: 'Next: Links and pages · 1 missing page · no link recorded',
-      brokenEmpty: 'No link is in this check’s record, so no link to a missing page can be named.',
-      headline:
-        '1 missing page found · no link recorded · 0 redirects · titles and descriptions read on 1 page',
+      doorBody:
+        '1 missing page, linked from 0 pages in this check’s record, answering 410. ' +
+        'The links of 1 page are not all in this check’s record. ' +
+        'The page that answered 200 has a title and a meta description.',
+      tab: 'Next: Links and pages · 1 missing page · linked from 0 pages in the record',
+      brokenEmpty: 'The missing page is linked from 0 pages in this check’s record.',
+      headline: '1 missing page found · 0 redirects · titles and descriptions read on 1 page',
     },
   ],
   [
@@ -801,6 +799,10 @@ const VECTORS: [string, PageResult[], LinkEdge[], Said][] = [
     {
       pill: '1 missing page · linked from 1 page in the record',
       body:
+        '1 missing page, linked from 1 page in this check’s record, answering 404. ' +
+        'The links of 1 page are not all in this check’s record. ' +
+        'Each of the 2 pages that answered 200 has its own title and meta description.',
+      doorBody:
         '1 missing page, linked from 1 page in this check’s record, answering 404. ' +
         'The links of 1 page are not all in this check’s record. ' +
         'Each of the 2 pages that answered 200 has its own title and meta description.',
@@ -818,6 +820,9 @@ const VECTORS: [string, PageResult[], LinkEdge[], Said][] = [
       body:
         '3 pages answered an error (429). ' +
         'The page that answered 200 has a title and a meta description.',
+      doorBody:
+        '3 pages answered an error (429). ' +
+        'The page that answered 200 has a title and a meta description.',
       tab: 'Next: Links and pages · no page checked answered 404 or 410',
       brokenEmpty: 'No page checked answered 404 or 410.',
       headline: '0 missing pages found · 0 redirects · titles and descriptions read on 1 page',
@@ -828,14 +833,14 @@ const VECTORS: [string, PageResult[], LinkEdge[], Said][] = [
     [pdf('/a.pdf'), pdf('/b.pdf')],
     [],
     {
-      pill: 'no link read',
-      body:
+      pill: 'no page checked answered 404 or 410',
+      body: 'No title or meta description was read on the 2 pages that answered 200.',
+      doorBody:
         'None of the 2 pages we checked answers an error. ' +
         'No title or meta description was read on the 2 pages that answered 200.',
-      tab: 'Next: Links and pages · no link read',
-      brokenEmpty: 'No link was read, so no link to a missing page can be named.',
-      headline:
-        '0 missing pages found · no link read · 0 redirects · titles and descriptions read on 0 pages',
+      tab: 'Next: Links and pages · no page checked answered 404 or 410',
+      brokenEmpty: 'None of the 2 pages we checked answers an error.',
+      headline: '0 missing pages found · 0 redirects · titles and descriptions read on 0 pages',
     },
   ],
 ];
@@ -847,11 +852,12 @@ describe('Links and pages on hand-counted records: the pill, body, tab, empty st
     expect({
       pill: v.headline.pill?.label,
       body: v.body,
+      doorBody: door.body,
       tab,
       brokenEmpty: v.broken.empty,
       headline: v.headline.title,
     }).toEqual(want);
-    expect([door.pill.label, door.body]).toEqual([want.pill, want.body]);
+    expect(door.pill.label).toBe(want.pill);
   });
 });
 

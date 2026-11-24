@@ -323,7 +323,7 @@ describe('a hand-counted record: a blank title, a 503, a self-linked 410, blank 
   it('writes each clause once, each true of every page it names', () => {
     expect(v.body).toBe(
       '1 missing page, linked from 2 pages in this check’s record, answering 404. ' +
-        '1 missing page, answering 410; no link in this check’s record leads to it. ' +
+        '1 missing page, linked from 0 pages in this check’s record, answering 410. ' +
         // The links to the 410 were taken out of the record; the page they were on keeps its count.
         'The links of 1 page are not all in this check’s record. ' +
         '1 page answered an error (503). ' +
@@ -338,7 +338,13 @@ describe('a hand-counted record: a blank title, a 503, a self-linked 410, blank 
     expect(
       v.unlinked.rows.map((r) => [r.path, r.status, r.linkedFrom, r.linkedAll, r.linkedSummary]),
     ).toEqual([
-      ['/products/sleeping-bags-item-1', 410, [], 'no link in the record', 'no link in the record'],
+      [
+        '/products/sleeping-bags-item-1',
+        410,
+        [],
+        '0 pages in this check’s record',
+        '0 pages in this check’s record',
+      ],
     ]);
     expect(v.titles.missing.shown.map((p) => p.path)).toEqual(['/blog/rainy-day-camping']);
   });

@@ -28,7 +28,7 @@ export interface LinksView {
   coverage: { read: string };
   counts: LinksCounts;
   broken: { rows: ErrorRowView[]; empty: string | null };
-  /** Missing pages found with no link in the record leading to them; listed only when there is one. */
+  /** Missing pages the record links to from 0 pages; listed only when there is one. */
   unlinked: { heading: string; rows: ErrorRowView[] };
   /** Pages that answered an error other than missing; listed only when there is one. */
   errors: { heading: string; rows: ErrorRowView[] };
@@ -62,13 +62,7 @@ export function linksView(
   });
   // The missing pages the record holds, however they are linked, and whether any link was read.
   const missing = c.broken + c.missingUnlinked;
-  const linkPart = `${count(missing)} missing ${plural(missing, 'page', 'pages')} found${
-    f.linkGap === 'unread'
-      ? ' · no link read'
-      : f.linkGap === 'unrecorded'
-        ? ' · no link recorded'
-        : ''
-  }`;
+  const linkPart = `${count(missing)} missing ${plural(missing, 'page', 'pages')} found`;
   const redirectPart = c.redirectsRecorded
     ? `${count(c.redirects)} ${plural(c.redirects, 'redirect', 'redirects')}`
     : 'redirects not recorded';
