@@ -69,7 +69,10 @@ export interface HomeView {
   };
 }
 
-/** A crawler's row is a without-JavaScript finding: a thin verdict, or a client-rendered template. */
+/**
+ * A crawler whose check records a without-JavaScript finding on any template, including one the
+ * table does not show: a thin verdict, or a client-rendered template as its cause.
+ */
 function isNojsFinding(c: CrawlerResult): boolean {
   return (
     c.cause === 'client_rendered_template' ||

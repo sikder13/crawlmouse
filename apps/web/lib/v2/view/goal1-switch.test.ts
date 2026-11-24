@@ -170,6 +170,7 @@ describe('no module a client component reaches imports the switch as a value', (
 
   it('the walk starts at client files and reaches the modules that take the record', () => {
     expect(roots.map(rel)).toContain('components/v2/screens/pricing/AgencyPlusForm.tsx');
+    expect(roots.map(rel)).toContain('instrumentation-client.ts');
     const seen = [...reached].map(rel);
     for (const f of ['lib/v2/copy/pricing.ts', 'lib/v2/features.ts']) expect(seen).toContain(f);
   });
