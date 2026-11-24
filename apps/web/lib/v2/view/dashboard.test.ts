@@ -42,7 +42,7 @@ describe('Dashboard home, bad-site at as_of (Fri 30 Oct 06:05 in Indiana)', () =
     expect(v.header.title).toBe("Since Thursday's check");
     // last check: 10:02Z = 06:02 EDT; next: Fri 6 Nov 06:00 EST; trial: 8 Nov 02:41Z = Sat 7 Nov.
     expect(v.header.line).toBe(
-      'Fri 30 Oct · 5 sites · last check today 06:02 · next weekly check Fri 6 Nov around 06:00 · trial ends Sat 7 Nov',
+      'Fri 30 Oct · 4 sites · last check today 06:02 · next weekly check Fri 6 Nov around 06:00 · trial ends Sat 7 Nov',
     );
   });
 
@@ -168,7 +168,7 @@ describe('Dashboard home, bad-site at as_of (Fri 30 Oct 06:05 in Indiana)', () =
       billing: null,
     });
     expect(v.shell.trial!.keep!.label).toBe('Keep Pro, $19 a month');
-    expect(v.shell.nav.find((n) => n.label === 'Sites')!.count).toBe('5');
+    expect(v.shell.nav.find((n) => n.label === 'Sites')!.count).toBe('4');
   });
 
   it('makes running a check its one orange action', () => {
@@ -437,5 +437,67 @@ describe('the Pro trial offer after a refusal (F-104)', () => {
   it('changes nothing else on the page', () => {
     const v = offered();
     expect(withoutTrialOffer(v, { notice: 'refused' })).toEqual({ ...v, startPro: null });
+  });
+});
+
+describe('a Free dashboard with paused sites, as after a trial ends (F-234, F-235)', () => {
+  const c = fixture('clean-site');
+  const site = c.sites.find((s) => CLEAN_VIEWER.adopt!.includes(s.id))!;
+  const extra = ['b', 'c'].map((n) => ({
+    ...site,
+    id: `${site.id.slice(0, -1)}${n}`,
+    host: `${n}.example`,
+    paused: true,
+  }));
+  /** The clean account with two more sites, each paused; its own site paused when `all`. */
+  const withPaused = (all: boolean) => ({
+    ...c,
+    sites: [...c.sites.map((s) => (s.id === site.id ? { ...s, paused: all } : s)), ...extra],
+  });
+  /** The clean viewer, adopting the two sites as well, on a plan of `sites` sites. */
+  const viewer = (sites = 1) => ({
+    ...CLEAN_VIEWER,
+    adopt: [...CLEAN_VIEWER.adopt!, ...extra.map((s) => s.id)],
+    account: { ...CLEAN_VIEWER.account!, limits: { ...CLEAN_VIEWER.account!.limits, sites } },
+  });
+
+  it('names the site Free still checks, and how many of the three are checked', () => {
+    const v = dashboardView(withPaused(false), viewer());
+    expect(v.header.title).toBe(`${site.host} is kept.`);
+    // Three sites hold slots on a plan of one; one is checked.
+    expect(v.sites.note).toBe('1 of 3 sites checked · Free checks 1 site');
+  });
+
+  it('with every site paused, says so, and promises no check', () => {
+    const v = dashboardView(withPaused(true), viewer());
+    expect(v.header.title).toBe('Every site is paused.');
+    expect(v.sites.note).toBe('0 of 3 sites checked · Free checks 1 site');
+    expect(v.sites.foot).toBe(
+      'Every site is paused, so none is scheduled. Nothing to compare yet.',
+    );
+  });
+
+  it('with the first site paused, names the schedule of a site still checked', () => {
+    const d = withPaused(true);
+    const b = d.sites.find((s) => s.id === extra[0]!.id)!;
+    const weekly = {
+      ...b,
+      paused: false,
+      schedule: { cadence: 'weekly' as const, iso_weekday: 5, hour_local: 6 },
+    };
+    const v = dashboardView(
+      { ...d, sites: d.sites.map((s) => (s.id === b.id ? weekly : s)) },
+      viewer(),
+    );
+    expect(v.header.title).toBe('b.example is kept.');
+    expect(v.sites.foot).toBe(
+      'Changes appear here after the first weekly check. Nothing to compare yet.',
+    );
+  });
+
+  it('within the limit, keeps the slot count and adds how many are paused', () => {
+    expect(dashboardView(withPaused(false), viewer(5)).sites.note).toBe(
+      '3 of 5 on Free · 2 paused',
+    );
   });
 });

@@ -3,10 +3,10 @@
 <!-- Rendered by scripts/golive/budget-doc.ts from scripts/golive/budget.ts. Do not edit by hand:
      change the model and run `pnpm --filter @crawlmouse/scripts exec tsx golive/budget-doc.ts --write`. -->
 
-Inngest's Hobby plan allows 50,000 executions a month. Each function run is one
-execution and each step (`step.run`, `step.sleep*`, `step.waitForEvent`, `step.sendEvent`,
-`step.invoke`) is one more. When the quota is used, every function pauses until the next month or an
-upgrade: v1's audits, the checks, the mail and the crons alike (inngest.com/pricing, read 2026-11-13).
+The account is on Inngest Pro, which includes 1,000,000 executions a month and bills $50 for each
+further 1,000,000 (Inngest dashboard, Billing, read 2026-11-23). Each function run is one execution
+and each step (`step.run`, `step.sleep*`, `step.waitForEvent`, `step.sendEvent`, `step.invoke`) is
+one more. On the Hobby plan, before the owner's upgrade on 21 Nov, a used quota paused every function.
 
 How the numbers are made: a check is counted by running the real `runCheck` (`inngest/check.ts`)
 against a scripted worker with a counting `step` (`checkExecutions`). Every other function's steps
@@ -26,6 +26,7 @@ from the step calls it cites; no test derives that number from the code.
 | `crawlmouse.check.expiry`           | `inngest/check-expiry.ts`     | V2_PIPELINE                    | cron `17 5 * * *`   | 3 (expire-unkept, settle-kept, purge-removed)                                        | 4                |
 | `crawlmouse.ledger.backfill`        | `inngest/ledger.ts`           | V2_PIPELINE                    | cron `41 */6 * * *` | 1 (backfill)                                                                         | 8                |
 | `crawlmouse.billing.past-due-sweep` | `inngest/past-due-sweep.ts`   | V2_BILLING                     | cron `0 * * * *`    | 2 (now, candidates; then two per due account, none when nothing is due)              | 72               |
+| `crawlmouse.trial.clock`            | `inngest/trial-clock.ts`      | V2_CHECKS_PUBLIC               | cron `20 * * * *`   | 2 (now, due; then two per due account, none when nothing is due)                     | 72               |
 | `crawlmouse.account.purge-deleted`  | `inngest/deletion.ts`         | V2_CHECKS_PUBLIC               | cron `30 3 * * *`   | 2 (now, due; then one per person due)                                                | 3                |
 | `crawlmouse.mail.contact-purge`     | `inngest/mail.ts`             | V2_CHECKS_PUBLIC               | cron `43 5 * * *`   | 1 (purge)                                                                            | 2                |
 | `crawlmouse.report.schedules`       | `inngest/report-schedules.ts` | V2_CHECKS_PUBLIC               | cron `7 * * * *`    | 1 (run-due: the due client report schedules, in one step)                            | 48               |
@@ -34,7 +35,7 @@ from the step calls it cites; no test derives that number from the code.
 | `crawlmouse.founder.sweep`          | `inngest/founder.ts`          | V2_BILLING or V2_CHECKS_PUBLIC | cron `*/5 * * * *`  | 1 (sweep: sign-ups, agency accounts and cancellations, read and noticed in one step) | 576              |
 | `crawlmouse.founder.digest`         | `inngest/founder.ts`          | V2_BILLING or V2_CHECKS_PUBLIC | cron `7 * * * *`    | 2 (clock, digest: the daily and weekly digests and the "N more" notice, in one step) | 72               |
 
-**Floor: 37,913 executions a month.** v1's own crons are 186 of it, counted as
+**Floor: 40,145 executions a month.** v1's own crons are 186 of it, counted as
 they run with V2_BILLING on (the reconcile's second step); with every flag off they are one step fewer a day.
 
 Not in the floor: `crawlmouse.ops.signin-canary` (`inngest/signin-canary.ts`, cron `*/10 * * * *`, 3 steps idle: request, wait (a sleep), look; then report-{stage} when it raises its signal) runs once `SIGNIN_CANARY_TO` is set, whatever the flags, and adds 17,856 executions a month.
@@ -45,8 +46,8 @@ Not in the floor: `crawlmouse.ops.signin-canary` (`inngest/signin-canary.ts`, cr
 | ---------------------------------------------------------- | ------------- |
 | V2_PIPELINE                                                | 9,486         |
 | V2_PIPELINE, V2_ACCOUNT_DOOR                               | 9,486         |
-| V2_PIPELINE, V2_ACCOUNT_DOOR, V2_CHECKS_PUBLIC             | 35,681        |
-| V2_PIPELINE, V2_ACCOUNT_DOOR, V2_CHECKS_PUBLIC, V2_BILLING | 37,913        |
+| V2_PIPELINE, V2_ACCOUNT_DOOR, V2_CHECKS_PUBLIC             | 37,913        |
+| V2_PIPELINE, V2_ACCOUNT_DOOR, V2_CHECKS_PUBLIC, V2_BILLING | 40,145        |
 
 A cron registered under two flags (`V2_PIPELINE+V2_CHECKS_PUBLIC`) starts with the second of them.
 
@@ -54,7 +55,7 @@ A cron registered under two flags (`V2_PIPELINE+V2_CHECKS_PUBLIC`) starts with t
 
 | Function                             | File                         | Registered with                | Trigger                                              | Steps a run                                                                         | Step calls                                                                                                                                                                                              |
 | ------------------------------------ | ---------------------------- | ------------------------------ | ---------------------------------------------------- | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `crawlmouse.audit`                   | `inngest/audit.ts`           | v1                             | audit.requested                                      | 5 (pause-gate, mark-crawling, crawl-and-persist, emit-completed, send-notify-email) | `inngest/audit.ts:357`, `inngest/audit.ts:361`, `inngest/audit.ts:376`, `inngest/audit.ts:378`, `inngest/audit.ts:386`                                                                                  |
+| `crawlmouse.audit`                   | `inngest/audit.ts`           | v1                             | audit.requested                                      | 5 (pause-gate, mark-crawling, crawl-and-persist, emit-completed, send-notify-email) | `inngest/audit.ts:354`, `inngest/audit.ts:358`, `inngest/audit.ts:373`, `inngest/audit.ts:375`, `inngest/audit.ts:383`                                                                                  |
 | `crawlmouse.stripe-reconcile-manual` | `inngest/billing.ts`         | v1                             | billing.reconcile.requested                          | 1 (reconcile)                                                                       | `inngest/billing.ts:95`                                                                                                                                                                                 |
 | `crawlmouse.check.run`               | `inngest/check.ts`           | V2_PIPELINE                    | check.requested                                      | see the check shapes                                                                | measured                                                                                                                                                                                                |
 | `crawlmouse.check.cancelled`         | `inngest/check.ts`           | V2_PIPELINE                    | inngest/function.cancelled (checkFn)                 | 2 (fail, emit-failed)                                                               | `inngest/check.ts:590`, `inngest/check.ts:592`                                                                                                                                                          |
@@ -62,13 +63,13 @@ A cron registered under two flags (`V2_PIPELINE+V2_CHECKS_PUBLIC`) starts with t
 | `crawlmouse.trial.lifecycle`         | `inngest/trial-lifecycle.ts` | V2_BILLING                     | trial.started                                        | 6 (reminder-due, remind, remind-effects, trial-ends, expire, expire-effects)        | `inngest/trial-lifecycle.ts:87`, `inngest/trial-lifecycle.ts:89`, `inngest/trial-lifecycle.ts:99`, `inngest/trial-lifecycle.ts:102`, `inngest/trial-lifecycle.ts:103`, `inngest/trial-lifecycle.ts:113` |
 | `crawlmouse.account.deletion-cancel` | `inngest/deletion.ts`        | V2_CHECKS_PUBLIC               | account.deletion_confirmed                           | 1 (cancel)                                                                          | `inngest/deletion.ts:73`                                                                                                                                                                                |
 | `crawlmouse.account.deletion-resume` | `inngest/deletion.ts`        | V2_CHECKS_PUBLIC               | account.restored                                     | 1 (resume-{id}, one per subscription)                                               | `inngest/deletion.ts:85`                                                                                                                                                                                |
-| `crawlmouse.mail.account`            | `inngest/mail.ts`            | V2_CHECKS_PUBLIC               | email.requested                                      | 1 (send)                                                                            | `inngest/mail.ts:115`                                                                                                                                                                                   |
-| `crawlmouse.mail.check-notify`       | `inngest/mail.ts`            | V2_CHECKS_PUBLIC               | check.notify_requested, check.finished, check.failed | 1 (send)                                                                            | `inngest/mail.ts:126`                                                                                                                                                                                   |
-| `crawlmouse.mail.fix-to-developer`   | `inngest/mail.ts`            | V2_CHECKS_PUBLIC               | fix.email_developer_requested                        | 1 (send)                                                                            | `inngest/mail.ts:137`                                                                                                                                                                                   |
-| `crawlmouse.events.check-finished`   | `inngest/mail.ts`            | V2_CHECKS_PUBLIC               | check.finished                                       | 1 (capture)                                                                         | `inngest/mail.ts:153`                                                                                                                                                                                   |
-| `crawlmouse.mail.seat-invite`        | `inngest/mail.ts`            | V2_CHECKS_PUBLIC               | seat.invite.requested                                | 1 (send)                                                                            | `inngest/mail.ts:164`                                                                                                                                                                                   |
-| `crawlmouse.mail.report-confirm`     | `inngest/mail.ts`            | V2_CHECKS_PUBLIC               | report.confirmation.requested                        | 1 (send)                                                                            | `inngest/mail.ts:182`                                                                                                                                                                                   |
-| `crawlmouse.mail.client-report`      | `inngest/mail.ts`            | V2_CHECKS_PUBLIC               | report.send.requested                                | 1 (send)                                                                            | `inngest/mail.ts:195`                                                                                                                                                                                   |
+| `crawlmouse.mail.account`            | `inngest/mail.ts`            | V2_CHECKS_PUBLIC               | email.requested                                      | 1 (send)                                                                            | `inngest/mail.ts:119`                                                                                                                                                                                   |
+| `crawlmouse.mail.check-notify`       | `inngest/mail.ts`            | V2_CHECKS_PUBLIC               | check.notify_requested, check.finished, check.failed | 1 (send)                                                                            | `inngest/mail.ts:130`                                                                                                                                                                                   |
+| `crawlmouse.mail.fix-to-developer`   | `inngest/mail.ts`            | V2_CHECKS_PUBLIC               | fix.email_developer_requested                        | 1 (send)                                                                            | `inngest/mail.ts:141`                                                                                                                                                                                   |
+| `crawlmouse.events.check-finished`   | `inngest/mail.ts`            | V2_CHECKS_PUBLIC               | check.finished                                       | 1 (capture)                                                                         | `inngest/mail.ts:159`                                                                                                                                                                                   |
+| `crawlmouse.mail.seat-invite`        | `inngest/mail.ts`            | V2_CHECKS_PUBLIC               | seat.invite.requested                                | 1 (send)                                                                            | `inngest/mail.ts:170`                                                                                                                                                                                   |
+| `crawlmouse.mail.report-confirm`     | `inngest/mail.ts`            | V2_CHECKS_PUBLIC               | report.confirmation.requested                        | 1 (send)                                                                            | `inngest/mail.ts:188`                                                                                                                                                                                   |
+| `crawlmouse.mail.client-report`      | `inngest/mail.ts`            | V2_CHECKS_PUBLIC               | report.send.requested                                | 1 (send)                                                                            | `inngest/mail.ts:201`                                                                                                                                                                                   |
 | `crawlmouse.alert.dispatch`          | `inngest/alerts.ts`          | V2_PIPELINE+V2_CHECKS_PUBLIC   | check.finished                                       | 1 (plan; then one per channel ('email', 'slack') when an alert fires)               | `inngest/alerts.ts:51`, `inngest/alerts.ts:57`                                                                                                                                                          |
 | `crawlmouse.summary.send`            | `inngest/summary.ts`         | V2_PIPELINE+V2_CHECKS_PUBLIC   | summary.requested                                    | 1 (send)                                                                            | `inngest/summary.ts:88`                                                                                                                                                                                 |
 | `crawlmouse.founder.entitlement`     | `inngest/founder.ts`         | V2_BILLING or V2_CHECKS_PUBLIC | entitlement.changed                                  | 1 (notify)                                                                          | `inngest/founder.ts:71`                                                                                                                                                                                 |
@@ -106,9 +107,9 @@ start `crawlmouse.check.cancelled` and the failed-check mail instead.
 
 | Checks a month | typical | large   | heaviest searched |
 | -------------- | ------- | ------- | ----------------- |
-| 100            | 40,913  | 45,613  | 90,913            |
-| 1,000          | 67,913  | 114,913 | 567,913           |
-| 5,000          | 187,913 | 422,913 | 2,687,913         |
+| 100            | 43,145  | 47,845  | 93,145            |
+| 1,000          | 70,145  | 117,145 | 570,145           |
+| 5,000          | 190,145 | 425,145 | 2,690,145         |
 
 Every figure is a clean run: a step that fails and is retried is one more execution, and an
 `onFailure` handler's run and steps are more again. The totals are a floor under real traffic.
@@ -118,8 +119,8 @@ the brief measured 85 audits in production in the 30 days to 2026-11-13 (F2), co
 
 ## The rule (CC-35 D2)
 
-The floor plus 1,000 typical checks is **67,913** against the line of 40,000.
-**It is over the line: `golive:check` reports the Hobby plan as a failing precondition of `V2_PIPELINE`, and the owner decides the plan (Pro starts at $99 a month for 1M executions) before step 2.**
+The floor plus 1,000 typical checks is **70,145** against the line of 800,000.
+It is under the line: the Pro plan passes `golive:check`.
 
 The largest part of the floor is `crawlmouse.founder.sweep`, on cron `*/5 * * * *` (17,856 a month).
 

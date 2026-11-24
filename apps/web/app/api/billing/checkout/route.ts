@@ -6,7 +6,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin';
 import { stripe } from '@/lib/stripe';
 import { resolveOrigin } from '@/lib/origin';
 import { checkoutV2, parseCheckout, supabaseCheckoutAccounts } from '@/lib/billing/checkout-v2';
-import { agencySalesOpen, billingV2Enabled } from '@/lib/billing/flags';
+import { agencySalesOpen, billingOpenTo, billingV2Enabled } from '@/lib/billing/flags';
 import { v1PurchasesClosed } from '@/lib/billing/v1-purchases';
 import { requestedAccountId } from '@/lib/billing/owner';
 import { chosenInHeader } from '@/lib/v2/account/viewer-cookie';
@@ -28,6 +28,8 @@ export async function POST(req: Request) {
   if (!user) return NextResponse.json({ error: 'auth_required' }, { status: 401 });
 
   if (billingV2Enabled()) {
+    // While paying is kept to one user, anyone else is refused before anything else is read.
+    if (!billingOpenTo(user.id)) return refuse(403, 'billing_not_open');
     // CC-03 D6. The account must answer 'owner' to the caller's own session before the
     // service-role client is made.
     const body = await readBody(req);

@@ -2,7 +2,9 @@
 /**
  * The QA lab's sites, generated (CC-QA). Every `*.lab.crawlmouse.com` host the QA accounts audit is a
  * static site written by this file into `sites/<label>/`, and `vercel.json` routes each host to its
- * folder. The output is committed, so what Vercel serves is what review read.
+ * folder. The output is committed, so what Vercel serves is what review read. The large lab's four hosts,
+ * which no account audits, are not folders: `api/large.mjs` renders their pages, and this file writes
+ * only their routes.
  *
  *   node fixtures/qa-lab/generate.mjs           # rewrite sites/ and vercel.json
  *   node fixtures/qa-lab/generate.mjs --check   # exit 1 if the files on disk differ from its output
@@ -34,6 +36,7 @@ import {
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as prettier from 'prettier';
+import { HOSTS as LARGE_HOSTS } from './api/large.mjs';
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
 const ZONE = 'lab.crawlmouse.com';
@@ -1130,6 +1133,35 @@ function buildSites() {
     sites.push(site);
   }
 
+  // slow — an ordinary small site served late: each page answers after a fixed delay (api/slow.mjs), for
+  // the journey step that a slow site still finishes inside its stated time, with progress throughout.
+  {
+    const site = {
+      label: 'slow',
+      name: 'Tidewell Pottery',
+      town: 'Tidewell',
+      tagline: 'Thrown by hand, fired slowly, made to be used.',
+      homeTitle: 'Handmade pottery in Tidewell',
+      homeTopic: 'handmade pottery',
+      palette: 'plum',
+      words: ['stoneware', 'glaze', 'kiln', 'clay body', 'wheel', 'firing', 'throwing'],
+      sitemap: true,
+      llms: false,
+      schema: true,
+      robots: 'open',
+      nav: [{ href: '/shop/', text: 'Shop' }],
+    };
+    site.pages = hierarchy(
+      site,
+      [
+        { title: 'Shop', leaves: ['Mugs', 'Bowls', 'Plates', 'Vases'] },
+        { title: 'Classes', leaves: ['Beginners wheel', 'Hand building', 'Glazing day'] },
+        { title: 'Studio', leaves: ['Our kiln', 'Visiting', 'Care of your pots'] },
+      ],
+      {},
+    );
+    sites.push(site);
+  }
   return sites;
 }
 
@@ -1365,7 +1397,7 @@ function vercelJson(sites) {
       continue: true,
     },
     {
-      src: '/(?:(?:sites|blocked\\.html|404\\.html)(?:/.*)?|.*%.*)',
+      src: '/(?:(?:sites|api|blocked\\.html|404\\.html)(?:/.*)?|.*%.*)',
       status: 404,
       dest: '/404.html',
     },
@@ -1386,7 +1418,17 @@ function vercelJson(sites) {
     routes.push({
       src: '/(.*)',
       has: [{ type: 'host', value: host }],
-      dest: `/sites/${s.label}/$1`,
+      // The slow site is served by its function, which answers late; every other site is static files.
+      dest: s.label === 'slow' ? '/api/slow?path=/$1' : `/sites/${s.label}/$1`,
+    });
+  }
+  // The large lab: one function renders the same ~2,500 pages on four hosts and answers each host its
+  // own way (api/large.mjs); it tells them apart by the Host header, so the route is the same for all.
+  for (const host of Object.values(LARGE_HOSTS)) {
+    routes.push({
+      src: '/(.*)',
+      has: [{ type: 'host', value: host }],
+      dest: '/api/large?path=/$1',
     });
   }
   routes.push({ src: '/(.*)', status: 404, dest: '/404.html' });
@@ -1394,6 +1436,10 @@ function vercelJson(sites) {
     {
       $schema: 'https://openapi.vercel.sh/vercel.json',
       ignoreCommand: IGNORE_COMMAND,
+      functions: {
+        'api/slow.mjs': { includeFiles: 'sites/slow/**', maxDuration: 10 },
+        'api/large.mjs': { maxDuration: 10 },
+      },
       routes,
     },
     null,
@@ -1454,7 +1500,7 @@ function listed(dir) {
 
 const files = await output();
 /** What is here by hand rather than written by this file; anything else unlisted is stale output. */
-const SOURCES = ['generate.mjs', 'README.md', '.vercelignore'];
+const SOURCES = ['generate.mjs', 'README.md', '.vercelignore', 'api/slow.mjs', 'api/large.mjs'];
 // `vercel link` writes .vercel/ and .env.local; both are gitignored and never uploaded.
 const generated = listed(ROOT).filter(
   (p) => !SOURCES.includes(p) && !p.startsWith('.vercel/') && p !== '.env.local',

@@ -127,6 +127,7 @@ export function trialEndView(
   const owner = role === 'owner';
   // No card and no checkout: the trial simply ends, so there is nothing to choose between.
   const nothingToChoose = !billingOpen && !onFile && a.renews_at === null;
+  const otherSeats = v.d.seats.filter((s) => s.accepted_at !== null && s.role !== 'owner').length;
   const hostOf = new Map(v.d.sites.map((s) => [s.id, s.host]));
   const checkSite = new Map(v.d.checks.map((c) => [c.id, c.site_id]));
 
@@ -140,7 +141,7 @@ export function trialEndView(
     : null;
   const line = [
     dayDate(v.now, zone),
-    COPY.sites(v.d.sites.length),
+    COPY.sites(primarySites(v).length),
     ...(lastWhen ? [COPY.lastCheck(lastWhen)] : []),
     COPY.trialEnds(dayDate(end, zone)),
   ].join(' · ');
@@ -151,7 +152,7 @@ export function trialEndView(
   // when the reminder is due, from its day until that day is over in the account's zone, and nothing
   // after.
   const reminderLine =
-    billingOpen &&
+    owner &&
     a.email_prefs.trial_reminder &&
     (at(reminder) >= at(v.now) || sameDay(reminder, v.now, zone))
       ? COPY.reminderDue(dayDate(reminder, zone))
@@ -370,6 +371,16 @@ export function trialEndView(
         billingOpen,
         site.paused,
       ),
+      // Free keeps only the owner's seat, so each reader is told what happens to theirs or to others'.
+      ...(owner
+        ? otherSeats > 0
+          ? [COPY.seatsLost(otherSeats)]
+          : []
+        : [
+            (charges || onFile) && billingEnd === null
+              ? COPY.yourSeatIfCancelled(dayDate(end, zone))
+              : COPY.yourSeatEnds(dayDate(end, zone), billingOpen ? plan : null),
+          ]),
     ].join(' '),
     tables: COPY.tables,
     columns: COPY.columns,
@@ -414,7 +425,7 @@ export function trialEndedView(
     shell: accountShellView(v, 'Sites', { plan: 'page', role, billingOpen }),
     header: {
       title: COPY.ended.title(plan),
-      line: [dayDate(v.now, zone), COPY.sites(v.d.sites.length)].join(' · '),
+      line: [dayDate(v.now, zone), COPY.sites(primarySites(v).length)].join(' · '),
     },
     banner: {
       title: COPY.ended.banner(plan, dayDate(a.state_history.at(-1)!.since, zone)),

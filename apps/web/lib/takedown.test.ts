@@ -8,64 +8,81 @@ vi.mock('./reports', () => ({ purgePublicReport }));
 
 import { processTakedown } from './takedown';
 
-// Per-table override: pass { public_reports: Error } or { takedown_requests: Error } to make
-// that table's update return an error; the call is still recorded (in order) either way.
-// The update chain records both the terminal `.eq(col, val)` (public_reports) and the
-// `.eq(col, val).in(col, vals)` shape (takedown_requests, scoped to open statuses) so the
-// queue update's key column AND its status scoping are observable.
+// Per-table override: pass { public_reports: Error } or { takedown_requests: Error } to make that
+// table's update return an error; the call is still recorded, in order. What the writes do to real
+// rows is lib/takedown.db.test.ts; this file pins their shape, order and failure handling.
 function makeSb(errs: { public_reports?: Error; takedown_requests?: Error } = {}) {
-  const calls: {
+  type Call = {
     table: string;
     update?: Record<string, unknown>;
-    eq?: [string, string];
-    in?: [string, string[]];
-  }[] = [];
+    filters: [string, string, unknown][];
+    after?: string;
+  };
+  const calls: Call[] = [];
   const sb = {
     calls,
-    from: (table: string) => ({
-      update: (patch: Record<string, unknown>) => ({
-        eq: (col: string, val: string) => {
-          const rec: (typeof calls)[number] = { table, update: patch, eq: [col, val] };
+    from: (table: string) => {
+      const rec: Call = { table, filters: [] };
+      const chain = {
+        select: () => chain,
+        update: (patch: Record<string, unknown>) => {
+          rec.update = patch;
           calls.push(rec);
-          const result = Promise.resolve({ error: errs[table as keyof typeof errs] ?? null });
-          // Allow an optional trailing `.in(...)` (queue update scoping). When present it
-          // annotates the SAME recorded call and returns the result; awaiting either the bare
-          // `.eq()` or the `.eq().in()` resolves to the table's configured error.
-          return Object.assign(result, {
-            in: (inCol: string, inVals: string[]) => {
-              rec.in = [inCol, inVals];
-              return Promise.resolve({ error: errs[table as keyof typeof errs] ?? null });
-            },
-          });
+          return chain;
         },
-      }),
-    }),
+        eq: (col: string, val: unknown) => (rec.filters.push(['eq', col, val]), chain),
+        is: (col: string, val: unknown) => (rec.filters.push(['is', col, val]), chain),
+        in: (col: string, val: unknown) => (rec.filters.push(['in', col, val]), chain),
+        order: () => chain,
+        limit: () => chain,
+        gte: (_col: string, val: string) => ((rec.after = val), chain),
+        maybeSingle: async () => ({ data: { domain: 'taken.example' }, error: null }),
+        then: (resolve: (r: unknown) => unknown) =>
+          resolve(
+            rec.update
+              ? { error: errs[table as keyof typeof errs] ?? null }
+              : {
+                  data: rec.after ? [{ slug: rec.after }] : [{ slug: 'abc123' }, { slug: 'older' }],
+                  error: null,
+                },
+          ),
+      };
+      return chain;
+    },
   };
-  return sb as unknown as Parameters<typeof processTakedown>[0] & { calls: typeof calls };
+  return sb as unknown as Parameters<typeof processTakedown>[0] & { calls: Call[] };
 }
 
 describe('processTakedown', () => {
-  beforeEach(() => { purgePublicReport.mockClear(); });
+  beforeEach(() => {
+    purgePublicReport.mockClear();
+  });
 
   it('sets takedown_requested_at on the report, marks the request removed, and purges caches', async () => {
     const sb = makeSb();
     await processTakedown(sb, 'abc123');
     const reportUpdate = sb.calls.find((c) => c.table === 'public_reports');
     expect(reportUpdate?.update).toHaveProperty('takedown_requested_at');
-    expect(reportUpdate?.eq).toEqual(['slug', 'abc123']);
+    expect(reportUpdate?.filters).toEqual([
+      ['eq', 'domain', 'taken.example'],
+      ['is', 'takedown_requested_at', null],
+    ]);
     // The report patch is an ISO timestamp.
     expect(typeof reportUpdate?.update?.takedown_requested_at).toBe('string');
-    expect(() => new Date(reportUpdate!.update!.takedown_requested_at as string).toISOString()).not.toThrow();
+    expect(() =>
+      new Date(reportUpdate!.update!.takedown_requested_at as string).toISOString(),
+    ).not.toThrow();
     const reqUpdate = sb.calls.find((c) => c.table === 'takedown_requests');
     // EXACT match (not toMatchObject): the write is { status: 'removed' } and NOTHING else —
     // a stray `processed_at` (the column does not exist on takedown_requests) or any extra
     // field would be caught here at the unit level before it fails against the live schema.
     expect(reqUpdate?.update).toEqual({ status: 'removed' });
-    // The queue update is keyed on the slug...
-    expect(reqUpdate?.eq).toEqual(['public_report_slug', 'abc123']);
-    // ...and scoped to OPEN statuses so it advances only undecided requests and never rewrites
-    // an already-decided ('rejected') row's moderation history.
-    expect(reqUpdate?.in).toEqual(['status', ['pending', 'verified']]);
+    // The queue update is keyed on the host, and scoped to OPEN statuses so it advances
+    // only undecided requests and never rewrites a decided ('rejected') row's moderation history.
+    expect(reqUpdate?.filters).toEqual([
+      ['eq', 'domain', 'taken.example'],
+      ['in', 'status', ['pending', 'verified']],
+    ]);
     expect(purgePublicReport).toHaveBeenCalledWith('abc123');
   });
 

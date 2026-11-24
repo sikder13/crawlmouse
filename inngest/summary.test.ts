@@ -97,12 +97,12 @@ describe('the summary send (D6)', () => {
           return { sent: 1 };
         },
       },
-      { INNGEST_SUMMARY_CONCURRENCY: '99' },
+      { INNGEST_SUMMARY_CONCURRENCY: '500' },
     );
     expect(config(fn)).toMatchObject({
       id: `${inngest.id}-${SUMMARY_SEND_FN_ID}`,
       triggers: [{ event: 'summary.requested' }],
-      concurrency: { limit: 5 },
+      concurrency: { limit: 100 },
     });
     const ids: string[] = [];
     const out = await (fn as unknown as { fn: (ctx: unknown) => Promise<unknown> }).fn({

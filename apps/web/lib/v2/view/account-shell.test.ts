@@ -16,11 +16,11 @@ const shellOf = (name: keyof typeof ACCOUNT_VIEWERS, d = bad) =>
   accountShellView(viewAt(d, ACCOUNT_VIEWERS[name]()), 'Sites', { role: 'owner' });
 
 describe('the rail', () => {
-  it('counts the sites and the new changes on day 9: five sites, three changes', () => {
+  it('counts the sites and the new changes on day 9: four sites (the staging copy holds no slot), three changes', () => {
     // Opened: Claude-SearchBot and ClaudeBot (change 1, 2); resolved: nahltech's orphans (change 5).
     const nav = shellOf('home').nav;
     expect(nav.map((n) => [n.label, n.count])).toEqual([
-      ['Sites', '5'],
+      ['Sites', '4'],
       ['Changes', '3 new'],
       ['Alerts', null],
       ['Competitors', null],
