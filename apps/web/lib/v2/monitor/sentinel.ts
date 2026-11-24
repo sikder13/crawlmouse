@@ -5,12 +5,12 @@
  *
  * The baseline is the site's latest full check: its access tests, one page per template. A look
  * fetches the same pages as each crawler again, through the worker's access batch, and stores
- * nothing. A move is a crawler whose verdict on a template changed class, or a template whose text
+ * nothing. A move is an identity (a crawler, the control or the canary) whose verdict on a template changed class, or a template whose text
  * fell under a fifth of what the full check read. A move seen twice, minutes apart, starts a full
  * check, whose diff and the existing alert rules raise the alert.
  */
 import { createHash } from 'node:crypto';
-import type { Verdict } from '@crawlmouse/types/v2';
+import type { IdentityRole, Verdict } from '@crawlmouse/types/v2';
 
 /** Templates looked at per site, at most. */
 export const SENTINEL_MAX_TEMPLATES = 8;
@@ -67,25 +67,36 @@ export function verdictClass(v: Verdict): VerdictClass {
   }
 }
 
-/** One crawler's answer on one template, from a full check's access test or from a look. */
+/**
+ * One identity's answer on one template, from a full check's access test or from a look: a crawler
+ * (`ua` set), or the control or canary (`ua` null), told apart by `identity_role`.
+ */
 export interface Look {
+  identity_role: IdentityRole;
   ua: string | null;
   template_key: string;
   verdict: Verdict;
   word_count: number | null;
 }
 
+type Who = { identity_role: IdentityRole; ua: string | null; template_key: string };
+
 export type Movement =
-  | { ua: string | null; template_key: string; from: Verdict; to: Verdict }
-  | { ua: string | null; template_key: string; from_words: number; to_words: number };
+  | (Who & { from: Verdict; to: Verdict })
+  | (Who & { from_words: number; to_words: number });
 
 /** A template's text counts as gone when a look reads under this share of the baseline's words. */
 const WORDS_GONE = 1 / 5;
 
-const keyOf = (l: Pick<Look, 'ua' | 'template_key'>) => `${l.ua ?? ''}\u0000${l.template_key}`;
+const who = (l: Who): Who => ({
+  identity_role: l.identity_role,
+  ua: l.ua,
+  template_key: l.template_key,
+});
+const keyOf = (l: Who) => `${l.identity_role}\u0000${l.ua ?? ''}\u0000${l.template_key}`;
 
 /**
- * What moved between `baseline` and `now`, for each crawler and template both hold. A crawler and
+ * What moved between `baseline` and `now`, for each identity and template both hold. An identity and
  * template the baseline holds more than once (several pages of a template were tested) is compared
  * with all of them: a verdict moved when its class is none of the baseline's, and text went when the
  * look read under a fifth of the fewest words the baseline read. A side that was not measured, or a
@@ -114,7 +125,7 @@ export function movements(baseline: readonly Look[], now: readonly Look[]): Move
     const to = verdictClass(l.verdict);
     if (!b || to === 'unknown') continue;
     if (!b.classes.has(to)) {
-      out.push({ ua: l.ua, template_key: l.template_key, from: b.from, to: l.verdict });
+      out.push({ ...who(l), from: b.from, to: l.verdict });
       continue;
     }
     if (
@@ -124,8 +135,7 @@ export function movements(baseline: readonly Look[], now: readonly Look[]): Move
       l.word_count < b.words * WORDS_GONE
     ) {
       out.push({
-        ua: l.ua,
-        template_key: l.template_key,
+        ...who(l),
         from_words: b.words,
         to_words: l.word_count,
       });

@@ -49,6 +49,31 @@ describe('watchableSites', () => {
     expect(await store().watchableSites(0)).toEqual([]);
   });
 
+  it.each([
+    ['deleted_at', `deleted_at = now()`],
+    [
+      'deletion_confirmed_at',
+      `deletion_confirmed_at = now(), purge_after = now() + interval '30 days'`,
+    ],
+  ])('leaves out a site whose account has %s set', async (_, set) => {
+    const c = await keptRecorded();
+    await db.query(`update public.accounts set ${set} where id = $1`, [c.accountId]);
+    expect(await store().watchableSites(0)).toEqual([]);
+  });
+
+  it('leaves out a staging site', async () => {
+    const c = await keptRecorded();
+    const parent = await db.query<{ id: string }>(
+      `insert into public.sites (account_id, host) values ($1, 'parent.example') returning id`,
+      [c.accountId],
+    );
+    await db.query(`update public.sites set staging_of_site_id = $2 where id = $1`, [
+      c.siteId,
+      parent.rows[0]!.id,
+    ]);
+    expect((await store().watchableSites(0)).map((s) => s.siteId)).toEqual([parent.rows[0]!.id]);
+  });
+
   it('leaves out a site no account keeps', async () => {
     await recordedStoredCheck(db, memoryEvidenceStore(), LATER);
     expect(await store().watchableSites(0)).toEqual([]);
@@ -60,11 +85,13 @@ describe('baseline', () => {
     const c = await keptRecorded();
     const base = await store().baseline(c.siteId);
     expect(base?.checkId).toBe(c.checkId);
-    const key = (t: { ua: string | null; page_url: string }) => `${t.ua ?? ''} ${t.page_url}`;
+    const key = (t: { identity_role: string; ua: string | null; page_url: string }) =>
+      `${t.identity_role} ${t.ua ?? ''} ${t.page_url}`;
     expect(base!.tests.map(key).sort()).toEqual(c.built.access_tests.map(key).sort());
     expect(base!.tests.length).toBeGreaterThan(0);
     const one = c.built.access_tests[0]!;
     expect(base!.tests.find((t) => key(t) === key(one))).toEqual({
+      identity_role: one.identity_role,
       ua: one.ua,
       template_key: one.template_key,
       page_url: one.page_url,

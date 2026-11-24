@@ -16,6 +16,7 @@ import {
 } from './sentinel';
 
 const look = (over: Partial<Look> = {}): Look => ({
+  identity_role: 'crawler',
   ua: 'GPTBot',
   template_key: '/products/{slug}',
   verdict: 'allowed',
@@ -99,6 +100,7 @@ describe('movements', () => {
   it('names a crawler whose verdict changed class on a template', () => {
     expect(movements([look()], [look({ verdict: 'disallowed_by_robots' })])).toEqual([
       {
+        identity_role: 'crawler',
         ua: 'GPTBot',
         template_key: '/products/{slug}',
         from: 'allowed',
@@ -120,7 +122,13 @@ describe('movements', () => {
 
   it('names a template whose text fell under a fifth of what the full check read', () => {
     expect(movements([look({ word_count: 400 })], [look({ word_count: 79 })])).toEqual([
-      { ua: 'GPTBot', template_key: '/products/{slug}', from_words: 400, to_words: 79 },
+      {
+        identity_role: 'crawler',
+        ua: 'GPTBot',
+        template_key: '/products/{slug}',
+        from_words: 400,
+        to_words: 79,
+      },
     ]);
     expect(movements([look({ word_count: 400 })], [look({ word_count: 80 })])).toEqual([]);
   });
@@ -132,6 +140,37 @@ describe('movements', () => {
         [look({ ua: 'ClaudeBot', verdict: 'disallowed_by_robots' }), look({ ua: 'GPTBot' })],
       ),
     ).toEqual([]);
+  });
+
+  it('tells the control from the canary, though neither has a user agent', () => {
+    // A review's vector: the control was allowed and the canary challenged; the control is now
+    // challenged too, which a key on the user agent alone merges with the canary and misses.
+    const control = look({
+      identity_role: 'control',
+      ua: null,
+      verdict: 'allowed',
+      word_count: 500,
+    });
+    const canary = look({
+      identity_role: 'canary',
+      ua: null,
+      verdict: 'challenged_ua',
+      word_count: 0,
+    });
+    const moved = movements(
+      [control, canary, look({ verdict: 'blocked_by_ua_rule' })],
+      [{ ...control, verdict: 'challenged_ua' }, look({ verdict: 'not_measured' })],
+    );
+    expect(moved).toEqual([
+      {
+        identity_role: 'control',
+        ua: null,
+        template_key: '/products/{slug}',
+        from: 'allowed',
+        to: 'challenged_ua',
+      },
+    ]);
+    expect(movements([control, canary], [{ ...control, word_count: 3 }])).toHaveLength(1);
   });
 
   it('names nothing for a crawler or template the full check did not test', () => {
@@ -149,6 +188,11 @@ describe('movements', () => {
       fc.property(
         fc.array(
           fc.record({
+            identity_role: fc.constantFrom(
+              'crawler' as const,
+              'control' as const,
+              'canary' as const,
+            ),
             ua: fc.constantFrom('GPTBot', 'ClaudeBot', null),
             template_key: fc.constantFrom('/', '/a/{slug}'),
             verdict: fc.constantFrom(...verdicts),

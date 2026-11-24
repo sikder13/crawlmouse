@@ -46,6 +46,7 @@ export function sentinelDeps(env: Env): SentinelDeps {
     // 32 characters of [A-Za-z0-9_-], which the worker's nonce rule takes.
     nonce: () => randomBytes(24).toString('base64url'),
     global: () => startLimits.global(),
+    send: (events) => inngest.send(events),
     request: async (siteId, day) =>
       (
         await requestCheck(
@@ -60,15 +61,14 @@ export function sentinelDeps(env: Env): SentinelDeps {
 export function sentinelStepsFromEnv(env: Env): SentinelSteps {
   const work = () => sentinelWork(sentinelDeps(env));
   return {
-    due: (hour) => work().due(hour),
-    plan: (siteId) => work().plan(siteId),
-    look: (siteId, host, pages, n) => work().look(siteId, host, pages, n),
-    result: (siteId, batchId) => work().result(siteId, batchId),
-    request: (siteId) => work().request(siteId),
+    dispatch: (hour, day) => work().dispatch(hour, day),
+    look: (siteId, day, n) => work().look(siteId, day, n),
+    result: (baseline, batchId) => work().result(baseline, batchId),
+    request: (siteId, day) => work().request(siteId, day),
   };
 }
 
 export function sentinelFunctions(env: Env): InngestFunction.Like[] {
   const steps = sentinelStepsFromEnv(env);
-  return [createSentinelTickFn(steps, env), createSentinelWatchFn(steps, env)];
+  return [createSentinelTickFn(steps), createSentinelWatchFn(steps, env)];
 }
