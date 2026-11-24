@@ -1044,6 +1044,79 @@ describe('the mail ledgers CC-28 adds (D9)', () => {
   });
 });
 
+describe('every logo an Agency account saved (migration 20261124000002)', () => {
+  // POST /api/agency/brand stores each logo with the service role (no owner) at
+  // report-logos/agency/<account_id>/<sha256-16>.<ext>, and keeps the earlier ones, which reports
+  // made with them still show. Only the current one is named by agency_brands.logo_path.
+  const logo = () => `${randomUUID().replace(/-/g, '').slice(0, 16)}.png`;
+  const put = (bucket: string, name: string) =>
+    pglite.query(`insert into storage.objects (bucket_id, name) values ($1, $2)`, [bucket, name]);
+  const held = (bucket: string, name: string) =>
+    n(`select count(*) from storage.objects where bucket_id = $1 and name = $2`, [bucket, name]);
+
+  /** A person alone on their account with three ownerless logos, and objects that are not theirs. */
+  async function branded() {
+    const tag = `l${++serial}`;
+    const world = await seedWorld(pglite, tag);
+    await pglite.query(`delete from public.seats where id = $1`, [world.scopedSeatId]);
+    const bystander = await seedWorld(pglite, `${tag}b`);
+    await removeObjects((await planErasure(db(), { userId: world.ownerId })).storage);
+    const prefix = `agency/${world.accountId}`;
+    const [old1, old2, current] = [logo(), logo(), logo()].map((f) => `${prefix}/${f}`);
+    for (const name of [old1!, old2!, current!]) await put('report-logos', name);
+    await pglite.query(
+      `insert into public.agency_brands (account_id, agency_name, logo_path) values ($1, 'Agency', $2)`,
+      [world.accountId, current],
+    );
+    // Not theirs, each varying one thing the clause reads: another account's id under agency/; a
+    // v1 logo at <slug>/<hash>; their id with no agency/ segment; a first segment that only starts
+    // with agency; their id in upper case; their prefix in another bucket.
+    const outside = [
+      { bucket: 'report-logos', name: `agency/${bystander.accountId}/${logo()}` },
+      { bucket: 'report-logos', name: `v1-${tag}/${logo()}` },
+      { bucket: 'report-logos', name: `${world.accountId}/${logo()}` },
+      { bucket: 'report-logos', name: `agencyx/${world.accountId}/${logo()}` },
+      { bucket: 'report-logos', name: `agency/${world.accountId.toUpperCase()}/${logo()}` },
+      { bucket: 'reports', name: `${prefix}/${logo()}` },
+    ];
+    for (const o of outside) await put(o.bucket, o.name);
+    const mine = [old1!, old2!, current!].sort().map((name) => ({ bucket: 'report-logos', name }));
+    return { world, mine, outside };
+  }
+
+  it('the plan’s storage lists the two earlier logos and the current one', async () => {
+    const p = await branded();
+    const plan = await planErasure(db(), { userId: p.world.ownerId });
+    expect(plan.storage).toEqual(p.mine);
+    expect(plan.refusalCodes).toEqual(['storage']);
+  });
+
+  it('lists nothing outside agency/<their account id>/ in report-logos', async () => {
+    const p = await branded();
+    const plan = await planErasure(db(), { userId: p.world.ownerId });
+    const listed = plan.storage.map((o) => `${o.bucket}/${o.name}`);
+    for (const o of p.outside)
+      expect(listed, `${o.bucket}/${o.name}`).not.toContain(`${o.bucket}/${o.name}`);
+  });
+
+  it('once they are removed the recount lists none, the erasure runs, and the others stay', async () => {
+    const p = await branded();
+    const plan = await planErasure(db(), { userId: p.world.ownerId });
+    await removeObjects(plan.storage);
+    for (const o of p.mine) expect(await held(o.bucket, o.name), o.name).toBe(0);
+    const recount = (
+      await pglite.query<{ r: { storage: unknown[] } }>(
+        `select public.erase_person_counts($1, $2, $3) as r`,
+        [plan.userId, plan.emails, plan.accounts],
+      )
+    ).rows[0]!.r;
+    expect(recount.storage).toEqual([]);
+    const { after } = await executeErasure(db(), { userId: p.world.ownerId }, sqlDelete);
+    expect(after.storage).toEqual([]);
+    for (const o of p.outside) expect(await held(o.bucket, o.name), o.name).toBe(1);
+  }, 120_000);
+});
+
 describe('sameProject', () => {
   it('needs the same Supabase ref, or a database and API both on this machine', () => {
     const db = (host: string) =>

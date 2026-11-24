@@ -392,7 +392,9 @@ describe('(c) the owner of an agency with invited seats, stored reports, share l
         edits += 1;
         return sql.replace(REPORTS_LINE, '');
       });
-      expect(edits).toBe(1);
+      // Two files define the function: 20261112000002 and 20261124000002, which re-issues it with
+      // the line unchanged. The line goes from both, or the later one would put it back.
+      expect(edits).toBe(2);
       const p = await person(other, 'no-list');
       const account = (await agencyAccount(other, p)).accountId;
       const kept = await keptSite(other, account);
