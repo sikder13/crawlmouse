@@ -461,7 +461,17 @@ export function siteView(
   viewer: Viewer,
   siteId: string,
   next?: NextChecks,
-  { allFixes = false }: { allFixes?: boolean } = {},
+  {
+    allFixes = false,
+    deployHookUrl = null,
+  }: {
+    allFixes?: boolean;
+    /**
+     * The staging site's deploy hook address, which the page signs (lib/v2/account/deploy-hook);
+     * null when there is no staging site or no secret to sign it with.
+     */
+    deployHookUrl?: string | null;
+  } = {},
 ): SiteView {
   const v = viewAt(d, viewer);
   const zone = zoneOf(v);
@@ -702,6 +712,18 @@ export function siteView(
                   },
                 ]),
               },
+              // Shown to the roles that run sites: the address is the credential that starts a check.
+              ...(staging && deployHookUrl && manage
+                ? [
+                    {
+                      label: SITE_COPY.deployHook,
+                      value: SITE_COPY.deployHookValue(deployHookUrl),
+                      mono: true,
+                      muted: false,
+                      action: null,
+                    },
+                  ]
+                : []),
             ]
           : []),
         ...(publicLink?.public_slug
@@ -812,7 +834,7 @@ export function sitePage(
   viewer: Viewer,
   siteId: string,
   next?: NextChecks,
-  options: { allFixes?: boolean } = {},
+  options: { allFixes?: boolean; deployHookUrl?: string | null } = {},
 ): SitePageView {
   const v = viewAt(d, viewer);
   const site = v.d.sites.find((s) => s.id === siteId);

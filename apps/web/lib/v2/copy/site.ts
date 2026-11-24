@@ -14,6 +14,9 @@ export const TAGGED_UA_LINE =
   'Tested with tagged user agents from published IPs — crawlmouse.com/bot.';
 
 export const SITE_COPY = {
+  /** The staging site's deploy hook: what a deploy sends, and where (Goal 1 row 20). */
+  deployHook: 'Deploy hook',
+  deployHookValue: (url: string) => `POST ${url} after each deploy`,
   fixesSub: `Mark one done and it is re-checked in about ${RECHECK_MINUTES} ${plural(RECHECK_MINUTES, 'minute', 'minutes')}; it closes only when the next crawl agrees.`,
   copyAll: 'Copy all as one prompt',
   /** The expiry's purge step deletes a removed site's checks after RESTORE_DAYS (CC-GL D2). */

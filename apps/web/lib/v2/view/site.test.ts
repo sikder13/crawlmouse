@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { fixture } from '../fixtures';
 import { parseReportRequest } from '../reports/generate-request';
 import { axisLabels, move } from './checks';
+import type { Viewer } from './account';
 import { siteView } from './site';
 
 const BAD_ACCOUNT = 'a0000000-0000-4000-8000-000000000001';
@@ -90,6 +91,24 @@ describe('Site page, example-outfitter.com at as_of', () => {
     );
     expect(v.fixes.rest).toMatchObject({ numbers: '4, 6–15', count: 11 });
     expect(v.fixes.rest!.title).toBe('Eleven more: 6 in Structure and 5 in Content');
+  });
+
+  it('shows the staging site’s deploy hook to the roles that run sites, and only when signed', () => {
+    const url = 'https://crawlmouse.com/api/hooks/deploy/x.y';
+    const viewer: Viewer = { accountId: BAD_ACCOUNT, now: bad.as_of };
+    const rows = (d: typeof bad, at: Viewer = viewer, hook: string | null = url) =>
+      siteView(d, at, OUTFITTER, undefined, { deployHookUrl: hook }).settings.rows;
+    const hook = (r: ReturnType<typeof rows>) => r.find((x) => x.label === 'Deploy hook');
+    expect(hook(rows(bad))).toMatchObject({ value: `POST ${url} after each deploy`, mono: true });
+    expect(hook(rows(bad, viewer, null))).toBeUndefined();
+    const owner = bad.seats.find((x) => x.role === 'owner')!;
+    const seat = {
+      ...owner,
+      id: '50000000-0000-4000-8000-0000000000d1',
+      role: 'developer' as const,
+    };
+    const withDev = { ...bad, seats: [...bad.seats, seat] };
+    expect(hook(rows(withDev, { ...viewer, seatId: seat.id }))).toBeUndefined();
   });
 
   it('shows the site’s settings and the alert rules that fired at its checks', () => {

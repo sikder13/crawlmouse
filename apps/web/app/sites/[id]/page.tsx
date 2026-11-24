@@ -5,6 +5,8 @@ import { LiveActions } from '@/components/v2/screens/account/LiveActions';
 import { FirstCheckScreen } from '@/components/v2/screens/site/FirstCheckScreen';
 import { SiteScreen } from '@/components/v2/screens/site/SiteScreen';
 import { checksPublicEnabled } from '@/lib/auth/flags';
+import { siteOrigin } from '@/lib/site-url';
+import { deployHookPath, deployHookSecret } from '@/lib/v2/account/deploy-hook';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { seedDefaultAlertRules } from '@/lib/v2/monitor/alert-defaults';
 import { supabaseServer } from '@/lib/supabase/server';
@@ -69,8 +71,15 @@ export default async function SitePage({
       : null;
   // The scheduler's own column (CC-28 D8), read once the caller's seat is established.
   const query = await searchParams;
+  // The staging site's deploy hook, signed here: the view never sees the secret (Goal 1 row 20).
+  const secret = deployHookSecret();
+  const staging = d.sites.find((s) => s.staging_of_site_id === id);
   const page = sitePage(d, viewer, id, await readNextChecks(supabaseAdmin(), [id]), {
     allFixes: wantsAllFixes(query),
+    deployHookUrl:
+      staging && secret
+        ? `${siteOrigin()}${deployHookPath(staging.id, staging.created_at, secret)}`
+        : null,
   });
   const notice = noticeLine(query, d.accounts[0]!.timezone);
   const account = viewAt(d, viewer);
