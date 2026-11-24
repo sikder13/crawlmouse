@@ -15,6 +15,7 @@ export const INTEGRATIONS_COPY = {
   connect: 'Connect Slack',
   replace: 'Replace webhook',
   disconnect: 'Disconnect',
+  test: 'Send a test message',
   seePlans: 'See plans',
   field: {
     label: 'Slack webhook URL',
@@ -24,3 +25,7 @@ export const INTEGRATIONS_COPY = {
   notConnected: 'not connected',
   onPro: 'on Pro',
 } as const;
+
+/** What a test posts: fixed, so nothing of the account or its sites reaches Slack. */
+export const SLACK_TEST_TEXT =
+  'Crawlmouse test message: alerts for this account will post to this channel.';

@@ -7,6 +7,10 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 // the viewer is CC-26b's readViewer over the two.
 
 const h = vi.hoisted(() => ({
+  posted: [] as { url: string; text: string }[],
+  slackAnswer: { ok: true } as { ok: true } | { ok: false; code: string; retryable: boolean },
+  limited: false,
+  limitKeys: [] as string[],
   db: null as unknown as PGlite,
   user: null as { id: string; email: string } | null,
   log: [] as string[],
@@ -45,6 +49,19 @@ vi.mock('@/lib/supabase/admin', async () => {
     },
   };
 });
+vi.mock('@/lib/v2/monitor/slack', async (original) => ({
+  ...(await original<typeof import('@/lib/v2/monitor/slack')>()),
+  slackPoster: () => async (url: string, text: string) => {
+    h.posted.push({ url, text });
+    return h.slackAnswer;
+  },
+}));
+vi.mock('@/lib/rate-limit', () => ({
+  checkRateLimit: async (key: string) => {
+    h.limitKeys.push(key);
+    return { allowed: !h.limited, remaining: 0, resetAt: new Date(Date.now() + 60_000) };
+  },
+}));
 vi.mock('@/lib/v2/account/viewer', async () => {
   const { postgrestOver } = await import('@/__tests__/helpers/postgrest-pglite');
   const { readViewer } = await import('@/lib/v2/account/viewer-read');
@@ -79,6 +96,10 @@ beforeAll(async () => {
 afterAll(async () => h.db.close());
 
 beforeEach(() => {
+  h.posted.length = 0;
+  h.slackAnswer = { ok: true };
+  h.limited = false;
+  h.limitKeys.length = 0;
   h.log.length = 0;
   h.user = null;
   vi.stubEnv('V2_CHECKS_PUBLIC', '1');
@@ -198,6 +219,67 @@ describe('PUT /api/alert-rules', () => {
     expect(await secretsOf(m.accountId)).toEqual([URL_A]);
   });
 
+  describe('a test message', () => {
+    const PAGE = `${ORIGIN}/settings/integrations`;
+
+    it('posts one fixed message to the stored webhook, and goes back saying so', async () => {
+      const m = await member('test-ok', 'pro');
+      h.user = m.user;
+      await PUT(put({ slackWebhookUrl: URL_A }));
+      const res = await POST(formFrom('_method=PUT&testSlack=true', PAGE));
+      expect(res.headers.get('location')).toBe('/settings/integrations?tested=1');
+      expect(h.posted).toEqual([{ url: URL_A, text: expect.stringContaining('test message') }]);
+      // Nothing of the account or its sites is in it.
+      expect(h.posted[0]!.text).not.toContain(m.user.email);
+      expect(h.limitKeys).toEqual([`slack-test:account:${m.accountId}`]);
+    });
+
+    it('with nothing connected: refused, nothing posted', async () => {
+      const m = await member('test-none', 'pro');
+      h.user = m.user;
+      const res = await POST(formFrom('_method=PUT&testSlack=true', PAGE));
+      expect(res.headers.get('location')).toBe('/settings/integrations?error=slack_not_connected');
+      expect(h.posted).toEqual([]);
+    });
+
+    it('a webhook Slack refuses: says so, and the URL stays stored', async () => {
+      const m = await member('test-refused', 'pro');
+      h.user = m.user;
+      await PUT(put({ slackWebhookUrl: URL_A }));
+      h.slackAnswer = { ok: false, code: 'slack_404', retryable: false };
+      const res = await POST(formFrom('_method=PUT&testSlack=true', PAGE));
+      expect(res.headers.get('location')).toBe('/settings/integrations?error=slack_failed');
+      expect(await secretsOf(m.accountId)).toEqual([URL_A]);
+    });
+
+    it('over the limit: refused before anything is posted', async () => {
+      const m = await member('test-limit', 'pro');
+      h.user = m.user;
+      await PUT(put({ slackWebhookUrl: URL_A }));
+      h.limited = true;
+      const res = await POST(formFrom('_method=PUT&testSlack=true', PAGE));
+      expect(res.headers.get('location')).toBe('/settings/integrations?error=rate_limited');
+      expect(h.posted).toEqual([]);
+    });
+
+    it('on Free: refused with upgrade_required, nothing read or posted', async () => {
+      const m = await member('test-free', 'free');
+      h.user = m.user;
+      const res = await POST(formFrom('_method=PUT&testSlack=true', PAGE));
+      expect(res.headers.get('location')).toBe('/settings/integrations?error=upgrade_required');
+      expect(h.posted).toEqual([]);
+      expect(h.limitKeys).toEqual([]);
+    });
+
+    it('cannot ride along with another change', async () => {
+      const m = await member('test-mixed', 'pro');
+      h.user = m.user;
+      const res = await PUT(put({ testSlack: true, clearSlack: true }));
+      expect(res.status).toBe(400);
+      expect(h.posted).toEqual([]);
+    });
+  });
+
   describe('which alerts go to Slack', () => {
     const channelsOf = async (accountId: string) =>
       (
@@ -246,7 +328,7 @@ describe('PUT /api/alert-rules', () => {
     const res = await PUT(put({ slackWebhookUrl: URL_A }));
     expect(res.status).toBe(200);
     const text = await res.text();
-    expect(JSON.parse(text)).toEqual({ slack: { set: true, last4: 'WXYZ' } });
+    expect(JSON.parse(text)).toEqual({ slack: { set: true, last4: 'WXYZ' }, tested: false });
     expect(text).not.toContain('hooks.slack.com');
     expect(text).not.toContain(URL_A.split('/').slice(-3).join('/'));
     expect(await secretsOf(m.accountId)).toEqual([URL_A]);

@@ -10,6 +10,8 @@ import { numberWord } from '../words';
 
 export const SETTINGS_NOTICES = {
   saved: 'Saved.',
+  slackTested:
+    'A test message was sent. If it is not in the channel within a minute, check the webhook in Slack.',
   emailSent:
     'We sent a confirmation link to the new address. The change takes effect when you open it, and the old address gets a notice with a link to undo it.',
   deleteSent:
@@ -53,6 +55,9 @@ export const REFUSAL_SENTENCES: Readonly<Record<string, string>> = {
   personal_account_only:
     'Your sign-in address and deleting your account belong to your own account. Switch to it, then try again.',
   upgrade_required: 'Slack alerts need Pro or Agency.',
+  slack_not_connected: 'Slack is not connected, so there is nowhere to send a test.',
+  slack_failed:
+    'Slack did not take the test message. Check that the webhook is still active in Slack, or replace it.',
   // What was sent
   invalid: 'Something in the form was not accepted. Check it and save again.',
   method_not_allowed: 'That form could not be sent that way. Reload the page and try again.',
@@ -111,6 +116,7 @@ export function settingsNotice(
   }
   if (page === 'alerts') return null;
   if (page === 'integrations') {
+    if (query.tested === '1') return { tone: 'ok', text: SETTINGS_NOTICES.slackTested };
     return query.saved === '1' ? { tone: 'ok', text: SETTINGS_NOTICES.saved } : null;
   }
   return query.sent === '1' ? { tone: 'ok', text: SETTINGS_NOTICES.deleteSent } : null;

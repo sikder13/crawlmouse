@@ -1,4 +1,5 @@
 import { checksPublicEnabled } from '@/lib/auth/flags';
+import { checkRateLimit } from '@/lib/rate-limit';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { supabaseServer } from '@/lib/supabase/server';
 import {
@@ -14,6 +15,10 @@ export const dynamic = 'force-dynamic';
 
 /** The page the Alerts screen's forms post from. */
 const BACK = '/alerts';
+/** Test messages an account may send in a day. */
+const TESTS_PER_DAY = 10;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
 /** The page the Slack form posts from. */
 const INTEGRATIONS = '/settings/integrations';
 
@@ -83,14 +88,22 @@ async function update(req: Request, method: 'PUT' | null): Promise<Response> {
       : no(400, decision.code);
   }
 
+  // A test posts to Slack, so it is bounded per account, failing closed.
+  if (decision.plan.slack === 'test') {
+    const limit = await checkRateLimit(`slack-test:account:${account.id}`, TESTS_PER_DAY, DAY_MS, {
+      failClosed: true,
+    });
+    if (!limit.allowed) return no(429, 'rate_limited');
+  }
   const outcome = await applyAlertRules(
     supabaseAlertRulePorts(supabaseAdmin()),
     account.id,
     decision.plan,
   );
-  if (!outcome.ok) return no(404, 'not_found');
-  if (body.kind !== 'form') return Response.json({ slack: outcome.slack });
-  return respond('form', back === INTEGRATIONS ? `${INTEGRATIONS}?saved=1` : back);
+  if (!outcome.ok) return no(outcome.status, outcome.code);
+  if (body.kind !== 'form') return Response.json({ slack: outcome.slack, tested: outcome.tested });
+  if (back !== INTEGRATIONS) return respond('form', back);
+  return respond('form', `${INTEGRATIONS}?${outcome.tested ? 'tested' : 'saved'}=1`);
 }
 
 export async function PUT(req: Request) {

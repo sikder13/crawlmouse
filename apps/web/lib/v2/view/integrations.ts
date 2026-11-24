@@ -18,6 +18,8 @@ export interface IntegrationCardView {
   /** The form that sets or replaces the connection; null where the tier has none. */
   connect: ActionView | null;
   disconnect: ActionView | null;
+  /** Posts a fixed test message to the connected webhook. */
+  test: ActionView | null;
   /** The way to a plan that has it: for the owner, who alone may change the plan. */
   upgrade: ActionView | null;
   help: { label: string; href: string } | null;
@@ -55,6 +57,7 @@ function slackCard(entitled: boolean, last4: string | null, role: SeatRole): Int
       status: { state: 'neutral', label: COPY.onPro },
       connect: null,
       disconnect: last4 === null ? null : disconnect(),
+      test: null,
       upgrade: owner ? action('plan', COPY.seePlans) : null,
       help: null,
     };
@@ -70,6 +73,7 @@ function slackCard(entitled: boolean, last4: string | null, role: SeatRole): Int
       status: { state: 'neutral', label: COPY.notConnected },
       connect: form(COPY.connect),
       disconnect: null,
+      test: null,
       upgrade: null,
       help: COPY.help,
     };
@@ -80,6 +84,7 @@ function slackCard(entitled: boolean, last4: string | null, role: SeatRole): Int
     status: { state: 'ok', label: COPY.connected },
     connect: form(COPY.replace),
     disconnect: disconnect(),
+    test: routeAction('accountAlertRules', COPY.test, {}, { fields: { testSlack: 'true' } }),
     upgrade: null,
     help: COPY.help,
   };

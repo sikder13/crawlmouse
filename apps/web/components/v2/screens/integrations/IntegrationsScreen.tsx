@@ -18,6 +18,7 @@ function IntegrationCard({ card }: { card: IntegrationCardView }) {
       </CardHead>
       <div className={styles.body}>
         {card.connect ? <ActionControl action={card.connect} size="md" /> : null}
+        {card.test ? <ActionControl action={card.test} size="md" /> : null}
         {card.disconnect ? (
           <ActionControl action={card.disconnect} variant="quiet" size="md" />
         ) : null}

@@ -17,6 +17,8 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { z } from 'zod';
 import type { RequestBody } from '../../billing/request-body';
 import type { TierGates } from '../../entitlement-v2';
+import { SLACK_TEST_TEXT } from '../copy/integrations';
+import { slackPoster, type PostSlack } from '../monitor/slack';
 
 export const SLACK_URL_MAX = 500;
 /** Slack's incoming-webhook URL, as `set_account_slack_webhook` (migration 027b, section C) holds it. */
@@ -24,7 +26,8 @@ const SLACK_URL = /^https:\/\/hooks\.slack\.com\/services\/[A-Za-z0-9_/-]+$/;
 
 export interface AlertRulesPlan {
   rule: { id: string; enabled: boolean } | null;
-  slack: { set: string } | 'clear' | null;
+  /** `test`: post the fixed test message to the stored webhook, and change nothing. */
+  slack: { set: string } | 'clear' | 'test' | null;
 }
 
 export interface SlackState {
@@ -49,10 +52,21 @@ const bodyOf = (kind: RequestBody['kind']) =>
       clearSlack: flag(kind)
         .refine((v) => v)
         .optional(),
+      testSlack: flag(kind)
+        .refine((v) => v)
+        .optional(),
     })
     .refine((b) => (b.rule === undefined) === (b.enabled === undefined))
     .refine((b) => !(b.slackWebhookUrl !== undefined && b.clearSlack !== undefined))
-    .refine((b) => b.rule !== undefined || b.slackWebhookUrl !== undefined || b.clearSlack);
+    // A test changes nothing, so it travels alone.
+    .refine(
+      (b) =>
+        !b.testSlack ||
+        (b.rule === undefined && b.slackWebhookUrl === undefined && b.clearSlack === undefined),
+    )
+    .refine(
+      (b) => b.rule !== undefined || b.slackWebhookUrl !== undefined || b.clearSlack || b.testSlack,
+    );
 
 /** What the body asks for, under the gates of the account's tier now. */
 export function decideAlertRules(
@@ -62,7 +76,7 @@ export function decideAlertRules(
   const parsed = bodyOf(body.kind).safeParse(body.fields);
   if (!parsed.success) return { ok: false, status: 400, code: 'invalid' };
   const b = parsed.data;
-  if (b.slackWebhookUrl !== undefined && !gates.slack) {
+  if ((b.slackWebhookUrl !== undefined || b.testSlack) && !gates.slack) {
     return { ok: false, status: 402, code: 'upgrade_required', gate: 'slack' };
   }
   return {
@@ -74,7 +88,9 @@ export function decideAlertRules(
           ? { set: b.slackWebhookUrl }
           : b.clearSlack
             ? 'clear'
-            : null,
+            : b.testSlack
+              ? 'test'
+              : null,
     },
   };
 }
@@ -85,11 +101,15 @@ export interface AlertRulePorts {
   setSlack(accountId: string, url: string): Promise<void>;
   clearSlack(accountId: string): Promise<void>;
   slackLast4(accountId: string): Promise<string | null>;
+  /** Posts the test message to the account's webhook, if its tier has Slack and one is set. */
+  testSlack(accountId: string): Promise<'sent' | 'not_connected' | 'failed'>;
 }
 
 export type AlertRulesOutcome =
-  | { ok: true; slack: SlackState }
-  | { ok: false; status: 404; code: 'not_found' };
+  | { ok: true; slack: SlackState; tested: boolean }
+  | { ok: false; status: 404; code: 'not_found' }
+  | { ok: false; status: 409; code: 'slack_not_connected' }
+  | { ok: false; status: 502; code: 'slack_failed' };
 
 /**
  * Writes the plan to `accountId`: the rule first, so a rule that is not one of the account's own
@@ -104,10 +124,14 @@ export async function applyAlertRules(
     const found = await ports.setRuleEnabled(accountId, plan.rule.id, plan.rule.enabled);
     if (!found) return { ok: false, status: 404, code: 'not_found' };
   }
-  if (plan.slack === 'clear') await ports.clearSlack(accountId);
+  if (plan.slack === 'test') {
+    const sent = await ports.testSlack(accountId);
+    if (sent === 'not_connected') return { ok: false, status: 409, code: 'slack_not_connected' };
+    if (sent === 'failed') return { ok: false, status: 502, code: 'slack_failed' };
+  } else if (plan.slack === 'clear') await ports.clearSlack(accountId);
   else if (plan.slack !== null) await ports.setSlack(accountId, plan.slack.set);
   const last4 = await ports.slackLast4(accountId);
-  return { ok: true, slack: { set: last4 !== null, last4 } };
+  return { ok: true, slack: { set: last4 !== null, last4 }, tested: plan.slack === 'test' };
 }
 
 function failed(what: string, error: { message: string }): never {
@@ -142,7 +166,11 @@ async function slackOnRules(admin: SupabaseClient, accountId: string, on: boolea
 }
 
 /** The writes over the service role, each keyed by the account id. */
-export function supabaseAlertRulePorts(admin: SupabaseClient): AlertRulePorts {
+export function supabaseAlertRulePorts(
+  admin: SupabaseClient,
+  post: PostSlack = slackPoster(),
+  now: () => Date = () => new Date(),
+): AlertRulePorts {
   return {
     async setRuleEnabled(accountId, ruleId, enabled) {
       const found = await admin
@@ -175,6 +203,17 @@ export function supabaseAlertRulePorts(admin: SupabaseClient): AlertRulePorts {
       const { error } = await admin.rpc('clear_account_slack_webhook', { p_account: accountId });
       if (error) failed('clear_account_slack_webhook', error);
       await slackOnRules(admin, accountId, false);
+    },
+    async testSlack(accountId) {
+      // The same read delivery makes: null unless the tier has Slack and a webhook is set.
+      const { data, error } = await admin.rpc('account_slack_webhook_url', {
+        p_account: accountId,
+        p_now: now().toISOString(),
+      });
+      if (error) failed('account_slack_webhook_url', error);
+      const url = (data as string | null) ?? null;
+      if (url === null) return 'not_connected';
+      return (await post(url, SLACK_TEST_TEXT)).ok ? 'sent' : 'failed';
     },
     async slackLast4(accountId) {
       const { data, error } = await admin.rpc('account_slack_last4', { p_account: accountId });

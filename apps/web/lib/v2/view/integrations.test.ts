@@ -51,6 +51,13 @@ describe('Integrations, Slack', () => {
       fields: { _method: 'PUT', clearSlack: 'true' },
     });
     expect(s.upgrade).toBeNull();
+    expect(s.test).toMatchObject({
+      label: 'Send a test message',
+      href: '/api/alert-rules',
+      fields: { _method: 'PUT', testSlack: 'true' },
+    });
+    expect(pro(null).test).toBeNull();
+    expect(free('WXYZ').test).toBeNull();
   });
 
   it('on Free, for the owner: no form, and the way to Pro', () => {
