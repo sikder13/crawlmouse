@@ -19,6 +19,7 @@
  * three it did not (the report page on your domain, your own sender address, the one-pager) a proof
  * that still holds beside its routes.
  */
+import { featureShown, type RiskFeature } from '../../feature-switch';
 import { TRIAL_DAYS } from '../../billing/state-machine';
 import { AGENCY_MONTHLY, PRO_MONTHLY, usd } from '../../billing/prices';
 import { GATES } from '../../entitlement-v2';
@@ -76,6 +77,8 @@ export type Proof =
 
 export interface Capability {
   status: 'built' | 'coming';
+  /** The Goal 1 switch that hides it while unproven (`lib/feature-switch.ts`). */
+  risk?: RiskFeature;
   /** What it is, in a sentence. */
   what: string;
   proof: Proof;
@@ -120,6 +123,7 @@ export const CAPABILITIES: Readonly<Record<CapabilityKey, Capability>> = {
   },
   competitors: {
     status: 'coming',
+    risk: 'competitors',
     what: 'Measuring competitors: a site stores them, but the check builder records none.',
     proof: {
       kind: 'holds',
@@ -140,6 +144,7 @@ export const CAPABILITIES: Readonly<Record<CapabilityKey, Capability>> = {
   },
   client_report_page: {
     status: 'coming',
+    risk: 'agency_domain',
     what: 'Reports and the client report page under your own name: on your domain, with your logo. The report a client opens is on our domain, names no agency and shows no logo.',
     // CC-31 built the report a client opens (`/s/<token>`), on our domain and with no logo: what
     // the client is shown is drawn here, and nothing here reads a logo.
@@ -163,6 +168,7 @@ export const CAPABILITIES: Readonly<Record<CapabilityKey, Capability>> = {
   },
   one_pagers: {
     status: 'coming',
+    risk: 'agency_white_label',
     what: 'The branded one-pager made from an audit: the report generator makes four kinds, and the one-pager is not one of them.',
     proof: {
       kind: 'holds',
@@ -173,11 +179,13 @@ export const CAPABILITIES: Readonly<Record<CapabilityKey, Capability>> = {
   },
   client_reports: {
     status: 'built',
+    risk: 'agency_white_label',
     what: 'Client reports sent on a schedule to a contact who confirmed, naming the agency (CC-31’s hourly run).',
     proof: { kind: 'exists', path: 'apps/web/lib/v2/agency/schedules-run.ts' },
   },
   client_matrix: {
     status: 'built',
+    risk: 'agency_white_label',
     what: 'The client matrix, every client site on one screen (/agency, CC-31).',
     proof: { kind: 'exists', path: 'apps/web/app/agency/page.tsx' },
   },
@@ -198,12 +206,14 @@ export const CAPABILITIES: Readonly<Record<CapabilityKey, Capability>> = {
   },
   staging: {
     status: 'coming',
+    risk: 'staging_deploys',
     what: 'Auditing a staging or preview URL before a deploy: a staging host is stored, but no check is requested for a deploy.',
     proof: { kind: 'nowhere', dirs: SOURCE_DIRS, text: /trigger:\s*['"]deploy['"]/ },
     named: /staging|preview URLs?|before you deploy/i,
   },
   renders: {
     status: 'coming',
+    risk: 'rendering',
     what: 'Full JavaScript renders counted against the plan’s monthly allowance: the pipeline runs with no render budget.',
     proof: {
       kind: 'holds',
@@ -261,6 +271,8 @@ export const CAPABILITIES: Readonly<Record<CapabilityKey, Capability>> = {
 export interface TaggedView {
   text: string;
   capabilities: readonly CapabilityKey[];
+  /** It names a feature the Goal 1 switch hides, so no page shows it. */
+  hidden: boolean;
   /** It names a capability that is not built, so the page marks it "coming". */
   coming: boolean;
 }
@@ -268,10 +280,22 @@ export interface TaggedView {
 const isComing = (keys: readonly CapabilityKey[]) =>
   keys.some((k) => CAPABILITIES[k].status === 'coming');
 
+/** Whether copy naming these capabilities names a feature the Goal 1 switch hides. */
+export const isHidden = (keys: readonly CapabilityKey[]) =>
+  keys.some((k) => {
+    const risk = CAPABILITIES[k].risk;
+    return risk !== undefined && !featureShown(risk);
+  });
+
+/** A list of tagged copy without what the switch hides. */
+export const shown = <T extends { hidden: boolean }>(items: readonly T[]): T[] =>
+  items.filter((i) => !i.hidden);
+
 export const tagged = ({ text, capabilities }: Tagged): TaggedView => ({
   text,
   capabilities,
   coming: isComing(capabilities),
+  hidden: isHidden(capabilities),
 });
 
 /**
@@ -315,6 +339,7 @@ export interface AgenciesView {
     label: string;
     capabilities: readonly CapabilityKey[];
     coming: boolean;
+    hidden: boolean;
     agency: string;
     meta: string;
     heading: string;
@@ -359,6 +384,7 @@ function onePager(): AgenciesView['onePager'] {
     label: o.label,
     capabilities: o.capabilities,
     coming: isComing(o.capabilities),
+    hidden: isHidden(o.capabilities),
     agency: SAMPLE_AGENCY.name,
     meta: `${SAMPLE_AGENCY.host} · ${dayMonthYear(s.checkedAt)}`,
     heading: `${s.host}: ${s.headline}`,
@@ -408,7 +434,7 @@ export function agenciesView(flags: AgenciesFlags): AgenciesView {
       ? COPY.description({ price, sites: agency.sites, days: TRIAL_DAYS })
       : COPY.descriptionBillingOff({ price, sites: agency.sites }),
     h1: COPY.h1,
-    hero: [tagged(COPY.hero[0](numberWord(aiCrawlers))), tagged(COPY.hero[1]())],
+    hero: shown([tagged(COPY.hero[0](numberWord(aiCrawlers))), tagged(COPY.hero[1]())]),
     trial: flags.billing
       ? { ...tagged(COPY.trial(TRIAL_DAYS)), href: AGENCY_TRIAL_HREF }
       : {
@@ -425,7 +451,7 @@ export function agenciesView(flags: AgenciesFlags): AgenciesView {
     trialNote: tagged(COPY.trialNote({ days: TRIAL_DAYS, price, sites: agency.sites })),
     prospect: {
       title: tagged(COPY.prospect.title),
-      lines: COPY.prospect.lines.map(tagged),
+      lines: shown(COPY.prospect.lines.map(tagged)),
       formLabel: COPY.prospect.formLabel,
       homeLink: COPY.prospect.homeLink,
     },
@@ -449,12 +475,12 @@ export function agenciesView(flags: AgenciesFlags): AgenciesView {
         branded('onePagers'),
         branded('reports'),
         branded('matrix'),
-      ],
+      ].filter((r) => !r.label.hidden),
     },
-    uses: { title: COPY.uses.title, steps: COPY.uses.steps.map(tagged) },
+    uses: { title: COPY.uses.title, steps: shown(COPY.uses.steps.map(tagged)) },
     cost: {
       title: COPY.cost.title,
-      lines: [
+      lines: shown([
         tagged(
           COPY.cost.price({
             price,
@@ -463,7 +489,7 @@ export function agenciesView(flags: AgenciesFlags): AgenciesView {
           }),
         ),
         tagged(COPY.cost.rest(numberWord(agency.seats))),
-      ],
+      ]),
       compare: { label: COPY.cost.compare, href: PRICING_HREF },
     },
     comingLabel: COPY.coming,

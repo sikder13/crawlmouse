@@ -23,7 +23,7 @@ import { usd } from '../../billing/prices';
 import { trialRefusal, type EntitlementSnapshot } from '../../billing/state-machine';
 import type { PaidTier, Tier } from '../../entitlement-v2';
 import { AGENCIES_COPY } from '../copy/agencies';
-import { footerComing, tagged, type TaggedView } from './agencies';
+import { footerComing, shown, tagged, type TaggedView } from './agencies';
 import { agencyTrialPath } from './agency-trial';
 import { PRICING_COPY as COPY, per, planCopy, priceOf, type PlanRow } from '../copy/pricing';
 
@@ -318,7 +318,7 @@ export function pricingView(
     signedIn: viewer.kind === 'signed_in',
     h1: COPY.h1,
     title: tagged(COPY.title),
-    lead: COPY.lead().map(tagged),
+    lead: shown(COPY.lead().map(tagged)),
     interval,
     intervals: (['month', 'year'] as const).map((i) => ({
       interval: i,
@@ -331,16 +331,13 @@ export function pricingView(
       name: copy[tier].name,
       tag: copy[tier].tag,
       description: tagged(copy[tier].description),
-      rows: builtFirst(
-        tier,
-        copy[tier].rows.map((r) => ({ label: r.label, ...tagged(r) })),
-      ),
+      rows: builtFirst(tier, shown(copy[tier].rows.map((r) => ({ label: r.label, ...tagged(r) })))),
       price: usd(priceOf(tier, interval)),
       per: per(interval),
       action: actions[tier],
     })),
-    crawlers: COPY.crawlers().map(tagged),
-    annual: COPY.annual(flags.billing).map(tagged),
+    crawlers: shown(COPY.crawlers().map(tagged)),
+    annual: shown(COPY.annual(flags.billing).map(tagged)),
     agencyPlus: {
       name: COPY.agencyPlus.name,
       limits: tagged({ text: COPY.agencyPlus.limits(), capabilities: ['sites', 'seats'] }),
@@ -357,16 +354,20 @@ export function pricingView(
     },
     after: {
       title: COPY.after.title(pro.trial, flags.billing),
-      lead: COPY.after.lead(flags.billing).map(tagged),
+      lead: shown(COPY.after.lead(flags.billing).map(tagged)),
       columns: COPY.after.columns,
       rows: COPY.after
         .rows(interval, flags.billing)
-        .map(([what, happens]) => [what, tagged(happens)]),
+        .map(([what, happens]) => [what, tagged(happens)] as [string, TaggedView])
+        .filter(([, happens]) => !happens.hidden),
     },
-    why: { title: COPY.why.title, text: COPY.why.text().map(tagged) },
+    why: { title: COPY.why.title, text: shown(COPY.why.text().map(tagged)) },
     faq: {
       title: COPY.faq.title,
-      items: COPY.faq.items(pro.trial, flags.billing).map(({ q, a }) => ({ q, a: tagged(a) })),
+      items: COPY.faq
+        .items(pro.trial, flags.billing)
+        .map(({ q, a }) => ({ q, a: tagged(a) }))
+        .filter(({ a }) => !a.hidden),
     },
     comingLabel: AGENCIES_COPY.coming,
     footerComing: footerComing(),

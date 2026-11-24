@@ -23,10 +23,12 @@ export function Capability({
   className,
 }: {
   as?: 'span' | 'p' | 'div' | 'li';
-  item: { text: string; capabilities: readonly string[]; coming: boolean };
+  item: { text: string; capabilities: readonly string[]; coming: boolean; hidden?: boolean };
   comingLabel: string;
   className?: string;
 }) {
+  // A feature the Goal 1 switch hides is named nowhere (lib/feature-switch.ts).
+  if (item.hidden) return null;
   return (
     <Tag className={className} data-capability={item.capabilities.join(' ')}>
       {item.text}

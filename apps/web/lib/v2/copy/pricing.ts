@@ -9,6 +9,7 @@
  * `CAPABILITIES`), and the page marks "coming" each one that is not built (SEO review 1–3, Q27);
  * components/v2/screens/pricing/pricing-capabilities.test.tsx sweeps the rendered page for it.
  */
+import { featureShown } from '../../feature-switch';
 import { TRIAL_REMINDER_DAYS_BEFORE_END, EMAIL_KINDS } from '../../auth/constants';
 import type { Interval } from '../../billing/catalog';
 import {
@@ -75,7 +76,9 @@ function freeFixes(): number {
   if (n === 'all') throw new Error('the pricing copy assumes Free shows a number of fixes');
   return n;
 }
-const pages = (tier: Tier) => `${count(GATES[tier].pagesPerCheck)} pages`;
+/** A plan's page limit, or the free one while the Goal 1 switch hides 2,000 pages. */
+const pages = (tier: Tier) =>
+  `${count(featureShown('pages_2000') ? GATES[tier].pagesPerCheck : Math.min(GATES[tier].pagesPerCheck, GATES.free.pagesPerCheck))} pages`;
 
 export interface PlanRow extends Tagged {
   /** The short left-hand label: "5 sites", "weekly". */
