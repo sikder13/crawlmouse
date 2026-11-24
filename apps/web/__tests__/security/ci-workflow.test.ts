@@ -618,6 +618,8 @@ describe("the changes job's decide step", () => {
         '-f',
         'event=pull_request',
         '-f',
+        'branch=build/x',
+        '-f',
         'head_sha=feedc0de',
         '--jq',
         '.total_count',

@@ -12,7 +12,9 @@ name: CI
 # A pull request event runs every job, not only the visual set: a job skipped by a condition reports
 # success, and a skipped twin of a required check on the head commit could stand in for one that
 # failed. It tests the pull request's merge commit, as GitHub checks it out; its checks attach to the
-# head commit. A pull request can merge only up to date with main, where the two trees are the same.
+# head commit. The ruleset does not require a branch to be up to date with main
+# (`strict_required_status_checks_policy: false`), so the merge commit tested can differ from the one
+# that merges when main has moved since the run.
 #
 # The nightly run on main runs everything, the visual set included; a failure is red here, and
 # GitHub emails the user who last edited the schedule.
@@ -114,7 +116,7 @@ jobs:
             # required jobs report on the same commit and block the merge (PR #125). When the answer
             # cannot be had, the visual set runs here, as before this rule.
             if [ "$EVENT" = push ]; then
-              if ! prruns="$(gh api -X GET "repos/$REPO/actions/workflows/ci.yml/runs" -f event=pull_request -f head_sha="$SHA" --jq .total_count)"; then
+              if ! prruns="$(gh api -X GET "repos/$REPO/actions/workflows/ci.yml/runs" -f event=pull_request -f branch="$BRANCH" -f head_sha="$SHA" --jq .total_count)"; then
                 echo "::warning::could not ask GitHub for this commit's pull request runs, so the gate stays open"
               elif ! [[ "$prruns" =~ ^[0-9]+$ ]]; then
                 echo "::warning::GitHub answered '${prruns}' for this commit's pull request runs, so the gate stays open"
