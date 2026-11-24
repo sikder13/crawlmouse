@@ -58,6 +58,8 @@ type Pages = ReturnType<typeof pagesOf>;
 
 /** A page's sentence as the report prints it: without the sentences only a screen can act on. */
 export function printable(t: string): string {
+  // A sentence with none of them is printed exactly as the page says it.
+  if (!SCREEN_ONLY.some((sentence) => t.includes(sentence))) return t;
   return SCREEN_ONLY.reduce((out, sentence) => out.split(sentence).join(''), t)
     .replace(/ {2,}/g, ' ')
     .trim();

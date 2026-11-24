@@ -6,7 +6,7 @@ const AT = '2026-11-23T22:41:07.123Z';
 describe('the name a report file downloads under (F-125)', () => {
   it.each([
     ['audit_pdf', 'pdf', 'crawlmouse-example.com-2026-11-23-audit.pdf'],
-    ['compare', 'pdf', 'crawlmouse-example.com-2026-11-23-compare.pdf'],
+    ['compare', 'html', 'crawlmouse-example.com-2026-11-23-compare.doc.json'],
     ['client_report', 'pdf', 'crawlmouse-example.com-2026-11-23-report.pdf'],
     ['raw_export', 'csv', 'crawlmouse-example.com-2026-11-23-export.csv'],
     ['raw_export', 'json', 'crawlmouse-example.com-2026-11-23-export.json'],
@@ -35,6 +35,16 @@ describe('the name a report file downloads under (F-125)', () => {
     const name = reportFileName({ host, createdAt: AT, kind: 'audit_pdf', format: 'pdf' });
     expect(name).toBe(`crawlmouse-${kept}-2026-11-23-audit.pdf`);
     expect(name).toMatch(/^[a-z0-9.-]+$/);
+  });
+
+  it('keeps a long host to 100 characters', () => {
+    const name = reportFileName({
+      host: `${'a'.repeat(240)}.com`,
+      createdAt: AT,
+      kind: 'audit_pdf',
+      format: 'pdf',
+    });
+    expect(name).toBe(`crawlmouse-${'a'.repeat(100)}-2026-11-23-audit.pdf`);
   });
 
   it('an unreadable date leaves the date out rather than writing a wrong one', () => {

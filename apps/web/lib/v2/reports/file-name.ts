@@ -15,7 +15,12 @@ const WHAT: Record<ReportKindName, string> = {
   client_report: 'report',
 };
 
-const safe = (s: string): string => s.toLowerCase().replace(/[^a-z0-9.-]/g, '-');
+/** At most 100 characters of the host, so the whole name stays well under a file system's 255. */
+const safe = (s: string): string =>
+  s
+    .toLowerCase()
+    .replace(/[^a-z0-9.-]/g, '-')
+    .slice(0, 100);
 
 export function reportFileName(r: {
   host: string;

@@ -115,6 +115,23 @@ describe('the printed report leaves out what only a screen can do (F-126)', () =
     },
   );
 
+  it('prints the real method paragraph whole, less only the two sentences', () => {
+    // Read from the screen, then worked out by hand: each sentence of the paragraph except the two.
+    const tagged = BAD.checks.find((c) =>
+      accessView(BAD, c.id, { plan: 'pro' }).method.includes(SCREEN_ONLY[1]),
+    )!;
+    const method = accessView(BAD, tagged.id, { plan: 'pro' }).method;
+    const sentences = method.split(/(?<=\.) /);
+    const kept = sentences.filter((x) => !(SCREEN_ONLY as readonly string[]).includes(x));
+    expect(sentences.length - kept.length).toBe(2);
+    expect(printable(method)).toBe(kept.join(' '));
+    expect(printable(method)).not.toMatch(/ {2}/);
+  });
+
+  it('leaves a sentence with none of them exactly as written', () => {
+    expect(printable('  Two  spaces stay.  ')).toBe('  Two  spaces stay.  ');
+  });
+
   it('keeps the rest of the paragraph', () => {
     expect(
       printable('Tested from our IPs. Select a cell to see the raw request and response.'),
