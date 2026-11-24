@@ -19,7 +19,15 @@ vi.mock('server-only', () => ({}));
 vi.mock('@/lib/supabase/admin', () => ({
   supabaseAdmin: () => {
     h.log.push('supabaseAdmin');
-    return adminOver(h.db);
+    // Each RPC is logged, so a case can tell the route's own refusal from the database's.
+    const admin = adminOver(h.db);
+    const rpc = admin.rpc.bind(admin);
+    return Object.assign(admin, {
+      rpc: (fn: string, args?: Record<string, unknown>) => {
+        h.log.push(`rpc:${fn}`);
+        return rpc(fn, args);
+      },
+    });
   },
 }));
 vi.mock('../../../../../../../inngest/client', () => ({ inngest: { send: h.send } }));
@@ -120,6 +128,8 @@ describe('POST /api/hooks/deploy/[hook]', () => {
     const hook = await hookOf(staging.id);
     await h.db.query(`update public.sites set removed_at = now() where id = $1`, [staging.id]);
     expect((await post(hook)).status).toBe(404);
+    // Refused by the route itself, before it asks the database for a check.
+    expect(h.log.filter((x) => x.startsWith('rpc:'))).toEqual([]);
   });
 
   it('an account whose plan has no deploy hooks: 402, nothing queued', async () => {

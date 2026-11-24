@@ -640,7 +640,7 @@ const ROUTES: readonly Spec[] = [
     identity: 'a deploy pipeline holding the staging site’s hook address',
     gate: 'signature',
     detail:
-      'Queues a deploy check of a live staging site after `verifyDeployHook` checks the address’s HMAC in constant time; any other answer is the same 404.',
+      'Queues a deploy check of a live staging site after `verifyDeployHook` checks the address’s HMAC in constant time; no such site, a wrong signature and a site that is not a live staging site get the same 404.',
     check: at('app/api/hooks/deploy/[hook]/route.ts', 'verifyDeployHook'),
     proof: by(
       'app/api/hooks/deploy/[hook]/route.test.ts',

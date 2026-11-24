@@ -27,8 +27,9 @@ const HOUR_MS = 60 * 60 * 1000;
  * - 429 over the per-address hour, before any read;
  * - 503 while crawls are paused or the pipeline is off;
  * - the same 404 for no such site, a signature that is not the site's (compared in constant time), a
- *   site that is not a live staging site, or a site nobody keeps, so the answer says nothing about
- *   which;
+ *   site that is not a live staging site, or a site nobody keeps (which the `sites_staging_kept`
+ *   constraint already forbids for a staging site; the check narrows the type), so the answer says
+ *   nothing about which;
  * - 402 when the account's plan has no deploy hooks.
  *
  * The check goes through `request_capped_check`, under the plan's `checksPerSiteDay` counted over

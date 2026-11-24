@@ -99,7 +99,11 @@ describe('Site page, example-outfitter.com at as_of', () => {
     const rows = (d: typeof bad, at: Viewer = viewer, hook: string | null = url) =>
       siteView(d, at, OUTFITTER, undefined, { deployHookUrl: hook }).settings.rows;
     const hook = (r: ReturnType<typeof rows>) => r.find((x) => x.label === 'Deploy hook');
-    expect(hook(rows(bad))).toMatchObject({ value: `POST ${url} after each deploy`, mono: true });
+    expect(hook(rows(bad))).toMatchObject({
+      value: `POST ${url} after each deploy`,
+      mono: true,
+      secret: true,
+    });
     expect(hook(rows(bad, viewer, null))).toBeUndefined();
     const owner = bad.seats.find((x) => x.role === 'owner')!;
     const seat = {

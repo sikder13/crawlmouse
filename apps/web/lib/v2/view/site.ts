@@ -145,6 +145,8 @@ export interface SiteView {
       mono: boolean;
       muted: boolean;
       action: ActionView | null;
+      /** A credential in the value: the screen leaves it out of session recordings. */
+      secret?: true;
     }[];
   };
   alerts: {
@@ -721,6 +723,7 @@ export function siteView(
                       mono: true,
                       muted: false,
                       action: null,
+                      secret: true as const,
                     },
                   ]
                 : []),

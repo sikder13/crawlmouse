@@ -124,6 +124,13 @@ const REPORT_LINK_PATH = new RegExp(
   'gi',
 );
 /**
+ * A staging site's deploy hook in its path (`/api/hooks/deploy/<site id>.<signature>`; Goal 1 row
+ * 20), with the slashes as CHECK_PATH reads them. Whoever holds the address queues a check, so the
+ * whole segment goes, the site id with the signature (`lib/v2/account/deploy-hook.ts`); the route's
+ * own name, `/api/hooks/deploy/[hook]`, holds neither and is left.
+ */
+const DEPLOY_HOOK_PATH = new RegExp(`(${SLASH}hooks${SLASH}deploy${SLASH})[A-Za-z0-9._-]+`, 'gi');
+/**
  * The SDK's own processing state, which holds the live scope and client: never part of what is
  * sent, and not ours to walk (a getter-only property on it throws when assigned).
  */
@@ -148,7 +155,8 @@ function scrub(value: unknown, seen: WeakSet<object>): unknown {
       .replace(UNSUBSCRIBE_TOKEN, '$1[Filtered]')
       .replace(SIGNED_TOKEN_QUERY, '$1[Filtered]')
       .replace(SHARE_LINK_PATH, '$1[Filtered]')
-      .replace(REPORT_LINK_PATH, '$1[Filtered]');
+      .replace(REPORT_LINK_PATH, '$1[Filtered]')
+      .replace(DEPLOY_HOOK_PATH, '$1[Filtered]');
   }
   if (value === null || typeof value !== 'object') return value;
   if (seen.has(value)) return value;
