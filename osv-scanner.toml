@@ -30,31 +30,6 @@ ignoreUntil = 2026-11-26
 reason = "Present at the CC-00 baseline: esbuild@0.21.5 (fixed: 0.25.0)"
 
 [[IgnoredVulns]]
-id = "GHSA-5v7r-6r5c-r473"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: file-type@20.5.0 (fixed: 21.3.1)"
-
-[[IgnoredVulns]]
-id = "GHSA-j47w-4g3g-c36v"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: file-type@20.5.0 (fixed: 21.3.2)"
-
-[[IgnoredVulns]]
-id = "GHSA-528h-pc64-c93x"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: stream-json@1.9.1 (fixed: 3.5.0)"
-
-[[IgnoredVulns]]
-id = "GHSA-hqr4-qq8f-hg3x"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: stream-json@1.9.1 (fixed: 3.6.0)"
-
-[[IgnoredVulns]]
-id = "GHSA-mjw6-4jj6-33hc"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: stream-json@1.9.1 (fixed: 3.6.0)"
-
-[[IgnoredVulns]]
 id = "GHSA-5gmw-xhrv-c9v3"
 ignoreUntil = 2026-11-26
 reason = "Present at the CC-00 baseline: tinypool@1.1.1 (fixed: 2.1.1)"
