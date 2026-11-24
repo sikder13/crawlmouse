@@ -1,5 +1,5 @@
 /**
- * /agency-trial (CC-29 D3): with V2_BILLING off a redirect to /agencies, before any read; signed out, a redirect to
+ * /agency-trial (CC-29 D3): with V2_BILLING off or Agency not on sale a redirect to /agencies, before any read; signed out, a redirect to
  * sign in that returns here; never indexed; the form for a new trialist, the reason and no form for
  * a used trial, and the "did not finish" note for an agency account a Checkout left (Q16).
  */
@@ -65,6 +65,7 @@ beforeEach(() => {
   h.rows = [];
   h.used = null;
   vi.stubEnv('V2_BILLING', '1');
+  vi.stubEnv('V2_AGENCY_SALES', '1');
 });
 afterEach(() => vi.unstubAllEnvs());
 
@@ -79,6 +80,22 @@ describe('/agency-trial', () => {
       expect(h.reads).toBe(0);
     },
   );
+
+  it('sends the visitor to For agencies with Agency not on sale, before any read', async () => {
+    vi.stubEnv('V2_AGENCY_SALES', '');
+    await expect(render()).rejects.toMatchObject({
+      digest: expect.stringContaining('NEXT_REDIRECT;replace;/agencies;'),
+    });
+    expect(h.reads).toBe(0);
+  });
+
+  it('its layout does the same', async () => {
+    const { default: Layout } = await import('./layout');
+    vi.stubEnv('V2_AGENCY_SALES', '');
+    expect(() => Layout({ children: null })).toThrow(/NEXT_REDIRECT/);
+    vi.stubEnv('V2_AGENCY_SALES', '1');
+    expect(() => Layout({ children: null })).not.toThrow();
+  });
 
   it.each([
     [{}, '/login?next=%2Fagency-trial'],

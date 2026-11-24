@@ -105,7 +105,14 @@ function targets(html: string): string[] {
 const ENVS: Env[] = [];
 for (const door of ['1', undefined])
   for (const checks of ['1', undefined])
-    ENVS.push({ V2_BILLING: '1', V2_ACCOUNT_DOOR: door, V2_CHECKS_PUBLIC: checks });
+    // With Agency sales open. Closed, these pages still offer it until they say "coming", which the
+    // go-live row `agency-offers-closed` holds step 5 to.
+    ENVS.push({
+      V2_BILLING: '1',
+      V2_AGENCY_SALES: '1',
+      V2_ACCOUNT_DOOR: door,
+      V2_CHECKS_PUBLIC: checks,
+    });
 
 const VIEWERS: [string, PricingViewer][] = [
   ['signed out', { kind: 'signed_out' }],
