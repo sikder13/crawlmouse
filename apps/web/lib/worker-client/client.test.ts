@@ -11,9 +11,12 @@ import { fakeFetcher } from '../../../../packages/worker/src/test-support/fake-f
 import { pageFetcher, startWorker, type InProcessWorker } from './__tests__/in-process-worker';
 import { readRendered } from '@crawlmouse/engine/worker';
 import { readMeasure } from '../../../../packages/worker/src/reader/measure';
+import { READ_DEADLINE_MS } from '../../../../packages/worker/src/reader/thread-reader';
+import { MEASURE_CONCURRENCY } from '../../../../packages/worker/src/server';
 import {
   createWorkerClient,
   MEASURE_BUSY_WAITS_MS,
+  MEASURE_TIMEOUT_MS,
   PROGRESS_TIMEOUT_MS,
   WORKER_REFUSALS,
   workerClientFromEnv,
@@ -1037,6 +1040,14 @@ describe('measureRendered (questions/042, design C)', () => {
   });
 
   const busy = () => Response.json({ error: 'measure_busy' }, { status: 429 });
+
+  it('waits long enough for every read the worker holds ahead of it, and its own', () => {
+    // The worker holds MEASURE_CONCURRENCY signed requests, each read under READ_DEADLINE_MS, one
+    // after another on its measure thread; 5 s more is for the HTML each way.
+    expect(MEASURE_TIMEOUT_MS).toBeGreaterThanOrEqual(
+      MEASURE_CONCURRENCY * READ_DEADLINE_MS + 5_000,
+    );
+  });
 
   it('waits and asks again while the worker is busy measuring, then returns the reading', async () => {
     let n = 0;

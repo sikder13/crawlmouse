@@ -149,7 +149,10 @@ describe('POST /render/measure', () => {
     const page = () => Promise.reject(new Error('crawl reader'));
     const { base, clock } = await start(inlineMeasure, { ...crawl, page });
     const r = await post(base, PAGE_RAW, signed(String(clock.now()), PAGE_RAW));
-    expect(r.status).toBe(200);
+    expect(r).toEqual({
+      status: 200,
+      body: { reading: readRendered(PAGE.static_html, PAGE.rendered_html, PAGE.url) },
+    });
   });
 
   it('answers that the read failed when the measure thread gave up on the page', async () => {

@@ -323,8 +323,9 @@ export function createWorker(deps: WorkerDeps): Worker {
     try {
       const raw = await readBody(req, bytes);
       if (raw === 'timeout') return close('body_timeout');
-      // Over the signed length, cut short, or not the bytes that were signed.
-      if (raw === null || raw.length !== bytes || sha256Hex(raw) !== sha256) {
+      // Over the signed length (readBody stops there), or not the bytes that were signed: a body cut
+      // short has another digest.
+      if (raw === null || sha256Hex(raw) !== sha256) {
         return close('bad_signature');
       }
       let r: Awaited<ReturnType<MeasureReader['measure']>>;
