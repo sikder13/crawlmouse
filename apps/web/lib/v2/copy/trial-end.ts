@@ -86,7 +86,9 @@ export const TRIAL_END_COPY = {
     }`;
   },
   changesCaught: 'Changes caught',
-  blocked: (uas: readonly string[], date: string) => `${listOf(uas)} blocked ${date}`,
+  keptOut: (uas: readonly string[], word: string, date: string) => `${listOf(uas)} ${word} ${date}`,
+  /** For a group holding a verdict that neither robots.txt nor a refusal explains, such as a challenge. */
+  noLongerServed: 'no longer served',
   after: (where: string, when: string) => `after ${where} changed ${when}`,
   fixesClosed: 'Fixes closed',
   closedDetail: (where: string, host: string, date: string, moves: readonly string[]) =>

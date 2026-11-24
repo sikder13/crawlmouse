@@ -6,7 +6,13 @@
  * tier), with the paid features the account uses. "What Pro did" counts the account's checks,
  * changes and fixes between the trial's start and `now`, each count the length of the rows it lists.
  */
-import { instant, type Change, type FixtureDataset, type Verdict } from '@crawlmouse/types/v2';
+import {
+  instant,
+  type Change,
+  type Check,
+  type FixtureDataset,
+  type Verdict,
+} from '@crawlmouse/types/v2';
 import { TRIAL_REMINDER_DAYS_BEFORE_END } from '../../auth/constants';
 import { AGENCY_MONTHLY, AGENCY_YEARLY, PRO_MONTHLY, PRO_YEARLY } from '../../billing/prices';
 import { GATES } from '../../entitlement-v2';
@@ -37,6 +43,7 @@ import { ACCOUNT_NAV, action, type ActionView } from './account-actions';
 import { FREE_SCHEDULE, accountShellView, checkoutOpen, type ShellView } from './account-shell';
 import { freeFixes } from './free-fixes';
 import { GRADES } from './segment/changes';
+import { isBlocked, keptOutWord } from '../sentences';
 import type { SeatRole } from '../account/profile';
 
 export interface TrialRowView {
@@ -219,7 +226,7 @@ export function trialEndView(
         at(x.detected_at) - at(y.detected_at) ||
         x.id.localeCompare(y.id),
     );
-  const caughtText = describeChanges(caught, zone);
+  const caughtText = describeChanges(caught, zone, v.d.checks);
   const caughtVerdicts = [
     ...new Set(
       caught.flatMap((c) => {
@@ -576,7 +583,11 @@ function staysAndPauses(v: AccountView, plan: string, ended = false) {
  * "Claude-SearchBot and ClaudeBot blocked Fri 30 Oct, after robots.txt changed Thu 19:40"; any
  * other change by its summary.
  */
-function describeChanges(changes: readonly Change[], zone: string): string {
+function describeChanges(
+  changes: readonly Change[],
+  zone: string,
+  checks: readonly Check[],
+): string {
   const parts: string[] = [];
   const groups = new Map<string, Change[]>();
   for (const c of changes) {
@@ -595,13 +606,24 @@ function describeChanges(changes: readonly Change[], zone: string): string {
       const group = groups.get(p);
       if (!group) return byId.get(p)!.summary;
       const first = group[0]!;
-      const blocked = COPY.blocked(
+      const verdicts = group.flatMap((c) => {
+        const crawler = checks
+          .find((k) => k.id === c.check_id)
+          ?.crawlers.find((x) => x.ua === c.ua);
+        return crawler ? [crawler.verdict] : [];
+      });
+      const word =
+        verdicts.length === group.length && verdicts.every(isBlocked)
+          ? keptOutWord(verdicts)
+          : COPY.noLongerServed;
+      const said = COPY.keptOut(
         group.map((c) => c.ua!),
+        word,
         dayDate(first.detected_at, zone),
       );
       return first.cause?.changed_at
-        ? `${blocked}, ${COPY.after(first.where, weekdayTime(first.cause.changed_at, zone))}`
-        : blocked;
+        ? `${said}, ${COPY.after(first.where, weekdayTime(first.cause.changed_at, zone))}`
+        : said;
     })
     .join(' · ');
 }

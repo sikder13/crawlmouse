@@ -454,3 +454,37 @@ describe('what the dashboard calls crawlers it counts as kept out', () => {
     );
   });
 });
+
+describe('the word for crawlers a change kept out, on each surface that counts them', () => {
+  /** The bad site with its two newly blocked crawlers refused instead, at the check that found them. */
+  const refused = () => {
+    const d = structuredClone(bad);
+    const v = dashboardView(d, { accountId: BAD_ACCOUNT, now: d.as_of });
+    const opened = v.history!.marker!;
+    expect(opened.verdicts).toEqual(['disallowed_by_robots', 'disallowed_by_robots']);
+    for (const c of d.changes.filter(
+      (x) => x.kind === 'opened' && x.subject === 'crawler_access',
+    )) {
+      const crawler = d.checks
+        .find((k) => k.id === c.check_id)!
+        .crawlers.find((x) => x.ua === c.ua);
+      if (crawler?.verdict === 'disallowed_by_robots') crawler.verdict = 'blocked_by_ua_rule';
+    }
+    return dashboardView(d, { accountId: BAD_ACCOUNT, now: d.as_of });
+  };
+
+  it('says refused in the strip, the site row and the chart marker', () => {
+    const v = refused();
+    expect(v.strip!.opened.noun).toBe('crawlers refused');
+    const pills = v.sites.rows.flatMap((r) => r.since.pills.map((p) => p.label));
+    expect(pills).toContain('2 refused');
+    expect(pills.join(' ')).not.toMatch(/\bblocked\b/);
+    expect(v.history!.marker!.label).toBe('Claude-SearchBot and ClaudeBot refused · 22');
+  });
+
+  it('keeps blocked for a robots.txt disallow on the same surfaces', () => {
+    const v = home();
+    expect(v.sites.rows.flatMap((r) => r.since.pills.map((p) => p.label))).toContain('2 blocked');
+    expect(v.history!.marker!.label).toBe('Claude-SearchBot and ClaudeBot blocked · 22');
+  });
+});

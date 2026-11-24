@@ -295,3 +295,32 @@ describe('Trial ending, the reminder line around its date (fix round 2, item 4)'
     );
   });
 });
+
+describe('the changes caught, in the word each verdict earns', () => {
+  const caughtWith = (verdict: 'blocked_by_ua_rule' | 'challenged_ua') => {
+    const d = structuredClone(bad);
+    for (const c of d.changes.filter(
+      (x) => x.kind === 'opened' && x.subject === 'crawler_access',
+    )) {
+      const crawler = d.checks
+        .find((k) => k.id === c.check_id)!
+        .crawlers.find((x) => x.ua === c.ua);
+      if (crawler) crawler.verdict = verdict;
+    }
+    return trialEndView(d, trialEndViewer(d, BAD)).did.rows.find(
+      (r) => r.label === 'Changes caught',
+    )!.detail;
+  };
+
+  it('says refused of a refusal', () => {
+    expect(caughtWith('blocked_by_ua_rule')).toContain(
+      'Claude-SearchBot and ClaudeBot refused Fri 30 Oct',
+    );
+  });
+
+  it('does not call a challenge blocked or refused', () => {
+    const said = caughtWith('challenged_ua');
+    expect(said).toContain('Claude-SearchBot and ClaudeBot no longer served Fri 30 Oct');
+    expect(said).not.toMatch(/ClaudeBot (blocked|refused)/);
+  });
+});
