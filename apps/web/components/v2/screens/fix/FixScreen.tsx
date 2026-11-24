@@ -4,15 +4,13 @@ import { Heading } from '../../Heading';
 import { SUPPORT_COPY } from '../../../../lib/v2/copy/support';
 import type { ActionView } from '../../../../lib/v2/view/account-actions';
 import type { FixView } from '../../../../lib/v2/view/fix';
-import { ActionControl } from '../account/ActionControl';
-import { LiveActions } from '../account/LiveActions';
 import { Notice, type NoticeView } from '../account/Notice';
 import { ResultShell } from '../result/ResultScreen';
 import { KeepBar } from '../result/KeepBar';
 import { RecommendationTag } from '../segment/SegmentParts';
 import { SegmentTabs } from '../segment/SegmentTabs';
 import { FrameworkSwitch } from './FrameworkSwitch';
-import { ChosenPacket, PacketChoice } from './PacketChoice';
+import { ChosenDeveloperForm, ChosenPacket, PacketChoice } from './PacketChoice';
 import layout from '../../layout.module.css';
 import segment from '../segment/SegmentScreen.module.css';
 import styles from './FixScreen.module.css';
@@ -45,11 +43,9 @@ function PacketCard({
           <div className={styles.hdSub}>{data.notWritten}</div>
         </div>
       )}
-      {developer ? (
+      {p && developer ? (
         <div className={styles.developer} data-v2-addition="">
-          <LiveActions>
-            <ActionControl action={developer} />
-          </LiveActions>
+          <ChosenDeveloperForm action={developer} bodies={p.bodies} />
         </div>
       ) : null}
     </Card>

@@ -722,6 +722,31 @@ describe('/audit/[id]/fix/[fixId]', () => {
       expect(markup).toContain('Email this fix to my developer');
     });
 
+    it('names the packet’s own framework until the reader switches', () => {
+      const fix = live()[0]!;
+      const read: ReadyCheck = {
+        ...kept(one),
+        dataset: {
+          ...kept(one).dataset,
+          fixes: kept(one).dataset.fixes.map((f) =>
+            f.id === fix.id ? { ...f, packet: withBodies(PACKET, ['wordpress']) } : f,
+          ),
+        },
+      };
+      const hidden = page(read, fix.id).match(/<input[^>]*name="framework"[^>]*>/)?.[0] ?? '';
+      expect(hidden).toContain('type="hidden"');
+      expect(hidden).toContain(`value="${PACKET.framework}"`);
+    });
+
+    it('a locked fix ignores a notice typed into the address', () => {
+      const id = live()[FREE_FIXES]!.id;
+      const read = kept(one);
+      expect(fixOf(read, id)!.developer).toBeNull();
+      expect(
+        page(read, id, { code: 'email_requested', text: 'Recorded for the test.' }),
+      ).not.toContain('Recorded for the test.');
+    });
+
     it('an audit nobody keeps has none: its email ask opens the keep bar', () => {
       const id = live()[0]!.id;
       const markup = page(one, id);

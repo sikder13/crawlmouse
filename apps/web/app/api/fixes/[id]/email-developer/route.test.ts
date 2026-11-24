@@ -1,5 +1,5 @@
 import type { PGlite } from '@electric-sql/pglite';
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // POST /api/fixes/[id]/email-developer (CC-26b D9, questions.md Q8). The route's guards and
 // lib/v2/account/fixes.ts run over PGlite through the PostgREST stand-in; the rate limiter and the
@@ -56,6 +56,8 @@ vi.mock('../../../../../../../inngest/client', () => ({
 }));
 
 import { fixWorld, type FixWorld } from '@/lib/v2/account/test-support/fix-world';
+import { fixture } from '@/lib/v2/fixtures';
+import { withBodies } from '@/lib/v2/view/test-support/multi-body';
 import { POST } from './route';
 
 let fw: FixWorld;
@@ -229,6 +231,66 @@ describe('POST /api/fixes/[id]/email-developer from a live form', () => {
     const res = await postFrom(id, `https://crawlmouse.com${fixPage(id)}`, 'email=nope');
     expect(where(res)).toEqual([303, `${fixPage(id)}?notice=invalid_email`]);
     expect(h.sent).toEqual([]);
+  });
+
+  it('a limit from the fix page: back to that page', async () => {
+    h.limited.add('fix-email:user');
+    const id = fw.ranked[0]!;
+    const res = await postFrom(id, `https://crawlmouse.com${fixPage(id)}`);
+    const to = new URL(res.headers.get('location')!, 'https://crawlmouse.com');
+    expect([to.pathname, to.searchParams.get('notice')]).toEqual([fixPage(id), 'rate_limited']);
+    expect(h.sent).toEqual([]);
+  });
+
+  it('a fix the tier does not open, from the fix page: back to that page', async () => {
+    const id = fw.ranked[3]!;
+    const res = await postFrom(id, `https://crawlmouse.com${fixPage(id)}`);
+    expect(where(res)).toEqual([303, `${fixPage(id)}?notice=upgrade_required`]);
+  });
+
+  describe('naming the framework on screen', () => {
+    const PACKET = withBodies(fixture('bad-site').fixes.find((f) => f.packet !== null)!.packet!, [
+      'wordpress',
+    ]);
+    const packed = async (id: string, packet: unknown) =>
+      fw.db.query(`update public.site_fixes set packet = $1 where id = $2`, [
+        JSON.stringify(packet),
+        id,
+      ]);
+    afterEach(() => packed(fw.ranked[0]!, null));
+
+    it('carries a framework the packet has a body for, on the event', async () => {
+      const id = fw.ranked[0]!;
+      await packed(id, PACKET);
+      const res = await post(id, 'email=dev%40agency.example&framework=wordpress', FORM);
+      expect(res.status).toBe(303);
+      expect(h.sent).toHaveLength(1);
+      expect((h.sent[0] as { data: unknown }).data).toMatchObject({ framework: 'wordpress' });
+    });
+
+    it('with no framework, the event names none', async () => {
+      const id = fw.ranked[0]!;
+      await packed(id, PACKET);
+      await post(id, 'email=dev%40agency.example', FORM);
+      expect((h.sent[0] as { data: object }).data).not.toHaveProperty('framework');
+    });
+
+    it.each([
+      ['one the packet has no body for', 'shopify_liquid'],
+      ['one that is not a framework', 'nonsense'],
+    ])('refuses %s, and sends nothing', async (_name, framework) => {
+      const id = fw.ranked[0]!;
+      await packed(id, PACKET);
+      const res = await post(id, `email=dev%40agency.example&framework=${framework}`, FORM);
+      expect(where(res)).toEqual([303, '/dashboard?notice=invalid']);
+      expect(h.sent).toEqual([]);
+      expect(await requests(id)).toBe(requestsBefore);
+    });
+
+    let requestsBefore = 0;
+    beforeEach(async () => {
+      requestsBefore = await requests(fw.ranked[0]!);
+    });
   });
 
   it('keeps only the path of the page it came from', async () => {

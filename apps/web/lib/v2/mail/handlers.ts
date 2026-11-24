@@ -30,7 +30,7 @@ import type {
   MailHandlers,
   ReportMailHandlers,
 } from '../../../../../inngest/mail';
-import { packetPrompt } from '../view/segment/fixes';
+import { packetBodies, packetPrompt } from '../view/segment/fixes';
 import type { AgencyCapture } from '../agency/events';
 import { checkRef } from '../pipeline/public';
 import { hashMailAddress } from './address-hash';
@@ -194,11 +194,13 @@ export function mailHandlers(d: MailHandlerDeps): MailHandlers {
       });
     },
 
-    async fixToDeveloper(requestId) {
+    async fixToDeveloper(requestId, framework) {
       const r = await read(store.fixEmailRequest(requestId));
       if (r === null) return 'not_found';
       if (r.fix.packet === null) return 'no_packet';
-      const packet = r.fix.packet;
+      // The steps the reader had on screen, or the packet's own (an event from before the field).
+      const packet =
+        packetBodies(r.fix.packet).find((b) => b.framework === framework) ?? r.fix.packet;
       const outcome = await send(mail, {
         kind: 'fix_to_developer',
         to: r.toEmail,

@@ -264,7 +264,7 @@ export interface EmailLimits {
 export interface EmailEvent {
   id: string;
   name: 'fix.email_developer_requested';
-  data: { requestId: string };
+  data: { requestId: string; framework?: NonNullable<Fix['packet']>['framework'] };
 }
 
 export interface EmailDeps extends FixDeps {
@@ -274,8 +274,14 @@ export interface EmailDeps extends FixDeps {
   back?: string;
 }
 
-/** The email-developer body, `{email}` and nothing else; the live form posts it as rendered. */
-export const EmailBody = z.strictObject({ email: z.email().max(254) });
+/**
+ * The email-developer body: `{email}`, and from the fix page the `framework` whose steps the reader
+ * has on screen. The live form posts it as rendered.
+ */
+export const EmailBody = z.strictObject({
+  email: z.email().max(254),
+  framework: z.string().max(40).optional(),
+});
 
 /**
  * POST /api/fixes/[id]/email-developer `{email}` once membership is established: 402
@@ -300,6 +306,13 @@ export async function emailDeveloper(
   const input = EmailBody.safeParse(body?.fields ?? {});
   if (!input.success) return refuseTo(kind, back, 400, 'invalid_email');
   const to = input.data.email.toLowerCase();
+  const named = input.data.framework;
+  const written =
+    named === undefined || r.fix.packet === null
+      ? undefined
+      : packetBodies(r.fix.packet).find((b) => b.framework === named);
+  // A framework the packet has no steps for: the mail could not hold what the form said it would.
+  if (named !== undefined && written === undefined) return refuseTo(kind, back, 400, 'invalid');
 
   for (const limit of [deps.limits.perFix, deps.limits.perUser]) {
     const verdict = await limit();
@@ -324,7 +337,7 @@ export async function emailDeveloper(
   await deps.send({
     id: `fix-email:${requestId}`,
     name: 'fix.email_developer_requested',
-    data: { requestId },
+    data: written ? { requestId, framework: written.framework } : { requestId },
   });
   return kind === 'form' ? noticeTo(back, 'email_requested') : Response.json({ queued: true });
 }
