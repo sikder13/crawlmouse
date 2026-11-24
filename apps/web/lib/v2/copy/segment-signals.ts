@@ -7,6 +7,14 @@ import type { Addition, CopyChange } from '../copy-registry';
 export const SIGNALS_CHANGES: CopyChange[] = [
   {
     screen: 'segment-signals',
+    kind: 'ruling',
+    locked: 'Crawlers that get in',
+    rendered: 'Crawlers served',
+    source:
+      'V2R register F-135: the count is of crawlers our own requests were served to, not of crawlers that get in.',
+  },
+  {
+    screen: 'segment-signals',
     kind: 'facts',
     locked:
       'Two of seven agent signals are present, and one of the missing five is worth your time today.',

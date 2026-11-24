@@ -26,7 +26,7 @@ import {
   weekdayLong,
   weekdayTime,
 } from '../format';
-import { aiWithheldSummary } from '../sentences';
+import { aiWithheldSummary, keptOutWord } from '../sentences';
 
 /** The verdicts "blocked" names (FACTS I2), the ones the crawler alert fires on. */
 const BLOCKING_VERDICTS: Verdict[] = ['disallowed_by_robots', 'blocked_by_ua_rule'];
@@ -236,8 +236,8 @@ function aiCard(c: Check, prev: Check | null, zone: string): GradeCardView {
   const was = prev ? aiOf(prev) : null;
   const { blocked, of, verdicts } = blockedOf(c);
   const parts = [
-    // FACTS I2: "blocked" names a blocking verdict, so with none the part is left out.
-    blocked ? `Crawlers blocked ${blocked} of ${of}` : null,
+    // FACTS I2: this names a blocking verdict, so with none the part is left out.
+    blocked ? `Crawlers ${keptOutWord(verdicts)} ${blocked} of ${of}` : null,
     c.without_js ? `Text without JS ${percent(c.without_js.site_text_share)}%` : null,
     c.content?.score != null ? `Quotable ${c.content.score}` : null,
   ].filter(Boolean);

@@ -28,7 +28,7 @@ import {
   weekdayLong,
   weekdayTime,
 } from '../format';
-import { isAi, isBlocked } from '../sentences';
+import { isAi, isBlocked, keptOutWord } from '../sentences';
 import { count, plural } from '../words';
 import {
   PLAN_NAMES,
@@ -342,12 +342,10 @@ function allBlocked(v: AccountView, changes: readonly Change[]): boolean {
   );
 }
 
-/** "blocked" is what robots.txt does; a refusal of our request is counted as a refusal. */
+/** "2 crawlers refused": the count's noun, in the word its verdicts earn. */
 export function keptOutNoun(n: number, verdicts: readonly Verdict[]): string {
-  const robots = verdicts.filter((x) => x === 'disallowed_by_robots').length;
-  if (robots === verdicts.length) return plural(n, 'crawler blocked', 'crawlers blocked');
-  if (robots === 0) return plural(n, 'crawler refused', 'crawlers refused');
-  return plural(n, 'crawler blocked or refused', 'crawlers blocked or refused');
+  const word = keptOutWord(verdicts);
+  return plural(n, `crawler ${word}`, `crawlers ${word}`);
 }
 
 function countOf(v: AccountView, changes: readonly Change[]): CountView {
@@ -377,7 +375,7 @@ function since(v: AccountView, site: Site): SinceCellView {
   if (opened.length) {
     pills.push({
       state: PILL.opened,
-      label: `${opened.length} ${allBlocked(v, opened) ? 'blocked' : 'opened'}`,
+      label: `${opened.length} ${allBlocked(v, opened) ? keptOutWord(opened.flatMap((c) => verdictOf(v, c) ?? [])) : 'opened'}`,
     });
   }
   if (resolved.length) pills.push({ state: PILL.resolved, label: `${resolved.length} resolved` });
@@ -635,7 +633,7 @@ function history(v: AccountView, site: Site): HistoryView | null {
     marker: blockedThere.length
       ? {
           index: markAt,
-          label: `${listOf(blockedThere.map((c) => c.ua!))} blocked · ${ai[markAt]}`,
+          label: `${listOf(blockedThere.map((c) => c.ua!))} ${keptOutWord(blockedThere.flatMap((c) => verdictOf(v, c) ?? []))} · ${ai[markAt]}`,
           verdicts: blockedThere.flatMap((c) => verdictOf(v, c) ?? []),
         }
       : null,

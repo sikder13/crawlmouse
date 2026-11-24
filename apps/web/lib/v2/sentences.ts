@@ -95,6 +95,16 @@ export function servedExtent(
     : `, on ${range} of the ${count(sampled)} sampled ${noun}`;
 }
 
+/**
+ * What to call crawlers counted as kept out: "blocked" is what robots.txt does, and a refusal of
+ * our request is a refusal.
+ */
+export function keptOutWord(verdicts: readonly Verdict[]): string {
+  const robots = verdicts.filter((v) => v === 'disallowed_by_robots').length;
+  if (robots === verdicts.length) return 'blocked';
+  return robots === 0 ? 'refused' : 'blocked or refused';
+}
+
 export const meetsEdge = (check: Pick<Check, 'crawlers'>) =>
   check.crawlers.some((c) => c.verdict === 'edge_blocks_automation');
 
@@ -338,7 +348,6 @@ export function seoSummary(check: Check, fixes: readonly Fix[], isOpen: (f: Fix)
 function allInSentence(scored: readonly CrawlerResult[], extent: string): string {
   if (!scored.length) return 'No scored AI crawler was tested.';
   const shares = scored.map((c) => c.text_share);
-  const one = scored.length === 1;
   const all = `${servedAll(scored.length, 'scored')}${extent}`;
   if (shares.some((x) => x === null)) return `${all}.`;
   const share = percent(Math.min(...(shares as number[])));
