@@ -36,7 +36,9 @@ describe('Reports, generated', () => {
         expect(v.scheduled.rows.map((r) => r.key).sort()).toEqual(
           scheduled.map((r) => r.id).sort(),
         );
-        expect(v.header.line).toMatch(new RegExp(`^${live.length} sites? · `));
+        // A staging copy holds no site slot, so the header counts primaries (Owner ruling Q10).
+        const primaries = live.filter((s) => s.staging_of_site_id === null).length;
+        expect(v.header.line).toMatch(new RegExp(`^${primaries} sites? · `));
         const otherHosts = new Set(
           d.sites.filter((s) => s.account_id === other).map((s) => s.host),
         );
