@@ -15,7 +15,14 @@
  * key, is merged, keeping the first in sorted order. A link to a URL the crawl did not fetch is kept:
  * it is how the detectors know the crawl did not see every page it found.
  */
-import type { AccessTest, Coverage, CrawlPage, LinkEdge, PageResult } from '@crawlmouse/types/v2';
+import type {
+  AccessTest,
+  BatchPartialReason,
+  Coverage,
+  CrawlPage,
+  LinkEdge,
+  PageResult,
+} from '@crawlmouse/types/v2';
 import type { CmsName } from '@crawlmouse/types';
 import { classifyPages } from '../../analysis/classify-pages.js';
 import { computeDepth } from '../../analysis/depth.js';
@@ -35,7 +42,7 @@ import type { RenderOutcome } from '../render/run.js';
 import type { Batches } from './batches.js';
 import { fileEdges, landingsOf } from './filing.js';
 import { crawlableDiscovered, crawlableSeeds, landedOn, nextCrawlBatch } from './plan.js';
-import { decideStatus, type StatusDecision } from './status.js';
+import { decideStatus, PARTIAL_RULE, type StatusDecision } from './status.js';
 import type { BuildInput, Seed } from './types.js';
 
 /** The most pages the staged sample holds (ENGINE-GAP §8.4): Coverage's `sample_strategy.max_pages`. */
@@ -303,6 +310,7 @@ export function assemble(
     gradeable: accounting.gradeable,
     excluded: accounting.excluded,
     excluded_by_robots: robotsExcluded,
+    stopped: crawlStopped(batches, crawlOpen, input.check.page_cap),
   };
   return {
     homepage_url: homepage,
@@ -392,4 +400,25 @@ function renderedPages(
     if (p.rendered) out.set(p.url, p.without_js);
   }
   return out;
+}
+
+/**
+ * Why the crawl ended (`coverage.stopped`, inbox 082, 084), from what the planner and the batches
+ * hold: the cap, when the crawl asked for that many URLs (the planner counts every row, fetched or
+ * not); time, when a crawl batch's time budget ran out, or the planner still had URLs to ask and no
+ * crawl batch says why it stopped short (the time plan ended the crawl, or a batch was lost); the site,
+ * when a crawl batch says the site stopped it.
+ */
+function crawlStopped(batches: Batches, crawlOpen: boolean, pageCap: number): Coverage['stopped'] {
+  const reasons = new Set<BatchPartialReason>(
+    batches.crawl.flatMap((b) => b.partial?.reasons ?? []),
+  );
+  const asked = batches.crawl.reduce((n, b) => n + b.pages.length, 0);
+  const crawlReason = [...reasons].some((r) => PARTIAL_RULE[r].crawl);
+  return {
+    page_cap: pageCap,
+    at_cap: asked >= pageCap,
+    time_ran_out: reasons.has('budget_seconds') || (crawlOpen && !crawlReason),
+    site_stopped: reasons.has('site_stopped'),
+  };
 }

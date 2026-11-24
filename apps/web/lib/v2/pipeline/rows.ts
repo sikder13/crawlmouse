@@ -106,14 +106,19 @@ function contractRecord<T>(schema: ObjectSchema<T>, row: Row, derived: Row = {})
  */
 const PROGRESS_ADDED = { waiting_since: null, sitemap_urls: null, robots_txt: null } as const;
 
+/**
+ * The field a check's coverage gained after rows were first written with it (inbox 084): a row
+ * written before then lacks it, and is read with `stopped: null`, which says no reason is known.
+ */
+const COVERAGE_ADDED = { stopped: null } as const;
+
+const isRecord = (v: unknown): v is Row => typeof v === 'object' && v !== null && !Array.isArray(v);
+
 export function checkFromRow(row: Row): Check {
-  const progress = row.progress;
-  if (typeof progress !== 'object' || progress === null || Array.isArray(progress)) {
-    return contractRecord(CheckSchema, row);
-  }
-  return contractRecord(CheckSchema, row, {
-    progress: { ...PROGRESS_ADDED, ...(progress as Row) },
-  });
+  const derived: Row = {};
+  if (isRecord(row.progress)) derived.progress = { ...PROGRESS_ADDED, ...row.progress };
+  if (isRecord(row.coverage)) derived.coverage = { ...COVERAGE_ADDED, ...row.coverage };
+  return contractRecord(CheckSchema, row, derived);
 }
 export const pageResultFromRow = (row: Row): PageResult => contractRecord(PageResultSchema, row);
 export const linkEdgeFromRow = (row: Row): LinkEdge => contractRecord(LinkEdgeSchema, row);

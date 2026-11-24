@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import cleanSite from '../../fixtures/v2/clean-site.json';
 import {
   checkFromRow,
   diffInputsFromRow,
@@ -108,6 +109,20 @@ describe('checkFromRow', () => {
       robots_txt: 'not_found',
     };
     expect(checkFromRow(running(progress)).progress).toEqual(progress);
+  });
+
+  // Inbox 084: coverage gained `stopped`; a check written before it is read with stopped: null.
+  it('reads a check whose coverage was written before `stopped` with stopped: null, and keeps a newer one', () => {
+    const check = cleanSite.checks.find((c) => c.coverage !== null)!;
+    const older = Object.fromEntries(
+      Object.entries(check.coverage!).filter(([key]) => key !== 'stopped'),
+    );
+    expect(checkFromRow({ ...check, coverage: older }).coverage).toEqual({
+      ...check.coverage,
+      stopped: null,
+    });
+    expect(checkFromRow({ ...check }).coverage).toEqual(check.coverage);
+    expect(check.coverage!.stopped).not.toBeNull();
   });
 
   it('still refuses a progress field the contract does not define', () => {
