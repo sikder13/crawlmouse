@@ -402,6 +402,18 @@ const ROWS: readonly RowInput[] = [
     stepAt: [51, 57],
   },
   {
+    file: 'inngest/competitors.ts',
+    id: 'crawlmouse.competitors.compare',
+    onFailure: false,
+    callSites: 6,
+    registration: 'V2_PIPELINE+V2_CHECKS_PUBLIC',
+    trigger: 'check.finished, competitors.requested',
+    steps: 1,
+    stepsHow:
+      'plan, for a site with no competitors; with 3, up to 33 (start-{n}, wait-{n}, ended-{n}, write) and 3 competitor checks',
+    stepAt: [77, 86],
+  },
+  {
     file: 'inngest/sentinel.ts',
     id: 'crawlmouse.sentinel.tick',
     onFailure: false,
@@ -770,6 +782,7 @@ export const FINISHED_FAN_OUT = [
   'crawlmouse.mail.check-notify',
   'crawlmouse.events.check-finished',
   'crawlmouse.ledger.write',
+  'crawlmouse.competitors.compare',
 ] as const;
 /** The executions one finished check's fan-out costs: each function's run and its steps. */
 export const finishedFanOut = (): number =>
