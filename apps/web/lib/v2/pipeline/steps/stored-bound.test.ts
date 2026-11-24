@@ -1,5 +1,6 @@
 import { BatchResultSchema, type BatchResult, type LinkEdge } from '@crawlmouse/types/v2';
-import { describe, expect, it } from 'vitest';
+import { totalmem } from 'node:os';
+import { describe, expect, it, vi } from 'vitest';
 import {
   LARGE_CHECK_OTHER_EDGES_PER_PAGE,
   MAX_OTHER_EDGES_PER_PAGE,
@@ -115,6 +116,21 @@ describe('loadResultsForBuild (F-248)', () => {
     expect(ownEdgeBoundFor(2048)).toBe(100_000);
     expect(ownEdgeBoundFor(4096)).toBe(250_000);
     expect(buildMemoryMb()).toBeGreaterThan(0);
+  });
+
+  it('reads memory as the smaller of the container’s limit and the machine’s, the machine’s when there is no limit', () => {
+    const machine = Math.floor(totalmem() / 2 ** 20);
+    const limit = vi.spyOn(process, 'constrainedMemory');
+    try {
+      limit.mockReturnValue(2048 * 2 ** 20);
+      expect(buildMemoryMb()).toBe(Math.min(2048, machine));
+      limit.mockReturnValue(0);
+      expect(buildMemoryMb()).toBe(machine);
+      limit.mockReturnValue(Number.MAX_SAFE_INTEGER);
+      expect(buildMemoryMb()).toBe(machine);
+    } finally {
+      limit.mockRestore();
+    }
   });
 
   it('fails the check build_failed, by name, when the own-page edges pass their bound', async () => {
