@@ -73,8 +73,8 @@ export default function BotPage() {
               never produces a Googlebot result.
             </li>
             <li>
-              For each sampled page we also send one comparison request with an ordinary browser user agent,
-              with no Crawlmouse tag and no{' '}
+              For each sampled page we also send one comparison request with an ordinary browser
+              user agent, with no Crawlmouse tag and no{' '}
               <code className="font-mono text-sm bg-oat px-1.5 py-0.5 rounded">{FROM_HEADER}</code>{' '}
               header, to tell a rule about one crawler from a site that refuses all automation.
             </li>
