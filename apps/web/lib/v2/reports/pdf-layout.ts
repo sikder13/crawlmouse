@@ -325,10 +325,13 @@ class Flow {
   }
 
   /** One string as a paragraph across the page's width. */
-  paragraph(text: string, source: number, style: TextStyle): void {
+  /**
+   * A paragraph that fits on a page is not split by a page's footer (F-126); a longer one runs on.
+   * `keepWhole` is false for a section's first paragraph: its heading has already been kept with it.
+   */
+  paragraph(text: string, source: number, style: TextStyle, keepWhole = true): void {
     const columns = [{ x: MARGIN.x, pieces: [this.piece(text, source, style, WIDTH)] }];
-    // A paragraph that fits on a page is not split by a page's footer (F-126); a longer one runs on.
-    this.keep(Flow.heightOf(columns));
+    if (keepWhole) this.keep(Flow.heightOf(columns));
     this.columns(columns);
   }
 
@@ -427,10 +430,10 @@ function side(flow: Flow, sources: Sources, s: DocSide, x: number, width: number
   };
 }
 
-function block(flow: Flow, measure: Measure, sources: Sources, b: DocBlock): void {
+function block(flow: Flow, measure: Measure, sources: Sources, b: DocBlock, first = false): void {
   switch (b.type) {
     case 'text':
-      flow.paragraph(b.text, sources.take(), STYLE.body);
+      flow.paragraph(b.text, sources.take(), STYLE.body, !first);
       return;
     case 'facts': {
       const labelWidth = WIDTH * 0.38;
@@ -491,16 +494,21 @@ export function drawDoc(doc: ReportDoc, measure: Measure, sink: PdfSink): void {
   for (const section of doc.sections) {
     flow.space(GAP.section);
     const heading = flow.piece(section.heading, sources.take(), STYLE.heading, WIDTH);
-    // A heading is not left alone at the foot of a page.
-    flow.keep(
-      Flow.heightOf([{ x: MARGIN.x, pieces: [heading] }]) + RULE_HEIGHT + 3 * STYLE.body.leading,
-    );
+    // A heading is not left alone at the foot of a page. When the section opens with a paragraph,
+    // the heading is kept with the whole of it if both fit on a page; otherwise with its first lines.
+    const headHeight = Flow.heightOf([{ x: MARGIN.x, pieces: [heading] }]) + RULE_HEIGHT;
+    const opening = section.blocks[0];
+    if (opening?.type === 'text') {
+      const lines = flow.piece(opening.text, -1, STYLE.body, WIDTH);
+      flow.keep(headHeight + GAP.block + Flow.heightOf([{ x: MARGIN.x, pieces: [lines] }]));
+    }
+    flow.keep(headHeight + 3 * STYLE.body.leading);
     flow.rule();
     flow.columns([{ x: MARGIN.x, pieces: [heading] }]);
-    for (const b of section.blocks) {
+    section.blocks.forEach((b, i) => {
       flow.space(GAP.block);
-      block(flow, measure, sources, b);
-    }
+      block(flow, measure, sources, b, i === 0);
+    });
   }
 
   if (doc.notMeasured.length) {

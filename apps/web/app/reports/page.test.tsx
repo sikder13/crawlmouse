@@ -244,7 +244,7 @@ describe('/reports', () => {
     const html = await page({ notice: 'share_made' });
     expect(rowOf(html, ids.proof)!.text).toContain(`https://crawlmouse.com/s/${token}`);
     expect(html.split(token)).toHaveLength(2);
-    // F-125: the link has a button that copies it, and the token is still written once.
+    // F-125: the link has a button beside it (what it copies: __tests__/v2/reports-copy-link.dom.test.tsx).
     expect(html).toContain('Copy link');
     expect(html).toContain(
       'The link is made. It is shown on its report’s row for two minutes: copy it now.',

@@ -181,6 +181,31 @@ describe('drawDoc', () => {
     for (const i of instances) expect(new Set(i.pages).size, i.text.slice(0, 4)).toBe(1);
   });
 
+  it('never leaves a section’s heading alone at the foot of a page, whatever its first paragraph', () => {
+    const filler = 'One short line.';
+    for (let fillers = 0; fillers < 60; fillers += 1) {
+      for (const words of [10, 80, 160, 400]) {
+        const para = Array.from({ length: words }, (_, n) => `w${n}`).join(' ');
+        const d = doc({
+          sections: [
+            {
+              heading: 'Fill',
+              blocks: Array.from({ length: fillers }, () => ({
+                type: 'text' as const,
+                text: filler,
+              })),
+            },
+            { heading: 'Opening', blocks: [{ type: 'text', text: para }] },
+          ],
+        });
+        const drawn = expectDrawsTheDocument(d, draw(d));
+        const heading = drawn.find((i) => i.text === 'Opening')!;
+        const opening = drawn.find((i) => i.text === para)!;
+        expect(opening.pages[0], `${fillers} × ${words}`).toBe(heading.pages.at(-1));
+      }
+    }
+  });
+
   it('marks each not-measured sentence, after a rule', () => {
     const d = doc({
       notMeasured: ['Text without JavaScript was not measured.', 'Tested 6 of 7 signals'],
