@@ -241,6 +241,16 @@ const ROWS: readonly RowInput[] = [
   },
   // ── V2_CHECKS_PUBLIC ──
   {
+    file: 'inngest/trial-clock.ts',
+    id: 'crawlmouse.trial.clock',
+    onFailure: false,
+    callSites: 4,
+    registration: 'V2_CHECKS_PUBLIC',
+    cron: '20 * * * *',
+    steps: 2,
+    stepsHow: 'now, due; then two per due account, none when nothing is due',
+  },
+  {
     file: 'inngest/deletion.ts',
     id: 'crawlmouse.account.deletion-cancel',
     onFailure: false,
@@ -281,7 +291,7 @@ const ROWS: readonly RowInput[] = [
     trigger: 'email.requested',
     steps: 1,
     stepsHow: 'send',
-    stepAt: [115],
+    stepAt: [119],
   },
   {
     file: 'inngest/mail.ts',
@@ -292,7 +302,7 @@ const ROWS: readonly RowInput[] = [
     trigger: 'check.notify_requested, check.finished, check.failed',
     steps: 1,
     stepsHow: 'send',
-    stepAt: [126],
+    stepAt: [130],
   },
   {
     file: 'inngest/mail.ts',
@@ -303,7 +313,7 @@ const ROWS: readonly RowInput[] = [
     trigger: 'fix.email_developer_requested',
     steps: 1,
     stepsHow: 'send',
-    stepAt: [137],
+    stepAt: [141],
   },
   {
     file: 'inngest/mail.ts',
@@ -314,7 +324,7 @@ const ROWS: readonly RowInput[] = [
     trigger: 'check.finished',
     steps: 1,
     stepsHow: 'capture',
-    stepAt: [153],
+    stepAt: [159],
   },
   {
     file: 'inngest/mail.ts',
@@ -335,7 +345,7 @@ const ROWS: readonly RowInput[] = [
     trigger: 'seat.invite.requested',
     steps: 1,
     stepsHow: 'send',
-    stepAt: [164],
+    stepAt: [170],
   },
   {
     file: 'inngest/mail.ts',
@@ -346,7 +356,7 @@ const ROWS: readonly RowInput[] = [
     trigger: 'report.confirmation.requested',
     steps: 1,
     stepsHow: 'send',
-    stepAt: [182],
+    stepAt: [188],
   },
   {
     file: 'inngest/mail.ts',
@@ -357,7 +367,7 @@ const ROWS: readonly RowInput[] = [
     trigger: 'report.send.requested',
     steps: 1,
     stepsHow: 'send',
-    stepAt: [195],
+    stepAt: [201],
   },
   {
     file: 'inngest/report-schedules.ts',

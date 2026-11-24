@@ -38,7 +38,12 @@ const down = (host: string) => hostTakenDown(postgrestOver(db), normalizeDomain(
 
 describe('hostTakenDown', () => {
   it('is true for the host, however it is written', async () => {
-    for (const host of ['taken.example', 'www.taken.example', 'WWW.Taken.Example.']) {
+    for (const host of [
+      'taken.example',
+      'www.taken.example',
+      'WWW.Taken.Example.',
+      'taken.example..',
+    ]) {
       expect(await down(host), host).toBe(true);
     }
   });
