@@ -76,6 +76,7 @@ export const OPTIONAL_ENV: Why = {
   INNGEST_ALERT_CONCURRENCY: "unset uses inngest/alerts.ts's default",
   INNGEST_SUMMARY_CONCURRENCY: "unset uses inngest/summary.ts's default",
   INNGEST_COMPETITOR_CONCURRENCY: "unset uses inngest/competitors.ts's default",
+  INNGEST_SENTINEL_CONCURRENCY: "unset uses inngest/sentinel.ts's default",
   NEXT_PUBLIC_POSTHOG_HOST: 'unset uses the /ingest proxy default',
   SENTRY_AUTH_TOKEN: 'build-time source-map upload; unset ships without source maps',
   SIGNIN_CANARY_TO:

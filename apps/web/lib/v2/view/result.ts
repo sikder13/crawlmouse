@@ -52,6 +52,7 @@ import {
   meetsEdge,
   seoSummary,
   clientRenderedTemplates,
+  crawledAll,
   verbFor,
 } from '../sentences';
 import { capitalise, count, numberWord, plural } from '../words';
@@ -434,7 +435,9 @@ function structureDoor(
   ].filter(Boolean) as string[];
   const lead = problems.length
     ? `${capitalise(problems.join(', '))}.`
-    : 'No orphan pages, every page within three clicks, varied anchor text.';
+    : crawledAll(check)
+      ? 'No orphan pages, every page within three clicks, varied anchor text.'
+      : 'Of the pages crawled: no orphans, every one within three clicks, varied anchor text.';
   const hubs = `${capitalise(numberWord(s.hubs))} ${plural(s.hubs, 'hub carries', 'hubs carry')} ${percent(s.hub_pagerank_share)}% of the site's PageRank.`;
   const crawled = check.coverage!.pages_crawled;
   return {
@@ -1040,14 +1043,37 @@ function crawlerRows(check: Check): CrawlerRowView[] {
   }));
 }
 
-/** "All 214 pages crawled", or "96 of 140 pages crawled" when the crawl stopped short. */
-function crawledLine(check: Check, answeredIfNoneServed: number | null) {
-  const { pages_crawled: crawled, pages_discovered: found } = check.coverage!;
+/**
+ * Answers that say an address has no page: such an address is not a page of the site (F-244). The
+ * engine's GONE_STATUSES (packages/engine/src/v2/detectors/thresholds.ts), held equal to it by
+ * crawled-line.test.ts; not imported, so this view stays out of the engine's modules.
+ */
+export const NOT_FOUND_STATUSES: readonly number[] = [404, 410];
+
+/**
+ * "All 214 pages crawled", or "96 of 140 pages crawled" when the crawl stopped short, counting only
+ * pages: an address that answered 404 or 410 is crawled and found, but it is not a page, so it comes
+ * off both sides and is named after them ("All 21 pages crawled; 2 addresses answered not found").
+ * `coverage.pages_crawled` keeps counting every address fetched, as the engine and the diff use it.
+ */
+function crawledLine(
+  check: Check,
+  answeredIfNoneServed: number | null,
+  statuses: readonly (number | null)[],
+) {
+  const { pages_crawled, pages_discovered } = check.coverage!;
   if (answeredIfNoneServed !== null)
     return `${count(answeredIfNoneServed)} ${plural(answeredIfNoneServed, 'page', 'pages')} answered, none served`;
-  return crawled === found
-    ? `All ${count(found)} ${plural(found, 'page', 'pages')} crawled`
-    : `${count(crawled)} of ${count(found)} pages crawled`;
+  const notFound = statuses.filter((s) => s !== null && NOT_FOUND_STATUSES.includes(s)).length;
+  const crawled = pages_crawled - notFound;
+  const found = pages_discovered - notFound;
+  const pages =
+    crawled === found
+      ? `All ${count(found)} ${plural(found, 'page', 'pages')} crawled`
+      : `${count(crawled)} of ${count(found)} pages crawled`;
+  return notFound === 0
+    ? pages
+    : `${pages}; ${count(notFound)} ${plural(notFound, 'address', 'addresses')} answered not found or gone`;
 }
 
 export interface ResultOptions {
@@ -1146,7 +1172,11 @@ export function resultView(
     state: 'result',
     variant: withheld ? 'withheld' : clean ? 'clean' : 'issues',
     domain: site.host,
-    crawledLine: crawledLine(check, notServed ? pageRows.length : null),
+    crawledLine: crawledLine(
+      check,
+      notServed ? pageRows.length : null,
+      pageRows.map((p) => p.status_code),
+    ),
     competitorPrompt: check.crawlers.filter(isAi).some((c) => c.verdict !== 'not_measured'),
     crawledAt: dateTimeUtc(check.finished_at!),
     keptUntil: keptUntil ? dayTimeUtc(keptUntil) : null,

@@ -64,7 +64,7 @@ function expectOwn(
 describe('social metadata of the CC-29 public pages', () => {
   it('/agencies', async () => {
     const { metadata } = await import('../../app/agencies/page');
-    const v = agenciesView({ billing: false, accountDoor: false });
+    const v = agenciesView({ billing: false, agencySales: false, accountDoor: false });
     expectOwn(metadata, {
       url: '/agencies',
       title: v.title + SUFFIX,

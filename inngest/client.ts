@@ -76,6 +76,9 @@ type Events = {
   // Row 18: for a member's change of a site's competitor list (the site edit route is to send it);
   // competitors.ts audits the list against the site's latest ended check. Names the site only.
   'competitors.requested': { data: { siteId: string } };
+  // Row 23: the sentinel's hourly tick asks for one watch of a paid site on a UTC day. Names the
+  // site and the day only.
+  'sentinel.watch': { data: { siteId: string; day: string } };
   // CC-26b: a member asked for a fix's packet to be emailed to a developer
   // (POST /api/fixes/[id]/email-developer). The request, address included, is a
   // fix_email_requests row; the event names that row and no address, so none sits in Inngest's

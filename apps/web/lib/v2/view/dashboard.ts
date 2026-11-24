@@ -949,7 +949,9 @@ export function dashboardView(
   const nextText = nextAt ? `${next ? 'next check' : 'next weekly check'} ${nextAt}` : null;
   const trialEnds = trial ? `trial ends ${dayDate(v.account.trial_ends_at!, zone)}` : null;
   const flight = v.inFlight.filter((f) => f.siteId === primary.id).map((f) => `check ${f.status}`);
-  const sitesWord = `${v.d.sites.length} ${plural(v.d.sites.length, 'site', 'sites')}`;
+  // The sites that hold a slot: a staging copy is not a sixth site (F-097).
+  const slotsHeld = primarySites(v).length;
+  const sitesWord = `${slotsHeld} ${plural(slotsHeld, 'site', 'sites')}`;
   const prev = sinceCheck(v);
 
   const addSite = addSiteAction(v);
