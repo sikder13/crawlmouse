@@ -85,6 +85,14 @@ skipped, and `visual` passes, when every file the branch changed is on the revie
 `.github/workflows/scripts/changes.mjs`. A docs-only or CI-only branch with an open pull request
 therefore costs the cheap jobs only.
 
+Added 2026-11-24 (CTO inbox 105): `fixtures/qa-lab/**` (the QA lab, a separate Vercel project that
+the app never imports or serves) and `tests/journeys/**` (the staging journeys; their pure guard
+specs run in the `test` job, which the gate does not decide). Over the pull requests opened since
+2026-11-23, six changed only paths the widened list skips (#109, #111, #114, #115, #145, #161), and
+their runs ran 274 visual shard jobs. `packages/worker/**` and `infra/**` were already skipped; a
+worker pull request that also changes `packages/engine` or `packages/types` still runs the set,
+because the screens read both.
+
 ## D3 — the crawl screen's budget measures work, not the refresh rate
 
 See `tests/visual/perf.spec.ts`. The three crawl-screen windows were judged on the 95th-percentile
