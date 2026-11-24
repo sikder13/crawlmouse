@@ -23,7 +23,7 @@ import { type FixHrefs } from './fix';
 import type { MapDrawing } from './map';
 import { openFixes, type FixPlan } from './free-fixes';
 import { keptUntilOf } from './result';
-import { isMissing } from './segment/broken';
+import { isMissing, missingGroups, redirected } from './segment/broken';
 import { sectionFixes } from './segment/fixes';
 import { NO_HREFS, SEGMENT_KEYS, SEGMENTS, segmentTab, type SegmentLink } from './segment/frame';
 import { drawingOf } from './segment/structure';
@@ -61,7 +61,7 @@ export interface MapNodeView {
   parent: string | null;
   /** The link the line stands for was made by JavaScript (drawn dashed). */
   js: boolean;
-  /** "missing (404)" for a page that answered 404 or 410, which has no depth; else null. */
+  /** `missingLabel`: for a page that answered 404 or 410, which has no depth; else null. */
   missing: string | null;
 }
 
@@ -159,10 +159,15 @@ const round = (n: number) => Math.round(n * 10) / 10;
 
 /**
  * "missing (404)" for a page that answered one of MISSING_STATUSES (segment/broken.ts, which the
- * Links and pages view reads too); null for any other page.
+ * Links and pages view reads too); "redirects to a missing page (404)" for a URL whose redirects end
+ * at one, which is not itself the missing page; null for any other page.
  */
 export const missingLabel = (page: PageResult): string | null =>
-  isMissing(page) ? `missing (${page.status_code})` : null;
+  !isMissing(page)
+    ? null
+    : redirected(page)
+      ? `redirects to a missing page (${page.status_code})`
+      : `missing (${page.status_code})`;
 
 /** "0.4%" for a small share, "18%" otherwise. */
 const share = (s: number) => (s < 0.01 ? `${(s * 100).toFixed(1)}%` : `${percent(s)}%`);
@@ -465,8 +470,13 @@ export function linkMapView(
   const isGenerated = drawnScope === 'generated';
   const linkCount = isGenerated ? nodes.filter((n) => n.parent).length : s.internal_links;
   // Pages that answered 404 or 410 are counted apart: they are links to pages that are not there.
-  const missingCount = isGenerated ? 0 : records.filter((p) => missingLabel(p) !== null).length;
-  const pageCount = isGenerated ? nodes.length : crawled - missingCount;
+  // They are counted where they answered (segment/broken.ts `missingGroups`, which the Links and
+  // pages view groups by too), so a URL redirecting to a missing page the record also holds is one
+  // missing page, not two. Every record that answered 404 or 410 is taken out of the pages.
+  const missingCount = isGenerated ? 0 : missingGroups(records).length;
+  const pageCount = isGenerated
+    ? nodes.length
+    : crawled - records.filter((p) => missingLabel(p) !== null).length;
   const drawnOf = (pred: (n: MapNodeView) => boolean) => nodes.filter(pred).map((n) => n.path);
   const filter = (
     key: MapFilter['key'],

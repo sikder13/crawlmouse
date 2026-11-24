@@ -4,6 +4,7 @@ import { findCheck, fixture } from '../fixtures';
 import { generatedGraph } from '../generated-graph';
 import { layoutMap } from '../map-layout';
 import { linkMapView, EXPLORER_SVG_MAX } from './link-map';
+import { linksView } from './segment/links';
 import { structureView } from './segment/structure';
 import { FIRST_AUDIT } from './segment/test-helpers';
 
@@ -255,6 +256,40 @@ describe('a page that answered 404 or 410', () => {
     expect(
       linkMapView(copy, id, { scope: 'all', hrefs }).nodes.find((n) => n.path === path)!.missing,
     ).toBe('missing (410)');
+  });
+
+  it('counts a URL redirecting to a missing page the record holds once, as Links and pages does', () => {
+    // /products/old-dome-tent redirects to the missing /products/retired-tent, which the record
+    // also holds: one missing page, reached two ways.
+    const copy = structuredClone(d);
+    const at = (p: string) =>
+      copy.page_results.find((x) => x.check_id === id && new URL(x.url).pathname === p)!;
+    const old = at('/products/old-dome-tent');
+    const retired = at('/products/retired-tent');
+    Object.assign(old, {
+      status_code: 404,
+      final_url: retired.url,
+      redirect: { hops: [{ from: old.url, status: 301, location: retired.url }], loop: false },
+      links_out: 0,
+      links_read: false,
+      content_simhash: null,
+      title: null,
+      meta_description: null,
+    });
+    // Counted here from the record: the distinct URLs where a 404 or 410 answered.
+    const answered = new Set(
+      copy.page_results
+        .filter((p) => p.check_id === id && (p.status_code === 404 || p.status_code === 410))
+        .map((p) => ((p.redirect?.hops.length ?? 0) > 0 ? p.final_url! : p.url)),
+    );
+    expect(answered.size).toBe(1);
+    const v = linkMapView(copy, id, { scope: 'all', hrefs });
+    const links = linksView(copy, id);
+    expect(v.title).toMatch(/, 1 missing, /);
+    expect(links.counts.broken + links.counts.missingUnlinked).toBe(answered.size);
+    expect(v.nodes.find((n) => n.path === '/products/old-dome-tent')?.missing ?? null).not.toBe(
+      'missing (404)',
+    );
   });
 
   it('leaves the title alone on a record with no missing page', () => {
