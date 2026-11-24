@@ -12,8 +12,7 @@ import { formatPlanPrice } from './plan-price';
  * Why Home's paid cards and Sign-up's Pro row state a page limit the artboards do not: the owner's
  * ruling, and the switch that hides it. Here, and read by Home's entries in copy-registry.ts, which imports this module.
  */
-export const PAGE_LIMIT_SOURCE =
-  'Owner ruling of 2026-11-24 (the CTO, "a stranger reads only what works that day"): the paid plans state their page limit, read from GATES through Pricing’s planPages, shown only while the Goal 1 switch shows pages_2000.';
+export const PAGE_LIMIT_SOURCE = `Owner ruling of 2026-11-24, relayed in V2R inbox b/063 ("up to ${planPages('pro', true)} a site" on the Pro and Agency cards, shown only while pages_2000 is)`;
 
 const MASKED =
   'FACTS correction (CC-25 scope 3): Check-email shows the address masked, the local part shortened and the domain whole (lib/auth/mask-email.ts).';
@@ -91,7 +90,7 @@ export const ACCOUNT_DOOR_CHANGES: CopyChange[] = [
     screen: 'signup',
     kind: 'ruling',
     locked: 'Weekly checks, alerts to Slack, up to 5 sites',
-    rendered: `Weekly checks, alerts to Slack, up to 5 sites, up to ${planPages('pro', true)} a site`,
+    rendered: `Weekly checks, alerts to Slack, up to 5 sites of up to ${planPages('pro', true)} each`,
     source: PAGE_LIMIT_SOURCE,
   },
   // ── Check-email, from an audit ────────────────────────────────────────────────────────────

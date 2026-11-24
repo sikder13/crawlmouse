@@ -44,8 +44,11 @@ export function planGroups(features: Features = ALL_SHOWN): PlanGroup[] {
   const proChecks = row(features, [
     { text: `${cap(cadenceOf('pro'))} checks`, capabilities: ['weekly_checks'] },
     ...(pro.slack ? [{ text: 'alerts to Slack', capabilities: ['slack_alerts'] } as Tagged] : []),
-    { text: `up to ${pro.sites} sites`, capabilities: ['sites'] },
-    ...(pages === null ? [] : [{ text: `up to ${pages} a site`, capabilities: [] } as Tagged]),
+    // "up to 5 sites of up to 2,000 pages each"; while `pages_2000` is hidden, the sites alone.
+    {
+      text: `up to ${pro.sites} sites${pages === null ? '' : ` of up to ${pages} each`}`,
+      capabilities: ['sites'],
+    },
   ]);
   const proExtras = cap(
     row(features, [

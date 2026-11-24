@@ -169,7 +169,7 @@ const PRO_SHOWN =
 const AGENCY_SHOWN =
   'Twenty-five client sites, up to 2,000 pages a site, five seats, reports on your domain with your logo, and a one-page audit you can hand to a prospect.';
 const SIGNUP_PRO_LIMITS_SHOWN =
-  'Weekly checks, alerts to Slack, up to 5 sites, up to 2,000 pages a site';
+  'Weekly checks, alerts to Slack, up to 5 sites of up to 2,000 pages each';
 
 const SHOWN_HOME = LOCKED_HOME.map((c) =>
   c.name === 'Pro'
@@ -299,7 +299,7 @@ describe('the page limit follows pages_2000, with the figure from GATES', () => 
     expect(card('Pro').body).toContain(`up to ${figure} pages a site`);
     expect(card('Agency').body).toContain(`up to ${figure} pages a site`);
     expect(tableRows(signupHtml())).toContain(
-      `Weekly checks, alerts to Slack, up to ${GATES.pro.sites} sites, up to ${figure} pages a site`,
+      `Weekly checks, alerts to Slack, up to ${GATES.pro.sites} sites of up to ${figure} pages each`,
     );
     expect(homeHtml()).toContain(`up to ${count(GATES.free.pagesPerCheck)} pages`);
   });
@@ -336,7 +336,7 @@ describe('the page limit follows pages_2000, with the figure from GATES', () => 
       expect(home.match(/up to 3,456 pages a site/g)).toHaveLength(2);
       expect(home).not.toContain('2,000');
       const signup = signupAside(renderToStaticMarkup(<Signup checksPublic={false} />));
-      expect(signup).toContain('up to 3,456 pages a site');
+      expect(signup).toContain('up to 5 sites of up to 3,456 pages each');
       expect(signup).not.toContain('2,000');
     } finally {
       vi.doUnmock('../../entitlement-v2');

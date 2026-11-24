@@ -112,7 +112,7 @@ describe('every number on the door comes from a constant', () => {
     const rows = planGroups().flatMap((g) => g.rows.map((r) => r.what));
     expect(rows).toContain(`One site, up to ${GATES.free.pagesPerCheck} pages, re-checked monthly`);
     expect(rows).toContain(
-      `Weekly checks, alerts to Slack, up to ${GATES.pro.sites} sites, up to ${count(GATES.pro.pagesPerCheck)} pages a site`,
+      `Weekly checks, alerts to Slack, up to ${GATES.pro.sites} sites of up to ${count(GATES.pro.pagesPerCheck)} pages each`,
     );
     expect(rows).toContain('Three complete fixes per audit, with packets');
   });
