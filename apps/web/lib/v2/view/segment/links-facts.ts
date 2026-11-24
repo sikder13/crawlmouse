@@ -309,9 +309,10 @@ function spell(u: string): string {
 
 /**
  * The pages that answered 200 as HTML with more distinct links (`links_out`) than the record holds
- * from them; a page whose reader stopped (`links_read` false) counts only by that test. The worker records a page's links from the URL its request ended at,
- * in the engine's spelling, and counts in `links_out` each distinct link to another URL, a link to
- * the page itself left out; the links held are counted the same way here.
+ * from them; a page whose reader stopped (`links_read` false) counts only by that test. The worker
+ * records a page's links from the URL its request ended at, in the engine's spelling, and counts in
+ * `links_out` each distinct link to another URL, a link to the page itself left out; the links held
+ * are counted the same way here.
  */
 export function linksNotAllHeld(
   pages: readonly PageResult[],
@@ -326,8 +327,11 @@ export function linksNotAllHeld(
   }
   return pages.filter((p) => {
     if (PAGE_CELLS.status_code(p) !== 200 || !p.is_html) return false;
-    // A page whose reader stopped (`links_read` false) is counted only when the links it did count
-    // outnumber the links the record holds from it: its reader stopping alone shows no missing link.
+    // `links_out` is the page's count when its reader finished (`links_read`). When the reader
+    // stopped, it is the links found before it did: a floor, not a count. A floor above the links
+    // held still shows a link missing from the record, so it is tested the same way below. A reader
+    // that stopped having found none shows nothing: its stopping alone shows no missing link.
+    if (!p.links_read && p.links_out === 0) return false;
     const from = new Set([p.url, spell(p.url)]);
     if (p.final_url !== null) [p.final_url, spell(p.final_url)].forEach((u) => from.add(u));
     const to = new Set([...from].flatMap((u) => [...(held.get(u) ?? [])]));
