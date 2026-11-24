@@ -66,7 +66,9 @@ export const isCrawl = (b: BatchResult): b is CrawlBatchResult => b.kind === 'cr
 /**
  * The memory this process may use, in MiB: the smaller of its container's limit
  * (`process.constrainedMemory`, which answers a huge number where there is none) and the machine's.
- * On Vercel's functions the machine is the function, so this is its size. Not
+ * On a Vercel function this is the function instance's size. Under Fluid compute, invocations that
+ * share an instance share its memory, so two builds at once on one instance could hold more than one
+ * build was measured at: the bound is per build, not per instance. Not
  * AWS_LAMBDA_FUNCTION_MEMORY_SIZE: the engine's ensureCrawleeMemoryHint writes 3008 there when it is
  * unset (packages/engine/src/crawler.ts).
  */

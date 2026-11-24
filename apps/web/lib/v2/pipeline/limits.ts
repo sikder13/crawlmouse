@@ -56,9 +56,15 @@ export const LARGE_CRAWL_S_PER_PAGE = 1.7;
  */
 export const LARGE_RESERVE_S = 300;
 
-/** The crawl's ceiling for a check of `pageCap` pages: CRAWL_CEILING_S up to 500, then by the page. */
+/**
+ * The crawl's ceiling for a check of `pageCap` pages: CRAWL_CEILING_S up to 500, then by the page, up to
+ * MAX_PAGE_CAP's. A cap above it is read as MAX_PAGE_CAP: PACE.maxCrawlBatches reads no more, and the
+ * run's finish timeout is sized for it, so a longer plan would be cancelled before its build.
+ */
 export const crawlCeilingS = (pageCap: number): number =>
-  pageCap > LARGE_CHECK_ABOVE ? Math.ceil(pageCap * LARGE_CRAWL_S_PER_PAGE) : CRAWL_CEILING_S;
+  pageCap > LARGE_CHECK_ABOVE
+    ? Math.ceil(Math.min(pageCap, MAX_PAGE_CAP) * LARGE_CRAWL_S_PER_PAGE)
+    : CRAWL_CEILING_S;
 /** The reserve after the last batch for a check of `pageCap` pages. */
 export const reserveS = (pageCap: number): number =>
   pageCap > LARGE_CHECK_ABOVE ? LARGE_RESERVE_S : RESERVE_S;

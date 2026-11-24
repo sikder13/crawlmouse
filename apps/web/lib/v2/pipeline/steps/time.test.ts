@@ -67,7 +67,9 @@ describe('the time plan by page cap (2,000 pages)', () => {
 
   it('the run’s finish timeout is the largest cap’s, so no check is cut short by it', () => {
     expect(PACE.finishS).toBe(finishSFor(MAX_PAGE_CAP));
-    for (const cap of [500, 1000, 2000]) expect(finishSFor(cap)).toBeLessThanOrEqual(PACE.finishS);
+    // A cap past MAX_PAGE_CAP reads no more pages (PACE.maxCrawlBatches) and plans no longer.
+    for (const cap of [500, 1000, 2000, 2001, 100_000])
+      expect(finishSFor(cap)).toBeLessThanOrEqual(PACE.finishS);
   });
 
   it('ends a check’s fetching and its crawl by its own cap’s plan', () => {

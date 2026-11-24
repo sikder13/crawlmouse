@@ -13,9 +13,10 @@ export type Tier = 'free' | 'pro' | 'agency';
 export type PaidTier = Exclude<Tier, 'free'>;
 
 /**
- * Pages read per check on Pro and Agency. Pending re-measurement against the cost model at the load
- * test (CC-39): at the measured 2 requests a second a 2,000-page crawl (1,000 s) does not fit the
- * crawl phase's ceiling, CRAWL_CEILING_S (480 s) (ENGINE-GAP §8.2 proposed 800 on cost grounds).
+ * Pages read per check on Pro and Agency. A check of more than 500 pages gets a crawl of 1.7 s a page
+ * and a longer reserve (`crawlCeilingS`, `reserveS` in lib/v2/pipeline/limits.ts; inbox 079), so a
+ * 2,000-page check has 3,400 s of crawl. Cost against the model is re-measured at the load test
+ * (CC-39).
  */
 export const PAID_PAGES_PER_CHECK = 2000;
 export const FREE_PAGES_PER_CHECK = 500;

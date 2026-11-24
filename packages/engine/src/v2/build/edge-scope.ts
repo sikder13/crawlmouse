@@ -11,12 +11,14 @@
  *   - every edge with generic anchor text is kept, wherever it points: the generic-anchor detector
  *     counts a page's generic links against its `links_out`, so it decides as it would uncut, except
  *     that a page keeping fewer links can be `indeterminate` where it was `not_detected`;
- *   - any other edge to an address the crawl never fetched is kept only up to
- *     MAX_OTHER_EDGES_PER_PAGE per source page, in the order the worker recorded them. Such edges
+ *   - any other edge to an address the crawl never fetched is kept only up to `maxOther` per
+ *     source page (otherEdgesPerPage: 20, or 5 on a check of more than 500 pages), in the order the
+ *     worker recorded them. Such edges
  *     reach no grade; they tell the detectors the crawl left pages unread (`unfetched`). The loader
  *     records how many it left out (`link_edges_dropped`), and `internal_links` counts them;
- *   - when the edges kept whole (to own pages, or generic) pass MAX_OWN_EDGES, the build is not
- *     attempted (OwnEdgesOverBound): a graph that large is not held, and no grade is given from part
+ *   - when the edges kept whole (to own pages, or generic) pass `maxOwn` (ownEdgeBound: 250,000
+ *     with 3.5 GiB of memory or more, 100,000 otherwise), the build is not attempted
+ *     (OwnEdgesOverBound): a graph that large is not held, and no grade is given from part
  *     of one.
  */
 import type { CrawlPage, LinkEdge } from '@crawlmouse/types/v2';
@@ -89,8 +91,8 @@ export const noEdgesKept = (): EdgesKept => ({ own: 0, other: new Map() });
 
 /**
  * A batch's edges over the bound: every edge to `addresses` or with generic anchor text, and up to
- * MAX_OTHER_EDGES_PER_PAGE per source page of the rest. Throws OwnEdgesOverBound once the edges kept
- * whole pass MAX_OWN_EDGES.
+ * `maxOther` per source page of the rest. Throws OwnEdgesOverBound once the edges kept whole pass
+ * `maxOwn`.
  */
 export function boundedEdges(
   edges: readonly LinkEdge[],
