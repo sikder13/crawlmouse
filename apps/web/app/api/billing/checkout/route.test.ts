@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // POST /api/billing/checkout with V2_BILLING=1 (CC-03 D6). The session client, the service-role
 // client and both Stripe clients are fakes; the order of the checks, the refusals and the answers are
@@ -183,6 +183,27 @@ describe('POST /api/billing/checkout, V2_BILLING=1', () => {
     expect(h.sessionsCreate.mock.calls[0]![0]).toMatchObject({
       metadata,
       subscription_data: { metadata },
+    });
+  });
+
+  describe('while paying is kept to one user (V2_BILLING_ONLY_USER)', () => {
+    afterEach(() => {
+      delete process.env.V2_BILLING_ONLY_USER;
+    });
+
+    it('refuses anyone else before any account or Stripe call', async () => {
+      process.env.V2_BILLING_ONLY_USER = 'someone-else';
+      const res = await json({ plan: 'pro', interval: 'month' });
+      expect([res.status, await res.json()]).toEqual([403, { error: 'billing_not_open' }]);
+      expect(h.log).toEqual(['getUser']);
+      expect(h.sessionsCreate).not.toHaveBeenCalled();
+    });
+
+    it('lets that user buy', async () => {
+      process.env.V2_BILLING_ONLY_USER = 'u1';
+      const res = await json({ plan: 'pro', interval: 'month' });
+      expect(res.status).toBe(200);
+      expect(h.sessionsCreate).toHaveBeenCalledTimes(1);
     });
   });
 

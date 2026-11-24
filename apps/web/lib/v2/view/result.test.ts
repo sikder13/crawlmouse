@@ -480,7 +480,7 @@ describe('the third card when there is no fix', () => {
     if (v.first.kind !== 'not-served') throw new Error(`got ${v.first.kind}`);
     expect(v.first.title).toBe('Your site refused our requests');
     expect(v.first.body).toMatch(/^2 pages answered our requests, with 403\./);
-    expect(v.first.action).toBeNull();
+    expect(v.first.action).toEqual({ label: 'Run a new audit', href: '/' });
   });
 
   it('does not call a 404 a refusal', () => {
@@ -530,7 +530,9 @@ describe('the third card when there is no fix', () => {
       ];
     });
     if (v.first.kind !== 'not-served') throw new Error(`got ${v.first.kind}`);
-    expect(v.first.body).toMatch(/^3 pages answered our requests, with 401, 403 or 429\./);
+    expect(v.first.body).toMatch(
+      /^3 pages answered our requests, with 401, 403 or 429 \(“too many requests”/,
+    );
   });
 
   it('does not let a search engine it could not measure stop the all-clear', () => {
@@ -572,7 +574,7 @@ describe('the third card when there is no fix', () => {
       const f = answering([code]).first;
       return f.kind === 'not-served' ? f.body : '';
     };
-    expect(next(403)).toContain('find the firewall or bot rule that answered them');
+    expect(next(403)).toContain('look for a firewall or bot rule');
     expect(next(404)).toContain('Once the site serves its pages');
     expect(next(404)).not.toContain('firewall');
     expect(next(301)).toContain('If the site has moved, run this audit on its new address');
