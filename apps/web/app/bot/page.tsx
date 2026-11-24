@@ -11,8 +11,10 @@ export const metadata = {
 };
 
 /**
- * Every kind of request Crawlmouse sends a site, as data, so a line cannot describe a kind it does
- * not name. `page.test.tsx` holds the values to the worker's identities and the fetchers.
+ * Each kind of request a check can send today. Rendering is absent because `NO_DAILY_BUDGET` refuses
+ * it; the change that enables it adds its row here. `page.test.tsx` pins the strings and the crawl
+ * and control From headers to the worker's identities; `discover.test.ts` and
+ * `verification.test.ts` pin those fetchers' headers. `obeysRobots` is checked by review.
  */
 const REQUESTS: readonly {
   what: string;
@@ -23,14 +25,14 @@ const REQUESTS: readonly {
   obeysRobots: boolean;
 }[] = [
   {
-    what: 'Finding pages: our audit service reads robots.txt and your sitemap files.',
+    what: 'Finding pages: our audit service reads robots.txt and your sitemap files, at the addresses robots.txt or a sitemap names or at common sitemap paths, plus any redirects they follow, which can be on another host.',
     agent: '',
     code: CRAWL_USER_AGENT,
     from: false,
     obeysRobots: false,
   },
   {
-    what: 'Reading robots.txt: the crawler reads it itself, unless it holds a recent copy.',
+    what: 'Reading robots.txt: the crawler reads it itself, plus any redirects it follows, which can be on another host, unless it holds a recent copy.',
     agent: '',
     code: CRAWL_USER_AGENT,
     from: true,

@@ -473,7 +473,7 @@ function howWeCrawl(): HelpArticle {
       ),
       p(
         s(
-          `Our page requests, site-file checks and crawler tests obey the robots.txt groups named ${ours} and ${alias}, and the * group when your file has neither. A request sent as a crawler also obeys that crawler’s own group, and a page that group disallows is not requested.`,
+          `Our page requests, site-file checks and crawler tests obey the robots.txt groups named ${ours} and ${alias}, and the * group when your file has neither. A request sent as a crawler also obeys that crawler’s own group, or the * group when your file has none for it, and a page that group disallows is not requested.`,
         ),
       ),
       p(s(`To keep Crawlmouse out, add this group to your robots.txt:`)),
