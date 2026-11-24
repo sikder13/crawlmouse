@@ -196,5 +196,9 @@ describe('supabaseMailStore.finishedCheck: a competitor’s check (row 18)', () 
       competitor: false,
       accountId: p.accountId,
     });
+    // A site an account keeps, even at its host's competitor id, is that account's audit.
+    const keptHost = `kept-at-competitor-${host}`;
+    const keptThere = await siteWithCheck(competitorSiteId(keptHost), keptHost, p.accountId);
+    expect(await store.finishedCheck(keptThere)).toMatchObject({ competitor: false });
   });
 });
