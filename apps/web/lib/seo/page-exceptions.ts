@@ -28,8 +28,8 @@ export const PAGE_EXCEPTIONS: readonly PageException[] = [
   {
     path: '/agencies',
     rule: 'no-in-link',
-    builds: ['on'],
-    reason: `${OUTSIDE}; "For agencies" is a planned, unlinked item in components/v2/footer-links.ts`,
+    builds: ['off'],
+    reason: `${OUTSIDE}; with the flags off v1's header and footer serve, and neither links it`,
   },
   // v1 home (app/page.tsx): the feature cards' h3s follow the h1 with no h2 between.
   { path: '/', rule: 'heading-skip', builds: ['off'], reason: OUTSIDE },
@@ -105,7 +105,7 @@ export const LIVE_OUTSIDE_SITEMAP: readonly {
   {
     path: '/agency-trial',
     builds: ['on'],
-    reason: 'noindex; answers while V2_BILLING is on (app/agency-trial/page.tsx)',
+    reason: 'noindex; the page itself while V2_BILLING is on (app/agency-trial/page.tsx)',
   },
 ];
 

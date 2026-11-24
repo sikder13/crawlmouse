@@ -126,6 +126,7 @@ export interface DevelopersView {
   title: string;
   description: string;
   h1: string;
+  tagline: string;
   intro: string;
   sample: {
     title: string;
@@ -155,6 +156,7 @@ export function developersView(): DevelopersView {
     title: COPY.title,
     description: COPY.description,
     h1: COPY.h1,
+    tagline: COPY.tagline,
     intro: COPY.intro,
     sample: {
       title: COPY.sample.title,
