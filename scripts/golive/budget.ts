@@ -1,7 +1,7 @@
 /**
- * The Inngest execution budget (CC-35 D2). Inngest's Hobby plan bills each function run and each step
- * (step.run, step.sleep*, step.waitForEvent, step.sendEvent, step.invoke) as one execution, and stops
- * every function once the month's quota is used.
+ * The Inngest execution budget (CC-35 D2). Inngest bills each function run and each step
+ * (step.run, step.sleep*, step.waitForEvent, step.sendEvent, step.invoke) as one execution. On Pro,
+ * executions past the month's included amount are billed; on Hobby they stopped every function.
  *
  * A check's count is not written down here: `checkExecutions` runs the real `runCheck`
  * (inngest/check.ts) against a scripted worker and a counting `step`, so the figure moves when the
@@ -21,10 +21,13 @@ import {
   type PostOutput,
 } from '@crawlmouse/inngest/check';
 
-/** Inngest Hobby, read on inngest.com/pricing on 2026-11-13 (brief F5). */
-export const HOBBY_MONTHLY_EXECUTIONS = 50_000;
-/** D2: with the floor plus 1,000 checks a month above this, the Hobby plan fails the go-live check. */
-export const HOBBY_HEADROOM_LINE = 40_000;
+/**
+ * Inngest Pro's executions included a month, then $50 per further 1,000,000 (Inngest dashboard,
+ * Billing, read 2026-11-23; the owner upgraded on 21 Nov).
+ */
+export const PLAN_MONTHLY_EXECUTIONS = 1_000_000;
+/** D2's line, four fifths of what the plan includes, as it was on Hobby (40,000 of 50,000). */
+export const PLAN_HEADROOM_LINE = 800_000;
 /** The month the totals are computed over: the longest, so the floor is not understated. */
 export const DAYS_PER_MONTH = 31;
 
@@ -118,7 +121,7 @@ const ROWS: readonly RowInput[] = [
     trigger: 'audit.requested',
     steps: 5,
     stepsHow: 'pause-gate, mark-crawling, crawl-and-persist, emit-completed, send-notify-email',
-    stepAt: [357, 361, 376, 378, 386],
+    stepAt: [354, 358, 373, 375, 383],
   },
   {
     file: 'inngest/billing.ts',
@@ -780,8 +783,8 @@ export async function monthlyTotal(checks: number, shape: CheckShape): Promise<n
   return monthlyFloor() + checks * perCheck;
 }
 
-/** D2's rule: the Hobby plan passes only when the floor plus 1,000 typical checks stays at or under the line. */
-export async function hobbyVerdict(): Promise<{ total: number; passes: boolean }> {
+/** D2's rule: the plan passes only when the floor plus 1,000 typical checks stays at or under the line. */
+export async function planVerdict(): Promise<{ total: number; passes: boolean }> {
   const total = await monthlyTotal(1_000, SHAPES[0]!);
-  return { total, passes: total <= HOBBY_HEADROOM_LINE };
+  return { total, passes: total <= PLAN_HEADROOM_LINE };
 }

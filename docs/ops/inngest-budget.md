@@ -3,10 +3,10 @@
 <!-- Rendered by scripts/golive/budget-doc.ts from scripts/golive/budget.ts. Do not edit by hand:
      change the model and run `pnpm --filter @crawlmouse/scripts exec tsx golive/budget-doc.ts --write`. -->
 
-Inngest's Hobby plan allows 50,000 executions a month. Each function run is one
-execution and each step (`step.run`, `step.sleep*`, `step.waitForEvent`, `step.sendEvent`,
-`step.invoke`) is one more. When the quota is used, every function pauses until the next month or an
-upgrade: v1's audits, the checks, the mail and the crons alike (inngest.com/pricing, read 2026-11-13).
+The account is on Inngest Pro, which includes 1,000,000 executions a month and bills $50 for each
+further 1,000,000 (Inngest dashboard, Billing, read 2026-11-23). Each function run is one execution
+and each step (`step.run`, `step.sleep*`, `step.waitForEvent`, `step.sendEvent`, `step.invoke`) is
+one more. On the Hobby plan, before the owner's upgrade on 21 Nov, a used quota paused every function.
 
 How the numbers are made: a check is counted by running the real `runCheck` (`inngest/check.ts`)
 against a scripted worker with a counting `step` (`checkExecutions`). Every other function's steps
@@ -55,7 +55,7 @@ A cron registered under two flags (`V2_PIPELINE+V2_CHECKS_PUBLIC`) starts with t
 
 | Function                             | File                         | Registered with                | Trigger                                              | Steps a run                                                                         | Step calls                                                                                                                                                                                              |
 | ------------------------------------ | ---------------------------- | ------------------------------ | ---------------------------------------------------- | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `crawlmouse.audit`                   | `inngest/audit.ts`           | v1                             | audit.requested                                      | 5 (pause-gate, mark-crawling, crawl-and-persist, emit-completed, send-notify-email) | `inngest/audit.ts:357`, `inngest/audit.ts:361`, `inngest/audit.ts:376`, `inngest/audit.ts:378`, `inngest/audit.ts:386`                                                                                  |
+| `crawlmouse.audit`                   | `inngest/audit.ts`           | v1                             | audit.requested                                      | 5 (pause-gate, mark-crawling, crawl-and-persist, emit-completed, send-notify-email) | `inngest/audit.ts:354`, `inngest/audit.ts:358`, `inngest/audit.ts:373`, `inngest/audit.ts:375`, `inngest/audit.ts:383`                                                                                  |
 | `crawlmouse.stripe-reconcile-manual` | `inngest/billing.ts`         | v1                             | billing.reconcile.requested                          | 1 (reconcile)                                                                       | `inngest/billing.ts:95`                                                                                                                                                                                 |
 | `crawlmouse.check.run`               | `inngest/check.ts`           | V2_PIPELINE                    | check.requested                                      | see the check shapes                                                                | measured                                                                                                                                                                                                |
 | `crawlmouse.check.cancelled`         | `inngest/check.ts`           | V2_PIPELINE                    | inngest/function.cancelled (checkFn)                 | 2 (fail, emit-failed)                                                               | `inngest/check.ts:590`, `inngest/check.ts:592`                                                                                                                                                          |
@@ -119,8 +119,8 @@ the brief measured 85 audits in production in the 30 days to 2026-11-13 (F2), co
 
 ## The rule (CC-35 D2)
 
-The floor plus 1,000 typical checks is **70,145** against the line of 40,000.
-**It is over the line: `golive:check` reports the Hobby plan as a failing precondition of `V2_PIPELINE`, and the owner decides the plan (Pro starts at $99 a month for 1M executions) before step 2.**
+The floor plus 1,000 typical checks is **70,145** against the line of 800,000.
+It is under the line: the Pro plan passes `golive:check`.
 
 The largest part of the floor is `crawlmouse.founder.sweep`, on cron `*/5 * * * *` (17,856 a month).
 

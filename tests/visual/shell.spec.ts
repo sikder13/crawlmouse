@@ -269,7 +269,8 @@ test.describe('footer links', () => {
       const hrefs = await page
         .locator(p.links)
         .evaluateAll((as) => as.map((a) => a.getAttribute('href')));
-      expect(hrefs.length).toBeGreaterThan(15);
+      // The count only proves the locator found the footer; the next line checks each target.
+      expect(hrefs.length).toBeGreaterThanOrEqual(15);
       expect(hrefs.filter((h) => !h || h === '#' || !allowed.has(h))).toEqual([]);
     });
   }

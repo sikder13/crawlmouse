@@ -141,8 +141,8 @@ export const PRECONDITIONS: readonly Precondition[] = [
   },
   {
     id: 'inngest-plan',
-    mustBeTrue: `the Inngest plan holds the floor plus 1,000 checks a month under the D2 line, or the paid plan is ticked (${PAID_PLAN_TICK})`,
-    why: 'on Hobby, running out stops every audit and every mail until the next month (D2)',
+    mustBeTrue: `the Inngest plan holds the floor plus 1,000 checks a month under the D2 line, or the owner has accepted a total over it (${PAID_PLAN_TICK})`,
+    why: 'past what Pro includes, every further 1,000,000 executions is billed at $50 (D2)',
     source: 'docs/ops/inngest-budget.md:1',
     gates: 2,
     owner: 'owner',
@@ -438,6 +438,16 @@ export const PRECONDITIONS: readonly Precondition[] = [
     source: 'docs/specs/v2/03-billing.md:265',
     gates: 5,
     owner: 'owner',
+    check: manual,
+  },
+  {
+    id: 'agency-offers-closed',
+    mustBeTrue:
+      'V2_AGENCY_SALES is unset in Production, and pricing, /agencies, the structured data and llms.txt show Agency as coming, with no button to buy it',
+    why: 'with sales closed the checkout and the trial refuse Agency, so a button that still offers it is a dead end',
+    source: 'apps/web/lib/billing/flags.ts:24',
+    gates: 5,
+    owner: 'CTO',
     check: manual,
   },
   {
