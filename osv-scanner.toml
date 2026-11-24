@@ -35,11 +35,6 @@ ignoreUntil = 2026-11-26
 reason = "Present at the CC-00 baseline: @opentelemetry/propagator-jaeger@2.7.1 (fixed: 2.9.0)"
 
 [[IgnoredVulns]]
-id = "GHSA-mchm-gjx6-7h55"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: @sentry/nextjs@10.53.1 (fixed: 10.75.2)"
-
-[[IgnoredVulns]]
 id = "GHSA-82fw-gwwq-j7x9"
 ignoreUntil = 2026-11-26
 reason = "Present at the CC-00 baseline: @vitest/mocker@2.1.9 (fixed: 4.1.11); vitest@2.1.9 (fixed: 4.1.11)"
