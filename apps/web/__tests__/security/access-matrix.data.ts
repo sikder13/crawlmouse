@@ -1878,6 +1878,7 @@ const LIBS: readonly Spec[] = [
     [
       ['apps/web/lib/v2/agency/schedules-wiring.ts', 'The report-schedule functions’ store.', 1],
       ['apps/web/lib/v2/monitor/functions.ts', 'The alert and summary functions’ stores.', 1],
+      ['apps/web/lib/v2/competitors/functions.ts', 'The competitor audits’ store and requests.', 1],
       ['apps/web/lib/v2/monitor/schedule.ts', 'The scheduled re-check claims.', 1],
       ['apps/web/lib/billing/inngest-functions.ts', 'The billing functions’ stores.', 1],
     ] as const
@@ -2001,6 +2002,7 @@ const LIBS: readonly Spec[] = [
       'apps/web/app/s/view/[reportId]/page.tsx',
       'apps/web/lib/v2/account/deletion-ports.ts',
       'apps/web/lib/v2/account/email-change-ports.ts',
+      'apps/web/lib/v2/competitors/functions.ts',
       'apps/web/lib/v2/reports/mint-deps.ts',
     ],
     proof: by(

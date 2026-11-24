@@ -326,6 +326,10 @@ const INVENTORY: [entry: string, why: string][] = [
     'array slice (a batch of Storage object names) \u2014 cannot split a surrogate pair',
   ],
   [
+    'apps/web/lib/v2/competitors/compare.ts :: return hosts.slice(0, limit);',
+    'array slice (a site\u2019s competitor hosts, to its plan\u2019s limit) \u2014 cannot split a surrogate pair',
+  ],
+  [
     'apps/web/lib/audit-stream-projection.ts :: .slice(0, AI_CLIENT_MAX_FINDINGS),',
     'array slice \u2014 cannot split a surrogate pair',
   ],
