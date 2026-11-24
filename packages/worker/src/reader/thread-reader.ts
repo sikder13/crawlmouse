@@ -1,4 +1,5 @@
 import { Worker, type ResourceLimits } from 'node:worker_threads';
+import type { RenderedReading } from '@crawlmouse/engine/worker';
 import type {
   NotRead,
   PageRead,
@@ -42,23 +43,26 @@ export type ReadMessage =
       bodyCut: boolean;
       finalUrl: string;
       stackHeaders: StackHeaders | null;
-    };
+    }
+  /** A page's two renders, sent as one body: the static side is its first `split` characters. */
+  | { id: number; kind: 'rendered'; body: ArrayBuffer; split: number; pageUrl: string };
 
 export type ReadReply =
-  | { id: number; result: WordCount | PageRead }
+  | { id: number; result: WordCount | PageRead | RenderedReading }
   | { id: number; error: string };
 export type ReadyMessage = { ready: true };
 
 type Ask =
   | { kind: 'words'; bodyCut: boolean }
-  | { kind: 'page'; bodyCut: boolean; finalUrl: string; stackHeaders: StackHeaders | null };
+  | { kind: 'page'; bodyCut: boolean; finalUrl: string; stackHeaders: StackHeaders | null }
+  | { kind: 'rendered'; split: number; pageUrl: string };
 
 interface Read {
   id: number;
   ask: Ask;
   /** Kept to send again to a new thread; the caller holds the same string until the read answers. */
   body: string;
-  resolve: (r: WordCount | PageRead | NotRead) => void;
+  resolve: (r: WordCount | PageRead | RenderedReading | NotRead) => void;
   reject: (e: Error) => void;
 }
 
@@ -113,6 +117,17 @@ export class ThreadReader implements PageReader {
     >;
   }
 
+  rendered(
+    staticHtml: string,
+    renderedHtml: string,
+    pageUrl: string,
+  ): Promise<RenderedReading | NotRead> {
+    return this.send(
+      { kind: 'rendered', split: staticHtml.length, pageUrl },
+      staticHtml + renderedHtml,
+    ) as Promise<RenderedReading | NotRead>;
+  }
+
   async close(): Promise<void> {
     this.disarm();
     const t = this.thread;
@@ -120,7 +135,7 @@ export class ThreadReader implements PageReader {
     if (t) await t.terminate();
   }
 
-  private send(ask: Ask, body: string): Promise<WordCount | PageRead | NotRead> {
+  private send(ask: Ask, body: string): Promise<WordCount | PageRead | RenderedReading | NotRead> {
     return new Promise((resolve, reject) => {
       const read: Read = { id: this.nextId++, ask, body, resolve, reject };
       this.queue.push(read);

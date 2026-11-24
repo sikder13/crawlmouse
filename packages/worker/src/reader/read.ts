@@ -1,3 +1,4 @@
+import type { RenderedReading } from '@crawlmouse/engine/worker';
 import {
   detectCms,
   readContentFeatures,
@@ -112,6 +113,15 @@ export interface PageReader {
     finalUrl: string,
     stackHeaders?: StackHeaders | null,
   ): Promise<PageRead | NotRead>;
+  /**
+   * A page's two renders, read as the engine reads them (`readRendered`). Only the thread reader has
+   * it, because only it stops a read at its deadline; the route that asks refuses without it.
+   */
+  rendered?(
+    staticHtml: string,
+    renderedHtml: string,
+    pageUrl: string,
+  ): Promise<RenderedReading | NotRead>;
   /** Threads started after the first, each because the one before it died or was stopped. */
   readonly restarts?: number;
 }

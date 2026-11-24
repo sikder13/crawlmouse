@@ -36,3 +36,5 @@ export { CRAWLER_REGISTRY_V2 } from './crawler-registry.js';
 export { readPage as readContentFeatures } from './content/read.js';
 export type { ContentFeatures } from './content/read.js';
 export { detectCms } from '../cms-detection/index.js';
+export { readRendered } from './render/page.js';
+export type { RenderedReading } from './render/page.js';

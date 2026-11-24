@@ -1,4 +1,5 @@
 import { parentPort } from 'node:worker_threads';
+import { readRendered } from '@crawlmouse/engine/worker';
 import { readPage, readWords } from './read.js';
 import type { ReadMessage, ReadReply, ReadyMessage } from './thread-reader.js';
 
@@ -18,15 +19,20 @@ port.on('message', (m: ReadMessage) => {
     reply =
       m.kind === 'words'
         ? { id: m.id, result: readWords({ body, bodyCut: m.bodyCut }) }
-        : {
-            id: m.id,
-            result: readPage({
-              body,
-              bodyCut: m.bodyCut,
-              finalUrl: m.finalUrl,
-              stackHeaders: m.stackHeaders,
-            }),
-          };
+        : m.kind === 'rendered'
+          ? {
+              id: m.id,
+              result: readRendered(body.slice(0, m.split), body.slice(m.split), m.pageUrl),
+            }
+          : {
+              id: m.id,
+              result: readPage({
+                body,
+                bodyCut: m.bodyCut,
+                finalUrl: m.finalUrl,
+                stackHeaders: m.stackHeaders,
+              }),
+            };
   } catch (e) {
     reply = { id: m.id, error: e instanceof Error ? e.message : String(e) };
   }
