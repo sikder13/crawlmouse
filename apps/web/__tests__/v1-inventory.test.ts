@@ -203,6 +203,7 @@ describe('the finders see what they claim to see', () => {
       'app/audit/[id]/structure/page.tsx',
       'app/changes/page.tsx',
       'app/check/[question]/page.tsx',
+      'app/competitors/page.tsx',
       'app/dashboard/v2/page.tsx',
       'app/help/[slug]/page.tsx',
       'app/help/page.tsx',

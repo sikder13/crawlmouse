@@ -1412,6 +1412,19 @@ const ENTRIES: readonly Spec[] = [
     ),
   },
   {
+    path: 'apps/web/app/competitors/page.tsx',
+    v2: true,
+    identity: 'signed-in seat, in its viewer account',
+    gate: 'member_for_site',
+    detail:
+      'Redirects to the Signals page of the first site the seat covers with a competitor named (row 18).',
+    check: at('lib/v2/account/dataset.ts', 'sitesInScope'),
+    proof: by(
+      'app/competitors/page.test.tsx',
+      'goes to the latest check’s Signals page of the site with a competitor named',
+    ),
+  },
+  {
     path: 'apps/web/app/seats/page.tsx',
     v2: true,
     identity: 'signed-in seat, in its viewer account',

@@ -27,8 +27,8 @@ when:
 Not read: anything outside those roots, `scripts/` included. The files there that name the
 service-role factory or key: `grep -rlE "supabaseAdmin|SUPABASE_SERVICE_ROLE_KEY" scripts`.
 
-Rows: 92 route handlers, 56 server entry files that read data, 115 files that
-open a service-role client. By gate: caller 24, capability 65, member 29, member_for_site 26, operator 7, own_rows 42, public 34, seat_may 26, signature 10. Open holes: none.
+Rows: 92 route handlers, 57 server entry files that read data, 115 files that
+open a service-role client. By gate: caller 24, capability 65, member 29, member_for_site 27, operator 7, own_rows 42, public 34, seat_may 26, signature 10. Open holes: none.
 
 What this cannot see: a signed-in seat calling PostgREST or an RPC directly with its own session,
 which row security and grants decide (`infra/supabase/migrations`, tested by the `v2-0*` suites);
@@ -163,6 +163,7 @@ Regenerate: `pnpm --filter @crawlmouse/web exec tsx __tests__/security/access-ma
 | `apps/web/app/(v2-kept)/v2-kept/verify/[id]/page.tsx` | signed-in person | own_rows | `.eq('user_id', …)` in `apps/web/app/verify/[id]/page.tsx` | v1’s verification page in the v2 shell, with V2_CHECKS_PUBLIC on: the caller’s own verification row, filtered by their user id. Another person is a 404; signed out is sent to sign in. | `apps/web/app/(v2-kept)/kept-access.test.tsx` › the owner sees their verification; another signed-in person is a 404; signed out is sent to sign in |
 | `apps/web/app/alerts/page.tsx` | signed-in seat, in its viewer account | member_for_site | `sitesInScope` in `apps/web/lib/v2/account/dataset.ts` | Alerts of the sites the seat covers; the Slack destination only as a boolean. | `apps/web/__tests__/security/access-proof-pages.test.ts` › /alerts: a developer sees the client their seat covers alone, and a stranger neither |
 | `apps/web/app/changes/page.tsx` | signed-in seat, in its viewer account | member_for_site | `sitesInScope` in `apps/web/lib/v2/account/dataset.ts` | Changes on the sites the seat covers. | `apps/web/__tests__/security/access-proof-pages.test.ts` › /changes: a developer sees the client their seat covers alone, and a stranger neither |
+| `apps/web/app/competitors/page.tsx` | signed-in seat, in its viewer account | member_for_site | `sitesInScope` in `apps/web/lib/v2/account/dataset.ts` | Redirects to the Signals page of the first site the seat covers with a competitor named (row 18). | `apps/web/app/competitors/page.test.tsx` › goes to the latest check’s Signals page of the site with a competitor named |
 | `apps/web/app/seats/page.tsx` | signed-in seat, in its viewer account | member_for_site | `sitesInScope` in `apps/web/lib/v2/account/dataset.ts` | The account’s people and the role table; the invite form by role. | `apps/web/__tests__/security/access-proof-pages.test.ts` › /seats: a developer sees the client their seat covers alone, and a stranger neither |
 | `apps/web/app/sites/[id]/page.tsx` | signed-in seat covering the site | member_for_site | `siteOfCaller` in `apps/web/app/sites/[id]/page.tsx` | The site page: `siteOfCaller` reads the site through the session, so a site outside the seat’s scope is a 404. | `apps/web/app/sites/[id]/page.test.tsx` › another account’s site, a removed site, a missing site and a malformed id are each a 404 |
 | `apps/web/app/agency/page.tsx` | signed-in seat, in its viewer account | member_for_site | `sitesInScope` in `apps/web/lib/v2/account/dataset.ts` | The agency matrix of the clients the seat covers. | `apps/web/app/agency/page.test.tsx` › a developer whose seat covers one client sees that client alone, and no form to add one |
