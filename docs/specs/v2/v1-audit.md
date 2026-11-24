@@ -82,12 +82,12 @@ show up through the items that use them (A-7, B-F8).
 | kind | keep | retire | delete | total |
 | --- | ---: | ---: | ---: | ---: |
 | page | 20 | 6 | 0 | 26 |
-| metadata | 23 | 0 | 0 | 23 |
+| metadata | 24 | 0 | 0 | 24 |
 | route | 30 | 9 | 0 | 39 |
 | inngest | 2 | 2 | 0 | 4 |
 | cron | 1 | 1 | 0 | 2 |
 | table | 11 | 7 | 0 | 18 |
-| **all** | 87 | 25 | 0 | 112 |
+| **all** | 88 | 25 | 0 | 113 |
 <!-- /v1-inventory:counts -->
 <!-- prettier-ignore-end -->
 
@@ -171,6 +171,7 @@ rows that matter here are reproduced below so this repository holds the basis of
 | metadata | `app/audit/[id]/changes/not-found.tsx` | keep | 404 of a v2 check's changes tab (F-127): re-exports the overview's, so a private result and a missing id read alike | apps/web/app/audit/[id]/changes/not-found.tsx:1 |
 | metadata | `app/audit/[id]/content/not-found.tsx` | keep | 404 of a v2 check's content tab (F-127): re-exports the overview's, so a private result and a missing id read alike | apps/web/app/audit/[id]/content/not-found.tsx:1 |
 | metadata | `app/audit/[id]/fix/[fixId]/not-found.tsx` | keep | 404 of a v2 check's fix page (F-127): re-exports the overview's, so a private result and a missing id read alike | apps/web/app/audit/[id]/fix/[fixId]/not-found.tsx:1 |
+| metadata | `app/audit/[id]/links/not-found.tsx` | keep | 404 of a v2 check's links tab (F-127): re-exports the overview's, so a private result and a missing id read alike | apps/web/app/audit/[id]/links/not-found.tsx:1 |
 | metadata | `app/audit/[id]/map/not-found.tsx` | keep | 404 of a v2 check's map tab (F-127): re-exports the overview's, so a private result and a missing id read alike | apps/web/app/audit/[id]/map/not-found.tsx:1 |
 | metadata | `app/audit/[id]/nojs/not-found.tsx` | keep | 404 of a v2 check's nojs tab (F-127): re-exports the overview's, so a private result and a missing id read alike | apps/web/app/audit/[id]/nojs/not-found.tsx:1 |
 | metadata | `app/audit/[id]/signals/not-found.tsx` | keep | 404 of a v2 check's signals tab (F-127): re-exports the overview's, so a private result and a missing id read alike | apps/web/app/audit/[id]/signals/not-found.tsx:1 |
