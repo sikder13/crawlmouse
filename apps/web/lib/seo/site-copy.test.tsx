@@ -18,7 +18,13 @@ vi.mock('../fonts', () => ({
 const fixture = JSON.parse(
   readFileSync(join(__dirname, '__fixtures__', 'flags-off-v1.json'), 'utf8'),
 );
-const ON = { V2_ACCOUNT_DOOR: '1', V2_PIPELINE: '1', V2_CHECKS_PUBLIC: '1', V2_BILLING: '1' };
+const ON = {
+  V2_ACCOUNT_DOOR: '1',
+  V2_PIPELINE: '1',
+  V2_CHECKS_PUBLIC: '1',
+  V2_BILLING: '1',
+  V2_AGENCY_SALES: '1',
+};
 
 describe('/llms.txt is built with the site', () => {
   it('is force-static, so the flags it reads are the build\u2019s', async () => {

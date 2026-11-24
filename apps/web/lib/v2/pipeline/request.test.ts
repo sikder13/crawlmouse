@@ -121,6 +121,42 @@ describe('requestCheck (D13)', () => {
     expect([h.rows.size, h.sent.length]).toEqual([0, 0]);
   });
 
+  it('keys a sentinel request on its UTC day, apart from the scheduled check (row 23)', async () => {
+    const h = harness();
+    const req = { siteId: SITE.id, trigger: 'scheduled', sentinelDay: '2026-11-08' } as const;
+    const first = await requestCheck(h.deps, req);
+    h.at(NOON + 11 * 60 * 60 * 1000);
+    const again = await requestCheck(h.deps, req);
+    const scheduled = await requestCheck(h.deps, { siteId: SITE.id, trigger: 'scheduled' });
+    const next = await requestCheck(h.deps, { ...req, sentinelDay: '2026-11-09' });
+    expect(again.checkId).toBe(first.checkId);
+    expect(first.checkId).toBe(checkIdOfKey(`check:${SITE.id}:sentinel:2026-11-08`));
+    expect(new Set([first.checkId, scheduled.checkId, next.checkId]).size).toBe(3);
+    expect(h.rows.get(first.checkId)?.trigger).toBe('scheduled');
+    expect(h.sent[0]!.id).toBe(`check:${SITE.id}:sentinel:2026-11-08`);
+  });
+
+  it('keys a sentinel request on a site with no next_check_at', async () => {
+    const h = harness({ ...SITE, next_check_at: null });
+    const r = await requestCheck(h.deps, {
+      siteId: SITE.id,
+      trigger: 'scheduled',
+      sentinelDay: '2026-11-08',
+    });
+    expect(r.created).toBe(true);
+  });
+
+  it.each([
+    ['a site no account keeps', { ...SITE, account_id: null }, '2026-11-08'],
+    ['a day that is not a date', SITE, '2026-11-08T00:00'],
+  ])('refuses a sentinel request for %s', async (_, site, day) => {
+    const h = harness(site);
+    await expect(
+      requestCheck(h.deps, { siteId: SITE.id, trigger: 'scheduled', sentinelDay: day }),
+    ).rejects.toThrow(/sentinel/);
+    expect(h.rows.size).toBe(0);
+  });
+
   it('keys re-checks and deploys on their own buckets', () => {
     const k = { siteId: SITE.id, kept: true, now: NOON + 599_999, nextCheckAt: null };
     expect(bucketedKey({ ...k, trigger: 'fix_recheck' })).toBe(
