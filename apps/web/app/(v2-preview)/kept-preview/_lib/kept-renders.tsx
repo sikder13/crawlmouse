@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react';
 import { keptPage } from '@/app/(v2-kept)/_lib/KeptShell';
+import { legalPage } from '@/app/(v2-kept)/_lib/LegalShell';
 import { KeptAiReadinessChecker } from '@/app/(v2-kept)/_lib/KeptAiReadinessChecker';
 import { ArticleLayout } from '@/components/blog/ArticleLayout';
-import { LegalPage } from '@/components/legal/LegalPage';
 
 const params = (slug: string) => ({ params: Promise.resolve({ slug }) });
 
@@ -25,10 +25,9 @@ export const KEPT_RENDERS: Record<string, () => Promise<ReactNode>> = {
   guides: async () => keptPage((await import('@/app/guides/page')).default()),
   login: async () => keptPage((await import('@/app/login/page')).default()),
   status: async () => keptPage((await import('@/app/status/page')).default()),
-  takedown: async () => keptPage((await import('@/app/takedown/page')).default()),
-  privacy: async () => keptPage((await import('@/app/privacy/page')).default(), [LegalPage]),
-  terms: async () => keptPage((await import('@/app/terms/page')).default(), [LegalPage]),
-  aup: async () => keptPage((await import('@/app/aup/page')).default(), [LegalPage]),
-  subprocessors: async () =>
-    keptPage((await import('@/app/subprocessors/page')).default(), [LegalPage]),
+  takedown: async () => legalPage((await import('@/app/takedown/page')).default()),
+  privacy: async () => legalPage((await import('@/app/privacy/page')).default()),
+  terms: async () => legalPage((await import('@/app/terms/page')).default()),
+  aup: async () => legalPage((await import('@/app/aup/page')).default()),
+  subprocessors: async () => legalPage((await import('@/app/subprocessors/page')).default()),
 };

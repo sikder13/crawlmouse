@@ -156,6 +156,7 @@ function pages(env: Env): [string, string][] {
   const flags = {
     accountDoor: authFlags.accountDoorEnabled(env),
     checksPublic: authFlags.checksPublicEnabled(env),
+    billing: true,
   };
   const pricing = VIEWERS.map(
     ([name, viewer]) =>
@@ -280,6 +281,7 @@ describe('the Pro column’s words follow its button, under each flag combinatio
     const flags = {
       accountDoor: authFlags.accountDoorEnabled(env),
       checksPublic: authFlags.checksPublicEnabled(env),
+      billing: true,
     };
     for (const [name, viewer] of VIEWERS) {
       for (const interval of ['month', 'year'] as const) {
@@ -328,6 +330,7 @@ describe('the Agency Plus fallback', () => {
       const flags = {
         accountDoor: authFlags.accountDoorEnabled(env),
         checksPublic: authFlags.checksPublicEnabled(env),
+        billing: true,
       };
       const html = renderToStaticMarkup(
         <PricingScreen view={pricingView({ kind: 'signed_out' }, 'month', NOW, flags)} />,

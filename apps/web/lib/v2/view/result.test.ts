@@ -153,6 +153,39 @@ describe('the content door’s sentences', () => {
   });
 });
 
+describe('the first fix’s estimated effect', () => {
+  it('prints the score after it to two places', () => {
+    const v = view('bad-site', (c, d) => {
+      c.technical_seo!.score = 81.57;
+      for (const f of d.fixes) {
+        f.effect.ai_readability = 0;
+        f.effect.technical_seo = 1.35;
+      }
+    });
+    if (v.first.kind !== 'fix') throw new Error(`got ${v.first.kind}`);
+    expect(v.first.body).toContain('Technical SEO 81.57 → 82.92, estimated.');
+    expect(allText(v)).not.toMatch(/\d\.\d{3,}/);
+  });
+
+  it('prints the AI readability score after it to two places', () => {
+    expect(40.1 + 0.2).not.toBe(40.3);
+    const v = view('bad-site', (c, d) => {
+      Object.assign(c.ai_readability!, {
+        withheld: false,
+        withheld_reasons: [],
+        total: 40.1,
+        grade: 'D',
+      });
+      for (const f of d.fixes) {
+        f.effect.ai_readability = 0.2;
+        f.effect.ai_readability_pending_on = [];
+      }
+    });
+    if (v.first.kind !== 'fix') throw new Error(`got ${v.first.kind}`);
+    expect(v.first.body).toContain('AI readability 40.1 → 40.3, estimated.');
+  });
+});
+
 describe('the clean bill’s all-clear card', () => {
   const allClear = (v: ResultView) => {
     if (v.first.kind !== 'all-clear') throw new Error('Not a clean bill');

@@ -53,9 +53,9 @@ const ALL_ON = () => {
 describe('GET /og/<card>', () => {
   // Each card's title, independently of the registry: the page's own title source.
   const TITLES: [string, string, string][] = [
-    ['pricing', 'Pricing', 'V2_BILLING'],
-    ['developers', DEVELOPERS_COPY.title, 'V2_BILLING'],
-    ['agencies', AGENCIES_COPY.title, 'V2_BILLING'],
+    ['pricing', 'Pricing', 'either'],
+    ['developers', DEVELOPERS_COPY.title, 'either'],
+    ['agencies', AGENCIES_COPY.title, 'either'],
     ['check-gptbot', CHECK_COPY.gptbot.title, 'V2_CHECKS_PUBLIC'],
     ['check-javascript', CHECK_COPY.javascript.title, 'V2_CHECKS_PUBLIC'],
     ['check-robots-ai', CHECK_COPY['robots-ai'].title, 'V2_CHECKS_PUBLIC'],
@@ -80,7 +80,9 @@ describe('GET /og/<card>', () => {
       height: 630,
       headers: { 'CDN-Cache-Control': 'public, max-age=86400' },
     });
-    const markup = renderToStaticMarkup(res.element!).replace(/&#x27;/g, "'");
+    const markup = renderToStaticMarkup(res.element!)
+      .replace(/&#x27;/g, "'")
+      .replace(/&amp;/g, '&');
     expect(markup).toContain(`>${title}<`);
     expect(markup).toContain(`crawlmouse.com${SOCIAL_CARDS[card]!.path}`);
     expect(markup).not.toMatch(/internal.linking/i);
@@ -89,11 +91,26 @@ describe('GET /og/<card>', () => {
 
   it.each(TITLES)('%s: a 404 while its page’s flag is off', async (card, _title, flag) => {
     ALL_ON();
-    vi.stubEnv(flag, '');
+    for (const name of flag === 'either' ? ['V2_BILLING', 'V2_CHECKS_PUBLIC'] : [flag]) {
+      vi.stubEnv(name, '');
+    }
     const res = await get(card);
     expect(res.status).toBe(404);
     // Nothing tells the CDN to keep the 404, so the card is served once its flag is back on.
     expect(res.headers.get('cdn-cache-control')).toBeNull();
+  });
+
+  it.each([
+    ['pricing', 'V2_BILLING'],
+    ['developers', 'V2_BILLING'],
+    ['agencies', 'V2_BILLING'],
+    ['pricing', 'V2_CHECKS_PUBLIC'],
+    ['developers', 'V2_CHECKS_PUBLIC'],
+    ['agencies', 'V2_CHECKS_PUBLIC'],
+  ])('RC-01: %s is served with %s off and the other flag on', async (card, off) => {
+    ALL_ON();
+    vi.stubEnv(off, '');
+    expect((await get(card)).status).toBe(200);
   });
 
   it('Next’s ImageResponse sends the CDN header beside its own Cache-Control', async () => {

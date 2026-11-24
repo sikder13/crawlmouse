@@ -11,7 +11,11 @@ import { TRIAL_DAYS } from './account';
 import { formatPlanPrice } from './plan-price';
 
 export const DASHBOARD_COPY = {
-  kept: (host: string) => `${host} is kept.`,
+  /** The heading: the site, or with several, the account's count of them (F-118). */
+  kept: (hosts: readonly string[]) =>
+    hosts.length === 1
+      ? `${hosts[0]} is kept.`
+      : `${capitalise(numberWord(hosts.length))} sites are kept.`,
   /** "Since Thursday's check", or, where a weekday would be ambiguous, "Since the check of Fri 23 Oct". */
   since: (name: { weekday: string } | { date: string }) =>
     'weekday' in name ? `Since ${name.weekday}'s check` : `Since the check of ${name.date}`,
@@ -26,14 +30,18 @@ export const DASHBOARD_COPY = {
     }. Nothing to compare yet.`,
   topFixesTitle: 'Start with the fix that pays most, estimated',
   topFixesFoot: (rest: number, open: string) =>
-    `Each fix page has "Mark done and re-check now", about ${RECHECK_MINUTES} ${plural(RECHECK_MINUTES, 'minute', 'minutes')}. The other ${rest} ${plural(rest, 'is', 'are')} ${open}.`,
+    `Each fix page has "Mark done and re-check now", about ${RECHECK_MINUTES} ${plural(RECHECK_MINUTES, 'minute', 'minutes')}.${rest === 0 ? '' : ` The other ${rest} ${plural(rest, 'is', 'are')} ${open}.`}`,
   setupTrialTitle: 'Worth doing while Pro is on',
   setupLeftTitle: (n: number) =>
     n === 0
       ? 'Everything is set up'
       : `${capitalise(numberWord(n))} ${plural(n, 'thing', 'things')} left to set up`,
-  setupTrialFoot: (n: number) =>
-    `All ${numberWord(n)} stop when the ${TRIAL_DAYS} days end unless you keep Pro. The site, its audits and its monthly check do not.`,
+  setupTrialFoot: (n: number, plansOpen = true, sitePaused = false) =>
+    `All ${numberWord(n)} stop when the ${TRIAL_DAYS} days end${plansOpen ? ' unless you keep Pro' : ''}. ${
+      sitePaused
+        ? 'The site and its audits do not.'
+        : 'The site, its audits and its monthly check do not.'
+    }`,
   /** The kinds of email the account gets, each a clause, read from its preferences. */
   emailKinds: (changeNotes: boolean, reminder: string | null) =>
     [
@@ -42,12 +50,12 @@ export const DASHBOARD_COPY = {
       reminder ? `one reminder on ${reminder}, three days before the trial ends` : null,
     ].filter((k): k is string => k !== null),
   /** "a, b, and c", as the locked page lists them; "a and b" for two. */
-  threeKinds: (kinds: readonly string[]) =>
+  threeKinds: (kinds: readonly string[], plansOpen = true) =>
     `${
       kinds.length > 2
         ? `${kinds.slice(0, -1).join(', ')}, and ${kinds.at(-1)}`
         : kinds.join(' and ')
-    }. If you keep Pro, Stripe sends the receipts.`,
+    }.${plansOpen ? ' If you keep Pro, Stripe sends the receipts.' : ''}`,
   threeKindsLead: (n: number) =>
     `You will hear from us ${numberWord(n)} ${plural(n, 'way', 'ways')} and no others:`,
   startProTitle: (days: number) => `Start ${days} days of Pro`,
@@ -63,6 +71,16 @@ export const DASHBOARD_COPY = {
     'Sites are added by the account’s owner, or by a manager whose seat covers every client. When a site you can see is added, its first check and its results appear here.',
   noSiteNote:
     'Adding a site starts its first check. Its grades, crawlers and fixes appear here when that check ends.',
+  /** What a trial with no site yet includes (F-103), every limit read from the account. */
+  noSiteTrial: (
+    plan: string,
+    until: string,
+    schedule: string,
+    competitors: number,
+    sites: number,
+    noCard: boolean,
+  ) =>
+    `You have ${plan} until ${until}: ${schedule} checks, every fix with its packet, Slack alerts and ${numberWord(competitors)} ${plural(competitors, 'competitor', 'competitors')} per site, on up to ${sites} sites.${noCard ? ' No card.' : ''}`,
   /** The email-a-developer form's one field, on a live page. */
   developerField: { label: 'Developer’s email', placeholder: 'dev@example.com' },
   /** Copy fix on a live page: what the status line says. */

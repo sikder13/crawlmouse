@@ -258,7 +258,7 @@ describe('the figures follow the modules that own them, not the values typed tod
    * with the number of times the altered pages show each. A figure typed as one of these words
    * adds one.
    */
-  const PROSE_USES: Record<string, number> = { one: 13, two: 5 };
+  const PROSE_USES: Record<string, number> = { one: 12, two: 5 };
   /**
    * How many times the altered pages show each owner's altered value, as a numeral or as its word:
    * the number of places the pages read that owner. A figure typed in one of those places shows

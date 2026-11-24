@@ -1,6 +1,7 @@
 /** The site page's view model against values worked out by hand from the fixtures. */
 import { describe, expect, it } from 'vitest';
 import { fixture } from '../fixtures';
+import { parseReportRequest } from '../reports/generate-request';
 import { axisLabels, move } from './checks';
 import { siteView } from './site';
 
@@ -72,23 +73,23 @@ describe('Site page, example-outfitter.com at as_of', () => {
     expect(by('GPTBot').changedNow).toBe(false);
   });
 
-  it('lists the fixes by number, marks the new ones and the Pro ones, and groups the rest', () => {
+  it('lists the fixes in impact order, marks the new ones, and groups the rest; on Pro none is locked', () => {
     expect(v.fixes.title).toBe('Fixes · 16, counting the 3 new');
     expect(v.fixes.rows.map((r) => [r.number, r.isNew, r.pro, r.effect])).toEqual([
-      [0, true, false, '+19 AI'],
       [1, false, false, '+24 AI'],
       [2, false, false, '+22 AI'],
-      [3, false, true, '+4 SEO'],
-      [4, false, true, 'AI after fixes 1 and 2'],
+      [0, true, false, '+19 AI'],
+      [3, false, false, '+4 SEO'],
+      [5, false, false, '+2 SEO'],
     ]);
-    expect(v.fixes.rows[0]!.diff).toBe(
+    expect(v.fixes.rows[2]!.diff).toBe(
       'robots.txt, Thu 19:40 · + User-agent: ClaudeBot · + User-agent: Claude-SearchBot · + Disallow: / · three lines to delete, then mark done',
     );
-    expect(v.fixes.rows[2]!.note).toBe(
+    expect(v.fixes.rows[1]!.note).toBe(
       'marked done Wed; the re-check that day did not agree, so it stays open',
     );
-    expect(v.fixes.rest).toMatchObject({ numbers: '5–15', count: 11 });
-    expect(v.fixes.rest!.title).toBe('Eleven more: 7 in Structure and 4 in Content');
+    expect(v.fixes.rest).toMatchObject({ numbers: '4, 6–15', count: 11 });
+    expect(v.fixes.rest!.title).toBe('Eleven more: 6 in Structure and 5 in Content');
   });
 
   it('shows the site’s settings and the alert rules that fired at its checks', () => {
@@ -172,5 +173,29 @@ describe('the history axis across a change of month', () => {
       'Sat 31',
       '1 Nov',
     ]);
+  });
+});
+
+describe('the Grades card’s two buttons (F-107)', () => {
+  const paid = () => {
+    const d = fixture('bad-site');
+    const viewer = { accountId: 'a0000000-0000-4000-8000-000000000001', now: d.as_of };
+    return siteView(d, viewer, '50000000-0000-4000-8000-000000000001');
+  };
+  const button = (label: string) => paid().grades.actions.find((a) => a.label === label)!;
+
+  it('Export posts a request the reports route accepts, for a file it can make', () => {
+    const a = button('Export');
+    expect(a.method).toBe('post');
+    expect(a.route).toBe('/api/reports');
+    const request = parseReportRequest(a.fields);
+    expect(request).toMatchObject({ kind: 'raw_export', format: 'csv' });
+  });
+
+  it('Compare opens the Reports page for this site, where the two checks are compared', () => {
+    const a = button('Compare any two checks');
+    expect(a.method).toBe('get');
+    expect(a.href).toBe('/reports?site=50000000-0000-4000-8000-000000000001');
+    expect(a.fields).toEqual({});
   });
 });

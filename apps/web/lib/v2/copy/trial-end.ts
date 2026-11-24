@@ -23,6 +23,7 @@ export const TRIAL_END_COPY = {
    */
   reminderDue: (date: string) => `The reminder is due once, on ${date}.`,
   noCard: 'No card is on file, so nothing is charged either way.',
+  noCardClosed: 'No card is on file, so nothing is charged.',
   /** A trial with a card on file becomes the plan at its end unless it is cancelled (ARCH-2 §3.1). */
   card: (last4: string | null, date: string) =>
     `The card ${last4 === null ? 'on file' : `ending ${last4}`} is charged on ${date} unless you cancel.`,
@@ -39,10 +40,10 @@ export const TRIAL_END_COPY = {
   stays: {
     site: (schedule: string, email: boolean) =>
       `${schedule} checks${email ? ', email if changed' : ''}`,
+    /** The oldest site, paused by the person: the move to Free does not change it. */
+    sitePaused: 'stays paused, as you left it',
     evidence: 'Every check, every audit, the evidence',
-    /** FACTS A6, long form. */
-    kept: (condensed: number) =>
-      `kept; evidence older than ${condensed} days is condensed to headers and the parts of pages that changed`,
+    kept: 'kept',
     freeFixes: (numbers: readonly number[]) =>
       `${plural(numbers.length, 'Fix', 'Fixes')} ${listOf(numbers.map(String))}, the free ${numberWord(numbers.length)}`,
     packetsOpen: 'packets stay open',
@@ -100,15 +101,18 @@ export const TRIAL_END_COPY = {
   none: 'none',
   keepTitle: (plan: string) => `If you keep ${plan}`,
   doNothingTitle: 'If you do nothing',
-  /** FACTS A6 (long form), D5 (two clicks) and A9 (Stripe emails the receipts). */
-  terms: (clicks: number, condensed: number) =>
-    `Cancel any day from Settings, in ${numberWord(clicks)} clicks; the account goes back to Free. Nothing you can see is deleted; evidence older than ${condensed} days is condensed to headers and the parts of pages that changed. Stripe emails the receipts; they are also in Settings › Plan.`,
+  /** FACTS A6, D5 (two clicks) and A9 (Stripe emails the receipts). */
+  terms: (clicks: number) =>
+    `Cancel any day from Settings, in ${numberWord(clicks)} clicks; the account goes back to Free. Nothing you can see is deleted. Stripe emails the receipts; they are also in Settings › Plan.`,
   /** Keeping a no-card trial is a checkout, which charges when it is made (`/api/billing/checkout`). */
   keepNoCardText: (monthly: number, yearly: number) =>
     `$${monthly} a month, or $${yearly} a year, charged when you choose it and then each month or year.`,
   keepCardText: (last4: string, price: number, date: string, period: 'month' | 'year') =>
     `The card ending ${last4} is charged $${price} on ${date}, then each ${period}.`,
   endTitle: 'If you let it end',
+  /** In place of the two choices while paid plans are not open (F-108). */
+  plansTitle: 'Paid plans',
+  whenItEndsTitle: 'When it ends',
   cancelTitle: 'If you cancel',
   endNothing: (date: string) => `Nothing to do. On ${date} the account is Free:`,
   endCancel: (date: string, clicks: number) =>
@@ -121,14 +125,20 @@ export const TRIAL_END_COPY = {
     others: number,
     staging: boolean,
     plan: string,
+    plansOpen = true,
+    oldestPaused = false,
   ) =>
-    `${host} keeps its ${schedule} check${fixes ? ` and its ${numberWord(fixes)} ${plural(fixes, 'fix', 'fixes')}` : ''}.${
+    `${
+      oldestPaused
+        ? `${host} stays paused, as you left it, so no site keeps a scheduled check${fixes ? `, and it keeps its ${numberWord(fixes)} ${plural(fixes, 'fix', 'fixes')}` : ''}`
+        : `${host} keeps its ${schedule} check${fixes ? ` and its ${numberWord(fixes)} ${plural(fixes, 'fix', 'fixes')}` : ''}`
+    }.${
       others || staging
         ? ` ${
             others
               ? `The other ${numberWord(others)} ${plural(others, 'site pauses', 'sites pause')} with ${plural(others, 'its', 'their')} history kept${staging ? ', and so does the staging copy' : ''}`
               : 'The staging copy pauses with its history kept'
-          }; add ${plan} any time to resume ${others ? 'them' : 'it'}.`
+          }${plansOpen ? `; add ${plan} any time to resume ${others ? 'them' : 'it'}` : ''}.`
         : ''
     }`,
   /** After the end, on Free (CC-27b D8; ARCH-2 §5 "free after trial"). */
@@ -138,8 +148,12 @@ export const TRIAL_END_COPY = {
       `${plan} ended ${date}. Here is what stays, and what is paused.`,
     sub: (plan: string) =>
       `Nothing you can see was deleted. Choose ${plan} any time to resume what is paused.`,
+    /** In place of `sub` while paid plans are not open (F-108). */
+    subPlansClosed: 'Nothing you can see was deleted. Paid plans open shortly.',
     choose: (plan: string, price: number) => `Choose ${plan}, $${price} a month`,
     pausesTitle: (plan: string) => `Paused, until ${plan}`,
+    /** After the end an oldest site may be one the move paused, so who paused it is not said. */
+    sitePaused: 'paused',
   },
   tables: { stays: 'Stays', pauses: 'Pauses', did: 'Trial summary' },
   columns: { what: 'What', how: 'How', item: 'Item', value: 'Count', detail: 'Detail' },
@@ -208,14 +222,6 @@ export const TRIAL_END_CHANGES: CopyChange[] = [
       'nahltech.com, redbirdaviation.com and drivepei.ca no checks; history kept, nothing you can see deleted staging.example-outfitter.dev no deploy checks on Free; history kept',
     source:
       'Owner ruling Q10 and CC-27 D7: the other primary sites pause (ARCH-2 §3.2), the staging copy is listed apart because Free has no staging (GATES.free.stagingAndDeployHooks); FACTS A6 for the wording',
-  },
-  {
-    screen: 'trial-end',
-    kind: 'facts',
-    locked: 'the evidence kept',
-    rendered:
-      'the evidence kept; evidence older than 90 days is condensed to headers and the parts of pages that changed',
-    source: 'FACTS A6 (long form): what Free keeps is what you can see',
   },
   {
     screen: 'trial-end',
@@ -289,8 +295,9 @@ export const TRIAL_END_CHANGES: CopyChange[] = [
     locked:
       'Cancel any day from Settings; the account goes back to Free, nothing is deleted. Receipts are in Settings › Plan, not emailed.',
     rendered:
-      'Cancel any day from Settings, in two clicks; the account goes back to Free. Nothing you can see is deleted; evidence older than 90 days is condensed to headers and the parts of pages that changed. Stripe emails the receipts; they are also in Settings › Plan.',
-    source: 'FACTS A6 (long form), D5 (two clicks) and A9 (Stripe emails the receipts)',
+      'Cancel any day from Settings, in two clicks; the account goes back to Free. Nothing you can see is deleted. Stripe emails the receipts; they are also in Settings › Plan.',
+    source:
+      'FACTS A6, D5 (two clicks) and A9 (Stripe emails the receipts). The sentence about condensing evidence is out: no job does it (CTO ruling, 2026-11-22)',
   },
   {
     screen: 'trial-end',
