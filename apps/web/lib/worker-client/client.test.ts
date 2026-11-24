@@ -1,4 +1,4 @@
-import { generateKeyPairSync, type KeyObject } from 'node:crypto';
+import { createHmac, generateKeyPairSync, type KeyObject } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
@@ -954,5 +954,71 @@ describe('the app does not depend on the worker package', () => {
         imports: false,
       });
     }
+  });
+});
+
+describe('measureRendered (questions/042, design C)', () => {
+  const SECRET_ = 's'.repeat(48);
+  const reading = {
+    raw_words: 3,
+    rendered_words: 12,
+    challenged: false,
+    links: { js_only: ['https://example.com/shop'], js_only_count: 1, truncated: false },
+  };
+  const make = (respond: (req: Request) => Response | Promise<Response>) => {
+    const seen: Request[] = [];
+    const client = createWorkerClient({
+      url: 'http://127.0.0.1:9',
+      signingSecret: SECRET_,
+      privateKey: generateKeyPairSync('ed25519').privateKey,
+      now: () => 1_800_000_000_000,
+      fetch: (async (input: RequestInfo | URL, init?: RequestInit) => {
+        const req = new Request(input, init);
+        seen.push(req.clone());
+        return respond(req);
+      }) as typeof fetch,
+    });
+    return { client, seen };
+  };
+
+  it('posts the two sides signed under the measure key, and returns the reading', async () => {
+    const { client, seen } = make(() => Response.json({ reading }));
+    expect(await client.measureRendered!('<p>a</p>', '<p>b</p>', 'https://example.com/p')).toEqual(
+      reading,
+    );
+    const req = seen[0]!;
+    expect(new URL(req.url).pathname).toBe('/render/measure');
+    const raw = new Uint8Array(await req.arrayBuffer());
+    const ts = req.headers.get('x-crawlmouse-ts')!;
+    // An HMAC computed here, apart from sign.ts: the key derived from the label, then ts and body.
+    const key = createHmac('sha256', SECRET_).update('crawlmouse-worker-measure-v1').digest();
+    const expected = createHmac('sha256', key).update(`${ts}.`).update(raw).digest('hex');
+    expect(req.headers.get('x-crawlmouse-signature')).toBe(expected);
+    expect(JSON.parse(new TextDecoder().decode(raw))).toEqual({
+      static_html: '<p>a</p>',
+      rendered_html: '<p>b</p>',
+      url: 'https://example.com/p',
+    });
+  });
+
+  it.each([
+    ['a stopped read', () => Response.json({ failed: 'reader_deadline' })],
+    ['a refusal', () => Response.json({ error: 'reader_unavailable' }, { status: 503 })],
+    [
+      'a reading of the wrong shape',
+      () => Response.json({ reading: { ...reading, raw_words: -1 } }),
+    ],
+    ['an extra field', () => Response.json({ reading: { ...reading, x: 1 } })],
+    [
+      'a network failure',
+      () => {
+        throw new TypeError('fetch failed');
+      },
+    ],
+  ])('answers null for %s, and never throws', async (_name, respond) => {
+    const { client } = make(respond);
+    expect(
+      await client.measureRendered!('<p>a</p>', '<p>b</p>', 'https://example.com/p'),
+    ).toBeNull();
   });
 });

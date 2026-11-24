@@ -39,6 +39,8 @@ export interface StepDeps {
     caps: RenderInput['caps'];
     daily: DailyBudget;
     inFlight: number;
+    /** Left out in production, so the engine's admission (DNS, the SSRF rule) decides. */
+    admit?: RenderInput['admit'];
   };
   discover: DiscoverDeps;
 }

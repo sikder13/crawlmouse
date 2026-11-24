@@ -66,3 +66,29 @@ export function verifyReadSignature(
     (equalHex(signature, signRead(secret, ts, purpose)) ? null : 'bad_signature')
   );
 }
+
+/**
+ * POST /render/measure is signed under a key of its own derived from the shared secret, as the done
+ * signal is, so a batch, read or signal signature is never accepted for it, nor the reverse. The label
+ * does not start with digits and a dot, so no `${ts}.…` signature can equal the derived key. Same rule
+ * as apps/web/lib/worker-client/sign.ts.
+ */
+const MEASURE_KEY_LABEL = 'crawlmouse-worker-measure-v1';
+
+export const signMeasure = (secret: string, ts: string, body: Buffer | string): string => {
+  const key = createHmac('sha256', secret).update(MEASURE_KEY_LABEL).digest();
+  return createHmac('sha256', key).update(`${ts}.`).update(body).digest('hex');
+};
+
+export function verifyMeasureSignature(
+  secret: string,
+  ts: string,
+  body: Buffer | string,
+  signature: string,
+  now: number,
+): SignatureFailure | null {
+  return (
+    tsProblem(ts, now) ??
+    (equalHex(signature, signMeasure(secret, ts, body)) ? null : 'bad_signature')
+  );
+}

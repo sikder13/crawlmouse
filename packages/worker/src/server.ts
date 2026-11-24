@@ -2,19 +2,21 @@ import { readFileSync } from 'node:fs';
 import http from 'node:http';
 import { monitorEventLoopDelay } from 'node:perf_hooks';
 import { inSiteScope } from '@crawlmouse/engine/worker';
+import { z } from 'zod';
 import {
   SIGNATURE_HEADER,
   TS_HEADER,
   tsProblem,
   type SignatureFailure,
   verifyBatchSignature,
+  verifyMeasureSignature,
   verifyReadSignature,
 } from './auth/hmac.js';
 import { parseJsonStrict, verifyBatchJwt, type BatchClaims } from './auth/jwt.js';
 import { Nonces } from './auth/nonces.js';
 import { BatchRequestSchema, batchIdOf, urlsOf, type BatchRequest } from './batch/request.js';
 import { runBatch } from './batch/run.js';
-import { inlineReader, type PageReader } from './reader/read.js';
+import { inlineReader, isNotRead, type PageReader } from './reader/read.js';
 import { RobotsCache } from './batch/site-rules.js';
 import { DeclarationCache } from './batch/declarations.js';
 import { BatchStore } from './batch/store.js';
@@ -33,6 +35,19 @@ import { REFUSALS, type Refusal } from './routes.js';
  */
 
 export const MAX_BODY_BYTES = 1024 * 1024;
+/**
+ * A POST /render/measure body: two rendered pages of at most the engine's MAX_REPLY_BYTES each
+ * (10 MiB, packages/engine/src/v2/render/client.ts) and the JSON around them.
+ */
+export const MAX_MEASURE_BODY_BYTES = 2 * 10 * 1024 * 1024 + 64 * 1024;
+/** Rendered pages measured at once; past it a request is refused, and the render step retries. */
+export const MEASURE_CONCURRENCY = 4;
+
+const MeasureRequestSchema = z.strictObject({
+  static_html: z.string(),
+  rendered_html: z.string(),
+  url: z.string().url().max(2048),
+});
 const BATCH_ID = /^\/batch\/([0-9a-f-]{36}:\d{1,7})$/;
 const BATCH_PROGRESS = /^\/batch\/([0-9a-f-]{36}:\d{1,7})\/progress(?:\?after=(\d{1,6}))?$/;
 
@@ -77,7 +92,10 @@ export const BODY_DEADLINE_MS = 5_000;
  * The body, as bytes; null when it is over MAX_BODY_BYTES or the request failed; 'timeout' when it did
  * not arrive within BODY_DEADLINE_MS. Reading stops at either limit, so the answer can still be sent.
  */
-function readBody(req: http.IncomingMessage): Promise<Buffer | null | 'timeout'> {
+function readBody(
+  req: http.IncomingMessage,
+  maxBytes: number = MAX_BODY_BYTES,
+): Promise<Buffer | null | 'timeout'> {
   return new Promise((resolve) => {
     const chunks: Buffer[] = [];
     let size = 0;
@@ -93,7 +111,7 @@ function readBody(req: http.IncomingMessage): Promise<Buffer | null | 'timeout'>
     const timer = setTimeout(() => finish('timeout'), BODY_DEADLINE_MS);
     req.on('data', (chunk: Buffer) => {
       size += chunk.length;
-      if (size > MAX_BODY_BYTES) return finish(null);
+      if (size > maxBytes) return finish(null);
       chunks.push(chunk);
     });
     req.on('end', () => finish(Buffer.concat(chunks)));
@@ -261,6 +279,50 @@ export function createWorker(deps: WorkerDeps): Worker {
     json(res, 202, { batch_id: id, ...(signal && { signals: true }) });
   }
 
+  let measuring = 0;
+  async function postMeasure(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
+    const early = headerProblem(req, now());
+    if (early) {
+      res.setHeader('connection', 'close');
+      return refuse(res, early);
+    }
+    const reader = batchDeps.reader;
+    if (!reader.rendered) return refuse(res, 'reader_unavailable');
+    if (measuring >= MEASURE_CONCURRENCY) return refuse(res, 'measure_busy');
+    measuring++;
+    try {
+      const raw = await readBody(req, MAX_MEASURE_BODY_BYTES);
+      if (raw === 'timeout' || raw === null) res.setHeader('connection', 'close');
+      if (raw === 'timeout') return refuse(res, 'body_timeout');
+      if (raw === null) return refuse(res, 'too_large');
+      const signature = verifyMeasureSignature(
+        config.signingSecret,
+        header(req, TS_HEADER),
+        raw,
+        header(req, SIGNATURE_HEADER),
+        now(),
+      );
+      if (signature) return refuse(res, signature);
+      let parsed: unknown;
+      try {
+        parsed = parseJsonStrict(utf8.decode(raw));
+      } catch {
+        return refuse(res, 'invalid_json');
+      }
+      const checked = MeasureRequestSchema.safeParse(parsed);
+      if (!checked.success) {
+        return refuse(res, 'invalid_body', {
+          fields: [...new Set(checked.error.issues.map((i) => i.path.join('.') || '(root)'))],
+        });
+      }
+      const { static_html, rendered_html, url } = checked.data;
+      const r = await reader.rendered(static_html, rendered_html, url);
+      json(res, 200, isNotRead(r) ? { failed: r.failed } : { reading: r });
+    } finally {
+      measuring--;
+    }
+  }
+
   function getBatch(req: http.IncomingMessage, res: http.ServerResponse, id: string): void {
     const signature = readSigned(req, `batch:${id}`);
     if (signature) return refuse(res, signature);
@@ -324,6 +386,7 @@ export function createWorker(deps: WorkerDeps): Worker {
       const progress = req.method === 'GET' ? BATCH_PROGRESS.exec(url) : null;
       if (progress) return getProgress(req, res, progress[1]!, Number(progress[2] ?? 0));
       if (req.method === 'POST' && url === '/batch') return postBatch(req, res);
+      if (req.method === 'POST' && url === '/render/measure') return postMeasure(req, res);
       refuse(res, 'not_found');
     };
     route().catch(() => {

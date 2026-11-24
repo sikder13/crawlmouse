@@ -8,7 +8,7 @@ import type { KeyObject } from 'node:crypto';
 import { CountSchema, HttpStatusSchema, HttpUrlSchema } from '@crawlmouse/types/v2';
 import { z } from 'zod';
 import { loadPrivateKey, mintBatchJwt, PRIVATE_KEY_ENV } from './jwt';
-import { SIGNATURE_HEADER, TS_HEADER, signBody, signRead } from './sign';
+import { SIGNATURE_HEADER, TS_HEADER, signBody, signMeasure, signRead } from './sign';
 import {
   batchIdOf,
   WorkerError,
@@ -17,6 +17,7 @@ import {
   type WorkerClient,
   type WorkerErrorKind,
   type LiveProgress,
+  type RenderedReading,
 } from './types';
 
 /** The worker's text is checked here: these URLs reach a visitor's screen. */
@@ -49,6 +50,23 @@ export const SIGNING_SECRET_ENV = 'WORKER_SIGNING_SECRET';
 export const DEFAULT_TIMEOUT_MS = 30_000;
 /** How long one live-progress read may wait: one poll of the stream (`POLL_MS`, 1.5 s). */
 export const PROGRESS_TIMEOUT_MS = 1_500;
+/** The worker's reader deadline (20 s, READ_DEADLINE_MS) and time for two pages of HTML each way. */
+export const MEASURE_TIMEOUT_MS = 35_000;
+
+const MeasuredSchema = z.strictObject({
+  reading: z.strictObject({
+    raw_words: CountSchema,
+    rendered_words: CountSchema,
+    challenged: z.boolean(),
+    links: z
+      .strictObject({
+        js_only: z.array(z.string().max(2048)).max(200),
+        js_only_count: CountSchema,
+        truncated: z.boolean(),
+      })
+      .nullable(),
+  }),
+});
 
 /**
  * The worker's refusals (packages/worker/src/routes.ts REFUSALS, plus server.ts's 500 `internal`),
@@ -59,6 +77,8 @@ export const PROGRESS_TIMEOUT_MS = 1_500;
 export const WORKER_REFUSALS: ReadonlyMap<string, { status: number; kind: WorkerErrorKind }> =
   new Map([
     ['busy', { status: 429, kind: 'busy' }],
+    ['measure_busy', { status: 429, kind: 'busy' }],
+    ['reader_unavailable', { status: 503, kind: 'server' }],
     ['batch_exists', { status: 409, kind: 'batch_exists' }],
     ['nonce_replayed', { status: 409, kind: 'nonce_replayed' }],
     ['paused', { status: 503, kind: 'paused' }],
@@ -308,7 +328,38 @@ export function createWorkerClient(opts: WorkerClientOptions): WorkerClient {
     return metrics;
   }
 
-  return { postBatch, pollBatch, readProgress, readMetrics };
+  async function measureRendered(
+    staticHtml: string,
+    renderedHtml: string,
+    pageUrl: string,
+  ): Promise<RenderedReading | null> {
+    try {
+      const raw = new TextEncoder().encode(
+        JSON.stringify({ static_html: staticHtml, rendered_html: renderedHtml, url: pageUrl }),
+      );
+      const ts = String(now());
+      const res = await send(
+        '/render/measure',
+        {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            [TS_HEADER]: ts,
+            [SIGNATURE_HEADER]: signMeasure(opts.signingSecret, ts, raw),
+          },
+          body: raw,
+        },
+        MEASURE_TIMEOUT_MS,
+      );
+      if (res.status !== 200) return null;
+      const answer = MeasuredSchema.safeParse(await bodyOf(res));
+      return answer.success ? answer.data.reading : null;
+    } catch {
+      return null;
+    }
+  }
+
+  return { postBatch, pollBatch, readProgress, readMetrics, measureRendered };
 }
 
 const present = (v: string | undefined): v is string => v !== undefined && v.trim() !== '';

@@ -34,6 +34,16 @@ export const signSignal = (secret: string, ts: string, raw: string): string => {
   return createHmac('sha256', key).update(`${ts}.`).update(raw).digest('hex');
 };
 
+/**
+ * POST /render/measure, signed under a key of its own derived from the shared secret, for the same
+ * reason as the signal. Same rule as packages/worker/src/auth/hmac.ts.
+ */
+const MEASURE_KEY_LABEL = 'crawlmouse-worker-measure-v1';
+export const signMeasure = (secret: string, ts: string, raw: string | Uint8Array): string => {
+  const key = createHmac('sha256', secret).update(MEASURE_KEY_LABEL).digest();
+  return createHmac('sha256', key).update(`${ts}.`).update(raw).digest('hex');
+};
+
 /** Whether a signal is the worker's, and recent. Compared in constant time. */
 export function verifySignal(
   secret: string,
