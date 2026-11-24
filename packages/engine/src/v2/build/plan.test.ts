@@ -389,6 +389,30 @@ describe('nextCrawlBatch', () => {
     expect(nextCrawlBatch(seeds, [batch], 500)).toBeNull();
   });
 
+  // F-252: the worker names a discovered URL as the site linked it (`/x/`); rows stay canonical.
+  it('counts a page once in coverage, whichever spelling the site linked', () => {
+    const batch = crawlBatch(
+      0,
+      [
+        crawlRow({ url: HOME, outcome: 'fetched', status: 200 }),
+        crawlRow({ url: at('/x'), outcome: 'fetched', status: 200, final_url: at('/x/') }),
+      ],
+      [],
+      [at('/x/'), at('/y/'), at('/y')],
+    );
+    const a = assemble(
+      {
+        check: { id: CHECK, site_id: SITE, page_cap: 500 } as never,
+        homepage_url: HOME,
+        seeds: [{ url: HOME, source: 'homepage', lastmod: null }],
+        render: null,
+      },
+      readBatches([batch], { id: CHECK, site_id: SITE }, 'unreleased'),
+    );
+    expect(a.coverage.pages_discovered).toBe(3);
+    expect(a.unread).toEqual([at('/y')]);
+  });
+
   it('crawls no sitemap seed on another port', () => {
     const seeds: Seed[] = [
       { url: HOME, source: 'homepage', lastmod: null },

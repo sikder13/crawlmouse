@@ -361,7 +361,10 @@ export const CrawlBatchResultSchema = z.strictObject({
   kind: z.literal('crawl'),
   pages: z.array(CrawlPageSchema),
   link_edges: z.array(LinkEdgeSchema),
-  /** Link targets the batch found that it neither requested nor landed on, in canonical spelling. */
+  /**
+   * Link targets the batch found that it neither requested nor landed on, compared in canonical
+   * spelling and named as the batch first saw them linked: resolved, without the fragment (F-252).
+   */
   discovered_urls: z.array(HttpUrlSchema),
 });
 

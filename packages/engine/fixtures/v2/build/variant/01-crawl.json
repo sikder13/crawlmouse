@@ -1920,7 +1920,7 @@
     }
   ],
   "discovered_urls": [
-    "https://built-site.test",
+    "https://built-site.test/",
     "https://built-site.test/collections/sleeping-bags",
     "https://built-site.test/collections/trail-backpacks",
     "https://built-site.test/products/camping-tents-item-1",
