@@ -47,6 +47,7 @@ function fakes(answer: LinkAnswer) {
     open: vi.fn(async () => answer),
     read: vi.fn(async () => answer),
     revoke: vi.fn(async () => undefined),
+    fileFacts: vi.fn(async () => ({ host: 'shop.example.com', createdAt: NOW.toISOString() })),
   };
   const files: ShareFiles = {
     signedUrl: vi.fn(async (path: string) => `https://files.example/${path}`),
@@ -186,8 +187,25 @@ describe('openShareLink', () => {
     const f = fakes(opened(fmt));
     const res = await openShareLink(f, ORIGIN, newShareToken());
     expect(res.status).toBe(302);
-    expect(f.files.signedUrl).toHaveBeenCalledWith(`${ACCOUNT}/${REPORT}.x`, 60);
+    expect(f.files.signedUrl).toHaveBeenCalledWith(
+      `${ACCOUNT}/${REPORT}.x`,
+      60,
+      `crawlmouse-shop.example.com-2026-11-12-audit.${fmt}`,
+    );
     expect(res.headers.get('set-cookie')).toBeNull();
+  });
+
+  it('downloads under the stored name when the site or the report is gone (F-125)', async () => {
+    const f = fakes(opened('pdf'));
+    vi.mocked(f.store.fileFacts).mockResolvedValueOnce(null);
+    expect((await openShareLink(f, ORIGIN, newShareToken())).status).toBe(302);
+    expect(f.files.signedUrl).toHaveBeenCalledWith(`${ACCOUNT}/${REPORT}.x`, 60, undefined);
+  });
+
+  it('reads no names for a proof page', async () => {
+    const f = fakes(opened('html'));
+    await openShareLink(f, ORIGIN, newShareToken());
+    expect(f.store.fileFacts).not.toHaveBeenCalled();
   });
 
   it('a proof page’s redirect holds the report’s id, and the token only in the cookie', async () => {

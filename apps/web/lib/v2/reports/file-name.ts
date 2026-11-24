@@ -15,6 +15,9 @@ const WHAT: Record<ReportKindName, string> = {
   client_report: 'report',
 };
 
+/** Whether a report kind has a file name of its own here; the others keep the stored object's. */
+export const isNamedKind = (kind: string): kind is ReportKindName => Object.hasOwn(WHAT, kind);
+
 /** At most 100 characters of the host, so the whole name stays well under a file system's 255. */
 const safe = (s: string): string =>
   s
