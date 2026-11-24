@@ -10,6 +10,7 @@ import { seedDefaultAlertRules } from '@/lib/v2/monitor/alert-defaults';
 import { supabaseServer } from '@/lib/supabase/server';
 import { isId } from '@/lib/v2/account/route';
 import { readAccount, siteOfCaller } from '@/lib/v2/account/pages';
+import { siteLinkGate } from '@/lib/v2/account/public-links';
 import { readNextChecks } from '@/lib/v2/account/sites-store';
 import { chosenFromRequest, readViewer } from '@/lib/v2/account/viewer';
 import { readerRole, viewAt } from '@/lib/v2/view/account';
@@ -69,8 +70,12 @@ export default async function SitePage({
       : null;
   // The scheduler's own column (CC-28 D8), read once the caller's seat is established.
   const query = await searchParams;
+  const host = d.sites.find((s) => s.id === id)?.host;
   const page = sitePage(d, viewer, id, await readNextChecks(supabaseAdmin(), [id]), {
     allFixes: wantsAllFixes(query),
+    link: host
+      ? await siteLinkGate(supabaseAdmin(), site.accountId, { id, host })
+      : { gate: 'unknown', hiddenCheckIds: [] },
   });
   const notice = noticeLine(query, d.accounts[0]!.timezone);
   const account = viewAt(d, viewer);
