@@ -97,6 +97,14 @@ describe('/v2-pricing', () => {
     expect(html).toContain('href="/agency-trial?interval=year"');
   });
 
+  it('passes the Goal 1 switch (V2_HIDE_FEATURES) to the view, read per request', async () => {
+    expect(renderToStaticMarkup(await render())).toMatch(/competitor/i);
+    vi.stubEnv('V2_HIDE_FEATURES', 'competitors');
+    const html = renderToStaticMarkup(await render());
+    expect(html).not.toMatch(/competitor/i);
+    expect(html).toContain('Every audit is free. Pay when you want it watched.');
+  });
+
   // Q24/Q31: the buttons follow the flags of the routes they reach, read per request. The header's
   // "Log in" is one /login link either way; with the door off Free is another, and Pro's carries `next`.
   it.each([
