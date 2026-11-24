@@ -68,9 +68,9 @@ export const OPTIONAL_ENV: Why = {
     'unset, no founder notice or digest is sent and each run logs founder.unconfigured (CC-33 D3)',
   HOMEPAGE_FETCH_TIMEOUT_MS: "engine timeout override; unset uses the engine's default",
   INNGEST_AUDIT_CONCURRENCY:
-    'unset is PLAN_CONCURRENCY_CAP; any value is clamped to it (inngest/concurrency.ts)',
+    'unset is AUDIT_CONCURRENCY_DEFAULT (5); any value is clamped to PLAN_CONCURRENCY_CAP (inngest/concurrency.ts)',
   INNGEST_CHECK_CONCURRENCY:
-    'unset is CHECK_CONCURRENCY_DEFAULT; any value is clamped to the plan cap',
+    'unset is CHECK_CONCURRENCY_DEFAULT (16, the worker’s batch slots); any value is clamped to the plan cap',
   INNGEST_ALERT_CONCURRENCY: "unset uses inngest/alerts.ts's default",
   INNGEST_SUMMARY_CONCURRENCY: "unset uses inngest/summary.ts's default",
   NEXT_PUBLIC_POSTHOG_HOST: 'unset uses the /ingest proxy default',

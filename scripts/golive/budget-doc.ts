@@ -11,8 +11,8 @@ import { format, resolveConfig } from 'prettier';
 import {
   DAYS_PER_MONTH,
   FUNCTIONS,
-  HOBBY_HEADROOM_LINE,
-  HOBBY_MONTHLY_EXECUTIONS,
+  PLAN_HEADROOM_LINE,
+  PLAN_MONTHLY_EXECUTIONS,
   alertFiring,
   canaryMonthly,
   allShapes,
@@ -21,7 +21,7 @@ import {
   finishedFanOut,
   FINISHED_FAN_OUT,
   floorBySwitchOn,
-  hobbyVerdict,
+  planVerdict,
   monthlyFloor,
   monthlyTotal,
   oneMail,
@@ -44,17 +44,17 @@ export async function renderBudget(): Promise<string> {
   // `|` (one flag of the two is enough) would end a table cell: written as "or".
   const reg = (f: (typeof FUNCTIONS)[number]) => f.registration.split('|').join(' or ');
   const events = FUNCTIONS.filter((f) => f.runsPerDay === 0);
-  const verdict = await hobbyVerdict();
+  const verdict = await planVerdict();
   const lines: string[] = [
     '# Inngest execution budget',
     '',
     '<!-- Rendered by scripts/golive/budget-doc.ts from scripts/golive/budget.ts. Do not edit by hand:',
     '     change the model and run `pnpm --filter @crawlmouse/scripts exec tsx golive/budget-doc.ts --write`. -->',
     '',
-    `Inngest's Hobby plan allows ${n(HOBBY_MONTHLY_EXECUTIONS)} executions a month. Each function run is one`,
-    'execution and each step (`step.run`, `step.sleep*`, `step.waitForEvent`, `step.sendEvent`,',
-    '`step.invoke`) is one more. When the quota is used, every function pauses until the next month or an',
-    "upgrade: v1's audits, the checks, the mail and the crons alike (inngest.com/pricing, read 2026-11-13).",
+    `The account is on Inngest Pro, which includes ${n(PLAN_MONTHLY_EXECUTIONS)} executions a month and bills $50 for each`,
+    'further 1,000,000 (Inngest dashboard, Billing, read 2026-11-23). Each function run is one execution',
+    'and each step (`step.run`, `step.sleep*`, `step.waitForEvent`, `step.sendEvent`, `step.invoke`) is',
+    "one more. On the Hobby plan, before the owner's upgrade on 21 Nov, a used quota paused every function.",
     '',
     'How the numbers are made: a check is counted by running the real `runCheck` (`inngest/check.ts`)',
     "against a scripted worker with a counting `step` (`checkExecutions`). Every other function's steps",
@@ -152,10 +152,10 @@ export async function renderBudget(): Promise<string> {
     '',
     '## The rule (CC-35 D2)',
     '',
-    `The floor plus 1,000 typical checks is **${n(verdict.total)}** against the line of ${n(HOBBY_HEADROOM_LINE)}.`,
+    `The floor plus 1,000 typical checks is **${n(verdict.total)}** against the line of ${n(PLAN_HEADROOM_LINE)}.`,
     verdict.passes
-      ? 'It is under the line: the Hobby plan passes `golive:check`.'
-      : '**It is over the line: `golive:check` reports the Hobby plan as a failing precondition of `V2_PIPELINE`, and the owner decides the plan (Pro starts at $99 a month for 1M executions) before step 2.**',
+      ? 'It is under the line: the Pro plan passes `golive:check`.'
+      : '**It is over the line: `golive:check` reports the plan as a failing precondition of `V2_PIPELINE`, and the owner decides whether to pay for more.**',
     '',
     ((largest) =>
       `The largest part of the floor is \`${largest.id}\`, on cron \`${largest.cron}\` (${n(

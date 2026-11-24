@@ -258,10 +258,10 @@ describe('resend', () => {
 });
 
 describe('inngest budget', () => {
-  it('fails on Hobby at the D2 figures, and passes once the paid plan is ticked', async () => {
+  it('passes on Pro at the D2 figures, against the 800,000 line', async () => {
     const r = await inngestBudgetProbe(deps());
-    expect(r.status).toBe('fail');
-    expect(r.reason).toMatch(/40,000 line \(docs\/ops\/inngest-budget\.md\)/);
+    expect(r.status).toBe('pass');
+    expect(r.reason).toMatch(/^Pro holds: .* 800,000 line \(docs\/ops\/inngest-budget\.md\)/);
     expect((await inngestBudgetProbe(deps({ ticked: new Set([PAID_PLAN_TICK]) }))).status).toBe(
       'pass',
     );
