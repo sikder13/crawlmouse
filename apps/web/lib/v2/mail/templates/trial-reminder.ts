@@ -60,7 +60,11 @@ export const trialReminder: Template<TrialReminderInput> = ({
   const settings = mailUrl('/settings');
   const off = 'You get this reminder once per trial. Settings can turn it off.';
   const closedLines = closed
-    ? [afterTrialSentence(closed), 'Nothing you can see is deleted.', SETTINGS_COPY.plansOpenSoon(null)]
+    ? [
+        afterTrialSentence(closed),
+        'Nothing you can see is deleted.',
+        SETTINGS_COPY.plansOpenSoon(null),
+      ]
     : [];
   // An account with no site has no such page: /trial-ended sends it to Settings.
   const showPage = closed?.kept !== null;

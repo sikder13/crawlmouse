@@ -150,6 +150,7 @@ describe('the function rows against the code', () => {
     'inngest/check-expiry.ts': 3, // 51 54 58 (CC-GL D2)
     'inngest/trial-lifecycle.ts': 6, // 87 89 99 102 103 113
     'inngest/past-due-sweep.ts': 4, // 51 52 58 61
+    'inngest/trial-clock.ts': 4, // 60 61 69 72
     'inngest/deletion.ts': 6, // 73 85 97 98 106 110
     'inngest/mail.ts': 8, // 115 126 137 153 164 182 195 210
     'inngest/report-schedules.ts': 1, // 30
@@ -356,6 +357,7 @@ describe('the month', () => {
     // CC-41's ledger backfill 4×2.
     // CC-33's sign-in canary is in no flag's floor: it runs once SIGNIN_CANARY_TO is set.
     // Since CC-GL D2 the check expiry runs three steps (expire-unkept, settle-kept, purge-removed): 1 + 3.
+    // The trial clock, hourly, reads the time and who is due when nobody is: 24×3.
     const hand =
       (144 * 2 +
         24 * 3 * 3 +
@@ -367,10 +369,11 @@ describe('the month', () => {
         (1 + 1) +
         288 * 2 +
         24 * 3 +
-        4 * 2) *
+        4 * 2 +
+        24 * 3) *
       31;
     expect(monthlyFloor()).toBe(hand);
-    expect(FUNCTIONS.filter((f) => f.runsPerDay > 0).map(cronPerDay)).toHaveLength(14);
+    expect(FUNCTIONS.filter((f) => f.runsPerDay > 0).map(cronPerDay)).toHaveLength(15);
     // The canary, idle: 144 runs a day of request, wait and look.
     expect(canaryMonthly()).toBe(144 * (1 + 3) * 31);
   });
@@ -399,8 +402,9 @@ describe('the floor by switch-on step', () => {
     expect(pipeline!.floor).toBe((3 + 3 + 288 + 4 + 8) * 31);
     expect(door!.floor).toBe(pipeline!.floor);
     // V2_CHECKS_PUBLIC adds the purge 3, the contact purge 2, the schedule and summary ticks 72 each,
-    // CC-31's report schedules 48, and CC-33's founder sweep 576 and digest tick 72 (either flag).
-    expect(checks!.floor).toBe(door!.floor + (3 + 2 + 72 + 72 + 48 + 576 + 72) * 31);
+    // CC-31's report schedules 48, CC-33's founder sweep 576 and digest tick 72 (either flag), and
+    // the trial clock 72.
+    expect(checks!.floor).toBe(door!.floor + (3 + 2 + 72 + 72 + 48 + 576 + 72 + 72) * 31);
     // V2_BILLING adds the past-due sweep, 72 a day.
     expect(billing!.floor).toBe(checks!.floor + 72 * 31);
     expect(billing!.floor).toBe(monthlyFloor());

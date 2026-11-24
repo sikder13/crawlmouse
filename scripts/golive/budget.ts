@@ -238,6 +238,16 @@ const ROWS: readonly RowInput[] = [
   },
   // ── V2_CHECKS_PUBLIC ──
   {
+    file: 'inngest/trial-clock.ts',
+    id: 'crawlmouse.trial.clock',
+    onFailure: false,
+    callSites: 4,
+    registration: 'V2_CHECKS_PUBLIC',
+    cron: '20 * * * *',
+    steps: 2,
+    stepsHow: 'now, due; then two per due account, none when nothing is due',
+  },
+  {
     file: 'inngest/deletion.ts',
     id: 'crawlmouse.account.deletion-cancel',
     onFailure: false,
