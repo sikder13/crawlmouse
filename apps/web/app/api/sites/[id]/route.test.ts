@@ -21,6 +21,9 @@ const h = vi.hoisted(() => ({
   db: null as unknown as PGlite,
   user: null as { id: string; email: string } | null,
   refused: new Set<string>(),
+  sent: [] as unknown[],
+  sendFails: false,
+  reported: [] as unknown[],
 }));
 
 vi.mock('server-only', () => ({}));
@@ -43,6 +46,16 @@ vi.mock('@/lib/auth/admit-site', () => ({
   },
 }));
 
+vi.mock('../../../../../../inngest/client', () => ({
+  inngest: {
+    send: async (e: unknown) => {
+      if (h.sendFails) throw new Error('inngest down');
+      h.sent.push(e);
+    },
+  },
+}));
+vi.mock('@sentry/nextjs', () => ({ captureException: (e: unknown) => h.reported.push(e) }));
+
 import { DELETE, PATCH, POST } from './route';
 
 beforeAll(async () => {
@@ -57,6 +70,9 @@ beforeEach(() => {
   h.log.length = 0;
   h.user = null;
   h.refused = new Set(['private.example']);
+  h.sent.length = 0;
+  h.reported.length = 0;
+  h.sendFails = false;
   vi.stubEnv('V2_CHECKS_PUBLIC', '1');
 });
 afterEach(() => vi.unstubAllEnvs());
@@ -250,6 +266,35 @@ describe('PATCH /api/sites/[id]', () => {
       { code: 'upgrade_required', gate: 'competitorsPerSite' },
     ]);
     expect((await siteRow(s.id)).competitor_hosts).toEqual(['rival.example']);
+  });
+
+  it('an edit that sets the competitor list asks for it to be audited; others ask nothing (row 18)', async () => {
+    const p = await person(h.db, 'compsend');
+    await makePaid(h.db, p.accountId, 'pro');
+    const s = await keptSite(h.db, p.accountId);
+    as(p);
+    expect((await patch(s.id, { competitorHosts: ['rival.example'] })).status).toBe(200);
+    expect(h.sent).toEqual([{ name: 'competitors.requested', data: { siteId: s.id } }]);
+    // Clearing the list is a change of it too.
+    expect((await patch(s.id, { competitorHosts: [] })).status).toBe(200);
+    expect(h.sent).toHaveLength(2);
+    // An edit that does not name competitors sends nothing.
+    expect((await patch(s.id, { schedule: 'none' })).status).toBe(200);
+    expect(h.sent).toHaveLength(2);
+    // A refused edit sends nothing.
+    expect((await patch(s.id, { competitorHosts: ['a.example', 'b.example'] })).status).toBe(402);
+    expect(h.sent).toHaveLength(2);
+  });
+
+  it('a failed send is reported, and the edit is still saved (row 18)', async () => {
+    const p = await person(h.db, 'compfail');
+    await makePaid(h.db, p.accountId, 'pro');
+    const s = await keptSite(h.db, p.accountId);
+    as(p);
+    h.sendFails = true;
+    expect((await patch(s.id, { competitorHosts: ['rival.example'] })).status).toBe(200);
+    expect((await siteRow(s.id)).competitor_hosts).toEqual(['rival.example']);
+    expect(h.reported).toHaveLength(1);
   });
 
   it('Pro: a staging URL makes a staging site that holds no slot, and an empty one clears it', async () => {

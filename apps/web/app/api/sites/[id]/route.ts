@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/nextjs';
 import { checksPublicEnabled } from '@/lib/auth/flags';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { supabaseServer } from '@/lib/supabase/server';
@@ -13,6 +14,16 @@ import {
 import { decideEdit, isRemoveConfirmed, parseEditBody, readSite } from '@/lib/v2/account/sites';
 import { editSite, removeSite } from '@/lib/v2/account/sites-store';
 import { readEntitlement } from '@/lib/v2/account/viewer';
+import { inngest } from '../../../../../../inngest/client';
+
+/** Sends `competitors.requested`; a failed send is reported and does not fail the edit. */
+async function requestCompetitors(siteId: string): Promise<void> {
+  try {
+    await inngest.send({ name: 'competitors.requested', data: { siteId } });
+  } catch (err) {
+    Sentry.captureException(err, { tags: { route: 'sites/[id]', event: 'competitors.requested' } });
+  }
+}
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -103,6 +114,9 @@ async function change(req: Request, { params }: Context, method: 'PATCH' | 'DELE
   const edited = await editSite(supabaseAdmin(), id, decision.patch);
   switch (edited.outcome) {
     case 'updated':
+      // Row 18: an edit that set the competitor list asks for it to be audited against the site's
+      // latest ended check (inngest/competitors.ts). The edit is saved whatever the send does.
+      if (decision.patch.competitor_hosts !== undefined) await requestCompetitors(id);
       return body.kind === 'form'
         ? respond('form', `/sites/${id}`)
         : Response.json({ stagingSiteId: edited.stagingSiteId });
