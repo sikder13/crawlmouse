@@ -394,9 +394,6 @@ export function settingsView(
     },
   };
 
-  // With paid plans closed nothing sends the trial's reminder yet, so it is not offered as a kind.
-  const emailKinds = EMAIL_KINDS.filter((k) => billingOpen || k !== 'trial_reminder');
-
   // The largest site: the most pages its latest result crawled.
   const largest = Math.max(
     0,
@@ -505,8 +502,8 @@ export function settingsView(
     email: {
       title: COPY.emailTitle,
       tableLabel: COPY.tables.email,
-      rows: emailKinds.map((k) => rowOf[k]()),
-      foot: COPY.emailFoot(emailKinds.length, billingOpen),
+      rows: EMAIL_KINDS.map((k) => rowOf[k]()),
+      foot: COPY.emailFoot(EMAIL_KINDS.length, billingOpen),
       undeliverable:
         undeliverable === null
           ? null
