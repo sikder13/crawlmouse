@@ -1,4 +1,9 @@
-import { extractPage, MainContentWalk, type ExtractedLink } from '@crawlmouse/engine/worker';
+import {
+  canonicalizeUrl,
+  extractPage,
+  MainContentWalk,
+  type ExtractedLink,
+} from '@crawlmouse/engine/worker';
 import * as cheerio from 'cheerio';
 import type { AnyNode, Element } from 'cheerio';
 import { MAX_HREFLANG_LINKS, type Hreflang } from '@crawlmouse/types/v2';
@@ -45,12 +50,37 @@ export interface LinksNotRead {
   pastLimit: number;
 }
 
+/**
+ * A link as extractPage keeps it, with `href`: its target as the page wrote it (F-252), resolved and
+ * without its fragment, which is never sent. `toUrl` is the canonical spelling pages are compared in;
+ * `href` is the address the crawl asks, since a server may answer `/docs/` and not `/docs`.
+ */
+export type LinkRead = ExtractedLink & { href: string };
+
+/**
+ * A link's target as a request sends it: resolved against the page, without its fragment. Trimmed as
+ * extractPage trims it (String.prototype.trim, which strips Unicode whitespace such as a no-break
+ * space; the URL parser strips only ASCII). Trimmed and resolved as the engine resolves it, the
+ * address names the recorded page, `toUrl` (links.test.ts holds that over generated hrefs). The
+ * check below is a guard should the two readings ever part: no input known today reaches its
+ * fallback, so no test turns red without it.
+ */
+function linkedAs(href: string, baseUrl: string, toUrl: string): string {
+  try {
+    const u = new URL(href.trim(), baseUrl);
+    u.hash = '';
+    return canonicalizeUrl(u.href) === toUrl ? u.href : toUrl;
+  } catch {
+    return toUrl;
+  }
+}
+
 export interface PageLinks {
   /**
    * In page order, as extractPage gives them. Each anchor text is the start of the engine's: cut with
    * `bounded(text, CAPS.anchorText)`, it is what the engine's would give.
    */
-  links: ExtractedLink[];
+  links: LinkRead[];
   canonicalUrl: string | undefined;
   notRead: LinksNotRead;
   /** The first rel=canonical as the page wrote it, whatever host it names. */
@@ -261,10 +291,11 @@ export function readLinks($: cheerio.CheerioAPI, baseUrl: string): PageLinks {
   const texts = read.map((a) => capture(text, a.start, a.end).trim());
   const kept = keptLinks(canonical, baseUrl, read);
   const generic = genericTexts(baseUrl, texts);
-  const links: ExtractedLink[] = [];
+  const links: LinkRead[] = [];
   for (const [i, toUrl] of kept.links) {
     const anchorText = texts[i]!;
-    links.push({ toUrl, anchorText, isGenericAnchor: generic.get(anchorText) ?? false });
+    const href = linkedAs(read[i]!.href, baseUrl, toUrl);
+    links.push({ toUrl, href, anchorText, isGenericAnchor: generic.get(anchorText) ?? false });
   }
   return {
     notRead,

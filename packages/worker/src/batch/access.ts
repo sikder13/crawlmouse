@@ -1,4 +1,5 @@
 import type { AccessCause, AccessTest, EvidenceClass, Verdict } from '@crawlmouse/types/v2';
+import { canonicalizeUrl } from '@crawlmouse/engine/worker';
 import type { Clock } from '../clock.js';
 import type { FetchOutcome } from '../fetch/fetcher.js';
 import { CANARY, CONTROL, CRAWLERS, type Identity } from '../identities.js';
@@ -227,7 +228,8 @@ async function accessPage(run: AccessRun, page: AccessPage): Promise<AccessTest[
   ) =>
     accessTestRow({
       checkId: run.checkId,
-      pageUrl: page.url,
+      // Keyed on the canonical spelling the crawl's rows use (F-252); asked as given.
+      pageUrl: canonicalizeUrl(page.url),
       templateKey: page.template_key,
       ua,
       verdict,
