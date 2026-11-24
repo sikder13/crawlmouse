@@ -5,7 +5,15 @@
  */
 import { SIGNIN_SENDER, SIGNIN_SENDER_LOCKED } from '../../auth/constants';
 import type { Addition, CopyChange, LockedScreen } from '../copy-registry';
+import { planPages } from './pricing';
 import { formatPlanPrice } from './plan-price';
+
+/**
+ * Why Home's paid cards and Sign-up's Pro row state a page limit the artboards do not: the owner's
+ * ruling, and the switch that hides it. Here, and read by Home's entries in copy-registry.ts, which imports this module.
+ */
+export const PAGE_LIMIT_SOURCE =
+  'Owner ruling of 2026-11-24 (the CTO, "a stranger reads only what works that day"): the paid plans state their page limit, read from GATES through Pricing’s planPages, shown only while the Goal 1 switch shows pages_2000.';
 
 const MASKED =
   'FACTS correction (CC-25 scope 3): Check-email shows the address masked, the local part shortened and the domain whole (lib/auth/mask-email.ts).';
@@ -78,6 +86,13 @@ export const ACCOUNT_DOOR_CHANGES: CopyChange[] = [
     locked: '$69 a month',
     rendered: `${formatPlanPrice('agency')} a month`,
     source: `FACTS correction (CC-25 D7): the project decision of 2026-11-03 sets the Agency list price at ${formatPlanPrice('agency')} a month.`,
+  },
+  {
+    screen: 'signup',
+    kind: 'ruling',
+    locked: 'Weekly checks, alerts to Slack, up to 5 sites',
+    rendered: `Weekly checks, alerts to Slack, up to 5 sites, up to ${planPages('pro', true)} a site`,
+    source: PAGE_LIMIT_SOURCE,
   },
   // ── Check-email, from an audit ────────────────────────────────────────────────────────────
   {

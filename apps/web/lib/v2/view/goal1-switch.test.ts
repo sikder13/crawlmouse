@@ -404,7 +404,7 @@ describe('Home', () => {
     const t = words(homeHtml());
     expect(t).toContain('alerts to Slack, one competitor per site, PDF and CSV export.');
     expect(t).toContain(
-      'Twenty-five client sites, five seats, reports on your domain with your logo, and a one-page audit you can hand to a prospect.',
+      'Twenty-five client sites, up to 2,000 pages a site, five seats, reports on your domain with your logo, and a one-page audit you can hand to a prospect.',
     );
     expect(t).toContain('A browser sees');
     expect(t).toContain('Text it can read');
@@ -414,20 +414,20 @@ describe('Home', () => {
   it('competitors, the agency features and nojs hidden: none of them is named', () => {
     const t = words(homeHtml(hide('competitors', 'agency_domain', 'agency_white_label', 'nojs')));
     expect(t).not.toMatch(/competitor/i);
-    expect(t).toContain('Twenty-five client sites and five seats.');
+    expect(t).toContain('Twenty-five client sites, up to 2,000 pages a site, and five seats.');
     expect(t).not.toContain('A browser sees');
     expect(t).not.toContain('run JavaScript. How much');
   });
 
   it('agency_domain alone hidden: the one-page audit stays, the domain and logo go', () => {
     expect(words(homeHtml(hide('agency_domain')))).toContain(
-      'Twenty-five client sites, five seats, and a one-page audit you can hand to a prospect.',
+      'Twenty-five client sites, up to 2,000 pages a site, five seats, and a one-page audit you can hand to a prospect.',
     );
   });
 
   it('agency_white_label alone hidden: the domain, the logo and the one-page audit go', () => {
     expect(words(homeHtml(hide('agency_white_label')))).toContain(
-      'Twenty-five client sites and five seats.',
+      'Twenty-five client sites, up to 2,000 pages a site, and five seats.',
     );
   });
 

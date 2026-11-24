@@ -4,19 +4,31 @@ import { PageShell } from '../../PageShell';
 import { Button } from '../../Button';
 import { LOG_IN, MARKETING_NAV } from '../../footer-links';
 import layout from '../../layout.module.css';
-import { planFootnote, planGroups, signupLead, trialDays } from './door-copy';
+import type { Features } from '../../../../lib/v2/features';
+import { signupLead, trialDays } from './door-copy';
+import { planFootnote, planGroups } from './plan-table';
 import { SignupForm, type SignupFormState } from './SignupForm';
 import styles from './Signup.module.css';
 
 /**
  * Final-Signup (CC-25): the email, an optional first site, and what the account is. The table and
- * every number on the page come from door-copy.ts; `checksPublic` is V2_CHECKS_PUBLIC, read by the route.
+ * every number on the page come from door-copy.ts and plan-table.ts; `checksPublic` is
+ * V2_CHECKS_PUBLIC, read by the route, as are `features` (the Goal 1 switch) and `agencyOpen`.
  */
 export function SignupScreen({
   checksPublic,
+  features,
+  agencyOpen = true,
   initial,
 }: {
   checksPublic: boolean;
+  /** What the Goal 1 switch hides (`shownFeatures()`); omitted (the preview), nothing. */
+  features?: Features;
+  /**
+   * Whether Agency is on sale (`billingPublic() && agencySalesOpen()`); omitted (the preview), it is,
+   * as the locked screen shows it.
+   */
+  agencyOpen?: boolean;
   /** Fix the form's state, for previews and tests. */
   initial?: SignupFormState;
 }) {
@@ -52,7 +64,7 @@ export function SignupScreen({
             </div>
             <table className={styles.table} aria-label="What your account includes">
               <tbody>
-                {planGroups().flatMap((group) => [
+                {planGroups(features).flatMap((group) => [
                   <tr key={group.heading}>
                     <th scope="colgroup">{group.heading}</th>
                     <th scope="col" className={styles.n}>
@@ -68,7 +80,7 @@ export function SignupScreen({
                 ])}
               </tbody>
             </table>
-            <div className={styles.foot}>{planFootnote()}</div>
+            <div className={styles.foot}>{planFootnote(features, agencyOpen)}</div>
           </Card>
         </div>
       </main>

@@ -4,10 +4,15 @@ import { Heading } from '../../Heading';
 import { PageShell } from '../../PageShell';
 import { Table } from '../../Table';
 import { VerdictCell } from '../../VerdictCell';
-import { LOG_IN, MARKETING_NAV } from '../../footer-links';
+import { FOR_AGENCIES, LOG_IN, MARKETING_NAV } from '../../footer-links';
+import { GATES } from '../../../../lib/entitlement-v2';
+import type { Tagged } from '../../../../lib/v2/copy/agencies';
+import { PRICING_COPY, planPages } from '../../../../lib/v2/copy/pricing';
+import type { Features } from '../../../../lib/v2/features';
+import { shown, taggedWith } from '../../../../lib/v2/view/agencies';
 import type { HomeView } from '../../../../lib/v2/view/home';
 import { formatPlanPrice } from '../../../../lib/v2/copy/plan-price';
-import { count } from '../../../../lib/v2/words';
+import { count, numberWord, plural } from '../../../../lib/v2/words';
 import { AuditForm } from './AuditForm';
 import { Stage } from './Stage';
 import layout from '../../layout.module.css';
@@ -21,21 +26,58 @@ const andList = (items: readonly string[]) =>
         .map((x, i) => (i === 0 ? x : i === items.length - 1 ? `, and ${x}` : `, ${x}`))
         .join('');
 
-/** The plan cards, without what the Goal 1 switch hides; with nothing hidden, the locked words. */
-function plans(f: HomeView['features']) {
-  const pro = [
-    'Every fix with a copy-paste packet',
-    'alerts to Slack',
-    f.competitors ? 'one competitor per site' : null,
-    'PDF and CSV export',
-  ].filter(Boolean);
-  const agency = [
-    'Twenty-five client sites',
-    'five seats',
+/**
+ * The phrases of a card the Goal 1 switch shows. Each phrase names its capabilities, and
+ * `CAPABILITIES[key].risk` (lib/v2/view/agencies.ts) names the switch that hides it, as on Pricing.
+ */
+const said = (f: Features, phrases: Tagged[]) =>
+  shown(phrases.map(taggedWith(f))).map((t) => t.text);
+
+/** "up to 2,000 pages a site", or nothing while `pages_2000` is hidden (Pricing's `planPages`). */
+const pageLimit = (tier: 'pro' | 'agency', f: Features): Tagged[] => {
+  const pages = planPages(tier, f.pages_2000);
+  return pages === null ? [] : [{ text: `up to ${pages} a site`, capabilities: [] }];
+};
+
+interface PlanCard {
+  name: string;
+  price: string;
+  per: string | null;
+  body: string;
+  /** Null: the card has no button. */
+  action: string | null;
+  note: string;
+  /** A link after the note. */
+  noteLink?: { label: string; href: string };
+}
+
+/**
+ * The plan cards, without what the Goal 1 switch hides; with nothing hidden, the locked words and
+ * the paid plans' page limit. `agencyOpen` false (Agency not on sale): its card offers no trial and
+ * says the plan opens, with a link to For agencies.
+ */
+function plans(f: Features, agencyOpen: boolean): PlanCard[] {
+  const competitors = GATES.pro.competitorsPerSite;
+  const pro = said(f, [
+    { text: 'Every fix with a copy-paste packet', capabilities: ['fix_packets'] },
+    { text: 'alerts to Slack', capabilities: ['slack_alerts'] },
+    {
+      text: `${numberWord(competitors)} ${plural(competitors, 'competitor', 'competitors')} per site`,
+      capabilities: ['competitors'],
+    },
+    { text: 'PDF and CSV export', capabilities: ['exports'] },
+  ]);
+  const proLimit = pageLimit('pro', f)
+    .map((p) => `, ${p.text}`)
+    .join('');
+  const agency = said(f, [
+    { text: 'Twenty-five client sites', capabilities: ['sites'] },
+    ...pageLimit('agency', f),
+    { text: 'five seats', capabilities: ['seats'] },
     // The client report page (row 24) on the agency's domain (row 25): either hidden drops it.
-    f.agency_domain && f.agency_white_label ? 'reports on your domain with your logo' : null,
-    f.agency_white_label ? 'a one-page audit you can hand to a prospect' : null,
-  ].filter((x): x is string => x !== null);
+    { text: 'reports on your domain with your logo', capabilities: ['client_report_page'] },
+    { text: 'a one-page audit you can hand to a prospect', capabilities: ['one_pagers'] },
+  ]);
   return [
     {
       name: 'Free',
@@ -49,7 +91,7 @@ function plans(f: HomeView['features']) {
       name: 'Pro',
       price: formatPlanPrice('pro'),
       per: ' a month',
-      body: `Five sites, checked weekly. ${pro.join(', ')}.`,
+      body: `Five sites${proLimit}, checked weekly. ${pro.join(', ')}.`,
       action: 'Start with 14 days of Pro',
       note: `The same free account; ${formatPlanPrice('pro')} a month only if you keep Pro`,
     },
@@ -58,8 +100,13 @@ function plans(f: HomeView['features']) {
       price: formatPlanPrice('agency'),
       per: ' a month',
       body: `${andList(agency)}.`,
-      action: 'Start a 14-day trial',
-      note: 'Card required; nothing charged for 14 days',
+      ...(agencyOpen
+        ? { action: 'Start a 14-day trial', note: 'Card required; nothing charged for 14 days' }
+        : {
+            action: null,
+            note: PRICING_COPY.buttons.agencyStartFree.note,
+            noteLink: FOR_AGENCIES,
+          }),
     },
   ];
 }
@@ -72,6 +119,7 @@ export function HomeScreen({
   data,
   start = false,
   planHref,
+  agencyOpen = true,
 }: {
   data: HomeView;
   /** The forms start an audit (`POST /api/checks`); omitted (the preview), they post nowhere. */
@@ -81,6 +129,11 @@ export function HomeScreen({
    * for has no button; omitted (the preview), each button renders as the locked screen shows it.
    */
   planHref?: Partial<Record<string, string>>;
+  /**
+   * Whether Agency is on sale (`billingPublic() && agencySalesOpen()`, read by the entry point).
+   * Omitted (the preview), it is, as the locked screen shows it.
+   */
+  agencyOpen?: boolean;
 }) {
   const { crawlers, withoutJs, alert } = data;
   // `nojs` hidden: the crawler table loses its "Text it can read" column, header and cells together.
@@ -265,7 +318,7 @@ export function HomeScreen({
             Every new account gets Pro for 14 days. When that ends, nothing you can see is deleted.
           </p>
           <div className={styles.g3}>
-            {plans(data.features).map((p) => (
+            {plans(data.features, agencyOpen).map((p) => (
               <Card key={p.name} className={styles.plan}>
                 <div className={layout.mut}>{p.name}</div>
                 <div className={styles.price}>
@@ -273,12 +326,19 @@ export function HomeScreen({
                   {p.per ? <span className={`${layout.mut} ${styles.per}`}>{p.per}</span> : null}
                 </div>
                 <p className={styles.planBody}>{p.body}</p>
-                {planHref && planHref[p.name] === undefined ? null : (
+                {p.action === null || (planHref && planHref[p.name] === undefined) ? null : (
                   <Button href={planHref?.[p.name] ?? '#'} className={styles.planButton}>
                     {p.action}
                   </Button>
                 )}
-                <div className={`${layout.mut} ${styles.planNote}`}>{p.note}</div>
+                <div className={`${layout.mut} ${styles.planNote}`}>
+                  {p.note}
+                  {p.noteLink ? (
+                    <>
+                      : <a href={p.noteLink.href}>{p.noteLink.label}</a>
+                    </>
+                  ) : null}
+                </div>
               </Card>
             ))}
           </div>

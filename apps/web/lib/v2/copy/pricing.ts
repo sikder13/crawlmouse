@@ -79,16 +79,16 @@ function freeFixes(): number {
 /**
  * A plan's page limit, "2,000 pages". Null when `pages2000` is false (the Goal 1 switch hides it) and
  * the plan's limit is above Free's: no figure is stated then, since the hidden one is the plan's own
- * and Free's would understate it.
+ * and Free's would understate it. Home's plan cards and Sign-up's plan table read it too.
  */
-const pages = (tier: Tier, pages2000: boolean): string | null =>
+export const planPages = (tier: Tier, pages2000: boolean): string | null =>
   !pages2000 && GATES[tier].pagesPerCheck > GATES.free.pagesPerCheck
     ? null
     : `${count(GATES[tier].pagesPerCheck)} pages`;
 
 /** "Up to 500 pages per audit", or `without` when `pages` states no figure. */
 const pagesSentence = (tier: Tier, pages2000: boolean, without: string): string => {
-  const p = pages(tier, pages2000);
+  const p = planPages(tier, pages2000);
   return p === null ? without : `Up to ${p} per audit`;
 };
 
@@ -108,7 +108,7 @@ function seatAndSitePrices(interval: Interval, pages2000: boolean): string {
   const a = GATES.agency;
   const seat = interval === 'month' ? EXTRA_SEAT : EXTRA_SEAT_YEARLY;
   const site = interval === 'month' ? EXTRA_SITE : EXTRA_SITE_YEARLY;
-  const p = pages('agency', pages2000);
+  const p = planPages('agency', pages2000);
   return (
     `${a.seats} seats, ${usd(seat)} a seat ${per(interval)} beyond; ` +
     `${usd(site)} ${per(interval)} for each site from ${a.sites + 1} to ${a.maxSites}` +

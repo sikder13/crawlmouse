@@ -2,6 +2,7 @@ import '../../../../styles/v2/tokens.css';
 import { ReferralCapture } from '@/components/analytics/ReferralCapture';
 import { TrackView } from '@/components/analytics/TrackView';
 import { accountDoorEnabled } from '../../../../lib/auth/flags';
+import { agencySalesOpen, billingPublic } from '../../../../lib/billing/flags';
 import { shownFeatures } from '../../../../lib/feature-switch';
 import { fixture } from '../../../../lib/v2/fixtures';
 import { stateAt } from '../../../../lib/v2/progress';
@@ -20,7 +21,8 @@ import { HomeScreen } from './HomeScreen';
  * this module). `app/page.tsx` does not import it; `live-home.test.tsx` holds that.
  *
  * The plan buttons lead to Sign-up while the account door is open (V2_ACCOUNT_DOOR); the Agency
- * trial has no page yet, so it has no button.
+ * trial has no page yet, so it has no button. While Agency is not on sale (V2_BILLING public and
+ * V2_AGENCY_SALES, read here at build time like the switch), its card names no trial or card.
  */
 export function LiveHome() {
   // The Goal 1 switch (V2_HIDE_FEATURES). `/` is a static page, so the switch is read at build
@@ -36,7 +38,12 @@ export function LiveHome() {
     <>
       <TrackView event="home_viewed" />
       <ReferralCapture />
-      <HomeScreen data={data} start planHref={planHref} />
+      <HomeScreen
+        data={data}
+        start
+        planHref={planHref}
+        agencyOpen={billingPublic() && agencySalesOpen()}
+      />
     </>
   );
 }

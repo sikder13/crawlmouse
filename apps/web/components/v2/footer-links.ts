@@ -95,7 +95,8 @@ const GUIDES: LiveLink = { label: 'Guides', href: '/guides' };
 const DOCS: PlannedLink = { label: 'Docs', planned: true };
 const DEVELOPERS: LiveLink = { label: 'Developers', href: '/developers' };
 const PRICING: LiveLink = { label: 'Pricing', href: '/pricing' };
-const FOR_AGENCIES: LiveLink = { label: 'For agencies', href: '/agencies' };
+/** For agencies' page; Home's Agency card links it while the plan is not on sale. */
+export const FOR_AGENCIES: LiveLink = { label: 'For agencies', href: '/agencies' };
 
 /** The marketing header: four top-level items, Developers under Learn. */
 export const MARKETING_NAV: NavEntry[] = [
