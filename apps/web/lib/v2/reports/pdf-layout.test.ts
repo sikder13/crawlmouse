@@ -165,6 +165,22 @@ describe('drawDoc', () => {
     expect(new Set(cell.pages).size).toBeGreaterThan(1);
   });
 
+  it('moves a paragraph that fits on a page to the next one rather than split it (F-126)', () => {
+    const para = Array.from({ length: 60 }, (_, n) => `word${n}`).join(' ');
+    // Enough paragraphs that one of them meets the bottom of page 1 part-way.
+    const texts = Array.from({ length: 40 }, (_, n) => `${n}: ${para}`);
+    const d = doc({
+      sections: [
+        { heading: 'Many', blocks: texts.map((text) => ({ type: 'text' as const, text })) },
+      ],
+    });
+    const drawn = draw(d);
+    const instances = expectDrawsTheDocument(d, drawn).filter((i) => texts.includes(i.text));
+    expect(instances).toHaveLength(texts.length);
+    expect(new Set(instances.flatMap((i) => i.pages)).size).toBeGreaterThan(1);
+    for (const i of instances) expect(new Set(i.pages).size, i.text.slice(0, 4)).toBe(1);
+  });
+
   it('marks each not-measured sentence, after a rule', () => {
     const d = doc({
       notMeasured: ['Text without JavaScript was not measured.', 'Tested 6 of 7 signals'],

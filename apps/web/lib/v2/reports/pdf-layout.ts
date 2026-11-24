@@ -12,8 +12,8 @@
  * page's number (`PAGE_NUMBER`).
  *
  * A table's column names are drawn again at the top of each page the table runs onto. A row, a
- * before-and-after pair or a heading with its first lines moves to a new page when it would
- * otherwise be split and fits on one; a row or pair taller than a page runs on, line by line.
+ * before-and-after pair, a paragraph or a heading with its first lines moves to a new page when it
+ * would otherwise be split and fits on one; one taller than a page runs on, line by line.
  */
 import type { DocBlock, DocSide, ReportDoc } from './generate';
 
@@ -326,7 +326,10 @@ class Flow {
 
   /** One string as a paragraph across the page's width. */
   paragraph(text: string, source: number, style: TextStyle): void {
-    this.columns([{ x: MARGIN.x, pieces: [this.piece(text, source, style, WIDTH)] }]);
+    const columns = [{ x: MARGIN.x, pieces: [this.piece(text, source, style, WIDTH)] }];
+    // A paragraph that fits on a page is not split by a page's footer (F-126); a longer one runs on.
+    this.keep(Flow.heightOf(columns));
+    this.columns(columns);
   }
 
   /** A paragraph with a square mark before its first line. */
