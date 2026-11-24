@@ -46,7 +46,7 @@ type Job = {
 };
 const ci = parse(readFileSync(CI_FILE, 'utf8')) as {
   on: unknown;
-  concurrency: { group: string };
+  concurrency: { group: string; 'cancel-in-progress': boolean | string };
   jobs: Record<string, Job>;
 };
 
@@ -80,10 +80,14 @@ describe('ci.yml triggers', () => {
     });
   });
 
-  it('keys its concurrency group on the ref, with one group per run on main', () => {
+  it('keys its concurrency group on the ref; on main pushes share one group and the nightly and a dispatch keep their own', () => {
     expect(ci.concurrency.group).toBe(
-      "ci-${{ github.ref }}${{ github.ref == 'refs/heads/main' && format('-{0}', github.run_id) || '' }}",
+      "ci-${{ github.ref }}${{ github.ref == 'refs/heads/main' && github.event_name != 'push' && format('-{0}', github.run_id) || '' }}",
     );
+  });
+
+  it('never cancels a running run on main, and cancels an older run of any other ref', () => {
+    expect(ci.concurrency['cancel-in-progress']).toBe("${{ github.ref != 'refs/heads/main' }}");
   });
 
   // A pull request's later pushes run the visual set from the push itself (its pull request is open),
