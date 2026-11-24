@@ -93,6 +93,11 @@ export const CrawlerResultSchema = z
     /** The HTTP status that decided the verdict; null when it rests on robots.txt alone. */
     status: HttpStatusSchema.nullable(),
     pages_measured: CountSchema,
+    /**
+     * Of those, the pages where our request with this crawler's user agent was served. Absent on a row
+     * stored before this field existed: `pages_measured` also counts refused and disallowed pages.
+     */
+    pages_served: CountSchema.optional(),
     cause: AccessCauseSchema.nullable(),
     /** Share of a browser-rendered page's words this crawler can read; null when it read nothing measurable. */
     text_share: ShareSchema.nullable(),
