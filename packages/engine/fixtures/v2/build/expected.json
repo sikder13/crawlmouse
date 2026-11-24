@@ -259,6 +259,7 @@
         "evidence_class": "declared",
         "status": null,
         "pages_measured": 60,
+        "pages_served": 0,
         "cause": null,
         "text_share": null,
         "confidence": "confirmed",
@@ -303,6 +304,7 @@
         "evidence_class": "declared",
         "status": null,
         "pages_measured": 60,
+        "pages_served": 0,
         "cause": null,
         "text_share": null,
         "confidence": "confirmed",
@@ -347,6 +349,7 @@
         "evidence_class": "simulated",
         "status": 200,
         "pages_measured": 50,
+        "pages_served": 50,
         "cause": null,
         "text_share": null,
         "confidence": "likely",
@@ -391,6 +394,7 @@
         "evidence_class": "simulated",
         "status": 200,
         "pages_measured": 50,
+        "pages_served": 50,
         "cause": null,
         "text_share": null,
         "confidence": "likely",
@@ -435,6 +439,7 @@
         "evidence_class": "simulated",
         "status": 200,
         "pages_measured": 50,
+        "pages_served": 36,
         "cause": null,
         "text_share": null,
         "confidence": "likely",
@@ -479,6 +484,7 @@
         "evidence_class": "simulated",
         "status": 200,
         "pages_measured": 50,
+        "pages_served": 50,
         "cause": null,
         "text_share": null,
         "confidence": "likely",
@@ -523,6 +529,7 @@
         "evidence_class": "declared",
         "status": null,
         "pages_measured": 50,
+        "pages_served": 0,
         "cause": "robots_txt_disallow",
         "text_share": null,
         "confidence": "confirmed",
@@ -567,6 +574,7 @@
         "evidence_class": "simulated",
         "status": 403,
         "pages_measured": 50,
+        "pages_served": 0,
         "cause": null,
         "text_share": null,
         "confidence": "likely",
@@ -5814,7 +5822,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "OAI-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot were served on this page."
+        "OAI-SearchBot was served on this page from the same address, so this refusal was not of our address alone; a rule that verifies only this crawler’s addresses would look the same. OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot were served on this page."
       ],
       "cause": null,
       "request_headers": [
@@ -6326,7 +6334,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "OAI-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot were served on this page."
+        "OAI-SearchBot was served on this page from the same address, so this refusal was not of our address alone; a rule that verifies only this crawler’s addresses would look the same. OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot were served on this page."
       ],
       "cause": null,
       "request_headers": [
@@ -6646,7 +6654,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "OAI-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. OAI-SearchBot, ChatGPT-User and Claude-SearchBot were served on this page."
+        "OAI-SearchBot was served on this page from the same address, so this refusal was not of our address alone; a rule that verifies only this crawler’s addresses would look the same. OAI-SearchBot, ChatGPT-User and Claude-SearchBot were served on this page."
       ],
       "cause": null,
       "request_headers": [
@@ -6842,7 +6850,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "OAI-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. OAI-SearchBot, ChatGPT-User and Claude-SearchBot were served on this page."
+        "OAI-SearchBot was served on this page from the same address, so this refusal was not of our address alone; a rule that verifies only this crawler’s addresses would look the same. OAI-SearchBot, ChatGPT-User and Claude-SearchBot were served on this page."
       ],
       "cause": null,
       "request_headers": [
@@ -7354,7 +7362,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "OAI-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot were served on this page."
+        "OAI-SearchBot was served on this page from the same address, so this refusal was not of our address alone; a rule that verifies only this crawler’s addresses would look the same. OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot were served on this page."
       ],
       "cause": null,
       "request_headers": [
@@ -7866,7 +7874,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "OAI-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot were served on this page."
+        "OAI-SearchBot was served on this page from the same address, so this refusal was not of our address alone; a rule that verifies only this crawler’s addresses would look the same. OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot were served on this page."
       ],
       "cause": null,
       "request_headers": [
@@ -8378,7 +8386,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "OAI-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot were served on this page."
+        "OAI-SearchBot was served on this page from the same address, so this refusal was not of our address alone; a rule that verifies only this crawler’s addresses would look the same. OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot were served on this page."
       ],
       "cause": null,
       "request_headers": [
@@ -8890,7 +8898,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "OAI-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot were served on this page."
+        "OAI-SearchBot was served on this page from the same address, so this refusal was not of our address alone; a rule that verifies only this crawler’s addresses would look the same. OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot were served on this page."
       ],
       "cause": null,
       "request_headers": [
@@ -9402,7 +9410,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "OAI-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot were served on this page."
+        "OAI-SearchBot was served on this page from the same address, so this refusal was not of our address alone; a rule that verifies only this crawler’s addresses would look the same. OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot were served on this page."
       ],
       "cause": null,
       "request_headers": [
@@ -9914,7 +9922,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "OAI-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot were served on this page."
+        "OAI-SearchBot was served on this page from the same address, so this refusal was not of our address alone; a rule that verifies only this crawler’s addresses would look the same. OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot were served on this page."
       ],
       "cause": null,
       "request_headers": [
@@ -10426,7 +10434,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "OAI-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot were served on this page."
+        "OAI-SearchBot was served on this page from the same address, so this refusal was not of our address alone; a rule that verifies only this crawler’s addresses would look the same. OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot were served on this page."
       ],
       "cause": null,
       "request_headers": [
@@ -10938,7 +10946,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "OAI-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot were served on this page."
+        "OAI-SearchBot was served on this page from the same address, so this refusal was not of our address alone; a rule that verifies only this crawler’s addresses would look the same. OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot were served on this page."
       ],
       "cause": null,
       "request_headers": [
@@ -11450,7 +11458,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "OAI-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot were served on this page."
+        "OAI-SearchBot was served on this page from the same address, so this refusal was not of our address alone; a rule that verifies only this crawler’s addresses would look the same. OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot were served on this page."
       ],
       "cause": null,
       "request_headers": [
@@ -11770,7 +11778,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "OAI-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. OAI-SearchBot, ChatGPT-User and Claude-SearchBot were served on this page."
+        "OAI-SearchBot was served on this page from the same address, so this refusal was not of our address alone; a rule that verifies only this crawler’s addresses would look the same. OAI-SearchBot, ChatGPT-User and Claude-SearchBot were served on this page."
       ],
       "cause": null,
       "request_headers": [
@@ -11966,7 +11974,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "OAI-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. OAI-SearchBot, ChatGPT-User and Claude-SearchBot were served on this page."
+        "OAI-SearchBot was served on this page from the same address, so this refusal was not of our address alone; a rule that verifies only this crawler’s addresses would look the same. OAI-SearchBot, ChatGPT-User and Claude-SearchBot were served on this page."
       ],
       "cause": null,
       "request_headers": [
@@ -12286,7 +12294,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "OAI-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. OAI-SearchBot, ChatGPT-User and Claude-SearchBot were served on this page."
+        "OAI-SearchBot was served on this page from the same address, so this refusal was not of our address alone; a rule that verifies only this crawler’s addresses would look the same. OAI-SearchBot, ChatGPT-User and Claude-SearchBot were served on this page."
       ],
       "cause": null,
       "request_headers": [
@@ -12482,7 +12490,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "OAI-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. OAI-SearchBot, ChatGPT-User and Claude-SearchBot were served on this page."
+        "OAI-SearchBot was served on this page from the same address, so this refusal was not of our address alone; a rule that verifies only this crawler’s addresses would look the same. OAI-SearchBot, ChatGPT-User and Claude-SearchBot were served on this page."
       ],
       "cause": null,
       "request_headers": [
@@ -12994,7 +13002,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "OAI-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot were served on this page."
+        "OAI-SearchBot was served on this page from the same address, so this refusal was not of our address alone; a rule that verifies only this crawler’s addresses would look the same. OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot were served on this page."
       ],
       "cause": null,
       "request_headers": [
@@ -13314,7 +13322,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "OAI-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. OAI-SearchBot, ChatGPT-User and Claude-SearchBot were served on this page."
+        "OAI-SearchBot was served on this page from the same address, so this refusal was not of our address alone; a rule that verifies only this crawler’s addresses would look the same. OAI-SearchBot, ChatGPT-User and Claude-SearchBot were served on this page."
       ],
       "cause": null,
       "request_headers": [
@@ -13510,7 +13518,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "OAI-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. OAI-SearchBot, ChatGPT-User and Claude-SearchBot were served on this page."
+        "OAI-SearchBot was served on this page from the same address, so this refusal was not of our address alone; a rule that verifies only this crawler’s addresses would look the same. OAI-SearchBot, ChatGPT-User and Claude-SearchBot were served on this page."
       ],
       "cause": null,
       "request_headers": [
@@ -13830,7 +13838,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "OAI-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. OAI-SearchBot, ChatGPT-User and Claude-SearchBot were served on this page."
+        "OAI-SearchBot was served on this page from the same address, so this refusal was not of our address alone; a rule that verifies only this crawler’s addresses would look the same. OAI-SearchBot, ChatGPT-User and Claude-SearchBot were served on this page."
       ],
       "cause": null,
       "request_headers": [
@@ -14026,7 +14034,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "OAI-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. OAI-SearchBot, ChatGPT-User and Claude-SearchBot were served on this page."
+        "OAI-SearchBot was served on this page from the same address, so this refusal was not of our address alone; a rule that verifies only this crawler’s addresses would look the same. OAI-SearchBot, ChatGPT-User and Claude-SearchBot were served on this page."
       ],
       "cause": null,
       "request_headers": [
@@ -14346,7 +14354,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "OAI-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. OAI-SearchBot, ChatGPT-User and Claude-SearchBot were served on this page."
+        "OAI-SearchBot was served on this page from the same address, so this refusal was not of our address alone; a rule that verifies only this crawler’s addresses would look the same. OAI-SearchBot, ChatGPT-User and Claude-SearchBot were served on this page."
       ],
       "cause": null,
       "request_headers": [
@@ -14542,7 +14550,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "OAI-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. OAI-SearchBot, ChatGPT-User and Claude-SearchBot were served on this page."
+        "OAI-SearchBot was served on this page from the same address, so this refusal was not of our address alone; a rule that verifies only this crawler’s addresses would look the same. OAI-SearchBot, ChatGPT-User and Claude-SearchBot were served on this page."
       ],
       "cause": null,
       "request_headers": [
@@ -14862,7 +14870,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "OAI-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. OAI-SearchBot, ChatGPT-User and Claude-SearchBot were served on this page."
+        "OAI-SearchBot was served on this page from the same address, so this refusal was not of our address alone; a rule that verifies only this crawler’s addresses would look the same. OAI-SearchBot, ChatGPT-User and Claude-SearchBot were served on this page."
       ],
       "cause": null,
       "request_headers": [
@@ -15058,7 +15066,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "OAI-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. OAI-SearchBot, ChatGPT-User and Claude-SearchBot were served on this page."
+        "OAI-SearchBot was served on this page from the same address, so this refusal was not of our address alone; a rule that verifies only this crawler’s addresses would look the same. OAI-SearchBot, ChatGPT-User and Claude-SearchBot were served on this page."
       ],
       "cause": null,
       "request_headers": [
@@ -15570,7 +15578,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "OAI-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot were served on this page."
+        "OAI-SearchBot was served on this page from the same address, so this refusal was not of our address alone; a rule that verifies only this crawler’s addresses would look the same. OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot were served on this page."
       ],
       "cause": null,
       "request_headers": [
@@ -15890,7 +15898,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "OAI-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. OAI-SearchBot, ChatGPT-User and Claude-SearchBot were served on this page."
+        "OAI-SearchBot was served on this page from the same address, so this refusal was not of our address alone; a rule that verifies only this crawler’s addresses would look the same. OAI-SearchBot, ChatGPT-User and Claude-SearchBot were served on this page."
       ],
       "cause": null,
       "request_headers": [
@@ -16086,7 +16094,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "OAI-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. OAI-SearchBot, ChatGPT-User and Claude-SearchBot were served on this page."
+        "OAI-SearchBot was served on this page from the same address, so this refusal was not of our address alone; a rule that verifies only this crawler’s addresses would look the same. OAI-SearchBot, ChatGPT-User and Claude-SearchBot were served on this page."
       ],
       "cause": null,
       "request_headers": [
@@ -16598,7 +16606,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "OAI-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot were served on this page."
+        "OAI-SearchBot was served on this page from the same address, so this refusal was not of our address alone; a rule that verifies only this crawler’s addresses would look the same. OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot were served on this page."
       ],
       "cause": null,
       "request_headers": [
@@ -17110,7 +17118,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "OAI-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot were served on this page."
+        "OAI-SearchBot was served on this page from the same address, so this refusal was not of our address alone; a rule that verifies only this crawler’s addresses would look the same. OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot were served on this page."
       ],
       "cause": null,
       "request_headers": [
@@ -17430,7 +17438,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "OAI-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. OAI-SearchBot, ChatGPT-User and Claude-SearchBot were served on this page."
+        "OAI-SearchBot was served on this page from the same address, so this refusal was not of our address alone; a rule that verifies only this crawler’s addresses would look the same. OAI-SearchBot, ChatGPT-User and Claude-SearchBot were served on this page."
       ],
       "cause": null,
       "request_headers": [
@@ -17626,7 +17634,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "OAI-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. OAI-SearchBot, ChatGPT-User and Claude-SearchBot were served on this page."
+        "OAI-SearchBot was served on this page from the same address, so this refusal was not of our address alone; a rule that verifies only this crawler’s addresses would look the same. OAI-SearchBot, ChatGPT-User and Claude-SearchBot were served on this page."
       ],
       "cause": null,
       "request_headers": [
@@ -18138,7 +18146,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "OAI-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot were served on this page."
+        "OAI-SearchBot was served on this page from the same address, so this refusal was not of our address alone; a rule that verifies only this crawler’s addresses would look the same. OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot were served on this page."
       ],
       "cause": null,
       "request_headers": [
@@ -18650,7 +18658,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "OAI-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot were served on this page."
+        "OAI-SearchBot was served on this page from the same address, so this refusal was not of our address alone; a rule that verifies only this crawler’s addresses would look the same. OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot were served on this page."
       ],
       "cause": null,
       "request_headers": [
@@ -18970,7 +18978,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "OAI-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. OAI-SearchBot, ChatGPT-User and Claude-SearchBot were served on this page."
+        "OAI-SearchBot was served on this page from the same address, so this refusal was not of our address alone; a rule that verifies only this crawler’s addresses would look the same. OAI-SearchBot, ChatGPT-User and Claude-SearchBot were served on this page."
       ],
       "cause": null,
       "request_headers": [
@@ -19166,7 +19174,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "OAI-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. OAI-SearchBot, ChatGPT-User and Claude-SearchBot were served on this page."
+        "OAI-SearchBot was served on this page from the same address, so this refusal was not of our address alone; a rule that verifies only this crawler’s addresses would look the same. OAI-SearchBot, ChatGPT-User and Claude-SearchBot were served on this page."
       ],
       "cause": null,
       "request_headers": [
@@ -19678,7 +19686,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "OAI-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot were served on this page."
+        "OAI-SearchBot was served on this page from the same address, so this refusal was not of our address alone; a rule that verifies only this crawler’s addresses would look the same. OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot were served on this page."
       ],
       "cause": null,
       "request_headers": [
@@ -19998,7 +20006,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "OAI-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. OAI-SearchBot, ChatGPT-User and Claude-SearchBot were served on this page."
+        "OAI-SearchBot was served on this page from the same address, so this refusal was not of our address alone; a rule that verifies only this crawler’s addresses would look the same. OAI-SearchBot, ChatGPT-User and Claude-SearchBot were served on this page."
       ],
       "cause": null,
       "request_headers": [
@@ -20194,7 +20202,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "OAI-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. OAI-SearchBot, ChatGPT-User and Claude-SearchBot were served on this page."
+        "OAI-SearchBot was served on this page from the same address, so this refusal was not of our address alone; a rule that verifies only this crawler’s addresses would look the same. OAI-SearchBot, ChatGPT-User and Claude-SearchBot were served on this page."
       ],
       "cause": null,
       "request_headers": [
@@ -20706,7 +20714,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "OAI-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot were served on this page."
+        "OAI-SearchBot was served on this page from the same address, so this refusal was not of our address alone; a rule that verifies only this crawler’s addresses would look the same. OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot were served on this page."
       ],
       "cause": null,
       "request_headers": [
@@ -21026,7 +21034,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "OAI-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. OAI-SearchBot, ChatGPT-User and Claude-SearchBot were served on this page."
+        "OAI-SearchBot was served on this page from the same address, so this refusal was not of our address alone; a rule that verifies only this crawler’s addresses would look the same. OAI-SearchBot, ChatGPT-User and Claude-SearchBot were served on this page."
       ],
       "cause": null,
       "request_headers": [
@@ -21222,7 +21230,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "OAI-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. OAI-SearchBot, ChatGPT-User and Claude-SearchBot were served on this page."
+        "OAI-SearchBot was served on this page from the same address, so this refusal was not of our address alone; a rule that verifies only this crawler’s addresses would look the same. OAI-SearchBot, ChatGPT-User and Claude-SearchBot were served on this page."
       ],
       "cause": null,
       "request_headers": [
@@ -21734,7 +21742,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "OAI-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot were served on this page."
+        "OAI-SearchBot was served on this page from the same address, so this refusal was not of our address alone; a rule that verifies only this crawler’s addresses would look the same. OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot were served on this page."
       ],
       "cause": null,
       "request_headers": [
@@ -22054,7 +22062,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "OAI-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. OAI-SearchBot, ChatGPT-User and Claude-SearchBot were served on this page."
+        "OAI-SearchBot was served on this page from the same address, so this refusal was not of our address alone; a rule that verifies only this crawler’s addresses would look the same. OAI-SearchBot, ChatGPT-User and Claude-SearchBot were served on this page."
       ],
       "cause": null,
       "request_headers": [
@@ -22250,7 +22258,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "OAI-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. OAI-SearchBot, ChatGPT-User and Claude-SearchBot were served on this page."
+        "OAI-SearchBot was served on this page from the same address, so this refusal was not of our address alone; a rule that verifies only this crawler’s addresses would look the same. OAI-SearchBot, ChatGPT-User and Claude-SearchBot were served on this page."
       ],
       "cause": null,
       "request_headers": [
@@ -22762,7 +22770,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "OAI-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot were served on this page."
+        "OAI-SearchBot was served on this page from the same address, so this refusal was not of our address alone; a rule that verifies only this crawler’s addresses would look the same. OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot were served on this page."
       ],
       "cause": null,
       "request_headers": [
@@ -23082,7 +23090,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "OAI-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. OAI-SearchBot, ChatGPT-User and Claude-SearchBot were served on this page."
+        "OAI-SearchBot was served on this page from the same address, so this refusal was not of our address alone; a rule that verifies only this crawler’s addresses would look the same. OAI-SearchBot, ChatGPT-User and Claude-SearchBot were served on this page."
       ],
       "cause": null,
       "request_headers": [
@@ -23278,7 +23286,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "OAI-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. OAI-SearchBot, ChatGPT-User and Claude-SearchBot were served on this page."
+        "OAI-SearchBot was served on this page from the same address, so this refusal was not of our address alone; a rule that verifies only this crawler’s addresses would look the same. OAI-SearchBot, ChatGPT-User and Claude-SearchBot were served on this page."
       ],
       "cause": null,
       "request_headers": [
@@ -23790,7 +23798,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "OAI-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot were served on this page."
+        "OAI-SearchBot was served on this page from the same address, so this refusal was not of our address alone; a rule that verifies only this crawler’s addresses would look the same. OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot were served on this page."
       ],
       "cause": null,
       "request_headers": [
@@ -24302,7 +24310,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "OAI-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot were served on this page."
+        "OAI-SearchBot was served on this page from the same address, so this refusal was not of our address alone; a rule that verifies only this crawler’s addresses would look the same. OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot were served on this page."
       ],
       "cause": null,
       "request_headers": [
@@ -24814,7 +24822,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "OAI-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot were served on this page."
+        "OAI-SearchBot was served on this page from the same address, so this refusal was not of our address alone; a rule that verifies only this crawler’s addresses would look the same. OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot were served on this page."
       ],
       "cause": null,
       "request_headers": [
@@ -25326,7 +25334,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "OAI-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot were served on this page."
+        "OAI-SearchBot was served on this page from the same address, so this refusal was not of our address alone; a rule that verifies only this crawler’s addresses would look the same. OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot were served on this page."
       ],
       "cause": null,
       "request_headers": [
@@ -25838,7 +25846,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "OAI-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot were served on this page."
+        "OAI-SearchBot was served on this page from the same address, so this refusal was not of our address alone; a rule that verifies only this crawler’s addresses would look the same. OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot were served on this page."
       ],
       "cause": null,
       "request_headers": [
@@ -26350,7 +26358,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "OAI-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot were served on this page."
+        "OAI-SearchBot was served on this page from the same address, so this refusal was not of our address alone; a rule that verifies only this crawler’s addresses would look the same. OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot were served on this page."
       ],
       "cause": null,
       "request_headers": [
@@ -26862,7 +26870,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "OAI-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot were served on this page."
+        "OAI-SearchBot was served on this page from the same address, so this refusal was not of our address alone; a rule that verifies only this crawler’s addresses would look the same. OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot were served on this page."
       ],
       "cause": null,
       "request_headers": [
@@ -27374,7 +27382,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "OAI-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot were served on this page."
+        "OAI-SearchBot was served on this page from the same address, so this refusal was not of our address alone; a rule that verifies only this crawler’s addresses would look the same. OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot were served on this page."
       ],
       "cause": null,
       "request_headers": [
@@ -27886,7 +27894,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "OAI-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot were served on this page."
+        "OAI-SearchBot was served on this page from the same address, so this refusal was not of our address alone; a rule that verifies only this crawler’s addresses would look the same. OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot were served on this page."
       ],
       "cause": null,
       "request_headers": [
@@ -28398,7 +28406,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "OAI-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot were served on this page."
+        "OAI-SearchBot was served on this page from the same address, so this refusal was not of our address alone; a rule that verifies only this crawler’s addresses would look the same. OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot were served on this page."
       ],
       "cause": null,
       "request_headers": [
@@ -28910,7 +28918,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "OAI-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot were served on this page."
+        "OAI-SearchBot was served on this page from the same address, so this refusal was not of our address alone; a rule that verifies only this crawler’s addresses would look the same. OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot were served on this page."
       ],
       "cause": null,
       "request_headers": [
@@ -29422,7 +29430,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "OAI-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot were served on this page."
+        "OAI-SearchBot was served on this page from the same address, so this refusal was not of our address alone; a rule that verifies only this crawler’s addresses would look the same. OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot were served on this page."
       ],
       "cause": null,
       "request_headers": [
@@ -29934,7 +29942,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "OAI-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot were served on this page."
+        "OAI-SearchBot was served on this page from the same address, so this refusal was not of our address alone; a rule that verifies only this crawler’s addresses would look the same. OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot were served on this page."
       ],
       "cause": null,
       "request_headers": [
@@ -30446,7 +30454,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "OAI-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot were served on this page."
+        "OAI-SearchBot was served on this page from the same address, so this refusal was not of our address alone; a rule that verifies only this crawler’s addresses would look the same. OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot were served on this page."
       ],
       "cause": null,
       "request_headers": [
@@ -30958,7 +30966,7 @@
       "source_ip_class": "other_egress",
       "limitations": [
         "Requested with the crawler's user agent tagged \"Crawlmouse/2.0\", from Crawlmouse's own IP address, not the operator's. A rule that matches the exact user agent will not fire on it, and a site that checks crawler IP addresses treats it as unverified.",
-        "OAI-SearchBot was served on this page from the same address, so this refusal is aimed at the user agent, not at an unverified address. OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot were served on this page."
+        "OAI-SearchBot was served on this page from the same address, so this refusal was not of our address alone; a rule that verifies only this crawler’s addresses would look the same. OAI-SearchBot, ChatGPT-User, PerplexityBot and Claude-SearchBot were served on this page."
       ],
       "cause": null,
       "request_headers": [
@@ -31413,7 +31421,7 @@
       "number": 5,
       "type": "edge_rule_blocks_crawler",
       "section": "crawler_access",
-      "title": "Let ClaudeBot through the user-agent rule",
+      "title": "Find the rule that refused our request as ClaudeBot",
       "detail": null,
       "recommendation_class": "confirmed_defect",
       "status": "open",
@@ -31453,10 +31461,10 @@
           "generic"
         ],
         "context": [
-          "`ClaudeBot` was refused on 50 of the 50 sampled pages the audit judged it on, by a rule that matches its user agent.",
+          "Our request with `ClaudeBot`'s user agent was refused on 50 of the 50 sampled pages the audit judged it on.",
           "Status of the refused requests: 403 (50 requests).",
           "The responses name no product: the audit did not identify what holds the rule.",
-          "On 50 of those pages another identity was served from the same address (`OAI-SearchBot`), so the refusal is aimed at the user agent.",
+          "On 50 of those pages another identity was served from the same address (`OAI-SearchBot`), so the refusal was not of our address alone; a rule that verifies only `ClaudeBot`'s addresses would look the same.",
           "The audit sent this user agent with a Crawlmouse tag, from Crawlmouse’s address. What the operator’s own crawler gets is in the site’s logs.",
           "Pages refused: `https://built-site.test`, `https://built-site.test/blog/camp-cooking-ideas`, `https://built-site.test/blog/campfire-safety-basics`, `https://built-site.test/blog/choosing-tent-pegs`, `https://built-site.test/blog/coming-soon-note` and 45 more pages not shown."
         ],
@@ -32070,7 +32078,7 @@
       "kind": "opened",
       "severity": "warn",
       "subject": "crawler_access",
-      "summary": "Let ClaudeBot through the user-agent rule",
+      "summary": "Find the rule that refused our request as ClaudeBot",
       "where": "all pages",
       "pages_affected": 50,
       "ua": "ClaudeBot",

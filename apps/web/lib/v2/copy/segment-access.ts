@@ -11,7 +11,7 @@ export const ACCESS_CHANGES: CopyChange[] = [
     locked:
       'Two of six crawlers never get in. blocked GPTBot is refused by a Cloudflare firewall rule on every page. PerplexityBot is served a challenge page instead of your content. Google, Bing, OAI-SearchBot and ClaudeBot reach the site; two of them then hit the JavaScript problem covered in the next section.',
     rendered:
-      'One of six AI crawlers is blocked, and one is challenged. 1 blocked · 1 challenged GPTBot is blocked by a firewall rule; PerplexityBot gets a challenge page. The other four AI crawlers get in; OAI-SearchBot, ChatGPT-User, Claude-SearchBot and ClaudeBot then read product pages empty without JavaScript, covered in the next section. Googlebot and Bingbot are allowed by robots.txt.',
+      'Requests as one of six AI crawlers were refused while another crawler name was served, and one was challenged. 1 refused, others served · 1 challenged GPTBot was refused by a firewall rule when we sent its user agent; PerplexityBot was challenged when we sent its user agent. Requests with the other four AI crawlers’ user agents were served; OAI-SearchBot, ChatGPT-User, Claude-SearchBot and ClaudeBot then read product pages empty without JavaScript, covered in the next section. Googlebot and Bingbot are allowed by robots.txt.',
     source:
       'FACTS I6 and I2: “two of six crawlers never get in” is ENGINE-DERIVED under the new vocabulary, where a challenge is not “blocked”; the pill is the Result door’s.',
   },
@@ -20,7 +20,7 @@ export const ACCESS_CHANGES: CopyChange[] = [
     kind: 'facts',
     locked: 'Crawlers tested 6 Pages requested per crawler 214 Responses kept as evidence 1,284',
     rendered:
-      'AI crawlers tested 6 Pages fetched per crawler 50 of 214 Responses kept as evidence 408',
+      'AI crawlers tested 6 Pages sampled per crawler 50 of 214 Responses kept as evidence 408',
     source:
       'FACTS B2 (the tiles, FACTS-proposed line 215) and I1; 408 is the fixture’s count of the responses this audit kept (`withheld.total`).',
   },
@@ -30,7 +30,7 @@ export const ACCESS_CHANGES: CopyChange[] = [
     locked:
       'Select a cell to see the raw request and response. Tested by user agent; your CDN may treat signed bots differently.',
     rendered:
-      'Each page was requested with the crawler’s own user agent, tagged “Crawlmouse/2.0 (+https://crawlmouse.com/bot)”, from our published IPs. Rules that match the whole string exactly will not fire on the tagged version, so a block can be under-reported here. Verify this site in Settings and we test with the exact strings. Rendering requests come from Cloudflare Browser Rendering, and one untagged browser-identity control fetch per sampled page is part of the method. Select a cell to see the raw request and response.',
+      'We request a sampled page with the crawler’s own user agent, tagged “Crawlmouse/2.0 (+https://crawlmouse.com/bot)”, from Crawlmouse’s own address, not the operator’s, only where our browser-identity control gets a normal answer and robots.txt allows that crawler. A rule matching the exact string will not fire on it, and a site that verifies crawler addresses may refuse it while serving the real crawler. Rendering requests come from Cloudflare Browser Rendering. One untagged browser-identity control fetch per sampled page is part of the method. Select a cell to see the raw request and response.',
     source: 'FACTS D1, with its L5 correction (FACTS-proposed line 217 points there).',
   },
   {
@@ -39,7 +39,7 @@ export const ACCESS_CHANGES: CopyChange[] = [
     locked:
       'Googlebot ● 200 ● 200 ● 200 ● 200 100% — Bingbot ● 200 ● 200 ● 200 ● 200 100% — GPTBot ■ 403 ■ 403 ■ 403 ■ 403 0% Cloudflare firewall rule (error 1020) OAI-SearchBot ● 200 ● 200 ▲ empty shell ● 200 31% client-rendered template ClaudeBot ● 200 ● 200 ▲ empty shell ● 200 31% client-rendered template PerplexityBot ■ challenge ■ challenge ■ challenge ■ challenge 0% Bot Fight Mode challenge',
     rendered:
-      'Googlebot allowed by robots.txt 100%* verified-bot response not testable from outside Bingbot allowed by robots.txt 100%* verified-bot response not testable from outside OAI-SearchBot allowed 200 allowed 200 allowed, thin 200 allowed 200 31% client-rendered template ChatGPT-User allowed 200 allowed 200 allowed, thin 200 allowed 200 31% client-rendered template PerplexityBot challenged: the real crawler may pass 403 challenged: the real crawler may pass 403 challenged: the real crawler may pass 403 challenged: the real crawler may pass 403 0% Bot Fight Mode challenge Claude-SearchBot allowed 200 allowed 200 allowed, thin 200 allowed 200 31% client-rendered template GPTBot blocked by a rule 403 blocked by a rule 403 blocked by a rule 403 blocked by a rule 403 0% Cloudflare firewall rule (error 1020) ClaudeBot allowed 200 allowed 200 allowed, thin 200 allowed 200 31% client-rendered template',
+      'Googlebot allowed by robots.txt 100%* verified-bot response not testable from outside Bingbot allowed by robots.txt 100%* verified-bot response not testable from outside OAI-SearchBot allowed 200 allowed 200 allowed, thin 200 allowed 200 31% client-rendered template ChatGPT-User allowed 200 allowed 200 allowed, thin 200 allowed 200 31% client-rendered template PerplexityBot challenged: the real crawler may pass 403 challenged: the real crawler may pass 403 challenged: the real crawler may pass 403 challenged: the real crawler may pass 403 0% Bot Fight Mode challenge Claude-SearchBot allowed 200 allowed 200 allowed, thin 200 allowed 200 31% client-rendered template GPTBot refused, others served 403 refused, others served 403 refused, others served 403 refused, others served 403 0% Cloudflare firewall rule (error 1020) ClaudeBot allowed 200 allowed 200 allowed, thin 200 allowed 200 31% client-rendered template',
     source:
       'FACTS I6 (eight crawlers in three groups), B2 (Googlebot and Bingbot by robots.txt, one cell, 100%*) and I2 (a verdict phrase beside every cell; ○ for a challenge, not ■).',
   },
@@ -136,6 +136,11 @@ export const ACCESS_CHANGES: CopyChange[] = [
 ];
 
 export const ACCESS_ADDITIONS: Addition[] = [
+  {
+    screen: 'segment-access',
+    what: 'How sure each crawler’s verdict is, beside its name',
+    source: 'V2R PR 2a, F-156: the confidence the engine computes, which no screen showed',
+  },
   {
     screen: 'segment-access',
     what: 'The evidence class beside each verdict, the group rows of the matrix, and the footnote on Google and Bing’s rendering',

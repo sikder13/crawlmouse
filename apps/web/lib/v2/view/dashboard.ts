@@ -28,7 +28,7 @@ import {
   weekdayLong,
   weekdayTime,
 } from '../format';
-import { isAi, isBlocked } from '../sentences';
+import { isAi, isBlocked, keptOutWord } from '../sentences';
 import { count, plural } from '../words';
 import {
   PLAN_NAMES,
@@ -108,7 +108,7 @@ export interface HealthView {
 
 export interface CountView {
   count: number;
-  /** What was counted: "crawlers blocked", "orphan pages". */
+  /** What was counted: "crawlers blocked", "crawlers refused", "orphan pages". */
   noun: string;
   /** The verdicts behind a "blocked" noun, so the copy guard can check the word. */
   verdicts: Verdict[];
@@ -342,6 +342,12 @@ function allBlocked(v: AccountView, changes: readonly Change[]): boolean {
   );
 }
 
+/** "2 crawlers refused": the count's noun, in the word its verdicts earn. */
+export function keptOutNoun(n: number, verdicts: readonly Verdict[]): string {
+  const word = keptOutWord(verdicts);
+  return plural(n, `crawler ${word}`, `crawlers ${word}`);
+}
+
 function countOf(v: AccountView, changes: readonly Change[]): CountView {
   const verdicts = changes.flatMap((c) => verdictOf(v, c) ?? []);
   if (!changes.length) return { count: 0, noun: '', verdicts };
@@ -349,7 +355,7 @@ function countOf(v: AccountView, changes: readonly Change[]): CountView {
   if (allBlocked(v, changes)) {
     return {
       count: changes.length,
-      noun: plural(changes.length, 'crawler blocked', 'crawlers blocked'),
+      noun: keptOutNoun(changes.length, verdicts),
       verdicts,
     };
   }
@@ -369,7 +375,7 @@ function since(v: AccountView, site: Site): SinceCellView {
   if (opened.length) {
     pills.push({
       state: PILL.opened,
-      label: `${opened.length} ${allBlocked(v, opened) ? 'blocked' : 'opened'}`,
+      label: `${opened.length} ${allBlocked(v, opened) ? keptOutWord(opened.flatMap((c) => verdictOf(v, c) ?? [])) : 'opened'}`,
     });
   }
   if (resolved.length) pills.push({ state: PILL.resolved, label: `${resolved.length} resolved` });
@@ -627,7 +633,7 @@ function history(v: AccountView, site: Site): HistoryView | null {
     marker: blockedThere.length
       ? {
           index: markAt,
-          label: `${listOf(blockedThere.map((c) => c.ua!))} blocked · ${ai[markAt]}`,
+          label: `${listOf(blockedThere.map((c) => c.ua!))} ${keptOutWord(blockedThere.flatMap((c) => verdictOf(v, c) ?? []))} · ${ai[markAt]}`,
           verdicts: blockedThere.flatMap((c) => verdictOf(v, c) ?? []),
         }
       : null,

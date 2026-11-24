@@ -35,8 +35,8 @@ export const VERDICT_LABELS: Readonly<
   >
 > = {
   disallowed_by_robots: 'blocked by robots.txt',
-  blocked_by_ua_rule: 'blocked by a rule',
-  refused_unverified: 'challenged: the real crawler may pass',
+  blocked_by_ua_rule: 'refused, others served',
+  refused_unverified: 'refused, unverified',
 };
 
 /** The robots.txt groups that bind the worker's requests. */

@@ -68,7 +68,7 @@ const REASONS: Readonly<Record<AccessIndeterminateReason, string>> = {
   not_measured:
     'edge: no page where the crawler’s own request got an answer, and none of the two below',
   edge_blocks_automation:
-    'edge: the edge refused or challenged the untagged browser control too, so it treats all automation that way; the crawler was not requested',
+    'edge: the edge refused or challenged the untagged browser control, so the crawler was not requested',
   robots_disallows:
     'edge: no page where the crawler’s own request got an answer, and robots.txt disallows it on one or more pages, so the edge was not tested there',
   challenge_real_crawler_may_pass: `edge: neither detected nor clear; challenges and unverified refusals together are as many as the blocks and as the other answers (${list(OTHER_ANSWERS)}) or more, and challenges are as many as unverified refusals or more: the real crawler, from its own addresses, may pass a challenge`,
@@ -92,7 +92,7 @@ const MATRIX_FIELDS: Readonly<Record<keyof CrawlerAccess, string>> = {
     'The status the crawler’s own request got on most deciding cells, the lower on a tie; a declared cell’s status is the robots.txt read’s and is not counted.',
   pages_measured: 'Cells with a measured verdict.',
   pages_served:
-    'Of the pages our own request answered, those it was served on. Optional: a row stored before the release that writes this field has none.',
+    'Of the pages our own request answered, those it was served on. A crawler disallowed on some pages can still be served on the others. Optional: a row stored before the release that writes this field has none.',
   cause: 'The cause the deciding cells name, when they all name the same one (none counts as one).',
   confidence: 'Below.',
   by_template: 'The same rules applied to each template’s cells.',

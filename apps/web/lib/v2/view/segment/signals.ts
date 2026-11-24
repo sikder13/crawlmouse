@@ -222,7 +222,7 @@ function competitorOf(check: Check, present: number): SignalsView['competitor'] 
     host: c.host,
     rows: [
       {
-        measure: 'Crawlers that get in',
+        measure: 'Crawlers served',
         own: `${ai.filter((x) => isAllowed(x.verdict)).length} of ${ai.length}`,
         theirs: `${c.crawlers_with_access} of ${c.crawlers_tested}`,
         pro: false,

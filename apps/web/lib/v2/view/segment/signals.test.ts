@@ -119,7 +119,7 @@ describe('signalsView: the competitor', () => {
     const c = view('bad-site').competitor!;
     expect(c.host).toBe('summitgear.co');
     expect(c.rows).toEqual([
-      { measure: 'Crawlers that get in', own: '4 of 6', theirs: '6 of 6', pro: false },
+      { measure: 'Crawlers served', own: '4 of 6', theirs: '6 of 6', pro: false },
       { measure: 'Text without JavaScript', own: '31%', theirs: '96%', pro: false },
       { measure: 'Technical SEO', own: 'B · 79', theirs: 'B- · 72', pro: false },
       { measure: 'AI readability', own: 'D · 41', theirs: 'with Pro', pro: true },

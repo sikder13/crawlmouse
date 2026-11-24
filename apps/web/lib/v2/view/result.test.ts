@@ -4,6 +4,7 @@ import { findCheck, fixture, type FixtureName } from '../fixtures';
 import { CHECKS } from '../recordings';
 import { partialNotice, resultView, type DoorView, type ResultView } from './result';
 import { pagesReadableText } from './effect-headline';
+import { isAi } from '../sentences';
 
 const NO_MAP = { nodes: [], positions: {} };
 
@@ -28,19 +29,24 @@ const door = (v: ResultView, title: string): DoorView => v.doors.find((x) => x.t
 const allText = (v: ResultView) =>
   JSON.stringify({ grades: v.grades, first: v.first, doors: v.doors, crawlers: v.crawlers });
 
-describe('the edge that blocks all automation', () => {
+describe('the edge that refused or challenged our tests', () => {
   it('is said in one wording, the access pill’s, wherever the challenged result mentions it', () => {
     const v = view('challenged-site');
-    expect(door(v, 'Crawler access').pill.label).toBe('blocks all automation');
-    expect(door(v, 'Crawler access').body).toMatch(/^The site’s edge blocks all automation/);
-    expect(v.grades[1].summary).toMatch(/^The site’s edge blocks all automation/);
-    expect(allText(v)).not.toMatch(/\brefused\b|lets through|challenges every|whoever we said/);
+    expect(door(v, 'Crawler access').pill.label).toBe('refused or challenged our tests');
+    expect(door(v, 'Crawler access').body).toMatch(
+      /^The site’s edge refused or challenged our browser-identity request from Crawlmouse’s address/,
+    );
+    expect(v.grades[1].summary).toMatch(
+      /^The site’s edge refused or challenged our browser-identity request from Crawlmouse’s address/,
+    );
+    // "Refused" is now the word for a refused request (RC-34), so it is not on this list.
+    expect(allText(v)).not.toMatch(/lets through|challenges every|whoever we said/);
   });
 
   it('is named as the reason content was not measured only when a crawler met it', () => {
     const content = 'Content an answer engine can quote';
     expect(door(view('challenged-site'), content).body).toBe(
-      'The site’s edge blocks all automation, so whether the pages open with a quotable answer could not be measured.',
+      'The site’s edge refused or challenged our browser-identity request from Crawlmouse’s address, so whether the pages open with a quotable answer could not be measured.',
     );
     const unmeasured = view('clean-site', (c) => (c.content = null));
     expect(door(unmeasured, content).body).toBe(
@@ -193,10 +199,22 @@ describe('the clean bill’s all-clear card', () => {
   };
   const TAIL = 'What changes that is a deploy, a plugin or a new firewall rule;';
 
+  it('claims nothing about the templates when one was read by no AI crawler', () => {
+    const v = view('clean-site', (c) => {
+      const key = c.coverage!.templates[0]!.template_key;
+      for (const x of c.crawlers.filter(isAi)) {
+        x.by_template.find((t) => t.template_key === key)!.verdict = 'refused_unverified';
+      }
+    });
+    const { body } = allClear(v);
+    expect(body).toContain('were served');
+    expect(body).not.toContain('ships its text');
+  });
+
   it('says what the verdicts and templates show, and offers to start watching', () => {
     const first = allClear(view('clean-site'));
     expect(first.body).toBe(
-      `All six AI crawlers get in and every template ships its text. ${TAIL} kept, this audit is re-run monthly and you hear when one lands.`,
+      `Requests with all six AI crawlers’ user agents were served and every template ships its text. ${TAIL} kept, this audit is re-run monthly and you hear when one lands.`,
     );
     expect(first.action).toEqual({ label: 'Watch this site', href: '#keep' });
   });
@@ -214,7 +232,7 @@ describe('the clean bill’s all-clear card', () => {
       }),
     );
     expect(first.body).toMatch(
-      /^GPTBot is blocked by robots\.txt; the other five AI crawlers get in, and product pages are empty without JavaScript\. /,
+      /^GPTBot is blocked by robots\.txt; requests with the other five AI crawlers’ user agents were served, and product pages are empty without JavaScript\. /,
     );
   });
 
@@ -286,7 +304,7 @@ describe('the crawler-access bar', () => {
     expect(access(view('challenged-site')).bar).toEqual({ percent: 100, tone: 'bad' });
     // Nothing kept out: the pill counts the crawlers allowed, and the bar is full, not empty.
     const clean = access(view('clean-site'));
-    expect(clean.pill).toEqual({ state: 'ok', label: '6 of 6 allowed' });
+    expect(clean.pill).toEqual({ state: 'ok', label: '6 of 6 served' });
     expect(clean.bar).toEqual({ percent: 100, tone: 'neutral' });
     const challengedOnly = access(
       view('bad-site', (c) => {
@@ -302,7 +320,13 @@ describe('the crawler-access bar', () => {
     const set = (c: Check, verdict: Check['crawlers'][number]['verdict'], uas: string[]) =>
       c.crawlers
         .filter((x) => uas.includes(x.ua))
-        .forEach((x) => Object.assign(x, { verdict, cause: null }));
+        .forEach((x) =>
+          Object.assign(x, {
+            verdict,
+            cause: null,
+            pages_served: verdict === 'allowed' ? x.pages_measured : 0,
+          }),
+        );
     const AI = [
       'OAI-SearchBot',
       'ChatGPT-User',
@@ -312,15 +336,15 @@ describe('the crawler-access bar', () => {
       'ClaudeBot',
     ];
     const none = access(view('bad-site', (c) => set(c, 'disallowed_by_robots', AI)));
-    expect(none.body).not.toMatch(/The other|get in/);
-    expect(none.pill.label).toBe('6 blocked');
+    expect(none.body).not.toMatch(/the other|get in/i);
+    expect(none.pill.label).toBe('6 blocked by robots.txt');
     const one = access(
       view('bad-site', (c) => {
         set(c, 'disallowed_by_robots', AI);
         set(c, 'allowed', ['OAI-SearchBot']);
       }),
     );
-    expect(one.body).toMatch(/The other AI crawler gets in;/);
+    expect(one.body).toMatch(/The request with the other AI crawler’s user agent was served;/);
     const unmeasured = access(
       view('bad-site', (c) => {
         set(c, 'allowed', AI);
@@ -330,19 +354,23 @@ describe('the crawler-access bar', () => {
     expect(unmeasured.pill).toEqual({ state: 'unverified', label: '1 not measured' });
     expect(unmeasured.pill.label).not.toMatch(/kept out/);
     expect(unmeasured.bar).toEqual({ percent: 17, tone: 'warn' });
-    expect(unmeasured.body).toMatch(/The other five AI crawlers get in;/);
+    expect(unmeasured.body).toMatch(
+      /Requests with the other five AI crawlers’ user agents were served;/,
+    );
   });
 
   /** The figure a pill states, as a share of 100; null for a pill that states none. */
   const figure = (d: DoorView): number | null => {
     const label = d.pill.label;
     const ai = Number(/^(\d+) AI crawlers/.exec(d.footer)?.[1]);
-    const of = /^(\d+) of (\d+) (?:present|allowed)$/.exec(label);
+    const of = /^(\d+) of (\d+) (?:present|served)$/.exec(label);
     if (of) return Math.round((Number(of[1]) / Number(of[2])) * 100);
     const plain = /^(\d+)(?: \/ 100|% of text)$/.exec(label);
     if (plain) return Number(plain[1]);
-    if (label === 'blocks all automation') return 100;
-    const counts = [...label.matchAll(/(\d+) (?:blocked|challenged|kept out|not measured)/g)];
+    if (label === 'refused or challenged our tests') return 100;
+    const counts = [
+      ...label.matchAll(/(\d+) (?:blocked|refused|challenged|not served|not measured)/g),
+    ];
     if (counts.length) return Math.round((counts.reduce((n, m) => n + Number(m[1]), 0) / ai) * 100);
     return null;
   };

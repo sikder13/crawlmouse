@@ -16,12 +16,16 @@ import type {
 import { findCheck } from '../../fixtures';
 import { listOf, percent, templateNoun, testedAt, timeOfDay } from '../../format';
 import {
+  EDGE_METHOD,
   EDGE_SENTENCE,
   isAi,
   isAllowed,
   isBlocked,
   isChallenged,
   keptOutClauses,
+  servedAll,
+  servedExtent,
+  servedOthers,
   meetsEdge,
   clientRenderedTemplates,
 } from '../../sentences';
@@ -54,6 +58,8 @@ export interface MatrixRow {
   ua: string;
   /** The crawler's verdict over the whole sample. */
   verdict: Verdict;
+  /** How sure that verdict is: `likely` at most for one that rests on our own requests (F-156). */
+  confidence: CrawlerResult['confidence'];
   cells: MatrixCell[];
   /** "31%", "100%*" (a search engine's own rendering), or "not measured". */
   text: string;
@@ -102,7 +108,7 @@ export interface AccessView {
 export const OUR_TAG = 'Crawlmouse/2.0 (+https://crawlmouse.com/bot)';
 
 const GROUPS: { group: CrawlerGroup; title: string; note: string }[] = [
-  { group: 'search_engine', title: 'Search engines', note: 'by robots.txt, not fetched' },
+  { group: 'search_engine', title: 'Search engines', note: 'by robots.txt' },
   { group: 'ai_search', title: 'AI search and answers', note: 'counts towards AI readability' },
   {
     group: 'ai_training',
@@ -117,7 +123,7 @@ export const CAUSE_SHORT: Record<AccessCause, string> = {
   bot_fight_mode: 'Bot Fight Mode challenge',
   client_rendered_template: 'client-rendered template',
   robots_txt_disallow: 'Disallow in robots.txt',
-  automation_challenge: 'edge challenge on all automation',
+  automation_challenge: 'edge challenge',
   rate_limit_429: 'rate limit (429)',
   pay_per_crawl_402: 'pay per crawl (402)',
   cross_host_redirect: 'redirect to another host',
@@ -125,21 +131,21 @@ export const CAUSE_SHORT: Record<AccessCause, string> = {
 };
 
 /** The evidence caption: what the response shows, in the locked screen's form. */
-const CAUSE_MEANS: Record<AccessCause, string> = {
+export const CAUSE_MEANS: Record<AccessCause, string> = {
   cloudflare_1020: 'error 1020 means a firewall rule on this site blocked the request',
   bot_fight_mode: 'a challenge page in place of the content is what Bot Fight Mode serves',
   client_rendered_template: 'the HTML arrives without its text; a browser draws it with JavaScript',
   robots_txt_disallow: 'robots.txt has a Disallow rule for this crawler',
-  automation_challenge: 'the edge challenged our request, with or without a crawler user agent',
+  automation_challenge: 'the edge answered our request with a challenge',
   rate_limit_429: '429 means the site limited how fast this crawler may fetch',
   pay_per_crawl_402: '402 means the site asks this crawler to pay to crawl',
   cross_host_redirect: 'the site sent this crawler to another host',
-  verified_bot_only: 'the site admits this crawler only from its verified IPs',
+  verified_bot_only: 'nothing we sent claiming to be a crawler was served',
 };
 
 /**
- * `automation_challenge` is the worker's cause for two verdicts: an edge that challenges every
- * automated request (`edge_blocks_automation`), and a challenge of one crawler's requests
+ * `automation_challenge` is the worker's cause for two verdicts: an edge that challenged our
+ * browser-identity control (`edge_blocks_automation`), and a challenge of one crawler's requests
  * (`challenged_ua`), where the same page asked for with a browser identity may have been served.
  * The two tables above word the first. These word the second from the rows themselves.
  */
@@ -166,6 +172,16 @@ const FOOTNOTE =
   '* Google and Bing render JavaScript; the text share is what a browser renders. Connect Search Console to see Google’s own fetches.';
 
 /** FACTS B2: a crawler allowed by robots.txt alone is said to be, not merely "allowed". */
+/**
+ * A refusal verdict whose status was a 404 or 410 says that status (F-152). Display only: the verdict
+ * and its weight are unchanged until PR 7's panel.
+ */
+const answeredGone = (verdict: Verdict, status: number | null | undefined) =>
+  (verdict === 'blocked_by_ua_rule' || verdict === 'refused_unverified') &&
+  (status === 404 || status === 410)
+    ? `(answered ${status} to our request)`
+    : null;
+
 const qualifierOf = (verdict: Verdict, evidence: EvidenceClass) =>
   verdict === 'allowed' && evidence === 'declared' ? 'by robots.txt' : null;
 
@@ -196,28 +212,48 @@ function evidenceView(
   };
 }
 
-/** "One of six AI crawlers is blocked, and one is challenged." */
+/** "Requests as one of six AI crawlers were refused while another crawler name was served, and one was challenged." */
 function headlineTitle(check: Check): string {
   const ai = check.crawlers.filter(isAi);
   if (meetsEdge(check)) return `${EDGE_SENTENCE}.`;
   const n = (keep: (v: Verdict) => boolean) => ai.filter((c) => keep(c.verdict)).length;
   const unmeasured = (v: Verdict) => v === 'not_measured';
-  const kinds: [n: number, one: string, many: string][] = [
-    [n(isBlocked), 'is blocked', 'are blocked'],
-    [n(isChallenged), 'is challenged', 'are challenged'],
+  const is = (x: Verdict) => (v: Verdict) => v === x;
+  // `request`: the fact is about a request we sent, so a first clause says so. A robots.txt rule is
+  // what the site declares, and an unmeasured crawler got no answer to report.
+  const kinds: [n: number, one: string, many: string, request: boolean][] = [
+    [n(is('disallowed_by_robots')), 'is blocked by robots.txt', 'are blocked by robots.txt', false],
+    [
+      n(is('blocked_by_ua_rule')),
+      'was refused while another crawler name was served',
+      'were refused while another crawler name was served',
+      true,
+    ],
+    [
+      n(is('refused_unverified')),
+      'was refused on pages where no other crawler name was served',
+      'were refused on pages where no other crawler name was served',
+      true,
+    ],
+    [n(is('challenged_ua')), 'was challenged', 'were challenged', true],
     [
       n((v) => !isAllowed(v) && !isBlocked(v) && !isChallenged(v) && !unmeasured(v)),
-      'is kept out another way',
-      'are kept out another way',
+      'was not served',
+      'were not served',
+      true,
     ],
-    [n(unmeasured), 'was not measured', 'were not measured'],
+    [n(unmeasured), 'was not measured', 'were not measured', false],
   ];
   const present = kinds.filter(([n]) => n > 0);
-  if (!present.length) return `All ${numberWord(ai.length)} AI crawlers get in.`;
-  const clauses = present.map(([n, one, many], i) =>
+  if (!present.length) return `${servedAll(ai.length, 'AI')}${servedExtent(check)}.`;
+  const clauses = present.map(([n, one, many, request], i) =>
     i === 0
-      ? `${capitalise(numberWord(n))} of ${numberWord(ai.length)} AI crawlers ${n === 1 ? one : many}`
-      : `${numberWord(n)} ${n === 1 ? one : many}`,
+      ? request
+        ? `Requests as ${numberWord(n)} of ${numberWord(ai.length)} AI crawlers ${many}`
+        : `${capitalise(numberWord(n))} of ${numberWord(ai.length)} AI crawlers ${n === 1 ? one : many}`
+      : request && !present[0]![3]
+        ? `requests as ${numberWord(n)} ${many}`
+        : `${numberWord(n)} ${n === 1 ? one : many}`,
   );
   return clauses.length === 1
     ? `${clauses[0]}.`
@@ -236,16 +272,11 @@ function headlineBody(check: Check): string {
   const readers = allowed.filter((c) => c.verdict === 'allowed_thin').map((c) => c.ua);
   const parts: string[] = [];
   if (edge) {
-    parts.push(
-      `${EDGE_SENTENCE} from our published IPs, tagged or not, so what the crawlers themselves get could not be measured.`,
-    );
+    parts.push(EDGE_METHOD);
   }
   if (out.length) parts.push(`${capitalise(out.join('; '))}.`);
   if (allowed.length) {
-    const who =
-      out.length === 0
-        ? `All ${numberWord(ai.length)} AI crawlers get in`
-        : `The other ${allowed.length === 1 ? 'AI crawler gets' : `${numberWord(allowed.length)} AI crawlers get`} in`;
+    const who = `${allowed.length === ai.length ? servedAll(ai.length, 'AI') : servedOthers(allowed.length)}${servedExtent(check)}`;
     parts.push(
       thin.length && readers.length
         ? `${who}; ${listOf(readers)} then read ${listOf(thin)} empty without JavaScript, covered in the next section.`
@@ -262,15 +293,26 @@ function headlineBody(check: Check): string {
   return parts.join(' ');
 }
 
-/** FACTS D1, with the L5 correction; the exact-string variant when the evidence carries no tag. */
-function methodSentence(tests: readonly AccessTest[]): string {
-  const crawlerTests = tests.filter((t) => t.ua !== null && t.source_ip_class === 'fly_egress');
-  const exact =
-    crawlerTests.length > 0 && crawlerTests.every((t) => !t.identity_sent.includes(OUR_TAG));
-  const identity = exact
-    ? 'Each page was requested with the crawler’s exact user agent from our published IPs; this site is verified.'
-    : `Each page was requested with the crawler’s own user agent, tagged “${OUR_TAG}”, from our published IPs. Rules that match the whole string exactly will not fire on the tagged version, so a block can be under-reported here. Verify this site in Settings and we test with the exact strings.`;
-  return `${identity} Rendering requests come from Cloudflare Browser Rendering, and one untagged browser-identity control fetch per sampled page is part of the method. Select a cell to see the raw request and response.`;
+/** The verdicts that hold no answer to a crawler's request: stopped at the edge, or unmeasured. */
+const NO_ANSWER: readonly Verdict[] = ['edge_blocks_automation', 'not_measured'];
+
+/** No crawler's verdict rests on an answer to a request in its name. */
+const noCrawlerAnswer = (ai: readonly CrawlerResult[]): boolean =>
+  ai.every((c) => NO_ANSWER.includes(c.verdict));
+
+/**
+ * Every crawler is unmeasured or disallowed on at least half the pages whose robots.txt was read.
+ * Some pages may have been served and others never checked, and a stored row does not record how
+ * many, so no sentence about all the sampled pages can be proven here.
+ */
+const decidedByRobots = (ai: readonly CrawlerResult[]): boolean =>
+  ai.every((c) => NO_ANSWER.includes(c.verdict) || c.verdict === 'disallowed_by_robots');
+
+/** FACTS D1, with the L5 correction. The worker tags every crawler identity it sends. */
+function methodSentence(rendered: boolean): string {
+  const stated = `We request a sampled page with the crawler’s own user agent, tagged “${OUR_TAG}”, from Crawlmouse’s own address, not the operator’s, only where our browser-identity control gets a normal answer and robots.txt allows that crawler. A rule matching the exact string will not fire on it, and a site that verifies crawler addresses may refuse it while serving the real crawler.`;
+  const render = rendered ? ' Rendering requests come from Cloudflare Browser Rendering.' : '';
+  return `${stated}${render} One untagged browser-identity control fetch per sampled page is part of the method. Select a cell to see the raw request and response.`;
 }
 
 function rowOf(
@@ -302,7 +344,7 @@ function rowOf(
           span: 1,
           verdict,
           evidence: c.evidence_class,
-          qualifier: qualifierOf(verdict, c.evidence_class),
+          qualifier: answeredGone(verdict, t?.status) ?? qualifierOf(verdict, c.evidence_class),
           status: t?.status == null ? null : String(t.status),
           evidenceId: testFor(c.ua, col.key)?.id ?? null,
         };
@@ -311,6 +353,7 @@ function rowOf(
   return {
     ua: c.ua,
     verdict: c.verdict,
+    confidence: c.confidence,
     cells,
     text:
       c.text_share === null ? 'not measured' : `${percent(c.text_share)}%${footnoted ? '*' : ''}`,
@@ -383,14 +426,17 @@ export function accessView(
         note: `${ai.filter((c) => c.scored).length} scored`,
       },
       {
-        label: 'Pages fetched per crawler',
+        label: 'Pages sampled per crawler',
         value: `${count(coverage.pages_sampled)} of ${count(coverage.pages_discovered)}`,
-        note:
-          coverage.sample_strategy.method === 'census'
-            ? coverage.pages_sampled === coverage.pages_discovered
-              ? 'every page'
-              : 'every page crawled'
-            : `at most ${coverage.sample_strategy.max_pages}, across every template`,
+        note: noCrawlerAnswer(ai)
+          ? 'no crawler request was measured'
+          : decidedByRobots(ai)
+            ? null
+            : coverage.sample_strategy.method === 'census'
+              ? coverage.pages_sampled === coverage.pages_discovered
+                ? 'every page'
+                : 'every page crawled'
+              : `at most ${coverage.sample_strategy.max_pages}, across every template`,
       },
       {
         label: 'Responses kept as evidence',
@@ -398,7 +444,7 @@ export function accessView(
         note: null,
       },
     ],
-    method: methodSentence(tests),
+    method: methodSentence(check.without_js !== null),
     columns,
     groups,
     footnote: groups.some((g) => g.rows.some((r) => r.text.endsWith('*'))) ? FOOTNOTE : null,

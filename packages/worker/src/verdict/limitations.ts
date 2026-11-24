@@ -149,7 +149,7 @@ export const crawlDelayOverLimit = (declaredS: number, limitS: number): string =
   `robots.txt asks for a ${declaredS} s Crawl-delay, above the ${limitS} s this worker honours, so the site was not fetched. The request shown is the robots.txt read.`;
 
 export const controlBlocked = (control: Observed): string =>
-  `The untagged browser control was ${control === 'challenged' ? 'challenged' : 'refused'} too, so the site treats our requests this way whatever the user agent. This shows our access, not what the real crawler receives; the crawler's own request was not sent, and the evidence shown is the control's.`;
+  `The untagged browser control was ${control === 'challenged' ? 'challenged' : 'refused'}, so the crawler's own request was not sent. This shows what our browser-identity request received, not what the real crawler receives, and the evidence shown is the control's.`;
 
 /** `redirectNotFollowed`: the control's last response was a redirect the batch did not follow. */
 export const controlUnusable = (control: Observed, redirectNotFollowed: boolean): string =>
@@ -232,7 +232,7 @@ export interface WitnessName {
 
 /**
  * For a refusal: what decided it, and which other tested crawlers were served on the same page. With
- * a witness, the refusal is aimed at the user agent (verdict/table.ts, the witness rule); with none,
+ * a witness, the refusal was not of our address alone (verdict/table.ts, the witness rule); with none,
  * it cannot be told apart from a site that refuses unverified crawler addresses.
  */
 export function witnessReading(
@@ -240,7 +240,7 @@ export function witnessReading(
   canary: Observed,
   canaryNote: string | null,
   othersServed: readonly string[],
-  /** A caveat follows (witnessCaveats), so the conclusion is stated as likely. */
+  /** A caveat follows (witnessCaveats), so the conclusion is stated as a possibility. */
   hedged = false,
 ): string {
   const tail = othersServed.length
@@ -250,8 +250,8 @@ export function witnessReading(
     return `No other tested crawler was served on this page, and the tagged Googlebot request ${canaryNote ?? CANARY_OUTCOME[canary]}, so this refusal cannot be told apart from IP verification.`;
   const who = witness.role === 'canary' ? 'The tagged Googlebot request' : witness.ua;
   const so = hedged
-    ? 'so this refusal is likely aimed at the user agent rather than at an unverified address'
-    : 'so this refusal is aimed at the user agent, not at an unverified address';
+    ? 'so this refusal may not be of our address alone'
+    : 'so this refusal was not of our address alone; a rule that verifies only this crawler’s addresses would look the same';
   return `${who} was served on this page from the same address, ${so}.${tail}`;
 }
 

@@ -84,17 +84,17 @@ From `FIX_SECTION`, `FIX_SUBJECT` and `COVERAGE_DEPENDENCE` in `subjects.ts`. Th
 
 How a verdict reads in a crawler row's summary, from `VERDICT_PHRASE` and `ACCESS` in `changes.ts`:
 
-| Verdict                | Reads in a summary as        | Counts as access |
-| ---------------------- | ---------------------------- | ---------------- |
-| `allowed`              | allowed                      | yes              |
-| `allowed_thin`         | allowed, reading little text | yes              |
-| `disallowed_by_robots` | disallowed by robots.txt     | no               |
-| `blocked_by_ua_rule`   | blocked by a user-agent rule | no               |
-| `challenged_ua`        | challenged                   | no               |
-| `refused_unverified`   | refused as unverified        | no               |
-| `rate_limited`         | rate limited                 | no               |
-| `payment_required`     | asked to pay                 | no               |
-| `redirected_away`      | redirected away              | no               |
+| Verdict                | Reads in a summary as                             | Counts as access |
+| ---------------------- | ------------------------------------------------- | ---------------- |
+| `allowed`              | our request served                                | yes              |
+| `allowed_thin`         | our request served, with little text              | yes              |
+| `disallowed_by_robots` | disallowed by robots.txt                          | no               |
+| `blocked_by_ua_rule`   | our request refused while another name was served | no               |
+| `challenged_ua`        | our request challenged                            | no               |
+| `refused_unverified`   | our request refused, unverified                   | no               |
+| `rate_limited`         | our request rate limited                          | no               |
+| `payment_required`     | our request asked to pay                          | no               |
+| `redirected_away`      | redirected away                                   | no               |
 
 ## Severity
 

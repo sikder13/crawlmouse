@@ -280,7 +280,7 @@ describe('the other Result variants and states', () => {
     expect(data.grades[0]).toMatchObject({ letter: 'C+', score: 67, withheld: false });
     expect(data.grades[1]).toMatchObject({ letter: null, score: null, withheld: true });
     expect(data.grades[1].summary).toContain('between 0 and 30 of 40');
-    expect(data.doors[0]!.pill.label).toBe('blocks all automation');
+    expect(data.doors[0]!.pill.label).toBe('refused or challenged our tests');
     const html = renderToStaticMarkup(resultElement('challenged'));
     expect(html).toContain('data-v2-grade-withheld');
     expect(html).toContain('data-v2-evidence="observed"');
@@ -530,7 +530,8 @@ describe('the edge that blocks all automation, as rendered', () => {
       renderToStaticMarkup(crawlElement('challenged-site', 'end')),
     ]) {
       expect(html).toContain(EDGE_PILL);
-      expect(html).not.toMatch(/\brefused\b|lets through|challenges every|whoever we said/);
+      // "Refused" is now the word for a refused request (RC-34), so it is not on this list.
+      expect(html).not.toMatch(/lets through|challenges every|whoever we said/);
     }
   });
 });

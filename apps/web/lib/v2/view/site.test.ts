@@ -49,7 +49,9 @@ describe('Site page, example-outfitter.com at as_of', () => {
     expect(seo!.parts).toBe('Structure 74 · Orphans 7 · Depth 2.4');
     expect(ai).toMatchObject({ letter: 'F', score: 22, move: '−19 since Thu' });
     // blocked: Claude-SearchBot and ClaudeBot by robots.txt, GPTBot by a rule = 3 of the 6 AI crawlers.
-    expect(ai!.parts).toBe('Crawlers blocked 3 of 6 · Text without JS 31% · Quotable 58');
+    expect(ai!.parts).toBe(
+      'Crawlers blocked or refused 3 of 6 · Text without JS 31% · Quotable 58',
+    );
   });
 
   it('lays the eight crawlers out by check, with the cause now', () => {

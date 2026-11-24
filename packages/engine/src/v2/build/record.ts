@@ -199,8 +199,9 @@ export function checkRecord(
       ),
     ],
     crawlers: graded.access.crawlers.map(
-      ({ counts: _c, supporting: _s, intent: _i, extent: _e, ...row }) => ({
+      ({ counts: _c, supporting: _s, intent: _i, extent, ...row }) => ({
         ...row,
+        pages_served: extent.edge.served,
         text_share: null,
       }),
     ),

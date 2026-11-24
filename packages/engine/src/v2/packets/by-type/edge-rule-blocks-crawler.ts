@@ -133,10 +133,10 @@ function context(record: AccessDetection, facts: PacketFacts): Line[] {
   const rows = rowsOf(record, facts);
   const lines: Line[] = [
     record.extent === null
-      ? line`${crawler} was refused on ${count(record.affected_urls.length)} sampled ${pagesOf(record.affected_urls.length)} by a rule that matches its user agent.`
+      ? line`Our request with ${crawler}'s user agent was refused on ${count(record.affected_urls.length)} sampled ${pagesOf(record.affected_urls.length)}.`
       : record.extent.of === 1
-        ? line`${crawler} was refused on the 1 sampled page the audit judged it on, by a rule that matches its user agent.`
-        : line`${crawler} was refused on ${count(record.extent.matching)} of the ${count(record.extent.of)} sampled pages the audit judged it on, by a rule that matches its user agent.`,
+        ? line`Our request with ${crawler}'s user agent was refused on the 1 sampled page the audit judged it on.`
+        : line`Our request with ${crawler}'s user agent was refused on ${count(record.extent.matching)} of the ${count(record.extent.of)} sampled pages the audit judged it on.`,
   ];
 
   const statuses = new Map<number, number>();
@@ -175,8 +175,8 @@ function context(record: AccessDetection, facts: PacketFacts): Line[] {
     const shown = list(identities, identities.length, 'identity');
     lines.push(
       rows.length === 1
-        ? line`On that page another identity was served from the same address (${shown}), so the refusal is aimed at the user agent.`
-        : line`On ${count(witnessed.length)} of those pages another identity was served from the same address (${shown}), so the refusal is aimed at the user agent.`,
+        ? line`On that page another identity was served from the same address (${shown}), so the refusal was not of our address alone; a rule that verifies only ${crawler}'s addresses would look the same.`
+        : line`On ${count(witnessed.length)} of those pages another identity was served from the same address (${shown}), so the refusal was not of our address alone; a rule that verifies only ${crawler}'s addresses would look the same.`,
     );
   }
   if (rows.length > 0 && rows.every((t) => t.tagged)) {
@@ -197,7 +197,7 @@ function cloudflare1020Steps(record: AccessDetection): Line[] {
   return [
     line`Cloudflare answered with error 1020. Cloudflare's page for that error says it is returned when a security rule with a Block action and no custom response matched the request, gives API Shield schema validation and JWT validation as examples, and says a request blocked by a WAF custom rule or a WAF managed rule does not get it.`,
     line`In the Cloudflare dashboard open Security > Analytics, Events tab, and find a refused request: the event shows which security feature and rule blocked it. Cloudflare's page does not list every feature that answers with error 1020, so the event is what names it.`,
-    line`Update the configuration of that feature or rule so that it no longer blocks ${crawler}.`,
+    line`Update the configuration of that feature or rule so that it no longer refuses ${crawler}'s user agent.`,
   ];
 }
 

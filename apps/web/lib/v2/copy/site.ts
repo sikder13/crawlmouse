@@ -75,6 +75,14 @@ export const SITE_CHANGES: CopyChange[] = [
   {
     screen: 'site',
     kind: 'ruling',
+    locked: 'Crawlers blocked 3 of 6',
+    rendered: 'Crawlers blocked or refused 3 of 6',
+    source:
+      'V2R register F-135: only a robots.txt disallow is blocked; a refusal of our request is counted as a refusal.',
+  },
+  {
+    screen: 'site',
+    kind: 'ruling',
     locked: 'Its history stays in your account in case you add it back',
     rendered: SITE_COPY.removeNote,
     source:

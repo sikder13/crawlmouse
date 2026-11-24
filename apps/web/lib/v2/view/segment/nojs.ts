@@ -7,13 +7,7 @@ import type { AccessTest, Check, FixSection, PageResult } from '@crawlmouse/type
 import { findCheck } from '../../fixtures';
 import { AI_WAITING } from '../effect-headline';
 import { listOf, percent, templateNoun, testedAt, timeOfDay } from '../../format';
-import {
-  EDGE_SENTENCE,
-  clientRenderedTemplates,
-  isAi,
-  isAllowed,
-  meetsEdge,
-} from '../../sentences';
+import { EDGE_METHOD, clientRenderedTemplates, isAi, isAllowed, meetsEdge } from '../../sentences';
 import { capitalise, count, numberWord, plural } from '../../words';
 import { sampledCoverage, type CoverageView, type DoorView } from '../result';
 import { sectionFixes, type SectionFixesView } from './fixes';
@@ -138,7 +132,7 @@ function body(check: Check, known: string[] | null, rows: readonly PageResult[])
   const parts: string[] = [];
   if (known === null && meetsEdge(check)) {
     parts.push(
-      `${EDGE_SENTENCE} from our published IPs, tagged or not, so this was measured with a rendering browser rather than as the crawlers.`,
+      `${EDGE_METHOD} This was measured with a rendering browser rather than as the crawlers.`,
     );
   } else if (known === null) {
     parts.push(
@@ -146,7 +140,7 @@ function body(check: Check, known: string[] | null, rows: readonly PageResult[])
     );
   } else if (readers.length) {
     parts.push(
-      `${listOf(readers)} read the HTML your server sends and do not run scripts${outside.length ? `; ${listOf(outside)} would too, once they get in` : ''}.`,
+      `${listOf(readers)} read the HTML your server sends and do not run scripts${outside.length ? `; ${listOf(outside)} would too, once they are served` : ''}.`,
     );
   }
   for (const key of thin) {

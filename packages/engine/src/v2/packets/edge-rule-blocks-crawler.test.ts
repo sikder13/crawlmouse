@@ -123,10 +123,10 @@ describe('the edge-rule packet, from its record', () => {
     const { record, rows } = detected({ crawler: 'PerplexityBot', pages: SITE_PAGES, judged: 20 });
     const p = compose(builder, record, factsOf(rows));
     expect(p.context).toEqual([
-      '`PerplexityBot` was refused on 8 of the 20 sampled pages the audit judged it on, by a rule that matches its user agent.',
+      "Our request with `PerplexityBot`'s user agent was refused on 8 of the 20 sampled pages the audit judged it on.",
       'Status of the refused requests: 403 (8 requests).',
       'The responses name no product: the audit did not identify what holds the rule.',
-      'On 8 of those pages another identity was served from the same address (`OAI-SearchBot`), so the refusal is aimed at the user agent.',
+      "On 8 of those pages another identity was served from the same address (`OAI-SearchBot`), so the refusal was not of our address alone; a rule that verifies only `PerplexityBot`'s addresses would look the same.",
       'The audit sent this user agent with a Crawlmouse tag, from Crawlmouse’s address. What the operator’s own crawler gets is in the site’s logs.',
       'Pages refused: `https://a.test/p/0`, `https://a.test/p/1`, `https://a.test/p/2`, `https://a.test/p/3`, `https://a.test/p/4` and 3 more pages not shown.',
     ]);
@@ -219,22 +219,24 @@ describe('the edge-rule packet, from its record', () => {
     const one = detected({ crawler: 'PerplexityBot', pages: SITE_PAGES.slice(0, 1) });
     const single = compose(builder, one.record, factsOf(one.rows)).context;
     expect(single[0]).toBe(
-      '`PerplexityBot` was refused on the 1 sampled page the audit judged it on, by a rule that matches its user agent.',
+      "Our request with `PerplexityBot`'s user agent was refused on the 1 sampled page the audit judged it on.",
     );
     expect(single).toContain(
-      'On that page another identity was served from the same address (`OAI-SearchBot`), so the refusal is aimed at the user agent.',
+      "On that page another identity was served from the same address (`OAI-SearchBot`), so the refusal was not of our address alone; a rule that verifies only `PerplexityBot`'s addresses would look the same.",
     );
     expect(single.at(-1)).toBe('Page refused: `https://a.test/p/0`.');
     expect(compose(builder, { ...one.record, extent: null }, factsOf(one.rows)).context[0]).toBe(
-      '`PerplexityBot` was refused on 1 sampled page by a rule that matches its user agent.',
+      "Our request with `PerplexityBot`'s user agent was refused on 1 sampled page.",
     );
     const two = detected({ crawler: 'PerplexityBot', pages: SITE_PAGES.slice(0, 2) });
     const both = compose(builder, two.record, factsOf(two.rows)).context;
-    expect(both[0]).toMatch(/^`PerplexityBot` was refused on 2 of the 2 sampled pages the audit/);
+    expect(both[0]).toMatch(
+      /^Our request with `PerplexityBot`'s user agent was refused on 2 of the 2 sampled pages the audit/,
+    );
     expect(both.join('\n')).toMatch(/On 2 of those pages another identity/);
     expect(both.at(-1)).toBe('Pages refused: `https://a.test/p/0`, `https://a.test/p/1`.');
     expect(compose(builder, { ...two.record, extent: null }, factsOf(two.rows)).context[0]).toBe(
-      '`PerplexityBot` was refused on 2 sampled pages by a rule that matches its user agent.',
+      "Our request with `PerplexityBot`'s user agent was refused on 2 sampled pages.",
     );
   });
 
@@ -366,7 +368,7 @@ describe('the edge-rule packet, from its record', () => {
     expect(cf.slice(1, -1)).toEqual([
       "Cloudflare answered with error 1020. Cloudflare's page for that error says it is returned when a security rule with a Block action and no custom response matched the request, gives API Shield schema validation and JWT validation as examples, and says a request blocked by a WAF custom rule or a WAF managed rule does not get it.",
       "In the Cloudflare dashboard open Security > Analytics, Events tab, and find a refused request: the event shows which security feature and rule blocked it. Cloudflare's page does not list every feature that answers with error 1020, so the event is what names it.",
-      'Update the configuration of that feature or rule so that it no longer blocks `PerplexityBot`.',
+      "Update the configuration of that feature or rule so that it no longer refuses `PerplexityBot`'s user agent.",
     ]);
     expect(cf.join('\n')).not.toMatch(
       /Security rules page|AI Crawl Control|Bot Fight Mode|access policy/,

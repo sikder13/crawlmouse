@@ -46,7 +46,7 @@ export const VERDICTS: Record<Verdict, VerdictStyle> = {
   },
   blocked_by_ua_rule: {
     state: 'bad',
-    label: 'blocked by a rule',
+    label: 'refused, others served',
     glyphFromFacts: true,
     labelFromFacts: false,
   },
@@ -58,7 +58,7 @@ export const VERDICTS: Record<Verdict, VerdictStyle> = {
   },
   refused_unverified: {
     state: 'unverified',
-    label: 'challenged: the real crawler may pass',
+    label: 'refused, unverified',
     glyphFromFacts: true,
     labelFromFacts: true,
   },
@@ -76,7 +76,7 @@ export const VERDICTS: Record<Verdict, VerdictStyle> = {
   },
   edge_blocks_automation: {
     state: 'bad',
-    label: 'blocks all automation',
+    label: 'refused or challenged our tests',
     glyphFromFacts: false,
     labelFromFacts: false,
   },

@@ -213,7 +213,7 @@ function crawlerShownAsBlocked(): HelpArticle {
       ),
       p(
         s(
-          `The audit says blocked in two cases: ${quote(VERDICT_LABELS.disallowed_by_robots)}, when your robots.txt disallows that crawler, and ${quote(VERDICT_LABELS.blocked_by_ua_rule)}, when a page refused that crawler’s user agent while it served another crawler the audit sent to the same page.`,
+          `The audit names two cases: ${quote(VERDICT_LABELS.disallowed_by_robots)}, when your robots.txt disallows that crawler, and ${quote(VERDICT_LABELS.blocked_by_ua_rule)}, when a page refused our request as that crawler while it served another crawler the audit sent to the same page.`,
         ),
         s(
           'A crawler your robots.txt disallows is your choice, so it is left out of the AI readability score rather than counted against it.',
@@ -231,7 +231,7 @@ function crawlerShownAsBlocked(): HelpArticle {
       ),
       p(
         s(
-          'Where the audit opens a fix for a blocked crawler, its steps end with a command under Verify that you can run from your own machine. It sends the request with the crawler’s own user agent.',
+          'Where the audit opens a fix for a refused crawler, its steps end with a command under Verify that you can run from your own machine. It sends the request with the crawler’s own user agent.',
           'fix_packets',
         ),
         s(

@@ -118,7 +118,7 @@ const BASE_CHANGES: CopyChange[] = [
     screen: 'home',
     kind: 'facts',
     locked: 'GPTBot is blocked by a firewall rule; PerplexityBot gets a challenge page.',
-    rendered: 'PerplexityBot gets a challenge page.',
+    rendered: 'PerplexityBot was challenged when we sent its user agent.',
     source:
       'FACTS I6: the AI readability grade counts the four scored crawlers; GPTBot is not one.',
   },
@@ -134,7 +134,7 @@ const BASE_CHANGES: CopyChange[] = [
     screen: 'home',
     kind: 'facts',
     locked: 'GPTBot 403 403 0%',
-    rendered: 'GPTBot blocked by a rule blocked by a rule 0%',
+    rendered: 'GPTBot refused, others served refused, others served 0%',
     source: 'FACTS I2: verdicts, not status codes, in a crawler cell',
   },
   {
@@ -243,7 +243,7 @@ const BASE_CHANGES: CopyChange[] = [
     screen: 'result',
     kind: 'facts',
     locked: "Two AI crawlers never get past Cloudflare's bot defences;",
-    rendered: 'PerplexityBot gets a challenge page;',
+    rendered: 'PerplexityBot was challenged when we sent its user agent;',
     source:
       'FACTS I6 (the grade counts the four scored crawlers; GPTBot is not one) and I2 (a challenge is not blocked); FACTS marks this count and verb ENGINE-DERIVED, and of the four the fixture challenges one.',
   },
@@ -259,7 +259,7 @@ const BASE_CHANGES: CopyChange[] = [
     screen: 'result',
     kind: 'facts',
     locked: '2 of 6 blocked',
-    rendered: '1 blocked · 1 challenged',
+    rendered: '1 refused, others served · 1 challenged',
     source:
       'FACTS I2 and the crawler-matrix line: under the new vocabulary a challenge is not "blocked", and the headline count is ENGINE-DERIVED.',
   },
@@ -267,14 +267,22 @@ const BASE_CHANGES: CopyChange[] = [
     screen: 'result',
     kind: 'facts',
     locked: 'GPTBot is refused by a firewall rule;',
-    rendered: 'GPTBot is blocked by a firewall rule;',
+    rendered: 'GPTBot was refused by a firewall rule when we sent its user agent;',
     source: 'FACTS I2: "blocked" is the word for blocked_by_ua_rule.',
   },
   {
     screen: 'result',
     kind: 'facts',
+    locked: 'PerplexityBot gets a challenge page.',
+    rendered: 'PerplexityBot was challenged when we sent its user agent.',
+    source: 'FACTS I2 and F-135: what our tagged request got, not a fact about the real crawler.',
+  },
+  {
+    screen: 'result',
+    kind: 'facts',
     locked: "Google, Bing, Claude and OpenAI's search bot get in.",
-    rendered: 'The other four AI crawlers get in; Googlebot and Bingbot are allowed by robots.txt.',
+    rendered:
+      'Requests with the other four AI crawlers’ user agents were served; Googlebot and Bingbot are allowed by robots.txt.',
     source:
       'FACTS I6: six AI crawlers are tested, and Googlebot and Bingbot are counted by robots.txt, never a live verdict.',
   },

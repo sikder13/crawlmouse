@@ -295,3 +295,34 @@ describe('Trial ending, the reminder line around its date (fix round 2, item 4)'
     );
   });
 });
+
+describe('the changes caught, in the word each verdict earns', () => {
+  const caughtWith = (verdict: 'blocked_by_ua_rule' | 'challenged_ua' | 'allowed') => {
+    const d = structuredClone(bad);
+    for (const c of d.changes) {
+      if (c.kind !== 'opened' || c.subject !== 'crawler_access') continue;
+      const check = d.checks.find((k) => k.id === c.check_id)!;
+      const crawler = check.crawlers.find((x) => x.ua === c.ua);
+      if (crawler) crawler.verdict = verdict;
+      c.summary = `${c.ua}: its own record`;
+    }
+    return trialEndView(d, trialEndViewer(d, BAD)).did.rows.find(
+      (r) => r.label === 'Changes caught',
+    )!.detail;
+  };
+
+  it('says refused of a refusal', () => {
+    expect(caughtWith('blocked_by_ua_rule')).toContain(
+      'Claude-SearchBot and ClaudeBot refused Fri 30 Oct',
+    );
+  });
+
+  it.each(['challenged_ua', 'allowed'] as const)(
+    'gives each change its own record when a crawler is %s',
+    (verdict) => {
+      const said = caughtWith(verdict);
+      expect(said).toContain('Claude-SearchBot: its own record · ClaudeBot: its own record');
+      expect(said).not.toMatch(/ClaudeBot (blocked|refused|no longer served)/);
+    },
+  );
+});

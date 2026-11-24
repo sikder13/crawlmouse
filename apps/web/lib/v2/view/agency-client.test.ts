@@ -58,7 +58,7 @@ describe('the client page', () => {
     expect(site.grades.cards[0].parts).not.toBeNull();
     // A withheld grade keeps the reason it is withheld.
     expect(view.grades.cards[1].withheld).toBe(site.grades.cards[1].withheld);
-    expect(view.grades.cards[1].withheld).toContain('edge blocks all automation');
+    expect(view.grades.cards[1].withheld).toContain('edge refused or challenged');
     expect(view.grades.site.href).toBe(`/sites/${GRANITEPEAK_SITE}`);
   });
 

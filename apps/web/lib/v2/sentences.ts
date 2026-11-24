@@ -35,34 +35,126 @@ export const isChallenged = (v: Verdict) => v === 'challenged_ua' || v === 'refu
 
 /**
  * `edge_blocks_automation` in words: the access pill's, so a result names that one condition one
- * way (the CC-22 brief's "blocks all automation").
+ * way. It says what our test saw: the request refused was our own control (F-145).
  */
-export const EDGE_PILL = 'blocks all automation';
-export const EDGE_SENTENCE = `The site’s edge ${EDGE_PILL}`;
+export const EDGE_PILL = 'refused or challenged our tests';
+export const EDGE_SENTENCE =
+  'The site’s edge refused or challenged our browser-identity request from Crawlmouse’s address';
+/**
+ * What an edge that refuses automation shows, and what follows from it. The request it refused was
+ * our browser-identity control, from our own address (F-145).
+ */
+export const EDGE_METHOD = `${EDGE_SENTENCE}, so no crawler request was measured where it did.`;
+
+/** What a served crawler request proves: our request carrying its user agent was served (F-139). */
+export const servedAll = (n: number, kind: 'AI' | 'scored') =>
+  n === 1
+    ? `The request with the one ${kind === 'AI' ? 'AI' : 'scored'} crawler’s user agent was served`
+    : `Requests with all ${numberWord(n)} ${kind} crawlers’ user agents were served`;
+
+export const servedOthers = (n: number) =>
+  n === 1
+    ? 'The request with the other AI crawler’s user agent was served'
+    : `Requests with the other ${numberWord(n)} AI crawlers’ user agents were served`;
+
+/** The crawlers our own request was served as: a verdict from robots.txt alone sent no request. */
+const servedRows = (among: readonly CrawlerResult[]) =>
+  among.filter((c) => isAllowed(c.verdict) && c.evidence_class !== 'declared');
+
+/** A served crawler's row was stored before `pages_served` existed, so its count is not known. */
+export const servedCountMissing = (check: Pick<Check, 'crawlers'>): boolean =>
+  servedRows(check.crawlers.filter(isAi)).some((c) => c.pages_served === undefined);
+
+/**
+ * How many sampled pages our requests were served on, when that is less than the sample: a crawler
+ * can read as served from one page in 25 (V2R question 010). A row stored before `pages_served`
+ * existed claims what its verdict proves: served on at least half of the pages that answered.
+ * `pages_measured` cannot say more, because it also counts refused and robots-disallowed pages. Empty
+ * when each was served on the whole sample. `among` is the crawlers the sentence names. `short` drops
+ * "the" and "sampled", for the pill, which does not use the wording for an older row.
+ */
+export function servedExtent(
+  check: Pick<Check, 'crawlers' | 'coverage'>,
+  short = false,
+  among: readonly CrawlerResult[] = check.crawlers.filter(isAi),
+): string {
+  const sampled = check.coverage?.pages_sampled ?? 0;
+  const rows = servedRows(among);
+  if (!rows.length) return '';
+  if (rows.some((c) => c.pages_served === undefined)) {
+    return ', on at least half of the pages that answered';
+  }
+  const read = rows.map((c) => Math.min(c.pages_served!, sampled));
+  if (read.every((n) => n >= sampled)) return '';
+  const low = Math.min(...read);
+  const high = Math.max(...read);
+  const range = low === high ? count(low) : `${count(low)} to ${count(high)}`;
+  const noun = plural(sampled, 'page', 'pages');
+  return short
+    ? `, on ${range} of ${count(sampled)} ${noun}`
+    : `, on ${range} of the ${count(sampled)} sampled ${noun}`;
+}
+
+/**
+ * What to call crawlers counted as kept out: "blocked" is what robots.txt does, and a refusal of
+ * our request is a refusal.
+ */
+export function keptOutWord(verdicts: readonly Verdict[]): string {
+  const robots = verdicts.filter((v) => v === 'disallowed_by_robots').length;
+  if (robots === verdicts.length) return 'blocked';
+  return robots === 0 ? 'refused' : 'blocked or refused';
+}
+
 export const meetsEdge = (check: Pick<Check, 'crawlers'>) =>
   check.crawlers.some((c) => c.verdict === 'edge_blocks_automation');
 
 /** What happened to a crawler that did not get in, singular and plural. */
+const OUR_REQUEST = / when we sent (?:its user agent|their user agents)/;
+
 function keptOut(verdict: Verdict, cause: AccessCause | null): [string, string] {
   switch (verdict) {
     case 'disallowed_by_robots':
       return ['is blocked by robots.txt', 'are blocked by robots.txt'];
     case 'blocked_by_ua_rule':
       return cause === 'cloudflare_1020'
-        ? ['is blocked by a firewall rule', 'are blocked by a firewall rule']
-        : ['is blocked by a rule', 'are blocked by a rule'];
+        ? [
+            'was refused by a firewall rule when we sent its user agent',
+            'were refused by a firewall rule when we sent their user agents',
+          ]
+        : [
+            'was refused when we sent its user agent, while another crawler name was served',
+            'were refused when we sent their user agents, while another crawler name was served',
+          ];
     case 'challenged_ua':
-      return ['gets a challenge page', 'get a challenge page'];
+      return [
+        'was challenged when we sent its user agent',
+        'were challenged when we sent their user agents',
+      ];
     case 'refused_unverified':
-      return ['is admitted only from verified IPs', 'are admitted only from verified IPs'];
+      return [
+        'was refused on pages where no other crawler name was served; this may be IP verification',
+        'were refused on pages where no other crawler name was served; this may be IP verification',
+      ];
     case 'rate_limited':
-      return ['is rate limited', 'are rate limited'];
+      return [
+        'was rate limited when we sent its user agent',
+        'were rate limited when we sent their user agents',
+      ];
     case 'payment_required':
-      return ['is asked to pay (402)', 'are asked to pay (402)'];
+      return [
+        'was asked to pay (402) when we sent its user agent',
+        'were asked to pay (402) when we sent their user agents',
+      ];
     case 'edge_blocks_automation':
-      return [`meets an edge that ${EDGE_PILL}`, `meet an edge that ${EDGE_PILL}`];
+      return [
+        'could not be tested: the site’s edge refused or challenged our control request',
+        'could not be tested: the site’s edge refused or challenged our control request',
+      ];
     case 'redirected_away':
-      return ['is sent to another host', 'are sent to another host'];
+      return [
+        'was sent to another host when we sent its user agent',
+        'were sent to another host when we sent their user agents',
+      ];
     case 'not_measured':
       return ['could not be measured', 'could not be measured'];
     case 'allowed':
@@ -72,7 +164,7 @@ function keptOut(verdict: Verdict, cause: AccessCause | null): [string, string] 
 }
 
 /**
- * "GPTBot is blocked by a firewall rule; PerplexityBot gets a challenge page": one clause per way
+ * "GPTBot was refused by a firewall rule when we sent its user agent; PerplexityBot was challenged when we sent its user agent": one clause per way
  * crawlers were kept out, in the contract's order of verdicts (`VerdictSchema`), crawlers sharing a
  * way grouped in the order they are listed.
  * A verdict resting on the site's own logs says so.
@@ -89,8 +181,11 @@ export function keptOutClauses(crawlers: readonly Crawler[]): string[] {
     .sort((a, b) => order(a) - order(b))
     .map((g) => {
       const [one, many] = keptOut(g[0]!.verdict, g[0]!.cause);
-      const seen = g[0]!.evidence_class === 'observed' ? ', in the site’s own logs' : '';
-      return `${listOf(g.map((c) => c.ua))} ${g.length === 1 ? one : many}${seen}`;
+      const observed = g[0]!.evidence_class === 'observed';
+      const clause = g.length === 1 ? one : many;
+      // An observed row is the site's log of the real crawler: we sent nothing in its name.
+      const said = observed ? clause.replace(OUR_REQUEST, '') : clause;
+      return `${listOf(g.map((c) => c.ua))} ${said}${observed ? ', in the site’s own logs' : ''}`;
     });
 }
 
@@ -122,7 +217,7 @@ export function thinTemplates(check: Check, crawlers: readonly Reader[]): string
 /**
  * The client-rendered templates, as the AI crawlers' verdicts show them (`thinTemplates` over every
  * AI crawler), or null when some template was read by no AI crawler (all kept out of it, or the
- * edge blocks all automation): the verdicts then cannot say whether that template arrives empty,
+ * edge refused our test requests): the verdicts then cannot say whether that template arrives empty,
  * so they are not used to say which do. Every screen that names those templates reads them here,
  * so a door and its segment cannot differ.
  */
@@ -247,19 +342,16 @@ export function seoSummary(check: Check, fixes: readonly Fix[], isOpen: (f: Fix)
 }
 
 /**
- * "All four scored crawlers get in and read 98% of the text or more": the share only when every one
+ * "All four scored crawlers are served and read 98% of the text or more": the share only when every one
  * was measured, and a plain statement when none was tested.
  */
-function allInSentence(scored: readonly CrawlerResult[]): string {
+function allInSentence(scored: readonly CrawlerResult[], extent: string): string {
   if (!scored.length) return 'No scored AI crawler was tested.';
   const shares = scored.map((c) => c.text_share);
-  const one = scored.length === 1;
-  const all = one
-    ? 'The one scored crawler gets in'
-    : `All ${numberWord(scored.length)} scored crawlers get in`;
+  const all = `${servedAll(scored.length, 'scored')}${extent}`;
   if (shares.some((x) => x === null)) return `${all}.`;
   const share = percent(Math.min(...(shares as number[])));
-  return `${all} and ${one ? 'reads' : 'read'} ${share}% of the text or more.`;
+  return `${all}, with ${share}% of the text or more.`;
 }
 
 /**
@@ -277,7 +369,9 @@ export function aiSummary(check: Check): string {
     entry.names.push(pagesOf(check, key));
     byReaders.set(uas.join('\n'), entry);
   }
-  if (!out.length && !byReaders.size) return allInSentence(scored);
+  if (!out.length && !byReaders.size) {
+    return allInSentence(scored, servedExtent(check, false, scored));
+  }
   const thin = [...byReaders.values()].map(({ uas, names }) => {
     const who =
       uas.length < inside.length
@@ -297,7 +391,10 @@ export function aiSummary(check: Check): string {
 export function aiShortSummary(check: Check): string {
   const out = keptOutClauses(scoredOf(check));
   const thin = thinSentence(check);
-  if (!out.length && !thin) return allInSentence(scoredOf(check));
+  if (!out.length && !thin) {
+    const scored = scoredOf(check);
+    return allInSentence(scored, servedExtent(check, false, scored));
+  }
   return [out.length ? `${capitalise(out.join('; '))}.` : null, thin].filter(Boolean).join(' ');
 }
 
@@ -319,7 +416,7 @@ const orList = (xs: readonly string[]) =>
 /**
  * The withheld AI readability grade, said plainly (FACTS I4). `measured` is the contract's count
  * (`scoredCrawlersMeasured`: a scored crawler with a verdict). The engine withholds by a count of
- * its own (a crawler with pages enough that were served or blocked by a rule), so the two can part:
+ * its own (a crawler with pages enough that were served or refused), so the two can part:
  * a site that challenges each crawler has four measured by the contract and none by the engine.
  * What is said therefore follows the reasons the grade names (`withheld_reasons`), of which a
  * withheld grade names at least one (CheckSchema refuses one that names none, and so does this):

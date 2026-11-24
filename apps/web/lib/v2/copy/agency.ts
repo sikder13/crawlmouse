@@ -349,7 +349,7 @@ export const CLIENT_CHANGES: CopyChange[] = [
     kind: 'fixture',
     locked: 'Technical SEO B 79 · −1 since Thu AI visibility F 22 · −19 since Thu',
     rendered:
-      'Technical SEO C+ 66 · −1 since Sat AI readability – withheld The site’s edge blocks all automation, so only one of the four scored crawlers could be measured. Access is somewhere between 0 and 30 of 40.',
+      'Technical SEO C+ 66 · −1 since Sat AI readability – withheld The site’s edge refused or challenged our browser-identity request from Crawlmouse’s address, so only one of the four scored crawlers could be measured. Access is somewhere between 0 and 30 of 40.',
     source:
       'The fixture’s grades of granitepeak.example, whose AI readability is withheld (FACTS I4: the reason is said with it); FACTS A1 names the grade AI readability',
   },

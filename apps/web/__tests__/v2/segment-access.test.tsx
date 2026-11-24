@@ -56,10 +56,12 @@ describe.each(SEGMENT_VARIANTS)(
       const n = (re: RegExp) => Number(re.exec(label)?.[1] ?? 0);
       const count = (vs: string[]) => rows.filter((r) => vs.includes(r.verdict)).length;
       if (rows.some((r) => r.verdict === 'edge_blocks_automation')) {
-        expect(label).toBe('blocks all automation');
+        expect(label).toBe('refused or challenged our tests');
       } else {
-        expect(n(/(\d+) blocked/)).toBe(count(['disallowed_by_robots', 'blocked_by_ua_rule']));
-        expect(n(/(\d+) challenged/)).toBe(count(['challenged_ua', 'refused_unverified']));
+        expect(n(/(\d+) blocked by robots/)).toBe(count(['disallowed_by_robots']));
+        expect(n(/(\d+) refused, others served/)).toBe(count(['blocked_by_ua_rule']));
+        expect(n(/(\d+) refused, unverified/)).toBe(count(['refused_unverified']));
+        expect(n(/(\d+) challenged/)).toBe(count(['challenged_ua']));
         expect(n(/(\d+) not measured/)).toBe(count(['not_measured']));
       }
     });

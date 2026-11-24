@@ -18,7 +18,6 @@ import {
   aiSummary,
   aiWithheldSummary,
   isAllowed,
-  isBlocked,
   isSingularNoun,
   keptOutClauses,
   nextBandSentence,
@@ -90,7 +89,10 @@ describe('the sentences about a check', () => {
         c('C', 'disallowed_by_robots'),
         c('D', 'allowed'),
       ]),
-    ).toEqual(['B and C are blocked by robots.txt', 'A gets a challenge page']);
+    ).toEqual([
+      'B and C are blocked by robots.txt',
+      'A was challenged when we sent its user agent',
+    ]);
   });
 });
 
@@ -104,7 +106,12 @@ const crawler = (c: Check, ua: string) => c.crawlers.find((x) => x.ua === ua)!;
 /** The crawler reads every template in full. */
 const readsAll = (c: Check, ua: string) => {
   const r = crawler(c, ua);
-  Object.assign(r, { verdict: 'allowed', cause: null, text_share: 0.95 });
+  Object.assign(r, {
+    verdict: 'allowed',
+    cause: null,
+    text_share: 0.95,
+    pages_served: r.pages_measured,
+  });
   r.by_template.forEach((t) => (t.verdict = 'allowed'));
 };
 const SCORED_THIN = ['OAI-SearchBot', 'ChatGPT-User', 'Claude-SearchBot'];
@@ -114,15 +121,15 @@ describe('thin templates, counted per crawler', () => {
     // The scored crawlers read every template in full; only unscored ClaudeBot reads one thin.
     const c = variant((c) => SCORED_THIN.forEach((ua) => readsAll(c, ua)));
     expect(crawler(c, 'ClaudeBot').by_template.map((t) => t.verdict)).toContain('allowed_thin');
-    expect(aiSummary(c)).toBe('PerplexityBot gets a challenge page.');
+    expect(aiSummary(c)).toBe('PerplexityBot was challenged when we sent its user agent.');
     expect(thinSentence(c)).toBeNull();
-    expect(aiShortSummary(c)).toBe('PerplexityBot gets a challenge page.');
+    expect(aiShortSummary(c)).toBe('PerplexityBot was challenged when we sent its user agent.');
   });
 
   it('says how many read it thin, and which, when not all the crawlers that got in do', () => {
     const c = variant((c) => readsAll(c, 'OAI-SearchBot'));
     expect(aiSummary(c)).toBe(
-      'PerplexityBot gets a challenge page; product pages are empty to ChatGPT-User and Claude-SearchBot.',
+      'PerplexityBot was challenged when we sent its user agent; product pages are empty to ChatGPT-User and Claude-SearchBot.',
     );
     // One scored crawler reads the product template in full, so it is not "empty without JavaScript".
     expect(thinSentence(c)).toBeNull();
@@ -130,7 +137,8 @@ describe('thin templates, counted per crawler', () => {
 
   it('says every scored crawler gets in, on the AI card and its short form, when none is kept out or reads thin', () => {
     const c = variant((c) => [...SCORED_THIN, 'PerplexityBot'].forEach((ua) => readsAll(c, ua)));
-    const all = 'All four scored crawlers get in and read 95% of the text or more.';
+    const all =
+      'Requests with all four scored crawlers’ user agents were served, with 95% of the text or more.';
     expect(aiSummary(c)).toBe(all);
     expect(aiShortSummary(c)).toBe(all);
   });
@@ -153,13 +161,15 @@ describe('thin templates, counted per crawler', () => {
       [...SCORED_THIN, 'PerplexityBot'].forEach((ua) => readsAll(c, ua));
       crawler(c, 'ChatGPT-User').text_share = null;
     });
-    expect(aiSummary(unknown)).toBe('All four scored crawlers get in.');
+    expect(aiSummary(unknown)).toBe(
+      'Requests with all four scored crawlers’ user agents were served.',
+    );
     const one = variant((c) => {
       readsAll(c, 'OAI-SearchBot');
       c.crawlers = c.crawlers.filter((x) => !x.scored || x.ua === 'OAI-SearchBot');
     });
     expect(aiSummary(one)).toBe(
-      'The one scored crawler gets in and reads 95% of the text or more.',
+      'The request with the one scored crawler’s user agent was served, with 95% of the text or more.',
     );
     const none = variant((c) => (c.crawlers = c.crawlers.filter((x) => !x.scored)));
     expect(aiSummary(none)).toBe('No scored AI crawler was tested.');
@@ -176,7 +186,7 @@ describe('thin templates, counted per crawler', () => {
     });
     expect(thinSentence(c)).toBe('The homepage is empty without JavaScript.');
     expect(aiSummary(c)).toBe(
-      'PerplexityBot gets a challenge page; the homepage is empty to the other three.',
+      'PerplexityBot was challenged when we sent its user agent; the homepage is empty to the other three.',
     );
     for (const [label, noun] of Object.entries(TEMPLATE_NOUNS)) {
       expect(isSingularNoun(noun.pages), label).toBe(label === 'Homepage');
@@ -229,7 +239,7 @@ describe('the wording at each threshold and form', () => {
   it('says why the AI grade is withheld without naming the edge when no crawler met it', () => {
     const challenged = findCheck(fixture('challenged-site'), CHECKS.challengedFirstAudit);
     const edge =
-      'The site’s edge blocks all automation, so only one of the four scored crawlers could be measured. Access is somewhere between 0 and 30 of 40.';
+      'The site’s edge refused or challenged our browser-identity request from Crawlmouse’s address, so only one of the four scored crawlers could be measured. Access is somewhere between 0 and 30 of 40.';
     expect(aiWithheldSummary(challenged, 1)).toBe(edge);
     const noEdge = structuredClone(challenged);
     for (const c of noEdge.crawlers.filter((x) => x.verdict === 'edge_blocks_automation')) {
@@ -334,14 +344,17 @@ describe('the wording at each threshold and form', () => {
         ),
       ).toEqual([
         0,
-        'The site’s edge blocks all automation, so none of the four scored crawlers could be measured.',
+        'The site’s edge refused or challenged our browser-identity request from Crawlmouse’s address, so none of the four scored crawlers could be measured.',
       ]);
     });
 
     it('the edge is named beside the count’s reason, and not in place of another reason', () => {
       expect(
         said(['challenged_ua', 'challenged_ua', 'edge_blocks_automation', 'not_measured'], COUNT),
-      ).toEqual([2, `The site’s edge blocks all automation. ${WAITS}`]);
+      ).toEqual([
+        2,
+        `The site’s edge refused or challenged our browser-identity request from Crawlmouse’s address. ${WAITS}`,
+      ]);
       const READ =
         'This audit did not measure the JavaScript comparison, which the AI readability grade needs.';
       // One scored crawler unmeasured at the edge, three served, and the grade waits for Readable.
@@ -386,7 +399,8 @@ describe('the wording at each threshold and form', () => {
 });
 
 describe('the vocabulary', () => {
-  it('says "blocked" for robots.txt and user-agent rules and for no other verdict (FACTS I2)', () => {
+  // A robots.txt rule is what the site declares. A refusal of our request is not called a block (RC-34).
+  it('says "blocked" for robots.txt and for no other verdict (FACTS I2, RC-34)', () => {
     for (const verdict of VerdictSchema.options.filter((v) => !isAllowed(v))) {
       for (const cause of [null, ...AccessCauseSchema.options]) {
         const as = (ua: string) => ({
@@ -401,7 +415,7 @@ describe('the vocabulary', () => {
         expect(clauses).toHaveLength(2);
         for (const clause of clauses) {
           expect(/\bblocked\b/.test(clause), `${verdict}/${cause}: ${clause}`).toBe(
-            isBlocked(verdict),
+            verdict === 'disallowed_by_robots',
           );
         }
       }

@@ -53,7 +53,7 @@ export const LINK_MAP_CHANGES: CopyChange[] = [
     kind: 'facts',
     locked: 'Open the fix for this template',
     rendered:
-      'Tested with tagged user agents from published IPs — crawlmouse.com/bot. Open the fix for this template',
+      'Tested with tagged user agents from Crawlmouse’s own address, not the crawlers’ — crawlmouse.com/bot. Open the fix for this template',
     source: 'FACTS D1: one line under every crawler table (the Link map is named).',
   },
   {

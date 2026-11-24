@@ -273,7 +273,7 @@ function detailsOf(
                 : null,
             // FACTS D1: one line under every crawler table, where the requests are ours.
             tagged: tests.length
-              ? 'Tested with tagged user agents from published IPs — crawlmouse.com/bot.'
+              ? 'Tested with tagged user agents from Crawlmouse’s own address, not the crawlers’ — crawlmouse.com/bot.'
               : null,
           }
         : null,

@@ -47,7 +47,7 @@ describe('the lab site, crawled over HTTP', () => {
   it('with its guides’ sections left to JavaScript: the guides fix opens, and both packets fail their check', async () => {
     const proof = await liveProof();
     expect(proof).toMatch(/^## \d+\. Serve the text of guides without JavaScript$/m);
-    expect(proof).toMatch(/^## \d+\. Let ClaudeBot through the user-agent rule$/m);
+    expect(proof).toMatch(/^## \d+\. Find the rule that refused our request as ClaudeBot$/m);
     expect(proof).toContain(
       '- The HTML response of the template `/guides/{slug}` holds far fewer words than its pages show once rendered in a browser: the difference is content added in the browser. The audit rendered each of its 3 graded pages in a browser.',
     );
@@ -68,7 +68,7 @@ describe('the lab site, crawled over HTTP', () => {
     for (const text of prose) expect(identifiersIn(text), text).toEqual([]);
 
     // the readable command comes first, with what it printed on the site as audited
-    const edge = proof.slice(proof.indexOf('Let ClaudeBot through the user-agent rule'));
+    const edge = proof.slice(proof.indexOf('Find the rule that refused our request as ClaudeBot'));
     const section = edge.slice(0, edge.indexOf('\n## '));
     expect(section.indexOf('#### See it')).toBeGreaterThan(section.indexOf('### Verify'));
     expect(section.indexOf('#### Exact check')).toBeGreaterThan(section.indexOf('#### See it'));
