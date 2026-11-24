@@ -270,6 +270,8 @@ export interface EmailEvent {
 export interface EmailDeps extends FixDeps {
   limits: EmailLimits;
   send(event: EmailEvent): Promise<unknown>;
+  /** The page a form's answer returns to (`backFrom`); the dashboard's change rows without one. */
+  back?: string;
 }
 
 /** The email-developer body, `{email}` and nothing else; the live form posts it as rendered. */
@@ -292,10 +294,11 @@ export async function emailDeveloper(
   const r = await reach(deps, caller);
   if (r === null) return notFound();
   const kind = body?.kind ?? 'json';
+  const back = deps.back ?? EMAIL_BACK;
   if (!(await visible(deps, r)))
-    return refuseTo(kind, EMAIL_BACK, 402, 'upgrade_required', { gate: 'fixesVisible' });
+    return refuseTo(kind, back, 402, 'upgrade_required', { gate: 'fixesVisible' });
   const input = EmailBody.safeParse(body?.fields ?? {});
-  if (!input.success) return refuseTo(kind, EMAIL_BACK, 400, 'invalid_email');
+  if (!input.success) return refuseTo(kind, back, 400, 'invalid_email');
   const to = input.data.email.toLowerCase();
 
   for (const limit of [deps.limits.perFix, deps.limits.perUser]) {
@@ -307,7 +310,7 @@ export async function emailDeveloper(
       );
       // The JSON answer carries the wait as Retry-After only; a form's notice says when.
       return kind === 'form'
-        ? noticeTo(EMAIL_BACK, 'rate_limited', verdict.resetAt.toISOString())
+        ? noticeTo(back, 'rate_limited', verdict.resetAt.toISOString())
         : refuse(429, 'rate_limited', {}, { 'retry-after': String(seconds) });
     }
   }
@@ -323,10 +326,8 @@ export async function emailDeveloper(
     name: 'fix.email_developer_requested',
     data: { requestId },
   });
-  return kind === 'form'
-    ? noticeTo(EMAIL_BACK, 'email_requested')
-    : Response.json({ queued: true });
+  return kind === 'form' ? noticeTo(back, 'email_requested') : Response.json({ queued: true });
 }
 
-/** The page the email action is on (the dashboard's change rows). */
+/** Where a form's answer goes when its page is not one to go back to: the dashboard's change rows. */
 const EMAIL_BACK = '/dashboard';

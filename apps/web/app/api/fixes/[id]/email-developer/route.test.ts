@@ -84,6 +84,20 @@ const post = (id: string, body: string, type = 'application/json') =>
     }),
     { params: Promise.resolve({ id }) },
   );
+/** The form as the fix page posts it, the browser naming the page in `Referer`. */
+const postFrom = (id: string, referer: string, body = 'email=dev%40agency.example') =>
+  POST(
+    new Request(`https://crawlmouse.com/api/fixes/${id}/email-developer`, {
+      method: 'POST',
+      headers: {
+        origin: 'https://crawlmouse.com',
+        'content-type': 'application/x-www-form-urlencoded',
+        referer,
+      },
+      body,
+    }),
+    { params: Promise.resolve({ id }) },
+  );
 const answer = async (res: Response) => [res.status, await res.json()];
 const json = (email: unknown) => JSON.stringify({ email });
 const requests = async (fixId: string) =>
@@ -200,6 +214,38 @@ describe('POST /api/fixes/[id]/email-developer', () => {
 describe('POST /api/fixes/[id]/email-developer from a live form', () => {
   const FORM = 'application/x-www-form-urlencoded';
   const where = (res: Response) => [res.status, res.headers.get('location')];
+  const CHECK = '11111111-1111-4111-8111-111111111111';
+  const fixPage = (id: string) => `/audit/${CHECK}/fix/${id}`;
+
+  it('sent from the fix page: back to that page saying so', async () => {
+    const id = fw.ranked[0]!;
+    const res = await postFrom(id, `https://crawlmouse.com${fixPage(id)}`);
+    expect(where(res)).toEqual([303, `${fixPage(id)}?notice=email_requested`]);
+    expect(h.sent).toHaveLength(1);
+  });
+
+  it('a bad address from the fix page: back to that page, nothing sent', async () => {
+    const id = fw.ranked[0]!;
+    const res = await postFrom(id, `https://crawlmouse.com${fixPage(id)}`, 'email=nope');
+    expect(where(res)).toEqual([303, `${fixPage(id)}?notice=invalid_email`]);
+    expect(h.sent).toEqual([]);
+  });
+
+  it('keeps only the path of the page it came from', async () => {
+    const id = fw.ranked[0]!;
+    const res = await postFrom(id, `https://crawlmouse.com${fixPage(id)}?notice=x&t=secret#y`);
+    expect(where(res)).toEqual([303, `${fixPage(id)}?notice=email_requested`]);
+  });
+
+  it.each([
+    ['another site', (id: string) => `https://evil.example${fixPage(id)}`],
+    ['another page of the audit', () => `https://crawlmouse.com/audit/${CHECK}`],
+    ['a fix address that is not ids', () => `https://crawlmouse.com/audit/x/fix/y`],
+    ['a path past the fix', (id: string) => `https://crawlmouse.com${fixPage(id)}/more`],
+  ])('from %s: back to the dashboard', async (_name, from) => {
+    const id = fw.ranked[0]!;
+    expect(where(await postFrom(id, from(id)))).toEqual([303, '/dashboard?notice=email_requested']);
+  });
 
   it('recorded: back to the dashboard saying so, the address not in the address bar', async () => {
     const res = await post(fw.ranked[0]!, 'email=dev%40agency.example', FORM);
