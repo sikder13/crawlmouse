@@ -150,6 +150,8 @@ export const NOTICE_CODES = [
   'report_declined',
   'fix_not_verified',
   // share links (CC-31)
+  'report_made',
+  'report_failed',
   'share_made',
   'share_revoked',
   'not_ready',

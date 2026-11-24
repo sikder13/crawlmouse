@@ -1,5 +1,7 @@
 import { createHash } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
+import { NOTICE_LINES } from '../copy/notices';
+import { REPORTS_COPY } from '../copy/reports';
 import {
   hashShareToken,
   isShareToken,
@@ -7,6 +9,7 @@ import {
   newShareToken,
   openShareLink,
   SHARE_COOKIE,
+  SHARE_FLASH_SECONDS,
   sharedProof,
   shareReport,
   shareTokenIn,
@@ -227,5 +230,13 @@ describe('sharedProof', () => {
       expect(await sharedProof(f, REPORT, 'tok')).toBeNull();
       expect(f.files.read).not.toHaveBeenCalled();
     }
+  });
+});
+
+describe('what the page says of a made link', () => {
+  it('names the time the flash cookie keeps it: two minutes', () => {
+    expect(SHARE_FLASH_SECONDS).toBe(120);
+    expect(REPORTS_COPY.madeLink).toContain('two minutes');
+    expect(NOTICE_LINES.share_made(null)).toContain('two minutes');
   });
 });

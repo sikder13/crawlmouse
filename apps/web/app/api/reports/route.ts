@@ -1,5 +1,4 @@
 import { checksPublicEnabled } from '@/lib/auth/flags';
-import { seeOther } from '@/lib/billing/request-body';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { siteUrl } from '@/lib/site-url';
 import { supabaseAdmin } from '@/lib/supabase/admin';
@@ -198,7 +197,10 @@ export async function POST(req: Request) {
       },
     );
   }
-  if (body.kind === 'form') return seeOther('/reports');
+  // A form says what happened, so the person knows the file is on its row to download (F-125).
+  if (body.kind === 'form') {
+    return noticeTo(REPORTS_PAGE, made.outcome === 'stored' ? 'report_made' : 'report_failed');
+  }
   return made.outcome === 'stored'
     ? Response.json({ reportId }, { status: 201 })
     : refuse(500, 'report_failed', { reportId });
