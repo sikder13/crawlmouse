@@ -10,8 +10,8 @@ import { isCrawl, loadResults, loadResultsForBuild } from './stored';
 /** The build step's loader (F-248): unchanged within the bound, bounded and streamed over it. */
 const EVENT = { checkId: 'c0000000-0000-4000-8000-000000000001' } as never;
 
-async function setup(extraPerPage: number) {
-  const results = (readRecorded('batches') as unknown[]).map((r) => {
+async function setup(extraPerPage: number, storedTwice = false) {
+  const read = (readRecorded('batches') as unknown[]).map((r) => {
     const b = BatchResultSchema.parse(r);
     if (!isCrawl(b)) return b;
     const extra: LinkEdge[] = b.pages
@@ -29,6 +29,8 @@ async function setup(extraPerPage: number) {
       );
     return { ...b, link_edges: [...b.link_edges, ...extra] };
   });
+  // A retried batch: the first crawl result stored a second time, at the end.
+  const results = storedTwice ? [...read, read.find(isCrawl)!] : read;
   const evidence = memoryEvidenceStore();
   const rows = results.map((_, i) => ({ status: 'done', result_path: `e/batch-${i + 1}.json.gz` }));
   for (const [i, r] of results.entries()) await putJson(evidence, rows[i]!.result_path, r);
@@ -78,6 +80,20 @@ describe('loadResultsForBuild (F-248)', () => {
       // toEqual reads an undefined field as absent, so the count of edges left out drops out here.
       bs.map((b) => (isCrawl(b) ? { ...b, link_edges: [], link_edges_dropped: undefined } : b));
     expect(strip(bounded)).toEqual(strip(full));
+  });
+
+  it('counts an edge left out once when a page is stored in two results (review of 93a7d3f5)', async () => {
+    const s = await setup(40, true);
+    const bounded = await loadResultsForBuild(s.deps, EVENT, Math.floor(s.edges(s.results) / 4));
+    const full = await loadResults(s.deps, EVENT);
+    const distinct = (bs: readonly BatchResult[]) =>
+      new Set(
+        bs.filter(isCrawl).flatMap((b) => b.link_edges.map((e) => `${e.from_url} ${e.to_url}`)),
+      ).size;
+    const dropped = bounded.filter(isCrawl).reduce((n, b) => n + (b.link_edges_dropped ?? 0), 0);
+    expect(dropped).toBeGreaterThan(0);
+    // What the build counts as links (one per from and to, plus what was left out) is the uncut count.
+    expect(distinct(bounded) + dropped).toBe(distinct(full));
   });
 
   it('fails the check build_failed, by name, when the own-page edges pass their bound', async () => {

@@ -94,6 +94,11 @@ export async function loadResultsForBuild(
   }
   if (held !== null) return held;
   const kept = noEdgesKept();
+  // Source pages whose edges an earlier result carried. The build keeps one edge per (from, to), so
+  // a page stored in two results (a retried batch) has its edges once: what a later result leaves
+  // out of such a page is not counted again. A page whose links changed between the two counts its
+  // new targets short; the structure facts then state fewer links than the uncut build would.
+  const sources = new Set<string>();
   const out: BatchResult[] = [];
   for (const r of done) {
     const b = await read(r.result_path!);
@@ -103,7 +108,9 @@ export async function loadResultsForBuild(
     }
     try {
       const link_edges = boundedEdges(b.link_edges, addresses, kept, maxOwn);
-      const dropped = b.link_edges.length - link_edges.length;
+      const held = new Set(link_edges);
+      const dropped = b.link_edges.filter((e) => !held.has(e) && !sources.has(e.from_url)).length;
+      for (const e of b.link_edges) sources.add(e.from_url);
       out.push({ ...b, link_edges, ...(dropped > 0 && { link_edges_dropped: dropped }) });
     } catch (e) {
       if (e instanceof OwnEdgesOverBound) throw new CheckFailure('build_failed', { cause: e });
