@@ -25,6 +25,8 @@ describe('billing kept to the owner', () => {
 
   it('llms.txt lists the same plans as with billing off', () => {
     vi.stubEnv('V2_CHECKS_PUBLIC', '1');
+    // Agency open, so the only thing keeping it off the line is billing kept to the owner.
+    vi.stubEnv('V2_AGENCY_SALES', '1');
     vi.stubEnv('V2_BILLING', '');
     const off = plansLine();
     vi.stubEnv('V2_BILLING', '1');
