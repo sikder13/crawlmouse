@@ -46,6 +46,13 @@ describe('checkoutOpen', () => {
   ])('V2_CHECKS_PUBLIC=%s, V2_BILLING=%s: %s', (checks, billing, open) => {
     expect(checkoutOpen({ V2_CHECKS_PUBLIC: checks, V2_BILLING: billing })).toBe(open);
   });
+
+  it('is closed while paying is kept to one user (V2_BILLING_ONLY_USER)', () => {
+    const env = { V2_CHECKS_PUBLIC: '1', V2_BILLING: '1' };
+    expect(checkoutOpen({ ...env, V2_BILLING_ONLY_USER: 'u-owner' })).toBe(false);
+    expect(checkoutOpen({ ...env, V2_BILLING_ONLY_USER: 'u-owner' }, 'u-owner')).toBe(true);
+    expect(checkoutOpen({ ...env, V2_BILLING_ONLY_USER: 'u-owner' }, 'u-other')).toBe(false);
+  });
 });
 
 describe('the rail with paid plans closed', () => {
