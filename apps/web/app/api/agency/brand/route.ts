@@ -70,9 +70,11 @@ function isDuplicate(e: { statusCode?: unknown; status?: unknown }): boolean {
 }
 
 /**
- * Set an Agency account's white-label brand (Goal 1 row 24): multipart `accountId`, `agencyName` and
- * an optional `logo` file. Each step refuses before the next runs, and nothing is written until all
- * have passed. The middleware has already refused a cross-site request (route-policy: strict).
+ * Set an Agency account's white-label brand (Goal 1 row 24). The account is named in the query
+ * string (`?account=<uuid>`); the multipart body carries `agencyName` and an optional `logo` file,
+ * and any `accountId` field in it is never read. Each step refuses before the next runs, the body is
+ * not read until the caller's role, tier and rate limit have passed, and nothing is written until
+ * every check has. The middleware has already refused a cross-site request (route-policy: strict).
  */
 export async function POST(req: Request) {
   // 1. The feature switch, before the session or the body is read.
@@ -85,24 +87,9 @@ export async function POST(req: Request) {
   } = await sb.auth.getUser();
   if (!user) return refuse(401, 'auth_required');
 
-  // 3. The body: multipart, refused on its declared length before it is read, then read up to the cap.
-  const type = req.headers.get('content-type') ?? '';
-  if (!type.toLowerCase().startsWith('multipart/form-data')) {
-    return refuse(415, 'unsupported_media_type');
-  }
-  const declared = req.headers.get('content-length');
-  if (declared !== null && !(/^\d+$/.test(declared) && Number(declared) <= BODY_MAX)) {
-    return refuse(413, 'too_large');
-  }
-  const raw = await readCapped(req);
-  if (raw === null) return refuse(413, 'too_large');
-  const form = await new Response(raw as BodyInit, { headers: { 'content-type': type } })
-    .formData()
-    .catch(() => null);
-  if (form === null) return refuse(400, 'invalid');
-
-  const accountId = form.get('accountId');
-  if (typeof accountId !== 'string' || !isId(accountId)) return refuse(400, 'invalid');
+  // 3. The account, from the query string.
+  const accountId = new URL(req.url).searchParams.get('account');
+  if (accountId === null || !isId(accountId)) return refuse(400, 'invalid');
 
   // 4. The caller's role on that account, asked through the caller's own session. No seat and a
   //    developer seat get the same answer, so it says nothing about whether the account exists.
@@ -129,11 +116,27 @@ export async function POST(req: Request) {
   });
   if (!rl.allowed) return refuse(429, 'rate_limited');
 
-  // 7. The brand name.
+  // 7. The body: multipart, refused on its declared length before it is read, then read up to the cap.
+  const type = req.headers.get('content-type') ?? '';
+  if (!type.toLowerCase().startsWith('multipart/form-data')) {
+    return refuse(415, 'unsupported_media_type');
+  }
+  const declared = req.headers.get('content-length');
+  if (declared !== null && !(/^\d+$/.test(declared) && Number(declared) <= BODY_MAX)) {
+    return refuse(413, 'too_large');
+  }
+  const raw = await readCapped(req);
+  if (raw === null) return refuse(413, 'too_large');
+  const form = await new Response(raw as BodyInit, { headers: { 'content-type': type } })
+    .formData()
+    .catch(() => null);
+  if (form === null) return refuse(400, 'invalid');
+
+  // 8. The brand name.
   const agencyName = cleanName(form.get('agencyName'));
   if (agencyName === null) return refuse(400, 'invalid_name');
 
-  // 8. The logo, if one was sent: the part's size first, then the validator decides on its bytes.
+  // 9. The logo, if one was sent: the part's size first, then the validator decides on its bytes.
   const file = form.get('logo');
   let logo: { bytes: Uint8Array; contentType: string; ext: string } | null = null;
   if (file !== null) {
@@ -147,8 +150,8 @@ export async function POST(req: Request) {
     logo = { bytes, contentType: v.contentType, ext: v.ext };
   }
 
-  // 9. The writes. The object path is content-addressed and never overwritten, so a report made
-  //    earlier keeps the logo it was made with; the same bytes again reuse the path.
+  // 10. The writes. The object path is content-addressed and never overwritten, so a report made
+  //     earlier keeps the logo it was made with; the same bytes again reuse the path.
   const admin = supabaseAdmin();
   let logoPath: string | undefined;
   if (logo) {

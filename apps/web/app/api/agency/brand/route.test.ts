@@ -12,6 +12,9 @@ import { MAX_LOGO_BYTES } from '../../../../lib/logo-validation';
 const ACCOUNT = 'aaaaaaaa-1111-4111-8111-111111111111';
 const OTHER = '22222222-2222-4222-8222-222222222222';
 const URL_ = 'https://crawlmouse.com/api/agency/brand';
+/** The route's address naming `account` in its query string, or naming none for null. */
+const AT = (account: string | null = ACCOUNT) =>
+  account === null ? URL_ : `${URL_}?account=${encodeURIComponent(account)}`;
 
 const h = vi.hoisted(() => ({
   user: null as { id: string; email: string } | null,
@@ -191,15 +194,17 @@ function accountRow(tier: 'free' | 'pro' | 'agency', id = ACCOUNT): Record<strin
 }
 
 interface Fields {
-  accountId?: string | null;
+  /** The query string's account; null sends none. */
+  account?: string | null;
+  /** An `accountId` field in the body, which the route must not read. */
+  formAccountId?: string;
   agencyName?: string | null;
   logo?: { bytes: Uint8Array; name?: string; type?: string } | null;
 }
 
 function form(f: Fields = {}): FormData {
   const fd = new FormData();
-  const accountId = f.accountId === undefined ? ACCOUNT : f.accountId;
-  if (accountId !== null) fd.append('accountId', accountId);
+  if (f.formAccountId !== undefined) fd.append('accountId', f.formAccountId);
   const name = f.agencyName === undefined ? 'Acme Agency' : f.agencyName;
   if (name !== null) fd.append('agencyName', name);
   if (f.logo) {
@@ -213,14 +218,21 @@ function form(f: Fields = {}): FormData {
   return fd;
 }
 
-const post = (f: Fields = {}) =>
-  POST(
-    new Request(URL_, {
-      method: 'POST',
-      headers: { origin: 'https://crawlmouse.com' },
-      body: form(f),
-    }),
-  );
+/** The last request `post` sent, and how many of its body bytes the route pulled. */
+let last: { req: Request; seen: { pulled: number } } | null = null;
+
+/** POST the form as a counted stream, so a test can say whether the route read the body. */
+async function post(f: Fields = {}): Promise<Response> {
+  const { bytes, type } = await encoded(f);
+  last = streamed(bytes, type, {}, AT(f.account));
+  return POST(last.req);
+}
+
+/** The last request's body was never read: no reader took it, and at most the first chunk queued. */
+function expectBodyUnread() {
+  expect(last?.req.bodyUsed).toBe(false);
+  expect(last?.seen.pulled).toBeLessThanOrEqual(4096);
+}
 
 /** The form's encoded bytes and its multipart content type, as a browser would send them. */
 async function encoded(f: Fields): Promise<{ bytes: Uint8Array; type: string }> {
@@ -247,9 +259,14 @@ function countedStream(bytes: Uint8Array, chunk = 4096) {
   return { stream, seen };
 }
 
-function streamed(bytes: Uint8Array, type: string, headers: Record<string, string> = {}) {
+function streamed(
+  bytes: Uint8Array,
+  type: string,
+  headers: Record<string, string> = {},
+  url = AT(),
+) {
   const { stream, seen } = countedStream(bytes);
-  const req = new Request(URL_, {
+  const req = new Request(url, {
     method: 'POST',
     headers: { 'content-type': type, ...headers },
     body: stream,
@@ -291,12 +308,12 @@ afterEach(() => {
 async function throughEdge(headers: Record<string, string>) {
   const init = { method: 'POST', headers, body: form() };
   const edge = await handleEdge(
-    new NextRequest(new Request(URL_, init)),
+    new NextRequest(new Request(AT(), init)),
     (r) => Promise.resolve(NextResponse.next({ request: r })),
     () => {},
   );
   if (edge.headers.get('x-middleware-next') !== '1') return edge;
-  return POST(new Request(URL_, { method: 'POST', headers, body: form() }));
+  return POST(new Request(AT(), { method: 'POST', headers, body: form() }));
 }
 
 describe('1. same-origin POST', () => {
@@ -368,6 +385,7 @@ describe('4. role, from member_role through the caller’s session', () => {
       expect(res.status).toBe(403);
       expect(await res.json()).toEqual({ code: 'role_refused' });
       expect(h.log).not.toContain('supabaseAdmin');
+      expectBodyUnread();
       expectNoWrite();
     },
   );
@@ -376,20 +394,47 @@ describe('4. role, from member_role through the caller’s session', () => {
     h.roles = { [ACCOUNT]: 'developer' };
     const developer = await post();
     h.roles = { [ACCOUNT]: 'owner' }; // the caller owns ACCOUNT, and has no seat on OTHER
-    const stranger = await post({ accountId: OTHER });
+    const stranger = await post({ account: OTHER });
     expect(h.rpcArgs).toContainEqual({ p_account: OTHER });
     expect(stranger.status).toBe(developer.status);
     expect(await stranger.json()).toEqual(await developer.json());
+    expectBodyUnread();
     expectNoWrite();
   });
 
-  it('400 for a missing or malformed accountId, before member_role', async () => {
-    for (const accountId of [null, 'not-a-uuid', ACCOUNT.toUpperCase()]) {
-      const res = await post({ accountId });
+  it('400 for a missing or malformed account in the query string, before member_role', async () => {
+    for (const account of [null, '', 'not-a-uuid', ACCOUNT.toUpperCase()]) {
+      const res = await post({ account });
       expect(res.status).toBe(400);
       expect(await res.json()).toEqual({ code: 'invalid' });
+      expectBodyUnread();
     }
     expect(h.rpcArgs).toEqual([]);
+    expectNoWrite();
+  });
+
+  it('ignores an accountId field in the body: the query string names the account', async () => {
+    // the caller owns ACCOUNT and has no seat on OTHER, which the body names
+    const res = await post({ formAccountId: OTHER });
+    expect(res.status).toBe(200);
+    expect(h.rpcArgs).toEqual([{ p_account: ACCOUNT }]);
+    expect(h.upserts.map((u) => u.row.account_id)).toEqual([ACCOUNT]);
+    // and a body naming the caller's own account does not open one the query names
+    h.roles = { [ACCOUNT]: 'owner' };
+    const other = await post({ account: OTHER, formAccountId: ACCOUNT });
+    expect(other.status).toBe(403);
+    expect(h.upserts).toHaveLength(1);
+  });
+
+  it('refuses a non-member with 403 before reading the body, even one declared over the limit', async () => {
+    h.roles = {};
+    const { bytes, type } = await encoded({ logo: { bytes: png(10, 10, 2 * MAX_LOGO_BYTES) } });
+    const { req, seen } = streamed(bytes, type, { 'content-length': String(bytes.length) });
+    const res = await POST(req);
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual({ code: 'role_refused' });
+    expect(req.bodyUsed).toBe(false);
+    expect(seen.pulled).toBeLessThanOrEqual(4096);
     expectNoWrite();
   });
 
@@ -414,6 +459,7 @@ describe('5. tier', () => {
       expect(res.status).toBe(403);
       expect(await res.json()).toEqual({ code: 'upgrade_required', gate: 'agencyBranding' });
       expect(h.rateCalls).toEqual([]);
+      expectBodyUnread();
       expectNoWrite();
     },
   );
@@ -427,6 +473,7 @@ describe('5. tier', () => {
     };
     const res = await post();
     expect(res.status).toBe(403);
+    expectBodyUnread();
     expectNoWrite();
   });
 
@@ -434,6 +481,7 @@ describe('5. tier', () => {
     delete h.accounts[ACCOUNT];
     const res = await post();
     expect(res.status).toBe(403);
+    expectBodyUnread();
     expectNoWrite();
   });
 });
@@ -448,6 +496,7 @@ describe('6. rate limit', () => {
     const sixth = await post();
     expect(sixth.status).toBe(429);
     expect(await sixth.json()).toEqual({ code: 'rate_limited' });
+    expectBodyUnread();
     expectNoWrite();
     expect(h.rateCalls.at(-1)).toEqual({
       key: `agency-brand:${ACCOUNT}`,
@@ -455,6 +504,19 @@ describe('6. rate limit', () => {
       windowMs: 60 * 60 * 1000,
       opts: { failClosed: true },
     });
+  });
+
+  it('refuses an over-limit caller with 429 before reading the body, even one declared over the limit', async () => {
+    for (let i = 0; i < 5; i++) expect((await post()).status).toBe(200);
+    h.uploads = [];
+    h.upserts = [];
+    const { bytes, type } = await encoded({ logo: { bytes: png(10, 10, 2 * MAX_LOGO_BYTES) } });
+    const { req, seen } = streamed(bytes, type, { 'content-length': String(bytes.length) });
+    const res = await POST(req);
+    expect(res.status).toBe(429);
+    expect(req.bodyUsed).toBe(false);
+    expect(seen.pulled).toBeLessThanOrEqual(4096);
+    expectNoWrite();
   });
 });
 
@@ -570,7 +632,7 @@ describe('8. logo', () => {
   it('refuses a logo field that is text, not a file', async () => {
     const fd = form();
     fd.append('logo', 'not a file');
-    const res = await POST(new Request(URL_, { method: 'POST', body: fd }));
+    const res = await POST(new Request(AT(), { method: 'POST', body: fd }));
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ code: 'invalid_logo', reason: 'unsupported_type' });
     expectNoWrite();
@@ -578,7 +640,7 @@ describe('8. logo', () => {
 
   it('refuses a malformed multipart body with 400 invalid', async () => {
     const { req } = streamed(
-      Uint8Array.from(ascii('--x\r\nContent-Disposition: form-data; name="accountId"\r\n\r\nabc')),
+      Uint8Array.from(ascii('--x\r\nContent-Disposition: form-data; name="agencyName"\r\n\r\nabc')),
       'multipart/form-data; boundary=x',
     );
     const res = await POST(req);
@@ -589,10 +651,10 @@ describe('8. logo', () => {
 
   it('refuses a body that is not multipart with 415', async () => {
     const res = await POST(
-      new Request(URL_, {
+      new Request(AT(), {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ accountId: ACCOUNT, agencyName: 'Acme' }),
+        body: JSON.stringify({ agencyName: 'Acme' }),
       }),
     );
     expect(res.status).toBe(415);
