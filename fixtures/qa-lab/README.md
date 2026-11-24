@@ -15,9 +15,11 @@ every page says so in its footer (app-shell's footer is built by its script).
   because Vercel serves a file at the requested path ahead of a rewrite, percent-encoded spellings
   included. So nothing else may sit at the lab's root (`scripts/qa/accounts.test.ts` holds it). The bare deployment URL answers 404. Another name under
   `*.lab` resolves but has no certificate, so a request to it fails at TLS.
-- **One function.** A static file cannot answer late, so `slow.lab.crawlmouse.com` is rewritten to `api/slow.mjs`,
-  which serves the files of `sites/slow/` by looking the path up in that folder's list. Its host must be added to
-  the Vercel project before it answers; `/api/*` answers 404 on every host when requested directly.
+- **Two small functions.** A static file cannot answer late, so `slow.lab.crawlmouse.com` is rewritten to `api/slow.mjs`,
+  which serves the files of `sites/slow/` by looking the path up in that folder's list. A static file cannot change
+  by itself either, so `sentinel.lab.crawlmouse.com` is rewritten to `api/sentinel.mjs`, which does the same for
+  `sites/sentinel/` and writes robots.txt from the clock. Each host must be added to the Vercel project before it
+  answers; `/api/*` answers 404 on every host when requested directly.
 - **The large lab's function.** The four `large*` hosts are rewritten to `api/large.mjs`, which renders
   about 2,500 pages from the request path and fixed tables, so none is a committed file. It tells the hosts
   apart by the `Host` header. Each host must be added to the Vercel project before it answers (see
@@ -72,6 +74,7 @@ pnpm smoke -- --url=https://healthy.lab.crawlmouse.com
 | `trial-client-1`      | a middling site for the Agency trial: some orphans, "Learn more" links                              |
 | `demo-1` … `3`        | polished fictional businesses with a few fixes that read well                                       |
 | `slow`                | an ordinary small site whose HTML pages each answer after 3 seconds (`api/slow.mjs`, journey J0.8g) |
+| `sentinel`            | a small site whose robots.txt disallows GPTBot in odd UTC hours (`api/sentinel.mjs`, journey J2.4i) |
 | `large`               | about 2,500 pages of an invented garden shop, answered at once (`api/large.mjs`)                    |
 | `large-slow`          | the same pages, each HTML page answered after 1 second                                              |
 | `large-throttle`      | the same pages; 429 with `Retry-After` above the throttle rule below                                |

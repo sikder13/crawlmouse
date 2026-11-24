@@ -34,6 +34,9 @@ export const QA_HOSTS = {
   demo: [1, 2, 3].map((n) => `demo-${n}.lab.crawlmouse.com`),
   // No account holds this one: journey J0.8g checks it directly (fixtures/qa-lab/api/slow.mjs).
   slow: 'slow.lab.crawlmouse.com',
+  // The daily sentinel's journey step (J2.4i) keeps this one on new Pro and Free accounts it makes:
+  // its robots.txt disallows GPTBot during odd UTC hours (fixtures/qa-lab/api/sentinel.mjs).
+  sentinel: 'sentinel.lab.crawlmouse.com',
   // No account holds these either: the large lab, about 2,500 pages rendered by one function
   // (fixtures/qa-lab/api/large.mjs), on four hosts that answer fast, slowly, and throttled with and
   // without Retry-After. For the large-crawl design study (inbox 067).
