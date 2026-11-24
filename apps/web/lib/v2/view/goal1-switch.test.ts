@@ -1,7 +1,8 @@
 /**
  * Goal 1 rule 2 on the public pages: a feature named in `V2_HIDE_FEATURES` disappears from Pricing,
- * For agencies, Home, the free check pages and `/llms.txt`, and with the variable unset their output
- * is what it was. The views take the switch's answer as a plain record (`features`); the server entry
+ * For agencies, Home, the free check pages and `/llms.txt`. With nothing hidden, each view's output
+ * equals its output with every feature passed as shown, and the rows this file names keep the words
+ * pinned under "nothing hidden" and in Home's first case. The views take the switch's answer as a plain record (`features`); the server entry
  * points call `shownFeatures()`. `/agencies`, `/`, `/check/*` and `/llms.txt` are static, so they
  * read the switch at build time and a change to it takes a redeploy; `/pricing` reads it per request.
  */
@@ -75,6 +76,16 @@ describe('nothing hidden', () => {
     expect(text(agencies())).toMatch(/client report/i);
     expect(words(agenciesHtml(EVERY))).toContain('The prospect one-pager');
   });
+
+  it('the branding rows keep their words', () => {
+    const agencyRows = pricing().plans.find((p) => p.tier === 'agency')!.rows;
+    expect(agencyRows.map((r) => r.text)).toContain(
+      'Reports on your domain with your logo; emails from your address',
+    );
+    expect(agencies().compare.rows.map((r) => r.label.text)).toContain(
+      'Reports and client report pages on your domain, your logo',
+    );
+  });
 });
 
 describe('the modules a client component can reach import the switch for its type alone', () => {
@@ -86,14 +97,16 @@ describe('the modules a client component can reach import the switch for its typ
     'lib/v2/view/check-pages.ts',
     'lib/v2/view/pricing.ts',
     'lib/v2/features.ts',
+    'lib/v2/reports/build-snapshot.ts',
+    'lib/v2/sentences.ts',
   ])('%s', (file) => {
     const source = readFileSync(join(WEB, file), 'utf8');
     const imports = [
       ...source.matchAll(
-        /^\s*import\b[^;]*?\bfrom\s*['"][^'"]*feature-switch['"]|\bimport\s*\(\s*['"][^'"]*feature-switch['"]/gm,
+        /^\s*(?:import|export)\b[^;]*?\bfrom\s*['"][^'"]*feature-switch['"]|\bimport\s*\(\s*['"][^'"]*feature-switch['"]/gm,
       ),
     ].map((m) => m[0].trim());
-    expect(imports.filter((i) => !/^import\s+type\b/.test(i))).toEqual([]);
+    expect(imports.filter((i) => !/^(?:import|export)\s+type\b/.test(i))).toEqual([]);
   });
 });
 
@@ -176,6 +189,35 @@ describe('Pricing and For agencies', () => {
   );
 });
 
+describe('the client report page under either agency name', () => {
+  it.each(['agency_white_label', 'agency_domain'] as const)(
+    '%s alone hidden: no Pricing row names the logo or the domain',
+    (name) => {
+      const rows = pricing(hide(name)).plans.flatMap((p) => p.rows.map((r) => r.text));
+      expect(rows.filter((t) => /logo|your domain/i.test(t))).toEqual([]);
+    },
+  );
+
+  it.each(['agency_white_label', 'agency_domain'] as const)(
+    '%s alone hidden: no For agencies compare row names the logo, the domain or the client page',
+    (name) => {
+      const rows = agencies(hide(name)).compare.rows.map((r) => r.label.text);
+      expect(rows.filter((t) => /logo|domain|client report page/i.test(t))).toEqual([]);
+      expect(rows).toContain('Sites');
+    },
+  );
+});
+
+describe('For agencies under nojs', () => {
+  it('the one-pager heading drops the empty-without-JavaScript sentence', () => {
+    expect(agencies().onePager.heading).toContain('empty without JavaScript');
+    const heading = agencies(hide('nojs')).onePager.heading;
+    expect(heading).toMatch(/^example-outfitter\.com: \S/);
+    expect(heading).not.toContain('JavaScript');
+    expect(agenciesHtml(hide('nojs'))).not.toContain('empty without JavaScript');
+  });
+});
+
 describe('Home', () => {
   it('nothing hidden: the locked plan cards, the words card, the text column and the legend', () => {
     const t = words(homeHtml());
@@ -202,10 +244,38 @@ describe('Home', () => {
     );
   });
 
-  it('agency_white_label alone hidden: the domain and logo stay, the one-page audit goes', () => {
+  it('agency_white_label alone hidden: the domain, the logo and the one-page audit go', () => {
     expect(words(homeHtml(hide('agency_white_label')))).toContain(
-      'Twenty-five client sites, five seats, and reports on your domain with your logo.',
+      'Twenty-five client sites and five seats.',
     );
+  });
+
+  it.each(['agency_white_label', 'agency_domain'] as const)(
+    '%s alone hidden: Home names no logo and no domain',
+    (name) => {
+      expect(words(homeHtml())).toContain('your logo');
+      expect(words(homeHtml(hide(name)))).not.toMatch(/logo|your domain/i);
+    },
+  );
+
+  it('nojs hidden: the map draws no JavaScript-only node and its label names no JavaScript', () => {
+    const label = (html: string) => /<svg[^>]*data-v2-map[^>]*>/.exec(html)![0];
+    const shown = homeHtml();
+    expect(label(shown)).toContain('only through JavaScript');
+    expect(shown).toContain('data-v2-kind="js_only"');
+    const html = homeHtml(hide('nojs'));
+    expect(label(html)).toMatch(/aria-label="Map of the site/);
+    expect(label(html)).not.toMatch(/JavaScript/);
+    expect(html).not.toContain('data-v2-kind="js_only"');
+    expect(html).not.toContain('only through JavaScript');
+  });
+
+  it('nojs hidden: the AI readability summary drops the empty-without-JavaScript sentence', () => {
+    const summary = (f?: Features) =>
+      homePreview(f).example.grades.find((g) => g.label === 'AI readability')!.summary;
+    expect(summary()).toContain('without JavaScript');
+    expect(summary(hide('nojs'))).not.toContain('JavaScript');
+    expect(summary(hide('nojs'))).not.toBe('');
   });
 
   it('nojs hidden: the crawler table drops its text column whole, and the legend its item', () => {

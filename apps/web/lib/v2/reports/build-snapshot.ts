@@ -14,9 +14,13 @@ import { crawlerRows, resultView } from '../view/result';
 import { freeFixes } from '../view/free-fixes';
 import { PublicSnapshotV2Schema, type PublicSnapshotV2 } from './snapshot';
 
-function headline(check: Check, host: string): string {
+/**
+ * The report's one-line verdict. `withThin` false (the Goal 1 switch hides `nojs`) leaves out the
+ * sentence naming the templates that are empty without JavaScript.
+ */
+export function headline(check: Check, host: string, withThin = true): string {
   const keptOut = keptOutClauses(check.crawlers);
-  const thin = thinSentence(check);
+  const thin = withThin ? thinSentence(check) : null;
   const sentences = [
     ...(keptOut.length ? [`${keptOut.join('; ')}.`] : []),
     ...(thin ? [thin] : []),

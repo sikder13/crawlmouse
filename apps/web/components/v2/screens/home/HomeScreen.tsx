@@ -32,7 +32,8 @@ function plans(f: HomeView['features']) {
   const agency = [
     'Twenty-five client sites',
     'five seats',
-    f.agency_domain ? 'reports on your domain with your logo' : null,
+    // The client report page (row 24) on the agency's domain (row 25): either hidden drops it.
+    f.agency_domain && f.agency_white_label ? 'reports on your domain with your logo' : null,
     f.agency_white_label ? 'a one-page audit you can hand to a prospect' : null,
   ].filter((x): x is string => x !== null);
   return [

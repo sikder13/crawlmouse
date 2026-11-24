@@ -294,9 +294,10 @@ export function aiSummary(check: Check): string {
  * Locked Home stage: the scored crawlers kept out, then the templates they read thin; when there is
  * neither, the sentence the AI card uses for a site every scored crawler reads.
  */
-export function aiShortSummary(check: Check): string {
+/** `withThin` false (the Goal 1 switch hides `nojs`) leaves out the empty-without-JavaScript sentence. */
+export function aiShortSummary(check: Check, withThin = true): string {
   const out = keptOutClauses(scoredOf(check));
-  const thin = thinSentence(check);
+  const thin = withThin ? thinSentence(check) : null;
   if (!out.length && !thin) return allInSentence(scoredOf(check));
   return [out.length ? `${capitalise(out.join('; '))}.` : null, thin].filter(Boolean).join(' ');
 }

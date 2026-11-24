@@ -76,6 +76,8 @@ function obstacle(c: CrawlerResult, productNoun: string): string {
   const phrases: Record<AccessCause, string> = {
     cloudflare_1020: 'a Cloudflare firewall rule',
     bot_fight_mode: 'Bot Fight Mode',
+    // Kept with `nojs` hidden: it names the cause of the Products column's "allowed, thin"
+    // verdict, which shows either way, and gives no without-JavaScript figure.
     client_rendered_template: `the ${productNoun} template is client-rendered`,
     robots_txt_disallow: 'a robots.txt rule',
     automation_challenge: 'an automation challenge at the edge',
@@ -157,6 +159,15 @@ export function homeView(
   if (!change) throw new Error('The example site has no crawler-access change');
   const zone = d.accounts.find((a) => a.id === site.account_id)?.timezone ?? 'UTC';
 
+  // `nojs` hidden: a page reachable only through JavaScript is drawn and counted as an ordinary
+  // page, so neither the triangle (whose legend item is gone) nor the label names JavaScript.
+  const drawn: MapDrawing = features.nojs
+    ? map
+    : {
+        ...map,
+        nodes: map.nodes.map((n) => (n.kind === 'js_only' ? { ...n, kind: 'page' as const } : n)),
+      };
+
   return {
     features,
     example: {
@@ -182,13 +193,13 @@ export function homeView(
                 score: ai.total,
                 tone: toneOf(ai.grade),
                 withheld: false,
-                summary: aiShortSummary(check),
+                summary: aiShortSummary(check, features.nojs),
               },
             ]
           : []),
       ],
-      map,
-      mapLabel: mapLabel(map.nodes, false),
+      map: drawn,
+      mapLabel: mapLabel(drawn.nodes, false),
     },
     crawlers: {
       productHeader: `${capitalise(productNoun.pages)} · ${product.pages}`,

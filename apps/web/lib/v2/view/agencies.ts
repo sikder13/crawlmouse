@@ -30,7 +30,7 @@ import { findCheck, fixture } from '../fixtures';
 import { dayMonth } from '../format';
 import { toneOf } from '../letters';
 import { CHECKS } from '../recordings';
-import { buildPublicSnapshot } from '../reports/build-snapshot';
+import { buildPublicSnapshot, headline } from '../reports/build-snapshot';
 import { numberWord } from '../words';
 import { FOOTER_LINE_CAPABILITIES } from '../copy/footer-line';
 
@@ -78,8 +78,11 @@ export type Proof =
 
 export interface Capability {
   status: 'built' | 'coming';
-  /** The Goal 1 switch that hides it while unproven (`lib/feature-switch.ts`). */
-  risk?: RiskFeature;
+  /**
+   * The Goal 1 switch names that hide it while unproven (`lib/feature-switch.ts`): one name, or a
+   * list, any of which hides it.
+   */
+  risk?: RiskFeature | readonly RiskFeature[];
   /** What it is, in a sentence. */
   what: string;
   proof: Proof;
@@ -145,7 +148,8 @@ export const CAPABILITIES: Readonly<Record<CapabilityKey, Capability>> = {
   },
   client_report_page: {
     status: 'coming',
-    risk: 'agency_domain',
+    // Row 24 names the client page and row 25 the agency's domain; this names both.
+    risk: ['agency_white_label', 'agency_domain'],
     what: 'Reports and the client report page under your own name: on your domain, with your logo. The report a client opens is on our domain, names no agency and shows no logo.',
     // CC-31 built the report a client opens (`/s/<token>`), on our domain and with no logo: what
     // the client is shown is drawn here, and nothing here reads a logo.
@@ -286,7 +290,8 @@ const isComing = (keys: readonly CapabilityKey[]) =>
 export const isHidden = (keys: readonly CapabilityKey[], features: Features = ALL_SHOWN) =>
   keys.some((k) => {
     const risk = CAPABILITIES[k].risk;
-    return risk !== undefined && !features[risk];
+    if (risk === undefined) return false;
+    return (typeof risk === 'string' ? [risk] : risk).some((r) => !features[r]);
   });
 
 /** A list of tagged copy without what the switch hides. */
@@ -399,7 +404,8 @@ function onePager(features: Features): AgenciesView['onePager'] {
     hidden: isHidden(o.capabilities, features),
     agency: SAMPLE_AGENCY.name,
     meta: `${SAMPLE_AGENCY.host} · ${dayMonthYear(s.checkedAt)}`,
-    heading: `${s.host}: ${s.headline}`,
+    // `nojs` hidden: the headline without its empty-without-JavaScript sentence.
+    heading: `${s.host}: ${features.nojs ? s.headline : headline(check, s.host, false)}`,
     // Without the AI readability letter (`ai_letter` hidden) the sample shows Technical SEO alone.
     grades: s.grades
       .filter((g) => features.ai_letter || g.label !== AI_READABILITY)
