@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { expect } from './pw';
 import { stagingAdmin } from './lib/accounts';
 import { freshContext, keptSite, person, type Person } from './lib/people';
+import { startTrialFromDashboard } from './lib/pro';
 import { step } from './lib/step';
 
 // J2.4i (row 23): the daily sentinel. sentinel.lab.crawlmouse.com disallows GPTBot during odd UTC
@@ -52,16 +53,15 @@ function nextLook(siteId: string, from: number): number {
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const isOdd = (ms: number) => new Date(ms).getUTCHours() % 2 === 1;
 
+/** QA's helper starts the trial with staging's trial ledger set aside, then the state is read. */
 async function startPro(who: Person) {
-  const status = await who.page.evaluate(async (accountId) => {
-    const r = await fetch('/api/billing/pro-trial/start', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ accountId }),
-    });
-    return r.status;
-  }, who.accountId);
-  expect(status, 'the no-card Pro trial starts').toBe(200);
+  await startTrialFromDashboard(who);
+  const { data } = await stagingAdmin()
+    .from('accounts')
+    .select('state')
+    .eq('id', who.accountId)
+    .single();
+  expect(data?.state, 'the no-card Pro trial started').toBe('pro_trial');
 }
 
 /** The site's latest ended check, once one has ended at or after `since`. */
