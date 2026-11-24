@@ -170,36 +170,6 @@ ignoreUntil = 2026-11-26
 reason = "Present at the CC-00 baseline: nanoid@3.3.12 (fixed: 3.3.18)"
 
 [[IgnoredVulns]]
-id = "GHSA-6g55-p6wh-862q"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: postcss@8.4.31 (fixed: 8.5.12)"
-
-[[IgnoredVulns]]
-id = "GHSA-fxqj-rqcc-2cmp"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: postcss@8.4.31 (fixed: 8.5.23); postcss@8.5.15 (fixed: 8.5.23)"
-
-[[IgnoredVulns]]
-id = "GHSA-qx2v-qp2m-jg93"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: postcss@8.4.31 (fixed: 8.5.10)"
-
-[[IgnoredVulns]]
-id = "GHSA-r28c-9q8g-f849"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: postcss@8.4.31 (fixed: 8.5.18); postcss@8.5.15 (fixed: 8.5.18)"
-
-[[IgnoredVulns]]
-id = "GHSA-rj75-hqrm-r3gf"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: postcss-selector-parser@6.1.2 (fixed: 6.1.5)"
-
-[[IgnoredVulns]]
-id = "GHSA-w9m9-85wc-3x92"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: postcss-selector-parser@6.1.2 (fixed: 6.1.3)"
-
-[[IgnoredVulns]]
 id = "GHSA-f38q-mgvj-vph7"
 ignoreUntil = 2026-11-26
 reason = "Present at the CC-00 baseline: protobufjs@7.6.1 (fixed: 7.6.3)"
@@ -208,11 +178,6 @@ reason = "Present at the CC-00 baseline: protobufjs@7.6.1 (fixed: 7.6.3)"
 id = "GHSA-j3f2-48v5-ccww"
 ignoreUntil = 2026-11-26
 reason = "Present at the CC-00 baseline: protobufjs@7.6.1 (fixed: 7.6.5)"
-
-[[IgnoredVulns]]
-id = "GHSA-68fv-2mgg-jv7q"
-ignoreUntil = 2026-11-26
-reason = "Present at the CC-00 baseline: source-map-js@1.2.1 (fixed: 1.2.2)"
 
 [[IgnoredVulns]]
 id = "GHSA-528h-pc64-c93x"
