@@ -552,6 +552,53 @@ describe('7. brand name', () => {
   });
 });
 
+describe('7b. brand name: format characters and separators', () => {
+  it.each([
+    ['LRM U+200E', '\u200e'],
+    ['RLM U+200F', '\u200f'],
+    ['ALM U+061C', '\u061c'],
+    ['ZWSP U+200B', '\u200b'],
+    ['ZWNJ U+200C', '\u200c'],
+    ['ZWJ U+200D', '\u200d'],
+    ['BOM U+FEFF', '\ufeff'],
+    ['line separator U+2028', '\u2028'],
+    ['paragraph separator U+2029', '\u2029'],
+  ])('strips the %s from the stored name', async (_label, ch) => {
+    const res = await post({ agencyName: `${ch}Acme${ch} Co${ch}` });
+    expect(res.status).toBe(200);
+    expect(h.upserts[0]?.row.agency_name).toBe('Acme Co');
+  });
+
+  it('refuses a name made of them alone with 400 invalid_name', async () => {
+    const res = await post({
+      agencyName: '\u200e\u200f\u061c\u200b\u200c\u200d\ufeff\u2028\u2029',
+    });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ code: 'invalid_name' });
+    expectNoWrite();
+  });
+});
+
+describe('7c. brand name that reads as a link or an address', () => {
+  it.each([
+    ['a host in a sentence', 'Acme reset at evil.tld'],
+    ['an https URL', 'https://evil.example/reset'],
+    ['an email address', 'help@evil.example'],
+    ['a host split by a zero-width space', 'evil\u200b.tld now'],
+  ])('refuses %s with 400 invalid_name and writes nothing', async (_label, agencyName) => {
+    const res = await post({ agencyName });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ code: 'invalid_name' });
+    expectNoWrite();
+  });
+
+  it('accepts an ordinary name with a trailing full stop (the control)', async () => {
+    const res = await post({ agencyName: 'Acme Partners Inc.' });
+    expect(res.status).toBe(200);
+    expect(h.upserts[0]?.row.agency_name).toBe('Acme Partners Inc.');
+  });
+});
+
 // ─── 8. logo ────────────────────────────────────────────────────────────────────────────────────
 
 describe('8. logo', () => {
@@ -715,6 +762,31 @@ describe('9. write', () => {
     expect(h.uploads).toEqual([]);
     expect(h.upserts[0]?.row).not.toHaveProperty('logo_path');
     expect(await res.json()).toEqual({ agencyName: 'Acme Agency', logoPath: h.storedLogo });
+  });
+
+  it('an empty file field (no bytes, no file name) is no logo: the name is saved, not a 400', async () => {
+    h.storedLogo = `agency/${ACCOUNT}/0123456789abcdef.webp`;
+    // Written by hand, as a browser sends a file input left empty: undici's own encoder drops an
+    // empty file name and would send a text part instead.
+    const b = '----empty-file-field';
+    const body = new TextEncoder().encode(
+      `--${b}\r\nContent-Disposition: form-data; name="agencyName"\r\n\r\nAcme Agency\r\n` +
+        `--${b}\r\nContent-Disposition: form-data; name="logo"; filename=""\r\n` +
+        `Content-Type: application/octet-stream\r\n\r\n\r\n--${b}--\r\n`,
+    );
+    const res = await POST(streamed(body, `multipart/form-data; boundary=${b}`).req);
+    expect(res.status).toBe(200);
+    expect(h.uploads).toEqual([]);
+    expect(h.validateCalls).toBe(0);
+    expect(h.upserts[0]?.row).not.toHaveProperty('logo_path');
+    expect(await res.json()).toEqual({ agencyName: 'Acme Agency', logoPath: h.storedLogo });
+  });
+
+  it('an empty file that has a name is still refused by the validator (the control)', async () => {
+    const res = await post({ logo: { bytes: new Uint8Array(0), name: 'logo.png' } });
+    expect(res.status).toBe(400);
+    expect((await res.json()) as { code: string }).toMatchObject({ code: 'invalid_logo' });
+    expectNoWrite();
   });
 
   it('a storage error is 500 upload_failed without its message, and nothing is upserted', async () => {

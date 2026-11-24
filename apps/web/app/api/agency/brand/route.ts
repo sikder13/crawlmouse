@@ -6,6 +6,7 @@ import { LOGO_BUCKET } from '@/lib/report-brand';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { supabaseServer } from '@/lib/supabase/server';
 import { isId, notFound, refuse } from '@/lib/v2/account/route';
+import { accountNameText } from '@/lib/v2/mail/templates/parts';
 import { readEntitlement } from '@/lib/v2/account/viewer-read';
 
 // node:crypto (the content address) and the storage upload need the Node runtime.
@@ -17,16 +18,26 @@ const HOUR_MS = 60 * 60 * 1000;
 /** The request body's cap: the logo's, plus room for the two text fields and the multipart framing. */
 const BODY_MAX = MAX_LOGO_BYTES + 16 * 1024;
 const NAME_MAX = 60;
-/** C0 and C1 controls (DEL included), and the bidi embeddings, overrides and isolates. */
-const CONTROLS = /[\u0000-\u001f\u007f-\u009f‪-‮⁦-⁩]/g;
+/**
+ * Controls (`Cc`: C0, DEL and C1), format characters (`Cf`: the bidi marks, embeddings, overrides and
+ * isolates U+200E/F, U+202A–U+202E and U+2066–U+2069, the Arabic letter mark U+061C, the zero-width
+ * U+200B–U+200D and U+FEFF among them), and the line and paragraph separators (`Zl`, `Zp`).
+ */
+const CONTROLS = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu;
 const EDITORS: ReadonlySet<unknown> = new Set(['owner', 'account_manager']);
 
-/** The name as stored: the controls removed, then trimmed; null unless 1 to 60 code points remain. */
+/**
+ * The name as stored: the controls removed, then trimmed; null unless 1 to 60 code points remain,
+ * and null when it holds text a mail client or a browser may read as a link or an address. That is
+ * the guard the mail templates apply to an account or agency name (`accountNameText`), so a name it
+ * would refuse to show is refused here instead of stored.
+ */
 function cleanName(raw: FormDataEntryValue | null): string | null {
   if (typeof raw !== 'string') return null;
   const name = raw.replace(CONTROLS, '').trim();
   const length = [...name].length;
-  return length >= 1 && length <= NAME_MAX ? name : null;
+  if (length < 1 || length > NAME_MAX) return null;
+  return accountNameText(name) === null ? null : name;
 }
 
 /** The body's bytes, or null once more than `BODY_MAX` arrive; the stream is cancelled there. */
@@ -52,6 +63,11 @@ async function readCapped(req: Request): Promise<Uint8Array | null> {
     at += c.byteLength;
   }
   return out;
+}
+
+/** The part a browser sends for a file input left empty: no bytes and no file name. */
+function isEmptyFileField(part: Blob): boolean {
+  return part.size === 0 && part instanceof File && part.name === '';
 }
 
 /** A missing bucket, matched as v1's logo route matches it (app/api/reports/[slug]/logo/route.ts). */
@@ -137,7 +153,9 @@ export async function POST(req: Request) {
   if (agencyName === null) return refuse(400, 'invalid_name');
 
   // 9. The logo, if one was sent: the part's size first, then the validator decides on its bytes.
-  const file = form.get('logo');
+  //    A form's empty file input arrives as a nameless, empty file part, which is no logo.
+  const part = form.get('logo');
+  const file = part instanceof Blob && isEmptyFileField(part) ? null : part;
   let logo: { bytes: Uint8Array; contentType: string; ext: string } | null = null;
   if (file !== null) {
     if (!(file instanceof Blob)) {
