@@ -29,6 +29,17 @@ describe('CRAWL_USER_AGENT', () => {
 });
 
 describe('discoverSeeds (Q8)', () => {
+  it('sends no From header, as `/bot` says', async () => {
+    const { deps, requests } = site({
+      'https://example.com/robots.txt':
+        'User-agent: *\nAllow: /\nSitemap: https://example.com/a.xml\n',
+      'https://example.com/a.xml': urlset(['https://example.com/']),
+    });
+    await discoverSeeds('https://example.com', deps);
+    expect(requests.length).toBeGreaterThan(1);
+    for (const r of requests) expect(r.opts).not.toHaveProperty('headers');
+  });
+
   it('seeds the homepage and the sitemaps robots.txt names, as our crawler', async () => {
     const { deps, requests } = site({
       'https://example.com/robots.txt':
