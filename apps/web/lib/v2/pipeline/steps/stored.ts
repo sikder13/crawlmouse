@@ -4,7 +4,17 @@
  * access sample and the render candidates are planned over.
  */
 import { z } from 'zod';
-import { assemble, readBatches, type Assembled, type Seed } from '@crawlmouse/engine/v2/pipeline';
+import {
+  assemble,
+  boundedEdges,
+  edgeQuota,
+  MAX_CHECK_EDGES,
+  readBatches,
+  rowAddresses,
+  type Assembled,
+  type EdgeQuota,
+  type Seed,
+} from '@crawlmouse/engine/v2/pipeline';
 import {
   BatchResultSchema,
   type BatchResult,
@@ -49,6 +59,47 @@ export async function loadResults(deps: StepDeps, event: CheckRequested): Promis
 }
 
 export const isCrawl = (b: BatchResult): b is CrawlBatchResult => b.kind === 'crawl';
+
+/**
+ * The build's batch results, with the edges it holds bounded (F-248; engine build/edge-scope.ts). The
+ * results are read one at a time, in the order loadResults reads them. At or under MAX_CHECK_EDGES
+ * they are what loadResults answers, read once. Over it, they are read again, each with its edges cut
+ * to the per-page quota, so no more than one whole result and the kept edges are held at once.
+ */
+export async function loadResultsForBuild(
+  deps: StepDeps,
+  event: CheckRequested,
+  cap: number = MAX_CHECK_EDGES,
+): Promise<BatchResult[]> {
+  const rows = await deps.store.batches(event.checkId);
+  const done = rows.filter((r) => r.status === 'done' && r.result_path !== null);
+  const read = async (path: string) => BatchResultSchema.parse(await getJson(deps.evidence, path));
+  const addresses = new Set<string>();
+  let pages = 0;
+  let edges = 0;
+  // Kept while the check is within the bound, so an ordinary check is read once; let go once over it.
+  let held: BatchResult[] | null = [];
+  for (const r of done) {
+    const b = await read(r.result_path!);
+    if (isCrawl(b)) {
+      for (const a of rowAddresses(b.pages)) addresses.add(a);
+      pages += b.pages.length;
+      edges += b.link_edges.length;
+    }
+    held = held !== null && edges <= cap ? [...held, b] : null;
+  }
+  if (held !== null) return held;
+  const quota = edgeQuota(pages, cap);
+  const kept = new Map<string, EdgeQuota>();
+  const out: BatchResult[] = [];
+  for (const r of done) {
+    const b = await read(r.result_path!);
+    out.push(
+      isCrawl(b) ? { ...b, link_edges: boundedEdges(b.link_edges, addresses, quota, kept) } : b,
+    );
+  }
+  return out;
+}
 
 /** The worker release a batch's rows name: the first that names one; null when none does. */
 export function releaseOf(b: BatchResult): string | null {
