@@ -61,6 +61,34 @@ describe('/competitors', () => {
     expect(await target()).toBe(`/audit/${latest.id}/signals`);
   });
 
+  it('prefers a later site with a competitor named over the first site without one', async () => {
+    const d = fixture('bad-site');
+    const mine = d.sites
+      .filter((s) => s.account_id === BAD && s.staging_of_site_id === null)
+      .sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at));
+    const [first, later] = [
+      mine[0]!,
+      mine.find(
+        (s, i) => i > 0 && d.checks.some((c) => c.site_id === s.id && c.status === 'finished'),
+      )!,
+    ];
+    h.dataset = {
+      ...d,
+      sites: d.sites.map((s) =>
+        s.id === first.id
+          ? { ...s, competitor_hosts: [] }
+          : s.id === later.id
+            ? { ...s, competitor_hosts: ['rival.example'] }
+            : { ...s, competitor_hosts: [] },
+      ),
+    };
+    const latest = d.checks
+      .filter((c) => c.site_id === later.id && (c.status === 'finished' || c.status === 'partial'))
+      .sort((a, b) => Date.parse(a.finished_at!) - Date.parse(b.finished_at!))
+      .at(-1)!;
+    expect(await target()).toBe(`/audit/${latest.id}/signals`);
+  });
+
   it('with no ended check of that site, goes to the site page, where competitors are named', async () => {
     const d = fixture('bad-site');
     const site = d.sites.find((s) => s.account_id === BAD && s.competitor_hosts.length > 0)!;
