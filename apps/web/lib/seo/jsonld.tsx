@@ -1,7 +1,7 @@
 import { siteOrigin, siteUrl } from '@/lib/site-url';
 import type { BlogPostMeta } from '@/lib/blog/posts';
 import { checksPublicEnabled } from '@/lib/auth/flags';
-import { billingV2Enabled } from '@/lib/billing/flags';
+import { billingPublic } from '@/lib/billing/flags';
 import { AGENCY_MONTHLY, AGENCY_YEARLY, PRO_MONTHLY, PRO_YEARLY } from '@/lib/billing/prices';
 import { PARENT_ORGANIZATION, V2_HOME_DESCRIPTION } from './site-copy';
 import { postAbstract } from '@/lib/blog/answers';
@@ -89,7 +89,7 @@ export function planOffers() {
     offer('Free', 0, null),
     offer('Pro, monthly', PRO_MONTHLY, 'P1M'),
     offer('Pro, yearly', PRO_YEARLY, 'P1Y'),
-    ...(billingV2Enabled()
+    ...(billingPublic()
       ? [
           offer('Agency, monthly', AGENCY_MONTHLY, 'P1M'),
           offer('Agency, yearly', AGENCY_YEARLY, 'P1Y'),
