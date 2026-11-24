@@ -17,7 +17,7 @@
  * the check its first attempt requested. Two customers' runs reading the host's row in the same
  * moment, before either has requested a check, can each request one: the read and the request are
  * not one transaction. A site row that an account has come
- * to keep is not a competitor's any more, and is neither read nor crawled.
+ * to keep is not a competitor's any more: `start` copies none of its checks and requests none.
  *
  * Before a new crawl: the crawl pause, the SSRF guard on `https://{host}/` (the public start's
  * `admitSiteHost`), the account's own daily bucket (in place of a visitor's per-address bucket),
@@ -28,15 +28,12 @@
  * member removed since the plan is left out, and a listed host with no new snapshot keeps the one
  * the check already holds.
  *
- * Two runs for one site can overlap: each waits up to three hours, and a sleeping run holds no
- * concurrency slot. Their start steps do not run at once (a concurrency key on the site), so the
- * later one finds the earlier one's check of a host under way or ended and takes it; it can take
- * a different one only when another customer's run requested a check of that host in the same
- * moment (above), or when the earlier check failed. Checks of a host started more than a day apart
- * cannot both be copied by overlapping runs, since a run ends within three hours.
+ * Two runs for one site can overlap, since a sleeping run holds no concurrency slot, and they can
+ * copy different checks of one host. Each run's `write` replaces a host's snapshot with the one
+ * it copied, so the run that writes last decides it.
  *
- * The site row keeps the host as the first customer to name it spelled it (`www.` or not), and the
- * crawl starts there.
+ * The site row keeps the host as spelled by the customer whose run inserted the row (`www.` or
+ * not), and the crawl starts there.
  */
 import { stableId } from '@crawlmouse/engine/v2/pipeline';
 import type { Check, CompetitorSnapshot } from '@crawlmouse/types/v2';

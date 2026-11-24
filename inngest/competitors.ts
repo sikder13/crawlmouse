@@ -7,8 +7,8 @@
  * for the site edit route to send after a member changes the competitor list, which that route's
  * owner adds; until then a changed list is first audited at the site's next check. A concurrency key
  * on the site keeps two runs' steps for one site from executing at once; it does not stop the runs
- * overlapping, since a sleeping run holds no slot. Why an overlap does no harm is in
- * apps/web/lib/v2/competitors/compare.ts. Steps: `latest` (the second event only), `plan` (whether the check audits competitors, and
+ * overlapping, since a sleeping run holds no slot (apps/web/lib/v2/competitors/compare.ts says what
+ * an overlap can do). Steps: `latest` (the second event only), `plan` (whether the check audits competitors, and
  * which hosts), `start-<n>` per host (reuse a recent check of the host, or request one), then
  * `wait-<n>` and `ended-<n>` until every started check has ended or the polls in
  * `COMPETITOR_POLLS_S` run out, then `write`. A competitor's own check finishing starts this function
