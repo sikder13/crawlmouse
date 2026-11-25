@@ -65,7 +65,7 @@ import { placeOrder } from './free-fixes';
 import { listedChanges } from './listed-changes';
 import { nextCheckLine, type NextChecks } from './site';
 import { titleAmong } from './fix-title';
-import { GRADES, PILL, SUBJECTS } from './segment/changes';
+import { GRADES, PILL, SUBJECTS, FOUND_AGAIN, foundAgain } from './segment/changes';
 import { effortText } from './segment/fixes';
 import { action, emailDeveloperAction, type ActionView } from './account-actions';
 import { roleMay } from '../agency/guard';
@@ -544,7 +544,11 @@ function changeRow(v: AccountView, site: Site, c: Change): ChangeRowView {
   const openFix = fix && fix.status !== 'verified_resolved';
   return {
     key: c.id,
-    pill: { state: PILL[c.kind], label: blocked ? 'blocked' : c.kind },
+    // A fix found again reads so before any other word, by its record (F-296), as on /changes.
+    pill: {
+      state: PILL[c.kind],
+      label: foundAgain(c, v.d.fix_events) ? FOUND_AGAIN : blocked ? 'blocked' : c.kind,
+    },
     verdicts: verdict ? [verdict] : [],
     title: c.summary,
     line: parts.filter(Boolean).join(' · '),

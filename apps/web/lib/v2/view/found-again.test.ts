@@ -61,3 +61,24 @@ describe('a fix found again, on the audit’s Changes segment', () => {
     expect(v.rows.find((r) => r.key === row.id)?.pill.label).toBe('found again');
   });
 });
+
+describe('a fix found again, on the dashboard (QA N2)', () => {
+  it('its change row reads "found again"; no other row does', async () => {
+    const { dashboardView } = await import('./dashboard');
+    const { d, row } = regressed();
+    // The dashboard lists a site's latest check's opened rows; this one is not a crawler block.
+    const latestOpened = d.changes.filter(
+      (c) => c.check_id === row.check_id && c.kind === 'opened' && c.subject !== 'crawler_access',
+    );
+    const target = latestOpened[0] ?? row;
+    d.fix_events.at(-1)!.fix_id = target.fix_id!;
+    (d.fix_events.at(-1)! as { check_id: string }).check_id = target.check_id;
+    const v = dashboardView(d, { accountId: ACCOUNT, now: d.as_of });
+    const shown = v.changed.find((r) => r.key === target.id);
+    expect(shown, 'the dashboard lists the row').toBeDefined();
+    expect(shown!.pill.label).toBe('found again');
+    for (const r of v.changed.filter((x) => x.key !== target.id)) {
+      expect(r.pill.label).not.toBe('found again');
+    }
+  });
+});
