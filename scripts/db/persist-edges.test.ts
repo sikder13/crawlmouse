@@ -38,9 +38,23 @@ if (URL_ENV && !['localhost', '127.0.0.1', '[::1]'].includes(new URL(URL_ENV).ho
 
 const PAGES = 2_000;
 const EDGES = 37_540;
+/**
+ * The shapes persisted the new way: production's failing check, and the densest 500-page check QA
+ * measured on staging (19,886 edges, 2.4× the most production has saved in one call), on which the
+ * Free 500-page check is held.
+ */
+const SHAPES = [
+  { name: 'now', pages: PAGES, edges: EDGES },
+  { name: 'dense500', pages: 500, edges: 19_886 },
+] as const;
 /** Production's `link_edges` on 25 Nov, ten times over. */
 const FILLER_EDGES = 568_590;
 const TIMEOUT_MS = 8_000;
+/**
+ * What persist_built_check, now without the edges, is held to on CI: half the timeout, for
+ * production's slower instance (the CTO's margin, inbox 114).
+ */
+const FINISH_BOUND_MS = TIMEOUT_MS / 2;
 /** What one edge piece is held to: a tenth of the timeout, for production's slower instance. */
 const PIECE_BOUND_MS = TIMEOUT_MS / 10;
 const HOOK_TIMEOUT_MS = 600_000;
@@ -82,7 +96,10 @@ const asDb = (sql: Sql) =>
 async function seedWithFiller(sql: Sql) {
   const { site, check } = largeBuiltSeed();
   await seedSite(asDb(sql), site);
-  const filler = { ...check, id: randomUUID() };
+  // On a site of its own: a site has one running check at a time (checks_one_running_per_site).
+  const fillerSite = { ...site, id: randomUUID(), host: 'filler.test' };
+  await seedSite(asDb(sql), fillerSite);
+  const filler = { ...check, id: randomUUID(), site_id: fillerSite.id };
   await seedRunning(asDb(sql), filler);
   const [lineage] = await sql`
     insert into public.measurement_lineages (id, engine_sha, detector_ruleset_version,
@@ -123,21 +140,24 @@ function timed(db: PersistDb) {
 
 describe.skipIf(!URL_ENV)('a 2,000-page check persisted under an 8 s timeout (F-330)', () => {
   const stamp = `${process.pid}_${Date.now()}`;
-  const names = { now: `persist_edges_${stamp}`, before: `persist_edges_before_${stamp}` };
+  const names = {
+    now: `persist_edges_${stamp}`,
+    dense500: `persist_edges_dense_${stamp}`,
+    before: `persist_edges_before_${stamp}`,
+  };
   let admin: Sql;
-  let now: Sql;
-  let before: Sql;
+  const dbs: Partial<Record<keyof typeof names, Sql>> = {};
 
   beforeAll(async () => {
     admin = postgres(URL_ENV!, { max: 1, onnotice: () => {} });
-    now = await migrated(admin, names.now);
-    before = await migrated(admin, names.before);
-    for (const sql of [now, before]) await seedWithFiller(sql);
+    for (const key of Object.keys(names) as (keyof typeof names)[]) {
+      dbs[key] = await migrated(admin, names[key]);
+      await seedWithFiller(dbs[key]!);
+    }
   }, HOOK_TIMEOUT_MS);
 
   afterAll(async () => {
-    await now?.end();
-    await before?.end();
+    for (const sql of Object.values(dbs)) await sql?.end();
     for (const name of Object.values(names)) {
       await admin?.unsafe(`drop database if exists ${name} with (force)`);
     }
@@ -152,12 +172,12 @@ describe.skipIf(!URL_ENV)('a 2,000-page check persisted under an 8 s timeout (F-
       connection: { statement_timeout: TIMEOUT_MS },
     });
 
-  it(
-    'now: every call well inside 8 s, every edge written once, and the check finished last',
-    async () => {
+  it.each(SHAPES)(
+    '$name ($pages pages, $edges edges): every call well inside 8 s, every edge once, the check finished last',
+    async ({ name, pages: PAGES, edges: EDGES }) => {
       const { check } = largeBuiltSeed();
-      await seedRunning(asDb(now), check);
-      const sql = underTimeout(names.now);
+      await seedRunning(asDb(dbs[name]!), check);
+      const sql = underTimeout(names[name]);
       try {
         const input = largeBuiltInput(PAGES, EDGES);
         expect(input.built.link_edges).toHaveLength(EDGES);
@@ -179,8 +199,13 @@ describe.skipIf(!URL_ENV)('a 2,000-page check persisted under an 8 s timeout (F-
         const max = (k: string) =>
           Math.round(Math.max(...calls.filter((c) => c.kind === k).map((c) => c.ms)));
         process.stdout.write(
-          `F-330 now: ${pieces.length} edge pieces, the slowest ${max('edges')} ms; ` +
-            `persist_built_check ${max('persist_built_check')} ms; the slowest stage ${max('stage')} ms\n`,
+          `F-330 ${name} (${PAGES} pages, ${EDGES} edges): ${pieces.length} edge pieces, the slowest ` +
+            `${max('edges')} ms; persist_built_check ${max('persist_built_check')} ms; the slowest ` +
+            `stage ${max('stage')} ms\n`,
+        );
+        // The rest of the check, still one statement: within the CTO's margin (inbox 114).
+        expect(max('persist_built_check'), 'persist_built_check without the edges').toBeLessThan(
+          FINISH_BOUND_MS,
         );
         // A retried persist step writes no edge twice.
         await persistBuiltCheck(pglitePersistDb(asDb(sql)), input);
@@ -200,7 +225,7 @@ describe.skipIf(!URL_ENV)('a 2,000-page check persisted under an 8 s timeout (F-
     'before: the edges inside persist_built_check, one statement, take several pieces’ time',
     async () => {
       const { check } = largeBuiltSeed();
-      await seedRunning(asDb(before), check);
+      await seedRunning(asDb(dbs.before!), check);
       const sql = underTimeout(names.before);
       try {
         const input = largeBuiltInput(PAGES, EDGES);
