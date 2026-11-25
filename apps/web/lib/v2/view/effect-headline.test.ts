@@ -206,7 +206,10 @@ describe('the waiting sentence, chosen from the first pending entry', () => {
   });
 
   it.each(MISSING_FOR_THIS_CHECK)('%s heads the fix with its own sentence', (reason) => {
-    const { unit, row } = waitingWith([reason, 'too_few_crawlers_measured']);
+    // Its partner is a fix's own reason, which a reason listed first leads (a site reason would lead
+    // whatever its place: effect-unmeasured.test.ts).
+    const partner = reason === 'check_not_scored' ? 'crawler_too_few_pages' : 'check_not_scored';
+    const { unit, row } = waitingWith([reason, partner]);
     expect(unit).toBe(AI_WAITING[reason]);
     expect(row).toBe('AI not yet estimated');
   });

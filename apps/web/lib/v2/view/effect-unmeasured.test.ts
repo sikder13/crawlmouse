@@ -9,7 +9,7 @@
 import type { Fix } from '@crawlmouse/types/v2';
 import { describe, expect, it } from 'vitest';
 import { fixture } from '../fixtures';
-import { effectHeadline } from './effect-headline';
+import { AI_WAITING, effectHeadline } from './effect-headline';
 import { points, restPoints } from './result';
 import { effectOf, groupPoints, proPoints } from './segment/fixes';
 
@@ -111,5 +111,26 @@ describe('the site page’s main button, for a fix with nothing to show', () => 
     const primary = labels.find((l) => /^Open (fix \d+|the .* packet)$/.test(l));
     expect(primary).toBeDefined();
     expect(labels.some((l) => l.endsWith(' · '))).toBe(false);
+  });
+});
+
+describe('precedence, with an unmeasured part co-pending (review #7)', () => {
+  // A reason the site's own state gives, which withholds the grade itself, keeps its words: it is
+  // true and the owner can act on it whatever else is unmeasured.
+  it.each([
+    [['quotable_unmeasured', 'too_few_crawlers_measured'], 'too_few_crawlers_measured'],
+    [['readable_unmeasured', 'blocked_by_choice'], 'blocked_by_choice'],
+  ] as const)('%j keeps the words of %s', (pending, reason) => {
+    const f = fixWith([...pending], 0);
+    expect(points(f, all)).toBe('AI not yet estimated');
+    expect(effectOf(f, all).unit).toBe(AI_WAITING[reason]);
+  });
+
+  // A fix's own reason, or a wait on another fix, cannot end the wait while a part is unmeasured.
+  it.each([
+    [['readable_unmeasured', 'quotable_unmeasured', 'check_not_scored']],
+    [['quotable_unmeasured', 'crawler_too_few_pages']],
+  ] as const)('%j says nothing', (pending) => {
+    expect(points(fixWith([...pending], 0), all)).toBe('');
   });
 });

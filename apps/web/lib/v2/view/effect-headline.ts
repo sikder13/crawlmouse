@@ -149,10 +149,29 @@ const UNMEASURED: ReadonlySet<string> = new Set<WithheldReason>([
   'signals_unmeasured',
 ]);
 
-/** Whether `f`'s AI effect waits on a part no check measures yet (`UNMEASURED`). */
-export const aiUnmeasured = (f: Pick<Fix, 'effect'>): boolean =>
-  f.effect.ai_readability === null &&
-  f.effect.ai_readability_pending_on.some((p) => UNMEASURED.has(p));
+/**
+ * The reasons the site's own state gives, which withhold the grade itself (too few scored crawlers
+ * measured, the site's robots.txt keeping them out). They outrank an unmeasured part: each is true
+ * and something the owner can act on, whatever else is unmeasured. A fix's own reasons and a wait on
+ * another fix do not: while a part is unmeasured, neither can end the wait.
+ */
+const SITE_WITHHELD: ReadonlySet<string> = new Set<WithheldReason>([
+  'too_few_crawlers_measured',
+  'blocked_by_choice',
+]);
+
+/**
+ * Whether `f`'s AI effect waits on a part no check measures yet (`UNMEASURED`) with no reason that
+ * outranks it (`SITE_WITHHELD`) co-pending.
+ */
+export const aiUnmeasured = (f: Pick<Fix, 'effect'>): boolean => {
+  const pending = f.effect.ai_readability_pending_on;
+  return (
+    f.effect.ai_readability === null &&
+    pending.some((p) => UNMEASURED.has(p)) &&
+    !pending.some((p) => SITE_WITHHELD.has(p))
+  );
+};
 const REASONS: readonly string[] = WithheldReasonSchema.options;
 const isReason = (p: string): p is WithheldReason => REASONS.includes(p);
 
@@ -187,7 +206,10 @@ function waiting(
       };
     }
   }
-  const reason = pending.find(isReason);
+  // A reason the site's own state gives is said before any other (SITE_WITHHELD).
+  const reason =
+    pending.find((p): p is WithheldReason => isReason(p) && SITE_WITHHELD.has(p)) ??
+    pending.find(isReason);
   return {
     kind: 'waiting',
     sentence: reason ? AI_WAITING[reason] : 'AI effect not yet estimated',
