@@ -19,8 +19,6 @@ const nextConfig = {
     // config (next 15.5 dist/build/index.js: `webpackBuildWorker === undefined && !config.webpack`),
     // and this file has one, so it was off and every compilation shared one process (CTO 094).
     webpackBuildWorker: true,
-    // Lower webpack's peak memory at some cost in build time (Next 15.0+, CTO 094).
-    webpackMemoryOptimizations: true,
   },
   typescript: { ignoreBuildErrors: SKIP_BUILD_CHECKS },
   eslint: { ignoreDuringBuilds: SKIP_BUILD_CHECKS },
