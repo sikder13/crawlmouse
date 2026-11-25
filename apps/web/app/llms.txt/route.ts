@@ -1,6 +1,7 @@
 import { postsNewestFirst } from '@/lib/blog/posts';
 import { siteUrl } from '@/lib/site-url';
 import { checksPublicEnabled } from '@/lib/auth/flags';
+import { shownFeatures } from '@/lib/feature-switch';
 import { plansLine, v2KeyPages } from '@/lib/seo/llms-v2';
 import { v2LlmsDescriptor } from '@/lib/seo/site-copy';
 
@@ -53,7 +54,10 @@ const KEY_PAGES: readonly (readonly [label: string, path: string, description: s
  */
 export function GET() {
   const v2 = checksPublicEnabled();
-  const keyPages = v2 ? v2KeyPages() : KEY_PAGES;
+  // The Goal 1 switch (V2_HIDE_FEATURES): read at build time like the flag, since the route is
+  // static, so a change to it takes a redeploy.
+  const features = shownFeatures();
+  const keyPages = v2 ? v2KeyPages(features) : KEY_PAGES;
   const keyPageLines = keyPages.map(
     ([label, path, description]) => `- [${label}](${siteUrl(path)}): ${description}`,
   );
@@ -65,7 +69,7 @@ export function GET() {
   const body = `${[
     '# Crawlmouse',
     '',
-    `> ${v2 ? v2LlmsDescriptor() : DESCRIPTOR}`,
+    `> ${v2 ? v2LlmsDescriptor(features) : DESCRIPTOR}`,
     ...(v2 ? ['', plansLine()] : []),
     '',
     '## Key pages',

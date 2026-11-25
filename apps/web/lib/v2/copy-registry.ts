@@ -33,11 +33,16 @@ import { LINK_MAP_ADDITIONS, LINK_MAP_CHANGES } from './copy/link-map';
 import { NOJS_ADDITIONS, NOJS_CHANGES } from './copy/segment-nojs';
 import { SIGNALS_ADDITIONS, SIGNALS_CHANGES } from './copy/segment-signals';
 import { STRUCTURE_ADDITIONS, STRUCTURE_CHANGES } from './copy/segment-structure';
-import { ACCOUNT_DOOR_ADDITIONS, ACCOUNT_DOOR_CHANGES } from './copy/account-door';
+import {
+  ACCOUNT_DOOR_ADDITIONS,
+  ACCOUNT_DOOR_CHANGES,
+  PAGE_LIMIT_SOURCE,
+} from './copy/account-door';
 import { CLIENT_ADDITIONS, CLIENT_CHANGES, MATRIX_ADDITIONS, MATRIX_CHANGES } from './copy/agency';
 import { CLIENT_REPORTS_ADDITIONS, CLIENT_REPORTS_CHANGES } from './copy/client-reports';
 import { SEATS_ADDITIONS, SEATS_CHANGES } from './copy/seats';
 import { formatPlanPrice } from './copy/plan-price';
+import { planPages } from './copy/pricing';
 
 export type LockedScreen =
   | 'signup'
@@ -97,6 +102,20 @@ const BASE_CHANGES: CopyChange[] = [
     locked: 'Agency $69 a month',
     rendered: `Agency ${formatPlanPrice('agency')} a month`,
     source: AGENCY_PRICE_SOURCE,
+  },
+  {
+    screen: 'home',
+    kind: 'ruling',
+    locked: 'Five sites, checked weekly.',
+    rendered: `Five sites, up to ${planPages('pro', true)} a site, checked weekly.`,
+    source: PAGE_LIMIT_SOURCE,
+  },
+  {
+    screen: 'home',
+    kind: 'ruling',
+    locked: 'Twenty-five client sites, five seats,',
+    rendered: `Twenty-five client sites, up to ${planPages('agency', true)} a site, five seats,`,
+    source: PAGE_LIMIT_SOURCE,
   },
   {
     screen: 'home',

@@ -204,6 +204,13 @@ export function nextBandSentence(
   return `${head}; ${numberWord(open)} of them ${open === 1 ? 'is' : 'are'} open now.`;
 }
 
+/**
+ * The crawl read every page it found. When it did not, or its coverage is unknown, a sentence about
+ * every page claims too much: orphans and depth are counted among the pages crawled (inbox 059).
+ */
+export const crawledAll = (check: Check): boolean =>
+  check.coverage !== null && check.coverage.pages_crawled >= check.coverage.pages_discovered;
+
 /** What a Technical SEO summary says of a check that read no internal link. */
 const NO_LINK_READ = 'No internal link was read, so the structure was not measured.';
 
@@ -213,7 +220,9 @@ export function seoShortSummary(check: Check, fixes: readonly Fix[], isOpen: (f:
   const orphans = check.structure!.orphan_pages;
   const lead = orphans
     ? `${count(orphans)} orphan ${plural(orphans, 'page', 'pages')}.`
-    : 'No orphan pages.';
+    : crawledAll(check)
+      ? 'No orphan pages.'
+      : 'No orphan pages among those crawled.';
   const next =
     t.score !== null && t.grade ? nextBandSentence(t.score, t.grade, fixes, isOpen) : null;
   return next ? `${lead} ${next.replace(/;.*$/, '.')}` : lead;
@@ -231,9 +240,12 @@ export function seoSummary(check: Check, fixes: readonly Fix[], isOpen: (f: Fix)
   const t = check.technical_seo!;
   if (!sectionMeasured(check, 'structure')) return NO_LINK_READ;
   const orphans = check.structure!.orphan_pages;
+  // Orphans are counted among the pages crawled; a partial crawl says nothing of the rest (F-247).
   const linked = orphans
     ? `${numberWord(orphans)} ${plural(orphans, 'page nobody links to', 'pages nobody links to')}`
-    : 'every page is linked';
+    : crawledAll(check)
+      ? 'every page is linked'
+      : 'every page crawled is linked';
   // A refused grade has no structure score: then the sentence says only what was counted.
   const lead =
     t.site_structure_score === null
@@ -250,14 +262,15 @@ export function seoSummary(check: Check, fixes: readonly Fix[], isOpen: (f: Fix)
  * "All four scored crawlers get in and read 98% of the text or more": the share only when every one
  * was measured, and a plain statement when none was tested.
  */
-function allInSentence(scored: readonly CrawlerResult[]): string {
+/** `withShare` false: who gets in, without the share of the text they read. */
+function allInSentence(scored: readonly CrawlerResult[], withShare = true): string {
   if (!scored.length) return 'No scored AI crawler was tested.';
   const shares = scored.map((c) => c.text_share);
   const one = scored.length === 1;
   const all = one
     ? 'The one scored crawler gets in'
     : `All ${numberWord(scored.length)} scored crawlers get in`;
-  if (shares.some((x) => x === null)) return `${all}.`;
+  if (!withShare || shares.some((x) => x === null)) return `${all}.`;
   const share = percent(Math.min(...(shares as number[])));
   return `${all} and ${one ? 'reads' : 'read'} ${share}% of the text or more.`;
 }
@@ -293,11 +306,15 @@ export function aiSummary(check: Check): string {
 /**
  * Locked Home stage: the scored crawlers kept out, then the templates they read thin; when there is
  * neither, the sentence the AI card uses for a site every scored crawler reads.
+ *
+ * `withThin` false (the Goal 1 switch hides `nojs`) leaves out the empty-without-JavaScript sentence.
+ * When that sentence is left out and no crawler is kept out, the summary says who gets in and no
+ * share of the text, since the share is the without-JavaScript figure the switch hides.
  */
-export function aiShortSummary(check: Check): string {
+export function aiShortSummary(check: Check, withThin = true): string {
   const out = keptOutClauses(scoredOf(check));
-  const thin = thinSentence(check);
-  if (!out.length && !thin) return allInSentence(scoredOf(check));
+  const thin = withThin ? thinSentence(check) : null;
+  if (!out.length && !thin) return allInSentence(scoredOf(check), withThin);
   return [out.length ? `${capitalise(out.join('; '))}.` : null, thin].filter(Boolean).join(' ');
 }
 

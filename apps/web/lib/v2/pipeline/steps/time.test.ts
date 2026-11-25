@@ -19,7 +19,14 @@ import {
   RENDER_SHARE_S,
   RESERVE_S,
 } from '../limits';
-import { addBackMs, batchSeconds, fetchEndsAt, phaseEndsAt, renderEndsAt } from './time';
+import {
+  addBackMs,
+  batchSeconds,
+  fetchEndsAt,
+  phaseEndsAt,
+  renderEndsAt,
+  tailOf,
+} from './time';
 
 const S = 1000;
 const T0 = Date.UTC(2026, 10, 8, 12, 0, 0);
@@ -110,6 +117,32 @@ describe('the time plan', () => {
     expect(batchSeconds(end, end - (MIN_BATCH_S + 89) * S, 240)).toBeNull();
   });
 
+  it('F-247: a crawl of 50-second batches uses its ceiling, not stopping ~115 s short', () => {
+    // QA's real sites: 50 pages a batch at ~1 s a page, about 1 s between batches.
+    const crawlSeconds = (tail: 'kept_inside' | 'spills_into_access') => {
+      const plan = so();
+      let t = 0;
+      let used = 0;
+      for (;;) {
+        const s = batchSeconds(
+          phaseEndsAt({ kind: 'crawl' }, plan, T0 + t * S),
+          T0 + t * S,
+          CRAWL_BATCH_BUDGET.max_seconds,
+          tail,
+        );
+        if (s === null) return used;
+        const ran = Math.min(s, 50);
+        used += ran;
+        t += ran + 1;
+      }
+    };
+    // As it was: the last batch had to fit a 60 s grace and a 30 s poll before the ceiling.
+    expect(crawlSeconds('kept_inside')).toBeLessThanOrEqual(CRAWL_CEILING_S - 90);
+    expect(crawlSeconds('spills_into_access')).toBeGreaterThan(CRAWL_CEILING_S - MIN_BATCH_S);
+    expect(tailOf('crawl')).toBe('spills_into_access');
+    expect(tailOf('access')).toBe('kept_inside');
+  });
+
   it('worst case from limits.ts: every claim wait, the whole wait budget, every batch at its deadline plus a poll wait, then the reserve, fit the finish timeout', () => {
     // Zero is the first claim attempt; the claim waits are inside the run. The whole budget is
     // spent waiting before the first batch, so none is added back after it.
@@ -122,13 +155,27 @@ describe('the time plan', () => {
     });
     const phase = (kind: BatchAt['kind'], most: number, batches: number) => {
       for (let n = 0; n < batches; n++) {
-        const s = batchSeconds(phaseEndsAt({ kind }, plan, t * S), t * S, most);
+        const s = batchSeconds(phaseEndsAt({ kind }, plan, t * S), t * S, most, tailOf(kind));
         if (s === null) return;
         // The batch reaches its deadline, and the poll that sees it comes one poll wait later.
         t += s + PACE.pollGraceS + PACE.pollMaxS;
       }
     };
     phase('crawl', CRAWL_BATCH_BUDGET.max_seconds, PACE.maxCrawlBatches);
+    // The crawl's tail may fall in the access slice here (F-247 review): the first access batch still
+    // gets the slice less two graces and polls, the crawl's and its own.
+    const firstAccess = batchSeconds(
+      phaseEndsAt({ kind: 'access' }, plan, t * S),
+      t * S,
+      ACCESS_BATCH_BUDGET.max_seconds,
+      tailOf('access'),
+    );
+    expect(firstAccess).toBeGreaterThanOrEqual(
+      Math.min(
+        ACCESS_BATCH_BUDGET.max_seconds,
+        ACCESS_SLICE_S - 2 * (PACE.pollGraceS + PACE.pollMaxS),
+      ),
+    );
     phase('access', ACCESS_BATCH_BUDGET.max_seconds, 2);
     const fetching = t;
     t += RESERVE_S;
@@ -147,7 +194,7 @@ describe('the time plan', () => {
     t += QUEUE_WAIT_MAX_S;
     const phase = (kind: BatchAt['kind'], most: number, batches: number) => {
       for (let n = 0; n < batches; n++) {
-        const s = batchSeconds(phaseEndsAt({ kind }, plan, t * S), t * S, most);
+        const s = batchSeconds(phaseEndsAt({ kind }, plan, t * S), t * S, most, tailOf(kind));
         if (s === null) return;
         t += s + PACE.pollGraceS + PACE.pollMaxS;
       }
@@ -217,7 +264,12 @@ function simulate(opts: {
       // has ended answers `none` whether or not the worker would have been busy.
       const most =
         at.kind === 'crawl' ? CRAWL_BATCH_BUDGET.max_seconds : ACCESS_BATCH_BUDGET.max_seconds;
-      const seconds = batchSeconds(phaseEndsAt(at, soFar, clock.now), clock.now, most);
+      const seconds = batchSeconds(
+        phaseEndsAt(at, soFar, clock.now),
+        clock.now,
+        most,
+        tailOf(at.kind),
+      );
       if (seconds === null) return { status: 'none', why: 'no_time' };
       const busyFor = at.batch === 1 ? (opts.busyFirst ?? 0) : (opts.busyLater ?? 0);
       if ((busyAnswers.get(at.batch) ?? 0) < busyFor) {

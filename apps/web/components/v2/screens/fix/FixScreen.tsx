@@ -155,6 +155,29 @@ export function FixScreen({
         ) : null}
       </Card>
 
+      {data.kind === 'resolved' && data.proof ? (
+        // "Fixed, and proven" (Goal 1 row 22): the verified fix's before and after, or on a plan
+        // whose proofs are spent, the counter in its place.
+        <Card as="section" className={styles.card} data-v2-addition="" data-v2-fix-proof="">
+          <Heading level={2} size="s">
+            {data.proof.title}
+          </Heading>
+          {data.proof.kind === 'shown' ? (
+            data.proof.lines.map((l) => (
+              <p key={l} className={styles.body}>
+                {l}
+              </p>
+            ))
+          ) : (
+            <>
+              <p className={styles.body}>{data.proof.counter}</p>
+              <Button href={data.proof.action.href} className={styles.cardAction}>
+                {data.proof.action.label}
+              </Button>
+            </>
+          )}
+        </Card>
+      ) : null}
       {data.kind === 'resolved' ? null : (
         // The side column holds the before and after, and an open fix's cards; with none of them
         // the packet card takes the whole width.

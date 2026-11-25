@@ -41,6 +41,7 @@ import {
   isCrawl,
   iso,
   loadResults,
+  loadResultsForBuild,
   loadSeeds,
   pathOf,
   releaseOfAll,
@@ -97,7 +98,7 @@ export function finishSteps(
       const [site, seeds, results] = await Promise.all([
         deps.store.site(event.siteId),
         loadSeeds(deps, event),
-        loadResults(deps, event),
+        loadResultsForBuild(deps, event),
       ]);
       const release = releaseOfAll(results);
       if (!results.some(isCrawl) || release === null) throw new CheckFailure('worker_unavailable');

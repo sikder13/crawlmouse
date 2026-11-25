@@ -1,6 +1,7 @@
 /**
- * A persisted check read back as the screens read it (CC-20b D12): FixtureDataset's collections, with
- * provenance "measured" (Q2), parsed whole with FixtureDatasetSchema's fields and that provenance.
+ * A persisted check read back (CC-20b D12): FixtureDataset's collections, with provenance "measured"
+ * (Q2), parsed whole with FixtureDatasetSchema's fields and that provenance. A view reads it with the
+ * site's earlier checks added (`loadCheckWithHistory`, below), which the fixes it holds name.
  *
  * What it holds: the check; its site, with the client report from report_schedules; its page results,
  * link edges, access tests and changes; the site's fixes first seen by this check or a check queued
@@ -136,6 +137,41 @@ export async function loadCheck(read: CheckReader, checkId: string): Promise<Che
     usage_events: usageRows.map(usageEventFromRow).sort((a, b) => byText(a.id, b.id)),
     withheld: [],
   });
+}
+
+/**
+ * `dataset`, loadCheck's dataset of `checkId`, with `checks` its site's checks queued at or before it
+ * (to the millisecond, as loadCheck keeps fixes), in the order they were queued, then by id. This is
+ * what a view of the check reads: the views look a fix's first-seen check up by id (`fixesAsOf`) and
+ * read `checks` as the site's history, and loadCheck holds the fixes first seen at those checks with
+ * its own check alone. `siteCheckRows` are the site's `checks` rows.
+ */
+export function withSiteHistory(
+  dataset: CheckDataset,
+  checkId: string,
+  siteCheckRows: readonly Record<string, unknown>[],
+): CheckDataset {
+  const own = dataset.checks.find((c) => c.id === checkId);
+  if (!own) throw new Error(`withSiteHistory: check ${checkId} is not in its dataset`);
+  const until = instant(own.queued_at);
+  const checks = siteCheckRows
+    .map(checkFromRow)
+    .filter((c) => instant(c.queued_at) <= until)
+    .sort((a, b) => instant(a.queued_at) - instant(b.queued_at) || byText(a.id, b.id));
+  return CheckDatasetSchema.parse({ ...dataset, checks });
+}
+
+/**
+ * A check as its views read it: loadCheck's dataset with its site's earlier checks
+ * (`withSiteHistory`). The audit page, its files and the public report each read this.
+ */
+export async function loadCheckWithHistory(
+  read: CheckReader,
+  checkId: string,
+): Promise<CheckDataset> {
+  const dataset = await loadCheck(read, checkId);
+  const siteId = dataset.checks[0]!.site_id;
+  return withSiteHistory(dataset, checkId, await read.rows('checks', 'site_id', [siteId]));
 }
 
 /** Each table's primary key: the order every page is read in, so pages neither overlap nor skip. */

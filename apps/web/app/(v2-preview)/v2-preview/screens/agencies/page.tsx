@@ -4,5 +4,7 @@ import { previewOnly } from '../../_preview/guard';
 
 export default function AgenciesPreview() {
   previewOnly();
-  return <AgenciesScreen data={agenciesView({ billing: true, accountDoor: true })} />;
+  return (
+    <AgenciesScreen data={agenciesView({ billing: true, agencySales: true, accountDoor: true })} />
+  );
 }

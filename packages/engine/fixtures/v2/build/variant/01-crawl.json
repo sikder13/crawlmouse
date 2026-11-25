@@ -107,6 +107,14 @@
       "from_cache": true
     }
   ],
+  "timing": {
+    "requests": 13,
+    "fetch_ms_p50": 0,
+    "fetch_ms_p90": 0,
+    "fetch_ms_max": 0,
+    "fetch_ms_total": 0,
+    "idle_ms_total": 6000
+  },
   "kind": "crawl",
   "pages": [
     {
@@ -1920,7 +1928,7 @@
     }
   ],
   "discovered_urls": [
-    "https://built-site.test",
+    "https://built-site.test/",
     "https://built-site.test/collections/sleeping-bags",
     "https://built-site.test/collections/trail-backpacks",
     "https://built-site.test/products/camping-tents-item-1",

@@ -10,7 +10,7 @@ import { numberWord } from '../words';
 import { pricingView, type PlanAction, type PricingViewer } from './pricing';
 
 const NOW = new Date('2026-11-22T12:00:00Z');
-const OFF = { accountDoor: true, checksPublic: true, billing: false };
+const OFF = { accountDoor: true, checksPublic: true, billing: false, agencySales: true };
 const ON = { ...OFF, billing: true };
 
 const account = (tier: 'free' | 'pro' | 'agency', owner = true) => ({

@@ -19,16 +19,19 @@
  * three it did not (the report page on your domain, your own sender address, the one-pager) a proof
  * that still holds beside its routes.
  */
+import type { RiskFeature } from '../../feature-switch';
+import { ALL_SHOWN, NOJS_FIX_TYPES, type Features } from '../features';
 import { TRIAL_DAYS } from '../../billing/state-machine';
 import { AGENCY_MONTHLY, PRO_MONTHLY, usd } from '../../billing/prices';
 import { GATES } from '../../entitlement-v2';
 import { AGENCIES_COPY as COPY, SAMPLE_AGENCY, type Tagged } from '../copy/agencies';
 import { AGENCY_PLUS_INBOX_ADDRESS } from '../copy/contact-inbox';
-import { findCheck, fixture } from '../fixtures';
+import { findCheck, fixesAsOf, fixture } from '../fixtures';
 import { dayMonth } from '../format';
 import { toneOf } from '../letters';
 import { CHECKS } from '../recordings';
-import { buildPublicSnapshot } from '../reports/build-snapshot';
+import { buildPublicSnapshot, headline, openFixRows } from '../reports/build-snapshot';
+import { AI_READABILITY_LABEL } from './result';
 import { numberWord } from '../words';
 import { FOOTER_LINE_CAPABILITIES } from '../copy/footer-line';
 
@@ -76,6 +79,11 @@ export type Proof =
 
 export interface Capability {
   status: 'built' | 'coming';
+  /**
+   * The Goal 1 switch names that hide it while unproven (`lib/feature-switch.ts`): one name, or a
+   * list, any of which hides it.
+   */
+  risk?: RiskFeature | readonly RiskFeature[];
   /** What it is, in a sentence. */
   what: string;
   proof: Proof;
@@ -120,6 +128,7 @@ export const CAPABILITIES: Readonly<Record<CapabilityKey, Capability>> = {
   },
   competitors: {
     status: 'coming',
+    risk: 'competitors',
     what: 'Measuring competitors: a site stores them, but the check builder records none.',
     proof: {
       kind: 'holds',
@@ -140,6 +149,8 @@ export const CAPABILITIES: Readonly<Record<CapabilityKey, Capability>> = {
   },
   client_report_page: {
     status: 'coming',
+    // Row 24 names the client page and row 25 the agency's domain; this names both.
+    risk: ['agency_white_label', 'agency_domain'],
     what: 'Reports and the client report page under your own name: on your domain, with your logo. The report a client opens is on our domain, names no agency and shows no logo.',
     // CC-31 built the report a client opens (`/s/<token>`), on our domain and with no logo: what
     // the client is shown is drawn here, and nothing here reads a logo.
@@ -153,6 +164,7 @@ export const CAPABILITIES: Readonly<Record<CapabilityKey, Capability>> = {
   },
   sender_address: {
     status: 'coming',
+    risk: 'agency_domain',
     what: 'Emails from your own address, with its records verified in Settings: every v2 email is sent from one address of ours.',
     proof: {
       kind: 'holds',
@@ -163,6 +175,7 @@ export const CAPABILITIES: Readonly<Record<CapabilityKey, Capability>> = {
   },
   one_pagers: {
     status: 'coming',
+    risk: 'agency_white_label',
     what: 'The branded one-pager made from an audit: the report generator makes four kinds, and the one-pager is not one of them.',
     proof: {
       kind: 'holds',
@@ -173,11 +186,13 @@ export const CAPABILITIES: Readonly<Record<CapabilityKey, Capability>> = {
   },
   client_reports: {
     status: 'built',
+    risk: 'agency_white_label',
     what: 'Client reports sent on a schedule to a contact who confirmed, naming the agency (CC-31’s hourly run).',
     proof: { kind: 'exists', path: 'apps/web/lib/v2/agency/schedules-run.ts' },
   },
   client_matrix: {
     status: 'built',
+    risk: 'agency_white_label',
     what: 'The client matrix, every client site on one screen (/agency, CC-31).',
     proof: { kind: 'exists', path: 'apps/web/app/agency/page.tsx' },
   },
@@ -198,12 +213,14 @@ export const CAPABILITIES: Readonly<Record<CapabilityKey, Capability>> = {
   },
   staging: {
     status: 'coming',
+    risk: 'staging_deploys',
     what: 'Auditing a staging or preview URL before a deploy: a staging host is stored, but no check is requested for a deploy.',
     proof: { kind: 'nowhere', dirs: SOURCE_DIRS, text: /trigger:\s*['"]deploy['"]/ },
     named: /staging|preview URLs?|before you deploy/i,
   },
   renders: {
     status: 'coming',
+    risk: 'rendering',
     what: 'Full JavaScript renders counted against the plan’s monthly allowance: the pipeline runs with no render budget.',
     proof: {
       kind: 'holds',
@@ -261,6 +278,8 @@ export const CAPABILITIES: Readonly<Record<CapabilityKey, Capability>> = {
 export interface TaggedView {
   text: string;
   capabilities: readonly CapabilityKey[];
+  /** It names a feature the Goal 1 switch hides, so no page shows it. */
+  hidden: boolean;
   /** It names a capability that is not built, so the page marks it "coming". */
   coming: boolean;
 }
@@ -268,11 +287,30 @@ export interface TaggedView {
 const isComing = (keys: readonly CapabilityKey[]) =>
   keys.some((k) => CAPABILITIES[k].status === 'coming');
 
-export const tagged = ({ text, capabilities }: Tagged): TaggedView => ({
-  text,
-  capabilities,
-  coming: isComing(capabilities),
-});
+/** Whether copy naming these capabilities names a feature `features` hides. */
+export const isHidden = (keys: readonly CapabilityKey[], features: Features = ALL_SHOWN) =>
+  keys.some((k) => {
+    const risk = CAPABILITIES[k].risk;
+    if (risk === undefined) return false;
+    return (typeof risk === 'string' ? [risk] : risk).some((r) => !features[r]);
+  });
+
+/** A list of tagged copy without what the switch hides. */
+export const shown = <T extends { hidden: boolean }>(items: readonly T[]): T[] =>
+  items.filter((i) => !i.hidden);
+
+/** Tags copy with `hidden` computed from `features`, the record a server entry point read. */
+export const taggedWith =
+  (features: Features) =>
+  ({ text, capabilities }: Tagged): TaggedView => ({
+    text,
+    capabilities,
+    coming: isComing(capabilities),
+    hidden: isHidden(capabilities, features),
+  });
+
+/** Tags copy with nothing hidden. */
+export const tagged = taggedWith(ALL_SHOWN);
 
 /**
  * The "coming" label for the shared footer's line (components/v2/footer-links.ts), or null once what
@@ -315,6 +353,7 @@ export interface AgenciesView {
     label: string;
     capabilities: readonly CapabilityKey[];
     coming: boolean;
+    hidden: boolean;
     agency: string;
     meta: string;
     heading: string;
@@ -346,31 +385,44 @@ export interface AgenciesView {
 export const AGENCY_TRIAL_HREF = '/agency-trial';
 export const PRICING_HREF = '/pricing';
 
-function onePager(): AgenciesView['onePager'] {
+function onePager(features: Features): AgenciesView['onePager'] {
+  const tag = taggedWith(features);
   const d = fixture('bad-site');
   const check = findCheck(d, CHECKS.badFirstAudit);
   const s = buildPublicSnapshot(d, check.id, check.finished_at!);
   const o = COPY.onePager;
+  // `nojs` hidden: no fix whose type is a without-JavaScript finding (`NOJS_FIX_TYPES`).
+  const nojsFixes = new Set(
+    fixesAsOf(d, check)
+      .filter((f) => NOJS_FIX_TYPES.has(f.type))
+      .map((f) => f.id),
+  );
+  const fixRows = openFixRows(d, check).filter((r) => features.nojs || !nojsFixes.has(r.key));
   // The client report page's path: the host without its last label (example-outfitter.com → example-outfitter).
   const slug = s.host.replace(/\.[^.]+$/, '');
   return {
-    title: tagged(o.title),
-    sub: tagged(o.sub),
+    title: tag(o.title),
+    sub: tag(o.sub),
     label: o.label,
     capabilities: o.capabilities,
     coming: isComing(o.capabilities),
+    hidden: isHidden(o.capabilities, features),
     agency: SAMPLE_AGENCY.name,
     meta: `${SAMPLE_AGENCY.host} · ${dayMonthYear(s.checkedAt)}`,
-    heading: `${s.host}: ${s.headline}`,
-    grades: s.grades.map((g) => ({
-      label: g.label,
-      letter: g.letter,
-      score: g.score,
-      withheld: g.withheld,
-      tone: g.letter ? toneOf(g.letter) : 'default',
-    })),
-    fixesCaption: o.fixesCaption,
-    fixes: s.topFixes.map((f, i) => ({
+    // `nojs` hidden: the headline without its empty-without-JavaScript sentence.
+    heading: `${s.host}: ${features.nojs ? s.headline : headline(check, s.host, false)}`,
+    // Without the AI readability letter (`ai_letter` hidden) the sample shows Technical SEO alone.
+    grades: s.grades
+      .filter((g) => features.ai_letter || g.label !== AI_READABILITY_LABEL)
+      .map((g) => ({
+        label: g.label,
+        letter: g.letter,
+        score: g.score,
+        withheld: g.withheld,
+        tone: g.letter ? toneOf(g.letter) : 'default',
+      })),
+    fixesCaption: o.fixesCaption(fixRows.length),
+    fixes: fixRows.map((f, i) => ({
       key: f.title,
       n: i + 1,
       title: f.scope ? `${f.title}, ${f.scope}` : f.title,
@@ -381,13 +433,21 @@ function onePager(): AgenciesView['onePager'] {
   };
 }
 
-/** The flags the page's first button follows: V2_BILLING and V2_ACCOUNT_DOOR. */
+/** The flags the page's first button follows: V2_BILLING, V2_AGENCY_SALES and V2_ACCOUNT_DOOR. */
 export interface AgenciesFlags {
   billing: boolean;
+  /**
+   * `agencySalesOpen()`. The trial is offered only with this and `billing` both on; otherwise the
+   * page reads as with billing off (F-251), since the checkout refuses Agency and `/agency-trial`
+   * redirects here.
+   */
+  agencySales: boolean;
   accountDoor: boolean;
 }
 
-export function agenciesView(flags: AgenciesFlags): AgenciesView {
+export function agenciesView(flags: AgenciesFlags, features: Features = ALL_SHOWN): AgenciesView {
+  const tagged = taggedWith(features);
+  const onSale = flags.billing && flags.agencySales;
   const pro = GATES.pro;
   const agency = GATES.agency;
   const price = usd(AGENCY_MONTHLY);
@@ -404,18 +464,21 @@ export function agenciesView(flags: AgenciesFlags): AgenciesView {
 
   return {
     title: COPY.title,
-    description: flags.billing
-      ? COPY.description({ price, sites: agency.sites, days: TRIAL_DAYS })
+    description: onSale
+      ? // "branded client reports are coming" names both agency features, so either hidden drops it.
+        features.agency_white_label && features.agency_domain
+        ? COPY.description({ price, sites: agency.sites, days: TRIAL_DAYS })
+        : COPY.descriptionUnbranded({ price, sites: agency.sites, days: TRIAL_DAYS })
       : COPY.descriptionBillingOff({ price, sites: agency.sites }),
     h1: COPY.h1,
-    hero: [tagged(COPY.hero[0](numberWord(aiCrawlers))), tagged(COPY.hero[1]())],
-    trial: flags.billing
+    hero: shown([tagged(COPY.hero[0](numberWord(aiCrawlers))), tagged(COPY.hero[1]())]),
+    trial: onSale
       ? { ...tagged(COPY.trial(TRIAL_DAYS)), href: AGENCY_TRIAL_HREF }
       : {
           ...tagged({ text: COPY.opensSoon.start, capabilities: ['free_audit'] }),
           href: flags.accountDoor ? '/signup' : '/login',
         },
-    opensSoon: flags.billing
+    opensSoon: onSale
       ? null
       : {
           before: COPY.opensSoon.before,
@@ -425,11 +488,11 @@ export function agenciesView(flags: AgenciesFlags): AgenciesView {
     trialNote: tagged(COPY.trialNote({ days: TRIAL_DAYS, price, sites: agency.sites })),
     prospect: {
       title: tagged(COPY.prospect.title),
-      lines: COPY.prospect.lines.map(tagged),
+      lines: shown(COPY.prospect.lines.map(tagged)),
       formLabel: COPY.prospect.formLabel,
       homeLink: COPY.prospect.homeLink,
     },
-    onePager: onePager(),
+    onePager: onePager(features),
     compare: {
       title: COPY.compare.title,
       columns: [
@@ -449,12 +512,12 @@ export function agenciesView(flags: AgenciesFlags): AgenciesView {
         branded('onePagers'),
         branded('reports'),
         branded('matrix'),
-      ],
+      ].filter((r) => !r.label.hidden),
     },
-    uses: { title: COPY.uses.title, steps: COPY.uses.steps.map(tagged) },
+    uses: { title: COPY.uses.title, steps: shown(COPY.uses.steps.map(tagged)) },
     cost: {
       title: COPY.cost.title,
-      lines: [
+      lines: shown([
         tagged(
           COPY.cost.price({
             price,
@@ -463,7 +526,7 @@ export function agenciesView(flags: AgenciesFlags): AgenciesView {
           }),
         ),
         tagged(COPY.cost.rest(numberWord(agency.seats))),
-      ],
+      ]),
       compare: { label: COPY.cost.compare, href: PRICING_HREF },
     },
     comingLabel: COPY.coming,
