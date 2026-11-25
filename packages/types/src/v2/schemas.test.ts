@@ -1642,6 +1642,8 @@ const BOUNDS: Record<string, string> = {
   'PageResult.without_js.text_share': '[0, 1]',
   'AccessTest.raw_status': 'int [100, 599]',
   'Fix.rank': 'int [1, inf)',
+  // The engine numbers a site's fixes from 1 (F-276), so no screen reads "Fix 0".
+  'Fix.number': 'int [1, inf)',
   // A count or a share (or a yes/no, which is not a number).
   'Fix.before_after[].today': '[0, inf)',
   'Fix.before_after[].after': '[0, inf)',
@@ -1735,6 +1737,14 @@ describe('numeric bounds', () => {
         expect(s.safeParse(high + 1).success).toBe(false);
       }
     }
+  });
+
+  it('a fix numbered 0 fails to parse and a fix numbered 1 parses (F-276)', () => {
+    const f = fixNumbered(bad, 'open');
+    expect(FixSchema.safeParse({ ...f, number: 1 }).success).toBe(true);
+    const zero = FixSchema.safeParse({ ...f, number: 0 });
+    expect(zero.success).toBe(false);
+    expect(zero.error!.issues.map((i) => i.path.join('.'))).toEqual(['number']);
   });
 
   it('every count takes 0 and refuses -1', () => {
