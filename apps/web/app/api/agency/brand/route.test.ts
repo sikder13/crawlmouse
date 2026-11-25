@@ -283,6 +283,7 @@ function expectNoWrite() {
 }
 
 beforeEach(() => {
+  vi.stubEnv('V2_ACCOUNT_DOOR', '1');
   h.user = { id: 'u-1', email: 'a@b.co' };
   h.roles = { [ACCOUNT]: 'owner' };
   h.roleError = null;
@@ -339,6 +340,19 @@ describe('1. same-origin POST', () => {
 // ─── 2. feature switch ──────────────────────────────────────────────────────────────────────────
 
 describe('2. feature switch', () => {
+  it('answers 404 while the account door is off, with the body unread and no session read', async () => {
+    vi.stubEnv('V2_ACCOUNT_DOOR', '');
+    const { bytes, type } = await encoded({ logo: { bytes: png(10, 10) } });
+    const { req, seen } = streamed(bytes, type);
+    const res = await POST(req);
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ code: 'not_found' });
+    expect(req.bodyUsed).toBe(false);
+    expect(seen.pulled).toBeLessThanOrEqual(4096);
+    expect(h.log).toEqual([]);
+    expectNoWrite();
+  });
+
   it('answers 404 while agency_white_label is hidden, with the body unread and no session read', async () => {
     vi.stubEnv('V2_HIDE_FEATURES', 'agency_white_label');
     const { bytes, type } = await encoded({ logo: { bytes: png(10, 10) } });

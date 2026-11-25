@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { accountDoorEnabled } from '@/lib/auth/flags';
 import { featureShown } from '@/lib/feature-switch';
 import { MAX_LOGO_BYTES, validateLogo } from '@/lib/logo-validation';
 import { checkRateLimit } from '@/lib/rate-limit';
@@ -101,7 +102,9 @@ function isDuplicate(e: { statusCode?: unknown; status?: unknown }): boolean {
  * every check has. The middleware has already refused a cross-site request (route-policy: strict).
  */
 export async function POST(req: Request) {
-  // 1. The feature switch, before the session or the body is read.
+  // 1. The account door (a v2 route, a 404 with V2_ACCOUNT_DOOR off) and the feature switch, before
+  // the session or the body is read.
+  if (!accountDoorEnabled()) return notFound();
   if (!featureShown('agency_white_label')) return notFound();
 
   // 2. Signed in.
