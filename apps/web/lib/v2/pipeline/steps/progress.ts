@@ -10,9 +10,12 @@ export type Phase = Progress['steps'][number]['phase'];
 
 const PHASES = CheckPhaseSchema.options;
 
-/** The screen step a batch belongs to: the first crawl batch fetches the homepage. */
-export const phaseOf = (at: BatchAt): Phase =>
-  at.kind === 'access' ? 'crawler_tests' : at.batch === 1 ? 'homepage' : 'crawl';
+/**
+ * The screen step a batch belongs to: the first crawl batch fetches the homepage. That is batch 1, or
+ * `firstBatch` on a check's retry run (F-260), which numbers its batches past the first run's.
+ */
+export const phaseOf = (at: BatchAt, firstBatch = 1): Phase =>
+  at.kind === 'access' ? 'crawler_tests' : at.batch === firstBatch ? 'homepage' : 'crawl';
 
 /**
  * `so.waitingSince` is written as `waiting_since`: the post step passes its own when the worker has

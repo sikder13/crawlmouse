@@ -14,5 +14,5 @@ export const dynamicParams = false;
  */
 export default async function KeptAuthorPage(props: { params: Promise<{ slug: string }> }) {
   if (!checksPublicEnabled()) return notFound();
-  return keptPage(await AuthorPage(props));
+  return keptPage(await AuthorPage(props), [], 'v2');
 }

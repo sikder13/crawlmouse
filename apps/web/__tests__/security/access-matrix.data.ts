@@ -293,6 +293,20 @@ const ROUTES: readonly Spec[] = [
     proof: by('app/api/agency-trial/route.test.ts', '401 without a session, whatever the flag'),
     calls: 1,
   },
+  {
+    path: 'api/agency/brand',
+    v2: true,
+    identity: 'signed-in owner or account manager of the named account',
+    gate: 'member',
+    detail:
+      'Sets the named Agency account’s brand name and logo once `member_role` answers owner or account manager there; no seat and a developer seat get the same 403.',
+    check: at('app/api/agency/brand/route.ts', 'member_role'),
+    proof: by(
+      'app/api/agency/brand/route.test.ts',
+      'answers an account the caller is not a member of exactly as a developer seat, so it says nothing about the account',
+    ),
+    calls: 1,
+  },
   // v2: account
   {
     path: 'api/account',
@@ -2004,6 +2018,7 @@ const LIBS: readonly Spec[] = [
     callers: [
       'apps/web/app/api/admin/takedown/process/route.ts',
       'apps/web/app/api/agency-trial/route.ts',
+      'apps/web/app/api/agency/brand/route.ts',
       'apps/web/app/api/alert-rules/route.ts',
       'apps/web/app/api/audits/[id]/notify/route.ts',
       'apps/web/app/api/audits/[id]/reaudit/route.ts',
@@ -2107,6 +2122,7 @@ const LIBS: readonly Spec[] = [
       'apps/web/app/api/account/route.ts',
       'apps/web/app/api/admin/takedown/process/route.ts',
       'apps/web/app/api/agency-trial/route.ts',
+      'apps/web/app/api/agency/brand/route.ts',
       'apps/web/app/api/alert-rules/route.ts',
       'apps/web/app/api/audits/[id]/cancel/route.ts',
       'apps/web/app/api/audits/[id]/export/route.ts',
