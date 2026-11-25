@@ -355,6 +355,14 @@ export const CLIENT_CHANGES: CopyChange[] = [
   },
   {
     screen: 'agency-client',
+    kind: 'ruling',
+    locked: '−1 since Sat AI readability',
+    rendered: '−1 since Sat 24 Oct AI readability',
+    source:
+      'V2R register, F-302 (CTO 080): a move measured from a check a week or more back names its date, so the weekday cannot read as another day',
+  },
+  {
+    screen: 'agency-client',
     kind: 'fixture',
     locked:
       'Open fixes · 4 to raise 0 Remove the ClaudeBot block from robots.txt new +19 AI Packet 1 Let GPTBot and PerplexityBot through Cloudflare +24 AI Packet 2 Server-render the product template +22 AI Packet 3 Link the 7 orphan pages +4 SEO Packet',
