@@ -22,6 +22,9 @@ export const dynamic = 'force-dynamic';
 
 // A signed-in page: never a search result.
 export const metadata: Metadata = {
+  // "Site · Crawlmouse" under the root layout's template, not its product line (D-31). The host is
+  // not named: that would read the site a second time, in generateMetadata.
+  title: 'Site',
   robots: { index: false, follow: false },
   alternates: { canonical: null },
 };

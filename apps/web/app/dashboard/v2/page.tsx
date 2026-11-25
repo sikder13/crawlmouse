@@ -23,6 +23,8 @@ export const dynamic = 'force-dynamic';
 
 // Signed-in application surface, as v1's /dashboard: never a search result.
 export const metadata = {
+  // The rail's name for this page, under the root layout's "%s · Crawlmouse" (D-31).
+  title: 'Sites',
   robots: { index: false, follow: true },
   alternates: { canonical: '/dashboard' },
 };

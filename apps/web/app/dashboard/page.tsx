@@ -15,11 +15,17 @@ import { isProActive } from '@/lib/pro';
 
 // Signed-in application surface — never a search result. `follow` keeps outbound links live.
 export const metadata = {
+  // The rail's name for this page, under the root layout's "%s · Crawlmouse" (D-31).
+  title: 'Sites',
   robots: { index: false, follow: true },
   alternates: { canonical: '/dashboard' },
 };
 
-export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ upgraded?: string }> }) {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ upgraded?: string }>;
+}) {
   const { upgraded } = await searchParams;
   const sb = await supabaseServer();
   const {
@@ -27,7 +33,11 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   } = await sb.auth.getUser();
   if (!user) redirect('/login');
 
-  const { data: planRow } = await sb.from('users').select('pro_until').eq('id', user.id).maybeSingle();
+  const { data: planRow } = await sb
+    .from('users')
+    .select('pro_until')
+    .eq('id', user.id)
+    .maybeSingle();
   const proUntil = planRow?.pro_until ?? null;
   const isPro = isProActive(proUntil);
   // Just paid but the entitlement webhook hasn't landed yet → show an activating state that polls,
@@ -40,7 +50,12 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const sites = await loadDashboardSites(sb, admin, isPro);
   // §3 dashboard — per-site report-branding + visibility settings for the owner's claimed reports
   // (fail-soft: an empty map on any error, so the dashboard never breaks).
-  const reportSettingsByUrl = await loadReportSettingsForSites(admin, user.id, sites.map((s) => s.siteUrl), isPro);
+  const reportSettingsByUrl = await loadReportSettingsForSites(
+    admin,
+    user.id,
+    sites.map((s) => s.siteUrl),
+    isPro,
+  );
 
   return (
     <>
@@ -54,7 +69,9 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           </Link>
         </div>
 
-        <div className="mb-8">{activating ? <ActivatingPro /> : <PlanStatusCard proUntil={proUntil} />}</div>
+        <div className="mb-8">
+          {activating ? <ActivatingPro /> : <PlanStatusCard proUntil={proUntil} />}
+        </div>
 
         <DashboardView sites={sites} reportSettingsByUrl={reportSettingsByUrl} />
       </main>
