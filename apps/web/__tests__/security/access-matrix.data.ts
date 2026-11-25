@@ -71,7 +71,7 @@ const ROUTES: readonly Spec[] = [
     gate: 'seat_may',
     action: 'add_site',
     detail:
-      'Adds a client site through `add_site` with the service role, after `seat_may(add_site)` and an unscoped seat.',
+      'Adds a client site through `add_site` with the service role, after `seat_may(add_site)` and an unscoped seat; a repeat add’s re-send reads the account’s plan for the check’s page cap with the same client.',
     check: at('app/api/sites/route.ts', 'seat_may'),
     proof: by(
       'app/api/sites/route.test.ts',
@@ -1222,9 +1222,13 @@ const ENTRIES: readonly Spec[] = [
     v2: true,
     identity: 'signed-in owner or account manager',
     gate: 'member',
-    detail: 'Settings of the viewer account; `member_role` decides the role, a developer is a 404.',
+    detail:
+      'Settings of the viewer account; `member_role` decides the role. A developer reads a page that says the owner or a manager changes them, with no account form (D-03).',
     check: at('lib/v2/account/settings-pages.ts', 'member_role'),
-    proof: by(SETTINGS_TEST, 'is a 404 for a developer'),
+    proof: by(
+      SETTINGS_TEST,
+      'a developer gets a page that says Settings are not theirs to change, never the 404 (D-03)',
+    ),
   },
   {
     path: 'apps/web/app/(account)/settings/integrations/page.tsx',
@@ -1823,7 +1827,10 @@ const LIBS: readonly Spec[] = [
     detail:
       'The settings pages’ dataset by `member_role`; the card’s last four read with the service role after `member_role`, for the owner alone.',
     check: at('lib/v2/account/settings-pages.ts', 'member_role'),
-    proof: by(SETTINGS_TEST, 'is a 404 for a developer'),
+    proof: by(
+      SETTINGS_TEST,
+      'a developer gets a page that says Settings are not theirs to change, never the 404 (D-03)',
+    ),
     calls: 1,
   },
   {

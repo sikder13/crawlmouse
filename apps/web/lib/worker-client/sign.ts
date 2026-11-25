@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual } from 'node:crypto';
+import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 
 /**
  * The HMAC the crawl worker checks on every signed route (packages/worker/src/auth/hmac.ts):
@@ -33,6 +33,22 @@ export const signSignal = (secret: string, ts: string, raw: string): string => {
   const key = createHmac('sha256', secret).update(SIGNAL_KEY_LABEL).digest();
   return createHmac('sha256', key).update(`${ts}.`).update(raw).digest('hex');
 };
+
+/**
+ * POST /render/measure, signed under a key of its own derived from the shared secret, for the same
+ * reason as the signal, over `${ts}.${sha256}.${bytes}`: the body's digest and length, sent in the two
+ * headers below, so the worker can refuse a request from its headers before reading the body. Same rule
+ * as packages/worker/src/auth/hmac.ts.
+ */
+export const BODY_SHA256_HEADER = 'x-crawlmouse-body-sha256';
+export const BODY_BYTES_HEADER = 'x-crawlmouse-body-bytes';
+const MEASURE_KEY_LABEL = 'crawlmouse-worker-measure-v1';
+export const signMeasure = (secret: string, ts: string, sha256: string, bytes: number): string => {
+  const key = createHmac('sha256', secret).update(MEASURE_KEY_LABEL).digest();
+  return createHmac('sha256', key).update(`${ts}.${sha256}.${bytes}`).digest('hex');
+};
+export const sha256Hex = (raw: Uint8Array): string =>
+  createHash('sha256').update(raw).digest('hex');
 
 /** Whether a signal is the worker's, and recent. Compared in constant time. */
 export function verifySignal(

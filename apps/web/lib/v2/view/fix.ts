@@ -41,6 +41,7 @@ import {
   type SegmentLink,
 } from './segment/frame';
 import type { ViewDataset } from '../fixtures';
+import { titleAmong } from './fix-title';
 
 export type { FixPlan, PacketFramework };
 
@@ -238,7 +239,7 @@ function headOf(f: Omit<Fix, 'packet'>, lede: string[], siteFixes: readonly Fix[
   }
   if (effort) tiles.push({ label: 'Effort', value: effort, note: null });
   return {
-    title: sentence(f.title),
+    title: sentence(titleAmong(f, siteFixes)),
     ...effectOf(f, siteFixes),
     recommendation: recommendation(f),
     lede,

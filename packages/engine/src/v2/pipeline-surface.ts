@@ -29,11 +29,14 @@ export type {
 export { nothingReadReason } from './build/nothing-read.js';
 export {
   boundedEdges,
+  LARGE_CHECK_OTHER_EDGES_PER_PAGE,
   MAX_CHECK_EDGES,
   MAX_OTHER_EDGES_PER_PAGE,
   MAX_OWN_EDGES,
   noEdgesKept,
+  otherEdgesPerPage,
   OwnEdgesOverBound,
+  ownEdgeBound,
   rowAddresses,
   type EdgesKept,
 } from './build/edge-scope.js';
@@ -42,7 +45,7 @@ export { stableId } from './diff/ids.js';
 export { GRADE_VERSION } from './grade/weights.js';
 export { renderCheck, inFlightFromEnv } from './render/run.js';
 export type { RenderOutcome } from './render/run.js';
-export { clientFromEnv } from './render/client.js';
+export { clientFromEnv, REQUEST_TIMEOUT_MS } from './render/client.js';
 export { capsFromEnv } from './render/budget.js';
 export type { DailyBudget } from './render/budget.js';
 export type { JsTextState } from './render/state.js';

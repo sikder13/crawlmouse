@@ -30,6 +30,7 @@ import { openFixes, type FixPlan } from '../free-fixes';
 import { noPacketLine } from '../no-packet';
 import { noPacketReason } from '../packet-reason';
 import type { ViewDataset } from '../../fixtures';
+import { titleAmong } from '../fix-title';
 
 /** A fix's packet; the contract names the schema, not the type. */
 export type FixPacket = NonNullable<Fix['packet']>;
@@ -321,7 +322,7 @@ export function openFix(f: Fix, siteFixes: readonly Fix[]): OpenFixView {
   const head = {
     id: f.id,
     number: f.number,
-    title: f.title,
+    title: titleAmong(f, siteFixes),
     points,
     unit,
     effort: effortText(f),
@@ -371,7 +372,7 @@ export function sectionFixes(
   const siteFixes = d.fixes.filter((x) => x.site_id === check.site_id);
   const row = (f: Fix): ProFixView => ({
     key: f.id,
-    title: f.title,
+    title: titleAmong(f, siteFixes),
     scope: f.detail,
     points: proPoints(f, siteFixes),
     recommendations: tally([f]),

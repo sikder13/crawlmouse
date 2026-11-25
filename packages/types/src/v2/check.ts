@@ -65,6 +65,24 @@ export const CoverageSchema = z
      * of the crawlable site, so neither fetched nor counted as missed.
      */
     excluded_by_robots: CountSchema,
+    /**
+     * Why the crawl ended, with the page cap it ran under (inbox 082, 084), so a result can say "this
+     * plan reads up to N pages" or "the crawl's time ran out" from the record:
+     * - `at_cap`: the crawl asked for its page cap's worth of URLs;
+     * - `time_ran_out`: the time plan ended the crawl with URLs left to ask, or a batch's time budget
+     *   ran out;
+     * - `site_stopped`: the site stopped the crawl (429s or challenges).
+     * All false: the crawl read everything it found, or another limit ended it. Null where nothing is
+     * known: a check stored before this was kept is read with `stopped: null`, and no reason is shown.
+     */
+    stopped: z
+      .strictObject({
+        page_cap: CountSchema,
+        at_cap: z.boolean(),
+        time_ran_out: z.boolean(),
+        site_stopped: z.boolean(),
+      })
+      .nullable(),
   })
   .check(
     rules((c, rule) => {

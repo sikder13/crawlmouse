@@ -1,4 +1,5 @@
 import { Worker, type ResourceLimits } from 'node:worker_threads';
+import type { MeasureReader, MeasureReply } from './measure.js';
 import type {
   NotRead,
   PageRead,
@@ -11,7 +12,8 @@ import type {
 /**
  * The page reader on one thread, created once per process. Reads are answered in the order sent, so
  * the oldest unanswered read is the one the thread is on. Each body is handed over as UTF-8 bytes in a
- * transferred ArrayBuffer, never copied.
+ * transferred ArrayBuffer made for that send: a string body is encoded into one, and a byte body is
+ * copied into one, so the caller's bytes are never detached and can be sent again.
  *
  * The read the thread is on has READ_DEADLINE_MS from when the thread reached it. Past that, the
  * thread is stopped and that read answers `reader_deadline`; if the thread dies (out of memory, say),
@@ -42,27 +44,30 @@ export type ReadMessage =
       bodyCut: boolean;
       finalUrl: string;
       stackHeaders: StackHeaders | null;
-    };
+    }
+  /** A POST /render/measure body, as the route received it (measure.ts). */
+  | { id: number; kind: 'measure'; body: ArrayBuffer };
 
 export type ReadReply =
-  | { id: number; result: WordCount | PageRead }
+  | { id: number; result: WordCount | PageRead | MeasureReply }
   | { id: number; error: string };
 export type ReadyMessage = { ready: true };
 
 type Ask =
   | { kind: 'words'; bodyCut: boolean }
-  | { kind: 'page'; bodyCut: boolean; finalUrl: string; stackHeaders: StackHeaders | null };
+  | { kind: 'page'; bodyCut: boolean; finalUrl: string; stackHeaders: StackHeaders | null }
+  | { kind: 'measure' };
 
 interface Read {
   id: number;
   ask: Ask;
-  /** Kept to send again to a new thread; the caller holds the same string until the read answers. */
-  body: string;
-  resolve: (r: WordCount | PageRead | NotRead) => void;
+  /** Kept to send again to a new thread; the caller holds the same value until the read answers. */
+  body: string | Uint8Array;
+  resolve: (r: WordCount | PageRead | MeasureReply | NotRead) => void;
   reject: (e: Error) => void;
 }
 
-export class ThreadReader implements PageReader {
+export class ThreadReader implements PageReader, MeasureReader {
   private thread: Worker | null = null;
   /** Unanswered reads, oldest first: all sent to the current thread. */
   private readonly queue: Read[] = [];
@@ -113,6 +118,15 @@ export class ThreadReader implements PageReader {
     >;
   }
 
+  /**
+   * A POST /render/measure body's bytes, decoded, parsed and read on this thread (measure.ts). The
+   * worker gives measuring a ThreadReader of its own (main.ts), so a slow rendered page never holds up
+   * a crawl read queued behind it.
+   */
+  measure(bytes: Uint8Array): Promise<MeasureReply | NotRead> {
+    return this.send({ kind: 'measure' }, bytes) as Promise<MeasureReply | NotRead>;
+  }
+
   async close(): Promise<void> {
     this.disarm();
     const t = this.thread;
@@ -120,21 +134,44 @@ export class ThreadReader implements PageReader {
     if (t) await t.terminate();
   }
 
-  private send(ask: Ask, body: string): Promise<WordCount | PageRead | NotRead> {
+  private send(
+    ask: Ask,
+    body: string | Uint8Array,
+  ): Promise<WordCount | PageRead | MeasureReply | NotRead> {
     return new Promise((resolve, reject) => {
       const read: Read = { id: this.nextId++, ask, body, resolve, reject };
       this.queue.push(read);
-      this.post(this.ensure(), read);
+      if (!this.post(read)) return;
       if (this.queue.length === 1) this.arm();
     });
   }
 
-  private post(thread: Worker, read: Read): void {
-    // A fresh ArrayBuffer of its own: Buffer.from may hand back a slice of a shared pool, which a
-    // transfer would detach from under other buffers.
-    const bytes = new TextEncoder().encode(read.body).buffer as ArrayBuffer;
-    thread.ref();
-    thread.postMessage({ ...read.ask, id: read.id, body: bytes } satisfies ReadMessage, [bytes]);
+  /**
+   * Sends a read to the thread, starting one if there is none; false when it could not be sent, and the
+   * read is then taken off the queue and rejected, so it never sits at the head with no deadline. Never
+   * throws: it runs in timer and exit callbacks, where a throw would end the process.
+   */
+  private post(read: Read): boolean {
+    try {
+      const thread = this.ensure();
+      // An ArrayBuffer made for this send, the size of the body. A Buffer's `slice` is a view on its
+      // memory (a small one on Node's shared pool), which a transfer would detach from under the
+      // caller and other buffers; the Uint8Array constructor copies.
+      const bytes = (
+        typeof read.body === 'string'
+          ? new TextEncoder().encode(read.body)
+          : new Uint8Array(read.body)
+      ).buffer as ArrayBuffer;
+      thread.ref();
+      thread.postMessage({ ...read.ask, id: read.id, body: bytes } satisfies ReadMessage, [bytes]);
+      return true;
+    } catch (e) {
+      const at = this.queue.indexOf(read);
+      if (at >= 0) this.queue.splice(at, 1);
+      if (this.queue.length === 0) this.thread?.unref();
+      read.reject(e instanceof Error ? e : new Error(String(e)));
+      return false;
+    }
   }
 
   /** Starts the deadline of the read the thread is now on, if any, once the thread is ready. */
@@ -158,15 +195,16 @@ export class ThreadReader implements PageReader {
     if (reason === 'reader_deadline') void thread?.terminate();
     this.queue.shift()?.resolve({ failed: reason });
     if (this.queue.length === 0) return;
-    const next = this.ensure();
-    for (const read of this.queue) this.post(next, read);
+    // A copy: a read that cannot be sent takes itself off the queue. The first send starts the new thread.
+    for (const read of [...this.queue]) this.post(read);
     this.arm();
   }
 
   private ensure(): Worker {
     if (this.thread) return this.thread;
-    if (this.started++ > 0) this.restarts++;
     const thread = new Worker(this.entry, { resourceLimits: this.limits });
+    // Counted once the thread exists: a constructor that throws started nothing.
+    if (this.started++ > 0) this.restarts++;
     this.ready = false;
     thread.unref();
     const died = () => {

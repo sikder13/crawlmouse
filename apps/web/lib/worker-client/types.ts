@@ -73,6 +73,25 @@ export interface WorkerClient {
    */
   readProgress(batchId: string, after?: number): Promise<LiveProgress | null>;
   readMetrics(): Promise<unknown>;
+  /**
+   * A page's two renders, read on the worker's reader thread (questions/042, design C): each side's
+   * words, whether either is a challenge, and the links only the rendered side has. Null for
+   * anything else (a refusal, a read the thread stopped, a timeout, an answer of the wrong shape); it
+   * never throws. Optional so a fake worker need not have it.
+   */
+  measureRendered?(
+    staticHtml: string,
+    renderedHtml: string,
+    pageUrl: string,
+  ): Promise<RenderedReading | null>;
+}
+
+/** What the worker reads from a page's two renders: the engine's `RenderedReading`. */
+export interface RenderedReading {
+  raw_words: number;
+  rendered_words: number;
+  challenged: boolean;
+  links: { js_only: string[]; js_only_count: number; truncated: boolean } | null;
 }
 
 /**

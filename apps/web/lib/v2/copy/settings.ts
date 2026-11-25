@@ -21,6 +21,11 @@ export { RESTORE_DAYS as DELETE_GRACE_DAYS } from './deletion';
 
 export const SETTINGS_COPY = {
   title: 'Settings',
+  /** The header line for a seat that may not change the account's settings (D-03). */
+  notYoursLine: 'Developer seat',
+  /** What a seat that may not change the account's settings reads on Settings (D-03). */
+  notYours:
+    'Your seat is a developer seat. This account’s address, its email and its plan are changed by its owner or an account manager.',
   trialLeft: (plan: string, days: number) =>
     `${plan} trial, ${count(days)} ${plural(days, 'day', 'days')} left`,
   accountTitle: 'Account',
@@ -340,6 +345,11 @@ export const SETTINGS_CHANGES: CopyChange[] = [
 ];
 
 export const SETTINGS_ADDITIONS: Addition[] = [
+  {
+    screen: 'settings',
+    what: 'For a developer seat, Settings in its rail and one line: the account’s address, email and plan are changed by its owner or an account manager. The page had been the public 404',
+    source: 'D-03 (QA’s production dashboard walk, 24 Nov)',
+  },
   {
     screen: 'settings',
     what: 'A line under the email kinds when mail to the reader’s own address hard-bounced or was reported as spam, saying that only sign-in links and account mail go to it now',

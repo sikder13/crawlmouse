@@ -15,10 +15,10 @@ import {
   dayDate,
   dayMonth,
   dayOfMonth,
-  hourMinute,
+  hourMinuteZoned,
   nextWeekly,
   weekday,
-  weekdayTime,
+  weekdayTimeZoned,
 } from '../format';
 import { toneOf } from '../letters';
 import { isAi, isBlocked } from '../sentences';
@@ -156,15 +156,15 @@ export function nextCheck(
     v.now,
     zoneOf(v),
   );
-  return `${dayDateOf(at)} around ${hourMinute(at, zoneOf(v))}`;
+  return `${dayDateOf(at)} around ${hourMinuteZoned(at, zoneOf(v))}`;
 }
 
 /** "today 06:02", or "Thu 18:23" for an earlier day. */
 export function whenAgo(ts: string, v: AccountView): string {
   const zone = zoneOf(v);
   return calendarDays(ts, v.now, zone) === 0
-    ? `today ${hourMinute(ts, zone)}`
-    : weekdayTime(ts, zone);
+    ? `today ${hourMinuteZoned(ts, zone)}`
+    : weekdayTimeZoned(ts, zone);
 }
 
 export const byFinish = (a: Check, b: Check) => instant(a.finished_at!) - instant(b.finished_at!);

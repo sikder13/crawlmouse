@@ -471,7 +471,7 @@ describe('compareDoc', () => {
     const moved = doc.sections.find((s) => s.heading === 'What moved')!;
     expect(moved.blocks[0]).toEqual({
       type: 'text',
-      text: 'Four changes found at the Fri 06:02 check.',
+      text: 'Four changes found at the Fri 06:02 EDT check.',
     });
     const changes = moved.blocks.filter((b) => b.type === 'pair');
     expect(changes).toHaveLength(4);
