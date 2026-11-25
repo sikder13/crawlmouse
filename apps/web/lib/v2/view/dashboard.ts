@@ -71,6 +71,7 @@ import {
   type ActionView,
 } from './account-actions';
 import { CAPABILITIES, type CapabilityKey } from './agencies';
+import { roleMay } from '../agency/guard';
 import {
   FREE_SCHEDULE,
   accountShellView,
@@ -713,7 +714,10 @@ function offered(
   if (c.status !== 'built') return false;
   const risks = c.risk === undefined ? [] : typeof c.risk === 'string' ? [c.risk] : c.risk;
   if (risks.some((r) => !features[r])) return false;
-  return done || ACCOUNT_ACTIONS[control].owner !== 'later';
+  // Every account action has its page today (#167 served Integrations); the check stays so a route
+  // marked 'later' again is not offered.
+  const owner: string = ACCOUNT_ACTIONS[control].owner;
+  return done || owner !== 'later';
 }
 
 function setup(
@@ -738,7 +742,7 @@ function setup(
     subject: string,
     todo: string,
     doneLabel: string,
-    act: ActionView,
+    act: ActionView | null,
     capability: CapabilityKey | null,
     control: ActionKey,
   ) => {
@@ -750,7 +754,7 @@ function setup(
       key,
       label: done ? doneLabel : todo,
       done,
-      action: done ? null : { ...act, context: `for ${subject}` },
+      action: done || act === null ? null : { ...act, context: `for ${subject}` },
     });
   };
   const settings = (label: string) =>
@@ -762,7 +766,10 @@ function setup(
       SETUP_COPY.slack.subject,
       SETUP_COPY.slack.todo,
       SETUP_COPY.slack.done,
-      action('integrations', 'Connect'),
+      // Integrations is a 404 for a role that may not edit the account's alerts.
+      roleMay(readerRole(v) ?? 'developer', 'edit_account_alerts')
+        ? action('integrations', 'Connect')
+        : null,
       'slack_alerts',
       'integrations',
     );
@@ -780,19 +787,6 @@ function setup(
       'sitePage',
     );
   }
-  if (g.searchConsole) {
-    item(
-      'search_console',
-      connected('search_console'),
-      SETUP_COPY.searchConsole.subject,
-      SETUP_COPY.searchConsole.todo,
-      SETUP_COPY.searchConsole.done,
-      action('integrations', 'Connect'),
-      // Nothing reads Search Console yet: no capability row names it.
-      null,
-      'integrations',
-    );
-  }
   if (g.stagingAndDeployHooks) {
     const done = v.d.sites.some((s) => s.staging_of_site_id === site.id);
     item(
@@ -804,18 +798,6 @@ function setup(
       settings('Add'),
       'staging',
       'sitePage',
-    );
-  }
-  if (g.observedCrawlerActivity) {
-    item(
-      'observed',
-      connected('cloudflare_analytics', 'vercel_drain'),
-      SETUP_COPY.observed.subject,
-      SETUP_COPY.observed.todo,
-      SETUP_COPY.observed.done,
-      action('integrations', 'Connect'),
-      'observed_crawlers',
-      'integrations',
     );
   }
   const left = items.filter((i) => !i.done).length;

@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { DASHBOARD_COPY } from '../copy/dashboard';
 import { fixture } from '../fixtures';
 import { firstRunNow } from './account';
+import { CAPABILITIES } from './agencies';
 import {
   ACCOUNT_ACTIONS,
   dashboardView,
@@ -158,6 +159,12 @@ describe('Dashboard home, bad-site at as_of (Fri 30 Oct 06:05 in Indiana)', () =
     expect(v.setup!.items.map((i) => i.done)).toEqual([true]);
   });
 
+  it('offers nothing to connect that has no connection behind it (CTO ruling 047)', () => {
+    const text = JSON.stringify(v.setup);
+    expect(text).not.toContain('Search Console');
+    expect(text).not.toContain('Vercel Drain');
+  });
+
   it('carries the trial card that follows the first run', () => {
     // Fri 30 Oct to Sat 7 Nov in Indiana: eight dates (Q4).
     expect(v.shell.trial).toMatchObject({
@@ -275,9 +282,8 @@ describe('V2R dashboard fixes: what the dashboard reads (QA dashboard walk, 24 N
   });
 
   it('D-16: offers only built, shown set-up items whose control has a page', () => {
-    // Slack (built) is done; competitors and staging are "coming" (CAPABILITIES); Search Console has
-    // no capability; observed activity is "coming"; and the three Connect buttons open
-    // /settings/integrations, which no page serves yet (ACCOUNT_ACTIONS.integrations.owner 'later').
+    // Slack (built, its Connect page served) is done; competitors and staging are "coming"
+    // (CAPABILITIES); Search Console and observed visits are not offered at all (CTO ruling 047).
     expect(v.setup!.items.map((i) => [i.key, i.label, i.done])).toEqual([
       ['slack', 'Slack alerts connected', true],
     ]);
@@ -287,23 +293,33 @@ describe('V2R dashboard fixes: what the dashboard reads (QA dashboard walk, 24 N
     );
   });
 
-  it('D-16, M5: the trial offer names neither competitors nor Slack while neither is offered', () => {
+  it('D-16, M5: the trial offer names Slack, whose Connect page is served (#167), and no competitor', () => {
     expect(dashboardPreview('clean').startPro!.body).toBe(
-      'Weekly checks and every fix with its packet, on up to 5 sites, for 14 days. No card. When it ends, this account goes back to Free; nothing you can see is deleted.',
+      'Weekly checks, every fix with its packet and Slack alerts, on up to 5 sites, for 14 days. No card. When it ends, this account goes back to Free; nothing you can see is deleted.',
     );
   });
 
-  it('M1: with no row listed, the set-up card claims nothing done', () => {
+  it('M1: Slack not connected is the one thing left; with no row listed, the card claims nothing done', () => {
     const copy = structuredClone(bad);
     for (const a of copy.accounts) {
       a.integrations = a.integrations.map((i) => ({ ...i, connected: false }));
     }
-    const s = dashboardView(copy, { accountId: BAD_ACCOUNT, now: bad.as_of }).setup!;
-    expect(s.items).toEqual([]);
-    expect(s.title).toBe('Weekly check schedule');
-    expect(s.schedule!.label).toBe(
-      'Choose the day and hour example-outfitter.com is checked weekly (now Fri around 06:00)',
-    );
+    const left = dashboardView(copy, { accountId: BAD_ACCOUNT, now: bad.as_of }).setup!;
+    expect(left.title).toBe('One thing left to set up');
+    expect(left.items.map((i) => [i.key, i.done])).toEqual([['slack', false]]);
+    // With Slack not offered (as when its capability is not built), no row is listed.
+    const slack = CAPABILITIES.slack_alerts as { status: string };
+    slack.status = 'coming';
+    try {
+      const s = dashboardView(copy, { accountId: BAD_ACCOUNT, now: bad.as_of }).setup!;
+      expect(s.items).toEqual([]);
+      expect(s.title).toBe('Weekly check schedule');
+      expect(s.schedule!.label).toBe(
+        'Choose the day and hour example-outfitter.com is checked weekly (now Fri around 06:00)',
+      );
+    } finally {
+      slack.status = 'built';
+    }
   });
 
   it('says each reason on its own terms beside the Technical SEO mean (review 2)', () => {
@@ -563,9 +579,9 @@ describe('Who builds each account route', () => {
       'built',
       'built',
     ]);
-    expect(ACCOUNT_ACTIONS.integrations.owner).toBe('later');
+    expect(ACCOUNT_ACTIONS.integrations.owner).toBe('built');
     expect(new Set(Object.values(ACCOUNT_ACTIONS).map((a) => a.owner))).toEqual(
-      new Set(['CC-26b', 'CC-27b', 'later', 'built']),
+      new Set(['CC-26b', 'CC-27b', 'built']),
     );
   });
 });

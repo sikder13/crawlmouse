@@ -139,12 +139,6 @@ describe('on each dashboard preview: no empty or bare-# href, no link off-site, 
         expect(href, a.outerHTML).toMatch(/^\//);
       }
     }
-    // No control opens the integrations page while no page serves it (D-02); the rail's own
-    // Integrations link is the shell's, A1's row (F-016), and is left to it.
-    const main = doc.querySelector('main')!;
-    for (const a of main.querySelectorAll('a')) {
-      expect(a.getAttribute('href'), a.outerHTML).not.toMatch(/^\/settings\/integrations/);
-    }
     for (const b of doc.querySelectorAll('button')) {
       // A button with no script submits its form: one outside a form does nothing.
       expect(b.closest('form'), b.outerHTML).not.toBeNull();

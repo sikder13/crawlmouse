@@ -54,6 +54,7 @@ import { PlanScreen } from '@/components/v2/screens/settings/PlanScreen';
 import { SettingsScreen } from '@/components/v2/screens/settings/SettingsScreen';
 import { TrialEndedScreen, TrialEndScreen } from '@/components/v2/screens/trial-end/TrialEndScreen';
 import DeletePage from './delete/page';
+import IntegrationsPage from './integrations/page';
 import SettingsPage from './page';
 import PlanPage from './plan/page';
 import TrialEndedPage from '../trial-ended/page';
@@ -211,6 +212,7 @@ const PAGES = [
   ['/settings/plan', PlanPage],
   ['/settings/delete', DeletePage],
   ['/trial-ended', TrialEndedPage],
+  ['/settings/integrations', IntegrationsPage],
 ] as const;
 
 describe('with V2_CHECKS_PUBLIC off', () => {
@@ -268,6 +270,38 @@ describe('/settings', () => {
     );
     expect(await text({ error: 'nonsense' })).toContain(SETTINGS_NOTICES.unknown);
     expect(await text({})).not.toContain(SETTINGS_NOTICES.saved);
+  });
+
+  it('Integrations is a 404 for a developer', async () => {
+    as(developer);
+    await expect(IntegrationsPage(q())).rejects.toMatchObject(notFoundError);
+  });
+
+  it('Integrations shows an account manager the form, with their own rail', async () => {
+    as(sharedManager);
+    const markup = renderToStaticMarkup((await IntegrationsPage(q())) as ReactElement);
+    expect(markup).toContain('name="slackWebhookUrl"');
+    expect(markup.toLowerCase()).toContain('autocomplete="off"');
+    // Settings › Plan is a 404 for a manager, so nothing on the page links there.
+    expect(markup).not.toContain('href="/settings/plan"');
+  });
+
+  it('Integrations on Free gives an account manager no link to the plan page', async () => {
+    as(manager);
+    const markup = renderToStaticMarkup((await IntegrationsPage(q())) as ReactElement);
+    expect(markup).not.toContain('name="slackWebhookUrl"');
+    expect(markup).not.toContain('href="/settings/plan"');
+  });
+
+  it('Integrations: a paid account gets the Slack form, Free the way to Pro', async () => {
+    as(shared);
+    const paid = renderToStaticMarkup((await IntegrationsPage(q())) as ReactElement);
+    expect(paid).toContain('action="/api/alert-rules"');
+    expect(paid).toContain('name="slackWebhookUrl"');
+    as(owner);
+    const free = renderToStaticMarkup((await IntegrationsPage(q())) as ReactElement);
+    expect(free).not.toContain('name="slackWebhookUrl"');
+    expect(free).toContain('href="/settings/plan"');
   });
 
   it('is a 404 for a developer', async () => {

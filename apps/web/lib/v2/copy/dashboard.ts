@@ -166,9 +166,7 @@ export const DASHBOARD_COPY = {
  */
 const competitorsOf = (n: number) => `${numberWord(n)} ${plural(n, 'competitor', 'competitors')}`;
 const SLACK = 'Slack';
-const SEARCH_CONSOLE = 'Search Console';
 const STAGING = 'a staging URL';
-const OBSERVED = 'Cloudflare Analytics or a Vercel Drain';
 
 export const SETUP_COPY = {
   slack: {
@@ -182,20 +180,10 @@ export const SETUP_COPY = {
     done: (n: number) =>
       `${capitalise(numberWord(n))} ${plural(n, 'competitor', 'competitors')} added`,
   },
-  searchConsole: {
-    subject: SEARCH_CONSOLE,
-    todo: `Connect ${SEARCH_CONSOLE} to lay Google's impressions and clicks by page over the audit, and its AI-feature breakdown when its API exposes it`,
-    done: 'Search Console connected',
-  },
   staging: {
     subject: STAGING,
     todo: `Add ${STAGING} so audits run after each staging deploy`,
     done: 'Staging audited on each deploy',
-  },
-  observed: {
-    subject: OBSERVED,
-    todo: `Connect ${OBSERVED} to see what the AI crawlers actually fetched`,
-    done: 'Observed crawler activity connected',
   },
   schedule: (host: string, when: string) =>
     `Choose the day and hour ${host} is checked weekly (now ${when})`,
@@ -350,7 +338,7 @@ const DAY0: CopyChange[] = [
       'Alerts to Slack, as well as email Connect Name one competitor to audit the same way Add',
     rendered: 'done Slack alerts connected',
     source:
-      'The contract records no date for an integration, so day 0 cannot roll it back: the account has Slack connected, shown done. Done, the Slack row names Slack alone, since Free keeps the email alerts (FACTS l.31). The competitor row is not offered: QA dashboard walk D-16 (F-279): the set-up card offers an item only when its capability is built and shown (CAPABILITIES, the Goal 1 switch) and its control has a page; competitors and staging are "coming", Search Console has no capability, observed activity is "coming", and /settings/integrations is a later page (ACCOUNT_ACTIONS.integrations)',
+      'The contract records no date for an integration, so day 0 cannot roll it back: the account has Slack connected, shown done. Done, the Slack row names Slack alone, since Free keeps the email alerts (FACTS l.31). The competitor row is not offered: QA dashboard walk D-16 (F-279): the set-up card offers an item only when its capability is built and shown (CAPABILITIES, the Goal 1 switch) and its control has a page: competitors and staging are "coming"; Search Console and observed crawler visits are not offered (CTO ruling 047, 23 Nov)',
   },
   {
     screen: 'dashboard-day0',
@@ -359,7 +347,7 @@ const DAY0: CopyChange[] = [
       "Connect Search Console to lay Google's AI-feature impressions over these pages Connect",
     rendered: '',
     source:
-      'V2R register, F-279 (QA dashboard walk D-16): the set-up card offers an item only when its capability is built and shown (CAPABILITIES, the Goal 1 switch) and its control has a page; competitors and staging are "coming", Search Console has no capability, observed activity is "coming", and /settings/integrations is a later page (ACCOUNT_ACTIONS.integrations)',
+      'V2R register, F-279 (QA dashboard walk D-16): the set-up card offers an item only when its capability is built and shown (CAPABILITIES, the Goal 1 switch) and its control has a page: competitors and staging are "coming"; Search Console and observed crawler visits are not offered (CTO ruling 047, 23 Nov)',
   },
   {
     screen: 'dashboard-day0',
@@ -375,7 +363,7 @@ const DAY0: CopyChange[] = [
     locked: 'Add a staging URL so audits run before each deploy',
     rendered: '',
     source:
-      'V2R register, F-279 (QA dashboard walk D-16): the set-up card offers an item only when its capability is built and shown (CAPABILITIES, the Goal 1 switch) and its control has a page; competitors and staging are "coming", Search Console has no capability, observed activity is "coming", and /settings/integrations is a later page (ACCOUNT_ACTIONS.integrations)',
+      'V2R register, F-279 (QA dashboard walk D-16): the set-up card offers an item only when its capability is built and shown (CAPABILITIES, the Goal 1 switch) and its control has a page: competitors and staging are "coming"; Search Console and observed crawler visits are not offered (CTO ruling 047, 23 Nov)',
   },
   {
     screen: 'dashboard-day0',
@@ -617,7 +605,7 @@ const HOME: CopyChange[] = [
       "done One competitor added 2 min Connect Search Console to lay Google's AI-feature impressions over these pages Connect 1 min",
     rendered: '',
     source:
-      'V2R register, F-279 (QA dashboard walk D-16): the set-up card offers an item only when its capability is built and shown (CAPABILITIES, the Goal 1 switch) and its control has a page; competitors and staging are "coming", Search Console has no capability, observed activity is "coming", and /settings/integrations is a later page (ACCOUNT_ACTIONS.integrations); the efforts "2 min" and "1 min" are in no record',
+      'V2R register, F-279 (QA dashboard walk D-16): the set-up card offers an item only when its capability is built and shown (CAPABILITIES, the Goal 1 switch) and its control has a page: competitors and staging are "coming"; Search Console and observed crawler visits are not offered (CTO ruling 047, 23 Nov); the efforts "2 min" and "1 min" are in no record',
   },
   {
     screen: 'dashboard',

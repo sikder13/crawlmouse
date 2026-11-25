@@ -40,14 +40,12 @@ describe('a new trial with no site', () => {
     expect(dashboardView(noSiteDataset(), viewer).sites.foot).toBe(`${PRO} No card. ${ADD_NOTE}`);
   });
 
-  it('names Slack only while it is connected: its Connect page is not served yet (review 5)', () => {
+  it('names Slack whether or not it is connected, since its Connect page is served (#167)', () => {
     const account = bad.accounts.find((a) => a.id === BAD)!;
     const d = withAccount(noSiteDataset(), {
       integrations: account.integrations.map((i) => ({ ...i, connected: false })),
     });
-    expect(dashboardView(d, viewer).sites.foot).toBe(
-      `You have Pro until Sat 7 Nov: weekly checks and every fix with its packet, on up to 5 sites. No card. ${ADD_NOTE}`,
-    );
+    expect(dashboardView(d, viewer).sites.foot).toBe(`${PRO} No card. ${ADD_NOTE}`);
   });
 
   it('does not say "no card" on a trial with a card', () => {
