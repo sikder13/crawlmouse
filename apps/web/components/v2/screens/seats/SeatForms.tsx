@@ -23,13 +23,18 @@ function RoleAndScope({ id, fields }: { id: string; fields: SeatFields }) {
         options={fields.roles}
         defaultValue={fields.role}
       />
-      <Select
-        id={`${id}-scope`}
-        label={F.scope}
-        name="scope"
-        options={fields.scope}
-        defaultValue={fields.scopeValue}
-      />
+      {fields.scope.length ? (
+        <Select
+          id={`${id}-scope`}
+          label={F.scope}
+          name="scope"
+          options={fields.scope}
+          defaultValue={fields.scopeValue}
+        />
+      ) : (
+        // Off Agency there are no clients to choose: the seat covers every site (D-35).
+        <input type="hidden" name="scope" value={fields.scopeValue} />
+      )}
       {fields.sites.length ? (
         <fieldset className={styles.sites}>
           <legend className={styles.legend}>{F.someClients}</legend>

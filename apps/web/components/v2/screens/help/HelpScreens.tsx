@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react';
-import { Button } from '../../Button';
+import { AccountLink } from '../../AccountLink';
 import { Heading } from '../../Heading';
 import { PageShell } from '../../PageShell';
-import { LOG_IN, MARKETING_NAV } from '../../footer-links';
+import { MARKETING_NAV } from '../../footer-links';
 import type { HelpSentence } from '../../../../lib/v2/help/articles';
 import type {
   HelpArticleView,
@@ -29,11 +29,7 @@ function HelpShell({
   return (
     <PageShell
       nav={MARKETING_NAV}
-      actions={
-        <Button variant="quiet" href={LOG_IN.href}>
-          {LOG_IN.label}
-        </Button>
-      }
+      actions={<AccountLink />}
       footerLineMark={footerComing ? <ComingMark label={footerComing} /> : null}
     >
       <main className={`${layout.wrap} ${styles.main}`}>

@@ -26,6 +26,7 @@ export function SeatsScreen({
   notice?: { text: string } | null;
 }) {
   const { header, people, roles, invite, buy } = data;
+  const clients = people.rows.some((r) => r.clients !== null);
   return (
     <AccountFrame shell={data.shell}>
       <header className={shared.header}>
@@ -57,7 +58,8 @@ export function SeatsScreen({
           columns={[
             { header: C.person },
             { header: C.role },
-            { header: C.clients, muted: true },
+            // Off Agency no row has clients (D-35), and the column is left out.
+            ...(clients ? [{ header: C.clients, muted: true }] : []),
             { header: C.alerts, muted: true },
             { header: <VisuallyHidden>{C.actions}</VisuallyHidden>, numeric: true },
           ]}
@@ -74,7 +76,7 @@ export function SeatsScreen({
                 ) : null}
               </div>,
               r.role,
-              r.clients,
+              ...(clients ? [r.clients] : []),
               r.alerts,
               r.change ? <ChangeSeat key="c" seat={r.change} who={r.person} /> : null,
             ],

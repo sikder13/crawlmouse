@@ -1,8 +1,9 @@
 import { NOT_FOUND_COPY as COPY } from '@/lib/v2/copy/not-found';
+import { AccountLink } from '../../AccountLink';
 import { Button } from '../../Button';
 import { Heading } from '../../Heading';
 import { PageShell } from '../../PageShell';
-import { LOG_IN, MARKETING_NAV } from '../../footer-links';
+import { MARKETING_NAV } from '../../footer-links';
 import layout from '../../layout.module.css';
 import styles from './NotFoundScreen.module.css';
 import '@/styles/v2/tokens.css';
@@ -17,11 +18,7 @@ export function NotFoundScreen() {
       // Rendered in the browser, which cannot read the server's flags. The v2 404 is shown only
       // while V2_CHECKS_PUBLIC is on (app/not-found.tsx), so the gated links are open.
       footerGates={OPEN_GATES}
-      actions={
-        <Button variant="quiet" href={LOG_IN.href}>
-          {LOG_IN.label}
-        </Button>
-      }
+      actions={<AccountLink />}
     >
       <main className={`${layout.wrap} ${styles.main}`}>
         <p className={styles.code}>404</p>

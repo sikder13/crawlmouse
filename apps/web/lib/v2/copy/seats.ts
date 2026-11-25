@@ -37,6 +37,14 @@ export const SEATS_COPY = {
     account_manager: 'Account manager',
     developer: 'Developer · packets only, no client email',
   } satisfies Record<SeatRole, string>,
+  /** The same off Agency, which has no branding and no clients (D-35). */
+  roleLinePlain: {
+    owner: 'Owner · billing, seats',
+    account_manager: 'Account manager',
+    developer: 'Developer · packets only',
+  } satisfies Record<SeatRole, string>,
+  /** The People card's line off Agency: no seat covers clients there (D-35). */
+  peopleSubPlain: 'Who gets which alerts',
   roleName: {
     owner: 'Owner',
     account_manager: 'Account manager',
@@ -104,6 +112,14 @@ export const ROLE_ROWS: readonly { can: string; action: SeatAction | null }[] = 
   { can: 'Edit and send client reports', action: 'schedule_report' },
   { can: 'Add or remove client sites', action: 'remove_site' },
   { can: 'Branding, seats, billing', action: 'invite_seat' },
+];
+
+/** The same off Agency, which has no client reports, clients or branding (D-35). */
+export const ROLE_ROWS_PLAIN: readonly { can: string; action: SeatAction | null }[] = [
+  { can: 'See audits and packets', action: null },
+  { can: 'Mark fixes done, run checks', action: null },
+  { can: 'Add or remove sites', action: 'remove_site' },
+  { can: 'Seats, billing', action: 'invite_seat' },
 ];
 
 export const INVITE_COPY = {

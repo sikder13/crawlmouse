@@ -501,3 +501,31 @@ describe('a Free dashboard with paused sites, as after a trial ends (F-234, F-23
     );
   });
 });
+
+describe('"Other changes · Show" opens the log filtered to what it counts (D-34)', () => {
+  const OUTFITTER = '50000000-0000-4000-8000-000000000001';
+
+  it('with changes of two kinds on two sites, opens the whole log', () => {
+    // bad-site's three: two "changed" rows on example-outfitter.com, a baseline on redbirdaviation.com.
+    const other = home().strip!.other;
+    expect(other.count).toBe(3);
+    expect(other.show.href).toBe('/changes');
+  });
+
+  it('with one kind on one site, names both', () => {
+    const d = structuredClone(bad);
+    d.changes = d.changes.filter((c) => c.kind !== 'baseline');
+    const other = dashboardView(d, { accountId: BAD_ACCOUNT, now: bad.as_of }).strip!.other;
+    expect(other.count).toBe(2);
+    expect(other.show.href).toBe(`/changes?site=${OUTFITTER}&kind=changed`);
+  });
+
+  it('with one kind on two sites, names the kind only', () => {
+    const d = structuredClone(bad);
+    const baseline = d.changes.find((c) => c.kind === 'baseline')!;
+    baseline.kind = 'changed';
+    expect(
+      dashboardView(d, { accountId: BAD_ACCOUNT, now: bad.as_of }).strip!.other.show.href,
+    ).toBe('/changes?kind=changed');
+  });
+});

@@ -1,6 +1,7 @@
 import { Button } from '../../Button';
 import { Card } from '../../Card';
 import { Heading } from '../../Heading';
+import { InlineCode } from '../../InlineCode';
 import { SUPPORT_COPY } from '../../../../lib/v2/copy/support';
 import type { ActionView } from '../../../../lib/v2/view/account-actions';
 import type { FixView } from '../../../../lib/v2/view/fix';
@@ -140,7 +141,7 @@ export function FixScreen({
         ) : null}
         {head.lede.map((l) => (
           <p key={l} className={styles.lede}>
-            {l}
+            <InlineCode text={l} />
           </p>
         ))}
         {head.tiles.length ? (
@@ -165,7 +166,7 @@ export function FixScreen({
           {data.proof.kind === 'shown' ? (
             data.proof.lines.map((l) => (
               <p key={l} className={styles.body}>
-                {l}
+                <InlineCode text={l} />
               </p>
             ))
           ) : (
@@ -216,14 +217,20 @@ export function FixScreen({
                       {data.beforeAfter.rows.map((r) => (
                         <tr key={r.label}>
                           <th scope="row">{r.label}</th>
-                          <td className={`${styles.num} ${styles.mono}`}>{r.today}</td>
-                          <td className={`${styles.num} ${styles.mono}`}>{r.after}</td>
+                          <td className={`${styles.num} ${styles.mono}`}>
+                            <InlineCode text={r.today} />
+                          </td>
+                          <td className={`${styles.num} ${styles.mono}`}>
+                            <InlineCode text={r.after} />
+                          </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                   {data.beforeAfter.footnote ? (
-                    <div className={styles.footnote}>{data.beforeAfter.footnote}</div>
+                    <div className={styles.footnote}>
+                      <InlineCode text={data.beforeAfter.footnote} />
+                    </div>
                   ) : null}
                 </Card>
               ) : null}
@@ -232,7 +239,9 @@ export function FixScreen({
                   <Heading level={2} size="s">
                     {data.shipped.heading}
                   </Heading>
-                  <p className={styles.body}>{data.shipped.body}</p>
+                  <p className={styles.body}>
+                    <InlineCode text={data.shipped.body} />
+                  </p>
                   <Button href={data.shipped.action.href} className={styles.cardAction}>
                     {data.shipped.action.label}
                   </Button>

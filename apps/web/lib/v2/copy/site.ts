@@ -47,7 +47,8 @@ export const SITE_COPY = {
     cadence: 'How often',
     weekday: 'Day',
     hour: (zone: string) => `Hour, ${zone}`,
-    competitors: { label: 'Competitor sites', placeholder: 'competitor.example, another.example' },
+    // One host: the field is narrow on a phone, and the two-host example was cut (D-36).
+    competitors: { label: 'Competitor sites', placeholder: 'competitor.example' },
     staging: { label: 'Staging URL (empty for none)', placeholder: 'staging.example.com' },
     removeConfirm: 'Yes, remove this site',
   },

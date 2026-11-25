@@ -28,7 +28,7 @@ import { extrasOffered, MAX_EXTRA_SEATS } from '../agency/extras-bounds';
 import { gateMessage } from '../agency/gates';
 import { roleMay } from '../agency/guard';
 import { INVITE_LINK_DAYS } from '../agency/seats';
-import { INVITE_COPY, ROLE_ROWS, SEATS_COPY as COPY } from '../copy/seats';
+import { INVITE_COPY, ROLE_ROWS, ROLE_ROWS_PLAIN, SEATS_COPY as COPY } from '../copy/seats';
 import { capitalise, count, numberWord, plural } from '../words';
 import {
   primarySites,
@@ -81,8 +81,11 @@ export interface SeatRowView {
   /** Under the name; null when the name is the address. */
   email: string | null;
   role: string;
-  /** "all 12", "all clients" for a reader whose seat covers some, or "7 · a.example, b.example, …". */
-  clients: string;
+  /**
+   * "all 12", "all clients" for a reader whose seat covers some, or "7 · a.example, b.example, …".
+   * Null off Agency, which has no clients (D-35): the table then has no Clients column.
+   */
+  clients: string | null;
   alerts: string;
   /** An invitation not yet accepted. */
   invited: boolean;
@@ -138,7 +141,23 @@ export const BUY_ANCHOR = 'buy';
 
 const siteField = (id: string) => `site_${id}`;
 
-function fields(sites: readonly Site[], role: string, scope: Seat['client_scope']): SeatFields {
+function fields(
+  sites: readonly Site[],
+  role: string,
+  scope: Seat['client_scope'],
+  agency: boolean,
+): SeatFields {
+  // Off Agency, with no seat scoped (the caller's rule), a seat covers every site and the form offers
+  // no choice of clients (D-35). The routes take a scope field, so the form sends scope=all.
+  if (!agency) {
+    return {
+      roles: INVITED_ROLES.map((r) => ({ value: r, label: COPY.roleName[r] })),
+      role,
+      scope: [],
+      scopeValue: 'all',
+      sites: [],
+    };
+  }
   return {
     roles: INVITED_ROLES.map((r) => ({ value: r, label: COPY.roleName[r] })),
     role,
@@ -210,6 +229,11 @@ export function seatsView(
       a.id.localeCompare(b.id),
   );
   const partial = v.seatId !== null && mine !== null && mine.client_scope !== 'all';
+  // Clients, client reports and branding are Agency's: off it the page names none of them (D-35).
+  // A seat scoped to some clients outlives the plan (a lapsed Agency account reads as Free, and a
+  // downgrade leaves seat_sites as they are), so while any seat is scoped the page stays Agency's:
+  // its scope is shown, and a change form keeps it rather than widening it to every site.
+  const agency = v.tier === 'agency' || seats.some((s) => s.client_scope !== 'all');
   const shown = partial ? seats.filter((s) => s.id === mine.id || s.role === 'owner') : seats;
   const limit = seatLimit ?? v.account.limits.seats;
   const used = seats.length;
@@ -226,8 +250,8 @@ export function seatsView(
       key: s.id,
       person,
       email: person === s.email ? null : s.email,
-      role: COPY.roleLine[s.role],
-      clients: clientsCell(s.client_scope, sites, partial),
+      role: (agency ? COPY.roleLine : COPY.roleLinePlain)[s.role],
+      clients: agency ? clientsCell(s.client_scope, sites, partial) : null,
       alerts: s.alert_channels.map((c) => COPY.channel[c]).join(', ') || COPY.noAlerts,
       invited,
       change:
@@ -235,7 +259,7 @@ export function seatsView(
           ? {
               change: {
                 action: `/api/seats/id/${s.id}`,
-                fields: fields(sites, s.role, s.client_scope),
+                fields: fields(sites, s.role, s.client_scope, agency),
               },
               remove: { action: `/api/seats/id/${s.id}`, label: COPY.form.remove },
               resend: invited
@@ -293,7 +317,7 @@ export function seatsView(
     },
     people: {
       title: partial ? COPY.people : COPY.peopleOf(used, limit),
-      sub: COPY.peopleSub,
+      sub: agency ? COPY.peopleSub : COPY.peopleSubPlain,
       rows,
       foot: partial ? null : foot,
       mailNote: COPY.mailNote(numberWord(INVITE_LINK_DAYS)),
@@ -301,14 +325,18 @@ export function seatsView(
     roles: {
       title: COPY.rolesTitle,
       columns: [COPY.columns.can, ...ROLES.map((r) => COPY.roleName[r])],
-      rows: ROLE_ROWS.map((r) => ({
+      rows: (agency ? ROLE_ROWS : ROLE_ROWS_PLAIN).map((r) => ({
         can: r.can,
         cells: ROLES.map((roleOf) => r.action === null || roleMay(roleOf, r.action)),
       })),
     },
     invite:
       mayInvite && v.tier !== 'free' && free > 0
-        ? { id: INVITE_ANCHOR, action: '/api/seats', fields: fields(sites, 'developer', 'all') }
+        ? {
+            id: INVITE_ANCHOR,
+            action: '/api/seats',
+            fields: fields(sites, 'developer', 'all', agency),
+          }
         : null,
     buy:
       mayBuy && billing && extrasOffered(v.account, v.gates.agencyBranding)
