@@ -52,6 +52,8 @@ const byText = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
  * The next crawl batch: up to CRAWL_BATCH_URLS URLs nobody has asked for yet, or null when there are
  * none or the crawl has asked for `pageCap` URLs. The homepage seed comes first, then the sitemap
  * seeds as given, then the URLs the batches discovered, batch by batch in the order each found them.
+ * When the homepage and the sitemap together are more than the cap, links come before the sitemap:
+ * the homepage alone, then the URLs discovered, then sitemap seeds once no discovered URL is left.
  * Every URL is compared in canonical spelling; a URL a request landed on counts as asked for, and one a
  * stopped redirect only names (its row still answers 3xx) does not. Seeds on another host than the
  * homepage's are not crawled (`crawlableSeeds`).
@@ -73,11 +75,21 @@ export function nextCrawlBatch(
   const room = Math.min(CRAWL_BATCH_URLS, pageCap - requested);
   if (room <= 0) return null;
   const crawlable = crawlableSeeds(seeds);
-  const queue = [
-    ...crawlable.filter((s) => s.source === 'homepage').map((s) => s.url),
-    ...crawlable.filter((s) => s.source === 'sitemap').map((s) => s.url),
-    ...crawlableDiscovered(seeds, crawl),
-  ];
+  const home = crawlable.filter((s) => s.source === 'homepage').map((s) => s.url);
+  const sitemap = crawlable.filter((s) => s.source === 'sitemap').map((s) => s.url);
+  const discovered = crawlableDiscovered(seeds, crawl);
+  const unasked = (urls: readonly string[]) => urls.filter((u) => !asked.has(canonicalizeUrl(u)));
+  // A sitemap larger than the cap would fill it with no linked page (inbox 083): read links outward
+  // from the home page first, the home page alone in the first batch, and sitemap entries only once
+  // no link is left to ask, so every page read is linked from one read before it.
+  const linksFirst = home.length + sitemap.length > pageCap;
+  const queue = !linksFirst
+    ? [...home, ...sitemap, ...discovered]
+    : unasked(home).length > 0
+      ? home
+      : unasked(discovered).length > 0
+        ? discovered
+        : sitemap;
   const next: string[] = [];
   for (const raw of queue) {
     const url = canonicalizeUrl(raw);
