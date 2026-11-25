@@ -3,19 +3,25 @@
 .scroll {
   position: relative;
   overflow-x: auto;
-  /* A table wider than its card shows a shade at the edge it continues past, so a phone reader sees
-     that it scrolls (QA dashboard walk D-19, D-20, D-21). The two covers scroll with the content
-     (local) and sit over the two shades, which stay put (scroll): at an end the cover hides that
-     end's shade; a table that fits shows none. The covers are the surface the table sits on,
-     --v2-table-surface, the card's (s1) unless a sunken card sets its own. */
+}
+
+/* `shade` (the signed-in app's tables, not the public pages'): a table wider than its card shows a
+   shade at the edge it continues past, so a phone reader sees that it scrolls (QA dashboard walk
+   D-19, D-20, D-21). The two covers scroll with the content (local) and sit over the two shades,
+   which stay put (scroll): at an end the cover hides that end's shade; a table that fits shows
+   none. The covers are the surface the table sits on, --v2-table-surface, the card's (s1) unless a
+   sunken card sets its own; the shade is the text colour thinned, so it reads on light and dark. */
+.shade {
+  --v2-table-shade: color-mix(in srgb, var(--v2-fg) 22%, transparent);
+
   background:
     linear-gradient(to right, var(--v2-table-surface, var(--v2-s1)) 30%, transparent) left center /
       40px 100% no-repeat local,
     linear-gradient(to left, var(--v2-table-surface, var(--v2-s1)) 30%, transparent) right center /
       40px 100% no-repeat local,
-    linear-gradient(to right, rgb(0 0 0 / 0.14), transparent) left center / 14px 100% no-repeat
+    linear-gradient(to right, var(--v2-table-shade), transparent) left center / 14px 100% no-repeat
       scroll,
-    linear-gradient(to left, rgb(0 0 0 / 0.14), transparent) right center / 14px 100% no-repeat
+    linear-gradient(to left, var(--v2-table-shade), transparent) right center / 14px 100% no-repeat
       scroll;
 }
 

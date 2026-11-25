@@ -100,6 +100,7 @@ export function ReportsScreen({
         <CardHead title={made.title} sub={made.sub} />
         {made.rows.length ? (
           <Table
+            shade
             label={T.made}
             rowHeader
             className={shared.rowHeaded}
@@ -157,6 +158,7 @@ export function ReportsScreen({
         <CardHead title={scheduled.title} sub={scheduled.sub} />
         {scheduled.rows.length ? (
           <Table
+            shade
             label={T.scheduled}
             rowHeader
             className={shared.rowHeaded}

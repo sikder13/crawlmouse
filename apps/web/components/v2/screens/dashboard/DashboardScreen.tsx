@@ -149,6 +149,7 @@ function Changed({ data }: Props) {
         </a>
       </CardHead>
       <Table
+        shade
         label="What changed, by site"
         headersHidden
         className={styles.changedTable}
@@ -233,6 +234,7 @@ function History({ data }: Props) {
             ))}
           </div>
           <Table
+            shade
             label="Crawler access by check"
             headersHidden
             rowHeader
@@ -258,6 +260,7 @@ function CrawlersNow({ data }: Props) {
     <Card as="section" className={shared.panel}>
       <CardHead title="Crawler access now" />
       <Table
+        shade
         label="Crawler access"
         headersHidden
         rowHeader
@@ -292,8 +295,11 @@ function Sites({ data }: Props) {
       </CardHead>
       {sites.rows.length ? (
         <Table
+          shade
           label="Watched sites"
           rowHeader
+          // A phone lays each row out as a grid: the roles keep the column names read (review 7).
+          roles
           className={styles.sitesTable}
           columns={SITE_COLUMNS}
           rows={sites.rows.map((r) => ({
@@ -371,6 +377,7 @@ function TopFixes({ top }: { top: NonNullable<DashboardView['topFixes']> }) {
     <Card as="section" className={shared.panel}>
       <CardHead title={top.title} />
       <Table
+        shade
         label="Top fixes"
         headersHidden
         columns={[
@@ -416,6 +423,7 @@ function Setup({ setup }: { setup: NonNullable<DashboardView['setup']> }) {
     <Card as="section" className={shared.panel}>
       <CardHead title={setup.title} />
       <Table
+        shade
         label="Set-up"
         headersHidden
         columns={[{ header: 'Done' }, { header: 'What' }, { header: 'Action', numeric: true }]}
