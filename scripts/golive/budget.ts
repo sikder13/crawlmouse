@@ -159,7 +159,7 @@ const ROWS: readonly RowInput[] = [
     file: 'inngest/check.ts',
     id: 'crawlmouse.check.run',
     onFailure: true,
-    callSites: 13,
+    callSites: 14,
     registration: 'V2_PIPELINE',
     trigger: 'check.requested',
     steps: 0,
@@ -174,7 +174,7 @@ const ROWS: readonly RowInput[] = [
     trigger: 'inngest/function.cancelled (checkFn)',
     steps: 2,
     stepsHow: 'fail, emit-failed',
-    stepAt: [590, 592],
+    stepAt: [617, 619],
   },
   {
     file: 'inngest/check-reaper.ts',
@@ -755,6 +755,8 @@ export async function checkExecutions(shape: CheckShape): Promise<number> {
     persist: async () => ({ written: true }),
     finalize: async () => ({}),
     fail: async () => ({ failed: false }),
+    // F-260's retry run is not modelled: it needs a worker deploy within the check, never here.
+    requeue: async () => ({ requeued: false }),
   };
   let result;
   try {

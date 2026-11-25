@@ -215,6 +215,46 @@ describe('supabasePipelineStore: each method’s statements, whole (quality 2)',
         },
       ],
     },
+    requeue: {
+      answers: [ok([{ id: C }])],
+      call: (s) => s.requeue(C, 'run-1', 'T'),
+      calls: [
+        {
+          root: ['from', 'checks'],
+          chain: [
+            [
+              'update',
+              [
+                {
+                  status: 'queued',
+                  started_at: null,
+                  progress: null,
+                  inngest_run_id: null,
+                  heartbeat_at: 'T',
+                },
+              ],
+            ],
+            ['eq', ['id', C]],
+            ['eq', ['status', 'running']],
+            ['eq', ['inngest_run_id', 'run-1']],
+            ['select', ['id']],
+          ],
+        },
+      ],
+    },
+    deleteBatches: {
+      answers: [ok(null)],
+      call: (s) => s.deleteBatches(C),
+      calls: [
+        {
+          root: ['from', 'crawl_batches'],
+          chain: [
+            ['delete', []],
+            ['eq', ['check_id', C]],
+          ],
+        },
+      ],
+    },
     progress: {
       answers: [ok(null)],
       call: (s) => s.progress(C, PROGRESS, 'T'),
@@ -447,6 +487,22 @@ describe('supabasePipelineStore: each method’s statements, whole (quality 2)',
     const { sb, calls } = recorder(...c.answers);
     await c.call(supabasePipelineStore(sb));
     expect(calls).toEqual(c.calls);
+  });
+  // F-260: a retried requeue step finds the check queued with no run, and deletes again.
+  it('requeue: true for a check already queued with no run (a retried step)', async () => {
+    const { sb, calls } = recorder(ok([]), ok([{ status: 'queued', inngest_run_id: null }]));
+    expect(await supabasePipelineStore(sb).requeue(C, 'run-1', 'T')).toBe(true);
+    expect(calls.map((c) => c.root[1])).toEqual(['checks', 'checks']);
+  });
+
+  it.each([
+    ['running under another run', { status: 'running', inngest_run_id: 'run-2' }],
+    ['ended', { status: 'failed', inngest_run_id: 'run-1' }],
+    ['queued for a run', { status: 'queued', inngest_run_id: 'run-9' }],
+  ])('requeue: false, changing nothing, for a check %s', async (_, row) => {
+    const { sb, calls } = recorder(ok([]), ok([row]));
+    expect(await supabasePipelineStore(sb).requeue(C, 'run-1', 'T')).toBe(false);
+    expect(calls.map((c) => c.root[1])).toEqual(['checks', 'checks']);
   });
 });
 
