@@ -25,7 +25,7 @@ import {
 
 const REPO = join(__dirname, '../../../../..');
 /** The table names the text it looks for, so it is the one file the search leaves out. */
-const TABLE = join(__dirname, 'agencies.ts');
+const TABLE = join(__dirname, 'capabilities.ts');
 
 function sources(dir: string): string[] {
   if (!existsSync(dir)) return [];

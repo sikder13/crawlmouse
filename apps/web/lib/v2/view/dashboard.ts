@@ -70,7 +70,7 @@ import {
   type ActionKey,
   type ActionView,
 } from './account-actions';
-import { CAPABILITIES, type CapabilityKey } from './agencies';
+import { CAPABILITIES, type CapabilityKey } from './capabilities';
 import { roleMay } from '../agency/guard';
 import {
   FREE_SCHEDULE,

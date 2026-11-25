@@ -23,6 +23,7 @@ const SWEPT = [
   'lib/v2/copy/developers.ts',
   'lib/v2/copy/pricing.ts',
   'lib/v2/view/agencies.ts',
+  'lib/v2/view/capabilities.ts',
   'lib/v2/view/agency-trial.ts',
   'lib/v2/view/check-pages.ts',
   'lib/v2/view/developers.ts',
