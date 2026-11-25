@@ -21,9 +21,10 @@
  * holds a list of the wordings that claimed more (FORBIDDEN) and fails when a string the feature
  * renders for the records it builds matches one.
  *
- * Titles and descriptions are read over the pages that answered 200, in three kinds: not read (the
- * page's `title` or `meta_description` is null: a non-HTML page, or one read in part), missing (read,
- * and the page declares none, or text made of whitespace alone), and present. A page not read is
+ * Titles and descriptions are read over the pages that answered 200, each page that answered once
+ * however many of the record's URLs reached it (`/old` redirected to `/new`), in three kinds: not
+ * read (the page's `title` or `meta_description` is null: a non-HTML page, or one read in part),
+ * missing (read, and the page declares none, or text made of whitespace alone), and present. A page not read is
  * never counted missing; it is counted apart, and named where the counts are.
  */
 import type { Check, LinkEdge, PageResult } from '@crawlmouse/types/v2';
@@ -32,7 +33,7 @@ import { siteOf } from '../../fixtures';
 import { PAGE_CELLS } from '../../reports/csv';
 import { capitalise, count, plural } from '../../words';
 import { sectionMeasured } from '../section-measured';
-import { errorRows, redirected, type ErrorRow } from './broken';
+import { answeredAt, errorRows, redirected, type ErrorRow } from './broken';
 import type { DoorView } from '../result';
 import type { ViewDataset } from '../../fixtures';
 
@@ -465,14 +466,24 @@ export function linksFacts(d: ViewDataset, check: Check): LinksFacts {
     const status = PAGE_CELLS.status_code(p);
     // The last response is a redirect: the chain was not followed to a page that answered.
     const notFollowed = !chain.loop && REDIRECT_STATUSES.includes(status);
+    // Two URLs of the chain that shorten to one path (`http://host/a` to `https://host/a`) would
+    // read as a redirect to itself: the row then shows each URL whole.
+    const urls = [
+      p.url,
+      ...chain.hops.flatMap((h) => [h.from, ...(h.location === null ? [] : [h.location])]),
+      ...(finalUrl === null ? [] : [finalUrl]),
+    ];
+    const clash = new Set(urls.map(path)).size < new Set(urls).size;
+    const show = (u: string) => (clash ? u : path(u));
     const endsAt =
-      chain.loop || notFollowed || finalUrl === null ? null : { path: path(finalUrl), status };
+      chain.loop || notFollowed || finalUrl === null ? null : { path: show(finalUrl), status };
     return {
-      ...ref(p),
+      url: p.url,
+      path: show(p.url),
       hops: chain.hops
         .map(
           (h) =>
-            `${h.status} → ${h.location === null ? 'a URL too long to keep' : path(h.location)}`,
+            `${h.status} → ${h.location === null ? 'a URL too long to keep' : show(h.location)}`,
         )
         .join(' → '),
       endsAt,
@@ -487,7 +498,20 @@ export function linksFacts(d: ViewDataset, check: Check): LinksFacts {
     };
   });
 
-  const served = pages.filter((p) => PAGE_CELLS.status_code(p) === 200);
+  // The pages that answered 200, one per page that answered: rows whose requests landed at one URL
+  // (`/old` redirected to `/new`, `http://` to `https://`) are one page, keyed on where it answered
+  // in the worker's spelling. Its title and description are read off the row requested at that URL
+  // when the record holds one, else off the first of its rows.
+  const served = (() => {
+    const by = new Map<string, PageResult>();
+    for (const p of pages.filter((x) => PAGE_CELLS.status_code(x) === 200)) {
+      const key = spell(answeredAt(p));
+      const own = (x: PageResult) => !redirected(x) && spell(x.url) === key;
+      const held = by.get(key);
+      if (!held || (!own(held) && own(p))) by.set(key, p);
+    }
+    return [...by.values()];
+  })();
   const titles = column('Titles', TITLE_FIELD, served, ref);
   const descriptions = column('Meta descriptions', DESCRIPTION_FIELD, served, ref);
 

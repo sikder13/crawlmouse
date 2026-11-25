@@ -218,7 +218,17 @@ function truthOf(pages: PageResult[], edges: LinkEdge[], scope: Scope) {
   const brokenRows = goneRows.filter((r) => linkedAt.has(r.at));
   const unlinkedRows = goneRows.filter((r) => !linkedAt.has(r.at));
   const otherRows = rows.filter((r) => !r.gone);
-  const served = pages.filter((p) => p.status_code === 200);
+  // One per page that answered 200, keyed on where it answered in the engine's spelling: `/old`
+  // redirected to `/new` and `/new` itself are one page, read off the row requested at that URL
+  // when the record holds one, else off the first. Keyed on the page, never on the rows.
+  const servedBy = new Map<string, PageResult>();
+  for (const p of pages.filter((x) => x.status_code === 200)) {
+    const key = canon(at(p));
+    const direct = (x: PageResult) => (x.redirect?.hops.length ?? 0) === 0 && canon(x.url) === key;
+    const held = servedBy.get(key);
+    if (!held || (!direct(held) && direct(p))) servedBy.set(key, p);
+  }
+  const served = [...servedBy.values()];
   const headOf = (key: 'title' | 'meta_description') => {
     const read = served.filter((p) => p[key] !== null);
     const missing = read.filter((p) => isBlankText(p[key]!.text));
@@ -244,7 +254,10 @@ function truthOf(pages: PageResult[], edges: LinkEdge[], scope: Scope) {
     linksHeld: edges.length,
     linkGap,
     heldLinks: scope.extraLinks && !scope.unmeasured ? edges.length + scope.extraLinks : null,
-    notAllHeld: served.filter((p) => p.is_html && p.links_out > heldFrom(p, edges)).length,
+    // Over every row that answered 200: each row's links are its own request's.
+    notAllHeld: pages.filter(
+      (p) => p.status_code === 200 && p.is_html && p.links_out > heldFrom(p, edges),
+    ).length,
     rows,
     missingAt,
     broken: linkedAt.size,
@@ -772,6 +785,8 @@ interface Said {
   descriptions?: [string, string];
 }
 
+/** The same site at http://, as an old internal link spells it. */
+const HTTP_ORIGIN = ORIGIN.replace(/^https:/, 'http:');
 /**
  * A chain the worker stopped before its last Location (packages/worker/src/batch/polite-fetch.ts
  * `followChain`): `final_url` is that Location, which was not requested, and the status is the 3xx
@@ -984,6 +999,76 @@ const VECTORS: [string, PageResult[], LinkEdge[], Said][] = [
       brokenEmpty: 'None of the 2 pages we checked answers an error.',
       headline: '0 missing pages found · 1 redirect · titles and descriptions read on 1 page',
       redirects: [['/account', '302 → /login', 'not followed to the end']],
+    },
+  ],
+  [
+    '(k) /old 301s to /new, which answers 200, and /new is in the record too: one page',
+    [whole('/', 2), redirecting('/old', '/new', 200), whole('/new', 0)],
+    [edge('/', '/old'), edge('/', '/new')],
+    {
+      pill: 'no 404 or 410',
+      body:
+        '1 page redirects. ' +
+        'Each of the 2 pages that answered 200 has its own title and meta description.',
+      doorBody:
+        'None of the 3 pages we checked answers an error. 1 page redirects. ' +
+        'Each of the 2 pages that answered 200 has its own title and meta description.',
+      tab: 'Next: Links and pages · no 404 or 410',
+      brokenEmpty: 'None of the 3 pages we checked answers an error.',
+      headline: '0 missing pages found · 1 redirect · titles and descriptions read on 2 pages',
+      redirects: [['/old', '301 → /new', '/new (200)']],
+      titles: ['Missing: none', 'Shared by more than one page: none'],
+      descriptions: ['Missing: none', 'Shared by more than one page: none'],
+    },
+  ],
+  [
+    '(l) http:// 301s to https:// for /a, both in the record, the page with no description: one page',
+    [
+      whole('/', 2),
+      page('/a', 200, {
+        url: `${HTTP_ORIGIN}/a`,
+        final_url: url('/a'),
+        redirect: {
+          hops: [{ from: `${HTTP_ORIGIN}/a`, status: 301, location: url('/a') }],
+          loop: false,
+        },
+        meta_description: text(null),
+      }),
+      page('/a', 200, { meta_description: text(null) }),
+    ],
+    [edge('/', '/a'), { ...edge('/', '/a'), to_url: `${HTTP_ORIGIN}/a` }],
+    {
+      pill: 'no 404 or 410',
+      body: '1 page redirects. 1 page has no meta description.',
+      doorBody:
+        'None of the 3 pages we checked answers an error. ' +
+        '1 page redirects. 1 page has no meta description.',
+      tab: 'Next: Links and pages · no 404 or 410',
+      brokenEmpty: 'None of the 3 pages we checked answers an error.',
+      headline: '0 missing pages found · 1 redirect · titles and descriptions read on 2 pages',
+      redirects: [[`${HTTP_ORIGIN}/a`, `301 → ${ORIGIN}/a`, `${ORIGIN}/a (200)`]],
+      titles: ['Missing: none', 'Shared by more than one page: none'],
+      descriptions: ['Missing: 1 page', 'Shared by more than one page: none'],
+    },
+  ],
+  [
+    '(m) the control: /a and /b are two pages, each answering 200 with the title "Same"',
+    [
+      whole('/', 2),
+      page('/a', 200, { title: text('Same') }),
+      page('/b', 200, { title: text('Same') }),
+    ],
+    [edge('/', '/a'), edge('/', '/b')],
+    {
+      pill: 'no 404 or 410',
+      body: '2 pages share a title with another.',
+      doorBody:
+        'None of the 3 pages we checked answers an error. 2 pages share a title with another.',
+      tab: 'Next: Links and pages · no 404 or 410',
+      brokenEmpty: 'None of the 3 pages we checked answers an error.',
+      headline: '0 missing pages found · 0 redirects · titles and descriptions read on 3 pages',
+      titles: ['Missing: none', 'Shared by more than one page: 1 title, 2 pages'],
+      descriptions: ['Missing: none', 'Shared by more than one page: none'],
     },
   ],
 ];
@@ -1213,6 +1298,14 @@ describe('Links and pages: counts, rows, pills and clauses agree with the truth 
       gone410: some((r) => r.pages.some((p) => p.status_code === 410)),
       loop: some((r) => r.pages.some((p) => p.redirect?.loop === true)),
       stopped: some((r) => r.pages.some((p) => p.status_code === 302 && !p.redirect?.loop)),
+      onePageTwoUrls: some((r) => {
+        const at = r.pages
+          .filter((p) => p.status_code === 200)
+          .map((p) =>
+            canon((p.redirect?.hops.length ?? 0) > 0 && p.final_url ? p.final_url : p.url),
+          );
+        return at.length > new Set(at).size;
+      }),
       redirectNotRecorded: some((r) => r.pages.some((p) => p.redirect === null)),
       extraCrawled: some((r) => (r.scope.extraCrawled ?? 0) > 0 && r.pages.length > 0),
       cutTitle: some((r) => r.pages.some((p) => p.title?.cut === true)),
@@ -1239,6 +1332,7 @@ describe('Links and pages: counts, rows, pills and clauses agree with the truth 
       gone410: true,
       loop: true,
       stopped: true,
+      onePageTwoUrls: true,
       redirectNotRecorded: true,
       extraCrawled: true,
       cutTitle: true,
