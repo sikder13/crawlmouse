@@ -1,0 +1,145 @@
+/*
+ * F-265: v1's colour and type utilities, read in v2's tokens, inside the kept content wrapper of the
+ * blog, guides and author pages (`KeptShell` with `tone="v2"`). v1's own pages and every other kept
+ * page are untouched: this class is set on their wrapper only.
+ *
+ * Each rule is `.tone :global(.x)` (specificity 0,2,0 against Tailwind's 0,1,0), so it wins
+ * whatever order the stylesheets load in; a state variant adds its state, as Tailwind's does.
+ * Dark mode is the tokens' own: each var(--v2-…) flips under tokens.css's dark blocks.
+ *
+ * Orange text does not clear 4.5:1 on v2's light canvas (#ff7849 on #f7f8fa), so v1's orange
+ * text and links read in v2's text colour, as v2's own links do, and a link keeps the accent as its
+ * underline. The orange stays on the filled buttons, borders and the quote rule.
+ * `KeptV2Tone.test.ts` sweeps the files these pages render for every colour and type class and
+ * fails on one this file does not map; it also checks each text pair's contrast in both themes.
+ */
+
+/* The wrapper itself: `flex-1 bg-cream text-ink font-sans` in KeptShell. */
+.tone:global(.bg-cream),
+.tone :global(.bg-cream) {
+  background-color: var(--v2-bg);
+}
+
+.tone:global(.text-ink),
+.tone :global(.text-ink) {
+  color: var(--v2-fg);
+}
+
+.tone:global(.font-sans),
+.tone :global(.font-sans) {
+  font-family: var(--v2-font-body);
+}
+
+/* Text */
+.tone :global(.text-ink-muted),
+.tone :global(.text-ink\/80),
+.tone :global(.text-ink\/70) {
+  color: var(--v2-fg2);
+}
+
+.tone :global(.text-ink\/60),
+.tone :global(.text-ink\/50) {
+  color: var(--v2-mut);
+}
+
+.tone :global(.text-peach) {
+  color: var(--v2-fg);
+}
+
+.tone a:global(.text-peach) {
+  text-decoration-line: underline;
+  text-decoration-color: var(--v2-acc);
+  text-underline-offset: 3px;
+}
+
+.tone :global(.hover\:text-peach):hover,
+.tone :global(.group):hover :global(.group-hover\:text-peach) {
+  color: var(--v2-fg);
+}
+
+/* Surfaces */
+.tone :global(.bg-white),
+.tone :global(.bg-surface-raised) {
+  background-color: var(--v2-s1);
+}
+
+.tone :global(.bg-surface-raised\/60) {
+  background-color: color-mix(in srgb, var(--v2-s1) 60%, transparent);
+}
+
+.tone :global(.bg-oat),
+.tone :global(.bg-peach\/5) {
+  background-color: var(--v2-s2);
+}
+
+/* Lines */
+.tone :global(.border-oat) {
+  border-color: var(--v2-line);
+}
+
+.tone :global(.border-peach\/40) {
+  border-color: color-mix(in srgb, var(--v2-acc) 40%, transparent);
+}
+
+/* The filled call to action: v2's primary button colours. Its text classes sit only on bg-peach. */
+.tone :global(.bg-peach) {
+  background-color: var(--v2-acc);
+}
+
+.tone :global(.hover\:bg-peach\/90):hover {
+  background-color: var(--v2-acc2);
+}
+
+.tone :global(.bg-peach.text-white),
+.tone :global(.bg-peach.text-cream) {
+  color: var(--v2-on-acc);
+}
+
+/* Focus ring on an interactive Card: v2's focus colour, offset on the canvas. */
+.tone :global(.focus-visible\:ring-peach):focus-visible {
+  --tw-ring-color: var(--v2-fg);
+}
+
+.tone :global(.focus-visible\:ring-offset-cream):focus-visible {
+  --tw-ring-offset-color: var(--v2-bg);
+}
+
+/* Type: v2's display face, weight and tracking, as v2's headings set them (Heading.module.css). */
+.tone :global(.font-display) {
+  font-family: var(--v2-font-display);
+  font-weight: var(--v2-weight-display);
+  letter-spacing: var(--v2-tracking-display);
+}
+
+/* The post body (`.article-prose` in app/globals.css), which colours its elements with no class. */
+.tone :global(.article-prose),
+.tone :global(.article-prose) strong {
+  color: var(--v2-fg);
+}
+
+.tone :global(.article-prose) h2,
+.tone :global(.article-prose) h3 {
+  font-family: var(--v2-font-display);
+  font-weight: var(--v2-weight-display);
+}
+
+.tone :global(.article-prose) p,
+.tone :global(.article-prose) ul,
+.tone :global(.article-prose) ol,
+.tone :global(.article-prose) blockquote {
+  color: var(--v2-fg2);
+}
+
+.tone :global(.article-prose) blockquote {
+  border-left-color: var(--v2-acc);
+}
+
+.tone :global(.article-prose) a,
+.tone :global(.article-prose) a:hover {
+  color: var(--v2-fg);
+  text-decoration-color: var(--v2-acc);
+}
+
+.tone :global(.article-prose) code {
+  background: var(--v2-s2);
+}
