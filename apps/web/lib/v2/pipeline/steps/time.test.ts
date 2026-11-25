@@ -392,7 +392,7 @@ function simulate(opts: {
 // of 90 s each ran the check past the reserve. The render's end is counted from the earlier of the
 // step's start and the end of the fetching phases.
 describe('the render step’s end (RENDER_SHARE_S of the reserve)', () => {
-  const fetchEnd = fetchEndsAt(T0);
+  const fetchEnd = fetchEndsAt(so());
   it('gives a step that starts before the fetching phases end its whole share', () => {
     const start = fetchEnd - 600 * S;
     expect(renderEndsAt(start, so())).toBe(start + RENDER_SHARE_S * S);
