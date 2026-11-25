@@ -66,6 +66,7 @@ export const SETTINGS_COPY = {
     save: 'Save branding',
     saving: 'Saving…',
     saved: 'Branding saved.',
+    savedReload: 'Branding saved. The logo shows here after a reload.',
     rateLimited: (perHour: number) =>
       `Branding can be saved ${numberWord(perHour)} times an hour. Try again in an hour.`,
     logoErrors: {

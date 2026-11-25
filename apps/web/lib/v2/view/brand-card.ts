@@ -39,6 +39,8 @@ export interface BrandingCardView {
 
 export interface BrandMessages {
   saved: string;
+  /** Saved, with a logo stored that the answer gave no URL for. */
+  savedReload: string;
   failed: string;
   rateLimited: string;
   /** 401 `auth_required`: the session ended; `signIn` is the way back. */
@@ -57,7 +59,14 @@ export interface BrandMessages {
 
 /** What a save came to: the stored name, or a sentence, tied to its field where it has one. */
 export type BrandOutcome =
-  | { ok: true; agencyName: string }
+  | {
+      ok: true;
+      agencyName: string;
+      /** The stored logo's https URL from the route's answer; null when it gave none. */
+      logoUrl: string | null;
+      /** Whether a logo is stored (`logoPath` not null), shown or not. */
+      hasLogo: boolean;
+    }
   | {
       ok: false;
       field: 'name' | 'logo' | null;
@@ -84,7 +93,13 @@ export function brandBody(name: string, logo: File | null): FormData {
 export function brandOutcome(status: number, body: unknown, m: BrandMessages): BrandOutcome {
   const b = (typeof body === 'object' && body !== null ? body : {}) as Record<string, unknown>;
   if (status === 200 && typeof b.agencyName === 'string') {
-    return { ok: true, agencyName: b.agencyName };
+    const url = b.logoUrl;
+    return {
+      ok: true,
+      agencyName: b.agencyName,
+      logoUrl: typeof url === 'string' && url.startsWith('https://') ? url : null,
+      hasLogo: typeof b.logoPath === 'string',
+    };
   }
   if (status === 400 && b.code === 'invalid_name') {
     return { ok: false, field: 'name', text: m.name };

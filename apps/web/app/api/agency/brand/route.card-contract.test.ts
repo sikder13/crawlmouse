@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MAX_LOGO_BYTES } from '../../../../lib/logo-validation';
 
@@ -203,6 +204,7 @@ const file = (bytes: Uint8Array, name = 'logo.png') =>
 
 beforeEach(() => {
   vi.stubEnv('V2_ACCOUNT_DOOR', '1');
+  vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://ref.supabase.co');
   h.user = { id: 'u-1', email: 'a@b.co' };
   h.roles = { [ACCOUNT]: 'owner' };
   h.roleError = null;
@@ -222,10 +224,24 @@ afterEach(() => {
 });
 
 describe('the card’s body, through the real route, said as the card says it', () => {
-  it('200: saved, with the stored name', async () => {
-    expect(await card('  Acme Agency ', file(png(10, 10)))).toEqual({
+  it('200: saved, with the stored name and the stored logo’s https URL', async () => {
+    const bytes = png(10, 10);
+    const hash = createHash('sha256').update(bytes).digest('hex').slice(0, 16);
+    expect(await card('  Acme Agency ', file(bytes))).toEqual({
       status: 200,
-      outcome: { ok: true, agencyName: 'Acme Agency' },
+      outcome: {
+        ok: true,
+        agencyName: 'Acme Agency',
+        logoUrl: `https://ref.supabase.co/storage/v1/object/public/report-logos/agency/${ACCOUNT}/${hash}.png`,
+        hasLogo: true,
+      },
+    });
+  });
+
+  it('200 with no logo stored: no URL, and no logo', async () => {
+    expect(await card('Acme Agency')).toEqual({
+      status: 200,
+      outcome: { ok: true, agencyName: 'Acme Agency', logoUrl: null, hasLogo: false },
     });
   });
 

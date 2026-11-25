@@ -35,14 +35,6 @@ export function BrandingCard({ view }: { view: BrandingCardView }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [hydrated, setHydrated] = useState(false);
   useEffect(() => setHydrated(true), []);
-  // A logo shown from a chosen file is an object URL: revoked when it is replaced, and on unmount.
-  useEffect(() => {
-    const src = logo?.src;
-    return () => {
-      if (src?.startsWith('blob:')) URL.revokeObjectURL(src);
-    };
-  }, [logo?.src]);
-
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!live || state === 'sending') return;
@@ -55,13 +47,16 @@ export function BrandingCard({ view }: { view: BrandingCardView }) {
       const outcome = brandOutcome(res.status, body, view.messages);
       if (outcome.ok) {
         if (nameRef.current) nameRef.current.value = outcome.agencyName;
+        // The logo shown is the stored copy, from the route's answer; never the chosen file.
         const alt = brandLogoAlt(outcome.agencyName);
+        const { logoUrl, hasLogo } = outcome;
+        // A stored logo the answer gave no URL for keeps what is shown; the line says to reload.
         setLogo((was) =>
-          file !== null && file.size > 0
-            ? { src: URL.createObjectURL(file), alt }
-            : was === null
-              ? null
-              : { ...was, alt },
+          logoUrl !== null
+            ? { src: logoUrl, alt }
+            : hasLogo && was !== null
+              ? { ...was, alt }
+              : null,
         );
         if (fileRef.current) fileRef.current.value = '';
       }
@@ -79,7 +74,13 @@ export function BrandingCard({ view }: { view: BrandingCardView }) {
   const nameError = errorOn('name');
   const logoError = errorOn('logo');
   const formLine =
-    typeof state !== 'object' ? '' : state.ok ? view.messages.saved : (errorOn(null) ?? '');
+    typeof state !== 'object'
+      ? ''
+      : state.ok
+        ? state.hasLogo && state.logoUrl === null
+          ? view.messages.savedReload
+          : view.messages.saved
+        : (errorOn(null) ?? '');
   const formLink = failed?.field === null ? (failed.link ?? null) : null;
   const ids = {
     nameHint: `${view.name.id}-hint`,

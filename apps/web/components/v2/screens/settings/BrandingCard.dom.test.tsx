@@ -25,8 +25,9 @@ const NAME_RULE =
   'Use 1 to 60 characters, with no @, colon or slash, no dot followed by another character, and no number of 7 digits or more.';
 
 let root: Root;
-let made = 0;
-const revoked: string[] = [];
+/** Calls to URL.createObjectURL: the card must never make one (a chosen file never reaches src). */
+let objectUrls = 0;
+const STORED = 'https://ref.supabase.co/storage/v1/object/public/report-logos/agency/x/a.png';
 let host: HTMLDivElement;
 
 const answer = (status: number, body: unknown) =>
@@ -58,11 +59,8 @@ beforeEach(() => {
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
-  // jsdom has no object URLs: the card shows a chosen logo through one.
-  made = 0;
-  revoked.length = 0;
-  URL.createObjectURL = () => `blob:logo-${++made}`;
-  URL.revokeObjectURL = (u: string) => void revoked.push(u);
+  objectUrls = 0;
+  URL.createObjectURL = () => `blob:logo-${++objectUrls}`;
 });
 afterEach(async () => {
   await act(async () => root.unmount());
@@ -102,15 +100,21 @@ describe('Save', () => {
     expect([...body.keys()]).toEqual(['agencyName']);
   });
 
-  it('says it saved, shows the stored name and the chosen logo', async () => {
-    vi.stubGlobal('fetch', answer(200, { agencyName: 'Acme Studio', logoPath: 'agency/x/a.png' }));
+  it('says it saved, shows the stored name and the stored logo from the answer', async () => {
+    vi.stubGlobal(
+      'fetch',
+      answer(200, { agencyName: 'Acme Studio', logoPath: 'agency/x/a.png', logoUrl: STORED }),
+    );
     await draw();
     choose(new File([new Uint8Array([1])], 'logo.png', { type: 'image/png' }));
     await save('  Acme Studio  ');
     expect($('[role="status"]')!.textContent).toBe('Branding saved.');
     expect($<HTMLInputElement>('#brand-name')!.value).toBe('Acme Studio');
-    expect($<HTMLImageElement>('img')!.getAttribute('src')).toBe('blob:logo-1');
-    expect($<HTMLImageElement>('img')!.getAttribute('alt')).toBe('Acme Studio logo');
+    const img = $<HTMLImageElement>('img')!;
+    expect(img.getAttribute('src')).toBe(STORED);
+    expect(img.getAttribute('src')).not.toMatch(/^blob:/);
+    expect(img.getAttribute('alt')).toBe('Acme Studio logo');
+    expect(objectUrls).toBe(0);
   });
 
   it('sends an empty file when one is chosen, and says the route’s refusal of it', async () => {
@@ -126,33 +130,59 @@ describe('Save', () => {
     expect($('[role="status"]')!.textContent).toBe('');
   });
 
-  it('revokes a shown object URL when it is replaced and on unmount', async () => {
-    vi.stubGlobal('fetch', answer(200, { agencyName: 'Acme Studio', logoPath: 'agency/x/a.png' }));
+  it('a name-only save shows the answer’s stored logo under the saved name', async () => {
+    vi.stubGlobal(
+      'fetch',
+      answer(200, { agencyName: 'Renamed Co', logoPath: 'agency/x/a.png', logoUrl: STORED }),
+    );
     await draw();
-    choose(new File([new Uint8Array([1])], 'one.png', { type: 'image/png' }));
-    await save();
-    choose(new File([new Uint8Array([2])], 'two.png', { type: 'image/png' }));
-    await save();
-    expect($<HTMLImageElement>('img')!.getAttribute('src')).toBe('blob:logo-2');
-    expect(revoked).toEqual(['blob:logo-1']);
-    await act(async () => root.unmount());
-    expect(revoked).toEqual(['blob:logo-1', 'blob:logo-2']);
-    root = createRoot(host);
-  });
-
-  it('a name-only save keeps the logo and gives it the saved name', async () => {
-    vi.stubGlobal('fetch', answer(200, { agencyName: 'Acme', logoPath: 'agency/x/a.png' }));
-    await draw();
-    choose(new File([new Uint8Array([1])], 'one.png', { type: 'image/png' }));
-    await save('Acme');
-    expect($<HTMLImageElement>('img')!.getAttribute('alt')).toBe('Acme logo');
-    vi.stubGlobal('fetch', answer(200, { agencyName: 'Renamed Co', logoPath: 'agency/x/a.png' }));
     choose(null);
     await save('Renamed Co');
     const img = $<HTMLImageElement>('img')!;
-    expect(img.getAttribute('src')).toBe('blob:logo-1');
+    expect(img.getAttribute('src')).toBe(STORED);
     expect(img.getAttribute('alt')).toBe('Renamed Co logo');
-    expect(revoked).toEqual([]);
+    expect(objectUrls).toBe(0);
+  });
+
+  it('a stored logo the answer gives no URL for keeps what is shown, and says to reload', async () => {
+    await draw();
+    const before = $<HTMLImageElement>('img')!.getAttribute('src');
+    expect(before).toBe(view.logo.current!.src);
+    vi.stubGlobal(
+      'fetch',
+      answer(200, { agencyName: 'Acme', logoPath: 'agency/x/a.png', logoUrl: null }),
+    );
+    choose(new File([new Uint8Array([1])], 'logo.png', { type: 'image/png' }));
+    await save('Acme');
+    expect($('[role="status"]')!.textContent).toBe(
+      'Branding saved. The logo shows here after a reload.',
+    );
+    expect($<HTMLImageElement>('img')!.getAttribute('src')).toBe(before);
+    expect($<HTMLImageElement>('img')!.getAttribute('alt')).toBe('Acme logo');
+    expect(objectUrls).toBe(0);
+  });
+
+  it('no stored logo in the answer shows "No logo yet"', async () => {
+    vi.stubGlobal('fetch', answer(200, { agencyName: 'Acme', logoPath: null, logoUrl: null }));
+    await draw();
+    await save('Acme');
+    expect($('img')).toBeNull();
+    expect(host.textContent).toContain('No logo yet');
+    expect($('[role="status"]')!.textContent).toBe('Branding saved.');
+  });
+
+  it('never shows a logoUrl that is not https', async () => {
+    vi.stubGlobal(
+      'fetch',
+      answer(200, {
+        agencyName: 'Acme',
+        logoPath: 'agency/x/a.png',
+        logoUrl: 'javascript:alert(1)',
+      }),
+    );
+    await draw();
+    await save('Acme');
+    expect($<HTMLImageElement>('img')!.getAttribute('src')).toBe(view.logo.current!.src);
   });
 
   it('a preview posts nothing', async () => {

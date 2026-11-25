@@ -720,6 +720,7 @@ export function brandingCard(
     save: { label: B.save, busy: B.saving },
     messages: {
       saved: B.saved,
+      savedReload: B.savedReload,
       failed: B.failed,
       rateLimited: B.rateLimited(BRAND_SAVES_PER_HOUR),
       signedOut: B.signedOut,
