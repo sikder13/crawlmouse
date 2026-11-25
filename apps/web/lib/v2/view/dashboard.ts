@@ -59,6 +59,7 @@ import {
 import { points, type DoorView } from './result';
 import { auditHref } from './audit-hrefs';
 import { nextCheckLine, type NextChecks } from './site';
+import { titleAmong } from './fix-title';
 import { GRADES, PILL, SUBJECTS } from './segment/changes';
 import { effortText } from './segment/fixes';
 import { action, emailDeveloperAction, type ActionView } from './account-actions';
@@ -1116,7 +1117,7 @@ export function dashboardView(
             rows: fixes.slice(0, TOP_FIXES).map((f) => ({
               key: f.id,
               number: f.number,
-              title: f.title,
+              title: titleAmong(f, fixes),
               effort: effortText(f),
               effect: points(f, fixes),
               open: action('packet', 'Open', { checkId: result.id, fixId: f.id }),

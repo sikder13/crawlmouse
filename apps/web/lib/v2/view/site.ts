@@ -62,6 +62,7 @@ import { points } from './result';
 import { CAUSE_SHORT } from './segment/access';
 import { groupPoints, packetPrompt } from './segment/fixes';
 import { SEGMENTS } from './segment/frame';
+import { titleAmong } from './fix-title';
 
 export interface GradeCardView {
   label: string;
@@ -326,7 +327,7 @@ function fixRow(v: AccountView, result: Check, f: Fix, all: readonly Fix[]): Fix
   return {
     key: f.id,
     number: f.number,
-    title: f.title,
+    title: titleAmong(f, all),
     isNew,
     newLabel: isNew ? `new ${weekday(result.finished_at!, zoneOf(v))}` : null,
     diff: diffOf(v, f),
