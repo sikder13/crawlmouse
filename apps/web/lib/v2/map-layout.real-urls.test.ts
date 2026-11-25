@@ -12,7 +12,7 @@ import { canonicalizeUrl } from '@crawlmouse/engine';
 import { layoutInput } from './map-layout';
 import { INITIAL_STATE, reduce, type MapNode } from './progress';
 import { START, nextEvents } from './pipeline/stream';
-import { STARTED, crawlResult, edge, row } from './pipeline/stream.fixtures';
+import { ORIGIN, STARTED, crawlResult, edge, row, urlOf } from './pipeline/stream.fixtures';
 
 const SITE = 'https://site.test';
 const real = (path: string) => canonicalizeUrl(`${SITE}${path}`);
@@ -27,6 +27,13 @@ const node = (url: string, from: string | null): MapNode => ({
 describe('the map finds the home page as a real check writes it', () => {
   it('the engine writes the root without its slash (the case this file is about)', () => {
     expect(real('/')).toBe('https://site.test');
+  });
+
+  it('the stream’s fixtures write URLs as a check stores them, root and all', () => {
+    // They wrote `https://stream.test/` until c/027, the one form no real check holds.
+    expect(urlOf('/')).toBe(ORIGIN);
+    expect(urlOf('/')).toBe(canonicalizeUrl(`${ORIGIN}/`));
+    expect(row({ path: '/', at: 0 }).url).toBe(ORIGIN);
   });
 
   it('draws the home page at depth 0 and the pages its links reach below it', () => {
