@@ -131,3 +131,42 @@
   text-decoration: underline;
   text-underline-offset: 3px;
 }
+
+/* The Branding card (Goal 1 row 24): the current logo, the file input, and what a save came to. */
+.logoBox {
+  display: flex;
+  align-items: center;
+  min-height: 48px;
+  padding: 8px 12px;
+  border: 1px solid var(--v2-line);
+  border-radius: 6px;
+  box-sizing: border-box;
+}
+
+.logo {
+  display: block;
+  max-width: 200px;
+  max-height: 48px;
+  object-fit: contain;
+}
+
+.file {
+  font-size: var(--v2-text-small);
+  color: var(--v2-fg);
+}
+
+.file:focus-visible {
+  outline: 2px solid var(--v2-fg);
+  outline-offset: 2px;
+}
+
+.fieldError {
+  color: var(--v2-bad);
+  font-size: var(--v2-text-micro);
+}
+
+.formLine {
+  margin: 0;
+  font-size: var(--v2-text-small);
+  color: var(--v2-fg2);
+}

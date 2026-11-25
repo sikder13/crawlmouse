@@ -119,9 +119,28 @@ export const reportsPreview = (name: keyof typeof REPORTS_PATHS, query: PreviewQ
     REPORTS_PATHS[name],
   );
 
-/** Settings: on bad-site (Final-Settings), and on CC-26's stand-in Free account. */
-export const settingsPreview = (name: 'home' | 'clean') =>
-  settingsView(fixture(DATASET[name]), ACCOUNT_VIEWERS[name]());
+/**
+ * A logo for the Agency Settings preview: a 96 by 32 PNG drawn here, so the preview reads no remote
+ * URL. Northwind's fixture logo is an https address on a host that does not exist.
+ */
+export const PREVIEW_BRAND_LOGO =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGAAAAAgCAIAAABiouoDAAAAXUlEQVR42u3YOREAIAwEQJzgAxFYocYMVsEBVQqevYmCbS5JmrJNQgAIECBAVwHl2kMGEKBooNLG4QMIECBAHwNpMUCAAAEC5NSwBwECBAiQFgPkaQ8IECBAgN7OAhkrVp299fy/AAAAAElFTkSuQmCC';
+
+/**
+ * Settings: on bad-site (Final-Settings), on CC-26's stand-in Free account, and on Northwind's
+ * Agency account over challenged-site (`withheld`), read as its owner, whose Branding card shows its
+ * brand name and the logo above in place of the fixture's remote one.
+ */
+export function settingsPreview(name: 'home' | 'clean' | 'withheld') {
+  const d = fixture(DATASET[name]);
+  const viewer = ACCOUNT_VIEWERS[name]();
+  if (name !== 'withheld') return settingsView(d, viewer);
+  const account = d.accounts.find((a) => a.id === viewer.accountId)!;
+  return settingsView(d, {
+    ...viewer,
+    account: { ...account, branding: { ...account.branding!, logo_url: PREVIEW_BRAND_LOGO } },
+  });
+}
 
 /**
  * Trial ending on bad-site, read at the trial's reminder: three days before trial_ends_at, after the
@@ -168,6 +187,11 @@ export const CC27_PREVIEWS = {
     fixture: DATASET.clean,
     viewer: ACCOUNT_VIEWERS.clean,
     view: () => settingsPreview('clean'),
+  },
+  '/v2-preview/screens/settings/agency': {
+    fixture: DATASET.withheld,
+    viewer: ACCOUNT_VIEWERS.withheld,
+    view: () => settingsPreview('withheld'),
   },
   '/v2-preview/screens/settings/delete': {
     fixture: DATASET.home,

@@ -222,6 +222,11 @@ export const PREVIEWS: PreviewEntry[] = [
   },
   { path: '/v2-preview/screens/settings', name: 'Final-Settings', kind: 'screen' },
   { path: '/v2-preview/screens/settings/free', name: 'Settings, free', kind: 'screen' },
+  {
+    path: '/v2-preview/screens/settings/agency',
+    name: 'Settings, Agency (Northwind, Branding)',
+    kind: 'screen',
+  },
   // Its one action deletes, which the Settings artboard draws quiet, never as the best action.
   {
     path: '/v2-preview/screens/settings/delete',

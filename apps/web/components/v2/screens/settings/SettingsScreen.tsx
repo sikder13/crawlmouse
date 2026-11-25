@@ -8,6 +8,7 @@ import { ActionControl } from '../account/ActionControl';
 import { CardHead } from '../account/parts';
 import field from '../../Field.module.css';
 import shared from '../account/AccountScreen.module.css';
+import { BrandingCard } from './BrandingCard';
 import { PlanCard } from './PlanCard';
 import { NoticeLine } from './NoticeLine';
 import { StoppedForm } from './StoppedForm';
@@ -87,6 +88,8 @@ export function SettingsScreen({
               </div>
             </StoppedForm>
           </Card>
+
+          {data.branding ? <BrandingCard view={data.branding} /> : null}
 
           <Card as="section" className={shared.panel}>
             <CardHead title={email.title} />

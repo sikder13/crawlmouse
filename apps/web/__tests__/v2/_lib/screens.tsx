@@ -146,6 +146,9 @@ export const CC27_ELEMENTS: Record<string, () => React.ReactElement> = {
   '/v2-preview/screens/reports/agency': () => <ReportsScreen data={reportsPreview('withheld')} />,
   '/v2-preview/screens/settings': () => <SettingsScreen data={settingsPreview('home')} />,
   '/v2-preview/screens/settings/free': () => <SettingsScreen data={settingsPreview('clean')} />,
+  '/v2-preview/screens/settings/agency': () => (
+    <SettingsScreen data={settingsPreview('withheld')} />
+  ),
   '/v2-preview/screens/settings/delete': () => <DeleteScreen data={deletePreview()} />,
   '/v2-preview/screens/trial-end': () => <TrialEndScreen data={trialEndPreview()} />,
 };

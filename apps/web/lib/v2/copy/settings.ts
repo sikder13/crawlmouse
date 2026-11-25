@@ -19,6 +19,13 @@ export const CANCEL_CLICKS = 2;
  */
 export { RESTORE_DAYS as DELETE_GRACE_DAYS } from './deletion';
 
+const OR = new Intl.ListFormat('en-GB', { style: 'long', type: 'disjunction' });
+
+/** "PNG, JPEG or WebP"; with `article`, "a PNG, JPEG or WebP". */
+function orList(items: readonly string[], article = false): string {
+  return `${article ? 'a ' : ''}${OR.format(items)}`;
+}
+
 export const SETTINGS_COPY = {
   title: 'Settings',
   trialLeft: (plan: string, days: number) =>
@@ -30,10 +37,55 @@ export const SETTINGS_COPY = {
   emailOwnerOnly: 'Sign-in links and alerts go here. Only the account’s owner can change it.',
   nameLabel: 'Name',
   namePlaceholder: 'Optional',
-  nameHint: (agency: boolean) =>
-    agency
-      ? 'Shown on sign-in links and on client reports.'
-      : 'Shown on sign-in links and, on Agency, on client reports.',
+  /**
+   * Client reports show the Branding card's name, and this one only while no brand name is set
+   * (V2R register, row 24). `agency`: the account's plan; `brandName`: whether one is set;
+   * `reportsShown`: whether the Goal 1 switch shows white-label reports (`agency_white_label`).
+   */
+  nameHint: ({
+    agency,
+    brandName,
+    reportsShown,
+  }: {
+    agency: boolean;
+    brandName: boolean;
+    reportsShown: boolean;
+  }) =>
+    !reportsShown
+      ? 'Shown on sign-in links.'
+      : !agency
+        ? 'Shown on sign-in links and, on Agency, on client reports until a brand name is set.'
+        : brandName
+          ? 'Shown on sign-in links. Client reports show the brand name under Branding.'
+          : 'Shown on sign-in links, and on client reports until a brand name is set under Branding.',
+  /** The white-label brand (Goal 1 row 24): the card's fixed words; its limits are parameters. */
+  branding: {
+    title: 'Branding',
+    sub: 'The name and logo client reports carry.',
+    nameLabel: 'Brand name',
+    logoLabel: 'Logo',
+    /** `formats` from the validator's formats, `kb` and `px` from its constants. */
+    logoHint: (formats: readonly string[], kb: number, px: number) =>
+      `${orList(formats)}, up to ${count(kb)} KB and ${count(px)} pixels a side. Leave it empty to keep the current logo.`,
+    currentLogo: 'Current logo',
+    noLogo: 'No logo yet',
+    logoAlt: (name: string) => `${name} logo`,
+    save: 'Save branding',
+    saving: 'Saving…',
+    saved: 'Branding saved.',
+    rateLimited: (perHour: number) =>
+      `Branding can be saved ${numberWord(perHour)} times an hour. Try again in an hour.`,
+    logoErrors: {
+      empty: 'That file is empty. Choose an image.',
+      tooLarge: (kb: number) => `That logo is over ${count(kb)} KB. Choose a smaller file.`,
+      unsupported: (formats: readonly string[]) =>
+        `That file is not ${orList(formats, true)} image.`,
+      malformed: 'That image could not be read. Export it again and choose the new file.',
+      dimensions: (px: number) => `That logo is over ${count(px)} pixels on a side.`,
+      other: 'That logo could not be saved. Choose another image.',
+    },
+    failed: 'Branding was not saved. Try again in a minute.',
+  },
   signInTitle: 'Sign-in',
   signIn: (minutes: number) =>
     `Email link only; there is no password to lose. Links work once, for ${count(minutes)} minutes.`,
@@ -233,6 +285,14 @@ export const SETTINGS_CHANGES: CopyChange[] = [
   },
   {
     screen: 'settings',
+    kind: 'ruling',
+    locked: 'Shown on sign-in links and, on Agency, on client reports.',
+    rendered: 'Shown on sign-in links and, on Agency, on client reports until a brand name is set.',
+    source:
+      'V2R register, row 24 (CTO 085): an Agency account sets a brand name under Branding, and client reports show it, falling back to the account name only while none is set',
+  },
+  {
+    screen: 'settings',
     kind: 'fixture',
     locked: 'Save Email changed, not yet saved',
     rendered: 'Save',
@@ -349,5 +409,10 @@ export const SETTINGS_ADDITIONS: Addition[] = [
     screen: 'settings',
     what: 'A line under the cards, “A question about this account? Email support”: a mailto to the support address whose body carries the account’s id and the page’s path',
     source: 'CC-33 D5 (lib/v2/support/mailto.ts)',
+  },
+  {
+    screen: 'settings',
+    what: 'A Branding card for an Agency account’s owner or account manager while the Goal 1 switch shows `agency_white_label`: the brand name with the route’s rule, the current logo or “No logo yet”, a logo file input with the validator’s formats and limits, and one save posting to `/api/agency/brand`',
+    source: 'V2R register, row 24 (CTO 085)',
   },
 ];

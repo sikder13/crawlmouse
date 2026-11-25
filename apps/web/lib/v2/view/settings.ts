@@ -43,6 +43,16 @@ import { EMAIL_UNDO_DAYS } from '../account/email-change-page';
 import type { SeatRole } from '../account/profile';
 import { SUPPORT_COPY } from '../copy/support';
 import { supportMailto } from '../support/mailto';
+import { MAX_LOGO_BYTES, MAX_LOGO_DIMENSION, type LogoFormat } from '../../logo-validation';
+import {
+  AGENCY_BRAND_ROUTE,
+  BRAND_EDITORS,
+  BRAND_FIELDS,
+  BRAND_NAME_RULE,
+  BRAND_SAVES_PER_HOUR,
+} from '../agency/brand-rules';
+import { ALL_SHOWN, type Features } from '../features';
+import type { BrandingCardView } from './brand-card';
 
 export const CC27B_ROUTES = {
   accountAlertRules: {
@@ -288,6 +298,12 @@ export interface SettingsView {
      */
     confirm: { text: string; action: ActionView } | null;
   };
+  /**
+   * The white-label brand (Goal 1 row 24), shown only where the route would take a save: an Agency
+   * plan with `agencyBranding`, a reader the route lets edit (`BRAND_EDITORS`), and the Goal 1
+   * switch showing `agency_white_label`. Null otherwise (`brandingCard`).
+   */
+  branding: BrandingCardView | null;
   columns: typeof COPY.columns;
   /** "Email support": the support link with the account's id and this page's path (CC-33 D5). */
   support: { lead: string; label: string; href: string };
@@ -317,7 +333,10 @@ export function settingsView(
     undeliverable = null,
     cancelStep = null,
     billingOpen = true,
+    features = ALL_SHOWN,
   }: {
+    /** What the Goal 1 switch hides; the live page passes `shownFeatures()`. */
+    features?: Features;
     /**
      * Whether paid plans can be bought (`V2_BILLING`, read by the live pages). While they cannot, the
      * card has no button that posts to checkout, and says so (F-108). Left out in a preview.
@@ -493,7 +512,11 @@ export function settingsView(
         name: 'name',
         value: a.name ?? '',
         placeholder: COPY.namePlaceholder,
-        hint: COPY.nameHint(agency),
+        hint: COPY.nameHint({
+          agency,
+          brandName: a.branding !== null,
+          reportsShown: features.agency_white_label,
+        }),
         readOnly: false,
       },
       signIn: { title: COPY.signInTitle, text: COPY.signIn(AUTH_LINK_MINUTES) },
@@ -631,6 +654,7 @@ export function settingsView(
           }
         : null,
     },
+    branding: brandingCard(v, role, features),
     columns: COPY.columns,
     support: {
       lead: SUPPORT_COPY.settings.lead,
@@ -640,6 +664,74 @@ export function settingsView(
         accountId: a.id,
         path: ACCOUNT_ACTIONS.emailSettings.route,
       }),
+    },
+  };
+}
+
+/** The formats `validateLogo` detects, as the card names them and as its file input accepts them. */
+export const LOGO_TYPES: Readonly<Record<LogoFormat, { name: string; contentType: string }>> = {
+  png: { name: 'PNG', contentType: 'image/png' },
+  jpeg: { name: 'JPEG', contentType: 'image/jpeg' },
+  webp: { name: 'WebP', contentType: 'image/webp' },
+};
+
+/**
+ * The Branding card, or null where the brand route would refuse the reader's save. Each condition is
+ * the route's own (app/api/agency/brand/route.ts): the effective tier is Agency with
+ * `agencyBranding`, the seat role is one `BRAND_EDITORS` names, and `agency_white_label` is shown.
+ */
+export function brandingCard(
+  v: ReturnType<typeof viewAt>,
+  role: SeatRole,
+  features: Features,
+): BrandingCardView | null {
+  if (v.tier !== 'agency' || !v.gates.agencyBranding) return null;
+  if (!BRAND_EDITORS.includes(role)) return null;
+  if (!features.agency_white_label) return null;
+  const B = COPY.branding;
+  const brand = v.account.branding;
+  const formats = Object.values(LOGO_TYPES);
+  const names = formats.map((f) => f.name);
+  const kb = MAX_LOGO_BYTES / 1024;
+  const name = brand?.agency_name ?? '';
+  return {
+    title: B.title,
+    sub: B.sub,
+    href: `${AGENCY_BRAND_ROUTE}?account=${encodeURIComponent(v.account.id)}`,
+    name: {
+      id: 'brand-name',
+      label: B.nameLabel,
+      field: BRAND_FIELDS.name,
+      value: name,
+      hint: BRAND_NAME_RULE,
+    },
+    logo: {
+      id: 'brand-logo',
+      label: B.logoLabel,
+      field: BRAND_FIELDS.logo,
+      hint: B.logoHint(names, kb, MAX_LOGO_DIMENSION),
+      accept: formats.map((f) => f.contentType).join(','),
+      current:
+        brand?.logo_url == null
+          ? null
+          : { src: brand.logo_url, alt: B.logoAlt(name || (v.account.name ?? B.logoLabel)) },
+      currentLabel: B.currentLogo,
+      none: B.noLogo,
+    },
+    save: { label: B.save, busy: B.saving },
+    messages: {
+      saved: B.saved,
+      failed: B.failed,
+      rateLimited: B.rateLimited(BRAND_SAVES_PER_HOUR),
+      name: BRAND_NAME_RULE,
+      logo: {
+        empty: B.logoErrors.empty,
+        too_large: B.logoErrors.tooLarge(kb),
+        unsupported_type: B.logoErrors.unsupported(names),
+        malformed: B.logoErrors.malformed,
+        bad_dimensions: B.logoErrors.dimensions(MAX_LOGO_DIMENSION),
+        other: B.logoErrors.other,
+      },
     },
   };
 }

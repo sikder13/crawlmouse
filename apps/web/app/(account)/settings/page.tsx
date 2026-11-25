@@ -3,6 +3,7 @@ import { notFound, redirect } from 'next/navigation';
 import { LiveActions } from '@/components/v2/screens/account/LiveActions';
 import { SettingsScreen } from '@/components/v2/screens/settings/SettingsScreen';
 import { checksPublicEnabled } from '@/lib/auth/flags';
+import { shownFeatures } from '@/lib/feature-switch';
 import { settingsNotice } from '@/lib/v2/copy/settings-notices';
 import { readSettingsPage } from '@/lib/v2/account/settings-pages';
 import { checkoutOpen, withSwitcher } from '@/lib/v2/view/account-shell';
@@ -43,6 +44,7 @@ export default async function SettingsPage({
             subscriptionStatus: page.subscriptionStatus,
             undeliverable: page.undeliverable,
             billingOpen: checkoutOpen(process.env, page.userId),
+            features: shownFeatures(),
             ...(page.ownPersonalId === accountId
               ? {}
               : { notOwnAccount: { personalAccountId: page.ownPersonalId } }),
