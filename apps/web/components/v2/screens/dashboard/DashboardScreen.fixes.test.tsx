@@ -99,6 +99,10 @@ describe('crawlers blocked on any site (D-09)', () => {
     ]);
     expect(access.className).toMatch(/blockedAccess/);
     expect(row.querySelector('a')!.className).toMatch(/blockedHost/);
+    // The site heads its row and the crawler and verdict are its data, so the row's header has a
+    // data cell to name (axe: th-has-data-cells).
+    expect([...row.children].map((c) => c.tagName)).toEqual(['TH', 'TD']);
+    expect(row.children[0]!.getAttribute('scope')).toBe('row');
   });
 });
 

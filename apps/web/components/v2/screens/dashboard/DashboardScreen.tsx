@@ -258,7 +258,7 @@ function BlockedElsewhere({ data }: Props) {
         <Table
           label={data.blockedTitle}
           headersHidden
-          rowHeader={1}
+          rowHeader={0}
           // Two columns, so the card fits a phone: the crawler and its verdict share a cell and
           // wrap onto two lines when the width runs out, and a long host breaks inside itself.
           columns={[{ header: 'Site', mono: true }, { header: 'Crawler and access' }]}
