@@ -81,6 +81,10 @@ const INVENTORY: [entry: string, why: string][] = [
     'array slice \u2014 cannot split a surrogate pair',
   ],
   [
+    'apps/web/lib/v2/pipeline/steps/full-render.ts :: .slice(index * FULL_RENDER_CHUNK_PAGES, (index + 1) * FULL_RENDER_CHUNK_PAGES)',
+    'array slice of the render plan into chunks \u2014 cannot split a surrogate pair',
+  ],
+  [
     'apps/web/lib/v2/reports/file-name.ts :: .slice(0, 100);',
     'Not crawled text: a site host we stored, already reduced to ASCII letters, digits, dots and hyphens on the line above, so the cut cannot split a character; it bounds a download file name (F-125).',
   ],
