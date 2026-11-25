@@ -12,9 +12,9 @@ import { supabaseAlertRulePorts } from '@/lib/v2/account/alert-rules';
 import { readAccount } from '@/lib/v2/account/pages';
 import { loadViewer } from '@/lib/v2/account/viewer';
 import { settingsNotice } from '@/lib/v2/copy/settings-notices';
-import type { AccountDataset } from '@/lib/v2/view/account';
 import { withSwitcher } from '@/lib/v2/view/account-shell';
 import { alertsView } from '@/lib/v2/view/alerts';
+import { withSlackConnected } from '@/lib/v2/view/integrations';
 
 export const dynamic = 'force-dynamic';
 
@@ -54,7 +54,7 @@ export default async function AlertsPage({
     <LiveActions>
       <AlertsScreen
         data={withSwitcher(
-          alertsView(withSlack(d, account.id, last4 !== null), viewer),
+          alertsView(withSlackConnected(d, account.id, last4 !== null), viewer),
           accounts,
           account.id,
         )}
@@ -62,17 +62,4 @@ export default async function AlertsPage({
       />
     </LiveActions>
   );
-}
-
-/** The dataset with the account's Slack destination as its one integration, when one is set. */
-function withSlack(d: AccountDataset, accountId: string, set: boolean): AccountDataset {
-  if (!set) return d;
-  return {
-    ...d,
-    accounts: d.accounts.map((a) =>
-      a.id === accountId
-        ? { ...a, integrations: [{ kind: 'slack', connected: true, label: null }] }
-        : a,
-    ),
-  };
 }
