@@ -17,6 +17,7 @@ import { objectNames } from '../keep';
 import { fakeWorker, memoryStore, queuedCheck } from '../test-support/fakes';
 import { memoryEvidenceStore } from '../test-support/memory-evidence';
 import { NO_DAILY_BUDGET, checkSteps, type StepDeps } from './index';
+import type { WorkerClient } from '../../../worker-client/types';
 
 // persist.ts and checkMap are workstreams A's and D's: stand-ins here, so this test is about the
 // steps and the orchestration. The persist stand-in records what the persist step hands it.
@@ -75,12 +76,18 @@ function recordedFromOne(): Map<number, BatchResult> {
   );
 }
 
-async function runRecorded() {
+async function runRecorded(
+  over: {
+    render?: Partial<StepDeps['render']>;
+    measure?: NonNullable<WorkerClient['measureRendered']>;
+  } = {},
+) {
   persisted.length = 0;
   const clock = { now: T0 };
   const iso = () => new Date(clock.now).toISOString();
   const results = recordedFromOne();
-  const { worker, posted } = fakeWorker(results);
+  const { worker: plain, posted } = fakeWorker(results);
+  const worker: WorkerClient = over.measure ? { ...plain, measureRendered: over.measure } : plain;
   const { store, batches, rows } = memoryStore(
     recordedInput().site,
     [
@@ -107,6 +114,7 @@ async function runRecorded() {
       caps: { perCheckMs: 3_600_000, perDayMs: 36_000_000 },
       daily: NO_DAILY_BUDGET,
       inFlight: 2,
+      ...over.render,
     },
     discover: { fetch: (async () => ({})) as never, userAgent: 'UA', now: () => clock.now },
   };
@@ -210,6 +218,61 @@ describe('checkSteps under runCheck, on the recorded worker batches', () => {
     expect(render.pages.length).toBeGreaterThan(0);
     for (const p of render.pages)
       expect(p).toMatchObject({ rendered: false, reason: 'daily_budget_unavailable' });
+  });
+
+  describe('with the budget granted, each rendered page is read on the worker (questions/042)', () => {
+    const granted = (): Partial<StepDeps['render']> => {
+      let used = 0;
+      return {
+        client: {
+          content: async () => ({ ok: true, html: '<p>a b c</p>', browserMs: 50 }),
+        } as never,
+        // The recorded host does not resolve; admission is the engine's to test, not this one's.
+        admit: async () => {},
+        daily: {
+          async reserve(ms: number, limitMs: number) {
+            if (used + ms > limitMs) return false;
+            used += ms;
+            return true;
+          },
+          async settle(reservedMs: number, usedMs: number) {
+            used += usedMs - reservedMs;
+          },
+        },
+      };
+    };
+    const renderOf = async (evidence: Awaited<ReturnType<typeof runRecorded>>['evidence']) =>
+      (await getJson(evidence, `anon/${SITE_ID}/${CHECK}/render.json.gz`)) as {
+        pages: { url: string; rendered: boolean; reason?: string; without_js?: unknown }[];
+      };
+
+    it('measures with what the worker read, for every rendered page', async () => {
+      const asked: string[] = [];
+      const { evidence } = await runRecorded({
+        render: granted(),
+        measure: async (_s, _r, url) => {
+          asked.push(url);
+          return { raw_words: 4, rendered_words: 8, challenged: false, links: null };
+        },
+      });
+      const render = await renderOf(evidence);
+      expect(render.pages.length).toBeGreaterThan(0);
+      expect(asked.sort()).toEqual(render.pages.map((p) => p.url).sort());
+      for (const p of render.pages) {
+        expect(p).toMatchObject({
+          rendered: true,
+          without_js: { raw_words: 4, rendered_words: 8, text_share: 0.5 },
+        });
+      }
+    });
+
+    it('reads no page itself when the worker cannot: each records measure_failed', async () => {
+      const { evidence } = await runRecorded({ render: granted() });
+      const render = await renderOf(evidence);
+      expect(render.pages.length).toBeGreaterThan(0);
+      for (const p of render.pages)
+        expect(p).toMatchObject({ rendered: false, reason: 'measure_failed' });
+    });
   });
 
   it('hands persistence the built check, every page’s vantage and the map’s path', async () => {

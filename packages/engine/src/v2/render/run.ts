@@ -42,8 +42,8 @@ import {
   type RenderSide,
 } from './client.js';
 import { siteEstimate, type SiteEstimate } from './estimate.js';
-import { renderLinks, type RenderLinks } from './links.js';
-import { measurePage, type WithoutJs } from './page.js';
+import type { RenderLinks } from './links.js';
+import { measureReading, readRendered, type RenderedReading, type WithoutJs } from './page.js';
 import { selectEmptyRoots, type EmptyRootCandidate } from './empty-root.js';
 import { oncePerUrl, selectRenders, type PickedFor, type RenderCandidate } from './sample.js';
 import type { JsTextState } from './state.js';
@@ -155,7 +155,22 @@ export interface RenderCheckInput {
   /** Requests open at once; from inFlightFromEnv. An invalid number is read as the default. */
   inFlight?: number;
   sleep?: (ms: number) => Promise<void>;
+  /**
+   * Reads a page's two renders. Null, a refusal or a throw records `measure_failed`. Left out, the
+   * reading runs here, on the calling thread, with no bound of its own; the pipeline passes the crawl
+   * worker's reader, which stops a read at its deadline (`questions/042`, design C).
+   */
+  read?: RenderedReader;
 }
+
+/** Reads a page's two renders somewhere bounded; null when it could not. */
+export type RenderedReader = (
+  staticHtml: string,
+  renderedHtml: string,
+  pageUrl: string,
+) => Promise<RenderedReading | null>;
+
+const readHere: RenderedReader = async (s, r, url) => readRendered(s, r, url);
 
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
@@ -172,7 +187,12 @@ export async function renderCheck(input: RenderCheckInput): Promise<RenderOutcom
     input.emptyRootCandidates ?? [],
     input.maxEmptyRootRenders ?? 0,
   ).filter((p) => !inSample.has(p.url));
-  const run = { ...input, admit: input.admit ?? defaultAdmit(), sleep: input.sleep ?? wait };
+  const run = {
+    ...input,
+    admit: input.admit ?? defaultAdmit(),
+    sleep: input.sleep ?? wait,
+    read: input.read ?? readHere,
+  };
 
   const gradedPhase = await renderPhase(run, sample, (n) =>
     Math.min(input.caps.perCheckMs, n * PAGE_RESERVE_MS),
@@ -227,7 +247,11 @@ interface PhaseResult {
  * stop, and its own settle. Nothing a phase does reaches the pages of another.
  */
 async function renderPhase(
-  input: RenderCheckInput & { admit: Admit; sleep: (ms: number) => Promise<void> },
+  input: RenderCheckInput & {
+    admit: Admit;
+    sleep: (ms: number) => Promise<void>;
+    read: RenderedReader;
+  },
   sample: readonly Picked[],
   allowanceFor: (pages: number) => number,
   /** A reason the phase renders nothing, decided before it: today's budget is then not asked. */
@@ -321,26 +345,19 @@ async function renderPhase(
     if (!staticSide.ok) return notRendered(p, staticSide.reason);
     const renderedSide = await side(p.url, 'rendered', used);
     if (!renderedSide.ok) return notRendered(p, renderedSide.reason);
-    let m: ReturnType<typeof measurePage>;
+    let reading: RenderedReading | null;
     try {
-      m = measurePage({
-        staticHtml: staticSide.html,
-        renderedHtml: renderedSide.html,
-        previous: input.previousStates.get(p.url) ?? null,
-      });
+      reading = await input.read(staticSide.html, renderedSide.html, p.url);
     } catch {
-      return notRendered(p, 'measure_failed');
+      reading = null;
     }
+    if (reading === null) return notRendered(p, 'measure_failed');
+    const m = measureReading(reading, input.previousStates.get(p.url) ?? null);
     if (!m.measured) return notRendered(p, m.reason);
     // A page whose links cannot be read keeps its measurement and carries no links: it is not
     // evidence for js_only_navigation, and nothing else reads them.
-    let links: RenderLinks;
-    try {
-      links = renderLinks(staticSide.html, renderedSide.html, p.url);
-    } catch {
-      return { ...p, rendered: true, without_js: m.without_js };
-    }
-    return { ...p, rendered: true, without_js: m.without_js, links };
+    if (reading.links === null) return { ...p, rendered: true, without_js: m.without_js };
+    return { ...p, rendered: true, without_js: m.without_js, links: reading.links };
   }
 
   /**

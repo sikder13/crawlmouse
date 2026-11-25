@@ -30,7 +30,16 @@ import { ACCESS_BATCH_BUDGET, CRAWL_BATCH_BUDGET } from '../limits';
 import type { StepDeps } from './deps';
 import { phaseOf, progressOf } from './progress';
 import { batchSeconds, phaseEndsAt, tailOf } from './time';
-import { assembledSoFar, isCrawl, iso, loadResults, loadSeeds, pathOf, releaseOf } from './stored';
+import {
+  assembledSoFar,
+  isCrawl,
+  iso,
+  loadResultsForBuild,
+  loadResultsForPlanning,
+  loadSeeds,
+  pathOf,
+  releaseOf,
+} from './stored';
 
 /** A post's summary until the batch is read: what was asked and how long it was given. */
 const PlannedSchema = z.object({ urls: z.int().min(1), max_seconds: z.int().min(1) });
@@ -103,11 +112,20 @@ export function batchSteps(
   const found = (s: string) => s === 'running' || s === 'done' || s === 'failed';
 
   async function plan(event: CheckRequested, at: BatchAt): Promise<Planned> {
-    const [seeds, results] = await Promise.all([loadSeeds(deps, event), loadResults(deps, event)]);
+    // QA's gate on #182, F2: a crawl post reads no edge, and an access post reads the build's
+    // bounded view (the same pages and sample), so neither holds every edge of a 2,000-page check.
     if (at.kind === 'crawl') {
+      const [seeds, results] = await Promise.all([
+        loadSeeds(deps, event),
+        loadResultsForPlanning(deps, event),
+      ]);
       const urls = nextCrawlBatch(seeds, results.filter(isCrawl), event.pageCap);
       return urls === null ? { none: 'done' } : { kind: 'crawl', urls };
     }
+    const [seeds, results] = await Promise.all([
+      loadSeeds(deps, event),
+      loadResultsForBuild(deps, event),
+    ]);
     const { assembled } = await assembledSoFar(deps, event, seeds, results);
     return stagePages(sample(assembled), at.stage ?? 1, assembled.rows);
   }
@@ -172,6 +190,7 @@ export function batchSteps(
       now,
       budget.max_seconds,
       tailOf(at.kind),
+      so.pageCap,
     );
     if (seconds === null) return { status: 'none', why: 'no_time' };
 
