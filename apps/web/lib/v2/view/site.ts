@@ -351,6 +351,9 @@ function fixRow(v: AccountView, result: Check, f: Fix, all: readonly Fix[]): Fix
   };
 }
 
+/** "Open fix 2 · +1 SEO", or the label alone when the fix has no effect to name (F-274). */
+const withPoints = (label: string, pts: string) => (pts ? `${label} · ${pts}` : label);
+
 /** A fix this account's tier does not open: on a tier with every fix, none is. */
 const lockedFix = (v: AccountView, result: Check, f: Fix) =>
   v.gates.fixesVisible !== 'all' && !isFreeFix(v.d, result, f);
@@ -528,8 +531,8 @@ export function siteView(
     action('openAudit', 'Open the latest audit', { checkId: result.id }, { primary });
   const targetLabel = target
     ? target.section === 'crawler_access' && target.crawler_uas.length
-      ? `Open the ${listOf(target.crawler_uas)} packet · ${points(target, fixes)}`
-      : `Open fix ${target.number} · ${points(target, fixes)}`
+      ? withPoints(`Open the ${listOf(target.crawler_uas)} packet`, points(target, fixes))
+      : withPoints(`Open fix ${target.number}`, points(target, fixes))
     : null;
 
   // ── fixes table ──

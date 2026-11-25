@@ -192,7 +192,20 @@ describe('the waiting sentence, chosen from the first pending entry', () => {
     return { unit: open.unit, row: rowOf(d, 'challenged-site', f.id) };
   };
 
-  it.each(WithheldReasonSchema.options)('%s heads the fix with its own sentence', (reason) => {
+  // The three unmeasured parts head the fix with nothing (F-274, effect-unmeasured.test.ts).
+  const MISSING_FOR_THIS_CHECK = WithheldReasonSchema.options.filter(
+    (r) => !['readable_unmeasured', 'quotable_unmeasured', 'signals_unmeasured'].includes(r),
+  );
+  it('leaves four reasons that head the fix with a sentence', () => {
+    expect(MISSING_FOR_THIS_CHECK).toEqual([
+      'too_few_crawlers_measured',
+      'blocked_by_choice',
+      'crawler_too_few_pages',
+      'check_not_scored',
+    ]);
+  });
+
+  it.each(MISSING_FOR_THIS_CHECK)('%s heads the fix with its own sentence', (reason) => {
     const { unit, row } = waitingWith([reason, 'too_few_crawlers_measured']);
     expect(unit).toBe(AI_WAITING[reason]);
     expect(row).toBe('AI not yet estimated');

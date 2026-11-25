@@ -576,7 +576,9 @@ export function fixView(
         ? null
         : following
           ? {
-              label: `Next fix: ${following.title} · ${points(following, siteFixes)}`,
+              label: [`Next fix: ${following.title}`, points(following, siteFixes)]
+                .filter(Boolean)
+                .join(' · '),
               href: hrefs.fix?.(following.id) ?? '#',
             }
           : { label: 'Back to overview', href: hrefs.overview },

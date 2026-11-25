@@ -16,6 +16,7 @@ import {
 import { findCheck, fixesAsOf, siteOf } from '../fixtures';
 import {
   AI_WAITING,
+  aiUnmeasured,
   effectHeadline,
   formatPoints,
   scoreAfter,
@@ -891,6 +892,7 @@ export function points(
   if (h.kind === 'seo') return `${h.signed} SEO`;
   if (h.kind === 'no_effect') return NO_EFFECT_SHORT;
   if (h.kind === 'pages_readable') return h.text;
+  if (h.kind === 'none') return '';
   return h.kind === 'waiting' ? h.short : 'SEO not estimated';
 }
 
@@ -933,12 +935,14 @@ function fixFirstBody(check: Check, f: Fix, siteFixes: readonly Fix[]): string {
           ? `${NO_EFFECT}.`
           : h.kind === 'pages_readable'
             ? `${h.text}.`
-            : seo === null || h.kind === 'seo_not_estimated'
-              ? 'Technical SEO is not graded for this audit, so no change to it is estimated.'
-              : `Technical SEO ${seo} → ${scoreAfter(seo, h.points)}, estimated.`;
+            : h.kind === 'none'
+              ? ''
+              : seo === null || h.kind === 'seo_not_estimated'
+                ? 'Technical SEO is not graded for this audit, so no change to it is estimated.'
+                : `Technical SEO ${seo} → ${scoreAfter(seo, h.points)}, estimated.`;
   // The steps are named only where a packet was written; a fix with none ends at its effect.
   const open = f.packet ? ' The steps and the evidence are open, free.' : '';
-  return `${what ? `${capitalise(what)}. ` : ''}${effect}${open}`;
+  return `${what ? `${capitalise(what)}. ` : ''}${effect}${open}`.trim();
 }
 
 /** Whether a title states the number `n` as a whole number, grouped ("1,120") or not. */
@@ -1013,8 +1017,10 @@ export function restPoints(
   const sums = [figures || null, pagesReadable(fixes)].filter(Boolean);
   if (sums.length) return sums.join('; ');
   if (!seoKnown) return 'SEO not estimated';
-  const waiting = fixes.filter((f) => f.effect.ai_readability === null).length;
+  // A member whose AI effect waits on an unmeasured part is not counted as waiting (F-274).
+  const waiting = fixes.filter((f) => f.effect.ai_readability === null && !aiUnmeasured(f)).length;
   if (waiting) return `AI not yet estimated for ${waiting}`;
+  if (fixes.every(aiUnmeasured)) return '';
   return fixes.some((f) => f.effect.technical_seo === null) ? 'SEO not estimated' : NO_EFFECT_SHORT;
 }
 
