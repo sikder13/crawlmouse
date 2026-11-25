@@ -3,7 +3,7 @@
  * (`/mail-preview/<slug>`, app/(v2-preview)/mail-preview) and the visual harness's mail baselines
  * (tests/visual/pages.ts `MAIL_PREVIEWS`), which each read this list. Adding a template's preview is
  * one entry here: a slug, a name, its kind and a render over fixture input. Nothing here reads a
- * database, an environment variable or the clock.
+ * database or the clock; the links read the deployment's mail origin (`mailOrigin()`, links.ts).
  */
 import { ALERT_LABELS } from '../../copy/site';
 import { fixture } from '../../fixtures';

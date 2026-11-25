@@ -4,8 +4,8 @@
  * says how its grades moved over the week. It is never rendered empty: a week with no change sends
  * nothing (the caller's rule), and this refuses one.
  *
- * Outside strings are bounded and escaped as in the alert (alert.ts); the only links are crawlmouse.com
- * pages built from ids, and the signed unsubscribe URL.
+ * Outside strings are bounded and escaped as in the alert (alert.ts); the only links are pages of the
+ * mail origin (`mailOrigin()`, links.ts) built from ids, and the signed unsubscribe URL.
  */
 import type { GradeName } from '@crawlmouse/types/v2';
 import { dayMonth } from '../../format';

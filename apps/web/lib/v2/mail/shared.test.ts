@@ -2,7 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { bounded, html, oneLine } from './escape';
 import { layout } from './layout';
 import { checkUrl, mailOrigin, PRODUCTION_MAIL_ORIGIN } from './links';
-import { pageUrl } from './templates/alert';
+import { alertTemplate, pageUrl } from './templates/alert';
+import { htmlTargets } from './templates/inspect';
 import { linkSecret, signUnsubscribe, verifyUnsubscribe } from './unsubscribe-token';
 
 const SECRET = 's'.repeat(40);
@@ -107,6 +108,37 @@ describe('mailOrigin: where mail links point (F-253)', () => {
     expect(mailOrigin()).toBe('https://staging.crawlmouse.example');
     expect(checkUrl(id)).toBe(`https://staging.crawlmouse.example/audit/${id}`);
     expect(pageUrl('/sites/', id)).toBe(`https://staging.crawlmouse.example/sites/${id}`);
+  });
+
+  it('points every link of an alert at that origin: check, fix and rules pages (F-253)', () => {
+    vi.stubEnv('NEXT_PUBLIC_BASE_URL', 'https://staging.crawlmouse.example');
+    const unsubscribe = 'https://staging.crawlmouse.example/unsubscribe?t=x.y';
+    const m = alertTemplate({
+      host: 'shop.example',
+      checkId: id,
+      checkedAt: '2026-11-13T10:58:00Z',
+      zone: 'UTC',
+      rules: [],
+      unsubscribeUrl: unsubscribe,
+      changes: [
+        {
+          kind: 'opened',
+          subject: 'orphans',
+          severity: 'warn',
+          summary: '3 orphan pages',
+          where: '/blog/*',
+          pages_affected: 3,
+          ua: null,
+          grade_deltas: [],
+          fix_id: 'f0000000-0000-4000-8000-000000000001',
+        },
+      ],
+    });
+    const targets = htmlTargets(m.html);
+    // The check, the fix, the rules page and the unsubscribe page: four, all on staging.
+    expect(targets.length).toBeGreaterThanOrEqual(4);
+    for (const t of targets) expect(t, t).toMatch(/^https:\/\/staging\.crawlmouse\.example\//);
+    expect(targets).toContain('https://staging.crawlmouse.example/alerts');
   });
 
   it('falls back to production for anything but a bare https origin', () => {

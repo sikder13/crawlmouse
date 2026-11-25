@@ -279,6 +279,9 @@ describe('fix_regressed: a fix reopened at this check whose state before was mar
     // A second marking done: the later one, the one the fix was in when it was found again.
     const again = { ...marked, at: '2026-11-09T18:00:00Z' };
     expect(regressedFixes(CHECK, [marked, unable, again, reopened()]).get(FIX)).toBe(again.at);
+    // Marked done again after it was found again: still the marking it was found against.
+    const later = { ...marked, at: '2026-11-11T09:00:00Z' };
+    expect(regressedFixes(CHECK, [marked, reopened(), later]).get(FIX)).toBe(marked.at);
     expect(regressedFixes(CHECK, [verified, reopened()]).size).toBe(0);
     expect(regressedFixes(CHECK, [marked, reopened(OTHER_CHECK)]).size).toBe(0);
   });

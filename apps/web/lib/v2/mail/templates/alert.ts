@@ -5,9 +5,9 @@
  * phrase (`wherePhrase`), and how a grade moved. An opened change with a fix links to the fix's page.
  *
  * Every string from outside our code (the host, a change's summary and where, a crawler's name) is
- * made one line and bounded (escape.ts) and HTML-escaped in the HTML part. The only links are pages of
- * crawlmouse.com built here from ids, and the signed unsubscribe URL (D3, D7); the recipient's address
- * is not in the message.
+ * made one line and bounded (escape.ts) and HTML-escaped in the HTML part. The only links are pages
+ * of this deployment's mail origin (`mailOrigin()`, links.ts: crawlmouse.com in production) built here
+ * from ids, and the signed unsubscribe URL (D3, D7); the recipient's address is not in the message.
  */
 import type { Change, GradeLetter, GradeName } from '@crawlmouse/types/v2';
 import { dayDate } from '../../format';
@@ -215,7 +215,7 @@ export const ALERT_COPY = {
   /** Which of the reader's rules sent the message (F-254): each by the name the Alerts screen gives it. */
   sentFor: (rules: readonly string[]) =>
     `Sent for your alert ${plural(rules.length, 'rule', 'rules')}: ${rules.map((r) => `“${r}”`).join(', ')}.`,
-  /** A fix that rule caught: when it was marked done (F-254). */
+  /** A fix marked done and found again at this check: when it was marked done (F-254). */
   markedDone: (day: string) => `Marked done ${day}; found again at this check.`,
   more: (n: number) => `And ${count(n)} more on the check’s page.`,
   open: 'Open the check',

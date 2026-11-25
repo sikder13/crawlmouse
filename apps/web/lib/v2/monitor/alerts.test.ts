@@ -341,6 +341,40 @@ describe('email (D5, D7)', () => {
     expect(text.match(/Marked done/g)).toHaveLength(1);
   });
 
+  it('names only the rules that fired for email, each with its threshold (F-254)', async () => {
+    const drop: StoredChange = {
+      ...block,
+      id: '90000000-0000-4000-8000-000000000004',
+      subject: 'text_without_js',
+      summary: 'Product pages ship no text without JavaScript',
+      where: '/products/*',
+      ua: null,
+    };
+    const h = harness({
+      data: data({
+        changes: [block, drop],
+        rules: [
+          // Fires on the GPTBot row, for Slack only: the email does not name it.
+          { ...data().rules[0]!, channels: ['slack'] },
+          {
+            id: '70000000-0000-4000-8000-000000000002',
+            site_id: null,
+            kind: 'text_drop',
+            enabled: true,
+            threshold_points: 10,
+            channels: ['email'],
+          },
+        ],
+        textShare: { before: 0.8, now: 0.5 },
+      }),
+    });
+    expect(await deliverAlert(h.deps, CHECK, 'email')).toEqual({ status: 'sent', reason: null });
+    expect(h.sent[0]!.text).toContain(
+      'Sent for your alert rule: “Text without JavaScript drops more than 10 points”.',
+    );
+    expect(h.sent[0]!.text).not.toContain('A crawler becomes blocked');
+  });
+
   it('asks for the seats whose client scope covers this site (review r1, security S1)', async () => {
     const h = harness();
     await deliverAlert(h.deps, CHECK, 'email');
