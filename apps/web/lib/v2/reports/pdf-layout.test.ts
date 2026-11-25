@@ -165,6 +165,91 @@ describe('drawDoc', () => {
     expect(new Set(cell.pages).size).toBeGreaterThan(1);
   });
 
+  it('moves a paragraph that fits on a page to the next one rather than split it (F-126)', () => {
+    const para = Array.from({ length: 60 }, (_, n) => `word${n}`).join(' ');
+    // Enough paragraphs that one of them meets the bottom of page 1 part-way.
+    const texts = Array.from({ length: 40 }, (_, n) => `${n}: ${para}`);
+    const d = doc({
+      sections: [
+        { heading: 'Many', blocks: texts.map((text) => ({ type: 'text' as const, text })) },
+      ],
+    });
+    const drawn = draw(d);
+    const instances = expectDrawsTheDocument(d, drawn).filter((i) => texts.includes(i.text));
+    expect(instances).toHaveLength(texts.length);
+    expect(new Set(instances.flatMap((i) => i.pages)).size).toBeGreaterThan(1);
+    for (const i of instances) expect(new Set(i.pages).size, i.text.slice(0, 4)).toBe(1);
+  });
+
+  it('never leaves a section’s heading alone at the foot of a page, whatever its first paragraph', () => {
+    const filler = 'One short line.';
+    for (let fillers = 0; fillers < 60; fillers += 1) {
+      for (const words of [10, 80, 160, 400]) {
+        const para = Array.from({ length: words }, (_, n) => `w${n}`).join(' ');
+        const d = doc({
+          sections: [
+            {
+              heading: 'Fill',
+              blocks: Array.from({ length: fillers }, () => ({
+                type: 'text' as const,
+                text: filler,
+              })),
+            },
+            { heading: 'Opening', blocks: [{ type: 'text', text: para }] },
+          ],
+        });
+        const drawn = expectDrawsTheDocument(d, draw(d));
+        const heading = drawn.find((i) => i.text === 'Opening')!;
+        const opening = drawn.find((i) => i.text === para)!;
+        expect(opening.pages[0], `${fillers} × ${words}`).toBe(heading.pages.at(-1));
+      }
+    }
+  });
+
+  /** A section of `fillers` one-line paragraphs, then a section opening with a `words`-word one. */
+  const opening = (fillers: number, words: number) => {
+    const para = Array.from({ length: words }, (_, n) => `w${n}`).join(' ');
+    const d = doc({
+      sections: [
+        {
+          heading: 'Fill',
+          blocks: Array.from({ length: fillers }, () => ({
+            type: 'text' as const,
+            text: 'One short line.',
+          })),
+        },
+        { heading: 'Opening', blocks: [{ type: 'text', text: para }] },
+      ],
+    });
+    const drawn = expectDrawsTheDocument(d, draw(d));
+    return {
+      heading: drawn.find((i) => i.text === 'Opening')!,
+      para: drawn.find((i) => i.text === para)!,
+    };
+  };
+
+  it('keeps a short first paragraph whole, on its heading’s page, wherever the section starts', () => {
+    // Short enough that heading and paragraph fit on one page together: drawn so, wherever they fall.
+    for (let fillers = 0; fillers < 80; fillers += 1) {
+      for (const words of [20, 60, 120, 200]) {
+        const o = opening(fillers, words);
+        expect(new Set(o.para.pages).size, `${fillers} × ${words}`).toBe(1);
+        expect(o.para.pages[0], `${fillers} × ${words}`).toBe(o.heading.pages.at(-1));
+      }
+    }
+  });
+
+  it('keeps the heading with a first paragraph about a page long, at the top of a page', () => {
+    // At the top of the section's page, a paragraph of about a page fits alone but not with its
+    // heading: the window where keeping the paragraph whole on its own would strand the heading.
+    for (let words = 950; words <= 1050; words += 5) {
+      for (const fillers of [0, 1, 2]) {
+        const o = opening(fillers, words);
+        expect(o.para.pages[0], `${fillers} × ${words}`).toBe(o.heading.pages.at(-1));
+      }
+    }
+  });
+
   it('marks each not-measured sentence, after a rule', () => {
     const d = doc({
       notMeasured: ['Text without JavaScript was not measured.', 'Tested 6 of 7 signals'],

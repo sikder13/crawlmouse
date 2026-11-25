@@ -419,7 +419,7 @@ describe('Reports, with what a live page knows', () => {
     // the report's expiry).
     const v = live({ madeLink: { reportId: CSV, url } });
     expect(row(v, CSV).madeLink).toEqual({
-      label: 'The link, shown here for a short while:',
+      label: 'The link, shown here for two minutes:',
       url,
     });
     expect([row(v, PDF).madeLink, row(v, COMPARE).madeLink]).toEqual([null, null]);

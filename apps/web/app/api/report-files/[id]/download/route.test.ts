@@ -148,7 +148,36 @@ describe('GET /api/report-files/[id]/download', () => {
       const path = reportPath(w.accountId, onSite, 'pdf');
       expect(res.status).toBe(302);
       expect(res.headers.get('location')).toBe(`https://storage.test/reports/${path}?token=signed`);
-      expect(h.bucket.signed).toEqual([[path, 600]]);
+      const { rows } = await h.db.query<{ host: string }>(
+        `select host from public.sites where id = $1`,
+        [w.site.id],
+      );
+      // F-125: the file downloads under the site and the day the report was made, not the
+      // report's id. The row is dated far from today, so a name dated by the clock fails.
+      await h.db.query(
+        `update public.reports set created_at = '2025-03-07T12:00:00Z' where id = $1`,
+        [onSite],
+      );
+      const named = await get(onSite);
+      expect(named.status).toBe(302);
+      expect(h.bucket.signed.at(-1)).toEqual([
+        path,
+        600,
+        `crawlmouse-${rows[0]!.host}-2025-03-07-audit.pdf`,
+      ]);
+      h.bucket.signed.pop();
+      expect(h.bucket.signed).toEqual([
+        [
+          path,
+          600,
+          expect.stringMatching(
+            new RegExp(
+              `^crawlmouse-${rows[0]!.host.replace(/[.]/g, '\\.')}-\\d{4}-\\d{2}-\\d{2}-audit\\.pdf$`,
+            ),
+          ),
+        ],
+      ]);
+      expect(h.bucket.signed[0]![2]).not.toContain(onSite);
       expect(res.headers.get('cache-control')).toBe('no-store');
       expect(res.headers.get('referrer-policy')).toBe('no-referrer');
       expect(await res.text()).toBe('');

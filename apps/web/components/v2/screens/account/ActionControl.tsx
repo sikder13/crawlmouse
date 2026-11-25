@@ -100,6 +100,7 @@ function Inputs({ inputs, prefix }: { inputs: readonly ActionInput[]; prefix: st
               placeholder={i.placeholder}
               defaultValue={i.value}
               required={i.required}
+              autoComplete={i.autoComplete}
             />
           );
         if (i.kind === 'select')
