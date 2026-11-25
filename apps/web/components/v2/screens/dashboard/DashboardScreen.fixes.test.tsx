@@ -107,3 +107,31 @@ describe('the chart’s words under a phone chart are read once, in its caption 
     ]);
   });
 });
+
+describe('a long host on the sites table (PR 2 review, item 6)', () => {
+  it('lets a 63-character label break inside itself, and keeps a short one whole', () => {
+    const label = `xn--${'a'.repeat(59)}`;
+    expect(label).toHaveLength(63);
+    const data = dashboardPreview('home');
+    const host = `${label}.example-outfitter.dev`;
+    const withLong = {
+      ...data,
+      sites: {
+        ...data.sites,
+        rows: data.sites.rows.map((r, i) => (i === 0 ? { ...r, host } : r)),
+      },
+    };
+    const link = dom(withLong).querySelector('table[aria-label="Watched sites"] tbody th a')!;
+    expect(link.textContent).toBe(host);
+    expect(
+      [...link.querySelectorAll('[data-v2-part]')].map((s) => [
+        s.textContent,
+        s.getAttribute('data-v2-part'),
+      ]),
+    ).toEqual([
+      [`${label}.`, 'long'],
+      ['example-outfitter.', 'whole'],
+      ['dev', 'whole'],
+    ]);
+  });
+});

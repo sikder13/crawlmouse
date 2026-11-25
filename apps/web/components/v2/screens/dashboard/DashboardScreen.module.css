@@ -197,6 +197,11 @@
   white-space: nowrap;
 }
 
+/* A part longer than a line can hold (DashboardScreen LONG_PART): it may break anywhere. */
+.longPart {
+  overflow-wrap: anywhere;
+}
+
 /* A sites-table cell's column name, drawn only where a phone stacks the row (below). */
 .cellName {
   display: none;

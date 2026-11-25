@@ -49,14 +49,29 @@ const hostParts = (host: string) => host.split(/(?<=\.)/);
 /** "Fri 06:01 · check queued" in the pieces it may break between: after each " · ". */
 const checkParts = (line: string) => line.split(/(?<= · )/);
 
-/** Text that breaks only between its parts, never inside one ("example-" / "outfitter"). */
+/**
+ * A part longer than this may break inside itself: a dot-free label of a host can run to 63
+ * characters (a punycode `xn--…` or a long hyphenated name), more than a phone's sites table holds
+ * on one line (about 40 mono characters at 390px).
+ */
+const LONG_PART = 24;
+
+/**
+ * Text that breaks between its parts, and inside a part only when the part is longer than
+ * `LONG_PART`: "example-outfitter." stays whole, a 63-character label wraps where it must.
+ */
 function Breaks({ parts }: { parts: readonly string[] }) {
   return (
     <>
       {parts.map((p, i) => (
         <Fragment key={i}>
           {i > 0 ? <wbr /> : null}
-          <span className={styles.whole}>{p}</span>
+          <span
+            className={p.length > LONG_PART ? styles.longPart : styles.whole}
+            data-v2-part={p.length > LONG_PART ? 'long' : 'whole'}
+          >
+            {p}
+          </span>
         </Fragment>
       ))}
     </>
