@@ -60,6 +60,8 @@ let db: PGlite;
 let ownerId: string;
 let strangerId: string;
 let kept: string;
+/** The personal account's first site; the session here carries no email, so its name (D-22). */
+let keptHost: string;
 let empty: string;
 let removed: string;
 let theirs: string;
@@ -80,6 +82,7 @@ beforeAll(async () => {
   const { accountId } = await personalAccount(db, ownerId);
   const input = recordedBuild();
   kept = input.site.id;
+  keptHost = input.site.host;
   await seedRunningCheck(db, { ...input.site, account_id: accountId }, input.check);
   await persistBuiltCheck(pglitePersistDb(db), {
     built: buildCheck(input),
@@ -343,13 +346,13 @@ describe('/sites/[id] with V2_CHECKS_PUBLIC=1', () => {
       expect(shellOf(children(await open(client))).switcher).toMatchObject({
         current: 'Summit Digital',
         visiting: null,
-        others: [{ label: 'Personal account', fields: { accountId: ownId } }],
+        others: [{ label: keptHost, fields: { accountId: ownId } }],
       });
       // No cookie: the person acts in their default, personal account, whose site this is.
       h.chosen = null;
       for (const site of [kept, empty]) {
         const shell = shellOf(children(await open(site)));
-        expect(shell.switcher).toMatchObject({ current: 'Personal account', visiting: null });
+        expect(shell.switcher).toMatchObject({ current: keptHost, visiting: null });
         expect(shell.trial!.keep ?? shell.trial!.billing).not.toBeNull();
       }
     });
@@ -383,7 +386,7 @@ describe('/sites/[id] with V2_CHECKS_PUBLIC=1', () => {
         expect(shell.switcher!.visiting).toMatchObject({
           acting: 'Summit Digital',
           switchTo: {
-            label: 'Switch to Personal account',
+            label: `Switch to ${keptHost}`,
             href: '/api/seats/switch',
             fields: { accountId: ownId },
           },

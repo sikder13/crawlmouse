@@ -9,7 +9,12 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { GATES } from '../../entitlement-v2';
 import { applyAllMigrations, freshDb } from '../../../__tests__/helpers/pglite-migrations';
 import { postgrestOver, type Call } from '../../../__tests__/helpers/postgrest-pglite';
-import { personalAccount, signUp } from '../../../__tests__/helpers/v2-check-tables';
+import {
+  insertRow,
+  personalAccount,
+  ROWS,
+  signUp,
+} from '../../../__tests__/helpers/v2-check-tables';
 import { ACCOUNT_COOKIE, accountCookie, chosenAccount, chosenInHeader } from './viewer-cookie';
 import { readEntitlement, readViewer, type ViewerResult } from './viewer-read';
 
@@ -285,15 +290,74 @@ describe('the account a person chose (CC-31 D2b)', () => {
     if (r.kind !== 'viewer') throw new Error(`expected a viewer, got ${r.kind}`);
     expect([...r.viewer.accounts].sort((a, b) => a.id.localeCompare(b.id))).toEqual(
       [
-        { id: w.agency.accountId, kind: 'agency', name: 'Summit Digital' },
-        { id: w.own.accountId, kind: 'personal', name: null },
+        {
+          id: w.agency.accountId,
+          kind: 'agency',
+          name: 'Summit Digital',
+          ownerEmail: null,
+          firstSite: null,
+        },
+        // The caller owns this one: its owner's address is the caller's own.
+        {
+          id: w.own.accountId,
+          kind: 'personal',
+          name: null,
+          ownerEmail: w.member.email,
+          firstSite: null,
+        },
       ].sort((a, b) => a.id.localeCompare(b.id)),
     );
+    // One account: no switcher names it, so neither is read.
     const single = await read(w.owner);
     if (single.kind !== 'viewer') throw new Error(`expected a viewer, got ${single.kind}`);
     expect(single.viewer.accounts).toEqual([
-      { id: w.agency.accountId, kind: 'agency', name: 'Summit Digital' },
+      {
+        id: w.agency.accountId,
+        kind: 'agency',
+        name: 'Summit Digital',
+        ownerEmail: null,
+        firstSite: null,
+      },
     ]);
+  });
+
+  it('tells two unnamed personal accounts apart: the caller’s own address, the other’s first site (D-22)', async () => {
+    const a = await person('a');
+    const theirs = await personalAccount(db, a.userId);
+    const b = await person('b');
+    const own = await personalAccount(db, b.userId);
+    await addSeat(theirs.accountId, b, 'developer');
+    const base = randomUUID().slice(0, 8);
+    /** One of A's sites, added on `day` of November. */
+    const add = async (name: string, day: number, over: string = ''): Promise<string> => {
+      const id = randomUUID();
+      await insertRow(db, 'sites', {
+        ...ROWS.sites(id, theirs.accountId, `${base}-${name}.example`),
+        created_at: `2026-11-${String(day).padStart(2, '0')}T09:00:00Z`,
+      });
+      if (over) await db.query(`update public.sites set ${over} where id = $1`, [id]);
+      return id;
+    };
+    // Older than its first site: a removed site and a staging copy. Newer: two more.
+    await add('gone', 1, 'removed_at = now()');
+    const staging = await add('old', 2);
+    await add('shop', 3);
+    await add('new', 4);
+    const primary = await add('main', 5);
+    await db.query(`update public.sites set staging_of_site_id = $1 where id = $2`, [
+      primary,
+      staging,
+    ]);
+    const r = await read(b);
+    if (r.kind !== 'viewer') throw new Error(`expected a viewer, got ${r.kind}`);
+    const byId = new Map(r.viewer.accounts.map((x) => [x.id, x]));
+    expect(byId.get(own.accountId)).toMatchObject({ ownerEmail: b.email, firstSite: null });
+    expect(byId.get(theirs.accountId)).toMatchObject({
+      ownerEmail: null,
+      firstSite: `${base}-shop.example`,
+    });
+    // A's address is in no part of what B reads.
+    expect(strings(r)).not.toContain(a.email);
   });
 
   it('a choice naming another person’s account changes nothing', async () => {

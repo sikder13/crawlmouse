@@ -35,8 +35,19 @@ export interface AccountViewer {
   tier: Tier;
   gates: Readonly<TierGates>;
   limits: { sites: number; seats: number; competitorsPerSite: number };
-  /** Every account the caller holds an active seat on, this one included: what the switcher lists. */
-  accounts: { id: string; kind: 'personal' | 'agency'; name: string | null }[];
+  /**
+   * Every account the caller holds an active seat on, this one included: what the switcher lists.
+   * An unnamed account is told apart by `ownerEmail`, the caller's own email on an account they own
+   * and null on any other, and by `firstSite`, the host of its oldest live site, read with the
+   * caller's client (D-22). Both are null for a caller with one account: no switcher names it.
+   */
+  accounts: {
+    id: string;
+    kind: 'personal' | 'agency';
+    name: string | null;
+    ownerEmail: string | null;
+    firstSite: string | null;
+  }[];
 }
 
 export type ViewerResult =
@@ -115,10 +126,7 @@ export async function readViewer(
       email: user.email,
       seat: { id: seat.id, role: seat.role, theme: seat.theme },
       ...entitlement,
-      accounts: await seatAccounts(
-        deps.session,
-        mine.map((s) => s.account_id),
-      ),
+      accounts: await seatAccounts(deps.session, mine, user.email),
     },
   };
 }
@@ -129,18 +137,58 @@ const SwitcherRow = z.object({
   name: z.string().nullable(),
 });
 
+const FirstSiteRow = z.object({ account_id: z.string(), host: z.string() });
+
 /** The accounts of the caller's active seats, read with the caller's own client. */
 async function seatAccounts(
   session: SupabaseClient,
-  accountIds: string[],
+  mine: z.infer<typeof SeatRow>[],
+  email: string | null,
 ): Promise<AccountViewer['accounts']> {
   const accounts = await session
     .from('accounts')
     .select('id, kind, name')
-    .in('id', accountIds)
+    .in(
+      'id',
+      mine.map((s) => s.account_id),
+    )
     .is('deleted_at', null);
   if (accounts.error) failed('accounts list', accounts.error);
-  return z.array(SwitcherRow).parse(accounts.data);
+  const rows = z.array(SwitcherRow).parse(accounts.data);
+  const owned = new Set(mine.filter((s) => s.role === 'owner').map((s) => s.account_id));
+  const several = rows.length > 1;
+  const first = several
+    ? await firstSites(
+        session,
+        rows.map((a) => a.id),
+      )
+    : new Map();
+  return rows.map((a) => ({
+    ...a,
+    ownerEmail: several && owned.has(a.id) ? email : null,
+    firstSite: first.get(a.id) ?? null,
+  }));
+}
+
+/** Each account's oldest live site that is not a staging copy, by host; read through row security. */
+async function firstSites(
+  session: SupabaseClient,
+  accountIds: string[],
+): Promise<Map<string, string>> {
+  const sites = await session
+    .from('sites')
+    .select('account_id, host')
+    .in('account_id', accountIds)
+    .is('staging_of_site_id', null)
+    .is('removed_at', null)
+    .order('created_at', { ascending: true })
+    .order('id', { ascending: true });
+  if (sites.error) failed('first sites', sites.error);
+  const out = new Map<string, string>();
+  for (const s of z.array(FirstSiteRow).parse(sites.data)) {
+    if (!out.has(s.account_id)) out.set(s.account_id, s.host);
+  }
+  return out;
 }
 
 export type Entitlement = Pick<AccountViewer, 'account' | 'tier' | 'gates' | 'limits'>;
