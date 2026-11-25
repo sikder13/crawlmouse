@@ -5,8 +5,9 @@
  * would make every public page dynamic (CC-41 rulings Q7).
  *
  * How "reach" is read: import and export specifiers (`@/…` and relative) are followed through the
- * files they resolve to under apps/web; packages are not followed. Comments are stripped before a
- * call is looked for.
+ * files they resolve to under apps/web; packages are not followed. A whole-statement type import
+ * (`import type … from`, `export type … from`) is not followed: TypeScript erases it, so it puts no
+ * code on the page. Comments are stripped before a call is looked for.
  */
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
@@ -53,6 +54,8 @@ function resolveImport(from: string, spec: string): string | null {
 const IMPORT =
   /(?:import|export)\s[^'";]*?from\s+['"]([^'"]+)['"]|import\(\s*['"]([^'"]+)['"]\s*\)/g;
 const VIEWER_CALL = /\b(?:loadViewer|readViewer)\(/;
+/** A statement that imports or re-exports types only, which compiles to nothing. */
+const TYPE_ONLY = /^(?:import|export)\s+type\s/;
 
 function reachesViewer(page: string): boolean {
   const seen = new Set<string>();
@@ -64,6 +67,7 @@ function reachesViewer(page: string): boolean {
     const src = readFileSync(file, 'utf8');
     if (VIEWER_CALL.test(strip(src))) return true;
     for (const m of src.matchAll(IMPORT)) {
+      if (TYPE_ONLY.test(m[0])) continue;
       const next = resolveImport(file, m[1] ?? m[2]!);
       if (next !== null) stack.push(next);
     }
@@ -105,6 +109,20 @@ describe('the signed-in layouts identify the browser', () => {
       expect(chain.filter(mounts).map((l) => relative(WEB, l))).not.toEqual([]);
     },
   );
+
+  it('does not follow a type-only import, which puts no code on the page', () => {
+    // The vector: the public pages' header link imports lib/v2/session-header.ts, which imports
+    // only a type from the viewer read. Followed, it would ask the prerendered home and help pages
+    // for a signed-in layout.
+    const header = readFileSync(join(WEB, 'lib/v2/session-header.ts'), 'utf8');
+    expect(header).toMatch(/^import type \{ ViewerResult \} from '\.\/account\/viewer-read';$/m);
+    expect(readFileSync(join(WEB, 'lib/v2/account/viewer-read.ts'), 'utf8')).toMatch(VIEWER_CALL);
+    expect(readFileSync(join(WEB, 'components/v2/AccountLink.tsx'), 'utf8')).toContain(
+      "from '../../lib/v2/session-header'",
+    );
+    expect(viewerPages).not.toContain('app/v2-home/page.tsx');
+    expect(viewerPages).not.toContain('app/help/page.tsx');
+  });
 
   it('each public exemption still reads the viewer, so none is stale', () => {
     for (const page of Object.keys(PUBLIC_VIEWER_PAGES)) expect(viewerPages).toContain(page);
