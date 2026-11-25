@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { hasSessionCookie } from '../../lib/v2/session-header';
-import { safeNextPath } from '../../lib/safe-next-path';
 import { Button } from './Button';
 import { LOG_IN } from './footer-links';
 
@@ -58,23 +57,4 @@ export function AccountLink() {
       {link.label}
     </Button>
   );
-}
-
-/**
- * On /login (D-38): a person already signed in is sent on, after load, by the same check: to the
- * page a `?next=` names when it is a safe path, else to the dashboard. It renders nothing.
- */
-export function LeaveIfSignedIn() {
-  useEffect(() => {
-    let live = true;
-    void signedIn().then((yes) => {
-      // Where the sign-in was headed (?next=, as LoginForm reads it), else the dashboard.
-      const next = safeNextPath(new URLSearchParams(window.location.search).get('next'));
-      if (live && yes) window.location.replace(next ?? DASHBOARD_LINK.href);
-    });
-    return () => {
-      live = false;
-    };
-  }, []);
-  return null;
 }

@@ -1,6 +1,5 @@
 import { Footer } from '@/components/layout/Footer';
 import { Header } from '@/components/layout/Header';
-import { LeaveIfSignedIn } from '@/components/v2/AccountLink';
 import { LoginForm } from './LoginForm';
 
 // The sign-in form is a client component, and Next refuses a `metadata` export from a module marked
@@ -16,8 +15,6 @@ export const metadata = {
 export default function LoginPage() {
   return (
     <>
-      {/* A person already signed in goes to the dashboard, after load (D-38): the page stays static. */}
-      <LeaveIfSignedIn />
       <Header />
       <LoginForm />
       <Footer />

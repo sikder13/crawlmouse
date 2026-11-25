@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
 /**
- * D-27, D-38: a signed-in person sees "Dashboard", not "Log in", on the public pages, and /login
- * sends them on. The public pages stay as they were for a stranger: the link renders "Log in" on the
+ * D-27: a signed-in person sees "Dashboard", not "Log in", on the public pages. The public pages stay as they were for a stranger: the link renders "Log in" on the
  * server, byte for byte the markup it replaced, and is changed only in the browser, after a check
  * that a stranger (no Supabase auth cookie) does not make at all.
  */
@@ -11,15 +10,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
-import {
-  AccountLink,
-  LeaveIfSignedIn,
-  mayBeSignedIn,
-  signedIn,
-} from '../../components/v2/AccountLink';
+import { AccountLink, mayBeSignedIn, signedIn } from '../../components/v2/AccountLink';
 import { Button } from '../../components/v2/Button';
-import LoginPage from '../../app/login/page';
-import { withoutV1Chrome } from '../../app/(v2-kept)/_lib/v1-chrome';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -58,7 +50,6 @@ describe('the server render, as a stranger and a crawler get it', () => {
         </Button>,
       ),
     );
-    expect(renderToStaticMarkup(<LeaveIfSignedIn />)).toBe('');
   });
 });
 
@@ -132,41 +123,6 @@ describe('in the browser', () => {
     const host = await mount(<AccountLink />);
     expect(host.querySelector('a')!.textContent).toBe('Log in');
   });
-
-  it.each([
-    ['?next=/r/abc', '/r/abc'],
-    ['?next=//evil.example', '/dashboard'],
-    ['?next=https://evil.example', '/dashboard'],
-  ])('/login%s sends a signed-in person to %s', async (search, to) => {
-    const replace = vi.fn();
-    vi.spyOn(window, 'location', 'get').mockReturnValue({
-      ...window.location,
-      search,
-      replace,
-    } as Location);
-    document.cookie = 'sb-proj-auth-token=x; path=/';
-    vi.stubGlobal('fetch', answer(200));
-    await mount(<LeaveIfSignedIn />);
-    expect(replace).toHaveBeenCalledWith(to);
-  });
-
-  it('/login sends a signed-in person to the dashboard, and leaves anyone else', async () => {
-    const replace = vi.fn();
-    vi.spyOn(window, 'location', 'get').mockReturnValue({
-      ...window.location,
-      replace,
-    } as Location);
-    document.cookie = 'sb-proj-auth-token=x; path=/';
-    vi.stubGlobal('fetch', answer(200));
-    await mount(<LeaveIfSignedIn />);
-    expect(replace).toHaveBeenCalledWith('/dashboard');
-    act(() => root?.unmount());
-    root = null;
-    replace.mockClear();
-    vi.stubGlobal('fetch', answer(401));
-    await mount(<LeaveIfSignedIn />);
-    expect(replace).not.toHaveBeenCalled();
-  });
 });
 
 describe('the public pages read no cookie on the server', () => {
@@ -176,8 +132,6 @@ describe('the public pages read no cookie on the server', () => {
     'app/help/page.tsx',
     'app/help/[slug]/page.tsx',
     'app/not-found.tsx',
-    'app/login/page.tsx',
-    'app/(v2-kept)/v2-kept/login/page.tsx',
     'app/v2-home/page.tsx',
     'components/v2/screens/home/HomeScreen.tsx',
     'components/v2/screens/help/HelpScreens.tsx',
@@ -185,21 +139,6 @@ describe('the public pages read no cookie on the server', () => {
   ])('%s imports no request cookies or headers', (file) => {
     const src = readFileSync(join(WEB, file), 'utf8');
     expect(src).not.toMatch(/from 'next\/headers'|cookies\(\)|supabaseServer/);
-  });
-
-  it('the /login the v2 shell serves (/v2-kept/login, keptPage(LoginPage())) keeps the redirect', () => {
-    // The kept page strips v1's header and footer and keeps the rest of LoginPage's tree.
-    const found: unknown[] = [];
-    const walk = (n: unknown): void => {
-      if (Array.isArray(n)) return n.forEach(walk);
-      if (n && typeof n === 'object' && 'type' in n) {
-        const el = n as { type: unknown; props?: { children?: unknown } };
-        if (el.type === LeaveIfSignedIn) found.push(el);
-        walk(el.props?.children);
-      }
-    };
-    walk(withoutV1Chrome(LoginPage()));
-    expect(found).toHaveLength(1);
   });
 
   it('the three screens draw the island, not a fixed "Log in" link', () => {
