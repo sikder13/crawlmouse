@@ -21,6 +21,7 @@ import { REQUEST_TIMEOUT_MS } from '@crawlmouse/engine/v2/pipeline';
 import { RENDER_STEP_MS } from './deps';
 import { NO_DAILY_BUDGET, checkSteps, type StepDeps } from './index';
 import type { WorkerClient } from '../../../worker-client/types';
+import type { RowTarget } from '../types';
 
 // persist.ts and checkMap are workstreams A's and D's: stand-ins here, so this test is about the
 // steps and the orchestration. The persist stand-in records what the persist step hands it.
@@ -32,9 +33,10 @@ vi.mock('../persist', () => ({
         .filter((p) => p.outcome === 'fetched')
         .map((p) => [p.url, { identity_sent: p.identity_sent }]),
     ),
-  persistBuiltCheck: async (_db: unknown, input: unknown) => {
+  // One persist step that writes every row and finishes the check (persist.ts persistStep).
+  persistStep: async (_db: unknown, input: unknown) => {
     persisted.push(input);
-    return { written: true, counts: {}, verified: [] };
+    return { next: null, outcome: { written: true, counts: {}, verified: [] } };
   },
   // What the build read of the fixes, marked so the persist step's hand-over can be seen.
   readOfFixes: (fixes: unknown[], events: unknown[]) => [
@@ -58,7 +60,10 @@ const UNUSED_DB = {
   stageCheckRows: async (): Promise<unknown> => {
     throw new Error('persistDb is not called in this test');
   },
-  edgeTarget: async (): Promise<{ lineageId: string; checkMonth: string }> => {
+  rowTarget: async (): Promise<RowTarget> => {
+    throw new Error('persistDb is not called in this test');
+  },
+  insertPageResults: async (): Promise<void> => {
     throw new Error('persistDb is not called in this test');
   },
   insertEdges: async (): Promise<void> => {

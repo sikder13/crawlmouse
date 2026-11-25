@@ -35,6 +35,7 @@ import { CRAWL_CEILING_S, PACE, QUEUE_WAIT_MAX_S } from '../limits';
 import { fakeWorker, memoryStore, queuedCheck } from '../test-support/fakes';
 import { memoryEvidenceStore } from '../test-support/memory-evidence';
 import { NO_DAILY_BUDGET, checkSteps, type StepDeps } from './index';
+import type { RowTarget } from '../types';
 
 const persisted = vi.hoisted(() => [] as unknown[]);
 vi.mock('../persist', () => ({
@@ -44,9 +45,9 @@ vi.mock('../persist', () => ({
         .filter((p) => p.outcome === 'fetched')
         .map((p) => [p.url, { identity_sent: p.identity_sent }]),
     ),
-  persistBuiltCheck: async (_db: unknown, input: unknown) => {
+  persistStep: async (_db: unknown, input: unknown) => {
     persisted.push(input);
-    return { written: true, counts: {}, verified: [] };
+    return { next: null, outcome: { written: true, counts: {}, verified: [] } };
   },
   readOfFixes: () => [],
 }));
@@ -64,7 +65,10 @@ const UNUSED_DB = {
   stageCheckRows: async (): Promise<unknown> => {
     throw new Error('persistDb is not called in this test');
   },
-  edgeTarget: async (): Promise<{ lineageId: string; checkMonth: string }> => {
+  rowTarget: async (): Promise<RowTarget> => {
+    throw new Error('persistDb is not called in this test');
+  },
+  insertPageResults: async (): Promise<void> => {
     throw new Error('persistDb is not called in this test');
   },
   insertEdges: async (): Promise<void> => {

@@ -93,17 +93,33 @@ export interface PersistDb {
   ): Promise<unknown>;
   persistBuiltCheck(payload: unknown): Promise<unknown>;
   /**
-   * F-330: the id of the check's `fetching` lineage, written first as persist_built_check writes it
-   * (`on conflict do nothing` on its natural key), and the check's `check_month`: what a link edge
-   * row names before persist_built_check runs.
+   * F-330: what a page or edge row names before persist_built_check runs, and whether it may be
+   * written. Throws when the check does not exist, or when the built check's site, trigger, grade
+   * version, queue time or start time differs from its row (persist_built_check's own refusals,
+   * asked before any row is written). A check that is not running answers its status and nothing
+   * else. A running one has its month's partitions made and its `fetching` lineage written as
+   * persist_built_check writes it (`on conflict do nothing` on the natural key), and answers the
+   * lineage's id and the check's `check_month`.
    */
-  edgeTarget(
-    checkId: string,
-    fetching: unknown,
-  ): Promise<{ lineageId: string; checkMonth: string }>;
+  rowTarget(checkId: string, fetching: unknown, identity: CheckIdentity): Promise<RowTarget>;
+  /** F-330: one piece of a check's page rows; a row already written is skipped, not an error. */
+  insertPageResults(rows: readonly Record<string, unknown>[]): Promise<void>;
   /** F-330: one piece of a check's link edges; a row already written is skipped, not an error. */
   insertEdges(rows: readonly Record<string, unknown>[]): Promise<void>;
 }
+
+/** The columns persist_built_check holds a built check to, as its row has them. */
+export interface CheckIdentity {
+  site_id: string;
+  trigger: string;
+  grade_version: string;
+  queued_at: string;
+  started_at: string | null;
+}
+
+export type RowTarget =
+  | { running: true; lineageId: string; checkMonth: string }
+  | { running: false; status: string };
 
 /** The tables the read-back reads. */
 export type ReadTable =

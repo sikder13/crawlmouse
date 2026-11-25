@@ -10,8 +10,8 @@
  * check.test.ts moves the system clock between invocations).
  *
  * Step order: claim (with `claim-wait-{i}` / `claim-{i}` while the site is busy) → discover → crawl
- * batches `crawl-{n}` → access batches `access-{stage}` → render → build → persist → emit →
- * finalize. A batch is `{p}-post` (busy: `{p}-post-busy-{k}`, `{p}-post-{k}`), then `{p}-wait-{i}` and
+ * batches `crawl-{n}` → access batches `access-{stage}` → render → build → persist (and
+ * `persist-{k}` while rows are left to write) → emit → finalize. A batch is `{p}-post` (busy: `{p}-post-busy-{k}`, `{p}-post-{k}`), then `{p}-wait-{i}` and
  * `{p}-poll-{i}` until the batch is done, failed or past its deadline, then `{p}-read`. A worker
  * that signals a batch's end replaces the wait with `{p}-done-{i}`, and a poll follows only a wait
  * that timed out. A batch the worker lost is posted once more (`{p}-repost`), and a later read is
@@ -46,6 +46,12 @@ export const CHECK_CANCELLED_FN_ID = 'crawlmouse.check.cancelled';
  * window closes (steps/time.ts); the budget bounds what is added back, not what is waited.
  */
 export const QUEUE_WAIT_MAX_S = 900;
+/**
+ * The most further persist steps a check takes (F-330). At 50 pieces a step of at most 2,000 rows,
+ * 40 steps are 4,000,000 rows past the first step's, far past any check the build's bound lets
+ * through; a run past it is a fault, and fails persist_failed rather than loop.
+ */
+export const PERSIST_STEPS_MAX = 40;
 
 /** The orchestration's waits and bounds, in seconds unless named otherwise. */
 export const PACE = {
@@ -200,7 +206,11 @@ export type ReadOutput =
   | { status: 'failed' };
 export type RenderOutput = { rendered: number; not_rendered: number };
 export type BuildOutput = { status: 'finished' | 'partial'; pages: number; fixes: number };
-export type PersistOutput = { written: boolean };
+/**
+ * `next`: the first piece of rows a further persist step writes (F-330), or null when the check is
+ * persisted. An output stored by a release before it has none, and reads as null.
+ */
+export type PersistOutput = { written: boolean; next?: number | null };
 /**
  * Whether the check is failed with the reason asked for (by this call, or by an earlier one with the
  * same reason that this call retries), and if so the site the database holds it under.
@@ -225,7 +235,8 @@ export interface CheckSteps {
   failBatch(event: CheckRequested, at: BatchAt): Promise<Empty>;
   render(event: CheckRequested, so: RunSoFar): Promise<RenderOutput>;
   build(event: CheckRequested, so: RunSoFar): Promise<BuildOutput>;
-  persist(event: CheckRequested): Promise<PersistOutput>;
+  /** Writes rows from piece `from` (0 on the first step); the last step also finishes the check. */
+  persist(event: CheckRequested, from?: number): Promise<PersistOutput>;
   finalize(event: CheckRequested): Promise<Empty>;
   /** Marks the check failed unless it has ended; `failed` says whether it is failed with `reason`. */
   fail(event: CheckRequested, reason: FailureReason): Promise<FailOutput>;
@@ -511,7 +522,23 @@ export async function runCheck(
   const built = await failingAs('build_failed', () =>
     run('build', () => steps.build(data, soFar())),
   );
-  await failingAs('persist_failed', () => run('persist', () => steps.persist(data)));
+  // F-330: a step writes at most PIECES_PER_STEP pieces of rows (persist.ts); a check with more
+  // takes `persist-1`, `persist-2`, … from where the last one stopped, so no invocation runs toward
+  // the route's 300 s and a retry repeats one step's pieces. The first step keeps its id.
+  let persisted = await failingAs('persist_failed', () =>
+    run('persist', () => steps.persist(data)),
+  );
+  for (let k = 1; (persisted.next ?? null) !== null; k++) {
+    if (k > PERSIST_STEPS_MAX) {
+      throw new CheckFailure('persist_failed', {
+        cause: new Error(`more than ${PERSIST_STEPS_MAX} persist steps`),
+      });
+    }
+    const from = persisted.next!;
+    persisted = await failingAs('persist_failed', () =>
+      run(`persist-${k}`, () => steps.persist(data, from)),
+    );
+  }
   // Before finalize: a finalize that fails after the check is persisted cannot cost its event.
   await step.sendEvent('emit', {
     id: checkFinishedEventId(data.checkId),
