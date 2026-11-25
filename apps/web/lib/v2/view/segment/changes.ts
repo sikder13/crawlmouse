@@ -211,7 +211,12 @@ export function rowOf(
     key: c.id,
     when: at(c.detected_at),
     kind: c.kind,
-    pill: { state: PILL[c.kind], label: c.kind },
+    // A fix first seen at an earlier check and opened again here came back: "reopened" (D-33).
+    // The kind stays `opened`, so a filter by kind and the counts read it as before.
+    pill: {
+      state: PILL[c.kind],
+      label: c.kind === 'opened' && seen !== null ? 'reopened' : c.kind,
+    },
     summary: c.summary,
     subject: SUBJECTS[c.subject],
     where: c.where,

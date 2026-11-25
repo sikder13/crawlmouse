@@ -158,7 +158,13 @@ describe('changesView: a check that found changes', () => {
               // Seen earlier only for an opened row: a resolved or changed one was observed here.
               (specs[i]!.seenEarlier && specs[i]!.kind === 'opened'
                 ? /^First seen at the Sat 24 Oct 22:34 check[.;]/.test(r.cause)
-                : /^First observed /.test(r.cause)) && !/\bcaused by\b/i.test(r.cause),
+                : /^First observed /.test(r.cause)) &&
+              !/\bcaused by\b/i.test(r.cause) &&
+              // D-33: the pill says "reopened" exactly when the fix was first seen earlier.
+              r.pill.label ===
+                (specs[i]!.seenEarlier && specs[i]!.kind === 'opened'
+                  ? 'reopened'
+                  : specs[i]!.kind),
           )
         );
       }),
@@ -232,6 +238,21 @@ describe('changesView: a fix found again (F-213)', () => {
     expect(changesView(d, HISTORY).rows.find((r) => r.key === OPENED)!.cause).toBe(
       'First observed at this check. What we found: Marked done on 2026-10-28, and found again on this check.',
     );
+  });
+
+  // D-33 (QA's dashboard walk): a fix marked done and found again was labelled "opened".
+  it('labels the row "reopened" when the fix was first seen at an earlier check (D-33)', () => {
+    expect(reopened(FIRST_AUDIT).pill).toEqual({ state: 'bad', label: 'reopened' });
+    expect(reopened('c0000000-0000-4000-8000-0000000000ff').pill).toEqual({
+      state: 'bad',
+      label: 'reopened',
+    });
+    // First seen at this check: a new fix, "opened" as before.
+    expect(reopened(HISTORY).pill).toEqual({ state: 'bad', label: 'opened' });
+  });
+
+  it('keeps the row\'s kind "opened", so a filter by kind still finds it (D-33)', () => {
+    expect(reopened(FIRST_AUDIT).kind).toBe('opened');
   });
 
   it('reads as before for a fix first seen at this check', () => {
