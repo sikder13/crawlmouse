@@ -111,8 +111,22 @@
   color: var(--v2-fg);
 }
 
+/* The sign-out wears this look, and is drawn whether or not analytics run: its focus is shown. */
+.feedback:focus-visible {
+  outline: 2px solid var(--v2-fg);
+  outline-offset: 2px;
+}
+
 .card {
   margin-top: auto;
+}
+
+/* The sign-out's marker and its form are boxes of their own, so the rail's last child, and the
+   button's parent, have a size to measure; the button wears the feedback button's look. */
+.signOut,
+.signOut form {
+  display: flex;
+  flex-direction: column;
 }
 
 /* Skip to the page: read first, and drawn only while it has focus. */

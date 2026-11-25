@@ -16,10 +16,15 @@
  * - `api_keys`: the account's unrevoked keys; a seat that cannot read them passes none.
  * - `agency_brands`: branding.
  *
- * What no table holds: integrations (no table records a connection, so the list is empty), the
+ * What no table holds: integrations (no table records a connection, so the list is empty) and the
  * Agency trial's consent (an account whose history holds an Agency trial is refused rather than
- * given a consent nothing recorded), and a logo URL (agency_brands.logo_path is a storage path; a
- * stored logo is refused rather than dropped).
+ * given a consent nothing recorded).
+ *
+ * The logo URL is derived, not stored: `agency_brands.logo_path` is a path in the public
+ * `report-logos` bucket, and `logoPublicUrl` (lib/report-brand.ts) turns it into the URL the v1
+ * report already serves logos at. That reads `NEXT_PUBLIC_SUPABASE_URL`; when the URL cannot be
+ * built, or is not https (a local Supabase serves http), `logo_url` is null and the failure is
+ * logged, so a deployment's configuration never takes every account page down with it.
  */
 import {
   AccountSchema,
@@ -33,6 +38,7 @@ import {
   type Seat,
 } from '@crawlmouse/types/v2';
 import { GATES, type Tier } from '../../entitlement-v2';
+import { logoPublicUrl } from '../../report-brand';
 import { instantFromDb } from '../pipeline/rows';
 
 type Row = Record<string, unknown>;
@@ -118,17 +124,29 @@ function unrevoked(key: Row): boolean {
   return key.revoked_at === null;
 }
 
+/** The stored logo's public URL; null with no logo, or when no https URL can be built for it. */
+function logoUrl(b: Row): string | null {
+  if (!Object.hasOwn(b, 'logo_path'))
+    throw new Error('accountFromRow: an agency_brands row must carry logo_path');
+  const path = b.logo_path;
+  if (path === null) return null;
+  const url = typeof path === 'string' ? logoPublicUrl(path) : null;
+  if (url === null || !url.startsWith('https://')) {
+    console.error(
+      `accountFromRow: account ${String(b.account_id)} has a stored logo and no https URL to serve it at`,
+    );
+    return null;
+  }
+  return url;
+}
+
 /** A row's columns are passed as they are, so one read without a column fails the schema. */
 function brandingFromRow(b: Row): AgencyBranding {
-  if (b.logo_path !== null)
-    throw new Error(
-      `accountFromRow: account ${String(b.account_id)} has a stored logo and no URL to serve it at`,
-    );
   const domain = b.portal_domain;
   const sender = b.sender_from;
   return {
     agency_name: b.agency_name,
-    logo_url: null,
+    logo_url: logoUrl(b),
     accent_hex: b.accent_hex,
     portal_domain: domain,
     dns:
