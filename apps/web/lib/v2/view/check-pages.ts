@@ -16,6 +16,7 @@ import {
   type CheckQuestion,
   type Paragraph,
 } from '../copy/check-pages';
+import { ALL_SHOWN, type Features } from '../features';
 import { findCheck, fixture } from '../fixtures';
 import { listOf } from '../format';
 import { stateAt } from '../progress';
@@ -29,8 +30,8 @@ export type CheckPageBlock =
   | {
       kind: 'table';
       label: string;
-      columns: [string, string, string];
-      rows: { key: string; cells: [string, string, string] }[];
+      columns: string[];
+      rows: { key: string; cells: string[] }[];
       sources: readonly string[];
     };
 
@@ -56,17 +57,19 @@ function exampleCheck() {
   return { d, check: findCheck(d, CHECKS.badFirstAudit) };
 }
 
-function gptbotBlocks(): CheckPageBlock[] {
+function gptbotBlocks(features: Features): CheckPageBlock[] {
   const { check } = exampleCheck();
   const [p1, ...rest] = CHECK_COPY.gptbot.paragraphs;
   const t = CHECK_DATA_COPY.openAiTable;
+  // Without the AI readability letter (Goal 1 switch), no sentence or column names the grade.
+  const grade = features.ai_letter;
   const rows = OPENAI.map((ua) => {
     const crawler = check.crawlers.find((c) => c.ua === ua);
     const bot = AI_BOT_REGISTRY.find((b) => b.token === ua);
     if (!crawler || !bot) throw new Error(`The check pages need ${ua} in the check and the list`);
     return {
       key: ua,
-      cells: [ua, bot.note, crawler.scored ? t.counted : t.notCounted] as [string, string, string],
+      cells: grade ? [ua, bot.note, crawler.scored ? t.counted : t.notCounted] : [ua, bot.note],
     };
   });
   const scored = check.crawlers.filter((c) => c.scored).map((c) => c.ua);
@@ -75,19 +78,23 @@ function gptbotBlocks(): CheckPageBlock[] {
     {
       kind: 'table',
       label: t.label,
-      columns: [t.crawler, t.does, t.grade],
+      columns: grade ? [t.crawler, t.does, t.grade] : [t.crawler, t.does],
       rows,
       sources: CHECK_DATA_COPY.openAiSources,
     },
-    paragraph({
-      text: CHECK_DATA_COPY.scored(listOf(scored)),
-      sources: CHECK_DATA_COPY.scoredSources,
-    }),
+    ...(grade
+      ? [
+          paragraph({
+            text: CHECK_DATA_COPY.scored(listOf(scored)),
+            sources: CHECK_DATA_COPY.scoredSources,
+          }),
+        ]
+      : []),
     ...rest.map(paragraph),
   ];
 }
 
-function javascriptBlocks(): CheckPageBlock[] {
+function javascriptBlocks(features: Features): CheckPageBlock[] {
   const { d } = exampleCheck();
   const { withoutJs: w } = homeView(d, CHECKS.badFirstAudit, {
     map: mapDrawing('bad-site'),
@@ -101,39 +108,59 @@ function javascriptBlocks(): CheckPageBlock[] {
     }),
     paragraph(p1!),
     paragraph(p2!),
-    paragraph({
-      text: CHECK_DATA_COPY.example({
-        path: w.path,
-        browser: count(w.browserWords),
-        bot: w.bot,
-        botWords: count(w.botWords),
-        share: w.share,
-        pages: capitalise(count(w.templatePages)),
-        noun: w.templateNoun,
-      }),
-      sources: CHECK_DATA_COPY.exampleSources,
-    }),
+    // The sample's per-page figure is the without-JavaScript measurement (Goal 1 row 4).
+    ...(features.nojs
+      ? [
+          paragraph({
+            text: CHECK_DATA_COPY.example({
+              path: w.path,
+              browser: count(w.browserWords),
+              bot: w.bot,
+              botWords: count(w.botWords),
+              share: w.share,
+              pages: capitalise(count(w.templatePages)),
+              noun: w.templateNoun,
+            }),
+            sources: CHECK_DATA_COPY.exampleSources,
+          }),
+        ]
+      : []),
     paragraph(p3!),
   ];
 }
 
-const BLOCKS: Record<CheckQuestion, () => CheckPageBlock[]> = {
+const BLOCKS: Record<CheckQuestion, (features: Features) => CheckPageBlock[]> = {
   gptbot: gptbotBlocks,
   javascript: javascriptBlocks,
   'robots-ai': () => CHECK_COPY['robots-ai'].paragraphs.map(paragraph),
 };
 
-export function checkPageView(question: CheckQuestion): CheckPageView {
+/** `features`: what the Goal 1 switch hides, read by the page (`shownFeatures()`); nothing by default. */
+export function checkPageView(
+  question: CheckQuestion,
+  features: Features = ALL_SHOWN,
+): CheckPageView {
   const copy = CHECK_COPY[question];
   return {
     question,
     canonical: checkPath(question),
     h1: copy.h1,
-    sub: copy.sub,
+    sub: question === 'javascript' && !features.nojs ? CHECK_DATA_COPY.subWithoutNojs : copy.sub,
     heroNote: FUNNEL.heroNote(count(GATES.free.pagesPerCheck)),
     heading: copy.heading,
-    blocks: BLOCKS[question](),
+    blocks: BLOCKS[question](features),
     closing: FUNNEL.closing,
     formLabel: FUNNEL.formLabel,
   };
+}
+
+/**
+ * A page's meta description, also its social text and its `/llms.txt` line: `/check/javascript`'s
+ * promises the per-page figure, so with `nojs` hidden it is `descriptionWithoutNojs`. The title is
+ * the same either way.
+ */
+export function checkDescription(question: CheckQuestion, features: Features = ALL_SHOWN): string {
+  return question === 'javascript' && !features.nojs
+    ? CHECK_DATA_COPY.descriptionWithoutNojs
+    : CHECK_COPY[question].description;
 }

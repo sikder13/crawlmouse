@@ -3,13 +3,14 @@
  * alert card, as data from the bad-site fixture. The marketing copy around them is the component's.
  */
 import type { AccessCause, CrawlerResult } from '@crawlmouse/types/v2';
+import { ALL_SHOWN, type Features } from '../features';
 import { crawlerOf, findCheck, fixesAsOf, siteOf, templateOf } from '../fixtures';
 import { duration, percent, templateNoun, weekdayTime } from '../format';
 import { mapLabel } from '../map-label';
 import { toneOf } from '../letters';
 import type { CrawlState } from '../progress';
 import type { MapDrawing } from './map';
-import type { GradeView } from './result';
+import { AI_READABILITY_LABEL, type GradeView } from './result';
 import { isFreeFix } from './free-fixes';
 import { aiShortSummary, seoShortSummary } from '../sentences';
 import { capitalise } from '../words';
@@ -24,13 +25,16 @@ export interface VerdictView {
 }
 
 export interface HomeView {
+  /** Which Goal 1 features may be named: the record the server entry point passed in. */
+  features: Features;
   example: {
     domain: string;
     duration: string;
     pagesCrawled: number;
     pagesTotal: number;
     links: number;
-    grades: [GradeView, GradeView];
+    /** Technical SEO, then AI readability unless the Goal 1 switch hides its letter. */
+    grades: GradeView[];
     map: MapDrawing;
     mapLabel: string;
   };
@@ -40,7 +44,8 @@ export interface HomeView {
       crawler: string;
       homepage: VerdictView;
       products: VerdictView;
-      text: string;
+      /** The share of text it can read; null while the Goal 1 switch hides `nojs`. */
+      text: string | null;
       obstacle: string;
     }[];
   };
@@ -64,6 +69,18 @@ export interface HomeView {
   };
 }
 
+/**
+ * A crawler whose check records a without-JavaScript finding on any template, including one the
+ * table does not show: a thin verdict, or a client-rendered template as its cause.
+ */
+function isNojsFinding(c: CrawlerResult): boolean {
+  return (
+    c.cause === 'client_rendered_template' ||
+    c.by_template.some((x) => x.verdict === 'allowed_thin')
+  );
+}
+
+/** What is in the crawler's way, as the check recorded it. */
 function obstacle(c: CrawlerResult, productNoun: string): string {
   if (c.group === 'search_engine' && c.verdict === 'allowed') {
     return 'nothing: robots.txt allows it and it renders JavaScript';
@@ -85,11 +102,13 @@ function obstacle(c: CrawlerResult, productNoun: string): string {
 /**
  * `end` is the crawl screen's replay at its end, so Home's example is that replay scrubbed to its
  * last frame; its counts are the stream's own (synthesise.test.ts shows they equal the check's).
+ * `features`: what the Goal 1 switch hides, read by the server entry point; nothing by default.
  */
 export function homeView(
   d: ViewDataset,
   checkId: string,
   { map, end }: { map: MapDrawing; end: CrawlState },
+  features: Features = ALL_SHOWN,
 ): HomeView {
   if (end.ended === null || !end.grades || end.pages_estimated === null) {
     throw new Error('Home shows the replay at its end');
@@ -150,7 +169,22 @@ export function homeView(
   if (!change) throw new Error('The example site has no crawler-access change');
   const zone = d.accounts.find((a) => a.id === site.account_id)?.timezone ?? 'UTC';
 
+  // `nojs` hidden: a page reachable only through JavaScript is drawn and counted as an ordinary
+  // page, and its link as an ordinary link, so neither the triangle (whose legend item is gone), the
+  // dashed edge nor the label names JavaScript.
+  const drawn: MapDrawing = features.nojs
+    ? map
+    : {
+        ...map,
+        nodes: map.nodes.map((n) => ({
+          ...n,
+          kind: n.kind === 'js_only' ? ('page' as const) : n.kind,
+          via: n.via === 'javascript' ? ('link' as const) : n.via,
+        })),
+      };
+
   return {
+    features,
     example: {
       domain: site.host,
       duration: duration(end.elapsed_ms),
@@ -166,30 +200,43 @@ export function homeView(
           withheld: false,
           summary: seoShortSummary(check, fixes, isOpen),
         },
-        {
-          label: 'AI readability',
-          letter: ai.grade,
-          score: ai.total,
-          tone: toneOf(ai.grade),
-          withheld: false,
-          summary: aiShortSummary(check),
-        },
+        ...(features.ai_letter
+          ? [
+              {
+                label: AI_READABILITY_LABEL,
+                letter: ai.grade,
+                score: ai.total,
+                tone: toneOf(ai.grade),
+                withheld: false,
+                summary: aiShortSummary(check, features.nojs),
+              },
+            ]
+          : []),
       ],
-      map,
-      mapLabel: mapLabel(map.nodes, false),
+      map: drawn,
+      mapLabel: mapLabel(drawn.nodes, false),
     },
     crawlers: {
       productHeader: `${capitalise(productNoun.pages)} · ${product.pages}`,
-      rows: HOME_CRAWLERS.map((ua) => {
-        const c = crawlerOf(check, ua);
-        return {
-          crawler: ua,
-          homepage: cell(c, '/'),
-          products: cell(c, product.template_key),
-          text: c.text_share === null ? 'not measured' : `${percent(c.text_share)}%`,
-          obstacle: obstacle(c, productNoun.adjective),
-        };
-      }),
+      // `nojs` hidden: a crawler whose row is a without-JavaScript finding (a thin verdict, or a
+      // client-rendered template in its way) is left out of the table. No row is reworded, so each
+      // row shown says what the check recorded.
+      rows: HOME_CRAWLERS.map((ua) => crawlerOf(check, ua))
+        .filter((c) => features.nojs || !isNojsFinding(c))
+        .map((c) => {
+          const ua = c.ua;
+          return {
+            crawler: ua,
+            homepage: cell(c, '/'),
+            products: cell(c, product.template_key),
+            text: !features.nojs
+              ? null
+              : c.text_share === null
+                ? 'not measured'
+                : `${percent(c.text_share)}%`,
+            obstacle: obstacle(c, productNoun.adjective),
+          };
+        }),
     },
     withoutJs: {
       path: new URL(page.url).pathname,
