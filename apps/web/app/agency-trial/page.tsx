@@ -2,7 +2,7 @@ import '../../styles/v2/tokens.css';
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { AgencyTrialScreen } from '@/components/v2/screens/agency-trial/AgencyTrialScreen';
-import { agencySalesOpen, billingV2Enabled } from '@/lib/billing/flags';
+import { agencySalesOpen, billingOpenTo, billingV2Enabled } from '@/lib/billing/flags';
 import { supabasePortalAccounts } from '@/lib/billing/portal-v2';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { supabaseServer } from '@/lib/supabase/server';
@@ -26,7 +26,9 @@ export const metadata: Metadata = {
 
 /**
  * The Agency trial page (CC-29 D3). With V2_BILLING off, or Agency not on sale (V2_AGENCY_SALES),
- * it sends the visitor to For agencies (RC-01, a temporary redirect), and reads nothing; a signed-out visitor is sent to
+ * it sends the visitor to For agencies (RC-01, a temporary redirect), and reads nothing. While paying is kept to
+ * one user (V2_BILLING_ONLY_USER), a signed-in visitor who is not that user is sent there too, once the
+ * session is read. A signed-out visitor is sent to
  * sign in and back here. The form posts to /api/agency-trial. An owned agency account on the trial,
  * Agency or past due gets its Manage billing and Cancel here, naming the account (Q26);
  * `?cancel=<id>` shows that account's confirmation, CC-03's second click.
@@ -46,6 +48,8 @@ export default async function AgencyTrialPage({
   }
   const now = new Date();
   const userId = r.kind === 'viewer' ? r.viewer.userId : r.userId;
+  // While paying is kept to one user (V2_BILLING_ONLY_USER), the trial is that user's alone.
+  if (!billingOpenTo(userId)) redirect('/agencies');
   const rows = await readAgencyAccounts(await supabaseServer(), userId);
   const admin = supabaseAdmin();
   const used = await readUsedAgencyTrial(admin, userId);
