@@ -14,3 +14,10 @@ export {
   type RenderOutcome,
 } from './run.js';
 export { FREE_MAX_RENDERS, type RenderCandidate } from './sample.js';
+export {
+  FULL_RENDER_CHUNK_PAGES,
+  FULL_RENDER_MAX_BROWSER_MS,
+  FULL_RENDER_PAGE_RESERVE_MS,
+  fullRenderPlan,
+  mergeFullRender,
+} from './full.js';

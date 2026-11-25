@@ -28,7 +28,7 @@ import { diffBuilt, diffInputsOf } from './diff.js';
 import { gradeAssembled } from './grade.js';
 import { lineagesOf, usageOf } from './lineage.js';
 import { renderable } from '../render/sample.js';
-import { plannedEmptyRoots, renderCandidates, sample } from './plan.js';
+import { fullRenderCandidates, plannedEmptyRoots, renderCandidates, sample } from './plan.js';
 import { decideStatus } from './status.js';
 import { checkRecord, robotsText } from './record.js';
 import { summariesOf } from './summaries.js';
@@ -87,9 +87,14 @@ export function buildCheck(input: BuildInput): BuiltCheck {
   // The graded phase renders sampled pages it may render (render/sample.ts `renderable`), and the
   // empty-root phase the empty-root pages `selectEmptyRoots` picks from this crawl
   // (render/empty-root.ts); nothing else is admitted.
+  // Row 17: a full render renders every renderable page, so with one, any of them is admitted.
   const gradedPhase = new Set(
-    renderCandidates(assembledOf, [...planned.stage1, ...planned.stage2], [], new Map())
-      .candidates.filter(renderable)
+    (input.render?.full === true
+      ? fullRenderCandidates(assembledOf)
+      : renderCandidates(assembledOf, [...planned.stage1, ...planned.stage2], [], new Map())
+          .candidates
+    )
+      .filter(renderable)
       .map((c) => c.url),
   );
   const emptyRoots = plannedEmptyRoots(assembledOf);

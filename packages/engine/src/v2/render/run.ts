@@ -143,6 +143,11 @@ export interface RenderOutcome {
    * its reservation; CC-20 decides how the store is corrected.
    */
   settle_failed: boolean;
+  /**
+   * Row 17: a full render (full.ts), every renderable page and not the sample. The build then admits a
+   * render of any renderable page. Absent on a sampled render.
+   */
+  full?: true;
 }
 
 export interface RenderCheckInput {

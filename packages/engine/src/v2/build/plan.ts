@@ -371,6 +371,22 @@ export const awaitingShellTemplates = (
  * pages' states in the previous check, which CC-20b reads from that check's PageResults, and, for the
  * empty-root phase, every crawled page with EMPTY_ROOT_MAX_RENDERS.
  */
+/**
+ * Row 17: every crawled page as a render candidate, for a full render (render/full.ts) and for the
+ * build's admission of one. The same candidates renderCandidates gives, from every page, not the
+ * sample.
+ */
+export const fullRenderCandidates = (
+  assembled: Pick<Assembled, 'pages' | 'content'>,
+): readonly RenderCandidate[] =>
+  // renderCandidates reads only the sampled pages' URLs.
+  renderCandidates(
+    assembled,
+    assembled.pages.map((p) => ({ url: p.url }) as SampledPage),
+    [],
+    new Map(),
+  ).candidates;
+
 export function renderCandidates(
   assembled: Pick<Assembled, 'pages' | 'content'>,
   sampled: readonly SampledPage[],
