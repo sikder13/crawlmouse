@@ -8,3 +8,6 @@ test-results
 playwright-report
 tsconfig.tsbuildinfo
 next-env.d.ts
+
+# A Vercel build moves the preview screens here before next build (scripts/prebuild.mjs).
+.vercel-excluded/

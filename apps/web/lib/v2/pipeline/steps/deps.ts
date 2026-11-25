@@ -6,6 +6,7 @@ import type { DailyBudget, renderCheck } from '@crawlmouse/engine/v2/pipeline';
 import type { WorkerClient } from '../../../worker-client/types';
 import type { LedgerDraftSink } from '../../ledger/draft-step';
 import type { DiscoverDeps } from '../discover';
+import { RENDER_SHARE_S } from '../limits';
 import type { PipelineStore } from '../store';
 import type { EvidenceStore, PersistDb } from '../types';
 
@@ -37,7 +38,10 @@ export interface StepDeps {
   render: {
     client: RenderInput['client'];
     caps: RenderInput['caps'];
+    /** Used when `dailyFor` is absent. */
     daily: DailyBudget;
+    /** The durable budget for one check; production wires it (render-budget.ts). */
+    dailyFor?: (checkId: string) => DailyBudget;
     inFlight: number;
     /** Left out in production, so the engine's admission (DNS, the SSRF rule) decides. */
     admit?: RenderInput['admit'];
@@ -46,10 +50,18 @@ export interface StepDeps {
 }
 
 /**
- * Q7: no durable daily render budget exists yet, and one kept in memory would count per Vercel
- * instance, not per day. The pipeline passes this one, which throws, so renderCheck renders nothing:
- * a sampled page records `daily_budget_unavailable`, or a reason renderCheck finds before it asks the
- * budget (`not_configured`, `caps_not_configured`, `check_cap`).
+ * How long the render step may render, counted from the step's start: its share of the run's reserve
+ * after the last batch (`RENDER_SHARE_S` of `RESERVE_S`), so build, persist and finalize keep the
+ * rest. Within the step it leaves time of the function's 300 s (`maxDuration`) for settling the
+ * budget and storing the outcome.
+ */
+export const RENDER_STEP_MS = RENDER_SHARE_S * 1000;
+
+/**
+ * The budget for a wiring with no durable one: it throws, so renderCheck renders nothing. A sampled
+ * page records `daily_budget_unavailable`, or a reason renderCheck finds before it asks the budget
+ * (`not_configured`, `caps_not_configured`, `check_cap`). One kept in memory would count per Vercel
+ * instance, not per day.
  */
 export const NO_DAILY_BUDGET: DailyBudget = {
   reserve: async () => {
