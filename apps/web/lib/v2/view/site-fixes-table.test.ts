@@ -1,7 +1,7 @@
 /**
  * F-099: the site page's fixes table lists what the tier opens first, agrees with what Free opens,
  * offers no packet it would refuse, and "Show all" shows all. On bad-site's example-outfitter.com the
- * live fixes in rank order are numbers 1, 2, 0, 3, 5, 4, then 6 to 15: sixteen, and Free opens the
+ * live fixes in rank order are numbers 1, 2, 16, 3, 5, 4, then 6 to 15: sixteen, and Free opens the
  * first three of that order.
  */
 import { readFileSync } from 'node:fs';
@@ -41,7 +41,7 @@ describe('on Pro', () => {
   const t = () => siteView(bad, viewer, SITE).fixes;
 
   it('lists the fixes in impact order, by the engine’s rank', () => {
-    expect(t().rows.map((r) => r.number)).toEqual([1, 2, 0, 3, 5]);
+    expect(t().rows.map((r) => r.number)).toEqual([1, 2, 16, 3, 5]);
   });
 
   it('does not mark any row as Pro, and every row has its packet', () => {
@@ -63,7 +63,7 @@ describe('on Free', () => {
       [7, false],
       [1, false],
       [2, false],
-      [0, true],
+      [16, true],
       [3, true],
     ]);
   });
@@ -112,13 +112,13 @@ describe('on Free', () => {
 
 describe('the folded row', () => {
   it('is not used to fold a single fix', () => {
-    const live = new Set([0, 1, 2, 3, 4, 5]);
+    const live = new Set([1, 2, 3, 4, 5, 16]);
     const six: FixtureDataset = {
       ...bad,
       fixes: bad.fixes.filter((f) => f.site_id !== SITE || live.has(f.number)),
     };
     const t = siteView(six, viewer, SITE).fixes;
-    expect(t.rows.map((r) => r.number)).toEqual([1, 2, 0, 3, 5, 4]);
+    expect(t.rows.map((r) => r.number)).toEqual([1, 2, 16, 3, 5, 4]);
     expect(t.rest).toBeNull();
   });
 
