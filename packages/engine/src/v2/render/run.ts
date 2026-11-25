@@ -176,7 +176,12 @@ const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, 
 
 const graded = (p: RenderCandidate) => p.kind === 'content' && p.status_code === 200 && p.is_html;
 
-/** What one page reserves from its phase's allowance before it runs: both of its renders. */
+/**
+ * What one page reserves from its phase's allowance (browser time, against the caps) before it
+ * runs: both of its renders. The deadline is tested per request instead (`fits(REQUEST_TIMEOUT_MS)`
+ * before each), so a step whose share is exactly two requests long can still render (QA B1 on #172):
+ * a request starts only while it could still finish by the deadline.
+ */
 const PAGE_RESERVE_MS = 2 * RESERVE_PER_RENDER_MS;
 
 export async function renderCheck(input: RenderCheckInput): Promise<RenderOutcome> {
@@ -270,7 +275,7 @@ async function renderPhase(
     if (input.deadlineAt === undefined) return work;
     // A refusal that lands after the wait ended has nobody to hear it.
     work.catch(() => undefined);
-    const left = input.deadlineAt - PAGE_RESERVE_MS - now();
+    const left = input.deadlineAt - REQUEST_TIMEOUT_MS - now();
     if (left < 0) return 'late';
     let timer: ReturnType<typeof setTimeout> | undefined;
     const late = new Promise<'late'>((resolve) => {
@@ -328,7 +333,7 @@ async function renderPhase(
   async function reserve(allowanceMs: number): Promise<NotRenderedReason | null> {
     for (;;) {
       if (stopped) return stopped;
-      if (!fits(PAGE_RESERVE_MS)) return (stopped = 'out_of_time');
+      if (!fits(REQUEST_TIMEOUT_MS)) return (stopped = 'out_of_time');
       if (checkHeld + PAGE_RESERVE_MS <= allowanceMs) {
         checkHeld += PAGE_RESERVE_MS;
         rendering += 1;
@@ -401,8 +406,8 @@ async function renderPhase(
   const allowanceMs = allowanceFor(sample.length);
   let settleFailed = false;
   if (!stopped && sample.length > 0 && allowanceMs < PAGE_RESERVE_MS) stopped = 'check_cap';
-  // Before the budget is asked, so a phase with no time to render reserves nothing.
-  if (!stopped && sample.length > 0 && !fits(PAGE_RESERVE_MS)) stopped = 'out_of_time';
+  // Before the budget is asked, so a phase with no time for one request reserves nothing.
+  if (!stopped && sample.length > 0 && !fits(REQUEST_TIMEOUT_MS)) stopped = 'out_of_time';
   let reserved = false;
   let stoppedAtBudget: NotRenderedReason | null = null;
   if (!stopped && sample.length > 0) {

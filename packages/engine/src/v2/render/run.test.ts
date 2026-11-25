@@ -664,12 +664,17 @@ describe('the step deadline', () => {
   }
   const WORST_PAGE = 2 * REQUEST_TIMEOUT_MS;
 
-  it('starts no page that could run past the deadline, and asks the budget for nothing', async () => {
+  it('starts no request that could run past the deadline, and asks the budget for nothing', async () => {
     const { client, clock, calls } = timedClient(1_000);
     const daily = memoryDailyBudget();
     const reserve = vi.spyOn(daily, 'reserve');
     const out = await renderCheck(
-      input({ client, daily, now: () => clock.now, deadlineAt: clock.now + WORST_PAGE - 1 }),
+      input({
+        client,
+        daily,
+        now: () => clock.now,
+        deadlineAt: clock.now + REQUEST_TIMEOUT_MS - 1,
+      }),
     );
     expect(calls).toEqual([]);
     expect(reserve).not.toHaveBeenCalled();
@@ -689,8 +694,9 @@ describe('the step deadline', () => {
         daily,
         inFlight: 1,
         now: () => clock.now,
-        // Room to start the first page, and not the second after it has run.
-        deadlineAt: clock.now + WORST_PAGE + pageMs - 1,
+        // Room for the first page's two requests, one after the other, and not for the second
+        // page's first request once the first page has run.
+        deadlineAt: clock.now + pageMs + REQUEST_TIMEOUT_MS - 1,
       }),
     );
     expect(out.pages[0]).toMatchObject({ rendered: true });
@@ -699,6 +705,26 @@ describe('the step deadline', () => {
     for (const p of rest) expect(p).toMatchObject({ rendered: false, reason: 'out_of_time' });
     expect(settle).toHaveBeenCalledTimes(1);
     expect(out.browser_ms).toBeGreaterThan(0);
+  });
+
+  // QA's B1 on #172: the step's share is exactly two requests (90 s), and the deadline was tested
+  // against both up front, so a page rendered only when no time at all had passed. It is tested
+  // before each request now: a step that has used some of its share still renders.
+  it('renders a page when less than both requests’ time is left, one request at a time', async () => {
+    for (const used of [1, 1_000, REQUEST_TIMEOUT_MS - 1_000]) {
+      const { client, clock, calls } = timedClient(1);
+      const out = await renderCheck(
+        input({
+          client,
+          inFlight: 1,
+          maxRenders: 1,
+          now: () => clock.now,
+          deadlineAt: clock.now + WORST_PAGE - used,
+        }),
+      );
+      expect(out.pages[0], `used ${used}`).toMatchObject({ rendered: true });
+      expect(calls).toHaveLength(2);
+    }
   });
 
   it('does not wait out a rate limit that would end past the deadline', async () => {
@@ -762,8 +788,8 @@ describe('the step deadline', () => {
         inFlight: 1,
         admit: () => new Promise<void>(() => undefined),
         now: () => clock.now,
-        // 20 ms of real time before a page could no longer finish.
-        deadlineAt: clock.now + WORST_PAGE + 20,
+        // 20 ms of real time before a request could no longer finish.
+        deadlineAt: clock.now + REQUEST_TIMEOUT_MS + 20,
       }),
     );
     expect(calls).toEqual([]);
@@ -830,7 +856,7 @@ describe('the step deadline', () => {
             throw new NotAdmitted('private');
           },
           now: () => clock.now,
-          deadlineAt: clock.now + WORST_PAGE,
+          deadlineAt: clock.now + REQUEST_TIMEOUT_MS,
         }),
       );
       expect(out.pages[0]).toMatchObject({ rendered: false, reason: 'out_of_time' });
