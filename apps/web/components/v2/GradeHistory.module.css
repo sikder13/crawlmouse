@@ -66,3 +66,54 @@
 .marker {
   fill: var(--v2-bad);
 }
+
+/* Notes written under the chart, shown only where a phone fits it (below). */
+.phoneNotes {
+  display: none;
+}
+
+/* `fitOnPhone`: the chart fits a phone's card instead of scrolling. Scaled from the 640-unit
+   viewBox to about 356px (0.56), the axis lettering is drawn at 15 units, so it reads at about
+   8.5px and the longest date label ("24 Nov 02:39", 12 characters at about 0.6 em, 108 units) fits
+   the 118 units between six checks; the 75 and 25 tick labels are left out, so "100" and "50" stand alone (their grid lines
+   stay); the note and the marker's words, which would sit on the lines at that size, are written
+   under the chart. */
+@media (max-width: 760px) {
+  .fit .chart {
+    min-width: 0;
+    height: auto;
+  }
+
+  .fit .ticks text {
+    font-size: 15px;
+  }
+
+  .fit .ticks .minorTick,
+  .fit .chart .note {
+    display: none;
+  }
+
+  .fit .phoneNotes {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin: 4px 0 0;
+    padding: 0 16px;
+    list-style: none;
+    color: var(--v2-fg2);
+    font-size: var(--v2-text-micro);
+  }
+
+  .fit .phoneNotes li {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .phoneMarker {
+    flex: none;
+    width: 8px;
+    height: 8px;
+    background: var(--v2-bad);
+  }
+}

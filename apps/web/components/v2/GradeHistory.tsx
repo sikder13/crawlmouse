@@ -29,6 +29,11 @@ export interface GradeHistoryProps {
    * verdicts its words name, so a test can hold "blocked" to them.
    */
   marker?: { series: 0 | 1; index: number; text: string; verdicts?: readonly string[] } | null;
+  /**
+   * On a phone the chart fits its card instead of scrolling: its lettering drawn larger, the 75 and
+   * 25 ticks left out, and the note and the marker's words written under it rather than on the lines.
+   */
+  fitOnPhone?: boolean;
 }
 
 const W = 640;
@@ -64,6 +69,7 @@ export function GradeHistory({
   caption,
   note,
   marker,
+  fitOnPhone = false,
 }: GradeHistoryProps) {
   const n = labels.length;
   if (n < 2) throw new Error(`GradeHistory "${label}": two checks at least, got ${n}`);
@@ -87,7 +93,7 @@ export function GradeHistory({
   const captionId = useId();
 
   return (
-    <div className={styles.history}>
+    <div className={fitOnPhone ? `${styles.history} ${styles.fit}` : styles.history}>
       <ScrollRegion label={label} className={styles.scroll} startAtEnd describedBy={captionId}>
         <svg
           className={styles.chart}
@@ -103,7 +109,12 @@ export function GradeHistory({
           </g>
           <g className={styles.ticks}>
             {TICKS.map((t) => (
-              <text key={t} x={t === 100 ? 8 : 14} y={y(t) + 4}>
+              <text
+                key={t}
+                x={t === 100 ? 8 : 14}
+                y={y(t) + 4}
+                className={t === 75 || t === 25 ? styles.minorTick : undefined}
+              >
                 {t}
               </text>
             ))}
@@ -161,6 +172,18 @@ export function GradeHistory({
           </g>
         </svg>
       </ScrollRegion>
+      {fitOnPhone && ((note && first(note.series) !== undefined) || (marker && marked != null)) ? (
+        // The words the drawing writes on its lines, under it on a phone; read once, in the caption.
+        <ul className={styles.phoneNotes} aria-hidden="true" data-v2-addition="">
+          {note && first(note.series) !== undefined ? <li>{note.text}</li> : null}
+          {marker && marked != null ? (
+            <li>
+              <span className={styles.phoneMarker} />
+              {marker.text}
+            </li>
+          ) : null}
+        </ul>
+      ) : null}
       {/* A table ignores a 1px width; the box around it holds the screen-reader-only size. */}
       <div className={layout.srOnly} data-v2-sr-only="">
         <table className={styles.values}>
