@@ -77,6 +77,10 @@ const isCut = (line: string): boolean =>
 /** [ "<path> :: <source line>", "why it is safe" ] — the auditable inventory. */
 const INVENTORY: [entry: string, why: string][] = [
   [
+    'apps/web/lib/v2/pipeline/persist.ts :: out.push(chunk.slice(i, i + maxRows) as LinkEdge[]);',
+    'array slice \u2014 cannot split a surrogate pair',
+  ],
+  [
     'apps/web/lib/v2/reports/file-name.ts :: .slice(0, 100);',
     'Not crawled text: a site host we stored, already reduced to ASCII letters, digits, dots and hyphens on the line above, so the cut cannot split a character; it bounds a download file name (F-125).',
   ],

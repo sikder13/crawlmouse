@@ -524,6 +524,12 @@ const UNUSED_DB: StepStores['persistDb'] = {
   stageCheckRows: async () => {
     throw new Error('persistDb is not called in this test');
   },
+  edgeTarget: async () => {
+    throw new Error('persistDb is not called in this test');
+  },
+  insertEdges: async () => {
+    throw new Error('persistDb is not called in this test');
+  },
 };
 
 describe('stepDeps: the step bodies’ dependencies as production wires them (quality 3, security 3)', () => {
