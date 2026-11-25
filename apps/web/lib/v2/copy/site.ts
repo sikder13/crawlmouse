@@ -278,6 +278,36 @@ SITE_CHANGES.push(
   },
 );
 
+/**
+ * F-276: each row's place in the list, 1 first in rank order, and the fix's stored number as its
+ * name beside its title; the folded row names the places it holds.
+ */
+const PLACE_SOURCE =
+  'V2R register, F-276 (CTO 081): the first column is the row’s place in rank order, 1 first; the fix’s stored number is its name (“Fix 9”), never its order';
+
+SITE_CHANGES.push(
+  {
+    screen: 'site',
+    kind: 'ruling',
+    locked:
+      '1 Let GPTBot and PerplexityBot through Cloudflare Crawler access +24 AI open Packet 2 Server-render the product template · marked done Wed; the re-check that day did not agree, so it stays open Without JavaScript +22 AI open Packet 0 Remove the Claude-SearchBot block from robots.txt new Fri robots.txt, Thu 19:40 · + User-agent: ClaudeBot · + User-agent: Claude-SearchBot · + Disallow: / · three lines to delete, then mark done Crawler access +19 AI open Packet 3 Link the 7 orphan pages from their collections Structure +4 SEO open Packet 5 Replace the generic anchor text on 6 pages Structure +2 SEO open Packet 4, 6–15 Eleven more: 6 in Structure and 5 in Content — +6 Technical SEO together; AI effect not yet estimated for 5',
+    rendered:
+      '1 Fix 1 · Let GPTBot and PerplexityBot through Cloudflare Crawler access +24 AI open Packet 2 Fix 2 · Server-render the product template · marked done Wed; the re-check that day did not agree, so it stays open Without JavaScript +22 AI open Packet 3 Fix 0 · Remove the Claude-SearchBot block from robots.txt new Fri robots.txt, Thu 19:40 · + User-agent: ClaudeBot · + User-agent: Claude-SearchBot · + Disallow: / · three lines to delete, then mark done Crawler access +19 AI open Packet 4 Fix 3 · Link the 7 orphan pages from their collections Structure +4 SEO open Packet 5 Fix 5 · Replace the generic anchor text on 6 pages Structure +2 SEO open Packet 6–16 Eleven more: 6 in Structure and 5 in Content — +6 Technical SEO together; AI effect not yet estimated for 5',
+    hiddenOnPhone: true,
+    source: PLACE_SOURCE,
+  },
+  {
+    screen: 'site',
+    kind: 'ruling',
+    locked:
+      '1 Let GPTBot and PerplexityBot through Cloudflare Crawler access +24 AI open Packet 2 Server-render the product template Without JavaScript +22 AI open Packet 0 Remove the Claude-SearchBot block from robots.txt new Fri robots.txt, Thu 19:40 · + User-agent: ClaudeBot · + User-agent: Claude-SearchBot · + Disallow: / · three lines to delete, then mark done Crawler access +19 AI open Packet 3 Link the 7 orphan pages from their collections Structure +4 SEO open Packet 5 Replace the generic anchor text on 6 pages Structure +2 SEO open Packet 4, 6–15 Eleven more: 6 in Structure and 5 in Content — +6 Technical SEO together; AI effect not yet estimated for 5',
+    rendered:
+      '1 Fix 1 · Let GPTBot and PerplexityBot through Cloudflare Crawler access +24 AI open Packet 2 Fix 2 · Server-render the product template Without JavaScript +22 AI open Packet 3 Fix 0 · Remove the Claude-SearchBot block from robots.txt new Fri robots.txt, Thu 19:40 · + User-agent: ClaudeBot · + User-agent: Claude-SearchBot · + Disallow: / · three lines to delete, then mark done Crawler access +19 AI open Packet 4 Fix 3 · Link the 7 orphan pages from their collections Structure +4 SEO open Packet 5 Fix 5 · Replace the generic anchor text on 6 pages Structure +2 SEO open Packet 6–16 Eleven more: 6 in Structure and 5 in Content — +6 Technical SEO together; AI effect not yet estimated for 5',
+    onlyOnPhone: true,
+    source: PLACE_SOURCE,
+  },
+);
+
 export const SITE_ADDITIONS: Addition[] = [
   {
     screen: 'site',

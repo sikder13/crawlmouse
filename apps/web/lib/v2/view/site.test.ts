@@ -90,7 +90,7 @@ describe('Site page, example-outfitter.com at as_of', () => {
     expect(v.fixes.rows[1]!.note).toBe(
       'marked done Wed; the re-check that day did not agree, so it stays open',
     );
-    expect(v.fixes.rest).toMatchObject({ numbers: '4, 6–15', count: 11 });
+    expect(v.fixes.rest).toMatchObject({ numbers: '6–16', count: 11 });
     expect(v.fixes.rest!.title).toBe('Eleven more: 6 in Structure and 5 in Content');
   });
 

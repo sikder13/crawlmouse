@@ -146,8 +146,9 @@ export function SiteScreen({
               ...fixes.rows.map((f) => ({
                 key: f.key,
                 cells: [
-                  String(f.number),
+                  String(f.place),
                   <span key="t">
+                    {`${f.name} · `}
                     {f.isNew ? <strong>{f.title}</strong> : f.title}
                     {f.newLabel ? (
                       <>

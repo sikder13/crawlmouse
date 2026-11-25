@@ -553,13 +553,10 @@ export function fixView(
     domain: siteOf(d, check).host,
     overview: hrefs.overview,
     section: { title: SEGMENTS[segment].title, href: hrefs.segment(segment) },
-    // The fix's own number, and where it stands in the audit's order when that differs from it.
+    // The fix's name, then where it stands in the audit's order, always apart, so the name never
+    // reads as a place (F-276, CTO 081).
     position:
-      at < 0
-        ? `Fix ${bare.number}, resolved`
-        : bare.number === at + 1
-          ? `Fix ${bare.number} of ${live.length}`
-          : `Fix ${bare.number} · ${at + 1} of ${live.length}`,
+      at < 0 ? `Fix ${bare.number}, resolved` : `Fix ${bare.number} · ${at + 1} of ${live.length}`,
     keptUntil: keptUntil === null ? null : dayTimeUtc(keptUntil),
     keepHref,
     tabs: [

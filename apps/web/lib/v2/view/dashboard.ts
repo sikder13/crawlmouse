@@ -199,7 +199,12 @@ export interface SitesView {
 
 export interface TopFixRowView {
   key: string;
+  /** The fix's stored number (F-276): its name, never its order. */
   number: number;
+  /** "Fix 9". */
+  name: string;
+  /** The row's place, 1 first, in rank order (F-276, CTO 081). */
+  place: number;
   title: string;
   effort: string | null;
   effect: string;
@@ -951,7 +956,7 @@ export function dashboardView(
               openAudit('Open the audit'),
               action(
                 'packet',
-                `Start with fix ${first.number}${effortText(first) ? ` · ${effortText(first)}` : ''}`,
+                `Start with the first fix · Fix ${first.number}${effortText(first) ? ` · ${effortText(first)}` : ''}`,
                 { checkId: result!.id, fixId: first.id },
                 { primary: true },
               ),
@@ -1066,9 +1071,11 @@ export function dashboardView(
       firstRun && result && fixes.length
         ? {
             title: COPY.topFixesTitle,
-            rows: fixes.slice(0, TOP_FIXES).map((f) => ({
+            rows: fixes.slice(0, TOP_FIXES).map((f, i) => ({
               key: f.id,
               number: f.number,
+              name: `Fix ${f.number}`,
+              place: i + 1,
               title: f.title,
               effort: effortText(f),
               effect: points(f, fixes),

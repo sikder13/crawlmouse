@@ -134,6 +134,10 @@ const competitorsOf = (n: number) => `${numberWord(n)} ${plural(n, 'competitor',
 const SLACK = 'Slack';
 const STAGING = 'a staging URL';
 
+/** F-276: a row's place in rank order, and the fix's stored number as its name. */
+const PLACE_SOURCE =
+  'V2R register, F-276 (CTO 081): the first column is the row’s place in rank order, 1 first; the fix’s stored number is its name (“Fix 9”), never its order; the button names the first fix by place, then by name';
+
 export const SETUP_COPY = {
   slack: {
     subject: SLACK,
@@ -343,6 +347,34 @@ const DAY0: CopyChange[] = [
     rendered: 'not done Add a staging URL so audits run after each staging deploy',
     source:
       'V2R register, F-304 (D-42): the set-up table’s Done column shows a row still to do as “not done” on screen, in a neutral pill beside the done rows’ “done” pill; the locked page left that cell empty',
+  },
+  {
+    screen: 'dashboard-day0',
+    kind: 'ruling',
+    locked: 'Start with fix 1',
+    rendered: 'Start with the first fix · Fix 1',
+    source: PLACE_SOURCE,
+  },
+  {
+    screen: 'dashboard-day0',
+    kind: 'ruling',
+    locked: '1 Let GPTBot',
+    rendered: '1 Fix 1 · Let GPTBot',
+    source: PLACE_SOURCE,
+  },
+  {
+    screen: 'dashboard-day0',
+    kind: 'ruling',
+    locked: '2 Server-render the product template',
+    rendered: '2 Fix 2 · Server-render the product template',
+    source: PLACE_SOURCE,
+  },
+  {
+    screen: 'dashboard-day0',
+    kind: 'ruling',
+    locked: '3 Link the 7 orphan pages',
+    rendered: '3 Fix 3 · Link the 7 orphan pages',
+    source: PLACE_SOURCE,
   },
   {
     screen: 'dashboard-day0',

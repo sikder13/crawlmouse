@@ -31,7 +31,7 @@ import { aiWithheldSummary } from '../sentences';
 
 /** The verdicts "blocked" names (FACTS I2), the ones the crawler alert fires on. */
 const BLOCKING_VERDICTS: Verdict[] = ['disallowed_by_robots', 'blocked_by_ua_rule'];
-import { capitalise, count, numberWord, plural } from '../words';
+import { capitalise, count, numberWord, ordinalWord, plural } from '../words';
 import {
   PLAN_NAMES,
   primarySite,
@@ -93,7 +93,12 @@ export interface CrawlerGridRowView {
 
 export interface FixRowView {
   key: string;
+  /** The fix's stored number (F-276): its name, never its order. */
   number: number;
+  /** "Fix 9": the stored number as the fix's name. */
+  name: string;
+  /** The row's place in this list, 1 first, in rank order (F-276, CTO 081). */
+  place: number;
   title: string;
   /** First seen at the latest result. */
   isNew: boolean;
@@ -325,12 +330,20 @@ function noteOf(v: AccountView, f: Fix): string | null {
   return null;
 }
 
-function fixRow(v: AccountView, result: Check, f: Fix, all: readonly Fix[]): FixRowView {
+function fixRow(
+  v: AccountView,
+  result: Check,
+  f: Fix,
+  all: readonly Fix[],
+  place: number,
+): FixRowView {
   const isNew = f.first_seen_check_id === result.id && result.previous_check_id !== null;
   const pro = lockedFix(v, result, f);
   return {
     key: f.id,
     number: f.number,
+    name: `Fix ${f.number}`,
+    place,
     title: f.title,
     isNew,
     newLabel: isNew ? `new ${weekday(result.finished_at!, zoneOf(v))}` : null,
@@ -534,12 +547,6 @@ export function siteView(
   const target = fresh.filter(doable).sort(byRank)[0] ?? fixes.filter(doable).sort(byRank)[0];
   const openLatest = (primary: boolean) =>
     action('openAudit', 'Open the latest audit', { checkId: result.id }, { primary });
-  const targetLabel = target
-    ? target.section === 'crawler_access' && target.crawler_uas.length
-      ? withPoints(`Open the ${listOf(target.crawler_uas)} packet`, points(target, fixes))
-      : withPoints(`Open fix ${target.number}`, points(target, fixes))
-    : null;
-
   // ── fixes table ──
   const byNumber = [...fixes].sort((a, b) => a.number - b.number);
   const withPackets = byNumber.filter((f) => todo(f) && f.packet !== null);
@@ -549,8 +556,18 @@ export function siteView(
   const inTable = [...byNumber].sort(
     (a, b) => Number(lockedFix(v, result, a)) - Number(lockedFix(v, result, b)) || byRank(a, b),
   );
+  // The button names the row it opens by its place, then the fix by its name (F-276, CTO 081), so
+  // "fix 2" cannot read as the second row.
+  const targetLabel = target
+    ? target.section === 'crawler_access' && target.crawler_uas.length
+      ? withPoints(`Open the ${listOf(target.crawler_uas)} packet`, points(target, fixes))
+      : withPoints(
+          `Open the ${ordinalWord(inTable.indexOf(target) + 1)} fix · Fix ${target.number}`,
+          points(target, fixes),
+        )
+    : null;
   const shownFixes = allFixes || fixes.length <= SHOWN_FIXES + 1 ? fixes.length : SHOWN_FIXES;
-  const rows = inTable.slice(0, shownFixes).map((f) => fixRow(v, result, f, fixes));
+  const rows = inTable.slice(0, shownFixes).map((f, i) => fixRow(v, result, f, fixes, i + 1));
   const rest = inTable.slice(shownFixes);
   const sections = Object.entries(
     rest.reduce<Record<string, number>>((m, f) => {
@@ -674,7 +691,7 @@ export function siteView(
       rows,
       rest: rest.length
         ? {
-            numbers: numberRanges(rest.map((f) => f.number)),
+            numbers: numberRanges(rest.map((_, i) => shownFixes + i + 1)),
             count: rest.length,
             title: `${capitalise(numberWord(rest.length))} more: ${listOf(sections.map(([k, n]) => `${n} in ${k}`))}`,
             effect: groupPoints(rest),

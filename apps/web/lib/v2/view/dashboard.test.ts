@@ -203,7 +203,7 @@ describe('Dashboard, day 0: the moment the account begins', () => {
       'Each fix page has "Mark done and re-check now", about 2 minutes. The other 10 are open for 14 days.',
     );
     expect(v.header.actions.filter((a) => a.primary).map((a) => a.label)).toEqual([
-      'Start with fix 1 · about 10 minutes',
+      'Start with the first fix · Fix 1 · about 10 minutes',
     ]);
   });
 

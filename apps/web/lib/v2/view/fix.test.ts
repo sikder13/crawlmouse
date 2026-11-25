@@ -58,7 +58,7 @@ describe('fixView: the fix the locked screen shows (fix 2 of the bad site’s fi
     expect(v.frame.domain).toBe('example-outfitter.com');
     expect(v.frame.section.title).toBe('Readable without JavaScript');
     // FACTS I10: the fixture has 13 live fixes at this audit, not the lock's 14 (Web Bot Auth left).
-    expect(v.frame.position).toBe('Fix 2 of 13');
+    expect(v.frame.position).toBe('Fix 2 · 2 of 13');
     expect(v.frame.keptUntil).toBe('26 Oct, 02:34 UTC');
     expect(v.frame.tabs.filter((t) => t.current).map((t) => t.label)).toEqual([
       'Without JavaScript',
@@ -600,9 +600,9 @@ describe('fixView: the two verify layers of a body with a readable command', () 
 });
 
 describe('fixView: where the fix stands', () => {
-  it('gives the fix’s place in the order beside its number when the two differ', () => {
+  it('gives the fix’s place in the order beside its name, also when the two agree (F-276)', () => {
     expect(view(5).frame.position).toBe('Fix 5 · 4 of 13');
-    expect(view(3).frame.position).toBe('Fix 3 of 13');
+    expect(view(3).frame.position).toBe('Fix 3 · 3 of 13');
   });
 });
 

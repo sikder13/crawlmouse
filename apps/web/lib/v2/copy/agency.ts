@@ -374,6 +374,14 @@ export const CLIENT_CHANGES: CopyChange[] = [
   {
     screen: 'agency-client',
     kind: 'ruling',
+    locked: "1 Let AI crawlers past the edge's automation challenge",
+    rendered: "1 Fix 1 · Let AI crawlers past the edge's automation challenge",
+    source:
+      'V2R register, F-276 (CTO 081): the first column is the row’s place in rank order, 1 first; the fix’s stored number is its name (“Fix 9”), never its order',
+  },
+  {
+    screen: 'agency-client',
+    kind: 'ruling',
     locked: "Packets are addressed to the client's developer and carry your name, not ours.",
     rendered: '',
     source: D11,

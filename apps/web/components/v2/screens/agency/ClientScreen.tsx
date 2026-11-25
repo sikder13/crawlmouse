@@ -71,8 +71,9 @@ export function ClientScreen({
               rows={fixes.rows.map((f) => ({
                 key: f.key,
                 cells: [
-                  String(f.number),
+                  String(f.place),
                   <span key="t" className={shared.breakAnywhere}>
+                    {`${f.name} · `}
                     {f.title}
                     {f.newLabel ? (
                       <>

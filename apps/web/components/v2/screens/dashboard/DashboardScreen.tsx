@@ -325,8 +325,9 @@ function TopFixes({ top }: { top: NonNullable<DashboardView['topFixes']> }) {
         rows={top.rows.map((r) => ({
           key: r.key,
           cells: [
-            String(r.number),
+            String(r.place),
             <span key="t">
+              {`${r.name} · `}
               {r.title}
               {r.effort ? (
                 // Data, so it shows on a phone too, where the locked page hides it (owner ruling
@@ -340,7 +341,7 @@ function TopFixes({ top }: { top: NonNullable<DashboardView['topFixes']> }) {
             r.effect,
             <Button key="o" href={r.open.href} variant="quiet" size="sm">
               {r.open.label}
-              <VisuallyHidden>{` fix ${r.number}`}</VisuallyHidden>
+              <VisuallyHidden>{` ${r.name}`}</VisuallyHidden>
             </Button>,
           ],
         }))}
