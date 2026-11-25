@@ -25,6 +25,7 @@ import {
   clientFromEnv,
   inFlightFromEnv,
   safeFetch,
+  type DailyBudget,
 } from '@crawlmouse/engine/v2/pipeline';
 import { auditFn } from '../../../../../inngest/audit';
 import {
@@ -67,12 +68,16 @@ import {
   reapStalled,
   type StepDeps,
 } from './steps';
+import { supabaseRenderBudget } from './render-budget';
 import { supabasePipelineStore, type PipelineStore } from './store';
 
 type Env = Readonly<Record<string, string | undefined>>;
 
 /** The stores a check's steps read and write. */
-export type StepStores = Pick<StepDeps, 'store' | 'evidence' | 'persistDb' | 'ledger'>;
+export type StepStores = Pick<StepDeps, 'store' | 'evidence' | 'persistDb' | 'ledger'> & {
+  /** The durable daily render budget, per check. */
+  renderBudget?: (checkId: string) => DailyBudget;
+};
 
 /** Where the functions get their stores. Production's go through the service-role client. */
 export interface Wiring {
@@ -98,6 +103,7 @@ export const SERVICE_WIRING: Wiring = {
       evidence: supabaseEvidenceStore(sb),
       persistDb: supabasePersistDb(sb),
       ledger: { put: (checkId, draft) => putLedgerDraft(sb, checkId, draft) },
+      renderBudget: (checkId) => supabaseRenderBudget(sb, checkId),
     };
   },
   expiry: (env) => {
@@ -184,7 +190,7 @@ export function checkStepsFromEnv(env: Env, stores: StepStores): CheckSteps {
 /**
  * The step bodies' dependencies as production wires them, over `stores`: the worker client built
  * from the environment when a batch step asks for it, discovery through the engine's `safeFetch`
- * (the SSRF guard, §5), and rendering with the refusing daily budget (Q7).
+ * (the SSRF guard, §5), and rendering with the daily budget the stores carry, or else one that refuses.
  */
 export function stepDeps(env: Env, stores: StepStores): StepDeps {
   return {
@@ -201,6 +207,7 @@ export function stepDeps(env: Env, stores: StepStores): StepDeps {
       client: clientFromEnv(env),
       caps: capsFromEnv(env),
       daily: NO_DAILY_BUDGET,
+      dailyFor: stores.renderBudget,
       inFlight: inFlightFromEnv(env),
     },
     discover: { fetch: safeFetch, userAgent: CRAWL_USER_AGENT, now: Date.now },

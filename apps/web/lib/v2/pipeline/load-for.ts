@@ -9,6 +9,7 @@
  * (the views look other checks up by id and read `checks` as the site's history), the plan that
  * decides which fixes open, and the stored map drawing.
  */
+import type { SupabaseClient } from '@supabase/supabase-js';
 import type { MapDrawing } from '@crawlmouse/engine/v2/pipeline';
 import { z } from 'zod';
 import { effectiveTier, GATES, type EntitlementClock } from '../../entitlement-v2';
@@ -80,6 +81,20 @@ export function clockFromAccountRow(row: Record<string, unknown>): EntitlementCl
 /** The columns `clockFromAccountRow` reads. */
 export const ACCOUNT_CLOCK_COLUMNS =
   'state, tier, past_due_tier, past_due_since, trial_variant, trial_ends_at';
+
+/** The entitlement clock of `accountId`, from its `accounts` row. */
+export async function readAccountClock(
+  sb: SupabaseClient,
+  accountId: string,
+): Promise<EntitlementClock> {
+  const { data, error } = await sb
+    .from('accounts')
+    .select(ACCOUNT_CLOCK_COLUMNS)
+    .eq('id', accountId)
+    .single();
+  if (error || !data) throw new Error(`reading account clock: ${error?.code ?? 'none'}`);
+  return clockFromAccountRow(data as Record<string, unknown>);
+}
 
 async function readyDataset(
   deps: Pick<PublicCheckDeps, 'read'>,

@@ -81,6 +81,9 @@ const READ_SCOPE: Record<string, ReadScope> = {
   // CC-41: an account's first touch and a check's ledger draft. Service only.
   account_attribution: 'none',
   check_ledger_drafts: 'none',
+  // V2R A2: the daily render budget. Service only.
+  render_budget_days: 'none',
+  render_reservations: 'none',
 };
 
 let db: PGlite;

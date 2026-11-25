@@ -5,6 +5,7 @@
  * strings), and go through the same converters.
  */
 import type { CheckSide } from '@crawlmouse/engine/v2/pipeline';
+import { clockFromAccountRow } from '../load-for';
 import type { ReapedCheck } from '../../../../../../inngest/check-reaper';
 import { checkFromRow, fixEventFromRow, fixFromRow, siteFromRow } from '../rows';
 import {
@@ -137,6 +138,18 @@ export function sqlPipelineStore(db: SqlDb): PipelineStore {
       );
       if (!r) throw new Error(`sql store: no site ${siteId}`);
       return r as unknown as RequestSite;
+    },
+
+    async accountClock(accountId) {
+      const r = await one(
+        `select jsonb_build_object('state', state, 'tier', tier, 'past_due_tier', past_due_tier,
+                                   'past_due_since', past_due_since, 'trial_variant', trial_variant,
+                                   'trial_ends_at', trial_ends_at) as row
+           from public.accounts where id = $1`,
+        [accountId],
+      );
+      if (!r) throw new Error(`sql store: no account ${accountId}`);
+      return clockFromAccountRow(r);
     },
 
     async previousGraded(siteId, checkId): Promise<CheckSide | null> {
