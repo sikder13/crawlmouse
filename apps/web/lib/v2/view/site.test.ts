@@ -313,13 +313,17 @@ describe('the site’s public link (F-123)', () => {
     expect(v.settings.rows.find((x) => x.label === 'Public link')).toBeUndefined();
   });
 
-  it('a partial latest check cannot be published, so none is offered', () => {
+  it('a partial latest check cannot be published: no link is offered, and the row says why (D-14)', () => {
     const partial = {
       ...noLinks,
       checks: noLinks.checks.map((c) =>
         c.id === latestCheck.id ? { ...c, status: 'partial' as const } : c,
       ),
     };
-    expect(row(partial)).toBeUndefined();
+    // The row used to vanish, and the page did not say why (QA dashboard walk D-14, F-277).
+    expect(row(partial)!.value).toBe(
+      'The latest check is partial, and only a finished check can be published. A link can be made from a later check that finishes.',
+    );
+    expect(row(partial)!.publicLink!.mintCheckId).toBeNull();
   });
 });
