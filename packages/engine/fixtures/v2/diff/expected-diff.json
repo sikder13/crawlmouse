@@ -105,7 +105,7 @@
       "ua": null,
       "grade_deltas": [],
       "cause": {
-        "text": "Marked done on 2026-10-03, and found again on this check.",
+        "text": "Marked done on 3 Oct 2026, and found again on this check.",
         "changed_at": null,
         "diff": null
       },
@@ -126,7 +126,7 @@
       "ua": null,
       "grade_deltas": [],
       "cause": {
-        "text": "Resolved on 2026-10-03, and found again on this check.",
+        "text": "Resolved on 3 Oct 2026, and found again on this check.",
         "changed_at": null,
         "diff": null
       },

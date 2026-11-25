@@ -323,10 +323,20 @@ export function fixRow(
   );
 }
 
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/**
+ * The calendar day (UTC) of an ISO timestamp, as a reader writes it: "3 Oct 2026", not the ISO date
+ * (D-33). The UTC day, so a note does not depend on where it is read.
+ */
+export function noteDay(at: string): string {
+  const d = new Date(at);
+  return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+}
+
 function reopenNote(prior: FixStatus | 'none', events: readonly FixEvent[]): Change['cause'] {
   const lastOf = (kind: FixEvent['kind']) => events.filter((e) => e.kind === kind).at(-1);
-  // The calendar day (UTC) of an ISO timestamp: the part before its `T`.
-  const day = (e: FixEvent) => e.at.split('T')[0]!;
+  const day = (e: FixEvent) => noteDay(e.at);
   const marked = lastOf('marked_done');
   const verified = lastOf('verified');
   if ((prior === 'marked_done' || prior === 'unable_to_verify') && marked) {
