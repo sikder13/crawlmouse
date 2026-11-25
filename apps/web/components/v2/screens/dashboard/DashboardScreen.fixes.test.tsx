@@ -4,6 +4,8 @@
  * carries its column's name for a phone, and day 0's add-site action sits beside the sentence that
  * says what it starts.
  */
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { JSDOM } from 'jsdom';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -133,5 +135,11 @@ describe('a long host on the sites table (PR 2 review, item 6)', () => {
       ['example-outfitter.', 'whole'],
       ['dev', 'whole'],
     ]);
+    // The class a long part carries is the stylesheet's rule that lets it break anywhere.
+    const css = readFileSync(join(__dirname, 'DashboardScreen.module.css'), 'utf8');
+    const long = link.querySelector('[data-v2-part="long"]')!;
+    const cls = long.getAttribute('class')!.match(/_(\w+)_/)![1]!;
+    expect(cls).toBe('longPart');
+    expect(css).toMatch(new RegExp(`\\n\\.${cls} \\{[^}]*overflow-wrap: anywhere;`));
   });
 });
