@@ -9,7 +9,7 @@ import { secondInput } from '../pipeline/test-support/public-checks';
 import { fixView } from '../view/fix';
 import { partialNotice, resultView } from '../view/result';
 import { accessView } from '../view/segment/access';
-import { changesView } from '../view/segment/changes';
+import { changesView, lettersUnmoved } from '../view/segment/changes';
 import { contentView } from '../view/segment/content';
 import { nojsView } from '../view/segment/nojs';
 import { signalsView } from '../view/segment/signals';
@@ -541,7 +541,10 @@ describe('property: no document holds a string its pages do not say', () => {
         expectSaidByThePages(baselineDoc(before, OPTIONS), saidBefore, at(before));
         const compared = compareDoc(before, after, OPTIONS);
         expectSaidByThePages(compared, [...saidBefore, ...saidAfter], at(after));
-        expect(pairs(compared).length).toBe(2 + after.dataset.changes.length);
+        // A grade row whose letters held is not listed as a change (F-302).
+        expect(pairs(compared).length).toBe(
+          2 + after.dataset.changes.filter((c) => !lettersUnmoved(c)).length,
+        );
 
         for (const e of verifiedIn(second)) {
           const fix = (r: typeof before) =>
