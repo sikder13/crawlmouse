@@ -130,16 +130,17 @@ A button, a link that looks like one, or a picture of one.
 
 A single object on a hairline surface (rules 2 and 8).
 
-| Prop         | Type                                           | Required | Note                                                                                  |
-| ------------ | ---------------------------------------------- | -------- | ------------------------------------------------------------------------------------- |
-| `as`         | `"div" \| "section" \| "article" \| undefined` | no       |                                                                                       |
-| `tone`       | `"raised" \| "sunken" \| undefined`            | no       | `raised` is the s1 surface; `sunken` is the s2 step used for the one emphasised card. |
-| `href`       | `string \| undefined`                          | no       | Renders the whole card as a link (a door into a section).                             |
-| `id`         | `string \| undefined`                          | no       |                                                                                       |
-| `className`  | `string \| undefined`                          | no       |                                                                                       |
-| `style`      | `CSSProperties \| undefined`                   | no       |                                                                                       |
-| `aria-label` | `string \| undefined`                          | no       |                                                                                       |
-| `children`   | `ReactNode`                                    | yes      |                                                                                       |
+| Prop               | Type                                           | Required | Note                                                                                  |
+| ------------------ | ---------------------------------------------- | -------- | ------------------------------------------------------------------------------------- |
+| `as`               | `"div" \| "section" \| "article" \| undefined` | no       |                                                                                       |
+| `tone`             | `"raised" \| "sunken" \| undefined`            | no       | `raised` is the s1 surface; `sunken` is the s2 step used for the one emphasised card. |
+| `href`             | `string \| undefined`                          | no       | Renders the whole card as a link (a door into a section).                             |
+| `id`               | `string \| undefined`                          | no       |                                                                                       |
+| `className`        | `string \| undefined`                          | no       |                                                                                       |
+| `style`            | `CSSProperties \| undefined`                   | no       |                                                                                       |
+| `aria-label`       | `string \| undefined`                          | no       |                                                                                       |
+| `data-v2-addition` | `"" \| undefined`                              | no       | Marks a card the locked screens do not have (read by the lock comparison).            |
+| `children`         | `ReactNode`                                    | yes      |                                                                                       |
 
 ### CheckGlyph
 
@@ -526,6 +527,10 @@ From `apps/web/app/(v2-preview)/v2-preview/_preview/registry.ts`. They are serve
 | Final-Seg-Structure                                | `/v2-preview/screens/segment/structure`                  | screen    |                                      |
 | Structure, clean bill                              | `/v2-preview/screens/segment/structure/clean`            | screen    |                                      |
 | Structure, withheld                                | `/v2-preview/screens/segment/structure/challenged`       | screen    |                                      |
+| Links and pages                                    | `/v2-preview/screens/segment/links`                      | screen    |                                      |
+| Links and pages, clean bill                        | `/v2-preview/screens/segment/links/clean`                | screen    |                                      |
+| Links and pages, withheld                          | `/v2-preview/screens/segment/links/challenged`           | screen    |                                      |
+| Links and pages, a broken link                     | `/v2-preview/screens/segment/links/built`                | screen    |                                      |
 | Final-Seg-Content                                  | `/v2-preview/screens/segment/content`                    | screen    |                                      |
 | Content, clean bill                                | `/v2-preview/screens/segment/content/clean`              | screen    |                                      |
 | Content, withheld                                  | `/v2-preview/screens/segment/content/challenged`         | screen    |                                      |

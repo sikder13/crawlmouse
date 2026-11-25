@@ -10,6 +10,7 @@ import { FixScreen } from '../../../../components/v2/screens/fix/FixScreen';
 import { AccessScreen } from '../../../../components/v2/screens/segment/AccessScreen';
 import { ChangesScreen } from '../../../../components/v2/screens/segment/ChangesScreen';
 import { ContentScreen } from '../../../../components/v2/screens/segment/ContentScreen';
+import { LinksScreen } from '../../../../components/v2/screens/segment/LinksScreen';
 import { NoJsScreen } from '../../../../components/v2/screens/segment/NoJsScreen';
 import { SignalsScreen } from '../../../../components/v2/screens/segment/SignalsScreen';
 import { StructureScreen } from '../../../../components/v2/screens/segment/StructureScreen';
@@ -23,6 +24,7 @@ import { accessView } from '../../../../lib/v2/view/segment/access';
 import { changesView } from '../../../../lib/v2/view/segment/changes';
 import { contentView } from '../../../../lib/v2/view/segment/content';
 import type { SegmentKey } from '../../../../lib/v2/view/segment/frame';
+import { linksView } from '../../../../lib/v2/view/segment/links';
 import { nojsView } from '../../../../lib/v2/view/segment/nojs';
 import { signalsView } from '../../../../lib/v2/view/segment/signals';
 import { structureView } from '../../../../lib/v2/view/segment/structure';
@@ -51,6 +53,8 @@ export function segmentScreen(read: ReadyCheck, segment: SegmentKey): ReactNode 
       return <NoJsScreen data={nojsView(...args)} />;
     case 'structure':
       return <StructureScreen data={structureView(...args, read.map)} />;
+    case 'links':
+      return <LinksScreen data={linksView(...args)} />;
     case 'content':
       return <ContentScreen data={contentView(...args)} />;
     case 'signals':
