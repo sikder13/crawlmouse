@@ -5,6 +5,7 @@
  * `docStrings` lists them, for the tests that compare what a renderer drew with what its document
  * holds. A raw export (CSV, JSON, edge list) is the check's rows and has no document.
  */
+import type { DocBrand } from './brand-doc';
 import { z } from 'zod';
 
 const Id = z
@@ -60,6 +61,11 @@ export interface DocSection {
 }
 
 export interface ReportDoc {
+  /**
+   * The agency whose report this is (Goal 1 row 24, white-label), stamped when the report is made:
+   * absent, not null, when there is none, so a document with no brand is what it was before.
+   */
+  brand?: DocBrand;
   title: string;
   /** Under the title: the site, and when it was checked. */
   lines: string[];
@@ -89,6 +95,7 @@ function blockStrings(b: DocBlock): string[] {
 /** Every string a `ReportDoc` holds, in reading order. */
 export function docStrings(doc: ReportDoc): string[] {
   return [
+    ...(doc.brand ? [doc.brand.name] : []),
     doc.title,
     ...doc.lines,
     ...doc.sections.flatMap((s) => [s.heading, ...s.blocks.flatMap(blockStrings)]),

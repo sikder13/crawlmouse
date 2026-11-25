@@ -61,6 +61,23 @@ export interface PdfSink {
   mark(m: { x: number; y: number; size: number }): void;
   /** An area of the page that opens `href`. */
   link(l: { x: number; y: number; width: number; height: number; href: string }): void;
+  /**
+   * The agency's logo (white-label), its top-left corner `y` points from the top. Drawn only for a
+   * document with a brand and a logo, so a sink that draws no logo need not have it.
+   */
+  image?(i: { x: number; y: number; width: number; height: number }): void;
+}
+
+/** The logo's box in a branded header, in points: it is scaled to fit, its aspect kept. */
+export const LOGO_BOX = { width: 160, height: 32 } as const;
+
+/** A logo's drawn size: its pixels scaled down to fit `LOGO_BOX`, never up. */
+export function logoSize(pixels: { width: number; height: number }): {
+  width: number;
+  height: number;
+} {
+  const scale = Math.min(1, LOGO_BOX.width / pixels.width, LOGO_BOX.height / pixels.height);
+  return { width: pixels.width * scale, height: pixels.height * scale };
 }
 
 /** A4, in points. */
@@ -69,6 +86,8 @@ const MARGIN = { x: 48, top: 52, bottom: 40 } as const;
 const WIDTH = PAGE.width - 2 * MARGIN.x;
 
 const STYLE = {
+  /** A branded document's header: the agency's name, above the title. */
+  brand: { face: 'semibold', size: 11, leading: 15, tone: 'muted' },
   title: { face: 'semibold', size: 22, leading: 28, tone: 'ink' },
   line: { face: 'mono', size: 9, leading: 13, tone: 'muted' },
   heading: { face: 'semibold', size: 13, leading: 18, tone: 'ink' },
@@ -271,6 +290,12 @@ class Flow {
       this.newPage();
       drawFirst();
     }
+  }
+
+  /** The logo at the left margin, at the top of what is left of the page. */
+  image(size: { width: number; height: number }): void {
+    this.sink.image?.({ x: MARGIN.x, y: this.y, ...size });
+    this.y += size.height;
   }
 
   space(points: number): void {
@@ -477,19 +502,36 @@ function block(flow: Flow, measure: Measure, sources: Sources, b: DocBlock, firs
 }
 
 /** Lays `doc` out and draws it through `sink`. */
-export function drawDoc(doc: ReportDoc, measure: Measure, sink: PdfSink): void {
+export function drawDoc(
+  doc: ReportDoc,
+  measure: Measure,
+  sink: PdfSink,
+  /** The logo's drawn size, for a branded document whose logo is drawn; omitted otherwise. */
+  logo?: { width: number; height: number },
+): void {
   const sources = new Sources();
+  // A branded document's header (white-label) comes first in reading order, as `docStrings` lists it.
+  const brand = doc.brand ? sources.take() : null;
   const title = sources.take();
   const lines = doc.lines.map(() => sources.take());
   // The footer is drawn on each page from the first, so its place is counted ahead: it follows
   // each section's strings and the not-measured list.
   const footerSource =
+    (brand === null ? 0 : 1) +
     1 +
     doc.lines.length +
     doc.sections.reduce((n, s) => n + 1 + s.blocks.reduce((m, b) => m + stringsIn(b), 0), 0) +
     doc.notMeasured.length;
   const flow = new Flow(sink, measure, { ...doc.footer, source: footerSource });
 
+  if (doc.brand && brand !== null) {
+    if (logo) {
+      flow.image(logo);
+      flow.space(6);
+    }
+    flow.paragraph(doc.brand.name, brand, STYLE.brand);
+    flow.space(GAP.block);
+  }
   flow.paragraph(doc.title, title, STYLE.title);
   flow.space(2);
   doc.lines.forEach((line, i) => flow.paragraph(line, lines[i]!, STYLE.line));

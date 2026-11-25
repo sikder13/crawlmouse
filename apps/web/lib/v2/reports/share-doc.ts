@@ -29,6 +29,10 @@ const Block = z.discriminatedUnion('type', [
 ]);
 
 const Doc = z.strictObject({
+  // White-label (Goal 1 row 24): the agency stamped on the report when it was made; absent for none.
+  brand: z
+    .strictObject({ name: z.string().min(1).max(60), logoPath: z.string().nullable() })
+    .optional(),
   title: z.string(),
   lines: z.array(z.string()),
   sections: z.array(z.strictObject({ heading: z.string(), blocks: z.array(Block) })),

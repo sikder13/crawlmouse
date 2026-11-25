@@ -77,6 +77,10 @@ const isCut = (line: string): boolean =>
 /** [ "<path> :: <source line>", "why it is safe" ] — the auditable inventory. */
 const INVENTORY: [entry: string, why: string][] = [
   [
+    "apps/web/lib/v2/reports/brand.ts :: return `data:${MEDIA[logo.format]};base64,${Buffer.from(logo.bytes).toString('base64')}`;",
+    "Not crawled text and not a cut: the base64 of a logo's bytes, which `checkedLogo` has just accepted as a PNG, JPEG or WebP, written whole into a `data:` address (white-label, Goal 1 row 24).",
+  ],
+  [
     'apps/web/lib/v2/reports/file-name.ts :: .slice(0, 100);',
     'Not crawled text: a site host we stored, already reduced to ASCII letters, digits, dots and hyphens on the line above, so the cut cannot split a character; it bounds a download file name (F-125).',
   ],
