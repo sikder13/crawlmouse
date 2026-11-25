@@ -105,7 +105,7 @@ export const ACCOUNT_ACTIONS = {
   integrations: {
     verb: 'GET',
     route: '/settings/integrations',
-    owner: 'later',
+    owner: 'built',
     guard: 'Owner or manager.',
   },
   plan: { verb: 'GET', route: '/settings/plan', owner: 'CC-27b', guard: 'Signed-in owner.' },
@@ -184,6 +184,8 @@ export type ActionInput =
       /** What the field holds when the page opens (a site's competitors as they stand). */
       value?: string;
       required: boolean;
+      /** `off` for a value the browser should not offer again, such as a webhook's secret URL. */
+      autoComplete?: 'off';
     }
   | {
       kind: 'select';
@@ -243,6 +245,8 @@ export const ACCOUNT_NAV = [
   { label: 'Competitors', href: '/competitors' },
   { label: 'Reports', href: '/reports' },
   { label: 'Integrations', href: '/settings/integrations' },
+  // Not on the locked rail: /seats was reached only by typing it (D-24, F-287).
+  { label: 'Seats', href: '/seats' },
   { label: 'Settings', href: '/settings' },
 ] as const;
 

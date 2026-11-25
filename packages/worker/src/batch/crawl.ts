@@ -353,7 +353,9 @@ async function crawlPage(
     hreflang: recorded ? hreflang : null,
     content_simhash: read.simhash,
     is_html: true,
-    links_read: linksRead,
+    // B's question 025: true only when the record holds every link read, so a reader can trust it.
+    // Not when links past MAX_EDGES_PER_PAGE were withheld, or the batch's room left this page's out.
+    links_read: linksRead && edges.withheld === 0 && recorded,
     robots_search: search,
     title: read.title,
     meta_description: read.description,

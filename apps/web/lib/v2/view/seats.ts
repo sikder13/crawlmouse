@@ -280,7 +280,7 @@ export function seatsView(
   };
 
   return {
-    shell: accountShellView(v, null, { role: role ?? 'developer' }),
+    shell: accountShellView(v, 'Seats', { role: role ?? 'developer' }),
     header: {
       title: COPY.title,
       line: partial

@@ -15,7 +15,14 @@
  * key, is merged, keeping the first in sorted order. A link to a URL the crawl did not fetch is kept:
  * it is how the detectors know the crawl did not see every page it found.
  */
-import type { AccessTest, Coverage, CrawlPage, LinkEdge, PageResult } from '@crawlmouse/types/v2';
+import type {
+  AccessTest,
+  BatchPartialReason,
+  Coverage,
+  CrawlPage,
+  LinkEdge,
+  PageResult,
+} from '@crawlmouse/types/v2';
 import type { CmsName } from '@crawlmouse/types';
 import { classifyPages } from '../../analysis/classify-pages.js';
 import { computeDepth } from '../../analysis/depth.js';
@@ -303,6 +310,7 @@ export function assemble(
     gradeable: accounting.gradeable,
     excluded: accounting.excluded,
     excluded_by_robots: robotsExcluded,
+    stopped: crawlStopped(batches, crawlOpen, input.check.page_cap),
   };
   return {
     homepage_url: homepage,
@@ -392,4 +400,27 @@ function renderedPages(
     if (p.rendered) out.set(p.url, p.without_js);
   }
   return out;
+}
+
+/**
+ * Why the crawl ended (`coverage.stopped`, inbox 082, 084), from what the planner and the batches
+ * hold: the cap, when the crawl asked for that many URLs (the planner counts every row, fetched or
+ * not); the site, when a crawl batch says the site stopped it; time, when a crawl batch's time budget
+ * ran out, or the planner still had URLs to ask and the site did not stop the crawl. A batch reason
+ * that does not end the crawl (a result past its size, a budget of one batch) leaves the time plan to
+ * end it, so it is no cause here. A batch lost before its result was read also leaves URLs unasked,
+ * and reads as time: the batches the build reads do not include it.
+ */
+function crawlStopped(batches: Batches, crawlOpen: boolean, pageCap: number): Coverage['stopped'] {
+  const reasons = new Set<BatchPartialReason>(
+    batches.crawl.flatMap((b) => b.partial?.reasons ?? []),
+  );
+  const asked = batches.crawl.reduce((n, b) => n + b.pages.length, 0);
+  const siteStopped = reasons.has('site_stopped');
+  return {
+    page_cap: pageCap,
+    at_cap: asked >= pageCap,
+    time_ran_out: reasons.has('budget_seconds') || (crawlOpen && !siteStopped),
+    site_stopped: siteStopped,
+  };
 }

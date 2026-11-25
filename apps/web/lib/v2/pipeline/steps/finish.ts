@@ -40,7 +40,6 @@ import {
   assembledSoFar,
   isCrawl,
   iso,
-  loadResults,
   loadResultsForBuild,
   loadSeeds,
   pathOf,
@@ -63,10 +62,12 @@ export function finishSteps(
 ): Pick<CheckSteps, 'render' | 'build' | 'persist' | 'finalize'> {
   return {
     async render(event, so) {
+      // The build's view of the edges (F2): the same pages and PageRank, so the same candidates, at
+      // the build's bound; a check past it fails build_failed by name here, not out of memory.
       const startedAt = deps.now();
       const [seeds, results] = await Promise.all([
         loadSeeds(deps, event),
-        loadResults(deps, event),
+        loadResultsForBuild(deps, event),
       ]);
       const { assembled } = await assembledSoFar(deps, event, seeds, results);
       const sampled = sample(assembled);

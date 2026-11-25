@@ -1,0 +1,78 @@
+/* Links and pages: the disclosures, the side-by-side basics, and the muted headings line. */
+
+/* A URL or crawled text breaks anywhere, so a long one keeps to the column (F-237). */
+.breakAnywhere {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.mono {
+  font-family: var(--v2-font-mono);
+  font-size: var(--v2-text-small);
+}
+
+.empty {
+  padding: 16px 24px;
+  font-size: var(--v2-text-small);
+  color: var(--v2-mut);
+}
+
+.more summary {
+  cursor: pointer;
+  font-size: var(--v2-text-small);
+  color: var(--v2-mut);
+  margin-top: 4px;
+}
+
+/* Inset, so a table's scroll edge cannot cut it off, as the access tab's cells are. */
+.more summary:focus-visible {
+  outline: 2px solid var(--v2-fg);
+  outline-offset: -2px;
+}
+
+.list {
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--v2-text-small);
+}
+
+.list li + li {
+  margin-top: 4px;
+}
+
+.anchor {
+  color: var(--v2-mut);
+}
+
+.basics {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 760px) {
+  .basics {
+    grid-template-columns: 1fr;
+  }
+}
+
+.column {
+  padding: 18px 24px;
+  min-width: 0;
+}
+
+.line {
+  font-size: var(--v2-text-small);
+  margin-top: 12px;
+}
+
+.group {
+  margin-top: 10px;
+  font-size: var(--v2-text-small);
+}
+
+.headings {
+  font-size: var(--v2-text-small);
+  color: var(--v2-mut);
+}

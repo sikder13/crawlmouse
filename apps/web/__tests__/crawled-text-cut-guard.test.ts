@@ -77,6 +77,14 @@ const isCut = (line: string): boolean =>
 /** [ "<path> :: <source line>", "why it is safe" ] — the auditable inventory. */
 const INVENTORY: [entry: string, why: string][] = [
   [
+    'apps/web/lib/v2/reports/file-name.ts :: .slice(0, 100);',
+    'Not crawled text: a site host we stored, already reduced to ASCII letters, digits, dots and hyphens on the line above, so the cut cannot split a character; it bounds a download file name (F-125).',
+  ],
+  [
+    'apps/web/lib/v2/reports/file-name.ts :: const day = Number.isNaN(at) ? null : new Date(at).toISOString().slice(0, 10);',
+    "Not crawled text: the date part of an ISO timestamp of our own clock (a report row's created_at), for a download file name (F-125).",
+  ],
+  [
     'apps/web/lib/analytics-server.ts :: parsed = JSON.parse(decodeURIComponent(pair.slice(name.length)));',
     "STRING slice of a cookie pair after its ASCII `name=` prefix: the cut is at the prefix's end, so it cannot split a surrogate pair, and the value is parsed and bounded before use; never crawled text (CC-41).",
   ],
@@ -232,6 +240,10 @@ const INVENTORY: [entry: string, why: string][] = [
   [
     'apps/web/app/api/audits/[id]/export/route.ts :: .slice()',
     'array slice \u2014 cannot split a surrogate pair',
+  ],
+  [
+    "apps/web/app/api/agency/brand/route.ts :: const hash = createHash('sha256').update(logo.bytes).digest('hex').slice(0, 16);",
+    'ASCII/structural \u2014 hex, percent-encoding, punctuation, a date prefix or a file extension',
   ],
   [
     "apps/web/app/api/reports/[slug]/logo/route.ts :: const hash = createHash('sha256').update(bytes).digest('hex').slice(0, 16);",
@@ -489,6 +501,10 @@ const INVENTORY: [entry: string, why: string][] = [
   [
     'apps/web/lib/v2/view/segment/content.ts :: return words.length <= n ? text : text.slice(0, words[n - 1]!.index! + words[n - 1]![0].length);',
     "STRING cut on crawled text (a rendered page's `body_excerpt`) in the CC-23 content preview, display-only, never persisted. The cut ends where a `/\\S+/g` match ends: both halves of a surrogate pair are non-space, so a match never ends between them. The page says the excerpt is its first 150 words.",
+  ],
+  [
+    'apps/web/lib/v2/view/segment/signals.ts :: ? check.competitors.slice(0, allowed).map((c) => competitorOf(check, c, present, false))',
+    "ARRAY slice over the check's competitor snapshots, never persisted: no string is indexed, so no surrogate pair can be split. The competitors the reader's plan compares (GATES[tier].competitorsPerSite).",
   ],
   [
     'apps/web/lib/v2/view/segment/fixes.ts :: const named = pro.length <= NAMED_PRO ? pro : pro.slice(0, NAMED_PRO - 1);',

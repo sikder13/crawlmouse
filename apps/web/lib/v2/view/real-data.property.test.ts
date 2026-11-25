@@ -175,7 +175,7 @@ describe('each view renders a generated measured check', () => {
     };
     const views = everyView(keyed, checkId);
     note('AI readability graded', !views.result.grades[1].withheld);
-    expect(views.result.doors).toHaveLength(6);
+    expect(views.result.doors).toHaveLength(7);
   });
 
   it('met each shape real data can take that no preview shows', () => {

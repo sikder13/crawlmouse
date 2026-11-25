@@ -18,19 +18,21 @@
 import type { BatchAt, RunSoFar } from '../../../../../../inngest/check';
 import {
   ACCESS_SLICE_S,
-  CRAWL_CEILING_S,
+  cadenceFor,
+  crawlCeilingS,
+  finishSFor,
   MIN_BATCH_S,
   PACE,
   QUEUE_WAIT_MAX_S,
   RENDER_SHARE_S,
-  RESERVE_S,
+  reserveS,
 } from '../limits';
 
 const S = 1000;
 
-/** The end of the fetching phases. */
-export const fetchEndsAt = (startedAt: number): number =>
-  startedAt + (PACE.finishS - RESERVE_S) * S;
+/** The end of the fetching phases: the check's own finish (by its page cap) less its reserve. */
+export const fetchEndsAt = (so: Pick<RunSoFar, 'startedAt' | 'pageCap'>): number =>
+  so.startedAt + (finishSFor(so.pageCap) - reserveS(so.pageCap)) * S;
 
 /**
  * When the render step, started at `stepStart`, must stop rendering: RENDER_SHARE_S after the earlier
@@ -38,8 +40,10 @@ export const fetchEndsAt = (startedAt: number): number =>
  * gets only what the share has left, so the steps after render keep the rest of RESERVE_S however
  * many attempts render takes.
  */
-export const renderEndsAt = (stepStart: number, so: Pick<RunSoFar, 'startedAt'>): number =>
-  Math.min(stepStart, fetchEndsAt(so.startedAt)) + RENDER_SHARE_S * S;
+export const renderEndsAt = (
+  stepStart: number,
+  so: Pick<RunSoFar, 'startedAt' | 'pageCap'>,
+): number => Math.min(stepStart, fetchEndsAt(so)) + RENDER_SHARE_S * S;
 
 /**
  * The busy time after the first accepted crawl batch that is added back to the crawl's end: what
@@ -54,10 +58,13 @@ export function addBackMs(
 
 /** When the phase of `at`, posted at `now`, must have ended. */
 export function phaseEndsAt(at: Pick<BatchAt, 'kind'>, so: RunSoFar, now: number): number {
-  const fetchEnd = fetchEndsAt(so.startedAt);
+  const fetchEnd = fetchEndsAt(so);
   if (at.kind === 'access') return fetchEnd;
   const crawlFrom = so.crawlFrom ?? now;
-  return Math.min(crawlFrom + CRAWL_CEILING_S * S + addBackMs(so), fetchEnd - ACCESS_SLICE_S * S);
+  return Math.min(
+    crawlFrom + crawlCeilingS(so.pageCap) * S + addBackMs(so),
+    fetchEnd - ACCESS_SLICE_S * S,
+  );
 }
 
 /**
@@ -80,9 +87,10 @@ export function batchSeconds(
   endsAt: number,
   now: number,
   most: number,
-  tail: PhaseTail = 'kept_inside',
+  tail: PhaseTail,
+  pageCap: number,
 ): number | null {
-  const after = tail === 'kept_inside' ? PACE.pollGraceS + PACE.pollMaxS : 0;
+  const after = tail === 'kept_inside' ? PACE.pollGraceS + cadenceFor(pageCap).pollMaxS : 0;
   const left = Math.floor((endsAt - now) / S) - after;
   const seconds = Math.min(most, left);
   return seconds >= MIN_BATCH_S ? seconds : null;

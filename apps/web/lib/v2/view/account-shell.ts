@@ -74,6 +74,10 @@ export interface SwitcherAccount {
   id: string;
   kind: 'personal' | 'agency';
   name: string | null;
+  /** The reader's own email, on an account the reader owns (`AccountViewer.accounts`). */
+  ownerEmail?: string | null;
+  /** The host of the account's oldest live site. */
+  firstSite?: string | null;
 }
 
 /** The rail's account switcher, for a person with seats on several accounts. */
@@ -241,15 +245,20 @@ function trialCard(
   };
 }
 
-/** An account with no name, or a blank one, reads by its kind. */
+/** An account with no name, no owner's address the reader may see and no site reads by its kind. */
 const UNNAMED: Record<SwitcherAccount['kind'], string> = {
   personal: 'Personal account',
   agency: 'Agency account',
 };
 
-/** An account as the switcher names it. */
-export const accountLabel = (a: Pick<SwitcherAccount, 'kind' | 'name'>): string =>
-  a.name?.trim() || UNNAMED[a.kind];
+/**
+ * An account as the switcher names it: its name; else, unnamed, the reader's own address on an
+ * account they own, then its first site, so two unnamed accounts of one person are told apart and
+ * an account of someone else's says whose site it holds (D-22, F-285); else its kind.
+ */
+export const accountLabel = (
+  a: Pick<SwitcherAccount, 'kind' | 'name' | 'ownerEmail' | 'firstSite'>,
+): string => a.name?.trim() || a.ownerEmail?.trim() || a.firstSite?.trim() || UNNAMED[a.kind];
 
 const switchTo = (a: SwitcherAccount, label: string): ActionView =>
   action('switchAccount', label, {}, { fields: { accountId: a.id } });

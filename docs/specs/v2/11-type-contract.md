@@ -193,6 +193,11 @@ Fixture collection: `checks`.
 | `coverage.excluded[].kind`                     | `PageKind`             | no   |                    |                     |
 | `coverage.excluded[].count`                    | `integer`              | no   |                    |                     |
 | `coverage.excluded_by_robots`                  | `integer`              | no   |                    | brief               |
+| `coverage.stopped`                             | `object`               | yes  |                    | Final-Result        |
+| `coverage.stopped.page_cap`                    | `integer`              | no   |                    |                     |
+| `coverage.stopped.at_cap`                      | `boolean`              | no   |                    |                     |
+| `coverage.stopped.time_ran_out`                | `boolean`              | no   |                    |                     |
+| `coverage.stopped.site_stopped`                | `boolean`              | no   |                    |                     |
 | `technical_seo`                                | `object`               | yes  |                    |                     |
 | `technical_seo.score`                          | `number`               | yes  |                    |                     |
 | `technical_seo.grade`                          | `GradeLetter`          | yes  |                    |                     |
@@ -1306,6 +1311,7 @@ What limited a batch, once each; `kind` names the variant.
 | Check                | `coverage.gradeable`                   | brief                |
 | Check                | `coverage.excluded`                    | brief                |
 | Check                | `coverage.excluded_by_robots`          | brief                |
+| Check                | `coverage.stopped`                     | Final-Result         |
 | Check                | `signals[].recommendation_class`       | PR #48               |
 | Check                | `stack.frontend.framework`             | PR #49               |
 | Check                | `technical_seo.site_structure_score`   | Final-Seg-Structure  |

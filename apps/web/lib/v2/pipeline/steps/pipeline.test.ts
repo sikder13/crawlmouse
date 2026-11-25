@@ -13,6 +13,7 @@ import {
   seedsOf,
 } from '../../../../../../packages/engine/fixtures/v2/build/recorded';
 import { getJson, putJson } from '../evidence';
+import { objectNames } from '../keep';
 import { fakeWorker, memoryStore, queuedCheck } from '../test-support/fakes';
 import { memoryEvidenceStore } from '../test-support/memory-evidence';
 import { AFTER_RENDER_MIN_S, RENDER_SHARE_S, RESERVE_S } from '../limits';
@@ -375,5 +376,174 @@ describe('checkSteps under runCheck, on the recorded worker batches', () => {
         .filter((p) => p.outcome === 'fetched').length,
     );
     expect(row.inngest_run_id).toBe('run-1');
+  });
+});
+
+/**
+ * F-260 end to end: a worker deploy meets the first run at its second crawl batch, which comes from
+ * another release. The first run queues the check again and sends its retry; the retry run, with one
+ * worker that still holds the first run's batches (as the real one does for an hour), reads the same
+ * recording numbered from `firstBatch`.
+ */
+async function runAcrossADeploy(honourFirstBatch = true) {
+  persisted.length = 0;
+  const clock = { now: T0 };
+  const iso = () => new Date(clock.now).toISOString();
+  const results = new Map<number, BatchResult>();
+  const recorded = recordedFromOne();
+  const crawl2 = recorded.get(2) as CrawlBatchResult;
+  results.set(1, recorded.get(1)!);
+  results.set(2, {
+    ...crawl2,
+    pages: crawl2.pages.map((p) => ({ ...p, worker_release: 'b'.repeat(12) })),
+  });
+  const { worker, posted, held } = fakeWorker(results);
+  const { store, batches, rows } = memoryStore(
+    recordedInput().site,
+    [
+      {
+        ...queuedCheck(CHECK, SITE_ID, '2026-11-05T02:29:58.000Z', GRADE_VERSION),
+        trigger: 'first_audit',
+      },
+    ],
+    iso,
+  );
+  const evidence = memoryEvidenceStore();
+  let nonces = 0;
+  const deps: StepDeps = {
+    store,
+    evidence,
+    persistDb: UNUSED_DB,
+    worker: () => worker,
+    now: () => clock.now,
+    nonce: () => `nonce-${String(++nonces).padStart(16, '0')}`,
+    env: { VERCEL_GIT_COMMIT_SHA: 'a'.repeat(40) },
+    render: {
+      client: { content: async () => ({ ok: false }) } as never,
+      caps: { perCheckMs: 3_600_000, perDayMs: 36_000_000 },
+      daily: NO_DAILY_BUDGET,
+      inFlight: 2,
+    },
+    discover: { fetch: (async () => ({})) as never, userAgent: 'UA', now: () => clock.now },
+  };
+  const steps = checkSteps(deps);
+  steps.discover = async () => {
+    await putJson(evidence, `anon/${SITE_ID}/${CHECK}/seeds.json.gz`, seedsOf(HOST));
+    return {
+      seeds: seedsOf(HOST).length,
+      sitemap_urls: seedsOf(HOST).length - 1,
+      robots_txt: 'found',
+      at: clock.now,
+    };
+  };
+  const sent: { name: string; id: string; data: CheckRequested }[] = [];
+  const tools: CheckStepTools = {
+    run: async (_id, fn) => JSON.parse(JSON.stringify(await fn())),
+    sleep: async (_id, ms) => {
+      clock.now += ms;
+    },
+    sendEvent: async (_id, payload) => {
+      sent.push(payload as (typeof sent)[number]);
+    },
+  };
+  const first = await runCheck({ event: { data: EVENT }, step: tools, runId: 'run-1' }, steps);
+  const retry = sent.find((e) => e.name === 'check.requested');
+  const rowAfterFirst = { ...rows.get(CHECK)! };
+  const batchesAfterFirst = batches.size;
+  const objectsAfterFirst = [...evidence.objects.keys()].sort();
+  if (!retry) return { first, retry, rowAfterFirst, batchesAfterFirst, objectsAfterFirst };
+  const firstBatch = honourFirstBatch ? retry.data.retry!.firstBatch : 1;
+  // The worker's new release answers the recording, numbered from the retry's first batch.
+  for (const [n, b] of recorded) {
+    const m = n - 1 + firstBatch;
+    if (m > 2) results.set(m, { ...b, batch_id: `${CHECK}:${m}` });
+  }
+  clock.now += 60_000;
+  const second = await runCheck(
+    {
+      event: { data: honourFirstBatch ? retry.data : { ...retry.data, retry: { firstBatch } } },
+      step: tools,
+      runId: 'run-2',
+    },
+    steps,
+  );
+  return {
+    first,
+    retry,
+    rowAfterFirst,
+    batchesAfterFirst,
+    objectsAfterFirst,
+    second,
+    posted,
+    held,
+    rows,
+    batches,
+    evidence,
+  };
+}
+
+describe('F-260: a worker deploy in the middle of a check', () => {
+  it('queues the check again and sends its one retry, numbered past the first run’s batches', async () => {
+    const { first, retry, rowAfterFirst, batchesAfterFirst } = await runAcrossADeploy();
+    expect(first).toEqual({ status: 'retried' });
+    expect(retry).toEqual({
+      id: `check-retry:${CHECK}`,
+      name: 'check.requested',
+      data: { ...EVENT, retry: { firstBatch: 3 } },
+    });
+    expect(rowAfterFirst).toMatchObject({
+      status: 'queued',
+      started_at: null,
+      progress: null,
+      inngest_run_id: null,
+    });
+    expect(batchesAfterFirst).toBe(0);
+  });
+
+  // QA's gate on #190, F1: expiry and the purge name a check's objects from its batch rows, so the
+  // first run's stored results go with its rows, and no object is left that nothing would remove.
+  it('removes the first run’s stored batches with its rows, so every object left is one expiry names', async () => {
+    const { objectsAfterFirst, evidence, batches } = await runAcrossADeploy();
+    const base = `anon/${SITE_ID}/${CHECK}`;
+    expect(objectsAfterFirst).toEqual([`${base}/seeds.json.gz`]);
+    const named = new Set(
+      objectNames([...batches!.values()].map((b) => b.batch)).map((n) => `${base}/${n}.json.gz`),
+    );
+    const left = [...evidence!.objects.keys()];
+    expect(left.filter((k) => !named.has(k))).toEqual([]);
+    expect(left.sort()).toEqual(
+      [
+        `${base}/batch-3.json.gz`,
+        `${base}/batch-4.json.gz`,
+        `${base}/batch-5.json.gz`,
+        `${base}/batch-6.json.gz`,
+        `${base}/map.json.gz`,
+        `${base}/render.json.gz`,
+        `${base}/seeds.json.gz`,
+      ].sort(),
+    );
+  });
+
+  it('builds on the retry what an undisturbed run builds, from batches the worker did not hold', async () => {
+    const undisturbed = await runRecorded();
+    const before = persisted[0] as { built: { page_results: unknown[]; link_edges: unknown[] } };
+    const { second, posted } = await runAcrossADeploy();
+    expect(second).toEqual(undisturbed.result);
+    expect(posted!.map((p) => [p.kind, p.batch])).toEqual([
+      ['crawl', 1],
+      ['crawl', 2],
+      ['crawl', 3],
+      ['crawl', 4],
+      ['access', 5],
+      ['access', 6],
+    ]);
+    const after = persisted[0] as typeof before;
+    expect(after.built.page_results).toEqual(before.built.page_results);
+    expect(after.built.link_edges).toEqual(before.built.link_edges);
+  });
+
+  it('would read the first run’s held batches if the retry numbered from 1, and fail', async () => {
+    const { second } = await runAcrossADeploy(false);
+    expect(second).toEqual({ status: 'failed', reason: 'worker_redeployed' });
   });
 });

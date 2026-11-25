@@ -576,10 +576,14 @@ A deploy restarts the machine twice (the rollout, then the egress check's restar
 both is given up and its check goes on without it, so it can end with fewer pages, or
 `worker_unavailable` when it read no crawl batch at all (`runBatch` in `inngest/check.ts`). Deploy at
 a quiet hour, or set `CRAWL_PAUSED=1` first ("Stop all crawling"), so fewer are running. A check that already took a batch
-from the release before the rollback and then reads one from the rolled-back release fails with
-`worker_redeployed`: `take` in `inngest/check.ts` refuses a batch whose worker release differs
-from the first one the check read. The same holds for any production deploy. Those checks have to
-be run again.
+from the release before the rollback and then reads one from the rolled-back release stops there:
+`take` in `inngest/check.ts` refuses a batch whose worker release differs from the first one the
+check read. The same holds for any production deploy. Since F-260, the check is then queued again
+and run once more from the start, as a new run of the same check (`redeployed` in
+`inngest/check.ts`, the `requeue` step); its batch numbers continue past the first run's, because the
+worker keeps a result for an hour under (check, batch number). A retry run that meets another
+release in turn fails the check with `worker_redeployed`, and that check has to be run again. So
+two deploys within one check's run still cost it; space them by the longest check's time.
 
 ## Browser Run: the render token, limits and cost
 

@@ -5,8 +5,12 @@
  */
 import { PACE } from '../../../../../inngest/check';
 
+import { FIRST_ACCEPT_BY_S, LARGE_CHECK_ABOVE } from '../../../../../inngest/check';
+
 export {
+  cadenceFor,
   FIRST_ACCEPT_BY_S,
+  LARGE_CHECK_ABOVE,
   PACE,
   QUEUE_WAIT_MAX_S,
   STEP_OUTPUT_BYTES,
@@ -44,6 +48,47 @@ export const CRAWL_CEILING_S = 480;
  * step latency and any busy answer to the access post.
  */
 export const ACCESS_SLICE_S = 300;
+/**
+ * The largest page cap a check is given, Pro's and Agency's (inbox 079): PACE.maxCrawlBatches
+ * batches of the engine's CRAWL_BATCH_URLS (50).
+ */
+export const MAX_PAGE_CAP = 2000;
+/**
+ * A large check's crawl, 1.7 s a page (inbox 079). Requirement: a site that answers a paced request
+ * in 1.0 s or less is read to the cap. At 1.0 s a page a 50-page batch takes 50 s, and a run that
+ * hears no done signal polls at 10, 30 and 70 s, so it finds the batch done 20 s late; with the step
+ * latency on top, the orchestration's simulation reads all 40 batches only from 1.7 s a page at 3 s a
+ * step (1.5 does at 1 s a step; steps/time.test.ts). With the worker's done signal (PR 5a) a batch
+ * is read when it ends, so a fast site finishes well inside this: it is a ceiling, not a duration.
+ * The worker's limiter (packages/worker/src/politeness/limiter.ts) starts requests at least 500 ms
+ * apart and lets two run at once on a slow site.
+ */
+export const LARGE_CRAWL_S_PER_PAGE = 1.7;
+/**
+ * A large check's reserve after the last batch: building a 2,000-page check measured 45 to 62 s
+ * in-process (#165's harness, 24 Nov); persisting it is one database transaction, not measured.
+ */
+export const LARGE_RESERVE_S = 300;
+
+/**
+ * The crawl's ceiling for a check of `pageCap` pages: CRAWL_CEILING_S up to 500, then by the page, up to
+ * MAX_PAGE_CAP's. A cap above it is read as MAX_PAGE_CAP: PACE.maxCrawlBatches reads no more, and the
+ * run's finish timeout is sized for it, so a longer plan would be cancelled before its build.
+ */
+export const crawlCeilingS = (pageCap: number): number =>
+  pageCap > LARGE_CHECK_ABOVE
+    ? Math.ceil(Math.min(pageCap, MAX_PAGE_CAP) * LARGE_CRAWL_S_PER_PAGE)
+    : CRAWL_CEILING_S;
+/** The reserve after the last batch for a check of `pageCap` pages. */
+export const reserveS = (pageCap: number): number =>
+  pageCap > LARGE_CHECK_ABOVE ? LARGE_RESERVE_S : RESERVE_S;
+/**
+ * A check's own finish, from its first claim attempt: the latest first batch, then its crawl, the
+ * access slice and its reserve. The run's finish timeout, PACE.finishS, is the largest cap's.
+ */
+export const finishSFor = (pageCap: number): number =>
+  FIRST_ACCEPT_BY_S + crawlCeilingS(pageCap) + ACCESS_SLICE_S + reserveS(pageCap);
+
 /** A batch that could be given less than this is not posted; its phase ends instead. */
 export const MIN_BATCH_S = 60;
 /** Discovery's bound on reading robots.txt and the sitemaps (PACE.discoverS, one value). */
@@ -56,9 +101,10 @@ export const DEFAULT_PAGE_CAP = 500;
 /**
  * The reaper fails a queued or running check whose heartbeat is older than this (D13): above the
  * finish timeout plus the longest wait between two heartbeats (steps/lifecycle.test.ts), so no check
- * whose run may still be alive is reaped. 45 minutes since the finish timeout became 37 (CC-42A).
+ * whose run may still be alive is reaped. 95 minutes since the finish timeout became 88 for 2,000
+ * pages (inbox 079); 45 before that.
  */
-export const REAP_AFTER_S = 45 * 60;
+export const REAP_AFTER_S = 95 * 60;
 /** An audit nobody keeps stays readable this long after it was requested (CC-22b D8). */
 export const ANONYMOUS_EXPIRY_HOURS = 24;
 /** Manual and fix re-check requests in one 2-minute bucket are one check (ARCH-2 §4.1). */

@@ -161,18 +161,25 @@ async function buildWith(f: BuildFixture, caps: RenderCaps, maxEmptyRootRenders:
 }
 
 describe('no grade moves when empty-root pages are rendered: the build fixtures', () => {
+  // One test per fixture and cap setting (QA's gate on #182, F5): each builds its fixture two or
+  // three times, not five, so it is well inside the 5 s a test gets. The graded picks the caps are
+  // set from are found once per fixture and shared.
   for (const [name, f] of Object.entries(BUILD_FIXTURES)) {
-    it(`${name}`, async () => {
-      const { plan } = await buildWith(f, LOOSE, 0);
-      const picks = selectRenders(plan.candidates, plan.openFixTemplates, plan.maxRenders).length;
-      for (const [capsName, caps] of Object.entries(capsFor(picks))) {
+    let picks: Promise<number> | undefined;
+    const picksOf = () =>
+      (picks ??= buildWith(f, LOOSE, 0).then(
+        ({ plan }) => selectRenders(plan.candidates, plan.openFixTemplates, plan.maxRenders).length,
+      ));
+    for (const capsName of Object.keys(capsFor(0))) {
+      it(`${name}, ${capsName}`, async () => {
+        const caps = capsFor(await picksOf())[capsName]!;
         const off = await buildWith(f, caps, 0);
         const on = await buildWith(f, caps, EMPTY_ROOT_MAX_RENDERS);
         expect(on.built.check, capsName).toEqual(off.built.check);
         expect(emptyRootRendered(off.outcome), capsName).toBe(0);
         if (caps === LOOSE) expect(emptyRootRendered(on.outcome), capsName).toBe(f.emptyRoots);
-      }
-    });
+      });
+    }
   }
 });
 

@@ -293,6 +293,20 @@ const ROUTES: readonly Spec[] = [
     proof: by('app/api/agency-trial/route.test.ts', '401 without a session, whatever the flag'),
     calls: 1,
   },
+  {
+    path: 'api/agency/brand',
+    v2: true,
+    identity: 'signed-in owner or account manager of the named account',
+    gate: 'member',
+    detail:
+      'Sets the named Agency account’s brand name and logo once `member_role` answers owner or account manager there; no seat and a developer seat get the same 403.',
+    check: at('app/api/agency/brand/route.ts', 'member_role'),
+    proof: by(
+      'app/api/agency/brand/route.test.ts',
+      'answers an account the caller is not a member of exactly as a developer seat, so it says nothing about the account',
+    ),
+    calls: 1,
+  },
   // v2: account
   {
     path: 'api/account',
@@ -1213,6 +1227,17 @@ const ENTRIES: readonly Spec[] = [
     proof: by(SETTINGS_TEST, 'is a 404 for a developer'),
   },
   {
+    path: 'apps/web/app/(account)/settings/integrations/page.tsx',
+    v2: true,
+    identity: 'signed-in owner or account manager',
+    gate: 'member',
+    detail:
+      'The Slack destination of the viewer account, as its last four characters; `member_role` decides the role, a developer is a 404.',
+    check: at('lib/v2/account/settings-pages.ts', 'member_role'),
+    proof: by(SETTINGS_TEST, 'Integrations is a 404 for a developer'),
+    calls: 1,
+  },
+  {
     path: 'apps/web/app/(account)/settings/plan/page.tsx',
     v2: true,
     identity: 'signed-in owner',
@@ -1306,6 +1331,7 @@ const ENTRIES: readonly Spec[] = [
       'app/agency/layout.tsx',
       'app/alerts/layout.tsx',
       'app/changes/layout.tsx',
+      'app/competitors/layout.tsx',
       'app/dashboard/v2/layout.tsx',
       'app/reports/layout.tsx',
       'app/seats/layout.tsx',
@@ -1334,13 +1360,13 @@ const ENTRIES: readonly Spec[] = [
     identity: 'signed-in seat, in its viewer account',
     gate: 'member_for_site',
     detail:
-      'The account home: the sites the seat’s scope covers, read by `sitesInScope` through the session. Its two service-role clients read the next check time of those sites alone (`readNextChecks`) and the signed-in viewer’s own completed v1 audits, keyed by their user id (`readEarlierAudits`).',
+      'The account home: the sites the seat’s scope covers, read by `sitesInScope` through the session. Its three service-role clients read the next check time of those sites alone (`readNextChecks`), the signed-in viewer’s own completed v1 audits, keyed by their user id (`readEarlierAudits`), and whether the viewer account has a Slack destination (`account_slack_last4`, of which only set or not reaches the page).',
     check: at('lib/v2/account/dataset.ts', 'sitesInScope'),
     proof: by(
       PAGES_TEST,
       '/dashboard/v2: a developer sees the client their seat covers alone, and a stranger neither',
     ),
-    calls: 2,
+    calls: 3,
   },
   {
     path: 'apps/web/app/internal/page.tsx',
@@ -1411,6 +1437,19 @@ const ENTRIES: readonly Spec[] = [
     proof: by(
       PAGES_TEST,
       '/changes: a developer sees the client their seat covers alone, and a stranger neither',
+    ),
+  },
+  {
+    path: 'apps/web/app/competitors/page.tsx',
+    v2: true,
+    identity: 'signed-in seat, in its viewer account',
+    gate: 'member_for_site',
+    detail:
+      'Redirects to the Signals page of the first site the seat covers with a competitor named (row 18).',
+    check: at('lib/v2/account/dataset.ts', 'sitesInScope'),
+    proof: by(
+      'app/competitors/page.test.tsx',
+      'goes to the latest check’s Signals page of the site with a competitor named',
     ),
   },
   {
@@ -1612,6 +1651,7 @@ const ENTRIES: readonly Spec[] = [
       'changes',
       'content',
       'fix/[fixId]',
+      'links',
       'map',
       'nojs',
       'overview',
@@ -1972,6 +2012,8 @@ const LIBS: readonly Spec[] = [
     callers: [
       'apps/web/app/api/admin/takedown/process/route.ts',
       'apps/web/app/api/agency-trial/route.ts',
+      'apps/web/app/api/agency/brand/route.ts',
+      'apps/web/app/api/alert-rules/route.ts',
       'apps/web/app/api/audits/[id]/notify/route.ts',
       'apps/web/app/api/audits/[id]/reaudit/route.ts',
       'apps/web/app/api/audits/[id]/stream/route.ts',
@@ -2001,6 +2043,7 @@ const LIBS: readonly Spec[] = [
       'apps/web/app/api/reports/route.ts',
       'apps/web/app/api/seats/id/[id]/resend/route.ts',
       'apps/web/app/api/seats/route.ts',
+      'apps/web/app/api/sites/[id]/route.ts',
       'apps/web/app/api/takedown/route.ts',
       'apps/web/app/api/verify/check/[id]/route.ts',
       'apps/web/app/api/verify/start/route.ts',
@@ -2059,6 +2102,7 @@ const LIBS: readonly Spec[] = [
       'apps/web/app/(account)/account/email/page.tsx',
       'apps/web/app/(account)/account/restore/page.tsx',
       'apps/web/app/(account)/settings/delete/page.tsx',
+      'apps/web/app/(account)/settings/integrations/page.tsx',
       'apps/web/app/(account)/trial-ended/page.tsx',
       'apps/web/app/agency-trial/page.tsx',
       'apps/web/app/agency/clients/[siteId]/page.tsx',
@@ -2072,6 +2116,7 @@ const LIBS: readonly Spec[] = [
       'apps/web/app/api/account/route.ts',
       'apps/web/app/api/admin/takedown/process/route.ts',
       'apps/web/app/api/agency-trial/route.ts',
+      'apps/web/app/api/agency/brand/route.ts',
       'apps/web/app/api/alert-rules/route.ts',
       'apps/web/app/api/audits/[id]/cancel/route.ts',
       'apps/web/app/api/audits/[id]/export/route.ts',
