@@ -13,6 +13,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import type { Report } from '@crawlmouse/types/v2';
 import { noticeTo, refuse, type RequestBody } from '../account/route';
 import type { AgencyCapture } from '../agency/events';
+import { isNamedKind, reportFileName } from './file-name';
 import { GONE_PAGE } from './share-gone';
 
 // ─── the token ───────────────────────────────────────────────────────────────────────────────────
@@ -140,11 +141,13 @@ export interface ShareStore {
   /** `open` without the count. */
   read(token: string, now: Date): Promise<LinkAnswer>;
   revoke(reportId: string, now: Date): Promise<void>;
+  /** The site's host and the report's creation time, which name its file; null if either is gone. */
+  fileFacts(link: SharedReport): Promise<{ host: string; createdAt: string } | null>;
 }
 
 export interface ShareFiles {
-  /** A URL that reads the stored object for `seconds`. */
-  signedUrl(path: string, seconds: number): Promise<string>;
+  /** A URL that downloads the stored object for `seconds`, under `filename` when one is given. */
+  signedUrl(path: string, seconds: number, filename?: string): Promise<string>;
   read(path: string): Promise<Uint8Array>;
 }
 
@@ -277,11 +280,17 @@ export async function openShareLink(
     res.headers.append('Set-Cookie', viewCookie(link.reportId, token));
     return res;
   }
+  // Named by its site and day, as a member's own download is (F-125); the store's name otherwise.
+  let name: string | undefined;
+  if (isNamedKind(link.kind)) {
+    const facts = await deps.store.fileFacts(link);
+    if (facts) name = reportFileName({ ...facts, kind: link.kind, format: link.format });
+  }
   return new Response(null, {
     status: 302,
     headers: {
       ...SHARE_HEADERS,
-      Location: await deps.files.signedUrl(link.storagePath, SIGNED_URL_SECONDS),
+      Location: await deps.files.signedUrl(link.storagePath, SIGNED_URL_SECONDS, name),
     },
   });
 }

@@ -72,6 +72,15 @@ export interface PipelineStore {
   takeFullRender(accountId: string, checkId: string, limit: number): Promise<boolean>;
   /** Row 17: `give_back_full_render`, for a full render that rendered no page. */
   giveBackFullRender(accountId: string, checkId: string): Promise<void>;
+  /**
+   * F-260: a check running under `runId` back to queued, as `checks`' constraints require of a queued
+   * check (no start, no progress, no run), with its heartbeat at `at` so the reaper counts from now.
+   * True when the check is queued with no run after the call: a retried call finds it so. False when
+   * it is another run's or has ended, and then nothing is changed.
+   */
+  requeue(checkId: string, runId: string, at: string): Promise<boolean>;
+  /** F-260: a requeued check's batch rows, deleted once their stored results are removed. */
+  deleteBatches(checkId: string): Promise<void>;
   /** `reap_stalled_checks`: checks whose heartbeat (or queue time) is before `cutoff`. */
   reap(cutoff: string): Promise<ReapedCheck[]>;
   /** The check a run claimed, if any. */
@@ -227,6 +236,38 @@ export function supabasePipelineStore(sb: SupabaseClient): PipelineStore {
         await sb.from('checks').select('site_id').eq('id', checkId).maybeSingle(),
       );
       return row ? String(row.site_id) : null;
+    },
+
+    async requeue(checkId, runId, at) {
+      const moved = must<Row[]>(
+        'requeue',
+        await sb
+          .from('checks')
+          .update({
+            status: 'queued',
+            started_at: null,
+            progress: null,
+            inngest_run_id: null,
+            heartbeat_at: at,
+          })
+          .eq('id', checkId)
+          .eq('status', 'running')
+          .eq('inngest_run_id', runId)
+          .select('id'),
+      );
+      if ((moved ?? []).length === 0) {
+        const now = must<Row[]>(
+          'requeue status',
+          await sb.from('checks').select('status, inngest_run_id').eq('id', checkId),
+        );
+        const r = (now ?? [])[0];
+        if (r?.status !== 'queued' || r.inngest_run_id !== null) return false;
+      }
+      return true;
+    },
+
+    async deleteBatches(checkId) {
+      must('delete batches', await sb.from('crawl_batches').delete().eq('check_id', checkId));
     },
 
     async progress(checkId, progress, at) {

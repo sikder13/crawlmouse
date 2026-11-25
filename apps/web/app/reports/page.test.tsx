@@ -244,10 +244,12 @@ describe('/reports', () => {
     const html = await page({ notice: 'share_made' });
     expect(rowOf(html, ids.proof)!.text).toContain(`https://crawlmouse.com/s/${token}`);
     expect(html.split(token)).toHaveLength(2);
+    // F-125: the link has a button beside it (what it copies: __tests__/v2/reports-copy-link.dom.test.tsx).
+    expect(html).toContain('Copy link');
     expect(html).toContain(
-      'The link is made. It is shown on its report’s row for a short while: copy it now.',
+      'The link is made. It is shown on its report’s row for two minutes: copy it now.',
     );
-    expect(rowOf(html, ids.proof)!.text).toContain('The link, shown here for a short while:');
+    expect(rowOf(html, ids.proof)!.text).toContain('The link, shown here for two minutes:');
   });
 
   it('shows no link for a cookie that names a report the caller does not list, or is not one this product wrote', async () => {

@@ -81,6 +81,29 @@ export function sqlPipelineStore(db: SqlDb): PipelineStore {
       ]);
     },
 
+    async requeue(checkId, runId, at) {
+      const { rows: moved } = await db.query(
+        `update public.checks
+            set status = 'queued', started_at = null, progress = null, inngest_run_id = null,
+                heartbeat_at = $3::timestamptz
+          where id = $1::uuid and status = 'running' and inngest_run_id = $2
+          returning id`,
+        [checkId, runId, at],
+      );
+      if (moved.length === 0) {
+        const { rows: now } = await db.query<{ status: string; inngest_run_id: string | null }>(
+          `select status, inngest_run_id from public.checks where id = $1::uuid`,
+          [checkId],
+        );
+        if (now[0]?.status !== 'queued' || now[0].inngest_run_id !== null) return false;
+      }
+      return true;
+    },
+
+    async deleteBatches(checkId) {
+      await db.query(`delete from public.crawl_batches where check_id = $1::uuid`, [checkId]);
+    },
+
     async reap(cutoff) {
       const { rows: r } = await db.query<{ check_id: string; site_id: string; reason: string }>(
         `select check_id, site_id, reason from public.reap_stalled_checks($1::timestamptz)`,

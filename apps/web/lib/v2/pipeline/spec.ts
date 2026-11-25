@@ -70,7 +70,8 @@ const REASONS: Readonly<Record<FailureReason, string>> = {
   canceled: 'the run was cancelled or passed its finish timeout (Inngest reports both alike)',
   stalled: 'the reaper found a claimed check with no heartbeat within its bound',
   not_started: 'the reaper found a check that no run claimed within its bound',
-  worker_redeployed: 'a batch came from another worker release than the check’s first (Q10)',
+  worker_redeployed:
+    'a batch came from another worker release than the check’s first (Q10), in the check’s one retry run: a first run that meets one is queued again and retried from the start (F-260)',
   worker_unavailable:
     'no crawl batch could be read: the worker did not answer, refused the app’s credentials, lost a batch twice, kept a batch running past its deadline, or its result could not be read',
   capacity_wait_exceeded: `the worker answered, busy with other checks, until the next wait for the first crawl batch would have passed the wait budget (${QUEUE_WAIT_MAX_S} s) or ${FIRST_ACCEPT_BY_S} s from the start: the check never won a slot`,

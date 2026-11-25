@@ -150,7 +150,7 @@ describe('the function rows against the code', () => {
   const HAND: Record<string, number> = {
     'inngest/audit.ts': 5, // 357 361 376 378 386
     'inngest/billing.ts': 5, // 65 77 95 116 120
-    'inngest/check.ts': 17, // 301 305 313 375 419 428 504 521 587 588 598 599 600 601 602 655 657
+    'inngest/check.ts': 18, // 311 315 323 385 429 438 493 532 549 614 615 625 626 627 628 629 682 684
     'inngest/full-render.ts': 8, // 72 89 93 94 121 122 135 136 (row 17)
     'inngest/check-reaper.ts': 1, // 39
     'inngest/check-expiry.ts': 3, // 51 54 58 (CC-GL D2)

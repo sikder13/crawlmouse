@@ -82,12 +82,15 @@ interface Script {
   read?: (at: BatchAt) => ReadOutput | undefined;
   /** Row 17: whether the check takes a full render; false when unset. */
   fullRender?: boolean;
+  /** What `requeue` answers; true when unset. */
+  requeued?: boolean;
 }
 
 /** Fake step bodies; each returns the clock's time where the real one returns its own. */
 function fakeSteps(clock: { now: number }, script: Script = {}) {
   const posts: { at: BatchAt; so: RunSoFar }[] = [];
   const failed: string[] = [];
+  const requeues: { checkId: string; runId: string }[] = [];
   let claimN = 0;
   let pollN = 0;
   let postN = 0;
@@ -136,16 +139,20 @@ function fakeSteps(clock: { now: number }, script: Script = {}) {
     persist: async () => ({ written: true }),
     finalize: async () => ({}),
     fail: async () => ({ failed: true, siteId: EVENT.siteId }),
+    requeue: async (e, runId) => {
+      requeues.push({ checkId: e.checkId, runId });
+      return { requeued: script.requeued ?? true };
+    },
   };
-  return { steps, posts, failed };
+  return { steps, posts, failed, requeues };
 }
 
-async function drive(script: Script = {}, start = T0) {
+async function drive(script: Script = {}, start = T0, event: CheckRequested = EVENT) {
   const clock = { now: start };
   const step = fakeStep(clock);
   const fake = fakeSteps(clock, script);
   const result = await runCheck(
-    { event: { data: EVENT }, step: step.tools, runId: 'run-1' },
+    { event: { data: event }, step: step.tools, runId: 'run-1' },
     fake.steps,
   );
   return { result, ...step, ...fake, clock };
@@ -571,22 +578,103 @@ describe('runCheck: polling (D1)', () => {
     expect(result).toEqual({ status: 'failed', reason: 'paused' });
   });
 
-  it('fails the check worker_redeployed when a batch comes from another release', async () => {
-    const { result, ids } = await drive({
-      read: (at) =>
-        at.batch === 2
-          ? {
-              status: 'read',
-              pages: 50,
-              links: 0,
-              access_tests: 0,
-              partial: false,
-              release: '0123456789ab',
-            }
-          : undefined,
+  /** A read from a worker release other than the check's first. */
+  const fromOtherRelease: ReadOutput = {
+    status: 'read',
+    pages: 50,
+    links: 0,
+    access_tests: 0,
+    partial: false,
+    release: '0123456789ab',
+  };
+
+  // F-260: a worker deploy fails every check in flight. A check is retried once, from the start.
+  it('retries the check once, from the start, when a crawl batch comes from another release', async () => {
+    const { result, ids, events, requeues } = await drive({
+      read: (at) => (at.batch === 2 ? fromOtherRelease : undefined),
     });
+    expect(result).toEqual({ status: 'retried' });
+    expect(ids.slice(-3)).toEqual(['crawl-2-read', 'requeue', 'retry']);
+    expect(ids).not.toContain('fail');
+    expect(requeues).toEqual([{ checkId: EVENT.checkId, runId: 'run-1' }]);
+    expect(events.at(-1)).toEqual({
+      id: 'retry',
+      payload: {
+        id: `check-retry:${EVENT.checkId}`,
+        name: 'check.requested',
+        // Numbered past every batch the first run posted, which the worker may still hold.
+        data: { ...EVENT, retry: { firstBatch: 3 } },
+      },
+    });
+  });
+
+  it('retries the check when an access batch comes from another release', async () => {
+    const { result, ids, events } = await drive({
+      crawlBatches: 2,
+      read: (at) => (at.kind === 'access' ? fromOtherRelease : undefined),
+    });
+    expect(result).toEqual({ status: 'retried' });
+    expect(ids.slice(-3)).toEqual(['access-1-read', 'requeue', 'retry']);
+    expect(events.at(-1)).toMatchObject({ payload: { data: { retry: { firstBatch: 4 } } } });
+  });
+
+  it('fails the check worker_redeployed when the retried run meets another release', async () => {
+    const { result, ids, requeues } = await drive(
+      { read: (at) => (at.batch === 8 ? fromOtherRelease : undefined) },
+      T0,
+      { ...EVENT, retry: { firstBatch: 7 } },
+    );
     expect(result).toEqual({ status: 'failed', reason: 'worker_redeployed' });
     expect(ids.slice(-3)).toEqual(['crawl-2-read', 'fail', 'emit-failed']);
+    expect(requeues).toEqual([]);
+  });
+
+  // QA's gate on #190, F4: a requeue that finds the check another run's, or ended, fails nothing.
+  it('ends gone, failing nothing and sending no retry, when the requeue finds the check no longer this run’s', async () => {
+    const { result, ids, events } = await drive({
+      read: (at) => (at.batch === 2 ? fromOtherRelease : undefined),
+      requeued: false,
+    });
+    expect(result).toEqual({ status: 'gone' });
+    expect(ids.slice(-2)).toEqual(['crawl-2-read', 'requeue']);
+    expect(ids).not.toContain('fail');
+    expect(events.map((e) => e.id)).not.toContain('retry');
+  });
+
+  // QA's gate on #190, F5: only a batch from another release retries; every other end fails as before.
+  it.each([
+    [
+      'paused',
+      { post: (at: BatchAt) => (at.batch === 2 ? ({ status: 'paused' } as const) : undefined) },
+    ],
+    ['worker_unavailable', { crawlBatches: 1, poll: () => 'failed' as const }],
+    [
+      'capacity_wait_exceeded',
+      { post: () => ({ status: 'busy', at: T0 + 10 * 3600 * 1000 }) as const },
+    ],
+  ] as const)(
+    'ends %s failed with no requeue: only worker_redeployed is retried',
+    async (reason, script) => {
+      const { result, ids, requeues } = await drive(script as Script);
+      expect(result).toEqual({ status: 'failed', reason });
+      expect(ids).not.toContain('requeue');
+      expect(requeues).toEqual([]);
+    },
+  );
+
+  it('numbers a retried run’s batches from firstBatch, crawl then access', async () => {
+    const { result, posts } = await drive({ crawlBatches: 2 }, T0, {
+      ...EVENT,
+      retry: { firstBatch: 7 },
+    });
+    expect(result).toEqual({ status: 'finished' });
+    expect([...new Set(posts.map((p) => `${p.at.kind}:${p.at.batch}`))]).toEqual([
+      'crawl:7',
+      'crawl:8',
+      'crawl:9',
+      'access:9',
+      'access:10',
+    ]);
   });
 });
 
@@ -831,11 +919,13 @@ describe('createCheckFn (D3)', () => {
       id: `${inngest.id}-${CHECK_FN_ID}`,
       triggers: [{ event: 'check.requested' }],
       concurrency: [{ key: 'event.data.siteId', limit: 1 }, { limit: 16 }],
-      idempotency: 'event.data.checkId',
       timeouts: { finish: '7420s' },
       cancel: [{ event: 'check.cancel.requested', if: 'event.data.checkId == async.data.checkId' }],
     });
     expect(PACE.finishS).toBe(7420);
+    // F-260: no function idempotency, so a check's retry run can start (one event id a retry).
+    expect(main!.idempotency).toBeUndefined();
+    expect(main!.rateLimit).toBeUndefined();
     expect((main!.steps as Record<string, { retries: unknown }>).step!.retries).toEqual({
       attempts: 2,
     });

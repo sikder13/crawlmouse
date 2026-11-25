@@ -19,6 +19,12 @@ export type CheckRequested = {
   /** The most pages the crawl may fetch. */
   pageCap: number;
   requestedByUserId?: string;
+  /**
+   * F-260: this run is the check's one retry, after a worker deploy failed its first run. Its batches
+   * are numbered from `firstBatch`, past every batch the first run posted: the worker keeps a result
+   * for an hour under (check, batch number), and would hand an earlier number's back as posted.
+   */
+  retry?: { firstBatch: number };
 };
 
 /** The worker's note that a batch ended (PR 5a): a hint to read it now. The result is still read. */
@@ -92,6 +98,8 @@ export type CheckNotifyRequested = { checkId: string; siteId: string };
  */
 export const checkFailedEventId = (checkId: string): string => `check-failed:${checkId}`;
 export const checkFinishedEventId = (checkId: string): string => `check-finished:${checkId}`;
+/** F-260: the one retry of a check. Inngest keeps an event id 24 hours, so a second send starts nothing. */
+export const checkRetryEventId = (checkId: string): string => `check-retry:${checkId}`;
 
 const FAILURE_PREFIX = 'check failed: ';
 const FAILURE_MESSAGE = /^check failed: ([a-z_]+)$/;

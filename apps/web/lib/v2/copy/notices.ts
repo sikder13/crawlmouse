@@ -129,8 +129,12 @@ export const NOTICE_LINES: Record<NoticeCode, (at: string | null) => string> = {
     `No link was made: the account’s limit on new links was reached, or could not be read.${at ? ` Try again from ${at}.` : ''}`,
   fix_not_verified: () =>
     'That check did not verify the fix, so there is no proof to make. Nothing was made.',
+  report_made: () => 'The report is made. Download it from its row below.',
+  report_made_page: () => 'The report is made. Open it from its row below.',
+  report_failed: () =>
+    'The report could not be made. Try again; if it fails again, write to support@crawlmouse.com.',
   share_made: () =>
-    'The link is made. It is shown on its report’s row for a short while: copy it now. Making another replaces it.',
+    'The link is made. It is shown on its report’s row for two minutes: copy it now. Making another replaces it.',
   share_revoked: () => 'The link was withdrawn and no longer opens.',
   not_ready: () => 'That report’s file is not stored yet, so no link was made.',
   schedule_saved: () => 'The schedule was saved.',

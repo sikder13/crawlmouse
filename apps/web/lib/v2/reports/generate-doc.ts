@@ -13,7 +13,7 @@
  */
 import { instant } from '@crawlmouse/types/v2';
 import { VERDICTS } from '../../../components/v2/verdicts';
-import { footerLine, REPORT_DOC_COPY as COPY } from '../copy/report-doc';
+import { footerLine, REPORT_DOC_COPY as COPY, SCREEN_ONLY } from '../copy/report-doc';
 import { findCheck, type ViewDataset } from '../fixtures';
 import { fixView } from '../view/fix';
 import { partialNotice, resultView, type GradeView } from '../view/result';
@@ -56,7 +56,16 @@ function pagesOf({ dataset: d, checkId }: CheckRecords) {
 
 type Pages = ReturnType<typeof pagesOf>;
 
-const text = (t: string): DocBlock => ({ type: 'text', text: t });
+/** A page's sentence as the report prints it: without the sentences only a screen can act on. */
+export function printable(t: string): string {
+  // A sentence with none of them is printed exactly as the page says it.
+  if (!SCREEN_ONLY.some((sentence) => t.includes(sentence))) return t;
+  return SCREEN_ONLY.reduce((out, sentence) => out.split(sentence).join(''), t)
+    .replace(/ {2,}/g, ' ')
+    .trim();
+}
+
+const text = (t: string): DocBlock => ({ type: 'text', text: printable(t) });
 
 const facts = (tiles: readonly { label: string; value: string }[]): DocBlock[] =>
   tiles.length

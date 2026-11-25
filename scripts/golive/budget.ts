@@ -160,7 +160,7 @@ const ROWS: readonly RowInput[] = [
     file: 'inngest/check.ts',
     id: 'crawlmouse.check.run',
     onFailure: true,
-    callSites: 15,
+    callSites: 16,
     registration: 'V2_PIPELINE',
     trigger: 'check.requested',
     steps: 0,
@@ -175,7 +175,7 @@ const ROWS: readonly RowInput[] = [
     trigger: 'inngest/function.cancelled (checkFn)',
     steps: 2,
     stepsHow: 'fail, emit-failed',
-    stepAt: [655, 657],
+    stepAt: [682, 684],
   },
   {
     // Row 17: one run per full render a Pro or Agency account takes (10 or 30 a month), not per
@@ -793,6 +793,8 @@ export async function checkExecutions(shape: CheckShape): Promise<number> {
     persist: async () => ({ written: true }),
     finalize: async () => ({}),
     fail: async () => ({ failed: false }),
+    // F-260's retry run is not modelled: it needs a worker deploy within the check, never here.
+    requeue: async () => ({ requeued: false }),
   };
   let result;
   try {
