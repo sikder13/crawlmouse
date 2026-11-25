@@ -143,3 +143,19 @@ describe('a long host on the sites table (PR 2 review, item 6)', () => {
     expect(css).toMatch(new RegExp(`\\n\\.${cls} \\{[^}]*overflow-wrap: anywhere;`));
   });
 });
+
+describe('the by-check rows keep the locked 4px 0 padding (CI layout.spec.ts:517)', () => {
+  const css = readFileSync(join(__dirname, 'DashboardScreen.module.css'), 'utf8');
+  const rules = [...css.matchAll(/([^{}]*byCheckTable[^{]*)\{([^}]*)\}/g)].map(
+    (m): [string, string] => [m[1]!.trim(), m[2]!],
+  );
+
+  it('no by-check cell rule pads beyond 4px 0; the markers keep 12px from the name by their margin', () => {
+    expect(rules.length).toBeGreaterThan(0);
+    for (const [selector, body] of rules) {
+      expect(body, selector).not.toMatch(/padding-(left|right)|padding: (?!4px 0;)/);
+    }
+    const markers = rules.find(([s]) => s.endsWith('td > *'))!;
+    expect(markers[1]).toMatch(/margin-left: 12px;/);
+  });
+});
