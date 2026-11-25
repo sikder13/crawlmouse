@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { JSDOM } from 'jsdom';
 import { FixPreview } from '../../app/(v2-preview)/v2-preview/_preview/FixPreview';
 import {
   FIX_SOURCES,
@@ -203,5 +204,45 @@ describe('the fix page agrees with the Result and the segment', () => {
     expect(fixPreview('bad-site').frame.position).toBe(`Fix 2 of ${result.fixes!.total}`);
     const d = fixture('bad-site');
     expect(findCheck(d, FIX_SOURCES['bad-site'].check).id).toBe(FIX_SOURCES.locked.check);
+  });
+});
+
+describe('Fixed, and proven on the resolved fix page (Goal 1 row 22)', () => {
+  const card = (html: string) => {
+    const doc = new JSDOM(html).window.document;
+    return doc.querySelector('[data-v2-fix-proof]');
+  };
+
+  it('draws the verified fix’s before and after under its own heading', () => {
+    const el = card(renderToStaticMarkup(<FixScreen data={fixPreview('resolved')} />));
+    expect(el?.querySelector('h2')?.textContent).toBe('Fixed, and proven');
+    expect([...el!.querySelectorAll('p')].map((p) => p.textContent)).toEqual([
+      'Affected pages: 3, now 0',
+      'Re-checked 30 Oct, 10:01 UTC · verified',
+    ]);
+    expect(el?.hasAttribute('data-v2-addition')).toBe(true);
+  });
+
+  it('does not carry the proof page’s marker, which the a11y suite reads as that page', () => {
+    const html = renderToStaticMarkup(<FixScreen data={fixPreview('resolved')} />);
+    expect(card(html)).not.toBeNull();
+    expect(new JSDOM(html).window.document.querySelector('[data-v2-proof]')).toBeNull();
+  });
+
+  it('draws the counter and its link in the card’s place', () => {
+    const data = fixPreview('resolved');
+    if (data.kind !== 'resolved') throw new Error(data.kind);
+    const counted = {
+      ...data,
+      proof: {
+        kind: 'counted' as const,
+        title: 'Fixed, and proven',
+        counter: '1 of 2 proven fixes shown on Free · see every one with Pro',
+        action: { label: 'See plans', href: '/pricing' },
+      },
+    };
+    const el = card(renderToStaticMarkup(<FixScreen data={counted} />));
+    expect(el?.textContent).toContain('1 of 2 proven fixes shown on Free');
+    expect(el?.querySelector('a')?.getAttribute('href')).toBe('/pricing');
   });
 });
