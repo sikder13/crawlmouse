@@ -19,7 +19,8 @@ import {
   type Viewer,
 } from './account';
 import { accountShellView, newChanges, type ShellView } from './account-shell';
-import { lettersUnmoved, rowOf, type ChangeRowView } from './segment/changes';
+import { listedChanges } from './listed-changes';
+import { rowOf, type ChangeRowView } from './segment/changes';
 
 const DAY_MS = 86_400_000;
 
@@ -78,7 +79,7 @@ export function asSentBy(c: Change, now: string): Change {
 
 /** The account's changes at `now`, newest first; ties in the order of their ids. */
 export function accountChanges(v: AccountView): Change[] {
-  return v.d.changes
+  return listedChanges(v.d.changes)
     .map((c) => asSentBy(c, v.now))
     .sort((a, b) => instant(b.detected_at) - instant(a.detected_at) || a.id.localeCompare(b.id));
 }
@@ -137,7 +138,7 @@ export function changesLogView(
   );
   const hostOf = new Map(sites.map((s) => [s.id, s.host]));
   const siteOfCheck = new Map(v.d.checks.map((c) => [c.id, c.site_id]));
-  const all = logEntries(accountChanges(v).filter((c) => !lettersUnmoved(c)));
+  const all = logEntries(accountChanges(v));
   const site = query.site && hostOf.has(query.site) ? query.site : null;
   const kind = KIND_ORDER.find((k) => k === query.kind) ?? null;
   // The kinds the account's changes hold, and the one asked for even when none has it yet.

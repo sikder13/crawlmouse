@@ -26,6 +26,7 @@ import {
   pagesReadable,
 } from './effect-headline';
 import { openFixes, type FixPlan } from './free-fixes';
+import { listedChanges } from './listed-changes';
 import { noFixKind, noPageServed, servedWord } from './no-fix-card';
 import {
   anySectionMeasured,
@@ -687,7 +688,7 @@ const CHANGE_KINDS: readonly [Change['kind'], string][] = [
 
 /** The door of a check that has one before it: its own change rows, counted by kind. */
 function recheckDoor(d: ViewDataset, check: Check): DoorView {
-  const changes = d.changes.filter((c) => c.check_id === check.id);
+  const changes = listedChanges(d.changes).filter((c) => c.check_id === check.id);
   const counted = CHANGE_KINDS.map(
     ([kind, word]) => [changes.filter((c) => c.kind === kind).length, word] as const,
   ).filter(([n]) => n > 0);

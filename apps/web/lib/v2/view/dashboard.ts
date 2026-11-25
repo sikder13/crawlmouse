@@ -59,6 +59,7 @@ import {
 } from './checks';
 import { points, type DoorView } from './result';
 import { auditHref } from './audit-hrefs';
+import { listedChanges } from './listed-changes';
 import { nextCheckLine, type NextChecks } from './site';
 import { GRADES, PILL, SUBJECTS } from './segment/changes';
 import { effortText } from './segment/fixes';
@@ -503,7 +504,7 @@ function health(d: AccountDataset, viewer: Viewer, v: AccountView): HealthView {
 
 /** The grade moves recorded at a check, as "AI readability D → F" (FACTS row 98, Q12). */
 function gradeMoves(v: AccountView, checkId: string): string[] {
-  return v.d.changes
+  return listedChanges(v.d.changes)
     .filter((c) => c.check_id === checkId && c.subject === 'grade')
     .flatMap((c) => c.grade_deltas)
     .map((g) => `${GRADES[g.grade]} ${g.from_grade} → ${g.to_grade}`);

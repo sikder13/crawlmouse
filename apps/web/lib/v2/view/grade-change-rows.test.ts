@@ -66,3 +66,64 @@ describe('the site page’s grade cards, a week after the earlier check', () => 
     expect(card(bad.as_of)).toBe('−1 since Thu');
   });
 });
+
+describe('a re-check whose only change is a letter-held grade row (review #1)', () => {
+  /** The bad site's latest check with its own rows replaced by "Technical SEO A → A (90 → 91)". */
+  function onlyHeld(withRow: boolean) {
+    const d = structuredClone(fixture('bad-site'));
+    const moved = d.changes.find((c) => c.id === LETTER_MOVED)!;
+    const check = moved.check_id;
+    d.changes = d.changes.filter((c) => c.check_id !== check);
+    if (withRow) {
+      d.changes.push({
+        ...moved,
+        id: SAME_LETTER,
+        summary: 'Technical SEO A → A (90 → 91)',
+        grade_deltas: [
+          { grade: 'technical_seo', from_score: 90, to_score: 91, from_grade: 'A', to_grade: 'A' },
+        ],
+      });
+    }
+    return { d, check };
+  }
+
+  it('is counted nowhere it is not listed: dashboard strip, overview door, the tab and the log', async () => {
+    const { dashboardView } = await import('./dashboard');
+    const { resultView } = await import('./result');
+    const viewer = { accountId: ACCOUNT, now: fixture('bad-site').as_of };
+    const read = (withRow: boolean) => {
+      const { d, check } = onlyHeld(withRow);
+      const tab = changesView(d, check, {});
+      if (tab.state !== 'changes') throw new Error(`segment state ${tab.state}`);
+      const door = resultView(d, check, { map: null }).doors.find(
+        (x) => x.title === 'What changed since last time',
+      )!;
+      const log = changesLogView(d, viewer, {}, '/changes').rows.filter(
+        (r) => r.key === SAME_LETTER,
+      );
+      const dash = dashboardView(d, viewer);
+      return {
+        tab: tab.rows.length,
+        door: door.pill.label,
+        log: log.length,
+        other: dash.strip!.other.count,
+      };
+    };
+    const without = read(false);
+    // Beside the check's other rows, the dashboard's change rows do not name it either.
+    const { dashboardView: dash } = await import('./dashboard');
+    const kept = structuredClone(fixture('bad-site'));
+    const moved = kept.changes.find((c) => c.id === LETTER_MOVED)!;
+    kept.changes.push({
+      ...moved,
+      id: SAME_LETTER,
+      summary: 'Technical SEO A → A (90 → 91)',
+      grade_deltas: [
+        { grade: 'technical_seo', from_score: 90, to_score: 91, from_grade: 'A', to_grade: 'A' },
+      ],
+    });
+    expect(JSON.stringify(dash(kept, viewer))).not.toContain('Technical SEO A → A');
+    expect(without).toMatchObject({ tab: 0, door: 'no changes', log: 0 });
+    expect(read(true)).toEqual(without);
+  });
+});
