@@ -37,6 +37,11 @@ export interface TierGates {
   fixesVisible: 3 | 'all';
   /** Free gets a 402 for the packet of a fix it cannot see. */
   packets: 'visible_fixes_only' | 'all';
+  /**
+   * Verified fixes whose before and after a fix page shows ("Fixed, and proven", Goal 1 row 22):
+   * Free one, the site's first verified, and the rest behind a counter; paid plans every one.
+   */
+  fixProofs: 1 | 'all';
   competitorsPerSite: number;
   /** PDF, CSV and JSON exports. */
   exports: boolean;
@@ -69,6 +74,7 @@ const PAID: Omit<
   schedule: 'weekly',
   fixesVisible: 'all',
   packets: 'all',
+  fixProofs: 'all',
   exports: true,
   slack: true,
   stagingAndDeployHooks: true,
@@ -88,6 +94,7 @@ export const GATES: Readonly<Record<Tier, Readonly<TierGates>>> = Object.freeze(
     schedule: 'monthly_first_site_only',
     fixesVisible: 3,
     packets: 'visible_fixes_only',
+    fixProofs: 1,
     competitorsPerSite: 0,
     exports: false,
     slack: false,

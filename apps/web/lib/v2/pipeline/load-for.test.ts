@@ -195,6 +195,8 @@ describe('loadCheckFor: a finished check built by the engine and persisted', () 
       host: 'built-site.test',
       kept: false,
       plan: 'free',
+      // A visitor compares no competitor (F-256).
+      competitors: 0,
     });
     expect(read.dataset).toEqual(await loadCheck(deps.read, FIRST));
     expect(read.dataset.checks.map((c) => c.id)).toEqual([FIRST]);
@@ -272,8 +274,8 @@ describe('loadCheckFor: a finished check built by the engine and persisted', () 
     it('its member reads it, kept, on the plan of the account', async () => {
       const read = await loadCheckFor(deps, SECOND, { userId: owner });
       expect(read).toMatchObject({ state: 'ready', kept: true });
-      const expected = await deps.planOf(accountId);
-      expect(read?.state === 'ready' && read.plan).toBe(expected);
+      const tier = await deps.planOf(accountId);
+      expect(read?.state === 'ready' && read.plan).toBe(tier === 'free' ? 'free' : 'pro');
     });
 
     it("a visitor, and another account's member, get null", async () => {
@@ -309,10 +311,18 @@ describe('loadCheckFor: a finished check built by the engine and persisted', () 
       };
       const kept = await loadCheckFor(spying, FIRST, { userId: owner });
       expect(kept?.state === 'ready' && kept.plan).toBe('pro');
+      // Pro compares one competitor per site (F-256).
+      expect(kept?.state === 'ready' && kept.competitors).toBe(1);
       expect(asked).toEqual([accountId]);
       const unkept = await anonymousCheck(db, 'unkept.example', new Date(NOW + 60_000));
       await loadCheckFor(spying, unkept.checkId, anonymous);
       expect(asked).toEqual([accountId]);
+    });
+
+    it('Agency compares three competitors, and reads every fix (F-256)', async () => {
+      const agency = { ...deps, planOf: async () => 'agency' as const };
+      const read = await loadCheckFor(agency, FIRST, { userId: owner });
+      expect(read?.state === 'ready' && [read.plan, read.competitors]).toEqual(['pro', 3]);
     });
   });
 });

@@ -10,21 +10,28 @@ import { auditHrefs, type AuditHrefs } from './hrefs';
 export type ReadyCheck = Extract<CheckRead, { state: 'ready' }>;
 
 /**
- * The options of a view on an audit page: the page's routes, the reader's plan, and no "Re-run"
+ * The options of a view on an audit page: the page's routes, the reader's plan and the competitors
+ * it compares, and no "Re-run"
  * in the header (a re-run of a kept site belongs to its site page, and an anonymous one is a new
  * audit from the home page).
  */
 export function viewOptions(read: ReadyCheck): {
   hrefs: AuditHrefs;
   plan: ReadyCheck['plan'];
+  competitors: number;
   rerun: false;
 } {
-  return { hrefs: auditHrefs(read.checkId), plan: read.plan, rerun: false };
+  return {
+    hrefs: auditHrefs(read.checkId),
+    plan: read.plan,
+    competitors: read.competitors,
+    rerun: false,
+  };
 }
 
 /**
  * The page as its screens see it. No control of `AuditLinks` has a route in this step (Share:
- * the public report, wave 2; Re-run and "Email this fix": the site page and the emails), so none
+ * the public report, wave 2; Re-run and "Email this fix": the site page, the fix page's own form and the emails), so none
  * is rendered.
  */
 export const auditPage = (checkId: string, from: AuditPage['from']): AuditPage => ({

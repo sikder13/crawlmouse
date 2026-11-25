@@ -3,7 +3,10 @@ import { notFound, redirect } from 'next/navigation';
 import { LiveActions } from '@/components/v2/screens/account/LiveActions';
 import { TrialEndedScreen, TrialEndScreen } from '@/components/v2/screens/trial-end/TrialEndScreen';
 import { checksPublicEnabled } from '@/lib/auth/flags';
+import { supabaseAdmin } from '@/lib/supabase/admin';
+import { mintedLinks } from '@/lib/v2/account/public-links';
 import { readSettingsPage } from '@/lib/v2/account/settings-pages';
+import { checkoutOpen } from '@/lib/v2/view/account-shell';
 import { trialPage } from '@/lib/v2/view/trial-end';
 
 // Not indexed, not in the sitemap and rendered per request: the (account) layout says so for
@@ -20,7 +23,19 @@ export default async function TrialEndedPage() {
   const page = await readSettingsPage();
   if (page.kind === 'signed_out') redirect('/login');
   if (page.kind === 'none') notFound();
-  const shown = trialPage(page.d, page.viewer, { billingEnd: page.billingEnd, role: page.role });
+  // The links a v2 mint wrote, for this reader's sites: the page says those keep working.
+  // One optional row on this page, so a failed read leaves it out rather than failing the page.
+  const links = await mintedLinks(
+    supabaseAdmin(),
+    page.viewer.accountId,
+    page.d.sites.map((s) => s.id),
+  ).catch(() => []);
+  const shown = trialPage({ ...page.d, reports: [...page.d.reports, ...links] }, page.viewer, {
+    billingEnd: page.billingEnd,
+    role: page.role,
+    // While paying is kept to one user, that user still sees the checkout (V2_BILLING_ONLY_USER).
+    billingOpen: checkoutOpen(process.env, page.userId),
+  });
   if (shown === null) redirect(page.role === 'owner' ? '/settings/plan' : '/dashboard');
   return (
     <LiveActions>

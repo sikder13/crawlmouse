@@ -2,7 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 import type { Fix } from '@crawlmouse/types/v2';
 import { fixture } from '../fixtures';
 import { checkRef } from '../pipeline/public';
-import { packetPrompt } from '../view/segment/fixes';
+import { packetBodies, packetPrompt } from '../view/segment/fixes';
+import { withBodies } from '../view/test-support/multi-body';
 import { hashMailAddress } from './address-hash';
 import { guarded } from '../../../../../inngest/mail';
 import { mailHandlers, reportMailHandlers, REQUEST_ID_MAX, type CaptureEvent } from './handlers';
@@ -88,6 +89,7 @@ function store(over: Partial<MailStore> = {}): MailStore {
       trigger: 'scheduled',
       status: 'finished',
       accountId: ACCOUNT,
+      competitor: false,
     })),
     seatInvitation: vi.fn(async () => ({ recipient: INVITEE, accountId: ACCOUNT, marked: false })),
     issueSeatInvite: vi.fn(
@@ -364,6 +366,41 @@ describe('the fix to a developer', () => {
     expect(s.markFixEmailSent).toHaveBeenCalledTimes(2);
   });
 
+  describe('with a framework named', () => {
+    const PACKET = withBodies(FIX.packet!, ['wordpress']);
+    const [own, wordpress] = packetBodies(PACKET);
+    const several = () =>
+      store({
+        fixEmailRequest: vi.fn(async () => ({
+          toEmail: 'dev@example.com',
+          sentAt: null,
+          accountId: ACCOUNT,
+          host: 'example.com',
+          fix: { ...FIX, packet: PACKET },
+        })),
+      });
+
+    it('sends the body written for it, not the packet’s own', async () => {
+      const { h, transport } = setup(several());
+      expect(await h.fixToDeveloper('r1', 'wordpress')).toBe('sent');
+      expect(transport.sent[0]!.text).toContain(packetPrompt(FIX, wordpress!));
+      expect(transport.sent[0]!.text).not.toContain(packetPrompt(FIX, own!));
+    });
+
+    it('with none named, sends the packet’s own', async () => {
+      const { h, transport } = setup(several());
+      await h.fixToDeveloper('r1');
+      expect(transport.sent[0]!.text).toContain(packetPrompt(FIX, own!));
+    });
+
+    it('with one the packet no longer has a body for, sends nothing', async () => {
+      const { h, transport, ledger } = setup(several());
+      expect(await h.fixToDeveloper('r1', 'shopify_liquid')).toBe('no_body');
+      expect(transport.sent).toEqual([]);
+      expect(ledger.claims).toEqual([]);
+    });
+  });
+
   it('does not mark a send that did not go out', async () => {
     const s = store();
     const { h } = setup(s, ['dev@example.com']);
@@ -565,6 +602,7 @@ describe('check_finished (D11)', () => {
           trigger: 'manual',
           status: 'partial',
           accountId: null,
+          competitor: false,
         })),
       }),
     );
@@ -573,6 +611,23 @@ describe('check_finished (D11)', () => {
       `check:${checkRef(CHECK)}`,
       null,
     ]);
+  });
+});
+
+describe('check_finished for a competitor’s check (row 18)', () => {
+  it('captures nothing: it is no one’s audit', async () => {
+    const { h, capture } = setup(
+      store({
+        finishedCheck: vi.fn(async () => ({
+          trigger: 'manual',
+          status: 'finished',
+          accountId: null,
+          competitor: true,
+        })),
+      }),
+    );
+    expect(await h.checkFinished(CHECK)).toBe('competitor');
+    expect(capture).not.toHaveBeenCalled();
   });
 });
 

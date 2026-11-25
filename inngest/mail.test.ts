@@ -139,7 +139,12 @@ describe('the handlers run in one step, with the event’s ids', () => {
       event: { data: { requestId: 'r1' } },
       step: steps().step,
     });
-    expect(h.fixToDeveloper).toHaveBeenCalledWith('r1');
+    expect(h.fixToDeveloper).toHaveBeenCalledWith('r1', undefined);
+    await handler(createFixToDeveloperFn(() => h))({
+      event: { data: { requestId: 'r2', framework: 'wordpress' } },
+      step: steps().step,
+    });
+    expect(h.fixToDeveloper).toHaveBeenCalledWith('r2', 'wordpress');
     const out = await handler(createCheckFinishedEventFn(() => h))({
       event: { data: { checkId: 'c1' } },
       step: steps().step,

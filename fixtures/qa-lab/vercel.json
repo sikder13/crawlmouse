@@ -5,6 +5,13 @@
     "api/slow.mjs": {
       "includeFiles": "sites/slow/**",
       "maxDuration": 10
+    },
+    "api/sentinel.mjs": {
+      "includeFiles": "sites/sentinel/**",
+      "maxDuration": 10
+    },
+    "api/large.mjs": {
+      "maxDuration": 10
     }
   },
   "routes": [
@@ -182,6 +189,56 @@
         }
       ],
       "dest": "/api/slow?path=/$1"
+    },
+    {
+      "src": "/(.*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "sentinel.lab.crawlmouse.com"
+        }
+      ],
+      "dest": "/api/sentinel?path=/$1"
+    },
+    {
+      "src": "/(.*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "large.lab.crawlmouse.com"
+        }
+      ],
+      "dest": "/api/large?path=/$1"
+    },
+    {
+      "src": "/(.*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "large-slow.lab.crawlmouse.com"
+        }
+      ],
+      "dest": "/api/large?path=/$1"
+    },
+    {
+      "src": "/(.*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "large-throttle.lab.crawlmouse.com"
+        }
+      ],
+      "dest": "/api/large?path=/$1"
+    },
+    {
+      "src": "/(.*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "large-throttle-bare.lab.crawlmouse.com"
+        }
+      ],
+      "dest": "/api/large?path=/$1"
     },
     {
       "src": "/(.*)",

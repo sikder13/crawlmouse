@@ -9,6 +9,7 @@ import type { PGlite } from '@electric-sql/pglite';
 import { buildCheck, type BuiltCheck } from '@crawlmouse/engine/v2/pipeline';
 import {
   AccountSchema,
+  ReportSchema,
   ChangeSchema,
   CheckSchema,
   FixEventSchema,
@@ -34,6 +35,7 @@ import {
 import { dashboardView } from '../view/dashboard';
 import { sitePage, siteView } from '../view/site';
 import { loadAccountDataset } from './dataset';
+import { siteLinkGate } from './public-links';
 
 let db: PGlite;
 let built: BuiltCheck;
@@ -213,6 +215,189 @@ describe('an account with no site', () => {
     expect(d.sites).toEqual([]);
     const v = dashboardView(d, { accountId, seatId, now: NOW.toISOString() });
     expect(v.header.title).toBe('Add the site to watch');
+  });
+});
+
+describe('the public links a v2 mint wrote (F-123)', () => {
+  const failedCheck = async (siteId: string) =>
+    (
+      await db.query<{ id: string }>(
+        `insert into public.checks
+           (site_id, status, trigger, grade_version, queued_at, started_at, finished_at, failure_reason)
+         values ($1, 'failed', 'manual', '1.0.0', now(), now(), now(), 'crawl_failed') returning id`,
+        [siteId],
+      )
+    ).rows[0]!.id;
+  const mint = async (
+    slug: string,
+    siteId: string,
+    accountId: string,
+    extra: 'hidden_at' | 'takedown_requested_at' | null = null,
+  ) => {
+    const checkId = await failedCheck(siteId);
+    await db.query(
+      `insert into public.public_reports (slug, check_id, site_id, account_id, domain${
+        extra ? `, ${extra}` : ''
+      }) values ($1, $2, $3, $4, 'link.example'${extra ? ', now()' : ''})`,
+      [slug, checkId, siteId, accountId],
+    );
+    return checkId;
+  };
+  const slugs = (d: Awaited<ReturnType<typeof load>>) => d.reports.map((r) => r.public_slug).sort();
+
+  let mainSite: string;
+  let shown: string;
+
+  beforeAll(async () => {
+    mainSite = built.check.site_id;
+    shown = await mint('shown-link', mainSite, owner.accountId);
+    await mint('hidden-link', mainSite, owner.accountId, 'hidden_at');
+    await mint('taken-down-link', mainSite, owner.accountId, 'takedown_requested_at');
+    await mint('scoped-link', OTHER_SITE, owner.accountId);
+    // A row on this site carrying another account, and a v1-shaped row with no check.
+    const elsewhere = await signUp(db, `elsewhere-${randomUUID().slice(0, 8)}@example.com`);
+    await mint('wrong-account-link', mainSite, (await personalAccount(db, elsewhere)).accountId);
+    await db.query(
+      `insert into public.public_reports (slug, audit_id, site_id, account_id, domain)
+       values ('no-check-link', null, $1, $2, 'link.example')`,
+      [mainSite, owner.accountId],
+    );
+    const stranger = await signUp(db, `stranger-${randomUUID().slice(0, 8)}@example.com`);
+    const theirs = await personalAccount(db, stranger);
+    const theirSite = randomUUID();
+    await db.query(
+      `insert into public.sites (id, account_id, host) values ($1, $2, 'theirs.example')`,
+      [theirSite, theirs.accountId],
+    );
+    await mint('their-link', theirSite, theirs.accountId);
+  });
+
+  it('reads a live link as a public_link report of its check', async () => {
+    const d = await load(owner.userId);
+    expect(slugs(d)).toEqual(['scoped-link', 'shown-link']);
+    const link = d.reports.find((r) => r.public_slug === 'shown-link')!;
+    expect(ReportSchema.safeParse(link).success).toBe(true);
+    expect(link).toMatchObject({
+      kind: 'public_link',
+      site_id: mainSite,
+      account_id: owner.accountId,
+      covers_check_ids: [shown],
+    });
+  });
+
+  describe('whether a new link may be offered', () => {
+    const admin = () => postgrestOver(db);
+    const report = (
+      slug: string,
+      domain: string,
+      column: string,
+      siteId: string | null,
+      accountId: string | null,
+    ) =>
+      db.query(
+        `insert into public.public_reports (slug, site_id, account_id, domain, ${column})
+         values ($1, $2, $3, $4, now())`,
+        [slug, siteId, accountId, domain],
+      );
+    const newSite = async (host: string) => {
+      const id = randomUUID();
+      await db.query(`insert into public.sites (id, account_id, host) values ($1, $2, $3)`, [
+        id,
+        owner.accountId,
+        host,
+      ]);
+      return { id, host };
+    };
+
+    it('is open with nothing withdrawn', async () => {
+      const site = await newSite('clear.example');
+      expect(await siteLinkGate(admin(), owner.accountId, site)).toEqual({
+        gate: 'open',
+        hiddenCheckIds: [],
+      });
+    });
+
+    it('a takedown closes the host, on a v1 row with no site id', async () => {
+      const site = await newSite('taken-v1.example');
+      await report('v1-down', 'taken-v1.example', 'takedown_requested_at', null, null);
+      expect((await siteLinkGate(admin(), owner.accountId, site)).gate).toBe('withdrawn');
+    });
+
+    it('a takedown closes a www sibling', async () => {
+      await report('www-down', 'sibling.example', 'takedown_requested_at', null, null);
+      const www = await newSite('www.sibling.example');
+      expect((await siteLinkGate(admin(), owner.accountId, www)).gate).toBe('withdrawn');
+    });
+
+    it('a takedown closes a host added again under a new site id', async () => {
+      const first = await newSite('readded.example');
+      await report(
+        're-down',
+        'readded.example',
+        'takedown_requested_at',
+        first.id,
+        owner.accountId,
+      );
+      await db.query(`update public.sites set removed_at = now() where id = $1`, [first.id]);
+      const again = await newSite('readded.example');
+      expect((await siteLinkGate(admin(), owner.accountId, again)).gate).toBe('withdrawn');
+    });
+
+    it('a hide closes nothing, and names the check whose link is hidden', async () => {
+      const site = await newSite('hidden-own.example');
+      const checkId = await mint('own-hidden', site.id, owner.accountId, 'hidden_at');
+      expect(await siteLinkGate(admin(), owner.accountId, site)).toEqual({
+        gate: 'open',
+        hiddenCheckIds: [checkId],
+      });
+    });
+
+    it('someone else’s hide of the same domain changes nothing', async () => {
+      const site = await newSite('hidden-elsewhere.example');
+      await report('v1-hidden', 'hidden-elsewhere.example', 'hidden_at', null, null);
+      expect(await siteLinkGate(admin(), owner.accountId, site)).toEqual({
+        gate: 'open',
+        hiddenCheckIds: [],
+      });
+    });
+
+    it('a live link of the site leaves it open, with nothing hidden', async () => {
+      const site = await newSite('live-only.example');
+      await mint('live-only-link', site.id, owner.accountId);
+      expect(await siteLinkGate(admin(), owner.accountId, site)).toEqual({
+        gate: 'open',
+        hiddenCheckIds: [],
+      });
+    });
+
+    it.each(['takedown_requested_at', 'hidden_at'])(
+      'a failed read of %s alone is unknown, not open',
+      async (failing) => {
+        const client = {
+          from: () => {
+            let broken = false;
+            const q: Record<string, unknown> = {};
+            q.select = () => q;
+            q.eq = () => q;
+            q.not = (column: string) => {
+              broken = column === failing;
+              return q;
+            };
+            q.order = () => q;
+            q.limit = async () =>
+              broken ? { data: null, error: { message: 'down' } } : { data: [], error: null };
+            return q;
+          },
+        } as unknown as ReturnType<typeof admin>;
+        expect(
+          (await siteLinkGate(client, owner.accountId, { id: OTHER_SITE, host: 'x.example' })).gate,
+        ).toBe('unknown');
+      },
+    );
+  });
+
+  it('a seat scoped to one site reads only that site’s link', async () => {
+    expect(slugs(await load(devUserId))).toEqual(['scoped-link']);
   });
 });
 

@@ -6,6 +6,9 @@ import { WEB_ROOT } from './_lib/tokens-css';
 import { V2_REWRITES } from '../../lib/v2/rewrites';
 import { isFlagGated } from '../v1-inventory-source';
 
+// The Home preview reads the Goal 1 switch (lib/feature-switch.ts), which imports 'server-only'.
+vi.mock('server-only', () => ({}));
+
 const GROUP = join(WEB_ROOT, 'app', '(v2-preview)');
 /**
  * The account door's pages (CC-25), the first live pages on the v2 design system: their group's
@@ -212,6 +215,8 @@ describe('v2 stays out of live pages', () => {
     // CC-28: the Alerts page and the changes log.
     join(WEB_ROOT, 'app', 'alerts'),
     join(WEB_ROOT, 'app', 'changes'),
+    // Row 18 (F-256): the rail's Competitors, a redirect to where competitors are compared.
+    join(WEB_ROOT, 'app', 'competitors'),
     // CC-31 workstream B2: the proof page, signed in and through a share link.
     join(WEB_ROOT, 'app', 'reports'),
     join(WEB_ROOT, 'app', 's'),
@@ -258,6 +263,7 @@ describe('v2 stays out of live pages', () => {
       'app/agency/reports/page.tsx',
       'app/alerts/page.tsx',
       'app/changes/page.tsx',
+      'app/competitors/page.tsx',
       'app/dashboard/v2/page.tsx',
       'app/invite/page.tsx',
       'app/reports/[id]/page.tsx',

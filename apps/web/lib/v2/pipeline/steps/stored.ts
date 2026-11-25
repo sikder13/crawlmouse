@@ -4,14 +4,25 @@
  * access sample and the render candidates are planned over.
  */
 import { z } from 'zod';
-import { assemble, readBatches, type Assembled, type Seed } from '@crawlmouse/engine/v2/pipeline';
+import {
+  assemble,
+  boundedEdges,
+  MAX_CHECK_EDGES,
+  MAX_OWN_EDGES,
+  noEdgesKept,
+  OwnEdgesOverBound,
+  readBatches,
+  rowAddresses,
+  type Assembled,
+  type Seed,
+} from '@crawlmouse/engine/v2/pipeline';
 import {
   BatchResultSchema,
   type BatchResult,
   type Check,
   type CrawlBatchResult,
 } from '@crawlmouse/types/v2';
-import type { CheckRequested } from '../../../../../../inngest/check-events';
+import { CheckFailure, type CheckRequested } from '../../../../../../inngest/check-events';
 import { getJson } from '../evidence';
 import { evidencePath, type EvidenceName, type EvidenceOwner } from '../types';
 import type { StepDeps } from './deps';
@@ -49,6 +60,65 @@ export async function loadResults(deps: StepDeps, event: CheckRequested): Promis
 }
 
 export const isCrawl = (b: BatchResult): b is CrawlBatchResult => b.kind === 'crawl';
+
+/**
+ * The build's batch results, with the edges it holds bounded (F-248; engine build/edge-scope.ts). The
+ * stored results are read one at a time, in the order loadResults reads them. While the edges read so
+ * far are within MAX_CHECK_EDGES, the results are kept: a check within the bound gets what loadResults
+ * gives, each result read once. Past it they are let go, and read again one at a time, each crawl
+ * result keeping every edge between the crawl's own pages and every generic-anchor edge, and up to
+ * MAX_OTHER_EDGES_PER_PAGE of the rest per page, with the number left out as `link_edges_dropped`;
+ * the results' page rows and other fields are kept whole. When the own-page edges pass
+ * MAX_OWN_EDGES the build is not attempted: the check fails `build_failed`, by name, rather than being
+ * graded from part of its graph or killed for memory.
+ */
+export async function loadResultsForBuild(
+  deps: StepDeps,
+  event: CheckRequested,
+  cap: number = MAX_CHECK_EDGES,
+  maxOwn: number = MAX_OWN_EDGES,
+): Promise<BatchResult[]> {
+  const rows = await deps.store.batches(event.checkId);
+  const done = rows.filter((r) => r.status === 'done' && r.result_path !== null);
+  const read = async (path: string) => BatchResultSchema.parse(await getJson(deps.evidence, path));
+  const addresses = new Set<string>();
+  let edges = 0;
+  let held: BatchResult[] | null = [];
+  for (const r of done) {
+    const b = await read(r.result_path!);
+    if (isCrawl(b)) {
+      for (const a of rowAddresses(b.pages)) addresses.add(a);
+      edges += b.link_edges.length;
+    }
+    held = held !== null && edges <= cap ? [...held, b] : null;
+  }
+  if (held !== null) return held;
+  const kept = noEdgesKept();
+  // Source pages whose edges an earlier result carried. The build keeps one edge per (from, to), so
+  // a page stored in two results (a retried batch) has its edges once: what a later result leaves
+  // out of such a page is not counted again. A page whose links changed between the two counts its
+  // new targets short; the structure facts then state fewer links than the uncut build would.
+  const sources = new Set<string>();
+  const out: BatchResult[] = [];
+  for (const r of done) {
+    const b = await read(r.result_path!);
+    if (!isCrawl(b)) {
+      out.push(b);
+      continue;
+    }
+    try {
+      const link_edges = boundedEdges(b.link_edges, addresses, kept, maxOwn);
+      const held = new Set(link_edges);
+      const dropped = b.link_edges.filter((e) => !held.has(e) && !sources.has(e.from_url)).length;
+      for (const e of b.link_edges) sources.add(e.from_url);
+      out.push({ ...b, link_edges, ...(dropped > 0 && { link_edges_dropped: dropped }) });
+    } catch (e) {
+      if (e instanceof OwnEdgesOverBound) throw new CheckFailure('build_failed', { cause: e });
+      throw e;
+    }
+  }
+  return out;
+}
 
 /** The worker release a batch's rows name: the first that names one; null when none does. */
 export function releaseOf(b: BatchResult): string | null {

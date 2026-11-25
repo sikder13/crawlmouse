@@ -23,7 +23,7 @@
   "devDependencies": {
     "@crawlmouse/timing": "workspace:*",
     "@types/node": "^22.5.0",
-    "esbuild": "0.28.0",
+    "esbuild": "0.28.2",
     "fast-check": "^4.9.0",
     "prettier": "^3.3.3",
     "tsx": "^4.19.0",

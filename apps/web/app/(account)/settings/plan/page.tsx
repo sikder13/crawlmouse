@@ -3,9 +3,8 @@ import { notFound, redirect } from 'next/navigation';
 import { LiveActions } from '@/components/v2/screens/account/LiveActions';
 import { PlanScreen } from '@/components/v2/screens/settings/PlanScreen';
 import { checksPublicEnabled } from '@/lib/auth/flags';
-import { billingV2Enabled } from '@/lib/billing/flags';
 import { readSettingsPage } from '@/lib/v2/account/settings-pages';
-import { withSwitcher } from '@/lib/v2/view/account-shell';
+import { checkoutOpen, withSwitcher } from '@/lib/v2/view/account-shell';
 import { cancelStepFrom, settingsView } from '@/lib/v2/view/settings';
 
 // Not indexed, not in the sitemap and rendered per request: the (account) layout says so for
@@ -38,7 +37,7 @@ export default async function PlanPage({
             role: page.role,
             subscriptionStatus: page.subscriptionStatus,
             cancelStep,
-            billingOpen: billingV2Enabled(),
+            billingOpen: checkoutOpen(process.env, page.userId),
           }),
           page.accounts,
           page.viewer.accountId,

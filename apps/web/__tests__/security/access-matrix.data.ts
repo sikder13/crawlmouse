@@ -1243,6 +1243,8 @@ const ENTRIES: readonly Spec[] = [
       SETTINGS_TEST,
       'offers the owner the checkout, and the manager neither it nor a link to Settings › Plan',
     ),
+    // `mintedLinks`, once the seat is established: the reader's own sites' live public reports (F-123).
+    calls: 1,
   },
   {
     path: 'apps/web/app/(account)/account/delete/page.tsx',
@@ -1304,6 +1306,7 @@ const ENTRIES: readonly Spec[] = [
       'app/agency/layout.tsx',
       'app/alerts/layout.tsx',
       'app/changes/layout.tsx',
+      'app/competitors/layout.tsx',
       'app/dashboard/v2/layout.tsx',
       'app/reports/layout.tsx',
       'app/seats/layout.tsx',
@@ -1412,6 +1415,19 @@ const ENTRIES: readonly Spec[] = [
     ),
   },
   {
+    path: 'apps/web/app/competitors/page.tsx',
+    v2: true,
+    identity: 'signed-in seat, in its viewer account',
+    gate: 'member_for_site',
+    detail:
+      'Redirects to the Signals page of the first site the seat covers with a competitor named (row 18).',
+    check: at('lib/v2/account/dataset.ts', 'sitesInScope'),
+    proof: by(
+      'app/competitors/page.test.tsx',
+      'goes to the latest check’s Signals page of the site with a competitor named',
+    ),
+  },
+  {
     path: 'apps/web/app/seats/page.tsx',
     v2: true,
     identity: 'signed-in seat, in its viewer account',
@@ -1435,7 +1451,8 @@ const ENTRIES: readonly Spec[] = [
       'app/sites/[id]/page.test.tsx',
       'another account’s site, a removed site, a missing site and a malformed id are each a 404',
     ),
-    calls: 3,
+    // The fourth, `siteLinkGate`: whether a new public link may be offered, once the site is the caller's (F-123).
+    calls: 4,
   },
   {
     path: 'apps/web/app/agency/page.tsx',
@@ -1878,6 +1895,12 @@ const LIBS: readonly Spec[] = [
     [
       ['apps/web/lib/v2/agency/schedules-wiring.ts', 'The report-schedule functions’ store.', 1],
       ['apps/web/lib/v2/monitor/functions.ts', 'The alert and summary functions’ stores.', 1],
+      ['apps/web/lib/v2/competitors/functions.ts', 'The competitor audits’ store and requests.', 1],
+      [
+        'apps/web/lib/v2/monitor/sentinel-functions.ts',
+        'The daily sentinel’s store and requests.',
+        1,
+      ],
       ['apps/web/lib/v2/monitor/schedule.ts', 'The scheduled re-check claims.', 1],
       ['apps/web/lib/billing/inngest-functions.ts', 'The billing functions’ stores.', 1],
     ] as const
@@ -1992,6 +2015,7 @@ const LIBS: readonly Spec[] = [
       'apps/web/app/api/reports/route.ts',
       'apps/web/app/api/seats/id/[id]/resend/route.ts',
       'apps/web/app/api/seats/route.ts',
+      'apps/web/app/api/sites/[id]/route.ts',
       'apps/web/app/api/takedown/route.ts',
       'apps/web/app/api/verify/check/[id]/route.ts',
       'apps/web/app/api/verify/start/route.ts',
@@ -2001,6 +2025,7 @@ const LIBS: readonly Spec[] = [
       'apps/web/app/s/view/[reportId]/page.tsx',
       'apps/web/lib/v2/account/deletion-ports.ts',
       'apps/web/lib/v2/account/email-change-ports.ts',
+      'apps/web/lib/v2/competitors/functions.ts',
       'apps/web/lib/v2/reports/mint-deps.ts',
     ],
     proof: by(
@@ -2049,6 +2074,7 @@ const LIBS: readonly Spec[] = [
       'apps/web/app/(account)/account/email/page.tsx',
       'apps/web/app/(account)/account/restore/page.tsx',
       'apps/web/app/(account)/settings/delete/page.tsx',
+      'apps/web/app/(account)/trial-ended/page.tsx',
       'apps/web/app/agency-trial/page.tsx',
       'apps/web/app/agency/clients/[siteId]/page.tsx',
       'apps/web/app/agency/reports/page.tsx',

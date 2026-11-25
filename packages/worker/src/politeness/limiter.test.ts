@@ -92,6 +92,55 @@ describe('SiteLimiter: 2 requests per second, measured between starts', () => {
   });
 });
 
+describe('SiteLimiter: a task with a deadline (review of the back-off, B1)', () => {
+  /** Whether `p` has settled, without waiting on it. */
+  const settled = (p: Promise<unknown>) => {
+    let done = false;
+    void p.then(() => (done = true));
+    return () => done;
+  };
+
+  it('drops a task at once when another batch’s pause already holds the site past its deadline', async () => {
+    const limiter = new SiteLimiter(systemClock);
+    // Batch A: a request, then the site asks for 60 s, and A's retry waits for it.
+    await limiter.schedule(async () => undefined);
+    limiter.pauseUntil(Date.now() + 60_000);
+    const retry = limiter.schedule(async () => undefined);
+    await vi.advanceTimersByTimeAsync(1_000);
+    // Batch B, with 10 s of its own time left, while the pump sleeps through A's pause.
+    const b = limiter.schedule(async () => 'ran', undefined, Date.now() + 10_000);
+    const bDone = settled(b);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(bDone()).toBe(true);
+    expect(await b).toEqual({ ran: false });
+    await vi.runAllTimersAsync();
+    expect(await retry).toEqual({ ran: true, value: undefined });
+  });
+
+  it('drops a queued task when a later pause makes it late, not when the pump wakes', async () => {
+    const limiter = new SiteLimiter(systemClock);
+    await limiter.schedule(async () => undefined);
+    const keep = limiter.schedule(async () => 'kept');
+    const late = limiter.schedule(async () => 'late', undefined, Date.now() + 30_000);
+    const lateDone = settled(late);
+    limiter.pauseUntil(Date.now() + 60_000);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(lateDone()).toBe(true);
+    expect(await late).toEqual({ ran: false });
+    await vi.runAllTimersAsync();
+    expect(await keep).toEqual({ ran: true, value: 'kept' });
+  });
+
+  it('still runs a task whose deadline the pause leaves room for', async () => {
+    const limiter = new SiteLimiter(systemClock);
+    await limiter.schedule(async () => undefined);
+    limiter.pauseUntil(Date.now() + 5_000);
+    const t = limiter.schedule(async () => 'ran', undefined, Date.now() + 10_000);
+    await vi.runAllTimersAsync();
+    expect(await t).toEqual({ ran: true, value: 'ran' });
+  });
+});
+
 describe('SiteLimiter: Crawl-delay', () => {
   it('uses a raised gap between starts', async () => {
     const limiter = new SiteLimiter(systemClock);

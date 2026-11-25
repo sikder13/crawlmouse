@@ -85,6 +85,12 @@ export interface SegmentOptions {
   /** The reader's plan: Free opens the free fixes (free-fixes.ts), Pro opens every live fix. */
   plan?: FixPlan;
   /**
+   * How many competitors the reader's plan compares, `GATES[tier].competitorsPerSite` (F-256): Signals
+   * shows that many of the check's compared competitors in full. 0, the default, shows the first
+   * one as the preview held for Pro.
+   */
+  competitors?: number;
+  /**
    * Whether the page's header offers "Re-run, free", which the Changes page of a first audit
    * mentions. The previews show it; a page that has no such control passes false.
    */

@@ -21,6 +21,12 @@ import {
   OUR_ROBOTS_TOKENS,
 } from '../../packages/worker/src/identities';
 import { QA_ACCOUNTS, QA_HOSTS } from './accounts';
+import {
+  createLab,
+  HOSTS as LARGE,
+  paths as largePaths,
+  // @ts-expect-error a plain .mjs served by Vercel as it is, with no declaration file
+} from '../../fixtures/qa-lab/api/large.mjs';
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const LAB = join(REPO, 'fixtures', 'qa-lab');
@@ -53,6 +59,19 @@ const routes = (): Route[] =>
 const allHosts = (): string[] => Object.values(QA_HOSTS).flat();
 const labHosts = (): string[] => allHosts().filter((h) => h.endsWith(LAB_ZONE));
 const label = (host: string): string => host.slice(0, -LAB_ZONE.length);
+
+/** The large lab's four hosts: one function renders their pages (api/large.mjs), so they have no folder. */
+const largeHosts = (): string[] => Object.values(LARGE as Record<string, string>);
+const staticHosts = (): string[] => labHosts().filter((h) => !largeHosts().includes(h));
+/** A large host's robots.txt, as its function answers it. */
+const largeRobots = async (host: string): Promise<string> =>
+  (
+    (await (
+      createLab({ log: () => {} }) as {
+        answer: (r: object) => Promise<{ body: string }>;
+      }
+    ).answer({ host, path: '/robots.txt', client: 'test' })) as { body: string }
+  ).body;
 
 /**
  * `src` and a `has` value as regular expressions anchored at both ends, ignoring case. The case part
@@ -137,7 +156,7 @@ const taggedUserAgents = (): string[] => [
 ];
 
 describe('QA_HOSTS', () => {
-  it('names the fourteen lab sites under lab.crawlmouse.com, and the owner’s two domains', () => {
+  it('names the nineteen lab sites under lab.crawlmouse.com, and the owner’s two domains', () => {
     expect(allHosts()).toEqual([
       'nahltech.com',
       'crawlmouse.com',
@@ -155,6 +174,11 @@ describe('QA_HOSTS', () => {
       'demo-2.lab.crawlmouse.com',
       'demo-3.lab.crawlmouse.com',
       'slow.lab.crawlmouse.com',
+      'sentinel.lab.crawlmouse.com',
+      'large.lab.crawlmouse.com',
+      'large-slow.lab.crawlmouse.com',
+      'large-throttle.lab.crawlmouse.com',
+      'large-throttle-bare.lab.crawlmouse.com',
     ]);
   });
 
@@ -165,10 +189,18 @@ describe('QA_HOSTS', () => {
 });
 
 describe('the lab serves every lab host', () => {
-  it('has a site folder with an index page for each lab host, and no folder no host names', () => {
+  it('has a site folder with an index page for each lab host but the large four, and no folder no host names', () => {
+    expect(largeHosts().sort()).toEqual(
+      [
+        QA_HOSTS.large,
+        QA_HOSTS.largeSlow,
+        QA_HOSTS.largeThrottle,
+        QA_HOSTS.largeThrottleBare,
+      ].sort(),
+    );
     const folders = readdirSync(SITES).filter((f) => statSync(join(SITES, f)).isDirectory());
-    expect(folders.sort()).toEqual(labHosts().map(label).sort());
-    for (const host of labHosts()) {
+    expect(folders.sort()).toEqual(staticHosts().map(label).sort());
+    for (const host of staticHosts()) {
       expect(existsSync(join(SITES, label(host), 'index.html')), host).toBe(true);
     }
   });
@@ -178,8 +210,15 @@ describe('the lab serves every lab host', () => {
       for (const path of PATHS) {
         expect(routeFor(host, path, CONTROL.userAgent), `${host}${path}`).toEqual({
           status: undefined,
-          // The slow site is served by its function, which reads the same folder (api/slow.mjs).
-          dest: host === QA_HOSTS.slow ? `/api/slow?path=${path}` : `/sites/${label(host)}${path}`,
+          // The slow and sentinel sites are served by their functions, which read the same folders
+          // (api/slow.mjs, api/sentinel.mjs); the large four by one function that renders them
+          // (api/large.mjs).
+          dest:
+            host === QA_HOSTS.slow || host === QA_HOSTS.sentinel
+              ? `/api/${label(host)}?path=${path}`
+              : largeHosts().includes(host)
+                ? `/api/large?path=${path}`
+                : `/sites/${label(host)}${path}`,
         });
       }
     }
@@ -269,7 +308,15 @@ describe('the lab serves every lab host', () => {
       .sort();
     expect(served).toEqual(['404.html', 'api', 'blocked.html', 'sites']);
     for (const host of labHosts()) {
-      for (const f of ['404.html', 'blocked.html', 'sites/healthy/', 'api/slow', 'api/slow.mjs']) {
+      for (const f of [
+        '404.html',
+        'blocked.html',
+        'sites/healthy/',
+        'api/slow',
+        'api/slow.mjs',
+        'api/large',
+        'api/large.mjs',
+      ]) {
         expect(routeFor(host, `/${f}`, CONTROL.userAgent)?.status, `${host}/${f}`).toBe(404);
       }
     }
@@ -299,11 +346,14 @@ describe('the lab serves every lab host', () => {
 
   // robots.txt must not keep search engines out: one disallowed never fetches a page, so never reads
   // the noindex header above, and could list a linked lab URL without it (owner ruling).
-  it('disallows nothing in any lab robots.txt but GPTBot on the two clients built to block it', () => {
+  it('disallows nothing in any lab robots.txt but GPTBot on the two clients built to block it', async () => {
     // The two clients built to block GPTBot (README).
     const blocksGptbot = new Set(['client-3', 'client-6']);
     for (const host of labHosts()) {
-      const text = readFileSync(join(SITES, label(host), 'robots.txt'), 'utf8');
+      const large = largeHosts().includes(host);
+      const text = large
+        ? await largeRobots(host)
+        : readFileSync(join(SITES, label(host), 'robots.txt'), 'utf8');
       // Structural: every non-empty Disallow, with the user agents of the group it sits in.
       const disallows: string[] = [];
       let agents: string[] = [];
@@ -334,7 +384,7 @@ describe('the lab serves every lab host', () => {
               ? [at]
               : [],
         );
-      const paths = pages(join(SITES, label(host)), '/');
+      const paths = large ? (largePaths() as string[]) : pages(join(SITES, label(host)), '/');
       expect(paths).toContain('/');
       const tokens = [
         ...CRAWLER_REGISTRY_V2.map((e) => e.robots_token ?? e.token),
@@ -350,14 +400,32 @@ describe('the lab serves every lab host', () => {
     }
   });
 
-  it('holds under 500 pages across every host, so a QA run stays cheap', () => {
+  // The large lab's four hosts exist to be crawled past 500 pages, so they alone are exempt, each held
+  // to 2,600 (scripts/qa/large-lab.test.ts holds the 2,400 floor). Every other host stays under 500 in all.
+  it('holds under 500 pages across every host but the large four, and each of those to 2,600', () => {
     const pages = (dir: string): number =>
       readdirSync(dir, { withFileTypes: true }).reduce(
         (n, e) =>
           n + (e.isDirectory() ? pages(join(dir, e.name)) : e.name.endsWith('.html') ? 1 : 0),
         0,
       );
-    expect(pages(SITES)).toBeLessThan(500);
+    const exempt = new Set(largeHosts());
+    expect([...exempt].sort()).toEqual(
+      [
+        'large.lab.crawlmouse.com',
+        'large-slow.lab.crawlmouse.com',
+        'large-throttle.lab.crawlmouse.com',
+        'large-throttle-bare.lab.crawlmouse.com',
+      ].sort(),
+    );
+    const served = (host: string): number =>
+      exempt.has(host) ? (largePaths() as string[]).length : pages(join(SITES, label(host)));
+    const others = labHosts().filter((h) => !exempt.has(h));
+    expect(others.length).toBe(labHosts().length - 4);
+    expect(others.reduce((n, h) => n + served(h), 0)).toBeLessThan(500);
+    // Nothing else under sites/ escapes the count: the folders are the other hosts' and no more.
+    expect(pages(SITES)).toBe(others.reduce((n, h) => n + served(h), 0));
+    for (const host of exempt) expect(served(host), host).toBeLessThanOrEqual(2600);
   });
 
   it('is what the generator writes, so the served sites are the reviewed ones', () => {
