@@ -49,6 +49,20 @@ describe('the site page’s settings card (CC-39 F10)', () => {
     expect(wide).toMatch(/\.settings td:nth-child\(2\) \{[^}]*min-width: 12em;/);
   });
 
+  it('gives the public link’s buttons a line of their own in a narrow card, as a row with fields has', () => {
+    // Whitespace collapsed: the formatter wraps a long selector across lines.
+    const narrow = media('(max-width: 639.98px)', '@container').replace(/\s+/g, ' ');
+    // The rule whose selector lifts the row's last cell onto a line of its own.
+    const head = narrow.indexOf('.settings tr:has(td:last-child :is(');
+    expect(head, 'the own-line rule').toBeGreaterThanOrEqual(0);
+    const open = narrow.indexOf('{', head);
+    const selector = narrow.slice(head, open);
+    const body = narrow.slice(open, narrow.indexOf('}', open));
+    expect(selector).toContain('td:nth-child(3)');
+    expect(selector).toContain('.publicLink');
+    expect(body).toMatch(/grid-column: 1 \/ -1;/);
+  });
+
   it('carries the classes the rules key on, with each control in the row’s last cell', () => {
     const html = renderToStaticMarkup(
       <LiveActions>

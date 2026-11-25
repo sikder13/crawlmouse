@@ -68,3 +68,21 @@ test('in a narrow card a text field has its own line and the room on it', async 
   expect(below, 'the field sits under the row’s value').toBe(true);
   expect(field, 'the field uses the line').toBeGreaterThan(card * 0.6);
 });
+
+test('at 390 the public link’s address has the line, not a sliver beside its buttons', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 900 });
+  await openPreview(page, LIVE);
+  const table = page.getByRole('table', { name: 'Site settings' });
+  const { address, card } = await table.evaluate((t) => {
+    const row = [...t.querySelectorAll('tbody tr')].find((r) =>
+      r.textContent?.startsWith('Public link'),
+    )!;
+    return {
+      address: row.children[1]!.getBoundingClientRect().width,
+      card: t.getBoundingClientRect().width,
+    };
+  });
+  expect(address, 'the address cell uses the line').toBeGreaterThan(card * 0.6);
+});
