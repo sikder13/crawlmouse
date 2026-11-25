@@ -53,8 +53,9 @@ vi.mock('../../r/[slug]/page', async () => {
 });
 
 // F-292 (D-29): a signed-in visitor whose seat is Dark. The public report must not wear it.
-vi.mock('@/lib/v2/account/session-theme', () => ({
-  sessionTheme: async () => <i data-seat-theme="dark" />,
+vi.mock('@/lib/v2/account/session-theme', () => ({ sessionTheme: async () => 'dark' }));
+vi.mock('@/components/v2/SeatTheme', () => ({
+  SeatTheme: ({ theme }: { theme: string }) => <i data-seat-theme={theme} />,
 }));
 
 const route = await import('./page');

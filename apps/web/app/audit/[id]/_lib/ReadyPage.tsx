@@ -14,6 +14,7 @@ import { LinksScreen } from '../../../../components/v2/screens/segment/LinksScre
 import { NoJsScreen } from '../../../../components/v2/screens/segment/NoJsScreen';
 import { SignalsScreen } from '../../../../components/v2/screens/segment/SignalsScreen';
 import { StructureScreen } from '../../../../components/v2/screens/segment/StructureScreen';
+import { SeatTheme } from '../../../../components/v2/SeatTheme';
 import { sessionTheme } from '../../../../lib/v2/account/session-theme';
 import { findCheck } from '../../../../lib/v2/fixtures';
 import { supportMailto } from '../../../../lib/v2/support/mailto';
@@ -75,11 +76,11 @@ export function SegmentBody({ read, segment }: { read: ReadyCheck; segment: Segm
 }
 
 export async function SegmentPage({ id, segment }: { id: string; segment: SegmentKey }) {
-  // The theme is read beside the audit, and never fails the page (session-theme.tsx).
+  // The theme is read beside the audit, and never fails the page (session-theme.ts).
   const [read, theme] = await Promise.all([readyAudit(id), sessionTheme()]);
   return (
     <>
-      {theme}
+      {theme ? <SeatTheme theme={theme} /> : null}
       <SegmentBody read={read} segment={segment} />
     </>
   );
@@ -159,7 +160,7 @@ export async function FixPage({
   if (!found) notFound();
   return (
     <>
-      {theme}
+      {theme ? <SeatTheme theme={theme} /> : null}
       <FixBody read={read} found={found} notice={notice} />
     </>
   );
@@ -204,7 +205,7 @@ export async function MapPage({ id, scope }: { id: string; scope: 'hubs' | 'all'
   const [read, theme] = await Promise.all([readyAudit(id), sessionTheme()]);
   return (
     <>
-      {theme}
+      {theme ? <SeatTheme theme={theme} /> : null}
       <MapBody read={read} scope={scope} />
     </>
   );

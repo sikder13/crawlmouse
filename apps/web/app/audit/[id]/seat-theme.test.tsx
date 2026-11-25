@@ -150,12 +150,13 @@ afterEach(() => {
 });
 
 describe('the seat theme on the signed-in result, fix and report pages', () => {
-  it('covers the overview, the fix page, the six segments, the map and the report page', () => {
+  it('covers the overview, the fix page, the seven segments, the map and the report page', () => {
     expect(SURFACES).toEqual([
       'access/page.tsx',
       'changes/page.tsx',
       'content/page.tsx',
       'fix/[fixId]/page.tsx',
+      'links/page.tsx',
       'map/page.tsx',
       'nojs/page.tsx',
       'overview/page.tsx',

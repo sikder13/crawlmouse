@@ -16,14 +16,12 @@
  */
 import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { ReactElement } from 'react';
 import { cookies } from 'next/headers';
 import { z } from 'zod';
 import { ThemeSchema } from '@crawlmouse/types/v2';
-import { SeatTheme } from '../../../components/v2/SeatTheme';
 import { supabaseServer } from '../../supabase/server';
 import { ACCOUNT_COOKIE, chosenAccount } from './viewer-cookie';
-import { pickSeat, SeatRow, type ViewerDeps } from './viewer-read';
+import { pickSeat, SeatRow, type SeatDeps } from './seat-pick';
 import { supabaseAdmin } from '../../supabase/admin';
 
 type Theme = z.infer<typeof ThemeSchema>;
@@ -33,7 +31,7 @@ type Theme = z.infer<typeof ThemeSchema>;
  * account, else the only seat, else the landing seat); null when there is none, or on any error.
  */
 export async function seatThemeFor(
-  deps: Pick<ViewerDeps, 'session' | 'admin'>,
+  deps: SeatDeps,
   userId: string,
   chosen: string | null,
 ): Promise<Theme | null> {
@@ -53,13 +51,14 @@ export async function seatThemeFor(
 }
 
 /**
- * The element that applies the session's seat theme, or null. `known` is the session client and user
- * a page has already read, so it is not read twice.
+ * The session's seat theme, or null: data, which the page hands to `SeatTheme` (a lib module imports
+ * no v2 component). `known` is the session client and user a page has already read, so it is not
+ * read twice.
  */
 export async function sessionTheme(known?: {
   session: SupabaseClient;
   user: { id: string } | null;
-}): Promise<ReactElement | null> {
+}): Promise<Theme | null> {
   try {
     let session = known?.session;
     let user = known?.user ?? null;
@@ -70,8 +69,7 @@ export async function sessionTheme(known?: {
     }
     if (!session || !user) return null;
     const chosen = chosenAccount((await cookies()).get(ACCOUNT_COOKIE)?.value);
-    const theme = await seatThemeFor({ session, admin: supabaseAdmin() }, user.id, chosen);
-    return theme === null ? null : <SeatTheme theme={theme} />;
+    return await seatThemeFor({ session, admin: supabaseAdmin() }, user.id, chosen);
   } catch {
     return null;
   }

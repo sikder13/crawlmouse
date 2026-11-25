@@ -107,7 +107,7 @@ describe('seatThemeFor', () => {
 
 describe('sessionTheme', () => {
   it('reads the dark seat', async () => {
-    expect(await sessionTheme()).not.toBeNull();
+    expect(await sessionTheme()).toBe('dark');
   });
 
   it.each([
@@ -122,7 +122,7 @@ describe('sessionTheme', () => {
     const session = db({ seats: [seat('a1', 'light')] });
     const from = vi.spyOn(session, 'from');
     env.getUserThrows = true;
-    expect(await sessionTheme({ session: session as never, user: { id: 'u1' } })).not.toBeNull();
+    expect(await sessionTheme({ session: session as never, user: { id: 'u1' } })).toBe('light');
     expect(from).toHaveBeenCalledTimes(1);
   });
 });
