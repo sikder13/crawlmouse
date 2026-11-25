@@ -46,7 +46,7 @@ export type ViewerResult =
   | { kind: 'ambiguous'; userId: string }
   | { kind: 'viewer'; viewer: AccountViewer };
 
-const SeatRow = z.object({
+export const SeatRow = z.object({
   id: z.string(),
   account_id: z.string(),
   role: SeatRoleSchema,
@@ -101,8 +101,7 @@ export async function readViewer(
     .eq('status', 'active');
   if (seats.error) failed('seats read', seats.error);
   const mine = z.array(SeatRow).parse(seats.data);
-  const picked = chosen === null ? undefined : mine.find((s) => s.account_id === chosen);
-  const seat = picked ?? (mine.length <= 1 ? mine[0] : await landingSeat(deps, user.id, mine));
+  const seat = await pickSeat(deps, user.id, mine, chosen);
   if (seat === null) return { kind: 'ambiguous', userId: user.id };
   if (seat === undefined) return { kind: 'no_account', userId: user.id };
 
@@ -208,7 +207,7 @@ export async function readEntitlement(
  * once `deletion_confirmed_at` is set, and the caller's grant does not include that column.
  */
 async function landingSeat(
-  deps: ViewerDeps,
+  deps: Pick<ViewerDeps, 'session' | 'admin'>,
   userId: string,
   mine: z.infer<typeof SeatRow>[],
 ): Promise<z.infer<typeof SeatRow> | null> {
@@ -244,9 +243,27 @@ async function landingSeat(
   return sites.data.length > 0 ? home : agencies[0]!;
 }
 
+/** One active seat of the caller's, as `SeatRow` reads it. */
+export type SeatChoice = z.infer<typeof SeatRow>;
+
+/**
+ * The seat a caller acts in: the one on the account the switcher names, else their only seat, else
+ * `landingSeat`'s. Undefined with no seat, null when none can be chosen. The viewer and the page
+ * theme (`session-theme.tsx`) both choose here, so they cannot land on different seats.
+ */
+export async function pickSeat(
+  deps: Pick<ViewerDeps, 'session' | 'admin'>,
+  userId: string,
+  mine: SeatChoice[],
+  chosen: string | null,
+): Promise<SeatChoice | null | undefined> {
+  const picked = chosen === null ? undefined : mine.find((s) => s.account_id === chosen);
+  return picked ?? (mine.length <= 1 ? mine[0] : await landingSeat(deps, userId, mine));
+}
+
 /** The seat on the caller's default account, or null when the default is none of their seats. */
 async function defaultSeat(
-  deps: ViewerDeps,
+  deps: Pick<ViewerDeps, 'session' | 'admin'>,
   userId: string,
   mine: z.infer<typeof SeatRow>[],
 ): Promise<z.infer<typeof SeatRow> | null> {

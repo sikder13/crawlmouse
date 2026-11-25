@@ -10,7 +10,7 @@ import { readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import type { ReactElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fixesAsOf, fixture } from '../../../lib/v2/fixtures';
 
 vi.mock('server-only', () => ({}));
@@ -21,7 +21,7 @@ vi.mock('server-only', () => ({}));
  */
 const state = vi.hoisted(() => ({
   user: null as { id: string } | null,
-  seats: [] as { account_id: string; theme: string }[],
+  seats: [] as { id: string; account_id: string; role: string; theme: string }[],
   fail: null as null | 'error' | 'throw',
 }));
 vi.mock('next/headers', () => ({ cookies: async () => ({ get: () => undefined }) }));
@@ -46,7 +46,12 @@ vi.mock('@/lib/supabase/server', () => ({
 }));
 const signedIn = (...themes: string[]) => {
   state.user = { id: 'u1' };
-  state.seats = themes.map((theme, i) => ({ account_id: `a${i}`, theme }));
+  state.seats = themes.map((theme, i) => ({
+    id: `s${i}`,
+    account_id: `a${i}`,
+    role: 'developer',
+    theme,
+  }));
   state.fail = null;
 };
 vi.mock('@/components/v2/SeatTheme', () => ({
@@ -73,7 +78,19 @@ vi.mock('./_lib/access', () => ({
   isReadableAudit: async () => true,
 }));
 
-vi.mock('@/lib/supabase/admin', () => ({ supabaseAdmin: () => ({}) }));
+// The service role answers `users.default_account_id` (the landing seat, `pickSeat`): the first seat's.
+vi.mock('@/lib/supabase/admin', () => ({
+  supabaseAdmin: () => ({
+    from: () => {
+      const chain = {
+        select: () => chain,
+        eq: () => chain,
+        maybeSingle: async () => ({ data: { default_account_id: 'a0' }, error: null }),
+      };
+      return chain;
+    },
+  }),
+}));
 vi.mock('@/lib/v2/reports/share-proof', () => ({
   memberProof: async () => ({ accountId: 'a1', doc: {} }),
   pageCapture: async () => async () => undefined,
@@ -118,6 +135,11 @@ async function render(file: string): Promise<string> {
 /** The themes the markup asks to apply. */
 const themes = (markup: string) =>
   [...markup.matchAll(/data-seat-theme="([^"]*)"/g)].map((m) => m[1]);
+
+// The first import of a route loads the screens behind it, which takes longer than one test's time.
+beforeAll(async () => {
+  for (const file of SURFACES) await import(`./${file}`);
+}, 120_000);
 
 beforeEach(() => vi.stubEnv('V2_CHECKS_PUBLIC', '1'));
 afterEach(() => {
@@ -176,9 +198,9 @@ describe('the seat theme on the signed-in result, fix and report pages', () => {
     },
   );
 
-  it('two seats with different themes and no account chosen apply none; the same theme, that one', async () => {
-    signedIn('dark', 'light');
-    expect(themes(await render('overview/page.tsx'))).toEqual([]);
+  it('two seats with different themes and no account chosen apply the landing seat’s, as the dashboard does', async () => {
+    signedIn('light', 'dark');
+    expect(themes(await render('overview/page.tsx'))).toEqual(['light']);
     signedIn('dark', 'dark');
     expect(themes(await render('overview/page.tsx'))).toEqual(['dark']);
   });

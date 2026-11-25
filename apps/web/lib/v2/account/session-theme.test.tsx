@@ -1,7 +1,7 @@
 /**
- * F-292, review #3: the theme read is cosmetic and never throws. `seatThemeFor` answers null on a
- * query error and on a throw; `sessionTheme` answers null when anything before it throws (the
- * session, the cookie store).
+ * F-292: the page theme is the theme of the seat the viewer acts in, chosen by the viewer's own rule
+ * (`pickSeat`), and the read never throws. `seatThemeFor` answers null on a query error and on a
+ * throw; `sessionTheme` answers null when anything before it throws (the session, the cookie store).
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -21,22 +21,36 @@ vi.mock('../../supabase/server', () => ({
         return { data: { user: { id: 'u1' } } };
       },
     },
-    from: () => seats([{ account_id: 'a1', theme: 'dark' }]),
+    from: db({ seats: [seat('a1', 'dark')] }).from,
   }),
 }));
+vi.mock('../../supabase/admin', () => ({ supabaseAdmin: () => db({ users: null }) }));
 
 const { seatThemeFor, sessionTheme } = await import('./session-theme');
 
-function seats(data: unknown, error: unknown = null) {
-  const result = { data, error };
-  const chain = {
-    select: () => chain,
-    eq: () => chain,
-    then: (f: (r: unknown) => unknown) => Promise.resolve(result).then(f),
-  };
-  return chain;
+function seat(account_id: string, theme: string, role = 'developer') {
+  return { id: `s-${account_id}`, account_id, role, theme };
 }
-const client = (from: () => unknown) => ({ from }) as never;
+
+/** A client whose tables answer `rows[table]`; a table set to an Error answers that as its error. */
+function db(rows: Record<string, unknown>) {
+  return {
+    from(table: string) {
+      if (!(table in rows)) throw new Error(`unexpected read of ${table}`);
+      const data = rows[table];
+      const result =
+        data instanceof Error ? { data: null, error: { code: '08006' } } : { data, error: null };
+      const chain: Record<string, unknown> = {
+        then: (f: (r: unknown) => unknown) => Promise.resolve(result).then(f),
+        maybeSingle: async () => result,
+      };
+      for (const m of ['select', 'eq', 'in', 'is', 'limit']) chain[m] = () => chain;
+      return chain;
+    },
+  };
+}
+const deps = (session: Record<string, unknown>, admin: Record<string, unknown> = {}) =>
+  ({ session: db(session), admin: db(admin) }) as never;
 
 afterEach(() => {
   env.cookiesThrow = false;
@@ -45,44 +59,49 @@ afterEach(() => {
 
 describe('seatThemeFor', () => {
   it('gives the chosen account’s seat theme', async () => {
-    const rows = [
-      { account_id: 'a1', theme: 'dark' },
-      { account_id: 'a2', theme: 'light' },
-    ];
-    expect(
-      await seatThemeFor(
-        client(() => seats(rows)),
-        'u1',
-        'a2',
-      ),
-    ).toBe('light');
+    const d = deps({ seats: [seat('a1', 'dark'), seat('a2', 'light')] });
+    expect(await seatThemeFor(d, 'u1', 'a2')).toBe('light');
+  });
+
+  it('with no account chosen and seats on different themes, gives the landing seat’s, as the dashboard does', async () => {
+    // Neither seat owns its account, so the landing seat is the default account's (`landingSeat`).
+    const d = deps(
+      { seats: [seat('a1', 'dark'), seat('a2', 'light')] },
+      { users: { default_account_id: 'a2' } },
+    );
+    expect(await seatThemeFor(d, 'u1', null)).toBe('light');
+  });
+
+  it('lands an owner of a personal account with no site and one agency in the agency, as the dashboard does', async () => {
+    const d = deps(
+      {
+        seats: [seat('p1', 'light', 'owner'), seat('g1', 'dark', 'owner')],
+        accounts: [
+          { id: 'p1', kind: 'personal' },
+          { id: 'g1', kind: 'agency' },
+        ],
+        sites: [],
+      },
+      { users: { default_account_id: 'p1' } },
+    );
+    expect(await seatThemeFor(d, 'u1', null)).toBe('dark');
   });
 
   it('answers null on a query error', async () => {
-    expect(
-      await seatThemeFor(
-        client(() => seats(null, { code: '08006' })),
-        'u1',
-        null,
-      ),
-    ).toBeNull();
+    expect(await seatThemeFor(deps({ seats: new Error('down') }), 'u1', null)).toBeNull();
   });
 
   it('answers null when the query throws', async () => {
-    const throws = () => {
-      throw new Error('network down');
-    };
-    expect(await seatThemeFor(client(throws), 'u1', null)).toBeNull();
+    expect(await seatThemeFor(deps({}), 'u1', null)).toBeNull();
+  });
+
+  it('answers null when the landing seat’s read fails', async () => {
+    const d = deps({ seats: [seat('a1', 'dark'), seat('a2', 'light')] }, { users: new Error('x') });
+    expect(await seatThemeFor(d, 'u1', null)).toBeNull();
   });
 
   it('answers null on rows that do not parse', async () => {
-    expect(
-      await seatThemeFor(
-        client(() => seats([{ account_id: 'a1', theme: 'sepia' }])),
-        'u1',
-        null,
-      ),
-    ).toBeNull();
+    expect(await seatThemeFor(deps({ seats: [seat('a1', 'sepia')] }), 'u1', null)).toBeNull();
   });
 });
 
@@ -100,9 +119,10 @@ describe('sessionTheme', () => {
   });
 
   it('with the user a page already has, reads no session', async () => {
-    const from = vi.fn(() => seats([{ account_id: 'a1', theme: 'light' }]));
+    const session = db({ seats: [seat('a1', 'light')] });
+    const from = vi.spyOn(session, 'from');
     env.getUserThrows = true;
-    expect(await sessionTheme({ session: client(from), user: { id: 'u1' } })).not.toBeNull();
+    expect(await sessionTheme({ session: session as never, user: { id: 'u1' } })).not.toBeNull();
     expect(from).toHaveBeenCalledTimes(1);
   });
 });
