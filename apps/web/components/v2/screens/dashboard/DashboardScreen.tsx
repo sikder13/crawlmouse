@@ -265,9 +265,11 @@ function BlockedElsewhere({ data }: Props) {
           rows={data.blockedElsewhere.map((b) => ({
             key: b.key,
             cells: [
-              <a key="h" href={b.href} className={styles.blockedHost}>
+              // The site is named, not linked: the Sites table below links each site, and a link here
+              // would repeat that name for every blocked crawler of the site (account-control-names).
+              <span key="h" className={styles.blockedHost}>
                 {b.host}
-              </a>,
+              </span>,
               <span key="v" className={styles.blockedAccess}>
                 <span>{b.ua}</span>
                 <span data-v2-verdict={b.verdict}>

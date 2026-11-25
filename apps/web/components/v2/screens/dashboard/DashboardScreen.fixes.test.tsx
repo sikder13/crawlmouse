@@ -98,7 +98,9 @@ describe('crawlers blocked on any site (D-09)', () => {
       'Problem: blocked by a rule',
     ]);
     expect(access.className).toMatch(/blockedAccess/);
-    expect(row.querySelector('a')!.className).toMatch(/blockedHost/);
+    expect(row.querySelector('th > span')!.className).toMatch(/blockedHost/);
+    // Named, not linked: the Sites table links the site (account-control-names, no repeated name).
+    expect(row.querySelector('a')).toBeNull();
     // The site heads its row and the crawler and verdict are its data, so the row's header has a
     // data cell to name (axe: th-has-data-cells).
     expect([...row.children].map((c) => c.tagName)).toEqual(['TH', 'TD']);

@@ -278,7 +278,7 @@ export interface DashboardView {
    * Each AI crawler blocked at the latest result of a site the crawler panels do not read, so a
    * block on any site reaches the dashboard (D-09). Empty when there is none.
    */
-  blockedElsewhere: { key: string; host: string; href: string; ua: string; verdict: Verdict }[];
+  blockedElsewhere: { key: string; host: string; ua: string; verdict: Verdict }[];
   /** That card's title: "on your other sites" beside the panels, "on your sites" without them. */
   blockedTitle: string;
   sites: SitesView;
@@ -1211,7 +1211,6 @@ export function dashboardView(
           .map((r) => ({
             key: `${s.id}:${r.ua}`,
             host: s.host,
-            href: action('sitePage', s.host, { id: s.id }).href,
             ua: r.ua,
             verdict: r.verdict,
           }));

@@ -231,13 +231,8 @@ describe('V2R dashboard fixes: what the dashboard reads (QA dashboard walk, 24 N
     c.crawlers.find((x) => x.ua === 'GPTBot')!.verdict = 'disallowed_by_robots';
     const w = dashboardView(copy, { accountId: BAD_ACCOUNT, now: bad.as_of });
     expect(w.blockedTitle).toBe('AI crawlers blocked on your other sites');
-    expect(w.blockedElsewhere.map((b) => [b.host, b.ua, b.verdict, b.href])).toEqual([
-      [
-        'nahltech.com',
-        'GPTBot',
-        'disallowed_by_robots',
-        '/sites/50000000-0000-4000-8000-000000000002',
-      ],
+    expect(w.blockedElsewhere.map((b) => [b.host, b.ua, b.verdict])).toEqual([
+      ['nahltech.com', 'GPTBot', 'disallowed_by_robots'],
     ]);
   });
 
