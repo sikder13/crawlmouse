@@ -147,8 +147,8 @@ function fields(
   scope: Seat['client_scope'],
   agency: boolean,
 ): SeatFields {
-  // Off Agency a seat covers every site and the form offers no choice of clients (D-35): it posts
-  // scope=all, as the routes require.
+  // Off Agency, with no seat scoped (the caller's rule), a seat covers every site and the form offers
+  // no choice of clients (D-35). The routes take a scope field, so the form sends scope=all.
   if (!agency) {
     return {
       roles: INVITED_ROLES.map((r) => ({ value: r, label: COPY.roleName[r] })),
@@ -230,7 +230,10 @@ export function seatsView(
   );
   const partial = v.seatId !== null && mine !== null && mine.client_scope !== 'all';
   // Clients, client reports and branding are Agency's: off it the page names none of them (D-35).
-  const agency = v.tier === 'agency';
+  // A seat scoped to some clients outlives the plan (a lapsed Agency account reads as Free, and a
+  // downgrade leaves seat_sites as they are), so while any seat is scoped the page stays Agency's:
+  // its scope is shown, and a change form keeps it rather than widening it to every site.
+  const agency = v.tier === 'agency' || seats.some((s) => s.client_scope !== 'all');
   const shown = partial ? seats.filter((s) => s.id === mine.id || s.role === 'owner') : seats;
   const limit = seatLimit ?? v.account.limits.seats;
   const used = seats.length;

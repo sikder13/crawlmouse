@@ -69,6 +69,10 @@ describe('mayBeSignedIn: only a Supabase auth cookie starts the check', () => {
     ['sb-abcd-auth-token=x', true],
     ['a=1; sb-abcd-auth-token.0=x', true],
     ['notsb-abcd-auth-token=x', false],
+    // The rule the prerendered header already uses (hasSessionCookie): no empty value, no PKCE
+    // verifier, which a signed-out browser can hold.
+    ['sb-abcd-auth-token=', false],
+    ['sb-abcd-auth-token-code-verifier=x', false],
   ])('%j → %s', (cookie, yes) => {
     expect(mayBeSignedIn(cookie)).toBe(yes);
   });
@@ -129,6 +133,23 @@ describe('in the browser', () => {
     expect(host.querySelector('a')!.textContent).toBe('Log in');
   });
 
+  it.each([
+    ['?next=/r/abc', '/r/abc'],
+    ['?next=//evil.example', '/dashboard'],
+    ['?next=https://evil.example', '/dashboard'],
+  ])('/login%s sends a signed-in person to %s', async (search, to) => {
+    const replace = vi.fn();
+    vi.spyOn(window, 'location', 'get').mockReturnValue({
+      ...window.location,
+      search,
+      replace,
+    } as Location);
+    document.cookie = 'sb-proj-auth-token=x; path=/';
+    vi.stubGlobal('fetch', answer(200));
+    await mount(<LeaveIfSignedIn />);
+    expect(replace).toHaveBeenCalledWith(to);
+  });
+
   it('/login sends a signed-in person to the dashboard, and leaves anyone else', async () => {
     const replace = vi.fn();
     vi.spyOn(window, 'location', 'get').mockReturnValue({
@@ -153,6 +174,7 @@ describe('the public pages read no cookie on the server', () => {
   it.each([
     'app/page.tsx',
     'app/help/page.tsx',
+    'app/help/[slug]/page.tsx',
     'app/not-found.tsx',
     'app/login/page.tsx',
     'app/(v2-kept)/v2-kept/login/page.tsx',

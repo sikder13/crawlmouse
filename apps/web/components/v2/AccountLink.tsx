@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { hasSessionCookie } from '../../lib/v2/session-header';
+import { safeNextPath } from '../../lib/safe-next-path';
 import { Button } from './Button';
 import { LOG_IN } from './footer-links';
 
@@ -8,11 +10,11 @@ import { LOG_IN } from './footer-links';
 export const DASHBOARD_LINK = { label: 'Dashboard', href: '/dashboard' } as const;
 
 /**
- * Whether this browser may hold a session: a Supabase auth cookie is present. A stranger has none,
- * so a public page sends them no request at all.
+ * Whether this browser may hold a session: a non-empty Supabase session cookie, by the rule the
+ * prerendered pages' header hint already uses (`hasSessionCookie`). A stranger has none, so a public
+ * page sends them no request at all.
  */
-export const mayBeSignedIn = (cookie: string): boolean =>
-  /(?:^|;\s*)sb-[^=;]*-auth-token/.test(cookie);
+export const mayBeSignedIn = (cookie: string): boolean => hasSessionCookie(cookie);
 
 /**
  * Whether the session is live, asked of the existing signed-in GET: 200 for a person signed in,
@@ -59,14 +61,16 @@ export function AccountLink() {
 }
 
 /**
- * On /login (D-38): a person already signed in is sent to the dashboard, after load, by the same
- * check. It renders nothing.
+ * On /login (D-38): a person already signed in is sent on, after load, by the same check: to the
+ * page a `?next=` names when it is a safe path, else to the dashboard. It renders nothing.
  */
 export function LeaveIfSignedIn() {
   useEffect(() => {
     let live = true;
     void signedIn().then((yes) => {
-      if (live && yes) window.location.replace(DASHBOARD_LINK.href);
+      // Where the sign-in was headed (?next=, as LoginForm reads it), else the dashboard.
+      const next = safeNextPath(new URLSearchParams(window.location.search).get('next'));
+      if (live && yes) window.location.replace(next ?? DASHBOARD_LINK.href);
     });
     return () => {
       live = false;

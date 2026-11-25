@@ -26,6 +26,8 @@ import { INVITE_LINK_DAYS } from '../../lib/v2/agency/seats';
 import { NOTICE_LINES } from '../../lib/v2/copy/notices';
 import { ROLE_ROWS } from '../../lib/v2/copy/seats';
 import { inviteView, seatsView } from '../../lib/v2/view/seats';
+import { viewAt } from '../../lib/v2/view/account';
+import { fixture } from '../../lib/v2/fixtures';
 import { numberWord } from '../../lib/v2/words';
 import { CC31_SEAT_ELEMENTS } from './_lib/screens';
 import { expected, firstDifference, locked, renderedText, withoutShell } from './_lib/lock';
@@ -705,5 +707,27 @@ describe('seats off Agency name no clients and no branding (D-35)', () => {
     expect(v.people.rows[0]!.role).toBe('Owner · billing, branding, seats');
     expect(v.roles.rows.map((r) => r.can)).toContain('Edit and send client reports');
     expect(renderToStaticMarkup(CC31_SEAT_ELEMENTS[OWNER]!())).toMatch(/<th[^>]*>Clients</);
+  });
+});
+
+describe('a lapsed Agency account whose seats are still scoped (D-35, review B1)', () => {
+  // Northwind went past due on 1 Nov; on 2 Dec it is beyond the 7-day grace and reads as Free, and
+  // seats …ca and …cb still cover one client each (seat_sites outlive the plan).
+  const d = fixture('challenged-site');
+  const viewer = { accountId: 'a0000000-0000-4000-8000-0000000000c9', now: '2026-12-02T12:00:00Z' };
+
+  it('is read as Free (the case this guards)', () => {
+    expect(viewAt(d, viewer).tier).toBe('free');
+  });
+
+  it('still shows each seat’s clients, and its change form keeps the scope, never posting all', () => {
+    const v = seatsView(d, viewer);
+    const scoped = v.people.rows.filter((r) => r.role === 'Account manager');
+    expect(scoped).toHaveLength(2);
+    expect(scoped.map((r) => r.clients)).toEqual(scoped.map(() => expect.stringMatching(/^1 · /)));
+    for (const r of scoped) {
+      expect(r.change!.change.fields.scope.map((o) => o.value)).toEqual(['all', 'some']);
+      expect(r.change!.change.fields.scopeValue).toBe('some');
+    }
   });
 });
