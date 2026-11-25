@@ -1317,6 +1317,7 @@ const ENTRIES: readonly Spec[] = [
       'app/agency/layout.tsx',
       'app/alerts/layout.tsx',
       'app/changes/layout.tsx',
+      'app/competitors/layout.tsx',
       'app/dashboard/v2/layout.tsx',
       'app/reports/layout.tsx',
       'app/seats/layout.tsx',
@@ -1422,6 +1423,19 @@ const ENTRIES: readonly Spec[] = [
     proof: by(
       PAGES_TEST,
       '/changes: a developer sees the client their seat covers alone, and a stranger neither',
+    ),
+  },
+  {
+    path: 'apps/web/app/competitors/page.tsx',
+    v2: true,
+    identity: 'signed-in seat, in its viewer account',
+    gate: 'member_for_site',
+    detail:
+      'Redirects to the Signals page of the first site the seat covers with a competitor named (row 18).',
+    check: at('lib/v2/account/dataset.ts', 'sitesInScope'),
+    proof: by(
+      'app/competitors/page.test.tsx',
+      'goes to the latest check’s Signals page of the site with a competitor named',
     ),
   },
   {
@@ -2013,6 +2027,7 @@ const LIBS: readonly Spec[] = [
       'apps/web/app/api/reports/route.ts',
       'apps/web/app/api/seats/id/[id]/resend/route.ts',
       'apps/web/app/api/seats/route.ts',
+      'apps/web/app/api/sites/[id]/route.ts',
       'apps/web/app/api/takedown/route.ts',
       'apps/web/app/api/verify/check/[id]/route.ts',
       'apps/web/app/api/verify/start/route.ts',
