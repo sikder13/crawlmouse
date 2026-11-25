@@ -1,4 +1,4 @@
-import { generateKeyPairSync, type KeyObject } from 'node:crypto';
+import { createHash, createHmac, generateKeyPairSync, type KeyObject } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
@@ -9,8 +9,14 @@ import { CRAWL } from '../../../../packages/worker/src/identities';
 import { InstantClock } from '../../../../packages/worker/src/test-support/clock';
 import { fakeFetcher } from '../../../../packages/worker/src/test-support/fake-fetcher';
 import { pageFetcher, startWorker, type InProcessWorker } from './__tests__/in-process-worker';
+import { readRendered } from '@crawlmouse/engine/worker';
+import { readMeasure } from '../../../../packages/worker/src/reader/measure';
+import { READ_DEADLINE_MS } from '../../../../packages/worker/src/reader/thread-reader';
+import { MEASURE_CONCURRENCY } from '../../../../packages/worker/src/server';
 import {
   createWorkerClient,
+  MEASURE_BUSY_WAITS_MS,
+  MEASURE_TIMEOUT_MS,
   PROGRESS_TIMEOUT_MS,
   WORKER_REFUSALS,
   workerClientFromEnv,
@@ -954,5 +960,158 @@ describe('the app does not depend on the worker package', () => {
         imports: false,
       });
     }
+  });
+});
+
+describe('measureRendered (questions/042, design C)', () => {
+  const SECRET_ = 's'.repeat(48);
+  const reading = {
+    raw_words: 3,
+    rendered_words: 12,
+    challenged: false,
+    links: { js_only: ['https://example.com/shop'], js_only_count: 1, truncated: false },
+  };
+  const make = (respond: (req: Request) => Response | Promise<Response>) => {
+    const seen: Request[] = [];
+    const waits: number[] = [];
+    const client = createWorkerClient({
+      sleep: async (ms) => {
+        waits.push(ms);
+      },
+      url: 'http://127.0.0.1:9',
+      signingSecret: SECRET_,
+      privateKey: generateKeyPairSync('ed25519').privateKey,
+      now: () => 1_800_000_000_000,
+      fetch: (async (input: RequestInfo | URL, init?: RequestInit) => {
+        const req = new Request(input, init);
+        seen.push(req.clone());
+        return respond(req);
+      }) as typeof fetch,
+    });
+    return { client, seen, waits };
+  };
+
+  it('posts the two sides signed under the measure key, and returns the reading', async () => {
+    const { client, seen } = make(() => Response.json({ reading }));
+    expect(await client.measureRendered!('<p>a</p>', '<p>b</p>', 'https://example.com/p')).toEqual(
+      reading,
+    );
+    const req = seen[0]!;
+    expect(new URL(req.url).pathname).toBe('/render/measure');
+    const raw = new Uint8Array(await req.arrayBuffer());
+    const ts = req.headers.get('x-crawlmouse-ts')!;
+    // Computed here, apart from sign.ts: the body's digest and length, and the HMAC under the key
+    // derived from the label over ts, digest and length.
+    const digest = createHash('sha256').update(raw).digest('hex');
+    expect(req.headers.get('x-crawlmouse-body-sha256')).toBe(digest);
+    expect(req.headers.get('x-crawlmouse-body-bytes')).toBe(String(raw.length));
+    const key = createHmac('sha256', SECRET_).update('crawlmouse-worker-measure-v1').digest();
+    const expected = createHmac('sha256', key)
+      .update(`${ts}.${digest}.${raw.length}`)
+      .digest('hex');
+    expect(req.headers.get('x-crawlmouse-signature')).toBe(expected);
+    expect(JSON.parse(new TextDecoder().decode(raw))).toEqual({
+      static_html: '<p>a</p>',
+      rendered_html: '<p>b</p>',
+      url: 'https://example.com/p',
+    });
+  });
+
+  it.each([
+    ['a stopped read', () => Response.json({ failed: 'reader_deadline' })],
+    ['a refusal', () => Response.json({ error: 'reader_unavailable' }, { status: 503 })],
+    [
+      'a reading of the wrong shape',
+      () => Response.json({ reading: { ...reading, raw_words: -1 } }),
+    ],
+    ['an extra field', () => Response.json({ reading: { ...reading, x: 1 } })],
+  ])('answers null for %s, and never throws', async (_name, respond) => {
+    const { client, seen } = make(respond);
+    expect(
+      await client.measureRendered!('<p>a</p>', '<p>b</p>', 'https://example.com/p'),
+    ).toBeNull();
+    expect(seen).toHaveLength(1);
+  });
+
+  const busy = () => Response.json({ error: 'measure_busy' }, { status: 429 });
+
+  it('waits long enough for every read the worker holds ahead of it, and its own', () => {
+    // The worker holds MEASURE_CONCURRENCY signed requests, each read under READ_DEADLINE_MS, one
+    // after another on its measure thread; 5 s more is for the HTML each way.
+    // and 5 s for a replacement thread to load.
+    expect(MEASURE_TIMEOUT_MS).toBeGreaterThanOrEqual(
+      MEASURE_CONCURRENCY * READ_DEADLINE_MS + 5_000 + 5_000,
+    );
+  });
+
+  it('waits and asks again while the worker is busy measuring, then returns the reading', async () => {
+    let n = 0;
+    const { client, seen, waits } = make(() => (n++ < 2 ? busy() : Response.json({ reading })));
+    expect(await client.measureRendered!('<p>a</p>', '<p>b</p>', 'https://example.com/p')).toEqual(
+      reading,
+    );
+    expect(seen).toHaveLength(3);
+    expect(waits).toEqual([1_000, 2_000]);
+    // Each try is signed afresh, over the same body.
+    expect(new Set(seen.map((r) => r.headers.get('x-crawlmouse-body-sha256'))).size).toBe(1);
+  });
+
+  it(`gives up after ${MEASURE_BUSY_WAITS_MS.length} waits`, async () => {
+    const { client, seen, waits } = make(busy);
+    expect(
+      await client.measureRendered!('<p>a</p>', '<p>b</p>', 'https://example.com/p'),
+    ).toBeNull();
+    expect(waits).toEqual([...MEASURE_BUSY_WAITS_MS]);
+    expect(seen).toHaveLength(MEASURE_BUSY_WAITS_MS.length + 1);
+  });
+
+  it("is read by the worker's own route: the same headers, digest and signature", async () => {
+    const w = await worker({}, undefined, { measure: async (b) => readMeasure(b) });
+    const s = '<html><body><div id="root"></div></body></html>';
+    const r = '<html><body><main><h1>Ridge tent</h1><a href="/shop">Shop</a></main></body></html>';
+    expect(await clientOf(w).measureRendered!(s, r, 'https://example.com/p')).toEqual(
+      readRendered(s, r, 'https://example.com/p'),
+    );
+  });
+
+  it('asks again after a network failure, such as a busy worker resetting a long upload', async () => {
+    let n = 0;
+    const { client, seen, waits } = make(() => {
+      if (n++ === 0) throw new TypeError('fetch failed');
+      return Response.json({ reading });
+    });
+    expect(await client.measureRendered!('<p>a</p>', '<p>b</p>', 'https://example.com/p')).toEqual(
+      reading,
+    );
+    expect(seen).toHaveLength(2);
+    expect(waits).toEqual([1_000]);
+  });
+
+  it('answers null after a network failure on every try, and never throws', async () => {
+    const { client, seen } = make(() => {
+      throw new TypeError('fetch failed');
+    });
+    expect(
+      await client.measureRendered!('<p>a</p>', '<p>b</p>', 'https://example.com/p'),
+    ).toBeNull();
+    expect(seen).toHaveLength(MEASURE_BUSY_WAITS_MS.length + 1);
+  });
+
+  it('does not ask again after a timeout', async () => {
+    const { client, seen } = make(() => {
+      throw new DOMException('timed out', 'TimeoutError');
+    });
+    expect(
+      await client.measureRendered!('<p>a</p>', '<p>b</p>', 'https://example.com/p'),
+    ).toBeNull();
+    expect(seen).toHaveLength(1);
+  });
+
+  it('does not ask again on a 429 that is not the worker saying it is busy measuring', async () => {
+    const { client, seen } = make(() => Response.json({ error: 'busy' }, { status: 429 }));
+    expect(
+      await client.measureRendered!('<p>a</p>', '<p>b</p>', 'https://example.com/p'),
+    ).toBeNull();
+    expect(seen).toHaveLength(1);
   });
 });

@@ -71,7 +71,7 @@ const ROUTES: readonly Spec[] = [
     gate: 'seat_may',
     action: 'add_site',
     detail:
-      'Adds a client site through `add_site` with the service role, after `seat_may(add_site)` and an unscoped seat.',
+      'Adds a client site through `add_site` with the service role, after `seat_may(add_site)` and an unscoped seat; a repeat add’s re-send reads the account’s plan for the check’s page cap with the same client.',
     check: at('app/api/sites/route.ts', 'seat_may'),
     proof: by(
       'app/api/sites/route.test.ts',
@@ -291,6 +291,20 @@ const ROUTES: readonly Spec[] = [
       'Creates a new Agency-trial account owned by the caller’s user id; touches no other account.',
     check: at('app/api/agency-trial/route.ts', 'getUser'),
     proof: by('app/api/agency-trial/route.test.ts', '401 without a session, whatever the flag'),
+    calls: 1,
+  },
+  {
+    path: 'api/agency/brand',
+    v2: true,
+    identity: 'signed-in owner or account manager of the named account',
+    gate: 'member',
+    detail:
+      'Sets the named Agency account’s brand name and logo once `member_role` answers owner or account manager there; no seat and a developer seat get the same 403.',
+    check: at('app/api/agency/brand/route.ts', 'member_role'),
+    proof: by(
+      'app/api/agency/brand/route.test.ts',
+      'answers an account the caller is not a member of exactly as a developer seat, so it says nothing about the account',
+    ),
     calls: 1,
   },
   // v2: account
@@ -1208,9 +1222,13 @@ const ENTRIES: readonly Spec[] = [
     v2: true,
     identity: 'signed-in owner or account manager',
     gate: 'member',
-    detail: 'Settings of the viewer account; `member_role` decides the role, a developer is a 404.',
+    detail:
+      'Settings of the viewer account; `member_role` decides the role. A developer reads a page that says the owner or a manager changes them, with no account form (D-03).',
     check: at('lib/v2/account/settings-pages.ts', 'member_role'),
-    proof: by(SETTINGS_TEST, 'is a 404 for a developer'),
+    proof: by(
+      SETTINGS_TEST,
+      'a developer gets a page that says Settings are not theirs to change, never the 404 (D-03)',
+    ),
   },
   {
     path: 'apps/web/app/(account)/settings/integrations/page.tsx',
@@ -1637,6 +1655,7 @@ const ENTRIES: readonly Spec[] = [
       'changes',
       'content',
       'fix/[fixId]',
+      'links',
       'map',
       'nojs',
       'overview',
@@ -1794,7 +1813,10 @@ const LIBS: readonly Spec[] = [
     detail:
       'The settings pages’ dataset by `member_role`; the card’s last four read with the service role after `member_role`, for the owner alone.',
     check: at('lib/v2/account/settings-pages.ts', 'member_role'),
-    proof: by(SETTINGS_TEST, 'is a 404 for a developer'),
+    proof: by(
+      SETTINGS_TEST,
+      'a developer gets a page that says Settings are not theirs to change, never the 404 (D-03)',
+    ),
     calls: 1,
   },
   {
@@ -1997,6 +2019,7 @@ const LIBS: readonly Spec[] = [
     callers: [
       'apps/web/app/api/admin/takedown/process/route.ts',
       'apps/web/app/api/agency-trial/route.ts',
+      'apps/web/app/api/agency/brand/route.ts',
       'apps/web/app/api/alert-rules/route.ts',
       'apps/web/app/api/audits/[id]/notify/route.ts',
       'apps/web/app/api/audits/[id]/reaudit/route.ts',
@@ -2100,6 +2123,7 @@ const LIBS: readonly Spec[] = [
       'apps/web/app/api/account/route.ts',
       'apps/web/app/api/admin/takedown/process/route.ts',
       'apps/web/app/api/agency-trial/route.ts',
+      'apps/web/app/api/agency/brand/route.ts',
       'apps/web/app/api/alert-rules/route.ts',
       'apps/web/app/api/audits/[id]/cancel/route.ts',
       'apps/web/app/api/audits/[id]/export/route.ts',

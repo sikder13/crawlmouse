@@ -14,6 +14,7 @@ import { contentView } from '../view/segment/content';
 import { nojsView } from '../view/segment/nojs';
 import { signalsView } from '../view/segment/signals';
 import { structureView } from '../view/segment/structure';
+import { linksView } from '../view/segment/links';
 import { datasetOfBuilds } from '../view/test-support/built-dataset';
 import { inputOf, recheckInputOf, siteShape } from '../view/test-support/generated-check';
 import { docStrings, type DocBlock, type ReportDoc } from './generate';
@@ -47,6 +48,7 @@ function pageStrings(d: ViewDataset, checkId: string): string[] {
     accessView(d, checkId, plan),
     nojsView(d, checkId, plan),
     structureView(d, checkId, plan, null),
+    linksView(d, checkId, plan),
     contentView(d, checkId, plan),
     signalsView(d, checkId, plan),
     graded(d).map((c) => changesView(d, c.id, { ...plan, rerun: false })),
@@ -229,6 +231,7 @@ describe('auditDoc on the contract fixtures', () => {
       'Crawler access',
       'Readable without JavaScript',
       'Site structure',
+      'Broken links and page basics',
       'Content an answer engine can quote',
       'Agent-readiness signals',
       'Open fixes, effects estimated',
@@ -270,6 +273,131 @@ describe('auditDoc on the contract fixtures', () => {
       pageStrings(d, checkId),
       checkedAt,
     );
+  });
+});
+
+describe('auditDoc: broken links and page basics', () => {
+  // The built site, with a page answering 503 and a 410 linked only from itself: neither is a
+  // broken link, so the truth below differs from "every page answering 400 or more".
+  const BUILT = structuredClone(fixture('built-site'));
+  const id = BUILT.checks[0]!.id;
+  {
+    const at = (p: string) =>
+      BUILT.page_results.find((x) => x.check_id === id && new URL(x.url).pathname === p)!;
+    at('/products/camp-kitchen-item-1').status_code = 503;
+    const gone = at('/products/sleeping-bags-item-1');
+    gone.status_code = 410;
+    BUILT.link_edges = BUILT.link_edges.filter((e) => e.to_url !== gone.url);
+    BUILT.link_edges.push({
+      ...BUILT.link_edges.find((e) => e.check_id === id)!,
+      from_url: gone.url,
+      to_url: gone.url,
+    });
+  }
+  const doc = auditDoc({ dataset: BUILT, checkId: id }, OPTIONS);
+  const section = doc.sections.find((s) => s.heading === REPORT_DOC_COPY.links)!;
+  // Counted here from the records, apart from the code under test.
+  const pages = BUILT.page_results.filter((p) => p.check_id === id);
+  // A missing page (404 or 410) that a link from another page leads to: a page's link to itself
+  // does not make it a broken link.
+  const fromOthers = (p: (typeof pages)[number]) =>
+    BUILT.link_edges.filter((e) => e.check_id === id && e.to_url === p.url && e.from_url !== p.url);
+  const broken = pages.filter(
+    (p) => (p.status_code === 404 || p.status_code === 410) && fromOthers(p).length > 0,
+  );
+  const redirecting = pages.filter((p) => (p.redirect?.hops.length ?? 0) > 0);
+  const path = (u: string) => new URL(u).pathname;
+
+  it('follows Site structure', () => {
+    const headings = doc.sections.map((s) => s.heading);
+    expect(headings.indexOf(REPORT_DOC_COPY.links)).toBe(headings.indexOf('Site structure') + 1);
+  });
+
+  it('holds every broken page with every page linking to it, and every redirect', () => {
+    const table = (caption: string) =>
+      section.blocks.find((b) => b.type === 'table' && b.caption === caption) as Extract<
+        DocBlock,
+        { type: 'table' }
+      >;
+    expect(table(REPORT_DOC_COPY.brokenLinks).rows).toEqual(
+      broken.map((p) => [
+        path(p.url),
+        String(p.status_code),
+        [...new Set(fromOthers(p).map((e) => path(e.from_url)))].join(', '),
+      ]),
+    );
+    expect(broken).toHaveLength(1);
+    expect(table(REPORT_DOC_COPY.redirects).columns[0]).toBe('Requested as');
+    expect(table(REPORT_DOC_COPY.redirects).rows.map((r) => r[0])).toEqual(
+      redirecting.map((p) => path(p.url)),
+    );
+  });
+
+  it('counts the missing and shared descriptions, and lists the missing pages', () => {
+    const served = pages.filter((p) => p.status_code === 200);
+    // Read (not null) and declaring none: a description not read is not missing.
+    const missing = served.filter((p) => p.meta_description !== null && !p.meta_description.text);
+    const texts = section.blocks.flatMap((b) =>
+      b.type === 'text' ? [b.text] : b.type === 'table' ? [b.caption] : [],
+    );
+    expect(texts).toContain(`Missing: ${missing.length} pages`);
+    expect(texts).toContain('Shared by more than one page: 1 description, 2 pages');
+    expect(texts).toContain('Headings are not checked yet.');
+    const missingTable = section.blocks.find(
+      (b) => b.type === 'table' && b.caption === `Missing: ${missing.length} pages`,
+    ) as Extract<DocBlock, { type: 'table' }>;
+    expect(missingTable.rows).toEqual(missing.map((p) => [path(p.url)]));
+  });
+
+  it('says only what the pages say', () => {
+    expectSaidByThePages(
+      doc,
+      pageStrings(BUILT, id),
+      resultView(BUILT, id, { map: null }).crawledAt,
+    );
+  });
+
+  it('lists a page answering 503 apart from the broken links, under a neutral "Page" column', () => {
+    const copy = structuredClone(BUILT);
+    const p = copy.page_results.find(
+      (x) => x.check_id === id && new URL(x.url).pathname === '/products/camp-kitchen-item-1',
+    )!;
+    p.status_code = 503;
+    const s = auditDoc({ dataset: copy, checkId: id }, OPTIONS).sections.find(
+      (x) => x.heading === REPORT_DOC_COPY.links,
+    )!;
+    const tables = s.blocks.filter(
+      (b): b is Extract<DocBlock, { type: 'table' }> => b.type === 'table',
+    );
+    const errors = tables.find((t) => t.caption === 'Pages that answered an error')!;
+    expect(errors.columns).toEqual([
+      REPORT_DOC_COPY.page,
+      REPORT_DOC_COPY.status,
+      REPORT_DOC_COPY.linkedFrom,
+    ]);
+    expect(errors.rows.map((r) => r.filter((_, i) => i < 2))).toEqual([
+      ['/products/camp-kitchen-item-1', '503'],
+    ]);
+    const brokenRows = tables.find((t) => t.caption === REPORT_DOC_COPY.brokenLinks)!.rows;
+    expect(brokenRows.map((r) => r[0])).not.toContain('/products/camp-kitchen-item-1');
+    expectSaidByThePages(
+      auditDoc({ dataset: copy, checkId: id }, OPTIONS),
+      pageStrings(copy, id),
+      resultView(copy, id, { map: null }).crawledAt,
+    );
+  });
+});
+
+describe('auditDoc: broken links on a record of 2 pages of 38', () => {
+  const s = auditDoc({ dataset: CLEAN, checkId: CLEAN_CHECK }, OPTIONS).sections.find(
+    (x) => x.heading === REPORT_DOC_COPY.links,
+  )!;
+  const texts = s.blocks.flatMap((b) => (b.type === 'text' ? [b.text] : []));
+
+  it('says no page answers an error once, scoped to the pages checked', () => {
+    const none = 'None of the 2 pages we checked answers an error.';
+    expect(texts.filter((t) => t.includes(none))).toEqual([none]);
+    expect(texts).toContain('None of the 2 pages we checked redirects.');
   });
 });
 
@@ -343,7 +471,7 @@ describe('compareDoc', () => {
     const moved = doc.sections.find((s) => s.heading === 'What moved')!;
     expect(moved.blocks[0]).toEqual({
       type: 'text',
-      text: 'Four changes found at the Fri 06:02 check.',
+      text: 'Four changes found at the Fri 06:02 EDT check.',
     });
     const changes = moved.blocks.filter((b) => b.type === 'pair');
     expect(changes).toHaveLength(4);

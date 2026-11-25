@@ -13,6 +13,7 @@
  * test fails when the file differs from the render.
  */
 import {
+  FIRST_ACCEPT_BY_S,
   PACE,
   QUEUE_WAIT_MAX_S,
   runCheck,
@@ -159,7 +160,7 @@ const ROWS: readonly RowInput[] = [
     file: 'inngest/check.ts',
     id: 'crawlmouse.check.run',
     onFailure: true,
-    callSites: 13,
+    callSites: 14,
     registration: 'V2_PIPELINE',
     trigger: 'check.requested',
     steps: 0,
@@ -174,7 +175,7 @@ const ROWS: readonly RowInput[] = [
     trigger: 'inngest/function.cancelled (checkFn)',
     steps: 2,
     stepsHow: 'fail, emit-failed',
-    stepAt: [590, 592],
+    stepAt: [648, 650],
   },
   {
     file: 'inngest/check-reaper.ts',
@@ -651,7 +652,7 @@ export async function heaviestSearched(): Promise<{
     `the most executions of ${tried} shapes tried (claim waits ${SEARCH.claimWaits.join(' or ')}; ` +
     `${SEARCH.busyPerPost.join(', ')} busy answers a post; batches done at ${SEARCH.batchSeconds.join(', ')} s; ` +
     `a first read that finds the batch gone, or not), all ${PACE.maxCrawlBatches} crawl batches and both access stages, ` +
-    `cut at the ${PACE.finishS / 60}-minute finish timeout. This one: ${shape.claimWaits} claim waits, ` +
+    `cut at a ${MODEL_PAGE_CAP}-page check's ${MODEL_FINISH_S / 60}-minute finish. This one: ${shape.claimWaits} claim waits, ` +
     `${shape.busyPerPost} busy a post, batches of ${shape.batchSeconds} s, ` +
     `${shape.readFailsFirst ? 'each re-posted once' : 'none re-posted'}. Not a bound: batches that differ from one another are not tried`;
   return { shape: { ...shape, why }, executions, tried };
@@ -662,13 +663,37 @@ export async function allShapes(): Promise<CheckShape[]> {
   return [...SHAPES, (await heaviestSearched()).shape];
 }
 
+/**
+ * The page cap the modelled check runs under: 500, the cap every check is sent today
+ * (`apps/web/lib/v2/pipeline/request.ts`). A 2,000-page check (inbox 079) has a longer plan and
+ * waits twice as long between polls; it is not modelled here yet.
+ */
+export const MODEL_PAGE_CAP = 500;
+
 const EVENT = {
   checkId: '00000000-0000-4000-8000-000000000001',
   siteId: '00000000-0000-4000-8000-000000000002',
   accountId: '00000000-0000-4000-8000-000000000003',
   host: 'example.test',
   homepageUrl: 'https://example.test/',
+  pageCap: MODEL_PAGE_CAP,
 } as const;
+
+/**
+ * A 500-page check's crawl ceiling, access slice and reserve, copied from the pipeline's limits
+ * (`CRAWL_CEILING_S`, `ACCESS_SLICE_S`, `RESERVE_S`; budget.test.ts reads them there), since this
+ * package does not import the app.
+ */
+export const MODEL_PLAN = { crawlS: 480, accessS: 300, reserveS: 180 } as const;
+
+/**
+ * Where the modelled run is cut: the check's own finish, by its page cap. Inngest's finish timeout
+ * (`PACE.finishS`) is the largest cap's and later; a run of this cap stops posting at its own plan's
+ * end (`steps/time.ts`), which the model's worker, which answers without looking at the clock, does
+ * not, so the plan's end is where the real run stops calling steps.
+ */
+export const MODEL_FINISH_S =
+  FIRST_ACCEPT_BY_S + MODEL_PLAN.crawlS + MODEL_PLAN.accessS + MODEL_PLAN.reserveS;
 
 /** Thrown by the counting `sleep` once the virtual clock passes the run's finish timeout. */
 class FinishTimeout extends Error {}
@@ -676,8 +701,8 @@ class FinishTimeout extends Error {}
 /**
  * The executions of one checkFn run of this shape: 1 for the run, plus each step call runCheck makes
  * against a worker that behaves as `shape` says. The clock is virtual: each sleep advances it, and
- * step.run takes no time. Inngest cancels a run at its finish timeout (`PACE.finishS`), so the sleep
- * that passes it is the last call counted and the run ends there.
+ * step.run takes no time. The run is cut at its own finish (MODEL_FINISH_S), so the sleep that passes
+ * it is the last call counted and the run ends there.
  */
 export async function checkExecutions(shape: CheckShape): Promise<number> {
   const busyPerPost = shape.busyPerPost ?? 0;
@@ -698,7 +723,7 @@ export async function checkExecutions(shape: CheckShape): Promise<number> {
     sleep: async (_id, ms) => {
       calls += 1;
       now += ms;
-      if (now > PACE.finishS * 1000) throw new FinishTimeout();
+      if (now > MODEL_FINISH_S * 1000) throw new FinishTimeout();
     },
     sendEvent: async () => {
       calls += 1;
@@ -755,6 +780,8 @@ export async function checkExecutions(shape: CheckShape): Promise<number> {
     persist: async () => ({ written: true }),
     finalize: async () => ({}),
     fail: async () => ({ failed: false }),
+    // F-260's retry run is not modelled: it needs a worker deploy within the check, never here.
+    requeue: async () => ({ requeued: false }),
   };
   let result;
   try {

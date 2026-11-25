@@ -403,7 +403,13 @@
         },
         "gradeable": 214,
         "excluded": [],
-        "excluded_by_robots": 0
+        "excluded_by_robots": 0,
+        "stopped": {
+          "page_cap": 500,
+          "at_cap": false,
+          "time_ran_out": false,
+          "site_stopped": false
+        }
       },
       "technical_seo": {
         "score": 79,
@@ -984,7 +990,13 @@
         },
         "gradeable": 214,
         "excluded": [],
-        "excluded_by_robots": 0
+        "excluded_by_robots": 0,
+        "stopped": {
+          "page_cap": 500,
+          "at_cap": false,
+          "time_ran_out": false,
+          "site_stopped": false
+        }
       },
       "technical_seo": {
         "score": 79,
@@ -1548,7 +1560,13 @@
         },
         "gradeable": 214,
         "excluded": [],
-        "excluded_by_robots": 0
+        "excluded_by_robots": 0,
+        "stopped": {
+          "page_cap": 500,
+          "at_cap": false,
+          "time_ran_out": false,
+          "site_stopped": false
+        }
       },
       "technical_seo": {
         "score": 80,
@@ -2140,7 +2158,13 @@
         },
         "gradeable": 214,
         "excluded": [],
-        "excluded_by_robots": 0
+        "excluded_by_robots": 0,
+        "stopped": {
+          "page_cap": 500,
+          "at_cap": false,
+          "time_ran_out": false,
+          "site_stopped": false
+        }
       },
       "technical_seo": {
         "score": 80,
@@ -2704,7 +2728,13 @@
         },
         "gradeable": 214,
         "excluded": [],
-        "excluded_by_robots": 0
+        "excluded_by_robots": 0,
+        "stopped": {
+          "page_cap": 500,
+          "at_cap": false,
+          "time_ran_out": false,
+          "site_stopped": false
+        }
       },
       "technical_seo": {
         "score": 80,
@@ -3268,7 +3298,13 @@
         },
         "gradeable": 214,
         "excluded": [],
-        "excluded_by_robots": 0
+        "excluded_by_robots": 0,
+        "stopped": {
+          "page_cap": 500,
+          "at_cap": false,
+          "time_ran_out": false,
+          "site_stopped": false
+        }
       },
       "technical_seo": {
         "score": 79,
@@ -3844,7 +3880,13 @@
         },
         "gradeable": 120,
         "excluded": [],
-        "excluded_by_robots": 0
+        "excluded_by_robots": 0,
+        "stopped": {
+          "page_cap": 500,
+          "at_cap": false,
+          "time_ran_out": false,
+          "site_stopped": false
+        }
       },
       "technical_seo": {
         "score": 79,
@@ -4053,7 +4095,13 @@
         },
         "gradeable": 120,
         "excluded": [],
-        "excluded_by_robots": 0
+        "excluded_by_robots": 0,
+        "stopped": {
+          "page_cap": 500,
+          "at_cap": false,
+          "time_ran_out": false,
+          "site_stopped": false
+        }
       },
       "technical_seo": {
         "score": 84,
@@ -4262,7 +4310,13 @@
         },
         "gradeable": 86,
         "excluded": [],
-        "excluded_by_robots": 0
+        "excluded_by_robots": 0,
+        "stopped": {
+          "page_cap": 500,
+          "at_cap": false,
+          "time_ran_out": false,
+          "site_stopped": false
+        }
       },
       "technical_seo": {
         "score": 74,
@@ -4471,7 +4525,13 @@
         },
         "gradeable": 86,
         "excluded": [],
-        "excluded_by_robots": 0
+        "excluded_by_robots": 0,
+        "stopped": {
+          "page_cap": 500,
+          "at_cap": false,
+          "time_ran_out": false,
+          "site_stopped": false
+        }
       },
       "technical_seo": {
         "score": 74,
@@ -4680,7 +4740,13 @@
         },
         "gradeable": 64,
         "excluded": [],
-        "excluded_by_robots": 0
+        "excluded_by_robots": 0,
+        "stopped": {
+          "page_cap": 500,
+          "at_cap": false,
+          "time_ran_out": false,
+          "site_stopped": false
+        }
       },
       "technical_seo": {
         "score": 73,
@@ -4889,7 +4955,13 @@
         },
         "gradeable": 64,
         "excluded": [],
-        "excluded_by_robots": 0
+        "excluded_by_robots": 0,
+        "stopped": {
+          "page_cap": 500,
+          "at_cap": false,
+          "time_ran_out": false,
+          "site_stopped": false
+        }
       },
       "technical_seo": {
         "score": 73,
@@ -5130,7 +5202,13 @@
         },
         "gradeable": 214,
         "excluded": [],
-        "excluded_by_robots": 0
+        "excluded_by_robots": 0,
+        "stopped": {
+          "page_cap": 500,
+          "at_cap": false,
+          "time_ran_out": false,
+          "site_stopped": false
+        }
       },
       "technical_seo": {
         "score": 86,
@@ -5344,7 +5422,13 @@
         },
         "gradeable": 214,
         "excluded": [],
-        "excluded_by_robots": 0
+        "excluded_by_robots": 0,
+        "stopped": {
+          "page_cap": 500,
+          "at_cap": false,
+          "time_ran_out": false,
+          "site_stopped": false
+        }
       },
       "technical_seo": {
         "score": 86,

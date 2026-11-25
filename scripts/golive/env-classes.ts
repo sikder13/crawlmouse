@@ -78,6 +78,8 @@ export const OPTIONAL_ENV: Why = {
   INNGEST_COMPETITOR_CONCURRENCY: "unset uses inngest/competitors.ts's default",
   INNGEST_SENTINEL_CONCURRENCY: "unset uses inngest/sentinel.ts's default",
   NEXT_PUBLIC_POSTHOG_HOST: 'unset uses the /ingest proxy default',
+  INNGEST_ENV:
+    "the Inngest environment events are sent to and functions served in; set on staging and Preview, unset on production, which uses Inngest's default (settings-parity, c/036)",
   SENTRY_AUTH_TOKEN: 'build-time source-map upload; unset ships without source maps',
   SIGNIN_CANARY_TO:
     'unset, the sign-in canary is not registered; set, it runs every 10 minutes (CC-33 D6, docs/ops/uptime.md)',
@@ -127,7 +129,8 @@ export const WORKER_FLY_ENV: Why = {
   WORKER_SIGNING_SECRET: 'Fly secret, the pair of the app variable of the same name',
   WORKER_JWT_PUBLIC_KEY:
     "Fly secret, the public half of the app's WORKER_JWT_PRIVATE_KEY_PKCS8_B64",
-  APP_SIGNAL_URL: "Fly secret, the app's route for a batch's end (PR 5a); unset means polling",
+  APP_SIGNAL_URL:
+    "fly.toml [env], the production app's route for a batch's end (PR 5a, F-332); the staging worker's Fly secret of the same name takes its place",
   APP_SIGNAL_PROTECTION_BYPASS:
     'Fly secret on the staging worker only, to reach a protected staging app; ignored on production',
   BATCH_CONCURRENCY: 'fly.toml [env]',
@@ -144,6 +147,7 @@ export const READ_BY_LIBRARIES: Why = {
   INNGEST_SIGNING_KEY: 'the inngest SDK',
   INNGEST_EVENT_KEY: 'the inngest SDK',
   INNGEST_DEV: 'the inngest SDK',
+  INNGEST_ENV: 'the inngest SDK',
 };
 
 /** Must NOT be set for Production: the Vercel probe fails step 1 when one is. */
