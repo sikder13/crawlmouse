@@ -588,6 +588,16 @@ function expectTrueToTheRecord(given: PageResult[], edges: LinkEdge[], scope: Sc
     }
   }
 
+  // A chain whose last response is a redirect names no URL and no status where it ends: the record
+  // cannot say whether that URL was requested. Any other chain ends at the status it answered.
+  for (const r of v.redirects.rows) {
+    const p = pages.find((x) => x.url === r.url)!;
+    if (p.redirect!.loop) expect(r.endsText).toBe('LOOP');
+    else if ([301, 302, 303, 307, 308].includes(p.status_code))
+      expect(r.endsText).toBe('not followed to the end');
+    else if (p.final_url !== null) expect(r.endsText.endsWith(` (${p.status_code})`)).toBe(true);
+  }
+
   // The redirect table names where a chain started as requested, never as linked.
   expect(screenText).not.toContain('Linked as');
   if (t.redirecting) expect(screenText).toContain('Requested as');
@@ -755,7 +765,31 @@ interface Said {
   tab: string;
   brokenEmpty: string | null;
   headline: string;
+  /** The redirects table, as [Requested as, Hops, Ends at]: the screen's rows and the PDF's. */
+  redirects?: string[][];
+  /** Each column's two lines: [missing, shared]. */
+  titles?: [string, string];
+  descriptions?: [string, string];
 }
+
+/**
+ * A chain the worker stopped before its last Location (packages/worker/src/batch/polite-fetch.ts
+ * `followChain`): `final_url` is that Location, which was not requested, and the status is the 3xx
+ * of the hop before it. The row was not read, and its response was a redirect, not HTML.
+ */
+const stopped = (from: string, hops: [string, number, string][]) =>
+  page(from, hops.at(-1)![1], {
+    final_url: hops.at(-1)![2],
+    title: null,
+    meta_description: null,
+    links_read: false,
+    is_html: false,
+    redirect: {
+      hops: hops.map(([f, status, location]) => ({ from: f, status, location })),
+      loop: false,
+    },
+  });
+const SEVEN = ['/r1', '/r2', '/r3', '/r4', '/r5', '/r6', '/r7'];
 
 const VECTORS: [string, PageResult[], LinkEdge[], Said][] = [
   [
@@ -888,12 +922,82 @@ const VECTORS: [string, PageResult[], LinkEdge[], Said][] = [
       headline: '0 missing pages found · 0 redirects · titles and descriptions read on 2 pages',
     },
   ],
+  [
+    '(h) a chain stopped after six hops: /r1 301s six times to /r7, which was never requested',
+    [
+      whole('/', 1),
+      stopped(
+        '/r1',
+        SEVEN.slice(0, 6).map((p, i): [string, number, string] => [
+          url(p),
+          301,
+          url(SEVEN[i + 1]!),
+        ]),
+      ),
+    ],
+    [edge('/', '/r1')],
+    {
+      pill: 'no 404 or 410',
+      body: '1 page redirects. The page that answered 200 has a title and a meta description.',
+      doorBody:
+        'None of the 2 pages we checked answers an error. ' +
+        '1 page redirects. The page that answered 200 has a title and a meta description.',
+      tab: 'Next: Links and pages · no 404 or 410',
+      brokenEmpty: 'None of the 2 pages we checked answers an error.',
+      headline: '0 missing pages found · 1 redirect · titles and descriptions read on 1 page',
+      redirects: [
+        [
+          '/r1',
+          '301 → /r2 → 301 → /r3 → 301 → /r4 → 301 → /r5 → 301 → /r6 → 301 → /r7',
+          'not followed to the end',
+        ],
+      ],
+    },
+  ],
+  [
+    '(i) a chain stopped off the site: /go 301s to https://partner.example/x, which was never requested',
+    [whole('/', 1), stopped('/go', [[url('/go'), 301, 'https://partner.example/x']])],
+    [edge('/', '/go')],
+    {
+      pill: 'no 404 or 410',
+      body: '1 page redirects. The page that answered 200 has a title and a meta description.',
+      doorBody:
+        'None of the 2 pages we checked answers an error. ' +
+        '1 page redirects. The page that answered 200 has a title and a meta description.',
+      tab: 'Next: Links and pages · no 404 or 410',
+      brokenEmpty: 'None of the 2 pages we checked answers an error.',
+      headline: '0 missing pages found · 1 redirect · titles and descriptions read on 1 page',
+      redirects: [['/go', '301 → https://partner.example/x', 'not followed to the end']],
+    },
+  ],
+  [
+    '(j) a chain stopped by robots.txt: /account 302s to /login, a disallowed path never requested',
+    [whole('/', 1), stopped('/account', [[url('/account'), 302, url('/login')]])],
+    [edge('/', '/account')],
+    {
+      pill: 'no 404 or 410',
+      body: '1 page redirects. The page that answered 200 has a title and a meta description.',
+      doorBody:
+        'None of the 2 pages we checked answers an error. ' +
+        '1 page redirects. The page that answered 200 has a title and a meta description.',
+      tab: 'Next: Links and pages · no 404 or 410',
+      brokenEmpty: 'None of the 2 pages we checked answers an error.',
+      headline: '0 missing pages found · 1 redirect · titles and descriptions read on 1 page',
+      redirects: [['/account', '302 → /login', 'not followed to the end']],
+    },
+  ],
 ];
 
 describe('Links and pages on hand-counted records: the pill, body, tab, empty state and headline, as written', () => {
   it.each(VECTORS)('%s', (_name, pages, edges, want) => {
-    expectTrueToTheRecord(pages, edges);
-    const { v, door, tab } = said(dataset(settle(pages, edges), edges));
+    const d = dataset(settle(pages, edges), edges);
+    const { v, door, tab } = said(d);
+    const col = (c: typeof v.titles): [string, string] => [c.missingLine, c.sharedLine];
+    const pdfRedirects = auditDoc({ dataset: d, checkId: ID }, { home: 'https://h.test' })
+      .sections.find((s) => s.heading === REPORT_DOC_COPY.links)!
+      .blocks.flatMap((b) =>
+        b.type === 'table' && b.columns.includes(REPORT_DOC_COPY.endsAt) ? b.rows : [],
+      );
     expect({
       pill: v.headline.pill?.label,
       body: v.body,
@@ -901,8 +1005,16 @@ describe('Links and pages on hand-counted records: the pill, body, tab, empty st
       tab,
       brokenEmpty: v.broken.empty,
       headline: v.headline.title,
+      ...(want.redirects
+        ? { redirects: v.redirects.rows.map((r) => [r.path, r.hops, r.endsText]) }
+        : {}),
+      ...(want.titles ? { titles: col(v.titles) } : {}),
+      ...(want.descriptions ? { descriptions: col(v.descriptions) } : {}),
     }).toEqual(want);
     expect(door.pill.label).toBe(want.pill);
+    if (want.redirects) expect(pdfRedirects).toEqual(want.redirects);
+    // The literals first, so a vector that goes red says which string changed; then the truth.
+    expectTrueToTheRecord(pages, edges);
   });
 });
 
@@ -937,13 +1049,28 @@ const redirectArb = (p: string): fc.Arbitrary<RedirectKind> => {
 const pageArb = (p: string) =>
   fc
     .record({
-      status: fc.constantFrom(200, 200, 200, 404, 410, 429, 503, 301),
+      status: fc.constantFrom(200, 200, 200, 404, 410, 429, 503, 301, 302),
       title: headArb,
       desc: headArb,
       redirect: redirectArb(p),
       kind: fc.constantFrom('html', 'html', 'pdf', 'partial'),
     })
     .map(({ status, title, desc, redirect, kind }): PageResult => {
+      if (status === 302) {
+        // A chain the worker stopped: `final_url` is the Location it did not request, and the status
+        // is the 302 of the hop before it.
+        return page(p, 302, {
+          final_url: url(`${p}-stop`),
+          title: null,
+          meta_description: null,
+          links_read: false,
+          is_html: false,
+          redirect: {
+            hops: [{ from: url(p), status: 302, location: url(`${p}-stop`) }],
+            loop: false,
+          },
+        });
+      }
       if (status === 301) {
         return page(p, 301, {
           final_url: null,
@@ -1085,6 +1212,7 @@ describe('Links and pages: counts, rows, pills and clauses agree with the truth 
       unrecorded: some((r) => truthOf(r.pages, r.edges, r.scope).linkGap === 'unrecorded'),
       gone410: some((r) => r.pages.some((p) => p.status_code === 410)),
       loop: some((r) => r.pages.some((p) => p.redirect?.loop === true)),
+      stopped: some((r) => r.pages.some((p) => p.status_code === 302 && !p.redirect?.loop)),
       redirectNotRecorded: some((r) => r.pages.some((p) => p.redirect === null)),
       extraCrawled: some((r) => (r.scope.extraCrawled ?? 0) > 0 && r.pages.length > 0),
       cutTitle: some((r) => r.pages.some((p) => p.title?.cut === true)),
@@ -1110,6 +1238,7 @@ describe('Links and pages: counts, rows, pills and clauses agree with the truth 
       unrecorded: true,
       gone410: true,
       loop: true,
+      stopped: true,
       redirectNotRecorded: true,
       extraCrawled: true,
       cutTitle: true,

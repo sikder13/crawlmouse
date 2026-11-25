@@ -27,7 +27,7 @@
  * never counted missing; it is counted apart, and named where the counts are.
  */
 import type { Check, LinkEdge, PageResult } from '@crawlmouse/types/v2';
-import { DESCRIPTION_BYTES, TITLE_BYTES } from '@crawlmouse/types/v2';
+import { DESCRIPTION_BYTES, REDIRECT_STATUSES, TITLE_BYTES } from '@crawlmouse/types/v2';
 import { siteOf } from '../../fixtures';
 import { PAGE_CELLS } from '../../reports/csv';
 import { capitalise, count, plural } from '../../words';
@@ -94,12 +94,27 @@ export interface ErrorRowView extends PageRef {
 export interface RedirectRowView extends PageRef {
   /** "301 → /b → 302 → /c" */
   hops: string;
-  /** Where the chain ends, with that response's status; null for a loop. */
+  /**
+   * Where the chain ends, with that response's status; null for a loop, and for a chain whose last
+   * response is a redirect (NOT_FOLLOWED).
+   */
   endsAt: { path: string; status: number } | null;
   loop: boolean;
-  /** "/c (200)", or "LOOP": the end as one cell, as the PDF prints it. */
+  /** "/c (200)", "LOOP", or NOT_FOLLOWED: the end as one cell, as the PDF prints it. */
   endsText: string;
 }
+
+/**
+ * The "Ends at" cell of a chain whose last response is a redirect, not a loop. The worker
+ * (packages/worker/src/batch/polite-fetch.ts `followChain`) records such a chain in two shapes the
+ * record cannot tell apart: one it stopped (too many hops, off the
+ * site, onto another port, into a path robots.txt disallows, the batch stopping), where `final_url`
+ * is a Location it did not request and `status_code` is the 3xx of the hop before; and one whose last
+ * redirect named no Location it could follow, where `final_url` was requested and the 3xx is its
+ * own. PageResult keeps no stop reason (packages/types/src/v2/page-result.ts). So the cell names no
+ * URL, no status and no reason.
+ */
+export const NOT_FOLLOWED = 'not followed to the end';
 
 export interface SharedGroupView {
   text: string;
@@ -447,10 +462,11 @@ export function linksFacts(d: ViewDataset, check: Check): LinksFacts {
   const redirects: RedirectRowView[] = pages.filter(redirected).map((p) => {
     const chain = p.redirect!;
     const finalUrl = PAGE_CELLS.final_url(p);
+    const status = PAGE_CELLS.status_code(p);
+    // The last response is a redirect: the chain was not followed to a page that answered.
+    const notFollowed = !chain.loop && REDIRECT_STATUSES.includes(status);
     const endsAt =
-      chain.loop || finalUrl === null
-        ? null
-        : { path: path(finalUrl), status: PAGE_CELLS.status_code(p) };
+      chain.loop || notFollowed || finalUrl === null ? null : { path: path(finalUrl), status };
     return {
       ...ref(p),
       hops: chain.hops
@@ -463,9 +479,11 @@ export function linksFacts(d: ViewDataset, check: Check): LinksFacts {
       loop: chain.loop,
       endsText: chain.loop
         ? 'LOOP'
-        : endsAt === null
-          ? 'not recorded'
-          : `${endsAt.path} (${endsAt.status})`,
+        : notFollowed
+          ? NOT_FOLLOWED
+          : endsAt === null
+            ? 'not recorded'
+            : `${endsAt.path} (${endsAt.status})`,
     };
   });
 

@@ -434,14 +434,14 @@ Every interface the segment view modules export, read through the TypeScript com
 
 #### `RedirectRowView`
 
-| Field      | Type                                        | Note                                                                |
-| ---------- | ------------------------------------------- | ------------------------------------------------------------------- |
-| `hops`     | `string`                                    | "301 → /b → 302 → /c"                                               |
-| `endsAt`   | `{ path: string; status: number; } \| null` | Where the chain ends, with that response's status; null for a loop. |
-| `loop`     | `boolean`                                   |                                                                     |
-| `endsText` | `string`                                    | "/c (200)", or "LOOP": the end as one cell, as the PDF prints it.   |
-| `url`      | `string`                                    |                                                                     |
-| `path`     | `string`                                    |                                                                     |
+| Field      | Type                                        | Note                                                                                                                                  |
+| ---------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `hops`     | `string`                                    | "301 → /b → 302 → /c"                                                                                                                 |
+| `endsAt`   | `{ path: string; status: number; } \| null` | Where the chain ends, with that response's status; null for a loop, and for a chain whose last response is a redirect (NOT_FOLLOWED). |
+| `loop`     | `boolean`                                   |                                                                                                                                       |
+| `endsText` | `string`                                    | "/c (200)", "LOOP", or NOT_FOLLOWED: the end as one cell, as the PDF prints it.                                                       |
+| `url`      | `string`                                    |                                                                                                                                       |
+| `path`     | `string`                                    |                                                                                                                                       |
 
 #### `SharedGroupView`
 
