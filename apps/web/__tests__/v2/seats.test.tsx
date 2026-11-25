@@ -657,3 +657,53 @@ describe('Seats against Final-Ag-Seats', () => {
     ).toBeNull();
   });
 });
+
+describe('seats off Agency name no clients and no branding (D-35)', () => {
+  /** Every string the People and Roles cards and their forms hold, keys left out. */
+  const words = (v: ReturnType<typeof seatsPreview>): string => {
+    const out: string[] = [];
+    const walk = (x: unknown): void => {
+      if (typeof x === 'string') out.push(x);
+      else if (Array.isArray(x)) x.forEach(walk);
+      else if (x && typeof x === 'object') Object.values(x).forEach(walk);
+    };
+    walk([v.people, v.roles, v.invite]);
+    return out.join(' | ').toLowerCase();
+  };
+
+  it.each([PRO_FULL, FREE] as const)(
+    '%s: no Clients cell or column, no branding, no client report',
+    (path) => {
+      const v = seatsPreview(path);
+      expect(v.people.rows.length).toBeGreaterThan(0);
+      expect(v.people.rows.map((r) => r.clients)).toEqual(v.people.rows.map(() => null));
+      expect(words(v)).not.toMatch(/client|branding/);
+      expect(v.people.rows.find((r) => r.role.startsWith('Owner'))!.role).toBe(
+        'Owner · billing, seats',
+      );
+      expect(v.roles.rows.map((r) => r.can)).toEqual([
+        'See audits and packets',
+        'Mark fixes done, run checks',
+        'Add or remove sites',
+        'Seats, billing',
+      ]);
+      const html = renderToStaticMarkup(CC31_SEAT_ELEMENTS[path]!());
+      expect(html).not.toMatch(/<th[^>]*>Clients</);
+      // Its live forms post scope=all, as the seats routes require, and offer no client choice.
+      const live = renderToStaticMarkup(<LiveActions>{CC31_SEAT_ELEMENTS[path]!()}</LiveActions>);
+      expect(live).not.toMatch(/Every client|Only the clients ticked/);
+      const forms = v.people.rows.filter((r) => r.change).length + (v.invite ? 1 : 0);
+      expect(live.match(/<input type="hidden" name="scope" value="all"\/>/g) ?? []).toHaveLength(
+        forms,
+      );
+    },
+  );
+
+  it('on Agency, still names each seat’s clients and the owner’s branding', () => {
+    const v = seatsPreview(OWNER);
+    expect(v.people.rows.every((r) => r.clients !== null)).toBe(true);
+    expect(v.people.rows[0]!.role).toBe('Owner · billing, branding, seats');
+    expect(v.roles.rows.map((r) => r.can)).toContain('Edit and send client reports');
+    expect(renderToStaticMarkup(CC31_SEAT_ELEMENTS[OWNER]!())).toMatch(/<th[^>]*>Clients</);
+  });
+});
