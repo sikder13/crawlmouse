@@ -377,13 +377,18 @@ export function aiWithheldSummary(check: Check, measured: number): string {
   // crawler with a verdict may not have counted: the grade stores that number only when it is one;
   // otherwise it is at least I4's two, and a stored check cannot say more.
   const from = ai.scored_from_fewer_crawlers;
+  // "all four", "three of the four", "none of the four"; with one scored crawler, "the one".
   const testedOf =
     measured >= scored
-      ? `all ${numberWord(scored)}`
-      : `${numberWord(measured)} of the ${numberWord(scored)}`;
+      ? scored === 1
+        ? 'the one scored crawler'
+        : `all ${numberWord(scored)} scored crawlers`
+      : measured === 0
+        ? `none of the ${numberWord(scored)} scored ${plural(scored, 'crawler', 'crawlers')}`
+        : `${numberWord(measured)} of the ${numberWord(scored)} scored crawlers`;
   const restsOn = from === null ? `at least ${numberWord(I4_MEASURED_CRAWLERS)}` : numberWord(from);
   const tested = [
-    accessPart.score === null ? null : `crawler access for ${testedOf} scored crawlers`,
+    accessPart.score === null ? null : `crawler access for ${testedOf}`,
     quotable.score === null ? null : 'content',
     signals.score === null ? null : 'AI signals',
   ].filter((x): x is string => x !== null);
@@ -392,7 +397,7 @@ export function aiWithheldSummary(check: Check, measured: number): string {
       ? `It tested ${listOf(tested)}.${
           accessPart.score === null || (from === null && measured <= I4_MEASURED_CRAWLERS)
             ? ''
-            : ` Its access score rests on ${restsOn} of them.`
+            : ` Its access score rests on ${restsOn} of those crawlers.`
         }`
       : '';
   const range = ai.access_range;
