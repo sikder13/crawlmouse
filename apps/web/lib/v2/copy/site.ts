@@ -4,7 +4,7 @@
  */
 import type { AlertRule } from '@crawlmouse/types/v2';
 import type { Addition, CopyChange } from '../copy-registry';
-import { DEPLOY_BUCKET_S } from '../pipeline/limits';
+import { DEPLOY_BUCKET_S } from '../pipeline/deploy-bucket';
 import { RECHECK_MINUTES } from '../recheck';
 import { RESTORE_DAYS } from './restore-window';
 import { SUPPORT_EMAIL } from './support';
